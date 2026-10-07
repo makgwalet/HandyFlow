@@ -33,6 +33,7 @@ class ClinicServiceTest {
     @Mock ClinicPractitionerRepository practitionerRepo;
     @Mock ClinicAppointmentRepository  appointmentRepo;
     @Mock ClinicConsultationRepository consultationRepo;
+    @Mock ClinicConsultationEditRepository consultationEditRepo;
     @Mock ClinicPrescriptionRepository prescriptionRepo;
 
     @InjectMocks ClinicService service;
@@ -522,7 +523,6 @@ class ClinicServiceTest {
     class UpdateConsultation {
 
         @Test
-        @Disabled("updateConsultation() not yet applied to ClinicService — apply ClinicService_updateConsultation.java first")
         @DisplayName("updates clinical notes without touching vitals when only SOAP sent")
         void updatesClinicalNotesOnly() {
             var id = UUID.randomUUID();
@@ -534,7 +534,6 @@ class ClinicServiceTest {
 
             when(consultationRepo.findActiveById(TENANT, id)).thenReturn(Optional.of(consultation));
             when(patientRepo.findActiveById(any(), any())).thenReturn(Optional.of(patientWithId("Jane","D")));
-            when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
 
             var req = new CreateConsultationRequest(null, null, "Updated complaint",
                     null, null, null, null, null, null, // no vitals
@@ -551,7 +550,6 @@ class ClinicServiceTest {
         }
 
         @Test
-        @Disabled("updateConsultation() not yet applied to ClinicService — apply ClinicService_updateConsultation.java first")
         @DisplayName("throws when consultation not found")
         void throwsWhenNotFound() {
             var id = UUID.randomUUID();
@@ -563,6 +561,128 @@ class ClinicServiceTest {
 
             assertThatThrownBy(() -> service.updateConsultation(TENANT, id, req))
                     .isInstanceOf(ResourceNotFoundException.class);
+        }
+    }
+
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Draft / sign / abandon lifecycle and edit history (patch 0059 / 0063)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("consultation lifecycle")
+    class ConsultationLifecycle {
+
+        private CreateConsultationRequest emptyReq(UUID apptId) {
+            return new CreateConsultationRequest(apptId, null, "Cough",
+                    null, null, null, null, null, null,
+                    null, null, null, null, null, null);
+        }
+
+        @Test
+        @DisplayName("createDraftConsultation saves a DRAFT and does not touch the appointment or last visit")
+        void draftDoesNotCompleteAppointmentOrTouchPatient() {
+            var patientId = UUID.randomUUID();
+            when(patientRepo.findActiveById(TENANT, patientId))
+                    .thenReturn(Optional.of(patientWithId("Jane", "Dlamini")));
+
+            var result = service.createDraftConsultation(TENANT, patientId, emptyReq(UUID.randomUUID()));
+
+            assertThat(result.status()).isEqualTo("DRAFT");
+            verify(consultationRepo).save(argThat(c -> c.isDraft()));
+            verify(appointmentRepo, never()).save(any());
+            verify(patientRepo, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("signConsultation moves DRAFT to SIGNED, completes the appointment and stamps last visit")
+        void signCompletesAppointmentAndStampsVisit() {
+            var patientId = UUID.randomUUID();
+            var apptId    = UUID.randomUUID();
+            var draft = ClinicConsultation.createDraft(TENANT, patientId, apptId, null, "Cough");
+            var patient = patientWithId("Jane", "Dlamini");
+            var appt = ClinicAppointment.create(TENANT, patientId, null,
+                    Instant.now(), 30, "CONSULTATION", null);
+            appt.confirm(); appt.start();
+
+            when(consultationRepo.findActiveById(TENANT, draft.getId())).thenReturn(Optional.of(draft));
+            when(appointmentRepo.findActiveById(TENANT, apptId)).thenReturn(Optional.of(appt));
+            when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patient));
+
+            var result = service.signConsultation(TENANT, draft.getId());
+
+            assertThat(result.status()).isEqualTo("SIGNED");
+            assertThat(draft.getSignedAt()).isNotNull();
+            verify(appointmentRepo).save(argThat(a -> "COMPLETED".equals(a.getStatus())));
+            verify(patientRepo).save(argThat(p -> p.getLastVisitAt() != null));
+        }
+
+        @Test
+        @DisplayName("signConsultation rejects a consultation that is not a DRAFT")
+        void signRejectsNonDraft() {
+            var signed = ClinicConsultation.create(TENANT, UUID.randomUUID(), null, null, "Done");
+            when(consultationRepo.findActiveById(TENANT, signed.getId())).thenReturn(Optional.of(signed));
+
+            assertThatThrownBy(() -> service.signConsultation(TENANT, signed.getId()))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("abandonConsultation abandons a DRAFT and rejects a signed one")
+        void abandonOnlyDrafts() {
+            var draft  = ClinicConsultation.createDraft(TENANT, UUID.randomUUID(), null, null, "x");
+            var signed = ClinicConsultation.create(TENANT, UUID.randomUUID(), null, null, "y");
+            when(consultationRepo.findActiveById(TENANT, draft.getId())).thenReturn(Optional.of(draft));
+            when(consultationRepo.findActiveById(TENANT, signed.getId())).thenReturn(Optional.of(signed));
+
+            service.abandonConsultation(TENANT, draft.getId());
+            assertThat(draft.getStatus()).isEqualTo("ABANDONED");
+
+            assertThatThrownBy(() -> service.abandonConsultation(TENANT, signed.getId()))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("updateConsultation rejects a LOCKED consultation")
+        void updateRejectsLocked() {
+            var c = ClinicConsultation.create(TENANT, UUID.randomUUID(), null, null, "x");
+            c.lock();
+            when(consultationRepo.findActiveById(TENANT, c.getId())).thenReturn(Optional.of(c));
+
+            assertThatThrownBy(() -> service.updateConsultation(TENANT, c.getId(), emptyReq(null)))
+                    .isInstanceOf(IllegalStateException.class);
+            verify(consultationEditRepo, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("editing a DRAFT does not write edit history")
+        void draftEditsAreNotRecorded() {
+            var patientId = UUID.randomUUID();
+            var draft = ClinicConsultation.createDraft(TENANT, patientId, null, null, "x");
+            when(consultationRepo.findActiveById(TENANT, draft.getId())).thenReturn(Optional.of(draft));
+            when(patientRepo.findActiveById(any(), any())).thenReturn(Optional.of(patientWithId("Jane","D")));
+
+            service.updateConsultation(TENANT, draft.getId(), emptyReq(null));
+
+            verify(consultationEditRepo, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("editing a SIGNED consultation stores the previous version")
+        void signedEditsKeepPreviousVersion() {
+            var c = ClinicConsultation.create(TENANT, UUID.randomUUID(), null, null, "Original");
+            c.recordClinical("hist", "exam", "Old diagnosis", List.of("J00"), "plan", 7);
+            when(consultationRepo.findActiveById(TENANT, c.getId())).thenReturn(Optional.of(c));
+            when(patientRepo.findActiveById(any(), any())).thenReturn(Optional.of(patientWithId("Jane","D")));
+
+            var req = new CreateConsultationRequest(null, null, null,
+                    null, null, null, null, null, null,
+                    null, null, "New diagnosis", null, null, null);
+            service.updateConsultation(TENANT, c.getId(), req);
+
+            verify(consultationEditRepo).save(argThat(e ->
+                    "Old diagnosis".equals(e.getDiagnosis()) && "Original".equals(e.getChiefComplaint())));
+            assertThat(c.getDiagnosis()).isEqualTo("New diagnosis");
         }
     }
 
@@ -610,6 +730,87 @@ class ClinicServiceTest {
 
             assertThatThrownBy(() -> service.addPrescription(TENANT, consultId, req))
                     .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("persists NAPPI code and schedule so claim medicine lines can price")
+        void persistsNappiAndSchedule() {
+            var consultId = UUID.randomUUID();
+            var consult   = ClinicConsultation.create(TENANT, UUID.randomUUID(), null, null, "Infection");
+            when(consultationRepo.findActiveById(TENANT, consultId)).thenReturn(Optional.of(consult));
+
+            var req = new AddPrescriptionRequest("Amoxicillin", "500mg", "TDS", "7 days",
+                    21, 0, null, " 700000 ", 2);
+
+            var result = service.addPrescription(TENANT, consultId, req);
+
+            verify(prescriptionRepo).save(argThat(p ->
+                    "700000".equals(p.getNappiCode()) && Integer.valueOf(2).equals(p.getSchedule())));
+            assertThat(result.nappiCode()).isEqualTo("700000");
+            assertThat(result.schedule()).isEqualTo(2);
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Patient PATCH: clinical fields and principal validation (patch 0061)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("patchPatient")
+    class PatchPatient {
+
+        @Test
+        @DisplayName("updates allergies, conditions and blood type; empty list clears")
+        void updatesClinicalFields() {
+            var id = UUID.randomUUID();
+            var patient = patientWithId("Jane", "Dlamini");
+            when(patientRepo.findByTenantIdAndId(TENANT, id)).thenReturn(Optional.of(patient));
+            when(patientRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            service.patchPatient(TENANT, id, Map.of(
+                    "allergies", List.of("Penicillin", " "),
+                    "chronicConditions", List.of(),
+                    "bloodType", "O+"));
+
+            assertThat(patient.getAllergies()).containsExactly("Penicillin");
+            assertThat(patient.getChronicConditions()).isEmpty();
+            assertThat(patient.getBloodType()).isEqualTo("O+");
+        }
+
+        @Test
+        @DisplayName("rejects a patient being their own principal")
+        void rejectsSelfPrincipal() {
+            var id = UUID.randomUUID();
+            when(patientRepo.findByTenantIdAndId(TENANT, id))
+                    .thenReturn(Optional.of(patientWithId("Jane", "Dlamini")));
+
+            assertThatThrownBy(() -> service.patchPatient(TENANT, id, Map.of("principalId", id.toString())))
+                    .isInstanceOf(IllegalArgumentException.class);
+            verify(patientRepo, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("rejects a principal that does not exist in the tenant")
+        void rejectsUnknownPrincipal() {
+            var id = UUID.randomUUID();
+            var other = UUID.randomUUID();
+            when(patientRepo.findByTenantIdAndId(TENANT, id))
+                    .thenReturn(Optional.of(patientWithId("Jane", "Dlamini")));
+            when(patientRepo.findByTenantIdAndId(TENANT, other)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.patchPatient(TENANT, id, Map.of("principalId", other.toString())))
+                    .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("rejects a malformed principalId with a 400-style error")
+        void rejectsMalformedPrincipalId() {
+            var id = UUID.randomUUID();
+            when(patientRepo.findByTenantIdAndId(TENANT, id))
+                    .thenReturn(Optional.of(patientWithId("Jane", "Dlamini")));
+
+            assertThatThrownBy(() -> service.patchPatient(TENANT, id, Map.of("principalId", "not-a-uuid")))
+                    .isInstanceOf(IllegalArgumentException.class);
         }
     }
 }

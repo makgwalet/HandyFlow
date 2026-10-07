@@ -240,6 +240,15 @@ public class ClinicController {
                 clinicService.getDraftConsultations(TenantContext.getTenantIdAsObject())));
     }
 
+    @GetMapping("/consultations/{id}/edits")
+    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @Operation(summary = "Edit history of a consultation (previous versions, newest first)")
+    public ResponseEntity<ApiResponse<List<ConsultationEditResponse>>> getConsultationEdits(
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                clinicService.getConsultationEdits(TenantContext.getTenantIdAsObject(), id)));
+    }
+
     @PostMapping("/consultations/{id}/sign")
     @PreAuthorize("hasAuthority('CLINIC_WRITE')")
     @Operation(summary = "Sign a DRAFT consultation: completes the appointment (no automatic email, see DEC-CLINIC-002)")

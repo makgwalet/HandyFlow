@@ -97,6 +97,14 @@ public class ClinicConsultation {
         this.updatedAt = this.signedAt;
     }
 
+    public void lock() {
+        if (!"SIGNED".equals(status)) {
+            throw new IllegalStateException("Only a SIGNED consultation can be locked (is " + status + ").");
+        }
+        this.status    = "LOCKED";
+        this.updatedAt = Instant.now();
+    }
+
     public void abandon() {
         this.status    = "ABANDONED";
         this.updatedAt = Instant.now();

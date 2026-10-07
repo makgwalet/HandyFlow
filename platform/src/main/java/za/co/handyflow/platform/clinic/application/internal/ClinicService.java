@@ -31,6 +31,7 @@ public class ClinicService {
     private final ClinicPractitionerRepository practitionerRepo;
     private final ClinicAppointmentRepository  appointmentRepo;
     private final ClinicConsultationRepository consultationRepo;
+    private final ClinicConsultationEditRepository consultationEditRepo;
     private final ClinicPrescriptionRepository prescriptionRepo;
     private final EmailService                 emailService;
     private final ClinicConsultationSummaryPdfService consultationSummaryPdfService;
@@ -564,6 +565,12 @@ public class ClinicService {
                     + " and can no longer be edited; add an addendum instead.");
         }
 
+        // Edits to an already-signed record keep the previous version (audit F-02).
+        // DRAFT autosaves are not recorded: they are the working copy, not the record.
+        if (!c.isDraft()) {
+            consultationEditRepo.save(ClinicConsultationEdit.snapshotOf(c, currentUserIdOrNull()));
+        }
+
         boolean hasVitals = req.weightKg() != null || req.heightCm() != null
                 || req.bloodPressure() != null || req.pulseBpm() != null
                 || req.temperatureC() != null  || req.oxygenSatPct() != null;
@@ -606,6 +613,27 @@ public class ClinicService {
                 ? loadPractitionerNamesById(tenantId, List.of(c.getPractitionerId()))
                 : Map.of();
         return toConsultationResponse(c, patientNames, practNames);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ConsultationEditResponse> getConsultationEdits(TenantId tenantId, UUID consultationId) {
+        consultationRepo.findActiveById(tenantId, consultationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Consultation", consultationId.toString()));
+        return consultationEditRepo.findByConsultation(tenantId, consultationId).stream()
+                .map(e -> new ConsultationEditResponse(e.getId(), e.getConsultationId(), e.getEditedBy(),
+                        e.getEditedAt(), e.getChiefComplaint(), e.getHistory(), e.getExamination(),
+                        e.getDiagnosis(), e.getIcd10Codes(), e.getTreatmentPlan(), e.getFollowUpDays(),
+                        e.getWeightKg(), e.getHeightCm(), e.getBloodPressure(), e.getPulseBpm(),
+                        e.getTemperatureC(), e.getOxygenSatPct()))
+                .toList();
+    }
+
+    private static UUID currentUserIdOrNull() {
+        try {
+            return za.co.handyflow.platform.shared.UserContext.getCurrentUserId();
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     // ── Prescriptions ─────────────────────────────────────────────────────────
