@@ -46,8 +46,10 @@ public class ClinicConsultation {
     @Column(name = "treatment_plan") String  treatmentPlan;
     @Column(name = "follow_up_days") Integer followUpDays;
 
-    // Lifecycle: DRAFT -> SIGNED -> LOCKED, or DRAFT -> ABANDONED
+    // Lifecycle: DRAFT -> SIGNED -> LOCKED, or DRAFT -> ABANDONED.
+    // Nurse/doctor handoff (DEC-CLINIC-004) sits between DRAFT and SIGNED, see HANDOFF_TRANSITIONS.
     String status = "SIGNED";
+    @Column(name = "reviewing_practitioner_id") UUID reviewingPractitionerId;
     @Column(name = "signed_at") Instant signedAt;
 
     // Billing
@@ -88,8 +90,44 @@ public class ClinicConsultation {
         return c;
     }
 
+    /** Allowed handoff moves. DRAFT is the generic working state; NURSE_IN_PROGRESS marks nurse-led work. */
+    public static final java.util.Map<String, java.util.Set<String>> HANDOFF_TRANSITIONS = java.util.Map.of(
+            "DRAFT",              java.util.Set.of("NURSE_IN_PROGRESS", "READY_FOR_DOCTOR"),
+            "NURSE_IN_PROGRESS",  java.util.Set.of("READY_FOR_DOCTOR"),
+            "READY_FOR_DOCTOR",   java.util.Set.of("DOCTOR_REVIEWING", "RETURNED_TO_NURSE"),
+            "DOCTOR_REVIEWING",   java.util.Set.of("DOCTOR_COMPLETED", "RETURNED_TO_NURSE"),
+            "RETURNED_TO_NURSE",  java.util.Set.of("NURSE_IN_PROGRESS", "READY_FOR_DOCTOR"),
+            "DOCTOR_COMPLETED",   java.util.Set.of("RETURNED_TO_NURSE"));
+
+    /** The plain working copy (autosave target, shown in the drafts tray). */
     public boolean isDraft()  { return "DRAFT".equals(status); }
     public boolean isLocked() { return "LOCKED".equals(status) || "ABANDONED".equals(status); }
+    public boolean isSigned() { return "SIGNED".equals(status); }
+    /** Any not-yet-signed state, including the handoff states. */
+    public boolean isUnsigned() { return HANDOFF_TRANSITIONS.containsKey(status); }
+    /** Waiting on the other party: neither the nurse nor the doctor edits in these states. */
+    public boolean isAwaitingHandoff() {
+        return "READY_FOR_DOCTOR".equals(status) || "DOCTOR_COMPLETED".equals(status);
+    }
+    /** Signing is allowed from the plain draft or once the doctor has completed their review. */
+    public boolean isSignable() { return isDraft() || "DOCTOR_COMPLETED".equals(status); }
+    public boolean isAbandonable() {
+        return isDraft() || "NURSE_IN_PROGRESS".equals(status) || "RETURNED_TO_NURSE".equals(status);
+    }
+
+    /** Moves along {@link #HANDOFF_TRANSITIONS}; anything else is rejected. */
+    public void transitionTo(String next) {
+        if (!HANDOFF_TRANSITIONS.getOrDefault(status, java.util.Set.of()).contains(next)) {
+            throw new IllegalStateException("A consultation cannot move from " + status + " to " + next + ".");
+        }
+        this.status    = next;
+        this.updatedAt = Instant.now();
+    }
+
+    public void assignReviewer(UUID practitionerId) {
+        this.reviewingPractitionerId = practitionerId;
+        this.updatedAt = Instant.now();
+    }
 
     public void sign() {
         this.status    = "SIGNED";

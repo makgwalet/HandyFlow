@@ -554,8 +554,9 @@ public class ClinicService {
     public ConsultationResponse signConsultation(TenantId tenantId, UUID id) {
         ClinicConsultation c = consultationRepo.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Consultation", id.toString()));
-        if (!c.isDraft()) {
-            throw new IllegalStateException("Only a DRAFT consultation can be signed (is " + c.getStatus() + ").");
+        if (!c.isSignable()) {
+            throw new IllegalStateException("Only a DRAFT consultation, or one the doctor has completed, can be signed (is "
+                    + c.getStatus() + ").");
         }
         c.sign();
         consultationRepo.save(c);
@@ -584,8 +585,8 @@ public class ClinicService {
     public void abandonConsultation(TenantId tenantId, UUID id) {
         ClinicConsultation c = consultationRepo.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Consultation", id.toString()));
-        if (!c.isDraft()) {
-            throw new IllegalStateException("Only a DRAFT consultation can be abandoned (is " + c.getStatus() + ").");
+        if (!c.isAbandonable()) {
+            throw new IllegalStateException("This consultation cannot be abandoned from " + c.getStatus() + ".");
         }
         c.abandon();
         consultationRepo.save(c);
@@ -602,10 +603,14 @@ public class ClinicService {
             throw new IllegalStateException("Consultation is " + c.getStatus()
                     + " and can no longer be edited; add an addendum instead.");
         }
+        if (c.isAwaitingHandoff()) {
+            throw new IllegalStateException("Consultation is " + c.getStatus()
+                    + ": it is with the other clinician. Accept it, or return it to the nurse, before editing.");
+        }
 
         // Edits to an already-signed record keep the previous version (audit F-02).
         // DRAFT autosaves are not recorded: they are the working copy, not the record.
-        if (!c.isDraft()) {
+        if (c.isSigned()) {
             consultationEditRepo.save(ClinicConsultationEdit.snapshotOf(c, currentUserIdOrNull()));
         }
 
@@ -642,7 +647,7 @@ public class ClinicService {
         }
 
         consultationRepo.save(c);
-        if (!c.isDraft()) observationService.syncConsultationVitals(tenantId, c);
+        if (c.isSigned()) observationService.syncConsultationVitals(tenantId, c);
         log.info("Updated consultation={}", id);
 
         Map<UUID, String> patientNames = patientRepo.findActiveById(tenantId, c.getPatientId())
@@ -711,6 +716,12 @@ public class ClinicService {
         Map<UUID, String> patientNames = loadPatientNames(tenantId, list);
         Map<UUID, String> practNames   = loadPractitionerNames(tenantId, list);
         return list.stream().map(a -> toAppointmentResponse(a, patientNames, practNames)).toList();
+    }
+
+    /** Maps consultations to responses (patient and practitioner names resolved in bulk). */
+    @Transactional(readOnly = true)
+    public List<ConsultationResponse> toResponses(TenantId tenantId, List<ClinicConsultation> list) {
+        return mapConsultationsList(list, tenantId);
     }
 
     private List<ConsultationResponse> mapConsultationsList(List<ClinicConsultation> list, TenantId tenantId) {
