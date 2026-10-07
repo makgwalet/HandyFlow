@@ -81,7 +81,7 @@ export default function ClientDetailPage() {
       )}
 
       <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: "20px 16px" }}>
-        <div style={{ display: "flex", gap: 2, borderBottom: "1px solid var(--hf-border)", marginBottom: 28, overflowX: "auto" }}>
+        <div style={{ display: "flex", gap: 2, borderBottom: "1px solid var(--hf-border)", marginBottom: 28, overflowX: "auto", overflowY: "hidden" }}>
           {TABS.map(t => {
             const Icon = t.icon
             const active = tab === t.id
@@ -93,7 +93,6 @@ export default function ClientDetailPage() {
                   borderBottom: active ? `2px solid ${ACCENT}` : "2px solid transparent",
                   color: active ? ACCENT_TEXT : "var(--hf-text-muted)",
                   fontWeight: active ? 600 : 400, fontSize: 13, cursor: "pointer",
-                  marginBottom: -1,
                 }}>
                 <Icon size={14} />{t.label}
               </button>
