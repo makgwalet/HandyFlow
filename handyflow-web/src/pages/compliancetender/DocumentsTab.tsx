@@ -89,7 +89,7 @@ export default function DocumentsTab() {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
             <div>
               <label style={lbl}>Document type *</label>
-              <LookupInput value={documentType} options={DOCUMENT_TYPES} onChange={setDocumentType} placeholder="e.g. Tax Clearance Certificate" style={{ ...inp, width: 220 }} />
+              <LookupInput value={documentType} options={DOCUMENT_TYPES} list="DOCUMENT_TYPES" onChange={setDocumentType} placeholder="e.g. Tax Clearance Certificate" style={{ ...inp, width: 220 }} />
             </div>
             <div>
               <label style={lbl}>Linked registration</label>

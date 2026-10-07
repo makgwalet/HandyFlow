@@ -194,7 +194,7 @@ export default function TendersTab() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
               <div>
                 <label style={lbl}>Tender authority</label>
-                <LookupInput value={form.tenderAuthority} options={TENDER_AUTHORITIES} onChange={v => setForm(f => ({ ...f, tenderAuthority: v }))} placeholder="City of Cape Town" style={inp("tenderAuthority")} />
+                <LookupInput value={form.tenderAuthority} options={TENDER_AUTHORITIES} list="TENDER_AUTHORITIES" onChange={v => setForm(f => ({ ...f, tenderAuthority: v }))} placeholder="City of Cape Town" style={inp("tenderAuthority")} />
               </div>
               <div>
                 <label style={lbl}>Authority reference</label>
@@ -222,11 +222,11 @@ export default function TendersTab() {
               </div>
               <div>
                 <label style={lbl}>Industry</label>
-                <LookupInput value={form.industry} options={INDUSTRIES} onChange={v => setForm(f => ({ ...f, industry: v }))} placeholder="Construction" style={inp("industry")} />
+                <LookupInput value={form.industry} options={INDUSTRIES} list="INDUSTRIES" onChange={v => setForm(f => ({ ...f, industry: v }))} placeholder="Construction" style={inp("industry")} />
               </div>
               <div>
                 <label style={lbl}>Required class of work</label>
-                <LookupInput value={form.requiredClassOfWork} options={CLASS_OF_WORK} onChange={v => setForm(f => ({ ...f, requiredClassOfWork: v }))} placeholder="cidb Grade 6GB" style={inp("requiredClassOfWork")} />
+                <LookupInput value={form.requiredClassOfWork} options={CLASS_OF_WORK} list="CLASS_OF_WORK" onChange={v => setForm(f => ({ ...f, requiredClassOfWork: v }))} placeholder="cidb Grade 6GB" style={inp("requiredClassOfWork")} />
               </div>
             </div>
             {apiError && <div style={{ marginBottom: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{apiError}</div>}

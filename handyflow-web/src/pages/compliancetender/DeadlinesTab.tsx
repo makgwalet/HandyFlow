@@ -148,7 +148,7 @@ export default function DeadlinesTab() {
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Deadline type *</label>
-              <LookupInput value={form.deadlineType} options={DEADLINE_TYPES} onChange={v => { setForm(f => ({ ...f, deadlineType: v })); setFieldErrors(f => { const n = { ...f }; delete n.deadlineType; return n }) }} placeholder="e.g. ANNUAL_RETURN" style={inp("deadlineType")} />
+              <LookupInput value={form.deadlineType} options={DEADLINE_TYPES} list="DEADLINE_TYPES" onChange={v => { setForm(f => ({ ...f, deadlineType: v })); setFieldErrors(f => { const n = { ...f }; delete n.deadlineType; return n }) }} placeholder="e.g. ANNUAL_RETURN" style={inp("deadlineType")} />
               <FErr k="deadlineType" />
             </div>
             <div style={{ marginBottom: 14 }}>

@@ -454,7 +454,7 @@ export default function TenderDetailPage() {
                   <input aria-label="Organisation" value={extOrg} onChange={e => setExtOrg(e.target.value)} placeholder="Organisation (optional)" style={{ ...inp, flex: "1 1 160px" }} />
                 </>
               )}
-              <LookupInput value={personnelRole} options={PERSONNEL_ROLES} onChange={setPersonnelRole} placeholder="Role on tender, e.g. Project Manager" style={{ ...inp, flex: "1 1 200px" }} />
+              <LookupInput value={personnelRole} options={PERSONNEL_ROLES} list="PERSONNEL_ROLES" onChange={setPersonnelRole} placeholder="Role on tender, e.g. Project Manager" style={{ ...inp, flex: "1 1 200px" }} />
               <button onClick={() => !personProblem && addPersonnel.mutate()}
                 disabled={!!personProblem || addPersonnel.isPending} title={personProblem ?? undefined}
                 style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 14px", background: personProblem ? "var(--hf-border-strong)" : "var(--hf-sky-solid-strong)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: personProblem ? "not-allowed" : "pointer" }}>

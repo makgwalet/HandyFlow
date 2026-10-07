@@ -56,7 +56,7 @@ export default function EditTenderModal({ tender, onClose, onSaved }: { tender: 
             <input id="et-name" value={form.name} onChange={e => set({ name: e.target.value })} style={inp(!!errors.name)} />{err("name")}
           </div>
           <div><label htmlFor="et-auth" style={lbl}>Tender authority</label>
-            <LookupInput id="et-auth" value={form.tenderAuthority} options={TENDER_AUTHORITIES} onChange={v => set({ tenderAuthority: v })} style={inp(false)} /></div>
+            <LookupInput id="et-auth" value={form.tenderAuthority} options={TENDER_AUTHORITIES} list="TENDER_AUTHORITIES" onChange={v => set({ tenderAuthority: v })} style={inp(false)} /></div>
           <div><label htmlFor="et-ref" style={lbl}>Authority reference</label>
             <input id="et-ref" value={form.authorityReferenceNumber} onChange={e => set({ authorityReferenceNumber: e.target.value })} style={inp(false)} /></div>
           {date("closingDate", "Closing date")}
@@ -65,9 +65,9 @@ export default function EditTenderModal({ tender, onClose, onSaved }: { tender: 
           <div><label htmlFor="et-value" style={lbl}>Estimated value (R)</label>
             <input id="et-value" inputMode="decimal" value={form.estimatedValue} onChange={e => set({ estimatedValue: e.target.value })} style={inp(!!errors.estimatedValue)} />{err("estimatedValue")}</div>
           <div><label htmlFor="et-industry" style={lbl}>Industry</label>
-            <LookupInput id="et-industry" value={form.industry} options={INDUSTRIES} onChange={v => set({ industry: v })} style={inp(false)} /></div>
+            <LookupInput id="et-industry" value={form.industry} options={INDUSTRIES} list="INDUSTRIES" onChange={v => set({ industry: v })} style={inp(false)} /></div>
           <div><label htmlFor="et-class" style={lbl}>Required class of work</label>
-            <LookupInput id="et-class" value={form.requiredClassOfWork} options={CLASS_OF_WORK} onChange={v => set({ requiredClassOfWork: v })} style={inp(false)} /></div>
+            <LookupInput id="et-class" value={form.requiredClassOfWork} options={CLASS_OF_WORK} list="CLASS_OF_WORK" onChange={v => set({ requiredClassOfWork: v })} style={inp(false)} /></div>
           <div style={{ gridColumn: "1 / -1" }}>
             <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--hf-text-secondary)", cursor: "pointer" }}>
               <input type="checkbox" checked={form.requiresPricing} onChange={e => set({ requiresPricing: e.target.checked })} />

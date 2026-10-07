@@ -3,7 +3,7 @@
 // Pick-lists for the data that is typed over and over and that other screens match on (a requirement's "CSD" must equal a registration's "CSD").
 // They are suggestions, not a cage: anything not on a list can still be typed, and is marked as custom.
 // Pure data and two helpers. No React, no network.
-export interface LookupOption { value: string; hint?: string }
+export interface LookupOption { value: string; hint?: string; id?: string }   // id is set on a value the company added itself
 
 const opts = (values: string[]): LookupOption[] => values.map(value => ({ value }))
 

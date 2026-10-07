@@ -281,7 +281,7 @@ function LineForm({ title, submitLabel, initial, sections, busy, resetOnSuccess,
     <div>
       <label htmlFor={`${listId}-${key}`} style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }}>{label}</label>
       {key === "unit"
-        ? <LookupInput id={`${listId}-${key}`} value={d[key]} options={UNITS} onChange={v => set({ [key]: v })} aria-invalid={!!errors[key]} style={input} placeholder={extra?.placeholder} />
+        ? <LookupInput id={`${listId}-${key}`} value={d[key]} options={UNITS} list="UNITS" onChange={v => set({ [key]: v })} aria-invalid={!!errors[key]} style={input} placeholder={extra?.placeholder} />
         : <input id={`${listId}-${key}`} value={d[key]} onChange={e => set({ [key]: e.target.value })} aria-invalid={!!errors[key]} style={input} {...extra} />}
       {errors[key] && <div role="alert" style={errText}>{errors[key]}</div>}
     </div>
