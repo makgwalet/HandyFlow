@@ -1,8 +1,10 @@
 // src/pages/security/ReportsTab.tsx
 import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { FileBarChart, Download, TrendingUp, Users, Building2, AlertTriangle } from "lucide-react"
+import { FileBarChart, Download, Building2 } from "lucide-react"
+import { canGenerate, defaultMonth, knownCards, lastRunLine, monthLabel, reportPaths, runSummary, scopeNeeds, ago } from "./reports.logic"
+import type { Card, Catalogue, ReportKey } from "./reports.logic"
 
 interface Site  { id: string; name: string }
 interface Guard { id: string; fullName: string }
@@ -29,10 +31,15 @@ interface MonthlySummaryReport {
   totalGuardHours: number; overallCompletionRatePct: number
   totalIncidents: number; incidentsBySeverity: Record<string, number>
   activeGuards: number
-  siteSummaries: { siteName: string; totalShifts: number; completedShifts: number; guardHours: number; coverageRatePct: number; incidents: number }[]
+  siteSummaries: { siteName: string; totalShifts: number; completedShifts: number; missedShifts: number; guardHours: number; coverageRatePct: number; incidents: number }[]
 }
 
-type ReportType = "site-coverage" | "guard-attendance" | "monthly-summary"
+interface SiteAccessReport {
+  siteName: string; month: string; totalEntries: number; currentlyOnSite: number; departed: number; overstayed: number
+  entriesByType: Record<string, number>
+}
+
+type ReportType = ReportKey
 
 const SEV_COLORS: Record<string, string> = {
   LOW: "var(--hf-sky)", MEDIUM: "var(--hf-warning)", HIGH: "var(--hf-orange)", CRITICAL: "var(--hf-danger)",
@@ -48,17 +55,20 @@ function StatBox({ label, value, sub }: { label: string; value: string | number;
   )
 }
 
-function thisMonth() {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
-}
-
 export default function ReportsTab() {
   const [reportType,   setReportType]   = useState<ReportType>("monthly-summary")
-  const [month,        setMonth]        = useState(thisMonth())
+  const [month,        setMonth]        = useState(defaultMonth())
   const [siteId,       setSiteId]       = useState("")
   const [guardId,      setGuardId]      = useState("")
   const [triggered,    setTriggered]    = useState(false)
+  const qc = useQueryClient()
+
+  const { data: catalogue } = useQuery<Catalogue>({
+    queryKey: ["report-catalogue"],
+    queryFn: async () => { const r = await apiClient.get("/api/v1/security/reports/catalogue"); return (r.data?.data ?? r.data) as Catalogue },
+  })
+  const cards = knownCards(catalogue?.cards ?? [])
+  const recent = catalogue?.recent ?? []
 
   const { data: sites = [] } = useQuery<Site[]>({
     queryKey: ["sites-list"],
@@ -78,49 +88,65 @@ export default function ReportsTab() {
     },
   })
 
-  const apiPath = () => {
-    if (reportType === "site-coverage")     return `/api/v1/security/reports/site-coverage?siteId=${siteId}&month=${month}`
-    if (reportType === "guard-attendance")  return `/api/v1/security/reports/guard-attendance?guardId=${guardId}&month=${month}`
-    return `/api/v1/security/reports/monthly-summary?month=${month}`
-  }
-
-  const pdfPath = () => apiPath().replace("/reports/", "/reports/") + "" // same path + /pdf
-    .replace("reports/site-coverage?", "reports/site-coverage/pdf?")
-    .replace("reports/guard-attendance?", "reports/guard-attendance/pdf?")
-    .replace("reports/monthly-summary?", "reports/monthly-summary/pdf?")
-
-  const canFetch = reportType === "monthly-summary"
-    ? !!month
-    : reportType === "site-coverage"
-    ? !!siteId && !!month
-    : !!guardId && !!month
+  const scope = (cards.find(c => c.key === reportType)?.scope) ?? (reportType === "monthly-summary" ? "NONE" : reportType === "guard-attendance" ? "GUARD" : "SITE")
+  const params = { month, siteId, guardId }
+  const paths = reportPaths(reportType, params)
+  const canFetch = canGenerate(scope, params)
 
   const { data: report, isLoading, error, refetch } = useQuery({
     queryKey: ["report", reportType, month, siteId, guardId],
     queryFn: async () => {
-      const r = await apiClient.get(apiPath())
+      const r = await apiClient.get(paths.view)
       return r.data?.data ?? r.data
     },
     enabled: false,
   })
 
   async function downloadPdf() {
-    const r = await apiClient.get(pdfPath(), { responseType: "blob" })
+    const r = await apiClient.get(paths.pdf, { responseType: "blob" })
     const url = URL.createObjectURL(new Blob([r.data], { type: "application/pdf" }))
     const a = document.createElement("a")
     a.href = url
     a.download = `handyflow-report-${reportType}-${month}.pdf`
     a.click()
     URL.revokeObjectURL(url)
+    qc.invalidateQueries({ queryKey: ["report-catalogue"] })
   }
 
-  function run() { setTriggered(true); refetch() }
+  async function run() {
+    setTriggered(true)
+    await refetch()
+    qc.invalidateQueries({ queryKey: ["report-catalogue"] })
+  }
+
+  function choose(c: Card) { setReportType(c.key); setTriggered(false) }
 
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>Reports</h2>
         <p style={{ margin: 0, fontSize: 12, color: "var(--hf-text-muted)" }}>Monthly security performance reports — JSON view or PDF download</p>
+      </div>
+
+      {/* Report cards */}
+      <div data-testid="report-cards" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 24 }}>
+        {cards.map(c => {
+          const active = c.key === reportType
+          return (
+            <button key={c.key} onClick={() => choose(c)} aria-pressed={active} data-testid={`report-card-${c.key}`}
+              style={{ textAlign: "left" as const, cursor: "pointer", padding: "14px 16px", borderRadius: 12, background: "var(--hf-surface)", border: `1px solid ${active ? "var(--hf-accent)" : "var(--hf-border)"}`, boxShadow: active ? "0 0 0 1px var(--hf-accent)" : "none", display: "flex", flexDirection: "column" as const, gap: 6 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>
+                <FileBarChart size={16} style={{ color: "var(--hf-accent)" }} /> {c.title}
+              </span>
+              <span style={{ fontSize: 12, color: "var(--hf-text-muted)", lineHeight: 1.4 }}>{c.description}</span>
+              <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{scopeNeeds(c.scope)}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: c.lastRun ? "var(--hf-text-secondary)" : "var(--hf-text-faint)", marginTop: 2 }}>
+                {lastRunLine(c.lastRun)}
+              </span>
+              {c.lastRun && <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{runSummary(c.lastRun)}</span>}
+            </button>
+          )
+        })}
       </div>
 
       {/* Controls */}
@@ -131,13 +157,14 @@ export default function ReportsTab() {
             <option value="monthly-summary">Monthly Summary (all sites)</option>
             <option value="site-coverage">Site Coverage</option>
             <option value="guard-attendance">Guard Attendance</option>
+            <option value="site-access">Site Access</option>
           </select>
         </div>
         <div>
           <label style={lblStyle}>Month</label>
           <input type="month" value={month} onChange={e => setMonth(e.target.value)} style={selStyle} />
         </div>
-        {reportType === "site-coverage" && (
+        {(reportType === "site-coverage" || reportType === "site-access") && (
           <div>
             <label style={lblStyle}>Site</label>
             <select value={siteId} onChange={e => setSiteId(e.target.value)} style={selStyle}>
@@ -281,10 +308,48 @@ export default function ReportsTab() {
         )
       })()}
 
+      {report && reportType === "site-access" && (() => {
+        const r = report as SiteAccessReport
+        return (
+          <div>
+            <p style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)", marginBottom: 16 }}>{r.siteName} — {monthLabel(r.month)}</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 16 }}>
+              <StatBox label="Total Entries"   value={r.totalEntries} />
+              <StatBox label="On Site Now"     value={r.currentlyOnSite} />
+              <StatBox label="Departed"        value={r.departed} />
+              <StatBox label="Overstayed"      value={r.overstayed} />
+            </div>
+            {Object.keys(r.entriesByType ?? {}).length > 0 && (
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const, marginBottom: 12 }}>
+                {Object.entries(r.entriesByType).map(([type, count]) => (
+                  <span key={type} style={{ padding: "8px 14px", borderRadius: 8, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)" }}>{count} {type.toLowerCase().replace(/_/g, " ")}</span>
+                ))}
+              </div>
+            )}
+            <p style={{ margin: 0, fontSize: 11, color: "var(--hf-text-faint)" }}>The PDF lists each entry by name; this view shows counts only.</p>
+          </div>
+        )
+      })()}
+
+      {recent.length > 0 && (
+        <div style={{ marginTop: 32 }} data-testid="recent-runs">
+          <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "var(--hf-text-secondary)", marginBottom: 10 }}>Recently generated</p>
+          <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflow: "hidden" }}>
+            {recent.map((r, i) => (
+              <div key={i} style={{ display: "flex", gap: 12, alignItems: "baseline", padding: "10px 14px", borderBottom: i < recent.length - 1 ? "1px solid var(--hf-border-subtle)" : "none", fontSize: 12 }}>
+                <strong style={{ color: "var(--hf-text)", minWidth: 140 }}>{cards.find(c => c.key === r.reportKey)?.title ?? r.reportKey}</strong>
+                <span style={{ flex: 1, color: "var(--hf-text-secondary)" }}>{runSummary(r)}</span>
+                <span style={{ color: "var(--hf-text-faint)", whiteSpace: "nowrap" as const }}>{ago(r.generatedAt)}{r.generatedBy ? ` · ${r.generatedBy}` : ""}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {!triggered && (
         <div style={{ textAlign: "center", padding: "48px 0", color: "var(--hf-text-disabled)" }}>
           <FileBarChart size={32} strokeWidth={1.5} style={{ display: "block", margin: "0 auto 8px" }} />
-          <p style={{ margin: 0, fontWeight: 500 }}>Configure the report above and click Generate</p>
+          <p style={{ margin: 0, fontWeight: 500 }}>Choose a report, set it up above and click Generate</p>
         </div>
       )}
     </div>

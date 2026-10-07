@@ -13,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.security.application.internal.PdfReportService;
 import za.co.handyflow.platform.security.application.internal.ReportingService;
+import za.co.handyflow.platform.security.application.internal.ReportRunService;
 import za.co.handyflow.platform.security.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -49,6 +50,7 @@ public class ReportingController {
 
     private final ReportingService  reportingService;
     private final PdfReportService  pdfReportService;
+    private final ReportRunService  runService;
 
     // ── 1. Site Coverage ───────────────────────────────────────────────────────
 
@@ -63,8 +65,9 @@ public class ReportingController {
             @RequestParam UUID siteId,
             @RequestParam String month) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
-        return ResponseEntity.ok(ApiResponse.success(
-                reportingService.getSiteCoverageReport(tenantId, siteId, parseMonth(month))));
+        SiteCoverageReport report = reportingService.getSiteCoverageReport(tenantId, siteId, parseMonth(month));
+        runService.record(tenantId, ReportRunService.SITE_COVERAGE, month, report.siteName(), "VIEW");
+        return ResponseEntity.ok(ApiResponse.success(report));
     }
 
     @GetMapping("/site-coverage/pdf")
@@ -81,6 +84,7 @@ public class ReportingController {
         SiteCoverageReport report = reportingService.getSiteCoverageReport(
                 tenantId, siteId, parseMonth(month));
         byte[] pdf = pdfReportService.siteCoveragePdf(report, tenantId);
+        runService.record(tenantId, ReportRunService.SITE_COVERAGE, month, report.siteName(), "PDF");
         return pdfResponse(pdf,
                 "site-coverage-" + report.siteName().replaceAll("[^a-zA-Z0-9]", "-")
                         + "-" + month + ".pdf");
@@ -98,8 +102,9 @@ public class ReportingController {
             @RequestParam UUID guardId,
             @RequestParam String month) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
-        return ResponseEntity.ok(ApiResponse.success(
-                reportingService.getGuardAttendanceReport(tenantId, guardId, parseMonth(month))));
+        GuardAttendanceReport report = reportingService.getGuardAttendanceReport(tenantId, guardId, parseMonth(month));
+        runService.record(tenantId, ReportRunService.GUARD_ATTENDANCE, month, report.guardName(), "VIEW");
+        return ResponseEntity.ok(ApiResponse.success(report));
     }
 
     @GetMapping("/guard-attendance/pdf")
@@ -116,6 +121,7 @@ public class ReportingController {
         GuardAttendanceReport report = reportingService.getGuardAttendanceReport(
                 tenantId, guardId, parseMonth(month));
         byte[] pdf = pdfReportService.guardAttendancePdf(report, tenantId);
+        runService.record(tenantId, ReportRunService.GUARD_ATTENDANCE, month, report.guardName(), "PDF");
         return pdfResponse(pdf,
                 "guard-attendance-" + report.guardName().replaceAll("[^a-zA-Z0-9]", "-")
                         + "-" + month + ".pdf");
@@ -132,8 +138,9 @@ public class ReportingController {
     public ResponseEntity<ApiResponse<MonthlySummaryReport>> getMonthlySummary(
             @RequestParam String month) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
-        return ResponseEntity.ok(ApiResponse.success(
-                reportingService.getMonthlySummaryReport(tenantId, parseMonth(month))));
+        MonthlySummaryReport report = reportingService.getMonthlySummaryReport(tenantId, parseMonth(month));
+        runService.record(tenantId, ReportRunService.MONTHLY_SUMMARY, month, null, "VIEW");
+        return ResponseEntity.ok(ApiResponse.success(report));
     }
 
     @GetMapping("/monthly-summary/pdf")
@@ -147,6 +154,7 @@ public class ReportingController {
         MonthlySummaryReport report = reportingService.getMonthlySummaryReport(
                 tenantId, parseMonth(month));
         byte[] pdf = pdfReportService.monthlySummaryPdf(report, tenantId);
+        runService.record(tenantId, ReportRunService.MONTHLY_SUMMARY, month, null, "PDF");
         return pdfResponse(pdf, "monthly-summary-" + month + ".pdf");
     }
 

@@ -47,6 +47,7 @@ public class GateAccessController {
     private final ReportingService      reportingService;
     private final SiteAccessPdfService  siteAccessPdfService;
     private final FeatureGuard          featureGuard;
+    private final za.co.handyflow.platform.security.application.internal.ReportRunService runService;
 
     // ── Access Point CRUD ─────────────────────────────────────────────────────
 
@@ -144,9 +145,11 @@ public class GateAccessController {
             @RequestParam UUID siteId,
             @RequestParam String month) {
         featureGuard.requireModule("security");
-        return ResponseEntity.ok(ApiResponse.success(
-                reportingService.getSiteAccessReport(TenantContext.getTenantIdAsObject(), siteId,
-                        java.time.YearMonth.parse(month))));
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        var report = reportingService.getSiteAccessReport(tenantId, siteId, java.time.YearMonth.parse(month));
+        runService.record(tenantId, za.co.handyflow.platform.security.application.internal.ReportRunService.SITE_ACCESS,
+                month, report.siteName(), "VIEW");
+        return ResponseEntity.ok(ApiResponse.success(report));
     }
 
     @GetMapping("/reports/site-access/pdf")
@@ -159,6 +162,8 @@ public class GateAccessController {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         var report = reportingService.getSiteAccessReport(tenantId, siteId, java.time.YearMonth.parse(month));
         byte[] pdf = siteAccessPdfService.siteAccessPdf(report, tenantId);
+        runService.record(tenantId, za.co.handyflow.platform.security.application.internal.ReportRunService.SITE_ACCESS,
+                month, report.siteName(), "PDF");
         return ResponseEntity.ok()
                 .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"site-access-" + report.siteName().replaceAll("[^a-zA-Z0-9]", "-")
