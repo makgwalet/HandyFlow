@@ -20,6 +20,8 @@ export interface LimitsDraft {
 }
 export const EMPTY_LIMITS: LimitsDraft = { name: "", allowed: "", maxFileMb: "", maxTotalMb: "", maxFiles: "", maxNameLength: "", zip: "" }
 
+export type OutputMode = "COMBINED" | "NUMBERED_ZIP"
+
 export interface PackageDraft {
   included: string[]                       // section keys, in package order
   coverLetter: string
@@ -31,11 +33,12 @@ export interface PackageDraft {
   pricingRequired: boolean
   pageNumbers: boolean                     // stamp "Page X of N" across the combined PDF
   compress: boolean                        // write the combined PDF with full compression
+  outputMode: OutputMode                   // one merged PDF, or every file separate and numbered in a ZIP
 }
 
 export const INITIAL_DRAFT: PackageDraft = {
   included: SECTIONS.map(s => s.key), coverLetter: "", companyMode: "CURRENT", companyText: "", documentIds: [],
-  profileId: null, limits: EMPTY_LIMITS, pricingRequired: false, pageNumbers: false, compress: false,
+  profileId: null, limits: EMPTY_LIMITS, pricingRequired: false, pageNumbers: false, compress: false, outputMode: "COMBINED",
 }
 
 const MB = 1024 * 1024
@@ -88,15 +91,16 @@ export function toRequest(d: PackageDraft): RequestResult {
       submissionProfileId: d.profileId,
       limits: limits.value,
       pricingRequired: d.pricingRequired,
-      pageNumbers: d.pageNumbers,
-      compress: d.compress,
+      pageNumbers: d.pageNumbers && d.outputMode === "COMBINED",
+      compress: d.compress && d.outputMode === "COMBINED",
+      outputMode: d.outputMode,
     },
   }
 }
 
 /** The request for a screen that has not been touched; used only to give the preview query something to hold while the real one is being debounced. */
 export const DEFAULT_REQUEST: BuildRequest = {
-  sectionKeys: INITIAL_DRAFT.included, coverLetterText: null, companyProfileText: null, documentIds: [], submissionProfileId: null, limits: null, pricingRequired: false, pageNumbers: false, compress: false,
+  sectionKeys: INITIAL_DRAFT.included, coverLetterText: null, companyProfileText: null, documentIds: [], submissionProfileId: null, limits: null, pricingRequired: false, pageNumbers: false, compress: false, outputMode: "COMBINED",
 }
 
 // ---- section choice and order
@@ -248,6 +252,7 @@ export function hydrateDraft(stored: unknown): PackageDraft {
     pricingRequired: s.pricingRequired === true,
     pageNumbers: s.pageNumbers === true,
     compress: s.compress === true,
+    outputMode: s.outputMode === "NUMBERED_ZIP" ? "NUMBERED_ZIP" : "COMBINED",
   }
 }
 

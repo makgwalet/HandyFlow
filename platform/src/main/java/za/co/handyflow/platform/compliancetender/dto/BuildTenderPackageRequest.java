@@ -18,6 +18,7 @@ import java.util.UUID;
  * @param pricingRequired     the tender requires a price, so a package without it can be built as a draft but is not ready to submit
  * @param pageNumbers         stamp "Page X of N" on every page of the combined PDF
  * @param compress            write the combined PDF with full compression (smaller, same content)
+ * @param outputMode          COMBINED (one merged PDF plus originals; the default when blank) or NUMBERED_ZIP (every file kept separate, numbered in package order, in one ZIP)
  */
 public record BuildTenderPackageRequest(
         List<String> sectionKeys,
@@ -28,5 +29,6 @@ public record BuildTenderPackageRequest(
         @Valid SubmissionProfileRequest limits,
         boolean pricingRequired,
         boolean pageNumbers,
-        boolean compress
+        boolean compress,
+        String outputMode
 ) {}

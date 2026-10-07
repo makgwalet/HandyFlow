@@ -100,7 +100,7 @@ class TenderPackageServiceTest {
     }
 
     private static BuildTenderPackageRequest request(List<String> keys, boolean pricingRequired) {
-        return new BuildTenderPackageRequest(keys, null, null, List.of(), null, null, pricingRequired, false, false);
+        return new BuildTenderPackageRequest(keys, null, null, List.of(), null, null, pricingRequired, false, false, null);
     }
 
     @BeforeEach
@@ -150,6 +150,43 @@ class TenderPackageServiceTest {
         assertThat(r.built().files().get(1).pages()).isEqualTo(2);
         verify(storage, times(1)).store(any(), any(), any(), any(), any(), any());
         verify(files, times(2)).save(any(TenderPackageFile.class));
+    }
+
+    private static BuildTenderPackageRequest zipRequest(List<String> keys, Boolean zipAllowed, Long maxTotal) {
+        za.co.handyflow.platform.compliancetender.dto.SubmissionProfileRequest limits =
+                new za.co.handyflow.platform.compliancetender.dto.SubmissionProfileRequest("Portal", null, null, maxTotal, null, zipAllowed, null);
+        return new BuildTenderPackageRequest(keys, null, null, List.of(), null, limits, false, false, false, "NUMBERED_ZIP");
+    }
+
+    @Test
+    @DisplayName("a numbered ZIP is refused until the submission rules say a ZIP is allowed")
+    void zipNeedsPermission() {
+        TenderPackagePlanResponse r = service.build(tenant, tenderId, true, zipRequest(List.of("COVER_LETTER", "SUPPORTING_DOCUMENTS"), null, null), userId, "Sam");
+        assertThat(r.built()).isNull();
+        assertThat(r.issues().stream().anyMatch(i -> i.code().equals("ZIP_NOT_ALLOWED"))).isEqualTo(true);
+        verify(storage, never()).store(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("a numbered ZIP keeps every file separate, in order, and is stored as a .zip")
+    void zipBuilds() {
+        when(storage.store(any(), any(), any(), any(), any(), any())).thenReturn(new TenderPackageStorage.Stored("key-z", 10, "x"));
+        TenderPackagePlanResponse r = service.build(tenant, tenderId, true, zipRequest(List.of("COVER_LETTER", "SUPPORTING_DOCUMENTS"), true, null), userId, "Sam");
+        assertThat(r.built()).isNotNull();
+        assertThat(r.built().fileName()).isEqualTo("tnd-0042-submission-v1.zip");
+        assertThat(r.built().files().size()).isEqualTo(2);
+        assertThat(r.built().pageCount()).isEqualTo(3);
+        org.mockito.ArgumentCaptor<String> type = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(storage).store(any(), any(), any(), any(), type.capture(), any());
+        assertThat(type.getValue()).isEqualTo("application/zip");
+    }
+
+    @Test
+    @DisplayName("a ZIP larger than the whole-package limit is blocked")
+    void zipTooLarge() {
+        TenderPackagePlanResponse r = service.build(tenant, tenderId, true, zipRequest(List.of("COVER_LETTER", "SUPPORTING_DOCUMENTS"), true, 100L), userId, "Sam");
+        assertThat(r.built()).isNull();
+        assertThat(r.issues().stream().anyMatch(i -> i.code().equals("ZIP_TOO_LARGE"))).isEqualTo(true);
     }
 
     @Test

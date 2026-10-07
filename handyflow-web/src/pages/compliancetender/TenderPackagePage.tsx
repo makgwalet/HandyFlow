@@ -430,12 +430,18 @@ function Rules({ draft, set, saved, notes }: { draft: PackageDraft; set: (p: Par
       </select>
       <fieldset style={{ border: "none", padding: 0, margin: "14px 0 0" }}>
         <legend style={{ ...label, padding: 0 }}>Output options</legend>
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--hf-text)", marginTop: 6 }}>
-          <input type="checkbox" checked={draft.pageNumbers} onChange={e => set({ pageNumbers: e.target.checked })} />
+        <label htmlFor="out-mode" style={{ ...label, marginTop: 6 }}>Deliver as</label>
+        <select id="out-mode" value={draft.outputMode} onChange={e => set({ outputMode: e.target.value as PackageDraft["outputMode"] })} style={input}>
+          <option value="COMBINED">One combined PDF (originals kept beside it)</option>
+          <option value="NUMBERED_ZIP">Separate numbered files in a ZIP</option>
+        </select>
+        {draft.outputMode === "NUMBERED_ZIP" && <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: "6px 0 0" }}>Every file stays separate and is numbered in package order. The submission rules must say a ZIP is allowed. Page numbering and PDF compression apply to the combined PDF only.</p>}
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: draft.outputMode === "COMBINED" ? "var(--hf-text)" : "var(--hf-text-faint)", marginTop: 6 }}>
+          <input type="checkbox" disabled={draft.outputMode !== "COMBINED"} checked={draft.pageNumbers} onChange={e => set({ pageNumbers: e.target.checked })} />
           Number the pages (Page X of N across the whole PDF)
         </label>
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--hf-text)", marginTop: 6 }}>
-          <input type="checkbox" checked={draft.compress} onChange={e => set({ compress: e.target.checked })} />
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: draft.outputMode === "COMBINED" ? "var(--hf-text)" : "var(--hf-text-faint)", marginTop: 6 }}>
+          <input type="checkbox" disabled={draft.outputMode !== "COMBINED"} checked={draft.compress} onChange={e => set({ compress: e.target.checked })} />
           Make the PDF smaller (lossless compression)
         </label>
       </fieldset>

@@ -24,6 +24,7 @@ export interface BuildRequest {
   pricingRequired: boolean
   pageNumbers: boolean
   compress: boolean
+  outputMode: "COMBINED" | "NUMBERED_ZIP"
 }
 
 export interface SectionStatus { key: string; title: string; available: boolean; unavailableReason: string | null; fileCount: number }

@@ -43,5 +43,10 @@ public record SubmissionProfile(String name, Set<String> allowedExtensions, Long
                 override.maxFileNameLength != null ? override.maxFileNameLength : maxFileNameLength);
     }
 
+    /** The same profile without the whole-package size limit; used when the total is judged on the delivered ZIP rather than on its contents. */
+    public SubmissionProfile withoutTotalLimit() {
+        return new SubmissionProfile(name, allowedExtensions, maxFileBytes, null, maxFileCount, zipAllowed, maxFileNameLength);
+    }
+
     public boolean offersZip() { return Boolean.TRUE.equals(zipAllowed); }
 }

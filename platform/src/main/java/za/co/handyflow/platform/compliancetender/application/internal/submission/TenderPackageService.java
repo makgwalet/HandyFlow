@@ -45,6 +45,7 @@ public class TenderPackageService {
 
     static final Set<String> BUILDABLE_STATUSES = Set.of("DRAFT", "IN_PREPARATION", "INTERNAL_REVIEW", "READY_TO_SUBMIT");
     static final String CONTENT_TYPE = "application/pdf";
+    static final String ZIP_CONTENT_TYPE = "application/zip";
 
     private final TenderRepository tenderRepository;
     private final TenderPackageRepository packageRepository;
@@ -109,26 +110,63 @@ public class TenderPackageService {
                 originals.add(a);
             }
         }
-        if (toMerge.isEmpty()) throw new BusinessException("There is nothing to merge. Add at least one section or PDF document.");
-
-        PdfPackageMerger.Merged merged;
-        try {
-            merged = PdfPackageMerger.merge(toMerge, new PdfPackageMerger.Options(request.pageNumbers(), request.compress()));
-        } catch (PackageMergeException e) {
-            throw new BusinessException("The package could not be built: " + e.getMessage());
-        }
+        boolean zipMode = "NUMBERED_ZIP".equalsIgnoreCase(request.outputMode());
+        if (!zipMode && toMerge.isEmpty()) throw new BusinessException("There is nothing to merge. Add at least one section or PDF document.");
+        if (zipMode && ordered.isEmpty()) throw new BusinessException("There is nothing to put in the ZIP. Add at least one section or document.");
 
         int version = packageRepository.maxVersion(tenantId, tenderId) + 1;
-        String combinedName = PackageNaming.combinedFileName(tender.getTenderNumber(), version);
-        PackageFile combined = new PackageFile("COMBINED", combinedName, merged.pdf().length, PackageManifest.sha256Hex(merged.pdf()),
-                null, PdfHealth.OK, merged.pages());
-
-        // what the portal receives is the combined PDF plus the originals: limits on size, count and names apply to that
+        byte[] outBytes;
+        int outPages;
+        String outName;
+        String outType;
+        List<Integer> pagesPerInput = new ArrayList<>();
         List<PackageFile> delivered = new ArrayList<>();
-        delivered.add(combined);
-        for (SectionContent.Attachment o : originals) delivered.add(o.file());
         List<PackageIssue> issues = new ArrayList<>(p.plan.issues());
-        issues.addAll(PackageValidator.validate(p.effective.profile(), delivered));
+        if (zipMode) {
+            outName = PackageNaming.combinedFileName(tender.getTenderNumber(), version).replaceAll("\\.pdf$", ".zip");
+            outType = ZIP_CONTENT_TYPE;
+            List<PackageZipper.Entry> entries = new ArrayList<>();
+            int seq = 0;
+            outPages = 0;
+            for (SectionContent.Attachment a : ordered) {
+                seq++;
+                String name = PackageZipper.numberedName(seq, a.file().fileName());
+                entries.add(new PackageZipper.Entry(name, a.bytes()));
+                PackageFile f = a.file();
+                delivered.add(new PackageFile(f.sectionKey(), name, f.sizeBytes(), f.sha256(), f.evidenceId(), f.pdfHealth(), f.pages()));
+                int pages = f.kind() == FileKind.IMAGE ? 1 : f.pages() == null ? 0 : f.pages();
+                pagesPerInput.add(pages);
+                outPages += pages;
+            }
+            outBytes = PackageZipper.zip(entries);
+            if (!p.effective.profile().offersZip()) {
+                issues.add(new PackageIssue(PackageIssue.Severity.BLOCKING, "ZIP_NOT_ALLOWED",
+                        "This submission has not been marked as accepting a ZIP. Set ZIP to Allowed in the submission rules if the tender instructions allow it.", null));
+            }
+            Long maxTotal = p.effective.profile().maxTotalBytes();
+            if (maxTotal != null && outBytes.length > maxTotal) {
+                issues.add(new PackageIssue(PackageIssue.Severity.BLOCKING, "ZIP_TOO_LARGE",
+                        "The ZIP is " + PackageValidator.megabytes(outBytes.length) + " MB; the submission allows " + PackageValidator.megabytes(maxTotal) + " MB.", null));
+            }
+            issues.addAll(PackageValidator.validate(p.effective.profile().withoutTotalLimit(), delivered));
+        } else {
+            PdfPackageMerger.Merged merged;
+            try {
+                merged = PdfPackageMerger.merge(toMerge, new PdfPackageMerger.Options(request.pageNumbers(), request.compress()));
+            } catch (PackageMergeException e) {
+                throw new BusinessException("The package could not be built: " + e.getMessage());
+            }
+            outBytes = merged.pdf();
+            outPages = merged.pages();
+            outName = PackageNaming.combinedFileName(tender.getTenderNumber(), version);
+            outType = CONTENT_TYPE;
+            pagesPerInput = new ArrayList<>(merged.pagesPerInput());
+            PackageFile combined = new PackageFile("COMBINED", outName, outBytes.length, PackageManifest.sha256Hex(outBytes), null, PdfHealth.OK, outPages);
+            // what the portal receives is the combined PDF plus the originals: limits on size, count and names apply to that
+            delivered.add(combined);
+            for (SectionContent.Attachment o : originals) delivered.add(o.file());
+            issues.addAll(PackageValidator.validate(p.effective.profile(), delivered));
+        }
         boolean canStore = PackageValidator.canBuild(issues);
         if (!canStore) return response(p, false, false, issues, null);
 
@@ -137,21 +175,21 @@ public class TenderPackageService {
         int mergeIndex = 0;
         for (SectionContent.Attachment a : ordered) {
             PackageFile f = a.file();
-            if (f.kind() == FileKind.PDF || f.kind() == FileKind.IMAGE) {
-                f = new PackageFile(f.sectionKey(), f.fileName(), f.sizeBytes(), f.sha256(), f.evidenceId(), f.pdfHealth(), merged.pagesPerInput().get(mergeIndex++));
+            if (zipMode || f.kind() == FileKind.PDF || f.kind() == FileKind.IMAGE) {
+                f = new PackageFile(f.sectionKey(), f.fileName(), f.sizeBytes(), f.sha256(), f.evidenceId(), f.pdfHealth(), pagesPerInput.get(mergeIndex++));
             }
             manifestFiles.add(f);
         }
         PackageManifest manifest = PackageManifest.of(manifestFiles);
 
         UUID packageId = UUID.randomUUID();
-        TenderPackageStorage.Stored stored = storage.store(tenantId, tenderId, packageId, combinedName, CONTENT_TYPE, merged.pdf());
+        TenderPackageStorage.Stored stored = storage.store(tenantId, tenderId, packageId, outName, outType, outBytes);
 
         boolean includesPricing = p.plan.sections().stream().anyMatch(s -> s.type().needsPricingAuthority() && s.content().available());
         boolean ready = p.plan.submissionReady();
         TenderPackage pkg = TenderPackage.create(packageId, tenantId, tenderId, version, ready, includesPricing, p.effective.profile().name(),
-                ProfileJson.of(p.effective.profile()), ProfileJson.issues(issues), manifest.packageHash(), combinedName, combined.sha256(), CONTENT_TYPE,
-                stored.sizeBytes(), merged.pages(), stored.storageKey(), userId, userName);
+                ProfileJson.of(p.effective.profile()), ProfileJson.issues(issues), manifest.packageHash(), outName, PackageManifest.sha256Hex(outBytes), outType,
+                stored.sizeBytes(), outPages, stored.storageKey(), userId, userName);
         pkg.recordInputs(inputs.current(tenantId, tender).encode());
         List<TenderPackageFile> savedFiles = new ArrayList<>();
         try {
