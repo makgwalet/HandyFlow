@@ -73,6 +73,15 @@ public class ClinicPatient {
     @Setter @Column(name = "archive_reason")
     String archiveReason;
 
+    @Setter @Column(name = "sex_at_birth")
+    String sexAtBirth;      // MALE | FEMALE | INTERSEX | UNKNOWN; null = not yet recorded
+
+    @Setter @Column(name = "pregnancy_status")
+    String pregnancyStatus; // NOT_PREGNANT | PREGNANT | UNKNOWN; null = not recorded
+
+    @Setter @Column(name = "expected_delivery_date")
+    java.time.LocalDate expectedDeliveryDate;
+
     @Setter @Column(name = "last_visit_at")
     Instant lastVisitAt;    // denormalised — updated on each createConsultation()
 

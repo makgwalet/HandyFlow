@@ -33,6 +33,7 @@ public class ClinicService {
     private final ClinicConsultationRepository consultationRepo;
     private final ClinicConsultationEditRepository consultationEditRepo;
     private final ClinicPatientClinicalService     patientClinicalService;
+    private final ClinicObservationService         observationService;
     private final ClinicPrescriptionRepository prescriptionRepo;
     private final EmailService                 emailService;
     private final ClinicConsultationSummaryPdfService consultationSummaryPdfService;
@@ -133,6 +134,25 @@ public class ClinicService {
         if (updates.containsKey("lastVisitAt") && updates.get("lastVisitAt") != null)
             patient.setLastVisitAt(Instant.parse(updates.get("lastVisitAt").toString()));
 
+        // Reproductive context. sex_at_birth drives sex-specific question visibility, not gender.
+        if (updates.containsKey("sexAtBirth")) {
+            patient.setSexAtBirth(enumOrNull(updates.get("sexAtBirth"), "sexAtBirth",
+                    Set.of("MALE", "FEMALE", "INTERSEX", "UNKNOWN")));
+        }
+        if (updates.containsKey("pregnancyStatus")) {
+            patient.setPregnancyStatus(enumOrNull(updates.get("pregnancyStatus"), "pregnancyStatus",
+                    Set.of("NOT_PREGNANT", "PREGNANT", "UNKNOWN")));
+        }
+        if (updates.containsKey("expectedDeliveryDate")) {
+            Object v = updates.get("expectedDeliveryDate");
+            try {
+                patient.setExpectedDeliveryDate(v == null || v.toString().isBlank()
+                        ? null : java.time.LocalDate.parse(v.toString().trim()));
+            } catch (java.time.format.DateTimeParseException e) {
+                throw new IllegalArgumentException("expectedDeliveryDate must be an ISO date (yyyy-MM-dd)");
+            }
+        }
+
         // Clinical / contact fields (audit F-01). Absent key = unchanged; an empty list clears.
         if (updates.containsKey("allergies") || updates.containsKey("chronicConditions")
                 || updates.containsKey("bloodType") || updates.containsKey("notes")
@@ -156,6 +176,16 @@ public class ClinicService {
                     optStringList(updates, "allergies"), optStringList(updates, "chronicConditions"));
         }
         return toPatientResponse(saved, Collections.emptyMap());
+    }
+
+    /** Null/blank clears; otherwise upper-cased and checked against the allowed values. */
+    private static String enumOrNull(Object v, String field, Set<String> allowed) {
+        if (v == null || v.toString().isBlank()) return null;
+        String u = v.toString().trim().toUpperCase(Locale.ROOT);
+        if (!allowed.contains(u)) {
+            throw new IllegalArgumentException(field + " must be one of " + new TreeSet<>(allowed));
+        }
+        return u;
     }
 
     private static String optString(Map<String, Object> m, String key) {
@@ -422,6 +452,7 @@ public class ClinicService {
         }
 
         consultationRepo.save(c);
+        observationService.syncConsultationVitals(tenantId, c);
 
         // Update denormalised lastVisitAt — avoids MAX() join on patient list
         patient.setLastVisitAt(Instant.now());
@@ -528,6 +559,7 @@ public class ClinicService {
         }
         c.sign();
         consultationRepo.save(c);
+        observationService.syncConsultationVitals(tenantId, c);
 
         if (c.getAppointmentId() != null) {
             appointmentRepo.findActiveById(tenantId, c.getAppointmentId())
@@ -610,6 +642,7 @@ public class ClinicService {
         }
 
         consultationRepo.save(c);
+        if (!c.isDraft()) observationService.syncConsultationVitals(tenantId, c);
         log.info("Updated consultation={}", id);
 
         Map<UUID, String> patientNames = patientRepo.findActiveById(tenantId, c.getPatientId())
@@ -753,7 +786,10 @@ public class ClinicService {
                 p.getPrincipalId() != null ? principalMap.get(p.getPrincipalId()) : null,
                 p.getRelationship(),
                 p.getLastVisitAt(),
-                p.getArchivedAt()
+                p.getArchivedAt(),
+                p.getSexAtBirth(),
+                p.getPregnancyStatus(),
+                p.getExpectedDeliveryDate()
         );
     }
 

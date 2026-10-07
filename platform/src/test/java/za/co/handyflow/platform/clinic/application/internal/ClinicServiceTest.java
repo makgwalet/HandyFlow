@@ -35,6 +35,7 @@ class ClinicServiceTest {
     @Mock ClinicConsultationRepository consultationRepo;
     @Mock ClinicConsultationEditRepository consultationEditRepo;
     @Mock ClinicPatientClinicalService     patientClinicalService;
+    @Mock ClinicObservationService         observationService;
     @Mock ClinicPrescriptionRepository prescriptionRepo;
 
     @InjectMocks ClinicService service;
@@ -614,6 +615,7 @@ class ClinicServiceTest {
 
             assertThat(result.status()).isEqualTo("SIGNED");
             assertThat(draft.getSignedAt()).isNotNull();
+            verify(observationService).syncConsultationVitals(TENANT, draft);
             verify(appointmentRepo).save(argThat(a -> "COMPLETED".equals(a.getStatus())));
             verify(patientRepo).save(argThat(p -> p.getLastVisitAt() != null));
         }
@@ -666,6 +668,7 @@ class ClinicServiceTest {
             service.updateConsultation(TENANT, draft.getId(), emptyReq(null));
 
             verify(consultationEditRepo, never()).save(any());
+            verify(observationService, never()).syncConsultationVitals(any(), any());
         }
 
         @Test
@@ -776,6 +779,28 @@ class ClinicServiceTest {
             assertThat(patient.getAllergies()).containsExactly("Penicillin");
             assertThat(patient.getChronicConditions()).isEmpty();
             assertThat(patient.getBloodType()).isEqualTo("O+");
+        }
+
+        @Test
+        @DisplayName("records sex at birth and pregnancy status, validating the values")
+        void updatesReproductiveContext() {
+            var id = UUID.randomUUID();
+            var patient = patientWithId("Jane", "Dlamini");
+            when(patientRepo.findByTenantIdAndId(TENANT, id)).thenReturn(Optional.of(patient));
+            when(patientRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            service.patchPatient(TENANT, id, Map.of(
+                    "sexAtBirth", "female", "pregnancyStatus", "pregnant",
+                    "expectedDeliveryDate", "2027-02-14"));
+
+            assertThat(patient.getSexAtBirth()).isEqualTo("FEMALE");
+            assertThat(patient.getPregnancyStatus()).isEqualTo("PREGNANT");
+            assertThat(patient.getExpectedDeliveryDate()).isEqualTo(java.time.LocalDate.of(2027, 2, 14));
+
+            assertThatThrownBy(() -> service.patchPatient(TENANT, id, Map.of("sexAtBirth", "robot")))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> service.patchPatient(TENANT, id, Map.of("expectedDeliveryDate", "soon")))
+                    .isInstanceOf(IllegalArgumentException.class);
         }
 
         @Test
