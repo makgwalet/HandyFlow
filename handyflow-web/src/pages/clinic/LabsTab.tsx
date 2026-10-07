@@ -19,10 +19,11 @@ interface LabResult {
   patientNameRaw?: string; parsedMarkersJson?: string
   interpretation?: string; reviewedAt?: string; reviewedBy?: string
   collectedAt?: string; consultationId?: string
+  hasCritical?: boolean; hasAbnormal?: boolean
 }
 interface Marker {
   marker: string; value: string; unit?: string
-  refRange?: string; flag?: "HIGH" | "LOW" | "NORMAL"
+  refRange?: string; flag?: "HIGH" | "LOW" | "NORMAL" | "ABNORMAL" | "CRITICAL" | "UNKNOWN"
 }
 interface Consultation { id: string; chiefComplaint: string; consultedAt: string }
 
@@ -52,6 +53,10 @@ const FLAG_CFG = {
   HIGH:   {color:RED,   bg:"var(--hf-danger-soft)",label:"H"},
   LOW:    {color:AMBER, bg:"var(--hf-warning-soft)",label:"L"},
   NORMAL: {color:GREEN, bg:"var(--hf-success-soft-strong)",label:"N"},
+  ABNORMAL: {color:AMBER, bg:"var(--hf-warning-soft)",label:"A"},
+  CRITICAL: {color:RED,   bg:"var(--hf-danger-soft)",label:"!!"},
+  // A number with no reference range, or a text result nobody has judged: never shown as normal.
+  UNKNOWN:  {color:GRAY,  bg:LIGHT,label:"?"},
 }
 
 const parseMarkers = (json?: string): Marker[] => {
@@ -161,7 +166,7 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
             const s = STATUS_LAB[lab.status] ?? STATUS_LAB.UNREVIEWED
             const isOpen = expanded===lab.id
             const markers = parseMarkers(lab.parsedMarkersJson)
-            const abnormal = markers.filter(m=>m.flag && m.flag!=="NORMAL")
+            const abnormal = markers.filter(m=>m.flag && m.flag!=="NORMAL" && m.flag!=="UNKNOWN")
             const isInterpreting = interpreting===lab.id
 
             return (
@@ -174,6 +179,11 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                       <FlaskConical size={14} style={{ color: s.color }}/>
                       <span style={{fontWeight:700,fontSize:14,color:"var(--hf-text)"}}>{lab.pdfFilename||`${lab.source} result`}</span>
                       <span style={{background:s.bg,color:s.color,padding:"1px 7px",borderRadius:20,fontSize:11,fontWeight:700,border:`1px solid ${s.border}`}}>{lab.status}</span>
+                      {(lab.hasCritical || markers.some(m=>m.flag==="CRITICAL")) && (
+                        <span style={{background:RED,color:"var(--hf-text-on-solid)",padding:"1px 7px",borderRadius:20,fontSize:11,fontWeight:800}}>
+                          CRITICAL
+                        </span>
+                      )}
                       {abnormal.length>0 && (
                         <span style={{background:"var(--hf-danger-soft)",color:RED,padding:"1px 7px",borderRadius:20,fontSize:11,fontWeight:700,border:"1px solid var(--hf-danger-border)"}}>
                           {abnormal.length} abnormal
@@ -248,7 +258,7 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                               {markers.map((m,i)=>{
                                 const flag = m.flag && m.flag!=="NORMAL" ? FLAG_CFG[m.flag] : null
                                 return (
-                                  <tr key={i} style={{borderTop:i>0?`1px solid var(--hf-border-subtle)`:"none",background:flag?"var(--hf-warning-soft)":"var(--hf-surface)"}}>
+                                  <tr key={i} style={{borderTop:i>0?`1px solid var(--hf-border-subtle)`:"none",background:flag && m.flag!=="UNKNOWN"?(m.flag==="CRITICAL"?"var(--hf-danger-soft)":"var(--hf-warning-soft)"):"var(--hf-surface)"}}>
                                     <td style={{padding:"8px 12px",fontSize:13,fontWeight:600,color:"var(--hf-text)"}}>{m.marker}</td>
                                     <td style={{padding:"8px 12px",fontSize:13,fontWeight:flag?700:400,color:flag?flag.color:"var(--hf-text)"}}>{m.value}</td>
                                     <td style={{padding:"8px 12px",fontSize:12,color:GRAY}}>{m.unit||"—"}</td>
@@ -256,7 +266,7 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                                     <td style={{padding:"8px 12px"}}>
                                       {flag ? (
                                         <span style={{background:flag.bg,color:flag.color,padding:"2px 8px",borderRadius:20,fontSize:11,fontWeight:700,border:`1px solid color-mix(in srgb, ${flag.color} 19%, transparent)`}}>
-                                          {m.flag}
+                                          {m.flag==="UNKNOWN"?"NOT ASSESSED":m.flag}
                                         </span>
                                       ) : <span style={{color:GREEN,fontSize:11,fontWeight:600}}>NORMAL</span>}
                                     </td>

@@ -31,11 +31,12 @@ import TimeOffTab        from "./TimeOffTab"
 import WorkingHoursTab   from "./WorkingHoursTab"
 import ClosuresTab       from "./ClosuresTab"
 import RoomsTab          from "./RoomsTab"
+import LabInboxTab       from "./LabInboxTab"
 import QuestionLibraryAdminTab from "./QuestionLibraryAdminTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { CLINIC_SECTIONS } from "../../navigation/moduleSections"
 
-export type ClinicTab = "dashboard"|"patients"|"schedule"|"consultations"|"practitioners"|"claims"|"billing"|"recalls"|"waitlist"|"handoff"|"drafts"|"access-log"|"waiting-room"|"time-off"|"working-hours"|"closures"|"rooms"|"question-library"
+export type ClinicTab = "dashboard"|"patients"|"schedule"|"consultations"|"practitioners"|"claims"|"billing"|"recalls"|"waitlist"|"handoff"|"drafts"|"access-log"|"waiting-room"|"time-off"|"working-hours"|"closures"|"rooms"|"lab-inbox"|"question-library"
 
 interface Patient { id: string; firstName: string; lastName: string; fullName: string; [key: string]: any }
 interface FileState { openPatient?: Patient | null; sessionAppointment?: unknown }
@@ -98,6 +99,7 @@ export function ClinicPage() {
           case "working-hours": return <WorkingHoursTab />
           case "closures":      return <ClosuresTab />
           case "rooms":         return <RoomsTab />
+          case "lab-inbox":     return <LabInboxTab />
           case "access-log":    return <AccessLogTab />
           case "practitioners": return <PractitionersTab />
           case "claims":        return <ClaimsTab />

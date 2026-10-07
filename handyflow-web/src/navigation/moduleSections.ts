@@ -22,7 +22,7 @@ import {
   Stethoscope, ListPlus, ArrowRightLeft, FileClock,
   Megaphone, Warehouse, Handshake, UserCog,
   Database, CalendarRange,
-  UserCheck, Palette, Headphones, Wallet, Receipt, CheckSquare, LayoutGrid, ListChecks, Sprout,
+  UserCheck, Palette, Headphones, Wallet, Receipt, CheckSquare, LayoutGrid, ListChecks, Sprout, FlaskConical,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -562,6 +562,7 @@ export const CLINIC_SECTIONS: ModuleSections = {
         { id: 'handoff', label: 'Handoff queue', icon: ArrowRightLeft, permission: 'CLINIC_CLINICAL_WRITE' },
         { id: 'recalls', label: 'Recalls', icon: CalendarClock },
         { id: 'waitlist', label: 'Waitlist', icon: ListPlus },
+        { id: 'lab-inbox', label: 'Lab inbox', icon: FlaskConical },
       ],
     },
     { label: 'Scheduling', sections: [{ id: 'schedule', label: 'Schedule', icon: Calendar }, { id: 'waiting-room', label: 'Waiting room', icon: Users }, { id: 'time-off', label: 'Time off', icon: Calendar }, { id: 'working-hours', label: 'Working hours', icon: Calendar }, { id: 'closures', label: 'Closures', icon: Calendar }, { id: 'rooms', label: 'Rooms', icon: Calendar }] },
