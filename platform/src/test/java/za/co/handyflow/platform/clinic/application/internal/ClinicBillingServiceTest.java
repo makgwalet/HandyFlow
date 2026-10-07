@@ -244,6 +244,49 @@ class ClinicBillingServiceTest {
         }
 
         @Test
+        @DisplayName("a draft claim cannot be marked paid")
+        void draftCannotBePaid() {
+            var id    = UUID.randomUUID();
+            var claim = draftClaim();
+            when(claimRepo.findActiveById(TENANT, id)).thenReturn(Optional.of(claim));
+
+            assertThatThrownBy(() -> service.updateClaimStatus(TENANT, id, "paid", null))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("DRAFT");
+            assertThat(claim.getStatus()).isEqualTo("DRAFT");
+            verify(claimRepo, never()).save(any(ClinicClaim.class));
+        }
+
+        @Test
+        @DisplayName("a paid claim cannot be rejected afterwards")
+        void paidCannotBeRejected() {
+            var id    = UUID.randomUUID();
+            var claim = draftClaim();
+            claim.submit("REF-001");
+            claim.markAccepted();
+            claim.markPaid(claim.getGrossAmount());
+            when(claimRepo.findActiveById(TENANT, id)).thenReturn(Optional.of(claim));
+
+            assertThatThrownBy(() -> service.updateClaimStatus(TENANT, id, "reject", "late"))
+                    .isInstanceOf(IllegalStateException.class);
+            assertThat(claim.getStatus()).isEqualTo("PAID");
+        }
+
+        @Test
+        @DisplayName("rejecting needs a reason")
+        void rejectNeedsReason() {
+            var id    = UUID.randomUUID();
+            var claim = draftClaim();
+            claim.submit("REF-001");
+            when(claimRepo.findActiveById(TENANT, id)).thenReturn(Optional.of(claim));
+
+            assertThatThrownBy(() -> service.updateClaimStatus(TENANT, id, "reject", "  "))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("reason");
+            assertThat(claim.getStatus()).isEqualTo("SUBMITTED");
+        }
+
+        @Test
         @DisplayName("throws on unknown status action")
         void throwsOnUnknownAction() {
             var id = UUID.randomUUID();

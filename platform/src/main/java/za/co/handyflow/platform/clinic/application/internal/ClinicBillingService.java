@@ -279,6 +279,12 @@ public class ClinicBillingService {
         ClinicClaim claim = claimRepo.findActiveById(tenantId, claimId)
                 .orElseThrow(() -> new ResourceNotFoundException("Claim", claimId.toString()));
         String upperAction = action.toUpperCase();
+        if (Set.of("ACCEPT", "REJECT", "PAID", "PARTIAL").contains(upperAction)) {
+            ClaimTransitions.require(upperAction, claim.getStatus());
+        }
+        if ("REJECT".equals(upperAction) && (reason == null || reason.isBlank())) {
+            throw new IllegalArgumentException("Give the reason the scheme rejected the claim");
+        }
         switch (upperAction) {
             case "ACCEPT"  -> claim.markAccepted();
             case "REJECT"  -> claim.markRejected(reason);
