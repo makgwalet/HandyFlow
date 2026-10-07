@@ -84,6 +84,7 @@ export const SECURITY_SECTIONS: ModuleSections = {
         { id: 'patrol-routes', label: 'Patrol Routes', icon: Route },
         { id: 'checkpoints', label: 'Checkpoints', icon: QrCode },
         { id: 'post-orders', label: 'Post Orders', icon: ClipboardList },
+        { id: 'gate-dashboard', label: 'Gate Dashboard', icon: LayoutDashboard },
         { id: 'gate-access', label: 'Gate Access', icon: DoorOpen },
       ],
     },
