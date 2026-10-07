@@ -6,6 +6,7 @@ import { LabsTabEnhanced } from "./LabsTab"
 import ConsentTab from "./ConsentTab"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { AllergyWarning, missingReasons, useAllergyChecks } from "./PrescriptionAllergyCheck"
 import { useAuthStore } from "../../store/auth.store"
 import {
   User, Calendar, Stethoscope, CreditCard, Pill, FlaskConical,
@@ -812,9 +813,18 @@ function ConsultationTab({ patient, consultations, practitioners, qc, addToBill,
     },
     onError:(e:any)=>setApiError(e.response?.data?.message??"Failed"),
   })
+  const [rxAllergyReason, setRxAllergyReason] = useState("")
+  const [rxError, setRxError] = useState("")
+  const rxAllergy = useAllergyChecks(showRx||null, [{id:"rx-form",medicationName:rxForm.medicationName}])
+  const rxNeedsReason = missingReasons([{id:"rx-form",medicationName:rxForm.medicationName,allergyReason:rxAllergyReason}], rxAllergy).length>0
   const addRx = useMutation({
     mutationFn: ({cid,body}:{cid:string;body:any})=>apiClient.post(`/api/v1/clinic/consultations/${cid}/prescriptions`,body),
-    onSuccess: ()=>qc.invalidateQueries({queryKey:["pf-rx",showRx]}),
+    onSuccess: ()=>{
+      qc.invalidateQueries({queryKey:["pf-rx",showRx]})
+      setRxForm({medicationName:"",dosage:"",frequency:"",duration:"",quantity:"30",repeats:"0",instructions:""})
+      setRxAllergyReason(""); setRxError("")
+    },
+    onError:(e:any)=>setRxError(e.response?.data?.message??"Could not add the prescription"),
   })
 
   const startRecording = () => {
@@ -928,8 +938,10 @@ function ConsultationTab({ patient, consultations, practitioners, qc, addToBill,
               <div><label style={lbl}>Qty</label><input type="number" value={rxForm.quantity} onChange={e=>setRxForm(f=>({...f,quantity:e.target.value}))} style={sinp}/></div>
               <div style={{ gridColumn:"1/-1" }}><label style={lbl}>Instructions</label><input value={rxForm.instructions} onChange={e=>setRxForm(f=>({...f,instructions:e.target.value}))} placeholder="Take with food" style={sinp}/></div>
             </div>
+            <AllergyWarning result={rxAllergy["rx-form"]} reason={rxAllergyReason} onReason={setRxAllergyReason} />
+            {rxError && <div role="alert" style={{ color:"var(--hf-danger-text)", fontSize:12, marginTop:8 }}>{rxError}</div>}
             <div style={{ display:"flex", justifyContent:"flex-end", marginTop:14 }}>
-              <button onClick={()=>addRx.mutate({cid:showRx!,body:{...rxForm,quantity:parseInt(rxForm.quantity),repeats:parseInt(rxForm.repeats)}})} disabled={!rxForm.medicationName||addRx.isPending} style={btnPrimary}>{addRx.isPending?"Adding...":"Add prescription"}</button>
+              <button onClick={()=>{ setRxError(""); addRx.mutate({cid:showRx!,body:{...rxForm,quantity:parseInt(rxForm.quantity),repeats:parseInt(rxForm.repeats),allergyOverrideReason:rxAllergyReason.trim()||null}}) }} disabled={!rxForm.medicationName||addRx.isPending||rxNeedsReason} style={btnPrimary}>{addRx.isPending?"Adding...":"Add prescription"}</button>
             </div>
           </div>
         </Modal>
