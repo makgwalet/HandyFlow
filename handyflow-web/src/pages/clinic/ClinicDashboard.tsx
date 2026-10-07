@@ -4,9 +4,19 @@ import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Users, Calendar, Clock, CheckCircle, ArrowRight } from "lucide-react"
 
-const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p }
-const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })
-const today   = new Date().toISOString().split("T")[0]
+const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" })
+
+/** The clinic-day (South African) date of an instant, yyyy-mm-dd. */
+export const dayOf = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" })
+
+export interface DashItem {
+  id: string; patientName: string; practitionerName?: string | null; scheduledAt: string
+  durationMinutes: number; appointmentType?: string | null; status: string
+}
+export interface DashSummary {
+  date: string; todayTotal: number; awaiting: number; inProgress: number; completed: number
+  cancelled: number; noShow: number; totalPatients: number; today: DashItem[]; next: DashItem | null
+}
 
 const STATUS_CFG: Record<string, { color: string; bg: string; label: string }> = {
   SCHEDULED:   { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", label: "Scheduled" },
@@ -20,36 +30,28 @@ const STATUS_CFG: Record<string, { color: string; bg: string; label: string }> =
 }
 
 export default function ClinicDashboard({ onNavigate }: { onNavigate: (tab: any) => void }) {
-  const { data: apptData } = useQuery({
-    queryKey: ["clinic-appts-dashboard"],
-    queryFn: async () => { const r = await apiClient.get("/api/v1/clinic/appointments?size=100"); return unwrap(r) as any[] },
-  })
-  const { data: patientsData } = useQuery({
-    queryKey: ["clinic-patients-dashboard"],
-    queryFn: async () => { const r = await apiClient.get("/api/v1/clinic/patients?size=1"); return (r.data?.data ?? r.data) },
+  const { data: summary } = useQuery({
+    queryKey: ["clinic-dashboard-summary"],
+    queryFn: async () => { const r = await apiClient.get("/api/v1/clinic/dashboard/summary"); return (r.data?.data ?? r.data) as DashSummary },
+    refetchInterval: 60000,
   })
   const { data: practitioners = [] } = useQuery({
     queryKey: ["clinic-practitioners-list"],
     queryFn: async () => { const r = await apiClient.get("/api/v1/clinic/practitioners/list"); return (r.data?.data ?? r.data) as any[] },
   })
 
-  const appts    = apptData ?? []
-  const todayA   = appts.filter((a: any) => a.scheduledAt?.startsWith(today))
-  const upcoming = appts
-    .filter((a: any) => ["SCHEDULED","CONFIRMED"].includes(a.status) && a.scheduledAt >= new Date().toISOString())
-    .sort((a: any, b: any) => a.scheduledAt.localeCompare(b.scheduledAt))
+  const todayA = summary?.today ?? []
+  const next   = summary?.next ?? null
+  const n = (v: number | undefined) => (v === undefined ? "—" : v)
 
   const kpis = [
-    { label: "Today's appointments", value: todayA.length,
+    { label: "Today's appointments", value: n(summary?.todayTotal),
       color: "var(--hf-primary-text)", bg: "var(--hf-info-soft)", icon: Calendar, tab: "schedule" },
-    { label: "Awaiting today",
-      value: todayA.filter((a: any) => ["SCHEDULED","CONFIRMED"].includes(a.status)).length,
-      color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", icon: Clock, tab: "schedule" },
-    { label: "Completed today",
-      value: todayA.filter((a: any) => a.status === "COMPLETED").length,
+    { label: "Awaiting today", value: n(summary?.awaiting),
+      color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", icon: Clock, tab: "waiting-room" },
+    { label: "Completed today", value: n(summary?.completed),
       color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", icon: CheckCircle, tab: "schedule" },
-    { label: "Total patients",
-      value: (patientsData as any)?.totalElements ?? "—",
+    { label: "Total patients", value: n(summary?.totalPatients),
       color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", icon: Users, tab: "patients" },
   ]
 
@@ -100,7 +102,7 @@ export default function ClinicDashboard({ onNavigate }: { onNavigate: (tab: any)
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {todayA.sort((a: any, b: any) => a.scheduledAt.localeCompare(b.scheduledAt)).map((a: any) => {
+              {todayA.map((a) => {
                 const s = STATUS_CFG[a.status] ?? STATUS_CFG.SCHEDULED
                 return (
                   <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px",
@@ -131,18 +133,21 @@ export default function ClinicDashboard({ onNavigate }: { onNavigate: (tab: any)
         {/* Sidebar */}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* Next up */}
-          {upcoming[0] && (
+          {next && (
             <div style={{ background: "var(--hf-accent)", borderRadius: 12, padding: 20, color: "var(--hf-text-on-solid)" }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginBottom: 8,
                 textTransform: "uppercase", letterSpacing: "0.06em" }}>Next up</div>
-              <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 3 }}>{upcoming[0].patientName}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 3 }}>{next.patientName}</div>
               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", marginBottom: 12 }}>
-                {upcoming[0].appointmentType?.replace("_"," ")}
+                {next.appointmentType?.replace("_"," ")}
               </div>
-              <div style={{ fontSize: 22, fontWeight: 800 }}>{fmtTime(upcoming[0].scheduledAt)}</div>
-              {upcoming[0].practitionerName && (
+              <div style={{ fontSize: 22, fontWeight: 800 }}>{fmtTime(next.scheduledAt)}</div>
+              {dayOf(next.scheduledAt) !== summary?.date && (
+                <div style={{ fontSize: 12, marginTop: 2 }}>{dayOf(next.scheduledAt)}</div>
+              )}
+              {next.practitionerName && (
                 <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 6 }}>
-                  Dr. {upcoming[0].practitionerName}
+                  Dr. {next.practitionerName}
                 </div>
               )}
             </div>
