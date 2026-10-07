@@ -23,10 +23,11 @@ import BillingTab        from "./BillingTab"
 import PatientFilePage   from "./PatientFilePage"
 import RecallsTab        from "./RecallsTab"
 import WaitlistTab       from "./WaitlistTab"
+import HandoffQueueTab   from "./HandoffQueueTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { CLINIC_SECTIONS } from "../../navigation/moduleSections"
 
-export type ClinicTab = "dashboard"|"patients"|"schedule"|"consultations"|"practitioners"|"claims"|"billing"|"recalls"|"waitlist"
+export type ClinicTab = "dashboard"|"patients"|"schedule"|"consultations"|"practitioners"|"claims"|"billing"|"recalls"|"waitlist"|"handoff"
 
 interface Patient { id: string; firstName: string; lastName: string; fullName: string; [key: string]: any }
 interface FileState { openPatient?: Patient | null; sessionAppointment?: unknown }
@@ -81,6 +82,7 @@ export function ClinicPage() {
           case "consultations": return <ConsultationsTab />
           case "recalls":       return <RecallsTab />
           case "waitlist":      return <WaitlistTab />
+          case "handoff":       return <HandoffQueueTab />
           case "practitioners": return <PractitionersTab />
           case "claims":        return <ClaimsTab />
           case "billing":       return <BillingTab />

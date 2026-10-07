@@ -19,7 +19,7 @@ import {
   Building2, GraduationCap, CalendarDays, Award, Scale, Gavel, FileSearch, MapPin as PinIcon, HardHat,
   ShoppingCart, Package, CalendarClock, ClipboardCheck,
   PartyPopper, FilePlus, LayoutTemplate, CreditCard,
-  Stethoscope, ListPlus,
+  Stethoscope, ListPlus, ArrowRightLeft,
   Megaphone, Warehouse, Handshake, UserCog,
   Database, CalendarRange,
   UserCheck, Palette, Headphones, Wallet, Receipt, CheckSquare, LayoutGrid, ListChecks, Sprout,
@@ -556,6 +556,7 @@ export const CLINIC_SECTIONS: ModuleSections = {
       sections: [
         { id: 'patients', label: 'Patients', icon: Users },
         { id: 'consultations', label: 'Consultations', icon: FileText },
+        { id: 'handoff', label: 'Handoff queue', icon: ArrowRightLeft },
         { id: 'recalls', label: 'Recalls', icon: CalendarClock },
         { id: 'waitlist', label: 'Waitlist', icon: ListPlus },
       ],

@@ -22,6 +22,9 @@ public interface ClinicConsultationRepository extends JpaRepository<ClinicConsul
     @Query("SELECT c FROM ClinicConsultation c WHERE c.tenantId = :#{#tenantId.value} AND c.status IN ('READY_FOR_DOCTOR','DOCTOR_REVIEWING','DOCTOR_COMPLETED') AND c.deletedAt IS NULL ORDER BY c.updatedAt ASC")
     List<ClinicConsultation> findHandoffQueue(TenantId tenantId);
 
+    @Query("SELECT c FROM ClinicConsultation c WHERE c.tenantId = :#{#tenantId.value} AND c.appointmentId = :appointmentId AND c.status IN ('DRAFT','NURSE_IN_PROGRESS','READY_FOR_DOCTOR','DOCTOR_REVIEWING','RETURNED_TO_NURSE','DOCTOR_COMPLETED') AND c.deletedAt IS NULL")
+    List<ClinicConsultation> findUnsignedByAppointment(TenantId tenantId, UUID appointmentId);
+
     @Query("SELECT c FROM ClinicConsultation c WHERE c.tenantId = :#{#tenantId.value} AND c.id = :id AND c.deletedAt IS NULL")
     Optional<ClinicConsultation> findActiveById(TenantId tenantId, UUID id);
 

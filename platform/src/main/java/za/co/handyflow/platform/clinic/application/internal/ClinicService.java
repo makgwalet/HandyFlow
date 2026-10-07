@@ -527,6 +527,11 @@ public class ClinicService {
         ClinicPatient patient = patientRepo.findActiveById(tenantId, patientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient", patientId.toString()));
 
+        if (req.appointmentId() != null
+                && !consultationRepo.findUnsignedByAppointment(tenantId, req.appointmentId()).isEmpty()) {
+            throw new IllegalStateException(
+                    "This appointment already has an open consultation (possibly handed over to a doctor).");
+        }
         ClinicConsultation c = ClinicConsultation.createDraft(
                 tenantId, patientId, req.appointmentId(), req.practitionerId(), req.chiefComplaint());
         c.recordVitals(req.weightKg(), req.heightCm(), req.bloodPressure(),
