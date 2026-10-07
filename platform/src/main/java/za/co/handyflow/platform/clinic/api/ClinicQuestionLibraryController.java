@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.clinic.application.internal.ClinicContentGovernanceService;
+import za.co.handyflow.platform.clinic.application.internal.ClinicQuestionAuthoringService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicQuestionLibraryService;
 import za.co.handyflow.platform.clinic.dto.QuestionLibraryDtos.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -26,6 +27,7 @@ public class ClinicQuestionLibraryController {
 
     private final ClinicQuestionLibraryService library;
     private final ClinicContentGovernanceService governance;
+    private final ClinicQuestionAuthoringService authoring;
 
     // ── Clinicians ───────────────────────────────────────────────────────────
 
@@ -78,6 +80,40 @@ public class ClinicQuestionLibraryController {
     @Operation(summary = "All groups with review status (including DRAFT and demo)")
     public ResponseEntity<ApiResponse<List<GroupSummary>>> adminList() {
         return ResponseEntity.ok(ApiResponse.success("Success", governance.list(TenantContext.getTenantIdAsObject())));
+    }
+
+    // ── Authoring ────────────────────────────────────────────────────────────
+
+    @GetMapping("/question-groups/{groupId}/definition")
+    @PreAuthorize("hasAnyAuthority('CLINIC_CONTENT_ADMIN','CLINIC_CONTENT_APPROVE')")
+    @Operation(summary = "Full definition of a group in any status, for editing or review (platform groups are read-only)")
+    public ResponseEntity<ApiResponse<GroupDefinitionView>> definition(@PathVariable UUID groupId) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                authoring.definition(TenantContext.getTenantIdAsObject(), groupId)));
+    }
+
+    @PostMapping("/question-groups")
+    @PreAuthorize("hasAuthority('CLINIC_CONTENT_ADMIN')")
+    @Operation(summary = "Create a new question group as a DRAFT (version 1)")
+    public ResponseEntity<ApiResponse<UUID>> createGroup(@RequestBody CreateGroupRequest body) {
+        return ResponseEntity.status(201).body(ApiResponse.success("Group created", authoring.create(
+                TenantContext.getTenantIdAsObject(), UserContext.getCurrentUserId(), body.code(), body.definition())));
+    }
+
+    @PutMapping("/question-groups/{groupId}/definition")
+    @PreAuthorize("hasAuthority('CLINIC_CONTENT_ADMIN')")
+    @Operation(summary = "Replace a group's definition. Only while DRAFT or CHANGES_REQUESTED; fully validated.")
+    public ResponseEntity<ApiResponse<Void>> replaceDefinition(@PathVariable UUID groupId, @RequestBody GroupDefinition body) {
+        authoring.replace(TenantContext.getTenantIdAsObject(), groupId, UserContext.getCurrentUserId(), body);
+        return ResponseEntity.ok(ApiResponse.success("Saved", null));
+    }
+
+    @PostMapping("/question-groups/{groupId}/new-version")
+    @PreAuthorize("hasAuthority('CLINIC_CONTENT_ADMIN')")
+    @Operation(summary = "Copy a group into a new DRAFT version (refused while another version is in progress)")
+    public ResponseEntity<ApiResponse<UUID>> newVersion(@PathVariable UUID groupId) {
+        return ResponseEntity.status(201).body(ApiResponse.success("New version created", authoring.newVersion(
+                TenantContext.getTenantIdAsObject(), groupId, UserContext.getCurrentUserId())));
     }
 
     @PostMapping("/question-groups/{groupId}/submit-for-review")
