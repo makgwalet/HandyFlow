@@ -47,6 +47,7 @@ class GuardComplaintServiceTest {
     @Mock private GuardService guardService;
     @Mock private EvidenceFacade evidenceFacade;
     @Mock private TenantNumberingFacade numberingFacade;
+    @Mock private GuardComplaintAlerts alerts;
 
     private static final TenantId TENANT = TenantId.generate();
     private static final UUID USER = UUID.randomUUID();
@@ -54,7 +55,7 @@ class GuardComplaintServiceTest {
     private final UUID guardId = UUID.randomUUID();
 
     private GuardComplaintService service() {
-        return new GuardComplaintService(repository, eventRepository, guardRepository, siteRepository, guardService, evidenceFacade, numberingFacade);
+        return new GuardComplaintService(repository, eventRepository, guardRepository, siteRepository, guardService, evidenceFacade, numberingFacade, alerts);
     }
 
     @BeforeEach
@@ -135,7 +136,7 @@ class GuardComplaintServiceTest {
                 .isInstanceOf(HandyFlowException.class).hasMessageContaining("not substantiated");
         var out = service().close(TENANT, c.getId(), new CloseRequest("Complainant informed"), USER, "Sam");
         assertThat(out.summary().status()).isEqualTo("CLOSED");
-        assertThat(out.allowedSteps()).isEmpty();
+        assertThat(out.allowedSteps()).containsExactly("REOPEN");
     }
 
     @Test @DisplayName("Substantiated: no action needs a note, a warning then closure works, and closure needs a resolution")
@@ -152,6 +153,50 @@ class GuardComplaintServiceTest {
         var out = service().close(TENANT, c.getId(), new CloseRequest("Guard warned and signed"), USER, "Sam");
         assertThat(out.summary().status()).isEqualTo("CLOSED");
         assertThat(out.summary().action()).isEqualTo("VERBAL_WARNING");
+    }
+
+    @Test @DisplayName("A closed complaint can be reopened with a reason; finding and action are cleared and the timeline keeps them")
+    void reopen() {
+        var c = complaint(Status.UNDER_INVESTIGATION);
+        service().finding(TENANT, c.getId(), new FindingRequest("SUBSTANTIATED", "Confirmed"), USER, "Sam");
+        service().action(TENANT, c.getId(), new ActionRequest("VERBAL_WARNING", null), USER, "Sam");
+        assertThatThrownBy(() -> service().reopen(TENANT, c.getId(), new ReopenRequest("new evidence"), USER, "Sam"))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("not available");
+        service().close(TENANT, c.getId(), new CloseRequest("Warned"), USER, "Sam");
+        assertThatThrownBy(() -> service().reopen(TENANT, c.getId(), new ReopenRequest(" "), USER, "Sam"))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("reason");
+        var out = service().reopen(TENANT, c.getId(), new ReopenRequest("Guard produced new evidence"), USER, "Sam");
+        assertThat(out.summary().status()).isEqualTo("UNDER_INVESTIGATION");
+        assertThat(out.summary().finding()).isNull();
+        assertThat(out.summary().action()).isNull();
+        assertThat(out.allowedSteps()).containsExactlyInAnyOrder("FINDING", "WITHDRAW");
+        var captor = org.mockito.ArgumentCaptor.forClass(GuardComplaintEvent.class);
+        verify(eventRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
+        var last = captor.getAllValues().get(captor.getAllValues().size() - 1);
+        assertThat(last.getEventType()).isEqualTo("REOPENED");
+        assertThat(last.getNote()).contains("new evidence").contains("substantiated").contains("verbal warning");
+    }
+
+    @Test @DisplayName("A withdrawn complaint cannot be reopened")
+    void withdrawnNotReopened() {
+        var c = complaint(Status.RECEIVED);
+        service().withdraw(TENANT, c.getId(), new WithdrawRequest("Retracted"), USER, "Sam");
+        assertThatThrownBy(() -> service().reopen(TENANT, c.getId(), new ReopenRequest("x"), USER, "Sam")).isInstanceOf(HandyFlowException.class);
+    }
+
+    @Test @DisplayName("Only an urgent complaint raises the administrators' alert, on logging and when an edit makes it urgent")
+    void urgentAlert() {
+        service().log(TENANT, req("LATENESS", "LOW", TODAY, "Late"), USER, "Sam", TODAY);
+        verify(alerts, never()).urgentComplaint(any(), any(), any());
+        service().log(TENANT, req("THEFT", "LOW", TODAY, "Took stock"), USER, "Sam", TODAY);
+        service().log(TENANT, req("LATENESS", "CRITICAL", TODAY, "Very late"), USER, "Sam", TODAY);
+        verify(alerts, org.mockito.Mockito.times(2)).urgentComplaint(any(), any(GuardComplaint.class), any());
+
+        var c = complaint(Status.UNDER_INVESTIGATION);
+        service().update(TENANT, c.getId(), req("LATENESS", "HIGH", TODAY.minusDays(1), "Late"), USER, "Sam");
+        verify(alerts, org.mockito.Mockito.times(2)).urgentComplaint(any(), any(GuardComplaint.class), any());
+        service().update(TENANT, c.getId(), req("EXCESSIVE_FORCE", "HIGH", TODAY.minusDays(1), "Pushed someone"), USER, "Sam");
+        verify(alerts, org.mockito.Mockito.times(3)).urgentComplaint(any(), any(GuardComplaint.class), any());
     }
 
     @Test @DisplayName("Withdrawal needs a reason and is final")

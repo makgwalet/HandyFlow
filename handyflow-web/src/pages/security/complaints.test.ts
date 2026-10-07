@@ -7,6 +7,11 @@ describe('complaints logic', () => {
     expect(availableSteps([])).toEqual([])
     expect(availableSteps(['CLOSE', 'ACTION']).map(s => s.label)).toEqual(['Record action', 'Close complaint'])
   })
+  it('offers Reopen on a closed complaint and asks for a reason', () => {
+    expect(availableSteps(['REOPEN']).map(s => s.label)).toEqual(['Reopen'])
+    expect(stepFormError('REOPEN', { note: ' ' })).toMatch(/reopening/i)
+    expect(stepFormError('REOPEN', { note: 'New evidence' })).toBeNull()
+  })
   it('checks the log form', () => {
     expect(complaintFormError({ guardId: '', occurredOn: '2026-10-01', description: 'x' }, '2026-10-07')).toMatch(/guard/i)
     expect(complaintFormError({ guardId: 'g', occurredOn: '', description: 'x' }, '2026-10-07')).toMatch(/date/i)

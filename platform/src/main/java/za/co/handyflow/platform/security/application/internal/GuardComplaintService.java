@@ -57,6 +57,7 @@ public class GuardComplaintService {
     private final GuardService guardService;
     private final EvidenceFacade evidenceFacade;
     private final TenantNumberingFacade numberingFacade;
+    private final GuardComplaintAlerts alerts;
 
     // ── Logging and editing ───────────────────────────────────────────────────
 
@@ -67,7 +68,7 @@ public class GuardComplaintService {
 
     @Transactional
     ComplaintDetail log(TenantId tenantId, SaveComplaintRequest req, UUID by, String byName, LocalDate today) {
-        guardService.getGuard(tenantId, req.guardId());
+        var guard = guardService.getGuard(tenantId, req.guardId());
         checkSite(tenantId, req.siteId());
         var parsed = parse(req, today);
         String number = numberingFacade.next(tenantId, "GUARD_COMPLAINT", "CMP");
@@ -77,6 +78,7 @@ public class GuardComplaintService {
         repository.save(c);
         event(c, "LOGGED", Status.RECEIVED, null, by, byName);
         log.info("[Security] Complaint logged {} guardId={} category={} severity={}", number, req.guardId(), parsed.category, parsed.severity);
+        if (ComplaintWorkflow.isUrgent(parsed.category, parsed.severity)) alerts.urgentComplaint(tenantId, c, guard == null ? null : guard.fullName());
         return detail(c);
     }
 
@@ -89,10 +91,15 @@ public class GuardComplaintService {
             throw bad("A complaint cannot be moved to a different guard", "GUARD_CHANGE_NOT_ALLOWED");
         checkSite(tenantId, req.siteId());
         var parsed = parse(req, LocalDate.now(SAST));
+        boolean wasUrgent = ComplaintWorkflow.isUrgent(c.getCategory(), c.getSeverity());
         c.edit(req.siteId(), req.occurredOn(), parsed.category, parsed.severity, req.description(), parsed.complainant,
                 req.complainantName(), req.complainantContact(), req.witnesses());
         repository.save(c);
         event(c, "EDITED", null, "Details updated", by, byName);
+        if (!wasUrgent && ComplaintWorkflow.isUrgent(parsed.category, parsed.severity)) {
+            String name = guardRepository.findActiveById(tenantId, c.getGuardId()).map(g -> g.getFullName()).orElse(null);
+            alerts.urgentComplaint(tenantId, c, name);
+        }
         return detail(c);
     }
 
@@ -155,6 +162,20 @@ public class GuardComplaintService {
         c.withdraw(req.reason(), byName);
         repository.save(c);
         event(c, "WITHDRAWN", Status.WITHDRAWN, req.reason(), by, byName);
+        return detail(c);
+    }
+
+    /** A closed complaint (not a withdrawn one) goes back to investigation, for new evidence or a challenge to the outcome. */
+    @Transactional
+    public ComplaintDetail reopen(TenantId tenantId, UUID id, ReopenRequest req, UUID by, String byName) {
+        GuardComplaint c = find(tenantId, id);
+        requireStep(c, Step.REOPEN);
+        if (req == null || req.reason() == null || req.reason().isBlank()) throw bad("Give a reason for reopening", "REASON_REQUIRED");
+        String before = c.getFinding() == null ? "" : " (previous finding: " + c.getFinding().name().toLowerCase().replace('_', ' ')
+                + (c.getAction() == null ? "" : ", action: " + c.getAction().name().toLowerCase().replace('_', ' ')) + ")";
+        c.reopen();
+        repository.save(c);
+        event(c, "REOPENED", Status.UNDER_INVESTIGATION, req.reason().trim() + before, by, byName);
         return detail(c);
     }
 

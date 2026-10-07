@@ -61,9 +61,9 @@ export function statusTone(status: string, finding: string | null): Tone {
 
 /** The next-step buttons, in the order they are shown, limited to what the server allows now. */
 export const STEP_LABELS: Record<string, string> = {
-  START: "Start investigation", FINDING: "Record finding", ACTION: "Record action", CLOSE: "Close complaint", WITHDRAW: "Withdraw",
+  START: "Start investigation", FINDING: "Record finding", ACTION: "Record action", CLOSE: "Close complaint", WITHDRAW: "Withdraw", REOPEN: "Reopen",
 }
-const STEP_ORDER = ["START", "FINDING", "ACTION", "CLOSE", "WITHDRAW"]
+const STEP_ORDER = ["START", "FINDING", "ACTION", "CLOSE", "WITHDRAW", "REOPEN"]
 export function availableSteps(allowed: string[]): { step: string; label: string }[] {
   return STEP_ORDER.filter(s => allowed.includes(s)).map(step => ({ step, label: STEP_LABELS[step] }))
 }
@@ -92,6 +92,7 @@ export function stepFormError(step: string, f: { finding?: string; action?: stri
       return null
     case "CLOSE": return note ? null : "Say how the complaint was resolved"
     case "WITHDRAW": return note ? null : "Give a reason for withdrawing"
+    case "REOPEN": return note ? null : "Give a reason for reopening"
     default: return null
   }
 }
@@ -103,5 +104,5 @@ export function actionsFor(finding: string | null) {
 
 export const EVENT_LABELS: Record<string, string> = {
   LOGGED: "Complaint logged", EDITED: "Details updated", INVESTIGATION_STARTED: "Investigation started", FINDING_RECORDED: "Finding recorded",
-  ACTION_RECORDED: "Action recorded", CLOSED: "Complaint closed", WITHDRAWN: "Complaint withdrawn", EVIDENCE_ADDED: "Evidence added", EVIDENCE_REMOVED: "Evidence removed",
+  ACTION_RECORDED: "Action recorded", CLOSED: "Complaint closed", WITHDRAWN: "Complaint withdrawn", REOPENED: "Complaint reopened", EVIDENCE_ADDED: "Evidence added", EVIDENCE_REMOVED: "Evidence removed",
 }

@@ -44,7 +44,7 @@ function Path({ status }: { status: string }) {
 function StepForm({ id, step, finding, onDone, onCancel }: { id: string; step: string; finding: string | null; onDone: () => void; onCancel: () => void }) {
   const [f, setF] = useState({ finding: "", action: "", note: "", investigator: "" })
   const [err, setErr] = useState("")
-  const path = { START: "start", FINDING: "finding", ACTION: "action", CLOSE: "close", WITHDRAW: "withdraw" }[step]
+  const path = { START: "start", FINDING: "finding", ACTION: "action", CLOSE: "close", WITHDRAW: "withdraw", REOPEN: "reopen" }[step]
   const send = useMutation({
     mutationFn: () => {
       const body = step === "START" ? { investigator: f.investigator.trim() || null }
@@ -56,7 +56,7 @@ function StepForm({ id, step, finding, onDone, onCancel }: { id: string; step: s
     onSuccess: onDone, onError: e => setErr(errText(e)),
   })
   const submit = () => { const m = stepFormError(step, { ...f, finding: step === "ACTION" ? finding ?? "" : f.finding }); if (m) setErr(m); else { setErr(""); send.mutate() } }
-  const noteLabel = { FINDING: "What the investigation found", ACTION: "Note (required if no action is taken on a substantiated complaint)", CLOSE: "How it was resolved", WITHDRAW: "Reason for withdrawing" }[step]
+  const noteLabel = { FINDING: "What the investigation found", ACTION: "Note (required if no action is taken on a substantiated complaint)", CLOSE: "How it was resolved", WITHDRAW: "Reason for withdrawing", REOPEN: "Why it is being reopened" }[step]
   return (
     <div style={{ ...card, display: "grid", gap: 10, marginTop: 12 }}>
       {step === "START" && <label style={{ fontSize: 12 }}>Investigator (optional)<input value={f.investigator} onChange={e => setF({ ...f, investigator: e.target.value })} style={input} /></label>}
@@ -121,7 +121,7 @@ export default function ComplaintDetailPage() {
         <Path status={s.status} />
         {canManage && (steps.length > 0 || data.editable) && !step && !editing && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
-            {steps.map(x => <button key={x.step} onClick={() => setStep(x.step)} style={x.step === "WITHDRAW" ? btn : primary}>{x.label}</button>)}
+            {steps.map(x => <button key={x.step} onClick={() => setStep(x.step)} style={x.step === "WITHDRAW" || x.step === "REOPEN" ? btn : primary}>{x.label}</button>)}
             {data.editable && <button onClick={() => setEditing(true)} style={btn}><Pencil size={14} /> Edit details</button>}
           </div>
         )}

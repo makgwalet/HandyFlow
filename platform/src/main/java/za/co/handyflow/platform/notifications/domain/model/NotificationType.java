@@ -223,6 +223,9 @@ public enum NotificationType {
     PATROL_ROUND_MISSED(WARNING, Set.of(IN_APP, EMAIL)),
     PRINCIPAL_VETTING_HIT(CRITICAL, Set.of(IN_APP, EMAIL)),
     GATE_OVERSTAY(WARNING, Set.of(IN_APP, EMAIL)),
+    GUARD_COMPETENCY_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
+    GUARD_COMPLAINT_URGENT(CRITICAL, Set.of(IN_APP, EMAIL)),
+    GUARD_RISK_RECOMMENDATION(WARNING, Set.of(IN_APP, EMAIL)),
 
     // ── Supply Chain ─────────────────────────────────────────────────────────
     PO_APPROVED(INFO, Set.of(IN_APP, EMAIL)),

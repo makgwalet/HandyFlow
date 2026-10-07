@@ -67,14 +67,16 @@ BEGIN
   'security_shifts',
   'security_grade_rates',
   'security_branch_assignments',
+  'security_guard_score_history',
   'security_guards',
   'security_posts',
   'security_contacts',
   'security_sites',
   'security_branches'
   ]) LOOP
-    IF t = 'security_guard_current_location' THEN
-      EXECUTE 'DELETE FROM security_guard_current_location WHERE guard_id::text LIKE ''d3d3d3d3-%''';
+    IF t IN ('security_guard_current_location', 'security_guard_score_history') THEN
+      -- keyed by guard: the nightly job writes these rows with random ids
+      EXECUTE format('DELETE FROM %I WHERE guard_id::text LIKE ''d3d3d3d3-%%''', t);
     ELSE
       EXECUTE format('DELETE FROM %I WHERE id::text LIKE ''d3d3d3d3-%%''', t);
     END IF;

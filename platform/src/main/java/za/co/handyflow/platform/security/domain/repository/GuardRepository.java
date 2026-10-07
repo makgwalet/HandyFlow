@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.security.domain.model.Guard;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -60,6 +61,10 @@ public interface GuardRepository extends JpaRepository<Guard, UUID> {
         ORDER BY g.lastName, g.firstName
         """)
     Page<Guard> findSchedulable(TenantId tenantId, Pageable pageable);
+
+    /** Every guard on the tenant's books that is not deleted, for the nightly jobs. */
+    @Query("SELECT g FROM Guard g WHERE g.tenantId = :tenantId AND g.deletedAt IS NULL ORDER BY g.lastName, g.firstName")
+    List<Guard> findAllActiveList(TenantId tenantId);
 
     // ── Guard authentication (Phase 1.5) ──────────────────────────────────────
 

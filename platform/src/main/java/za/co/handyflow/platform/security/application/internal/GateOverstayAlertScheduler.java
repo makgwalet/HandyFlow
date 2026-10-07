@@ -117,7 +117,7 @@ public class GateOverstayAlertScheduler {
                     .title(entries.size() + " overstayed at site — gate register")
                     .message(entries.size() + " visitor(s)/vehicle(s) have been on site over "
                             + overstayThresholdHours + " hours without logging an exit: " + summary)
-                    .actionUrl("/security/sites/" + siteId + "/on-site")
+                    .actionUrl("/security/sites/" + siteId)
                     .sourceModule("security")
                     .recipients(admins)
                     .build());

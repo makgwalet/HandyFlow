@@ -118,6 +118,15 @@ public class GuardComplaintController {
                 TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
     }
 
+    @PostMapping("/{id}/reopen")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @Operation(summary = "Reopen a closed complaint for further investigation")
+    public ResponseEntity<ApiResponse<ComplaintDetail>> reopen(@PathVariable UUID id, @Valid @RequestBody ReopenRequest req) {
+        featureGuard.requireModule("security");
+        return ResponseEntity.ok(ApiResponse.success(service.reopen(TenantContext.getTenantIdAsObject(), id, req,
+                TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
+    }
+
     @PostMapping(value = "/{id}/evidence", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Attach an evidence file")

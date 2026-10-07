@@ -42,6 +42,10 @@ const KNOWN_ROUTES = new Set<string>([
 //   tasks            : /tasks?board=&task= opens that task
 const PRESERVES_DEEP_PATH = new Set(['quotes', 'projects', 'tasks'])
 
+// Security has real detail pages: /security/guards/:id, /security/complaints/:id, /security/incidents/:id and
+// /security/sites/:id. Anything deeper or unknown on that module still lands on /security.
+const SECURITY_DETAIL = /^\/security\/(guards|complaints|incidents|sites)\/[^/]+\/?$/
+
 /** Returns a safe URL to navigate to, or null if actionUrl doesn't target any known route at all. */
 export function resolveSafeActionUrl(actionUrl: string): string | null {
   const path = actionUrl.split(/[?#]/)[0]
@@ -49,5 +53,7 @@ export function resolveSafeActionUrl(actionUrl: string): string | null {
   if (segments.length === 0) return null
   const base = segments[0]
   if (!KNOWN_ROUTES.has(base)) return null
-  return PRESERVES_DEEP_PATH.has(base) ? actionUrl : '/' + base
+  if (PRESERVES_DEEP_PATH.has(base)) return actionUrl
+  if (base === 'security' && SECURITY_DETAIL.test(path)) return actionUrl
+  return '/' + base
 }

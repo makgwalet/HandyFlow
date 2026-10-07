@@ -29,6 +29,8 @@ public final class GuardComplaintDtos {
 
     public record WithdrawRequest(@NotBlank String reason) {}
 
+    public record ReopenRequest(@NotBlank String reason) {}
+
     /** A row in a list: enough to scan, nothing sensitive beyond the headline. */
     public record ComplaintSummary(
             UUID id, String complaintNumber, UUID guardId, String guardName, UUID siteId, String siteName,

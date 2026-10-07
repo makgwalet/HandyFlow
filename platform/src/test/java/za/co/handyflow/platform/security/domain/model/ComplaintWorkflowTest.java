@@ -27,11 +27,17 @@ class ComplaintWorkflowTest {
 
     @Test @DisplayName("Closed and withdrawn complaints are final")
     void finals() {
-        assertThat(ComplaintWorkflow.allowedSteps(Status.CLOSED, Finding.SUBSTANTIATED)).isEmpty();
         assertThat(ComplaintWorkflow.allowedSteps(Status.WITHDRAWN, null)).isEmpty();
         assertThat(ComplaintWorkflow.isOpen(Status.CLOSED)).isFalse();
         assertThat(ComplaintWorkflow.isOpen(Status.WITHDRAWN)).isFalse();
         assertThat(ComplaintWorkflow.isOpen(Status.FINDING_MADE)).isTrue();
+    }
+
+    @Test @DisplayName("A closed complaint can only be reopened")
+    void reopenOnlyFromClosed() {
+        assertThat(ComplaintWorkflow.allowedSteps(Status.CLOSED, Finding.SUBSTANTIATED)).containsExactly(Step.REOPEN);
+        assertThat(ComplaintWorkflow.allowedSteps(Status.ACTION_TAKEN, Finding.SUBSTANTIATED)).doesNotContain(Step.REOPEN);
+        assertThat(ComplaintWorkflow.allowedSteps(Status.WITHDRAWN, null)).doesNotContain(Step.REOPEN);
     }
 
     @Test @DisplayName("Details are editable only before a finding")

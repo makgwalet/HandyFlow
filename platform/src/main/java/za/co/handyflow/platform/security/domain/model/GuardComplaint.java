@@ -190,5 +190,22 @@ public class GuardComplaint {
         this.updatedAt = Instant.now();
     }
 
+    /** Back to investigation. The earlier finding, action and closure are cleared; the timeline event records them. */
+    public void reopen() {
+        this.status = Status.UNDER_INVESTIGATION;
+        this.finding = null;
+        this.findingNote = null;
+        this.findingByName = null;
+        this.findingAt = null;
+        this.action = null;
+        this.actionNote = null;
+        this.actionByName = null;
+        this.actionAt = null;
+        this.resolutionNote = null;
+        this.closedByName = null;
+        this.closedAt = null;
+        this.updatedAt = Instant.now();
+    }
+
     private static String blank(String s) { return s == null || s.isBlank() ? null : s.trim(); }
 }

@@ -25,4 +25,13 @@ public interface GuardCompetencyRepository extends JpaRepository<GuardCompetency
         WHERE c.tenantId = :tenantId AND c.guardId = :guardId AND c.id = :id AND c.deletedAt IS NULL
         """)
     Optional<GuardCompetency> findActiveForGuardById(TenantId tenantId, UUID guardId, UUID id);
+
+    /** Competencies that expire on or before the cut-off (not yet expired before `from`), across the tenant's guards. */
+    @Query("""
+        SELECT c FROM GuardCompetency c
+        WHERE c.tenantId = :tenantId AND c.deletedAt IS NULL AND c.expiryDate IS NOT NULL
+          AND c.expiryDate >= :from AND c.expiryDate <= :to
+        ORDER BY c.expiryDate
+        """)
+    List<GuardCompetency> findExpiringBetween(TenantId tenantId, java.time.LocalDate from, java.time.LocalDate to);
 }

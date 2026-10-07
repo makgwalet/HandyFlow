@@ -181,6 +181,12 @@ Load the demo, sign in as a user with `SECURITY_READ` and `SECURITY_MANAGE` (adm
 ### Complaints
 - [ ] 8 complaints, numbered CMP-DEMO-01 to CMP-DEMO-08, one per workflow state: Received, Under investigation, Finding made, Action taken, Closed, Withdrawn.
 - [ ] Open one and advance it. Only valid next steps are offered; the event timeline shows every step.
+- [ ] Open the closed one (CMP-DEMO-05) and choose **Reopen**, giving a reason. It returns to Under investigation, the finding and action are cleared, and the timeline records what they were. A withdrawn complaint cannot be reopened.
+- [ ] Logging a complaint that is critical, or about excessive force, a firearm, theft or harassment, sends an in-app and email alert to the tenant's administrators (link opens the complaint).
+
+### Automatic alerts and snapshots
+- [ ] 06:45 every day: one digest of skills and certificates that expire within 30 days (the notification links to Guards).
+- [ ] 02:15 every day: each active guard's score and risk recommendations are saved (table `security_guard_score_history`). A recommendation that was not on the guard's previous snapshot is announced once to administrators; one that keeps standing is not repeated. A guard's first snapshot is a baseline and announces nothing.
 
 ### Risk Rules and Ratings
 - [ ] Risk Rules shows the seeded thresholds.
@@ -434,6 +440,7 @@ Generated from the controllers. Paths are under the host root. A blank permissio
 | POST | `/api/v1/security/complaints/{id}/action` | SECURITY_MANAGE |
 | POST | `/api/v1/security/complaints/{id}/close` | SECURITY_MANAGE |
 | POST | `/api/v1/security/complaints/{id}/withdraw` | SECURITY_MANAGE |
+| POST | `/api/v1/security/complaints/{id}/reopen` | SECURITY_MANAGE |
 | POST | `/api/v1/security/complaints/{id}/evidence` | SECURITY_MANAGE |
 | GET | `/api/v1/security/complaints/{id}/evidence/{evidenceId}/download` | SECURITY_READ |
 | DELETE | `/api/v1/security/complaints/{id}/evidence/{evidenceId}` | SECURITY_MANAGE |

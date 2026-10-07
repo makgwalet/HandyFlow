@@ -9,7 +9,8 @@ import java.util.Set;
  *
  * Flow: RECEIVED -> UNDER_INVESTIGATION -> FINDING_MADE -> ACTION_TAKEN -> CLOSED.
  * A complaint that was not substantiated may be closed straight after the finding.
- * RECEIVED or UNDER_INVESTIGATION may be withdrawn. CLOSED and WITHDRAWN are final.
+ * RECEIVED or UNDER_INVESTIGATION may be withdrawn. WITHDRAWN is final. CLOSED may be reopened, which returns it to
+ * UNDER_INVESTIGATION with the earlier finding and action cleared (the timeline keeps what they were).
  * The system records what people decide; it never decides an employment outcome.
  */
 public final class ComplaintWorkflow {
@@ -18,7 +19,7 @@ public final class ComplaintWorkflow {
 
     public enum Status { RECEIVED, UNDER_INVESTIGATION, FINDING_MADE, ACTION_TAKEN, CLOSED, WITHDRAWN }
 
-    public enum Step { START, FINDING, ACTION, CLOSE, WITHDRAW }
+    public enum Step { START, FINDING, ACTION, CLOSE, WITHDRAW, REOPEN }
 
     public enum Finding { SUBSTANTIATED, UNSUBSTANTIATED, INCONCLUSIVE }
 
@@ -60,7 +61,8 @@ public final class ComplaintWorkflow {
             case UNDER_INVESTIGATION -> EnumSet.of(Step.FINDING, Step.WITHDRAW);
             case FINDING_MADE -> finding == Finding.UNSUBSTANTIATED ? EnumSet.of(Step.ACTION, Step.CLOSE) : EnumSet.of(Step.ACTION);
             case ACTION_TAKEN -> EnumSet.of(Step.CLOSE);
-            case CLOSED, WITHDRAWN -> EnumSet.noneOf(Step.class);
+            case CLOSED -> EnumSet.of(Step.REOPEN);
+            case WITHDRAWN -> EnumSet.noneOf(Step.class);
         };
     }
 
