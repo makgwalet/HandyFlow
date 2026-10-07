@@ -214,6 +214,36 @@ class ClinicBillingServiceTest {
         }
 
         @Test
+        @DisplayName("partial without an amount is refused, not defaulted to 80%")
+        void partialNeedsAnAmount() {
+            var id    = UUID.randomUUID();
+            var claim = draftClaim();
+            claim.submit("REF-001");
+            claim.markAccepted();
+            when(claimRepo.findActiveById(TENANT, id)).thenReturn(Optional.of(claim));
+
+            assertThatThrownBy(() -> service.updateClaimStatus(TENANT, id, "partial", null))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Enter the amount");
+            assertThat(claim.getStatus()).isEqualTo("ACCEPTED");
+            verify(claimRepo, never()).save(any(ClinicClaim.class));
+        }
+
+        @Test
+        @DisplayName("partial with an amount moves the claim to PARTIAL")
+        void partialWithAmount() {
+            var id    = UUID.randomUUID();
+            var claim = draftClaim();
+            claim.submit("REF-001");
+            claim.markAccepted();
+            when(claimRepo.findActiveById(TENANT, id)).thenReturn(Optional.of(claim));
+
+            var result = service.updateClaimStatus(TENANT, id, "partial", null, new java.math.BigDecimal("300.00"));
+
+            assertThat(result.status()).isEqualTo("PARTIAL");
+        }
+
+        @Test
         @DisplayName("throws on unknown status action")
         void throwsOnUnknownAction() {
             var id = UUID.randomUUID();

@@ -1,3 +1,4 @@
+import PartialPaymentModal from "./PartialPaymentModal"
 import React from "react"
 // src/pages/clinic/ClaimsTab.tsx
 // Medical aid claims — per-consultation builder, full lifecycle management
@@ -73,6 +74,7 @@ export default function ClaimsTab() {
   const [expanded, setExpanded]         = useState<string|null>(null)
   const [showCreate, setShowCreate]     = useState(false)
   const [showReject, setShowReject]     = useState<string|null>(null)
+  const [showPartial, setShowPartial]   = useState<Claim|null>(null)
   const [rejectReason, setRejectReason] = useState("")
   const [apiError, setApiError]         = useState("")
   const [selected, setSelected]         = useState<Set<string>>(new Set())
@@ -93,12 +95,13 @@ export default function ClaimsTab() {
   })
 
   const doAction = useMutation({
-    mutationFn: ({id,action,reason}:{id:string;action:string;reason?:string}) => {
+    mutationFn: ({id,action,reason,schemeAmount}:{id:string;action:string;reason?:string;schemeAmount?:number}) => {
       if (action==="submit") return apiClient.post(`/api/v1/clinic/billing/claims/${id}/submit`)
       if (action==="reject") return apiClient.post(`/api/v1/clinic/billing/claims/${id}/reject`,null,{params:{reason}})
+      if (action==="partial") return apiClient.post(`/api/v1/clinic/billing/claims/${id}/partial`,null,{params:{schemeAmount}})
       return apiClient.post(`/api/v1/clinic/billing/claims/${id}/${action}`)
     },
-    onSuccess: () => { qc.invalidateQueries({queryKey:["clinic-claims"]}); setShowReject(null); setRejectReason("") },
+    onSuccess: () => { qc.invalidateQueries({queryKey:["clinic-claims"]}); setShowReject(null); setRejectReason(""); setShowPartial(null) },
     onError: (e:any) => setApiError(e.response?.data?.message ?? "Action failed"),
   })
 
@@ -329,6 +332,7 @@ export default function ClaimsTab() {
                             onClick={()=>{
                               setApiError("")
                               if (btn.action==="reject") { setShowReject(claim.id); return }
+                              if (btn.action==="partial") { setShowPartial(claim); return }
                               doAction.mutate({id:claim.id, action:btn.action})
                             }}
                             disabled={doAction.isPending}
@@ -344,6 +348,12 @@ export default function ClaimsTab() {
             )
           })}
         </div>
+      )}
+
+      {showPartial && (
+        <PartialPaymentModal gross={showPartial.grossAmount} busy={doAction.isPending} error={apiError}
+          onClose={()=>{ setShowPartial(null); setApiError("") }}
+          onConfirm={amount=>{ setApiError(""); doAction.mutate({id:showPartial.id, action:"partial", schemeAmount:amount}) }}/>
       )}
 
       {/* ── Reject reason modal ──────────────────────────────────────────── */}

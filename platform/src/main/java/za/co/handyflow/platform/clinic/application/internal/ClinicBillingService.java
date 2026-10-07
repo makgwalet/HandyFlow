@@ -282,19 +282,8 @@ public class ClinicBillingService {
         switch (upperAction) {
             case "ACCEPT"  -> claim.markAccepted();
             case "REJECT"  -> claim.markRejected(reason);
-            case "PAID" -> {
-                // Use provided amount or default to full gross (scheme paid everything)
-                var paid = schemeAmount != null ? schemeAmount : claim.getGrossAmount();
-                claim.markPaid(paid);
-            }
-            case "PARTIAL" -> {
-                // schemeAmount is required for PARTIAL — default to 80% if not provided
-                var partial = schemeAmount != null ? schemeAmount
-                        : claim.getGrossAmount()
-                        .multiply(new java.math.BigDecimal("0.80"))
-                        .setScale(2, java.math.RoundingMode.HALF_UP);
-                claim.markPartial(partial);
-            }
+            case "PAID" -> claim.markPaid(ClaimPaymentRules.schemeAmount("PAID", claim.getGrossAmount(), schemeAmount));
+            case "PARTIAL" -> claim.markPartial(ClaimPaymentRules.schemeAmount("PARTIAL", claim.getGrossAmount(), schemeAmount));
             default -> throw new IllegalArgumentException("Unknown action: " + action);
         }
         claimRepo.save(claim);
