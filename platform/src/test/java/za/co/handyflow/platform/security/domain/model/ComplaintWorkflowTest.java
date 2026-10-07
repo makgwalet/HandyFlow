@@ -59,4 +59,14 @@ class ComplaintWorkflowTest {
         assertThat(ComplaintWorkflow.validateAction(Finding.SUBSTANTIATED, Action.VERBAL_WARNING, null)).isNull();
         assertThat(ComplaintWorkflow.validateAction(Finding.INCONCLUSIVE, Action.RETRAINING, null)).isNull();
     }
+
+    @Test @DisplayName("Attendance, service and other categories are not misconduct")
+    void misconduct() {
+        assertThat(ComplaintWorkflow.isMisconduct(Category.THEFT)).isTrue();
+        assertThat(ComplaintWorkflow.isMisconduct(Category.SLEEPING_ON_DUTY)).isTrue();
+        assertThat(ComplaintWorkflow.isMisconduct(Category.LATENESS)).isFalse();
+        assertThat(ComplaintWorkflow.isMisconduct(Category.ABSENTEEISM)).isFalse();
+        assertThat(ComplaintWorkflow.isMisconduct(Category.POOR_CUSTOMER_SERVICE)).isFalse();
+        assertThat(ComplaintWorkflow.isMisconduct(Category.OTHER)).isFalse();
+    }
 }

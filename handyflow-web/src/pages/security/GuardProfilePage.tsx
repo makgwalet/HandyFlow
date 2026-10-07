@@ -15,6 +15,7 @@ import { PageHeader } from "../../components/ui/PageHeader"
 import GuardScreeningPanel, { RequestScreening } from "./GuardScreeningPanel"
 import SkillsTab from "./GuardCompetencyPanel"
 import ComplaintsTab from "./ComplaintsTab"
+import GuardPerformancePanel from "./GuardPerformancePanel"
 import type { ComplaintCounts, ComplaintSummary } from "./complaints.logic"
 import {
   DOCUMENT_CATEGORIES, SEVERITY_TONE, SHIFT_TONE, categoryLabel, completionRate, expiryState,
@@ -42,7 +43,7 @@ interface Overview {
   complaintCounts?: ComplaintCounts
 }
 
-const TABS = ["Overview", "Compliance", "Skills", "Documents", "Shifts", "Incidents", "Complaints"] as const
+const TABS = ["Overview", "Compliance", "Skills", "Documents", "Shifts", "Incidents", "Complaints", "Performance"] as const
 type Tab = typeof TABS[number]
 
 const STATUS_TONE: Record<string, "ok" | "warn" | "bad" | "info" | "neutral"> = { ACTIVE: "ok", ON_LEAVE: "info", SUSPENDED: "bad", UNDER_INVESTIGATION: "warn", TERMINATED: "neutral" }
@@ -198,6 +199,8 @@ export default function GuardProfilePage() {
           {data.counts.shiftsLast90Days > data.shifts.length && <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 8 }}>Showing the newest {data.shifts.length}.</div>}
         </div>
       )}
+
+      {tab === "Performance" && <GuardPerformancePanel guardId={guard.id} canManage={canManage} />}
 
       {tab === "Complaints" && <ComplaintsTab guardId={guard.id} />}
 

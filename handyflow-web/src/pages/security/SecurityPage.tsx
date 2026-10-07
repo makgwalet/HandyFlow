@@ -11,6 +11,7 @@ import RotationPatternsTab from "./RotationPatternsTab"
 import ShiftSwapsTab      from "./ShiftSwapsTab"
 import GuardScreeningTab  from "./GuardScreeningTab"
 import ComplaintsTab       from "./ComplaintsTab"
+import RiskRulesTab        from "./RiskRulesTab"
 import ShiftsTab          from "./ShiftsTab"
 import IncidentsTab       from "./IncidentsTab"
 import LiveMapTab         from "./LiveMapTab"
@@ -60,6 +61,7 @@ export function SecurityPage() {
     "guards":            <GuardsTab />,
     "guard-screening":   <GuardScreeningTab />,
     "complaints":        <ComplaintsTab />,
+    "risk-rules":        <RiskRulesTab />,
     "rotation-patterns": <RotationPatternsTab />,
     "shift-swaps":       <ShiftSwapsTab />,
     "payroll":           <PayrollTab />,

@@ -40,6 +40,12 @@ public final class ComplaintWorkflow {
     private static final Set<Category> URGENT_CATEGORIES =
             EnumSet.of(Category.EXCESSIVE_FORCE, Category.FIREARM_VIOLATION, Category.THEFT, Category.HARASSMENT);
 
+    /** Categories that count as misconduct for the repeated-misconduct recommendation. Attendance, service and "other" do not. */
+    private static final Set<Category> NOT_MISCONDUCT =
+            EnumSet.of(Category.ABSENTEEISM, Category.LATENESS, Category.POOR_CUSTOMER_SERVICE, Category.OTHER);
+
+    public static boolean isMisconduct(Category c) { return !NOT_MISCONDUCT.contains(c); }
+
     public static boolean isOpen(Status s) { return s != Status.CLOSED && s != Status.WITHDRAWN; }
 
     /** Details may be edited until a finding is made. */
