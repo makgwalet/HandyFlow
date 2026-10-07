@@ -1,4 +1,5 @@
 // src/pages/clinic/ClinicDashboard.tsx
+import MyDayPanel from "./MyDayPanel"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Users, Calendar, FileText, Clock, CheckCircle, AlertCircle, ArrowRight, TrendingUp } from "lucide-react"
@@ -54,6 +55,7 @@ export default function ClinicDashboard({ onNavigate }: { onNavigate: (tab: any)
 
   return (
     <div>
+      <MyDayPanel onNavigate={onNavigate} />
       {/* KPI cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 28 }}>
         {kpis.map(k => (
