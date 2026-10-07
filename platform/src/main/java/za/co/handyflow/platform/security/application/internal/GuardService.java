@@ -441,7 +441,7 @@ public class GuardService {
         return digitsOnly.substring(0, 6) + "*".repeat(digitsOnly.length() - 6);
     }
 
-    private GuardResponse toResponse(Guard g) {
+    GuardResponse toResponse(Guard g) {
         return new GuardResponse(
                 g.getId(), g.getFirstName(), g.getLastName(),
                 g.getFullName(), g.getPsiraNumber(), maskIdNumber(g.getIdNumber()),

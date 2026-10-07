@@ -165,7 +165,9 @@ Load the demo, sign in as a user with `SECURITY_READ` and `SECURITY_MANAGE` (adm
 - [ ] Recording a departure for an on-site visitor moves them to departed and drops the on-site count.
 
 ### Guards and Guard 360
-- [ ] Guards lists 14. Filter by grade and by status; the terminated guard is hidden or flagged as your filter dictates.
+- [ ] Guards lists 14 (25 per page). Status pills show counts (Active 11, On leave 1, Suspended 1, Terminated 1). Filter by grade, PSiRA state and screening; sort by clicking Guard, PSiRA No., Grade, Status or Last activity; the search box matches name, PSiRA number, employee code and phone.
+- [ ] Flags column: Busisiwe Cele and the expired-PSiRA guard show "PSiRA expired"; two guards show "PSiRA 15d left" and "PSiRA 25d left"; screening flags follow the guard's screening status. The PSiRA banner says 1 expired and 2 expiring, and Show them filters to those three.
+- [ ] Select two guards: the bar offers Set status and Export CSV. A guard the server refuses is named in the result and the others still change.
 - [ ] Open a guard: the profile shows screening, competencies, documents, ratings and complaints.
 - [ ] On a guard's Documents tab the "Guard file checklist" can say police clearance or POPIA consent is missing while Deployment Readiness is 100%. They are different lists, and the panel now says so.
 - [ ] PSiRA badges: some valid, two expiring within 30 days (about 15 and 25 days), one expired about 10 days ago.
@@ -441,6 +443,7 @@ Generated from the controllers. Paths are under the host root. A blank permissio
 | Method | Path | Permission |
 |---|---|---|
 | GET | `/api/v1/security/guards` | SECURITY_READ |
+| GET | `/api/v1/security/guards/directory` | SECURITY_READ | Guards list with search, status, grade, PSiRA and screening filters, sorting, paging and counts |
 | GET | `/api/v1/security/guards/{id}` | SECURITY_READ |
 | GET | `/api/v1/security/guards/{id}/overview` | SECURITY_READ |
 | POST | `/api/v1/security/guards` | SECURITY_MANAGE |

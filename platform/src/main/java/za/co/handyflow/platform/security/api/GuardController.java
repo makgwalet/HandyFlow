@@ -54,6 +54,7 @@ public class GuardController {
     private final GuardService guardService;
     private final FeatureGuard featureGuard;
     private final za.co.handyflow.platform.security.application.internal.GuardOverviewService overviewService;
+    private final za.co.handyflow.platform.security.application.internal.GuardDirectoryService directoryService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('SECURITY_READ')")
@@ -67,6 +68,26 @@ public class GuardController {
                 branchId != null
                         ? guardService.getGuardsByBranch(TenantContext.getTenantIdAsObject(), branchId, pageable)
                         : guardService.getGuards(TenantContext.getTenantIdAsObject(), search, pageable)));
+    }
+
+    @GetMapping("/directory")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
+    @Operation(summary = "Guards list: search, filter by status, grade, PSiRA and screening, sort, page, with counts for the whole filtered set")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.security.dto.GuardDirectoryDtos.Result>> directory(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String grade,
+            @RequestParam(required = false) String psira,
+            @RequestParam(required = false) String screening,
+            @RequestParam(required = false) java.util.UUID branchId,
+            @RequestParam(defaultValue = "name") String sort,
+            @RequestParam(defaultValue = "asc") String dir,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        featureGuard.requireModule("security");
+        return ResponseEntity.ok(ApiResponse.success(directoryService.search(TenantContext.getTenantIdAsObject(),
+                new za.co.handyflow.platform.security.application.internal.GuardDirectoryService.Query(
+                        search, status, grade, psira, screening, branchId, sort, "desc".equalsIgnoreCase(dir), page, size))));
     }
 
     @GetMapping("/{id}")

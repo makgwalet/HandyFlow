@@ -20,11 +20,13 @@
 //
 // All other behavior/logic is unchanged from the original file.
 
-import { useState, useRef } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, Search, Shield, Phone, BadgeCheck, Trash2, X, Edit2, Eye, AlertCircle, Fingerprint, Upload, CheckCircle, AlertTriangle, Clock, Ban, HelpCircle, Calendar, ShieldCheck } from "lucide-react"
+import { Plus, Search, Shield, Phone, BadgeCheck, Trash2, X, Edit2, Eye, AlertCircle, Fingerprint, Upload, CheckCircle, AlertTriangle, Clock, Ban, HelpCircle, Calendar, ShieldCheck, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Download } from "lucide-react"
+import Chip from "../../components/ui/Chip"
+import { DEFAULT_DIR_QUERY, directoryParams, nextSort, withFilter, pageInfo, complianceFlags, activityLabel, guardsCsv, bulkSummary, type DirQuery, type DirResult, type DirSort, type BulkResult } from "./guardDirectory.logic"
 import { usePermission } from "../../hooks/usePermission"
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -319,7 +321,13 @@ export default function GuardsTab() {
   // client-side-mirror convention as the fuel margin report.
   const canViewCpTier = usePermission("VIP_DETAIL_ACCESS")
 
-  const [search,          setSearch]          = useState("")
+  const [q,               setQ]               = useState<DirQuery>(DEFAULT_DIR_QUERY)
+  const [searchText,      setSearchText]      = useState("")
+  const [selected,        setSelected]        = useState<Set<string>>(new Set())
+  const [bulkStatus,      setBulkStatus]      = useState("ON_LEAVE")
+  const [bulkNote,        setBulkNote]        = useState("")
+  const [bulkMsg,         setBulkMsg]         = useState("")
+  const [bulkBusy,        setBulkBusy]        = useState(false)
   const [showAdd,         setShowAdd]         = useState(false)
   const [editing,         setEditing]         = useState<Guard | null>(null)
   const [viewing,         setViewing]         = useState<Guard | null>(null)
@@ -334,22 +342,32 @@ export default function GuardsTab() {
   // FIX (P0 backlog item 1.3) — see the enrollGuard mutation's own
   // comment for the full context on why this exists.
   const [enrollPin,       setEnrollPin]        = useState("")
-  const [statusFilter,    setStatusFilter]    = useState("ALL")
   const [newStatus,       setNewStatus]       = useState("")
   const [statusNote,      setStatusNote]      = useState("")
 
   // ── Queries & mutations ────────────────────────────────────────────────────
 
+  // The search box waits for a pause in typing before it asks the server.
+  useEffect(() => {
+    const t = setTimeout(() => setQ(cur => cur.search === searchText ? cur : withFilter(cur, { search: searchText })), 300)
+    return () => clearTimeout(t)
+  }, [searchText])
+
+  const params = directoryParams(q)
   const { data, isLoading } = useQuery({
-    queryKey: ["guards", search],
+    queryKey: ["guards", "directory", params],
     queryFn: async () => {
-      const params = search ? `?search=${encodeURIComponent(search)}&size=100` : "?size=100"
-      const res = await apiClient.get(`/api/v1/security/guards${params}`)
-      const payload = res.data?.data ?? res.data
-      return (payload?.content ?? payload) as Guard[]
+      const res = await apiClient.get(`/api/v1/security/guards/directory${params}`)
+      return (res.data?.data ?? res.data) as DirResult<Guard>
     },
+    placeholderData: keepPreviousData,
   })
-  const guards = data ?? []
+  const rows = data?.rows ?? []
+  const counts = data?.counts
+  const total = data?.totalElements ?? 0
+  const paging = pageInfo(total, q.page, q.size)
+  // A selection only makes sense for the page it was made on.
+  useEffect(() => { setSelected(new Set()); setBulkMsg("") }, [params])
 
   const createGuard = useMutation({
     mutationFn: (body: any) => apiClient.post("/api/v1/security/guards", body),
@@ -467,7 +485,40 @@ export default function GuardsTab() {
     reader.readAsDataURL(file)
   }
 
-  const filtered = statusFilter === "ALL" ? guards : guards.filter(g => (g.status ?? "ACTIVE") === statusFilter)
+  const allOnPageSelected = rows.length > 0 && rows.every(r => selected.has(r.guard.id))
+  const toggleOne = (id: string) => setSelected(cur => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const toggleAll = () => setSelected(allOnPageSelected ? new Set() : new Set(rows.map(r => r.guard.id)))
+  const selectedRows = rows.filter(r => selected.has(r.guard.id))
+
+  const exportSelected = () => {
+    const blob = new Blob([guardsCsv(selectedRows)], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a"); a.href = url; a.download = "guards.csv"; a.click(); URL.revokeObjectURL(url)
+  }
+
+  // One request per guard through the same status endpoint the single-guard dialog uses, so the lifecycle rules apply
+  // exactly as they do there; a guard the server refuses is named in the result and the rest still go through.
+  const applyBulkStatus = async () => {
+    const label = STATUS_MAP[bulkStatus]?.label ?? bulkStatus
+    if (!window.confirm(`Set ${selectedRows.length} guard${selectedRows.length === 1 ? "" : "s"} to ${label}?`)) return
+    setBulkBusy(true); setBulkMsg("")
+    const results: BulkResult[] = []
+    for (const r of selectedRows) {
+      try { await apiClient.patch(`/api/v1/security/guards/${r.guard.id}/status`, { status: bulkStatus, note: bulkNote.trim() || undefined }); results.push({ id: r.guard.id, name: r.guard.fullName, ok: true }) }
+      catch (e: any) { results.push({ id: r.guard.id, name: r.guard.fullName, ok: false, error: e?.response?.data?.message ?? "refused" }) }
+    }
+    setBulkBusy(false); setBulkMsg(bulkSummary(results).text)
+    qc.invalidateQueries({ queryKey: ["guards"] })
+  }
+
+  const sortHeader = (label: string, key: DirSort) => (
+    <th key={key} aria-sort={q.sort === key ? (q.dir === "asc" ? "ascending" : "descending") : "none"} style={{ padding: "11px 16px", textAlign: "left", fontWeight: 600, fontSize: 12, color: "var(--hf-text-muted)", letterSpacing: "0.05em" }}>
+      <button onClick={() => setQ(cur => nextSort(cur, key))} style={{ all: "unset", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 3 }}>
+        {label}{q.sort === key && (q.dir === "asc" ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+      </button>
+    </th>
+  )
+  const selectSt: React.CSSProperties = { padding: "7px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text-primary)" }
 
   const fmtDate = (iso: string | null) => iso ? new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : null
 
@@ -482,11 +533,11 @@ export default function GuardsTab() {
   return (
     <div>
       {/* Toolbar */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 12, flexWrap: "wrap" }}>
         <div style={{ position: "relative" }}>
           <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--hf-text-faint)" }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or PSiRA..."
-            style={{ paddingLeft: 36, paddingRight: 14, paddingTop: 9, paddingBottom: 9, border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 14, width: 260, outline: "none" }} />
+          <input value={searchText} onChange={e => setSearchText(e.target.value)} placeholder="Search name, PSiRA, code or phone..." aria-label="Search guards"
+            style={{ paddingLeft: 36, paddingRight: 14, paddingTop: 9, paddingBottom: 9, border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 14, width: 300, outline: "none" }} />
         </div>
         <button onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError(""); setCapturedPhoto(null) }}
           style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
@@ -494,68 +545,83 @@ export default function GuardsTab() {
         </button>
       </div>
 
-      {/* Stats */}
+      {/* Stats: over every guard that matches the search and filters, not just this page */}
       <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
         {[
-          { label: "Total",     value: guards.length,                                                     color: "var(--hf-primary-text)" },
-          { label: "Active",    value: guards.filter(g => (g.status ?? "ACTIVE") === "ACTIVE").length,    color: "var(--hf-success-text-strong)" },
-          { label: "On Leave",  value: guards.filter(g => g.status === "ON_LEAVE").length,                color: "var(--hf-info-text)" },
-          { label: "Suspended", value: guards.filter(g => g.status === "SUSPENDED").length,               color: "var(--hf-danger-text)" },
-        ].map(s => (
-          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 20px" }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
+          { label: "Total",     value: counts?.total ?? 0,                    color: "var(--hf-primary-text)" },
+          { label: "Active",    value: counts?.byStatus?.ACTIVE ?? 0,         color: "var(--hf-success-text-strong)" },
+          { label: "On Leave",  value: counts?.byStatus?.ON_LEAVE ?? 0,       color: "var(--hf-info-text)" },
+          { label: "Suspended", value: counts?.byStatus?.SUSPENDED ?? 0,      color: "var(--hf-danger-text)" },
+        ].map(t => (
+          <div key={t.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 20px" }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: t.color }}>{t.value}</div>
+            <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 2 }}>{t.label}</div>
           </div>
         ))}
       </div>
 
-      {/* PSiRA expiry alerts — only show if any are expired or expiring soon */}
-      {(() => {
-        const expiring = guards.filter(g => {
-          const s = psiraExpiryStatus(g.psiraExpiryDate)
-          return s !== null
-        })
-        if (expiring.length === 0) return null
-        return (
-          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
-            <AlertTriangle size={16} style={{ color: 'var(--hf-warning-text)', flexShrink: 0, marginTop: 1 }} />
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-warning-text-deep)", marginBottom: 4 }}>PSiRA Compliance Alert</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                {expiring.map(g => {
-                  const s = psiraExpiryStatus(g.psiraExpiryDate)!
-                  return (
-                    <div key={g.id} style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>
-                      {g.fullName} — <span style={{ color: s.color, fontWeight: 600 }}>{s.label}</span>
-                      {g.psiraExpiryDate && ` (${fmtDate(g.psiraExpiryDate)})`}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+      {/* PSiRA alert: a count with a button that filters the list, instead of listing names that may be on another page */}
+      {counts && (counts.psiraExpired + counts.psiraExpiring) > 0 && (
+        <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 10, display: "flex", gap: 10, alignItems: "center" }}>
+          <AlertTriangle size={16} style={{ color: "var(--hf-warning-text)", flexShrink: 0 }} />
+          <div style={{ flex: 1, fontSize: 13, color: "var(--hf-warning-text-deep)" }}>
+            <strong>PSiRA compliance alert:</strong> {counts.psiraExpired} expired and {counts.psiraExpiring} expiring within 30 days.
           </div>
-        )
-      })()}
+          <button onClick={() => setQ(cur => withFilter(cur, { psira: "ATTENTION" }))} style={{ border: "1px solid var(--hf-warning-border-strong)", background: "var(--hf-surface)", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "var(--hf-warning-text-deep)" }}>Show them</button>
+        </div>
+      )}
 
-      {/* Status filter pills */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" }}>
+      {/* Status pills and filters */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
         {["ALL", ...GUARD_STATUSES.map(s => s.value)].map(s => {
           const cfg = s !== "ALL" ? STATUS_MAP[s] : null
+          const n = s === "ALL" ? counts?.total : counts?.byStatus?.[s]
           return (
-            <button key={s} onClick={() => setStatusFilter(s)}
-              style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: statusFilter === s ? 600 : 400,
-                background: statusFilter === s ? (cfg?.color ?? "var(--hf-primary)") : "var(--hf-surface-sunken)",
-                color: statusFilter === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
-              {s === "ALL" ? "All guards" : cfg?.label}
+            <button key={s} onClick={() => setQ(cur => withFilter(cur, { status: s }))}
+              style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: q.status === s ? 600 : 400,
+                background: q.status === s ? (cfg?.color ?? "var(--hf-primary)") : "var(--hf-surface-sunken)",
+                color: q.status === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
+              {s === "ALL" ? "All guards" : cfg?.label}{n != null ? ` (${n})` : ""}
             </button>
           )
         })}
       </div>
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <select aria-label="Grade" value={q.grade} onChange={e => setQ(cur => withFilter(cur, { grade: e.target.value }))} style={selectSt}>
+          <option value="ALL">Any grade</option>{["A", "B", "C", "D", "E"].map(g => <option key={g} value={g}>Grade {g}</option>)}
+        </select>
+        <select aria-label="PSiRA" value={q.psira} onChange={e => setQ(cur => withFilter(cur, { psira: e.target.value }))} style={selectSt}>
+          <option value="ALL">Any PSiRA state</option><option value="ATTENTION">Expired or expiring</option><option value="EXPIRED">Expired</option>
+          <option value="EXPIRING">Expiring in 30 days</option><option value="VALID">Valid</option><option value="NONE">No expiry on file</option>
+        </select>
+        <select aria-label="Screening" value={q.screening} onChange={e => setQ(cur => withFilter(cur, { screening: e.target.value }))} style={selectSt}>
+          <option value="ALL">Any screening</option><option value="CLEARED">Cleared</option><option value="PENDING">Pending</option>
+          <option value="FLAGGED">Flagged</option><option value="UNSCREENED">Not screened</option>
+        </select>
+        {(q.grade !== "ALL" || q.psira !== "ALL" || q.screening !== "ALL" || q.status !== "ALL" || q.search !== "") && (
+          <button onClick={() => { setSearchText(""); setQ(DEFAULT_DIR_QUERY) }} style={{ ...selectSt, cursor: "pointer", color: "var(--hf-accent-text)" }}>Clear filters</button>
+        )}
+      </div>
+
+      {/* Bulk bar */}
+      {selectedRows.length > 0 && (
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "10px 14px", marginBottom: 12, border: "1px solid var(--hf-border)", borderRadius: 10, background: "var(--hf-surface-muted)" }}>
+          <strong style={{ fontSize: 13 }}>{selectedRows.length} selected</strong>
+          <select aria-label="Bulk status" value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} style={selectSt}>
+            {GUARD_STATUSES.filter(s => s.value !== "TERMINATED").map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+          <input aria-label="Bulk note" value={bulkNote} onChange={e => setBulkNote(e.target.value)} placeholder="Note (optional)" style={{ ...selectSt, width: 220 }} />
+          <button disabled={bulkBusy} onClick={applyBulkStatus} style={{ ...selectSt, cursor: "pointer", fontWeight: 600 }}>{bulkBusy ? "Updating..." : "Set status"}</button>
+          <button onClick={exportSelected} style={{ ...selectSt, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Download size={13} /> Export CSV</button>
+          <button onClick={() => setSelected(new Set())} style={{ ...selectSt, cursor: "pointer" }}>Clear selection</button>
+        </div>
+      )}
+      {bulkMsg && <div role="status" style={{ marginBottom: 12, fontSize: 13, color: "var(--hf-text-secondary)" }}>{bulkMsg}</div>}
 
       {/* Guard table */}
       {isLoading ? (
         <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading guards...</div>
-      ) : filtered.length === 0 ? (
+      ) : rows.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Shield size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
           <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No guards found</div>
@@ -565,18 +631,26 @@ export default function GuardsTab() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
               <tr style={{ background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border)" }}>
-                {["Guard", "PSiRA No.", "Phone", "Grade", "Status", "Actions"].map(h => (
-                  <th key={h} style={{ padding: "11px 16px", textAlign: "left", fontWeight: 600, fontSize: 12, color: "var(--hf-text-muted)", letterSpacing: "0.05em" }}>{h}</th>
-                ))}
+                <th style={{ padding: "11px 8px 11px 16px", width: 28 }}><input type="checkbox" aria-label="Select all on this page" checked={allOnPageSelected} onChange={toggleAll} /></th>
+                {sortHeader("Guard", "name")}
+                {sortHeader("PSiRA No.", "psira")}
+                <th style={{ padding: "11px 16px", textAlign: "left", fontWeight: 600, fontSize: 12, color: "var(--hf-text-muted)", letterSpacing: "0.05em" }}>Phone</th>
+                {sortHeader("Grade", "grade")}
+                {sortHeader("Status", "status")}
+                <th style={{ padding: "11px 16px", textAlign: "left", fontWeight: 600, fontSize: 12, color: "var(--hf-text-muted)", letterSpacing: "0.05em" }}>Flags</th>
+                {sortHeader("Last activity", "activity")}
+                <th style={{ padding: "11px 16px", textAlign: "left", fontWeight: 600, fontSize: 12, color: "var(--hf-text-muted)", letterSpacing: "0.05em" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((g, i) => {
+              {rows.map((r, i) => {
+                const g = r.guard
                 const gStatus   = g.status ?? "ACTIVE"
                 const unavail   = gStatus !== "ACTIVE"
-                const expiryBadge = psiraExpiryStatus(g.psiraExpiryDate)
+                const flags = complianceFlags(r)
                 return (
-                  <tr key={g.id} style={{ borderBottom: i < filtered.length - 1 ? "1px solid var(--hf-border-subtle)" : "none", background: unavail ? "var(--hf-surface-muted)" : "var(--hf-surface)" }}>
+                  <tr key={g.id} style={{ borderBottom: i < rows.length - 1 ? "1px solid var(--hf-border-subtle)" : "none", background: unavail ? "var(--hf-surface-muted)" : "var(--hf-surface)" }}>
+                    <td style={{ padding: "13px 8px 13px 16px" }}><input type="checkbox" aria-label={`Select ${g.fullName}`} checked={selected.has(g.id)} onChange={() => toggleOne(g.id)} /></td>
                     <td style={{ padding: "13px 16px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <GuardAvatar guard={g} size={36} />
@@ -590,22 +664,22 @@ export default function GuardsTab() {
                       </div>
                     </td>
                     <td style={{ padding: "13px 16px", color: "var(--hf-text-tertiary)" }}>
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}><BadgeCheck size={13} style={{ color: 'var(--hf-accent-text)' }} />{g.psiraNumber || "—"}</div>
-                        {expiryBadge && (
-                          <span style={{ fontSize: 10, fontWeight: 600, background: expiryBadge.bg, color: expiryBadge.color, padding: "1px 6px", borderRadius: 10, marginTop: 3, display: "inline-block" }}>
-                            {expiryBadge.label}
-                          </span>
-                        )}
-                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}><BadgeCheck size={13} style={{ color: "var(--hf-accent-text)" }} />{g.psiraNumber || "—"}</div>
+                      {g.psiraExpiryDate && <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 2 }}>Expires {fmtDate(g.psiraExpiryDate)}</div>}
                     </td>
                     <td style={{ padding: "13px 16px", color: "var(--hf-text-tertiary)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}><Phone size={13} style={{ color: 'var(--hf-text-faint)' }} />{g.phone || "—"}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}><Phone size={13} style={{ color: "var(--hf-text-faint)" }} />{g.phone || "—"}</div>
                     </td>
                     <td style={{ padding: "13px 16px" }}>
                       <span style={{ background: `color-mix(in srgb, ${GRADE_COLORS[g.grade] || "var(--hf-text-muted)"} 9%, transparent)`, color: GRADE_COLORS[g.grade] || "var(--hf-text-muted)", padding: "3px 10px", borderRadius: 20, fontWeight: 700, fontSize: 12 }}>Grade {g.grade}</span>
                     </td>
                     <td style={{ padding: "13px 16px" }}><StatusBadge status={gStatus} /></td>
+                    <td style={{ padding: "13px 16px" }}>
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        {flags.length === 0 ? <span style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>None</span> : flags.map(f => <Chip key={f.key} tone={f.tone}>{f.label}</Chip>)}
+                      </div>
+                    </td>
+                    <td style={{ padding: "13px 16px", fontSize: 12, color: "var(--hf-text-muted)", whiteSpace: "nowrap" }}>{activityLabel(r.lastActivityAt)}</td>
                     <td style={{ padding: "13px 16px" }}>
                       <div style={{ display: "flex", gap: 6 }}>
                         <button onClick={() => navigate(`/security/guards/${g.id}`)} title="Open guard profile" style={{ background: "var(--hf-info-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-info-text)" }}><Eye size={13} /></button>
@@ -619,6 +693,19 @@ export default function GuardsTab() {
               })}
             </tbody>
           </table>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderTop: "1px solid var(--hf-border)", background: "var(--hf-surface-muted)", fontSize: 12, color: "var(--hf-text-muted)", flexWrap: "wrap", gap: 8 }}>
+            <span>Showing {paging.from} to {paging.to} of {total}</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <label>Per page{" "}
+                <select aria-label="Per page" value={q.size} onChange={e => setQ(cur => withFilter(cur, { size: Number(e.target.value) }))} style={{ ...selectSt, padding: "3px 6px" }}>
+                  {[25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </label>
+              <button aria-label="Previous page" disabled={!paging.hasPrev} onClick={() => setQ(cur => ({ ...cur, page: cur.page - 1 }))} style={{ ...selectSt, padding: "3px 6px", cursor: paging.hasPrev ? "pointer" : "default", opacity: paging.hasPrev ? 1 : 0.4 }}><ChevronLeft size={14} /></button>
+              <span>Page {q.page + 1} of {paging.pages}</span>
+              <button aria-label="Next page" disabled={!paging.hasNext} onClick={() => setQ(cur => ({ ...cur, page: cur.page + 1 }))} style={{ ...selectSt, padding: "3px 6px", cursor: paging.hasNext ? "pointer" : "default", opacity: paging.hasNext ? 1 : 0.4 }}><ChevronRight size={14} /></button>
+            </span>
+          </div>
         </div>
       )}
 
