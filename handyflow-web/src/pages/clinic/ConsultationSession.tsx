@@ -11,62 +11,42 @@ import { PatientAlertBanner } from "./PatientNotes"
 import { AllergyWarning, missingReasons, useAllergyChecks } from "./PrescriptionAllergyCheck"
 import {
   Mic, MicOff, Plus, X, Pill,
-  Syringe, FlaskConical, Scissors, CheckCircle,
-  AlertCircle, Loader, Sparkles, Search, Zap,
+  CheckCircle,
+  AlertCircle, Loader, Sparkles, Search,
 } from "lucide-react"
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface Patient { id: string; fullName: string; bloodType?: string; allergies?: string[] }
-interface Appointment {
-  id: string; patientId: string; patientName: string
-  practitionerId: string; practitionerName: string
-  appointmentType: string; reason: string; scheduledAt: string
-}
-interface BillLine {
-  id: string; type: "CONSULTATION"|"PROCEDURE"|"MEDICINE"|"CONSUMABLE"
-  description: string; tariffCode?: string; nappiCode?: string
-  quantity: number; unitPrice: number; gross: number
-}
-interface RxDraft {
-  id: string; medicationName: string; nappiCode?: string
-  dosage: string; frequency: string; duration: string
-  quantity: number; instructions: string; fromBill: boolean
-  allergyReason?: string
-}
-
-// ── Tokens ────────────────────────────────────────────────────────────────────
-
-const NAVY="var(--hf-primary)";
-const NAVY_TEXT = "var(--hf-primary-text)"; const TEAL="var(--hf-accent)";
-const TEAL_TEXT = "var(--hf-accent-text)"; const RED="var(--hf-danger)"
-const RED_TEXT = "var(--hf-danger-text)";
-const GREEN="var(--hf-success-solid-strong)";
-const GREEN_TEXT = "var(--hf-success-text-strong)"; const AMBER="var(--hf-warning)";
-const AMBER_TEXT = "var(--hf-warning-text)"; const PURPLE="var(--hf-violet)"
-const PURPLE_TEXT = "var(--hf-violet-text)";
-const GRAY="var(--hf-neutral-solid)";
-const GRAY_TEXT = "var(--hf-text-muted)"; const BORDER="var(--hf-border)"; const LIGHT="var(--hf-surface-muted)"
-
-const QUICK_PROCEDURES = [
-  { label:"Injection IM",    tariff:"0115", price: 85,  icon: Syringe,      type:"PROCEDURE" },
-  { label:"Injection IV",    tariff:"0116", price:120,  icon: Syringe,      type:"PROCEDURE" },
-  { label:"Blood draw",      tariff:"0301", price: 95,  icon: FlaskConical, type:"PROCEDURE" },
-  { label:"Wound suture",    tariff:"0007", price:180,  icon: Scissors,     type:"PROCEDURE" },
-  { label:"ECG 12-lead",     tariff:"4116", price:350,  icon: Zap,          type:"PROCEDURE" },
-]
-
-const fmtR = (v: number) => `R ${(v||0).toLocaleString("en-ZA",{minimumFractionDigits:2})}`
-
-function padZero(n: number) { return String(n).padStart(2,"0") }
-function fmtTimer(seconds: number) {
-  const h = Math.floor(seconds/3600)
-  const m = Math.floor((seconds%3600)/60)
-  const s = seconds%60
-  return h > 0 ? `${padZero(h)}:${padZero(m)}:${padZero(s)}` : `${padZero(m)}:${padZero(s)}`
-}
-
-const unwrap = (r:any) => { const p=r.data?.data??r.data; return Array.isArray(p)?p:(p?.content??[]) }
+import {
+  type Patient,
+  type Appointment,
+  type BillLine,
+  type RxDraft,
+  NAVY,
+  NAVY_TEXT,
+  TEAL,
+  TEAL_TEXT,
+  RED,
+  RED_TEXT,
+  GREEN,
+  GREEN_TEXT,
+  AMBER,
+  AMBER_TEXT,
+  PURPLE,
+  PURPLE_TEXT,
+  GRAY,
+  GRAY_TEXT,
+  BORDER,
+  LIGHT,
+  QUICK_PROCEDURES,
+  fmtR,
+  fmtTimer,
+  unwrap,
+  lbl,
+  sectionLabel,
+  sinp,
+  primaryBtn,
+  cancelBtn,
+  voiceBtn,
+} from "./consultationSession.shared"
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
@@ -892,10 +872,4 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
 }
 
 // ── Style helpers ─────────────────────────────────────────────────────────────
-const lbl:React.CSSProperties         = {display:"block",fontSize:11,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:3}
-const sectionLabel:React.CSSProperties = {fontSize:10,fontWeight:700,color:GRAY_TEXT,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}
-const sinp:React.CSSProperties        = {width:"100%",padding:"8px 10px",boxSizing:"border-box" as const,border:`1.5px solid ${BORDER}`,borderRadius:7,fontSize:13,outline:"none",background:"var(--hf-surface)"}
-const primaryBtn:React.CSSProperties  = {background:NAVY,color:"var(--hf-text-on-solid)",border:"none",borderRadius:9,padding:"9px 18px",fontSize:13,fontWeight:600,cursor:"pointer"}
-const cancelBtn:React.CSSProperties   = {padding:"9px 16px",border:`1px solid ${BORDER}`,borderRadius:9,background:"var(--hf-surface)",fontSize:13,cursor:"pointer",color:"var(--hf-text-secondary)"}
-const voiceBtn = (bg:string):React.CSSProperties => ({display:"flex",alignItems:"center",gap:4,padding:"4px 10px",background:bg,color:"var(--hf-text-on-solid)",border:"none",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer"})
 
