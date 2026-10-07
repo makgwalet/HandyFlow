@@ -6,6 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import za.co.handyflow.platform.compliancetender.domain.model.Tender;
+import za.co.handyflow.platform.compliancetender.dto.TenderPricingResponse;
 import za.co.handyflow.platform.compliancetender.domain.model.TenderPersonnel;
 import za.co.handyflow.platform.compliancetender.domain.model.TenderRequirement;
 import za.co.handyflow.platform.compliancetender.domain.repository.TenderPersonnelRepository;
@@ -41,9 +42,10 @@ class TenderPdfServiceTest {
     @Mock private TenderPersonnelRepository personnelRepository;
     @Mock private TenantFacade tenantFacade;
     @Mock private HrFacade hrFacade;
+    @Mock private TenderPricingService pricingService;
 
     private TenderPdfService service() {
-        return new TenderPdfService(tenderRepository, requirementRepository, personnelRepository, tenantFacade, hrFacade);
+        return new TenderPdfService(tenderRepository, requirementRepository, personnelRepository, tenantFacade, hrFacade, pricingService);
     }
 
     private static final TenantId TENANT = TenantId.generate();
@@ -143,5 +145,60 @@ class TenderPdfServiceTest {
     @DisplayName("a malformed data: URI is refused")
     void decodeLogo_malformedDataUri_isRefused() {
         assertThatThrownBy(() -> service().decodeLogoBytes("data:image/png;base64")).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Malformed");
+    }
+
+    private static String text(byte[] pdf) throws Exception {
+        try (var doc = new com.itextpdf.kernel.pdf.PdfDocument(new com.itextpdf.kernel.pdf.PdfReader(new java.io.ByteArrayInputStream(pdf)))) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 1; i <= doc.getNumberOfPages(); i++) sb.append(com.itextpdf.kernel.pdf.canvas.parser.PdfTextExtractor.getTextFromPage(doc.getPage(i))).append('\n');
+            return sb.toString();
+        }
+    }
+
+    private void bareTender(UUID tenderId) {
+        Tender tender = Tender.create(TENANT, "TND-00003", "Priced Tender", null, null, null, null, null, null, null, null, USER);
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(tender));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(personnelRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(tenantFacade.findTenantDetails(TENANT)).thenReturn(Optional.of(tenantDetails("Zeta Earthmoving (Pty) Ltd")));
+    }
+
+    private static TenderPricingResponse pricing(boolean withLines) {
+        return new TenderPricingResponse(UUID.randomUUID(), "IN_PREPARATION", true, true, null,
+                new TenderPricingResponse.Settings(new BigDecimal("10.00"), BigDecimal.ZERO, new BigDecimal("5.00"), true, new BigDecimal("15.00"), null),
+                withLines ? List.of(new TenderPricingResponse.LineResponse(UUID.randomUUID(), "Roadworks", "1.1", "Kerbing", "m", new BigDecimal("10.000"),
+                        new BigDecimal("25.50"), new BigDecimal("255.00"), 1)) : List.of(),
+                new TenderPricingResponse.Breakdown(new BigDecimal("255.00"), new BigDecimal("25.50"), BigDecimal.ZERO.setScale(2), new BigDecimal("14.03"),
+                        new BigDecimal("294.53"), new BigDecimal("44.18"), new BigDecimal("338.71"), new BigDecimal("4.76"), List.of()));
+    }
+
+    @Test
+    @DisplayName("the default summary never contains pricing, and does not even load it")
+    void withoutPricing() throws Exception {
+        UUID tenderId = UUID.randomUUID();
+        bareTender(tenderId);
+        String t = text(service().generateTenderSummaryPdf(TENANT, tenderId));
+        assertThat(t).doesNotContain("Price Schedule").doesNotContain("338.71");
+        org.mockito.Mockito.verifyNoInteractions(pricingService);
+    }
+
+    @Test
+    @DisplayName("with pricing, the summary carries the schedule, how the price is built and the internal-use warning")
+    void withPricing() throws Exception {
+        UUID tenderId = UUID.randomUUID();
+        bareTender(tenderId);
+        when(pricingService.getPricing(TENANT, tenderId)).thenReturn(pricing(true));
+        String t = text(service().generateTenderSummaryPdf(TENANT, tenderId, true));
+        assertThat(t).contains("Price Schedule").contains("Roadworks").contains("Kerbing").contains("R 255.00")
+                .contains("Overhead 10%").contains("Profit 5%").contains("R 338.71").contains("do not send it to the tender authority");
+    }
+
+    @Test
+    @DisplayName("with pricing but nothing priced yet, it says so instead of printing an empty table")
+    void withPricing_noLines() throws Exception {
+        UUID tenderId = UUID.randomUUID();
+        bareTender(tenderId);
+        when(pricingService.getPricing(TENANT, tenderId)).thenReturn(pricing(false));
+        assertThat(text(service().generateTenderSummaryPdf(TENANT, tenderId, true))).contains("No pricing has been entered yet");
     }
 }

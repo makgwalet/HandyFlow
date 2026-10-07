@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
@@ -257,16 +258,24 @@ public class TenderController {
 
     @GetMapping("/{id}/export")
     @PreAuthorize("hasAnyAuthority('COMPLIANCE_READ','COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
-    @Operation(summary = "Tender Summary PDF — current live state (requirement matrix + key personnel)")
-    public ResponseEntity<byte[]> exportPdf(@PathVariable UUID id) {
+    @Operation(summary = "Tender Summary PDF — current live state (requirement matrix + key personnel); includePricing adds the price schedule (MANAGE or ADMIN only)")
+    public ResponseEntity<byte[]> exportPdf(@PathVariable UUID id, @RequestParam(defaultValue = "false") boolean includePricing) {
         featureGuard.requireModule("compliancetender");
-        byte[] pdf = pdfService.generateTenderSummaryPdf(TenantContext.getTenantIdAsObject(), id);
+        // pricing is commercially sensitive: asking for it without the right is refused, never quietly left out, so nobody thinks they exported the whole thing
+        if (includePricing && !mayViewPricing()) throw new AccessDeniedException("Pricing is only available to people who can manage tenders.");
+        byte[] pdf = pdfService.generateTenderSummaryPdf(TenantContext.getTenantIdAsObject(), id, includePricing);
         return ResponseEntity.ok()
                 .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
                 .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"tender-summary-" + id + ".pdf\"")
+                        "attachment; filename=\"tender-summary-" + id + (includePricing ? "-with-pricing" : "") + ".pdf\"")
                 .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
                 .contentLength(pdf.length)
                 .body(pdf);
+    }
+
+    private static boolean mayViewPricing() {
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("COMPLIANCE_MANAGE") || a.getAuthority().equals("COMPLIANCE_ADMIN"));
     }
 }
