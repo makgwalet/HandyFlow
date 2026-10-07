@@ -564,7 +564,7 @@ export const CLINIC_SECTIONS: ModuleSections = {
         { id: 'waitlist', label: 'Waitlist', icon: ListPlus },
       ],
     },
-    { label: 'Scheduling', sections: [{ id: 'schedule', label: 'Schedule', icon: Calendar }] },
+    { label: 'Scheduling', sections: [{ id: 'schedule', label: 'Schedule', icon: Calendar }, { id: 'waiting-room', label: 'Waiting room', icon: Users }] },
     {
       label: 'Practice & finance',
       sections: [
