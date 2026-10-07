@@ -39,6 +39,7 @@ public class ClinicController {
 
     private final ClinicService                      clinicService;
     private final za.co.handyflow.platform.clinic.application.internal.ClinicDispensingService dispensingService;
+    private final za.co.handyflow.platform.clinic.application.internal.ClinicAllergySnapshotService allergySnapshotService;
     private final ClinicPatientIdentityService       patientIdentityService;
     private final ClinicAppointmentReminderService    appointmentReminderService;
     private final ClinicTelehealthService              telehealthService;
@@ -325,6 +326,14 @@ public class ClinicController {
     public ResponseEntity<ApiResponse<List<FillDtos.FillResponse>>> fills(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Success",
                 dispensingService.fills(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @GetMapping("/consultations/{id}/allergy-snapshot")
+    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @Operation(summary = "Allergies on record when the consultation was signed (not captured for older consultations)")
+    public ResponseEntity<ApiResponse<AllergySnapshotResponse>> allergySnapshot(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                allergySnapshotService.get(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @PostMapping("/consultations/{consultationId}/prescriptions/allergy-check")

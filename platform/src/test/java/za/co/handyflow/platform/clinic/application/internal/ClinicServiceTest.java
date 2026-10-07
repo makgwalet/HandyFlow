@@ -40,6 +40,7 @@ class ClinicServiceTest {
     @Mock ClinicObservationService         observationService;
     @Mock ClinicPrescriptionRepository prescriptionRepo;
     @Mock ClinicPrescribingSafetyService prescribingSafety;
+    @Mock ClinicAllergySnapshotService allergySnapshot;
 
     @InjectMocks ClinicService service;
 
@@ -635,6 +636,7 @@ class ClinicServiceTest {
             assertThat(result.status()).isEqualTo("SIGNED");
             assertThat(draft.getSignedAt()).isNotNull();
             verify(observationService).syncConsultationVitals(TENANT, draft);
+            verify(allergySnapshot).capture(TENANT, draft.getId(), patientId);
             verify(appointmentRepo).save(argThat(a -> "COMPLETED".equals(a.getStatus())));
             verify(patientRepo).save(argThat(p -> p.getLastVisitAt() != null));
         }
@@ -651,6 +653,7 @@ class ClinicServiceTest {
                     .hasMessageContaining("Intake: Reason for visit");
             assertThat(draft.getStatus()).isEqualTo("DRAFT");
             verify(consultationRepo, never()).save(any());
+            verifyNoInteractions(allergySnapshot);
         }
 
         @Test

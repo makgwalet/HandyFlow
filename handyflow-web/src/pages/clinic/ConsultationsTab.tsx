@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import AddendaPanel from "./AddendaPanel"
 import QuestionAnswersReadOnly from "./QuestionAnswersReadOnly"
+import AllergySnapshot from "./AllergySnapshot"
 import { Plus, X, FileText, ChevronDown, ChevronUp, Pill, AlertCircle, Activity, Download } from "lucide-react"
 
 interface Consultation {
@@ -204,6 +205,7 @@ export default function ConsultationsTab() {
 
                 {isOpen && (
                   <div style={{ borderTop: "1px solid var(--hf-border)", padding: "18px 20px", background: "var(--hf-surface-muted)" }}>
+                    <AllergySnapshot consultationId={c.id} />
                     <QuestionAnswersReadOnly consultationId={c.id} />
                     <AddendaPanel consultationId={c.id} status={(c as any).status} />
                     {/* Vitals */}

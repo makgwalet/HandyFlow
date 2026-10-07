@@ -39,6 +39,7 @@ public class ClinicService {
     private final ClinicQuestionLibraryService     questionLibraryService;
     private final ClinicPrescriptionRepository prescriptionRepo;
     private final ClinicPrescribingSafetyService prescribingSafety;
+    private final ClinicAllergySnapshotService allergySnapshot;
     private final EmailService                 emailService;
     private final ClinicConsultationSummaryPdfService consultationSummaryPdfService;
     private final JdbcTemplate                 jdbc;
@@ -592,6 +593,7 @@ public class ClinicService {
         }
         c.sign();
         consultationRepo.save(c);
+        allergySnapshot.capture(tenantId, c.getId(), c.getPatientId());
         observationService.syncConsultationVitals(tenantId, c);
 
         if (c.getAppointmentId() != null) {
