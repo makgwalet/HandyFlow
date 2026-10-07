@@ -32,6 +32,8 @@ export interface TenderPackage {
   id: string; tenderId: string; versionNo: number; submissionReady: boolean; includesPricing: boolean; profileName: string | null
   packageHash: string; fileName: string; sizeBytes: number; pageCount: number | null; createdAt: string; createdByName: string | null
   files: PackageFileEntry[]
+  /** The tender has changed since this version was built. Older servers do not send these. */
+  stale?: boolean; staleReasons?: string[]
 }
 
 export interface PackagePlan {

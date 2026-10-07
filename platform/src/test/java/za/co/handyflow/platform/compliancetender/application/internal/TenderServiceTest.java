@@ -170,7 +170,7 @@ class TenderServiceTest {
     }
 
     private static UpdateTenderRequest edit(String name) {
-        return new UpdateTenderRequest(name, " SANRAL ", "", java.time.LocalDate.of(2026, 12, 21), null, null, null, "Construction", null);
+        return new UpdateTenderRequest(name, " SANRAL ", "", java.time.LocalDate.of(2026, 12, 21), null, null, null, "Construction", null, null);
     }
 
     @Test
@@ -187,6 +187,20 @@ class TenderServiceTest {
         assertThat(tender.getClosingDate()).isEqualTo(java.time.LocalDate.of(2026, 12, 21));
         assertThat(response.tenderNumber()).isEqualTo("TND-00001");
         assertThat(response.status()).isEqualTo("DRAFT");
+    }
+
+    @Test
+    @DisplayName("update() records that the tender requires pricing, and leaves it alone when the request does not say")
+    void update_requiresPricing() {
+        UUID tenderId = UUID.randomUUID();
+        Tender tender = tenderWith(tenderId);
+
+        var on = new UpdateTenderRequest("T", null, null, null, null, null, null, null, null, true);
+        assertThat(service().update(TENANT, tenderId, on, USER).requiresPricing()).isTrue();
+        assertThat(service().update(TENANT, tenderId, edit("T"), USER).requiresPricing()).isTrue();
+        var off = new UpdateTenderRequest("T", null, null, null, null, null, null, null, null, false);
+        assertThat(service().update(TENANT, tenderId, off, USER).requiresPricing()).isFalse();
+        assertThat(tender.isRequiresPricing()).isFalse();
     }
 
     @Test

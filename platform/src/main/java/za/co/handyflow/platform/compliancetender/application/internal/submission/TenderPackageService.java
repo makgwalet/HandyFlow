@@ -54,13 +54,14 @@ public class TenderPackageService {
     private final LetterheadProvider letterheads;
     private final TenderPackageStorage storage;
     private final SubmissionProfileService profiles;
+    private final PackageInputsProvider inputs;
     private final SectionCatalogue catalogue = SectionCatalogue.v1();
     private final long systemMaxFileBytes;
     private final long systemMaxTotalBytes;
 
     public TenderPackageService(TenderRepository tenderRepository, TenderPackageRepository packageRepository,
                                 TenderPackageFileRepository fileRepository, List<SectionSource> sectionSources,
-                                SectionRenderer renderer, LetterheadProvider letterheads, TenderPackageStorage storage, SubmissionProfileService profiles,
+                                SectionRenderer renderer, LetterheadProvider letterheads, TenderPackageStorage storage, SubmissionProfileService profiles, PackageInputsProvider inputs,
                                 @Value("${handyflow.tender.package.system-max-file-mb:100}") long systemMaxFileMb,
                                 @Value("${handyflow.tender.package.system-max-total-mb:250}") long systemMaxTotalMb) {
         this.tenderRepository = tenderRepository;
@@ -71,6 +72,7 @@ public class TenderPackageService {
         this.letterheads = letterheads;
         this.storage = storage;
         this.profiles = profiles;
+        this.inputs = inputs;
         this.systemMaxFileBytes = systemMaxFileMb * 1024 * 1024;
         this.systemMaxTotalBytes = systemMaxTotalMb * 1024 * 1024;
     }
@@ -150,6 +152,7 @@ public class TenderPackageService {
         TenderPackage pkg = TenderPackage.create(packageId, tenantId, tenderId, version, ready, includesPricing, p.effective.profile().name(),
                 ProfileJson.of(p.effective.profile()), ProfileJson.issues(issues), manifest.packageHash(), combinedName, combined.sha256(), CONTENT_TYPE,
                 stored.sizeBytes(), merged.pages(), stored.storageKey(), userId, userName);
+        pkg.recordInputs(inputs.current(tenantId, tender).encode());
         List<TenderPackageFile> savedFiles = new ArrayList<>();
         try {
             packageRepository.save(pkg);
@@ -165,20 +168,22 @@ public class TenderPackageService {
             throw e;
         }
         log.info("Tender package built tender={} version={} ready={} files={} tenant={}", tenderId, version, ready, manifest.entries().size(), tenantId);
-        return response(p, true, ready, issues, toResponse(pkg, savedFiles));
+        return response(p, true, ready, issues, toResponse(pkg, savedFiles, List.of()));
     }
 
     @Transactional(readOnly = true)
     public List<TenderPackageResponse> list(TenantId tenantId, UUID tenderId) {
-        tender(tenantId, tenderId);
+        Tender tender = tender(tenantId, tenderId);
+        PackageInputs now = inputs.current(tenantId, tender);
         return packageRepository.findByTender(tenantId, tenderId).stream()
-                .map(pkg -> toResponse(pkg, fileRepository.findByPackage(tenantId, pkg.getId()))).toList();
+                .map(pkg -> toResponse(pkg, fileRepository.findByPackage(tenantId, pkg.getId()), PackageInputs.changes(PackageInputs.parse(pkg.getInputsFingerprint()), now))).toList();
     }
 
     @Transactional(readOnly = true)
     public TenderPackageResponse get(TenantId tenantId, UUID packageId) {
         TenderPackage pkg = findPackage(tenantId, packageId);
-        return toResponse(pkg, fileRepository.findByPackage(tenantId, packageId));
+        PackageInputs now = inputs.current(tenantId, tender(tenantId, pkg.getTenderId()));
+        return toResponse(pkg, fileRepository.findByPackage(tenantId, packageId), PackageInputs.changes(PackageInputs.parse(pkg.getInputsFingerprint()), now));
     }
 
     @Transactional(readOnly = true)
@@ -231,7 +236,7 @@ public class TenderPackageService {
         SubmissionProfile saved = profiles.load(tenantId, request.submissionProfileId());
         SubmissionProfile override = overrideOf(request.limits());
         SubmissionProfileResolver.Effective effective = SubmissionProfileResolver.resolve(null, saved, override, systemMaxFileBytes, systemMaxTotalBytes);
-        PackagePlan plan = PackagePlanner.plan(planned, effective.profile(), request.pricingRequired());
+        PackagePlan plan = PackagePlanner.plan(planned, effective.profile(), tender.isRequiresPricing() || request.pricingRequired());
         return new Prepared(tender, planned, generated, plan, effective);
     }
 
@@ -253,11 +258,12 @@ public class TenderPackageService {
         return new TenderPackagePlanResponse(canBuild, ready, sections, out, p.effective.ceilingNotes(), built);
     }
 
-    private static TenderPackageResponse toResponse(TenderPackage pkg, List<TenderPackageFile> files) {
+    private static TenderPackageResponse toResponse(TenderPackage pkg, List<TenderPackageFile> files, List<String> staleReasons) {
         return new TenderPackageResponse(pkg.getId(), pkg.getTenderId(), pkg.getVersionNo(), pkg.isSubmissionReady(), pkg.isIncludesPricing(),
                 pkg.getProfileName(), pkg.getPackageHash(), pkg.getFileName(), pkg.getSizeBytes(), pkg.getPageCount(), pkg.getCreatedAt(), pkg.getCreatedByName(),
                 files.stream().map(f -> new TenderPackageResponse.FileEntry(f.getSequenceNo(), f.getSectionKey(), f.getFileName(), f.getSourceType().name(),
-                        f.getSizeBytes(), f.getSha256(), f.getPages())).toList());
+                        f.getSizeBytes(), f.getSha256(), f.getPages())).toList(),
+                !staleReasons.isEmpty(), staleReasons);
     }
 
     private Tender tender(TenantId tenantId, UUID tenderId) {

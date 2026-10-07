@@ -34,7 +34,7 @@ export default function EditTenderModal({ tender, onClose, onSaved }: { tender: 
   }
 
   const err = (k: string) => errors[k] ? <div role="alert" style={{ fontSize: 11, color: "var(--hf-danger-text)", marginTop: 3 }}>{errors[k]}</div> : null
-  const date = (k: keyof TenderForm, label: string) => (
+  const date = (k: "closingDate" | "briefingDate" | "siteInspectionDate", label: string) => (
     <div><label htmlFor={`et-${k}`} style={lbl}>{label}</label>
       <input id={`et-${k}`} type="date" value={form[k]} onChange={e => set({ [k]: e.target.value })} style={inp(!!errors[k])} />{err(k)}</div>
   )
@@ -68,6 +68,12 @@ export default function EditTenderModal({ tender, onClose, onSaved }: { tender: 
             <LookupInput id="et-industry" value={form.industry} options={INDUSTRIES} onChange={v => set({ industry: v })} style={inp(false)} /></div>
           <div><label htmlFor="et-class" style={lbl}>Required class of work</label>
             <LookupInput id="et-class" value={form.requiredClassOfWork} options={CLASS_OF_WORK} onChange={v => set({ requiredClassOfWork: v })} style={inp(false)} /></div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--hf-text-secondary)", cursor: "pointer" }}>
+              <input type="checkbox" checked={form.requiresPricing} onChange={e => set({ requiresPricing: e.target.checked })} />
+              The tender documents ask for a price (a package without pricing can't be marked ready to submit)
+            </label>
+          </div>
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
           <button onClick={onClose} style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Cancel</button>

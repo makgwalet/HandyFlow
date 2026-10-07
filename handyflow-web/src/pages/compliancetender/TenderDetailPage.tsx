@@ -24,7 +24,8 @@ import {
   Pencil,
 } from "lucide-react"
 import EditTenderModal from "./EditTenderModal"
-import { canEditDetails, canEditMatrix } from "./tender.logic"
+import { canEditDetails, canEditMatrix, EXTERNAL_TYPES, personTypeLabel, personnelBody, personnelProblem, submitWarnings } from "./tender.logic"
+import { usePackages } from "./package.api"
 import LookupInput from "../../components/ui/LookupInput"
 import Chip from "../../components/ui/Chip"
 import { countdown, stepper } from "./tendersView.logic"
@@ -39,7 +40,7 @@ interface Tender {
 }
 interface Requirement { id: string; description: string; source: string; status: string; complianceRequirementId: string | null }
 interface TrackedRequirement { id: string; code: string; name: string; evidenceType: string | null }
-interface Personnel { id: string; employeeId: string; role: string; employeeFound: boolean; employeeFullName: string | null; employeeNumber: string | null }
+interface Personnel { id: string; employeeId: string | null; role: string; employeeFound: boolean; employeeFullName: string | null; employeeNumber: string | null; personType?: string; externalOrganisation?: string | null }
 interface Snapshot { id: string; snapshotNumber: number; submittedAt: string; data: any }
 
 const STATUS_CFG: Record<string, { color: string; bg: string; label: string }> = {
@@ -99,6 +100,11 @@ export default function TenderDetailPage() {
   const [newRequirementSource, setNewRequirementSource] = useState("MANUAL")
   const [pickedRequirementId, setPickedRequirementId] = useState("")
   const [pickedEmployee, setPickedEmployee] = useState<EmployeeOption | null>(null)
+  const [personMode, setPersonMode] = useState<"EMPLOYEE" | "EXTERNAL">("EMPLOYEE")
+  const [extType, setExtType] = useState("CONSULTANT")
+  const [extName, setExtName] = useState("")
+  const [extOrg, setExtOrg] = useState("")
+  const [confirmSubmit, setConfirmSubmit] = useState<string[] | null>(null)
   const [personnelRole, setPersonnelRole] = useState("")
   const [snapshotsOpen, setSnapshotsOpen] = useState(false)
   const [expandedSnapshot, setExpandedSnapshot] = useState<string | null>(null)
@@ -118,6 +124,7 @@ export default function TenderDetailPage() {
     enabled: !!id,
   })
 
+  const packages = usePackages(id)
   const { data: personnel = [] } = useQuery<Personnel[]>({
     queryKey: ["ct-tender-personnel", id],
     queryFn: async () => unwrap(await apiClient.get(`/api/v1/compliance/tenders/${id}/personnel`)),
@@ -186,11 +193,11 @@ export default function TenderDetailPage() {
     onSuccess: afterMatrixChange, onError: matrixError("The status could not be changed"),
   })
 
+  const personDraft = { mode: personMode, employeeId: pickedEmployee?.id ?? null, role: personnelRole, type: extType, name: extName, organisation: extOrg }
+  const personProblem = personnelProblem(personDraft)
   const addPersonnel = useMutation({
-    mutationFn: () => apiClient.post(`/api/v1/compliance/tenders/${id}/personnel`, {
-      employeeId: pickedEmployee!.id, role: personnelRole,
-    }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ct-tender-personnel", id] }); setPickedEmployee(null); setPersonnelRole(""); setApiError("") },
+    mutationFn: () => apiClient.post(`/api/v1/compliance/tenders/${id}/personnel`, personnelBody(personDraft)),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ct-tender-personnel", id] }); qc.invalidateQueries({ queryKey: ["ct-packages", id] }); setPickedEmployee(null); setPersonnelRole(""); setExtName(""); setExtOrg(""); setApiError("") },
     onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to add personnel"),
   })
 
@@ -272,13 +279,28 @@ export default function TenderDetailPage() {
             const isOutcome = s === "AWARDED" || s === "UNSUCCESSFUL"
             const scfg = STATUS_CFG[s]
             return (
-              <button key={s} onClick={() => isOutcome ? setShowOutcome(s) : transition.mutate(s)}
+              <button key={s} onClick={() => {
+                if (isOutcome) return setShowOutcome(s)
+                if (s === "SUBMITTED") { const w = submitWarnings(packages.data ?? []); if (w.length > 0) return setConfirmSubmit(w) }
+                transition.mutate(s)
+              }}
                 disabled={transition.isPending}
                 style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", border: `1.5px solid color-mix(in srgb, ${scfg.color} 20%, transparent)`, background: scfg.bg, color: scfg.color }}>
                 Move to {scfg.label}
               </button>
             )
           })}
+        </div>
+      )}
+      {confirmSubmit && (
+        <div role="alertdialog" aria-label="Before you submit" style={{ marginBottom: 16, padding: "12px 16px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 10, fontSize: 13, color: "var(--hf-warning-text)" }}>
+          <strong>Before you mark this tender as submitted:</strong>
+          <ul style={{ margin: "6px 0 10px", paddingLeft: 18 }}>{confirmSubmit.map(w => <li key={w}>{w}</li>)}</ul>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={() => nav(`/compliancetender/tenders/${id}/package`)} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", color: "var(--hf-text)" }}>Go to the package</button>
+            <button onClick={() => { setConfirmSubmit(null); transition.mutate("SUBMITTED") }} style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "var(--hf-warning-text)", color: "var(--hf-surface)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>Submit anyway</button>
+            <button onClick={() => setConfirmSubmit(null)} style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "none", fontSize: 12.5, cursor: "pointer", color: "var(--hf-warning-text)" }}>Cancel</button>
+          </div>
         </div>
       )}
       {apiError && <div style={{ marginBottom: 16, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{apiError}</div>}
@@ -400,7 +422,7 @@ export default function TenderDetailPage() {
                   <div style={{ fontSize: 13, fontWeight: 600, color: p.employeeFound ? "var(--hf-text)" : "var(--hf-text-faint)" }}>
                     {p.employeeFound ? p.employeeFullName : "(employee record no longer available)"}
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{p.role}{p.employeeNumber ? ` · ${p.employeeNumber}` : ""}</div>
+                  <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{p.role}{p.employeeNumber ? ` · ${p.employeeNumber}` : ""}{!p.employeeId && p.personType ? ` · ${personTypeLabel(p.personType)}${p.externalOrganisation ? `, ${p.externalOrganisation}` : ""}` : ""}</div>
                 </div>
                 {canManage && (
                   <button onClick={() => removePersonnel.mutate(p.id)} style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
@@ -410,16 +432,35 @@ export default function TenderDetailPage() {
           </div>
         )}
         {canManage && (
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-            <div style={{ flex: 2 }}>
-              <EmployeePicker value={pickedEmployee} onChange={setPickedEmployee} emptyHint="No employee matches. Key personnel come from HR, so add the person under HR first." />
+          <div>
+            <div role="group" aria-label="Who is this person" style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+              {([["EMPLOYEE", "HR employee"], ["EXTERNAL", "Outside HR (director, subcontractor, consultant)"]] as const).map(([m, label]) => (
+                <button key={m} type="button" onClick={() => setPersonMode(m)} aria-pressed={personMode === m}
+                  style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: personMode === m ? 600 : 400,
+                    background: personMode === m ? "var(--hf-sky-solid-strong)" : "var(--hf-surface-sunken)", color: personMode === m ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>{label}</button>
+              ))}
             </div>
-            <LookupInput value={personnelRole} options={PERSONNEL_ROLES} onChange={setPersonnelRole} placeholder="Role on tender, e.g. Project Manager" style={{ ...inp, flex: 1 }} />
-            <button onClick={() => pickedEmployee && personnelRole.trim() && addPersonnel.mutate()}
-              disabled={!pickedEmployee || !personnelRole.trim() || addPersonnel.isPending}
-              style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 14px", background: (!pickedEmployee || !personnelRole.trim()) ? "var(--hf-border-strong)" : "var(--hf-sky-solid-strong)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (!pickedEmployee || !personnelRole.trim()) ? "not-allowed" : "pointer" }}>
-              <Plus size={13} /> Add
-            </button>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap" }}>
+              {personMode === "EMPLOYEE" ? (
+                <div style={{ flex: "2 1 240px" }}>
+                  <EmployeePicker value={pickedEmployee} onChange={setPickedEmployee} emptyHint="No employee matches. Choose 'Outside HR' for a director, subcontractor or consultant." />
+                </div>
+              ) : (
+                <>
+                  <select aria-label="Type of person" value={extType} onChange={e => setExtType(e.target.value)} style={{ ...inp, flex: "0 0 140px", background: "var(--hf-surface)" }}>
+                    {EXTERNAL_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                  <input aria-label="Name" value={extName} onChange={e => setExtName(e.target.value)} placeholder="Full name" style={{ ...inp, flex: "1 1 160px" }} />
+                  <input aria-label="Organisation" value={extOrg} onChange={e => setExtOrg(e.target.value)} placeholder="Organisation (optional)" style={{ ...inp, flex: "1 1 160px" }} />
+                </>
+              )}
+              <LookupInput value={personnelRole} options={PERSONNEL_ROLES} onChange={setPersonnelRole} placeholder="Role on tender, e.g. Project Manager" style={{ ...inp, flex: "1 1 200px" }} />
+              <button onClick={() => !personProblem && addPersonnel.mutate()}
+                disabled={!!personProblem || addPersonnel.isPending} title={personProblem ?? undefined}
+                style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 14px", background: personProblem ? "var(--hf-border-strong)" : "var(--hf-sky-solid-strong)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: personProblem ? "not-allowed" : "pointer" }}>
+                <Plus size={13} /> Add
+              </button>
+            </div>
           </div>
         )}
       </Section>
@@ -446,8 +487,13 @@ export default function TenderDetailPage() {
                     <div style={{ padding: "12px 14px", fontSize: 12, color: "var(--hf-text-secondary)" }}>
                       <div style={{ marginBottom: 6 }}><strong>{s.data.requirements?.length ?? 0}</strong> requirement(s), <strong>{s.data.personnel?.length ?? 0}</strong> personnel — frozen exactly as they were at submission.</div>
                       {s.data.personnel?.map((p: any, i: number) => (
-                        <div key={i} style={{ color: "var(--hf-text-muted)" }}>· {p.employeeFullName} — {p.role}</div>
+                        <div key={i} style={{ color: "var(--hf-text-muted)" }}>· {p.employeeFullName} — {p.role}{p.personType && p.personType !== "EMPLOYEE" ? ` (${personTypeLabel(p.personType)}${p.externalOrganisation ? `, ${p.externalOrganisation}` : ""})` : ""}</div>
                       ))}
+                      <div style={{ marginTop: 8, color: s.data.submittedPackage?.outOfDate ? "var(--hf-warning-text)" : "var(--hf-text-muted)" }}>
+                        {s.data.submittedPackage
+                          ? <>Package: version {s.data.submittedPackage.versionNo} · {s.data.submittedPackage.fileName} · fingerprint {String(s.data.submittedPackage.packageHash).slice(0, 12)}{s.data.submittedPackage.outOfDate ? ` · was out of date when submitted (${(s.data.submittedPackage.outOfDateReasons ?? []).join(", ").toLowerCase()})` : ""}</>
+                          : "No package was built when this was submitted."}
+                      </div>
                     </div>
                   )}
                 </div>

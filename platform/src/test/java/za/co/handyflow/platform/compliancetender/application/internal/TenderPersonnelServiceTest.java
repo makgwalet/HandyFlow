@@ -65,7 +65,7 @@ class TenderPersonnelServiceTest {
         when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(sampleTender()));
         when(hrFacade.findEmployeeById(TENANT, employeeId)).thenReturn(Optional.empty());
 
-        var req = new AddTenderPersonnelRequest(employeeId, "Project Manager");
+        var req = new AddTenderPersonnelRequest(employeeId, "Project Manager", null, null, null);
 
         assertThatThrownBy(() -> service().addPersonnel(TENANT, tenderId, req, USER))
                 .isInstanceOf(HandyFlowException.class);
@@ -77,7 +77,7 @@ class TenderPersonnelServiceTest {
         UUID tenderId = UUID.randomUUID();
         when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.empty());
 
-        var req = new AddTenderPersonnelRequest(UUID.randomUUID(), "Project Manager");
+        var req = new AddTenderPersonnelRequest(UUID.randomUUID(), "Project Manager", null, null, null);
 
         assertThatThrownBy(() -> service().addPersonnel(TENANT, tenderId, req, USER))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -92,7 +92,7 @@ class TenderPersonnelServiceTest {
         when(hrFacade.findEmployeeById(TENANT, employeeId))
                 .thenReturn(Optional.of(employee(employeeId, "Thabo Mokoena", "EMP-0042")));
 
-        var req = new AddTenderPersonnelRequest(employeeId, "Project Manager");
+        var req = new AddTenderPersonnelRequest(employeeId, "Project Manager", null, null, null);
         var response = service().addPersonnel(TENANT, tenderId, req, USER);
 
         assertThat(response.employeeFound()).isTrue();
@@ -118,5 +118,58 @@ class TenderPersonnelServiceTest {
         assertThat(results.get(0).employeeFound()).isFalse();
         assertThat(results.get(0).employeeFullName()).isNull();
         assertThat(results.get(0).role()).isEqualTo("Site Agent"); // the role itself is still ours, unaffected
+    }
+
+    @Test
+    @DisplayName("addPersonnel records a director, subcontractor or consultant who is not in HR, without touching HR")
+    void addPersonnel_external() {
+        UUID tenderId = UUID.randomUUID();
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(sampleTender()));
+        when(personnelRepository.findByTender(TENANT, tenderId)).thenReturn(java.util.List.of());
+
+        var req = new AddTenderPersonnelRequest(null, "Geotechnical engineer", "consultant", " Dr A Naidoo ", "Naidoo Geotech (Pty) Ltd");
+        var response = service().addPersonnel(TENANT, tenderId, req, USER);
+
+        assertThat(response.employeeId()).isNull();
+        assertThat(response.employeeFound()).isTrue();
+        assertThat(response.employeeFullName()).isEqualTo("Dr A Naidoo");
+        assertThat(response.personType()).isEqualTo("CONSULTANT");
+        assertThat(response.externalOrganisation()).isEqualTo("Naidoo Geotech (Pty) Ltd");
+        org.mockito.Mockito.verifyNoInteractions(hrFacade);
+    }
+
+    @Test
+    @DisplayName("addPersonnel needs exactly one of an HR employee or an outside name, and refuses the same outside person twice in a role")
+    void addPersonnel_externalRules() {
+        UUID tenderId = UUID.randomUUID();
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(sampleTender()));
+
+        var neither = new AddTenderPersonnelRequest(null, "Foreman", null, " ", null);
+        var both = new AddTenderPersonnelRequest(UUID.randomUUID(), "Foreman", "DIRECTOR", "Someone", null);
+        var badType = new AddTenderPersonnelRequest(null, "Foreman", "WIZARD", "Someone", null);
+        assertThatThrownBy(() -> service().addPersonnel(TENANT, tenderId, neither, USER)).isInstanceOf(HandyFlowException.class);
+        assertThatThrownBy(() -> service().addPersonnel(TENANT, tenderId, both, USER)).isInstanceOf(HandyFlowException.class);
+        assertThatThrownBy(() -> service().addPersonnel(TENANT, tenderId, badType, USER)).isInstanceOf(IllegalArgumentException.class);
+
+        TenderPersonnel existing = TenderPersonnel.createExternal(TENANT, tenderId, "DIRECTOR", "Sam Dube", null, "Contracts director", USER);
+        when(personnelRepository.findByTender(TENANT, tenderId)).thenReturn(java.util.List.of(existing));
+        var dup = new AddTenderPersonnelRequest(null, "contracts director", "DIRECTOR", "SAM DUBE", null);
+        assertThatThrownBy(() -> service().addPersonnel(TENANT, tenderId, dup, USER)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("getPersonnel lists an outside person by their own name and never asks HR for them")
+    void getPersonnel_external() {
+        UUID tenderId = UUID.randomUUID();
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(sampleTender()));
+        when(personnelRepository.findByTender(TENANT, tenderId)).thenReturn(java.util.List.of(
+                TenderPersonnel.createExternal(TENANT, tenderId, "SUBCONTRACTOR", "Kgosi Paving", null, "Paving", USER)));
+
+        var out = service().getPersonnel(TENANT, tenderId);
+
+        assertThat(out).hasSize(1);
+        assertThat(out.get(0).employeeFullName()).isEqualTo("Kgosi Paving");
+        assertThat(out.get(0).personType()).isEqualTo("SUBCONTRACTOR");
+        org.mockito.Mockito.verifyNoInteractions(hrFacade);
     }
 }

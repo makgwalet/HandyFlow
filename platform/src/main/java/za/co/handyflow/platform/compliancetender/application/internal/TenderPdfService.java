@@ -228,10 +228,16 @@ public class TenderPdfService {
 
         Table table = new Table(new float[]{2, 1, 1}).setWidth(UnitValue.createPercentValue(100)).setMarginTop(8);
         table.addHeaderCell(headerCell("Name", bold));
-        table.addHeaderCell(headerCell("Employee No.", bold));
+        table.addHeaderCell(headerCell("Employee No. / Organisation", bold));
         table.addHeaderCell(headerCell("Role on Tender", bold));
 
         for (TenderPersonnel p : personnel) {
+            if (p.isExternal()) {
+                table.addCell(bodyCell(p.getExternalName(), regular));
+                table.addCell(bodyCell(p.getExternalOrganisation() != null ? p.getExternalOrganisation() : p.getPersonType().toLowerCase(), regular));
+                table.addCell(bodyCell(p.getRole(), regular));
+                continue;
+            }
             var employee = hrFacade.findEmployeeById(tenantId, p.getEmployeeId()).orElse(null);
             table.addCell(bodyCell(employee != null ? employee.fullName() : "(employee record no longer available)", regular));
             table.addCell(bodyCell(employee != null ? employee.employeeNumber() : "—", regular));

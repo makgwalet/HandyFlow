@@ -11,9 +11,12 @@ import za.co.handyflow.platform.compliancetender.domain.repository.ComplianceReg
 import za.co.handyflow.platform.compliancetender.dto.ComplianceRegistrationResponse;
 import za.co.handyflow.platform.compliancetender.dto.CreateComplianceRegistrationRequest;
 import za.co.handyflow.platform.compliancetender.dto.UpdateComplianceRegistrationRequest;
+import za.co.handyflow.platform.shared.BusinessException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -36,6 +39,8 @@ public class ComplianceRegistrationService {
 
     private static final int EXPIRING_SOON_DAYS = 30;
 
+    private static final ZoneId SAST = ZoneId.of("Africa/Johannesburg");
+
     private final ComplianceRegistrationRepository registrationRepository;
 
     @Transactional(readOnly = true)
@@ -57,6 +62,8 @@ public class ComplianceRegistrationService {
     public ComplianceRegistrationResponse create(TenantId tenantId, CreateComplianceRegistrationRequest req, UUID createdBy) {
         ComplianceRegistration registration = ComplianceRegistration.create(tenantId, req.authority(), req.registrationType(),
                 req.registrationNumber(), req.issuedDate(), req.expiryDate(), req.notes(), createdBy);
+        // A registration entered with an expiry already in the past is recorded as what it is, never as Active.
+        if (isPast(req.expiryDate())) registration.markExpired();
         registrationRepository.save(registration);
         log.info("Compliance registration created id={} authority={} type={} tenant={}",
                 registration.getId(), registration.getAuthority(), registration.getRegistrationType(), tenantId);
@@ -66,6 +73,9 @@ public class ComplianceRegistrationService {
     @Transactional
     public ComplianceRegistrationResponse update(TenantId tenantId, UUID id, UpdateComplianceRegistrationRequest req, UUID updatedBy) {
         ComplianceRegistration registration = find(tenantId, id);
+        if ("ACTIVE".equals(req.status()) && isPast(req.expiryDate()))
+            throw new BusinessException("A registration that expired on " + req.expiryDate()
+                    + " cannot be Active. Set the status to Expired, or enter the renewed expiry date.");
         registration.update(req.registrationNumber(), req.status(), req.issuedDate(), req.expiryDate(), req.notes(), updatedBy);
         registrationRepository.save(registration);
         log.info("Compliance registration updated id={} tenant={}", id, tenantId);
@@ -77,6 +87,11 @@ public class ComplianceRegistrationService {
         ComplianceRegistration registration = find(tenantId, id);
         registrationRepository.delete(registration);
         log.info("Compliance registration deleted id={} tenant={}", id, tenantId);
+    }
+
+    /** True when the date is before today in South Africa (the day the registration lapses is still valid). */
+    private static boolean isPast(LocalDate expiry) {
+        return expiry != null && expiry.isBefore(LocalDate.now(SAST));
     }
 
     private ComplianceRegistration find(TenantId tenantId, UUID id) {

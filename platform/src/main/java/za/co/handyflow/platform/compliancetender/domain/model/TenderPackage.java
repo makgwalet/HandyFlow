@@ -54,6 +54,10 @@ public class TenderPackage {
     @Column(name = "file_name", nullable = false, updatable = false)
     private String fileName;
 
+    /** What the package was built from (see PackageInputs); null for packages built before this was recorded. */
+    @Column(name = "inputs_fingerprint", length = 400)
+    private String inputsFingerprint;
+
     @Column(name = "file_sha256", nullable = false, updatable = false, length = 64)
     private String fileSha256;
 
@@ -77,6 +81,9 @@ public class TenderPackage {
 
     @Column(name = "created_by_name", updatable = false)
     private String createdByName;
+
+    /** Set once, straight after create(), before the first save. */
+    public void recordInputs(String encoded) { this.inputsFingerprint = encoded; }
 
     public static TenderPackage create(UUID id, TenantId tenantId, UUID tenderId, int versionNo, boolean submissionReady,
                                        boolean includesPricing, String profileName, String profileSnapshot, String issuesSnapshot,

@@ -17,8 +17,16 @@ public record TenderSnapshotData(
         String authorityReferenceNumber, LocalDate closingDate, BigDecimal estimatedValue,
         String industry, String requiredClassOfWork, String status,
         List<RequirementSnapshot> requirements, List<PersonnelSnapshot> personnel, Instant capturedAt,
-        TenderPricingResponse pricing
+        TenderPricingResponse pricing,
+        PackageReference submittedPackage
 ) {
+    /**
+     * The package that was current when the tender was submitted: which version, what it was called, its hash, and whether the tender had
+     * changed since it was built. Null when no package had been built, and for snapshots taken before packages were linked.
+     */
+    public record PackageReference(UUID packageId, int versionNo, String fileName, String packageHash, boolean submissionReady,
+                                   Instant builtAt, boolean outOfDate, List<String> outOfDateReasons) {}
+
     /** description/source/status copied as they were at capture time — NOT a live reference. */
     public record RequirementSnapshot(String description, String source, String status) {}
 
@@ -29,5 +37,6 @@ public record TenderSnapshotData(
      * rather than referenced, because the entire point of a snapshot is
      * that it stays true even if the live HR record changes afterward.
      */
-    public record PersonnelSnapshot(UUID employeeId, String role, String employeeFullName, String employeeNumber) {}
+    public record PersonnelSnapshot(UUID employeeId, String role, String employeeFullName, String employeeNumber,
+                                    String personType, String externalOrganisation) {}
 }

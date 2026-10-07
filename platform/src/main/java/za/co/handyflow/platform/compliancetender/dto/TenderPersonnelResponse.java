@@ -14,5 +14,7 @@ import java.util.UUID;
  */
 public record TenderPersonnelResponse(
         UUID id, UUID tenderId, UUID employeeId, String role,
-        boolean employeeFound, String employeeFullName, String employeeNumber, Instant createdAt
+        boolean employeeFound, String employeeFullName, String employeeNumber, Instant createdAt,
+        /** EMPLOYEE, or DIRECTOR / SUBCONTRACTOR / CONSULTANT / OTHER for someone outside HR (then employeeId is null and employeeFullName is their name). */
+        String personType, String externalOrganisation
 ) {}

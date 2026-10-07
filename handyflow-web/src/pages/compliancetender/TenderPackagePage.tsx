@@ -5,6 +5,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
+import Chip from "../../components/ui/Chip"
 import {
   AlertOctagon, AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, Clock, Download, FileCheck2, FileText, FolderCheck, Hammer, History, ListChecks, Package, ShieldAlert,
 } from "lucide-react"
@@ -17,7 +18,7 @@ import {
 } from "./package.api"
 import {
   COVER_LETTER_TEMPLATE, DEFAULT_REQUEST, EMPTY_LIMITS, INITIAL_DRAFT, SECTIONS, blocking, closingText, documentState, feed, fmtSize, fmtWhen, headline, moveSection, sectionTone, sectionsReady, shortHash, sourceText,
-  toRequest, toggleDocument, toggleSection, warnings, type LimitsDraft, type PackageDraft,
+  staleLatest, toRequest, toggleDocument, toggleSection, warnings, type LimitsDraft, type PackageDraft,
 } from "./package.logic"
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: 20 }
@@ -53,7 +54,7 @@ export default function TenderPackagePage() {
   const mayPrice = canManage || canAdmin
   const today = useMemo(() => new Date(), [])
 
-  const { data: tender } = useQuery<{ name: string; tenderNumber: string; closingDate: string | null; status: string }>({
+  const { data: tender } = useQuery<{ name: string; tenderNumber: string; closingDate: string | null; status: string; requiresPricing?: boolean }>({
     queryKey: ["ct-tender", id], enabled: !!id,
     queryFn: async () => (await apiClient.get(`/api/v1/compliance/tenders/${id}`)).data,
   })
@@ -129,7 +130,7 @@ export default function TenderPackagePage() {
 
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start", marginTop: 16 }}>
         <div style={{ flex: "2 1 460px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
-          <Contents draft={draft} set={set} plan={plan} mayPrice={mayPrice} docs={docs.data ?? []} docsLoading={docs.isLoading} closingIso={tender?.closingDate} today={today} />
+          <Contents draft={draft} set={set} plan={plan} mayPrice={mayPrice} docs={docs.data ?? []} docsLoading={docs.isLoading} closingIso={tender?.closingDate} today={today} tenderRequiresPricing={tender?.requiresPricing} />
         </div>
         <div style={{ flex: "1 1 320px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
           <Feed plan={plan} />
@@ -137,6 +138,14 @@ export default function TenderPackagePage() {
         </div>
       </div>
 
+      {(() => {
+        const stale = staleLatest(packages.data ?? [])
+        return stale ? (
+          <div role="status" style={{ marginBottom: 14, padding: "10px 14px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 10, fontSize: 13, color: "var(--hf-warning-text)" }}>
+            <strong>Version {stale.versionNo} is out of date.</strong> {(stale.staleReasons ?? []).join(". ")}. Build a new version before you submit.
+          </div>
+        ) : null
+      })()}
       <Versions packages={packages.data ?? []} loading={packages.isLoading} />
     </div>
   )
@@ -197,7 +206,8 @@ function Kpis({ plan, documentCount }: { plan: PackagePlan; documentCount: numbe
 
 // ---- contents: sections as a pipeline, with their editors
 
-function Contents({ draft, set, plan, mayPrice, docs, docsLoading, closingIso, today }: {
+function Contents({ draft, set, plan, mayPrice, docs, docsLoading, closingIso, today, tenderRequiresPricing }: {
+  tenderRequiresPricing?: boolean
   draft: PackageDraft; set: (p: Partial<PackageDraft>) => void; plan: PackagePlan | undefined; mayPrice: boolean
   docs: { id: string; documentType: string; expiryDate: string | null; verified: boolean }[]; docsLoading: boolean; closingIso: string | null | undefined; today: Date
 }) {
@@ -269,10 +279,14 @@ function Contents({ draft, set, plan, mayPrice, docs, docsLoading, closingIso, t
 
               {on && s.key === "PRICING" && (
                 <div style={{ padding: "0 12px 12px 40px" }}>
-                  <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--hf-text-secondary)", cursor: "pointer" }}>
-                    <input type="checkbox" checked={draft.pricingRequired} onChange={e => set({ pricingRequired: e.target.checked })} />
-                    This tender requires pricing (a package without it can't be marked ready to submit)
-                  </label>
+{tenderRequiresPricing ? (
+                    <p style={{ fontSize: 12.5, color: "var(--hf-text-secondary)", margin: 0 }}>This tender requires pricing (set on the tender). A package without it can't be marked ready to submit.</p>
+                  ) : (
+                    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--hf-text-secondary)", cursor: "pointer" }}>
+                      <input type="checkbox" checked={draft.pricingRequired} onChange={e => set({ pricingRequired: e.target.checked })} />
+                      For this build only: treat pricing as required. To record it on the tender, use Edit details.
+                    </label>
+                  )}
                 </div>
               )}
 
@@ -404,6 +418,7 @@ function Versions({ packages, loading }: { packages: TenderPackage[]; loading: b
                         {p.submissionReady ? "Ready to submit" : "Draft"}
                       </span>
                       {p.includesPricing && <span style={{ fontSize: 11.5, color: "var(--hf-text-faint)", marginLeft: 8 }}>with pricing</span>}
+                      {p.stale && <span style={{ marginLeft: 8 }}><Chip tone="warn" title={(p.staleReasons ?? []).join(". ")}>Out of date</Chip></span>}
                     </td>
                     <td style={td}>{fmtSize(p.sizeBytes)}{p.pageCount ? ` · ${p.pageCount} pages` : ""}</td>
                     <td style={td}>{fmtWhen(p.createdAt)}{p.createdByName ? <span style={{ color: "var(--hf-text-faint)" }}> · {p.createdByName}</span> : null}</td>

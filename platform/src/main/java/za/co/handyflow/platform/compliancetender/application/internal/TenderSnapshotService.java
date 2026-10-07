@@ -12,6 +12,9 @@ import za.co.handyflow.platform.compliancetender.domain.model.Tender;
 import za.co.handyflow.platform.compliancetender.domain.model.TenderPersonnel;
 import za.co.handyflow.platform.compliancetender.domain.model.TenderRequirement;
 import za.co.handyflow.platform.compliancetender.domain.model.TenderSubmissionSnapshot;
+import za.co.handyflow.platform.compliancetender.application.internal.submission.PackageInputs;
+import za.co.handyflow.platform.compliancetender.application.internal.submission.PackageInputsProvider;
+import za.co.handyflow.platform.compliancetender.domain.repository.TenderPackageRepository;
 import za.co.handyflow.platform.compliancetender.domain.repository.TenderPersonnelRepository;
 import za.co.handyflow.platform.compliancetender.domain.repository.TenderRepository;
 import za.co.handyflow.platform.compliancetender.domain.repository.TenderRequirementRepository;
@@ -47,6 +50,8 @@ public class TenderSnapshotService {
     private final TenderSubmissionSnapshotRepository snapshotRepository;
     private final HrFacade hrFacade;
     private final TenderPricingService pricingService;
+    private final TenderPackageRepository packageRepository;
+    private final PackageInputsProvider packageInputs;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -68,7 +73,8 @@ public class TenderSnapshotService {
                 tender.getId(), tender.getTenderNumber(), tender.getName(), tender.getTenderAuthority(),
                 tender.getAuthorityReferenceNumber(), tender.getClosingDate(), tender.getEstimatedValue(),
                 tender.getIndustry(), tender.getRequiredClassOfWork(), tender.getStatus(),
-                requirements, personnel, Instant.now(), pricingService.snapshotOf(tenantId, tenderId));
+                requirements, personnel, Instant.now(), pricingService.snapshotOf(tenantId, tenderId),
+                packageReference(tenantId, tenderId, tender));
 
         String json = serialize(data);
         int snapshotNumber = (int) snapshotRepository.countByTender(tenantId, tenderId) + 1;
@@ -105,6 +111,15 @@ public class TenderSnapshotService {
                 deserialize(s.getSnapshotJson()), s.getSubmittedAt());
     }
 
+    /** The newest package version, as it stood against the tender at the moment of submission. */
+    private TenderSnapshotData.PackageReference packageReference(TenantId tenantId, UUID tenderId, Tender tender) {
+        return packageRepository.findByTender(tenantId, tenderId).stream().findFirst().map(pkg -> {
+            List<String> reasons = PackageInputs.changes(PackageInputs.parse(pkg.getInputsFingerprint()), packageInputs.current(tenantId, tender));
+            return new TenderSnapshotData.PackageReference(pkg.getId(), pkg.getVersionNo(), pkg.getFileName(), pkg.getPackageHash(),
+                    pkg.isSubmissionReady(), pkg.getCreatedAt(), !reasons.isEmpty(), reasons);
+        }).orElse(null);
+    }
+
     private TenderSnapshotData.RequirementSnapshot toRequirementSnapshot(TenderRequirement r) {
         return new TenderSnapshotData.RequirementSnapshot(r.getDescription(), r.getSource(), r.getStatus());
     }
@@ -113,10 +128,13 @@ public class TenderSnapshotService {
     // is deliberate and the one place in this module HR data is copied
     // rather than referenced — see TenderSnapshotData's own Javadoc.
     private TenderSnapshotData.PersonnelSnapshot toPersonnelSnapshot(TenantId tenantId, TenderPersonnel p) {
+        if (p.isExternal()) {
+            return new TenderSnapshotData.PersonnelSnapshot(null, p.getRole(), p.getExternalName(), null, p.getPersonType(), p.getExternalOrganisation());
+        }
         var employee = hrFacade.findEmployeeById(tenantId, p.getEmployeeId()).orElse(null);
         return new TenderSnapshotData.PersonnelSnapshot(p.getEmployeeId(), p.getRole(),
                 employee != null ? employee.fullName() : "(employee record no longer available)",
-                employee != null ? employee.employeeNumber() : null);
+                employee != null ? employee.employeeNumber() : null, p.getPersonType(), null);
     }
 
     private String serialize(TenderSnapshotData data) {

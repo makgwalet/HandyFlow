@@ -23,6 +23,7 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import za.co.handyflow.platform.compliancetender.dto.TenderPackageResponse;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -51,6 +52,8 @@ class TenderPackageServiceTest {
     private final TenderPackageStorage storage = mock(TenderPackageStorage.class);
     private final SubmissionProfileService profiles = mock(SubmissionProfileService.class);
     private final Tender tender = mock(Tender.class);
+
+    private static final PackageInputs CURRENT_INPUTS = new PackageInputs("d1", "r1", "p1", "k1");
 
     private byte[] attachedPdf;
     private TenderPackageService service;
@@ -93,7 +96,7 @@ class TenderPackageServiceTest {
     }
 
     private TenderPackageService serviceWith(SectionSource... sources) {
-        return new TenderPackageService(tenders, packages, files, List.of(sources), new TextSectionRenderer(), (tenantId, t) -> new Letterhead("Zeta Civils (Pty) Ltd", List.of("Tel: 012 000 0000"), null, "TND-1", "Road", "SANRAL", null, "21 December 2026"), storage, profiles, 100, 250);
+        return new TenderPackageService(tenders, packages, files, List.of(sources), new TextSectionRenderer(), (tenantId, t) -> new Letterhead("Zeta Civils (Pty) Ltd", List.of("Tel: 012 000 0000"), null, "TND-1", "Road", "SANRAL", null, "21 December 2026"), storage, profiles, (tenantId, t) -> CURRENT_INPUTS, 100, 250);
     }
 
     private static BuildTenderPackageRequest request(List<String> keys, boolean pricingRequired) {
@@ -226,5 +229,28 @@ class TenderPackageServiceTest {
         TenderPackageStorage.Loaded loaded = service.download(tenant, packageId);
         assertThat(loaded.fileName()).isEqualTo("p.pdf");
         assertThat(loaded.content().length).isEqualTo(8);
+    }
+
+    @Test
+    @DisplayName("list() flags a version stale, with reasons, when the tender no longer matches what it was built from")
+    void listFlagsStale() {
+        TenderPackage fresh = TenderPackage.create(UUID.randomUUID(), tenant, tenderId, 2, true, false, null, "{}", "[]", "a".repeat(64), "p2.pdf",
+                "b".repeat(64), "application/pdf", 8, 1, "key-2", userId, "Sam");
+        fresh.recordInputs(CURRENT_INPUTS.encode());
+        TenderPackage old = TenderPackage.create(UUID.randomUUID(), tenant, tenderId, 1, true, false, null, "{}", "[]", "a".repeat(64), "p1.pdf",
+                "c".repeat(64), "application/pdf", 8, 1, "key-1", userId, "Sam");
+        old.recordInputs(new PackageInputs("d0", "r1", "p0", "k1").encode());
+        TenderPackage unknown = TenderPackage.create(UUID.randomUUID(), tenant, tenderId, 0 + 3, true, false, null, "{}", "[]", "a".repeat(64), "p3.pdf",
+                "d".repeat(64), "application/pdf", 8, 1, "key-3", userId, "Sam");
+        when(tenders.findByIdForTenant(tenant, tenderId)).thenReturn(Optional.of(tender));
+        when(packages.findByTender(tenant, tenderId)).thenReturn(List.of(fresh, old, unknown));
+        when(files.findByPackage(any(), any())).thenReturn(List.of());
+
+        List<TenderPackageResponse> out = service.list(tenant, tenderId);
+
+        assertThat(out.get(0).stale()).isFalse();
+        assertThat(out.get(1).stale()).isTrue();
+        assertThat(out.get(1).staleReasons()).containsExactly("The tender details changed", "The pricing changed");
+        assertThat(out.get(2).stale()).as("built before fingerprints existed: unknown, not stale").isFalse();
     }
 }

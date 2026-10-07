@@ -74,6 +74,10 @@ public class Tender {
 
     private String industry;
 
+    /** The tender documents ask for a price, so a package without pricing is not ready to submit. */
+    @Column(name = "requires_pricing", nullable = false)
+    private boolean requiresPricing;
+
     @Column(name = "required_class_of_work")
     private String requiredClassOfWork; // free text for Phase 2 — e.g. "cidb Grade 6GB"
 
@@ -182,6 +186,14 @@ public class Tender {
         this.estimatedValue = estimatedValue;
         this.industry = blankToNull(industry);
         this.requiredClassOfWork = blankToNull(requiredClassOfWork);
+        this.updatedAt = Instant.now();
+        this.updatedBy = updatedBy;
+    }
+
+    /** Recorded from the tender documents; only changes while the tender can still be edited. */
+    public void setRequiresPricing(boolean requiresPricing, UUID updatedBy) {
+        if (CLOSED.contains(status)) throw new IllegalStateException("A " + status.toLowerCase() + " tender can no longer be edited.");
+        this.requiresPricing = requiresPricing;
         this.updatedAt = Instant.now();
         this.updatedBy = updatedBy;
     }

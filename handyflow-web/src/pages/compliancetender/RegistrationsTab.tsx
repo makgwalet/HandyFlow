@@ -15,7 +15,7 @@ import {
 } from "lucide-react"
 import LookupInput from "../../components/ui/LookupInput"
 import { REGISTRATION_AUTHORITIES, registrationTypesFor } from "../../lookups/southAfrica"
-import { effectiveStatus, expiryChip } from "./registration.logic"
+import { effectiveStatus, expiryChip, validateRegistration } from "./registration.logic"
 import Chip from "../../components/ui/Chip"
 import StatTile from "../../components/ui/StatTile"
 
@@ -83,9 +83,7 @@ export default function RegistrationsTab() {
   })
 
   const validate = () => {
-    const errs: Record<string, string> = {}
-    if (!form.registrationType.trim()) errs.registrationType = "Registration type is required"
-    if (form.expiryDate && form.issuedDate && form.expiryDate < form.issuedDate) errs.expiryDate = "Expiry date cannot be before issued date"
+    const errs = validateRegistration(form, new Date())
     setFieldErrors(errs)
     return Object.keys(errs).length === 0
   }

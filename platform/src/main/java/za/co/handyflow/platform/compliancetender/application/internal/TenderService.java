@@ -61,6 +61,7 @@ public class TenderService {
         Tender tender = find(tenantId, id);
         tender.updateDetails(req.name(), req.tenderAuthority(), req.authorityReferenceNumber(), req.closingDate(), req.briefingDate(),
                 req.siteInspectionDate(), req.estimatedValue(), req.industry(), req.requiredClassOfWork(), updatedBy);
+        if (req.requiresPricing() != null) tender.setRequiresPricing(req.requiresPricing(), updatedBy);
         tenderRepository.save(tender);
         log.info("Tender updated id={} tenant={}", id, tenantId);
         return toResponse(tender);
@@ -175,7 +176,7 @@ public class TenderService {
         return new TenderResponse(t.getId(), t.getTenderNumber(), t.getName(), t.getTenderAuthority(),
                 t.getAuthorityReferenceNumber(), t.getClosingDate(), t.getBriefingDate(), t.getSiteInspectionDate(),
                 t.getEstimatedValue(), t.getIndustry(), t.getRequiredClassOfWork(), t.getStatus(),
-                t.getOutcomeReason(), t.getAwardedValue(), t.getSubmittedAt(), t.getCreatedAt());
+                t.getOutcomeReason(), t.getAwardedValue(), t.getSubmittedAt(), t.getCreatedAt(), t.isRequiresPricing());
     }
 
     private TenderRequirementResponse toResponse(TenderRequirement r) {

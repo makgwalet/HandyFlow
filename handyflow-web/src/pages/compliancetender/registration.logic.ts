@@ -42,3 +42,15 @@ export function deadlineChip(dueDate: string | null | undefined, today: Date): C
   if (n === 1) return { text: "Due tomorrow", tone: "bad" }
   return { text: `Due in ${n} days`, tone: n <= 3 ? "bad" : n <= 14 ? "warn" : "ok" }
 }
+
+/** Form rules for a registration. Returns field -> message; empty means the form can be saved. */
+export function validateRegistration(f: { registrationType: string; issuedDate: string; expiryDate: string; status: string }, today: Date): Record<string, string> {
+  const e: Record<string, string> = {}
+  if (!f.registrationType.trim()) e.registrationType = "Registration type is required"
+  if (f.expiryDate && f.issuedDate && f.expiryDate < f.issuedDate) e.expiryDate = "Expiry date cannot be before issued date"
+  else if (f.expiryDate && f.status === "ACTIVE") {
+    const n = daysUntil(f.expiryDate, today)
+    if (n !== null && n < 0) e.expiryDate = "This date has passed. Set the status to Expired, or enter the renewed expiry date."
+  }
+  return e
+}

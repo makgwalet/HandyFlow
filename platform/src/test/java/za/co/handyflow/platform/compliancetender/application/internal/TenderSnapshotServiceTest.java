@@ -49,12 +49,14 @@ class TenderSnapshotServiceTest {
     @Mock private TenderSubmissionSnapshotRepository snapshotRepository;
     @Mock private HrFacade hrFacade;
     @Mock private TenderPricingService pricingService;
+    @Mock private za.co.handyflow.platform.compliancetender.domain.repository.TenderPackageRepository packageRepository;
+    @Mock private za.co.handyflow.platform.compliancetender.application.internal.submission.PackageInputsProvider packageInputs;
 
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     private TenderSnapshotService service() {
         return new TenderSnapshotService(tenderRepository, requirementRepository, personnelRepository,
-                snapshotRepository, hrFacade, pricingService, objectMapper);
+                snapshotRepository, hrFacade, pricingService, packageRepository, packageInputs, objectMapper);
     }
 
     private static final TenantId TENANT = TenantId.generate();
@@ -208,5 +210,50 @@ class TenderSnapshotServiceTest {
         service().captureSnapshot(TENANT, tenderId, USER);
 
         verify(snapshotRepository).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("the snapshot points at the newest package, says whether the tender had changed since it was built, and keeps outside personnel")
+    void captureSnapshot_linksPackageAndExternalPersonnel() {
+        UUID tenderId = UUID.randomUUID();
+        Tender tender = Tender.create(TENANT, "TND-00001", "Test Tender", null, null, null, null, null, null, null, null, USER);
+        var built = new za.co.handyflow.platform.compliancetender.application.internal.submission.PackageInputs("d0", "r", "p", "k");
+        var nowInputs = new za.co.handyflow.platform.compliancetender.application.internal.submission.PackageInputs("d1", "r", "p", "k");
+        var newest = za.co.handyflow.platform.compliancetender.domain.model.TenderPackage.create(UUID.randomUUID(), TENANT, tenderId, 3, true, false,
+                null, "{}", "[]", "a".repeat(64), "TND-00001-v3.pdf", "b".repeat(64), "application/pdf", 8, 1, "key", USER, "Sam");
+        newest.recordInputs(built.encode());
+        var older = za.co.handyflow.platform.compliancetender.domain.model.TenderPackage.create(UUID.randomUUID(), TENANT, tenderId, 2, false, false,
+                null, "{}", "[]", "c".repeat(64), "TND-00001-v2.pdf", "d".repeat(64), "application/pdf", 8, 1, "key2", USER, "Sam");
+
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(tender));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(personnelRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(
+                TenderPersonnel.createExternal(TENANT, tenderId, "CONSULTANT", "Dr A Naidoo", "Naidoo Geotech", "Geotechnical engineer", USER)));
+        when(snapshotRepository.countByTender(TENANT, tenderId)).thenReturn(0L);
+        when(packageRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(newest, older));
+        when(packageInputs.current(TENANT, tender)).thenReturn(nowInputs);
+
+        var data = service().captureSnapshot(TENANT, tenderId, USER).data();
+
+        assertThat(data.submittedPackage().versionNo()).isEqualTo(3);
+        assertThat(data.submittedPackage().packageHash()).isEqualTo("a".repeat(64));
+        assertThat(data.submittedPackage().outOfDate()).isTrue();
+        assertThat(data.submittedPackage().outOfDateReasons()).containsExactly("The tender details changed");
+        assertThat(data.personnel().get(0).employeeId()).isNull();
+        assertThat(data.personnel().get(0).employeeFullName()).isEqualTo("Dr A Naidoo");
+        assertThat(data.personnel().get(0).personType()).isEqualTo("CONSULTANT");
+    }
+
+    @Test
+    @DisplayName("a tender submitted with no package built has no package reference")
+    void captureSnapshot_noPackage() {
+        UUID tenderId = UUID.randomUUID();
+        Tender tender = Tender.create(TENANT, "TND-00001", "Test Tender", null, null, null, null, null, null, null, null, USER);
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(tender));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(personnelRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(snapshotRepository.countByTender(TENANT, tenderId)).thenReturn(0L);
+
+        assertThat(service().captureSnapshot(TENANT, tenderId, USER).data().submittedPackage()).isNull();
     }
 }

@@ -8,5 +8,6 @@ import java.time.LocalDate;
 public record UpdateTenderRequest(
         @NotBlank String name, String tenderAuthority, String authorityReferenceNumber,
         LocalDate closingDate, LocalDate briefingDate, LocalDate siteInspectionDate,
-        BigDecimal estimatedValue, String industry, String requiredClassOfWork
+        BigDecimal estimatedValue, String industry, String requiredClassOfWork,
+        /** null leaves the current setting unchanged. */ Boolean requiresPricing
 ) {}

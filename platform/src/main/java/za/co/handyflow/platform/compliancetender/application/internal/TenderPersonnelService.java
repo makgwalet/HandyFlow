@@ -43,6 +43,24 @@ public class TenderPersonnelService {
         tenderRepository.findByIdForTenant(tenantId, tenderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tender", tenderId.toString()));
 
+        boolean hasEmployee = req.employeeId() != null;
+        boolean hasExternal = req.externalName() != null && !req.externalName().isBlank();
+        if (hasEmployee == hasExternal) {
+            throw new HandyFlowException("Choose either an HR employee, or enter the name of someone outside HR.",
+                    HttpStatus.BAD_REQUEST, "PERSONNEL_WHO");
+        }
+
+        if (hasExternal) {
+            TenderPersonnel external = TenderPersonnel.createExternal(tenantId, tenderId, req.personType(), req.externalName(),
+                    req.externalOrganisation(), req.role(), createdBy);
+            boolean duplicate = personnelRepository.findByTender(tenantId, tenderId).stream().anyMatch(p -> p.isExternal()
+                    && p.getExternalName().equalsIgnoreCase(external.getExternalName()) && p.getRole().equalsIgnoreCase(external.getRole()));
+            if (duplicate) throw new IllegalStateException(external.getExternalName() + " is already on this tender as " + external.getRole() + ".");
+            personnelRepository.save(external);
+            log.info("Tender personnel (external {}) added tender={} role={} tenant={}", external.getPersonType(), tenderId, external.getRole(), tenantId);
+            return toResponse(external, null);
+        }
+
         EmployeeResponse employee = hrFacade.findEmployeeById(tenantId, req.employeeId())
                 .orElseThrow(() -> new HandyFlowException(
                         "No HR employee found with id " + req.employeeId() + " — add them in HR first",
@@ -61,7 +79,7 @@ public class TenderPersonnelService {
                 .orElseThrow(() -> new ResourceNotFoundException("Tender", tenderId.toString()));
 
         return personnelRepository.findByTender(tenantId, tenderId).stream()
-                .map(p -> toResponse(p, hrFacade.findEmployeeById(tenantId, p.getEmployeeId()).orElse(null)))
+                .map(p -> toResponse(p, p.isExternal() ? null : hrFacade.findEmployeeById(tenantId, p.getEmployeeId()).orElse(null)))
                 .toList();
     }
 
@@ -74,8 +92,12 @@ public class TenderPersonnelService {
     }
 
     private TenderPersonnelResponse toResponse(TenderPersonnel p, EmployeeResponse employee) {
+        if (p.isExternal()) {
+            return new TenderPersonnelResponse(p.getId(), p.getTenderId(), null, p.getRole(), true, p.getExternalName(), null,
+                    p.getCreatedAt(), p.getPersonType(), p.getExternalOrganisation());
+        }
         return new TenderPersonnelResponse(p.getId(), p.getTenderId(), p.getEmployeeId(), p.getRole(),
                 employee != null, employee != null ? employee.fullName() : null,
-                employee != null ? employee.employeeNumber() : null, p.getCreatedAt());
+                employee != null ? employee.employeeNumber() : null, p.getCreatedAt(), p.getPersonType(), null);
     }
 }

@@ -207,3 +207,10 @@ export const COVER_LETTER_TEMPLATE = [
   "",
   "Yours faithfully",
 ].join("\n")
+
+/** The newest version, when it no longer matches the tender. Older versions are superseded, so only the newest matters for the warning. */
+export function staleLatest<T extends { versionNo: number; stale?: boolean; staleReasons?: string[] }>(packages: T[]): T | null {
+  if (packages.length === 0) return null
+  const latest = packages.reduce((a, b) => (b.versionNo > a.versionNo ? b : a))
+  return latest.stale ? latest : null
+}

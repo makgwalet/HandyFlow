@@ -95,9 +95,16 @@ public final class PackageSections {
             List<String> lines = new ArrayList<>();
             for (TenderPersonnelResponse p : people) {
                 String name = p.employeeFound() ? p.employeeFullName() : "(employee record no longer available)";
-                lines.add(p.role() + ": " + name + (p.employeeFound() && p.employeeNumber() != null ? " (" + p.employeeNumber() + ")" : ""));
+                String detail = p.employeeNumber() != null ? " (" + p.employeeNumber() + ")"
+                        : p.employeeId() == null ? " (" + externalLabel(p) + ")" : "";
+                lines.add(p.role() + ": " + name + (p.employeeFound() ? detail : ""));
             }
             return SectionContent.textOnly(String.join("\n", lines));
+        }
+
+        private static String externalLabel(TenderPersonnelResponse p) {
+            String type = p.personType() == null ? "" : p.personType().charAt(0) + p.personType().substring(1).toLowerCase(Locale.ROOT);
+            return p.externalOrganisation() == null ? type : type + ", " + p.externalOrganisation();
         }
     }
 

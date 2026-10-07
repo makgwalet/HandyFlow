@@ -85,4 +85,30 @@ class ComplianceRegistrationServiceTest {
         assertThatThrownBy(() -> service().delete(TENANT, id))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
+
+    @Test
+    @DisplayName("create() with an expiry already in the past is stored as EXPIRED, not ACTIVE")
+    void create_pastExpiry_isExpired() {
+        var req = new CreateComplianceRegistrationRequest("CIPC", "Company Registration",
+                "2019/1", LocalDate.of(2018, 3, 12), LocalDate.of(2019, 3, 12), null);
+
+        assertThat(service().create(TENANT, req, USER).status()).isEqualTo("EXPIRED");
+    }
+
+    @Test
+    @DisplayName("update() refuses Active with a past expiry date but allows Expired")
+    void update_activeWithPastExpiry_refused() {
+        UUID id = UUID.randomUUID();
+        ComplianceRegistration existing = ComplianceRegistration.create(TENANT, "NHBRC", "Enrolment",
+                "N1", LocalDate.of(2023, 1, 1), LocalDate.of(2030, 1, 1), null, USER);
+        when(registrationRepository.findByIdForTenant(TENANT, id)).thenReturn(Optional.of(existing));
+
+        var active = new UpdateComplianceRegistrationRequest("N1", "ACTIVE", LocalDate.of(2023, 1, 1), LocalDate.of(2024, 1, 1), null);
+        assertThatThrownBy(() -> service().update(TENANT, id, active, USER))
+                .isInstanceOf(za.co.handyflow.platform.shared.BusinessException.class)
+                .hasMessageContaining("cannot be Active");
+
+        var expired = new UpdateComplianceRegistrationRequest("N1", "EXPIRED", LocalDate.of(2023, 1, 1), LocalDate.of(2024, 1, 1), null);
+        assertThat(service().update(TENANT, id, expired, USER).status()).isEqualTo("EXPIRED");
+    }
 }
