@@ -10,11 +10,13 @@ export interface OnSiteRow {
   company: string | null; hostName: string | null; vehicleRegistration: string | null; loggedInAt: string; status: string
 }
 export interface GateDashboard {
-  counts: { onSiteNow: number; overstayed: number; enteredToday: number; departedToday: number; onSiteByType: Record<string, number> }
+  counts: { onSiteNow: number; overstayed: number; enteredToday: number; departedToday: number; onSiteByType: Record<string, number>; vehiclesOnSite: number }
   onSite: OnSiteRow[]; onSiteTruncated: boolean
   bySite: { siteId: string; siteName: string; onSite: number; enteredToday: number }[]
+  byGate: GateRow[]
   todayStartedAt: string
 }
+export interface GateRow { accessPointId: string; accessPointName: string; siteId: string | null; siteName: string | null; onSite: number; overstayed: number; enteredToday: number; departedToday: number }
 
 export const TYPE_LABEL: Record<string, string> = { VISITOR: "Visitor", CONTRACTOR: "Contractor", DELIVERY: "Delivery", STAFF_VEHICLE: "Staff vehicle", OTHER: "Other" }
 export const typeLabel = (t: string) => TYPE_LABEL[t] ?? t.charAt(0) + t.slice(1).toLowerCase().replace(/_/g, " ")
@@ -31,9 +33,12 @@ export function onSiteFor(loggedInAt: string, now: Date = new Date()): string {
   return `${Math.floor(h / 24)} d ${h % 24} h`
 }
 
-export function filterOnSite(rows: OnSiteRow[], f: { type: string; search: string; overstayedOnly: boolean }): OnSiteRow[] {
+/** A registration number was recorded at the gate. */
+export const hasVehicle = (r: { vehicleRegistration: string | null }) => !!r.vehicleRegistration && r.vehicleRegistration.trim() !== ""
+
+export function filterOnSite(rows: OnSiteRow[], f: { type: string; search: string; overstayedOnly: boolean; vehiclesOnly?: boolean }): OnSiteRow[] {
   const q = f.search.trim().toLowerCase()
-  return rows.filter(r => (!f.type || r.entryType === f.type) && (!f.overstayedOnly || r.status === "OVERSTAYED")
+  return rows.filter(r => (!f.type || r.entryType === f.type) && (!f.overstayedOnly || r.status === "OVERSTAYED") && (!f.vehiclesOnly || hasVehicle(r))
     && (!q || [r.personName, r.company, r.hostName, r.vehicleRegistration, r.siteName].some(v => (v ?? "").toLowerCase().includes(q))))
 }
 
@@ -45,3 +50,10 @@ export function typesPresent(counts: Record<string, number>): string[] {
 
 /** Entries are oldest first from the server. */
 export const longestOnSite = (rows: OnSiteRow[]): OnSiteRow | null => rows.length ? rows[0] : null
+
+/** Gates that need a look first: overstays, then the most people on site. Quiet gates (nobody on site, nothing today) go last. */
+export function sortGates(gates: GateRow[]): GateRow[] {
+  const busy = (g: GateRow) => g.onSite + g.enteredToday + g.departedToday
+  return [...gates].sort((a, b) => b.overstayed - a.overstayed || b.onSite - a.onSite || busy(b) - busy(a)
+    || (a.siteName ?? "").localeCompare(b.siteName ?? "") || a.accessPointName.localeCompare(b.accessPointName))
+}

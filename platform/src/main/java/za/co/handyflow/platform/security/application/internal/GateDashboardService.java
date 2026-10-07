@@ -65,12 +65,14 @@ public class GateDashboardService {
 
         // Counts come from the database, not from the (capped) list above.
         Map<String, Integer> byType = new LinkedHashMap<>();
-        int onSiteNow = 0, overstayed = 0;
+        int onSiteNow = 0, overstayed = 0, vehicles = 0;
         for (Map<String, Object> r : jdbc.queryForList("""
-                SELECT e.entry_type, e.status, COUNT(*) AS n FROM security_gate_register_entries e
+                SELECT e.entry_type, e.status, COUNT(*) AS n,
+                       COUNT(*) FILTER (WHERE e.vehicle_registration IS NOT NULL AND btrim(e.vehicle_registration) <> '') AS v FROM security_gate_register_entries e
                 WHERE e.tenant_id = ? AND e.logged_out_at IS NULL""" + siteFilter + " GROUP BY e.entry_type, e.status", base.toArray())) {
             int n = ((Number) r.get("n")).intValue();
             onSiteNow += n;
+            vehicles += ((Number) r.get("v")).intValue();
             if ("OVERSTAYED".equals(r.get("status"))) overstayed += n;
             byType.merge(String.valueOf(r.get("entry_type")), n, Integer::sum);
         }
@@ -89,13 +91,37 @@ public class GateDashboardService {
                 (rs, n) -> new SiteCount((UUID) rs.getObject("id"), rs.getString("name"), rs.getInt("on_site"), rs.getInt("entered_today")),
                 bySiteParams(today, tenant, siteId));
 
-        return new Dashboard(new Counts(onSiteNow, overstayed, nz(entered), nz(departed), byType), onSite, truncated, bySite, today);
+        List<GateCount> byGate = jdbc.query("""
+                SELECT ap.id, ap.name, s.id AS site_id, s.name AS site_name,
+                       COUNT(*) FILTER (WHERE e.logged_out_at IS NULL) AS on_site,
+                       COUNT(*) FILTER (WHERE e.logged_out_at IS NULL AND e.status = 'OVERSTAYED') AS overstayed,
+                       COUNT(*) FILTER (WHERE e.logged_in_at >= ?) AS entered_today,
+                       COUNT(*) FILTER (WHERE e.logged_out_at >= ?) AS departed_today
+                FROM security_gate_register_entries e
+                JOIN security_access_points ap ON ap.id = e.access_point_id
+                LEFT JOIN security_sites s ON s.id = e.site_id
+                WHERE e.tenant_id = ?"""
+                + siteFilter + " AND (e.logged_out_at IS NULL OR e.logged_in_at >= ? OR e.logged_out_at >= ?)"
+                + " GROUP BY ap.id, ap.name, s.id, s.name ORDER BY s.name, ap.name",
+                (rs, n) -> new GateCount((UUID) rs.getObject("id"), rs.getString("name"), (UUID) rs.getObject("site_id"), rs.getString("site_name"),
+                        rs.getInt("on_site"), rs.getInt("overstayed"), rs.getInt("entered_today"), rs.getInt("departed_today")),
+                byGateParams(today, tenant, siteId));
+
+        return new Dashboard(new Counts(onSiteNow, overstayed, nz(entered), nz(departed), byType, vehicles), onSite, truncated, bySite, byGate, today);
     }
 
     private static Object[] bySiteParams(Instant today, UUID tenant, UUID siteId) {
         List<Object> p = new ArrayList<>(List.of(Timestamp.from(today), tenant));
         if (siteId != null) p.add(siteId);
         p.add(Timestamp.from(today));
+        return p.toArray();
+    }
+
+    private static Object[] byGateParams(Instant today, UUID tenant, UUID siteId) {
+        Timestamp t = Timestamp.from(today);
+        List<Object> p = new ArrayList<>(List.of(t, t, tenant));
+        if (siteId != null) p.add(siteId);
+        p.add(t); p.add(t);
         return p.toArray();
     }
 

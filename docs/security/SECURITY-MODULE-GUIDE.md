@@ -161,6 +161,7 @@ Load the demo, sign in as a user with `SECURITY_READ` and `SECURITY_MANAGE` (adm
 
 ### Gate
 - [ ] Gate Dashboard shows 7 on site now for all sites (6 on site plus 1 overstayed; the overstayed person counts), 1 overstayed, and per-site cards. Today's entered and left counts depend on the time you load the data.
+- [ ] Gate Dashboard also shows **Vehicles on site** (5 with the demo data), a **By gate** table (5 gates; Boom gate first because of the overstay) and a **Vehicles only** filter on the list.
 - [ ] Gate Access shows 6 access points and 16 entries, 9 departed.
 - [ ] Recording a departure for an on-site visitor moves them to departed and drops the on-site count.
 

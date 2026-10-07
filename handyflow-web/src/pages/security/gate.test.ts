@@ -38,3 +38,17 @@ describe("types and longest stay", () => {
     expect(longestOnSite([r({ id: "x" }), r({ id: "y" })])?.id).toBe("x"); expect(longestOnSite([])).toBeNull()
   })
 })
+
+import { hasVehicle, sortGates } from './gate.logic'
+describe('gate breakdown', () => {
+  const g = (name: string, o: any = {}) => ({ accessPointId: name, accessPointName: name, siteId: 's', siteName: 'Site', onSite: 0, overstayed: 0, enteredToday: 0, departedToday: 0, ...o })
+  it('puts overstays first, then the busiest gate, then gates with movement today, and idle gates last', () => {
+    expect(sortGates([g('Quiet'), g('Busy', { onSite: 5 }), g('Over', { onSite: 1, overstayed: 1 }), g('Moved', { enteredToday: 2 })]).map(x => x.accessPointName))
+      .toEqual(['Over', 'Busy', 'Moved', 'Quiet'])
+  })
+  it('treats a blank registration as no vehicle', () => {
+    expect(hasVehicle({ vehicleRegistration: 'CA 1' })).toBe(true)
+    expect(hasVehicle({ vehicleRegistration: '  ' })).toBe(false)
+    expect(hasVehicle({ vehicleRegistration: null })).toBe(false)
+  })
+})

@@ -1,14 +1,16 @@
 import { afterEach, describe, it, expect, vi } from "vitest"
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 
 const row = (over: any = {}) => ({ id: "e1", siteId: "s1", siteName: "Centurion Mall", accessPointName: "Main gate", entryType: "VISITOR", personName: "Ann Botha", company: "Acme", hostName: "Pieter",
   vehicleRegistration: "CA 123-456", loggedInAt: new Date(Date.now() - 3 * 3600_000).toISOString(), status: "ON_SITE", ...over })
 let data: any = {
-  counts: { onSiteNow: 2, overstayed: 1, enteredToday: 5, departedToday: 3, onSiteByType: { VISITOR: 1, CONTRACTOR: 1 } },
+  counts: { onSiteNow: 2, overstayed: 1, enteredToday: 5, departedToday: 3, onSiteByType: { VISITOR: 1, CONTRACTOR: 1 }, vehiclesOnSite: 1 },
   onSite: [row(), row({ id: "e2", personName: "Sipho Dube", company: "Fixit", entryType: "CONTRACTOR", status: "OVERSTAYED", vehicleRegistration: null })],
-  onSiteTruncated: false, bySite: [{ siteId: "s1", siteName: "Centurion Mall", onSite: 2, enteredToday: 5 }], todayStartedAt: "2026-10-06T22:00:00Z" }
+  onSiteTruncated: false, bySite: [{ siteId: "s1", siteName: "Centurion Mall", onSite: 2, enteredToday: 5 }],
+  byGate: [{ accessPointId: "a1", accessPointName: "Loading bay", siteId: "s1", siteName: "Centurion Mall", onSite: 0, overstayed: 0, enteredToday: 1, departedToday: 1 },
+           { accessPointId: "a2", accessPointName: "Main gate", siteId: "s1", siteName: "Centurion Mall", onSite: 2, overstayed: 1, enteredToday: 4, departedToday: 2 }], todayStartedAt: "2026-10-06T22:00:00Z" }
 const get = vi.fn((url: string) => Promise.resolve({ data: { data: url.includes("/gate/dashboard") ? data : { content: [{ id: "s1", name: "Centurion Mall" }] } } }))
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: any[]) => (get as any)(...a) } }))
 import GateDashboardTab from "./GateDashboardTab"
@@ -17,6 +19,19 @@ const show = () => render(<QueryClientProvider client={new QueryClient({ default
 afterEach(() => { cleanup(); get.mockClear() })
 
 describe("GateDashboardTab", () => {
+  it("lists each gate with its own counts, the gate with an overstay first", async () => {
+    show(); await screen.findByText("Ann Botha")
+    const rows = screen.getAllByRole("row", { name: /gate|bay/i }).filter(r => within(r).queryAllByRole("cell").length === 6)
+    expect(rows[0].textContent).toContain("Main gate")
+    expect(rows[1].textContent).toContain("Loading bay")
+    expect(screen.getByText("Vehicles on site")).toBeTruthy()
+  })
+  it("shows only entries with a vehicle when Vehicles only is ticked", async () => {
+    show(); await screen.findByText("Ann Botha")
+    fireEvent.click(screen.getByLabelText("Vehicles only"))
+    expect(screen.getByText("Ann Botha")).toBeTruthy()
+    expect(screen.queryByText("Sipho Dube")).toBeNull()
+  })
   it("shows the counts, who is on site and the overstay flag, without ID or phone numbers", async () => {
     show()
     expect(await screen.findByText("Ann Botha")).toBeTruthy()

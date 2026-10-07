@@ -13,6 +13,9 @@ public final class GateDashboardDtos {
     public record OnSiteRow(UUID id, UUID siteId, String siteName, String accessPointName, String entryType, String personName,
                             String company, String hostName, String vehicleRegistration, Instant loggedInAt, String status) {}
     public record SiteCount(UUID siteId, String siteName, int onSite, int enteredToday) {}
-    public record Counts(int onSiteNow, int overstayed, int enteredToday, int departedToday, Map<String, Integer> onSiteByType) {}
-    public record Dashboard(Counts counts, List<OnSiteRow> onSite, boolean onSiteTruncated, List<SiteCount> bySite, Instant todayStartedAt) {}
+    public record Counts(int onSiteNow, int overstayed, int enteredToday, int departedToday, Map<String, Integer> onSiteByType, int vehiclesOnSite) {}
+    /** One gate (access point): who is on site that came through it, and today's movement. */
+    public record GateCount(UUID accessPointId, String accessPointName, UUID siteId, String siteName,
+                            int onSite, int overstayed, int enteredToday, int departedToday) {}
+    public record Dashboard(Counts counts, List<OnSiteRow> onSite, boolean onSiteTruncated, List<SiteCount> bySite, List<GateCount> byGate, Instant todayStartedAt) {}
 }

@@ -6,11 +6,11 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import { AlertTriangle, DoorOpen, LogIn, LogOut, Users } from "lucide-react"
+import { AlertTriangle, Car, DoorOpen, LogIn, LogOut, Users } from "lucide-react"
 import { apiClient } from "../../api/client"
 import Chip from "../../components/ui/Chip"
 import StatTile from "../../components/ui/StatTile"
-import { STATUS_LABEL, STATUS_TONE, filterOnSite, onSiteFor, typeLabel, typesPresent, type GateDashboard } from "./gate.logic"
+import { STATUS_LABEL, STATUS_TONE, filterOnSite, onSiteFor, sortGates, typeLabel, typesPresent, type GateDashboard } from "./gate.logic"
 
 const sel: React.CSSProperties = { padding: "7px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text-primary)" }
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }
@@ -24,6 +24,7 @@ export default function GateDashboardTab() {
   const [type, setType] = useState("")
   const [search, setSearch] = useState("")
   const [overstayedOnly, setOverstayedOnly] = useState(false)
+  const [vehiclesOnly, setVehiclesOnly] = useState(false)
 
   const { data: sites = [] } = useQuery<{ id: string; name: string }[]>({ queryKey: ["gate-sites"], queryFn: async () => unwrap(await apiClient.get("/api/v1/security/sites?size=200")) })
   const { data, isLoading, error, dataUpdatedAt } = useQuery<GateDashboard>({
@@ -32,7 +33,7 @@ export default function GateDashboardTab() {
     refetchInterval: 30000,
   })
   const c = data?.counts
-  const rows = filterOnSite(data?.onSite ?? [], { type, search, overstayedOnly })
+  const rows = filterOnSite(data?.onSite ?? [], { type, search, overstayedOnly, vehiclesOnly })
   const now = dataUpdatedAt ? new Date(dataUpdatedAt) : new Date()
 
   return (
@@ -42,12 +43,14 @@ export default function GateDashboardTab() {
         <select aria-label="Type" value={type} onChange={e => setType(e.target.value)} style={sel}><option value="">Any type</option>{typesPresent(c?.onSiteByType ?? {}).map(t => <option key={t} value={t}>{typeLabel(t)}</option>)}</select>
         <input aria-label="Search" placeholder="Search name, company, host or vehicle" value={search} onChange={e => setSearch(e.target.value)} style={{ ...sel, width: 260 }} />
         <label style={{ fontSize: 13, display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={overstayedOnly} onChange={e => setOverstayedOnly(e.target.checked)} />Overstayed only</label>
+        <label style={{ fontSize: 13, display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={vehiclesOnly} onChange={e => setVehiclesOnly(e.target.checked)} />Vehicles only</label>
         <Link to="/security/gate-access" style={{ marginLeft: "auto", color: "var(--hf-primary-text)", fontWeight: 600, fontSize: 13, textDecoration: "none" }}>Open gate log and access points</Link>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 14 }}>
         <StatTile label="On site now" value={c?.onSiteNow ?? "-"} icon={<Users size={18} />} />
         <StatTile label="Overstayed" value={c?.overstayed ?? "-"} hint="flagged by the overstay check" icon={<AlertTriangle size={18} />} tone={c?.overstayed ? "bad" : "neutral"} />
+        <StatTile label="Vehicles on site" value={c?.vehiclesOnSite ?? "-"} hint="entries with a registration" icon={<Car size={18} />} />
         <StatTile label="Entered today" value={c?.enteredToday ?? "-"} icon={<LogIn size={18} />} />
         <StatTile label="Left today" value={c?.departedToday ?? "-"} icon={<LogOut size={18} />} />
       </div>
@@ -62,6 +65,26 @@ export default function GateDashboardTab() {
               <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 4 }}>{s.onSite} on site · {s.enteredToday} entered today</div>
             </button>
           ))}
+        </div>
+      )}
+
+      {(data?.byGate?.length ?? 0) > 0 && (
+        <div style={{ ...card, overflowX: "auto", marginBottom: 14 }}>
+          <table aria-label="By gate" style={{ width: "100%", borderCollapse: "collapse", minWidth: 560 }}>
+            <thead><tr><th style={th}>Gate</th><th style={th}>Site</th><th style={th}>On site</th><th style={th}>Overstayed</th><th style={th}>Entered today</th><th style={th}>Left today</th></tr></thead>
+            <tbody>
+              {sortGates(data!.byGate ?? []).map(g => (
+                <tr key={g.accessPointId}>
+                  <td style={{ ...td, fontWeight: 600 }}>{g.accessPointName}</td>
+                  <td style={td}>{g.siteName ?? "-"}</td>
+                  <td style={td}>{g.onSite}</td>
+                  <td style={td}>{g.overstayed > 0 ? <Chip tone="bad">{g.overstayed}</Chip> : 0}</td>
+                  <td style={td}>{g.enteredToday}</td>
+                  <td style={td}>{g.departedToday}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
