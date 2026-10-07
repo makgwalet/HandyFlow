@@ -6,7 +6,7 @@
 import { useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { ArrowLeft, CalendarClock, ClipboardCheck, FileText, Plus, ShieldAlert, ShieldCheck, Trash2, UserRound } from "lucide-react"
+import { AlertOctagon, ArrowLeft, CalendarClock, ClipboardCheck, FileText, Plus, ShieldAlert, ShieldCheck, Trash2, UserRound } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import Chip from "../../components/ui/Chip"
@@ -14,6 +14,8 @@ import StatTile from "../../components/ui/StatTile"
 import { PageHeader } from "../../components/ui/PageHeader"
 import GuardScreeningPanel, { RequestScreening } from "./GuardScreeningPanel"
 import SkillsTab from "./GuardCompetencyPanel"
+import ComplaintsTab from "./ComplaintsTab"
+import type { ComplaintCounts, ComplaintSummary } from "./complaints.logic"
 import {
   DOCUMENT_CATEGORIES, SEVERITY_TONE, SHIFT_TONE, categoryLabel, completionRate, expiryState,
   fileChecklist, isUpcoming, readinessState, readinessTone, screeningLabel, todayIso,
@@ -36,9 +38,11 @@ interface Overview {
   shifts: ShiftItem[]
   incidents: { id: string; siteName: string | null; title: string; severity: string; status: string; reportedAt: string }[]
   counts: { shiftsLast90Days: number; completedLast90Days: number; incidentsLast180Days: number; openIncidents: number }
+  complaints?: ComplaintSummary[]
+  complaintCounts?: ComplaintCounts
 }
 
-const TABS = ["Overview", "Compliance", "Skills", "Documents", "Shifts", "Incidents"] as const
+const TABS = ["Overview", "Compliance", "Skills", "Documents", "Shifts", "Incidents", "Complaints"] as const
 type Tab = typeof TABS[number]
 
 const STATUS_TONE: Record<string, "ok" | "warn" | "bad" | "info" | "neutral"> = { ACTIVE: "ok", ON_LEAVE: "info", SUSPENDED: "bad", UNDER_INVESTIGATION: "warn", TERMINATED: "neutral" }
@@ -120,7 +124,7 @@ export default function GuardProfilePage() {
           <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
             style={{ padding: "9px 14px", border: "none", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 700,
               color: tab === t ? "var(--hf-accent-text)" : "var(--hf-text-muted)", borderBottom: tab === t ? "2px solid var(--hf-accent)" : "2px solid transparent" }}>
-            {t}{t === "Incidents" && data.counts.openIncidents > 0 ? ` (${data.counts.openIncidents} open)` : ""}
+            {t}{t === "Incidents" && data.counts.openIncidents > 0 ? ` (${data.counts.openIncidents} open)` : ""}{t === "Complaints" && (data.complaintCounts?.open ?? 0) > 0 ? ` (${data.complaintCounts!.open} open)` : ""}
           </button>
         ))}
       </div>
@@ -131,6 +135,7 @@ export default function GuardProfilePage() {
             <StatTile label="Shifts, last 90 days" value={data.counts.shiftsLast90Days} icon={<CalendarClock size={18} />} />
             <StatTile label="Shifts completed" value={rate === null ? "-" : `${rate}%`} hint={`${data.counts.completedLast90Days} of ${data.counts.shiftsLast90Days}`} tone={rate !== null && rate < 80 ? "warn" : "neutral"} icon={<ClipboardCheck size={18} />} />
             <StatTile label="Incidents, last 180 days" value={data.counts.incidentsLast180Days} hint={`${data.counts.openIncidents} open`} tone={data.counts.openIncidents > 0 ? "warn" : "neutral"} icon={<ShieldAlert size={18} />} />
+            <StatTile label="Complaints, last 90 days" value={data.complaintCounts?.last90Days ?? 0} hint={`${data.complaintCounts?.open ?? 0} open`} tone={(data.complaintCounts?.open ?? 0) > 0 ? "warn" : "neutral"} icon={<AlertOctagon size={18} />} />
             <StatTile label="Documents on file" value={data.documents.length} icon={<FileText size={18} />} />
           </div>
           <div style={{ ...card, display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
@@ -193,6 +198,8 @@ export default function GuardProfilePage() {
           {data.counts.shiftsLast90Days > data.shifts.length && <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 8 }}>Showing the newest {data.shifts.length}.</div>}
         </div>
       )}
+
+      {tab === "Complaints" && <ComplaintsTab guardId={guard.id} />}
 
       {tab === "Incidents" && (
         <div style={{ ...card, overflowX: "auto" }}>

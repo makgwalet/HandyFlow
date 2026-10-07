@@ -89,6 +89,7 @@ export const SECURITY_SECTIONS: ModuleSections = {
       sections: [
         { id: 'guards', label: 'Guards', icon: Shield },
         { id: 'guard-screening', label: 'Guard Screening', icon: ShieldCheck },
+        { id: 'complaints', label: 'Complaints', icon: AlertOctagon },
         { id: 'rotation-patterns', label: 'Rotation Patterns', icon: RefreshCw },
         { id: 'shift-swaps', label: 'Shift Swaps', icon: Repeat },
         { id: 'payroll', label: 'Payroll', icon: DollarSign },

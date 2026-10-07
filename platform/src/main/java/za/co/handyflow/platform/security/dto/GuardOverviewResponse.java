@@ -21,7 +21,9 @@ public record GuardOverviewResponse(
         List<GuardCompetencyResponse> competencies,
         List<ShiftItem> shifts,
         List<IncidentItem> incidents,
-        Counts counts
+        Counts counts,
+        List<GuardComplaintDtos.ComplaintSummary> complaints,
+        GuardComplaintDtos.ComplaintCounts complaintCounts
 ) {
     public record ScreeningItem(
             UUID id, String screeningType, String reason, String result,

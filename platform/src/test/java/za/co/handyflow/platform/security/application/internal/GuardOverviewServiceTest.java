@@ -35,6 +35,7 @@ class GuardOverviewServiceTest {
     @Mock private GuardScreeningService screeningService;
     @Mock private GuardScreeningEvidenceService evidenceService;
     @Mock private GuardCompetencyService competencyService;
+    @Mock private GuardComplaintService complaintService;
     @Mock private GuardScreeningRepository screeningRepository;
     @Mock private ShiftRepository shiftRepository;
     @Mock private IncidentRepository incidentRepository;
@@ -46,7 +47,7 @@ class GuardOverviewServiceTest {
     private final UUID siteId = UUID.randomUUID();
 
     private GuardOverviewService service() {
-        return new GuardOverviewService(guardService, screeningService, evidenceService, competencyService, screeningRepository,
+        return new GuardOverviewService(guardService, screeningService, evidenceService, competencyService, complaintService, screeningRepository,
                 shiftRepository, incidentRepository, siteRepository);
     }
 

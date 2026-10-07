@@ -10,6 +10,7 @@ import PatrolRoutesTab    from "./PatrolRoutesTab"
 import RotationPatternsTab from "./RotationPatternsTab"
 import ShiftSwapsTab      from "./ShiftSwapsTab"
 import GuardScreeningTab  from "./GuardScreeningTab"
+import ComplaintsTab       from "./ComplaintsTab"
 import ShiftsTab          from "./ShiftsTab"
 import IncidentsTab       from "./IncidentsTab"
 import LiveMapTab         from "./LiveMapTab"
@@ -58,6 +59,7 @@ export function SecurityPage() {
     "gate-access":       <GateAccessTab />,
     "guards":            <GuardsTab />,
     "guard-screening":   <GuardScreeningTab />,
+    "complaints":        <ComplaintsTab />,
     "rotation-patterns": <RotationPatternsTab />,
     "shift-swaps":       <ShiftSwapsTab />,
     "payroll":           <PayrollTab />,

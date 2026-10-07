@@ -48,6 +48,7 @@ public class GuardOverviewService {
     private final GuardScreeningService screeningService;
     private final GuardScreeningEvidenceService evidenceService;
     private final GuardCompetencyService competencyService;
+    private final GuardComplaintService complaintService;
     private final GuardScreeningRepository screeningRepository;
     private final ShiftRepository shiftRepository;
     private final IncidentRepository incidentRepository;
@@ -77,6 +78,8 @@ public class GuardOverviewService {
         java.time.LocalDate today = now.atZone(java.time.ZoneId.of("Africa/Johannesburg")).toLocalDate();
         var competencies = competencyService.listForGuard(tenantId, guardId, today);
         Readiness readiness = readiness(guard.psiraNumber(), guard.psiraExpiryDate(), records, evidence, documents, competencies, now);
+
+        var complaints = complaintService.forGuard(tenantId, guardId);
 
         Instant shiftFrom = now.minus(Duration.ofDays(SHIFT_BACK_DAYS));
         Instant shiftTo = now.plus(Duration.ofDays(SHIFT_FORWARD_DAYS));
@@ -119,7 +122,9 @@ public class GuardOverviewService {
                 competencies,
                 shiftItems,
                 incidentItems,
-                new Counts((int) past90, (int) completed, incidents.size(), (int) open));
+                new Counts((int) past90, (int) completed, incidents.size(), (int) open),
+                complaints,
+                GuardComplaintService.counts(complaints, today));
     }
 
     /** Readiness is judged in South African time, like every other date rule in the product. */
