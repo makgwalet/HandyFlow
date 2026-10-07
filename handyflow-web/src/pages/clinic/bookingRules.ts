@@ -19,3 +19,18 @@ export function clashMessage(e: unknown): string | null {
   const r = (e as { response?: { status?: number; data?: { message?: string } } })?.response
   return r?.status === 409 ? (r.data?.message ?? "This practitioner already has an overlapping appointment.") : null
 }
+
+/** Value of the room filter that keeps only appointments with no room. */
+export const NO_ROOM_FILTER = "none"
+
+/** Whether an appointment passes the practitioner and room filters of the schedule ("all" keeps everything). */
+export function passesFilters(
+  a: { practitionerId?: string | null; roomId?: string | null },
+  doctorFilter: string,
+  roomFilter: string,
+): boolean {
+  if (doctorFilter !== "all" && a.practitionerId !== doctorFilter) return false
+  if (roomFilter === "all") return true
+  if (roomFilter === NO_ROOM_FILTER) return !a.roomId
+  return a.roomId === roomFilter
+}

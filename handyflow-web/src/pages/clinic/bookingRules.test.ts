@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { bookingProblem, clashMessage } from "./bookingRules"
+import { bookingProblem, clashMessage, NO_ROOM_FILTER, passesFilters } from "./bookingRules"
 
 const NOW = new Date("2026-10-07T10:00:00").getTime()
 const ok = { patientId: "p", scheduledAt: "2026-10-07T11:00", durationMinutes: "30" }
@@ -30,5 +30,30 @@ describe("clashMessage", () => {
     expect(clashMessage({ response: { status: 400, data: { message: "x" } } })).toBeNull()
     expect(clashMessage(new Error("network"))).toBeNull()
     expect(clashMessage(undefined)).toBeNull()
+  })
+})
+
+describe("passesFilters", () => {
+  const a = { practitionerId: "d1", roomId: "r1" }
+  const noRoom = { practitionerId: "d1", roomId: null }
+  it("keeps everything when both filters are all", () => {
+    expect(passesFilters(a, "all", "all")).toBe(true)
+    expect(passesFilters(noRoom, "all", "all")).toBe(true)
+  })
+  it("filters by practitioner", () => {
+    expect(passesFilters(a, "d1", "all")).toBe(true)
+    expect(passesFilters(a, "d2", "all")).toBe(false)
+  })
+  it("filters by room, and by no room", () => {
+    expect(passesFilters(a, "all", "r1")).toBe(true)
+    expect(passesFilters(a, "all", "r2")).toBe(false)
+    expect(passesFilters(noRoom, "all", "r1")).toBe(false)
+    expect(passesFilters(noRoom, "all", NO_ROOM_FILTER)).toBe(true)
+    expect(passesFilters(a, "all", NO_ROOM_FILTER)).toBe(false)
+  })
+  it("needs both to match when both are set", () => {
+    expect(passesFilters(a, "d1", "r1")).toBe(true)
+    expect(passesFilters(a, "d2", "r1")).toBe(false)
+    expect(passesFilters(a, "d1", "r2")).toBe(false)
   })
 })

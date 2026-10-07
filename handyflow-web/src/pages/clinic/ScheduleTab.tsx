@@ -1,7 +1,7 @@
 // src/pages/clinic/ScheduleTab.tsx
 // Day / Week calendar view per doctor — click slot to book appointment
 import RescheduleBox from "./RescheduleBox"
-import { bookingProblem, clashMessage, WALK_IN_GRACE_MS } from "./bookingRules"
+import { bookingProblem, clashMessage, NO_ROOM_FILTER, passesFilters, WALK_IN_GRACE_MS } from "./bookingRules"
 import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -94,6 +94,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
   const [view, setView]                 = useState<"day"|"week">("week")
   const [anchor, setAnchor]             = useState(() => { const d=new Date(); d.setHours(0,0,0,0); return d })
   const [doctorFilter, setDoctorFilter] = useState<string>("all")
+  const [roomFilter, setRoomFilter] = useState<string>("all")
   const [selected, setSelected]         = useState<Appointment|null>(null)
   const [showBook, setShowBook]         = useState(false)
   const [bookSlot, setBookSlot]         = useState<{date:Date;hour:number}|null>(null)
@@ -202,8 +203,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
   const filtered = (appointments as Appointment[]).filter(a => {
     const d = new Date(a.scheduledAt)
     const inRange = days.some(day => isSameDay(d, day))
-    const byDoc = doctorFilter==="all" || a.practitionerId===doctorFilter
-    return inRange && byDoc
+    return inRange && passesFilters(a, doctorFilter, roomFilter)
   })
 
   const getAppts = (day: Date) =>
@@ -253,6 +253,16 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
               <option key={p.id} value={p.id}>Dr. {p.fullName}</option>
             ))}
           </select>
+
+          {/* Room filter (only when the clinic has rooms) */}
+          {rooms.length>0 && (
+            <select aria-label="Filter by room" value={roomFilter} onChange={e=>setRoomFilter(e.target.value)}
+              style={{padding:"7px 12px",border:`1px solid ${BORDER}`,borderRadius:8,fontSize:13,outline:"none",background:"var(--hf-surface)",maxWidth:200}}>
+              <option value="all">All rooms</option>
+              {rooms.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
+              <option value={NO_ROOM_FILTER}>No room</option>
+            </select>
+          )}
 
           {/* Day / Week toggle */}
           <div style={{display:"flex",border:`1px solid ${BORDER}`,borderRadius:8,overflow:"hidden"}}>
