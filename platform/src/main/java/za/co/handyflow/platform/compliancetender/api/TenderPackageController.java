@@ -14,7 +14,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.compliancetender.application.internal.submission.PackageDocumentSuggestions;
 import za.co.handyflow.platform.compliancetender.application.internal.submission.SubmissionProfileService;
+import za.co.handyflow.platform.compliancetender.application.internal.submission.TenderPackageDraftService;
 import za.co.handyflow.platform.compliancetender.application.internal.submission.TenderPackageService;
 import za.co.handyflow.platform.compliancetender.application.internal.submission.TenderPackageStorage;
 import za.co.handyflow.platform.compliancetender.dto.*;
@@ -37,6 +39,8 @@ public class TenderPackageController {
 
     private final TenderPackageService packageService;
     private final SubmissionProfileService profileService;
+    private final TenderPackageDraftService draftService;
+    private final PackageDocumentSuggestions suggestions;
     private final FeatureGuard featureGuard;
 
     @PostMapping("/tenders/{id}/packages/preview")
@@ -56,6 +60,43 @@ public class TenderPackageController {
                 TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName());
         return ResponseEntity.status(result.built() != null ? HttpStatus.CREATED : HttpStatus.OK)
                 .body(ApiResponse.success(result.built() != null ? "Package built" : "Package not built", result));
+    }
+
+    @GetMapping("/tenders/{id}/package/suggested-documents")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_READ','COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
+    @Operation(summary = "For each requirement proved by a document: the verified document valid on the closing date, or why there is none")
+    public ResponseEntity<ApiResponse<List<SuggestedDocumentResponse>>> suggestedDocuments(@PathVariable UUID id) {
+        featureGuard.requireModule("compliancetender");
+        return ResponseEntity.ok(ApiResponse.success(suggestions.forTender(TenantContext.getTenantIdAsObject(), id).stream()
+                .map(s -> new SuggestedDocumentResponse(s.requirement(), s.documentType(), s.outcome().name(), s.documentId(), s.message())).toList()));
+    }
+
+    @GetMapping("/tenders/{id}/package-draft")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_READ','COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
+    @Operation(summary = "The saved choices on the package screen; 204 when nothing has been saved yet")
+    public ResponseEntity<ApiResponse<TenderPackageDraftResponse>> getDraft(@PathVariable UUID id) {
+        featureGuard.requireModule("compliancetender");
+        return draftService.find(TenantContext.getTenantIdAsObject(), id)
+                .map(d -> ResponseEntity.ok(ApiResponse.success(d)))
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @PutMapping("/tenders/{id}/package-draft")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_READ','COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
+    @Operation(summary = "Save the choices on the package screen (last save wins)")
+    public ResponseEntity<ApiResponse<TenderPackageDraftResponse>> saveDraft(@PathVariable UUID id, @Valid @RequestBody SaveTenderPackageDraftRequest request) {
+        featureGuard.requireModule("compliancetender");
+        return ResponseEntity.ok(ApiResponse.success(draftService.save(TenantContext.getTenantIdAsObject(), id, request.data(),
+                TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
+    }
+
+    @DeleteMapping("/tenders/{id}/package-draft")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_READ','COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
+    @Operation(summary = "Throw away the saved choices and start again")
+    public ResponseEntity<Void> discardDraft(@PathVariable UUID id) {
+        featureGuard.requireModule("compliancetender");
+        draftService.discard(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/tenders/{id}/packages")

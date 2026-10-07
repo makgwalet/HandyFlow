@@ -2,7 +2,7 @@
 //
 // Submission package for one of the tenant's own tenders (ADR-005): choose what goes in and in what order, see at a glance what is ready and what is blocking submission, then build a
 // versioned, hashed package. The server plans and validates; this page sends the choices (debounced preview) and shows the answer in plain words.
-import { Fragment, useEffect, useMemo, useState } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import Chip from "../../components/ui/Chip"
@@ -13,12 +13,12 @@ import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import ProgressRing from "../../components/ui/ProgressRing"
 import {
-  downloadPackage, useBuildPackage, useComplianceDocuments, usePackagePreview, usePackages, useSubmissionProfiles,
+  discardPackageDraft, downloadPackage, fetchSuggestedDocuments, savePackageDraft, useBuildPackage, usePackageDraft, useComplianceDocuments, usePackagePreview, usePackages, useSubmissionProfiles,
   type PackagePlan, type TenderPackage,
 } from "./package.api"
 import {
   COVER_LETTER_TEMPLATE, DEFAULT_REQUEST, EMPTY_LIMITS, INITIAL_DRAFT, SECTIONS, blocking, closingText, documentState, feed, fmtSize, fmtWhen, headline, moveSection, sectionTone, sectionsReady, shortHash, sourceText,
-  staleLatest, toRequest, toggleDocument, toggleSection, warnings, type LimitsDraft, type PackageDraft,
+  applySuggestions, staleLatest, draftKey, hydrateDraft, saveStateText, type SaveState, toRequest, toggleDocument, toggleSection, warnings, type LimitsDraft, type PackageDraft,
 } from "./package.logic"
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: 20 }
@@ -61,6 +61,39 @@ export default function TenderPackagePage() {
   const [draft, setDraft] = useState<PackageDraft>(INITIAL_DRAFT)
   const set = (patch: Partial<PackageDraft>) => setDraft(d => ({ ...d, ...patch }))
 
+  // saved draft: loaded once when the screen opens, then saved about a second after the last change
+  const saved = usePackageDraft(id)
+  const [hydrated, setHydrated] = useState(false)
+  const lastSaved = useRef(draftKey(INITIAL_DRAFT))
+  const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" })
+  useEffect(() => {
+    if (hydrated || saved.isLoading) return
+    if (saved.data) {
+      const h = hydrateDraft(saved.data.data)
+      lastSaved.current = draftKey(h)
+      setDraft(h)
+      setSaveState({ kind: "saved", at: saved.data.updatedAt, by: saved.data.updatedByName })
+    }
+    setHydrated(true)
+  }, [saved.isLoading, saved.data, hydrated])
+  const settled = useDebounced(draft, 1000)
+  useEffect(() => {
+    if (!hydrated || !id) return
+    const key = draftKey(settled)
+    if (key === lastSaved.current) return
+    setSaveState({ kind: "saving" })
+    savePackageDraft(id, settled)
+      .then(r => { lastSaved.current = key; setSaveState({ kind: "saved", at: r.updatedAt, by: r.updatedByName }) })
+      .catch(e => setSaveState({ kind: "error", error: apiMessage(e) }))
+  }, [settled, hydrated, id])
+  async function startOver() {
+    if (!id || !confirm("Throw away the saved choices on this screen and start again?")) return
+    try { await discardPackageDraft(id) } catch (e) { setSaveState({ kind: "error", error: apiMessage(e) }); return }
+    lastSaved.current = draftKey(INITIAL_DRAFT)
+    setDraft(INITIAL_DRAFT)
+    setSaveState({ kind: "idle" })
+  }
+
   const parsed = useMemo(() => toRequest(draft), [draft])
   const debounced = useDebounced(parsed.ok ? parsed.request : null, 450)
   const preview = usePackagePreview(id, debounced ?? DEFAULT_REQUEST, !!debounced)
@@ -98,6 +131,12 @@ export default function TenderPackagePage() {
         <div>
           <h1 style={{ margin: "0 0 2px", fontSize: 22, fontWeight: 800, color: "var(--hf-text)", display: "flex", alignItems: "center", gap: 10 }}><Package size={22} aria-hidden="true" /> Submission package</h1>
           <p style={{ margin: 0, fontSize: 13, color: "var(--hf-text-faint)" }}>{tender ? `${tender.tenderNumber} · ${tender.name}` : " "}</p>
+          <p role="status" aria-live="polite" style={{ margin: "4px 0 0", fontSize: 12, color: saveState.kind === "error" ? "var(--hf-danger-text)" : "var(--hf-text-faint)" }}>
+            {saveStateText(saveState)}
+            {hydrated && draftKey(draft) !== draftKey(INITIAL_DRAFT) && (
+              <> · <button type="button" onClick={startOver} style={{ background: "none", border: "none", padding: 0, textDecoration: "underline", cursor: "pointer", color: "inherit", fontSize: "inherit" }}>Start over</button></>
+            )}
+          </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, ...card, padding: "10px 16px", borderRadius: 12 }}>
           <Clock size={20} aria-hidden="true" style={{ color: closing.tone === "late" ? "var(--hf-danger)" : closing.tone === "soon" ? "var(--hf-warning)" : "var(--hf-text-muted)" }} />
@@ -130,7 +169,7 @@ export default function TenderPackagePage() {
 
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start", marginTop: 16 }}>
         <div style={{ flex: "2 1 460px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
-          <Contents draft={draft} set={set} plan={plan} mayPrice={mayPrice} docs={docs.data ?? []} docsLoading={docs.isLoading} closingIso={tender?.closingDate} today={today} tenderRequiresPricing={tender?.requiresPricing} />
+          <Contents draft={draft} set={set} plan={plan} mayPrice={mayPrice} docs={docs.data ?? []} docsLoading={docs.isLoading} closingIso={tender?.closingDate} today={today} tenderRequiresPricing={tender?.requiresPricing} tenderId={id!} />
         </div>
         <div style={{ flex: "1 1 320px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
           <Feed plan={plan} />
@@ -206,11 +245,22 @@ function Kpis({ plan, documentCount }: { plan: PackagePlan; documentCount: numbe
 
 // ---- contents: sections as a pipeline, with their editors
 
-function Contents({ draft, set, plan, mayPrice, docs, docsLoading, closingIso, today, tenderRequiresPricing }: {
-  tenderRequiresPricing?: boolean
+function Contents({ draft, set, plan, mayPrice, docs, docsLoading, closingIso, today, tenderRequiresPricing, tenderId }: {
+  tenderRequiresPricing?: boolean; tenderId: string
   draft: PackageDraft; set: (p: Partial<PackageDraft>) => void; plan: PackagePlan | undefined; mayPrice: boolean
   docs: { id: string; documentType: string; expiryDate: string | null; verified: boolean }[]; docsLoading: boolean; closingIso: string | null | undefined; today: Date
 }) {
+  const [choosing, setChoosing] = useState(false)
+  const [choice, setChoice] = useState<{ added: number; problems: string[] } | null>(null)
+  const [choiceError, setChoiceError] = useState<string | null>(null)
+  async function choose() {
+    setChoosing(true); setChoiceError(null)
+    try {
+      const r = applySuggestions(draft.documentIds, await fetchSuggestedDocuments(tenderId))
+      set({ documentIds: r.ids }); setChoice({ added: r.added, problems: r.problems })
+    } catch { setChoiceError("Could not read the tender's requirements. Try again.") }
+    finally { setChoosing(false) }
+  }
   const ordered = [...draft.included.map(k => SECTIONS.find(s => s.key === k)).filter((s): s is NonNullable<typeof s> => !!s),
     ...SECTIONS.filter(s => !draft.included.includes(s.key))]
   return (
@@ -292,6 +342,16 @@ function Contents({ draft, set, plan, mayPrice, docs, docsLoading, closingIso, t
 
               {on && s.key === "SUPPORTING_DOCUMENTS" && (
                 <div style={{ padding: "0 12px 12px 40px" }}>
+                  <button type="button" onClick={choose} disabled={choosing} style={{ marginBottom: 8, padding: "5px 10px", fontSize: 12.5, fontWeight: 700, border: "1px solid var(--hf-border-subtle)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", cursor: "pointer" }}>
+                    {choosing ? "Choosing…" : "Choose from requirements"}
+                  </button>
+                  {choiceError && <p role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)", margin: "0 0 8px" }}>{choiceError}</p>}
+                  {choice && (
+                    <div role="status" style={{ fontSize: 12.5, color: "var(--hf-text)", margin: "0 0 8px" }}>
+                      {choice.added === 0 ? "No new documents were added." : `Added ${choice.added} document${choice.added === 1 ? "" : "s"}.`}
+                      {choice.problems.length > 0 && <ul style={{ margin: "4px 0 0", paddingLeft: 18, color: "var(--hf-warning-text-deep)" }}>{choice.problems.map((m, i) => <li key={i}>{m}</li>)}</ul>}
+                    </div>
+                  )}
                   {docsLoading && <p style={{ fontSize: 12.5, color: "var(--hf-text-faint)", margin: 0 }}>Loading documents…</p>}
                   {!docsLoading && docs.length === 0 && <p style={{ fontSize: 12.5, color: "var(--hf-text-faint)", margin: 0 }}>No compliance documents uploaded yet. Add them in the Documents tab.</p>}
                   <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>

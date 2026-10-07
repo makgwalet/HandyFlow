@@ -214,3 +214,58 @@ export function staleLatest<T extends { versionNo: number; stale?: boolean; stal
   const latest = packages.reduce((a, b) => (b.versionNo > a.versionNo ? b : a))
   return latest.stale ? latest : null
 }
+
+// ---- saved draft
+
+/** A stable text form of the draft, used to tell whether anything changed since the last save. */
+export const draftKey = (d: PackageDraft): string => JSON.stringify(d)
+
+const isStrings = (v: unknown): v is string[] => Array.isArray(v) && v.every(x => typeof x === "string")
+
+/** Turns whatever was saved back into a usable draft. Unknown or malformed parts fall back to the defaults, so an old or damaged draft never breaks the screen. */
+export function hydrateDraft(stored: unknown): PackageDraft {
+  const s = (stored && typeof stored === "object" ? stored : {}) as Record<string, unknown>
+  const known = new Set(SECTIONS.map(x => x.key))
+  const included = isStrings(s.included) ? s.included.filter(k => known.has(k)) : null
+  const lim = (s.limits && typeof s.limits === "object" ? s.limits : {}) as Record<string, unknown>
+  const limits = { ...EMPTY_LIMITS }
+  for (const k of Object.keys(EMPTY_LIMITS) as (keyof LimitsDraft)[]) {
+    if (typeof lim[k] === "string") (limits as Record<string, string>)[k] = lim[k] as string
+  }
+  if (limits.zip !== "" && limits.zip !== "yes" && limits.zip !== "no") limits.zip = ""
+  return {
+    included: included && included.length > 0 ? included : INITIAL_DRAFT.included,
+    coverLetter: typeof s.coverLetter === "string" ? s.coverLetter : "",
+    companyMode: s.companyMode === "CUSTOM" ? "CUSTOM" : "CURRENT",
+    companyText: typeof s.companyText === "string" ? s.companyText : "",
+    documentIds: isStrings(s.documentIds) ? s.documentIds : [],
+    profileId: typeof s.profileId === "string" ? s.profileId : null,
+    limits,
+    pricingRequired: s.pricingRequired === true,
+  }
+}
+
+export interface SaveState { kind: "idle" | "saving" | "saved" | "error"; at?: string; by?: string | null; error?: string }
+
+export function saveStateText(s: SaveState): string {
+  switch (s.kind) {
+    case "saving": return "Saving…"
+    case "error": return `Not saved. ${s.error ?? "Try again."}`
+    case "saved": {
+      const t = s.at ? new Date(s.at).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" }) : ""
+      return `Draft saved${t ? ` at ${t}` : ""}${s.by ? ` by ${s.by}` : ""}`
+    }
+    default: return "Your choices are saved as you go"
+  }
+}
+
+/** Adds the chosen documents to the ticked ones (never un-ticks anything) and lists what could not be chosen. */
+export function applySuggestions(ids: string[], suggestions: { outcome: string; documentId: string | null; requirement: string; message: string }[]): { ids: string[]; added: number; problems: string[] } {
+  const next = [...ids]
+  let added = 0
+  for (const s of suggestions) {
+    if (s.outcome === "CHOSEN" && s.documentId && !next.includes(s.documentId)) { next.push(s.documentId); added++ }
+  }
+  const problems = suggestions.filter(s => s.outcome !== "CHOSEN").map(s => s.message)
+  return { ids: next, added, problems }
+}

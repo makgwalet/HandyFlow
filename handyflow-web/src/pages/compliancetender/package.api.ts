@@ -103,3 +103,31 @@ export async function downloadPackage(packageId: string, fileName: string): Prom
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a"); a.href = url; a.download = fileName; a.click(); URL.revokeObjectURL(url)
 }
+
+// ---- the saved draft: what was typed and ticked on this screen, kept so a reload does not lose it
+
+export interface SavedDraft { data: unknown; updatedAt: string; updatedByName: string | null }
+
+/** null when nothing has been saved yet (the server answers 204 with no body). */
+export function usePackageDraft(tenderId: string | undefined) {
+  return useQuery<SavedDraft | null>({
+    queryKey: ["ct-package-draft", tenderId], enabled: !!tenderId, staleTime: Infinity, refetchOnWindowFocus: false,
+    queryFn: async () => { const d = (await apiClient.get(`${base(tenderId!)}/package-draft`)).data as SavedDraft | "" | null; return d ? d : null },
+  })
+}
+
+export async function savePackageDraft(tenderId: string, data: unknown): Promise<SavedDraft> {
+  return (await apiClient.put(`${base(tenderId)}/package-draft`, { data })).data as SavedDraft
+}
+
+export async function discardPackageDraft(tenderId: string): Promise<void> {
+  await apiClient.delete(`${base(tenderId)}/package-draft`)
+}
+
+// ---- documents picked automatically from what the tender requires
+
+export interface SuggestedDocument { requirement: string; documentType: string; outcome: "CHOSEN" | "NOT_VERIFIED" | "EXPIRED" | "MISSING"; documentId: string | null; message: string }
+
+export async function fetchSuggestedDocuments(tenderId: string): Promise<SuggestedDocument[]> {
+  return (await apiClient.get(`${base(tenderId)}/package/suggested-documents`)).data as SuggestedDocument[]
+}
