@@ -65,13 +65,17 @@ public class ClinicAccessLogService {
     public List<Map<String, Object>> query(UUID tenantId, UUID patientId, UUID userId, int limit) {
         int capped = Math.max(1, Math.min(limit, 500));
         return jdbc.queryForList("""
-            SELECT id, user_id, patient_id, resource_type, resource_id, http_method, path,
-                   status_code, ip_address, impersonated, accessed_at
-            FROM clinic_access_log
-            WHERE tenant_id = ?
-              AND (?::uuid IS NULL OR patient_id = ?::uuid)
-              AND (?::uuid IS NULL OR user_id = ?::uuid)
-            ORDER BY accessed_at DESC
+            SELECT l.id, l.user_id, l.patient_id, l.resource_type, l.resource_id, l.http_method, l.path,
+                   l.status_code, l.ip_address, l.impersonated, l.accessed_at,
+                   NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), '') AS user_name,
+                   p.full_name AS patient_name
+            FROM clinic_access_log l
+            LEFT JOIN users u ON u.id = l.user_id AND u.tenant_id = l.tenant_id
+            LEFT JOIN clinic_patients p ON p.id = l.patient_id AND p.tenant_id = l.tenant_id
+            WHERE l.tenant_id = ?
+              AND (?::uuid IS NULL OR l.patient_id = ?::uuid)
+              AND (?::uuid IS NULL OR l.user_id = ?::uuid)
+            ORDER BY l.accessed_at DESC
             LIMIT ?""", tenantId, patientId, patientId, userId, userId, capped);
     }
 

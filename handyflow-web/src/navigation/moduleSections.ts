@@ -569,6 +569,7 @@ export const CLINIC_SECTIONS: ModuleSections = {
         { id: 'practitioners', label: 'Practitioners', icon: Stethoscope },
         { id: 'claims', label: 'Claims', icon: CreditCard },
         { id: 'billing', label: 'Billing', icon: BarChart2 },
+        { id: 'access-log', label: 'Access log', icon: ShieldCheck, permission: 'CLINIC_ADMIN' },
       ],
     },
   ],
