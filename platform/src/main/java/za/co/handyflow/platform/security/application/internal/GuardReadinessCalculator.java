@@ -30,13 +30,23 @@ public final class GuardReadinessCalculator {
     public static final List<String> SHOWN_SCREENING = List.of(
             "ID_VERIFICATION", "CRIMINAL_RECORD_CHECK", "REFERENCE_CHECK", "DRUG_TEST", "POLYGRAPH", "PSYCHOMETRIC");
 
-    public enum State { MET, EXPIRING, PENDING, INCOMPLETE, EXPIRED, FAILED, MISSING }
+    public enum State { MET, EXPIRING, PENDING, INCOMPLETE, UNVERIFIED, EXPIRED, FAILED, MISSING }
 
     public record ScreeningFacts(String type, String result, LocalDate conductedAt, LocalDate nextDueAt,
                                  Instant createdAt, int evidenceCount, String decision) {}
 
+    /** A competency the guard holds (first aid, firearm competency...). `required` is set by the supervisor per guard. */
+    public record CompetencyFacts(String id, String type, String title, boolean required, LocalDate expiry,
+                                  int evidenceCount, boolean verified) {}
+
     public record Input(LocalDate today, String psiraNumber, LocalDate psiraExpiry,
-                        List<ScreeningFacts> screenings, Set<String> documentCategories) {}
+                        List<ScreeningFacts> screenings, Set<String> documentCategories,
+                        List<CompetencyFacts> competencies) {
+        public Input(LocalDate today, String psiraNumber, LocalDate psiraExpiry,
+                     List<ScreeningFacts> screenings, Set<String> documentCategories) {
+            this(today, psiraNumber, psiraExpiry, screenings, documentCategories, List.of());
+        }
+    }
 
     public record Item(String key, String label, boolean required, State state, String detail,
                        LocalDate validUntil, int evidenceCount, boolean met) {}
@@ -59,15 +69,17 @@ public final class GuardReadinessCalculator {
             items.add(screening(t, latest.get(t), REQUIRED_SCREENING.contains(t), in.today()));
         }
 
+        for (CompetencyFacts c : in.competencies()) items.add(competency(c, in.today()));
+
         List<Item> required = items.stream().filter(Item::required).toList();
         long met = required.stream().filter(Item::met).count();
         int percent = required.isEmpty() ? 0 : (int) Math.round(met * 100.0 / required.size());
-        boolean optionalBlocked = items.stream().anyMatch(i -> !i.required()
+        boolean optionalBlocked = items.stream().anyMatch(i -> !i.required() && !isCompetency(i)
                 && (i.state() == State.FAILED || i.state() == State.EXPIRED));
         boolean ready = met == required.size() && !optionalBlocked;
 
         List<Item> problems = items.stream()
-                .filter(i -> (i.required() && !i.met()) || (!i.required() && (i.state() == State.FAILED || i.state() == State.EXPIRED)))
+                .filter(i -> (i.required() && !i.met()) || (!i.required() && !isCompetency(i) && (i.state() == State.FAILED || i.state() == State.EXPIRED)))
                 .sorted(Comparator.comparingInt(i -> severity(i.state())))
                 .toList();
         List<String> reasons = problems.stream().map(i -> i.label() + ": " + i.detail()).toList();
@@ -75,7 +87,49 @@ public final class GuardReadinessCalculator {
     }
 
     private static int severity(State s) {
-        return switch (s) { case FAILED -> 0; case EXPIRED -> 1; case MISSING -> 2; case INCOMPLETE -> 3; case PENDING -> 4; default -> 5; };
+        return switch (s) { case FAILED -> 0; case EXPIRED -> 1; case MISSING -> 2; case INCOMPLETE -> 3; case UNVERIFIED -> 4; case PENDING -> 5; default -> 6; };
+    }
+
+    public static final String COMPETENCY_PREFIX = "COMPETENCY:";
+
+    private static boolean isCompetency(Item i) { return i.key().startsWith(COMPETENCY_PREFIX); }
+
+    /**
+     * A competency is met when it is in date (or has no expiry), has at least one evidence file and has been
+     * verified by a named person. Only competencies marked required count towards the percentage, and an
+     * expired optional competency is shown but does not block readiness.
+     */
+    public static Item competency(CompetencyFacts c, LocalDate today) {
+        String label = c.title() != null && !c.title().isBlank() ? c.title() : labelOfCompetency(c.type());
+        String key = COMPETENCY_PREFIX + c.id();
+        long days = c.expiry() == null ? Long.MAX_VALUE : ChronoUnit.DAYS.between(today, c.expiry());
+        if (c.expiry() != null && days < 0)
+            return new Item(key, label, c.required(), State.EXPIRED, "expired " + plural(-days) + " ago", c.expiry(), c.evidenceCount(), false);
+        if (c.evidenceCount() == 0)
+            return new Item(key, label, c.required(), State.INCOMPLETE, "no certificate attached", c.expiry(), 0, false);
+        if (!c.verified())
+            return new Item(key, label, c.required(), State.UNVERIFIED, "awaiting verification", c.expiry(), c.evidenceCount(), false);
+        if (c.expiry() != null && days <= DUE_SOON_DAYS)
+            return new Item(key, label, c.required(), State.EXPIRING, days == 0 ? "expires today" : "expires in " + plural(days), c.expiry(), c.evidenceCount(), true);
+        return new Item(key, label, c.required(), State.MET, c.expiry() == null ? "verified, no expiry" : "verified", c.expiry(), c.evidenceCount(), true);
+    }
+
+    public static String labelOfCompetency(String type) {
+        return switch (type) {
+            case "FIREARM_COMPETENCY" -> "Firearm competency";
+            case "FIRST_AID" -> "First aid";
+            case "FIREFIGHTING" -> "Firefighting";
+            case "DRIVER" -> "Driver";
+            case "CLOSE_PROTECTION" -> "Close protection";
+            case "VIP_PROTECTION" -> "VIP protection";
+            case "CONTROL_ROOM" -> "Control room";
+            case "CCTV" -> "CCTV";
+            case "ACCESS_CONTROL" -> "Access control";
+            case "CANINE" -> "Canine handling";
+            case "MINING_SECURITY" -> "Mining security";
+            case "TACTICAL_RESPONSE" -> "Tactical response";
+            default -> "Other competency";
+        };
     }
 
     private static Item psira(Input in) {

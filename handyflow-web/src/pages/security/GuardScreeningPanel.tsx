@@ -2,12 +2,13 @@
 //
 // One screening on the Guard 360 Compliance tab, following the vetting trail:
 // Request, Evidence, Result, Review (sign-off), Expiry, Renewal. Also the "request a screening" form.
-import { useRef, useState } from "react"
+import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Download, Paperclip, RefreshCw, Trash2, X } from "lucide-react"
+import { RefreshCw, X } from "lucide-react"
 import { apiClient } from "../../api/client"
 import Chip from "../../components/ui/Chip"
-import { SCREENING_REASONS, SCREENING_TYPES, screeningLabel, todayIso, type EvidenceItem, type ScreeningItem } from "./guard360.logic"
+import EvidenceFiles from "./EvidenceFiles"
+import { SCREENING_REASONS, SCREENING_TYPES, screeningLabel, todayIso, type ScreeningItem } from "./guard360.logic"
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16 }
 const input: React.CSSProperties = { padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text-primary)", width: "100%", boxSizing: "border-box" }
@@ -15,13 +16,6 @@ const btn: React.CSSProperties = { display: "inline-flex", alignItems: "center",
 const primary: React.CSSProperties = { ...btn, background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", border: "none" }
 const fmt = (d: string | null) => d ? new Date(d.length === 10 ? d + "T00:00:00" : d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Johannesburg" }) : "-"
 const errText = (e: any) => e?.response?.data?.message ?? "That did not work. Please try again."
-const size = (n: number) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`
-
-async function downloadEvidence(guardId: string, screeningId: string, ev: EvidenceItem) {
-  const r = await apiClient.get(`/api/v1/security/guards/${guardId}/screening/${screeningId}/evidence/${ev.id}/download`, { responseType: "blob" })
-  const url = URL.createObjectURL(r.data)
-  const a = document.createElement("a"); a.href = url; a.download = ev.fileName; a.click(); URL.revokeObjectURL(url)
-}
 
 export function RequestScreening({ guardId, initial, onClose }: { guardId: string; initial?: { screeningType?: string; reason?: string; provider?: string | null }; onClose: () => void }) {
   const qc = useQueryClient()
@@ -60,8 +54,6 @@ export default function GuardScreeningPanel({ guardId, record, canManage, onClos
   const qc = useQueryClient()
   const base = `/api/v1/security/guards/${guardId}/screening/${record.id}`
   const refresh = () => qc.invalidateQueries({ queryKey: ["guard-overview", guardId] })
-  const fileRef = useRef<HTMLInputElement>(null)
-  const [label, setLabel] = useState("")
   const [err, setErr] = useState("")
   const [recording, setRecording] = useState(false)
   const [renewing, setRenewing] = useState(false)
@@ -69,11 +61,6 @@ export default function GuardScreeningPanel({ guardId, record, canManage, onClos
   const [note, setNote] = useState("")
   const fail = (e: any) => setErr(errText(e))
 
-  const upload = useMutation({
-    mutationFn: (file: File) => { const f = new FormData(); f.append("file", file); if (label.trim()) f.append("label", label.trim()); return apiClient.post(`${base}/evidence`, f) },
-    onSuccess: () => { setLabel(""); setErr(""); if (fileRef.current) fileRef.current.value = ""; refresh() }, onError: fail,
-  })
-  const removeFile = useMutation({ mutationFn: (id: string) => apiClient.delete(`${base}/evidence/${id}`), onSuccess: () => { setErr(""); refresh() }, onError: fail })
   const saveResult = useMutation({
     mutationFn: () => apiClient.post(`${base}/result`, { ...result, conductedBy: result.conductedBy.trim() || null, conductedAt: result.conductedAt || null, nextDueAt: result.nextDueAt || null, reportRef: result.reportRef.trim() || null, notes: result.notes.trim() || null }),
     onSuccess: () => { setRecording(false); setErr(""); refresh() }, onError: fail,
@@ -100,24 +87,9 @@ export default function GuardScreeningPanel({ guardId, record, canManage, onClos
 
       <div>
         <div style={lab}>2. Evidence ({record.evidence.length})</div>
-        {record.evidence.length === 0 ? <div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No evidence files yet. A passed screening only counts towards readiness once evidence is attached.</div> :
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
-            {record.evidence.map(e => (
-              <li key={e.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, flexWrap: "wrap" }}>
-                <Paperclip size={13} />
-                <span style={{ overflowWrap: "anywhere" }}>{e.fileName}</span>
-                <span style={{ color: "var(--hf-text-muted)" }}>{e.label ? `${e.label} · ` : ""}{size(e.sizeBytes)}{e.uploadedByName ? ` · ${e.uploadedByName}` : ""}</span>
-                <button aria-label={`Download ${e.fileName}`} onClick={() => downloadEvidence(guardId, record.id, e)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-accent-text)" }}><Download size={14} /></button>
-                {canManage && <button aria-label={`Remove ${e.fileName}`} onClick={() => removeFile.mutate(e.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-danger-text)" }}><Trash2 size={14} /></button>}
-              </li>
-            ))}
-          </ul>}
-        {canManage && (
-          <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <input aria-label="Evidence label" placeholder="What is this file? (optional)" value={label} onChange={e => setLabel(e.target.value)} style={{ ...input, width: 220 }} />
-            <input ref={fileRef} aria-label="Evidence file" type="file" onChange={e => { const f = e.target.files?.[0]; if (f) upload.mutate(f) }} style={{ fontSize: 12 }} />
-          </div>
-        )}
+        <EvidenceFiles baseUrl={`${base}/evidence`} items={record.evidence} canManage={canManage}
+          emptyHint="No evidence files yet. A passed screening only counts towards readiness once evidence is attached."
+          onChanged={() => { setErr(""); refresh() }} onError={setErr} />
       </div>
 
       <div>

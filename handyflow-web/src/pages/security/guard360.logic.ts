@@ -17,7 +17,14 @@ export interface ScreeningItem {
 }
 export interface ReadinessItem {
   key: string; label: string; required: boolean; state: string; detail: string
-  validUntil: string | null; evidenceCount: number; met: boolean; screeningId: string | null
+  validUntil: string | null; evidenceCount: number; met: boolean; screeningId: string | null; competencyId: string | null
+}
+export interface CompetencyItem {
+  id: string; guardId: string; competencyType: string; label: string; title: string | null; issuedBy: string | null
+  issueDate: string | null; expiryDate: string | null; certificateRef: string | null; required: boolean; notes: string | null
+  state: string; detail: string
+  verifiedByName: string | null; verifiedAt: string | null; verificationNote: string | null
+  evidence: EvidenceItem[]; createdAt: string
 }
 export interface Readiness { percent: number; ready: boolean; items: ReadinessItem[]; reasons: string[] }
 export interface DocumentItem { id: string; category: string; fileUrl: string; fileName: string | null; notes: string | null; createdAt: string }
@@ -70,7 +77,7 @@ export const SCREENING_REASONS: { value: string; label: string }[] = [
 /** Server states for a readiness row, as a tone and a short label. */
 export const READINESS_STATE: Record<string, { tone: Tone; label: string }> = {
   MET: { tone: "ok", label: "Met" }, EXPIRING: { tone: "warn", label: "Expiring" }, PENDING: { tone: "warn", label: "Pending" },
-  INCOMPLETE: { tone: "warn", label: "Incomplete" }, EXPIRED: { tone: "bad", label: "Expired" }, FAILED: { tone: "bad", label: "Failed" },
+  INCOMPLETE: { tone: "warn", label: "Incomplete" }, UNVERIFIED: { tone: "warn", label: "Unverified" }, EXPIRED: { tone: "bad", label: "Expired" }, FAILED: { tone: "bad", label: "Failed" },
   MISSING: { tone: "neutral", label: "Missing" },
 }
 export const readinessState = (s: string) => READINESS_STATE[s] ?? { tone: "neutral" as Tone, label: s.toLowerCase() }
@@ -79,6 +86,24 @@ export const readinessState = (s: string) => READINESS_STATE[s] ?? { tone: "neut
 export function readinessTone(r: { percent: number; ready: boolean }): Tone {
   if (r.ready) return "ok"
   return r.percent >= 60 ? "warn" : "bad"
+}
+
+export const COMPETENCY_TYPES: { value: string; label: string }[] = [
+  { value: "FIREARM_COMPETENCY", label: "Firearm competency" }, { value: "FIRST_AID", label: "First aid" },
+  { value: "FIREFIGHTING", label: "Firefighting" }, { value: "DRIVER", label: "Driver" },
+  { value: "CLOSE_PROTECTION", label: "Close protection" }, { value: "VIP_PROTECTION", label: "VIP protection" },
+  { value: "CONTROL_ROOM", label: "Control room" }, { value: "CCTV", label: "CCTV" },
+  { value: "ACCESS_CONTROL", label: "Access control" }, { value: "CANINE", label: "Canine handling" },
+  { value: "MINING_SECURITY", label: "Mining security" }, { value: "TACTICAL_RESPONSE", label: "Tactical response" },
+  { value: "OTHER", label: "Other (name it)" },
+]
+
+/** What a competency form may send. Mirrors the server's checks so the supervisor hears about a mistake before saving. */
+export function competencyFormError(f: { competencyType: string; title: string; issueDate: string; expiryDate: string }, today: string): string | null {
+  if (f.competencyType === "OTHER" && !f.title.trim()) return "Give the competency a name"
+  if (f.issueDate && f.issueDate > today) return "The issue date cannot be in the future"
+  if (f.issueDate && f.expiryDate && f.expiryDate < f.issueDate) return "The expiry date cannot be before the issue date"
+  return null
 }
 
 /** The standard guard file. This is a default list, not a legal requirement for every client. */

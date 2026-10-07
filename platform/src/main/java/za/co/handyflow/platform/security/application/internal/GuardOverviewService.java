@@ -47,6 +47,7 @@ public class GuardOverviewService {
     private final GuardService guardService;
     private final GuardScreeningService screeningService;
     private final GuardScreeningEvidenceService evidenceService;
+    private final GuardCompetencyService competencyService;
     private final GuardScreeningRepository screeningRepository;
     private final ShiftRepository shiftRepository;
     private final IncidentRepository incidentRepository;
@@ -73,7 +74,9 @@ public class GuardOverviewService {
         List<ScreeningItem> screening = records.stream()
                 .map(r -> toItem(r, evidence.get(r.getId())))
                 .toList();
-        Readiness readiness = readiness(guard.psiraNumber(), guard.psiraExpiryDate(), records, evidence, documents, now);
+        java.time.LocalDate today = now.atZone(java.time.ZoneId.of("Africa/Johannesburg")).toLocalDate();
+        var competencies = competencyService.listForGuard(tenantId, guardId, today);
+        Readiness readiness = readiness(guard.psiraNumber(), guard.psiraExpiryDate(), records, evidence, documents, competencies, now);
 
         Instant shiftFrom = now.minus(Duration.ofDays(SHIFT_BACK_DAYS));
         Instant shiftTo = now.plus(Duration.ofDays(SHIFT_FORWARD_DAYS));
@@ -113,6 +116,7 @@ public class GuardOverviewService {
                 documents,
                 screening,
                 readiness,
+                competencies,
                 shiftItems,
                 incidentItems,
                 new Counts((int) past90, (int) completed, incidents.size(), (int) open));
@@ -120,15 +124,20 @@ public class GuardOverviewService {
 
     /** Readiness is judged in South African time, like every other date rule in the product. */
     static Readiness readiness(String psiraNumber, java.time.LocalDate psiraExpiry, List<GuardScreeningRecord> records,
-                               Map<UUID, List<EvidenceItem>> evidence, List<GuardDocumentResponse> documents, Instant now) {
+                               Map<UUID, List<EvidenceItem>> evidence, List<GuardDocumentResponse> documents,
+                               List<za.co.handyflow.platform.security.dto.GuardCompetencyResponse> competencies, Instant now) {
         java.time.LocalDate today = now.atZone(java.time.ZoneId.of("Africa/Johannesburg")).toLocalDate();
         List<ScreeningFacts> facts = records.stream()
                 .map(r -> new ScreeningFacts(r.getScreeningType().name(), r.getResult().name(), r.getConductedAt(),
                         r.getNextDueAt(), r.getCreatedAt(), evidence.getOrDefault(r.getId(), List.of()).size(), r.getDecision()))
                 .toList();
         var categories = documents.stream().map(GuardDocumentResponse::category).collect(java.util.stream.Collectors.toSet());
+        var comps = competencies.stream()
+                .map(c -> new GuardReadinessCalculator.CompetencyFacts(c.id().toString(), c.competencyType(), c.title(), c.required(),
+                        c.expiryDate(), c.evidence().size(), c.verifiedAt() != null))
+                .toList();
         var result = GuardReadinessCalculator.calculate(
-                new GuardReadinessCalculator.Input(today, psiraNumber, psiraExpiry, facts, categories));
+                new GuardReadinessCalculator.Input(today, psiraNumber, psiraExpiry, facts, categories, comps));
 
         // Link each screening row to its newest record so the page can open it.
         Map<String, UUID> newestId = new HashMap<>();
@@ -139,7 +148,9 @@ public class GuardOverviewService {
         }
         List<ReadinessItem> items = result.items().stream()
                 .map(i -> new ReadinessItem(i.key(), i.label(), i.required(), i.state().name(), i.detail(), i.validUntil(),
-                        i.evidenceCount(), i.met(), newestId.get(i.key())))
+                        i.evidenceCount(), i.met(), newestId.get(i.key()),
+                        i.key().startsWith(GuardReadinessCalculator.COMPETENCY_PREFIX)
+                                ? UUID.fromString(i.key().substring(GuardReadinessCalculator.COMPETENCY_PREFIX.length())) : null))
                 .toList();
         return new Readiness(result.percent(), result.ready(), items, result.reasons());
     }

@@ -52,3 +52,18 @@ describe("fileChecklist", () => {
 describe("completionRate", () => {
   it("is null when nothing started and rounds otherwise", () => { expect(completionRate(0, 0)).toBeNull(); expect(completionRate(3, 2)).toBe(67) })
 })
+
+import { competencyFormError } from "./guard360.logic"
+describe("competencyFormError", () => {
+  const ok = { competencyType: "FIRST_AID", title: "", issueDate: "2026-01-01", expiryDate: "2027-01-01" }
+  it("accepts a valid form and dates left blank", () => {
+    expect(competencyFormError(ok, "2026-10-07")).toBeNull()
+    expect(competencyFormError({ ...ok, issueDate: "", expiryDate: "" }, "2026-10-07")).toBeNull()
+  })
+  it("needs a name for Other", () => { expect(competencyFormError({ ...ok, competencyType: "OTHER", title: " " }, "2026-10-07")).toBe("Give the competency a name") })
+  it("refuses a future issue date but accepts today", () => {
+    expect(competencyFormError({ ...ok, issueDate: "2026-10-08" }, "2026-10-07")).toBe("The issue date cannot be in the future")
+    expect(competencyFormError({ ...ok, issueDate: "2026-10-07", expiryDate: "" }, "2026-10-07")).toBeNull()
+  })
+  it("refuses expiry before issue", () => { expect(competencyFormError({ ...ok, expiryDate: "2025-12-31" }, "2026-10-07")).toBe("The expiry date cannot be before the issue date") })
+})

@@ -18,6 +18,7 @@ public record GuardOverviewResponse(
         List<GuardDocumentResponse> documents,
         List<ScreeningItem> screening,
         Readiness readiness,
+        List<GuardCompetencyResponse> competencies,
         List<ShiftItem> shifts,
         List<IncidentItem> incidents,
         Counts counts
@@ -37,7 +38,7 @@ public record GuardOverviewResponse(
 
     public record ReadinessItem(String key, String label, boolean required, String state, String detail,
                                 LocalDate validUntil, int evidenceCount, boolean met,
-                                UUID screeningId) {}
+                                UUID screeningId, UUID competencyId) {}
 
     public record ShiftItem(
             UUID id, UUID siteId, String siteName, Instant startAt, Instant endAt,

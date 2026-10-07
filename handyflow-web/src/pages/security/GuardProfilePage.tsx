@@ -13,10 +13,11 @@ import Chip from "../../components/ui/Chip"
 import StatTile from "../../components/ui/StatTile"
 import { PageHeader } from "../../components/ui/PageHeader"
 import GuardScreeningPanel, { RequestScreening } from "./GuardScreeningPanel"
+import SkillsTab from "./GuardCompetencyPanel"
 import {
   DOCUMENT_CATEGORIES, SEVERITY_TONE, SHIFT_TONE, categoryLabel, completionRate, expiryState,
   fileChecklist, isUpcoming, readinessState, readinessTone, screeningLabel, todayIso,
-  type DocumentItem, type Readiness, type ScreeningItem, type ShiftItem,
+  type CompetencyItem, type DocumentItem, type Readiness, type ScreeningItem, type ShiftItem,
 } from "./guard360.logic"
 
 interface Overview {
@@ -31,12 +32,13 @@ interface Overview {
   documents: DocumentItem[]
   screening: ScreeningItem[]
   readiness: Readiness
+  competencies: CompetencyItem[]
   shifts: ShiftItem[]
   incidents: { id: string; siteName: string | null; title: string; severity: string; status: string; reportedAt: string }[]
   counts: { shiftsLast90Days: number; completedLast90Days: number; incidentsLast180Days: number; openIncidents: number }
 }
 
-const TABS = ["Overview", "Compliance", "Documents", "Shifts", "Incidents"] as const
+const TABS = ["Overview", "Compliance", "Skills", "Documents", "Shifts", "Incidents"] as const
 type Tab = typeof TABS[number]
 
 const STATUS_TONE: Record<string, "ok" | "warn" | "bad" | "info" | "neutral"> = { ACTIVE: "ok", ON_LEAVE: "info", SUSPENDED: "bad", UNDER_INVESTIGATION: "warn", TERMINATED: "neutral" }
@@ -60,6 +62,8 @@ export default function GuardProfilePage() {
   const { guardId } = useParams<{ guardId: string }>()
   const navigate = useNavigate()
   const [tab, setTab] = useState<Tab>("Overview")
+  const [openCompetency, setOpenCompetency] = useState<string | null>(null)
+  const canManage = usePermission("SECURITY_MANAGE") || usePermission("SECURITY_ADMIN")
   const { data, isLoading, error } = useQuery<Overview>({
     queryKey: ["guard-overview", guardId],
     queryFn: async () => { const r = await apiClient.get(`/api/v1/security/guards/${guardId}/overview`); return r.data?.data ?? r.data },
@@ -171,7 +175,8 @@ export default function GuardProfilePage() {
         </div>
       )}
 
-      {tab === "Compliance" && <ComplianceTab guardId={guard.id} readiness={readiness} screening={data.screening} />}
+      {tab === "Compliance" && <ComplianceTab guardId={guard.id} readiness={readiness} screening={data.screening} onOpenCompetency={id => { setOpenCompetency(id); setTab("Skills") }} />}
+      {tab === "Skills" && <SkillsTab guardId={guard.id} competencies={data.competencies ?? []} canManage={canManage} initialOpenId={openCompetency} />}
 
       {tab === "Documents" && <DocumentsTab guardId={guard.id} docs={data.documents} />}
 
@@ -226,7 +231,7 @@ function ReadinessRing({ readiness }: { readiness: Readiness }) {
   )
 }
 
-function ComplianceTab({ guardId, readiness, screening }: { guardId: string; readiness: Readiness; screening: ScreeningItem[] }) {
+function ComplianceTab({ guardId, readiness, screening, onOpenCompetency }: { guardId: string; readiness: Readiness; screening: ScreeningItem[]; onOpenCompetency: (id: string) => void }) {
   const canManage = usePermission("SECURITY_MANAGE") || usePermission("SECURITY_ADMIN")
   const [openId, setOpenId] = useState<string | null>(null)
   const [requesting, setRequesting] = useState(false)
@@ -247,10 +252,13 @@ function ComplianceTab({ guardId, readiness, screening }: { guardId: string; rea
                 return (
                   <tr key={i.key}>
                     <td style={td}>{i.label}{i.required ? "" : <span style={{ color: "var(--hf-text-muted)", fontSize: 11 }}> (not required)</span>}</td>
-                    <td style={td}>{i.screeningId ? (i.evidenceCount > 0 ? `${i.evidenceCount} file${i.evidenceCount === 1 ? "" : "s"}` : "None") : "-"}</td>
+                    <td style={td}>{i.screeningId || i.competencyId ? (i.evidenceCount > 0 ? `${i.evidenceCount} file${i.evidenceCount === 1 ? "" : "s"}` : "None") : "-"}</td>
                     <td style={td}>{fmtDate(i.validUntil)}</td>
                     <td style={td}><Chip tone={st.tone}>{st.label}</Chip> <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{i.detail}</span></td>
-                    <td style={td}>{i.screeningId && <button onClick={() => setOpenId(i.screeningId)} style={{ ...linkBtn, padding: "4px 10px" }}>Open</button>}</td>
+                    <td style={td}>
+                      {i.screeningId && <button onClick={() => setOpenId(i.screeningId)} style={{ ...linkBtn, padding: "4px 10px" }}>Open</button>}
+                      {i.competencyId && <button onClick={() => onOpenCompetency(i.competencyId!)} style={{ ...linkBtn, padding: "4px 10px" }}>Open</button>}
+                    </td>
                   </tr>
                 )
               })}

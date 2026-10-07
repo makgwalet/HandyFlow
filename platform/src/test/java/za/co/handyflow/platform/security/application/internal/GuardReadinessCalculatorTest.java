@@ -2,6 +2,7 @@ package za.co.handyflow.platform.security.application.internal;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import za.co.handyflow.platform.security.application.internal.GuardReadinessCalculator.CompetencyFacts;
 import za.co.handyflow.platform.security.application.internal.GuardReadinessCalculator.Input;
 import za.co.handyflow.platform.security.application.internal.GuardReadinessCalculator.Item;
 import za.co.handyflow.platform.security.application.internal.GuardReadinessCalculator.Result;
@@ -120,5 +121,57 @@ class GuardReadinessCalculatorTest {
         Result r = GuardReadinessCalculator.calculate(input("123", null, allThree(), "ID_COPY"));
         assertThat(item(r, "PSIRA").state()).isEqualTo(State.INCOMPLETE);
         assertThat(r.percent()).isEqualTo(80);
+    }
+
+    // ── Competencies ──────────────────────────────────────────────────────────
+
+    private static CompetencyFacts comp(String id, boolean required, LocalDate expiry, int evidence, boolean verified) {
+        return new CompetencyFacts(id, "FIRST_AID", null, required, expiry, evidence, verified);
+    }
+
+    private static Input withComps(CompetencyFacts... c) {
+        return new Input(TODAY, "123", FAR, allThree(), Set.of("ID_COPY"), List.of(c));
+    }
+
+    @Test @DisplayName("A competency is met only when in date, with a certificate, and verified")
+    void competencyStates() {
+        assertThat(GuardReadinessCalculator.competency(comp("a", true, FAR, 1, true), TODAY).state()).isEqualTo(State.MET);
+        assertThat(GuardReadinessCalculator.competency(comp("a", true, null, 1, true), TODAY).detail()).isEqualTo("verified, no expiry");
+        assertThat(GuardReadinessCalculator.competency(comp("a", true, FAR, 0, true), TODAY).state()).isEqualTo(State.INCOMPLETE);
+        assertThat(GuardReadinessCalculator.competency(comp("a", true, FAR, 1, false), TODAY).state()).isEqualTo(State.UNVERIFIED);
+        var expired = GuardReadinessCalculator.competency(comp("a", true, TODAY.minusDays(3), 1, true), TODAY);
+        assertThat(expired.state()).isEqualTo(State.EXPIRED);
+        assertThat(expired.detail()).isEqualTo("expired 3 days ago");
+        assertThat(GuardReadinessCalculator.competency(comp("a", true, TODAY.plusDays(30), 1, true), TODAY).state()).isEqualTo(State.EXPIRING);
+        assertThat(GuardReadinessCalculator.competency(comp("a", true, TODAY.plusDays(31), 1, true), TODAY).state()).isEqualTo(State.MET);
+    }
+
+    @Test @DisplayName("Expiry wins over a missing certificate so the supervisor sees it has lapsed")
+    void expiredBeatsIncomplete() {
+        assertThat(GuardReadinessCalculator.competency(comp("a", true, TODAY.minusDays(1), 0, false), TODAY).state()).isEqualTo(State.EXPIRED);
+    }
+
+    @Test @DisplayName("A required competency counts towards the percentage and names the reason")
+    void requiredCounts() {
+        Result r = GuardReadinessCalculator.calculate(withComps(comp("a", true, TODAY.minusDays(8), 1, true)));
+        assertThat(r.percent()).isEqualTo(83); // 5 of 6 required items
+        assertThat(r.ready()).isFalse();
+        assertThat(r.reasons()).containsExactly("First aid: expired 8 days ago");
+    }
+
+    @Test @DisplayName("An optional competency is listed but never blocks readiness or changes the percentage")
+    void optionalNeverBlocks() {
+        Result r = GuardReadinessCalculator.calculate(withComps(comp("a", false, TODAY.minusDays(8), 1, true), comp("b", false, FAR, 0, false)));
+        assertThat(r.percent()).isEqualTo(100);
+        assertThat(r.ready()).isTrue();
+        assertThat(r.reasons()).isEmpty();
+        assertThat(r.items().stream().filter(i -> i.key().startsWith("COMPETENCY:")).count()).isEqualTo(2);
+    }
+
+    @Test @DisplayName("A custom title is used as the label")
+    void title() {
+        var item = GuardReadinessCalculator.competency(new CompetencyFacts("x", "OTHER", "Armed response", true, FAR, 1, true), TODAY);
+        assertThat(item.label()).isEqualTo("Armed response");
+        assertThat(item.key()).isEqualTo("COMPETENCY:x");
     }
 }
