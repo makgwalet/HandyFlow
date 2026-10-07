@@ -760,8 +760,8 @@ class ClinicServiceTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("patchPatient")
-    class PatchPatient {
+    @DisplayName("patchPatient: clinical fields and principal validation")
+    class PatchPatientClinicalFields {
 
         @Test
         @DisplayName("updates allergies, conditions and blood type; empty list clears")
