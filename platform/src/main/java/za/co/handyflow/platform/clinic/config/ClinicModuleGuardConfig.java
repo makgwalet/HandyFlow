@@ -8,7 +8,11 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.clinic.application.internal.ClinicAccessLogService;
 import za.co.handyflow.platform.shared.TenantContext;
+import za.co.handyflow.platform.shared.UserContext;
+
+import java.util.UUID;
 
 /**
  * Module entitlement for the whole Clinic API in one place (audit P0: the clinic
@@ -24,9 +28,12 @@ public class ClinicModuleGuardConfig implements WebMvcConfigurer {
     static final String MODULE_KEY = "clinic";
 
     private final ObjectProvider<FeatureGuard> featureGuard;
+    private final ObjectProvider<ClinicAccessLogService> accessLog;
 
-    public ClinicModuleGuardConfig(ObjectProvider<FeatureGuard> featureGuard) {
+    public ClinicModuleGuardConfig(ObjectProvider<FeatureGuard> featureGuard,
+                                   ObjectProvider<ClinicAccessLogService> accessLog) {
         this.featureGuard = featureGuard;
+        this.accessLog = accessLog;
     }
 
     @Override
@@ -41,6 +48,25 @@ public class ClinicModuleGuardConfig implements WebMvcConfigurer {
                     guard.requireModule(MODULE_KEY);   // throws 402/403 ResponseStatusException
                 }
                 return true;
+            }
+        }).addPathPatterns("/api/v1/clinic/**");
+
+        // S1-6: record who read which patient record (successful GETs only).
+        registry.addInterceptor(new HandlerInterceptor() {
+            @Override
+            public void afterCompletion(HttpServletRequest request, HttpServletResponse response,
+                                        Object handler, Exception ex) {
+                if (!"GET".equalsIgnoreCase(request.getMethod()) || response.getStatus() >= 400) return;
+                ClinicAccessLogService svc = accessLog.getIfAvailable();
+                if (svc == null || !TenantContext.hasTenant()) return;
+                String path = request.getRequestURI();
+                if (path.contains("/access-log")) return;
+                ClinicAccessLogService.Target t = ClinicAccessLogService.classify(path);
+                if (t == null) return;
+                UUID user;
+                try { user = UserContext.getCurrentUserId(); } catch (RuntimeException e) { user = null; }
+                svc.record(TenantContext.getTenantIdAsObject().getValue(), user, t, "GET", path,
+                        response.getStatus(), request.getRemoteAddr(), TenantContext.isImpersonation());
             }
         }).addPathPatterns("/api/v1/clinic/**");
     }
