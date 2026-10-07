@@ -2,7 +2,7 @@
 import MyDayPanel from "./MyDayPanel"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Users, Calendar, FileText, Clock, CheckCircle, AlertCircle, ArrowRight, TrendingUp } from "lucide-react"
+import { Users, Calendar, Clock, CheckCircle, ArrowRight } from "lucide-react"
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p }
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })

@@ -9,7 +9,7 @@ import { apiClient } from "../../api/client"
 import { useAuthStore } from "../../store/auth.store"
 import {
   FlaskConical, Upload, Download, Eye, CheckCircle, AlertCircle,
-  Loader, ChevronDown, ChevronUp, Plus, X, FileText, Sparkles,
+  Loader, ChevronDown, ChevronUp, X, FileText, Sparkles,
 } from "lucide-react"
 
 interface LabResult {

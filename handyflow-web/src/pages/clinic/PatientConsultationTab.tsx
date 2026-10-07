@@ -46,7 +46,7 @@ export default function ConsultationTab({ patient, consultations, practitioners,
   }
   const [isRecording, setIsRecording] = useState(false)
   const [transcript, setTranscript]   = useState("")
-  const [extracting, setExtracting]   = useState(false)
+  const [extracting]   = useState(false)
   const recognitionRef = useRef<any>(null)
 
   const EMPTY = { practitionerId:"",chiefComplaint:"",weightKg:"",heightCm:"",bloodPressure:"",pulseBpm:"",temperatureC:"",oxygenSatPct:"",history:"",examination:"",diagnosis:"",icd10Codes:"",treatmentPlan:"",followUpDays:"" }

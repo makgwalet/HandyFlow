@@ -3,15 +3,15 @@
 // Opened when a doctor starts a consultation from an appointment
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import QuestionForm from "./QuestionForm"
 import { PatientAlertBanner } from "./PatientNotes"
 import { AllergyWarning, missingReasons, useAllergyChecks } from "./PrescriptionAllergyCheck"
 import {
-  Mic, MicOff, Plus, X, Clock, Stethoscope, CreditCard, Pill,
-  Syringe, FlaskConical, Scissors, ChevronDown, CheckCircle,
+  Mic, MicOff, Plus, X, Pill,
+  Syringe, FlaskConical, Scissors, CheckCircle,
   AlertCircle, Loader, Sparkles, Search, Zap,
 } from "lucide-react"
 
@@ -216,7 +216,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
   // ── Voice recording ───────────────────────────────────────────────────────
   const [isRecording, setIsRecording] = useState(false)
   const [transcript, setTranscript]   = useState("")
-  const [extracting, setExtracting]   = useState(false)
+  const [extracting]   = useState(false)
   const recRef = useRef<any>(null)
 
   const startRec = () => {
@@ -312,7 +312,6 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
 
   // ── Complete consultation ─────────────────────────────────────────────────
   const [showComplete, setShowComplete] = useState(false)
-  const [completing, setCompleting] = useState(false)
   const [completeError, setCompleteError] = useState("")
   const savedRxRef = useRef<Set<string>>(new Set())
 
@@ -531,8 +530,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
       <div style={{ display:"flex", gap:14, flex:1, minHeight:0 }}>
 
         {/* ── LEFT: SOAP Notes ────────────────────────────────────────── */}
-        <div style={{ flex:1.4, display:"flex", flexDirection:"column", gap:10,
-          display: "flex" }}>
+        <div style={{ flex:1.4, display:"flex", flexDirection:"column", gap:10 }}>
 
           {/* Clinical question library (renders nothing when no groups are served for this visit) */}
           <QuestionForm consultationId={draftReady ? (draftIdRef.current ?? null) : null}
@@ -629,8 +627,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
         </div>
 
         {/* ── MIDDLE: Live Bill ───────────────────────────────────────── */}
-        <div style={{ flex:1, display:"flex", flexDirection:"column", gap:10,
-          display: "flex" }}>
+        <div style={{ flex:1, display:"flex", flexDirection:"column", gap:10 }}>
 
           {/* Quick-add procedures */}
           <div style={{ padding:"12px 14px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:10 }}>
@@ -759,8 +756,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
         </div>
 
         {/* ── RIGHT: Prescriptions ─────────────────────────────────────── */}
-        <div style={{ flex:1, display:"flex", flexDirection:"column", gap:10,
-          display: "flex" }}>
+        <div style={{ flex:1, display:"flex", flexDirection:"column", gap:10 }}>
 
           <div style={{padding:"12px 14px",background:"var(--hf-surface)",border:`1px solid ${BORDER}`,borderRadius:10}}>
             <div style={{...sectionLabel,marginBottom:8}}>Prescriptions ({rxDrafts.length})</div>

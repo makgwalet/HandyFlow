@@ -4,8 +4,8 @@ import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import {
-  ChevronLeft, ChevronRight, Plus, X, Calendar, Clock,
-  User, CheckCircle, PlayCircle, XCircle, AlertCircle, Mail, Video,
+  ChevronLeft, ChevronRight, Plus, X, 
+  CheckCircle, AlertCircle, Mail, Video,
 } from "lucide-react"
 
 // ── Types ─────────────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 // Paginated patient list — server search, family account registration,
 // dependant search, account type badges, no medical columns for reception
 import { useState, useEffect, useRef } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import {
   Plus, X, Search, User, Users, ChevronRight, AlertCircle,
@@ -88,7 +88,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
   const [dependants, setDependants] = useState<DepForm[]>([])
   const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({})
   const [apiError, setApiError]     = useState("")
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // Debounce search
   useEffect(() => {
@@ -119,7 +119,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
     return Object.keys(errs).length === 0
   }
 
-  const { data, isLoading, isPreviousData } = useQuery({
+  const { data, isLoading, isPlaceholderData } = useQuery<any>({
     queryKey: ["clinic-patients", debouncedSearch, page, showArchived],
     queryFn: async () => {
       const p = new URLSearchParams({ size:String(PAGE_SIZE), page:String(page) })
@@ -128,7 +128,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
       const r = await apiClient.get(`/api/v1/clinic/patients?${p}`)
       return r.data?.data ?? r.data
     },
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   })
 
   const createPatient = useMutation({
@@ -264,7 +264,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
         </div>
       ) : (
         <div style={{ border:"1px solid var(--hf-border)", borderRadius:12, overflow:"hidden",
-          opacity: isPreviousData ? 0.6 : 1, transition:"opacity 0.15s" }}>
+          opacity: isPlaceholderData ? 0.6 : 1, transition:"opacity 0.15s" }}>
           <table style={{ width:"100%", borderCollapse:"collapse" }}>
             <thead>
               <tr style={{ background:"var(--hf-surface-muted)", borderBottom:"1px solid var(--hf-border)" }}>
@@ -436,7 +436,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                     {duplicates.map((c:any) => `${c.fullName}${c.patientNumber ? ` (${c.patientNumber})` : ""}, ${c.matchReason.toLowerCase()}`).join("; ")}
                   </div>
                 )}
-                <PersonForm form={form} onChange={f} errors={fieldErrors} idInfo={idInfo} FErr={FErr} inp={inp}/>
+                <PersonForm form={form} onChange={f as (k: string, v: string) => void} errors={fieldErrors} idInfo={idInfo} FErr={FErr} inp={inp}/>
               </Sect>
 
               {/* Dependants */}
@@ -541,8 +541,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
 
 // ── Shared sub-components ─────────────────────────────────────────────────────
 
-function PersonForm({ form, onChange, errors, idInfo, FErr, inp }: { form: PersonForm; onChange: (k: string, v: string) => void; errors: Record<string,string>; idInfo: any; FErr: any; inp: any }) {
-  const f = (k: string) => (v: string) => onChange(k, v)
+function PersonForm({ form, onChange, idInfo, FErr, inp }: { form: PersonForm; onChange: (k: string, v: string) => void; errors: Record<string,string>; idInfo: any; FErr: any; inp: any }) {
   return (
     <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
       <div>

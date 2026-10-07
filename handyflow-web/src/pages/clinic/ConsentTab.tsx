@@ -18,7 +18,7 @@ interface ConsentEvent {
 }
 
 const NAVY="var(--hf-primary)";
-const NAVY_TEXT = "var(--hf-primary-text)"; const TEAL="var(--hf-accent)"; const RED="var(--hf-danger)"
+const NAVY_TEXT = "var(--hf-primary-text)"; const RED="var(--hf-danger)"
 const RED_TEXT = "var(--hf-danger-text)";
 const GREEN="var(--hf-success-solid-strong)";
 const GREEN_TEXT = "var(--hf-success-text-strong)"; const GRAY="var(--hf-text-muted)"; const BORDER="var(--hf-border)"; const LIGHT="var(--hf-surface-muted)"

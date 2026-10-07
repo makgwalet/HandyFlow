@@ -1,3 +1,4 @@
+import React from "react"
 // src/pages/clinic/ClaimsTab.tsx
 // Medical aid claims — per-consultation builder, full lifecycle management
 import { useState } from "react"
@@ -5,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import {
   CreditCard, Plus, X, ChevronDown, ChevronUp, AlertCircle,
-  CheckCircle, Clock, XCircle, RefreshCw, Send, FileText, Filter,
+  CheckCircle, Clock, XCircle, RefreshCw, Send, FileText, 
   CheckSquare, Square, Download,
 } from "lucide-react"
 

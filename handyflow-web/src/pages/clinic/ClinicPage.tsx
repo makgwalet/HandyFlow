@@ -70,7 +70,7 @@ export function ClinicPage() {
         if (id === "patients" && openPatient) {
           return (
             <PatientFilePage
-              patient={openPatient}
+              patient={openPatient as any}
               onClose={closeFile}
               onNavigate={goTo}
               onOpenPatient={p => openFile(p)}

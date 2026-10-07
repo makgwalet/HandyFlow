@@ -31,7 +31,6 @@ export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPati
     onError:(e:any)=>setDepError(e.response?.data?.message??"Failed to add dependant"),
   })
 
-  const principalId = patient.accountType==="PRINCIPAL" ? patient.id : patient.principalId
 
   return (
     <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:20 }}>

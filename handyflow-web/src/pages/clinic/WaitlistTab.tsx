@@ -15,7 +15,7 @@ interface PatientOption { id: string; fullName: string; phone?: string }
 interface PractitionerOption { id: string; fullName: string }
 
 const NAVY="var(--hf-primary)";
-const NAVY_TEXT = "var(--hf-primary-text)"; const TEAL="var(--hf-accent)"; const GRAY="var(--hf-text-muted)"
+const NAVY_TEXT = "var(--hf-primary-text)"; const GRAY="var(--hf-text-muted)"
 const BORDER="var(--hf-border)"; const LIGHT="var(--hf-surface-muted)"
 
 const fmtDT = (iso?:string) => iso ? new Date(iso).toLocaleDateString("en-ZA",{day:"numeric",month:"short"}) : "—"

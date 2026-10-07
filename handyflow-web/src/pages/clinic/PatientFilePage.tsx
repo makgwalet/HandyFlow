@@ -238,7 +238,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
             padding:24,boxShadow:"0 32px 80px rgba(0,0,0,0.3)",display:"flex",flexDirection:"column"}}>
             <ConsultationSession
               patient={patient}
-              appointment={activeSession}
+              appointment={activeSession as any}
               onMinimise={()=>setSessionMinimised(true)}
               discardToken={discardToken}
               onComplete={(_id)=>{
