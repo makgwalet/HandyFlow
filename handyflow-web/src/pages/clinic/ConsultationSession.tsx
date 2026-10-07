@@ -102,6 +102,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
   const draftIdRef = useRef<string|null>(null)
   const initStartedRef = useRef(false)
   const [draftReady, setDraftReady] = useState(false)
+  const [returnNote, setReturnNote] = useState<{ reason: string; comment: string } | null>(null)
   const [draftState, setDraftState] = useState<"idle"|"saving"|"saved"|"error">("idle")
 
   // Text fields are sent as "" (not null) so clearing a field actually clears it server-side.
@@ -130,6 +131,15 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
         const existing = unwrap(r).find((d:any) => d.appointmentId === appointment.id)
         if (existing) {
           draftIdRef.current = existing.id
+          if (existing.status === "RETURNED_TO_NURSE") {
+            // Doctor sent it back: show why, and take it back into nurse work.
+            try {
+              const t = unwrap(await apiClient.get(`/api/v1/clinic/consultations/${existing.id}/transitions`))
+              const last = [...t].reverse().find((x:any) => x.toStatus === "RETURNED_TO_NURSE")
+              if (last) setReturnNote({ reason: String(last.reasonCode||"").replace(/_/g," ").toLowerCase(), comment: last.comment||"" })
+              await apiClient.post(`/api/v1/clinic/consultations/${existing.id}/resume-nurse-work`)
+            } catch { /* the draft still opens; the note is a convenience */ }
+          }
           const str = (v:any) => v==null ? "" : String(v)
           setSoap(p => ({ ...p,
             chiefComplaint: existing.chiefComplaint || p.chiefComplaint,
@@ -467,6 +477,18 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
           </button>
         </div>
       </div>
+
+      {returnNote && (
+        <div role="status" style={{ margin:"8px 12px 0", padding:"10px 14px", borderRadius:10,
+          background:"var(--hf-warning-soft)", color:"var(--hf-warning-text)", fontSize:13,
+          display:"flex", gap:10, alignItems:"flex-start" }}>
+          <div style={{ flex:1 }}>
+            <strong>Returned by the doctor</strong> ({returnNote.reason}): {returnNote.comment}
+          </div>
+          <button onClick={() => setReturnNote(null)} aria-label="Dismiss"
+            style={{ background:"none", border:"none", cursor:"pointer", color:"inherit" }}>×</button>
+        </div>
+      )}
 
       {/* ── Panel tabs (mobile) ────────────────────────────────────────── */}
       <div style={{ display:"flex", gap:4, marginBottom:12 }}>
