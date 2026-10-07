@@ -8,6 +8,7 @@ import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import QuestionForm from "./QuestionForm"
 import { VitalsPanel, SoapFields } from "./ConsultationNotesPanels"
+import LiveBillPanel from "./LiveBillPanel"
 import { PatientAlertBanner } from "./PatientNotes"
 import { AllergyWarning, missingReasons, useAllergyChecks } from "./PrescriptionAllergyCheck"
 import {
@@ -27,9 +28,7 @@ import {
   TEAL_TEXT,
   RED,
   RED_TEXT,
-  GREEN,
   GREEN_TEXT,
-  AMBER,
   AMBER_TEXT,
   PURPLE,
   PURPLE_TEXT,
@@ -286,10 +285,6 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
     }])
     setMedSearch(""); setMedResults([]); setShowMedSearch(false)
   }
-
-  // ── Custom bill line ──────────────────────────────────────────────────────
-  const [showCustom, setShowCustom] = useState(false)
-  const [customLine, setCustomLine] = useState({type:"CONSUMABLE",description:"",quantity:"1",unitPrice:""})
 
   // ── Complete consultation ─────────────────────────────────────────────────
   const [showComplete, setShowComplete] = useState(false)
@@ -617,76 +612,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
             )}
           </div>
 
-          {/* Bill lines */}
-          <div style={{ flex:1, overflowY:"auto", display:"flex", flexDirection:"column", gap:6 }}>
-            {billLines.map((line,i)=>{
-              const typeColor:Record<string,string> = {
-                CONSULTATION:TEAL, PROCEDURE:NAVY, MEDICINE:GREEN, CONSUMABLE:AMBER
-              }
-              const col = typeColor[line.type]??GRAY
-              return (
-                <div key={line.id} style={{ display:"flex", alignItems:"center", gap:8,
-                  padding:"8px 12px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`,
-                  borderLeft:`3px solid ${col}`, borderRadius:8 }}>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:12, fontWeight:600, color:"var(--hf-text)",
-                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" as const }}>
-                      {line.description}
-                    </div>
-                    <div style={{ fontSize:10, color:GRAY_TEXT }}>
-                      {line.tariffCode||line.nappiCode||""} · qty {line.quantity}
-                    </div>
-                  </div>
-                  <div style={{ fontSize:13, fontWeight:700, color:"var(--hf-text)", flexShrink:0 }}>
-                    {fmtR(line.gross)}
-                  </div>
-                  {line.id!=="consult-0191" && (
-                    <button onClick={()=>removeBillLine(line.id)}
-                      style={{background:"none",border:"none",cursor:"pointer",color:RED_TEXT,display:"flex",padding:2}}>
-                      <X size={12}/>
-                    </button>
-                  )}
-                </div>
-              )
-            })}
-
-            {/* Add custom line */}
-            {!showCustom ? (
-              <button onClick={()=>setShowCustom(true)}
-                style={{display:"flex",alignItems:"center",gap:5,padding:"7px 12px",
-                  border:`1px dashed ${BORDER}`,borderRadius:8,background:LIGHT,
-                  color:GRAY_TEXT,fontSize:12,cursor:"pointer"}}>
-                <Plus size={12}/> Add custom item
-              </button>
-            ) : (
-              <div style={{padding:"10px 12px",background:LIGHT,border:`1px solid ${BORDER}`,borderRadius:8}}>
-                <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:8,marginBottom:8}}>
-                  <input value={customLine.description} onChange={e=>setCustomLine(f=>({...f,description:e.target.value}))}
-                    placeholder="Description" style={{...sinp,padding:"6px 8px",fontSize:12}} autoFocus/>
-                  <input type="number" value={customLine.quantity} onChange={e=>setCustomLine(f=>({...f,quantity:e.target.value}))}
-                    placeholder="Qty" style={{...sinp,padding:"6px 8px",fontSize:12}}/>
-                  <input type="number" step="0.01" value={customLine.unitPrice} onChange={e=>setCustomLine(f=>({...f,unitPrice:e.target.value}))}
-                    placeholder="R price" style={{...sinp,padding:"6px 8px",fontSize:12}}/>
-                </div>
-                <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
-                  <button onClick={()=>setShowCustom(false)} style={{...cancelBtn,padding:"4px 10px",fontSize:11}}>Cancel</button>
-                  <button onClick={()=>{
-                    const qty=parseFloat((customLine.quantity as any)||"1")
-                    const price=parseFloat((customLine.unitPrice as any)||"0")
-                    addBillLine({type:"CONSUMABLE",description:customLine.description,quantity:qty,unitPrice:price,gross:qty*price})
-                    setCustomLine({type:"CONSUMABLE",description:"",quantity:"1",unitPrice:""})
-                    setShowCustom(false)
-                  }} style={{...primaryBtn,padding:"4px 10px",fontSize:11}}>Add</button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Bill total */}
-          <div style={{padding:"12px 16px",background:NAVY,borderRadius:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{fontSize:12,color:"rgba(255,255,255,0.6)"}}>Total · {billLines.length} items</span>
-            <span style={{fontSize:20,fontWeight:800,color:"var(--hf-text-on-solid)"}}>{fmtR(billTotal)}</span>
-          </div>
+          <LiveBillPanel billLines={billLines} billTotal={billTotal} removeBillLine={removeBillLine} addBillLine={addBillLine}/>
         </div>
 
         {/* ── RIGHT: Prescriptions ─────────────────────────────────────── */}
