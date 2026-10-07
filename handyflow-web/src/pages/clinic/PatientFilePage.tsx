@@ -7,6 +7,7 @@ import ConsentTab from "./ConsentTab"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import RxFillControl from "./RxFillControl"
+import ClinicalSummaryPanel from "./ClinicalSummaryPanel"
 import { AllergyWarning, missingReasons, useAllergyChecks } from "./PrescriptionAllergyCheck"
 import { useAuthStore } from "../../store/auth.store"
 import {
@@ -452,39 +453,8 @@ function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc }: {
           ))}
         </div>
 
-        {/* Allergies */}
-        {patient.allergies?.length > 0 && (
-          <div style={{ marginBottom:12, padding:"14px 16px", background:"var(--hf-danger-soft)",
-            border:"1px solid var(--hf-danger-border)", borderRadius:12 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
-              <AlertCircle size={13} style={{ color: RED_TEXT }}/>
-              <span style={{ fontSize:11, fontWeight:700, color:RED_TEXT, textTransform:"uppercase", letterSpacing:"0.06em" }}>⚠ Allergies</span>
-            </div>
-            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-              {patient.allergies.map(a=>(
-                <span key={a} style={{ background:"var(--hf-surface)", color:RED_TEXT, padding:"3px 10px",
-                  borderRadius:6, fontSize:13, fontWeight:600, border:"1px solid var(--hf-danger-border)" }}>{a}</span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Chronic conditions */}
-        {patient.chronicConditions?.length > 0 && (
-          <div style={{ marginBottom:12, padding:"14px 16px", background:"var(--hf-warning-soft)",
-            border:"1px solid var(--hf-warning-border)", borderRadius:12 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
-              <Heart size={13} style={{ color: AMBER }}/>
-              <span style={{ fontSize:11, fontWeight:700, color:AMBER, textTransform:"uppercase", letterSpacing:"0.06em" }}>Chronic conditions</span>
-            </div>
-            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-              {patient.chronicConditions.map(c=>(
-                <span key={c} style={{ background:"var(--hf-surface)", color:AMBER, padding:"3px 10px",
-                  borderRadius:6, fontSize:13, fontWeight:600, border:"1px solid var(--hf-warning-border)" }}>{c}</span>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Allergies, conditions and medicines: structured records, editable by clinicians */}
+        <ClinicalSummaryPanel patientId={patient.id} fallbackAllergies={patient.allergies} fallbackConditions={patient.chronicConditions} />
 
         {patient.notes && (
           <div style={{ padding:"12px 14px", background:LIGHT, borderRadius:10, border:`1px solid ${BORDER}` }}>
