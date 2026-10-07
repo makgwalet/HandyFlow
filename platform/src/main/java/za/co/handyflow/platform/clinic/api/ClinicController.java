@@ -188,6 +188,17 @@ public class ClinicController {
                 clinicService.createAppointment(TenantContext.getTenantIdAsObject(), req, allowOverlap)));
     }
 
+    @PostMapping("/appointments/{id}/reschedule")
+    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @Operation(summary = "Move a SCHEDULED or CONFIRMED appointment. Refused with 409 when the practitioner already has an overlapping booking, unless allowOverlap=true.")
+    public ResponseEntity<ApiResponse<AppointmentResponse>> rescheduleAppointment(
+            @PathVariable UUID id,
+            @Valid @RequestBody RescheduleRequest req,
+            @RequestParam(defaultValue = "false") boolean allowOverlap) {
+        return ResponseEntity.ok(ApiResponse.success("Appointment moved",
+                clinicService.rescheduleAppointment(TenantContext.getTenantIdAsObject(), id, req, allowOverlap)));
+    }
+
     @PostMapping("/appointments/{id}/{action}")
     @PreAuthorize("hasAuthority('CLINIC_WRITE')")
     @Operation(summary = "Update appointment status: confirm | start | complete | cancel | no_show")

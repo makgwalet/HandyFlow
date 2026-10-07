@@ -126,6 +126,22 @@ public class ClinicAppointment {
         this.updatedAt = Instant.now();
     }
 
+    /**
+     * Moves a booking that has not started yet. A patient who has already arrived is here, so there is
+     * nothing to move. The booking goes back to SCHEDULED (an earlier confirmation was for the old time)
+     * and becomes eligible for a fresh automatic reminder.
+     */
+    public void reschedule(Instant newTime, int minutes, UUID newPractitionerId) {
+        if (!"SCHEDULED".equals(this.status) && !"CONFIRMED".equals(this.status))
+            throw new IllegalStateException("Only a SCHEDULED or CONFIRMED appointment can be moved (is " + this.status + ")");
+        this.scheduledAt = newTime;
+        this.durationMinutes = minutes;
+        if (newPractitionerId != null) this.practitionerId = newPractitionerId;
+        this.status = "SCHEDULED";
+        this.reminderSentAt = null;
+        this.updatedAt = Instant.now();
+    }
+
     public boolean isActive() {
         return !"CANCELLED".equals(this.status) && !"COMPLETED".equals(this.status)
                 && !"NO_SHOW".equals(this.status) && this.deletedAt == null;

@@ -470,6 +470,81 @@ class ClinicServiceTest {
     }
 
     @Nested
+    @DisplayName("rescheduleAppointment")
+    class RescheduleAppointment {
+
+        private ClinicAppointment existing(UUID practitionerId) {
+            return ClinicAppointment.create(TENANT, UUID.randomUUID(), practitionerId,
+                    Instant.now().plusSeconds(7200), 30, "CONSULTATION", null);
+        }
+
+        @Test
+        @DisplayName("moves the appointment and resets it to SCHEDULED")
+        void moves() {
+            var appt = existing(null);
+            appt.confirm();
+            when(appointmentRepo.findActiveById(TENANT, appt.getId())).thenReturn(Optional.of(appt));
+            when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+            var newTime = Instant.now().plusSeconds(86400);
+
+            service.rescheduleAppointment(TENANT, appt.getId(), new RescheduleRequest(newTime, 45, null), false);
+
+            assertThat(appt.getScheduledAt()).isEqualTo(newTime);
+            assertThat(appt.getDurationMinutes()).isEqualTo(45);
+            assertThat(appt.getStatus()).isEqualTo("SCHEDULED");
+            verify(appointmentRepo).save(appt);
+        }
+
+        @Test
+        @DisplayName("refuses a clash with the practitioner's other booking, ignoring the appointment itself")
+        void refusesClash() {
+            var practitionerId = UUID.randomUUID();
+            var appt = existing(practitionerId);
+            when(appointmentRepo.findActiveById(TENANT, appt.getId())).thenReturn(Optional.of(appt));
+            var newTime = Instant.now().plusSeconds(86400);
+            when(schedulingService.findClashes(TENANT, practitionerId, newTime, 30, appt.getId()))
+                    .thenReturn(List.of(new AppointmentRules.Clash("Sam Nkosi", newTime, 30)));
+            when(practitionerRepo.findActiveById(TENANT, practitionerId)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.rescheduleAppointment(TENANT, appt.getId(), new RescheduleRequest(newTime, null, null), false))
+                    .isInstanceOf(za.co.handyflow.platform.shared.ConflictException.class);
+            verify(appointmentRepo, never()).save(any(ClinicAppointment.class));
+        }
+
+        @Test
+        @DisplayName("refuses a move into the past")
+        void refusesPast() {
+            var appt = existing(null);
+            when(appointmentRepo.findActiveById(TENANT, appt.getId())).thenReturn(Optional.of(appt));
+            assertThatThrownBy(() -> service.rescheduleAppointment(TENANT, appt.getId(),
+                    new RescheduleRequest(Instant.now().minusSeconds(7200), null, null), false))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        @DisplayName("an appointment that has started cannot be moved")
+        void refusesStarted() {
+            var appt = existing(null);
+            appt.confirm();
+            appt.start();
+            when(appointmentRepo.findActiveById(TENANT, appt.getId())).thenReturn(Optional.of(appt));
+            assertThatThrownBy(() -> service.rescheduleAppointment(TENANT, appt.getId(),
+                    new RescheduleRequest(Instant.now().plusSeconds(86400), null, null), true))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("unknown appointment is not found")
+        void notFound() {
+            var id = UUID.randomUUID();
+            when(appointmentRepo.findActiveById(TENANT, id)).thenReturn(Optional.empty());
+            assertThatThrownBy(() -> service.rescheduleAppointment(TENANT, id,
+                    new RescheduleRequest(Instant.now().plusSeconds(86400), null, null), false))
+                    .isInstanceOf(ResourceNotFoundException.class);
+        }
+    }
+
+    @Nested
     @DisplayName("updateAppointmentStatus")
     class UpdateAppointmentStatus {
 

@@ -450,6 +450,32 @@ public class ClinicService {
                 loadPractitionerNames(tenantId, List.of(appt)));
     }
 
+    /** Moves a not-yet-started appointment; refuses a clash for the practitioner unless allowOverlap. */
+    @Transactional
+    public AppointmentResponse rescheduleAppointment(TenantId tenantId, UUID id, RescheduleRequest req, boolean allowOverlap) {
+        ClinicAppointment appt = appointmentRepo.findActiveById(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", id.toString()));
+        if (AppointmentRules.inThePast(req.scheduledAt(), Instant.now())) {
+            throw new IllegalArgumentException("Cannot move an appointment into the past");
+        }
+        int minutes = req.durationMinutes() != null ? AppointmentRules.minutes(req.durationMinutes()) : appt.getDurationMinutes();
+        UUID practitionerId = req.practitionerId() != null ? req.practitionerId() : appt.getPractitionerId();
+        if (!allowOverlap && practitionerId != null) {
+            var clashes = schedulingService.findClashes(tenantId, practitionerId, req.scheduledAt(), minutes, appt.getId());
+            if (!clashes.isEmpty()) {
+                String name = practitionerRepo.findActiveById(tenantId, practitionerId)
+                        .map(ClinicPractitioner::getFullName).orElse(null);
+                throw new ConflictException(AppointmentRules.conflictMessage(name, clashes, AppointmentRules.CLINIC_ZONE));
+            }
+        }
+        appt.reschedule(req.scheduledAt(), minutes, req.practitionerId());
+        appointmentRepo.save(appt);
+        log.info("Rescheduled appointment={} to {}", appt.getId(), req.scheduledAt());
+        return toAppointmentResponse(appt,
+                loadPatientNames(tenantId, List.of(appt)),
+                loadPractitionerNames(tenantId, List.of(appt)));
+    }
+
     // ── Consultations ─────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)

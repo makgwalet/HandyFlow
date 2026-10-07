@@ -1,5 +1,6 @@
 // src/pages/clinic/ScheduleTab.tsx
 // Day / Week calendar view per doctor — click slot to book appointment
+import RescheduleBox from "./RescheduleBox"
 import { bookingProblem, clashMessage, WALK_IN_GRACE_MS } from "./bookingRules"
 import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -380,6 +381,14 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
                     style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",border:`1px solid ${BORDER}`,borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",background:"var(--hf-surface)",color:reminderSent===selected.id?GREEN:TEAL}}>
                     {reminderSent===selected.id ? <><CheckCircle size={14}/> Reminder sent</> : <><Mail size={14}/> {sendReminder.isPending?"Sending...":"Send reminder"}</>}
                   </button>
+                )}
+                {["SCHEDULED","CONFIRMED"].includes(selected.status) && (
+                  <RescheduleBox key={selected.id + selected.scheduledAt} appointment={selected}
+                    onMoved={(u:Appointment)=>{
+                      qc.invalidateQueries({queryKey:["schedule-appts"]})
+                      qc.invalidateQueries({queryKey:["clinic-dashboard-summary"]})
+                      setSelected(u)
+                    }}/>
                 )}
                 {selected.appointmentType==="TELEHEALTH" && ["SCHEDULED","CONFIRMED","IN_PROGRESS"].includes(selected.status) && (
                   <button onClick={()=>joinVideoCall.mutate(selected.id)} disabled={joinVideoCall.isPending}
