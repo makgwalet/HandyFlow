@@ -67,3 +67,18 @@ describe("competencyFormError", () => {
   })
   it("refuses expiry before issue", () => { expect(competencyFormError({ ...ok, expiryDate: "2025-12-31" }, "2026-10-07")).toBe("The expiry date cannot be before the issue date") })
 })
+
+import { startedLabel } from './guard360.logic'
+describe('startedLabel', () => {
+  it('compares the real start with the schedule', () => {
+    expect(startedLabel({ status: 'COMPLETED', actualStartAt: 'x', minutesLate: 0 })).toEqual({ tone: 'ok', text: 'On time' })
+    expect(startedLabel({ status: 'COMPLETED', actualStartAt: 'x', minutesLate: 9 })).toEqual({ tone: 'ok', text: '9 min after start' })
+    expect(startedLabel({ status: 'COMPLETED', actualStartAt: 'x', minutesLate: 15 }).tone).toBe('ok')
+    expect(startedLabel({ status: 'ACTIVE', actualStartAt: 'x', minutesLate: 22 })).toEqual({ tone: 'warn', text: '22 min late' })
+  })
+  it('says so when there is no recorded start, and for shifts that never started', () => {
+    expect(startedLabel({ status: 'COMPLETED', actualStartAt: null, minutesLate: null }).text).toBe('Not recorded')
+    expect(startedLabel({ status: 'MISSED' }).text).toBe('Did not start')
+    expect(startedLabel({ status: 'SCHEDULED' }).text).toBe('-')
+  })
+})

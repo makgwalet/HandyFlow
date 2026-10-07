@@ -64,7 +64,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class NoShowAlertScheduler {
 
-    private static final int GRACE_MINUTES      = 15;
+    private static final int GRACE_MINUTES      = ShiftPunctuality.GRACE_MINUTES;
     private static final int NO_SHOW_MINUTES    = 45;
     private static final int OVERTIME_GRACE_MIN = 20;
 

@@ -44,7 +44,7 @@ public record GuardOverviewResponse(
 
     public record ShiftItem(
             UUID id, UUID siteId, String siteName, Instant startAt, Instant endAt,
-            String status) {}
+            String status, Instant actualStartAt, Integer minutesLate) {}
 
     public record IncidentItem(
             UUID id, UUID siteId, String siteName, String title, String severity,

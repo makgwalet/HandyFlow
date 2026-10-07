@@ -197,6 +197,11 @@ Load the demo, sign in as a user with `SECURITY_READ` and `SECURITY_MANAGE` (adm
 - [ ] Guard 360, Performance tab: a **Score trend** chart (30 or 90 days) with a one-line summary ("Up 12 points since 20 Sep"). With the demo data it shows 30 illustrative days; they are seeded, not calculated, and the nightly job adds real ones from the day it first runs.
 - [ ] Checkpoint compliance now has data: completed demo shifts carry scans, and about 85 per cent meet their minimum (guards 3 and 5 about half).
 
+### Punctuality from clock-in
+- [ ] Guard 360, Shifts tab: a **Started** column. Shifts show "On time", "n min after start" (within the 15 minute grace) or "n min late". Shifts started before the start time was kept show "Not recorded".
+- [ ] Performance tab: the Punctuality component counts a shift as late when it was started more than 15 minutes after its scheduled start. Demo data: guards 5 and 8 are late on about a third of their shifts. The start time is set when a supervisor starts a shift or when the guard opens a device session at the post.
+- [ ] Shifts without a recorded start are judged as before, on whether the late-arrival alert fired.
+
 ### Supervisor reviews
 - [ ] Guard 360, Performance tab: **Supervisor reviews** with a due notice. Demo data: guard 4 reviewed recently, guard 8 has a follow-up date that has arrived, guard 5 is overdue (over 90 days), guards 1 and 13 are in date, and the rest show "not been reviewed yet".
 - [ ] **New review**: period, review date, overall (exceeds, meets, below), six 1 to 5 scores, what went well, what to improve, training needs, actions agreed and an optional follow-up date. Either "went well" or "to improve" must be filled. A review cannot be dated in the future, cannot be dated before the end of its period, and cannot be edited after saving.

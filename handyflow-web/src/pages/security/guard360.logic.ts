@@ -28,7 +28,19 @@ export interface CompetencyItem {
 }
 export interface Readiness { percent: number; ready: boolean; items: ReadinessItem[]; reasons: string[] }
 export interface DocumentItem { id: string; category: string; fileUrl: string; fileName: string | null; notes: string | null; createdAt: string }
-export interface ShiftItem { id: string; siteId: string; siteName: string | null; startAt: string; endAt: string; status: string }
+export interface ShiftItem { id: string; siteId: string; siteName: string | null; startAt: string; endAt: string; status: string; actualStartAt?: string | null; minutesLate?: number | null }
+
+/** The late grace used by the server's late alert and the score: up to this many minutes after the scheduled start is on time. */
+export const LATE_GRACE_MINUTES = 15
+
+/** How a shift's real start compares with its schedule, for the Shifts tab. */
+export function startedLabel(s: Pick<ShiftItem, "status" | "actualStartAt" | "minutesLate">): { tone: Tone; text: string } {
+  if (s.status === "SCHEDULED" || s.status === "CANCELLED") return { tone: "neutral", text: "-" }
+  if (s.status === "MISSED") return { tone: "bad", text: "Did not start" }
+  if (s.minutesLate === null || s.minutesLate === undefined || !s.actualStartAt) return { tone: "neutral", text: "Not recorded" }
+  if (s.minutesLate > LATE_GRACE_MINUTES) return { tone: "warn", text: `${s.minutesLate} min late` }
+  return { tone: "ok", text: s.minutesLate === 0 ? "On time" : `${s.minutesLate} min after start` }
+}
 
 export const DUE_SOON_DAYS = 30
 

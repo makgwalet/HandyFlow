@@ -104,7 +104,8 @@ public class GuardOverviewService {
                 .sorted(Comparator.comparing(Shift::getStartAt).reversed())
                 .limit(LIST_CAP)
                 .map(s -> new ShiftItem(s.getId(), s.getSiteId(), siteName.apply(s.getSiteId()),
-                        s.getStartAt(), s.getEndAt(), s.getStatus().name()))
+                        s.getStartAt(), s.getEndAt(), s.getStatus().name(), s.getActualStartAt(),
+                        ShiftPunctuality.minutesLate(s.getStartAt(), s.getActualStartAt())))
                 .toList();
         List<IncidentItem> incidentItems = incidents.stream()
                 .sorted(Comparator.comparing(Incident::getCreatedAt).reversed())

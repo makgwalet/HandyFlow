@@ -63,7 +63,7 @@ public class GuardPerformanceService {
             if (st == ShiftStatus.COMPLETED) completed++;
             else if (st == ShiftStatus.PULLED) pulled++;
             else if (st == ShiftStatus.MISSED) missed++;
-            if ((st == ShiftStatus.COMPLETED || st == ShiftStatus.PULLED) && s.getLateAlertSentAt() != null) late++;
+            if ((st == ShiftStatus.COMPLETED || st == ShiftStatus.PULLED) && ShiftPunctuality.late(s.getStartAt(), s.getActualStartAt(), s.getLateAlertSentAt())) late++;
             if (st == ShiftStatus.COMPLETED && s.getMinScanCount() > 0) {
                 patrolRequired++;
                 if (checkpointLogRepository.countByShiftId(s.getId()) >= s.getMinScanCount()) patrolMet++;

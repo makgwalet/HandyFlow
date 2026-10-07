@@ -65,6 +65,14 @@ class GuardPerformanceServiceTest {
         Instant start = NOW.minus(Duration.ofDays(daysAgo));
         Shift s = Shift.create(TENANT, siteId, guardId, start, start.plus(Duration.ofHours(8)), null);
         s.start(); s.complete();
+        org.springframework.test.util.ReflectionTestUtils.setField(s, "actualStartAt", start); // started on time
+        return s;
+    }
+
+    /** A completed shift that was really started `minutes` after its scheduled start. */
+    private Shift startedLate(int daysAgo, int minutes) {
+        Shift s = completed(daysAgo);
+        org.springframework.test.util.ReflectionTestUtils.setField(s, "actualStartAt", s.getStartAt().plus(Duration.ofMinutes(minutes)));
         return s;
     }
 
@@ -82,6 +90,28 @@ class GuardPerformanceServiceTest {
         assertThat(out.score()).isEqualTo(100);
         assertThat(out.recommendations()).isEmpty();
         assertThat(out.coverage()).isEqualTo(70);
+    }
+
+    @Test @DisplayName("Punctuality is judged from the real start: over 15 minutes late counts, 15 or under does not")
+    void punctualityFromClockIn() {
+        base(List.of(startedLate(1, 16), startedLate(2, 15), startedLate(3, 2), startedLate(4, 40)), List.of());
+        var out = service().performance(TENANT, guardId, NOW);
+        var punctuality = out.components().stream().filter(c -> c.key().equals("PUNCTUALITY")).findFirst().orElseThrow();
+        assertThat(punctuality.detail()).isEqualTo("2 late of 4 shifts");
+        assertThat(punctuality.percent()).isEqualTo(50);
+    }
+
+    @Test @DisplayName("A shift with a late alert but a recorded start inside the grace is not late; one with no recorded start falls back to the alert")
+    void alertOnlyWithoutRecordedStart() {
+        Shift withAlertOnTime = startedLate(1, 10);
+        withAlertOnTime.markLateAlertSent();
+        Shift noRecordedStart = completed(2);
+        org.springframework.test.util.ReflectionTestUtils.setField(noRecordedStart, "actualStartAt", null);
+        noRecordedStart.markLateAlertSent();
+        base(List.of(withAlertOnTime, noRecordedStart, completed(3), completed(4)), List.of());
+        var out = service().performance(TENANT, guardId, NOW);
+        var punctuality = out.components().stream().filter(c -> c.key().equals("PUNCTUALITY")).findFirst().orElseThrow();
+        assertThat(punctuality.detail()).isEqualTo("1 late of 4 shifts");
     }
 
     @Test @DisplayName("Withdrawn and unsubstantiated complaints do not count towards the thresholds")

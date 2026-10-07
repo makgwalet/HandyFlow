@@ -77,6 +77,11 @@ public class Shift {
     @Column(name = "deleted_by")
     private UUID deletedBy;
 
+    // ── Real start (V335) ─────────────────────────────────────────────────────
+
+    @Column(name = "actual_start_at")
+    private Instant actualStartAt;
+
     // ── Alert dedup (V210) ────────────────────────────────────────────────────
 
     @Column(name = "late_alert_sent_at")
@@ -143,6 +148,7 @@ public class Shift {
             throw new IllegalStateException("Only SCHEDULED shifts can be started");
         }
         this.status    = ShiftStatus.ACTIVE;
+        this.actualStartAt = Instant.now();
         this.updatedAt = Instant.now();
     }
 

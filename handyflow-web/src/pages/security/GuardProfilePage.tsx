@@ -20,7 +20,7 @@ import GuardHrLinkCard from "./GuardHrLinkCard"
 import type { ComplaintCounts, ComplaintSummary } from "./complaints.logic"
 import {
   DOCUMENT_CATEGORIES, SEVERITY_TONE, SHIFT_TONE, categoryLabel, completionRate, expiryState,
-  fileChecklist, isUpcoming, readinessState, readinessTone, screeningLabel, todayIso,
+  fileChecklist, isUpcoming, readinessState, readinessTone, screeningLabel, startedLabel, todayIso,
   type CompetencyItem, type DocumentItem, type Readiness, type ScreeningItem, type ShiftItem,
 } from "./guard360.logic"
 
@@ -192,9 +192,10 @@ export default function GuardProfilePage() {
         <div style={{ ...card, overflowX: "auto" }}>
           {data.shifts.length === 0 ? <div style={{ color: "var(--hf-text-muted)", fontSize: 13 }}>No shifts in the last 90 days or the next 14.</div> :
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr><th style={th}>Start</th><th style={th}>End</th><th style={th}>Site</th><th style={th}>Status</th></tr></thead>
+              <thead><tr><th style={th}>Start</th><th style={th}>End</th><th style={th}>Site</th><th style={th}>Started</th><th style={th}>Status</th></tr></thead>
               <tbody>{data.shifts.map(s => (
                 <tr key={s.id}><td style={td}>{fmtDateTime(s.startAt)}</td><td style={td}>{fmtDateTime(s.endAt)}</td><td style={td}>{s.siteName ?? "-"}</td>
+                  <td style={td}>{(() => { const l = startedLabel(s); return l.text === "-" ? "-" : <Chip tone={l.tone}>{l.text}</Chip> })()}</td>
                   <td style={td}><Chip tone={SHIFT_TONE[s.status] ?? "neutral"}>{s.status.toLowerCase()}</Chip></td></tr>
               ))}</tbody>
             </table>}

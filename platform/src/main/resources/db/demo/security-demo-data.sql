@@ -254,6 +254,16 @@ FROM _roster r WHERE s.id = pg_temp.did(7, r.n) AND r.site = 1 AND r.hour = 6 AN
 UPDATE security_shifts s SET late_alert_sent_at = (r.start_ts + interval '20 minutes') AT TIME ZONE 'UTC'
 FROM _roster r WHERE s.id = pg_temp.did(7, r.n) AND r.site = 5 AND r.day_off = -4;
 
+-- When each started shift was really started (the Performance tab and the guard's Shifts tab judge lateness from this).
+-- Most start within a few minutes (some a little early); shifts that already carry a late alert start 20 to 34 minutes late;
+-- guards 5 and 8 are late on about a third of their shifts and any guard is late on about one shift in thirteen.
+UPDATE security_shifts s SET actual_start_at = s.start_at + make_interval(mins => CASE
+    WHEN s.late_alert_sent_at IS NOT NULL THEN 20 + (abs(hashtext(s.id::text)) % 15)
+    WHEN s.guard_id IN (pg_temp.did(3, 5), pg_temp.did(3, 8)) AND abs(hashtext(s.id::text)) % 3 = 0 THEN 18 + (abs(hashtext(s.id::text)) % 20)
+    WHEN abs(hashtext(s.id::text)) % 13 = 0 THEN 17 + (abs(hashtext(s.id::text)) % 10)
+    ELSE (abs(hashtext(s.id::text)) % 6) - 2 END)
+WHERE s.id::text LIKE 'd3d3d3d3-%' AND s.status IN ('ACTIVE', 'COMPLETED', 'PULLED') AND s.start_at <= pg_temp.utc_now();
+
 -- ── Checkpoints, routes, devices ───────────────────────────────────────────────────────────────
 -- Some checkpoints carry an NFC tag or a Bluetooth beacon, one is switched off, one has never been scanned.
 CREATE TEMP TABLE _cp (n int, site int, name text, seq int, active boolean, nfc text, ble text);
