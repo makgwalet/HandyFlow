@@ -10,7 +10,7 @@
 // (and bundle) a module's pages just to render its navigation.
 import type { ElementType } from 'react'
 import {
-  AlertTriangle, Camera, ClipboardList, Clock, Crosshair, DoorOpen, FileBarChart,
+  AlertTriangle, Coins, Camera, ClipboardList, Clock, Crosshair, DoorOpen, FileBarChart,
   GitBranch, Key, LayoutDashboard, Lock, MapPin, Radio, RefreshCw, Repeat, Route,
   Shield, ShieldCheck, Siren, Tablet, DollarSign, Wheat, Tractor, PawPrint,
   Droplets, ArrowDownToLine, Fuel, Truck, Users, TrendingUp, Car, Wrench,
@@ -443,7 +443,7 @@ export const COMPLIANCE_TENDER_SECTIONS: ModuleSections = {
         { id: 'requirements', label: 'Requirements', icon: ListChecks },
       ],
     },
-    { label: 'Tenders', sections: [{ id: 'tenders', label: 'Tenders', icon: Briefcase }] },
+    { label: 'Tenders', sections: [{ id: 'tenders', label: 'Tenders', icon: Briefcase }, { id: 'rates', label: 'Rates library', icon: Coins }] },
   ],
 }
 

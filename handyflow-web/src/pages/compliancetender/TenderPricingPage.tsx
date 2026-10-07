@@ -14,6 +14,8 @@ import {
   type LineDraft, type SettingsDraft,
 } from "./pricing.logic"
 import LookupInput from "../../components/ui/LookupInput"
+import { useRates } from "./rates.api"
+import { CATEGORY_LABEL, DEFAULT_FILTER, filterRates, lineFromRate } from "./rates.logic"
 import { UNITS } from "../../lookups/southAfrica"
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 20, marginBottom: 16 }
@@ -132,6 +134,8 @@ function PricingBody({ tenderId, pricing, tenderNumber }: { tenderId: string; pr
             </div>
           </div>
         ))}
+        {pricing.editable && <RatePicker sections={[...new Set(pricing.lines.map(l => l.section))]} busy={m.addLine.isPending}
+          onAdd={req => new Promise<boolean>(res => { setError(""); m.addLine.mutate(req, { onSuccess: () => res(true), onError: e => { fail(e); res(false) } }) })} />}
         {pricing.editable && <LineForm title="Add an item" submitLabel="Add item" sections={[...new Set(pricing.lines.map(l => l.section))]}
           busy={m.addLine.isPending} resetOnSuccess
           onSubmit={req => new Promise<boolean>(res => { setError(""); m.addLine.mutate(req, { onSuccess: () => res(true), onError: e => { fail(e); res(false) } }) })} />}
@@ -266,6 +270,52 @@ function LineRow({ line, editable, busy, onSave, onDelete }: { line: PricingLine
         </td>
       )}
     </tr>
+  )
+}
+
+/** Copies a rate from the library onto the schedule. The line keeps the cost it had when added; later changes to the rate do not move it. */
+function RatePicker({ sections, busy, onAdd }: { sections: string[]; busy: boolean; onAdd: (r: LineRequest) => Promise<boolean> }) {
+  const { data: rates = [] } = useRates(true)
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState("")
+  const [section, setSection] = useState("")
+  const [qty, setQty] = useState<Record<string, string>>({})
+  const [msg, setMsg] = useState("")
+  if (rates.filter(r => r.active).length === 0) return null
+  const matches = filterRates(rates, { ...DEFAULT_FILTER, search }).slice(0, 12)
+  async function add(id: string) {
+    const rate = rates.find(r => r.id === id)!
+    const req = lineFromRate(rate, qty[id] ?? "", section)
+    if (!req) { setMsg("Enter the quantity first (a number, up to 3 decimal places)."); return }
+    setMsg("")
+    if (await onAdd(req)) { setQty(q => ({ ...q, [id]: "" })); setMsg(`Added ${rate.description}.`) }
+  }
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <button type="button" style={btn} aria-expanded={open} onClick={() => setOpen(o => !o)}>{open ? "Hide rates library" : "Add from rates library"}</button>
+      {open && (
+        <div aria-label="Rates library" style={{ marginTop: 10, padding: 14, border: "1px solid var(--hf-border)", borderRadius: 10, background: "var(--hf-surface-sunken)" }}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+            <input aria-label="Search the rates library" placeholder="Search rates" value={search} onChange={e => setSearch(e.target.value)} style={{ ...input, flex: "1 1 200px", width: "auto" }} />
+            <input aria-label="Section for added rates" list="pr-rate-sections" placeholder="Section (General)" value={section} onChange={e => setSection(e.target.value)} style={{ ...input, flex: "0 1 200px", width: "auto" }} />
+            <datalist id="pr-rate-sections">{sections.map(s => <option key={s} value={s} />)}</datalist>
+          </div>
+          {matches.length === 0 && <p style={{ margin: 0, fontSize: 13, color: "var(--hf-text-faint)" }}>No rates match.</p>}
+          {matches.map(r => (
+            <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "6px 0", borderTop: "1px solid var(--hf-border)", flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 220px", fontSize: 13, color: "var(--hf-text)" }}>
+                <strong>{r.description}</strong>
+                <span style={{ color: "var(--hf-text-faint)" }}> · {CATEGORY_LABEL[r.category]}{r.supplier ? ` · ${r.supplier}` : ""}</span>
+              </div>
+              <div style={{ fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{fmtZar(r.unitCost)}{r.unit ? ` / ${r.unit}` : ""}</div>
+              <input aria-label={`Quantity of ${r.description}`} inputMode="decimal" placeholder="Qty" value={qty[r.id] ?? ""} onChange={e => setQty(q => ({ ...q, [r.id]: e.target.value }))} style={{ ...input, width: 80 }} />
+              <button type="button" style={primary} disabled={busy} aria-label={`Add ${r.description} to the schedule`} onClick={() => add(r.id)}><Plus size={13} aria-hidden="true" /> Add</button>
+            </div>
+          ))}
+          {msg && <p role="status" style={{ margin: "8px 0 0", fontSize: 12.5, color: "var(--hf-text-secondary)" }}>{msg}</p>}
+        </div>
+      )}
+    </div>
   )
 }
 

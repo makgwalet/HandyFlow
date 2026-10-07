@@ -10,6 +10,7 @@ import DocumentsTab from "./DocumentsTab"
 import DeadlinesTab from "./DeadlinesTab"
 import TendersTab from "./TendersTab"
 import RequirementsTab from "./RequirementsTab"
+import RatesTab from "./RatesTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { COMPLIANCE_TENDER_SECTIONS } from "../../navigation/moduleSections"
 
@@ -25,6 +26,7 @@ export default function CompliancePage() {
           case "deadlines":     return <DeadlinesTab />
           case "requirements":  return <RequirementsTab />
           case "tenders":       return <TendersTab />
+          case "rates":         return <RatesTab />
           default:              return null
         }
       }} />
