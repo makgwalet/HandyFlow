@@ -120,6 +120,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
   const [showActions, setShowActions] = useState(false)
   const [activeSession, setActiveSession] = useState<Appointment|null>(initialSession||null)
   const [sessionMinimised, setSessionMinimised] = useState(false)
+  const [discardToken, setDiscardToken] = useState(0)
   // Clear parent's initialSession ref once we've consumed it
   useEffect(() => { if (initialSession) onSessionClear?.() }, [])
   const pid = patient.id
@@ -315,15 +316,17 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
       </div>
 
       {/* ── Consultation session — full or minimised ─────────────────────── */}
-      {activeSession && !sessionMinimised && (
+      {/* Stays mounted while minimised (hidden), so nothing typed is lost. */}
+      {activeSession && (
         <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.7)",zIndex:1300,
-          display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}}>
+          display:sessionMinimised?"none":"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}}>
           <div style={{background:"var(--hf-surface)",borderRadius:16,width:"min(1200px,96vw)",height:"92vh",
             padding:24,boxShadow:"0 32px 80px rgba(0,0,0,0.3)",display:"flex",flexDirection:"column"}}>
             <ConsultationSession
               patient={patient}
               appointment={activeSession}
               onMinimise={()=>setSessionMinimised(true)}
+              discardToken={discardToken}
               onComplete={(_id)=>{
                 setActiveSession(null); setSessionMinimised(false)
                 setActiveTab("running-bill")
@@ -355,7 +358,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
               display:"flex",alignItems:"center",gap:6}}>
             ↑ Return to session
           </button>
-          <button onClick={()=>{ setActiveSession(null); setSessionMinimised(false) }}
+          <button onClick={()=>{ if (window.confirm("Discard this consultation draft?")) setDiscardToken(t=>t+1) }}
             style={{background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.7)",
               border:"none",borderRadius:8,padding:"7px 12px",fontSize:12,cursor:"pointer"}}>
             Discard session

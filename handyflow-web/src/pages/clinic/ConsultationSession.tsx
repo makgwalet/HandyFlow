@@ -71,9 +71,11 @@ interface Props {
   onComplete: (consultationId: string) => void
   onMinimise: () => void
   onCancel: () => void
+  /** Bumped by the parent (e.g. "Discard session" on the minimised bar) to discard this draft. */
+  discardToken?: number
 }
 
-export default function ConsultationSession({ patient, appointment, onComplete, onMinimise, onCancel }: Props) {
+export default function ConsultationSession({ patient, appointment, onComplete, onMinimise, onCancel, discardToken = 0 }: Props) {
   const qc = useQueryClient()
 
   // ── Timer ──────────────────────────────────────────────────────────────────
@@ -92,6 +94,91 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
     weightKg:"", heightCm:"", bloodPressure:"", pulseBpm:"", temperatureC:"", oxygenSatPct:""
   })
   const sf = (k: keyof typeof soap, v: string) => setSoap(p=>({...p,[k]:v}))
+
+  // ── Server-side DRAFT + autosave ───────────────────────────────────────────
+  // The consultation is persisted as a DRAFT on open and PATCHed (debounced) as the
+  // clinician types, so a refresh, crash or navigation no longer loses the note.
+  // Re-opening the same appointment resumes the existing draft.
+  const draftIdRef = useRef<string|null>(null)
+  const initStartedRef = useRef(false)
+  const [draftReady, setDraftReady] = useState(false)
+  const [draftState, setDraftState] = useState<"idle"|"saving"|"saved"|"error">("idle")
+
+  // Text fields are sent as "" (not null) so clearing a field actually clears it server-side.
+  const draftPayload = () => ({
+    chiefComplaint: soap.chiefComplaint,
+    weightKg:       parseFloat(soap.weightKg)||null,
+    heightCm:       parseFloat(soap.heightCm)||null,
+    bloodPressure:  soap.bloodPressure,
+    pulseBpm:       parseInt(soap.pulseBpm)||null,
+    temperatureC:   parseFloat(soap.temperatureC)||null,
+    oxygenSatPct:   parseFloat(soap.oxygenSatPct)||null,
+    history:        soap.history,
+    examination:    soap.examination,
+    diagnosis:      soap.diagnosis,
+    icd10Codes:     soap.icd10Codes?soap.icd10Codes.split(",").map((x:string)=>x.trim()).filter(Boolean):[],
+    treatmentPlan:  soap.treatmentPlan,
+    followUpDays:   parseInt(soap.followUpDays)||null,
+  })
+
+  useEffect(() => {
+    if (initStartedRef.current) return
+    initStartedRef.current = true
+    ;(async () => {
+      try {
+        const r = await apiClient.get("/api/v1/clinic/consultations/drafts")
+        const existing = unwrap(r).find((d:any) => d.appointmentId === appointment.id)
+        if (existing) {
+          draftIdRef.current = existing.id
+          const str = (v:any) => v==null ? "" : String(v)
+          setSoap(p => ({ ...p,
+            chiefComplaint: existing.chiefComplaint || p.chiefComplaint,
+            history: str(existing.history), examination: str(existing.examination),
+            diagnosis: str(existing.diagnosis),
+            icd10Codes: (existing.icd10Codes||[]).join(", "),
+            treatmentPlan: str(existing.treatmentPlan), followUpDays: str(existing.followUpDays),
+            weightKg: str(existing.weightKg), heightCm: str(existing.heightCm),
+            bloodPressure: str(existing.bloodPressure), pulseBpm: str(existing.pulseBpm),
+            temperatureC: str(existing.temperatureC), oxygenSatPct: str(existing.oxygenSatPct),
+          }))
+        } else {
+          const c = await apiClient.post(
+            `/api/v1/clinic/patients/${patient.id}/consultations/draft`,
+            { appointmentId: appointment.id, practitionerId: appointment.practitionerId||null,
+              chiefComplaint: soap.chiefComplaint||"" })
+          draftIdRef.current = (c.data?.data ?? c.data).id
+        }
+        setDraftReady(true); setDraftState("saved")
+      } catch { setDraftState("error") }
+    })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (!draftReady || !draftIdRef.current) return
+    const t = setTimeout(async () => {
+      setDraftState("saving")
+      try {
+        await apiClient.patch(`/api/v1/clinic/consultations/${draftIdRef.current}`, draftPayload())
+        setDraftState("saved")
+      } catch { setDraftState("error") }
+    }, 1500)
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [soap, draftReady])
+
+  const discardDraft = async () => {
+    const id = draftIdRef.current
+    if (id) { try { await apiClient.post(`/api/v1/clinic/consultations/${id}/abandon`) } catch { /* leave draft */ } }
+    onCancel()
+  }
+  const handleCancel = () => {
+    if (window.confirm("Discard this consultation draft? The notes entered so far will be abandoned.")) discardDraft()
+  }
+  useEffect(() => {
+    if (discardToken > 0) discardDraft()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [discardToken])
 
   // ── Voice recording ───────────────────────────────────────────────────────
   const [isRecording, setIsRecording] = useState(false)
@@ -193,37 +280,49 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
   const [showComplete, setShowComplete] = useState(false)
   const [completing, setCompleting] = useState(false)
   const [completeError, setCompleteError] = useState("")
+  const savedRxRef = useRef<Set<string>>(new Set())
 
   const complete = useMutation({
     mutationFn: async () => {
-      // 1. Save consultation
-      const consultRes = await apiClient.post(
-        `/api/v1/clinic/patients/${patient.id}/consultations`,
-        {
-          appointmentId:   appointment.id,
-          practitionerId:  appointment.practitionerId||null,
-          chiefComplaint:  soap.chiefComplaint||"Consultation",
-          weightKg:        parseFloat(soap.weightKg)||null,
-          heightCm:        parseFloat(soap.heightCm)||null,
-          bloodPressure:   soap.bloodPressure||null,
-          pulseBpm:        parseInt(soap.pulseBpm)||null,
-          temperatureC:    parseFloat(soap.temperatureC)||null,
-          oxygenSatPct:    parseFloat(soap.oxygenSatPct)||null,
-          history:         soap.history||null,
-          examination:     soap.examination||null,
-          diagnosis:       soap.diagnosis||null,
-          icd10Codes:      soap.icd10Codes?soap.icd10Codes.split(",").map((s:string)=>s.trim()).filter(Boolean):[],
-          treatmentPlan:   soap.treatmentPlan||null,
-          followUpDays:    parseInt(soap.followUpDays)||null,
-          durationMinutes, // from timer
-        }
-      )
-      const consult = consultRes.data?.data ?? consultRes.data
+      // 1. Save consultation: finalise the draft (PATCH) or, if the draft could not be
+      //    created, fall back to creating it in one shot as before.
+      let consultId: string
+      const draftId = draftIdRef.current
+      if (draftId) {
+        await apiClient.patch(`/api/v1/clinic/consultations/${draftId}`, {
+          ...draftPayload(),
+          chiefComplaint: soap.chiefComplaint||"Consultation",
+        })
+        consultId = draftId
+      } else {
+        const consultRes = await apiClient.post(
+          `/api/v1/clinic/patients/${patient.id}/consultations`,
+          {
+            appointmentId:   appointment.id,
+            practitionerId:  appointment.practitionerId||null,
+            chiefComplaint:  soap.chiefComplaint||"Consultation",
+            weightKg:        parseFloat(soap.weightKg)||null,
+            heightCm:        parseFloat(soap.heightCm)||null,
+            bloodPressure:   soap.bloodPressure||null,
+            pulseBpm:        parseInt(soap.pulseBpm)||null,
+            temperatureC:    parseFloat(soap.temperatureC)||null,
+            oxygenSatPct:    parseFloat(soap.oxygenSatPct)||null,
+            history:         soap.history||null,
+            examination:     soap.examination||null,
+            diagnosis:       soap.diagnosis||null,
+            icd10Codes:      soap.icd10Codes?soap.icd10Codes.split(",").map((x:string)=>x.trim()).filter(Boolean):[],
+            treatmentPlan:   soap.treatmentPlan||null,
+            followUpDays:    parseInt(soap.followUpDays)||null,
+            durationMinutes, // from timer
+          }
+        )
+        consultId = (consultRes.data?.data ?? consultRes.data).id
+      }
 
-      // 2. Save prescriptions
+      // 2. Save prescriptions (each only once, so a retry after a later failure cannot duplicate them)
       for (const rx of rxDrafts) {
-        if (!rx.medicationName.trim()) continue
-        await apiClient.post(`/api/v1/clinic/consultations/${consult.id}/prescriptions`,{
+        if (!rx.medicationName.trim() || savedRxRef.current.has(rx.id)) continue
+        await apiClient.post(`/api/v1/clinic/consultations/${consultId}/prescriptions`,{
           medicationName: rx.medicationName,
           nappiCode:      rx.nappiCode||null,
           dosage:         rx.dosage||null,
@@ -233,12 +332,16 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
           repeats:        0,
           instructions:   rx.instructions||null,
         })
+        savedRxRef.current.add(rx.id)
       }
+
+      // 2b. Sign the draft (DRAFT -> SIGNED). No email is sent (DEC-CLINIC-002).
+      if (draftId) await apiClient.post(`/api/v1/clinic/consultations/${draftId}/sign`)
 
       // 3. Complete the appointment
       await apiClient.post(`/api/v1/clinic/appointments/${appointment.id}/complete`)
 
-      return consult.id
+      return consultId
     },
     onSuccess: (consultationId) => {
       qc.invalidateQueries({queryKey:["pf-appointments"]})
@@ -300,6 +403,12 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
               <span style={{ fontSize:22, fontWeight:800, color:"var(--hf-text-on-solid)", fontVariantNumeric:"tabular-nums" }}>
                 {fmtTimer(elapsed)}
               </span>
+              <span title="Notes are saved to the server as you type"
+                style={{ fontSize:11, marginLeft:8, color:"rgba(255,255,255,0.7)" }}>
+                {draftState==="saving" ? "Saving…"
+                  : draftState==="saved" ? "Draft saved"
+                  : draftState==="error" ? "Not saved, check connection" : ""}
+              </span>
             </div>
             <div style={{ fontSize:10, color:"rgba(255,255,255,0.5)", marginTop:2 }}>
               {durationMinutes} min
@@ -326,7 +435,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
               fontSize:12, fontWeight:600, display:"flex", alignItems:"center", gap:4 }}>
             ↓ Minimise
           </button>
-          <button onClick={onCancel}
+          <button onClick={handleCancel}
             title="Discard session"
             style={{ background:"rgba(255,255,255,0.1)", border:"none", borderRadius:8,
               cursor:"pointer", color:"rgba(255,255,255,0.7)", padding:8, display:"flex" }}>
