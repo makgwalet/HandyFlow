@@ -7,6 +7,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import QuestionForm from "./QuestionForm"
+import { VitalsPanel, SoapFields } from "./ConsultationNotesPanels"
 import { PatientAlertBanner } from "./PatientNotes"
 import { AllergyWarning, missingReasons, useAllergyChecks } from "./PrescriptionAllergyCheck"
 import {
@@ -554,56 +555,9 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
               placeholder="Speak or type transcript here, then Extract SOAP…"/>
           </div>
 
-          {/* Vitals */}
-          <div style={{ padding:"12px 14px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:10 }}>
-            <div style={sectionLabel}>Vitals</div>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8 }}>
-              {[
-                {k:"weightKg",     label:"Weight (kg)", placeholder:"82"},
-                {k:"heightCm",     label:"Height (cm)", placeholder:"175"},
-                {k:"bloodPressure",label:"BP",          placeholder:"120/80"},
-                {k:"pulseBpm",     label:"Pulse (bpm)", placeholder:"72"},
-                {k:"temperatureC", label:"Temp (°C)",   placeholder:"36.6"},
-                {k:"oxygenSatPct", label:"SpO₂ (%)",   placeholder:"98"},
-              ].map(f=>(
-                <div key={f.k}>
-                  <label style={lbl}>{f.label}</label>
-                  <input value={(soap as any)[f.k]}
-                    onChange={e=>sf(f.k as keyof typeof soap,e.target.value)}
-                    placeholder={f.placeholder} style={{...sinp,padding:"6px 8px",fontSize:12}}/>
-                </div>
-              ))}
-            </div>
-            {soap.weightKg && soap.heightCm && (
-              <div style={{ marginTop:6, fontSize:11, color:GRAY_TEXT }}>
-                BMI: {(parseFloat(soap.weightKg)/Math.pow(parseFloat(soap.heightCm)/100,2)).toFixed(1)}
-              </div>
-            )}
-          </div>
+          <VitalsPanel soap={soap} sf={sf}/>
 
-          {/* SOAP fields */}
-          <div style={{ flex:1, overflowY:"auto", display:"flex", flexDirection:"column", gap:8 }}>
-            {([
-              {k:"chiefComplaint", label:"Chief complaint *", rows:1, ph:"Main reason for visit"},
-              {k:"history",        label:"History (S)",       rows:2, ph:"Subjective — patient history"},
-              {k:"examination",    label:"Examination (O)",   rows:2, ph:"Objective — physical findings"},
-              {k:"diagnosis",      label:"Diagnosis (A)",     rows:2, ph:"Assessment — working diagnosis"},
-              {k:"icd10Codes",     label:"ICD-10 codes",      rows:1, ph:"J06.9, Z00.0"},
-              {k:"treatmentPlan",  label:"Treatment plan (P)",rows:2, ph:"Plan — management and treatment"},
-              {k:"followUpDays",   label:"Follow-up (days)",  rows:1, ph:"7"},
-            ] as any[]).map((f:any)=>(
-              <div key={f.k}>
-                <label style={lbl}>{f.label}</label>
-                {f.rows===1
-                  ? <input value={(soap as any)[f.k]} onChange={e=>sf(f.k,e.target.value)}
-                      placeholder={f.ph} style={sinp}/>
-                  : <textarea value={(soap as any)[f.k]} onChange={e=>sf(f.k,e.target.value)}
-                      rows={f.rows} placeholder={f.ph}
-                      style={{...sinp,resize:"vertical" as const}}/>
-                }
-              </div>
-            ))}
-          </div>
+          <SoapFields soap={soap} sf={sf}/>
         </div>
 
         {/* ── MIDDLE: Live Bill ───────────────────────────────────────── */}
