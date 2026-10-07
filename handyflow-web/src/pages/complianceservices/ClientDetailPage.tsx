@@ -56,7 +56,7 @@ export default function ClientDetailPage() {
         <ArrowLeft size={15} /> Back to Clients
       </button>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20, flexWrap: "wrap" }}>
         <div style={{ width: 48, height: 48, borderRadius: 12, background: "var(--hf-success-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Building2 size={22} style={{ color: ACCENT_TEXT }} />
         </div>
@@ -80,7 +80,7 @@ export default function ClientDetailPage() {
         </div>
       )}
 
-      <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: 24 }}>
+      <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: "20px 16px" }}>
         <div style={{ display: "flex", gap: 2, borderBottom: "1px solid var(--hf-border)", marginBottom: 28, overflowX: "auto" }}>
           {TABS.map(t => {
             const Icon = t.icon

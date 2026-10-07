@@ -119,4 +119,19 @@ class ClientTenderPersonnelServiceTest {
         assertThat(results.get(0).employeeFound()).isFalse();
         assertThat(results.get(0).role()).isEqualTo("Site Agent");
     }
+
+    @Test
+    @DisplayName("addPersonnel refuses the same employee in the same role twice, and allows a second role")
+    void addPersonnel_duplicate_refused() {
+        UUID tenderId = UUID.randomUUID();
+        UUID employeeId = UUID.randomUUID();
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(sampleTender(UUID.randomUUID())));
+        when(hrFacade.findEmployeeById(TENANT, employeeId)).thenReturn(Optional.of(employee(employeeId, "Thabo Mokoena", "EMP-0042")));
+        when(personnelRepository.findByTender(TENANT, tenderId))
+                .thenReturn(List.of(ClientTenderPersonnel.create(TENANT, tenderId, employeeId, "Project Manager", USER)));
+
+        assertThatThrownBy(() -> service().addPersonnel(TENANT, tenderId, new AddClientTenderPersonnelRequest(employeeId, " project manager "), USER))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("already on this tender");
+        assertThat(service().addPersonnel(TENANT, tenderId, new AddClientTenderPersonnelRequest(employeeId, "Site Agent"), USER).role()).isEqualTo("Site Agent");
+    }
 }

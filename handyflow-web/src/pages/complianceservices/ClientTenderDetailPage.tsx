@@ -12,6 +12,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import TenderReadinessPanel from "../businessreadiness/TenderReadinessPanel"
+import Chip from "../../components/ui/Chip"
+import LookupInput from "../../components/ui/LookupInput"
+import { PERSONNEL_ROLES } from "../../lookups/southAfrica"
+import { countdown, stepper } from "../compliancetender/tendersView.logic"
 import EmployeePicker, { type EmployeeOption } from "../training/EmployeePicker"
 import {
   ArrowLeft, Briefcase, Download, Plus, Trash2, X, AlertCircle,
@@ -176,7 +180,7 @@ export default function ClientTenderDetailPage() {
 
   const cfg = STATUS_CFG[tender.status] ?? STATUS_CFG.DRAFT
   const nextStates = TRANSITIONS[tender.status] ?? []
-  const inp: React.CSSProperties = { padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box" as const }
+  const inp: React.CSSProperties = { padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box" as const, background: "var(--hf-surface)", color: "var(--hf-text)" }
 
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
@@ -201,6 +205,34 @@ export default function ClientTenderDetailPage() {
           style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-surface)", color: ACCENT_TEXT, border: "1px solid var(--hf-border)", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Download size={14} /> Export PDF
         </button>
+      </div>
+
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "stretch", marginBottom: 20 }}>
+        <div aria-label="Tender progress" style={{ flex: "2 1 420px", display: "flex", alignItems: "center", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "14px 18px", gap: 6, overflowX: "auto" }}>
+          {stepper(tender.status).map((st, i, arr) => (
+            <div key={st.label} style={{ display: "flex", alignItems: "center", flex: i < arr.length - 1 ? "1 1 0" : "0 0 auto", gap: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 22, height: 22, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800,
+                  background: st.state === "todo" ? "var(--hf-surface-sunken)" : st.state === "current" ? ACCENT : "var(--hf-success-soft-strong)",
+                  color: st.state === "todo" ? "var(--hf-text-faint)" : st.state === "current" ? "var(--hf-text-on-solid)" : "var(--hf-success-text-strong)" }}>
+                  {st.state === "done" ? "✓" : i + 1}
+                </span>
+                <span style={{ fontSize: 12, fontWeight: st.state === "current" ? 700 : 500, color: st.state === "todo" ? "var(--hf-text-faint)" : "var(--hf-text)", whiteSpace: "nowrap" }}>{st.label}</span>
+              </div>
+              {i < arr.length - 1 && <div style={{ flex: 1, height: 2, minWidth: 12, background: st.state === "done" ? "var(--hf-success-text-strong)" : "var(--hf-border)" }} />}
+            </div>
+          ))}
+        </div>
+        {(() => {
+          const cd = countdown(tender, new Date())
+          return (
+            <div style={{ flex: "1 1 200px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "12px 18px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 6 }}>
+              <div style={{ fontSize: 11, color: "var(--hf-text-faint)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Closing</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "var(--hf-text)" }}>{fmtDate(tender.closingDate)}</div>
+              {cd && <div><Chip tone={cd.tone}>{cd.text}</Chip></div>}
+            </div>
+          )
+        })()}
       </div>
 
       {canManage && nextStates.length > 0 && (
@@ -228,7 +260,7 @@ export default function ClientTenderDetailPage() {
       )}
 
       <Section title="Tender Details">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 16 }}>
           <Field l="Tender Authority" v={tender.tenderAuthority || "—"} />
           <Field l="Authority Reference" v={tender.authorityReferenceNumber || "—"} />
           <Field l="Estimated Value" v={fmtZar(tender.estimatedValue)} />
@@ -322,7 +354,7 @@ export default function ClientTenderDetailPage() {
             <div style={{ flex: 2 }}>
               <EmployeePicker value={pickedEmployee} onChange={setPickedEmployee} />
             </div>
-            <input value={personnelRole} onChange={e => setPersonnelRole(e.target.value)} placeholder="Role on tender, e.g. Project Manager" style={{ ...inp, flex: 1 }} />
+            <LookupInput value={personnelRole} options={PERSONNEL_ROLES} onChange={setPersonnelRole} placeholder="Role on tender, e.g. Project Manager" style={{ ...inp, flex: 1 }} />
             <button onClick={() => pickedEmployee && personnelRole.trim() && addPersonnel.mutate()}
               disabled={!pickedEmployee || !personnelRole.trim() || addPersonnel.isPending}
               style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 14px", background: (!pickedEmployee || !personnelRole.trim()) ? "var(--hf-border-strong)" : ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (!pickedEmployee || !personnelRole.trim()) ? "not-allowed" : "pointer" }}>
@@ -367,7 +399,7 @@ export default function ClientTenderDetailPage() {
 
       {showOutcome && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 480, maxWidth: "calc(100vw - 32px)", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Record Outcome — {STATUS_CFG[showOutcome].label}</h3>
               <button onClick={() => { setShowOutcome(null); setApiError("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
@@ -399,13 +431,13 @@ export default function ClientTenderDetailPage() {
 
 function Section({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 24 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+    <section aria-label={title} style={{ marginBottom: 16, background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
         {icon}
         <span style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>{title}</span>
       </div>
       {children}
-    </div>
+    </section>
   )
 }
 function Field({ l, v }: { l: string; v: string }) {

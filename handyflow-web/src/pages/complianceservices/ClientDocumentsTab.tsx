@@ -8,6 +8,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { Upload, FileText, CheckCircle2, Trash2, AlertCircle, BadgeCheck } from "lucide-react"
+import Chip from "../../components/ui/Chip"
+import LookupInput from "../../components/ui/LookupInput"
+import { DOCUMENT_TYPES } from "../../lookups/southAfrica"
+import { documentState } from "../compliancetender/registration.logic"
 
 interface Doc {
   id: string; registrationId: string | null; documentType: string; evidenceId: string
@@ -79,7 +83,7 @@ export default function ClientDocumentsTab({ clientId }: { clientId: string }) {
     onSuccess: () => invalidate(),
   })
 
-  const inp: React.CSSProperties = { padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box" as const }
+  const inp: React.CSSProperties = { padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box" as const, background: "var(--hf-surface)", color: "var(--hf-text)" }
 
   return (
     <div>
@@ -89,7 +93,7 @@ export default function ClientDocumentsTab({ clientId }: { clientId: string }) {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
             <div>
               <label style={lbl}>Document type *</label>
-              <input value={documentType} onChange={e => setDocumentType(e.target.value)} placeholder="e.g. Tax Clearance Certificate" style={{ ...inp, width: 220 }} />
+              <LookupInput value={documentType} options={DOCUMENT_TYPES} onChange={setDocumentType} placeholder="e.g. Tax Clearance Certificate" style={{ ...inp, width: 220 }} />
             </div>
             <div>
               <label style={lbl}>Linked registration</label>
@@ -167,17 +171,9 @@ export default function ClientDocumentsTab({ clientId }: { clientId: string }) {
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                {d.verified ? (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: "1px solid var(--hf-success-border)" }}>
-                    <BadgeCheck size={12} /> Verified
-                  </span>
-                ) : (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "var(--hf-warning-soft)", color: "var(--hf-warning-text)", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: "1px solid var(--hf-warning-border)" }}>
-                    Not verified
-                  </span>
-                )}
+                {(() => { const st = documentState(d, new Date()); return <Chip tone={st.tone} icon={d.verified && st.text.startsWith("Verified") ? <BadgeCheck size={12} /> : undefined}>{st.text}</Chip> })()}
                 {canManage && !d.verified && (
-                  <button onClick={() => verify.mutate(d.id)} title="Mark verified" style={{ background: "var(--hf-success-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-success-text-strong)" }}><CheckCircle2 size={13} /></button>
+                  <button onClick={() => verify.mutate(d.id)} title="Mark verified" aria-label="Mark verified" style={{ display: "inline-flex", alignItems: "center", background: "var(--hf-success-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-success-text-strong)" }}><CheckCircle2 size={13} /> <span style={{ marginLeft: 4, fontSize: 12, fontWeight: 700 }}>Verify</span></button>
                 )}
                 {canAdmin && (
                   <button onClick={() => { if (confirm(`Delete "${d.documentType}"?`)) remove.mutate(d.id) }} title="Delete" style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>

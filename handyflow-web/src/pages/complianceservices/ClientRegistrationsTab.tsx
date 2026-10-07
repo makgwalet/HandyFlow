@@ -8,7 +8,12 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
-import { Plus, ShieldCheck, ChevronDown, ChevronUp, X, Edit2, Trash2, AlertCircle, Clock } from "lucide-react"
+import { Plus, ShieldCheck, ShieldAlert, ShieldX, Layers, ChevronDown, ChevronUp, X, Edit2, Trash2, AlertCircle, Clock } from "lucide-react"
+import Chip from "../../components/ui/Chip"
+import StatTile from "../../components/ui/StatTile"
+import LookupInput from "../../components/ui/LookupInput"
+import { REGISTRATION_AUTHORITIES, registrationTypesFor } from "../../lookups/southAfrica"
+import { effectiveStatus, expiryChip, validateRegistration } from "../compliancetender/registration.logic"
 
 interface Registration {
   id: string; authority: string; registrationType: string; registrationNumber: string | null
@@ -16,7 +21,7 @@ interface Registration {
   expiringSoon: boolean; createdAt: string
 }
 
-const AUTHORITIES = ["CIPC", "SARS", "UIF", "PSIRA", "CSD", "CIDB", "NHBRC", "OTHER"]
+const AUTHORITIES = REGISTRATION_AUTHORITIES
 const STATUSES = ["ACTIVE", "EXPIRED", "LAPSED", "PENDING", "NOT_APPLICABLE"]
 const ACCENT = "var(--hf-success-solid-strong)"
 const ACCENT_TEXT = "var(--hf-success-text-strong)";
@@ -74,9 +79,7 @@ export default function ClientRegistrationsTab({ clientId }: { clientId: string 
   })
 
   const validate = () => {
-    const errs: Record<string, string> = {}
-    if (!form.registrationType.trim()) errs.registrationType = "Registration type is required"
-    if (form.expiryDate && form.issuedDate && form.expiryDate < form.issuedDate) errs.expiryDate = "Expiry date cannot be before issued date"
+    const errs = validateRegistration({ ...form, status: editing ? form.status : "ACTIVE" }, new Date())
     setFieldErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -92,17 +95,18 @@ export default function ClientRegistrationsTab({ clientId }: { clientId: string 
 
   const filtered = filterAuthority === "ALL" ? registrations : registrations.filter(r => r.authority === filterAuthority)
 
+  const now = new Date()
   const stats = [
-    { label: "Total",         value: registrations.length,                                    color: ACCENT_TEXT },
-    { label: "Active",        value: registrations.filter(r => r.status === "ACTIVE").length,  color: "var(--hf-success-text-strong)" },
-    { label: "Expiring Soon", value: registrations.filter(r => r.expiringSoon).length,          color: "var(--hf-warning-text)" },
-    { label: "Expired",       value: registrations.filter(r => r.status === "EXPIRED").length,  color: "var(--hf-danger-text)" },
+    registrations.length,
+    registrations.filter(r => effectiveStatus(r, now) === "ACTIVE").length,
+    registrations.filter(r => r.expiringSoon && effectiveStatus(r, now) === "ACTIVE").length,
+    registrations.filter(r => effectiveStatus(r, now) === "EXPIRED").length,
   ]
 
   const inp = (k: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
     border: `1.5px solid ${fieldErrors[k] ? "var(--hf-danger)" : "var(--hf-border)"}`,
-    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
+    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", color: "var(--hf-text)", outline: "none",
   })
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
     <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
@@ -120,13 +124,11 @@ export default function ClientRegistrationsTab({ clientId }: { clientId: string 
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
-        {stats.map(s => (
-          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
-          </div>
-        ))}
+      <div style={{ display: "flex", gap: 12, marginBottom: 22, flexWrap: "wrap" }}>
+        <StatTile label="Total registrations" value={stats[0]} icon={<Layers size={18} />} tone="info" />
+        <StatTile label="Active" value={stats[1]} icon={<ShieldCheck size={18} />} tone="ok" />
+        <StatTile label="Expiring soon" value={stats[2]} icon={<ShieldAlert size={18} />} tone={stats[2] > 0 ? "warn" : "neutral"} />
+        <StatTile label="Expired" value={stats[3]} icon={<ShieldX size={18} />} tone={stats[3] > 0 ? "bad" : "neutral"} />
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
@@ -159,7 +161,7 @@ export default function ClientRegistrationsTab({ clientId }: { clientId: string 
           {filtered.map(r => {
             const isOpen = expanded === r.id
             return (
-              <div key={r.id} style={{ border: `1px solid ${r.status === "EXPIRED" ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 12, overflow: "hidden" }}>
+              <div key={r.id} style={{ border: `1px solid ${effectiveStatus(r, now) === "EXPIRED" ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 12, overflow: "hidden" }}>
                 <div style={{ padding: "16px 20px", background: "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
                     <div style={{ width: 44, height: 44, borderRadius: 10, background: "var(--hf-success-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -176,7 +178,8 @@ export default function ClientRegistrationsTab({ clientId }: { clientId: string 
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-                    <StatusBadge status={r.status} expiringSoon={r.expiringSoon} />
+                    {r.expiryDate && effectiveStatus(r, now) !== "NOT_APPLICABLE" && (() => { const c = expiryChip(r.expiryDate, now); return <Chip tone={c.tone}>{c.text}</Chip> })()}
+                    <StatusBadge status={effectiveStatus(r, now)} expiringSoon={r.expiringSoon} />
                     {canManage && (
                       <div style={{ display: "flex", gap: 5 }}>
                         <button onClick={() => openEdit(r)} title="Edit" style={{ background: "var(--hf-success-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: ACCENT_TEXT }}><Edit2 size={13} /></button>
@@ -215,7 +218,7 @@ export default function ClientRegistrationsTab({ clientId }: { clientId: string 
 
       {(showAdd || editing) && (
         <div onClick={() => { setShowAdd(false); setEditing(null); setApiError("") }} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 560, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 560, maxWidth: "calc(100vw - 32px)", maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{editing ? `Edit — ${editing.authority} ${editing.registrationType}` : "New Compliance Registration"}</h3>
               <button onClick={() => { setShowAdd(false); setEditing(null); setApiError("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
@@ -233,14 +236,14 @@ export default function ClientRegistrationsTab({ clientId }: { clientId: string 
               </div>
               <div>
                 <label style={lbl}>Registration type *</label>
-                <input value={form.registrationType} onChange={e => { setForm(f => ({ ...f, registrationType: e.target.value })); setFieldErrors(f => { const n = { ...f }; delete n.registrationType; return n }) }} placeholder="e.g. Business Registration" style={inp("registrationType")} disabled={!!editing} />
+                <LookupInput value={form.registrationType} options={registrationTypesFor(form.authority)} onChange={v => { setForm(f => ({ ...f, registrationType: v })); setFieldErrors(f => { const n = { ...f }; delete n.registrationType; return n }) }} placeholder="e.g. Business Registration" style={inp("registrationType")} disabled={!!editing} />
                 <FErr k="registrationType" />
               </div>
             </div>
             {editing && (
               <div style={{ marginBottom: 14 }}>
                 <label style={lbl}>Status</label>
-                <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={{ ...inp("status"), background: "var(--hf-surface)" }}>
+                <select value={form.status} onChange={e => { setForm(f => ({ ...f, status: e.target.value })); setFieldErrors(f => { const n = { ...f }; delete n.expiryDate; return n }) }} style={{ ...inp("status"), background: "var(--hf-surface)" }}>
                   {STATUSES.map(s => <option key={s} value={s}>{STATUS_CFG[s]?.label ?? s}</option>)}
                 </select>
               </div>

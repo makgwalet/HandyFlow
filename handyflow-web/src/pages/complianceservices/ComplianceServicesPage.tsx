@@ -20,7 +20,8 @@ import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
-import { Plus, Building2, X, AlertCircle, ChevronRight, Ban, CheckCircle2 } from "lucide-react"
+import { Plus, Building2, X, AlertCircle, ChevronRight, Ban, CheckCircle2, Search, Users, UserX } from "lucide-react"
+import StatTile from "../../components/ui/StatTile"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { COMPLIANCE_SERVICES_SECTIONS } from "../../navigation/moduleSections"
 
@@ -44,6 +45,7 @@ export default function ComplianceServicesPage() {
   const canAdmin = usePermission("COMPLIANCE_SERVICES_ADMIN")
 
   const [filterStatus, setFilterStatus] = useState("ALL")
+  const [search, setSearch] = useState("")
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -55,6 +57,13 @@ export default function ComplianceServicesPage() {
       `/api/v1/compliance-services/clients?size=200${filterStatus !== "ALL" ? `&status=${filterStatus}` : ""}`
     )),
   })
+
+  const { data: allClients = [] } = useQuery<Client[]>({
+    queryKey: ["cs-clients", "ALL"],
+    queryFn: async () => unwrap(await apiClient.get("/api/v1/compliance-services/clients?size=200")),
+  })
+  const q = search.trim().toLowerCase()
+  const shownClients = q ? clients.filter(c => [c.name, c.contactEmail ?? "", c.crmCustomerName ?? ""].some(v => v.toLowerCase().includes(q))) : clients
 
   const { data: crmCustomers = [] } = useQuery<CrmCustomerOption[]>({
     queryKey: ["crm-customers-for-picker"],
@@ -93,7 +102,7 @@ export default function ComplianceServicesPage() {
   const inp = (k: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
     border: `1.5px solid ${fieldErrors[k] ? "var(--hf-danger)" : "var(--hf-border)"}`,
-    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
+    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", color: "var(--hf-text)", outline: "none",
   })
 
   return (
@@ -103,7 +112,18 @@ export default function ComplianceServicesPage() {
         switch (id) {
           case "clients": return (
             <>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
+                <StatTile label="Clients" value={allClients.length} icon={<Building2 size={18} />} tone="info" />
+                <StatTile label="Active" value={allClients.filter(c => c.status === "ACTIVE").length} icon={<Users size={18} />} tone="ok" />
+                <StatTile label="Inactive" value={allClients.filter(c => c.status !== "ACTIVE").length} icon={<UserX size={18} />} />
+              </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", flex: "1 1 320px" }}>
+                <div style={{ position: "relative", flex: "1 1 220px", maxWidth: 320 }}>
+                  <Search size={14} style={{ position: "absolute", left: 11, top: 11, color: "var(--hf-text-faint)" }} />
+                  <input aria-label="Search clients" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name or email"
+                    style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px 8px 32px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", outline: "none" }} />
+                </div>
                 <div style={{ display: "flex", gap: 6 }}>
                   {["ALL", "ACTIVE", "INACTIVE"].map(s => (
                     <button key={s} onClick={() => setFilterStatus(s)}
@@ -112,6 +132,7 @@ export default function ComplianceServicesPage() {
                       {s === "ALL" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
                     </button>
                   ))}
+                </div>
                 </div>
                 {canManage && (
                   <button onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("") }}
@@ -123,14 +144,14 @@ export default function ComplianceServicesPage() {
 
               {isLoading ? (
                 <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading clients...</div>
-              ) : clients.length === 0 ? (
+              ) : shownClients.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
                   <Building2 size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-                  <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No clients yet</div>
+                  <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>{q ? "No client matches your search" : "No clients yet"}</div>
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {clients.map(c => (
+                  {shownClients.map(c => (
                     <div key={c.id} onClick={() => nav(`/complianceservices/clients/${c.id}`)}
                       style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, border: "1px solid var(--hf-border)", borderRadius: 10, padding: "14px 18px", background: c.status === "INACTIVE" ? "var(--hf-surface-muted)" : "var(--hf-surface)", cursor: "pointer" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>

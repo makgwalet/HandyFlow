@@ -7,6 +7,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { Plus, CalendarClock, CheckCircle2, Trash2, AlertCircle, X } from "lucide-react"
+import Chip from "../../components/ui/Chip"
+import StatTile from "../../components/ui/StatTile"
+import LookupInput from "../../components/ui/LookupInput"
+import { DEADLINE_TYPES } from "../../lookups/southAfrica"
+import { deadlineChip } from "../compliancetender/registration.logic"
 
 interface Deadline {
   id: string; registrationId: string | null; deadlineType: string; description: string | null
@@ -65,7 +70,7 @@ export default function ClientDeadlinesTab({ clientId }: { clientId: string }) {
   const inp = (k: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
     border: `1.5px solid ${fieldErrors[k] ? "var(--hf-danger)" : "var(--hf-border)"}`,
-    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
+    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", color: "var(--hf-text)", outline: "none",
   })
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
     <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
@@ -79,6 +84,11 @@ export default function ClientDeadlinesTab({ clientId }: { clientId: string }) {
 
   return (
     <div>
+      <div style={{ display: "flex", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+        <StatTile label="Overdue" value={overdue.length} icon={<AlertCircle size={18} />} tone={overdue.length > 0 ? "bad" : "neutral"} />
+        <StatTile label="Due soon" value={dueSoon.length} icon={<CalendarClock size={18} />} tone={dueSoon.length > 0 ? "warn" : "neutral"} />
+        <StatTile label="Upcoming" value={upcoming.length} icon={<CheckCircle2 size={18} />} tone="ok" />
+      </div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
         {canManage && (
           <button onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("") }}
@@ -113,7 +123,8 @@ export default function ClientDeadlinesTab({ clientId }: { clientId: string }) {
                         Due {fmtDate(d.dueDate)}{d.description ? ` · ${d.description}` : ""}
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
+                      {(() => { const c = deadlineChip(d.dueDate, new Date()); return <Chip tone={c.tone}>{c.text}</Chip> })()}
                       {canManage && (
                         <button onClick={() => markDone.mutate(d.id)} title="Mark done" style={{ background: "var(--hf-success-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-success-text-strong)" }}><CheckCircle2 size={13} /></button>
                       )}
@@ -131,14 +142,14 @@ export default function ClientDeadlinesTab({ clientId }: { clientId: string }) {
 
       {showAdd && (
         <div onClick={() => { setShowAdd(false); setApiError("") }} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 480, maxWidth: "calc(100vw - 32px)", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>New Compliance Deadline</h3>
               <button onClick={() => { setShowAdd(false); setApiError("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Deadline type *</label>
-              <input value={form.deadlineType} onChange={e => { setForm(f => ({ ...f, deadlineType: e.target.value })); setFieldErrors(f => { const n = { ...f }; delete n.deadlineType; return n }) }} placeholder="e.g. ANNUAL_RETURN" style={inp("deadlineType")} />
+              <LookupInput value={form.deadlineType} options={DEADLINE_TYPES} onChange={v => { setForm(f => ({ ...f, deadlineType: v })); setFieldErrors(f => { const n = { ...f }; delete n.deadlineType; return n }) }} placeholder="e.g. ANNUAL_RETURN" style={inp("deadlineType")} />
               <FErr k="deadlineType" />
             </div>
             <div style={{ marginBottom: 14 }}>

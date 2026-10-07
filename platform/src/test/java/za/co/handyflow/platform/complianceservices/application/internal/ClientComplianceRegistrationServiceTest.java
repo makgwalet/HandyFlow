@@ -9,9 +9,13 @@ import za.co.handyflow.platform.complianceservices.domain.model.ComplianceClient
 import za.co.handyflow.platform.complianceservices.domain.repository.ClientComplianceRegistrationRepository;
 import za.co.handyflow.platform.complianceservices.domain.repository.ComplianceClientRepository;
 import za.co.handyflow.platform.complianceservices.dto.CreateClientComplianceRegistrationRequest;
+import za.co.handyflow.platform.complianceservices.domain.model.ClientComplianceRegistration;
+import za.co.handyflow.platform.complianceservices.dto.UpdateClientComplianceRegistrationRequest;
+import za.co.handyflow.platform.shared.BusinessException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -75,5 +79,41 @@ class ClientComplianceRegistrationServiceTest {
 
         assertThatThrownBy(() -> service().getRegistrations(TENANT, clientId))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("create() records a registration whose expiry has passed as Expired, not Active")
+    void create_pastExpiry_isExpired() {
+        UUID clientId = UUID.randomUUID();
+        ComplianceClient client = ComplianceClient.create(TENANT, "Acme Construction", null, null, null, null, USER);
+        when(clientRepository.findByIdForTenant(TENANT, clientId)).thenReturn(Optional.of(client));
+
+        var req = new CreateClientComplianceRegistrationRequest("NHBRC", "Home Builder Registration", "N1", null, LocalDate.now().minusDays(5), null);
+        assertThat(service().create(TENANT, clientId, req, USER).status()).isEqualTo("EXPIRED");
+    }
+
+    @Test
+    @DisplayName("create() keeps a registration that expires today Active")
+    void create_expiresToday_staysActive() {
+        UUID clientId = UUID.randomUUID();
+        ComplianceClient client = ComplianceClient.create(TENANT, "Acme Construction", null, null, null, null, USER);
+        when(clientRepository.findByIdForTenant(TENANT, clientId)).thenReturn(Optional.of(client));
+
+        var req = new CreateClientComplianceRegistrationRequest("CSD", "Supplier Registration", "S1", null,
+                LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg")), null);
+        assertThat(service().create(TENANT, clientId, req, USER).status()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    @DisplayName("update() refuses Active with a past expiry, and allows Expired")
+    void update_activeWithPastExpiry_refused() {
+        UUID id = UUID.randomUUID();
+        ClientComplianceRegistration existing = ClientComplianceRegistration.create(TENANT, UUID.randomUUID(), "CIPC", "Business Registration", "1", null, null, null, USER);
+        when(registrationRepository.findByIdForTenant(TENANT, id)).thenReturn(Optional.of(existing));
+        LocalDate past = LocalDate.now().minusDays(3);
+
+        assertThatThrownBy(() -> service().update(TENANT, id, new UpdateClientComplianceRegistrationRequest("1", "ACTIVE", null, past, null), USER))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("cannot be Active");
+        assertThat(service().update(TENANT, id, new UpdateClientComplianceRegistrationRequest("1", "EXPIRED", null, past, null), USER).status()).isEqualTo("EXPIRED");
     }
 }

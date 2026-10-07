@@ -48,6 +48,10 @@ public class ClientTenderPersonnelService {
                         "No HR employee found with id " + req.employeeId() + " — add them in HR first",
                         HttpStatus.BAD_REQUEST, "EMPLOYEE_NOT_FOUND"));
 
+        boolean duplicate = personnelRepository.findByTender(tenantId, clientTenderId).stream()
+                .anyMatch(p -> p.getEmployeeId().equals(req.employeeId()) && p.getRole().equalsIgnoreCase(req.role().trim()));
+        if (duplicate) throw new IllegalStateException(employee.fullName() + " is already on this tender as " + req.role().trim() + ".");
+
         ClientTenderPersonnel personnel = ClientTenderPersonnel.create(tenantId, clientTenderId, req.employeeId(),
                 req.role(), createdBy);
         personnelRepository.save(personnel);
