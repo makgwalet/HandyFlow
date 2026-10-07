@@ -786,6 +786,37 @@ class ClinicServiceTest {
             assertThat(result.nappiCode()).isEqualTo("700000");
             assertThat(result.schedule()).isEqualTo(2);
         }
+
+        @Test
+        @DisplayName("a saved prescription is put on the patient's medicine list")
+        void addsToMedicineList() {
+            var consultId = UUID.randomUUID();
+            var patientId = UUID.randomUUID();
+            var consult   = ClinicConsultation.create(TENANT, patientId, null, null, "Infection");
+            when(consultationRepo.findActiveById(TENANT, consultId)).thenReturn(Optional.of(consult));
+
+            service.addPrescription(TENANT, consultId,
+                    new AddPrescriptionRequest("Amoxicillin", "500mg", "TDS", "7 days", 21, 0, null, "700000", 2));
+
+            verify(patientClinicalService).recordPrescribed(eq(TENANT), eq(patientId), any(),
+                    eq("Amoxicillin"), eq("700000"), eq("500mg"), eq("TDS"));
+        }
+
+        @Test
+        @DisplayName("a prescription refused for an allergy match is not put on the medicine list")
+        void refusedNotListed() {
+            var consultId = UUID.randomUUID();
+            var consult   = ClinicConsultation.create(TENANT, UUID.randomUUID(), null, null, "Infection");
+            when(consultationRepo.findActiveById(TENANT, consultId)).thenReturn(Optional.of(consult));
+            when(prescribingSafety.allergyAlerts(eq(TENANT), any(), any())).thenReturn(List.of(
+                    new za.co.handyflow.platform.clinic.dto.AllergyCheckResponse.Alert("Penicillin", "SEVERE", null)));
+
+            assertThatThrownBy(() -> service.addPrescription(TENANT, consultId,
+                    new AddPrescriptionRequest("Penicillin V", "250mg", "QID", "5 days", 20, 0, null)))
+                    .isInstanceOf(za.co.handyflow.platform.shared.ConflictException.class);
+
+            verifyNoInteractions(patientClinicalService);
+        }
     }
 
     @Nested

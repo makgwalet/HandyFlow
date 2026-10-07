@@ -743,6 +743,8 @@ public class ClinicService {
             p.recordAllergyOverride(reason, summary);
         }
         prescriptionRepo.save(p);
+        patientClinicalService.recordPrescribed(tenantId, c.getPatientId(), p.getId(),
+                p.getMedicationName(), p.getNappiCode(), p.getDosage(), p.getFrequency());
         return toPrescriptionResponse(p);
     }
 

@@ -175,4 +175,51 @@ class ClinicPatientClinicalServiceTest {
         assertThat(rows).anyMatch(a -> a.getAllergen().equals("Peanuts") && a.isActive());
         assertThat(p.getAllergies()).containsExactlyInAnyOrder("Penicillin", "Peanuts");
     }
+
+    @Test
+    @DisplayName("recordPrescribed lists a prescribed medicine as PRESCRIBED_HERE with the prescription id")
+    void recordPrescribedAdds() {
+        var pid = UUID.randomUUID(); var rxId = UUID.randomUUID();
+        when(medicationRepo.findByPatient(TENANT, pid)).thenReturn(List.of());
+
+        service.recordPrescribed(TENANT, pid, rxId, " Amoxicillin 500mg ", " 700000 ", "500mg", " ");
+
+        verify(medicationRepo).save(argThat(m -> "Amoxicillin 500mg".equals(m.getMedicineName())
+                && "PRESCRIBED_HERE".equals(m.getSource()) && rxId.equals(m.getPrescriptionId())
+                && "700000".equals(m.getNappiCode()) && m.getFrequency() == null && m.isActive()));
+    }
+
+    @Test
+    @DisplayName("recordPrescribed does not duplicate: same prescription, or the same medicine already active")
+    void recordPrescribedSkipsDuplicates() {
+        var pid = UUID.randomUUID(); var rxId = UUID.randomUUID();
+        var existing = ClinicPatientMedication.create(TENANT, pid, "Amoxicillin 500mg", null, null, null,
+                "PATIENT_REPORTED", null, null, null, null);
+        when(medicationRepo.findByPatient(TENANT, pid)).thenReturn(List.of(existing));
+
+        service.recordPrescribed(TENANT, pid, rxId, "amoxicillin 500MG", null, null, null);
+
+        verify(medicationRepo, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("recordPrescribed lists the medicine again once the earlier entry was stopped")
+    void recordPrescribedAfterStopped() {
+        var pid = UUID.randomUUID();
+        var stopped = ClinicPatientMedication.create(TENANT, pid, "Amoxicillin", null, null, null,
+                "PATIENT_REPORTED", null, null, null, null);
+        stopped.update(null, null, "STOPPED", null, null, null);
+        when(medicationRepo.findByPatient(TENANT, pid)).thenReturn(List.of(stopped));
+
+        service.recordPrescribed(TENANT, pid, UUID.randomUUID(), "Amoxicillin", null, null, null);
+
+        verify(medicationRepo).save(any());
+    }
+
+    @Test
+    @DisplayName("recordPrescribed ignores a blank medicine name")
+    void recordPrescribedBlank() {
+        service.recordPrescribed(TENANT, UUID.randomUUID(), UUID.randomUUID(), "  ", null, null, null);
+        verifyNoInteractions(medicationRepo);
+    }
 }

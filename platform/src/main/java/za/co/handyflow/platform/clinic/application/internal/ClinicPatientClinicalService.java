@@ -137,6 +137,25 @@ public class ClinicPatientClinicalService {
         return toResponse(m);
     }
 
+    /**
+     * Puts a prescribed medicine on the patient's medicine list, labelled PRESCRIBED_HERE. A prescription is what was
+     * ordered, not proof the patient takes it. Skipped when this prescription is already listed, or when the same
+     * medicine name is already an active entry (so repeat prescribing does not fill the list with duplicates).
+     */
+    @Transactional
+    public void recordPrescribed(TenantId t, UUID patientId, UUID prescriptionId, String medicineName,
+                                 String nappiCode, String dose, String frequency) {
+        String name = clean(medicineName);
+        if (name == null) return;
+        var existing = medicationRepo.findByPatient(t, patientId);
+        boolean listed = existing.stream().anyMatch(m ->
+                (prescriptionId != null && prescriptionId.equals(m.getPrescriptionId()))
+                        || (m.isActive() && m.getMedicineName() != null && m.getMedicineName().equalsIgnoreCase(name)));
+        if (listed) return;
+        medicationRepo.save(ClinicPatientMedication.create(t, patientId, name, clean(nappiCode), clean(dose),
+                clean(frequency), "PRESCRIBED_HERE", java.time.LocalDate.now(), prescriptionId, null, currentUserOrNull()));
+    }
+
     @Transactional
     public MedicationResponse updateMedication(TenantId t, UUID patientId, UUID id, MedicationRequest req) {
         requirePatient(t, patientId);
