@@ -15,6 +15,7 @@
 // Everything else in this file is unchanged from the original.
 
 import { useState } from "react"
+import { Link } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import {
@@ -338,7 +339,7 @@ export default function SitesTab() {
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 3 }}>
-                      <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{site.name}</span>
+                      <Link to={`/security/sites/${site.id}`} onClick={e => e.stopPropagation()} style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)", textDecoration: "none" }}>{site.name}</Link>
                       <span style={{ fontSize: 11, fontWeight: 600, background: contract.bg, color: contract.color, padding: "2px 8px", borderRadius: 20 }}>
                         {contract.label}
                       </span>
