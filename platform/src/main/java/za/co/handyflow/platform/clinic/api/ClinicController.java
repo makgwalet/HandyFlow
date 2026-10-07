@@ -242,7 +242,7 @@ public class ClinicController {
 
     @PostMapping("/consultations/{id}/sign")
     @PreAuthorize("hasAuthority('CLINIC_WRITE')")
-    @Operation(summary = "Sign a DRAFT consultation: completes the appointment and emails the visit summary")
+    @Operation(summary = "Sign a DRAFT consultation: completes the appointment (no automatic email, see DEC-CLINIC-002)")
     public ResponseEntity<ApiResponse<ConsultationResponse>> signConsultation(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Consultation signed",
                 clinicService.signConsultation(TenantContext.getTenantIdAsObject(), id)));

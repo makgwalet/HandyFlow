@@ -262,7 +262,19 @@ public class ClinicService {
         }
     }
 
+    /**
+     * DEC-CLINIC-002: signing a consultation does NOT email the visit summary. Email is a
+     * deliberate, consent-gated delivery action (not built yet), so this stays off unless
+     * explicitly enabled with handyflow.clinic.visit-summary-email.enabled=true.
+     */
+    @org.springframework.beans.factory.annotation.Value("${handyflow.clinic.visit-summary-email.enabled:false}")
+    private boolean visitSummaryEmailEnabled;
+
     private void sendVisitSummaryEmail(TenantId tenantId, ClinicConsultation c, ClinicPatient patient) {
+        if (!visitSummaryEmailEnabled) {
+            log.debug("Visit summary email disabled (DEC-CLINIC-002); consultation={}", c.getId());
+            return;
+        }
         try {
             if (patient.getEmail() == null || patient.getEmail().isBlank()) {
                 return;
