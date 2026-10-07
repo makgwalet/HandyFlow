@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { usePermission } from "../../hooks/usePermission"
 import {
   Mic, MicOff, Plus, X, Clock, Stethoscope, CreditCard, Pill,
   Syringe, FlaskConical, Scissors, ChevronDown, CheckCircle,
@@ -183,6 +184,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
     onCancel()
   }
   // Nurse hands the consultation to a doctor: flush the latest notes, then hand over.
+  const canHandoff = usePermission("CLINIC_CLINICAL_WRITE")
   const [handoffBusy, setHandoffBusy] = useState(false)
   const [handoffError, setHandoffError] = useState("")
   const sendToDoctor = async () => {
@@ -449,13 +451,13 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
             <div style={{ fontSize:18, fontWeight:800, color:"var(--hf-text-on-solid)" }}>{fmtR(billTotal)}</div>
           </div>
 
-          <button onClick={sendToDoctor} disabled={handoffBusy || !draftReady}
+          {canHandoff && <button onClick={sendToDoctor} disabled={handoffBusy || !draftReady}
             title={handoffError || "Hand this consultation to a doctor; it leaves your drafts until returned"}
             style={{ padding:"10px 16px", background:"rgba(255,255,255,0.12)", color:"var(--hf-text-on-solid)",
               border:`1px solid ${handoffError ? "var(--hf-danger)" : "rgba(255,255,255,0.3)"}`, borderRadius:10,
               fontSize:13, fontWeight:700, cursor:"pointer" }}>
             {handoffBusy ? "Sending…" : "Send to doctor"}
-          </button>
+          </button>}
           <button onClick={() => { setShowComplete(true); setCompleteError("") }}
             style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 20px",
               background:TEAL, color:"var(--hf-text-on-solid)", border:"none", borderRadius:10,

@@ -203,7 +203,7 @@ public class ClinicController {
     }
 
     @PostMapping("/patients/{patientId}/consultations")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
     @Operation(summary = "Record a consultation with vitals, clinical notes and diagnosis")
     public ResponseEntity<ApiResponse<ConsultationResponse>> createConsultation(
             @PathVariable UUID patientId,
@@ -213,7 +213,7 @@ public class ClinicController {
     }
 
     @PatchMapping("/consultations/{id}")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
     @Operation(summary = "Partial update of a consultation (autosave target); null fields are left unchanged")
     public ResponseEntity<ApiResponse<ConsultationResponse>> patchConsultation(
             @PathVariable UUID id,
@@ -223,7 +223,7 @@ public class ClinicController {
     }
 
     @PostMapping("/patients/{patientId}/consultations/draft")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
     @Operation(summary = "Start a persisted DRAFT consultation (no appointment completion, no email)")
     public ResponseEntity<ApiResponse<ConsultationResponse>> createDraftConsultation(
             @PathVariable UUID patientId,
@@ -250,7 +250,7 @@ public class ClinicController {
     }
 
     @PostMapping("/consultations/{id}/sign")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_SIGN')")
     @Operation(summary = "Sign a DRAFT consultation: completes the appointment (no automatic email, see DEC-CLINIC-002)")
     public ResponseEntity<ApiResponse<ConsultationResponse>> signConsultation(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Consultation signed",
@@ -258,7 +258,7 @@ public class ClinicController {
     }
 
     @PostMapping("/consultations/{id}/abandon")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
     @Operation(summary = "Abandon a DRAFT consultation")
     public ResponseEntity<ApiResponse<Void>> abandonConsultation(@PathVariable UUID id) {
         clinicService.abandonConsultation(TenantContext.getTenantIdAsObject(), id);
@@ -289,7 +289,7 @@ public class ClinicController {
     // ── Medical Certificate PDF ───────────────────────────────────────────────
 
     @PostMapping("/consultations/{id}/medical-certificate")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_SIGN')")
     @Operation(summary = "Generate a medical certificate PDF for a consultation")
     public ResponseEntity<byte[]> generateMedicalCertificate(
             @PathVariable UUID id,
@@ -308,7 +308,7 @@ public class ClinicController {
     // supplied at generation time, nothing stored).
 
     @PostMapping("/consultations/{id}/referral-letter")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_SIGN')")
     @Operation(summary = "Generate a referral letter PDF for a consultation")
     public ResponseEntity<byte[]> generateReferralLetter(
             @PathVariable UUID id,

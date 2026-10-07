@@ -35,7 +35,7 @@ public class ClinicPatientClinicalController {
     }
 
     @PostMapping("/allergies")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
     @Operation(summary = "Record an allergy")
     public ResponseEntity<ApiResponse<AllergyResponse>> addAllergy(
             @PathVariable UUID patientId, @RequestBody AllergyRequest req) {
@@ -44,7 +44,7 @@ public class ClinicPatientClinicalController {
     }
 
     @PatchMapping("/allergies/{id}")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
     @Operation(summary = "Update an allergy or change its status (RESOLVED, ENTERED_IN_ERROR)")
     public ResponseEntity<ApiResponse<AllergyResponse>> updateAllergy(
             @PathVariable UUID patientId, @PathVariable UUID id, @RequestBody AllergyRequest req) {
@@ -64,7 +64,7 @@ public class ClinicPatientClinicalController {
     }
 
     @PostMapping("/conditions")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
     @Operation(summary = "Record a condition")
     public ResponseEntity<ApiResponse<ConditionResponse>> addCondition(
             @PathVariable UUID patientId, @RequestBody ConditionRequest req) {
@@ -73,7 +73,7 @@ public class ClinicPatientClinicalController {
     }
 
     @PatchMapping("/conditions/{id}")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
     @Operation(summary = "Update a condition or change its status")
     public ResponseEntity<ApiResponse<ConditionResponse>> updateCondition(
             @PathVariable UUID patientId, @PathVariable UUID id, @RequestBody ConditionRequest req) {
@@ -93,7 +93,7 @@ public class ClinicPatientClinicalController {
     }
 
     @PostMapping("/medications")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
     @Operation(summary = "Add a medicine to the patient's medication list")
     public ResponseEntity<ApiResponse<MedicationResponse>> addMedication(
             @PathVariable UUID patientId, @RequestBody MedicationRequest req) {
@@ -102,7 +102,7 @@ public class ClinicPatientClinicalController {
     }
 
     @PatchMapping("/medications/{id}")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
     @Operation(summary = "Update, stop or complete a medication")
     public ResponseEntity<ApiResponse<MedicationResponse>> updateMedication(
             @PathVariable UUID patientId, @PathVariable UUID id, @RequestBody MedicationRequest req) {

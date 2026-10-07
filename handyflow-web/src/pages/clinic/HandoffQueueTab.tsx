@@ -5,6 +5,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { usePermission } from "../../hooks/usePermission"
 
 interface QueueItem {
   id: string; patientName: string; practitionerName?: string; chiefComplaint?: string
@@ -41,6 +42,7 @@ const btn = (primary = false): React.CSSProperties => ({
 
 export default function HandoffQueueTab() {
   const qc = useQueryClient()
+  const canSign = usePermission("CLINIC_CLINICAL_SIGN")  // doctor actions
   const [error, setError] = useState("")
   const [returning, setReturning] = useState<QueueItem | null>(null)
   const [reason, setReason] = useState("MISSING_OBSERVATIONS")
@@ -97,22 +99,22 @@ export default function HandoffQueueTab() {
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {item.status === "READY_FOR_DOCTOR" && (
+              {canSign && item.status === "READY_FOR_DOCTOR" && (
                 <button style={btn(true)} disabled={act.isPending}
                   onClick={() => act.mutate({ id: item.id, path: "accept" })}>Accept</button>
               )}
-              {item.status === "DOCTOR_REVIEWING" && (
+              {canSign && item.status === "DOCTOR_REVIEWING" && (
                 <button style={btn(true)} disabled={act.isPending}
                   onClick={() => act.mutate({ id: item.id, path: "doctor-complete" })}>Finish review</button>
               )}
-              {item.status === "DOCTOR_COMPLETED" && (
+              {canSign && item.status === "DOCTOR_COMPLETED" && (
                 <button style={btn(true)} disabled={act.isPending}
                   onClick={() => { if (window.confirm("Sign this consultation? It will complete the visit.")) act.mutate({ id: item.id, path: "sign" }) }}>
                   Sign</button>
               )}
-              <button style={btn()} disabled={act.isPending}
+              {canSign && <button style={btn()} disabled={act.isPending}
                 onClick={() => { setReturning(item); setReason("MISSING_OBSERVATIONS"); setComment(""); setError("") }}>
-                Return to nurse</button>
+                Return to nurse</button>}
               <button style={btn()} onClick={() => setHistoryFor(historyFor === item.id ? null : item.id)}>
                 {historyFor === item.id ? "Hide history" : "History"}</button>
             </div>

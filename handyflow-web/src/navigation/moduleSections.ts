@@ -556,7 +556,7 @@ export const CLINIC_SECTIONS: ModuleSections = {
       sections: [
         { id: 'patients', label: 'Patients', icon: Users },
         { id: 'consultations', label: 'Consultations', icon: FileText },
-        { id: 'handoff', label: 'Handoff queue', icon: ArrowRightLeft },
+        { id: 'handoff', label: 'Handoff queue', icon: ArrowRightLeft, permission: 'CLINIC_CLINICAL_WRITE' },
         { id: 'recalls', label: 'Recalls', icon: CalendarClock },
         { id: 'waitlist', label: 'Waitlist', icon: ListPlus },
       ],

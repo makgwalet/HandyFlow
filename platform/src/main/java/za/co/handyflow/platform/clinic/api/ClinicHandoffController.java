@@ -29,7 +29,7 @@ public class ClinicHandoffController {
     private final ClinicService        clinicService;
 
     @PostMapping("/{id}/start-nurse-work")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
     @Operation(summary = "Mark a DRAFT as nurse-led work (NURSE_IN_PROGRESS)")
     public ResponseEntity<ApiResponse<ConsultationResponse>> startNurseWork(@PathVariable UUID id) {
         TenantId t = TenantContext.getTenantIdAsObject();
@@ -37,7 +37,7 @@ public class ClinicHandoffController {
     }
 
     @PostMapping("/{id}/send-to-doctor")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
     @Operation(summary = "Nurse hands over to the doctor (READY_FOR_DOCTOR); needs chief complaint and a vital sign")
     public ResponseEntity<ApiResponse<ConsultationResponse>> sendToDoctor(
             @PathVariable UUID id, @RequestBody(required = false) SendToDoctorRequest body) {
@@ -46,7 +46,7 @@ public class ClinicHandoffController {
     }
 
     @PostMapping("/{id}/accept")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_SIGN')")
     @Operation(summary = "Doctor accepts the handoff (DOCTOR_REVIEWING)")
     public ResponseEntity<ApiResponse<ConsultationResponse>> accept(
             @PathVariable UUID id, @RequestBody(required = false) AcceptHandoffRequest body) {
@@ -55,7 +55,7 @@ public class ClinicHandoffController {
     }
 
     @PostMapping("/{id}/return-to-nurse")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_SIGN')")
     @Operation(summary = "Doctor returns the consultation to the nurse; reasonCode and comment required")
     public ResponseEntity<ApiResponse<ConsultationResponse>> returnToNurse(
             @PathVariable UUID id, @RequestBody ReturnToNurseRequest body) {
@@ -64,7 +64,7 @@ public class ClinicHandoffController {
     }
 
     @PostMapping("/{id}/resume-nurse-work")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
     @Operation(summary = "Nurse resumes a returned consultation")
     public ResponseEntity<ApiResponse<ConsultationResponse>> resume(@PathVariable UUID id) {
         TenantId t = TenantContext.getTenantIdAsObject();
@@ -72,7 +72,7 @@ public class ClinicHandoffController {
     }
 
     @PostMapping("/{id}/doctor-complete")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_SIGN')")
     @Operation(summary = "Doctor finishes review (DOCTOR_COMPLETED); signing is a separate step")
     public ResponseEntity<ApiResponse<ConsultationResponse>> doctorComplete(@PathVariable UUID id) {
         TenantId t = TenantContext.getTenantIdAsObject();

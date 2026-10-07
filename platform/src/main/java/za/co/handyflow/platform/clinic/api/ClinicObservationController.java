@@ -27,7 +27,7 @@ public class ClinicObservationController {
     private final ClinicObservationService service;
 
     @PostMapping
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
     @Operation(summary = "Record one or more observations (max 50)")
     public ResponseEntity<ApiResponse<List<ObservationResponse>>> record(
             @PathVariable UUID patientId, @RequestBody List<ObservationRequest> body) {
@@ -59,7 +59,7 @@ public class ClinicObservationController {
     }
 
     @PostMapping("/{id}/void")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
     @Operation(summary = "Mark an observation entered in error (kept for audit, hidden from lists)")
     public ResponseEntity<ApiResponse<ObservationResponse>> voidObservation(
             @PathVariable UUID patientId, @PathVariable UUID id) {
