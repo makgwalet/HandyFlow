@@ -6,6 +6,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
+import QuestionForm from "./QuestionForm"
 import {
   Mic, MicOff, Plus, X, Clock, Stethoscope, CreditCard, Pill,
   Syringe, FlaskConical, Scissors, ChevronDown, CheckCircle,
@@ -523,6 +524,10 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
         {/* ── LEFT: SOAP Notes ────────────────────────────────────────── */}
         <div style={{ flex:1.4, display:"flex", flexDirection:"column", gap:10,
           display: "flex" }}>
+
+          {/* Clinical question library (renders nothing when no groups are served for this visit) */}
+          <QuestionForm consultationId={draftReady ? (draftIdRef.current ?? null) : null}
+            patientId={patient.id} visitType={appointment.appointmentType || "CONSULTATION"} />
 
           {/* Voice panel */}
           <div style={{ padding:"12px 14px", background:"var(--hf-violet-soft)", border:"1px solid var(--hf-violet-border)",

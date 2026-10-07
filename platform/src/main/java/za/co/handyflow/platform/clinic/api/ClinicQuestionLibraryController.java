@@ -38,6 +38,14 @@ public class ClinicQuestionLibraryController {
                 library.groupsForVisit(TenantContext.getTenantIdAsObject(), visitType, patientId)));
     }
 
+    @GetMapping("/question-groups/{code}")
+    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @Operation(summary = "One served question group by code (for groups opened by a TRIGGER_GROUP rule)")
+    public ResponseEntity<ApiResponse<GroupView>> one(@PathVariable String code) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                library.servedGroup(TenantContext.getTenantIdAsObject(), code)));
+    }
+
     @PostMapping("/question-groups/{code}/evaluate")
     @PreAuthorize("hasAuthority('CLINIC_READ')")
     @Operation(summary = "Evaluate answers: what is visible, required, warned, triggered and flagged. Never a diagnosis.")
