@@ -61,6 +61,29 @@ public class ClinicRestrictedRecordService {
                 (rs, i) -> (UUID) rs.getObject(1), tenantId, patientId, userId, ts(Instant.now())).stream().findFirst();
     }
 
+    /**
+     * Of these patients, the ones whose record this user may not open right now: restricted, and no unexpired break-glass
+     * session for this user. Used to mask worklists. The caller has already checked for standing access.
+     */
+    @Transactional(readOnly = true)
+    public java.util.Set<UUID> hiddenFrom(UUID tenantId, UUID userId, java.util.Collection<UUID> candidates) {
+        java.util.Set<UUID> hidden = new java.util.HashSet<>();
+        List<UUID> all = new java.util.ArrayList<>(candidates);
+        for (int from = 0; from < all.size(); from += 500) {
+            List<UUID> chunk = all.subList(from, Math.min(all.size(), from + 500));
+            String in = String.join(",", java.util.Collections.nCopies(chunk.size(), "?"));
+            List<Object> args = new java.util.ArrayList<>();
+            args.add(tenantId);
+            args.addAll(chunk);
+            args.add(userId);
+            args.add(ts(Instant.now()));
+            hidden.addAll(jdbc.query("SELECT r.patient_id FROM clinic_restricted_records r WHERE r.tenant_id = ? AND r.released_at IS NULL AND r.patient_id IN (" + in + ") "
+                    + "AND NOT EXISTS (SELECT 1 FROM clinic_break_glass_sessions s WHERE s.tenant_id = r.tenant_id AND s.patient_id = r.patient_id "
+                    + "AND s.user_id = ? AND s.expires_at > ?)", (rs, i) -> (UUID) rs.getObject(1), args.toArray()));
+        }
+        return hidden;
+    }
+
     @Transactional(readOnly = true)
     public Instant activeUntil(UUID tenantId, UUID patientId, UUID userId) {
         return jdbc.query("SELECT MAX(expires_at) FROM clinic_break_glass_sessions WHERE tenant_id = ? AND patient_id = ? AND user_id = ? AND expires_at > ?",
