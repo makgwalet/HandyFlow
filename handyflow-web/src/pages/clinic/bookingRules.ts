@@ -34,3 +34,15 @@ export function passesFilters(
   if (roomFilter === NO_ROOM_FILTER) return !a.roomId
   return a.roomId === roomFilter
 }
+
+/**
+ * Where the room name goes on a calendar block, by the block's height in px (CLINIC-DEC-018). Short blocks keep it out of the
+ * way (it is always in the hover text), medium blocks add it to the second line, tall blocks give it a line of its own.
+ */
+export type RoomPlacement = "tooltip" | "inline" | "own-line"
+export function roomPlacement(heightPx: number, roomName: string | null | undefined): RoomPlacement {
+  if (!roomName || !roomName.trim()) return "tooltip"
+  if (heightPx >= 58) return "own-line"
+  if (heightPx >= 40) return "inline"
+  return "tooltip"
+}

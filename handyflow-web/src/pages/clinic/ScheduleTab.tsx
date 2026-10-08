@@ -5,7 +5,7 @@ import PatientPicker, { type PickerPatient } from "./PatientPicker"
 import { myPractitionerId } from "./currentPractitioner"
 import { useAuthStore } from "../../store/auth.store"
 import RescheduleBox from "./RescheduleBox"
-import { bookingProblem, clashMessage, NO_ROOM_FILTER, passesFilters, WALK_IN_GRACE_MS } from "./bookingRules"
+import { bookingProblem, clashMessage, NO_ROOM_FILTER, passesFilters, roomPlacement, WALK_IN_GRACE_MS } from "./bookingRules"
 import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -363,7 +363,7 @@ export default function ScheduleTab({ onStartSession, prefill, onPrefillUsed }: 
                   const s    = STATUS_CFG[appt.status] ?? STATUS_CFG.SCHEDULED
                   if (top < 0 || top > HOURS.length*HOUR_HEIGHT) return null
                   return (
-                    <div key={appt.id}
+                    <div key={appt.id} title={[`${new Date(appt.scheduledAt).toLocaleTimeString("en-ZA",{hour:"2-digit",minute:"2-digit"})} ${appt.patientName}`, appt.appointmentType?.replace("_"," "), appt.reason, appt.roomName ? `Room: ${appt.roomName}` : ""].filter(Boolean).join(" · ")}
                       onClick={e=>{e.stopPropagation(); setSelected(appt); setApiError("")}}
                       style={{position:"absolute",left:3,right:3,top,height:h,
                         background:s.bg, border:`1px solid ${s.border}`, borderLeft:`3px solid ${s.color}`,
@@ -372,7 +372,8 @@ export default function ScheduleTab({ onStartSession, prefill, onPrefillUsed }: 
                       <div style={{fontSize:11,fontWeight:700,color:s.color,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>
                         {new Date(appt.scheduledAt).toLocaleTimeString("en-ZA",{hour:"2-digit",minute:"2-digit"})} {appt.patientName}
                       </div>
-                      {h > 28 && <div style={{fontSize:10,color:s.color,opacity:0.8,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{appt.appointmentType?.replace("_"," ")} {appt.reason?`· ${appt.reason}`:""}</div>}
+                      {h > 28 && <div style={{fontSize:10,color:s.color,opacity:0.8,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{appt.appointmentType?.replace("_"," ")} {appt.reason?`· ${appt.reason}`:""}{roomPlacement(h, appt.roomName)==="inline" ? ` · ${appt.roomName}` : ""}</div>}
+                      {roomPlacement(h, appt.roomName)==="own-line" && <div data-testid="block-room" style={{fontSize:10,color:s.color,opacity:0.8,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{appt.roomName}</div>}
                     </div>
                   )
                 })}

@@ -57,3 +57,19 @@ describe("passesFilters", () => {
     expect(passesFilters(a, "d1", "r2")).toBe(false)
   })
 })
+
+import { roomPlacement } from "./bookingRules"
+describe("roomPlacement (CLINIC-DEC-018)", () => {
+  it("keeps the room out of short blocks", () => {
+    expect(roomPlacement(20, "Room 2")).toBe("tooltip"); expect(roomPlacement(28, "Room 2")).toBe("tooltip"); expect(roomPlacement(39, "Room 2")).toBe("tooltip")
+  })
+  it("adds it to the second line of a medium block", () => {
+    expect(roomPlacement(40, "Room 2")).toBe("inline"); expect(roomPlacement(44, "Room 2")).toBe("inline"); expect(roomPlacement(57, "Room 2")).toBe("inline")
+  })
+  it("gives it its own line in a tall block", () => {
+    expect(roomPlacement(58, "Room 2")).toBe("own-line"); expect(roomPlacement(92, "Room 2")).toBe("own-line")
+  })
+  it("shows nothing when there is no room", () => {
+    expect(roomPlacement(92, null)).toBe("tooltip"); expect(roomPlacement(92, "  ")).toBe("tooltip"); expect(roomPlacement(92, undefined)).toBe("tooltip")
+  })
+})
