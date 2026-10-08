@@ -1,6 +1,7 @@
 // src/pages/clinic/PatientsTab.tsx
 // Paginated patient list — server search, family account registration,
 // dependant search, account type badges, no medical columns for reception
+import { ID_LABEL, ID_PLACEHOLDER, ID_TYPE_OPTIONS, autofillsFromId, cleanIdInput, idProblem, type IdType } from "./idEntry"
 import ModalShell from "./ModalShell"
 import { saId, saIdDob, saIdParts } from "./patientFile.shared"
 import { myPractitionerId } from "./currentPractitioner"
@@ -54,14 +55,14 @@ const GENDERS = ["MALE","FEMALE","NON_BINARY","PREFER_NOT_TO_SAY"]
 const RELATIONSHIPS = ["CHILD","PARENT","GRANDPARENT","SPOUSE","SIBLING","OTHER"]
 
 interface PersonForm {
-  firstName: string; lastName: string; idNumber: string; dateOfBirth: string
+  firstName: string; lastName: string; idType: IdType; idNumber: string; dateOfBirth: string
   gender: string; phone: string; email: string
   emergencyContactName: string; emergencyContactPhone: string
 }
 interface DepForm extends PersonForm { relationship: string }
 
 const EMPTY: PersonForm = {
-  firstName:"", lastName:"", idNumber:"", dateOfBirth:"", gender:"",
+  firstName:"", lastName:"", idType:"SA_ID", idNumber:"", dateOfBirth:"", gender:"",
   phone:"", email:"", emergencyContactName:"", emergencyContactPhone:""
 }
 const EMPTY_DEP = (): DepForm => ({ ...EMPTY, relationship:"CHILD" })
@@ -93,10 +94,12 @@ export default function PatientsTab({ onOpenPatient }: Props) {
 
   const f = (k: keyof PersonForm, v: string) => {
     setForm(p => ({ ...p, [k]:v }))
-    if (k === "idNumber") {
+    if (k === "idNumber" && autofillsFromId(form.idType)) {
       const info = autofillFromId(v)
       if (info) setForm(p => ({ ...p, idNumber:v, ...info }))
     }
+    // Changing the type re-cleans what was typed (a passport's letters would otherwise be lost, an SA ID's kept).
+    if (k === "idType") setForm(p => ({ ...p, idType: v as IdType, idNumber: cleanIdInput(v as IdType, p.idNumber) }))
     setFieldErrors(e => { const n={...e}; delete n[k]; return n })
   }
 
@@ -109,6 +112,8 @@ export default function PatientsTab({ onOpenPatient }: Props) {
     if (!form.lastName.trim())  errs.lastName  = "Required"
     if (form.phone && !/^(\+|0)[\d\s\-]{7,}$/.test(form.phone)) errs.phone = "Start with + or 0"
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = "Invalid email"
+    const idErr = idProblem(form.idType, form.idNumber)
+    if (idErr) errs.idNumber = idErr
     setFieldErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -137,6 +142,12 @@ export default function PatientsTab({ onOpenPatient }: Props) {
     },
   })
 
+  // The registration call has no ID type, so a passport or other document is recorded on the profile straight after.
+  const recordIdType = async (patientId: string, type: IdType, number: string) => {
+    if (type === "SA_ID" || !number) return
+    try { await apiClient.put(`/api/v1/clinic/patients/${patientId}/profile`, { idType: type }) } catch { /* the number is saved; the type can be set on the profile page */ }
+  }
+
   const handleRegister = async () => {
     if (!validate()) return
     try {
@@ -149,11 +160,12 @@ export default function PatientsTab({ onOpenPatient }: Props) {
         accountType: regType==="family" ? "PRINCIPAL" : "INDIVIDUAL",
       })
       const principal = principalRes.data?.data ?? principalRes.data
+      if (principal?.id) await recordIdType(principal.id, form.idType, form.idNumber)
 
       // Register dependants linked to principal
       for (const dep of dependants) {
         if (!dep.firstName.trim() || !dep.lastName.trim()) continue
-        await apiClient.post("/api/v1/clinic/patients", {
+        const depRes = await apiClient.post("/api/v1/clinic/patients", {
           firstName: dep.firstName, lastName: dep.lastName,
           idNumber: dep.idNumber||null, dateOfBirth: dep.dateOfBirth||null,
           gender: dep.gender||null, phone: dep.phone||null,
@@ -163,6 +175,8 @@ export default function PatientsTab({ onOpenPatient }: Props) {
           principalId: principal?.id,
           relationship: dep.relationship,
         })
+        const created = depRes.data?.data ?? depRes.data
+        if (created?.id) await recordIdType(created.id, dep.idType, dep.idNumber)
       }
 
       qc.invalidateQueries({ queryKey: ["clinic-patients"] })
@@ -417,7 +431,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                       : "Register patient"}
                 </button>
         </>}>
-          <p style={{ margin:"0 0 12px", fontSize:12, color:"var(--hf-text-faint)" }}>SA ID auto-fills DOB, age and gender</p>
+          <p style={{ margin:"0 0 12px", fontSize:12, color:"var(--hf-text-faint)" }}>An SA ID fills in date of birth and sex. A passport or other document is typed as it appears</p>
               {/* Account type toggle */}
               <div style={{ display:"flex", gap:6, marginBottom:20 }}>
                 {(["individual","family"] as const).map(t => (
@@ -468,15 +482,22 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                           <input value={dep.lastName} onChange={e=>updateDep(idx,"lastName",e.target.value)} placeholder="Smith" style={flatInp}/>
                         </div>
                         <div>
-                          <label style={lbl}>SA ID number</label>
-                          <input value={dep.idNumber}
-                            onChange={e=>{
-                              const v=e.target.value.replace(/\D/g,"").slice(0,13)
-                              updateDep(idx,"idNumber",v)
-                              const info=autofillFromId(v)
-                              if (info) { updateDep(idx,"dateOfBirth",info.dateOfBirth); updateDep(idx,"gender",info.gender) }
-                            }}
-                            placeholder="ID number" inputMode="numeric" style={flatInp}/>
+                          <label style={lbl}>{ID_LABEL[dep.idType]}</label>
+                          <div style={{ display:"flex", gap:6 }}>
+                            <select aria-label="Dependant ID type" value={dep.idType}
+                              onChange={e=>{ const t=e.target.value as IdType; updateDep(idx,"idType",t); updateDep(idx,"idNumber",cleanIdInput(t,dep.idNumber)) }}
+                              style={{ ...flatInp, width:"auto", flexShrink:0 }}>
+                              {ID_TYPE_OPTIONS.map(([v,l])=><option key={v} value={v}>{l}</option>)}
+                            </select>
+                            <input value={dep.idNumber}
+                              onChange={e=>{
+                                const v=cleanIdInput(dep.idType,e.target.value)
+                                updateDep(idx,"idNumber",v)
+                                const info=autofillsFromId(dep.idType) ? autofillFromId(v) : null
+                                if (info) { updateDep(idx,"dateOfBirth",info.dateOfBirth); updateDep(idx,"gender",info.gender) }
+                              }}
+                              placeholder={ID_PLACEHOLDER[dep.idType]} inputMode={dep.idType==="SA_ID"?"numeric":"text"} style={{ ...flatInp, flex:1 }}/>
+                          </div>
                         </div>
                         <div>
                           <label style={lbl}>Relationship to principal</label>
@@ -542,11 +563,17 @@ function PersonForm({ form, onChange, idInfo, FErr, inp }: { form: PersonForm; o
         <FErr k="lastName"/>
       </div>
       <div style={{ gridColumn:"1/-1" }}>
-        <label style={lbl}>SA ID number</label>
-        <input value={form.idNumber}
-          onChange={e=>onChange("idNumber",e.target.value.replace(/\D/g,"").slice(0,13))}
-          placeholder="8501015026083" inputMode="numeric" style={inp("idNumber")}/>
-        {form.idNumber?.length===13 && idInfo && (
+        <label style={lbl}>{ID_LABEL[form.idType]}</label>
+        <div style={{ display:"flex", gap:8 }}>
+          <select aria-label="ID type" value={form.idType} onChange={e=>onChange("idType",e.target.value)} style={{ ...inp("idType"), width:"auto", flexShrink:0 }}>
+            {ID_TYPE_OPTIONS.map(([v,l])=><option key={v} value={v}>{l}</option>)}
+          </select>
+          <input value={form.idNumber}
+            onChange={e=>onChange("idNumber",cleanIdInput(form.idType,e.target.value))}
+            placeholder={ID_PLACEHOLDER[form.idType]} inputMode={form.idType==="SA_ID"?"numeric":"text"} style={{ ...inp("idNumber"), flex:1 }}/>
+        </div>
+        <FErr k="idNumber"/>
+        {form.idType==="SA_ID" && form.idNumber?.length===13 && idInfo && (
           <div style={{ marginTop:6, padding:"7px 12px", background:"var(--hf-success-soft)",
             border:"1px solid var(--hf-success-border)", borderRadius:7, fontSize:12, color:"var(--hf-success-text-strong)",
             display:"flex", gap:16 }}>
