@@ -24,7 +24,7 @@ describe("clinic navigation structure", () => {
     expect(new Set(all).size).toBe(all.length)
   })
   it("keeps every section id the page can render, so deep links still work", () => {
-    for (const id of ["dashboard","patients","schedule","consultations","practitioners","claims","billing","recalls",
+    for (const id of ["dashboard","patients","schedule","practitioners","claims","billing","recalls",
       "waitlist","handoff","drafts","access-log","waiting-room","time-off","working-hours","closures","rooms",
       "lab-inbox","question-library"]) expect(all).toContain(id)
   })

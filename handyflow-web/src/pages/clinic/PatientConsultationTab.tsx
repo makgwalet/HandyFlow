@@ -5,6 +5,7 @@ import { useRef, useState } from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import PrescriptionForm from "./PrescriptionForm"
+import ReferralLetterModal from "./ReferralLetterModal"
 import type { Consultation, Patient, Practitioner, Prescription } from "./patientFile.shared"
 import { AMBER, BORDER, Empty, ErrBox, FSect, GRAY, GREEN_TEXT, LIGHT, Modal, ModalFooter, PURPLE, PURPLE_TEXT, RED, RED_TEXT, TEAL, TEAL_TEXT, btnPrimary, downloadPdf, fmtDT, lbl, sinp, unwrap } from "./patientFile.shared"
 import { Activity, ChevronDown, ChevronUp, Loader, Mic, MicOff, Pill, Plus, Stethoscope } from "lucide-react"
@@ -17,6 +18,7 @@ export default function ConsultationTab({ patient, consultations, practitioners,
   const { notify, dialogs } = useDialogs()
   const [showNew, setShowNew]   = useState(false)
   const [showRx, setShowRx]     = useState<string|null>(null)
+  const [showReferral, setShowReferral] = useState<string|null>(null)
   const [editingId, setEditingId] = useState<string|null>(null)
   const [editForm, setEditForm] = useState<any>({})
   const [apiError, setApiError] = useState("")
@@ -135,6 +137,8 @@ export default function ConsultationTab({ patient, consultations, practitioners,
                     <button onClick={e=>{e.stopPropagation();openEdit(c)}} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:"var(--hf-info-soft)", color:"var(--hf-info-text)", border:"1px solid var(--hf-info-border)", borderRadius:6, fontSize:12, cursor:"pointer", fontWeight:600 }}>✏ Edit</button>
                     <button onClick={e=>{e.stopPropagation();setShowRx(c.id)}} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:"var(--hf-success-soft)", color:GREEN_TEXT, border:"1px solid var(--hf-success-border)", borderRadius:6, fontSize:12, cursor:"pointer", fontWeight:600 }}><Pill size={11}/> Rx</button>
                     <button onClick={e=>{e.stopPropagation();downloadPdf(`/api/v1/clinic/consultations/${c.id}/prescription-pdf`,`rx-${c.id}.pdf`)}} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:"var(--hf-info-soft)", color:"var(--hf-info-text)", border:"1px solid var(--hf-info-border)", borderRadius:6, fontSize:12, cursor:"pointer", fontWeight:600 }}>Rx PDF</button>
+                    <button onClick={e=>{e.stopPropagation();downloadPdf(`/api/v1/clinic/consultations/${c.id}/summary-pdf`,`visit-summary-${c.id}.pdf`).catch(()=>notify({title:"Could not download the visit summary"}))}} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:"var(--hf-surface-muted)", color:"var(--hf-primary-text)", border:"1px solid var(--hf-border)", borderRadius:6, fontSize:12, cursor:"pointer", fontWeight:600 }}>Summary PDF</button>
+                    <button onClick={e=>{e.stopPropagation();setShowReferral(c.id)}} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:"var(--hf-danger-soft)", color:"var(--hf-danger-text-strong)", border:"1px solid var(--hf-danger-border)", borderRadius:6, fontSize:12, cursor:"pointer", fontWeight:600 }}>Refer</button>
                     {c.followUpDays&&<span style={{ fontSize:11, color:AMBER, background:"var(--hf-warning-soft)", padding:"2px 8px", borderRadius:20, border:"1px solid var(--hf-warning-border)" }}>F/U {c.followUpDays}d</span>}
                     {isOpen?<ChevronUp size={16} style={{ color: GRAY }}/>:<ChevronDown size={16} style={{ color: GRAY }}/>}
                   </div>
@@ -168,6 +172,8 @@ export default function ConsultationTab({ patient, consultations, practitioners,
           })}
         </div>
       )}
+
+      {showReferral && <ReferralLetterModal consultationId={showReferral} onClose={()=>setShowReferral(null)} />}
 
       {/* Prescriptions modal */}
       {showRx&&(

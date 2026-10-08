@@ -4,14 +4,16 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { ListPlus, X, Phone, CheckCircle, Calendar, Trash2, Users } from "lucide-react"
+import { ListPlus, Phone, CheckCircle, Calendar, Trash2, Users } from "lucide-react"
+import ModalShell from "./ModalShell"
+import PatientPicker, { type PickerPatient } from "./PatientPicker"
+import { useDialogs } from "./dialogs"
 
 interface WaitlistEntry {
   id: string; patientId: string; patientName: string
   practitionerId?: string; practitionerName?: string
   appointmentType?: string; notes?: string; status: string; createdAt: string
 }
-interface PatientOption { id: string; fullName: string; phone?: string }
 interface PractitionerOption { id: string; fullName: string }
 
 const NAVY="var(--hf-primary)";
@@ -24,19 +26,14 @@ const unwrap = (r:any) => { const p=r.data?.data??r.data; return Array.isArray(p
 export default function WaitlistTab() {
   const qc = useQueryClient()
   const [showAdd, setShowAdd] = useState(false)
-  const [patientSearch, setPatientSearch] = useState("")
+  const [patient, setPatient] = useState<PickerPatient | null>(null)
+  const { confirm, dialogs } = useDialogs()
   const [form, setForm] = useState({ patientId:"", practitionerId:"", appointmentType:"", notes:"" })
   const [apiError, setApiError] = useState("")
 
   const { data: entries=[], isLoading } = useQuery<WaitlistEntry[]>({
     queryKey: ["clinic-waitlist"],
     queryFn: async () => unwrap(await apiClient.get("/api/v1/clinic/waitlist")),
-  })
-
-  const { data: patientOptions=[] } = useQuery<PatientOption[]>({
-    queryKey: ["waitlist-patient-search", patientSearch],
-    queryFn: async () => unwrap(await apiClient.get(`/api/v1/clinic/patients?search=${encodeURIComponent(patientSearch)}&size=10`)),
-    enabled: showAdd && patientSearch.length > 1,
   })
 
   const { data: practitioners=[] } = useQuery<PractitionerOption[]>({
@@ -54,7 +51,7 @@ export default function WaitlistTab() {
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clinic-waitlist"] })
-      setShowAdd(false); setForm({ patientId:"", practitionerId:"", appointmentType:"", notes:"" }); setPatientSearch(""); setApiError("")
+      setShowAdd(false); setForm({ patientId:"", practitionerId:"", appointmentType:"", notes:"" }); setPatient(null); setApiError("")
     },
     onError: (e:any) => setApiError(e.response?.data?.message ?? "Failed to add to waitlist"),
   })
@@ -72,25 +69,28 @@ export default function WaitlistTab() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["clinic-waitlist"] }),
   })
 
-  const selectedPatient = patientOptions.find(p => p.id === form.patientId)
+  const remove = async (e: WaitlistEntry) => {
+    if (await confirm({ title: `Remove ${e.patientName} from the cancellation list?`, body: "Use Booked instead if they have been given a slot.", confirmLabel: "Remove", danger: true }))
+      removeAction.mutate(e.id)
+  }
 
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-        <div style={{fontSize:14,color:GRAY}}>{entries.length} patient{entries.length!==1?"s":""} waiting</div>
+        <div style={{fontSize:14,color:GRAY}}>{entries.length} patient{entries.length!==1?"s":""} waiting for a cancelled slot</div>
         <button onClick={()=>{setShowAdd(true);setApiError("")}}
           style={{display:"flex",alignItems:"center",gap:6,background:NAVY,color:"var(--hf-text-on-solid)",border:"none",borderRadius:9,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
-          <ListPlus size={15}/> Add to waitlist
+          <ListPlus size={15}/> Add to cancellation list
         </button>
       </div>
 
       {isLoading ? (
-        <div style={{textAlign:"center",padding:40,color:GRAY}}>Loading waitlist...</div>
+        <div style={{textAlign:"center",padding:40,color:GRAY}}>Loading…</div>
       ) : entries.length === 0 ? (
         <div style={{textAlign:"center",padding:"60px 20px",color:GRAY,border:`1px dashed ${BORDER}`,borderRadius:12}}>
           <Users size={36} style={{marginBottom:12,opacity:0.4}}/>
-          <div style={{fontWeight:600,color:"var(--hf-text-tertiary)",fontSize:15}}>No one on the waitlist</div>
-          <div style={{fontSize:13,marginTop:4}}>Add a patient here so you can backfill a cancellation or no-show.</div>
+          <div style={{fontWeight:600,color:"var(--hf-text-tertiary)",fontSize:15}}>No one on the cancellation list</div>
+          <div style={{fontSize:13,marginTop:4}}>When a slot opens up (cancellation or no-show), call these patients first. Patients who just need a follow-up are on the Recalls screen.</div>
         </div>
       ) : (
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -119,9 +119,9 @@ export default function WaitlistTab() {
                 )}
                 <button onClick={()=>scheduledAction.mutate(e.id)}
                   style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",background:"var(--hf-success-soft)",color:"var(--hf-success-text-strong)",border:"1px solid var(--hf-success-border)",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer"}}>
-                  <Calendar size={12}/> Scheduled
+                  <Calendar size={12}/> Booked
                 </button>
-                <button onClick={()=>removeAction.mutate(e.id)}
+                <button aria-label={`Remove ${e.patientName}`} onClick={()=>remove(e)}
                   style={{display:"flex",alignItems:"center",gap:5,padding:"6px 10px",background:"var(--hf-danger-soft)",color:"var(--hf-danger-text)",border:"1px solid var(--hf-danger-border)",borderRadius:7,fontSize:12,cursor:"pointer"}}>
                   <Trash2 size={12}/>
                 </button>
@@ -131,66 +131,39 @@ export default function WaitlistTab() {
         </div>
       )}
 
+      {dialogs}
       {showAdd && (
-        <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
-          <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:480,boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <h3 style={{margin:0,fontSize:17,fontWeight:700,color:"var(--hf-text)"}}>Add to Waitlist</h3>
-              <button onClick={()=>setShowAdd(false)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--hf-text-faint)"}}><X size={20}/></button>
-            </div>
-
-            <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:5}}>Patient *</label>
-            {selectedPatient ? (
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 12px",border:"1.5px solid var(--hf-border)",borderRadius:8,marginBottom:14}}>
-                <span style={{fontSize:14}}>{selectedPatient.fullName}</span>
-                <button onClick={()=>{setForm(f=>({...f,patientId:""}));setPatientSearch("")}} style={{background:"none",border:"none",cursor:"pointer",color:GRAY}}><X size={14}/></button>
-              </div>
-            ) : (
-              <div style={{marginBottom:14}}>
-                <input value={patientSearch} onChange={e=>setPatientSearch(e.target.value)} placeholder="Search patient by name..."
-                  style={{width:"100%",padding:"9px 12px",boxSizing:"border-box",border:"1.5px solid var(--hf-border)",borderRadius:8,fontSize:14}} autoFocus/>
-                {patientOptions.length > 0 && (
-                  <div style={{border:"1px solid var(--hf-border)",borderRadius:8,marginTop:4,maxHeight:160,overflowY:"auto"}}>
-                    {patientOptions.map(p => (
-                      <div key={p.id} onClick={()=>{setForm(f=>({...f,patientId:p.id}))}}
-                        style={{padding:"8px 12px",fontSize:13,cursor:"pointer",borderBottom:"1px solid var(--hf-border-subtle)"}}
-                        onMouseEnter={e=>(e.currentTarget.style.background=LIGHT)} onMouseLeave={e=>(e.currentTarget.style.background="var(--hf-surface)")}>
-                        {p.fullName}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:5}}>Preferred practitioner (optional)</label>
-            <select value={form.practitionerId} onChange={e=>setForm(f=>({...f,practitionerId:e.target.value}))}
-              style={{width:"100%",padding:"9px 12px",boxSizing:"border-box",border:"1.5px solid var(--hf-border)",borderRadius:8,fontSize:14,background:"var(--hf-surface)",marginBottom:14}}>
-              <option value="">Any practitioner</option>
-              {practitioners.map(p => <option key={p.id} value={p.id}>Dr. {p.fullName}</option>)}
-            </select>
-
-            <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:5}}>Appointment type (optional)</label>
-            <input value={form.appointmentType} onChange={e=>setForm(f=>({...f,appointmentType:e.target.value}))} placeholder="e.g. Follow-up consultation"
-              style={{width:"100%",padding:"9px 12px",boxSizing:"border-box",border:"1.5px solid var(--hf-border)",borderRadius:8,fontSize:14,marginBottom:14}}/>
-
-            <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:5}}>Notes (optional)</label>
-            <input value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="e.g. Available weekday mornings"
-              style={{width:"100%",padding:"9px 12px",boxSizing:"border-box",border:"1.5px solid var(--hf-border)",borderRadius:8,fontSize:14,marginBottom:14}}/>
-
-            {apiError && (
-              <div style={{marginBottom:14,padding:"10px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:"var(--hf-danger-text)"}}>{apiError}</div>
-            )}
-
-            <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-              <button onClick={()=>setShowAdd(false)} style={{padding:"9px 18px",border:"1px solid var(--hf-border)",borderRadius:9,background:"var(--hf-surface)",fontSize:14,cursor:"pointer"}}>Cancel</button>
-              <button onClick={()=>addEntry.mutate()} disabled={!form.patientId || addEntry.isPending}
-                style={{display:"flex",alignItems:"center",gap:7,background:NAVY,color:"var(--hf-text-on-solid)",border:"none",borderRadius:9,padding:"9px 20px",fontSize:14,fontWeight:600,cursor:!form.patientId?"not-allowed":"pointer",opacity:!form.patientId?0.6:1}}>
-                {addEntry.isPending ? "Adding..." : <><CheckCircle size={15}/> Add to waitlist</>}
-              </button>
-            </div>
+        <ModalShell title="Add to cancellation list" onClose={()=>setShowAdd(false)} width={480}
+          footer={<>
+            <button onClick={()=>setShowAdd(false)} style={{padding:"9px 18px",border:"1px solid var(--hf-border)",borderRadius:9,background:"var(--hf-surface)",fontSize:14,cursor:"pointer"}}>Cancel</button>
+            <button onClick={()=>addEntry.mutate()} disabled={!form.patientId || addEntry.isPending}
+              style={{display:"flex",alignItems:"center",gap:7,background:NAVY,color:"var(--hf-text-on-solid)",border:"none",borderRadius:9,padding:"9px 20px",fontSize:14,fontWeight:600,cursor:!form.patientId?"not-allowed":"pointer",opacity:!form.patientId?0.6:1}}>
+              {addEntry.isPending ? "Adding..." : <><CheckCircle size={15}/> Add</>}
+            </button></>}>
+          <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:5}}>Patient *</label>
+          <div style={{marginBottom:14}}>
+            <PatientPicker value={patient} onChange={p=>{ setPatient(p); setForm(f=>({...f,patientId:p?.id??""})) }} />
           </div>
-        </div>
+
+          <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:5}}>Preferred practitioner (optional)</label>
+          <select value={form.practitionerId} onChange={e=>setForm(f=>({...f,practitionerId:e.target.value}))}
+            style={{width:"100%",padding:"9px 12px",boxSizing:"border-box",border:"1.5px solid var(--hf-border)",borderRadius:8,fontSize:14,background:"var(--hf-surface)",marginBottom:14}}>
+            <option value="">Any practitioner</option>
+            {practitioners.map(p => <option key={p.id} value={p.id}>Dr. {p.fullName}</option>)}
+          </select>
+
+          <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:5}}>Appointment type (optional)</label>
+          <input value={form.appointmentType} onChange={e=>setForm(f=>({...f,appointmentType:e.target.value}))} placeholder="e.g. Follow-up consultation"
+            style={{width:"100%",padding:"9px 12px",boxSizing:"border-box",border:"1.5px solid var(--hf-border)",borderRadius:8,fontSize:14,marginBottom:14}}/>
+
+          <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:5}}>Notes (optional)</label>
+          <input value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="e.g. Available weekday mornings"
+            style={{width:"100%",padding:"9px 12px",boxSizing:"border-box",border:"1.5px solid var(--hf-border)",borderRadius:8,fontSize:14}}/>
+
+          {apiError && (
+            <div role="alert" style={{marginTop:14,padding:"10px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:"var(--hf-danger-text)"}}>{apiError}</div>
+          )}
+        </ModalShell>
       )}
     </div>
   )

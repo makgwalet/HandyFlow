@@ -17,7 +17,6 @@ import { useLocation, useNavigate, useParams } from "react-router-dom"
 import ClinicDashboard   from "./ClinicDashboard"
 import PatientsTab       from "./PatientsTab"
 import ScheduleTab       from "./ScheduleTab"
-import ConsultationsTab  from "./ConsultationsTab"
 import PractitionersTab  from "./PractitionersTab"
 import ClaimsTab         from "./ClaimsTab"
 import BillingTab        from "./BillingTab"
@@ -37,7 +36,7 @@ import QuestionLibraryAdminTab from "./QuestionLibraryAdminTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { CLINIC_SECTIONS } from "../../navigation/moduleSections"
 
-export type ClinicTab = "dashboard"|"patients"|"schedule"|"consultations"|"practitioners"|"claims"|"billing"|"recalls"|"waitlist"|"handoff"|"drafts"|"access-log"|"waiting-room"|"time-off"|"working-hours"|"closures"|"rooms"|"lab-inbox"|"question-library"
+export type ClinicTab = "dashboard"|"patients"|"schedule"|"practitioners"|"claims"|"billing"|"recalls"|"waitlist"|"handoff"|"drafts"|"access-log"|"waiting-room"|"time-off"|"working-hours"|"closures"|"rooms"|"lab-inbox"|"question-library"
 
 interface Patient { id: string; firstName: string; lastName: string; fullName: string; [key: string]: any }
 interface FileState { openPatient?: Patient | null; sessionAppointment?: unknown }
@@ -91,7 +90,6 @@ export function ClinicPage() {
           case "dashboard":     return <ClinicDashboard onNavigate={goTo} />
           case "patients":      return <PatientsTab onOpenPatient={p => openFile(p)} />
           case "schedule":      return <ScheduleTab onStartSession={(appt: unknown, pat: Patient) => openFile(pat, appt)} prefill={bookRequest} onPrefillUsed={() => setBookRequest(null)} />
-          case "consultations": return <ConsultationsTab />
           case "recalls":       return <RecallsTab onBook={r => { setBookRequest(r); goTo("schedule") }} />
           case "waitlist":      return <WaitlistTab />
           case "handoff":       return <HandoffQueueTab />

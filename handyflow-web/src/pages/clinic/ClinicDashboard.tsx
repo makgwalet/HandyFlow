@@ -182,7 +182,7 @@ export default function ClinicDashboard({ onNavigate }: { onNavigate: (tab: any)
             {[
               { label: "Register patient",    tab: "patients",      color: "var(--hf-primary-text)" },
               { label: "Book appointment",    tab: "schedule",  color: "var(--hf-accent-text)" },
-              { label: "Record consultation", tab: "consultations", color: "var(--hf-violet-text)" },
+              { label: "Find a patient to consult", tab: "patients", color: "var(--hf-violet-text)" },
             ].map(a => (
               <button key={a.label} onClick={() => onNavigate(a.tab)}
                 style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "var(--hf-surface)",

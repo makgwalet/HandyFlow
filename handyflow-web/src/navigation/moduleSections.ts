@@ -557,8 +557,8 @@ export const CLINIC_SECTIONS: ModuleSections = {
       label: 'Front desk',
       sections: [
         { id: 'schedule', label: 'Schedule', icon: CalendarDays },
-        { id: 'waiting-room', label: 'Waiting room', icon: UserCheck },
-        { id: 'waitlist', label: 'Waitlist', icon: ListPlus },
+        { id: 'waiting-room', label: "Today's queue", icon: UserCheck },
+        { id: 'waitlist', label: 'Cancellation list', icon: ListPlus },
         { id: 'recalls', label: 'Recalls', icon: CalendarClock },
       ],
     },
@@ -566,7 +566,6 @@ export const CLINIC_SECTIONS: ModuleSections = {
       label: 'Patient care',
       sections: [
         { id: 'patients', label: 'Patients', icon: Users },
-        { id: 'consultations', label: 'Consultations', icon: FileText },
         { id: 'drafts', label: 'Drafts', icon: FileClock, permission: 'CLINIC_CLINICAL_WRITE' },
         { id: 'handoff', label: 'Handoff queue', icon: ArrowRightLeft, permission: 'CLINIC_CLINICAL_WRITE' },
         { id: 'lab-inbox', label: 'Lab inbox', icon: FlaskConical },
