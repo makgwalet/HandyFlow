@@ -244,7 +244,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
       {activeTab==="account" && <PatientAccountTab patientId={pid}/>}
       {activeTab==="rx"           && <PrescriptionsTab patient={patient} consultations={consultations as Consultation[]}/>}
       {activeTab==="labs"         && <LabsTabEnhanced patient={patient}/>}
-      {activeTab==="growth"       && <GrowthTab patientId={patient.id}/>}
+      {activeTab==="growth"       && <GrowthTab patientId={patient.id} patientName={`${patient.firstName} ${patient.lastName}`.trim()}/>}
       {activeTab==="documents"    && <DocumentsTab patient={patient} consultations={consultations as Consultation[]}/>}
       {activeTab==="history"      && <TimelineTab patientId={patient.id}/>}
       {activeTab==="consent"      && <ConsentTab patient={patient}/>}

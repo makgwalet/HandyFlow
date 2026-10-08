@@ -9,7 +9,7 @@ vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => !!pe
 vi.mock("recharts", () => {
   const Pass = ({ children }: any) => <div>{children}</div>
   return { ResponsiveContainer: Pass, ComposedChart: Pass, CartesianGrid: () => null, XAxis: () => null, YAxis: () => null,
-    Tooltip: () => null, Legend: () => null, Line: () => null, Scatter: () => null }
+    Tooltip: () => null, Legend: () => null, Line: () => null, Scatter: () => null, Area: () => null }
 })
 import GrowthTab from "./GrowthTab"
 
@@ -33,7 +33,8 @@ describe("GrowthTab", () => {
     get.mockResolvedValue({ data: { data: chart() } })
     wrap()
     await screen.findByText("6.5 kg")
-    expect(screen.getAllByText("DATA NOT CLINICALLY APPROVED").length).toBe(2)
+    expect(screen.getAllByText("DATA NOT CLINICALLY APPROVED").length).toBe(1)
+    fireEvent.click(screen.getByRole("tab", { name: "Height-for-age" }))
     expect(screen.getByText(/No height recorded/)).toBeTruthy()
     expect(screen.queryByText(/SD$/)).toBeNull()
   })
@@ -84,5 +85,22 @@ describe("GrowthTab", () => {
     fireEvent.change(screen.getByLabelText("Date measured"), { target: { value: "2020-01-01" } })
     fireEvent.click(screen.getByRole("button", { name: "Save measurement" }))
     expect(await screen.findByText(/before the patient was born/)).toBeTruthy()
+  })
+  it("shows the patient, a tab per measure, the latest measurement and the merged table", async () => {
+    perms.CLINIC_GROWTH_READ = true
+    const c: any = chart(); c.currentAgeMonths = 84
+    c.measures[0].measurements.push({ observationId: "o2", takenAt: "2026-10-08T06:00:00Z", ageMonths: 84, value: 7.7, zScore: null, percentile: null })
+    c.measures[1].measurements.push({ observationId: "h1", takenAt: "2026-10-08T07:00:00Z", ageMonths: 84, value: 121, zScore: null, percentile: null })
+    get.mockResolvedValue({ data: { data: c } })
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><GrowthTab patientId="p1" patientName="Liam Botha"/></QueryClientProvider>)
+    expect(await screen.findByText("Liam Botha")).toBeTruthy()
+    expect(screen.getByText("7 y · Male")).toBeTruthy()
+    expect(screen.getAllByRole("tab").map(t => t.textContent)).toEqual(["Weight-for-age", "Height-for-age"])
+    const side = screen.getByLabelText("Latest measurements")
+    expect(side.textContent).toMatch(/7\.7\s*kg/); expect(side.textContent).toMatch(/\+1\.2 kg since/); expect(side.textContent).toMatch(/121 cm/)
+    const table = screen.getByLabelText("Measurements")
+    expect(table.textContent).toMatch(/7\.7 kg/); expect(table.textContent).toMatch(/121 cm/)
+    fireEvent.click(screen.getByRole("button", { name: "Show Height-for-age" }))
+    expect(screen.getByRole("tab", { name: "Height-for-age" }).getAttribute("aria-selected")).toBe("true")
   })
 })
