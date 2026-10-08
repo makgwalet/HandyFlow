@@ -5,6 +5,9 @@ import { FileText, Send } from "lucide-react"
 import { usePermission } from "../../hooks/usePermission"
 import ModalShell from "./ModalShell"
 import ReferralLetterModal from "./ReferralLetterModal"
+import LetterTemplatePicker from "./LetterTemplatePicker"
+import SaveAsTemplate from "./SaveAsTemplate"
+import { applySickNote } from "./letterView"
 import { downloadPdf, fmtDT, lbl, sinp } from "./patientFile.shared"
 import { Card, primaryBtn, smallBtn } from "./OverviewCard"
 import { certParams, certProblem, newestFirst, type CertForm } from "./historyView"
@@ -38,11 +41,14 @@ export function SickNoteModal({ patientId, list, onClose }: { patientId: string;
       footer={<><button onClick={onClose} style={smallBtn}>Cancel</button><button onClick={go} disabled={busy} style={{ ...primaryBtn, padding: "9px 18px", fontSize: 14 }}>{busy ? "Generating…" : "Download sick note"}</button></>}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {list.length > 1 && <ConsultationSelect list={list} value={f.consultationId} onChange={v => setF({ ...f, consultationId: v })} />}
+        {f.consultationId && <LetterTemplatePicker kind="SICK_NOTE" consultationId={f.consultationId} onApply={t => setF(x => applySickNote(x, t, new Date(Date.now() + 2 * 3600_000).toISOString().slice(0, 10)))} />}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div><label style={lbl} htmlFor="qa-from">Unfit from</label><input id="qa-from" type="date" value={f.unfitFrom} onChange={e => setF({ ...f, unfitFrom: e.target.value })} style={sinp} /></div>
           <div><label style={lbl} htmlFor="qa-to">Unfit until</label><input id="qa-to" type="date" value={f.unfitTo} onChange={e => setF({ ...f, unfitTo: e.target.value })} style={sinp} /></div>
         </div>
         <div><label style={lbl} htmlFor="qa-notes">Notes</label><textarea id="qa-notes" rows={2} value={f.notes} onChange={e => setF({ ...f, notes: e.target.value })} style={{ ...sinp, resize: "vertical" }} /></div>
+        <SaveAsTemplate kind="SICK_NOTE" payload={() => ({ body: f.notes.trim() || undefined,
+          unfitDays: f.unfitFrom && f.unfitTo && f.unfitTo >= f.unfitFrom ? Math.round((Date.parse(f.unfitTo) - Date.parse(f.unfitFrom)) / 86400000) + 1 : null })} />
         {error && <div role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
       </div>
     </ModalShell>

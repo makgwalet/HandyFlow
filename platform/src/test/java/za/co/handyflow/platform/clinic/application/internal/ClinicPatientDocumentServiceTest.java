@@ -118,7 +118,7 @@ class ClinicPatientDocumentServiceTest {
     @Test
     @DisplayName("only sick notes and referrals can be recorded as issued")
     void recordIssuedIgnoresOtherTypes() {
-        service.recordIssued(t, UUID.randomUUID(), "LETTER", "x", PDF);
+        service.recordIssued(t, UUID.randomUUID(), "OTHER", "x", PDF);
         verifyNoInteractions(storage, documentRepo);
     }
 

@@ -8,6 +8,8 @@ import { usePermission } from "../../hooks/usePermission"
 import { fmtDay } from "./briefing"
 import ModalShell from "./ModalShell"
 import ReferralLetterModal from "./ReferralLetterModal"
+import WriteLetterModal from "./WriteLetterModal"
+import LetterTemplatesManager from "./LetterTemplatesManager"
 import { SickNoteModal } from "./QuickActionsCard"
 import type { Consultation, Patient } from "./patientFile.shared"
 import { BORDER, Empty, GRAY, LIGHT, RED_TEXT, lbl, sinp } from "./patientFile.shared"
@@ -106,7 +108,7 @@ export default function DocumentsTab({ patient, consultations }: { patient: Pati
   const { data: items = [], isLoading, isError } = useQuery<RegisterItem[]>({ queryKey: key, enabled: canRead, retry: false,
     queryFn: async () => unwrap(await apiClient.get(`/api/v1/clinic/patients/${patient.id}/documents`))?.items ?? [] })
   const [kind, setKind] = useState("")
-  const [modal, setModal] = useState<"upload" | "sick" | "referral" | null>(null)
+  const [modal, setModal] = useState<"upload" | "sick" | "referral" | "letter" | "templates" | null>(null)
   const [removing, setRemoving] = useState<RegisterItem | null>(null)
   const [dlError, setDlError] = useState("")
   const latest = consultations[0]
@@ -127,6 +129,8 @@ export default function DocumentsTab({ patient, consultations }: { patient: Pati
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {canSick && latest && <button type="button" style={smallBtn} onClick={() => setModal("sick")}>Issue sick note</button>}
           {canRef && latest && <button type="button" style={smallBtn} onClick={() => setModal("referral")}>Write referral</button>}
+          {canUpload && latest && <button type="button" style={smallBtn} onClick={() => setModal("letter")}>Write letter</button>}
+          {canUpload && <button type="button" style={smallBtn} onClick={() => setModal("templates")}>Letter templates</button>}
           {canUpload && <button type="button" style={primaryBtn} onClick={() => setModal("upload")}><Upload size={13} /> Upload document</button>}
         </div>
       </div>
@@ -167,6 +171,8 @@ export default function DocumentsTab({ patient, consultations }: { patient: Pati
       {modal === "upload" && <UploadModal patientId={patient.id} consultations={consultations} onClose={() => setModal(null)} />}
       {modal === "sick" && latest && <SickNoteModal patientId={patient.id} list={consultations.map(c => ({ id: c.id, consultedAt: c.consultedAt, chiefComplaint: c.chiefComplaint }))} onClose={() => { setModal(null); reload() }} />}
       {modal === "referral" && latest && <ReferralLetterModal consultationId={latest.id} onClose={() => { setModal(null); reload() }} />}
+      {modal === "letter" && latest && <WriteLetterModal visits={consultations.map(c => ({ id: c.id, consultedAt: c.consultedAt, chiefComplaint: c.chiefComplaint }))} onClose={() => { setModal(null); reload() }} />}
+      {modal === "templates" && <LetterTemplatesManager onClose={() => setModal(null)} />}
       {removing && <RemoveModal patientId={patient.id} item={removing} onClose={() => setRemoving(null)} />}
     </div>
   )

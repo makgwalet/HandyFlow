@@ -9,7 +9,7 @@ final class DocumentRules {
 
     /** The types a person can choose when uploading. SICK_NOTE and REFERRAL are only ever written by the system when one is issued. */
     static final Set<String> UPLOAD_TYPES = Set.of("OUTSIDE_REPORT", "IMAGING", "LETTER", "PAPER_NOTES", "CONSENT_FORM", "OTHER");
-    static final Set<String> ISSUED_TYPES = Set.of("SICK_NOTE", "REFERRAL");
+    static final Set<String> ISSUED_TYPES = Set.of("SICK_NOTE", "REFERRAL", "LETTER");
     static final long MAX_BYTES = 10L * 1024 * 1024;
     static final int TITLE_MAX = 200, NOTES_MAX = 1000, REASON_MAX = 300;
 

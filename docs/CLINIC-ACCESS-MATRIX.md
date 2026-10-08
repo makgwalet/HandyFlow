@@ -386,7 +386,7 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 
 ## 3. API authorization matrix
 
-177 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
+184 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
 
 | Area | Method | Path | Requires |
 |---|---|---|---|
@@ -492,6 +492,13 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 | Lab | POST | `/lab/results/{id}/file` | `CLINIC_RESULT_FILE` |
 | LabMarker | PUT | `/lab/results/{id}/markers` | `CLINIC_RESULT_UPDATE` |
 | LabMarker | GET | `/lab/critical` | `CLINIC_RESULT_READ` |
+| Letter | GET | `/letter-templates` | `CLINIC_DOCUMENT_READ` |
+| Letter | GET | `/letter-templates/merge-fields` | `CLINIC_DOCUMENT_READ` |
+| Letter | POST | `/letter-templates` | `CLINIC_DOCUMENT_CREATE` |
+| Letter | PUT | `/letter-templates/{id}` | `CLINIC_DOCUMENT_CREATE` |
+| Letter | DELETE | `/letter-templates/{id}` | `CLINIC_DOCUMENT_CREATE` |
+| Letter | GET | `/letter-templates/{id}/render` | `CLINIC_DOCUMENT_READ` |
+| Letter | POST | `/consultations/{id}/letter` | `CLINIC_DOCUMENT_CREATE` |
 | Observation | POST | `/patients/{patientId}/observations` | `CLINIC_VITALS_WRITE` |
 | Observation | GET | `/patients/{patientId}/observations` | `CLINIC_VITALS_READ` |
 | Observation | GET | `/patients/{patientId}/observations/latest` | `CLINIC_VITALS_READ` |
