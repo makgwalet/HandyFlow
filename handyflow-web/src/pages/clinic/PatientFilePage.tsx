@@ -23,6 +23,8 @@ import AppointmentsTab from "./PatientAppointmentsTab"
 import PatientVisitsTab from "./PatientVisitsTab"
 import RestrictedRecordGate from "./RestrictedRecordGate"
 import GrowthTab from "./GrowthTab"
+import PatientProfilePage from "./PatientProfilePage"
+import type { SectionId } from "./profileView"
 import { usePermission } from "../../hooks/usePermission"
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -41,6 +43,8 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
   const canGrowth = usePermission("CLINIC_GROWTH_READ")
   const [activeTab, setActiveTab] = useState<TabId>("overview")
   const [showActions, setShowActions] = useState(false)
+  // The profile page takes the place of the tabs; null = the file itself.
+  const [profile, setProfile] = useState<{ section?: SectionId } | null>(null)
   // A consultation is a full-screen workspace of its own; starting one leaves the file and opens it.
   const startSession = (appt: { id: string }) => navigate(workspacePath(appt.id))
   const pid = patient.id
@@ -176,6 +180,9 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
                     color={PURPLE_TEXT} onClick={()=>convertToFamily.mutate()}
                     hint="Promotes patient to principal — add dependants after"/>
                 )}
+                <ActionItem icon={User} label="Complete / update profile"
+                  color={TEAL} onClick={()=>{ setShowActions(false); setProfile({}) }}
+                  hint="Identity, contact, address, emergency contacts"/>
                 {/* Deactivate / reactivate */}
                 {patient.active ? (
                   <ActionItem icon={UserX} label="Deactivate account"
@@ -212,7 +219,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
           {TABS.map(t=>{
             const Icon=t.icon; const active=activeTab===t.id
             return (
-              <button key={t.id} onClick={()=>setActiveTab(t.id)}
+              <button key={t.id} onClick={()=>{ setProfile(null); setActiveTab(t.id) }}
                 style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 14px",
                   background:active?"rgba(255,255,255,0.12)":"transparent", border:"none",
                   borderBottom:active?"2px solid var(--hf-accent)":"2px solid transparent",
@@ -236,9 +243,12 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
       {/* ── Tab content ─────────────────────────────────────────────────── */}
       <RestrictedRecordGate patientId={patient.id}>
       <PatientAlertBanner patientId={patient.id}/>
+      {profile && <PatientProfilePage patient={patient} initialSection={profile.section} onBack={()=>setProfile(null)}
+        onPatientChanged={p=>onOpenPatient?.(p)} onOpenConsent={()=>{ setProfile(null); setActiveTab("consent") }}/>}
+      {!profile && <>
       {activeTab==="overview"     && <OverviewTab patient={patient} idInfo={idInfo} familyMembers={familyMembers as Patient[]} onOpenPatient={onOpenPatient} qc={qc}
         appointments={appointments as any[]} consultations={consultations as any[]} defaultPractitionerId={myPractitionerId(practitioners as any[], userEmail)}
-        onStartSession={startSession} onOpenTab={setActiveTab}/>}
+        onStartSession={startSession} onOpenTab={setActiveTab} onOpenProfile={section=>setProfile({section})}/>}
       {activeTab==="appointments" && <AppointmentsTab patient={patient} appointments={appointments as Appointment[]} practitioners={practitioners as Practitioner[]} qc={qc} onStartSession={startSession}/>}
       {activeTab==="consultation" && <PatientVisitsTab patientId={patient.id} appointments={appointments as any[]} defaultPractitionerId={myPractitionerId(practitioners as any[], userEmail)} onStartSession={startSession}/>}
       {activeTab==="account" && <PatientAccountTab patientId={pid}/>}
@@ -248,6 +258,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
       {activeTab==="documents"    && <DocumentsTab patient={patient} consultations={consultations as Consultation[]}/>}
       {activeTab==="history"      && <TimelineTab patientId={patient.id}/>}
       {activeTab==="consent"      && <ConsentTab patient={patient}/>}
+      </>}
       </RestrictedRecordGate>
     </div>
   )

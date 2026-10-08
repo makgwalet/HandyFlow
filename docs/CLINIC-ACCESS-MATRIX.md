@@ -29,7 +29,7 @@ user -> role -> permissions -> (later) patient and context rules
 | `CLINIC_PATIENT_MERGE` | manage | Merge duplicate patient records | `CLINIC_ADMIN` | Reserved |
 | `CLINIC_PATIENT_DUPLICATE_REVIEW` | write | Review and resolve possible duplicate patients | `CLINIC_WRITE` | Reserved |
 | `CLINIC_PATIENT_DEMOGRAPHICS_READ` | read | View name, date of birth, sex and ID number | `CLINIC_READ` | Reserved |
-| `CLINIC_PATIENT_DEMOGRAPHICS_WRITE` | write | Change name, date of birth, sex and ID number | `CLINIC_WRITE` | Reserved |
+| `CLINIC_PATIENT_DEMOGRAPHICS_WRITE` | write | Change name, date of birth, sex and ID number | `CLINIC_WRITE` | Live |
 | `CLINIC_PATIENT_CONTACT_READ` | read | View phone and email | `CLINIC_READ` | Reserved |
 | `CLINIC_PATIENT_CONTACT_WRITE` | write | Change phone and email | `CLINIC_WRITE` | Reserved |
 | `CLINIC_PATIENT_ADDRESS_READ` | read | View addresses | `CLINIC_READ` | Reserved |
@@ -386,7 +386,7 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 
 ## 3. API authorization matrix
 
-184 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
+188 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
 
 | Area | Method | Path | Requires |
 |---|---|---|---|
@@ -528,6 +528,10 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 | PatientNote | GET | `/patients/{patientId}/notes` | `CLINIC_NOTE_READ` |
 | PatientNote | POST | `/patients/{patientId}/notes` | `CLINIC_NOTE_CREATE` |
 | PatientNote | POST | `/patients/{patientId}/notes/{noteId}/resolve` | `CLINIC_NOTE_UPDATE` |
+| PatientProfile | GET | `/patients/{id}/profile` | `CLINIC_PATIENT_READ` |
+| PatientProfile | PUT | `/patients/{id}/profile` | `CLINIC_PATIENT_UPDATE` |
+| PatientProfile | PUT | `/patients/{id}/demographics` | `CLINIC_PATIENT_DEMOGRAPHICS_WRITE` |
+| PatientProfile | PUT | `/patients/{id}/contact` | `CLINIC_PATIENT_UPDATE` |
 | QuestionLibrary | GET | `/question-groups` | `CLINIC_QUESTIONNAIRE_READ` |
 | QuestionLibrary | GET | `/question-groups/{code}` | `CLINIC_QUESTIONNAIRE_READ` |
 | QuestionLibrary | POST | `/question-groups/{code}/evaluate` | `CLINIC_QUESTIONNAIRE_READ` |

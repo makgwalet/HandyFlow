@@ -19,6 +19,14 @@ describe("quick actions", () => {
     const { container } = render(<QuickActionsCard patientId="p1" consultations={[newer]} />)
     expect(container.textContent).toBe("")
   })
+  it("offers the profile action to someone who may update patients, even without a consultation", () => {
+    perms.CLINIC_PATIENT_UPDATE = true
+    const open = vi.fn()
+    render(<QuickActionsCard patientId="p1" consultations={[]} onOpenProfile={open} />)
+    fireEvent.click(screen.getByRole("button", { name: /Complete \/ update profile/ }))
+    expect(open).toHaveBeenCalled()
+    expect(screen.queryByText(/Needs a consultation/)).toBeNull()
+  })
   it("shows only the actions the person may sign", () => {
     perms.CLINIC_SICK_NOTE_SIGN = true
     render(<QuickActionsCard patientId="p1" consultations={[newer]} />)

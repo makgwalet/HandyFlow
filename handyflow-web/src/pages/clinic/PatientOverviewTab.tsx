@@ -15,14 +15,17 @@ import { BORDER, GRAY, GREEN_TEXT, masonry, Modal, ModalFooter, RED_TEXT, TEAL_T
 import { ArrowRight, Plus } from "lucide-react"
 import { Card, Fact, smallBtn } from "./OverviewCard"
 import QuickActionsCard from "./QuickActionsCard"
+import ProfileCard from "./ProfileCard"
+import type { SectionId } from "./profileView"
 import { FamilyHistoryCard, MedicalAidCard, SocialHistoryCard } from "./PatientBackgroundCards"
 
 // ── OVERVIEW TAB ──────────────────────────────────────────────────────────────
 
-export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc, appointments = [], consultations = [], defaultPractitionerId, onStartSession, onOpenTab }: {
+export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc, appointments = [], consultations = [], defaultPractitionerId, onStartSession, onOpenTab, onOpenProfile }: {
   patient:Patient; idInfo:any; familyMembers:Patient[]; onOpenPatient?:(p:Patient)=>void; qc:any
   appointments?: any[]; consultations?: any[]; defaultPractitionerId?: string; onStartSession?: (appt:any)=>void
   onOpenTab?: (tab:"history"|"labs"|"appointments"|"rx"|"growth")=>void
+  onOpenProfile?: (section?: SectionId)=>void
 }) {
   const [showAddDep, setShowAddDep] = useState(false)
   const [depForm, setDepForm] = useState<DependantForm>(EMPTY_DEPENDANT)
@@ -90,7 +93,8 @@ export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPati
 
   const cards = (
     <>
-      <QuickActionsCard patientId={patient.id} consultations={consultations} />
+      <QuickActionsCard patientId={patient.id} consultations={consultations} onOpenProfile={onOpenProfile ? () => onOpenProfile() : undefined} />
+      <ProfileCard patientId={patient.id} onOpenProfile={onOpenProfile} />
 
       <Card title="Personal details" aside={
         <span style={{ display:"flex", gap:6 }}>

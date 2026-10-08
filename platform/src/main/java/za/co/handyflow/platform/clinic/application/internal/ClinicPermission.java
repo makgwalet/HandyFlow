@@ -35,7 +35,7 @@ public enum ClinicPermission {
             "Review and resolve possible duplicate patients"),
     CLINIC_PATIENT_DEMOGRAPHICS_READ(Group.PATIENT, Kind.READ, "CLINIC_READ", false,
             "View name, date of birth, sex and ID number"),
-    CLINIC_PATIENT_DEMOGRAPHICS_WRITE(Group.PATIENT, Kind.WRITE, "CLINIC_WRITE", false,
+    CLINIC_PATIENT_DEMOGRAPHICS_WRITE(Group.PATIENT, Kind.WRITE, "CLINIC_WRITE", true,
             "Change name, date of birth, sex and ID number"),
     CLINIC_PATIENT_CONTACT_READ(Group.PATIENT, Kind.READ, "CLINIC_READ", false,
             "View phone and email"),

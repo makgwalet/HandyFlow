@@ -136,6 +136,27 @@ public class ClinicPatient {
         this.updatedAt = Instant.now();
     }
 
+    /** Corrects name, identification and sex. The caller has already checked the values. */
+    public void updateDemographics(String firstName, String lastName, String idNumber, LocalDate dateOfBirth,
+                                   String gender, String sexAtBirth) {
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.idNumber = idNumber;
+        if (dateOfBirth != null) this.dateOfBirth = dateOfBirth;
+        this.gender = gender;
+        this.sexAtBirth = sexAtBirth;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Replaces phone, email and the first emergency contact: the form sends all four, so a cleared field is cleared. */
+    public void replaceContact(String phone, String email, String emergencyContactName, String emergencyContactPhone) {
+        this.phone = phone;
+        this.email = email;
+        this.emergencyContactName = emergencyContactName;
+        this.emergencyContactPhone = emergencyContactPhone;
+        this.updatedAt = Instant.now();
+    }
+
     public void softDelete(UUID deletedBy) {
         this.deletedAt = Instant.now();
         this.deletedBy = deletedBy;

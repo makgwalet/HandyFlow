@@ -1,7 +1,7 @@
 // Quick sick note and referral letter from the patient overview. Both documents are written for a consultation,
 // so the newest one is offered and the clinician can pick another. With no consultation yet, the buttons say why they are off.
 import { useState } from "react"
-import { FileText, Send } from "lucide-react"
+import { FileText, Send, UserCog } from "lucide-react"
 import { usePermission } from "../../hooks/usePermission"
 import ModalShell from "./ModalShell"
 import ReferralLetterModal from "./ReferralLetterModal"
@@ -67,13 +67,15 @@ function ReferralPicker({ list, onClose }: { list: Cons[]; onClose: () => void }
   )
 }
 
-export default function QuickActionsCard({ patientId, consultations }: { patientId: string; consultations: Cons[] }) {
+export default function QuickActionsCard({ patientId, consultations, onOpenProfile }: { patientId: string; consultations: Cons[]; onOpenProfile?: () => void }) {
   const canSick = usePermission("CLINIC_SICK_NOTE_SIGN")
   const canRef = usePermission("CLINIC_REFERRAL_SIGN")
+  const canProfile = usePermission("CLINIC_PATIENT_UPDATE") && !!onOpenProfile
   const [open, setOpen] = useState<"" | "sick" | "referral">("")
-  if (!canSick && !canRef) return null
+  if (!canSick && !canRef && !canProfile) return null
   const list = newestFirst(consultations)
   const none = list.length === 0
+  const needsVisit = none && (canSick || canRef)
   const why = none ? "Needs a consultation: both documents are written for one." : undefined
   const btn = (text: string, Icon: typeof FileText, kind: "sick" | "referral") => (
     <button type="button" disabled={none} title={why} onClick={() => setOpen(kind)}
@@ -85,7 +87,12 @@ export default function QuickActionsCard({ patientId, consultations }: { patient
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {canSick && btn("Sick note", FileText, "sick")}
         {canRef && btn("Referral letter", Send, "referral")}
-        {none && <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{why}</div>}
+        {canProfile && (
+          <button type="button" onClick={onOpenProfile}
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)",
+              fontSize: 13, fontWeight: 600, cursor: "pointer", color: "var(--hf-text)" }}>
+            <UserCog size={14} />Complete / update profile</button>)}
+        {needsVisit && <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{why}</div>}
       </div>
       {open === "sick" && <SickNoteModal patientId={patientId} list={list} onClose={() => setOpen("")} />}
       {open === "referral" && <ReferralPicker list={list} onClose={() => setOpen("")} />}
