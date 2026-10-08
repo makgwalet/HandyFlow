@@ -12,10 +12,10 @@ import TimelineTab from "./TimelineTab"
 import { PatientAlertBanner } from "./PatientNotes"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import RunningBillTab from "./PatientBillTab"
+import PatientAccountTab from "./PatientAccountTab"
 import PrescriptionsTab from "./PatientRxTab"
 import DocumentsTab from "./PatientDocumentsTab"
-import type { Appointment, BillLine, Consultation, Patient, Practitioner } from "./patientFile.shared"
+import type { Appointment, Consultation, Patient, Practitioner } from "./patientFile.shared"
 import { ACCOUNT_CFG, AMBER, BORDER, GRAY, GREEN_TEXT, LIGHT, NAVY, PURPLE_TEXT, RED_TEXT, TEAL, saId, unwrap } from "./patientFile.shared"
 import { AlertCircle, Archive, Calendar, Clock, CreditCard, FileText, FlaskConical, Heart, Link, MoreVertical, Phone, Pill, ShieldCheck, Stethoscope, User, UserCheck, UserX, Users } from "lucide-react"
 import OverviewTab from "./PatientOverviewTab"
@@ -27,7 +27,7 @@ import { usePermission } from "../../hooks/usePermission"
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-type TabId = "growth"|"overview"|"appointments"|"consultation"|"running-bill"|"rx"|"labs"|"documents"|"history"|"consent"
+type TabId = "growth"|"overview"|"appointments"|"consultation"|"account"|"rx"|"labs"|"documents"|"history"|"consent"
 
 interface Props {
   patient: Patient; onClose: () => void; onNavigate: (tab:any)=>void; onOpenPatient?: (p:Patient)=>void
@@ -40,15 +40,11 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
   const userEmail = useAuthStore(st => st.user?.email)
   const canGrowth = usePermission("CLINIC_GROWTH_READ")
   const [activeTab, setActiveTab] = useState<TabId>("overview")
-  const [billLines, setBillLines] = useState<BillLine[]>([])
   const [showActions, setShowActions] = useState(false)
   // A consultation is a full-screen workspace of its own; starting one leaves the file and opens it.
   const startSession = (appt: { id: string }) => navigate(workspacePath(appt.id))
   const pid = patient.id
   const idInfo = saId(patient.idNumber)
-
-  const removeBillLine = (id:string) =>
-    setBillLines(b=>b.filter(l=>l.id!==id))
 
   const { data: appointments=[] } = useQuery<Appointment[]>({
     queryKey:["pf-appointments",pid],
@@ -96,7 +92,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
     {id:"overview",     label:"Overview",     icon:User},
     {id:"appointments", label:"Appointments", icon:Calendar,   badge:pendingAppts||undefined},
     {id:"consultation", label:"Visits",       icon:Stethoscope},
-    {id:"running-bill", label:"Running bill", icon:CreditCard, badge:billLines.length||undefined},
+    {id:"account", label:"Account", icon:CreditCard},
     {id:"rx",           label:"Prescriptions",icon:Pill},
     {id:"labs",         label:"Lab results",  icon:FlaskConical},
     ...(canGrowth ? [{id:"growth" as TabId, label:"Growth", icon:Heart}] : []),
@@ -245,7 +241,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
         onStartSession={startSession} onOpenTab={setActiveTab}/>}
       {activeTab==="appointments" && <AppointmentsTab patient={patient} appointments={appointments as Appointment[]} practitioners={practitioners as Practitioner[]} qc={qc} onStartSession={startSession}/>}
       {activeTab==="consultation" && <PatientVisitsTab patientId={patient.id} appointments={appointments as any[]} defaultPractitionerId={myPractitionerId(practitioners as any[], userEmail)} onStartSession={startSession}/>}
-      {activeTab==="running-bill" && <RunningBillTab billLines={billLines} onRemove={removeBillLine} patient={patient}/>}
+      {activeTab==="account" && <PatientAccountTab patientId={pid}/>}
       {activeTab==="rx"           && <PrescriptionsTab patient={patient} consultations={consultations as Consultation[]}/>}
       {activeTab==="labs"         && <LabsTabEnhanced patient={patient}/>}
       {activeTab==="growth"       && <GrowthTab patientId={patient.id}/>}
