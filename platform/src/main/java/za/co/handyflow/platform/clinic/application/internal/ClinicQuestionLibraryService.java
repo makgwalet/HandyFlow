@@ -54,6 +54,12 @@ public class ClinicQuestionLibraryService {
 
     @Transactional(readOnly = true)
     public List<GroupView> groupsForVisit(TenantId tenantId, String visitType, UUID patientId) {
+        return groupsForVisit(tenantId, visitType, patientId, false);
+    }
+
+    /** {@code examination} true = the examination libraries (category EXAMINATION); false = every other group (the questionnaire block). */
+    @Transactional(readOnly = true)
+    public List<GroupView> groupsForVisit(TenantId tenantId, String visitType, UUID patientId, boolean examination) {
         PatientFacts facts = patientId == null ? new PatientFacts(null, null, null) : patientFacts(tenantId, patientId);
         List<VisitMapping> mapping = mappingFor(tenantId, visitType);
         if (mapping.isEmpty()) return List.of();
@@ -62,6 +68,7 @@ public class ClinicQuestionLibraryService {
         Map<String, VisitMapping> byCode = mapping.stream().collect(Collectors.toMap(VisitMapping::groupCode, m -> m, (a, b) -> a));
         List<GroupRow> chosen = rows.stream()
                 .filter(g -> applicable(g, visitType, facts))
+                .filter(g -> ExamGroupRules.onPage(g.category(), examination))
                 .sorted(Comparator.comparingInt((GroupRow g) -> byCode.get(g.code()).sortOrder()).thenComparing(GroupRow::code))
                 .toList();
         return chosen.stream().map(g -> view(g, byCode.get(g.code()).required())).toList();
@@ -297,7 +304,7 @@ public class ClinicQuestionLibraryService {
             }, g.id());
         jdbc.query("""
             SELECT id, code, label, help_text, answer_type, options, min_value, max_value,
-                   default_visible, default_required, observation_code
+                   default_visible, default_required, observation_code, normal_value::text AS normal_value
             FROM clinic_question WHERE group_id = ? ORDER BY sort_order, code""", rs -> {
                 UUID id = (UUID) rs.getObject("id");
                 String opts = rs.getString("options");
@@ -305,7 +312,7 @@ public class ClinicQuestionLibraryService {
                         rs.getString("answer_type"), opts == null ? List.of() : parseList(opts),
                         rs.getBigDecimal("min_value"), rs.getBigDecimal("max_value"),
                         rs.getBoolean("default_visible"), rs.getBoolean("default_required"), rs.getString("observation_code"),
-                        rulesByQuestion.getOrDefault(id, List.of())));
+                        rulesByQuestion.getOrDefault(id, List.of()), parseAny(rs.getString("normal_value"))));
             }, g.id());
         List<RedFlagView> flags = jdbc.query(
                 "SELECT code, label, severity, expression, message FROM clinic_red_flag_rule WHERE group_id = ? ORDER BY code",
@@ -337,6 +344,12 @@ public class ClinicQuestionLibraryService {
     private Map<String, Object> parse(String raw) {
         try { return json.readValue(raw, MAP); }
         catch (JsonProcessingException e) { throw new IllegalStateException("Stored rule or form data is not valid JSON.", e); }
+    }
+
+    private Object parseAny(String raw) {
+        if (raw == null) return null;
+        try { return json.readValue(raw, Object.class); }
+        catch (JsonProcessingException e) { throw new IllegalStateException("Stored normal answer is not valid JSON.", e); }
     }
 
     private List<Map<String, Object>> parseList(String raw) {

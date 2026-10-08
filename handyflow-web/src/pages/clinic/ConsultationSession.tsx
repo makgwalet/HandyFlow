@@ -523,6 +523,12 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
           <SoapFields soap={soap} sf={sf} only={["examination"]}/>
         </>)}
 
+        {/* Examination libraries: stays mounted like the questionnaire so answers still being saved are never cut off. */}
+        <div hidden={step !== "examination"}>
+          <QuestionForm kind="EXAMINATION" consultationId={draftReady ? (draftIdRef.current ?? null) : null}
+            patientId={patient.id} visitType={appointment.appointmentType || "CONSULTATION"} />
+        </div>
+
         {step === "diagnose" && (<>
           <StepTitle n={3} title="Assessment & treatment" help="Your assessment, then what you are doing about it." />
           <div style={{ display:"flex", gap:14, flexWrap:"wrap", alignItems:"flex-start" }}>

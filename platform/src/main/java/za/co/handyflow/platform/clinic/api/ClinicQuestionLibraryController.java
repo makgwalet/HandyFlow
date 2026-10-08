@@ -35,9 +35,10 @@ public class ClinicQuestionLibraryController {
     @PreAuthorize("hasAuthority('CLINIC_QUESTIONNAIRE_READ')")
     @Operation(summary = "Question groups for a visit type (ACTIVE content only), filtered for the patient")
     public ResponseEntity<ApiResponse<List<GroupView>>> forVisit(
-            @RequestParam String visitType, @RequestParam(required = false) UUID patientId) {
+            @RequestParam String visitType, @RequestParam(required = false) UUID patientId,
+            @RequestParam(defaultValue = "QUESTIONNAIRE") String kind) {
         return ResponseEntity.ok(ApiResponse.success("Success",
-                library.groupsForVisit(TenantContext.getTenantIdAsObject(), visitType, patientId)));
+                library.groupsForVisit(TenantContext.getTenantIdAsObject(), visitType, patientId, "EXAMINATION".equalsIgnoreCase(kind))));
     }
 
     @GetMapping("/question-groups/{code}")

@@ -109,6 +109,18 @@ class GroupDefinitionValidatorTest {
     }
 
     @Test
+    @DisplayName("a normal answer must fit the question's answer type")
+    void normalAnswers() {
+        var opts = opts("clear", "wheeze");
+        var good = new QuestionView("chest", "Chest", null, "SINGLE_SELECT", opts, null, null, true, false, null, List.of(), "clear");
+        var bad = new QuestionView("chest", "Chest", null, "SINGLE_SELECT", opts, null, null, true, false, null, List.of(), "crackles");
+        var number = new QuestionView("rate", "Rate", null, "NUMBER", null, null, null, true, false, null, List.of(), 16);
+        assertThat(problems(def(List.of(good), List.of()))).isEmpty();
+        assertThat(problems(def(List.of(bad), List.of()))).anyMatch(s -> s.contains("one of the options"));
+        assertThat(problems(def(List.of(number), List.of()))).anyMatch(s -> s.contains("never preset"));
+    }
+
+    @Test
     @DisplayName("array literals are quoted and escaped; empty means NULL (all)")
     void arrayLiteral() {
         assertThat(ClinicQuestionAuthoringService.arrayLiteral(null)).isNull();

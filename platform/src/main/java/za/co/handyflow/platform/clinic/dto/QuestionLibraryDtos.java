@@ -13,7 +13,15 @@ public final class QuestionLibraryDtos {
     public record QuestionView(String code, String label, String helpText, String answerType,
                                List<Map<String, Object>> options, BigDecimal min, BigDecimal max,
                                boolean defaultVisible, boolean defaultRequired, String observationCode,
-                               List<RuleView> rules) {}
+                               List<RuleView> rules, Object normalValue) {
+        /** Without a normal preset (every question written before examination libraries). */
+        public QuestionView(String code, String label, String helpText, String answerType,
+                            List<Map<String, Object>> options, BigDecimal min, BigDecimal max,
+                            boolean defaultVisible, boolean defaultRequired, String observationCode,
+                            List<RuleView> rules) {
+            this(code, label, helpText, answerType, options, min, max, defaultVisible, defaultRequired, observationCode, rules, null);
+        }
+    }
 
     public record RedFlagView(String code, String label, String severity, Map<String, Object> expression, String message) {}
 

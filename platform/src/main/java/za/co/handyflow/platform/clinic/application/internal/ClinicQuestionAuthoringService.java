@@ -69,13 +69,13 @@ public class ClinicQuestionAuthoringService {
 
         List<QuestionView> questions = jdbc.query("""
             SELECT id, code, label, help_text, answer_type, options::text, min_value, max_value,
-                   default_visible, default_required, observation_code
+                   default_visible, default_required, observation_code, normal_value::text AS normal_value
             FROM clinic_question WHERE group_id = ? ORDER BY sort_order, code""",
                 (rs, i) -> new QuestionView(rs.getString("code"), rs.getString("label"), rs.getString("help_text"),
                         rs.getString("answer_type"), parseList(rs.getString("options")),
                         rs.getBigDecimal("min_value"), rs.getBigDecimal("max_value"),
                         rs.getBoolean("default_visible"), rs.getBoolean("default_required"), rs.getString("observation_code"),
-                        rules.getOrDefault((UUID) rs.getObject("id"), List.of())), groupId);
+                        rules.getOrDefault((UUID) rs.getObject("id"), List.of()), parseAny(rs.getString("normal_value"))), groupId);
 
         List<RedFlagView> flags = jdbc.query("SELECT code, label, severity, expression::text, message FROM clinic_red_flag_rule WHERE group_id = ? ORDER BY code",
                 (rs, i) -> new RedFlagView(rs.getString(1), rs.getString(2), rs.getString(3), parse(rs.getString(4)), rs.getString(5)), groupId);
@@ -175,11 +175,12 @@ public class ClinicQuestionAuthoringService {
             UUID qid = UUID.randomUUID();
             jdbc.update("""
                 INSERT INTO clinic_question (id, group_id, code, label, help_text, answer_type, options, min_value, max_value,
-                    default_visible, default_required, observation_code, sort_order)
-                VALUES (?,?,?,?,?,?,?::jsonb,?,?,?,?,?,?)""",
+                    default_visible, default_required, observation_code, sort_order, normal_value)
+                VALUES (?,?,?,?,?,?,?::jsonb,?,?,?,?,?,?,?::jsonb)""",
                     qid, groupId, q.code(), q.label().trim(), blankToNull(q.helpText()), q.answerType(),
                     q.options() == null || q.options().isEmpty() ? null : write(q.options()),
-                    q.min(), q.max(), q.defaultVisible(), q.defaultRequired(), blankToNull(q.observationCode()), ++order);
+                    q.min(), q.max(), q.defaultVisible(), q.defaultRequired(), blankToNull(q.observationCode()), ++order,
+                    q.normalValue() == null ? null : write(q.normalValue()));
             for (RuleView r : q.rules() == null ? List.<RuleView>of() : q.rules()) {
                 jdbc.update("INSERT INTO clinic_question_rule (id, question_id, kind, expression, message, target_group_code) VALUES (?,?,?,?::jsonb,?,?)",
                         UUID.randomUUID(), qid, r.kind(), write(r.expression()), blankToNull(r.message()), blankToNull(r.targetGroupCode()));
@@ -194,6 +195,12 @@ public class ClinicQuestionAuthoringService {
     private void audit(TenantId tenantId, UUID groupId, String from, String to, UUID actor, String note) {
         jdbc.update("INSERT INTO clinic_content_audit (id, tenant_id, group_id, from_status, to_status, actor_user_id, note) VALUES (?,?,?,?,?,?,?)",
                 UUID.randomUUID(), tenantId.getValue(), groupId, from, to, actor, note);
+    }
+
+    private Object parseAny(String raw) {
+        if (raw == null) return null;
+        try { return json.readValue(raw, Object.class); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException e) { throw new IllegalStateException("Stored normal answer is not valid JSON.", e); }
     }
 
     private String write(Object o) {

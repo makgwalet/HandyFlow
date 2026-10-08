@@ -81,3 +81,21 @@ export function formatAnswer(answerType: string, value: AnswerValue, options: Qu
   if (typeof value === "number") return String(value)
   return answerType === "SINGLE_SELECT" || answerType === "RADIO_GROUP" ? labelOf(value) : value
 }
+
+/**
+ * "Mark all normal" for an examination group (Q-6). Fills each question that has a normal answer written by the clinical reviewer
+ * and that the clinician has not answered yet; an answer already given is never overwritten. Questions without a preset are left alone.
+ */
+export function applyNormal(questions: { code: string; normalValue?: AnswerValue }[], current: Answers): Answers {
+  const next: Answers = { ...current }
+  for (const q of questions) {
+    if (q.normalValue === undefined || q.normalValue === null) continue
+    const have = next[q.code]
+    const empty = have === undefined || have === null || have === "" || (Array.isArray(have) && have.length === 0)
+    if (empty) next[q.code] = q.normalValue
+  }
+  return next
+}
+
+export const hasNormalPreset = (questions: { normalValue?: AnswerValue }[]) =>
+  questions.some(q => q.normalValue !== undefined && q.normalValue !== null)

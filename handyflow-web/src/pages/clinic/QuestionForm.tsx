@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import {
-  BODY_REGIONS, DURATION_UNITS, cleanAnswers, scaleRange, toNumber, toggleInList, unitOptions, withUnit,
+  BODY_REGIONS, DURATION_UNITS, applyNormal, cleanAnswers, hasNormalPreset, scaleRange, toNumber, toggleInList, unitOptions, withUnit,
   type AnswerValue, type Answers, type QuestionOption,
 } from "./questionForm.logic"
 
@@ -15,6 +15,8 @@ interface Question {
   code: string; label: string; helpText?: string; answerType: string
   options: QuestionOption[]; min?: number | null; max?: number | null
   defaultRequired: boolean; rules: Rule[]
+  /** The reviewer's normal answer for this finding, if one was written (examination libraries). */
+  normalValue?: AnswerValue
 }
 interface Group {
   code: string; name: string; version: number; required: boolean; demo: boolean
@@ -36,12 +38,14 @@ interface Props {
   readOnly?: boolean
   /** When set, show exactly these groups (those already started) instead of the ones served for the visit type. */
   groupCodes?: string[]
+  /** QUESTIONNAIRE (default) = history groups under Symptoms; EXAMINATION = the examination libraries. */
+  kind?: "QUESTIONNAIRE" | "EXAMINATION"
 }
 
-export default function QuestionForm({ consultationId, patientId, visitType, readOnly, groupCodes }: Props) {
+export default function QuestionForm({ consultationId, patientId, visitType, readOnly, groupCodes, kind = "QUESTIONNAIRE" }: Props) {
   const fixed = groupCodes ? groupCodes.join(",") : null
   const { data: groups = [] } = useQuery<Group[]>({
-    queryKey: ["clinic-question-groups", visitType, patientId, fixed],
+    queryKey: ["clinic-question-groups", visitType, patientId, fixed, kind],
     queryFn: async () => {
       if (groupCodes) {
         const out: Group[] = []
@@ -50,7 +54,7 @@ export default function QuestionForm({ consultationId, patientId, visitType, rea
         }
         return out
       }
-      return unwrap(await apiClient.get("/api/v1/clinic/question-groups", { params: { visitType, patientId } })) ?? []
+      return unwrap(await apiClient.get("/api/v1/clinic/question-groups", { params: { visitType, patientId, kind } })) ?? []
     },
     staleTime: 5 * 60_000,
   })
@@ -124,6 +128,7 @@ function GroupSection({ group, consultationId, patientId, visitType, readOnly, o
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answers, consultationId])
 
+  const markNormal = () => { touched.current = true; setAnswers(p => applyNormal(group.questions, p)) }
   const set = (code: string, v: AnswerValue) => { touched.current = true; setAnswers(p => ({ ...p, [code]: v })) }
   const visible = new Set(ev?.visible ?? group.questions.filter(q => !q.rules.some(r => r.kind === "SHOW_WHEN")).map(q => q.code))
 
@@ -149,6 +154,16 @@ function GroupSection({ group, consultationId, patientId, visitType, readOnly, o
               {f.severity === "URGENT" ? "Needs attention: " : "Note: "}{f.label}{f.message ? `. ${f.message}` : ""}
             </div>
           ))}
+          {!readOnly && hasNormalPreset(group.questions) && (
+            <div>
+              <button type="button" onClick={markNormal}
+                style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)",
+                  fontSize: 12, fontWeight: 600, cursor: "pointer", color: "var(--hf-text)" }}>
+                Mark all normal
+              </button>
+              <span style={{ fontSize: 11, color: "var(--hf-text-muted)", marginLeft: 8 }}>Fills only the findings you have not answered.</span>
+            </div>
+          )}
           {group.questions.filter(q => visible.has(q.code)).map(q => {
             const required = (ev?.required ?? []).includes(q.code) || q.defaultRequired
             const disabled = readOnly || (ev?.disabled ?? []).includes(q.code)

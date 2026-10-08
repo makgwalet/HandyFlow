@@ -60,6 +60,10 @@ final class GroupDefinitionValidator {
             try { type = AnswerType.valueOf(q.answerType() == null ? "" : q.answerType()); }
             catch (IllegalArgumentException e) { out.add(at + "unknown answer type '" + q.answerType() + "'."); }
             if (type != null && CHOICE_TYPES.contains(type.name())) choiceOptions(at, q, out);
+            if (q.normalValue() != null) {
+                String bad = type == null ? null : ExamGroupRules.normalProblem(type.name(), q.options(), q.normalValue());
+                if (bad != null) out.add(at + bad);
+            }
             if (q.min() != null && q.max() != null && q.min().compareTo(q.max()) > 0) out.add(at + "minimum is above maximum.");
             if (!blank(q.observationCode())) {
                 if (observationCodes != null && !observationCodes.contains(q.observationCode())) {
