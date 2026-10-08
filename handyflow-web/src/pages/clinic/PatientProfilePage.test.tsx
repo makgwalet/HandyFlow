@@ -20,6 +20,29 @@ const wrap = (ui: React.ReactElement) => render(<QueryClientProvider client={new
 afterEach(cleanup)
 beforeEach(() => { get.mockReset(); put.mockReset(); for (const k of Object.keys(perms)) delete perms[k] })
 
+describe("change history", () => {
+  it("lists corrections to name, ID and date of birth with who and when", async () => {
+    perms.CLINIC_PATIENT_UPDATE = true; perms.CLINIC_PATIENT_DEMOGRAPHICS_WRITE = true
+    get.mockImplementation(async (url: string) => url.endsWith("/corrections")
+      ? { data: { data: [
+          { field: "LAST_NAME", oldValue: "Botha", newValue: "Bothma", changedByName: "Dr Priya Govender", changedAt: "2026-10-08T08:00:00Z" },
+          { field: "ID_NUMBER", oldValue: null, newValue: "A01234567", changedByName: null, changedAt: "2026-10-07T08:00:00Z" }] } }
+      : profile(["name"]))
+    wrap(<PatientProfilePage patient={patient} onBack={() => {}} initialSection="identity" />)
+    expect(await screen.findByText(/Last name: Botha to Bothma/)).toBeTruthy()
+    expect(screen.getByText(/Dr Priya Govender/)).toBeTruthy()
+    expect(screen.getByText(/ID number: added A01234567/)).toBeTruthy()
+    expect(screen.getByText(/A staff member/)).toBeTruthy()
+  })
+  it("shows no history block when there is none or it cannot be read", async () => {
+    perms.CLINIC_PATIENT_UPDATE = true; perms.CLINIC_PATIENT_DEMOGRAPHICS_WRITE = true
+    get.mockImplementation(async (url: string) => { if (url.endsWith("/corrections")) throw { response: { status: 403 } }; return profile(["name"]) })
+    wrap(<PatientProfilePage patient={patient} onBack={() => {}} initialSection="identity" />)
+    await screen.findByLabelText("First name *")
+    expect(screen.queryByLabelText("Change history")).toBeNull()
+  })
+})
+
 describe("profile page", () => {
   it("opens at the first section with something missing and shows the percentage", async () => {
     perms.CLINIC_PATIENT_UPDATE = true

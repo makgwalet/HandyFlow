@@ -30,6 +30,7 @@ class ClinicPatientProfileServiceTest {
     @Mock ClinicPatientRepository        patientRepo;
     @Mock ClinicPatientHistoryService    historyService;
     @Mock ClinicConsentService           consentService;
+    @Mock org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     @InjectMocks ClinicPatientProfileService service;
 
@@ -67,6 +68,17 @@ class ClinicPatientProfileServiceTest {
         PatientCore core = service.updateDemographics(T, p.getId(), req);
         assertThat(core.idNumber()).isEqualTo("8001015009087");
         assertThat(core.sexAtBirth()).isEqualTo("MALE");
+        // The ID number and sex were blank before, so each is recorded as a correction; the unchanged names are not.
+        verify(jdbc, times(2)).update(contains("INSERT INTO clinic_patient_corrections"), any(Object[].class));
+    }
+
+    @Test
+    void aSaveThatChangesNothingRecordsNothing() {
+        ClinicPatient p = patient();
+        when(patientRepo.findActiveById(T, p.getId())).thenReturn(Optional.of(p));
+        when(patientRepo.save(p)).thenReturn(p);
+        service.updateDemographics(T, p.getId(), new DemographicsRequest("Sipho", "Nkosi", null, LocalDate.of(1980, 1, 1), "Male", null));
+        verifyNoInteractions(jdbc);
     }
 
     @Test

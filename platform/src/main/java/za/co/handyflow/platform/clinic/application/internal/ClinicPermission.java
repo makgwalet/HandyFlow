@@ -33,7 +33,7 @@ public enum ClinicPermission {
             "Merge duplicate patient records"),
     CLINIC_PATIENT_DUPLICATE_REVIEW(Group.PATIENT, Kind.WRITE, "CLINIC_WRITE", false,
             "Review and resolve possible duplicate patients"),
-    CLINIC_PATIENT_DEMOGRAPHICS_READ(Group.PATIENT, Kind.READ, "CLINIC_READ", false,
+    CLINIC_PATIENT_DEMOGRAPHICS_READ(Group.PATIENT, Kind.READ, "CLINIC_READ", true,
             "View name, date of birth, sex and ID number"),
     CLINIC_PATIENT_DEMOGRAPHICS_WRITE(Group.PATIENT, Kind.WRITE, "CLINIC_WRITE", true,
             "Change name, date of birth, sex and ID number"),

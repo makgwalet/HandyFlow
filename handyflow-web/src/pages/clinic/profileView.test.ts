@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { EMPTY_PROFILE, firstIncomplete, missing, postalProblem, profileSummary, sectionProgress, toForm, toRequest, type Completeness } from "./profileView"
+import { describeCorrection, EMPTY_PROFILE, firstIncomplete, missing, postalProblem, profileSummary, sectionProgress, toForm, toRequest, type Completeness } from "./profileView"
 
 const comp = (done: string[]): Completeness => {
   const items = [["name", "identity"], ["phone", "contact"], ["address", "address"], ["emergency", "emergency"], ["consent", "consent"]]
@@ -33,5 +33,13 @@ describe("profile view", () => {
   })
   it("checks postal codes", () => {
     expect(postalProblem("2196")).toBeNull(); expect(postalProblem("")).toBeNull(); expect(postalProblem("21A6")).not.toBeNull()
+  })
+})
+
+describe("describeCorrection", () => {
+  it("says what changed in plain words", () => {
+    expect(describeCorrection({ field: "LAST_NAME", oldValue: "Botha", newValue: "Bothma" })).toBe("Last name: Botha to Bothma")
+    expect(describeCorrection({ field: "ID_NUMBER", oldValue: null, newValue: "A01234567" })).toBe("ID number: added A01234567")
+    expect(describeCorrection({ field: "DATE_OF_BIRTH", oldValue: "2019-01-15", newValue: null })).toBe("Date of birth: 2019-01-15 removed")
   })
 })

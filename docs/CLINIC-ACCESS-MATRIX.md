@@ -28,7 +28,7 @@ user -> role -> permissions -> (later) patient and context rules
 | `CLINIC_PATIENT_ARCHIVE` | manage | Archive a patient record | `CLINIC_ADMIN` | Reserved |
 | `CLINIC_PATIENT_MERGE` | manage | Merge duplicate patient records | `CLINIC_ADMIN` | Reserved |
 | `CLINIC_PATIENT_DUPLICATE_REVIEW` | write | Review and resolve possible duplicate patients | `CLINIC_WRITE` | Reserved |
-| `CLINIC_PATIENT_DEMOGRAPHICS_READ` | read | View name, date of birth, sex and ID number | `CLINIC_READ` | Reserved |
+| `CLINIC_PATIENT_DEMOGRAPHICS_READ` | read | View name, date of birth, sex and ID number | `CLINIC_READ` | Live |
 | `CLINIC_PATIENT_DEMOGRAPHICS_WRITE` | write | Change name, date of birth, sex and ID number | `CLINIC_WRITE` | Live |
 | `CLINIC_PATIENT_CONTACT_READ` | read | View phone and email | `CLINIC_READ` | Reserved |
 | `CLINIC_PATIENT_CONTACT_WRITE` | write | Change phone and email | `CLINIC_WRITE` | Reserved |
@@ -386,7 +386,7 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 
 ## 3. API authorization matrix
 
-189 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
+190 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
 
 | Area | Method | Path | Requires |
 |---|---|---|---|
@@ -532,6 +532,7 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 | PatientProfile | GET | `/patients/{id}/profile` | `CLINIC_PATIENT_READ` |
 | PatientProfile | PUT | `/patients/{id}/profile` | `CLINIC_PATIENT_UPDATE` |
 | PatientProfile | PUT | `/patients/{id}/demographics` | `CLINIC_PATIENT_DEMOGRAPHICS_WRITE` |
+| PatientProfile | GET | `/patients/{id}/corrections` | `CLINIC_PATIENT_DEMOGRAPHICS_READ` |
 | PatientProfile | PUT | `/patients/{id}/contact` | `CLINIC_PATIENT_UPDATE` |
 | QuestionLibrary | GET | `/question-groups` | `CLINIC_QUESTIONNAIRE_READ` |
 | QuestionLibrary | GET | `/question-groups/{code}` | `CLINIC_QUESTIONNAIRE_READ` |

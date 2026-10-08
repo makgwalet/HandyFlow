@@ -28,6 +28,9 @@ public final class ProfileDtos {
     /** Phone, email and the first emergency contact. */
     public record ContactRequest(String phone, String email, String emergencyContactName, String emergencyContactPhone) {}
 
+    /** One corrected field: what it was, what it is now, who changed it and when. */
+    public record CorrectionView(String field, String oldValue, String newValue, String changedByName, java.time.Instant changedAt) {}
+
     public record PatientCore(java.util.UUID id, String firstName, String lastName, String idNumber, LocalDate dateOfBirth,
                               String gender, String sexAtBirth, String phone, String email,
                               String emergencyContactName, String emergencyContactPhone) {}

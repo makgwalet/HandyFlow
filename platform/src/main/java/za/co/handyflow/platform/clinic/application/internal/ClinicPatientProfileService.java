@@ -1,6 +1,7 @@
 package za.co.handyflow.platform.clinic.application.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.clinic.domain.model.ClinicPatient;
@@ -13,7 +14,9 @@ import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.shared.UserContext;
 
+import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /** The patient profile page: details beyond the registration form, and how complete the profile is (patch 0166). */
@@ -25,6 +28,7 @@ public class ClinicPatientProfileService {
     private final ClinicPatientRepository        patientRepo;
     private final ClinicPatientHistoryService    historyService;
     private final ClinicConsentService           consentService;
+    private final JdbcTemplate                   jdbc;
 
     @Transactional(readOnly = true)
     public ProfileResponse get(TenantId t, UUID patientId) {
@@ -56,8 +60,35 @@ public class ClinicPatientProfileService {
                 }
             }
         }
+        var before = new CorrectionRules.Facts(p.getFirstName(), p.getLastName(), p.getIdNumber(), p.getDateOfBirth(), p.getGender(), p.getSexAtBirth());
         p.updateDemographics(d.firstName(), d.lastName(), d.idNumber(), d.dateOfBirth(), d.gender(), d.sexAtBirth());
-        return core(patientRepo.save(p));
+        var after = new CorrectionRules.Facts(p.getFirstName(), p.getLastName(), p.getIdNumber(), p.getDateOfBirth(), p.getGender(), p.getSexAtBirth());
+        PatientCore saved = core(patientRepo.save(p));
+        UUID me = currentUserOrNull();
+        for (var change : CorrectionRules.diff(before, after)) {
+            jdbc.update("INSERT INTO clinic_patient_corrections (id, tenant_id, patient_id, field, old_value, new_value, changed_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    UUID.randomUUID(), t.getValue(), patientId, change.field(), change.oldValue(), change.newValue(), me);
+        }
+        return saved;
+    }
+
+    /** Every correction to name, ID number, date of birth and sex, newest first. */
+    @Transactional(readOnly = true)
+    public List<CorrectionView> corrections(TenantId t, UUID patientId) {
+        patient(t, patientId);
+        return jdbc.query("""
+                SELECT c.field, c.old_value, c.new_value, c.changed_at,
+                       NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), '') AS name
+                  FROM clinic_patient_corrections c
+                  LEFT JOIN users u ON u.id = c.changed_by AND u.tenant_id = c.tenant_id
+                 WHERE c.tenant_id = ? AND c.patient_id = ?
+                 ORDER BY c.changed_at DESC, c.field
+                """,
+                (rs, i) -> {
+                    Timestamp at = rs.getTimestamp("changed_at");
+                    return new CorrectionView(rs.getString("field"), rs.getString("old_value"), rs.getString("new_value"),
+                            rs.getString("name"), at == null ? null : at.toInstant());
+                }, t.getValue(), patientId);
     }
 
     @Transactional

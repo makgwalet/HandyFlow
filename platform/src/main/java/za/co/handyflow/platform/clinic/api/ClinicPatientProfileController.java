@@ -43,6 +43,13 @@ public class ClinicPatientProfileController {
         return ResponseEntity.ok(ApiResponse.success("Details saved", profiles.updateDemographics(TenantContext.getTenantIdAsObject(), id, body)));
     }
 
+    @GetMapping("/corrections")
+    @PreAuthorize("hasAuthority('CLINIC_PATIENT_DEMOGRAPHICS_READ')")
+    @Operation(summary = "Who corrected the name, ID number, date of birth or sex, and what it was before")
+    public ResponseEntity<ApiResponse<java.util.List<CorrectionView>>> corrections(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Success", profiles.corrections(TenantContext.getTenantIdAsObject(), id)));
+    }
+
     @PutMapping("/contact")
     @PreAuthorize("hasAuthority('CLINIC_PATIENT_UPDATE')")
     @Operation(summary = "Save phone, email and the first emergency contact")

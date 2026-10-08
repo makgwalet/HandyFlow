@@ -73,3 +73,18 @@ export function profileSummary(c: Completeness | undefined): string {
   if (m.length === 0) return "Profile complete"
   return `${m.length} thing${m.length === 1 ? "" : "s"} missing: ${m.slice(0, 3).map(i => i.label.toLowerCase()).join(", ")}${m.length > 3 ? "…" : ""}`
 }
+
+// ── Corrections to name, ID, date of birth and sex ───────────────────────────
+
+export interface CorrectionRow { field: string; oldValue: string | null; newValue: string | null; changedByName: string | null; changedAt: string }
+const CORRECTION_LABEL: Record<string, string> = {
+  FIRST_NAME: "First name", LAST_NAME: "Last name", ID_NUMBER: "ID number", DATE_OF_BIRTH: "Date of birth", GENDER: "Gender", SEX_AT_BIRTH: "Sex at birth",
+}
+/** "Last name: Botha to Bothma", "ID number: added A01234567", "Date of birth: 2019-01-15 removed". */
+export function describeCorrection(c: Pick<CorrectionRow, "field" | "oldValue" | "newValue">): string {
+  const label = CORRECTION_LABEL[c.field] ?? c.field
+  if (c.oldValue && c.newValue) return `${label}: ${c.oldValue} to ${c.newValue}`
+  if (c.newValue) return `${label}: added ${c.newValue}`
+  if (c.oldValue) return `${label}: ${c.oldValue} removed`
+  return label
+}

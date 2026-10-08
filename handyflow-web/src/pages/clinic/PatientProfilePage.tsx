@@ -9,8 +9,8 @@ import { Card, primaryBtn, smallBtn } from "./OverviewCard"
 import { BORDER, GRAY, lbl, sinp, type Patient } from "./patientFile.shared"
 import {
   CONTACTS, ID_TYPES, LANGUAGES, PROVINCES, RELATIONSHIPS, SECTIONS, SEXES, TITLES, EMPTY_PROFILE,
-  firstIncomplete, postalProblem, profileSummary, sectionProgress, toForm, toRequest,
-  type Completeness, type ProfileForm, type SectionId,
+  describeCorrection, firstIncomplete, postalProblem, profileSummary, sectionProgress, toForm, toRequest,
+  type Completeness, type CorrectionRow, type ProfileForm, type SectionId,
 } from "./profileView"
 
 const root = (id: string) => `/api/v1/clinic/patients/${id}`
@@ -42,6 +42,11 @@ export default function PatientProfilePage({ patient, initialSection, onBack, on
   const canIdentity = usePermission("CLINIC_PATIENT_DEMOGRAPHICS_WRITE")
   const key = ["pf-profile", pid]
   const { data: profile } = useQuery<ProfileResponse>({ queryKey: key, queryFn: async () => data(await apiClient.get(`${root(pid)}/profile`)) })
+  // The change history is for people who may see these details; no permission or no answer shows nothing.
+  const { data: corrections = [] } = useQuery<CorrectionRow[]>({
+    queryKey: ["pf-corrections", pid], retry: false,
+    queryFn: async () => { try { const d = data(await apiClient.get(`${root(pid)}/corrections`)); return Array.isArray(d) ? d : [] } catch { return [] } },
+  })
   const comp = profile?.completeness
   const [section, setSection] = useState<SectionId | null>(initialSection ?? null)
   const [form, setForm] = useState<ProfileForm>(EMPTY_PROFILE)
@@ -82,6 +87,7 @@ export default function PatientProfilePage({ patient, initialSection, onBack, on
       }
       await apiClient.put(`${root(pid)}/profile`, toRequest(form))
       await qc.invalidateQueries({ queryKey: key })
+      qc.invalidateQueries({ queryKey: ["pf-corrections", pid] })
       qc.invalidateQueries({ queryKey: ["clinic-patients"] })
       if (next) {
         const changed = { ...patient, ...next, fullName: `${next.firstName} ${next.lastName}`.trim() } as Patient
@@ -120,7 +126,17 @@ export default function PatientProfilePage({ patient, initialSection, onBack, on
             <Field id="pp-lang" label="Preferred language"><Pick id="pp-lang" value={form.preferredLanguage} onChange={set("preferredLanguage")} options={LANGUAGES} disabled={readOnly} /></Field>
           </div>
           {!canIdentity && <div style={{ fontSize: 12, color: GRAY, marginTop: 10 }}>Name, ID number, date of birth and sex are changed by someone with that permission.</div>}
-          {canIdentity && <div style={{ fontSize: 12, color: GRAY, marginTop: 10 }}>A South African ID number is checked against the date of birth. Changes to name or ID are not yet kept in a change history.</div>}
+          {canIdentity && <div style={{ fontSize: 12, color: GRAY, marginTop: 10 }}>A South African ID number is checked against the date of birth. Every change to name, ID number, date of birth or sex is kept below.</div>}
+          {corrections.length > 0 && (
+            <div aria-label="Change history" style={{ marginTop: 14, borderTop: `1px solid ${BORDER}`, paddingTop: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: GRAY, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>Change history</div>
+              <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 4 }}>
+                {corrections.map((c, i) => (
+                  <li key={i} style={{ fontSize: 13, color: "var(--hf-text-secondary)" }}>
+                    {describeCorrection(c)} <span style={{ color: GRAY }}>· {c.changedByName ?? "A staff member"} · {new Date(c.changedAt).toLocaleString("en-ZA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                  </li>))}
+              </ul>
+            </div>)}
           {saveBar("identity")}
         </>)
       case "contact": return (
