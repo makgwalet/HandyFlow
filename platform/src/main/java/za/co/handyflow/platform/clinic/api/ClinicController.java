@@ -178,6 +178,23 @@ public class ClinicController {
                 clinicService.getAppointmentsInRange(TenantContext.getTenantIdAsObject(), from, to)));
     }
 
+    @GetMapping("/appointments/{id}")
+    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @Operation(summary = "One appointment")
+    public ResponseEntity<ApiResponse<AppointmentResponse>> getAppointment(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                clinicService.getAppointment(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @GetMapping("/appointments/{id}/consultation")
+    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @Operation(summary = "The unsigned consultation for an appointment (draft, nurse handoff or doctor review); 404 when none is open")
+    public ResponseEntity<ApiResponse<ConsultationResponse>> getOpenConsultation(@PathVariable UUID id) {
+        return clinicService.getOpenConsultationForAppointment(TenantContext.getTenantIdAsObject(), id)
+                .map(c -> ResponseEntity.ok(ApiResponse.success("Success", c)))
+                .orElseThrow(() -> new za.co.handyflow.platform.shared.ResourceNotFoundException("Consultation", id.toString()));
+    }
+
     @GetMapping("/patients/{patientId}/appointments")
     @PreAuthorize("hasAuthority('CLINIC_READ')")
     @Operation(summary = "Get all appointments for a specific patient")
@@ -308,9 +325,11 @@ public class ClinicController {
     @PostMapping("/consultations/{id}/sign")
     @PreAuthorize("hasAuthority('CLINIC_CLINICAL_SIGN')")
     @Operation(summary = "Sign a DRAFT consultation: completes the appointment (no automatic email, see DEC-CLINIC-002)")
-    public ResponseEntity<ApiResponse<ConsultationResponse>> signConsultation(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<ConsultationResponse>> signConsultation(
+            @PathVariable UUID id, @RequestBody(required = false) SignRequest body) {
         return ResponseEntity.ok(ApiResponse.success("Consultation signed",
-                clinicService.signConsultation(TenantContext.getTenantIdAsObject(), id)));
+                clinicService.signConsultation(TenantContext.getTenantIdAsObject(), id,
+                        body == null ? null : body.overrideReason())));
     }
 
     @PostMapping("/consultations/{id}/abandon")

@@ -35,6 +35,7 @@ import { AccountingPage }               from './pages/accounting/AccountingPage'
 import { BookingsPage }                 from './pages/bookings/BookingsPage'
 import { HrPage }                       from './pages/hr/HrPage'
 import { ClinicPage }                   from './pages/clinic/ClinicPage'
+import ConsultationWorkspacePage        from './pages/clinic/ConsultationWorkspacePage'
 import { EventsPage }                   from './pages/events/EventsPage'
 import ContractingPage                  from './pages/contracting/ContractingPage'
 import SigningPage                      from './pages/contracting/SigningPage'
@@ -309,6 +310,7 @@ export default function App() {
             <Route path="/accounting/:section?" element={<AccountingPage />} />
             <Route path="/settings"    element={<SettingsPage />} />
             <Route path="/hr/:section?" element={<HrPage />} />
+            <Route path="/clinic/consult/:appointmentId" element={<ConsultationWorkspacePage />} />
             <Route path="/clinic/:section?" element={<ClinicPage />} />
             <Route path="/events/:section?" element={<EventsPage />} />
             <Route path="/contracts/:section?" element={<ContractingPage />} />

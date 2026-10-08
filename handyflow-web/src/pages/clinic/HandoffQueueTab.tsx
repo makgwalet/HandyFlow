@@ -5,14 +5,17 @@
 import { useDialogs } from "./dialogs"
 import ModalShell from "./ModalShell"
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
+import { vitalsLine } from "./consultWizard"
+import { toNotes, workspacePath, type ConsultationLike } from "./workspace"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import QuestionAnswersReadOnly from "./QuestionAnswersReadOnly"
 import QuestionForm from "./QuestionForm"
 
-interface QueueItem {
-  id: string; patientId: string; patientName: string; practitionerName?: string; chiefComplaint?: string
+type QueueItem = ConsultationLike & {
+  patientName: string; practitionerName?: string
   status: "READY_FOR_DOCTOR" | "DOCTOR_REVIEWING" | "DOCTOR_COMPLETED" | string
   createdAt: string
 }
@@ -46,6 +49,7 @@ const btn = (primary = false): React.CSSProperties => ({
 
 export default function HandoffQueueTab() {
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const { confirm, dialogs } = useDialogs()
   const canSign = usePermission("CLINIC_CLINICAL_SIGN")  // doctor actions
   const [error, setError] = useState("")
@@ -82,6 +86,10 @@ export default function HandoffQueueTab() {
     onError: (e: any) => setError(errMsg(e)),
   })
 
+  // Accept the handover, then open the consultation with the nurse's complaint and vitals already filled in.
+  const reviewAndStart = (item: QueueItem) => act.mutate({ id: item.id, path: "accept" }, {
+    onSuccess: () => { if (item.appointmentId) navigate(workspacePath(item.appointmentId)) },
+  })
   const fmt = (iso: string) => new Date(iso).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
 
   return (
@@ -106,20 +114,29 @@ export default function HandoffQueueTab() {
               <div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>
                 {item.chiefComplaint || "No complaint recorded"} · {fmt(item.createdAt)}
               </div>
+              <div style={{ fontSize: 12, color: "var(--hf-text-secondary)", marginTop: 2 }}>
+                Nurse intake: {item.chiefComplaint ? "complaint ✓" : "complaint —"} · {vitalsLine(toNotes(item)) || "no vitals"}
+              </div>
               <div style={{ fontSize: 12, marginTop: 4, color: "var(--hf-accent-text)", fontWeight: 600 }}>
                 {STATUS_LABEL[item.status] ?? item.status}
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {canSign && item.status === "READY_FOR_DOCTOR" && (
-                <button style={btn(true)} disabled={act.isPending}
-                  onClick={() => act.mutate({ id: item.id, path: "accept" })}>Accept</button>
+                <button style={btn(true)} disabled={act.isPending} onClick={() => reviewAndStart(item)}>
+                  {item.appointmentId ? "Review & start" : "Accept"}</button>
               )}
-              {canSign && item.status === "DOCTOR_REVIEWING" && (
+              {canSign && item.status === "DOCTOR_REVIEWING" && item.appointmentId && (
+                <button style={btn(true)} onClick={() => navigate(workspacePath(item.appointmentId!))}>Open consultation</button>
+              )}
+              {canSign && item.status === "DOCTOR_REVIEWING" && !item.appointmentId && (
                 <button style={btn(true)} disabled={act.isPending}
                   onClick={() => act.mutate({ id: item.id, path: "doctor-complete" })}>Finish review</button>
               )}
-              {canSign && item.status === "DOCTOR_COMPLETED" && (
+              {canSign && item.status === "DOCTOR_COMPLETED" && item.appointmentId && (
+                <button style={btn(true)} onClick={() => navigate(workspacePath(item.appointmentId!))}>Review &amp; sign</button>
+              )}
+              {canSign && item.status === "DOCTOR_COMPLETED" && !item.appointmentId && (
                 <button style={btn(true)} disabled={act.isPending}
                   onClick={async () => { if (await confirm({ title: "Sign this consultation?", body: "It will complete the visit.", confirmLabel: "Sign" })) act.mutate({ id: item.id, path: "sign" }) }}>
                   Sign</button>

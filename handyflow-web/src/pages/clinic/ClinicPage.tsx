@@ -4,17 +4,18 @@
 // navigation/moduleSections.ts and components/shell/SectionedModulePage).
 //
 // The patient file is NOT a separate route: it is carried in the history
-// entry's router state ({ openPatient, sessionAppointment }) on
-// /clinic/patients. That gives the behaviour the old in-page state had, plus:
+// entry's router state ({ openPatient }) on /clinic/patients. That gives:
 //   - the browser Back button closes the file;
 //   - a refresh keeps it open (history state survives a reload);
 //   - clicking any section in the sidebar closes it (a plain link has no state).
-// "Start session" from the Schedule opens the patient's file with an
-// appointment to begin; that is a ONE-SHOT: the file clears it from the
-// history entry as soon as it has consumed it, so a refresh cannot restart it.
+// A consultation is its own full-screen route, /clinic/consult/:appointmentId (ConsultationWorkspacePage).
+// Starting or resuming one from the Schedule, the drafts tray or a patient file navigates there; the
+// ConsultationDock under every section shows a consultation left open and resumes it.
 import { useState } from "react"
 import { apiClient } from "../../api/client"
 import { useLocation, useNavigate, useParams } from "react-router-dom"
+import ConsultationDock from "./ConsultationDock"
+import { workspacePath } from "./workspace"
 import ClinicDashboard   from "./ClinicDashboard"
 import PatientsTab       from "./PatientsTab"
 import ScheduleTab       from "./ScheduleTab"
@@ -40,7 +41,7 @@ import { CLINIC_SECTIONS } from "../../navigation/moduleSections"
 export type ClinicTab = "dashboard"|"patients"|"schedule"|"practitioners"|"claims"|"billing"|"recalls"|"waitlist"|"handoff"|"drafts"|"access-log"|"waiting-room"|"time-off"|"working-hours"|"closures"|"rooms"|"lab-inbox"|"question-library"
 
 interface Patient { id: string; firstName: string; lastName: string; fullName: string; [key: string]: any }
-interface FileState { openPatient?: Patient | null; sessionAppointment?: unknown }
+interface FileState { openPatient?: Patient | null }
 
 export function ClinicPage() {
   const location = useLocation()
@@ -53,10 +54,10 @@ export function ClinicPage() {
   const state = (location.state ?? {}) as FileState
   // The file only ever belongs to the Patients section.
   const openPatient = section === "patients" ? (state.openPatient ?? null) : null
-  const sessionAppointment = openPatient ? (state.sessionAppointment ?? null) : null
 
-  const openFile = (patient: Patient, appointment?: unknown) =>
-    navigate(`${base}/patients`, { state: { openPatient: patient, sessionAppointment: appointment ?? null } satisfies FileState })
+  const openFile = (patient: Patient) =>
+    navigate(`${base}/patients`, { state: { openPatient: patient } satisfies FileState })
+  const openConsultation = (appointment: { id?: string } | null | undefined) => { if (appointment?.id) navigate(workspacePath(appointment.id)) }
   // The dashboard knows a patient's id only; fetch the record, then open the file.
   const openPatientById = async (id: string) => {
     try {
@@ -65,9 +66,6 @@ export function ClinicPage() {
     } catch { /* stays on the dashboard; the patient list is one click away */ }
   }
   const closeFile = () => navigate(`${base}/patients`, { replace: true })
-  // One-shot: drop the appointment from this history entry once consumed.
-  const clearSession = () =>
-    navigate(location.pathname, { replace: true, state: { openPatient } satisfies FileState })
 
   const backButton = openPatient ? (
     <button onClick={closeFile}
@@ -89,19 +87,17 @@ export function ClinicPage() {
               patient={openPatient as any}
               onClose={closeFile}
               onNavigate={goTo}
-              onOpenPatient={p => openFile(p)}
-              initialSession={sessionAppointment}
-              onSessionClear={clearSession} />
+              onOpenPatient={p => openFile(p)} />
           )
         }
         switch (id) {
-          case "dashboard":     return <ClinicDashboard onNavigate={goTo} onOpenPatient={openPatientById} />
+          case "dashboard":     return <ClinicDashboard onNavigate={goTo} onOpenPatient={openPatientById} onResume={id => openConsultation({ id })} />
           case "patients":      return <PatientsTab onOpenPatient={p => openFile(p)} />
-          case "schedule":      return <ScheduleTab onStartSession={(appt: unknown, pat: Patient) => openFile(pat, appt)} prefill={bookRequest} onPrefillUsed={() => setBookRequest(null)} />
+          case "schedule":      return <ScheduleTab onStartSession={(appt: any) => openConsultation(appt)} prefill={bookRequest} onPrefillUsed={() => setBookRequest(null)} />
           case "recalls":       return <RecallsTab onBook={r => { setBookRequest(r); goTo("schedule") }} />
           case "waitlist":      return <WaitlistTab />
           case "handoff":       return <HandoffQueueTab />
-          case "drafts":        return <DraftsTab onResume={(pat: Patient, appt: unknown) => openFile(pat, appt)} />
+          case "drafts":        return <DraftsTab onResume={(_pat: Patient, appt: any) => openConsultation(appt)} />
           case "question-library": return <QuestionLibraryAdminTab />
           case "waiting-room":  return <WaitingRoomTab />
           case "time-off":      return <TimeOffTab />
@@ -115,6 +111,8 @@ export function ClinicPage() {
           case "billing":       return <BillingTab />
           default:              return null
         }
-      }} />
+      }}>
+      <ConsultationDock />
+    </SectionedModulePage>
   )
 }

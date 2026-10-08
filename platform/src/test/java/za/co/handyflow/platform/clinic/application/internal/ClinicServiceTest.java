@@ -47,6 +47,7 @@ class ClinicServiceTest {
     @Mock ClinicClosureService closureService;
     @Mock za.co.handyflow.platform.shared.EmailService emailService;
     @Mock ClinicRoomService roomService;
+    @Mock ClinicSignOverrideService signOverrides;
 
     @InjectMocks ClinicService service;
 
@@ -1007,6 +1008,7 @@ class ClinicServiceTest {
             var patientId = UUID.randomUUID();
             var apptId    = UUID.randomUUID();
             var draft = ClinicConsultation.createDraft(TENANT, patientId, apptId, null, "Cough");
+            draft.recordClinical(null, null, "Acute upper respiratory infection", List.of("J06.9"), null, null);
             var patient = patientWithId("Jane", "Dlamini");
             var appt = ClinicAppointment.create(TENANT, patientId, null,
                     Instant.now(), 30, "CONSULTATION", null);
@@ -1016,7 +1018,7 @@ class ClinicServiceTest {
             when(appointmentRepo.findActiveById(TENANT, apptId)).thenReturn(Optional.of(appt));
             when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patient));
 
-            var result = service.signConsultation(TENANT, draft.getId());
+            var result = service.signConsultation(TENANT, draft.getId(), null);
 
             assertThat(result.status()).isEqualTo("SIGNED");
             assertThat(draft.getSignedAt()).isNotNull();
@@ -1030,10 +1032,11 @@ class ClinicServiceTest {
         @DisplayName("signConsultation is refused while a started questionnaire still lacks required answers")
         void signRefusedWithUnfinishedQuestionnaire() {
             var draft = ClinicConsultation.createDraft(TENANT, UUID.randomUUID(), null, null, "Cough");
+            draft.recordClinical(null, null, "Acute upper respiratory infection", List.of(), null, null);
             when(consultationRepo.findActiveById(TENANT, draft.getId())).thenReturn(Optional.of(draft));
             when(questionLibraryService.incompleteGroups(TENANT, draft)).thenReturn(List.of("Intake: Reason for visit"));
 
-            assertThatThrownBy(() -> service.signConsultation(TENANT, draft.getId()))
+            assertThatThrownBy(() -> service.signConsultation(TENANT, draft.getId(), null))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("Intake: Reason for visit");
             assertThat(draft.getStatus()).isEqualTo("DRAFT");
@@ -1042,12 +1045,41 @@ class ClinicServiceTest {
         }
 
         @Test
+        @DisplayName("signConsultation is refused without a diagnosis unless a reason is given, and nothing is saved")
+        void signRefusedWithoutDiagnosisOrReason() {
+            var draft = ClinicConsultation.createDraft(TENANT, UUID.randomUUID(), null, null, "Cough");
+            when(consultationRepo.findActiveById(TENANT, draft.getId())).thenReturn(Optional.of(draft));
+
+            assertThatThrownBy(() -> service.signConsultation(TENANT, draft.getId(), "  "))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Diagnosis");
+            assertThat(draft.getStatus()).isEqualTo("DRAFT");
+            verify(consultationRepo, never()).save(any());
+            verifyNoInteractions(signOverrides);
+        }
+
+        @Test
+        @DisplayName("signConsultation with an override reason signs and records the overridden step")
+        void signWithOverrideRecordsAudit() {
+            var patientId = UUID.randomUUID();
+            var draft = ClinicConsultation.createDraft(TENANT, patientId, null, null, "Results review");
+            when(consultationRepo.findActiveById(TENANT, draft.getId())).thenReturn(Optional.of(draft));
+            when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patientWithId("Jane", "Dlamini")));
+
+            var result = service.signConsultation(TENANT, draft.getId(), "Results review only, no diagnosis made");
+
+            assertThat(result.status()).isEqualTo("SIGNED");
+            verify(signOverrides).record(eq(TENANT), eq(draft.getId()), any(), eq(List.of("DIAGNOSIS")),
+                    eq("Results review only, no diagnosis made"));
+        }
+
+        @Test
         @DisplayName("signConsultation rejects a consultation that is not a DRAFT")
         void signRejectsNonDraft() {
             var signed = ClinicConsultation.create(TENANT, UUID.randomUUID(), null, null, "Done");
             when(consultationRepo.findActiveById(TENANT, signed.getId())).thenReturn(Optional.of(signed));
 
-            assertThatThrownBy(() -> service.signConsultation(TENANT, signed.getId()))
+            assertThatThrownBy(() -> service.signConsultation(TENANT, signed.getId(), null))
                     .isInstanceOf(IllegalStateException.class);
         }
 

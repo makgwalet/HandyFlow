@@ -1,9 +1,8 @@
 // src/pages/clinic/ConsultationSession.tsx
-// Live consultation session — timer, SOAP notes, live bill, prescriptions
-// Opened when a doctor starts a consultation from an appointment
+// The consultation workspace: safety bar, five stages, clinical context beside the notes, and a sign check.
+// Hosted by ConsultationWorkspacePage (route /clinic/consult/:appointmentId), not a modal.
 
 import { useDialogs } from "./dialogs"
-import ModalShell from "./ModalShell"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -15,12 +14,18 @@ import RxDraftsPanel from "./RxDraftsPanel"
 import ConsultationStepper from "./ConsultationStepper"
 import { consultSteps } from "./consultSteps"
 import { FOLLOW_UP_CHOICES, WIZARD_ORDER, nextStep, prevStep, stepNumber, vitalsLine, type WizardStep } from "./consultWizard"
+import SafetyBar from "./SafetyBar"
+import ClinicalContextDrawer, { useBriefing } from "./ClinicalContextDrawer"
+import SignReviewPanel from "./SignReviewPanel"
+import type { SignedSummary } from "./NextPatientPanel"
+import { Recap, StepTitle, chipStyle } from "./ConsultationParts"
+import { signChecklist, signVerdict } from "./signRules"
+import { isWithOtherClinician, lifecycleLabel } from "./workspace"
 import { PatientAlertBanner } from "./PatientNotes"
 import { missingReasons, useAllergyChecks } from "./PrescriptionAllergyCheck"
 import {
   Mic, MicOff, X,
-  CheckCircle,
-  AlertCircle, Loader, Sparkles, Search,
+  Loader, Sparkles, Search,
 } from "lucide-react"
 
 import {
@@ -28,14 +33,10 @@ import {
   type Appointment,
   type BillLine,
   type RxDraft,
-  NAVY,
   NAVY_TEXT,
   TEAL,
-  TEAL_TEXT,
   RED,
   RED_TEXT,
-  GREEN_TEXT,
-  AMBER_TEXT,
   PURPLE,
   PURPLE_TEXT,
   GRAY,
@@ -58,10 +59,10 @@ import {
 interface Props {
   patient: Patient
   appointment: Appointment
-  onComplete: (consultationId: string) => void
+  onComplete: (consultationId: string, summary: SignedSummary) => void
   onMinimise: () => void
   onCancel: () => void
-  /** Bumped by the parent (e.g. "Discard session" on the minimised bar) to discard this draft. */
+  /** Bumped by the parent to discard this draft. */
   discardToken?: number
 }
 
@@ -95,6 +96,14 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
   const [draftReady, setDraftReady] = useState(false)
   const [returnNote, setReturnNote] = useState<{ reason: string; comment: string } | null>(null)
   const [draftState, setDraftState] = useState<"idle"|"saving"|"saved"|"error">("idle")
+  // Where the consultation is in the nurse/doctor handoff; decides who may edit and which buttons show.
+  const [status, setStatusState] = useState("DRAFT")
+  const statusRef = useRef("DRAFT")
+  const setStatus = (v: string) => { statusRef.current = v; setStatusState(v) }
+  const [drawerOpen, setDrawerOpen] = useState(true)
+  const [handoffNote, setHandoffNote] = useState<{ comment: string; at: string } | null>(null)
+  const canSign = usePermission("CLINIC_CLINICAL_SIGN")
+  const canWrite = usePermission("CLINIC_CLINICAL_WRITE")
 
   // Text fields are sent as "" (not null) so clearing a field actually clears it server-side.
   const draftPayload = () => ({
@@ -118,10 +127,24 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
     initStartedRef.current = true
     ;(async () => {
       try {
-        const r = await apiClient.get("/api/v1/clinic/consultations/drafts")
-        const existing = unwrap(r).find((d:any) => d.appointmentId === appointment.id)
+        // Any unsigned consultation for this appointment, including one the nurse handed over.
+        let existing: any = null
+        try {
+          const r = await apiClient.get(`/api/v1/clinic/appointments/${appointment.id}/consultation`)
+          const c = r.data?.data ?? r.data
+          if (c && c.id) existing = c
+        } catch (e: any) { if (e?.response?.status !== 404) throw e }
         if (existing) {
           draftIdRef.current = existing.id
+          setStatus(existing.status)
+          if (existing.status === "READY_FOR_DOCTOR" || existing.status === "DOCTOR_REVIEWING") {
+            // What the nurse said when handing over, shown above the notes.
+            try {
+              const t = unwrap(await apiClient.get(`/api/v1/clinic/consultations/${existing.id}/transitions`))
+              const last = [...t].reverse().find((x:any) => x.toStatus === "READY_FOR_DOCTOR")
+              if (last) setHandoffNote({ comment: last.comment||"", at: last.createdAt })
+            } catch { /* the notes still open */ }
+          }
           if (existing.status === "RETURNED_TO_NURSE") {
             // Doctor sent it back: show why, and take it back into nurse work.
             try {
@@ -129,6 +152,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
               const last = [...t].reverse().find((x:any) => x.toStatus === "RETURNED_TO_NURSE")
               if (last) setReturnNote({ reason: String(last.reasonCode||"").replace(/_/g," ").toLowerCase(), comment: last.comment||"" })
               await apiClient.post(`/api/v1/clinic/consultations/${existing.id}/resume-nurse-work`)
+              setStatus("NURSE_IN_PROGRESS")
             } catch { /* the draft still opens; the note is a convenience */ }
           }
           const str = (v:any) => v==null ? "" : String(v)
@@ -148,6 +172,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
             { appointmentId: appointment.id, practitionerId: appointment.practitionerId||null,
               chiefComplaint: soap.chiefComplaint||"" })
           draftIdRef.current = (c.data?.data ?? c.data).id
+          setStatus("DRAFT")
         }
         setDraftReady(true); setDraftState("saved")
       } catch { setDraftState("error") }
@@ -156,7 +181,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
   }, [])
 
   useEffect(() => {
-    if (!draftReady || !draftIdRef.current) return
+    if (!draftReady || !draftIdRef.current || isWithOtherClinician(statusRef.current)) return
     const t = setTimeout(async () => {
       setDraftState("saving")
       try {
@@ -166,7 +191,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
     }, 1500)
     return () => clearTimeout(t)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [soap, draftReady])
+  }, [soap, draftReady, status])
 
   const discardDraft = async () => {
     const id = draftIdRef.current
@@ -174,7 +199,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
     onCancel()
   }
   // Nurse hands the consultation to a doctor: flush the latest notes, then hand over.
-  const canHandoff = usePermission("CLINIC_CLINICAL_WRITE")
+  const canHandoff = !canSign && canWrite
   const [handoffBusy, setHandoffBusy] = useState(false)
   const [handoffError, setHandoffError] = useState("")
   const sendToDoctor = async () => {
@@ -293,54 +318,23 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
     setMedSearch(""); setMedResults([]); setShowMedSearch(false)
   }
 
-  // ── Complete consultation ─────────────────────────────────────────────────
-  const [showComplete, setShowComplete] = useState(false)
+  // ── Sign ──────────────────────────────────────────────────────────────────
   const [completeError, setCompleteError] = useState("")
   const savedRxRef = useRef<Set<string>>(new Set())
+  const allergyBlocks = missingReasons(rxDrafts.filter(r=>!savedRxRef.current.has(r.id)), allergyResults)
 
   const complete = useMutation({
-    mutationFn: async () => {
-      const needReason = missingReasons(rxDrafts.filter(r=>!savedRxRef.current.has(r.id)), allergyResults)
-      if (needReason.length) throw new Error("Give a reason to prescribe despite the recorded allergy: " + needReason.join(", ") + ".")
-      // 1. Save consultation: finalise the draft (PATCH) or, if the draft could not be
-      //    created, fall back to creating it in one shot as before.
-      let consultId: string
+    mutationFn: async (overrideReason?: string) => {
+      if (allergyBlocks.length) throw new Error("Give a reason to prescribe despite the recorded allergy: " + allergyBlocks.join(", ") + ".")
       const draftId = draftIdRef.current
-      if (draftId) {
-        await apiClient.patch(`/api/v1/clinic/consultations/${draftId}`, {
-          ...draftPayload(),
-          chiefComplaint: soap.chiefComplaint||"Consultation",
-        })
-        consultId = draftId
-      } else {
-        const consultRes = await apiClient.post(
-          `/api/v1/clinic/patients/${patient.id}/consultations`,
-          {
-            appointmentId:   appointment.id,
-            practitionerId:  appointment.practitionerId||null,
-            chiefComplaint:  soap.chiefComplaint||"Consultation",
-            weightKg:        parseFloat(soap.weightKg)||null,
-            heightCm:        parseFloat(soap.heightCm)||null,
-            bloodPressure:   soap.bloodPressure||null,
-            pulseBpm:        parseInt(soap.pulseBpm)||null,
-            temperatureC:    parseFloat(soap.temperatureC)||null,
-            oxygenSatPct:    parseFloat(soap.oxygenSatPct)||null,
-            history:         soap.history||null,
-            examination:     soap.examination||null,
-            diagnosis:       soap.diagnosis||null,
-            icd10Codes:      soap.icd10Codes?soap.icd10Codes.split(",").map((x:string)=>x.trim()).filter(Boolean):[],
-            treatmentPlan:   soap.treatmentPlan||null,
-            followUpDays:    parseInt(soap.followUpDays)||null,
-            durationMinutes, // from timer
-          }
-        )
-        consultId = (consultRes.data?.data ?? consultRes.data).id
-      }
+      if (!draftId) throw new Error("This consultation was never saved, so it cannot be signed. Check your connection and open it again.")
+      // 1. Save the notes (not again once the doctor has completed their review: the record is then read-only).
+      if (statusRef.current !== "DOCTOR_COMPLETED") await apiClient.patch(`/api/v1/clinic/consultations/${draftId}`, draftPayload())
 
       // 2. Save prescriptions (each only once, so a retry after a later failure cannot duplicate them)
       for (const rx of rxDrafts) {
         if (!rx.medicationName.trim() || savedRxRef.current.has(rx.id)) continue
-        await apiClient.post(`/api/v1/clinic/consultations/${consultId}/prescriptions`,{
+        await apiClient.post(`/api/v1/clinic/consultations/${draftId}/prescriptions`,{
           medicationName: rx.medicationName,
           nappiCode:      rx.nappiCode||null,
           dosage:         rx.dosage||null,
@@ -354,140 +348,90 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
         savedRxRef.current.add(rx.id)
       }
 
-      // 2b. Sign the draft (DRAFT -> SIGNED). No email is sent (DEC-CLINIC-002).
-      if (draftId) await apiClient.post(`/api/v1/clinic/consultations/${draftId}/sign`)
-
-      // 3. Complete the appointment
-      await apiClient.post(`/api/v1/clinic/appointments/${appointment.id}/complete`)
-
-      return consultId
+      // 3. A consultation the doctor accepted from a nurse finishes its review, then is signed. Signing also completes
+      //    the appointment and never emails the patient (DEC-CLINIC-002). Missing Symptoms or Diagnosis need a reason.
+      if (statusRef.current === "DOCTOR_REVIEWING") {
+        await apiClient.post(`/api/v1/clinic/consultations/${draftId}/doctor-complete`)
+        setStatus("DOCTOR_COMPLETED")
+      }
+      await apiClient.post(`/api/v1/clinic/consultations/${draftId}/sign`, overrideReason ? { overrideReason } : {})
+      return draftId
     },
     onSuccess: (consultationId) => {
-      qc.invalidateQueries({queryKey:["pf-appointments"]})
-      qc.invalidateQueries({queryKey:["pf-consultations"]})
-      qc.invalidateQueries({queryKey:["clinic-appts-dashboard"]})
-      qc.invalidateQueries({queryKey:["schedule-appts"]})
-      qc.invalidateQueries({queryKey:["clinic-patients"]})
-      onComplete(consultationId)
+      for (const k of ["pf-appointments","pf-consultations","clinic-appts-dashboard","schedule-appts","clinic-patients","clinic-dock","clinic-handoff-queue","pf-briefing"])
+        qc.invalidateQueries({queryKey:[k]})
+      onComplete(consultationId, { consultationId, diagnosis: soap.diagnosis.trim(), rxCount: rxDrafts.filter(r=>r.medicationName.trim()).length,
+        followUpDays: soap.followUpDays, durationMinutes })
     },
-    onError: (e:any) => setCompleteError(e.response?.data?.message ?? e.message ?? "Failed to complete consultation"),
+    onError: (e:any) => setCompleteError(e.response?.data?.message ?? e.message ?? "Failed to sign the consultation"),
   })
 
   const [step, setStep] = useState<WizardStep>("symptoms")
+  const checklist = signChecklist(soap, rxDrafts, allergyBlocks)
+  const verdict = signVerdict(checklist)
+  const locked = isWithOtherClinician(status)
+  const { data: briefing } = useBriefing(patient.id)
+  const canDiscard = ["DRAFT","NURSE_IN_PROGRESS","RETURNED_TO_NURSE"].includes(status)
+
+  const [handoffActionError, setHandoffActionError] = useState("")
+  const acceptHandoff = async () => {
+    const id = draftIdRef.current; if (!id) return
+    setHandoffActionError("")
+    try {
+      await apiClient.post(`/api/v1/clinic/consultations/${id}/accept`, { practitionerId: appointment.practitionerId || null })
+      setStatus("DOCTOR_REVIEWING"); qc.invalidateQueries({ queryKey: ["clinic-handoff-queue"] })
+    } catch (e: any) { setHandoffActionError(e?.response?.data?.message ?? "Could not accept the handoff") }
+  }
+  const returnToNurse = async () => {
+    const id = draftIdRef.current; if (!id) return
+    const comment = await prompt({ title: "Return to nurse", label: "What does the nurse need to fix?", multiline: true, confirmLabel: "Return" })
+    if (comment === null) return
+    try {
+      await apiClient.post(`/api/v1/clinic/consultations/${id}/return-to-nurse`, { reasonCode: "OTHER", comment })
+      qc.invalidateQueries({ queryKey: ["clinic-handoff-queue"] }); qc.invalidateQueries({ queryKey: ["clinic-dock"] }); onCancel()
+    } catch (e: any) { setHandoffActionError(e?.response?.data?.message ?? "Could not return it to the nurse") }
+  }
+
+  const barBtn: React.CSSProperties = { padding:"8px 14px", borderRadius:8, border:`1px solid ${BORDER}`, background:"var(--hf-surface)", color:"var(--hf-text-secondary)", fontSize:13, fontWeight:600, cursor:"pointer" }
+  const banner = (tone: "warn"|"info", children: React.ReactNode) => (
+    <div role="status" style={{ margin:"10px 0 0", padding:"10px 14px", borderRadius:10, fontSize:13, display:"flex", gap:10, alignItems:"center", flexWrap:"wrap",
+      background: tone==="warn" ? "var(--hf-warning-soft)" : "var(--hf-info-soft)", color: tone==="warn" ? "var(--hf-warning-text)" : "var(--hf-info-text)" }}>{children}</div>)
 
   return (
-    <div style={{ fontFamily:"'Inter',system-ui,sans-serif", height:"100%", display:"flex", flexDirection:"column" }}>
+    <div style={{ fontFamily:"'Inter',system-ui,sans-serif", display:"flex", flexDirection:"column", minHeight:"calc(100vh - 140px)" }}>
       {dialogs}
 
-      {/* ── Session header ─────────────────────────────────────────────── */}
-      <div style={{ background:`linear-gradient(135deg,${NAVY} 0%,var(--hf-primary-deep) 100%)`,
-        borderRadius:12, padding:"16px 24px", marginBottom:16,
-        display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:16 }}>
-          <div style={{ width:48, height:48, borderRadius:"50%",
-            background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center",
-            justifyContent:"center", fontSize:18, fontWeight:800, color:"var(--hf-text-on-solid)" }}>
-            {patient.fullName.split(" ").map(n=>n[0]).join("").slice(0,2)}
-          </div>
-          <div>
-            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:2 }}>
-              <span style={{ fontSize:18, fontWeight:800, color:"var(--hf-text-on-solid)" }}>{patient.fullName}</span>
-              <span style={{ background:"rgba(13,148,136,0.3)", color:"var(--hf-accent-on-brand)",
-                padding:"2px 8px", borderRadius:20, fontSize:11, fontWeight:700 }}>
-                {appointment.appointmentType?.replace("_"," ")}
-              </span>
-            </div>
-            <div style={{ fontSize:13, color:"rgba(255,255,255,0.6)" }}>
-              {appointment.practitionerName && `Dr. ${appointment.practitionerName}`}
-              {appointment.reason && ` · ${appointment.reason}`}
-            </div>
-            {patient.allergies && patient.allergies.length > 0 && (
-              <div style={{ display:"flex", alignItems:"center", gap:4, marginTop:4 }}>
-                <AlertCircle size={11} style={{ color: 'var(--hf-danger-on-brand)' }}/>
-                <span style={{ fontSize:11, color:"var(--hf-danger-on-brand)", fontWeight:600 }}>
-                  ⚠ {patient.allergies.join(", ")}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
+      <SafetyBar patient={patient} briefing={briefing ?? undefined}
+        visit={`${(appointment.appointmentType||"Consultation").replace(/_/g," ").toLowerCase().replace(/^./, c=>c.toUpperCase())}${appointment.reason ? ` · ${appointment.reason}` : ""}`}
+        stateLabel={lifecycleLabel(status, soap)} timer={fmtTimer(elapsed)}
+        saveText={locked ? "Read only" : draftState==="saving" ? "Saving…" : draftState==="saved" ? "Auto-saved" : draftState==="error" ? "Not saved, check connection" : ""}>
+        {canSign && !locked && <button id="consult-complete" onClick={()=>setStep("sign")} style={{ ...barBtn, background:TEAL, color:"var(--hf-text-on-solid)", border:"none" }}>Review &amp; sign</button>}
+        {canHandoff && !locked && <button onClick={sendToDoctor} disabled={handoffBusy || !draftReady}
+          title={handoffError || "Hand this consultation to a doctor; it leaves your drafts until returned"} style={barBtn}>{handoffBusy ? "Sending…" : "Send to doctor"}</button>}
+        <button onClick={onMinimise} title="Leave the consultation; it stays saved and shows in the dock" style={barBtn}>Leave</button>
+        {canDiscard && <button onClick={handleCancel} title="Discard this draft" aria-label="Discard draft" style={{ ...barBtn, padding:8, display:"flex" }}><X size={16}/></button>}
+      </SafetyBar>
 
-        <div style={{ display:"flex", alignItems:"center", gap:16 }}>
-          {/* Live timer */}
-          <div style={{ textAlign:"center" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:6,
-              background:"rgba(255,255,255,0.1)", borderRadius:10, padding:"8px 16px" }}>
-              <div style={{ width:8, height:8, borderRadius:"50%", background:RED,
-                animation:"pulse 1.5s infinite" }}/>
-              <span style={{ fontSize:22, fontWeight:800, color:"var(--hf-text-on-solid)", fontVariantNumeric:"tabular-nums" }}>
-                {fmtTimer(elapsed)}
-              </span>
-              <span title="Notes are saved to the server as you type"
-                style={{ fontSize:11, marginLeft:8, color:"rgba(255,255,255,0.7)" }}>
-                {draftState==="saving" ? "Saving…"
-                  : draftState==="saved" ? "Draft saved"
-                  : draftState==="error" ? "Not saved, check connection" : ""}
-              </span>
-            </div>
-            <div style={{ fontSize:10, color:"rgba(255,255,255,0.5)", marginTop:2 }}>
-              {durationMinutes} min
-            </div>
-          </div>
-
-          {/* Bill total */}
-          <div style={{ textAlign:"center",
-            background:"rgba(255,255,255,0.1)", borderRadius:10, padding:"8px 16px" }}>
-            <div style={{ fontSize:11, color:"rgba(255,255,255,0.6)" }}>Running bill</div>
-            <div style={{ fontSize:18, fontWeight:800, color:"var(--hf-text-on-solid)" }}>{fmtR(billTotal)}</div>
-          </div>
-
-          {canHandoff && <button onClick={sendToDoctor} disabled={handoffBusy || !draftReady}
-            title={handoffError || "Hand this consultation to a doctor; it leaves your drafts until returned"}
-            style={{ padding:"10px 16px", background:"rgba(255,255,255,0.12)", color:"var(--hf-text-on-solid)",
-              border:`1px solid ${handoffError ? "var(--hf-danger)" : "rgba(255,255,255,0.3)"}`, borderRadius:10,
-              fontSize:13, fontWeight:700, cursor:"pointer" }}>
-            {handoffBusy ? "Sending…" : "Send to doctor"}
-          </button>}
-          <button id="consult-complete" onClick={() => { setShowComplete(true); setCompleteError("") }}
-            style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 20px",
-              background:TEAL, color:"var(--hf-text-on-solid)", border:"none", borderRadius:10,
-              fontSize:14, fontWeight:700, cursor:"pointer" }}>
-            <CheckCircle size={16}/> Complete
-          </button>
-          <button onClick={onMinimise}
-            title="Minimise — navigate tabs freely"
-            style={{ background:"rgba(255,255,255,0.1)", border:"none", borderRadius:8,
-              cursor:"pointer", color:"rgba(255,255,255,0.7)", padding:"8px 12px",
-              fontSize:12, fontWeight:600, display:"flex", alignItems:"center", gap:4 }}>
-            ↓ Minimise
-          </button>
-          <button onClick={handleCancel}
-            title="Discard session"
-            style={{ background:"rgba(255,255,255,0.1)", border:"none", borderRadius:8,
-              cursor:"pointer", color:"rgba(255,255,255,0.7)", padding:8, display:"flex" }}>
-            <X size={18}/>
-          </button>
-        </div>
-      </div>
-
-      {returnNote && (
-        <div role="status" style={{ margin:"8px 12px 0", padding:"10px 14px", borderRadius:10,
-          background:"var(--hf-warning-soft)", color:"var(--hf-warning-text)", fontSize:13,
-          display:"flex", gap:10, alignItems:"flex-start" }}>
-          <div style={{ flex:1 }}>
-            <strong>Returned by the doctor</strong> ({returnNote.reason}): {returnNote.comment}
-          </div>
-          <button onClick={() => setReturnNote(null)} aria-label="Dismiss"
-            style={{ background:"none", border:"none", cursor:"pointer", color:"inherit" }}>×</button>
-        </div>
-      )}
+      {returnNote && banner("warn", <>
+        <div style={{ flex:1 }}><strong>Returned by the doctor</strong> ({returnNote.reason}): {returnNote.comment}</div>
+        <button onClick={() => setReturnNote(null)} aria-label="Dismiss" style={{ background:"none", border:"none", cursor:"pointer", color:"inherit" }}>×</button></>)}
+      {status==="READY_FOR_DOCTOR" && canSign && banner("info", <>
+        <div style={{ flex:1 }}><strong>Handed over by the nurse.</strong> Accept it to review and edit.{handoffNote?.comment ? ` Nurse note: ${handoffNote.comment}` : ""}</div>
+        <button onClick={acceptHandoff} style={{ ...barBtn, background:TEAL, color:"var(--hf-text-on-solid)", border:"none" }}>Accept handoff</button>
+        <button onClick={returnToNurse} style={barBtn}>Return to nurse</button></>)}
+      {status==="READY_FOR_DOCTOR" && !canSign && banner("info", <div>With the doctor for review. It is read only until they accept or return it.</div>)}
+      {status==="DOCTOR_REVIEWING" && handoffNote && banner("info", <div><strong>Nurse intake</strong> is filled in below{handoffNote.comment ? `. Note: ${handoffNote.comment}` : "."}</div>)}
+      {status==="DOCTOR_COMPLETED" && banner("info", <div>Review finished. Go to Review &amp; sign to sign it.</div>)}
+      {handoffActionError && <div role="alert" style={{ marginTop:8, fontSize:13, color:RED_TEXT }}>{handoffActionError}</div>}
 
       <PatientAlertBanner patientId={patient.id}/>
 
+      <div style={{ display:"flex", gap:16, alignItems:"flex-start", flexWrap:"wrap", marginTop:12, flex:1 }}>
+      <div style={{ flex:"1 1 560px", minWidth:0, display:"flex", flexDirection:"column" }}>
       <ConsultationStepper steps={consultSteps(soap, rxDrafts)} current={step} onSelect={setStep}/>
 
       {/* ── One page per step ──────────────────────────────────────────── */}
-      <div style={{ flex:1, minHeight:0, display:"flex", flexDirection:"column", gap:10, marginBottom:12 }} data-step={step}>
+      <fieldset disabled={locked} style={{ border:0, margin:0, padding:0, minWidth:0, flex:1, display:"flex", flexDirection:"column", gap:10, marginBottom:12 }} data-step={step}>
 
         {/* Stays mounted on every step (hidden off the Symptoms page) so answers still being saved are never cut off. */}
         <div hidden={step !== "symptoms"}>
@@ -539,19 +483,19 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
         </>)}
 
         {step === "examination" && (<>
-          <StepTitle n={2} title="Examination" help="Vitals and what you found on examination." />
+          <StepTitle n={2} title="Examination" help="Vitals and what you found on examination. Vitals the nurse took are already here." />
           <VitalsPanel soap={soap} sf={sf}/>
           <SoapFields soap={soap} sf={sf} only={["examination"]}/>
         </>)}
 
         {step === "diagnose" && (<>
-          <StepTitle n={3} title="Diagnose & prescribe" help="Your assessment, the medicines, and what to bill." />
+          <StepTitle n={3} title="Assessment & treatment" help="Your assessment, then what you are doing about it." />
           <div style={{ display:"flex", gap:14, flexWrap:"wrap", alignItems:"flex-start" }}>
             <div style={{ flex:"1 1 340px", display:"flex", flexDirection:"column", gap:10 }}>
               <SoapFields soap={soap} sf={sf} only={["diagnosis","icd10Codes"]}/>
           {/* Medication search — adds to bill + Rx */}
           <div style={{ padding:"12px 14px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:10, position:"relative" }}>
-            <div style={sectionLabel}>Add medication (bill + Rx)</div>
+            <div style={sectionLabel}>Add medication (prescription + bill)</div>
             <div style={{ position:"relative" }}>
               <Search size={13} style={{ position:"absolute", left:8, top:"50%", transform:"translateY(-50%)", color:GRAY_TEXT }}/>
               <input value={medSearch} onChange={e=>{setMedSearch(e.target.value);setShowMedSearch(true)}}
@@ -590,7 +534,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
                 addBlankRx={()=>setRxDrafts(d=>[...d,{id:crypto.randomUUID(),
                   medicationName:"",dosage:"",frequency:"",duration:"",quantity:30,instructions:"",fromBill:false}])}/>
             </div>
-            <div style={{ flex:"1 1 300px", display:"flex", flexDirection:"column", gap:10 }}>
+            <div style={{ flex:"1 1 260px", display:"flex", flexDirection:"column", gap:10 }}>
           {/* Quick-add procedures */}
           <div style={{ padding:"12px 14px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:10 }}>
             <div style={sectionLabel}>Quick add — procedures</div>
@@ -606,9 +550,8 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
                 </button>
               ))}
             </div>
+            <div style={{ fontSize:11, color:GRAY_TEXT, marginTop:8 }}>Procedures and medicines are added to the running bill in the side panel.</div>
           </div>
-
-              <LiveBillPanel billLines={billLines} billTotal={billTotal} removeBillLine={removeBillLine} addBillLine={addBillLine}/>
             </div>
           </div>
         </>)}
@@ -632,27 +575,22 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
         </>)}
 
         {step === "sign" && (<>
-          <StepTitle n={5} title="Review & sign" help="Check the record, then complete the consultation." />
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:10 }}>
-            <Recap title="Symptoms" onEdit={()=>setStep("symptoms")} rows={[["Chief complaint", soap.chiefComplaint], ["History", soap.history]]} />
-            <Recap title="Examination" onEdit={()=>setStep("examination")} rows={[["Vitals", vitalsLine(soap)], ["Findings", soap.examination]]} />
-            <Recap title="Diagnosis" onEdit={()=>setStep("diagnose")} rows={[["Diagnosis", soap.diagnosis], ["ICD-10", soap.icd10Codes],
-              ["Prescriptions", rxDrafts.filter(r=>r.medicationName.trim()).map(r=>[r.medicationName, r.dosage, r.frequency, r.duration].filter(Boolean).join(" ")).join("\n")],
-              ["Bill", billLines.length ? `${billLines.length} line${billLines.length===1?"":"s"} · ${fmtR(billTotal)}` : ""]]} />
-            <Recap title="Plan" onEdit={()=>setStep("plan")} rows={[["Treatment plan", soap.treatmentPlan], ["Follow-up", soap.followUpDays.trim() ? `In ${soap.followUpDays.trim()} days` : ""]]} />
-          </div>
-          <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
-            <button onClick={() => { setShowComplete(true); setCompleteError("") }}
-              style={{ ...primaryBtn, background:TEAL, display:"flex", alignItems:"center", gap:8 }}>
-              <CheckCircle size={15}/> Complete consultation
-            </button>
-            <span style={{ fontSize:12, color:GRAY_TEXT }}>{consultSteps(soap, rxDrafts).find(x=>x.id==="sign")?.hint}</span>
-          </div>
+          <StepTitle n={5} title={canSign ? "Review & sign" : "Review & hand over"} help={canSign ? "Check the record, then sign it." : "Check the record, then hand it to the doctor."} />
+          <SignReviewPanel mode={canSign ? "sign" : "handoff"} items={checklist} verdict={verdict} busy={complete.isPending || handoffBusy} error={completeError || handoffError}
+            onGoTo={setStep} onSign={(reason)=>{ setCompleteError(""); complete.mutate(reason) }} onHandoff={sendToDoctor}>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))", gap:10 }}>
+              <Recap title="Symptoms" onEdit={()=>setStep("symptoms")} rows={[["Chief complaint", soap.chiefComplaint], ["History", soap.history]]} />
+              <Recap title="Examination" onEdit={()=>setStep("examination")} rows={[["Vitals", vitalsLine(soap)], ["Findings", soap.examination]]} />
+              <Recap title="Assessment & treatment" onEdit={()=>setStep("diagnose")} rows={[["Diagnosis", soap.diagnosis], ["ICD-10", soap.icd10Codes],
+                ["Prescriptions", rxDrafts.filter(r=>r.medicationName.trim()).map(r=>[r.medicationName, r.dosage, r.frequency, r.duration].filter(Boolean).join(" ")).join("\n")]]} />
+              <Recap title="Plan" onEdit={()=>setStep("plan")} rows={[["Treatment plan", soap.treatmentPlan], ["Follow-up", soap.followUpDays.trim() ? `In ${soap.followUpDays.trim()} days` : ""]]} />
+            </div>
+          </SignReviewPanel>
         </>)}
-      </div>
+      </fieldset>
 
       {/* ── Back / Next ─────────────────────────────────────────────────── */}
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:10, padding:"10px 0", borderTop:`1px solid ${BORDER}` }}>
+      <div style={{ position:"sticky", bottom:0, background:"var(--hf-bg, var(--hf-surface))", display:"flex", justifyContent:"space-between", alignItems:"center", gap:10, padding:"10px 0", borderTop:`1px solid ${BORDER}` }}>
         <button disabled={!prevStep(step)} onClick={()=>prevStep(step) && setStep(prevStep(step)!)}
           style={{ ...cancelBtn, opacity: prevStep(step) ? 1 : 0.4 }}>← Back</button>
         <span style={{ fontSize:12, color:GRAY_TEXT }}>Step {stepNumber(step)} of {WIZARD_ORDER.length}</span>
@@ -660,84 +598,12 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
           ? <button onClick={()=>setStep(nextStep(step)!)} style={primaryBtn}>Next →</button>
           : <span style={{ width:80 }}/>}
       </div>
-
-      {/* ── Complete modal ─────────────────────────────────────────────────── */}
-      {showComplete && (
-        <ModalShell title="Complete consultation" onClose={()=>setShowComplete(false)} width={520} footer={<>
-              <button onClick={()=>setShowComplete(false)} style={cancelBtn}>Back to session</button>
-              <button onClick={()=>complete.mutate()} disabled={complete.isPending}
-                style={{...primaryBtn,background:TEAL,display:"flex",alignItems:"center",gap:7}}>
-                {complete.isPending
-                  ? <><Loader size={14}/> Completing…</>
-                  : <><CheckCircle size={14}/> Complete & save</>}
-              </button>
-        </>}>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
-              {[
-                {label:"Duration",    value:`${durationMinutes} minutes`, color:NAVY_TEXT},
-                {label:"Bill total",  value:fmtR(billTotal),              color:GREEN_TEXT},
-                {label:"Bill items",  value:`${billLines.length} lines`,  color:TEAL_TEXT},
-                {label:"Prescriptions",value:`${rxDrafts.length} items`,  color:PURPLE_TEXT},
-              ].map(s=>(
-                <div key={s.label} style={{padding:"10px 14px",background:LIGHT,borderRadius:8}}>
-                  <div style={{fontSize:10,fontWeight:700,color:GRAY_TEXT,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:2}}>{s.label}</div>
-                  <div style={{fontSize:16,fontWeight:800,color:s.color}}>{s.value}</div>
-                </div>
-              ))}
-            </div>
-
-            {!soap.chiefComplaint.trim() && (
-              <div style={{marginBottom:12,padding:"8px 12px",background:"var(--hf-warning-soft)",border:"1px solid var(--hf-warning-border)",borderRadius:8,fontSize:12,color:AMBER_TEXT}}>
-                ⚠ Chief complaint is empty — add a reason for the visit before completing.
-              </div>
-            )}
-            {rxDrafts.some(rx=>rx.medicationName&&!rx.dosage) && (
-              <div style={{marginBottom:12,padding:"8px 12px",background:"var(--hf-info-soft)",border:"1px solid var(--hf-info-border)",borderRadius:8,fontSize:12,color:"var(--hf-info-text)"}}>
-                ℹ Some prescriptions are missing dosage details — they will still be saved.
-              </div>
-            )}
-
-            {completeError && (
-              <div style={{marginBottom:12,padding:"8px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:12,color:RED_TEXT}}>
-                {completeError}
-              </div>
-            )}
-
-        </ModalShell>
-      )}
-    </div>
-  )
-}
-
-// ── Style helpers ─────────────────────────────────────────────────────────────
-
-
-const chipStyle = (on: boolean): React.CSSProperties => ({ padding:"6px 12px", borderRadius:20, fontSize:12, fontWeight:600, cursor:"pointer",
-  border:`1px solid ${on ? "var(--hf-primary)" : BORDER}`, background: on ? "var(--hf-primary-text)" : "var(--hf-surface)", color: on ? "var(--hf-surface)" : "var(--hf-text)" })
-
-function StepTitle({ n, title, help }: { n: number; title: string; help: string }) {
-  return (
-    <div>
-      <h2 style={{ margin:0, fontSize:17, fontWeight:800, color:"var(--hf-text)" }}>{n}. {title}</h2>
-      <div style={{ fontSize:12, color:GRAY_TEXT }}>{help}</div>
-    </div>
-  )
-}
-
-function Recap({ title, rows, onEdit }: { title: string; rows: [string, string][]; onEdit: () => void }) {
-  return (
-    <section aria-label={title} style={{ padding:"12px 14px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:10 }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-        <span style={sectionLabel}>{title}</span>
-        <button type="button" onClick={onEdit} style={{ background:"none", border:"none", color:"var(--hf-accent-text)", fontSize:12, fontWeight:600, cursor:"pointer" }}>Edit</button>
       </div>
-      {rows.map(([k, v]) => (
-        <div key={k} style={{ marginBottom:6 }}>
-          <div style={{ fontSize:11, color:GRAY_TEXT }}>{k}</div>
-          {v.trim() ? <div style={{ fontSize:13, color:"var(--hf-text)", whiteSpace:"pre-wrap" }}>{v}</div>
-                    : <div style={{ fontSize:13, color:"var(--hf-text-disabled)" }}>Not recorded</div>}
-        </div>
-      ))}
-    </section>
+
+      <ClinicalContextDrawer patientId={patient.id} open={drawerOpen} onToggle={()=>setDrawerOpen(o=>!o)} billSummary={fmtR(billTotal)}
+        billSlot={<LiveBillPanel billLines={billLines} billTotal={billTotal} removeBillLine={removeBillLine} addBillLine={addBillLine}/>}/>
+      </div>
+    </div>
   )
 }
+

@@ -43,10 +43,12 @@ describe("consultSteps", () => {
     expect(by({ ...blank, treatmentPlan: "Rest" }).plan.state).toBe("done")
     expect(by({ ...blank, followUpDays: "7" }).plan.state).toBe("done")
   })
-  it("sign is ready only when symptoms and diagnose are done; plan and examination do not block it", () => {
-    expect(by({ ...blank, chiefComplaint: "Cough", history: "3 days" }).sign.hint).toBe("Finish first: Diagnose & prescribe")
+  it("sign needs a complaint and a diagnosis (or ICD-10 code); history, plan, examination and prescription gaps do not block it", () => {
+    expect(by({ ...blank, chiefComplaint: "Cough" }).sign.hint).toBe("Required first: Diagnosis")
     const ready = { ...blank, chiefComplaint: "Cough", history: "3 days", diagnosis: "URTI" }
     expect(by(ready).sign.state).toBe("done")
-    expect(by(ready, [rx({ dosage: "" })]).sign.state).toBe("todo")
+    expect(by({ ...blank, chiefComplaint: "Cough", icd10Codes: "J06.9" }).sign.state).toBe("done")
+    expect(by(ready, [rx({ dosage: "" })]).sign.state).toBe("done")
+    expect(by(blank).sign.hint).toBe("Required first: Symptoms, Diagnosis")
   })
 })

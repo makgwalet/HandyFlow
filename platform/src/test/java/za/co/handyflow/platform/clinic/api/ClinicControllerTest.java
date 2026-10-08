@@ -280,4 +280,61 @@ class ClinicControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray());
     }
+
+    // ── Sign override + appointment lookups (workspace) ───────────────────────
+
+    @Test
+    @WithMockUser(authorities = "CLINIC_CLINICAL_SIGN")
+    @DisplayName("POST /consultations/{id}/sign passes the override reason through")
+    void signWithOverrideReason() throws Exception {
+        var id = UUID.randomUUID();
+        mvc.perform(post(BASE + "/consultations/" + id + "/sign").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"overrideReason\":\"Patient left before diagnosis\"}"))
+                .andExpect(status().isOk());
+
+        verify(clinicService).signConsultation(any(TenantId.class), eq(id), eq("Patient left before diagnosis"));
+    }
+
+    @Test
+    @WithMockUser(authorities = "CLINIC_CLINICAL_SIGN")
+    @DisplayName("POST /consultations/{id}/sign without a body signs with a null reason")
+    void signWithoutBody() throws Exception {
+        var id = UUID.randomUUID();
+        mvc.perform(post(BASE + "/consultations/" + id + "/sign").with(csrf()))
+                .andExpect(status().isOk());
+
+        verify(clinicService).signConsultation(any(TenantId.class), eq(id), isNull());
+    }
+
+    @Test
+    @WithMockUser(authorities = "CLINIC_CLINICAL_WRITE")
+    @DisplayName("POST /consultations/{id}/sign needs the SIGN permission")
+    void signRequiresSignAuthority() throws Exception {
+        mvc.perform(post(BASE + "/consultations/" + UUID.randomUUID() + "/sign").with(csrf()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(authorities = "CLINIC_READ")
+    @DisplayName("GET /appointments/{id} returns 200")
+    void getAppointmentReturns200() throws Exception {
+        var id = UUID.randomUUID();
+        mvc.perform(get(BASE + "/appointments/" + id))
+                .andExpect(status().isOk());
+
+        verify(clinicService).getAppointment(any(TenantId.class), eq(id));
+    }
+
+    @Test
+    @WithMockUser(authorities = "CLINIC_READ")
+    @DisplayName("GET /appointments/{id}/consultation answers 404 when none is open")
+    void openConsultationNotFound() throws Exception {
+        var id = UUID.randomUUID();
+        when(clinicService.getOpenConsultationForAppointment(any(TenantId.class), eq(id)))
+                .thenReturn(Optional.empty());
+
+        mvc.perform(get(BASE + "/appointments/" + id + "/consultation"))
+                .andExpect(status().isNotFound());
+    }
 }

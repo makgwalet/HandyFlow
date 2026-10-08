@@ -48,6 +48,7 @@ public class ClinicService {
     private final ClinicWorkingHoursService    workingHoursService;
     private final ClinicClosureService         closureService;
     private final ClinicRoomService            roomService;
+    private final ClinicSignOverrideService    signOverrides;
 
     // ── Patients ──────────────────────────────────────────────────────────────
 
@@ -316,6 +317,20 @@ public class ClinicService {
             throw new IllegalArgumentException("from and to are required and to must be after from");
         }
         return mapAppointmentsList(appointmentRepo.findByDateRange(tenantId, from, to), tenantId);
+    }
+
+    @Transactional(readOnly = true)
+    public AppointmentResponse getAppointment(TenantId tenantId, UUID id) {
+        ClinicAppointment appt = appointmentRepo.findActiveById(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", id.toString()));
+        return mapAppointmentsList(List.of(appt), tenantId).get(0);
+    }
+
+    /** The consultation still being worked on for an appointment (any unsigned status, including a nurse handoff), or empty. */
+    @Transactional(readOnly = true)
+    public Optional<ConsultationResponse> getOpenConsultationForAppointment(TenantId tenantId, UUID appointmentId) {
+        List<ClinicConsultation> open = consultationRepo.findUnsignedByAppointment(tenantId, appointmentId);
+        return open.isEmpty() ? Optional.empty() : Optional.of(toResponses(tenantId, List.of(open.get(0))).get(0));
     }
 
     @Transactional(readOnly = true)
@@ -724,21 +739,28 @@ public class ClinicService {
     }
 
 
-    /** DRAFT -> SIGNED. Completes the appointment, stamps lastVisitAt, emails the summary. */
+    /**
+     * DRAFT -> SIGNED. Completes the appointment, stamps lastVisitAt, emails the summary.
+     * Symptoms and Diagnosis are required (CLINIC-DEC-010): without them the consultation is signed only with an
+     * override reason, which is audited (CLINIC-DEC-011).
+     */
     @Transactional
-    public ConsultationResponse signConsultation(TenantId tenantId, UUID id) {
+    public ConsultationResponse signConsultation(TenantId tenantId, UUID id, String overrideReason) {
         ClinicConsultation c = consultationRepo.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Consultation", id.toString()));
         if (!c.isSignable()) {
             throw new IllegalStateException("Only a DRAFT consultation, or one the doctor has completed, can be signed (is "
                     + c.getStatus() + ").");
         }
+        List<String> missingSteps = SignRules.missing(c.getChiefComplaint(), c.getDiagnosis(), c.getIcd10Codes());
+        String reason = SignRules.requireCompleteOrReason(missingSteps, overrideReason);
         List<String> unfinished = questionLibraryService.incompleteGroups(tenantId, c);
         if (!unfinished.isEmpty()) {
             throw new IllegalStateException("Finish the questionnaire before signing. Missing: " + String.join("; ", unfinished) + ".");
         }
         c.sign();
         consultationRepo.save(c);
+        if (!missingSteps.isEmpty()) signOverrides.record(tenantId, c.getId(), currentUserIdOrNull(), missingSteps, reason);
         allergySnapshot.capture(tenantId, c.getId(), c.getPatientId());
         observationService.syncConsultationVitals(tenantId, c);
 

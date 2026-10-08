@@ -3,8 +3,9 @@
 import { myPractitionerId } from "./currentPractitioner"
 import { useAuthStore } from "../../store/auth.store"
 import { useDialogs } from "./dialogs"
-import { useEffect, useState } from "react"
-import ConsultationSession from "./ConsultationSession"
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
+import { workspacePath } from "./workspace"
 import { LabsTabEnhanced } from "./LabsTab"
 import ConsentTab from "./ConsentTab"
 import TimelineTab from "./TimelineTab"
@@ -27,21 +28,18 @@ type TabId = "overview"|"appointments"|"consultation"|"running-bill"|"rx"|"labs"
 
 interface Props {
   patient: Patient; onClose: () => void; onNavigate: (tab:any)=>void; onOpenPatient?: (p:Patient)=>void
-  initialSession?: any; onSessionClear?: () => void
 }
 
-export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPatient, initialSession, onSessionClear }: Props) {
+export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPatient }: Props) {
   const qc = useQueryClient()
-  const { confirm, prompt, dialogs } = useDialogs()
+  const { prompt, dialogs } = useDialogs()
+  const navigate = useNavigate()
   const userEmail = useAuthStore(st => st.user?.email)
   const [activeTab, setActiveTab] = useState<TabId>("overview")
   const [billLines, setBillLines] = useState<BillLine[]>([])
   const [showActions, setShowActions] = useState(false)
-  const [activeSession, setActiveSession] = useState<Appointment|null>(initialSession||null)
-  const [sessionMinimised, setSessionMinimised] = useState(false)
-  const [discardToken, setDiscardToken] = useState(0)
-  // Clear parent's initialSession ref once we've consumed it
-  useEffect(() => { if (initialSession) onSessionClear?.() }, [])
+  // A consultation is a full-screen workspace of its own; starting one leaves the file and opens it.
+  const startSession = (appt: { id: string }) => navigate(workspacePath(appt.id))
   const pid = patient.id
   const idInfo = saId(patient.idNumber)
 
@@ -236,64 +234,12 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
         </div>
       </div>
 
-      {/* ── Consultation session — full or minimised ─────────────────────── */}
-      {/* Stays mounted while minimised (hidden), so nothing typed is lost. */}
-      {activeSession && (
-        <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.7)",zIndex:1300,
-          display:sessionMinimised?"none":"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}}>
-          <div style={{background:"var(--hf-surface)",borderRadius:16,width:"min(1200px,96vw)",height:"92vh",
-            padding:24,boxShadow:"0 32px 80px rgba(0,0,0,0.3)",display:"flex",flexDirection:"column"}}>
-            <ConsultationSession
-              patient={patient}
-              appointment={activeSession as any}
-              onMinimise={()=>setSessionMinimised(true)}
-              discardToken={discardToken}
-              onComplete={(_id)=>{
-                setActiveSession(null); setSessionMinimised(false)
-                setActiveTab("running-bill")
-                qc.invalidateQueries({queryKey:["pf-appointments",pid]})
-                qc.invalidateQueries({queryKey:["pf-consultations",pid]})
-                qc.invalidateQueries({queryKey:["pf-briefing",pid]})
-              }}
-              onCancel={()=>{ setActiveSession(null); setSessionMinimised(false) }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* ── Minimised session sticky bar ────────────────────────────────── */}
-      {activeSession && sessionMinimised && (
-        <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:1300,
-          background:"var(--hf-primary)",borderTop:"3px solid var(--hf-accent)",
-          padding:"10px 24px",display:"flex",alignItems:"center",gap:16,
-          boxShadow:"0 -4px 24px rgba(0,0,0,0.25)"}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <div style={{width:8,height:8,borderRadius:"50%",background:"var(--hf-danger)",animation:"pulse 1.5s infinite"}}/>
-            <span style={{color:"var(--hf-text-on-solid)",fontWeight:700,fontSize:14}}>Session in progress</span>
-            <span style={{color:"rgba(255,255,255,0.6)",fontSize:13}}>— {activeSession.patientName||patient.fullName}</span>
-          </div>
-          <div style={{flex:1}}/>
-          <span style={{color:"rgba(255,255,255,0.5)",fontSize:12}}>Navigate freely — session is saved</span>
-          <button onClick={()=>setSessionMinimised(false)}
-            style={{background:"var(--hf-accent)",color:"var(--hf-text-on-solid)",border:"none",borderRadius:8,
-              padding:"7px 16px",fontSize:13,fontWeight:700,cursor:"pointer",
-              display:"flex",alignItems:"center",gap:6}}>
-            ↑ Return to session
-          </button>
-          <button onClick={async ()=>{ if (await confirm({ title: "Discard this session?", body: "The consultation draft will be abandoned.", confirmLabel: "Discard", danger: true })) setDiscardToken(t=>t+1) }}
-            style={{background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.7)",
-              border:"none",borderRadius:8,padding:"7px 12px",fontSize:12,cursor:"pointer"}}>
-            Discard session
-          </button>
-        </div>
-      )}
-
       {/* ── Tab content ─────────────────────────────────────────────────── */}
       <PatientAlertBanner patientId={patient.id}/>
       {activeTab==="overview"     && <OverviewTab patient={patient} idInfo={idInfo} familyMembers={familyMembers as Patient[]} onOpenPatient={onOpenPatient} qc={qc}
         appointments={appointments as any[]} defaultPractitionerId={myPractitionerId(practitioners as any[], userEmail)}
-        onStartSession={setActiveSession} onOpenTab={setActiveTab}/>}
-      {activeTab==="appointments" && <AppointmentsTab patient={patient} appointments={appointments as Appointment[]} practitioners={practitioners as Practitioner[]} qc={qc} onStartSession={setActiveSession}/>}
+        onStartSession={startSession} onOpenTab={setActiveTab}/>}
+      {activeTab==="appointments" && <AppointmentsTab patient={patient} appointments={appointments as Appointment[]} practitioners={practitioners as Practitioner[]} qc={qc} onStartSession={startSession}/>}
       {activeTab==="consultation" && <ConsultationTab patient={patient} consultations={consultations as Consultation[]} practitioners={practitioners as Practitioner[]} qc={qc} addToBill={addToBill} onSwitchTab={setActiveTab}/>}
       {activeTab==="running-bill" && <RunningBillTab billLines={billLines} onRemove={removeBillLine} patient={patient}/>}
       {activeTab==="rx"           && <PrescriptionsTab patient={patient} consultations={consultations as Consultation[]}/>}

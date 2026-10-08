@@ -38,9 +38,11 @@ interface Props {
   onNavigate: (tab: any) => void
   /** Opens a patient's file (its Overview starts or resumes the consultation). */
   onOpenPatient?: (patientId: string) => void
+  /** Straight back into a consultation already in progress (no stop at the patient file). */
+  onResume?: (appointmentId: string) => void
 }
 
-export default function ClinicDashboard({ onNavigate, onOpenPatient }: Props) {
+export default function ClinicDashboard({ onNavigate, onOpenPatient, onResume }: Props) {
   const qc = useQueryClient()
   const user = useAuthStore(st => st.user)
   const clinician = usePermission("CLINIC_CLINICAL_WRITE")
@@ -186,7 +188,7 @@ export default function ClinicDashboard({ onNavigate, onOpenPatient }: Props) {
                               style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "var(--hf-text)" }}>{action.label}</button>
                           )}
                           {action?.kind === "open" && onOpenPatient && a.patientId && (
-                            <button onClick={() => onOpenPatient(a.patientId!)}
+                            <button onClick={() => (a.status === "IN_PROGRESS" && onResume ? onResume(a.id) : onOpenPatient(a.patientId!))}
                               style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{action.label}</button>
                           )}
                         </div>

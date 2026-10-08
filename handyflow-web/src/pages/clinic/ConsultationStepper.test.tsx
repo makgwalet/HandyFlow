@@ -13,7 +13,7 @@ describe("ConsultationStepper", () => {
     render(<ConsultationStepper steps={consultSteps(notes, [{ medicationName: "X", dosage: "", frequency: "", duration: "", quantity: 1 }])} />)
     const items = screen.getAllByRole("listitem")
     expect(items).toHaveLength(5)
-    expect(items.map(i => i.getAttribute("data-state"))).toEqual(["done", "todo", "attention", "todo", "todo"])
+    expect(items.map(i => i.getAttribute("data-state"))).toEqual(["done", "todo", "attention", "todo", "done"])
     expect(screen.getByText("1. Symptoms")).toBeTruthy()
     expect(screen.getByText("1 prescription needs dosage details")).toBeTruthy()
   })
