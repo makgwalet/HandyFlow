@@ -211,6 +211,12 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
     } finally { setLeaveBusy(false) }
   }
   // Save for later: write the latest notes now (the autosave waits 1.5 s), then leave. Stays put if the save fails.
+  // Minimise: leave at once (the work is already autosaved and shows in the strip); the latest notes are sent on the way out.
+  const minimise = () => {
+    const id = draftIdRef.current
+    if (id && !locked) apiClient.patch(`/api/v1/clinic/consultations/${id}`, draftPayload()).catch(() => { /* the autosave has the rest */ })
+    onMinimise()
+  }
   const saveForLater = async () => {
     const id = draftIdRef.current
     setLeaveError("")
@@ -435,6 +441,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
         {canSign && !locked && <button id="consult-complete" onClick={()=>setStep("sign")} style={{ ...barBtn, background:TEAL, color:"var(--hf-text-on-solid)", border:"none" }}>Review &amp; sign</button>}
         {canHandoff && !locked && <button onClick={sendToDoctor} disabled={handoffBusy || !draftReady}
           title={handoffError || "Hand this consultation to a doctor; it leaves your drafts until returned"} style={barBtn}>{handoffBusy ? "Sending…" : "Send to doctor"}</button>}
+        <button onClick={minimise} title="Step out of the consultation. It stays open and shows in the strip at the bottom of every clinic screen" style={barBtn}>Minimise</button>
         <button onClick={saveForLater} disabled={leaveBusy} title="Save the notes and leave. Resume from the strip at the bottom of any clinic screen or from the patient file" style={barBtn}>{leaveBusy ? "Saving…" : "Save for later"}</button>
         {canDiscard && <button onClick={handleCancel} disabled={leaveBusy} title="Throw this draft away" aria-label="Discard draft" style={{ ...barBtn, display:"flex", alignItems:"center", gap:6, color:"var(--hf-danger-text, var(--hf-danger))", borderColor:"var(--hf-danger)" }}><X size={14}/> Discard</button>}
       </SafetyBar>

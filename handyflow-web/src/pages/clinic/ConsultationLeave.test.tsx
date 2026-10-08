@@ -39,6 +39,12 @@ describe("Save for later and Discard", () => {
     expect(patch).toHaveBeenCalled()
     expect(JSON.stringify(patch.mock.calls[0][1])).toContain("cough for 3 days")
   })
+  it("Minimise leaves at once", async () => {
+    show(); await ready()
+    fireEvent.click(screen.getByRole("button", { name: "Minimise" }))
+    expect(onMinimise).toHaveBeenCalled()
+    expect(onCancel).not.toHaveBeenCalled()
+  })
   it("stays on the screen and says so when the notes cannot be saved", async () => {
     show(); await ready()
     patch.mockRejectedValue({ response: { data: { message: "Server down" } } })
