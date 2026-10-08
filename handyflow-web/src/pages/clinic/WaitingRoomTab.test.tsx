@@ -62,3 +62,14 @@ describe("WaitingRoomTab", () => {
     expect(await screen.findByRole("alert")).toBeTruthy()
   })
 })
+
+import { todayRangeUrl } from "./WaitingRoomTab"
+describe("todayRangeUrl", () => {
+  it("covers exactly one local day", () => {
+    const u = new URL("http://x" + todayRangeUrl(new Date(2026, 9, 8, 15, 30)))
+    expect(u.pathname).toBe("/api/v1/clinic/appointments/range")
+    const from = new Date(u.searchParams.get("from")!), to = new Date(u.searchParams.get("to")!)
+    expect(from.getTime()).toBe(new Date(2026, 9, 8).getTime())
+    expect(to.getTime()).toBe(new Date(2026, 9, 9).getTime())
+  })
+})

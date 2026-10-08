@@ -32,6 +32,13 @@ export function buildBoard(all: BoardAppt[], now: Date): Record<string, BoardApp
   return out
 }
 
+/** The query for today's appointments: [local midnight, next local midnight) as instants. */
+export function todayRangeUrl(now: Date): string {
+  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const to = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  return `/api/v1/clinic/appointments/range?${new URLSearchParams({ from: from.toISOString(), to: to.toISOString() })}`
+}
+
 /** "10:30 · 12 min past" / "10:30 · in 20 min", rounded to whole minutes. */
 export function timeNote(iso: string, now: Date): string {
   const t = new Date(iso)
@@ -46,7 +53,8 @@ const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return Array.isAr
 export default function WaitingRoomTab() {
   const { data, isLoading, isError, dataUpdatedAt } = useQuery<BoardAppt[]>({
     queryKey: ["clinic-waiting-room"], refetchInterval: 30000,
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/clinic/appointments?size=200")),
+    // Only today, from the range endpoint: the plain list returns the newest 200 overall, which can miss today.
+    queryFn: async () => unwrap(await apiClient.get(todayRangeUrl(new Date()))),
   })
   const now = new Date(dataUpdatedAt || Date.now())
   const board = buildBoard(data ?? [], now)
