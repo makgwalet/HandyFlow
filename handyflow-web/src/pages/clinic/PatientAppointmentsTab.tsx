@@ -99,7 +99,7 @@ export default function AppointmentsTab({ patient, appointments, practitioners, 
               <div>
                 <label style={lbl}>Type</label>
                 <select value={form.appointmentType} onChange={e=>setForm(f=>({...f,appointmentType:e.target.value}))} style={sinp}>
-                  {["CONSULTATION","FOLLOW_UP","PROCEDURE","EMERGENCY","CHECKUP"].map(t=><option key={t} value={t}>{t.replace("_"," ")}</option>)}
+                  {["CONSULTATION","FOLLOW_UP","PROCEDURE","EMERGENCY","CHECKUP","ANTENATAL","RESULTS_REVIEW"].map(t=><option key={t} value={t}>{t.replace("_"," ")}</option>)}
                 </select>
               </div>
               <div><label style={lbl}>Reason</label><input value={form.reason} onChange={e=>setForm(f=>({...f,reason:e.target.value}))} placeholder="Optional" style={sinp}/></div>

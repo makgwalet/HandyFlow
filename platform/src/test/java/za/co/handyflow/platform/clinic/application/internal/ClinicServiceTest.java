@@ -48,6 +48,13 @@ class ClinicServiceTest {
     @Mock za.co.handyflow.platform.shared.EmailService emailService;
     @Mock ClinicRoomService roomService;
     @Mock ClinicSignOverrideService signOverrides;
+    @Mock ClinicVisitStageService visitStages;
+
+    @org.junit.jupiter.api.BeforeEach
+    void defaultVisitStages() {
+        org.mockito.Mockito.lenient().when(visitStages.requiredStages(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(SignRules.DEFAULT_REQUIRED);
+    }
 
     @InjectMocks ClinicService service;
 
@@ -1071,6 +1078,42 @@ class ClinicServiceTest {
             assertThat(result.status()).isEqualTo("SIGNED");
             verify(signOverrides).record(eq(TENANT), eq(draft.getId()), any(), eq(List.of("DIAGNOSIS")),
                     eq("Results review only, no diagnosis made"));
+        }
+
+        @Test
+        @DisplayName("signConsultation asks the appointment's visit type which stages are required")
+        void signUsesAppointmentVisitType() {
+            var patientId = UUID.randomUUID();
+            var apptId    = UUID.randomUUID();
+            var draft = ClinicConsultation.createDraft(TENANT, patientId, apptId, null, "Booking visit");
+            draft.recordClinical(null, null, "Normal pregnancy", List.of("Z34.9"), null, null);
+            var appt = ClinicAppointment.create(TENANT, patientId, null, Instant.now(), 30, "ANTENATAL", null);
+            when(consultationRepo.findActiveById(TENANT, draft.getId())).thenReturn(Optional.of(draft));
+            when(appointmentRepo.findActiveById(TENANT, apptId)).thenReturn(Optional.of(appt));
+            when(visitStages.requiredStages(TENANT, "ANTENATAL"))
+                    .thenReturn(java.util.Set.of("SYMPTOMS", "EXAMINATION", "DIAGNOSIS", "PLAN"));
+
+            assertThatThrownBy(() -> service.signConsultation(TENANT, draft.getId(), null))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Examination and Plan");
+            assertThat(draft.getStatus()).isEqualTo("DRAFT");
+            verify(consultationRepo, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("signConsultation lets a results review sign without symptoms when the visit type does not require them")
+        void signResultsReviewWithoutSymptoms() {
+            var patientId = UUID.randomUUID();
+            var draft = ClinicConsultation.createDraft(TENANT, patientId, null, null, null);
+            draft.recordClinical(null, null, "Anaemia, iron started", List.of(), "Iron and recheck FBC", null);
+            when(consultationRepo.findActiveById(TENANT, draft.getId())).thenReturn(Optional.of(draft));
+            when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patientWithId("Jane", "Dlamini")));
+            when(visitStages.requiredStages(eq(TENANT), any())).thenReturn(java.util.Set.of("DIAGNOSIS", "PLAN"));
+
+            var result = service.signConsultation(TENANT, draft.getId(), null);
+
+            assertThat(result.status()).isEqualTo("SIGNED");
+            verifyNoInteractions(signOverrides);
         }
 
         @Test

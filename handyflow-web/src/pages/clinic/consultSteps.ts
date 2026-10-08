@@ -1,7 +1,7 @@
 // The five steps of a consultation and how far each one is, worked out from what has been typed.
 // This only reports whether the record is filled in; it never judges the clinical content and
 // never blocks anything. (Signing is gated separately, by signRules.ts.)
-import { signGaps } from "./signRules"
+import { DEFAULT_REQUIRED, signGaps, type RequiredStages } from "./signRules"
 
 export interface StepNotes {
   chiefComplaint: string; history: string; examination: string; diagnosis: string
@@ -14,7 +14,7 @@ export interface StepNotes {
 export interface StepRx { medicationName: string; dosage: string; frequency: string; duration: string; quantity: number }
 
 export type StepState = "done" | "todo" | "attention"
-export interface ConsultStep { id: "symptoms" | "examination" | "diagnose" | "plan" | "sign"; label: string; state: StepState; hint: string }
+export interface ConsultStep { id: "symptoms" | "examination" | "diagnose" | "plan" | "sign"; label: string; state: StepState; hint: string; required?: boolean }
 
 /** The element on the session screen each step jumps to. */
 export const STEP_TARGET: Record<ConsultStep["id"], string> = {
@@ -38,7 +38,7 @@ export function rxGaps(r: StepRx): string[] {
   return gaps
 }
 
-export function consultSteps(n: StepNotes, rx: StepRx[]): ConsultStep[] {
+export function consultSteps(n: StepNotes, rx: StepRx[], req: RequiredStages = DEFAULT_REQUIRED): ConsultStep[] {
   const symptoms: ConsultStep = has(n.chiefComplaint) && has(n.history)
     ? { id: "symptoms", label: "Symptoms", state: "done", hint: "Complaint and history recorded" }
     : { id: "symptoms", label: "Symptoms", state: "todo", hint: has(n.chiefComplaint) ? "Add the history" : "Add the chief complaint and history" }
@@ -60,10 +60,12 @@ export function consultSteps(n: StepNotes, rx: StepRx[]): ConsultStep[] {
     ? { id: "plan", label: "Plan", state: "done", hint: "Plan recorded" }
     : { id: "plan", label: "Plan", state: "todo", hint: "Add the treatment plan or a follow-up" }
 
-  const missing = signGaps({ chiefComplaint: n.chiefComplaint, diagnosis: n.diagnosis, icd10Codes: n.icd10Codes ?? "" }).map(g => g.label)
+  const missing = signGaps({ chiefComplaint: n.chiefComplaint, diagnosis: n.diagnosis, icd10Codes: n.icd10Codes ?? "",
+    examination: n.examination, hasVitals: vitals, hasPlan: has(n.treatmentPlan) || has(n.followUpDays) }, req).map(g => g.label)
   const sign: ConsultStep = missing.length === 0
     ? { id: "sign", label: "Sign", state: "done", hint: "Ready to sign" }
     : { id: "sign", label: "Sign", state: "todo", hint: "Required first: " + missing.join(", ") }
 
-  return [symptoms, examination, diagnose, plan, sign]
+  return [{ ...symptoms, required: req.symptoms }, { ...examination, required: req.examination },
+    { ...diagnose, required: req.diagnose }, { ...plan, required: req.plan }, sign]
 }

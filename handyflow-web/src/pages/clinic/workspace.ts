@@ -1,6 +1,6 @@
 // Pure rules for the consultation workspace: opening it, the lifecycle label, the dock and "who is next".
 import { consultSteps, type StepNotes, type StepState } from "./consultSteps"
-import { signGaps } from "./signRules"
+import { DEFAULT_REQUIRED, signGaps, type RequiredStages } from "./signRules"
 
 /** Appointment actions to run before a consultation can open, or null when it cannot be opened (finished, cancelled, no-show). */
 export function startSteps(status: string): string[] | null {
@@ -18,13 +18,14 @@ export const workspacePath = (appointmentId: string) => `/clinic/consult/${appoi
 export const isWithOtherClinician = (status: string) => status === "READY_FOR_DOCTOR" || status === "DOCTOR_COMPLETED"
 
 /** One word for where the record is: Draft, In progress, Ready to sign, or the handoff state. */
-export function lifecycleLabel(status: string, n: { chiefComplaint: string; history: string; examination: string; diagnosis: string; icd10Codes: string; treatmentPlan: string }): string {
+export function lifecycleLabel(status: string, n: { chiefComplaint: string; history: string; examination: string; diagnosis: string; icd10Codes: string; treatmentPlan: string; followUpDays?: string; hasVitals?: boolean },
+  req: RequiredStages = DEFAULT_REQUIRED): string {
   if (status === "READY_FOR_DOCTOR") return "Waiting for the doctor"
   if (status === "DOCTOR_REVIEWING") return "Doctor reviewing"
   if (status === "DOCTOR_COMPLETED") return "Review done"
   if (status === "RETURNED_TO_NURSE") return "Returned to nurse"
   if (status === "NURSE_IN_PROGRESS") return "Nurse in progress"
-  if (signGaps(n).length === 0) return "Ready to sign"
+  if (signGaps({ ...n, hasPlan: n.treatmentPlan.trim().length > 0 || (n.followUpDays ?? "").trim().length > 0 }, req).length === 0) return "Ready to sign"
   const started = [n.history, n.examination, n.diagnosis, n.icd10Codes, n.treatmentPlan].some(v => v.trim()) || n.chiefComplaint.trim().length > 0
   return started ? "In progress" : "Draft"
 }

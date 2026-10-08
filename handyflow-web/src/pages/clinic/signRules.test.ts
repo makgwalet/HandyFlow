@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { overrideProblem, signChecklist, signGaps, signVerdict, type ChecklistInput } from "./signRules"
+import { DEFAULT_REQUIRED, overrideProblem, requiredFromApi, signChecklist, signGaps, signVerdict, type ChecklistInput, type RequiredStages } from "./signRules"
 
 const blank: ChecklistInput = { chiefComplaint: "", diagnosis: "", icd10Codes: "", examination: "", followUpDays: "",
   weightKg: "", heightCm: "", bloodPressure: "", pulseBpm: "", temperatureC: "", oxygenSatPct: "" }
@@ -51,5 +51,48 @@ describe("overrideProblem", () => {
     expect(overrideProblem("  ")).toMatch(/reason/)
     expect(overrideProblem("Results review")).toBeNull()
     expect(overrideProblem("x".repeat(501))).toMatch(/500/)
+  })
+})
+
+const antenatal: RequiredStages = { symptoms: true, examination: true, diagnose: true, plan: true }
+const resultsReview: RequiredStages = { symptoms: false, examination: false, diagnose: true, plan: true }
+
+describe("visit-type required stages (CLINIC-DEC-012)", () => {
+  it("antenatal also needs an examination and a plan", () => {
+    const n = { ...blank, chiefComplaint: "Booking visit", diagnosis: "Normal pregnancy" }
+    expect(signGaps(n, antenatal).map(g => g.step)).toEqual(["examination", "plan"])
+    expect(signGaps({ ...n, hasVitals: true, hasPlan: true }, antenatal)).toEqual([])
+  })
+  it("a results review does not need symptoms", () => {
+    expect(signGaps({ ...blank, diagnosis: "Anaemia", hasPlan: true }, resultsReview)).toEqual([])
+    expect(signGaps({ ...blank, hasPlan: true }, resultsReview).map(g => g.step)).toEqual(["diagnose"])
+  })
+  it("the default is still Symptoms + Diagnosis", () => {
+    expect(DEFAULT_REQUIRED).toEqual({ symptoms: true, examination: false, diagnose: true, plan: false })
+    expect(signGaps(blank).map(g => g.step)).toEqual(["symptoms", "diagnose"])
+  })
+  it("checklist: required examination and plan stop the signature but can be overridden", () => {
+    const items = signChecklist({ ...blank, chiefComplaint: "Booking", diagnosis: "Normal pregnancy" }, [], [], antenatal)
+    const m = byId(items)
+    expect(m.examination.state).toBe("required")
+    expect(m.plan.state).toBe("required")
+    expect(signVerdict(items)).toEqual({ canSign: false, canOverride: true })
+  })
+  it("checklist: vitals and a follow-up satisfy examination and plan", () => {
+    const items = signChecklist({ ...blank, chiefComplaint: "Booking", diagnosis: "Normal pregnancy", pulseBpm: "80", followUpDays: "28" }, [], [], antenatal)
+    expect(byId(items).examination.state).toBe("ok")
+    expect(byId(items).plan.state).toBe("ok")
+    expect(signVerdict(items).canSign).toBe(true)
+  })
+  it("checklist: symptoms not required shows ok without a complaint", () => {
+    const items = signChecklist({ ...blank, diagnosis: "Anaemia", treatmentPlan: "Iron" }, [], [], resultsReview)
+    expect(byId(items).symptoms.state).toBe("ok")
+    expect(signVerdict(items).canSign).toBe(true)
+  })
+  it("reads the server's stages and falls back to the default for anything unusable", () => {
+    const api = { visitType: "ANTENATAL", source: "PLATFORM", stages: [
+      { stage: "SYMPTOMS", required: true }, { stage: "EXAMINATION", required: true }, { stage: "DIAGNOSIS", required: true }, { stage: "PLAN", required: false }] }
+    expect(requiredFromApi(api)).toEqual({ symptoms: true, examination: true, diagnose: true, plan: false })
+    for (const bad of [null, undefined, [], {}, { stages: [] }, "x"]) expect(requiredFromApi(bad)).toEqual(DEFAULT_REQUIRED)
   })
 })

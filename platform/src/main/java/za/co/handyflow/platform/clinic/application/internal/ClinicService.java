@@ -49,6 +49,7 @@ public class ClinicService {
     private final ClinicClosureService         closureService;
     private final ClinicRoomService            roomService;
     private final ClinicSignOverrideService    signOverrides;
+    private final ClinicVisitStageService      visitStages;
 
     // ── Patients ──────────────────────────────────────────────────────────────
 
@@ -752,7 +753,16 @@ public class ClinicService {
             throw new IllegalStateException("Only a DRAFT consultation, or one the doctor has completed, can be signed (is "
                     + c.getStatus() + ").");
         }
-        List<String> missingSteps = SignRules.missing(c.getChiefComplaint(), c.getDiagnosis(), c.getIcd10Codes());
+        Optional<ClinicAppointment> appointment = c.getAppointmentId() == null ? Optional.empty()
+                : appointmentRepo.findActiveById(tenantId, c.getAppointmentId());
+        Set<String> required = visitStages.requiredStages(tenantId,
+                appointment.map(ClinicAppointment::getAppointmentType).orElse(null));
+        boolean hasVitals = c.getWeightKg() != null || c.getHeightCm() != null || c.getPulseBpm() != null
+                || c.getTemperatureC() != null || c.getOxygenSatPct() != null
+                || (c.getBloodPressure() != null && !c.getBloodPressure().isBlank());
+        boolean hasPlan = (c.getTreatmentPlan() != null && !c.getTreatmentPlan().isBlank()) || c.getFollowUpDays() != null;
+        List<String> missingSteps = SignRules.missing(required, c.getChiefComplaint(), hasVitals, c.getExamination(),
+                c.getDiagnosis(), c.getIcd10Codes(), hasPlan);
         String reason = SignRules.requireCompleteOrReason(missingSteps, overrideReason);
         List<String> unfinished = questionLibraryService.incompleteGroups(tenantId, c);
         if (!unfinished.isEmpty()) {
@@ -764,10 +774,7 @@ public class ClinicService {
         allergySnapshot.capture(tenantId, c.getId(), c.getPatientId());
         observationService.syncConsultationVitals(tenantId, c);
 
-        if (c.getAppointmentId() != null) {
-            appointmentRepo.findActiveById(tenantId, c.getAppointmentId())
-                    .ifPresent(a -> { if (a.isActive()) { a.complete(); appointmentRepo.save(a); } });
-        }
+        appointment.ifPresent(a -> { if (a.isActive()) { a.complete(); appointmentRepo.save(a); } });
         ClinicPatient patient = patientRepo.findActiveById(tenantId, c.getPatientId())
                 .orElseThrow(() -> new ResourceNotFoundException("Patient", c.getPatientId().toString()));
         patient.setLastVisitAt(Instant.now());

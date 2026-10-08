@@ -2,28 +2,43 @@ package za.co.handyflow.platform.clinic.application.internal;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * What a consultation needs before it can be signed (CLINIC-DEC-010, 011).
  * Symptoms (a chief complaint) and a Diagnosis (text or an ICD-10 code) are required. A clinician may sign without
  * them only by giving a reason, which is then audited. Pure: no Spring, no database.
- * Which steps are required per visit type (CLINIC-DEC-012) will change {@link #missing}; callers do not.
+ * Which steps are required comes from the visit type (CLINIC-DEC-012, see {@link VisitStageRules}).
  */
 public final class SignRules {
     private SignRules() {}
 
     public static final String SYMPTOMS  = "SYMPTOMS";
     public static final String DIAGNOSIS = "DIAGNOSIS";
+    public static final String EXAMINATION = "EXAMINATION";
+    public static final String PLAN = "PLAN";
+    public static final Set<String> DEFAULT_REQUIRED = VisitStageRules.DEFAULT_REQUIRED;
     public static final int MAX_REASON = 500;
 
     private static boolean has(String s) { return s != null && !s.isBlank(); }
 
-    /** Required steps that are not filled in, in clinical order. Empty means the consultation can be signed as it is. */
+    /** Symptoms + Diagnosis only (the default for a visit type nobody has configured). */
     public static List<String> missing(String chiefComplaint, String diagnosis, List<String> icd10Codes) {
+        return missing(DEFAULT_REQUIRED, chiefComplaint, false, null, diagnosis, icd10Codes, false);
+    }
+
+    /**
+     * Required steps that are not filled in, in clinical order. Empty means the consultation can be signed as it is.
+     * Examination counts as done with findings or any vital sign; Plan with a treatment plan or a follow-up.
+     */
+    public static List<String> missing(Set<String> required, String chiefComplaint, boolean hasVitals, String examination,
+                                       String diagnosis, List<String> icd10Codes, boolean hasPlan) {
         List<String> out = new ArrayList<>();
-        if (!has(chiefComplaint)) out.add(SYMPTOMS);
+        if (required.contains(SYMPTOMS) && !has(chiefComplaint)) out.add(SYMPTOMS);
+        if (required.contains(EXAMINATION) && !hasVitals && !has(examination)) out.add(EXAMINATION);
         boolean coded = icd10Codes != null && icd10Codes.stream().anyMatch(SignRules::has);
-        if (!has(diagnosis) && !coded) out.add(DIAGNOSIS);
+        if (required.contains(DIAGNOSIS) && !has(diagnosis) && !coded) out.add(DIAGNOSIS);
+        if (required.contains(PLAN) && !hasPlan) out.add(PLAN);
         return out;
     }
 
@@ -43,6 +58,12 @@ public final class SignRules {
     }
 
     public static String label(String step) {
-        return SYMPTOMS.equals(step) ? "Symptoms" : DIAGNOSIS.equals(step) ? "Diagnosis" : step;
+        return switch (step) {
+            case SYMPTOMS -> "Symptoms";
+            case EXAMINATION -> "Examination";
+            case DIAGNOSIS -> "Diagnosis";
+            case PLAN -> "Plan";
+            default -> step;
+        };
     }
 }

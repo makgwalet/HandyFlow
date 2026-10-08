@@ -20,6 +20,7 @@ import SignReviewPanel from "./SignReviewPanel"
 import type { SignedSummary } from "./NextPatientPanel"
 import { Recap, StepTitle, chipStyle } from "./ConsultationParts"
 import { signChecklist, signVerdict } from "./signRules"
+import { useVisitStages } from "./useVisitStages"
 import { isWithOtherClinician, lifecycleLabel } from "./workspace"
 import { PatientAlertBanner } from "./PatientNotes"
 import { missingReasons, useAllergyChecks } from "./PrescriptionAllergyCheck"
@@ -367,7 +368,8 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
   })
 
   const [step, setStep] = useState<WizardStep>("symptoms")
-  const checklist = signChecklist(soap, rxDrafts, allergyBlocks)
+  const required = useVisitStages(appointment.appointmentType || "CONSULTATION")
+  const checklist = signChecklist(soap, rxDrafts, allergyBlocks, required)
   const verdict = signVerdict(checklist)
   const locked = isWithOtherClinician(status)
   const { data: briefing } = useBriefing(patient.id)
@@ -403,7 +405,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
 
       <SafetyBar patient={patient} briefing={briefing ?? undefined}
         visit={`${(appointment.appointmentType||"Consultation").replace(/_/g," ").toLowerCase().replace(/^./, c=>c.toUpperCase())}${appointment.reason ? ` · ${appointment.reason}` : ""}`}
-        stateLabel={lifecycleLabel(status, soap)} timer={fmtTimer(elapsed)}
+        stateLabel={lifecycleLabel(status, { ...soap, hasVitals: [soap.weightKg, soap.heightCm, soap.bloodPressure, soap.pulseBpm, soap.temperatureC, soap.oxygenSatPct].some(v => v.trim()) }, required)} timer={fmtTimer(elapsed)}
         saveText={locked ? "Read only" : draftState==="saving" ? "Saving…" : draftState==="saved" ? "Auto-saved" : draftState==="error" ? "Not saved, check connection" : ""}>
         {canSign && !locked && <button id="consult-complete" onClick={()=>setStep("sign")} style={{ ...barBtn, background:TEAL, color:"var(--hf-text-on-solid)", border:"none" }}>Review &amp; sign</button>}
         {canHandoff && !locked && <button onClick={sendToDoctor} disabled={handoffBusy || !draftReady}
@@ -428,7 +430,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
 
       <div style={{ display:"flex", gap:16, alignItems:"flex-start", flexWrap:"wrap", marginTop:12, flex:1 }}>
       <div style={{ flex:"1 1 560px", minWidth:0, display:"flex", flexDirection:"column" }}>
-      <ConsultationStepper steps={consultSteps(soap, rxDrafts)} current={step} onSelect={setStep}/>
+      <ConsultationStepper steps={consultSteps(soap, rxDrafts, required)} current={step} onSelect={setStep}/>
 
       {/* ── One page per step ──────────────────────────────────────────── */}
       <fieldset disabled={locked} style={{ border:0, margin:0, padding:0, minWidth:0, flex:1, display:"flex", flexDirection:"column", gap:10, marginBottom:12 }} data-step={step}>
