@@ -196,10 +196,31 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [soap, draftReady, status])
 
+  const [leaveError, setLeaveError] = useState("")
+  const [leaveBusy, setLeaveBusy] = useState(false)
+  // Discard only leaves the screen once the server has abandoned the draft; if it could not, say so and stay.
   const discardDraft = async () => {
     const id = draftIdRef.current
-    if (id) { try { await apiClient.post(`/api/v1/clinic/consultations/${id}/abandon`) } catch { /* leave draft */ } }
-    onCancel()
+    setLeaveError(""); setLeaveBusy(true)
+    try {
+      if (id) await apiClient.post(`/api/v1/clinic/consultations/${id}/abandon`)
+      qc.invalidateQueries({ queryKey: ["clinic-dock"] }); qc.invalidateQueries({ queryKey: ["pf-appointments"] }); qc.invalidateQueries({ queryKey: ["schedule-appts"] })
+      onCancel()
+    } catch (e: any) {
+      setLeaveError(e?.response?.data?.message ?? "The draft could not be discarded, so it is still saved. Try again.")
+    } finally { setLeaveBusy(false) }
+  }
+  // Save for later: write the latest notes now (the autosave waits 1.5 s), then leave. Stays put if the save fails.
+  const saveForLater = async () => {
+    const id = draftIdRef.current
+    setLeaveError("")
+    if (id && !locked) {
+      setLeaveBusy(true)
+      try { await apiClient.patch(`/api/v1/clinic/consultations/${id}`, draftPayload()) }
+      catch (e: any) { setLeaveError(e?.response?.data?.message ?? "The notes could not be saved. Check the connection before leaving."); setLeaveBusy(false); return }
+      setLeaveBusy(false)
+    }
+    onMinimise()
   }
   // Nurse hands the consultation to a doctor: flush the latest notes, then hand over.
   const canHandoff = !canSign && canWrite
@@ -414,13 +435,14 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
         {canSign && !locked && <button id="consult-complete" onClick={()=>setStep("sign")} style={{ ...barBtn, background:TEAL, color:"var(--hf-text-on-solid)", border:"none" }}>Review &amp; sign</button>}
         {canHandoff && !locked && <button onClick={sendToDoctor} disabled={handoffBusy || !draftReady}
           title={handoffError || "Hand this consultation to a doctor; it leaves your drafts until returned"} style={barBtn}>{handoffBusy ? "Sending…" : "Send to doctor"}</button>}
-        <button onClick={onMinimise} title="Leave the consultation; it stays saved and shows in the dock" style={barBtn}>Leave</button>
-        {canDiscard && <button onClick={handleCancel} title="Discard this draft" aria-label="Discard draft" style={{ ...barBtn, padding:8, display:"flex" }}><X size={16}/></button>}
+        <button onClick={saveForLater} disabled={leaveBusy} title="Save the notes and leave. Resume from the strip at the bottom of any clinic screen or from the patient file" style={barBtn}>{leaveBusy ? "Saving…" : "Save for later"}</button>
+        {canDiscard && <button onClick={handleCancel} disabled={leaveBusy} title="Throw this draft away" aria-label="Discard draft" style={{ ...barBtn, display:"flex", alignItems:"center", gap:6, color:"var(--hf-danger-text, var(--hf-danger))", borderColor:"var(--hf-danger)" }}><X size={14}/> Discard</button>}
       </SafetyBar>
 
       {returnNote && banner("warn", <>
         <div style={{ flex:1 }}><strong>Returned by the doctor</strong> ({returnNote.reason}): {returnNote.comment}</div>
         <button onClick={() => setReturnNote(null)} aria-label="Dismiss" style={{ background:"none", border:"none", cursor:"pointer", color:"inherit" }}>×</button></>)}
+      {leaveError && <div role="alert" style={{ margin:"10px 0 0", padding:"10px 14px", borderRadius:10, fontSize:13, background:"var(--hf-danger-soft)", color:"var(--hf-danger-text, var(--hf-danger))" }}>{leaveError}</div>}
       {status==="READY_FOR_DOCTOR" && canSign && banner("info", <>
         <div style={{ flex:1 }}><strong>Handed over by the nurse.</strong> Accept it to review and edit.{handoffNote?.comment ? ` Nurse note: ${handoffNote.comment}` : ""}</div>
         <button onClick={acceptHandoff} style={{ ...barBtn, background:TEAL, color:"var(--hf-text-on-solid)", border:"none" }}>Accept handoff</button>

@@ -110,6 +110,16 @@ public class ClinicAppointment {
         this.updatedAt = Instant.now();
     }
 
+    /**
+     * The consultation was thrown away before anything was signed: the patient is still in the building, so the
+     * appointment goes back to CHECKED_IN rather than staying "in consultation". Any other state is left alone.
+     */
+    public void returnToWaiting() {
+        if (!"IN_PROGRESS".equals(status)) return;
+        this.status    = "CHECKED_IN";
+        this.updatedAt = Instant.now();
+    }
+
     public void complete() {
         if (!"IN_PROGRESS".equals(this.status) && !"CONFIRMED".equals(this.status)
                 && !"SCHEDULED".equals(this.status) && !"CHECKED_IN".equals(this.status)

@@ -790,7 +790,10 @@ public class ClinicService {
                 patient.getFirstName() + " " + patient.getLastName()), practNames);
     }
 
-    /** DRAFT -> ABANDONED (kept for audit, hidden from the drafts tray and billing). */
+    /**
+     * DRAFT -> ABANDONED (kept for audit, hidden from the drafts tray and billing). The visit it belonged to goes back to
+     * "checked in": discarding a consultation must not leave the patient showing as still in consultation.
+     */
     @Transactional
     public void abandonConsultation(TenantId tenantId, UUID id) {
         ClinicConsultation c = consultationRepo.findActiveById(tenantId, id)
@@ -800,6 +803,12 @@ public class ClinicService {
         }
         c.abandon();
         consultationRepo.save(c);
+        if (c.getAppointmentId() != null) {
+            appointmentRepo.findActiveById(tenantId, c.getAppointmentId()).ifPresent(a -> {
+                a.returnToWaiting();
+                appointmentRepo.save(a);
+            });
+        }
     }
 
     // ── Edit a saved consultation ──────────────────────────────────────────────

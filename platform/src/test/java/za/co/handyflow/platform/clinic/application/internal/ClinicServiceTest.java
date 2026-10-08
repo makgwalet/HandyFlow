@@ -1143,6 +1143,24 @@ class ClinicServiceTest {
         }
 
         @Test
+        @DisplayName("abandonConsultation puts an in-progress appointment back to checked in")
+        void abandonReturnsTheAppointmentToWaiting() {
+            var appt = ClinicAppointment.create(TENANT, UUID.randomUUID(), null,
+                    Instant.now().plusSeconds(60), 30, "CONSULTATION", null, null);
+            appt.checkIn();
+            appt.start();
+            var draft = ClinicConsultation.createDraft(TENANT, appt.getPatientId(), appt.getId(), null, "x");
+            when(consultationRepo.findActiveById(TENANT, draft.getId())).thenReturn(Optional.of(draft));
+            when(appointmentRepo.findActiveById(TENANT, appt.getId())).thenReturn(Optional.of(appt));
+
+            service.abandonConsultation(TENANT, draft.getId());
+
+            assertThat(draft.getStatus()).isEqualTo("ABANDONED");
+            assertThat(appt.getStatus()).isEqualTo("CHECKED_IN");
+            verify(appointmentRepo).save(appt);
+        }
+
+        @Test
         @DisplayName("updateConsultation rejects a LOCKED consultation")
         void updateRejectsLocked() {
             var c = ClinicConsultation.create(TENANT, UUID.randomUUID(), null, null, "x");
