@@ -49,18 +49,19 @@ export function VitalsPanel({ soap, sf }: PanelProps) {
   )
 }
 
-export function SoapFields({ soap, sf }: PanelProps) {
+/** `only` limits the note to some fields, so each consultation step shows just its own. */
+export function SoapFields({ soap, sf, only }: PanelProps & { only?: (keyof NotesState)[] }) {
   return (
           <div style={{ flex:1, overflowY:"auto", display:"flex", flexDirection:"column", gap:8 }}>
             {([
               {k:"chiefComplaint", label:"Chief complaint *", rows:1, ph:"Main reason for visit"},
-              {k:"history",        label:"History (S)",       rows:2, ph:"Subjective — patient history"},
-              {k:"examination",    label:"Examination (O)",   rows:2, ph:"Objective — physical findings"},
-              {k:"diagnosis",      label:"Diagnosis (A)",     rows:2, ph:"Assessment — working diagnosis"},
+              {k:"history",        label:"History (S)",       rows:4, ph:"Subjective — patient history"},
+              {k:"examination",    label:"Examination findings (O)", rows:5, ph:"Objective — physical findings"},
+              {k:"diagnosis",      label:"Diagnosis (A)",     rows:3, ph:"Assessment — working diagnosis"},
               {k:"icd10Codes",     label:"ICD-10 codes",      rows:1, ph:"J06.9, Z00.0"},
-              {k:"treatmentPlan",  label:"Treatment plan (P)",rows:2, ph:"Plan — management and treatment"},
+              {k:"treatmentPlan",  label:"Treatment plan (P)",rows:5, ph:"Plan — management and treatment"},
               {k:"followUpDays",   label:"Follow-up (days)",  rows:1, ph:"7"},
-            ] as any[]).map((f:any)=>(
+            ] as any[]).filter((f:any) => !only || only.includes(f.k)).map((f:any)=>(
               <div key={f.k}>
                 <label style={lbl}>{f.label}</label>
                 {f.rows===1

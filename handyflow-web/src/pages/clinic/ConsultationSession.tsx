@@ -13,6 +13,7 @@ import LiveBillPanel from "./LiveBillPanel"
 import RxDraftsPanel from "./RxDraftsPanel"
 import ConsultationStepper from "./ConsultationStepper"
 import { consultSteps } from "./consultSteps"
+import { FOLLOW_UP_CHOICES, WIZARD_ORDER, nextStep, prevStep, stepNumber, vitalsLine, type WizardStep } from "./consultWizard"
 import { PatientAlertBanner } from "./PatientNotes"
 import { missingReasons, useAllergyChecks } from "./PrescriptionAllergyCheck"
 import {
@@ -371,14 +372,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
     onError: (e:any) => setCompleteError(e.response?.data?.message ?? e.message ?? "Failed to complete consultation"),
   })
 
-  // ── Active panel toggle (mobile-friendly) ─────────────────────────────────
-  const jumpTo = (id: string) => {
-    const el = document.getElementById(id)
-    if (!el) return
-    el.scrollIntoView?.({ behavior: "smooth", block: "center" })
-    ;(el as HTMLElement).focus?.()
-  }
-  const [activePanel, setActivePanel] = useState<"soap"|"bill"|"rx">("soap")
+  const [step, setStep] = useState<WizardStep>("symptoms")
 
   return (
     <div style={{ fontFamily:"'Inter',system-ui,sans-serif", height:"100%", display:"flex", flexDirection:"column" }}>
@@ -489,43 +483,19 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
 
       <PatientAlertBanner patientId={patient.id}/>
 
-      <ConsultationStepper steps={consultSteps(soap, rxDrafts)} onJump={jumpTo}/>
+      <ConsultationStepper steps={consultSteps(soap, rxDrafts)} current={step} onSelect={setStep}/>
 
-      {/* ── Panel tabs (mobile) ────────────────────────────────────────── */}
-      <div style={{ display:"flex", gap:4, marginBottom:12 }}>
-        {[
-          {id:"soap",label:"📋 Clinical notes",   count:0},
-          {id:"bill",label:"💰 Running bill",     count:billLines.length},
-          {id:"rx",  label:"💊 Prescriptions",   count:rxDrafts.length},
-        ].map(p=>(
-          <button key={p.id} onClick={()=>setActivePanel(p.id as any)}
-            style={{ flex:1, padding:"8px 12px", borderRadius:8, border:"none",
-              background:activePanel===p.id?NAVY:LIGHT,
-              color:activePanel===p.id?"var(--hf-text-on-solid)":GRAY_TEXT,
-              fontWeight:activePanel===p.id?600:400, fontSize:13, cursor:"pointer",
-              display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
-            {p.label}
-            {p.count>0 && (
-              <span style={{ background:TEAL, color:"var(--hf-text-on-solid)", borderRadius:"50%",
-                width:18, height:18, fontSize:11, fontWeight:700,
-                display:"inline-flex", alignItems:"center", justifyContent:"center" }}>
-                {p.count}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+      {/* ── One page per step ──────────────────────────────────────────── */}
+      <div style={{ flex:1, minHeight:0, display:"flex", flexDirection:"column", gap:10, marginBottom:12 }} data-step={step}>
 
-      {/* ── Three-column session panels ────────────────────────────────── */}
-      <div style={{ display:"flex", gap:14, flex:1, minHeight:0 }}>
-
-        {/* ── LEFT: SOAP Notes ────────────────────────────────────────── */}
-        <div style={{ flex:1.4, display:"flex", flexDirection:"column", gap:10 }}>
-
-          {/* Clinical question library (renders nothing when no groups are served for this visit) */}
+        {/* Stays mounted on every step (hidden off the Symptoms page) so answers still being saved are never cut off. */}
+        <div hidden={step !== "symptoms"}>
           <QuestionForm consultationId={draftReady ? (draftIdRef.current ?? null) : null}
             patientId={patient.id} visitType={appointment.appointmentType || "CONSULTATION"} />
+        </div>
 
+        {step === "symptoms" && (<>
+          <StepTitle n={1} title="Symptoms" help="Why the patient came and what they report." />
           {/* Voice panel */}
           <div style={{ padding:"12px 14px", background:"var(--hf-violet-soft)", border:"1px solid var(--hf-violet-border)",
             borderRadius:10 }}>
@@ -564,31 +534,20 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
               placeholder="Speak or type transcript here, then Extract SOAP…"/>
           </div>
 
+          <SoapFields soap={soap} sf={sf} only={["chiefComplaint","history"]}/>
+        </>)}
+
+        {step === "examination" && (<>
+          <StepTitle n={2} title="Examination" help="Vitals and what you found on examination." />
           <VitalsPanel soap={soap} sf={sf}/>
+          <SoapFields soap={soap} sf={sf} only={["examination"]}/>
+        </>)}
 
-          <SoapFields soap={soap} sf={sf}/>
-        </div>
-
-        {/* ── MIDDLE: Live Bill ───────────────────────────────────────── */}
-        <div style={{ flex:1, display:"flex", flexDirection:"column", gap:10 }}>
-
-          {/* Quick-add procedures */}
-          <div style={{ padding:"12px 14px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:10 }}>
-            <div style={sectionLabel}>Quick add — procedures</div>
-            <div style={{ display:"flex", gap:6, flexWrap:"wrap" as const }}>
-              {QUICK_PROCEDURES.map(proc=>(
-                <button key={proc.tariff} onClick={()=>addQuickProcedure(proc)}
-                  style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 10px",
-                    background:LIGHT, border:`1px solid ${BORDER}`, borderRadius:7,
-                    fontSize:11, fontWeight:600, color:NAVY_TEXT, cursor:"pointer" }}
-                  onMouseEnter={e=>(e.currentTarget.style.borderColor=TEAL)}
-                  onMouseLeave={e=>(e.currentTarget.style.borderColor=BORDER)}>
-                  <proc.icon size={11}/>{proc.label} <span style={{color:GRAY_TEXT}}>R{proc.price}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
+        {step === "diagnose" && (<>
+          <StepTitle n={3} title="Diagnose & prescribe" help="Your assessment, the medicines, and what to bill." />
+          <div style={{ display:"flex", gap:14, flexWrap:"wrap", alignItems:"flex-start" }}>
+            <div style={{ flex:"1 1 340px", display:"flex", flexDirection:"column", gap:10 }}>
+              <SoapFields soap={soap} sf={sf} only={["diagnosis","icd10Codes"]}/>
           {/* Medication search — adds to bill + Rx */}
           <div style={{ padding:"12px 14px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:10, position:"relative" }}>
             <div style={sectionLabel}>Add medication (bill + Rx)</div>
@@ -626,16 +585,79 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
             )}
           </div>
 
-          <LiveBillPanel billLines={billLines} billTotal={billTotal} removeBillLine={removeBillLine} addBillLine={addBillLine}/>
-        </div>
+              <RxDraftsPanel rxDrafts={rxDrafts} allergyResults={allergyResults} updateRx={updateRx} removeRx={removeRx}
+                addBlankRx={()=>setRxDrafts(d=>[...d,{id:crypto.randomUUID(),
+                  medicationName:"",dosage:"",frequency:"",duration:"",quantity:30,instructions:"",fromBill:false}])}/>
+            </div>
+            <div style={{ flex:"1 1 300px", display:"flex", flexDirection:"column", gap:10 }}>
+          {/* Quick-add procedures */}
+          <div style={{ padding:"12px 14px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:10 }}>
+            <div style={sectionLabel}>Quick add — procedures</div>
+            <div style={{ display:"flex", gap:6, flexWrap:"wrap" as const }}>
+              {QUICK_PROCEDURES.map(proc=>(
+                <button key={proc.tariff} onClick={()=>addQuickProcedure(proc)}
+                  style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 10px",
+                    background:LIGHT, border:`1px solid ${BORDER}`, borderRadius:7,
+                    fontSize:11, fontWeight:600, color:NAVY_TEXT, cursor:"pointer" }}
+                  onMouseEnter={e=>(e.currentTarget.style.borderColor=TEAL)}
+                  onMouseLeave={e=>(e.currentTarget.style.borderColor=BORDER)}>
+                  <proc.icon size={11}/>{proc.label} <span style={{color:GRAY_TEXT}}>R{proc.price}</span>
+                </button>
+              ))}
+            </div>
+          </div>
 
-        {/* ── RIGHT: Prescriptions ─────────────────────────────────────── */}
-        <div style={{ flex:1, display:"flex", flexDirection:"column", gap:10 }}>
+              <LiveBillPanel billLines={billLines} billTotal={billTotal} removeBillLine={removeBillLine} addBillLine={addBillLine}/>
+            </div>
+          </div>
+        </>)}
 
-          <RxDraftsPanel rxDrafts={rxDrafts} allergyResults={allergyResults} updateRx={updateRx} removeRx={removeRx}
-            addBlankRx={()=>setRxDrafts(d=>[...d,{id:crypto.randomUUID(),
-              medicationName:"",dosage:"",frequency:"",duration:"",quantity:30,instructions:"",fromBill:false}])}/>
-        </div>
+        {step === "plan" && (<>
+          <StepTitle n={4} title="Plan" help="Treatment, advice and when to see the patient again." />
+          <SoapFields soap={soap} sf={sf} only={["treatmentPlan"]}/>
+          <div style={{ padding:"12px 14px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:10 }}>
+            <div style={sectionLabel}>Follow-up</div>
+            <div style={{ display:"flex", gap:6, flexWrap:"wrap", alignItems:"center", marginBottom:8 }}>
+              <button type="button" aria-pressed={!soap.followUpDays.trim()} onClick={()=>sf("followUpDays","")}
+                style={chipStyle(!soap.followUpDays.trim())}>No follow-up</button>
+              {FOLLOW_UP_CHOICES.map(d=>(
+                <button key={d} type="button" aria-pressed={soap.followUpDays.trim()===String(d)} onClick={()=>sf("followUpDays",String(d))}
+                  style={chipStyle(soap.followUpDays.trim()===String(d))}>{d} days</button>
+              ))}
+            </div>
+            <SoapFields soap={soap} sf={sf} only={["followUpDays"]}/>
+            <div style={{ fontSize:11, color:GRAY_TEXT, marginTop:6 }}>The patient shows on Recalls when the follow-up date passes without a booking.</div>
+          </div>
+        </>)}
+
+        {step === "sign" && (<>
+          <StepTitle n={5} title="Review & sign" help="Check the record, then complete the consultation." />
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:10 }}>
+            <Recap title="Symptoms" onEdit={()=>setStep("symptoms")} rows={[["Chief complaint", soap.chiefComplaint], ["History", soap.history]]} />
+            <Recap title="Examination" onEdit={()=>setStep("examination")} rows={[["Vitals", vitalsLine(soap)], ["Findings", soap.examination]]} />
+            <Recap title="Diagnosis" onEdit={()=>setStep("diagnose")} rows={[["Diagnosis", soap.diagnosis], ["ICD-10", soap.icd10Codes],
+              ["Prescriptions", rxDrafts.filter(r=>r.medicationName.trim()).map(r=>[r.medicationName, r.dosage, r.frequency, r.duration].filter(Boolean).join(" ")).join("\n")],
+              ["Bill", billLines.length ? `${billLines.length} line${billLines.length===1?"":"s"} · ${fmtR(billTotal)}` : ""]]} />
+            <Recap title="Plan" onEdit={()=>setStep("plan")} rows={[["Treatment plan", soap.treatmentPlan], ["Follow-up", soap.followUpDays.trim() ? `In ${soap.followUpDays.trim()} days` : ""]]} />
+          </div>
+          <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
+            <button onClick={() => { setShowComplete(true); setCompleteError("") }}
+              style={{ ...primaryBtn, background:TEAL, display:"flex", alignItems:"center", gap:8 }}>
+              <CheckCircle size={15}/> Complete consultation
+            </button>
+            <span style={{ fontSize:12, color:GRAY_TEXT }}>{consultSteps(soap, rxDrafts).find(x=>x.id==="sign")?.hint}</span>
+          </div>
+        </>)}
+      </div>
+
+      {/* ── Back / Next ─────────────────────────────────────────────────── */}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:10, padding:"10px 0", borderTop:`1px solid ${BORDER}` }}>
+        <button disabled={!prevStep(step)} onClick={()=>prevStep(step) && setStep(prevStep(step)!)}
+          style={{ ...cancelBtn, opacity: prevStep(step) ? 1 : 0.4 }}>← Back</button>
+        <span style={{ fontSize:12, color:GRAY_TEXT }}>Step {stepNumber(step)} of {WIZARD_ORDER.length}</span>
+        {nextStep(step)
+          ? <button onClick={()=>setStep(nextStep(step)!)} style={primaryBtn}>Next →</button>
+          : <span style={{ width:80 }}/>}
       </div>
 
       {/* ── Complete modal ─────────────────────────────────────────────────── */}
@@ -698,3 +720,33 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
 
 // ── Style helpers ─────────────────────────────────────────────────────────────
 
+
+const chipStyle = (on: boolean): React.CSSProperties => ({ padding:"6px 12px", borderRadius:20, fontSize:12, fontWeight:600, cursor:"pointer",
+  border:`1px solid ${on ? "var(--hf-primary)" : BORDER}`, background: on ? "var(--hf-primary-text)" : "var(--hf-surface)", color: on ? "var(--hf-surface)" : "var(--hf-text)" })
+
+function StepTitle({ n, title, help }: { n: number; title: string; help: string }) {
+  return (
+    <div>
+      <h2 style={{ margin:0, fontSize:17, fontWeight:800, color:"var(--hf-text)" }}>{n}. {title}</h2>
+      <div style={{ fontSize:12, color:GRAY_TEXT }}>{help}</div>
+    </div>
+  )
+}
+
+function Recap({ title, rows, onEdit }: { title: string; rows: [string, string][]; onEdit: () => void }) {
+  return (
+    <section aria-label={title} style={{ padding:"12px 14px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:10 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+        <span style={sectionLabel}>{title}</span>
+        <button type="button" onClick={onEdit} style={{ background:"none", border:"none", color:"var(--hf-accent-text)", fontSize:12, fontWeight:600, cursor:"pointer" }}>Edit</button>
+      </div>
+      {rows.map(([k, v]) => (
+        <div key={k} style={{ marginBottom:6 }}>
+          <div style={{ fontSize:11, color:GRAY_TEXT }}>{k}</div>
+          {v.trim() ? <div style={{ fontSize:13, color:"var(--hf-text)", whiteSpace:"pre-wrap" }}>{v}</div>
+                    : <div style={{ fontSize:13, color:"var(--hf-text-disabled)" }}>Not recorded</div>}
+        </div>
+      ))}
+    </section>
+  )
+}
