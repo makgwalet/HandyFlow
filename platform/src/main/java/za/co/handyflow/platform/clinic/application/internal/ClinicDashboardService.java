@@ -72,14 +72,15 @@ public class ClinicDashboardService {
     }
 
     private static final String ITEM_SQL =
-            "SELECT a.id, p.full_name AS patient_name, pr.full_name AS practitioner_name, a.scheduled_at, "
+            "SELECT a.id, a.patient_id, a.practitioner_id, p.full_name AS patient_name, pr.full_name AS practitioner_name, a.scheduled_at, "
                     + "a.duration_minutes, a.appointment_type, a.status "
                     + "FROM clinic_appointments a "
                     + "JOIN clinic_patients p ON p.id = a.patient_id "
                     + "LEFT JOIN clinic_practitioners pr ON pr.id = a.practitioner_id ";
 
     private static Item item(java.sql.ResultSet rs) throws java.sql.SQLException {
-        return new Item(rs.getObject("id", UUID.class), rs.getString("patient_name"), rs.getString("practitioner_name"),
+        return new Item(rs.getObject("id", UUID.class), rs.getObject("patient_id", UUID.class), rs.getString("patient_name"),
+                rs.getObject("practitioner_id", UUID.class), rs.getString("practitioner_name"),
                 rs.getTimestamp("scheduled_at").toInstant(), rs.getInt("duration_minutes"),
                 rs.getString("appointment_type"), rs.getString("status"));
     }

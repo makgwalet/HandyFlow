@@ -21,6 +21,6 @@ public record DashboardSummary(
         Item next
 ) {
     /** One appointment line. */
-    public record Item(UUID id, String patientName, String practitionerName, Instant scheduledAt,
+    public record Item(UUID id, UUID patientId, String patientName, UUID practitionerId, String practitionerName, Instant scheduledAt,
                        int durationMinutes, String appointmentType, String status) {}
 }

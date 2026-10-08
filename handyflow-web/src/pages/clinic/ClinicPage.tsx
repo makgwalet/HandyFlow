@@ -13,6 +13,7 @@
 // appointment to begin; that is a ONE-SHOT: the file clears it from the
 // history entry as soon as it has consumed it, so a refresh cannot restart it.
 import { useState } from "react"
+import { apiClient } from "../../api/client"
 import { useLocation, useNavigate, useParams } from "react-router-dom"
 import ClinicDashboard   from "./ClinicDashboard"
 import PatientsTab       from "./PatientsTab"
@@ -56,6 +57,13 @@ export function ClinicPage() {
 
   const openFile = (patient: Patient, appointment?: unknown) =>
     navigate(`${base}/patients`, { state: { openPatient: patient, sessionAppointment: appointment ?? null } satisfies FileState })
+  // The dashboard knows a patient's id only; fetch the record, then open the file.
+  const openPatientById = async (id: string) => {
+    try {
+      const r = await apiClient.get(`/api/v1/clinic/patients/${id}`)
+      openFile((r.data?.data ?? r.data) as Patient)
+    } catch { /* stays on the dashboard; the patient list is one click away */ }
+  }
   const closeFile = () => navigate(`${base}/patients`, { replace: true })
   // One-shot: drop the appointment from this history entry once consumed.
   const clearSession = () =>
@@ -87,7 +95,7 @@ export function ClinicPage() {
           )
         }
         switch (id) {
-          case "dashboard":     return <ClinicDashboard onNavigate={goTo} />
+          case "dashboard":     return <ClinicDashboard onNavigate={goTo} onOpenPatient={openPatientById} />
           case "patients":      return <PatientsTab onOpenPatient={p => openFile(p)} />
           case "schedule":      return <ScheduleTab onStartSession={(appt: unknown, pat: Patient) => openFile(pat, appt)} prefill={bookRequest} onPrefillUsed={() => setBookRequest(null)} />
           case "recalls":       return <RecallsTab onBook={r => { setBookRequest(r); goTo("schedule") }} />
