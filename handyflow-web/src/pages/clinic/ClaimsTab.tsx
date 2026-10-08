@@ -1,3 +1,4 @@
+import ModalShell from "./ModalShell"
 import PartialPaymentModal from "./PartialPaymentModal"
 import React from "react"
 // src/pages/clinic/ClaimsTab.tsx
@@ -358,26 +359,19 @@ export default function ClaimsTab() {
 
       {/* ── Reject reason modal ──────────────────────────────────────────── */}
       {showReject && (
-        <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(3px)"}}>
-          <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:440,boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <h3 style={{margin:0,fontSize:16,fontWeight:700,color:"var(--hf-text)"}}>Reject claim</h3>
-              <button onClick={()=>setShowReject(null)} style={{background:"none",border:"none",cursor:"pointer",color:GRAY,display:"flex"}}><X size={18}/></button>
-            </div>
-            <label style={lbl}>Rejection reason *</label>
-            <textarea value={rejectReason} onChange={e=>setRejectReason(e.target.value)}
-              rows={3} placeholder="State reason for rejection (required for resubmission)..."
-              style={{...sinp,resize:"vertical" as const}}/>
-            <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:16}}>
+        <ModalShell title="Reject claim" onClose={()=>setShowReject(null)} width={440} footer={<>
               <button onClick={()=>setShowReject(null)} style={btnCancel}>Cancel</button>
               <button onClick={()=>{ if(!rejectReason.trim()){return} doAction.mutate({id:showReject,action:"reject",reason:rejectReason}) }}
                 disabled={doAction.isPending||!rejectReason.trim()}
                 style={{...btnPrimary,background:RED}}>
                 {doAction.isPending?"Rejecting...":"Confirm rejection"}
               </button>
-            </div>
-          </div>
-        </div>
+        </>}>
+            <label style={lbl}>Rejection reason *</label>
+            <textarea value={rejectReason} onChange={e=>setRejectReason(e.target.value)}
+              rows={3} placeholder="State reason for rejection (required for resubmission)..."
+              style={{...sinp,resize:"vertical" as const}}/>
+        </ModalShell>
       )}
 
       {/* ── New claim modal ──────────────────────────────────────────────── */}
@@ -409,13 +403,32 @@ function CreateClaimModal({ consultations, onClose, onCreated }:
   const selectedConsult = consultations.find(c=>c.id===form.consultationId)
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(3px)"}}>
-      <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:680,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 24px 64px rgba(0,0,0,0.22)"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
-          <h3 style={{margin:0,fontSize:18,fontWeight:700,color:"var(--hf-text)"}}>New medical aid claim</h3>
-          <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:GRAY,display:"flex"}}><X size={20}/></button>
-        </div>
-
+    <ModalShell title="New medical aid claim" onClose={onClose} width={680} footer={<>
+          <button onClick={onClose} style={btnCancel}>Cancel</button>
+          <button onClick={()=>{
+            if (!form.consultationId) { setApiError("Please select a consultation"); return }
+            createClaim.mutate({
+              consultationId: form.consultationId,
+              schemeName: form.schemeName||null,
+              memberNumber: form.memberNumber||null,
+              dependentCode: form.dependentCode||null,
+              consultationTariffCode: form.consultationTariffCode,
+              consultationIcd10Code: form.consultationIcd10Code||null,
+              consultationDescription: form.consultationDescription,
+              consultationRate: parseFloat(form.consultationRate)||520,
+              procedures: lines.filter(l=>l.description).map(l=>({
+                tariffCode:l.type!=="MEDICINE"?l.tariffCode||null:null,
+                nappiCode:l.type==="MEDICINE"?l.nappiCode||null:null,
+                icd10Code:l.icd10Code||null,
+                description:l.description,
+                quantity:parseFloat(l.quantity)||1,
+                unitPrice:parseFloat(l.unitPrice)||0,
+              }))
+            })
+          }} disabled={createClaim.isPending} style={btnPrimary}>
+            {createClaim.isPending ? "Creating claim..." : "Create claim"}
+          </button>
+    </>}>
         <Sect title="Select consultation">
           <select value={form.consultationId} onChange={e=>{ const c=consultations.find(x=>x.id===e.target.value); setForm(f=>({...f,consultationId:e.target.value,consultationIcd10Code:c?.icd10Codes?.[0]||""})) }} style={sinp}>
             <option value="">Select unbilled consultation...</option>
@@ -527,34 +540,7 @@ function CreateClaimModal({ consultations, onClose, onCreated }:
 
         {apiError && <div style={{marginBottom:14,padding:"10px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:RED_TEXT,display:"flex",alignItems:"center",gap:8}}><AlertCircle size={14}/>{apiError}</div>}
 
-        <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-          <button onClick={onClose} style={btnCancel}>Cancel</button>
-          <button onClick={()=>{
-            if (!form.consultationId) { setApiError("Please select a consultation"); return }
-            createClaim.mutate({
-              consultationId: form.consultationId,
-              schemeName: form.schemeName||null,
-              memberNumber: form.memberNumber||null,
-              dependentCode: form.dependentCode||null,
-              consultationTariffCode: form.consultationTariffCode,
-              consultationIcd10Code: form.consultationIcd10Code||null,
-              consultationDescription: form.consultationDescription,
-              consultationRate: parseFloat(form.consultationRate)||520,
-              procedures: lines.filter(l=>l.description).map(l=>({
-                tariffCode:l.type!=="MEDICINE"?l.tariffCode||null:null,
-                nappiCode:l.type==="MEDICINE"?l.nappiCode||null:null,
-                icd10Code:l.icd10Code||null,
-                description:l.description,
-                quantity:parseFloat(l.quantity)||1,
-                unitPrice:parseFloat(l.unitPrice)||0,
-              }))
-            })
-          }} disabled={createClaim.isPending} style={btnPrimary}>
-            {createClaim.isPending ? "Creating claim..." : "Create claim"}
-          </button>
-        </div>
-      </div>
-    </div>
+    </ModalShell>
   )
 }
 

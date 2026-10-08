@@ -3,13 +3,14 @@
 // Features: upload, AI interpretation via Claude, marker display, filing to consultation
 // Copy this entire function and replace the existing LabsTab in PatientFilePage.tsx
 
+import ModalShell from "./ModalShell"
 import { useState, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useAuthStore } from "../../store/auth.store"
 import {
   FlaskConical, Upload, Download, Eye, CheckCircle, AlertCircle,
-  Loader, ChevronDown, ChevronUp, X, FileText, Sparkles,
+  Loader, ChevronDown, ChevronUp, FileText, Sparkles,
 } from "lucide-react"
 
 interface LabResult {
@@ -337,12 +338,8 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
 
       {/* ── File to consultation modal ─────────────────────────────────────── */}
       {showFile && (
-        <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1200,backdropFilter:"blur(3px)"}}>
-          <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:480,boxShadow:"0 24px 64px rgba(0,0,0,0.22)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <h3 style={{margin:0,fontSize:16,fontWeight:700,color:"var(--hf-text)"}}>File to consultation</h3>
-              <button onClick={()=>setShowFile(null)} style={{background:"none",border:"none",cursor:"pointer",color:GRAY,display:"flex"}}><X size={18}/></button>
-            </div>
+        <ModalShell title="File to consultation" onClose={()=>setShowFile(null)} width={480}
+          footer={<button onClick={()=>setShowFile(null)} style={{padding:"8px 16px",border:`1px solid ${BORDER}`,borderRadius:8,background:"var(--hf-surface)",fontSize:13,cursor:"pointer",color:"var(--hf-text-secondary)"}}>Cancel</button>}>
             <p style={{fontSize:13,color:GRAY,marginBottom:16}}>Link this lab result to a consultation so it appears in the patient's history.</p>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {(consultations as Consultation[]).length===0
@@ -358,22 +355,59 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                   </button>
                 ))}
             </div>
-            <div style={{display:"flex",justifyContent:"flex-end",marginTop:16}}>
-              <button onClick={()=>setShowFile(null)} style={{padding:"8px 16px",border:`1px solid ${BORDER}`,borderRadius:8,background:"var(--hf-surface)",fontSize:13,cursor:"pointer",color:"var(--hf-text-secondary)"}}>Cancel</button>
-            </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
 
       {/* ── Upload modal ─────────────────────────────────────────────────────── */}
       {showUpload && (
-        <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1200,backdropFilter:"blur(3px)"}}>
-          <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:520,boxShadow:"0 24px 64px rgba(0,0,0,0.22)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <h3 style={{margin:0,fontSize:17,fontWeight:700,color:"var(--hf-text)"}}>Upload lab result</h3>
-              <button onClick={()=>setShowUpload(false)} style={{background:"none",border:"none",cursor:"pointer",color:GRAY,display:"flex"}}><X size={20}/></button>
-            </div>
+        <ModalShell title="Upload lab result" onClose={()=>setShowUpload(false)} width={520}
+          footer={<>
+              <button onClick={()=>setShowUpload(false)} style={btnCancel}>Cancel</button>
+              <button onClick={async()=>{
+                if (!uploadFile) { setUploadError("Please select a PDF file"); return }
+                setUploading(true); setUploadError("")
+                try {
+                  // FIX: "lab result upload doesn't actually upload anything" —
+                  // previously posted only the filename as JSON; the file itself
+                  // was never sent. Now sends the real bytes as
+                  // multipart/form-data via fetch (not apiClient/axios) — axios
+                  // doesn't reliably strip a Content-Type set as an instance
+                  // default via axios.create() just because a per-request
+                  // value is undefined, confirmed via real testing. fetch never
+                  // sets Content-Type here at all, so the browser adds the
+                  // correct "multipart/form-data; boundary=..." itself. The JWT
+                  // is attached manually since fetch bypasses apiClient's
+                  // request interceptor.
+                  const formData = new FormData()
+                  formData.append("file", uploadFile)
+                  formData.append("source", uploadForm.source)
+                  if (uploadForm.labReference) formData.append("labReference", uploadForm.labReference)
+                  if (uploadForm.collectedAt) formData.append("collectedAt", new Date(uploadForm.collectedAt).toISOString())
+                  formData.append("patientNameRaw", patient.fullName)
 
+                  const token = useAuthStore.getState().token
+                  const res = await fetch(`${apiClient.defaults.baseURL}/api/v1/clinic/lab/results`, {
+                    method: "POST",
+                    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+                    credentials: "include",
+                    body: formData,
+                  })
+                  const json = await res.json().catch(() => null)
+                  if (!res.ok || json?.success === false) {
+                    throw new Error(json?.message ?? `Upload failed (${res.status})`)
+                  }
+
+                  qc.invalidateQueries({queryKey:["pf-labs",patient.id]})
+                  setShowUpload(false)
+                  setUploadFile(null)
+                  setUploadForm({source:"MANUAL",labReference:"",collectedAt:"",notes:""})
+                } catch(e:any) {
+                  setUploadError(e.message ?? "Upload failed")
+                } finally { setUploading(false) }
+              }} disabled={uploading} style={btnPrimary}>
+                {uploading ? <><Loader size={13}/> Uploading...</> : "Upload result"}
+              </button>
+          </>}>
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <div>
                 <label style={lbl}>Lab source</label>
@@ -431,55 +465,7 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
               </div>
             )}
 
-            <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}>
-              <button onClick={()=>setShowUpload(false)} style={btnCancel}>Cancel</button>
-              <button onClick={async()=>{
-                if (!uploadFile) { setUploadError("Please select a PDF file"); return }
-                setUploading(true); setUploadError("")
-                try {
-                  // FIX: "lab result upload doesn't actually upload anything" —
-                  // previously posted only the filename as JSON; the file itself
-                  // was never sent. Now sends the real bytes as
-                  // multipart/form-data via fetch (not apiClient/axios) — axios
-                  // doesn't reliably strip a Content-Type set as an instance
-                  // default via axios.create() just because a per-request
-                  // value is undefined, confirmed via real testing. fetch never
-                  // sets Content-Type here at all, so the browser adds the
-                  // correct "multipart/form-data; boundary=..." itself. The JWT
-                  // is attached manually since fetch bypasses apiClient's
-                  // request interceptor.
-                  const formData = new FormData()
-                  formData.append("file", uploadFile)
-                  formData.append("source", uploadForm.source)
-                  if (uploadForm.labReference) formData.append("labReference", uploadForm.labReference)
-                  if (uploadForm.collectedAt) formData.append("collectedAt", new Date(uploadForm.collectedAt).toISOString())
-                  formData.append("patientNameRaw", patient.fullName)
-
-                  const token = useAuthStore.getState().token
-                  const res = await fetch(`${apiClient.defaults.baseURL}/api/v1/clinic/lab/results`, {
-                    method: "POST",
-                    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-                    credentials: "include",
-                    body: formData,
-                  })
-                  const json = await res.json().catch(() => null)
-                  if (!res.ok || json?.success === false) {
-                    throw new Error(json?.message ?? `Upload failed (${res.status})`)
-                  }
-
-                  qc.invalidateQueries({queryKey:["pf-labs",patient.id]})
-                  setShowUpload(false)
-                  setUploadFile(null)
-                  setUploadForm({source:"MANUAL",labReference:"",collectedAt:"",notes:""})
-                } catch(e:any) {
-                  setUploadError(e.message ?? "Upload failed")
-                } finally { setUploading(false) }
-              }} disabled={uploading} style={btnPrimary}>
-                {uploading ? <><Loader size={13}/> Uploading...</> : "Upload result"}
-              </button>
-            </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   )

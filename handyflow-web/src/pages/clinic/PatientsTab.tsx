@@ -1,6 +1,7 @@
 // src/pages/clinic/PatientsTab.tsx
 // Paginated patient list — server search, family account registration,
 // dependant search, account type badges, no medical columns for reception
+import ModalShell from "./ModalShell"
 import { saId, saIdDob, saIdParts } from "./patientFile.shared"
 import { myPractitionerId } from "./currentPractitioner"
 import { useAuthStore } from "../../store/auth.store"
@@ -400,24 +401,23 @@ export default function PatientsTab({ onOpenPatient }: Props) {
 
       {/* ── Register Patient modal ──────────────────────────────────────── */}
       {showCreate && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.55)",
-          display:"flex", alignItems:"center", justifyContent:"center",
-          zIndex:1000, backdropFilter:"blur(3px)" }}>
-          <div style={{ background:"var(--hf-surface)", borderRadius:16, width:660, maxHeight:"92vh",
-            overflowY:"auto", boxShadow:"0 24px 64px rgba(0,0,0,0.22)" }}>
-
-            {/* Header */}
-            <div style={{ padding:"24px 28px 0", borderBottom:"1px solid var(--hf-border-subtle)" }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
-                <div>
-                  <h3 style={{ margin:"0 0 3px", fontSize:18, fontWeight:700, color:"var(--hf-text)" }}>Register patient</h3>
-                  <p style={{ margin:0, fontSize:12, color:"var(--hf-text-faint)" }}>SA ID auto-fills DOB, age and gender</p>
-                </div>
+        <ModalShell title="Register patient" onClose={() => setShowCreate(false)} width={660} footer={<>
                 <button onClick={() => setShowCreate(false)}
-                  style={{ background:"none", border:"none", cursor:"pointer", color:"var(--hf-text-faint)", display:"flex" }}>
-                  <X size={20}/>
+                  style={{ padding:"9px 18px", border:"1px solid var(--hf-border)", borderRadius:9,
+                    background:"var(--hf-surface)", fontSize:14, cursor:"pointer", color:"var(--hf-text-secondary)" }}>
+                  Cancel
                 </button>
-              </div>
+                <button onClick={handleRegister} disabled={createPatient.isPending}
+                  style={{ display:"flex", alignItems:"center", gap:7, background:"var(--hf-primary)",
+                    color:"var(--hf-text-on-solid)", border:"none", borderRadius:9, padding:"9px 20px",
+                    fontSize:14, fontWeight:600, cursor:"pointer" }}>
+                  {createPatient.isPending ? "Registering..." :
+                    regType==="family" && dependants.length>0
+                      ? `Register family (${1+dependants.length} accounts)`
+                      : "Register patient"}
+                </button>
+        </>}>
+          <p style={{ margin:"0 0 12px", fontSize:12, color:"var(--hf-text-faint)" }}>SA ID auto-fills DOB, age and gender</p>
               {/* Account type toggle */}
               <div style={{ display:"flex", gap:6, marginBottom:20 }}>
                 {(["individual","family"] as const).map(t => (
@@ -432,9 +432,6 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                   </button>
                 ))}
               </div>
-            </div>
-
-            <div style={{ padding:"20px 28px" }}>
               {/* Principal form */}
               <Sect title={regType==="family" ? "Principal member" : "Personal information"}>
                 {duplicates.length > 0 && (
@@ -523,25 +520,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                 </div>
               )}
 
-              <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
-                <button onClick={() => setShowCreate(false)}
-                  style={{ padding:"9px 18px", border:"1px solid var(--hf-border)", borderRadius:9,
-                    background:"var(--hf-surface)", fontSize:14, cursor:"pointer", color:"var(--hf-text-secondary)" }}>
-                  Cancel
-                </button>
-                <button onClick={handleRegister} disabled={createPatient.isPending}
-                  style={{ display:"flex", alignItems:"center", gap:7, background:"var(--hf-primary)",
-                    color:"var(--hf-text-on-solid)", border:"none", borderRadius:9, padding:"9px 20px",
-                    fontSize:14, fontWeight:600, cursor:"pointer" }}>
-                  {createPatient.isPending ? "Registering..." :
-                    regType==="family" && dependants.length>0
-                      ? `Register family (${1+dependants.length} accounts)`
-                      : "Register patient"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   )

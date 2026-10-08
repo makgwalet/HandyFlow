@@ -1,8 +1,9 @@
 // src/pages/clinic/PractitionersTab.tsx
+import ModalShell from "./ModalShell"
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, X, Stethoscope, Mail, Phone, AlertCircle } from "lucide-react"
+import { Plus, Stethoscope, Mail, Phone, AlertCircle } from "lucide-react"
 
 interface Practitioner {
   id: string; firstName: string; lastName: string; fullName: string
@@ -137,16 +138,17 @@ export default function PractitionersTab() {
       )}
 
       {showCreate && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 540, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Register Practitioner</h3>
-              <button onClick={() => setShowCreate(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
-            </div>
+        <ModalShell title="Register practitioner" onClose={() => setShowCreate(false)} width={540}
+          footer={<>
+            <button onClick={() => setShowCreate(false)} style={btnCancel}>Cancel</button>
+            <button onClick={() => { if (validate()) createPractitioner.mutate(form) }}
+              disabled={createPractitioner.isPending} style={btnPrimary}>
+              {createPractitioner.isPending ? "Registering..." : "Register practitioner"}
+            </button></>}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
                 <label style={lbl}>First Name *</label>
-                <input autoFocus value={form.firstName} onChange={e => f("firstName", e.target.value)} placeholder="John" style={inp("firstName")} />
+                <input value={form.firstName} onChange={e => f("firstName", e.target.value)} placeholder="John" style={inp("firstName")} />
                 <FErr k="firstName" />
               </div>
               <div>
@@ -184,15 +186,7 @@ export default function PractitionersTab() {
                 <AlertCircle size={14} />{apiError}
               </div>
             )}
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-              <button onClick={() => setShowCreate(false)} style={btnCancel}>Cancel</button>
-              <button onClick={() => { if (validate()) createPractitioner.mutate(form) }}
-                disabled={createPractitioner.isPending} style={btnPrimary}>
-                {createPractitioner.isPending ? "Registering..." : "Register Practitioner"}
-              </button>
-            </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   )

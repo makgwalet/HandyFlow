@@ -2,11 +2,12 @@
 // FIX: "no POPIA consent tracking" gap — a system handling health records
 // (POPIA's "special personal information" category) had no consent-capture
 // mechanism on the patient record at all.
+import ModalShell from "./ModalShell"
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useAuthStore } from "../../store/auth.store"
-import { ShieldCheck, ShieldX, ShieldQuestion, Plus, X, Clock, Info } from "lucide-react"
+import { ShieldCheck, ShieldX, ShieldQuestion, Plus, Clock, Info } from "lucide-react"
 
 interface Patient { id: string; fullName: string }
 interface ConsentStatus {
@@ -136,13 +137,13 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
       )}
 
       {showRecord && (
-        <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
-          <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:460,boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <h3 style={{margin:0,fontSize:17,fontWeight:700,color:"var(--hf-text)"}}>Record Consent</h3>
-              <button onClick={()=>setShowRecord(false)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--hf-text-faint)"}}><X size={20}/></button>
-            </div>
-
+        <ModalShell title="Record consent" onClose={()=>setShowRecord(false)} width={460}
+          footer={<>
+            <button onClick={()=>setShowRecord(false)} style={{padding:"9px 18px",border:"1px solid var(--hf-border)",borderRadius:9,background:"var(--hf-surface)",fontSize:14,cursor:"pointer"}}>Cancel</button>
+            <button onClick={()=>recordConsent.mutate()} disabled={recordConsent.isPending}
+              style={{padding:"9px 20px",border:"none",borderRadius:9,background:NAVY,color:"var(--hf-text-on-solid)",fontSize:14,fontWeight:600,cursor:"pointer"}}>
+              {recordConsent.isPending ? "Saving..." : "Record"}
+            </button></>}>
             <label style={lbl}>Consent type *</label>
             <select value={form.consentType} onChange={e=>setForm(f=>({...f,consentType:e.target.value}))} style={inp}>
               {Object.entries(TYPE_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
@@ -178,24 +179,11 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
               <div style={{marginTop:4,marginBottom:14,padding:"10px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:RED_TEXT}}>{apiError}</div>
             )}
 
-            <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:6}}>
-              <button onClick={()=>setShowRecord(false)} style={{padding:"9px 18px",border:"1px solid var(--hf-border)",borderRadius:9,background:"var(--hf-surface)",fontSize:14,cursor:"pointer"}}>Cancel</button>
-              <button onClick={()=>recordConsent.mutate()} disabled={recordConsent.isPending}
-                style={{padding:"9px 20px",border:"none",borderRadius:9,background:NAVY,color:"var(--hf-text-on-solid)",fontSize:14,fontWeight:600,cursor:"pointer"}}>
-                {recordConsent.isPending ? "Saving..." : "Record"}
-              </button>
-            </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
 
       {showHistory && (
-        <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
-          <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:560,maxHeight:"80vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <h3 style={{margin:0,fontSize:17,fontWeight:700,color:"var(--hf-text)"}}>Consent History</h3>
-              <button onClick={()=>setShowHistory(false)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--hf-text-faint)"}}><X size={20}/></button>
-            </div>
+        <ModalShell title="Consent history" onClose={()=>setShowHistory(false)} width={560}>
             {history.length === 0 ? (
               <div style={{textAlign:"center",padding:30,color:GRAY,fontSize:13}}>No consent events recorded yet.</div>
             ) : (
@@ -222,8 +210,7 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
                 })}
               </div>
             )}
-          </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   )

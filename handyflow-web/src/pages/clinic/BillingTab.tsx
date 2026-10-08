@@ -1,12 +1,13 @@
 // src/pages/clinic/BillingTab.tsx
 // Billing & Reports — who paid, who owes, revenue by period/doctor, payment recording
+import ModalShell from "./ModalShell"
 import PatientPicker, { type PickerPatient } from "./PatientPicker"
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import {
   BarChart2, AlertCircle, CheckCircle,
-  CreditCard, Plus, X, Download, 
+  CreditCard, Plus, Download, 
 } from "lucide-react"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -385,12 +386,15 @@ export default function BillingTab() {
 
       {/* ── Record payment modal ─────────────────────────────────────────── */}
       {showPayment && (
-        <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(3px)"}}>
-          <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:460,boxShadow:"0 24px 64px rgba(0,0,0,0.22)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
-              <h3 style={{margin:0,fontSize:17,fontWeight:700,color:"var(--hf-text)"}}>Record payment</h3>
-              <button onClick={()=>setShowPayment(false)} style={{background:"none",border:"none",cursor:"pointer",color:GRAY_TEXT,display:"flex"}}><X size={20}/></button>
-            </div>
+        <ModalShell title="Record payment" onClose={()=>setShowPayment(false)} width={460} footer={<>
+              <button onClick={()=>setShowPayment(false)} style={btnCancel}>Cancel</button>
+              <button onClick={()=>{
+                if (!payForm.patientId||!payForm.amount) { setPayError("Patient and amount are required"); return }
+                recordPayment.mutate({...payForm, amount:parseFloat(payForm.amount)})
+              }} disabled={recordPayment.isPending} style={{...btnPrimary,background:TEAL}}>
+                {recordPayment.isPending ? "Recording..." : "Record payment"}
+              </button>
+        </>}>
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <div>
                 <label style={lbl}>Patient *</label>
@@ -433,17 +437,7 @@ export default function BillingTab() {
               </div>
             </div>
             {payError && <div style={{marginTop:12,padding:"8px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:RED_TEXT,display:"flex",alignItems:"center",gap:8}}><AlertCircle size={13}/>{payError}</div>}
-            <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}>
-              <button onClick={()=>setShowPayment(false)} style={btnCancel}>Cancel</button>
-              <button onClick={()=>{
-                if (!payForm.patientId||!payForm.amount) { setPayError("Patient and amount are required"); return }
-                recordPayment.mutate({...payForm, amount:parseFloat(payForm.amount)})
-              }} disabled={recordPayment.isPending} style={{...btnPrimary,background:TEAL}}>
-                {recordPayment.isPending ? "Recording..." : "Record payment"}
-              </button>
-            </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   )

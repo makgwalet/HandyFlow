@@ -3,6 +3,7 @@
 // Opened when a doctor starts a consultation from an appointment
 
 import { useDialogs } from "./dialogs"
+import ModalShell from "./ModalShell"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -662,15 +663,15 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
 
       {/* ── Complete modal ─────────────────────────────────────────────────── */}
       {showComplete && (
-        <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.6)",
-          display:"flex",alignItems:"center",justifyContent:"center",zIndex:1400,backdropFilter:"blur(4px)"}}>
-          <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:520,
-            boxShadow:"0 24px 64px rgba(0,0,0,0.25)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <h3 style={{margin:0,fontSize:18,fontWeight:700,color:"var(--hf-text)"}}>Complete consultation</h3>
-              <button onClick={()=>setShowComplete(false)} style={{background:"none",border:"none",cursor:"pointer",color:GRAY_TEXT}}><X size={18}/></button>
-            </div>
-
+        <ModalShell title="Complete consultation" onClose={()=>setShowComplete(false)} width={520} footer={<>
+              <button onClick={()=>setShowComplete(false)} style={cancelBtn}>Back to session</button>
+              <button onClick={()=>complete.mutate()} disabled={complete.isPending}
+                style={{...primaryBtn,background:TEAL,display:"flex",alignItems:"center",gap:7}}>
+                {complete.isPending
+                  ? <><Loader size={14}/> Completing…</>
+                  : <><CheckCircle size={14}/> Complete & save</>}
+              </button>
+        </>}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
               {[
                 {label:"Duration",    value:`${durationMinutes} minutes`, color:NAVY_TEXT},
@@ -702,17 +703,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
               </div>
             )}
 
-            <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-              <button onClick={()=>setShowComplete(false)} style={cancelBtn}>Back to session</button>
-              <button onClick={()=>complete.mutate()} disabled={complete.isPending}
-                style={{...primaryBtn,background:TEAL,display:"flex",alignItems:"center",gap:7}}>
-                {complete.isPending
-                  ? <><Loader size={14}/> Completing…</>
-                  : <><CheckCircle size={14}/> Complete & save</>}
-              </button>
-            </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   )

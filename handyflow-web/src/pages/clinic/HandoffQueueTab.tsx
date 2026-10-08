@@ -3,6 +3,7 @@
 // consultation, finish their review, and either sign it or send it back to the
 // nurse with a reason and comment. Every move is audited server-side.
 import { useDialogs } from "./dialogs"
+import ModalShell from "./ModalShell"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -153,28 +154,23 @@ export default function HandoffQueueTab() {
       </div>
 
       {returning && (
-        <div role="dialog" aria-modal="true" aria-label="Return to nurse" style={{ position: "fixed", inset: 0,
-          background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
-          <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 20, width: "100%", maxWidth: 440 }}>
-            <h3 style={{ margin: "0 0 4px", fontSize: 17, color: "var(--hf-text)" }}>Return to nurse</h3>
-            <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginBottom: 12 }}>{returning.patientName}</div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--hf-text)" }}>Reason</label>
-            <select value={reason} onChange={e => setReason(e.target.value)}
-              style={{ width: "100%", padding: 8, margin: "4px 0 12px", borderRadius: 8, border: "1px solid var(--hf-border)" }}>
-              {RETURN_REASONS.map(r => <option key={r.code} value={r.code}>{r.label}</option>)}
-            </select>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--hf-text)" }}>Comment (required)</label>
-            <textarea value={comment} onChange={e => setComment(e.target.value)} rows={3}
-              style={{ width: "100%", padding: 8, marginTop: 4, borderRadius: 8, border: "1px solid var(--hf-border)", boxSizing: "border-box" }} />
-            {error && <div role="alert" style={{ marginTop: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
-              <button style={btn()} onClick={() => setReturning(null)}>Cancel</button>
-              <button style={btn(true)} disabled={act.isPending || !comment.trim()}
-                onClick={() => act.mutate({ id: returning.id, path: "return-to-nurse", body: { reasonCode: reason, comment } })}>
-                Return</button>
-            </div>
-          </div>
-        </div>
+        <ModalShell title="Return to nurse" onClose={() => setReturning(null)} width={440}
+          footer={<>
+            <button style={btn()} onClick={() => setReturning(null)}>Cancel</button>
+            <button style={btn(true)} disabled={act.isPending || !comment.trim()}
+              onClick={() => act.mutate({ id: returning.id, path: "return-to-nurse", body: { reasonCode: reason, comment } })}>
+              Return</button></>}>
+          <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginBottom: 12 }}>{returning.patientName}</div>
+          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--hf-text)" }}>Reason</label>
+          <select value={reason} onChange={e => setReason(e.target.value)}
+            style={{ width: "100%", padding: 8, margin: "4px 0 12px", borderRadius: 8, border: "1px solid var(--hf-border)" }}>
+            {RETURN_REASONS.map(r => <option key={r.code} value={r.code}>{r.label}</option>)}
+          </select>
+          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--hf-text)" }}>Comment (required)</label>
+          <textarea value={comment} onChange={e => setComment(e.target.value)} rows={3}
+            style={{ width: "100%", padding: 8, marginTop: 4, borderRadius: 8, border: "1px solid var(--hf-border)", boxSizing: "border-box" }} />
+          {error && <div role="alert" style={{ marginTop: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
+        </ModalShell>
       )}
     </div>
   )
