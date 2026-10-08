@@ -140,3 +140,7 @@ export const btnPrimary:React.CSSProperties = {display:"flex",alignItems:"center
 export const btnCancel:React.CSSProperties  = {padding:"9px 18px",border:`1px solid ${BORDER}`,borderRadius:9,background:"var(--hf-surface)",fontSize:13,cursor:"pointer",color:"var(--hf-text-secondary)"}
 export const btnOutline:React.CSSProperties = {padding:"9px 18px",border:"1.5px solid",borderRadius:9,background:"var(--hf-surface)",fontSize:13,fontWeight:600,cursor:"pointer"}
 
+
+/** Card grid that fills the width: as many ~340px columns as fit, cards never split across columns. */
+export const masonry: import("react").CSSProperties = { columnWidth: 340, columnGap: 14 }
+export const flowCard: import("react").CSSProperties = { breakInside: "avoid", marginBottom: 14, display: "block" }

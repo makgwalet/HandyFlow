@@ -119,3 +119,13 @@ describe("overview: add dependant", () => {
     await screen.findByText(/dependant was added, but their sex at birth could not be saved/)
   })
 })
+
+describe("overview: layout", () => {
+  it("shows details, contact and notes as separate cards, with the family card only for family accounts", () => {
+    show({ emergencyContactName: "Sipho Dube", notes: "Prefers morning slots" })
+    for (const t of ["Personal details", "Contact and emergency", "Notes and alerts", "Registration notes", "Family account"]) expect(screen.getByText(t)).toBeTruthy()
+    expect(screen.getByText("Sipho Dube")).toBeTruthy(); cleanup()
+    show({ accountType: "INDIVIDUAL" })
+    expect(screen.queryByText("Family account")).toBeNull()
+  })
+})

@@ -115,12 +115,12 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
       {dialogs}
       {/* ── Patient banner ──────────────────────────────────────────────── */}
       <div style={{ background:`linear-gradient(135deg,${NAVY} 0%,var(--hf-primary-deep) 100%)`,
-        borderRadius:12, marginBottom:24, padding:"24px 28px 0", overflow:"hidden" }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
+        borderRadius:12, marginBottom:16, padding:"14px 20px 0", overflow:"hidden" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
           <div style={{ display:"flex", alignItems:"center", gap:16 }}>
-            <div style={{ width:64, height:64, borderRadius:"50%", background:"rgba(255,255,255,0.15)",
+            <div style={{ width:52, height:52, borderRadius:"50%", background:"rgba(255,255,255,0.15)",
               display:"flex", alignItems:"center", justifyContent:"center",
-              fontSize:24, fontWeight:800, color:"var(--hf-text-on-solid)", flexShrink:0 }}>
+              fontSize:20, fontWeight:800, color:"var(--hf-text-on-solid)", flexShrink:0 }}>
               {patient.firstName?.[0]}{patient.lastName?.[0]}
             </div>
             <div>
@@ -214,7 +214,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
         </div>
 
         {/* Tab bar */}
-        <div style={{ display:"flex", gap:1, overflowX:"auto", marginTop:4 }}>
+        <div style={{ display:"flex", gap:1, overflowX:"auto", marginTop:0 }}>
           {TABS.map(t=>{
             const Icon=t.icon; const active=activeTab===t.id
             return (

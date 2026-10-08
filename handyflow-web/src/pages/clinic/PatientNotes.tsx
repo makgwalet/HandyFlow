@@ -71,7 +71,7 @@ export default function PatientNotesPanel({ patientId }: { patientId: string }) 
 
   const notes = data ?? []
   return (
-    <div style={{ marginTop: 16 }}>
+    <div>
       <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", letterSpacing: "0.06em", marginBottom: 6 }}>NOTES AND ALERTS</div>
       {isError && <div style={{ fontSize: 12, color: "var(--hf-danger-text)" }}>Notes could not be loaded.</div>}
       {!isError && notes.length === 0 && <div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No open notes or alerts.</div>}

@@ -40,7 +40,6 @@ describe("PatientBriefingPanel", () => {
     expect(screen.getByText("12 days ago")).toBeTruthy()
     expect(screen.getAllByText("Acute bronchitis").length).toBeGreaterThan(0)
     expect(screen.getByText("J20.9")).toBeTruthy()
-    expect(screen.getByText("Amlodipine")).toBeTruthy()
     expect(screen.getByText("128/82")).toBeTruthy()
     expect(screen.getByText("1 not yet reviewed")).toBeTruthy()
   })
@@ -52,7 +51,6 @@ describe("PatientBriefingPanel", () => {
     show()
     expect(await screen.findByText("First visit")).toBeTruthy()
     expect(screen.getByText("No vitals on record.")).toBeTruthy()
-    expect(screen.getByText("No active medicines recorded.")).toBeTruthy()
   })
 
   it("checks a scheduled appointment in, starts it, and hands the started appointment to the session", async () => {

@@ -1,5 +1,5 @@
 // src/pages/clinic/PatientOverviewTab.tsx
-// Split out of PatientFilePage.tsx (W-4); behaviour unchanged.
+// Patient overview: a flowing grid of compact cards (details, contact, clinical lists, notes, family) under the briefing strip.
 import { useState } from "react"
 import PatientNotesPanel from "./PatientNotes"
 import ObservationMatrix from "./ObservationMatrix"
@@ -11,7 +11,7 @@ import { apiClient } from "../../api/client"
 import ClinicalSummaryPanel from "./ClinicalSummaryPanel"
 import PatientBriefingPanel from "./PatientBriefingPanel"
 import type { Patient } from "./patientFile.shared"
-import { BORDER, GRAY, GREEN_TEXT, LIGHT, Modal, ModalFooter, RED_TEXT, TEAL_TEXT, lbl, sinp } from "./patientFile.shared"
+import { BORDER, GRAY, GREEN_TEXT, flowCard, masonry, Modal, ModalFooter, RED_TEXT, TEAL_TEXT, lbl, sinp } from "./patientFile.shared"
 import { ArrowRight, Plus } from "lucide-react"
 
 // ── OVERVIEW TAB ──────────────────────────────────────────────────────────────
@@ -83,40 +83,27 @@ export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPati
     onError:(e:any)=>setDepError(e.response?.data?.message??"Failed to add dependant"),
   })
 
-  return (
-    <div>
-    {onStartSession && (
-      <PatientBriefingPanel patientId={patient.id} appointments={appointments} defaultPractitionerId={defaultPractitionerId}
-        onStartSession={onStartSession} onOpenTab={onOpenTab} />
-    )}
-    <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:20 }}>
-      {/* Left — demographics */}
-      <div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
-          {[
-            {label:"SA ID",             value:patient.idNumber||"—"},
-            {label:"Date of birth",     value:idInfo?`${idInfo.dob} (${age ?? `${idInfo.age} y`})`:patient.dateOfBirth?`${patient.dateOfBirth}${age?` (${age})`:""}`:"—"},
-            {label:"Gender",            value:patient.gender?.replace("_"," ")||"—"},
-            {label:"Phone",             value:patient.phone||"—"},
-            {label:"Email",             value:patient.email||"—"},
-            {label:"Emergency contact", value:patient.emergencyContactName||"—"},
-            {label:"Emergency phone",   value:patient.emergencyContactPhone||"—"},
-          ].map(item=>(
-            <div key={item.label} style={{ padding:"11px 14px", background:LIGHT,
-              borderRadius:10, border:`1px solid ${BORDER}` }}>
-              <div style={{ fontSize:10, fontWeight:700, color:GRAY, textTransform:"uppercase",
-                letterSpacing:"0.06em", marginBottom:3 }}>{item.label}</div>
-              <div style={{ fontSize:14, color:"var(--hf-text)", fontWeight:500, wordBreak:"break-all" }}>{item.value}</div>
-            </div>
-          ))}
-        </div>
+  const dobText = idInfo ? `${idInfo.dob} (${age ?? `${idInfo.age} y`})` : patient.dateOfBirth ? `${patient.dateOfBirth}${age ? ` (${age})` : ""}` : "—"
+
+  const cards = (
+    <>
+      <Card title="Personal details" aside={
+        <span style={{ display:"flex", gap:6 }}>
+          <span style={{ background:patient.active?"var(--hf-success-soft-strong)":"var(--hf-danger-soft)", color:patient.active?GREEN_TEXT:RED_TEXT,
+            padding:"2px 9px", borderRadius:20, fontSize:11, fontWeight:700 }}>{patient.active?"ACTIVE":"INACTIVE"}</span>
+          {patient.archivedAt && <span style={{ background:"var(--hf-surface-sunken)", color:GRAY, padding:"2px 9px", borderRadius:20, fontSize:11, fontWeight:700 }}>ARCHIVED</span>}
+        </span>}>
+        <Fact k="SA ID" v={patient.idNumber||"—"} />
+        <Fact k="Date of birth" v={dobText} />
+        <Fact k="Gender" v={patient.gender?.replace("_"," ")||"—"} />
+        {patient.bloodType && <Fact k="Blood type" v={patient.bloodType} />}
 
         {/* Sex at birth and pregnancy status: growth charts and sex-specific questions depend on them */}
-        <div aria-label="Clinical profile" style={{ padding:"11px 14px", background:LIGHT, borderRadius:10, border:`1px solid ${sexAtBirth?BORDER:"var(--hf-warning-border, "+BORDER+")"}`, marginBottom:16 }}>
+        <div aria-label="Clinical profile" style={{ marginTop:8, paddingTop:8, borderTop:`1px solid ${BORDER}` }}>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:10, fontWeight:700, color:GRAY, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:3 }}>Sex at birth</div>
-              <div style={{ fontSize:14, color:"var(--hf-text)", fontWeight:500 }}>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:10, fontWeight:700, color:GRAY, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:2 }}>Sex at birth</div>
+              <div style={{ fontSize:13, color:"var(--hf-text)", fontWeight:600 }}>
                 {sexAtBirth ? SEX_LABEL[sexAtBirth] ?? sexAtBirth : <span style={{ color:"var(--hf-warning-text, var(--hf-text))" }}>Not recorded</span>}
                 {sexAtBirth==="FEMALE" && profile.pregnancyStatus && <span style={{ color:GRAY, fontWeight:400 }}> · {PREGNANCY_LABEL[profile.pregnancyStatus] ?? profile.pregnancyStatus}</span>}
               </div>
@@ -124,11 +111,10 @@ export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPati
             </div>
             {canEdit && !editingProfile && (
               <button type="button" onClick={()=>{ setSexDraft(sexAtBirth ?? suggested ?? ""); setPregDraft(profile.pregnancyStatus ?? ""); setProfileError(""); setEditingProfile(true) }}
-                style={{ padding:"4px 10px", borderRadius:6, border:`1px solid ${BORDER}`, background:"var(--hf-surface)", fontSize:12, fontWeight:600, cursor:"pointer" }}>{sexAtBirth?"Change":"Set"}</button>
+                style={smallBtn}>{sexAtBirth?"Change":"Set"}</button>
             )}
             {canGrowth && onOpenTab && (
-              <button type="button" onClick={()=>onOpenTab("growth")}
-                style={{ padding:"4px 10px", borderRadius:6, border:`1px solid ${BORDER}`, background:"var(--hf-surface)", fontSize:12, fontWeight:600, cursor:"pointer" }}>Growth chart</button>
+              <button type="button" onClick={()=>onOpenTab("growth")} style={smallBtn}>Growth chart</button>
             )}
           </div>
           {editingProfile && (
@@ -151,93 +137,84 @@ export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPati
           )}
           {profileError && <div role="alert" style={{ marginTop:8, fontSize:12, color:RED_TEXT }}>{profileError}</div>}
         </div>
+      </Card>
 
-        {/* Allergies, conditions and medicines: structured records, editable by clinicians */}
-        <ClinicalSummaryPanel patientId={patient.id} fallbackAllergies={patient.allergies} fallbackConditions={patient.chronicConditions} />
-        <PatientNotesPanel patientId={patient.id} />
-        <ObservationMatrix patientId={patient.id} />
-        <div style={{ marginTop: 16 }}><PatientSummaryPrint patient={patient as any} /></div>
+      <Card title="Contact and emergency">
+        <Fact k="Phone" v={patient.phone||"—"} />
+        <Fact k="Email" v={patient.email||"—"} />
+        <Fact k="Emergency contact" v={patient.emergencyContactName||"—"} />
+        <Fact k="Emergency phone" v={patient.emergencyContactPhone||"—"} />
+      </Card>
 
-        {patient.notes && (
-          <div style={{ padding:"12px 14px", background:LIGHT, borderRadius:10, border:`1px solid ${BORDER}` }}>
-            <div style={{ fontSize:10, fontWeight:700, color:GRAY, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.06em" }}>Notes</div>
-            <div style={{ fontSize:13, color:"var(--hf-text-tertiary)", lineHeight:1.6 }}>{patient.notes}</div>
-          </div>
-        )}
-      </div>
+      {/* Allergies, conditions and medicines: structured records, editable by clinicians */}
+      <ClinicalSummaryPanel patientId={patient.id} fallbackAllergies={patient.allergies} fallbackConditions={patient.chronicConditions} />
 
-      {/* Right — family + status */}
-      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-        {/* Account status */}
-        <div style={{ padding:"14px 16px", background:LIGHT, border:`1px solid ${BORDER}`, borderRadius:12 }}>
-          <div style={{ fontSize:11, fontWeight:700, color:GRAY, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:8 }}>Account status</div>
-          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-            <span style={{ background:patient.active?"var(--hf-success-soft-strong)":"var(--hf-danger-soft)",
-              color:patient.active?GREEN_TEXT:RED_TEXT, padding:"3px 10px", borderRadius:20,
-              fontSize:12, fontWeight:700 }}>{patient.active?"ACTIVE":"INACTIVE"}</span>
-            {patient.archivedAt && <span style={{ background:"var(--hf-surface-sunken)", color:GRAY, padding:"3px 10px", borderRadius:20, fontSize:12, fontWeight:700 }}>ARCHIVED</span>}
-          </div>
-        </div>
+      <Card title="Notes and alerts"><PatientNotesPanel patientId={patient.id} /></Card>
 
-        {/* Family section — shown for PRINCIPAL or DEPENDANT */}
-        {(patient.accountType==="PRINCIPAL" || patient.accountType==="DEPENDANT") && (
-          <div style={{ padding:"14px 16px", background:LIGHT, border:`1px solid ${BORDER}`, borderRadius:12 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:GRAY, textTransform:"uppercase", letterSpacing:"0.06em" }}>
-                Family account
-              </div>
-              {patient.accountType==="PRINCIPAL" && (
-                <button onClick={()=>{ setDepError(""); setDepForm(EMPTY_DEPENDANT); setShowAddDep(true) }}
-                  style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px",
-                    background:"var(--hf-info-soft)", color:"var(--hf-info-text)", border:"1px solid var(--hf-info-border)",
-                    borderRadius:6, fontSize:11, fontWeight:600, cursor:"pointer" }}>
-                  <Plus size={11}/> Add
-                </button>
-              )}
-            </div>
+      {patient.notes && (
+        <Card title="Registration notes">
+          <div style={{ fontSize:13, color:"var(--hf-text-tertiary)", lineHeight:1.6 }}>{patient.notes}</div>
+        </Card>
+      )}
 
-            {/* Dependants list */}
-            {(familyMembers as Patient[]).length===0 ? (
-              <div style={{ fontSize:12, color:GRAY, fontStyle:"italic" }}>No dependants linked yet.</div>
-            ) : (
-              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                {(familyMembers as Patient[]).map(m=>{
-                  const isCurrentPatient = m.id===patient.id
-                  return (
-                    <div key={m.id}
-                      onClick={()=>!isCurrentPatient && onOpenPatient && onOpenPatient(m)}
-                      style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 10px",
-                        background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:8,
-                        cursor:isCurrentPatient?"default":"pointer" }}
-                      onMouseEnter={e=>{ if (!isCurrentPatient) (e.currentTarget as HTMLDivElement).style.background="var(--hf-success-soft)" }}
-                      onMouseLeave={e=>{ (e.currentTarget as HTMLDivElement).style.background="var(--hf-surface)" }}>
-                      <div style={{ width:28, height:28, borderRadius:"50%",
-                        background:isCurrentPatient?"var(--hf-sky-soft-strong)":"var(--hf-success-soft)",
-                        display:"flex", alignItems:"center", justifyContent:"center",
-                        fontSize:11, fontWeight:700, color:isCurrentPatient?"var(--hf-sky-text-strong)":TEAL_TEXT, flexShrink:0 }}>
-                        {m.firstName?.[0]}{m.lastName?.[0]}
-                      </div>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:12, fontWeight:600, color:"var(--hf-text)",
-                          overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" as const }}>
-                          {m.fullName}
-                          {isCurrentPatient && <span style={{ fontSize:10, color:GRAY, marginLeft:4 }}>(this patient)</span>}
-                        </div>
-                        {m.relationship && (
-                          <div style={{ fontSize:10, color:GRAY }}>
-                            {m.relationship.charAt(0)+m.relationship.slice(1).toLowerCase()}
-                          </div>
-                        )}
-                      </div>
-                      {!isCurrentPatient && <ArrowRight size={12} style={{ color: GRAY }}/>}
+      {/* Family section — shown for PRINCIPAL or DEPENDANT */}
+      {(patient.accountType==="PRINCIPAL" || patient.accountType==="DEPENDANT") && (
+        <Card title="Family account" aside={patient.accountType==="PRINCIPAL" ? (
+          <button onClick={()=>{ setDepError(""); setDepForm(EMPTY_DEPENDANT); setShowAddDep(true) }}
+            style={{ display:"flex", alignItems:"center", gap:4, padding:"3px 10px", background:"var(--hf-info-soft)", color:"var(--hf-info-text)",
+              border:"1px solid var(--hf-info-border)", borderRadius:6, fontSize:11, fontWeight:600, cursor:"pointer" }}>
+            <Plus size={11}/> Add
+          </button>) : undefined}>
+          {(familyMembers as Patient[]).length===0 ? (
+            <div style={{ fontSize:12, color:GRAY, fontStyle:"italic" }}>No dependants linked yet.</div>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {(familyMembers as Patient[]).map(m=>{
+                const isCurrentPatient = m.id===patient.id
+                return (
+                  <div key={m.id}
+                    onClick={()=>!isCurrentPatient && onOpenPatient && onOpenPatient(m)}
+                    style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 10px",
+                      background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:8,
+                      cursor:isCurrentPatient?"default":"pointer" }}
+                    onMouseEnter={e=>{ if (!isCurrentPatient) (e.currentTarget as HTMLDivElement).style.background="var(--hf-success-soft)" }}
+                    onMouseLeave={e=>{ (e.currentTarget as HTMLDivElement).style.background="var(--hf-surface)" }}>
+                    <div style={{ width:28, height:28, borderRadius:"50%",
+                      background:isCurrentPatient?"var(--hf-sky-soft-strong)":"var(--hf-success-soft)",
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                      fontSize:11, fontWeight:700, color:isCurrentPatient?"var(--hf-sky-text-strong)":TEAL_TEXT, flexShrink:0 }}>
+                      {m.firstName?.[0]}{m.lastName?.[0]}
                     </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:12, fontWeight:600, color:"var(--hf-text)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" as const }}>
+                        {m.fullName}
+                        {isCurrentPatient && <span style={{ fontSize:10, color:GRAY, marginLeft:4 }}>(this patient)</span>}
+                      </div>
+                      {m.relationship && (
+                        <div style={{ fontSize:10, color:GRAY }}>{m.relationship.charAt(0)+m.relationship.slice(1).toLowerCase()}</div>
+                      )}
+                    </div>
+                    {!isCurrentPatient && <ArrowRight size={12} style={{ color: GRAY }}/>}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </Card>
+      )}
+    </>
+  )
+
+  return (
+    <div>
+      {onStartSession
+        ? <PatientBriefingPanel patientId={patient.id} appointments={appointments} defaultPractitionerId={defaultPractitionerId}
+            onStartSession={onStartSession} onOpenTab={onOpenTab}>{cards}</PatientBriefingPanel>
+        : <div style={masonry}>{cards}</div>}
+
+      {/* Wide table and print action sit under the cards at full width */}
+      <ObservationMatrix patientId={patient.id} />
+      <div style={{ marginTop: 14 }}><PatientSummaryPrint patient={patient as any} /></div>
 
       {/* Add dependant modal */}
       {showAddDep && (
@@ -302,6 +279,26 @@ export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPati
         </Modal>
       )}
     </div>
+  )
+}
+
+const smallBtn: React.CSSProperties = { padding:"4px 10px", borderRadius:6, border:`1px solid ${BORDER}`, background:"var(--hf-surface)", fontSize:12, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }
+
+function Card({ title, aside, children }: { title:string; aside?:React.ReactNode; children:React.ReactNode }) {
+  return (
+    <div style={{ ...flowCard, background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:12, padding:"14px 16px" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8, minHeight:22 }}>
+        <div style={{ fontSize:12, fontWeight:800, letterSpacing:"0.05em", textTransform:"uppercase", color:"var(--hf-text-secondary)" }}>{title}</div>
+        {aside}
+      </div>
+      {children}
     </div>
   )
 }
+
+const Fact = ({ k, v }: { k:string; v:string }) => (
+  <div style={{ display:"flex", gap:10, padding:"4px 0", fontSize:13 }}>
+    <div style={{ width:112, flexShrink:0, color:GRAY, fontSize:12 }}>{k}</div>
+    <div style={{ color:"var(--hf-text)", fontWeight:500, minWidth:0, wordBreak:"break-word" }}>{v}</div>
+  </div>
+)

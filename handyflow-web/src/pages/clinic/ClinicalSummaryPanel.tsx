@@ -46,7 +46,7 @@ function Section({ title, tone, children }: { title: string; tone: "danger" | "w
               warning: ["var(--hf-warning-soft)", "var(--hf-warning-border)", "var(--hf-warning-text)"],
               neutral: ["var(--hf-surface-muted)", "var(--hf-border)", "var(--hf-text-muted)"] }[tone]
   return (
-    <div style={{ marginBottom: 12, padding: "14px 16px", background: t[0], border: `1px solid ${t[1]}`, borderRadius: 12 }}>
+    <div style={{ breakInside: "avoid", display: "block", marginBottom: 14, padding: "14px 16px", background: t[0], border: `1px solid ${t[1]}`, borderRadius: 12 }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: t[2], textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>{title}</div>
       {children}
     </div>
@@ -77,7 +77,7 @@ export default function ClinicalSummaryPanel({ patientId, fallbackAllergies = []
   const [m, setM] = useState({ medicineName: "", dose: "", frequency: "" })
 
   return (
-    <div>
+    <>
       {dialogs}
       {error && <div role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 8 }}>{error}</div>}
 
@@ -161,6 +161,6 @@ export default function ClinicalSummaryPanel({ patientId, fallbackAllergies = []
           )}
         </Section>
       )}
-    </div>
+    </>
   )
 }
