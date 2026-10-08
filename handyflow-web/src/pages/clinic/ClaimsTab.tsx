@@ -61,21 +61,6 @@ const unwrap = (r:any)       => { const p=r.data?.data??r.data; return Array.isA
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-// Procedure catalogue hook — replaces hardcoded tariff list
-function useProcedures(search: string) {
-  const [results, setResults] = React.useState<any[]>([])
-  React.useEffect(() => {
-    const url = search.length > 1
-      ? `/api/v1/clinic/procedures?search=${encodeURIComponent(search)}`
-      : `/api/v1/clinic/procedures`
-    apiClient.get(url).then(r => {
-      const d = r.data?.data ?? r.data
-      setResults(Array.isArray(d) ? d : [])
-    }).catch(() => setResults([]))
-  }, [search])
-  return results
-}
-
 export default function ClaimsTab() {
   const qc = useQueryClient()
   const canWriteOff = usePermission("CLINIC_WRITE_OFF")

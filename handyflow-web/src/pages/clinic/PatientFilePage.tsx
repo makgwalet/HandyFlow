@@ -26,6 +26,7 @@ import GrowthTab from "./GrowthTab"
 import PatientProfilePage from "./PatientProfilePage"
 import type { SectionId } from "./profileView"
 import { usePermission } from "../../hooks/usePermission"
+import { useCan } from "./clinicAccess"
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
@@ -35,13 +36,15 @@ interface Props {
   patient: Patient; onClose: () => void; onNavigate: (tab:any)=>void; onOpenPatient?: (p:Patient)=>void
 }
 
-export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPatient }: Props) {
+export default function PatientFilePage({ patient, onOpenPatient }: Props) {
   const qc = useQueryClient()
   const { prompt, dialogs } = useDialogs()
   const navigate = useNavigate()
   const userEmail = useAuthStore(st => st.user?.email)
   const canGrowth = usePermission("CLINIC_GROWTH_READ")
-  const [activeTab, setActiveTab] = useState<TabId>("overview")
+  const canAccount = useCan("viewAccount"), canRx = useCan("viewPrescriptions"), canResults = useCan("viewResults")
+  const canDocs = useCan("viewDocuments"), canTimeline = useCan("viewTimeline"), canConsent = useCan("viewConsent")
+  const [requestedTab, setActiveTab] = useState<TabId>("overview")
   const [showActions, setShowActions] = useState(false)
   // The profile page takes the place of the tabs; null = the file itself.
   const [profile, setProfile] = useState<{ section?: SectionId } | null>(null)
@@ -96,14 +99,17 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
     {id:"overview",     label:"Overview",     icon:User},
     {id:"appointments", label:"Appointments", icon:Calendar,   badge:pendingAppts||undefined},
     {id:"consultation", label:"Visits",       icon:Stethoscope},
-    {id:"account", label:"Account", icon:CreditCard},
-    {id:"rx",           label:"Prescriptions",icon:Pill},
-    {id:"labs",         label:"Lab results",  icon:FlaskConical},
+    ...(canAccount ? [{id:"account" as TabId, label:"Account", icon:CreditCard}] : []),
+    ...(canRx ? [{id:"rx" as TabId, label:"Prescriptions", icon:Pill}] : []),
+    ...(canResults ? [{id:"labs" as TabId, label:"Lab results", icon:FlaskConical}] : []),
     ...(canGrowth ? [{id:"growth" as TabId, label:"Growth", icon:Heart}] : []),
-    {id:"documents",    label:"Documents",    icon:FileText},
-    {id:"history",      label:"Timeline",      icon:Clock},
-    {id:"consent",      label:"Consent",      icon:ShieldCheck},
+    ...(canDocs ? [{id:"documents" as TabId, label:"Documents", icon:FileText}] : []),
+    ...(canTimeline ? [{id:"history" as TabId, label:"Timeline", icon:Clock}] : []),
+    ...(canConsent ? [{id:"consent" as TabId, label:"Consent", icon:ShieldCheck}] : []),
   ]
+
+  // A shortcut can ask for a tab this person may not open; they land on the overview instead.
+  const activeTab: TabId = TABS.some(t=>t.id===requestedTab) ? requestedTab : "overview"
 
   const acctCfg = ACCOUNT_CFG[patient.accountType]??ACCOUNT_CFG.INDIVIDUAL
   const isArchived = !!patient.archivedAt

@@ -23,6 +23,13 @@ export const CAN = {
   editWorkingHours:   { fine: "CLINIC_WORKING_HOURS_WRITE",     legacy: "CLINIC_WRITE" },
   editTimeOff:        { fine: "CLINIC_TIME_OFF_WRITE",          legacy: "CLINIC_WRITE" },
   viewAccessLog:      { fine: "CLINIC_ACCESS_LOG_READ",         legacy: "CLINIC_ADMIN" },
+  // Patient-file tabs: a tab is shown only to someone whose click on it would not answer 403.
+  viewAccount:        { fine: "CLINIC_BILL_READ",               legacy: "CLINIC_BILLING_READ" },
+  viewPrescriptions:  { fine: "CLINIC_PRESCRIPTION_READ",       legacy: "CLINIC_READ" },
+  viewResults:        { fine: "CLINIC_RESULT_READ",             legacy: "CLINIC_READ" },
+  viewDocuments:      { fine: "CLINIC_DOCUMENT_READ",           legacy: "CLINIC_READ" },
+  viewTimeline:       { fine: "CLINIC_TIMELINE_READ",           legacy: "CLINIC_READ" },
+  viewConsent:        { fine: "CLINIC_CONSENT_READ",            legacy: "CLINIC_READ" },
 } as const
 
 export type Capability = keyof typeof CAN

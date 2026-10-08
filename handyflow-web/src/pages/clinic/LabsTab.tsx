@@ -108,12 +108,6 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
     onSuccess: () => { qc.invalidateQueries({queryKey:["pf-labs",patient.id]}); setShowFile(null) },
   })
 
-  const saveInterpretation = useMutation({
-    mutationFn: ({id,text}:{id:string;text:string}) =>
-      apiClient.post(`/api/v1/clinic/lab/results/${id}/interpret`, null, {params:{interpretation:text}}),
-    onSuccess: () => qc.invalidateQueries({queryKey:["pf-labs",patient.id]}),
-  })
-
   // ── Claude interpretation ─────────────────────────────────────────────────
   // FIX: this used to call https://api.anthropic.com/v1/messages directly
   // from the browser — with no API key attached at all (confirmed: the
