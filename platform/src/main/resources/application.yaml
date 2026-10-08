@@ -213,3 +213,7 @@ notifications:
     # Set to "twilio" / "clickatell" / etc. once you implement and register a
     # real SmsSender bean guarded by @ConditionalOnProperty for that value.
     provider: "log"
+
+# Permissions travel in the JWT (packed, see PermissionCodec); headroom for the token plus cookies.
+server:
+  max-http-request-header-size: 16KB

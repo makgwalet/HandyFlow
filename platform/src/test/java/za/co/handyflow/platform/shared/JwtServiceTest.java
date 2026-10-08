@@ -66,6 +66,36 @@ class JwtServiceTest {
         assertThat(jwtService.isImpersonation(token)).isFalse();
     }
 
+    @Test
+    @DisplayName("a user with hundreds of permissions gets a token that fits in a request header")
+    void largePermissionSet_staysSmallAndRoundTrips() {
+        Set<String> many = new java.util.HashSet<>();
+        for (String m : new String[]{"CLINIC", "HR", "ACCOUNTING", "INVENTORY", "CRM", "INVOICE"})
+            for (String g : new String[]{"PATIENT", "NOTES", "CONSULTATION", "NURSE", "PRESCRIPTION", "RESULT", "BILL", "CLAIM", "APPOINTMENT", "CONTENT", "TASK", "GROWTH"})
+                for (String v : new String[]{"READ", "CREATE", "UPDATE", "DELETE", "SIGN", "VOID", "EXPORT", "MANAGE"})
+                    many.add(m + "_" + g + "_" + v);
+        String token = jwtService.generateToken(UUID.randomUUID(), UUID.randomUUID(), "user@example.com", "Jane", "Doe", many);
+
+        assertThat(token.length()).isLessThan(4000);
+        assertThat(jwtService.extractPermissions(token)).isEqualTo(many);
+    }
+
+    @Test
+    @DisplayName("a token issued before the packed claim still yields its plain permission list")
+    void oldPlainClaim_stillRead() {
+        SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        String old = Jwts.builder()
+                .subject(UUID.randomUUID().toString())
+                .claim("tenantId", UUID.randomUUID().toString())
+                .claim("permissions", java.util.List.of("INVOICE_READ", "CLINIC_READ"))
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + 900_000L))
+                .signWith(key)
+                .compact();
+
+        assertThat(jwtService.extractPermissions(old)).containsExactlyInAnyOrder("INVOICE_READ", "CLINIC_READ");
+    }
+
     /** Same claim shape as AdminAuthService.generateImpersonationToken() — no "permissions" claim. */
     private String tokenWithoutPermissionsClaim() {
         SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));

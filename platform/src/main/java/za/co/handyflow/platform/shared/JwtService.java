@@ -54,7 +54,8 @@ public class JwtService {
                         "email", email,
                         "firstName", firstName != null ? firstName : "",
                         "lastName",  lastName  != null ? lastName  : "",
-                        "permissions", permissions
+                        // Packed: the plain list outgrew the 8 KB header limit once Clinic had its own permission catalogue.
+                        "pz", PermissionCodec.encode(permissions)
                 ))
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expirationMs))
@@ -123,6 +124,11 @@ public class JwtService {
     @SuppressWarnings("unchecked")
     public Set<String> extractPermissions(String token) {
         return extractClaim(token, claims -> {
+            Object packed = claims.get("pz");
+            if (packed instanceof String s) {
+                return PermissionCodec.decode(s);
+            }
+            // Tokens issued before the packed claim, and the admin read-only token, carry the plain list.
             Object raw = claims.get("permissions");
             if (raw == null) {
                 return Set.of();
