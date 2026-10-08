@@ -22,10 +22,12 @@ import OverviewTab from "./PatientOverviewTab"
 import AppointmentsTab from "./PatientAppointmentsTab"
 import ConsultationTab from "./PatientConsultationTab"
 import RestrictedRecordGate from "./RestrictedRecordGate"
+import GrowthTab from "./GrowthTab"
+import { usePermission } from "../../hooks/usePermission"
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-type TabId = "overview"|"appointments"|"consultation"|"running-bill"|"rx"|"labs"|"documents"|"history"|"consent"
+type TabId = "growth"|"overview"|"appointments"|"consultation"|"running-bill"|"rx"|"labs"|"documents"|"history"|"consent"
 
 interface Props {
   patient: Patient; onClose: () => void; onNavigate: (tab:any)=>void; onOpenPatient?: (p:Patient)=>void
@@ -36,6 +38,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
   const { prompt, dialogs } = useDialogs()
   const navigate = useNavigate()
   const userEmail = useAuthStore(st => st.user?.email)
+  const canGrowth = usePermission("CLINIC_GROWTH_READ")
   const [activeTab, setActiveTab] = useState<TabId>("overview")
   const [billLines, setBillLines] = useState<BillLine[]>([])
   const [showActions, setShowActions] = useState(false)
@@ -98,6 +101,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
     {id:"running-bill", label:"Running bill", icon:CreditCard, badge:billLines.length||undefined},
     {id:"rx",           label:"Prescriptions",icon:Pill},
     {id:"labs",         label:"Lab results",  icon:FlaskConical},
+    ...(canGrowth ? [{id:"growth" as TabId, label:"Growth", icon:Heart}] : []),
     {id:"documents",    label:"Documents",    icon:FileText},
     {id:"history",      label:"Timeline",      icon:Clock},
     {id:"consent",      label:"Consent",      icon:ShieldCheck},
@@ -246,6 +250,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
       {activeTab==="running-bill" && <RunningBillTab billLines={billLines} onRemove={removeBillLine} patient={patient}/>}
       {activeTab==="rx"           && <PrescriptionsTab patient={patient} consultations={consultations as Consultation[]}/>}
       {activeTab==="labs"         && <LabsTabEnhanced patient={patient}/>}
+      {activeTab==="growth"       && <GrowthTab patientId={patient.id}/>}
       {activeTab==="documents"    && <DocumentsTab patient={patient} consultations={consultations as Consultation[]}/>}
       {activeTab==="history"      && <TimelineTab patientId={patient.id}/>}
       {activeTab==="consent"      && <ConsentTab patient={patient}/>}

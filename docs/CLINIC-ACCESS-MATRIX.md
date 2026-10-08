@@ -160,7 +160,7 @@ user -> role -> permissions -> (later) patient and context rules
 
 | Permission | Kind | What it allows | Auto from | State |
 |---|---|---|---|---|
-| `CLINIC_GROWTH_READ` | read | View growth measurements and charts | `CLINIC_READ` | Reserved |
+| `CLINIC_GROWTH_READ` | read | View growth measurements and charts | `CLINIC_READ` | Live |
 | `CLINIC_GROWTH_RECORD` | write | Record a growth measurement | `CLINIC_CLINICAL_WRITE` | Reserved |
 | `CLINIC_GROWTH_UPDATE` | write | Correct a growth measurement | `CLINIC_CLINICAL_WRITE` | Reserved |
 | `CLINIC_GROWTH_INTERPRET` | sign | Record a clinical interpretation of growth | `CLINIC_CLINICAL_SIGN` | Reserved |
@@ -386,7 +386,7 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 
 ## 3. API authorization matrix
 
-155 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
+163 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
 
 | Area | Method | Path | Requires |
 |---|---|---|---|
@@ -463,6 +463,14 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 | Core | GET | `/medications` | `CLINIC_CATALOGUE_READ` |
 | Core | GET | `/procedures` | `CLINIC_CATALOGUE_READ` |
 | Dashboard | GET | `/dashboard/summary` | `CLINIC_DASHBOARD_READ` |
+| Growth | GET | `/patients/{patientId}/growth` | `CLINIC_GROWTH_READ` |
+| Growth | GET | `/growth-reference` | `CLINIC_CONTENT_ADMIN` or `CLINIC_CONTENT_APPROVE` |
+| Growth | POST | `/growth-reference` | `CLINIC_CONTENT_ADMIN` |
+| Growth | POST | `/growth-reference/{id}/submit` | `CLINIC_CONTENT_ADMIN` |
+| Growth | POST | `/growth-reference/{id}/approve` | `CLINIC_CONTENT_APPROVE` |
+| Growth | POST | `/growth-reference/{id}/send-back` | `CLINIC_CONTENT_APPROVE` |
+| Growth | POST | `/growth-reference/{id}/activate` | `CLINIC_CONTENT_APPROVE` |
+| Growth | POST | `/growth-reference/{id}/retire` | `CLINIC_CONTENT_APPROVE` |
 | Handoff | POST | `/consultations/{id}/start-nurse-work` | `CLINIC_NURSE_INTAKE_CREATE` |
 | Handoff | POST | `/consultations/{id}/send-to-doctor` | `CLINIC_NURSE_HANDOFF` |
 | Handoff | POST | `/consultations/{id}/accept` | `CLINIC_NURSE_HANDOFF_ACCEPT` |

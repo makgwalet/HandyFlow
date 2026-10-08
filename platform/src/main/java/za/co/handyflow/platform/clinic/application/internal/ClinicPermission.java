@@ -163,7 +163,7 @@ public enum ClinicPermission {
             "Void a referral"),
     CLINIC_REFERRAL_SEND(Group.REFERRAL, Kind.SEND, "CLINIC_CLINICAL_SIGN", false,
             "Send a referral (separate from signing)"),
-    CLINIC_GROWTH_READ(Group.GROWTH, Kind.READ, "CLINIC_READ", false,
+    CLINIC_GROWTH_READ(Group.GROWTH, Kind.READ, "CLINIC_READ", true,
             "View growth measurements and charts"),
     CLINIC_GROWTH_RECORD(Group.GROWTH, Kind.WRITE, "CLINIC_CLINICAL_WRITE", false,
             "Record a growth measurement"),
