@@ -3,6 +3,8 @@ package za.co.handyflow.platform.clinic.domain.model;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.Instant;
@@ -23,7 +25,7 @@ public class ClinicLetterTemplate {
     String body;
     String specialty;
     String urgency;
-    @Column(name = "unfit_days")  Integer unfitDays;
+    @JdbcTypeCode(SqlTypes.SMALLINT) @Column(name = "unfit_days")  Integer unfitDays;
     @Column(name = "created_by")  UUID    createdBy;
     @Column(name = "created_at")  Instant createdAt;
     @Column(name = "updated_at")  Instant updatedAt;
