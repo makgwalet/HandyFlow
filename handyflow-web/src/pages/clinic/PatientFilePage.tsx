@@ -243,7 +243,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
       <RestrictedRecordGate patientId={patient.id}>
       <PatientAlertBanner patientId={patient.id}/>
       {activeTab==="overview"     && <OverviewTab patient={patient} idInfo={idInfo} familyMembers={familyMembers as Patient[]} onOpenPatient={onOpenPatient} qc={qc}
-        appointments={appointments as any[]} defaultPractitionerId={myPractitionerId(practitioners as any[], userEmail)}
+        appointments={appointments as any[]} consultations={consultations as any[]} defaultPractitionerId={myPractitionerId(practitioners as any[], userEmail)}
         onStartSession={startSession} onOpenTab={setActiveTab}/>}
       {activeTab==="appointments" && <AppointmentsTab patient={patient} appointments={appointments as Appointment[]} practitioners={practitioners as Practitioner[]} qc={qc} onStartSession={startSession}/>}
       {activeTab==="consultation" && <ConsultationTab patient={patient} consultations={consultations as Consultation[]} practitioners={practitioners as Practitioner[]} qc={qc} addToBill={addToBill} onSwitchTab={setActiveTab}/>}

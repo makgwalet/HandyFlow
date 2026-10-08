@@ -50,8 +50,8 @@ user -> role -> permissions -> (later) patient and context rules
 | `CLINIC_CONDITION_WRITE` | write | Record and change conditions | `CLINIC_CLINICAL_WRITE` | Live |
 | `CLINIC_MEDICATION_READ` | read | View the patient's current medicines | `CLINIC_READ` | Live |
 | `CLINIC_MEDICATION_WRITE` | write | Record and change the patient's current medicines | `CLINIC_CLINICAL_WRITE` | Live |
-| `CLINIC_CLINICAL_HISTORY_READ` | read | View clinical history | `CLINIC_READ` | Reserved |
-| `CLINIC_CLINICAL_HISTORY_WRITE` | write | Record clinical history | `CLINIC_CLINICAL_WRITE` | Reserved |
+| `CLINIC_CLINICAL_HISTORY_READ` | read | View clinical history | `CLINIC_READ` | Live |
+| `CLINIC_CLINICAL_HISTORY_WRITE` | write | Record clinical history | `CLINIC_CLINICAL_WRITE` | Live |
 | `CLINIC_VITALS_READ` | read | View vital signs and measurements | `CLINIC_READ` | Live |
 | `CLINIC_VITALS_WRITE` | write | Record vital signs and measurements | `CLINIC_CLINICAL_WRITE` | Live |
 | `CLINIC_VITALS_VOID` | write | Void a recorded measurement | `CLINIC_CLINICAL_WRITE` | Live |
@@ -386,7 +386,7 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 
 ## 3. API authorization matrix
 
-163 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
+171 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
 
 | Area | Method | Path | Requires |
 |---|---|---|---|
@@ -505,6 +505,14 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 | PatientClinical | POST | `/patients/{patientId}/medications` | `CLINIC_MEDICATION_WRITE` |
 | PatientClinical | PATCH | `/patients/{patientId}/medications/{id}` | `CLINIC_MEDICATION_WRITE` |
 | PatientDirectory | GET | `/patients/directory` | `CLINIC_PATIENT_READ` |
+| PatientHistory | GET | `/patients/{patientId}/family-history` | `CLINIC_CLINICAL_HISTORY_READ` |
+| PatientHistory | POST | `/patients/{patientId}/family-history` | `CLINIC_CLINICAL_HISTORY_WRITE` |
+| PatientHistory | PATCH | `/patients/{patientId}/family-history/{id}` | `CLINIC_CLINICAL_HISTORY_WRITE` |
+| PatientHistory | GET | `/patients/{patientId}/social-history` | `CLINIC_CLINICAL_HISTORY_READ` |
+| PatientHistory | PUT | `/patients/{patientId}/social-history` | `CLINIC_CLINICAL_HISTORY_WRITE` |
+| PatientHistory | GET | `/patients/{patientId}/medical-aid` | `CLINIC_PATIENT_READ` |
+| PatientHistory | PUT | `/patients/{patientId}/medical-aid` | `CLINIC_PATIENT_UPDATE` |
+| PatientHistory | DELETE | `/patients/{patientId}/medical-aid` | `CLINIC_PATIENT_UPDATE` |
 | PatientNote | GET | `/patients/{patientId}/notes` | `CLINIC_NOTE_READ` |
 | PatientNote | POST | `/patients/{patientId}/notes` | `CLINIC_NOTE_CREATE` |
 | PatientNote | POST | `/patients/{patientId}/notes/{noteId}/resolve` | `CLINIC_NOTE_UPDATE` |

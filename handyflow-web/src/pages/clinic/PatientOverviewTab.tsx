@@ -11,14 +11,17 @@ import { apiClient } from "../../api/client"
 import ClinicalSummaryPanel from "./ClinicalSummaryPanel"
 import PatientBriefingPanel from "./PatientBriefingPanel"
 import type { Patient } from "./patientFile.shared"
-import { BORDER, GRAY, GREEN_TEXT, flowCard, masonry, Modal, ModalFooter, RED_TEXT, TEAL_TEXT, lbl, sinp } from "./patientFile.shared"
+import { BORDER, GRAY, GREEN_TEXT, masonry, Modal, ModalFooter, RED_TEXT, TEAL_TEXT, lbl, sinp } from "./patientFile.shared"
 import { ArrowRight, Plus } from "lucide-react"
+import { Card, Fact, smallBtn } from "./OverviewCard"
+import QuickActionsCard from "./QuickActionsCard"
+import { FamilyHistoryCard, MedicalAidCard, SocialHistoryCard } from "./PatientBackgroundCards"
 
 // ── OVERVIEW TAB ──────────────────────────────────────────────────────────────
 
-export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc, appointments = [], defaultPractitionerId, onStartSession, onOpenTab }: {
+export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc, appointments = [], consultations = [], defaultPractitionerId, onStartSession, onOpenTab }: {
   patient:Patient; idInfo:any; familyMembers:Patient[]; onOpenPatient?:(p:Patient)=>void; qc:any
-  appointments?: any[]; defaultPractitionerId?: string; onStartSession?: (appt:any)=>void
+  appointments?: any[]; consultations?: any[]; defaultPractitionerId?: string; onStartSession?: (appt:any)=>void
   onOpenTab?: (tab:"history"|"labs"|"appointments"|"rx"|"growth")=>void
 }) {
   const [showAddDep, setShowAddDep] = useState(false)
@@ -87,6 +90,8 @@ export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPati
 
   const cards = (
     <>
+      <QuickActionsCard patientId={patient.id} consultations={consultations} />
+
       <Card title="Personal details" aside={
         <span style={{ display:"flex", gap:6 }}>
           <span style={{ background:patient.active?"var(--hf-success-soft-strong)":"var(--hf-danger-soft)", color:patient.active?GREEN_TEXT:RED_TEXT,
@@ -148,6 +153,10 @@ export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPati
 
       {/* Allergies, conditions and medicines: structured records, editable by clinicians */}
       <ClinicalSummaryPanel patientId={patient.id} fallbackAllergies={patient.allergies} fallbackConditions={patient.chronicConditions} />
+
+      <FamilyHistoryCard patientId={patient.id} />
+      <SocialHistoryCard patientId={patient.id} />
+      <MedicalAidCard patientId={patient.id} />
 
       <Card title="Notes and alerts"><PatientNotesPanel patientId={patient.id} /></Card>
 
@@ -281,24 +290,3 @@ export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPati
     </div>
   )
 }
-
-const smallBtn: React.CSSProperties = { padding:"4px 10px", borderRadius:6, border:`1px solid ${BORDER}`, background:"var(--hf-surface)", fontSize:12, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }
-
-function Card({ title, aside, children }: { title:string; aside?:React.ReactNode; children:React.ReactNode }) {
-  return (
-    <div style={{ ...flowCard, background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:12, padding:"14px 16px" }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8, minHeight:22 }}>
-        <div style={{ fontSize:12, fontWeight:800, letterSpacing:"0.05em", textTransform:"uppercase", color:"var(--hf-text-secondary)" }}>{title}</div>
-        {aside}
-      </div>
-      {children}
-    </div>
-  )
-}
-
-const Fact = ({ k, v }: { k:string; v:string }) => (
-  <div style={{ display:"flex", gap:10, padding:"4px 0", fontSize:13 }}>
-    <div style={{ width:112, flexShrink:0, color:GRAY, fontSize:12 }}>{k}</div>
-    <div style={{ color:"var(--hf-text)", fontWeight:500, minWidth:0, wordBreak:"break-word" }}>{v}</div>
-  </div>
-)

@@ -55,4 +55,12 @@ public class ClinicMedicalAid {
         m.updatedAt       = Instant.now();
         return m;
     }
+
+    /** Replaces the scheme details; the record keeps its id so claims that point at it stay valid. */
+    public void update(String schemeName, String planName, String memberNumber, String dependentCode,
+                       String principalMember, String schemeContactPhone) {
+        this.schemeName = schemeName; this.planName = planName; this.memberNumber = memberNumber;
+        this.dependentCode = dependentCode; this.principalMember = principalMember;
+        this.schemeContactPhone = schemeContactPhone; this.updatedAt = Instant.now();
+    }
 }
