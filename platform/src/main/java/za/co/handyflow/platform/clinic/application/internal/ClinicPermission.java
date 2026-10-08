@@ -93,6 +93,12 @@ public enum ClinicPermission {
             "Read administrative notes"),
     CLINIC_PRIVATE_NOTE_READ(Group.NOTES, Kind.READ, "CLINIC_CLINICAL_SIGN", false,
             "Read a clinician's private notes"),
+    CLINIC_TASK_READ(Group.SCHEDULING, Kind.READ, "CLINIC_READ", true,
+            "See clinic tasks (follow-ups, calls, results to chase)"),
+    CLINIC_TASK_CREATE(Group.SCHEDULING, Kind.WRITE, "CLINIC_WRITE", true,
+            "Create a clinic task for yourself or a colleague"),
+    CLINIC_TASK_COMPLETE(Group.SCHEDULING, Kind.WRITE, "CLINIC_WRITE", true,
+            "Complete or dismiss a clinic task"),
     CLINIC_CONSULTATION_READ(Group.CONSULTATION, Kind.READ, "CLINIC_READ", true,
             "View consultations, drafts, edit history and summaries"),
     CLINIC_CONSULTATION_CREATE(Group.CONSULTATION, Kind.WRITE, "CLINIC_CLINICAL_WRITE", true,
@@ -301,7 +307,7 @@ public enum ClinicPermission {
             "View the clinic access log"),
     ;
 
-    public enum Group { PATIENT, CLINICAL_SUMMARY, NOTES, CONSULTATION, NURSE_WORKFLOW, PRESCRIPTION, SICK_NOTE, REFERRAL, GROWTH, RESULTS, DOCUMENTS, CONSENT, RESTRICTED, SCHEDULING, BILLING, CONTENT, AUDIT }
+    public enum Group { PATIENT, CLINICAL_SUMMARY, NOTES, SCHEDULING, CONSULTATION, NURSE_WORKFLOW, PRESCRIPTION, SICK_NOTE, REFERRAL, GROWTH, RESULTS, DOCUMENTS, CONSENT, RESTRICTED, BILLING, CONTENT, AUDIT }
     /** What kind of capability: reading, changing, signing/approving, managing configuration, or sending something out. */
     public enum Kind { READ, WRITE, SIGN, MANAGE, SEND }
 

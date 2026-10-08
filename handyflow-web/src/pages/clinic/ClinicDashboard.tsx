@@ -1,5 +1,6 @@
 // src/pages/clinic/ClinicDashboard.tsx
 import MyDayPanel from "./MyDayPanel"
+import { ResultsToReviewPanel, TasksPanel } from "./TodayWork"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -136,6 +137,11 @@ export default function ClinicDashboard({ onNavigate, onOpenPatient, onResume }:
       </div>
 
       <MyDayPanel onNavigate={onNavigate} />
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 14, marginBottom: 22 }}>
+        <ResultsToReviewPanel onNavigate={onNavigate} />
+        <TasksPanel />
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 300px", gap: 18 }}>
         <div>

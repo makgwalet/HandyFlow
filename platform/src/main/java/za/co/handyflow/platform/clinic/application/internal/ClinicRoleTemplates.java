@@ -58,6 +58,9 @@ public final class ClinicRoleTemplates {
         static final ClinicPermission CLINIC_NOTE_LOCK = ClinicPermission.CLINIC_NOTE_LOCK;
         static final ClinicPermission CLINIC_ADMIN_NOTE_READ = ClinicPermission.CLINIC_ADMIN_NOTE_READ;
         static final ClinicPermission CLINIC_PRIVATE_NOTE_READ = ClinicPermission.CLINIC_PRIVATE_NOTE_READ;
+        static final ClinicPermission CLINIC_TASK_READ = ClinicPermission.CLINIC_TASK_READ;
+        static final ClinicPermission CLINIC_TASK_CREATE = ClinicPermission.CLINIC_TASK_CREATE;
+        static final ClinicPermission CLINIC_TASK_COMPLETE = ClinicPermission.CLINIC_TASK_COMPLETE;
         static final ClinicPermission CLINIC_CONSULTATION_READ = ClinicPermission.CLINIC_CONSULTATION_READ;
         static final ClinicPermission CLINIC_CONSULTATION_CREATE = ClinicPermission.CLINIC_CONSULTATION_CREATE;
         static final ClinicPermission CLINIC_CONSULTATION_UPDATE = ClinicPermission.CLINIC_CONSULTATION_UPDATE;
@@ -274,7 +277,10 @@ public final class ClinicRoleTemplates {
             P.CLINIC_PAYMENT_READ,
             P.CLINIC_CLAIM_READ,
             P.CLINIC_RESTRICTED_RECORD_REQUEST,
-            P.CLINIC_BREAK_GLASS_VIEW)));
+            P.CLINIC_BREAK_GLASS_VIEW,
+            P.CLINIC_TASK_READ,
+            P.CLINIC_TASK_CREATE,
+            P.CLINIC_TASK_COMPLETE)));
         t.put("CLINICAL_ASSOCIATE", new Template("CLINICAL_ASSOCIATE", "Clinical Associate",
             "Clinical practitioner; signing of prescriptions, sick notes and referrals depends on the tenant's scope configuration and is off by default.",
             EnumSet.of(
@@ -372,7 +378,10 @@ public final class ClinicRoleTemplates {
             P.CLINIC_PAYMENT_READ,
             P.CLINIC_CLAIM_READ,
             P.CLINIC_RESTRICTED_RECORD_REQUEST,
-            P.CLINIC_BREAK_GLASS_VIEW)));
+            P.CLINIC_BREAK_GLASS_VIEW,
+            P.CLINIC_TASK_READ,
+            P.CLINIC_TASK_CREATE,
+            P.CLINIC_TASK_COMPLETE)));
         t.put("PROFESSIONAL_NURSE", new Template("PROFESSIONAL_NURSE", "Professional Nurse",
             "Nursing assessment, observations and the nurse side of the handoff; cannot sign.",
             EnumSet.of(
@@ -437,7 +446,10 @@ public final class ClinicRoleTemplates {
             P.CLINIC_TIMELINE_READ,
             P.CLINIC_QUESTIONNAIRE_READ,
             P.CLINIC_QUESTIONNAIRE_ANSWER,
-            P.CLINIC_RECALL_READ)));
+            P.CLINIC_RECALL_READ,
+            P.CLINIC_TASK_READ,
+            P.CLINIC_TASK_CREATE,
+            P.CLINIC_TASK_COMPLETE)));
         t.put("ENROLLED_NURSE", new Template("ENROLLED_NURSE", "Enrolled / Staff Nurse",
             "More restricted clinical capture: vitals, growth measurements and intake; reads allergies, conditions and notes.",
             EnumSet.of(
@@ -468,7 +480,10 @@ public final class ClinicRoleTemplates {
             P.CLINIC_PRACTITIONER_READ,
             P.CLINIC_QUESTIONNAIRE_READ,
             P.CLINIC_QUESTIONNAIRE_ANSWER,
-            P.CLINIC_DOCUMENT_READ)));
+            P.CLINIC_DOCUMENT_READ,
+            P.CLINIC_TASK_READ,
+            P.CLINIC_TASK_CREATE,
+            P.CLINIC_TASK_COMPLETE)));
         t.put("RECEPTION", new Template("RECEPTION", "Reception / Front Desk",
             "Registration, appointments, queue, demographics and recalls. No clinical content.",
             EnumSet.of(
@@ -502,7 +517,10 @@ public final class ClinicRoleTemplates {
             P.CLINIC_RECALL_MANAGE,
             P.CLINIC_CONSENT_READ,
             P.CLINIC_CONSENT_RECORD,
-            P.CLINIC_DOCUMENT_READ)));
+            P.CLINIC_DOCUMENT_READ,
+            P.CLINIC_TASK_READ,
+            P.CLINIC_TASK_CREATE,
+            P.CLINIC_TASK_COMPLETE)));
         t.put("BILLING_OFFICER", new Template("BILLING_OFFICER", "Billing / Claims Officer",
             "Claims, bills and payments. Reads patient identity only.",
             EnumSet.of(
@@ -596,6 +614,9 @@ public final class ClinicRoleTemplates {
             P.CLINIC_PATIENT_RELATIONSHIP_WRITE,
             P.CLINIC_PATIENT_EMERGENCY_CONTACT_READ,
             P.CLINIC_PATIENT_EMERGENCY_CONTACT_WRITE,
+            P.CLINIC_TASK_READ,
+            P.CLINIC_TASK_CREATE,
+            P.CLINIC_TASK_COMPLETE,
             P.CLINIC_QUEUE_READ,
             P.CLINIC_APPOINTMENT_READ,
             P.CLINIC_APPOINTMENT_CREATE,
@@ -661,6 +682,9 @@ public final class ClinicRoleTemplates {
             P.CLINIC_PATIENT_RELATIONSHIP_WRITE,
             P.CLINIC_PATIENT_EMERGENCY_CONTACT_READ,
             P.CLINIC_PATIENT_EMERGENCY_CONTACT_WRITE,
+            P.CLINIC_TASK_READ,
+            P.CLINIC_TASK_CREATE,
+            P.CLINIC_TASK_COMPLETE,
             P.CLINIC_QUEUE_READ,
             P.CLINIC_APPOINTMENT_READ,
             P.CLINIC_APPOINTMENT_CREATE,
