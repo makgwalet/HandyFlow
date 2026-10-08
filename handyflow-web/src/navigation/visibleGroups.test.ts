@@ -39,3 +39,31 @@ describe("clinic navigation structure", () => {
     }
   })
 })
+
+describe("visibleGroups: clinic sections follow the permission catalogue (W-5)", () => {
+  it("keeps everything but money for someone who still holds only the old CLINIC_READ", () => {
+    const seen = ids(["CLINIC_READ"])
+    for (const id of ["dashboard", "patients", "schedule", "waiting-room", "waitlist", "recalls", "lab-inbox", "practitioners", "rooms", "working-hours", "time-off", "closures"])
+      expect(seen).toContain(id)
+    expect(seen).not.toContain("claims"); expect(seen).not.toContain("billing")
+  })
+  it("shows money to the old billing permission and to the new ones", () => {
+    expect(ids(["CLINIC_BILLING_READ"])).toEqual(expect.arrayContaining(["claims", "billing"]))
+    expect(ids(["CLINIC_CLAIM_READ"])).toContain("claims")
+    expect(ids(["CLINIC_CLAIM_READ"])).not.toContain("billing")
+    expect(ids(["CLINIC_BILL_READ"])).toContain("billing")
+  })
+  it("a billing clerk with only the new permissions sees money but no clinical sections", () => {
+    const seen = ids(["CLINIC_CLAIM_READ", "CLINIC_BILL_READ", "CLINIC_PATIENT_READ"])
+    expect(seen).toEqual(expect.arrayContaining(["dashboard", "patients", "claims", "billing"]))
+    for (const id of ["lab-inbox", "schedule", "recalls", "drafts", "handoff"]) expect(seen).not.toContain(id)
+  })
+  it("a nurse with only the new permissions sees care and scheduling but not money", () => {
+    const seen = ids(["CLINIC_PATIENT_READ", "CLINIC_APPOINTMENT_READ", "CLINIC_RESULT_READ", "CLINIC_RECALL_READ"])
+    expect(seen).toEqual(expect.arrayContaining(["patients", "schedule", "waiting-room", "lab-inbox", "recalls"]))
+    expect(seen).not.toContain("claims"); expect(seen).not.toContain("billing"); expect(seen).not.toContain("practitioners")
+  })
+  it("always leaves the dashboard so the default section never redirects away", () => {
+    expect(ids(["CLINIC_PATIENT_READ"])).toContain("dashboard")
+  })
+})

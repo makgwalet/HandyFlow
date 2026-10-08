@@ -556,36 +556,36 @@ export const CLINIC_SECTIONS: ModuleSections = {
     {
       label: 'Front desk',
       sections: [
-        { id: 'schedule', label: 'Schedule', icon: CalendarDays },
-        { id: 'waiting-room', label: "Today's queue", icon: UserCheck },
-        { id: 'waitlist', label: 'Cancellation list', icon: ListPlus },
-        { id: 'recalls', label: 'Recalls', icon: CalendarClock },
+        { id: 'schedule', label: 'Schedule', icon: CalendarDays, anyPermission: ['CLINIC_APPOINTMENT_READ', 'CLINIC_READ'] },
+        { id: 'waiting-room', label: "Today's queue", icon: UserCheck, anyPermission: ['CLINIC_APPOINTMENT_READ', 'CLINIC_READ'] },
+        { id: 'waitlist', label: 'Cancellation list', icon: ListPlus, anyPermission: ['CLINIC_APPOINTMENT_READ', 'CLINIC_READ'] },
+        { id: 'recalls', label: 'Recalls', icon: CalendarClock, anyPermission: ['CLINIC_RECALL_READ', 'CLINIC_READ'] },
       ],
     },
     {
       label: 'Patient care',
       sections: [
-        { id: 'patients', label: 'Patients', icon: Users },
+        { id: 'patients', label: 'Patients', icon: Users, anyPermission: ['CLINIC_PATIENT_READ', 'CLINIC_READ'] },
         { id: 'drafts', label: 'Drafts', icon: FileClock, anyPermission: ['CLINIC_CONSULTATION_UPDATE', 'CLINIC_CLINICAL_WRITE'] },
         { id: 'handoff', label: 'Handoff queue', icon: ArrowRightLeft, anyPermission: ['CLINIC_NURSE_HANDOFF', 'CLINIC_CLINICAL_WRITE'] },
-        { id: 'lab-inbox', label: 'Lab inbox', icon: FlaskConical },
+        { id: 'lab-inbox', label: 'Lab inbox', icon: FlaskConical, anyPermission: ['CLINIC_RESULT_READ', 'CLINIC_READ'] },
       ],
     },
     {
       label: 'Money',
       sections: [
-        { id: 'claims', label: 'Claims', icon: CreditCard },
-        { id: 'billing', label: 'Billing', icon: BarChart2 },
+        { id: 'claims', label: 'Claims', icon: CreditCard, anyPermission: ['CLINIC_CLAIM_READ', 'CLINIC_BILLING_READ'] },
+        { id: 'billing', label: 'Billing', icon: BarChart2, anyPermission: ['CLINIC_BILL_READ', 'CLINIC_BILLING_READ'] },
       ],
     },
     {
       label: 'Practice setup',
       sections: [
-        { id: 'practitioners', label: 'Practitioners', icon: Stethoscope },
-        { id: 'rooms', label: 'Rooms', icon: DoorOpen },
-        { id: 'working-hours', label: 'Working hours', icon: Clock },
-        { id: 'time-off', label: 'Time off', icon: CalendarRange },
-        { id: 'closures', label: 'Closures', icon: Lock },
+        { id: 'practitioners', label: 'Practitioners', icon: Stethoscope, anyPermission: ['CLINIC_PRACTITIONER_READ', 'CLINIC_READ'] },
+        { id: 'rooms', label: 'Rooms', icon: DoorOpen, anyPermission: ['CLINIC_APPOINTMENT_READ', 'CLINIC_READ'] },
+        { id: 'working-hours', label: 'Working hours', icon: Clock, anyPermission: ['CLINIC_APPOINTMENT_READ', 'CLINIC_READ'] },
+        { id: 'time-off', label: 'Time off', icon: CalendarRange, anyPermission: ['CLINIC_APPOINTMENT_READ', 'CLINIC_READ'] },
+        { id: 'closures', label: 'Closures', icon: Lock, anyPermission: ['CLINIC_APPOINTMENT_READ', 'CLINIC_READ'] },
       ],
     },
     {
