@@ -29,6 +29,15 @@ public class ClinicLetterValues {
     /** The patient comes from the visit when there is one; otherwise {@code patientId} is required. A visit of another patient is refused. */
     @Transactional(readOnly = true)
     public Loaded load(TenantId t, UUID patientId, UUID consultationId, String recipientName, String recipientCompany) {
+        return load(t, patientId, consultationId, recipientName, recipientCompany, null);
+    }
+
+    /**
+     * {@code signedBy} names the practitioner the letter is signed off by. It wins over the visit's doctor; without it the
+     * visit's doctor signs, and a letter with neither is signed by the practice.
+     */
+    @Transactional(readOnly = true)
+    public Loaded load(TenantId t, UUID patientId, UUID consultationId, String recipientName, String recipientCompany, UUID signedBy) {
         ClinicConsultation c = null;
         if (consultationId != null) {
             c = consultationRepo.findActiveById(t, consultationId)
@@ -39,7 +48,12 @@ public class ClinicLetterValues {
         if (patientId == null) throw new IllegalArgumentException("Choose a patient or a visit");
         UUID pid = patientId;
         ClinicPatient p = patientRepo.findActiveById(t, pid).orElseThrow(() -> new ResourceNotFoundException("Patient", pid.toString()));
-        ClinicPractitioner dr = c == null || c.getPractitionerId() == null ? null : practitionerRepo.findActiveById(t, c.getPractitionerId()).orElse(null);
+        ClinicPractitioner dr;
+        if (signedBy != null) {
+            dr = practitionerRepo.findActiveById(t, signedBy).orElseThrow(() -> new ResourceNotFoundException("Practitioner", signedBy.toString()));
+        } else {
+            dr = c == null || c.getPractitionerId() == null ? null : practitionerRepo.findActiveById(t, c.getPractitionerId()).orElse(null);
+        }
         ClinicPatientProfile profile = profileRepo.findOne(t, pid).orElse(null);
         LocalDate today = LocalDate.now(AppointmentRules.CLINIC_ZONE);
         var src = new LetterMerge.Source(p.getFirstName(), p.getLastName(), p.getDateOfBirth(), p.getIdNumber(), p.getPhone(), address(profile),

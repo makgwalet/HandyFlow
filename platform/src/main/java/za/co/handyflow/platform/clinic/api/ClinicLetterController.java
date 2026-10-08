@@ -71,8 +71,9 @@ public class ClinicLetterController {
     public ResponseEntity<ApiResponse<RenderedTemplate>> render(@PathVariable UUID id, @RequestParam(required = false) UUID consultationId,
                                                                 @RequestParam(required = false) UUID patientId,
                                                                 @RequestParam(required = false) String recipientName,
-                                                                @RequestParam(required = false) String recipientCompany) {
-        return ResponseEntity.ok(ApiResponse.success("Success", templates.render(TenantContext.getTenantIdAsObject(), id, patientId, consultationId, recipientName, recipientCompany)));
+                                                                @RequestParam(required = false) String recipientCompany,
+                                                                @RequestParam(required = false) UUID signedBy) {
+        return ResponseEntity.ok(ApiResponse.success("Success", templates.render(TenantContext.getTenantIdAsObject(), id, patientId, consultationId, recipientName, recipientCompany, signedBy)));
     }
 
     @PostMapping("/consultations/{id}/letter")
@@ -80,7 +81,7 @@ public class ClinicLetterController {
     @Operation(summary = "Write a general letter PDF for a visit; a copy is kept in the patient's documents")
     public ResponseEntity<byte[]> letter(@PathVariable UUID id, @RequestBody LetterRequest body) {
         var tenant = TenantContext.getTenantIdAsObject();
-        byte[] pdf = letterPdf.generate(tenant, null, id, body.title(), body.body(), body.recipientName(), body.recipientCompany());
+        byte[] pdf = letterPdf.generate(tenant, null, id, body.title(), body.body(), body.recipientName(), body.recipientCompany(), body.signedByPractitionerId());
         documents.recordIssued(tenant, id, "LETTER", body.title().trim(), pdf);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"letter-" + id + ".pdf\"")
@@ -92,7 +93,7 @@ public class ClinicLetterController {
     @Operation(summary = "Write a general letter PDF for a patient (a visit is optional; the letter may be addressed to a person or company); a copy is kept in the patient's documents")
     public ResponseEntity<byte[]> patientLetter(@PathVariable UUID id, @RequestBody LetterRequest body) {
         var tenant = TenantContext.getTenantIdAsObject();
-        byte[] pdf = letterPdf.generate(tenant, id, body.consultationId(), body.title(), body.body(), body.recipientName(), body.recipientCompany());
+        byte[] pdf = letterPdf.generate(tenant, id, body.consultationId(), body.title(), body.body(), body.recipientName(), body.recipientCompany(), body.signedByPractitionerId());
         documents.recordIssuedFor(tenant, id, body.consultationId(), "LETTER", body.title().trim(), pdf);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"letter-" + id + ".pdf\"")

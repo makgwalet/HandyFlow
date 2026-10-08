@@ -1,6 +1,6 @@
 // Write a general letter (prescription letter, fitness letter, letter to an employer or school, ...) for a patient, with or without
 // a visit, optionally addressed to a person or company, from a template or from scratch, and download it as a PDF. A copy is kept in the patient's documents.
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import ModalShell from "./ModalShell"
 import LetterTemplatePicker from "./LetterTemplatePicker"
 import SaveAsTemplate from "./SaveAsTemplate"
@@ -11,17 +11,33 @@ import { primaryBtn, smallBtn } from "./OverviewCard"
 import { MERGE_FIELDS, MERGE_LABEL, insertAt, mergeToken, type Kind } from "./letterView"
 
 interface Visit { id: string; consultedAt: string; chiefComplaint?: string }
+interface Practitioner { id: string; fullName?: string; firstName?: string; lastName?: string; active?: boolean }
+const pname = (p: Practitioner) => p.fullName ?? `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim()
 
 export default function WriteLetterModal({ patientId, visits, onClose }: { patientId: string; visits: Visit[]; onClose: () => void }) {
   const [visitId, setVisitId] = useState(visits[0]?.id ?? "")
   const [toName, setToName] = useState("")
   const [toCompany, setToCompany] = useState("")
+  const [signedBy, setSignedBy] = useState("")
+  const [people, setPeople] = useState<Practitioner[]>([])
   const [kind, setKind] = useState<Kind>("GENERAL_LETTER")
   const [title, setTitle] = useState("")
   const [body, setBody] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const area = useRef<HTMLTextAreaElement>(null)
+  // Who the letter is signed off by: the visit's doctor or the practice unless one is chosen. A failed lookup just leaves the default.
+  useEffect(() => {
+    let live = true
+    ;(async () => {
+      try {
+        const r: any = await apiClient.get("/api/v1/clinic/practitioners/list")
+        const d = r?.data?.data ?? r?.data
+        if (live) setPeople((Array.isArray(d) ? d : (d?.content ?? [])).filter((x: Practitioner) => x.active !== false))
+      } catch { if (live) setPeople([]) }
+    })()
+    return () => { live = false }
+  }, [])
   const ready = title.trim() !== "" && body.trim() !== "" && !busy
 
   const go = async () => {
@@ -29,6 +45,7 @@ export default function WriteLetterModal({ patientId, visits, onClose }: { patie
     try {
       const payload: Record<string, string> = { title: title.trim(), body }
       if (visitId) payload.consultationId = visitId
+      if (signedBy) payload.signedByPractitionerId = signedBy
       if (toName.trim()) payload.recipientName = toName.trim()
       if (toCompany.trim()) payload.recipientCompany = toCompany.trim()
       const res = await apiClient.post(`/api/v1/clinic/patients/${patientId}/letter`, payload, { responseType: "blob" } as any)
@@ -59,11 +76,18 @@ export default function WriteLetterModal({ patientId, visits, onClose }: { patie
           <div><label style={lbl} htmlFor="wl-to-name">Addressed to (name)</label><input id="wl-to-name" style={sinp} value={toName} onChange={e => setToName(e.target.value)} placeholder="e.g. The HR Manager" /></div>
           <div><label style={lbl} htmlFor="wl-to-company">Company</label><input id="wl-to-company" style={sinp} value={toCompany} onChange={e => setToCompany(e.target.value)} placeholder="e.g. Acme (Pty) Ltd" /></div>
         </div>
+        {people.length > 0 && <div><label style={lbl} htmlFor="wl-signer">Signed off by</label>
+          <select id="wl-signer" style={sinp} value={signedBy} onChange={e => setSignedBy(e.target.value)}>
+            <option value="">{visitId ? "The doctor of the visit" : "The practice (no named doctor)"}</option>
+            {people.map(p => <option key={p.id} value={p.id}>{pname(p)}</option>)}
+          </select>
+          {signedBy && <div style={{ fontSize: 11, color: GRAY, marginTop: 4 }}>The letter will carry this practitioner's name and HPCSA number. A copy is kept in the patient's documents with your name as the person who issued it.</div>}
+        </div>}
         <div><label style={lbl} htmlFor="wl-kind">Kind of letter</label>
           <select id="wl-kind" style={sinp} value={kind} onChange={e => setKind(e.target.value as Kind)}>
             <option value="GENERAL_LETTER">General letter</option><option value="PRESCRIPTION_LETTER">Prescription letter</option>
           </select></div>
-        <LetterTemplatePicker key={`${kind}-${visitId}-${toName}-${toCompany}`} kind={kind} consultationId={visitId || undefined} patientId={patientId} recipientName={toName} recipientCompany={toCompany} onApply={t => { setTitle(t.title ?? ""); setBody(t.body ?? "") }} />
+        <LetterTemplatePicker key={`${kind}-${visitId}-${toName}-${toCompany}-${signedBy}`} kind={kind} consultationId={visitId || undefined} patientId={patientId} recipientName={toName} recipientCompany={toCompany} signedBy={signedBy} onApply={t => { setTitle(t.title ?? ""); setBody(t.body ?? "") }} />
         <div><label style={lbl} htmlFor="wl-title">Title</label><input id="wl-title" style={sinp} value={title} onChange={e => setTitle(e.target.value)} /></div>
         <div><label style={lbl} htmlFor="wl-body">Text</label>
           <textarea id="wl-body" ref={area} rows={9} style={{ ...sinp, resize: "vertical" }} value={body} onChange={e => setBody(e.target.value)} />

@@ -57,8 +57,14 @@ public class ClinicLetterTemplateService {
     /** The template with {{patient.name}} and the other merge fields filled in, for a visit or for a patient with no visit. */
     @Transactional(readOnly = true)
     public RenderedTemplate render(TenantId t, UUID id, UUID patientId, UUID consultationId, String recipientName, String recipientCompany) {
+        return render(t, id, patientId, consultationId, recipientName, recipientCompany, null);
+    }
+
+    /** {@code signedBy} is the practitioner the letter will be signed off by; it fills {{doctor.name}} and the other doctor fields. */
+    @Transactional(readOnly = true)
+    public RenderedTemplate render(TenantId t, UUID id, UUID patientId, UUID consultationId, String recipientName, String recipientCompany, UUID signedBy) {
         ClinicLetterTemplate x = live(t, id);
-        var v = letterValues.load(t, patientId, consultationId, recipientName, recipientCompany).values();
+        var v = letterValues.load(t, patientId, consultationId, recipientName, recipientCompany, signedBy).values();
         return new RenderedTemplate(x.getId(), x.getKind(), x.getName(), LetterMerge.render(x.getTitle(), v), LetterMerge.render(x.getBody(), v),
                 x.getSpecialty(), x.getUrgency(), x.getUnfitDays());
     }

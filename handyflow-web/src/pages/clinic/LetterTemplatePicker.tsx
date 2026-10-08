@@ -9,8 +9,8 @@ import type { Kind, Template } from "./letterView"
 const unwrap = (r: any) => r?.data?.data ?? r?.data
 
 /** A template is filled for a visit, or for a patient when there is no visit; the recipient fills {{recipient.*}}. */
-export default function LetterTemplatePicker({ kind, consultationId, patientId, recipientName, recipientCompany, onApply }: {
-  kind: Kind; consultationId?: string; patientId?: string; recipientName?: string; recipientCompany?: string; onApply: (t: Template) => void
+export default function LetterTemplatePicker({ kind, consultationId, patientId, recipientName, recipientCompany, signedBy, onApply }: {
+  kind: Kind; consultationId?: string; patientId?: string; recipientName?: string; recipientCompany?: string; signedBy?: string; onApply: (t: Template) => void
 }) {
   const canRead = usePermission("CLINIC_DOCUMENT_READ")
   const [list, setList] = useState<Template[]>([])
@@ -31,6 +31,7 @@ export default function LetterTemplatePicker({ kind, consultationId, patientId, 
     else if (patientId) params.patientId = patientId
     if (recipientName?.trim()) params.recipientName = recipientName.trim()
     if (recipientCompany?.trim()) params.recipientCompany = recipientCompany.trim()
+    if (signedBy) params.signedBy = signedBy
     try { onApply(unwrap(await apiClient.get(`/api/v1/clinic/letter-templates/${id}/render`, { params }))) }
     catch (e: any) { setError(e?.response?.data?.message ?? "The template could not be applied.") }
   }

@@ -42,7 +42,7 @@ class ClinicLetterTemplateServiceTest {
         UUID visit = UUID.randomUUID();
         var values = LetterMerge.values(new LetterMerge.Source("Liam", "Botha", LocalDate.of(2019, 3, 12), null, null, null,
                 LocalDate.of(2026, 10, 7), "Cough", null, null, null, null, null, null, LocalDate.of(2026, 10, 8), null, null));
-        when(letterValues.load(t, null, visit, null, null)).thenReturn(new ClinicLetterValues.Loaded(null, null, null, values));
+        when(letterValues.load(t, null, visit, null, null, null)).thenReturn(new ClinicLetterValues.Loaded(null, null, null, values));
 
         RenderedTemplate r = service.render(t, x.getId(), null, visit, null, null);
 

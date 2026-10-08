@@ -81,6 +81,29 @@ describe("write a letter", () => {
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clinic/patients/p1/letter", { title: "Repeat prescription", body: "Dear Liam", consultationId: "c1" }, { responseType: "blob" }))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
+  it("lets the writer choose who signs off, and sends that practitioner with the letter", async () => {
+    get.mockImplementation(async (url: string) => url.includes("practitioners") ? { data: { data: [{ id: "d1", fullName: "Dr Priya Govender", active: true }, { id: "d2", fullName: "Dr Gone", active: false }] } } : { data: { data: [] } })
+    post.mockResolvedValue({ data: new Blob(["x"]) })
+    render(<WriteLetterModal patientId="p1" visits={[]} onClose={() => {}} />)
+    const signer = await screen.findByLabelText("Signed off by") as HTMLSelectElement
+    expect(signer.textContent).toContain("The practice (no named doctor)")
+    expect(signer.textContent).not.toContain("Dr Gone")          // someone who has left cannot sign
+    fireEvent.change(signer, { target: { value: "d1" } })
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "T" } })
+    fireEvent.change(screen.getByLabelText("Text"), { target: { value: "B" } })
+    fireEvent.click(screen.getByRole("button", { name: "Download letter" }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clinic/patients/p1/letter", { title: "T", body: "B", signedByPractitionerId: "d1" }, { responseType: "blob" }))
+  })
+  it("sends no signer when none is chosen", async () => {
+    get.mockImplementation(async (url: string) => url.includes("practitioners") ? { data: { data: [{ id: "d1", fullName: "Dr Priya Govender" }] } } : { data: { data: [] } })
+    post.mockResolvedValue({ data: new Blob(["x"]) })
+    render(<WriteLetterModal patientId="p1" visits={[]} onClose={() => {}} />)
+    await screen.findByLabelText("Signed off by")
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "T" } })
+    fireEvent.change(screen.getByLabelText("Text"), { target: { value: "B" } })
+    fireEvent.click(screen.getByRole("button", { name: "Download letter" }))
+    await waitFor(() => expect(post.mock.calls[0][1]).toEqual({ title: "T", body: "B" }))
+  })
   it("says so when the letter cannot be written", async () => {
     post.mockRejectedValue({ response: { data: new Blob(["x"]) } })
     render(<WriteLetterModal patientId="p1" visits={visits} onClose={() => {}} />)

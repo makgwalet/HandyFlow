@@ -42,11 +42,16 @@ public class ClinicLetterPdfService {
 
     /** A letter for a patient, with or without a visit, optionally addressed to a person or company. Merge fields typed in the text are filled here too. */
     public byte[] generate(TenantId t, UUID patientId, UUID consultationId, String title, String body, String recipientName, String recipientCompany) {
+        return generate(t, patientId, consultationId, title, body, recipientName, recipientCompany, null);
+    }
+
+    /** {@code signedBy}: the practitioner the letter is signed off by (wins over the visit's doctor); none means the visit's doctor, or the practice. */
+    public byte[] generate(TenantId t, UUID patientId, UUID consultationId, String title, String body, String recipientName, String recipientCompany, UUID signedBy) {
         if (title == null || title.isBlank()) throw new IllegalArgumentException("Give the letter a title");
         if (body == null || body.isBlank()) throw new IllegalArgumentException("The letter has no text");
         if (body.length() > 8000) throw new IllegalArgumentException("The letter is longer than 8000 characters");
         if (!LetterMerge.unknown(body + " " + title).isEmpty()) throw new IllegalArgumentException("The letter has merge fields this system does not know: " + String.join(", ", LetterMerge.unknown(body + " " + title)));
-        var loaded = letterValues.load(t, patientId, consultationId, recipientName, recipientCompany);
+        var loaded = letterValues.load(t, patientId, consultationId, recipientName, recipientCompany, signedBy);
         ClinicPatient p = loaded.patient();
         ClinicPractitioner dr = loaded.doctor();
         title = LetterMerge.render(title, loaded.values());
