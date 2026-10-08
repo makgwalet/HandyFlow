@@ -24,5 +24,10 @@ public record ClinicClaimResponse(
         String referenceNumber,
         String rejectionReason,
         List<ClinicClaimLineResponse> lines,
-        Instant createdAt
+        Instant createdAt,
+        // What the scheme has paid, what was written off or credited, and what it still owes (money ledger, 0150)
+        BigDecimal schemePaid,
+        BigDecimal writtenOff,
+        BigDecimal credited,
+        BigDecimal schemeOutstanding
 ) {}

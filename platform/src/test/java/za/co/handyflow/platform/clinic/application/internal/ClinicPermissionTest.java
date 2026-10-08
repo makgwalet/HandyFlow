@@ -137,9 +137,11 @@ class ClinicPermissionTest {
 
     @Test void moneyControlsAreNotInAnyTemplateExceptWhatTheRoleNeeds() {
         for (var t : ClinicRoleTemplates.all().values()) {
-            assertFalse(t.permissions().contains(ClinicPermission.CLINIC_WRITE_OFF), t.key());
             assertFalse(t.permissions().contains(ClinicPermission.CLINIC_PAYMENT_REVERSE), t.key());
-            assertFalse(t.permissions().contains(ClinicPermission.CLINIC_CLAIM_REVERSE), t.key());
+            // Write-off, credit notes and voids belong to the authoriser tier only.
+            boolean authoriser = t.key().equals("CLINIC_ADMINISTRATOR");
+            assertEquals(authoriser, t.permissions().contains(ClinicPermission.CLINIC_WRITE_OFF), t.key());
+            assertEquals(authoriser, t.permissions().contains(ClinicPermission.CLINIC_CLAIM_REVERSE), t.key());
         }
         assertTrue(of("BILLING_OFFICER").contains(ClinicPermission.CLINIC_PAYMENT_ALLOCATE));
         assertFalse(of("DOCTOR").stream().anyMatch(p -> p.name().startsWith("CLINIC_PAYMENT_") && p.kind() != ClinicPermission.Kind.READ));

@@ -5,8 +5,8 @@ import { partialAmountProblem, parseAmount } from "./claimPayment"
 const fmtR = (v: number) => `R ${(v || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
 
 /** Asks how much the scheme actually paid; there is no default. */
-export default function PartialPaymentModal({ gross, busy, error, onConfirm, onClose }: {
-  gross: number; busy?: boolean; error?: string; onConfirm: (amount: number) => void; onClose: () => void
+export default function PartialPaymentModal({ gross, label = "Claim total", busy, error, onConfirm, onClose }: {
+  gross: number; label?: string; busy?: boolean; error?: string; onConfirm: (amount: number) => void; onClose: () => void
 }) {
   const [text, setText] = useState("")
   const [touched, setTouched] = useState(false)
@@ -19,7 +19,7 @@ export default function PartialPaymentModal({ gross, busy, error, onConfirm, onC
           style={{ padding: "9px 20px", border: "none", borderRadius: 9, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", fontWeight: 600, cursor: "pointer", opacity: busy || problem ? 0.6 : 1 }}>
           {busy ? "Saving..." : "Record payment"}
         </button></>}>
-      <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginBottom: 14 }}>Claim total {fmtR(gross)}</div>
+      <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginBottom: 14 }}>{label} {fmtR(gross)}</div>
       <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 5 }}>Amount the scheme paid (R) *</label>
       <input aria-label="Amount the scheme paid" inputMode="decimal" value={text}
         onChange={e => { setText(e.target.value); setTouched(true) }}

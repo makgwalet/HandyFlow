@@ -12,7 +12,7 @@ final class ClaimTransitions {
             "ACCEPT",  Set.of("SUBMITTED"),
             "REJECT",  Set.of("SUBMITTED", "ACCEPTED"),
             "PAID",    Set.of("ACCEPTED", "PARTIAL"),
-            "PARTIAL", Set.of("ACCEPTED"));
+            "PARTIAL", Set.of("ACCEPTED", "PARTIAL"));
 
     /** @throws IllegalStateException when the action is not allowed from the claim's current status */
     static void require(String action, String currentStatus) {

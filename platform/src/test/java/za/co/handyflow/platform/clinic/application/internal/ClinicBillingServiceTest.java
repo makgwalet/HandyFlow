@@ -27,6 +27,14 @@ class ClinicBillingServiceTest {
     @Mock ClinicPractitionerRepository       practitionerRepo;
     @Mock ClinicPrescriptionRepository       prescriptionRepo;
     @Mock ClinicMedicationCatalogueRepository medicationRepo;
+    @Mock ClinicClaimMoneyService             money;
+    @Mock ClinicClaimLedgerService            ledger;
+
+    @BeforeEach
+    void emptyLedger() {
+        lenient().when(ledger.totals(any(), any())).thenReturn(ClaimLedgerRules.Totals.NONE);
+        lenient().when(ledger.totalsByClaim(any())).thenReturn(Map.of());
+    }
 
     @InjectMocks
     ClinicBillingService service;
@@ -204,26 +212,13 @@ class ClinicBillingServiceTest {
             claim.submit("REF-001");
             claim.markAccepted();
             when(claimRepo.findActiveById(TENANT, id)).thenReturn(Optional.of(claim));
+            // CLINIC-DEC-001: Mark paid is the ledger's job (it pays the remaining balance); the ledger moves the status.
+            when(money.markPaid(TENANT, id, null)).thenAnswer(i -> { claim.applyLedgerStatus("PAID"); return claim; });
 
             var result = service.updateClaimStatus(TENANT, id, "paid", null);
 
             assertThat(result.status()).isEqualTo("PAID");
-        }
-
-        @Test
-        @DisplayName("partial without an amount is refused, not defaulted to 80%")
-        void partialNeedsAnAmount() {
-            var id    = UUID.randomUUID();
-            var claim = draftClaim();
-            claim.submit("REF-001");
-            claim.markAccepted();
-            when(claimRepo.findActiveById(TENANT, id)).thenReturn(Optional.of(claim));
-
-            assertThatThrownBy(() -> service.updateClaimStatus(TENANT, id, "partial", null))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("Enter the amount");
-            assertThat(claim.getStatus()).isEqualTo("ACCEPTED");
-            verify(claimRepo, never()).save(any(ClinicClaim.class));
+            verify(money).markPaid(TENANT, id, null);
         }
 
         @Test
@@ -234,6 +229,7 @@ class ClinicBillingServiceTest {
             claim.submit("REF-001");
             claim.markAccepted();
             when(claimRepo.findActiveById(TENANT, id)).thenReturn(Optional.of(claim));
+            when(money.partial(TENANT, id, new java.math.BigDecimal("300.00"), null)).thenAnswer(i -> { claim.applyLedgerStatus("PARTIAL"); return claim; });
 
             var result = service.updateClaimStatus(TENANT, id, "partial", null, new java.math.BigDecimal("300.00"));
 

@@ -1,5 +1,9 @@
 import ModalShell from "./ModalShell"
 import PartialPaymentModal from "./PartialPaymentModal"
+import ClaimAdjustmentModal, { type AdjustmentKind } from "./ClaimAdjustmentModal"
+import SchemePaymentModal from "./SchemePaymentModal"
+import { usePermission } from "../../hooks/usePermission"
+import { moneyActions, moneyHasMoved, owed, rand } from "./claimMoney"
 import React from "react"
 // src/pages/clinic/ClaimsTab.tsx
 // Medical aid claims — per-consultation builder, full lifecycle management
@@ -21,6 +25,7 @@ interface Claim {
   grossAmount: number; schemePortion: number; patientPortion: number
   submittedAt?: string; referenceNumber?: string; rejectionReason?: string
   createdAt: string; lines?: ClaimLine[]
+  schemePaid?: number; writtenOff?: number; credited?: number; schemeOutstanding?: number
 }
 interface ClaimLine {
   id: string; lineType: string; tariffCode?: string; nappiCode?: string
@@ -46,6 +51,8 @@ const STATUS_CFG: Record<string,{color:string;bg:string;border:string;label:stri
   REJECTED:  {color:RED_TEXT,   bg:"var(--hf-danger-soft)",border:"var(--hf-danger-border)", label:"Rejected", icon:XCircle},
   PAID:      {color:GREEN, bg:"var(--hf-success-soft-strong)",border:"var(--hf-success-border)", label:"Paid",     icon:CheckCircle},
   PARTIAL:   {color:PURPLE,bg:"var(--hf-violet-soft)",border:"var(--hf-violet-border)", label:"Partial",  icon:Clock},
+  CLOSED:    {color:GRAY,  bg:LIGHT,    border:BORDER,    label:"Closed",   icon:CheckCircle},
+  VOIDED:    {color:GRAY,  bg:LIGHT,    border:BORDER,    label:"Voided",   icon:XCircle},
 }
 
 const fmtDT  = (iso?:string) => iso ? new Date(iso).toLocaleDateString("en-ZA",{day:"numeric",month:"short",year:"numeric"}) : "—"
@@ -71,6 +78,11 @@ function useProcedures(search: string) {
 
 export default function ClaimsTab() {
   const qc = useQueryClient()
+  const canWriteOff = usePermission("CLINIC_WRITE_OFF")
+  const canReverse  = usePermission("CLINIC_CLAIM_REVERSE")
+  const canAllocate = usePermission("CLINIC_PAYMENT_ALLOCATE")
+  const [adjust, setAdjust]             = useState<{claim:Claim;kind:AdjustmentKind}|null>(null)
+  const [showSchemePay, setShowSchemePay] = useState(false)
   const [statusFilter, setStatusFilter] = useState("all")
   const [expanded, setExpanded]         = useState<string|null>(null)
   const [showCreate, setShowCreate]     = useState(false)
@@ -93,6 +105,25 @@ export default function ClaimsTab() {
     queryKey: ["consultations-for-claims"],
     queryFn: async () => unwrap(await apiClient.get("/api/v1/clinic/billing/consultations?size=100&unbilled=true")),
     enabled: showCreate,
+  })
+
+  // Schemes with something still owed, for the "Record a scheme payment" dialog.
+  const { data: openForSchemes=[] } = useQuery<Claim[]>({
+    queryKey: ["clinic-claims","open-for-schemes"], enabled: canAllocate,
+    queryFn: async () => {
+      const [a,p] = await Promise.all(["ACCEPTED","PARTIAL"].map(st=>apiClient.get(`/api/v1/clinic/billing/claims?status=${st}`)))
+      return [...unwrap(a),...unwrap(p)]
+    },
+  })
+  const schemeNames = Array.from(new Set(openForSchemes.filter(c=>owed(c)>0).map(c=>c.schemeName).filter(Boolean))).sort()
+
+  const adjustMutation = useMutation({
+    mutationFn: ({claim,kind,amount,reason}:{claim:Claim;kind:AdjustmentKind;amount?:number;reason:string}) => {
+      const path = kind==="WRITE_OFF" ? "write-off" : kind==="CREDIT_NOTE" ? "credit-note" : "void"
+      return apiClient.post(`/api/v1/clinic/billing/claims/${claim.id}/${path}`, kind==="VOID" ? {reason} : {amount,reason})
+    },
+    onSuccess: () => { qc.invalidateQueries({queryKey:["clinic-claims"]}); setAdjust(null); setApiError("") },
+    onError: (e:any) => setApiError(e.response?.data?.message ?? "Action failed"),
   })
 
   const doAction = useMutation({
@@ -145,8 +176,9 @@ export default function ClaimsTab() {
 
   // Summary stats
   const total      = displayedClaims.length
-  const outstanding = displayedClaims.filter(c=>["DRAFT","SUBMITTED"].includes(c.status)).reduce((s,c)=>s+(c.schemePortion??0),0)
-  const paid       = displayedClaims.filter(c=>c.status==="PAID").reduce((s,c)=>s+(c.grossAmount??0),0)
+  const outstanding = displayedClaims.filter(c=>["DRAFT","SUBMITTED","ACCEPTED","PARTIAL"].includes(c.status))
+    .reduce((s,c)=>s+(["DRAFT","SUBMITTED"].includes(c.status) ? (c.schemePortion??0) : owed(c)),0)
+  const paid       = displayedClaims.reduce((s,c)=>s+(c.schemePaid??0),0)
   const rejected   = displayedClaims.filter(c=>c.status==="REJECTED").length
 
   return (
@@ -191,6 +223,13 @@ export default function ClaimsTab() {
               <Send size={14}/> {batchSubmit.isPending ? "Submitting..." : `Submit batch (${selected.size})`}
             </button>
           )}
+          {canAllocate && (
+            <button onClick={()=>setShowSchemePay(true)} disabled={schemeNames.length===0}
+              title={schemeNames.length===0 ? "No accepted claims are waiting for a scheme payment" : undefined}
+              style={{display:"flex",alignItems:"center",gap:6,background:LIGHT,color:NAVY_TEXT,border:`1px solid ${BORDER}`,borderRadius:9,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer",opacity:schemeNames.length===0?0.6:1}}>
+              <CreditCard size={14}/> Record scheme payment
+            </button>
+          )}
           <button onClick={()=>{setShowCreate(true);setApiError("")}}
             style={{display:"flex",alignItems:"center",gap:6,background:NAVY,color:"var(--hf-text-on-solid)",border:"none",borderRadius:9,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
             <Plus size={14}/> New claim
@@ -222,7 +261,7 @@ export default function ClaimsTab() {
             const s   = STATUS_CFG[claim.status] ?? STATUS_CFG.DRAFT
             const Icon = s.icon
             const isOpen = expanded===claim.id
-            const actions = getClaimActions(claim.status)
+            const actions = getClaimActions(claim, { writeOff: canWriteOff, reverse: canReverse })
             return (
               <div key={claim.id} style={{border:`1px solid ${s.border}`,borderLeft:`4px solid ${s.color}`,borderRadius:10,overflow:"hidden",background:"var(--hf-surface)"}}>
                 {/* Header row */}
@@ -273,6 +312,16 @@ export default function ClaimsTab() {
                     {claim.rejectionReason && (
                       <div style={{marginBottom:14,padding:"10px 14px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:RED_TEXT}}>
                         <span style={{fontWeight:700}}>Rejection reason: </span>{claim.rejectionReason}
+                      </div>
+                    )}
+
+                    {(claim.schemePortion>0 || moneyHasMoved(claim)) && (
+                      <div aria-label="Scheme money" style={{marginBottom:14,display:"flex",gap:18,flexWrap:"wrap",fontSize:13}}>
+                        <span>Scheme portion <b>{rand(claim.schemePortion)}</b></span>
+                        <span>Paid <b style={{color:GREEN}}>{rand(claim.schemePaid??0)}</b></span>
+                        {(claim.writtenOff??0)>0 && <span>Written off <b>{rand(claim.writtenOff??0)}</b></span>}
+                        {(claim.credited??0)>0 && <span>Credited <b>{rand(claim.credited??0)}</b></span>}
+                        <span>Still owed <b style={{color:owed(claim)>0?AMBER_TEXT:GRAY}}>{rand(owed(claim))}</b></span>
                       </div>
                     )}
 
@@ -334,6 +383,9 @@ export default function ClaimsTab() {
                               setApiError("")
                               if (btn.action==="reject") { setShowReject(claim.id); return }
                               if (btn.action==="partial") { setShowPartial(claim); return }
+                              if (btn.action==="writeOff") { setAdjust({claim,kind:"WRITE_OFF"}); return }
+                              if (btn.action==="creditNote") { setAdjust({claim,kind:"CREDIT_NOTE"}); return }
+                              if (btn.action==="void") { setAdjust({claim,kind:"VOID"}); return }
                               doAction.mutate({id:claim.id, action:btn.action})
                             }}
                             disabled={doAction.isPending}
@@ -352,10 +404,17 @@ export default function ClaimsTab() {
       )}
 
       {showPartial && (
-        <PartialPaymentModal gross={showPartial.grossAmount} busy={doAction.isPending} error={apiError}
+        <PartialPaymentModal gross={owed(showPartial)} label="Scheme still owes" busy={doAction.isPending} error={apiError}
           onClose={()=>{ setShowPartial(null); setApiError("") }}
           onConfirm={amount=>{ setApiError(""); doAction.mutate({id:showPartial.id, action:"partial", schemeAmount:amount}) }}/>
       )}
+
+      {adjust && (
+        <ClaimAdjustmentModal kind={adjust.kind} outstanding={owed(adjust.claim)} busy={adjustMutation.isPending} error={apiError}
+          onClose={()=>{ setAdjust(null); setApiError("") }}
+          onConfirm={v=>{ setApiError(""); adjustMutation.mutate({claim:adjust.claim,kind:adjust.kind,amount:v.amount,reason:v.reason}) }}/>
+      )}
+      {showSchemePay && <SchemePaymentModal schemes={schemeNames} onClose={()=>setShowSchemePay(false)}/>}
 
       {/* ── Reject reason modal ──────────────────────────────────────────── */}
       {showReject && (
@@ -546,14 +605,25 @@ function CreateClaimModal({ consultations, onClose, onCreated }:
 
 // ── Claim action config ────────────────────────────────────────────────────────
 
-function getClaimActions(status: string) {
-  switch(status) {
-    case "DRAFT":     return [{action:"submit",  label:"Submit to scheme", color:AMBER_TEXT,  icon:Send}]
-    case "SUBMITTED": return [{action:"accept",  label:"Mark accepted",   color:TEAL,   icon:CheckCircle},{action:"reject",label:"Reject",color:RED_TEXT,icon:XCircle}]
-    case "ACCEPTED":  return [{action:"paid",    label:"Mark paid",       color:GREEN,  icon:CheckCircle},{action:"partial",label:"Partial payment",color:PURPLE,icon:Clock}]
-    case "REJECTED":  return [{action:"submit",  label:"Resubmit",        color:AMBER_TEXT,  icon:RefreshCw}]
-    default: return []
+type ClaimButton = {action:string;label:string;color:string;icon:any}
+
+export function getClaimActions(claim: Claim, can: {writeOff:boolean;reverse:boolean}): ClaimButton[] {
+  const money = moneyActions(claim)
+  const out: ClaimButton[] = []
+  switch(claim.status) {
+    case "DRAFT":     out.push({action:"submit",  label:"Submit to scheme", color:AMBER_TEXT,  icon:Send}); break
+    case "SUBMITTED": out.push({action:"accept",  label:"Mark accepted",   color:TEAL,   icon:CheckCircle},{action:"reject",label:"Reject",color:RED_TEXT,icon:XCircle}); break
+    case "ACCEPTED":
+    case "PARTIAL":
+      // CLINIC-DEC-001: Mark paid receives whatever the scheme still owes.
+      if (money.includes("paid")) out.push({action:"paid", label:`Mark paid (${rand(owed(claim))})`, color:GREEN, icon:CheckCircle},{action:"partial",label:"Partial payment",color:PURPLE,icon:Clock})
+      break
+    case "REJECTED":  out.push({action:"submit",  label:"Resubmit",        color:AMBER_TEXT,  icon:RefreshCw}); break
   }
+  if (can.writeOff && money.includes("writeOff")) out.push({action:"writeOff", label:"Write off…", color:RED_TEXT, icon:XCircle})
+  if (can.reverse && money.includes("creditNote")) out.push({action:"creditNote", label:"Credit note…", color:PURPLE, icon:FileText})
+  if (can.reverse && money.includes("void")) out.push({action:"void", label:"Void claim…", color:RED_TEXT, icon:X})
+  return out
 }
 
 // ── Shared ────────────────────────────────────────────────────────────────────

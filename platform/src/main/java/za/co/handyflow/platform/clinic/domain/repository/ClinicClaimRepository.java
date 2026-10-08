@@ -21,7 +21,7 @@ public interface ClinicClaimRepository extends JpaRepository<ClinicClaim, UUID> 
     @Query("SELECT c FROM ClinicClaim c WHERE c.tenantId = :#{#tenantId.value} AND c.patientId = :patientId ORDER BY c.createdAt DESC")
     List<ClinicClaim> findByPatient(TenantId tenantId, UUID patientId);
 
-    @Query("SELECT c FROM ClinicClaim c WHERE c.tenantId = :#{#tenantId.value} AND c.consultationId = :consultationId")
+    @Query("SELECT c FROM ClinicClaim c WHERE c.tenantId = :#{#tenantId.value} AND c.consultationId = :consultationId AND c.status <> 'VOIDED'")
     Optional<ClinicClaim> findByConsultation(TenantId tenantId, UUID consultationId);
 
     @Query("SELECT c FROM ClinicClaim c WHERE c.tenantId = :#{#tenantId.value} AND c.id = :id")

@@ -43,6 +43,9 @@ public class ClinicBillingService {
     // event indirection — confirmed no circular dependency between
     // clinic and accounting.
     private final AccountingFacade accountingFacade;
+    // Scheme money (0150): payments, write-offs, credit notes and voids live in an append-only ledger.
+    private final ClinicClaimMoneyService  money;
+    private final ClinicClaimLedgerService ledger;
 
     // Real, confirmed seeded codes from ChartOfAccountsSeeder — not
     // invented, same codes already used by Invoicing/POS's own GL
@@ -219,6 +222,13 @@ public class ClinicBillingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Claim for consultation", consultationId.toString()));
     }
 
+    /** One claim by its own id, with ledger figures (the claim list and consultation lookup use other keys). */
+    @Transactional(readOnly = true)
+    public ClinicClaimResponse getClaimById(TenantId tenantId, UUID claimId) {
+        return toResponse(claimRepo.findActiveById(tenantId, claimId)
+                .orElseThrow(() -> new ResourceNotFoundException("Claim", claimId.toString())), tenantId);
+    }
+
     // IMPROVEMENT A — batch-load patient/practitioner names so ClaimsTab can display them
     @Transactional(readOnly = true)
     public List<ClinicClaimResponse> getClaims(TenantId tenantId, String status) {
@@ -237,8 +247,9 @@ public class ClinicBillingService {
                 : practitionerRepo.findAllByIds(tenantId, practitionerIds).stream()
                 .collect(Collectors.toMap(ClinicPractitioner::getId, ClinicPractitioner::getFullName));
 
+        Map<UUID, ClaimLedgerRules.Totals> ledgerTotals = ledger.totalsByClaim(tenantId.getValue());
         return claims.stream()
-                .map(c -> toResponseWithNames(c, patientNames, practNames))
+                .map(c -> toResponseWithNames(c, patientNames, practNames, ledgerTotals))
                 .toList();
     }
 
@@ -286,13 +297,13 @@ public class ClinicBillingService {
             throw new IllegalArgumentException("Give the reason the scheme rejected the claim");
         }
         switch (upperAction) {
-            case "ACCEPT"  -> claim.markAccepted();
-            case "REJECT"  -> claim.markRejected(reason);
-            case "PAID" -> claim.markPaid(ClaimPaymentRules.schemeAmount("PAID", claim.getGrossAmount(), schemeAmount));
-            case "PARTIAL" -> claim.markPartial(ClaimPaymentRules.schemeAmount("PARTIAL", claim.getGrossAmount(), schemeAmount));
+            case "ACCEPT"  -> { claim.markAccepted(); claimRepo.save(claim); }
+            case "REJECT"  -> { claim.markRejected(reason); claimRepo.save(claim); }
+            // CLINIC-DEC-001: Mark paid receives the remaining balance, whatever amount the caller sent.
+            case "PAID"    -> claim = money.markPaid(tenantId, claimId, null);
+            case "PARTIAL" -> claim = money.partial(tenantId, claimId, schemeAmount, null);
             default -> throw new IllegalArgumentException("Unknown action: " + action);
         }
-        claimRepo.save(claim);
 
         // FIX: "no claim status-change notification" gap — the patient
         // previously found out about an accepted/rejected/paid/partial claim
@@ -328,9 +339,8 @@ public class ClinicBillingService {
                 }
                 case "PARTIAL" -> {
                     subject = "Your medical aid claim was partially paid";
-                    bodyMessage = "Your medical aid scheme has partially paid this claim. "
-                            + "You may owe a balance — see the attached invoice for details, "
-                            + "or contact the practice.";
+                    bodyMessage = "Your medical aid scheme has paid part of this claim. "
+                            + "The practice will contact you if any balance is your responsibility.";
                 }
                 default -> { return; }
             }
@@ -493,7 +503,7 @@ public class ClinicBillingService {
     @Transactional(readOnly = true)
     public List<OutstandingBalanceResponse> getOutstanding(TenantId tenantId) {
         List<ClinicClaim> claims = claimRepo.findAll(tenantId).stream()
-                .filter(c -> !"REJECTED".equals(c.getStatus()))
+                .filter(c -> !"REJECTED".equals(c.getStatus()) && !"VOIDED".equals(c.getStatus()))
                 .toList();
         if (claims.isEmpty()) return List.of();
 
@@ -552,10 +562,8 @@ public class ClinicBillingService {
      * One point per bucket (day, for "week"/"month"; month, for "year") so
      * the frontend can chart a trend, not just a single aggregate.
      * <p>
-     * schemePaid is a best-available proxy, not an exact figure: ClinicClaim
-     * has no dedicated "scheme paid at" timestamp, so this uses updatedAt
-     * on claims currently PAID/PARTIAL, which assumes a claim isn't touched
-     * again after reaching a paid state. patientPaid is exact, sourced
+     * schemePaid is exact since the claim money ledger (V365): scheme payments by the time they were recorded.
+     * Payments made before V365 appear once, as LEGACY, on the day the old claim was last updated. patientPaid is exact, sourced
      * directly from ClinicPayment.recordedAt.
      */
     @Transactional(readOnly = true)
@@ -584,19 +592,21 @@ public class ClinicBillingService {
 
         List<ClinicClaim> allClaims = claimRepo.findAll(tenantId);
         List<ClinicPayment> allPayments = paymentRepo.findAllByTenant(tenantId);
+        // What the scheme actually paid, from the ledger, by the day it was recorded.
+        List<ClinicClaimLedgerService.PaymentAt> schemePayments = ledger.paymentsSince(tenantId.getValue(), buckets.get(0).from());
 
         return buckets.stream()
                 .map(b -> {
                     List<ClinicClaim> claimsInBucket = allClaims.stream()
+                            .filter(c -> !"VOIDED".equals(c.getStatus()))
                             .filter(c -> !c.getCreatedAt().isBefore(b.from()) && c.getCreatedAt().isBefore(b.to()))
                             .toList();
                     BigDecimal grossBilled = claimsInBucket.stream()
                             .map(ClinicClaim::getGrossAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
 
-                    BigDecimal schemePaid = allClaims.stream()
-                            .filter(c -> "PAID".equals(c.getStatus()) || "PARTIAL".equals(c.getStatus()))
-                            .filter(c -> !c.getUpdatedAt().isBefore(b.from()) && c.getUpdatedAt().isBefore(b.to()))
-                            .map(ClinicClaim::getSchemePortion)
+                    BigDecimal schemePaid = schemePayments.stream()
+                            .filter(p -> !p.at().isBefore(b.from()) && p.at().isBefore(b.to()))
+                            .map(ClinicClaimLedgerService.PaymentAt::amount)
                             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
                     BigDecimal patientPaid = allPayments.stream()
@@ -638,12 +648,14 @@ public class ClinicBillingService {
     // ── Mapper ────────────────────────────────────────────────────────────────
 
     private ClinicClaimResponse toResponse(ClinicClaim c, TenantId tenantId) {
-        return toResponseWithNames(c, Map.of(), Map.of());
+        return toResponseWithNames(c, Map.of(), Map.of(), Map.of(c.getId(), ledger.totals(tenantId.getValue(), c.getId())));
     }
 
     private ClinicClaimResponse toResponseWithNames(ClinicClaim c,
                                                     Map<UUID, String> patientNames,
-                                                    Map<UUID, String> practNames) {
+                                                    Map<UUID, String> practNames,
+                                                    Map<UUID, ClaimLedgerRules.Totals> ledgerTotals) {
+        ClaimLedgerRules.Totals t = ledgerTotals.getOrDefault(c.getId(), ClaimLedgerRules.Totals.NONE);
         List<ClinicClaimLineResponse> lines = c.getLines().stream()
                 .map(l -> new ClinicClaimLineResponse(
                         l.getId(), l.getLineType(), l.getTariffCode(), l.getNappiCode(),
@@ -659,6 +671,7 @@ public class ClinicBillingService {
                 c.getStatus(), c.getSchemeName(), c.getMemberNumber(), c.getDependentCode(),
                 c.getGrossAmount(), c.getSchemePortion(), c.getPatientPortion(),
                 c.getSubmittedAt(), c.getReferenceNumber(), c.getRejectionReason(),
-                lines, c.getCreatedAt());
+                lines, c.getCreatedAt(),
+                t.paid(), t.writtenOff(), t.credited(), ClaimLedgerRules.outstanding(c.getSchemePortion(), t));
     }
 }

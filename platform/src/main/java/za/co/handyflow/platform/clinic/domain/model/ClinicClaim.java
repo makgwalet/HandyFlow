@@ -33,6 +33,9 @@ public class ClinicClaim {
     @Column(name = "reference_number") String referenceNumber;
     @Column(name = "rejection_reason") String rejectionReason;
     String notes;
+    @Column(name = "voided_at")   Instant voidedAt;
+    @Column(name = "voided_by")   UUID    voidedBy;
+    @Column(name = "void_reason") String  voidReason;
     @Column(name = "created_at") Instant createdAt;
     @Column(name = "updated_at") Instant updatedAt;
 
@@ -63,7 +66,14 @@ public class ClinicClaim {
         return c;
     }
 
+    /** CLINIC-DEC-004: once a claim has left DRAFT its financial fields are fixed; corrections go through credit notes and a new claim. */
+    private void requireDraft() {
+        if (!"DRAFT".equals(this.status))
+            throw new IllegalStateException("A " + this.status + " claim's lines and amounts cannot be changed");
+    }
+
     public void addLine(ClinicClaimLine line) {
+        requireDraft();
         lines.add(line);
         recalculate();
     }
@@ -79,6 +89,7 @@ public class ClinicClaim {
     }
 
     public void expectSchemeToCover() {
+        requireDraft();
         lines.forEach(ClinicClaimLine::expectSchemeToCover);
         recalculate();
     }
@@ -103,6 +114,21 @@ public class ClinicClaim {
         this.updatedAt       = Instant.now();
     }
 
+    /** The status the money ledger now implies (PARTIAL, PAID or CLOSED). Amounts are not touched. */
+    public void applyLedgerStatus(String newStatus) {
+        this.status    = newStatus;
+        this.updatedAt = Instant.now();
+    }
+
+    /** CLINIC-DEC-002: the caller has already checked that no money has moved on this claim. */
+    public void voidClaim(UUID by, String reason) {
+        this.status     = "VOIDED";
+        this.voidedAt   = Instant.now();
+        this.voidedBy   = by;
+        this.voidReason = reason;
+        this.updatedAt  = Instant.now();
+    }
+
     /**
      * FIX #5 — markPaid now takes the amount the scheme actually paid
      * and distributes it proportionally across lines via applySchemePayment().
@@ -112,6 +138,7 @@ public class ClinicClaim {
      * If the scheme paid the full gross, patientPortion will be 0 on every line.
      * If null, defaults to the existing schemePortion total (no change to line splits).
      */
+    @Deprecated // payments now go through ClinicClaimMoneyService and the ledger; the claim's own amounts are no longer rewritten
     public void markPaid(BigDecimal schemePaid) {
         this.status = "PAID";
         applyPaymentToLines(schemePaid);
@@ -122,6 +149,7 @@ public class ClinicClaim {
      * FIX #6 — markPartial records how much the scheme actually paid (not null).
      * Previously took no arguments — no way to record the partial amount.
      */
+    @Deprecated // see markPaid
     public void markPartial(BigDecimal schemePaid) {
         this.status = "PARTIAL";
         applyPaymentToLines(schemePaid);

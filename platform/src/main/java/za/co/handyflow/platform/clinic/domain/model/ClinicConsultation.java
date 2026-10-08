@@ -185,6 +185,14 @@ public class ClinicConsultation {
         this.updatedAt     = Instant.now();
     }
 
+    /** A voided claim puts the consultation back in the unbilled list (CLINIC-DEC-002: void, then a new claim). */
+    public void markUnbilled() {
+        this.billed        = false;
+        this.billingCode   = null;
+        this.billingAmount = null;
+        this.updatedAt     = Instant.now();
+    }
+
     // Allows editing the chief complaint after creation (e.g. correction mid-consultation)
     public void updateChiefComplaint(String chiefComplaint) {
         this.chiefComplaint = chiefComplaint;

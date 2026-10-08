@@ -12,11 +12,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.clinic.application.internal.ClinicBillingService;
+import za.co.handyflow.platform.clinic.application.internal.ClinicClaimMoneyService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicClaimSubmissionPdfService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicPatientInvoicePdfService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicStatementOfAccountPdfService;
 import za.co.handyflow.platform.clinic.dto.billing.*;
+import za.co.handyflow.platform.clinic.dto.billing.ClaimMoneyDtos.*;
 import za.co.handyflow.platform.clinic.dto.ConsultationResponse;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -35,6 +37,7 @@ public class ClinicBillingController {
     private final ClinicService        clinicService;  // FIX #8 — for unbilled consultations
     private final ClinicPatientInvoicePdfService patientInvoicePdfService;
     private final ClinicClaimSubmissionPdfService claimSubmissionPdfService;
+    private final ClinicClaimMoneyService money;
     private final ClinicStatementOfAccountPdfService statementOfAccountPdfService;
 
     // ── Claims ────────────────────────────────────────────────────────────────
@@ -102,6 +105,47 @@ public class ClinicBillingController {
         return ResponseEntity.ok(ApiResponse.success("Claim updated",
                 billingService.updateClaimStatus(
                         TenantContext.getTenantIdAsObject(), id, action, reason, schemeAmount)));
+    }
+
+    // ── Claim money (CLINIC-DEC-001 to 003, 006): write-off, credit note, void, scheme payment allocation ─────────────
+
+    @GetMapping("/claims/{id}/ledger")
+    @PreAuthorize("hasAuthority('CLINIC_CLAIM_READ')")
+    @Operation(summary = "What the scheme paid, what was written off or credited, and what it still owes")
+    public ResponseEntity<ApiResponse<Ledger>> getClaimLedger(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Success", money.ledgerOf(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/claims/{id}/write-off")
+    @PreAuthorize("hasAuthority('CLINIC_WRITE_OFF')")
+    @Operation(summary = "Write off part or all of what the scheme still owes (amount and reason required; audited)")
+    public ResponseEntity<ApiResponse<ClinicClaimResponse>> writeOffClaim(@PathVariable UUID id, @RequestBody AdjustmentRequest body) {
+        money.writeOff(TenantContext.getTenantIdAsObject(), id, body == null ? null : body.amount(), body == null ? null : body.reason());
+        return ResponseEntity.ok(ApiResponse.success("Written off", billingService.getClaimById(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/claims/{id}/credit-note")
+    @PreAuthorize("hasAuthority('CLINIC_CLAIM_REVERSE')")
+    @Operation(summary = "Issue a credit note against the scheme balance (amount and reason required; numbered, audited)")
+    public ResponseEntity<ApiResponse<ClinicClaimResponse>> creditNoteClaim(@PathVariable UUID id, @RequestBody AdjustmentRequest body) {
+        money.creditNote(TenantContext.getTenantIdAsObject(), id, body == null ? null : body.amount(), body == null ? null : body.reason());
+        return ResponseEntity.ok(ApiResponse.success("Credit note issued", billingService.getClaimById(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/claims/{id}/void")
+    @PreAuthorize("hasAuthority('CLINIC_CLAIM_REVERSE')")
+    @Operation(summary = "Void a claim on which no money has moved (reason required); the consultation can be billed again")
+    public ResponseEntity<ApiResponse<ClinicClaimResponse>> voidClaim(@PathVariable UUID id, @RequestBody VoidRequest body) {
+        money.voidClaim(TenantContext.getTenantIdAsObject(), id, body == null ? null : body.reason());
+        return ResponseEntity.ok(ApiResponse.success("Claim voided", billingService.getClaimById(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/claims/scheme-payments")
+    @PreAuthorize("hasAuthority('CLINIC_PAYMENT_ALLOCATE')")
+    @Operation(summary = "Spread one scheme payment over claims: oldest first, or your own split with a reason. preview=true records nothing.")
+    public ResponseEntity<ApiResponse<AllocationResponse>> allocateSchemePayment(@RequestBody AllocateRequest body) {
+        return ResponseEntity.ok(ApiResponse.success(body.preview() ? "Preview" : "Payment recorded",
+                money.allocate(TenantContext.getTenantIdAsObject(), body)));
     }
 
     /**

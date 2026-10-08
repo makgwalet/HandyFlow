@@ -14,6 +14,7 @@ class ClaimTransitionsTest {
         assertDoesNotThrow(() -> ClaimTransitions.require("REJECT", "SUBMITTED"));
         assertDoesNotThrow(() -> ClaimTransitions.require("REJECT", "ACCEPTED"));
         assertDoesNotThrow(() -> ClaimTransitions.require("PAID", "PARTIAL"));
+        assertDoesNotThrow(() -> ClaimTransitions.require("PARTIAL", "PARTIAL"));
     }
 
     @Test
@@ -29,7 +30,7 @@ class ClaimTransitionsTest {
         assertThrows(IllegalStateException.class, () -> ClaimTransitions.require("REJECT", "PAID"));
         assertThrows(IllegalStateException.class, () -> ClaimTransitions.require("ACCEPT", "REJECTED"));
         assertThrows(IllegalStateException.class, () -> ClaimTransitions.require("PAID", "PAID"));
-        assertThrows(IllegalStateException.class, () -> ClaimTransitions.require("PARTIAL", "PARTIAL"));
+        assertThrows(IllegalStateException.class, () -> ClaimTransitions.require("PARTIAL", "PAID"));
     }
 
     @Test
