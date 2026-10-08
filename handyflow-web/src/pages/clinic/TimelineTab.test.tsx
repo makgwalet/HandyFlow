@@ -57,4 +57,12 @@ describe("groupByDay", () => {
     const g = groupByDay(events)
     expect(g.map(x => x.events.length)).toEqual([2, 1])
   })
+  it("shows the visit summary and who was involved on a consultation", async () => {
+    get.mockResolvedValue({ data: { data: [{ ...events[0], summary: ["Reason: Cough", "Diagnosis: Acute bronchitis (J20.9)", "1 medicine prescribed"],
+      people: ["Prepared by Sister Zodwa Nkosi", "Signed by Dr Andile Dlamini"] }, events[1]] } })
+    show()
+    expect(await screen.findByText("Diagnosis: Acute bronchitis (J20.9)")).toBeTruthy()
+    expect(screen.getByText(/Prepared by Sister Zodwa Nkosi · Signed by Dr Andile Dlamini/)).toBeTruthy()
+    expect(screen.getAllByText("People:").length).toBe(1)
+  })
 })

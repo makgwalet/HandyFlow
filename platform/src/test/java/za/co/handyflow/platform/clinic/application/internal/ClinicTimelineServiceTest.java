@@ -33,6 +33,7 @@ class ClinicTimelineServiceTest {
     @Mock ClinicLabResultRepository labRepo;
     @Mock ClinicClaimRepository claimRepo;
     @Mock ClinicPaymentRepository paymentRepo;
+    @Mock ClinicVisitService visitService;
     @InjectMocks ClinicTimelineService service;
 
     TenantId tenant;
@@ -66,6 +67,27 @@ class ClinicTimelineServiceTest {
         assertThat(r).extracting(TimelineEvent::kind).containsExactlyInAnyOrder("CONSULTATION", "PRESCRIPTION");
         assertThat(r).extracting(TimelineEvent::title).contains("Consultation: Cough", "Prescribed: Amoxicillin");
         verifyNoInteractions(claimRepo, paymentRepo);
+    }
+
+    @Test
+    @DisplayName("a consultation event carries the visit summary and the people involved")
+    void consultationCarriesSummaryAndPeople() {
+        patientExists();
+        var signed = ClinicConsultation.create(tenant, patientId, null, null, "Cough");
+        when(consultationRepo.findByPatient(tenant, patientId)).thenReturn(List.of(signed));
+        when(visitService.visits(tenant, patientId)).thenReturn(List.of(new za.co.handyflow.platform.clinic.dto.VisitDtos.VisitResponse(
+                signed.getId(), null, "SIGNED", null, null, null,
+                List.of(new za.co.handyflow.platform.clinic.dto.VisitDtos.TeamMember("Prepared by", "Sister Zodwa Nkosi", null)),
+                "Cough", null, null, "Acute bronchitis", List.of(), null, null,
+                null, null, null, null, null, null, false, null, List.of(), List.of())));
+        when(appointmentRepo.findByPatient(tenant, patientId)).thenReturn(List.of());
+        when(prescriptionRepo.findByPatient(tenant, patientId)).thenReturn(List.of());
+        when(labRepo.findByPatient(tenant, patientId)).thenReturn(List.of());
+
+        TimelineEvent e = service.timeline(tenant, patientId, null, null, null, false, null).get(0);
+
+        assertThat(e.summary()).containsExactly("Reason: Cough", "Diagnosis: Acute bronchitis");
+        assertThat(e.people()).containsExactly("Prepared by Sister Zodwa Nkosi");
     }
 
     @Test

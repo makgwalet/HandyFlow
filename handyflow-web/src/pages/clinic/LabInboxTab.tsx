@@ -177,9 +177,9 @@ export default function LabInboxTab() {
 
   return (
     <div style={{ maxWidth: 900 }}>
-      <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "var(--hf-text)" }}>Lab inbox</h2>
+      <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "var(--hf-text)" }}>Results inbox</h2>
       <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--hf-text-muted)" }}>
-        Match each result to a patient, type up the report using the lab's own ranges, then mark it reviewed. Reviewing a result sends the patient a notice if they have an email address.
+        This is the clinic-wide worklist: results that arrive from the lab with no patient yet, critical results for every patient, and everything waiting for review. A patient's own results are on their file under Lab results. Match each result to a patient, type up the report using the lab's own ranges, then mark it reviewed. Reviewing a result sends the patient a notice if they have an email address.
       </p>
 
       {(critical.data ?? []).length > 0 && (

@@ -568,7 +568,7 @@ export const CLINIC_SECTIONS: ModuleSections = {
         { id: 'patients', label: 'Patients', icon: Users, anyPermission: ['CLINIC_PATIENT_READ', 'CLINIC_READ'] },
         { id: 'drafts', label: 'Drafts', icon: FileClock, anyPermission: ['CLINIC_CONSULTATION_UPDATE', 'CLINIC_CLINICAL_WRITE'] },
         { id: 'handoff', label: 'Handoff queue', icon: ArrowRightLeft, anyPermission: ['CLINIC_NURSE_HANDOFF', 'CLINIC_CLINICAL_WRITE'] },
-        { id: 'lab-inbox', label: 'Lab inbox', icon: FlaskConical, anyPermission: ['CLINIC_RESULT_READ', 'CLINIC_READ'] },
+        { id: 'lab-inbox', label: 'Results inbox', icon: FlaskConical, anyPermission: ['CLINIC_RESULT_READ', 'CLINIC_READ'] },
       ],
     },
     {

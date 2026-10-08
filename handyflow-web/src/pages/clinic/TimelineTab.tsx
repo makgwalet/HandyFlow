@@ -5,7 +5,7 @@ import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 
-export interface TimelineEvent { kind: string; id: string; at: string; title: string; detail?: string | null; status?: string | null }
+export interface TimelineEvent { kind: string; id: string; at: string; title: string; detail?: string | null; status?: string | null; summary?: string[]; people?: string[] }
 
 export const KIND_LABEL: Record<string, string> = {
   APPOINTMENT: "Appointments", CONSULTATION: "Consultations", PRESCRIPTION: "Prescriptions",
@@ -79,6 +79,14 @@ export default function TimelineTab({ patientId }: { patientId: string }) {
                   <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)" }}>{(KIND_LABEL[e.kind] ?? e.kind).toUpperCase()}</div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{e.title}</div>
                   {e.detail && <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{e.detail}</div>}
+                  {(e.summary ?? []).length > 0 && (
+                    <ul aria-label="Visit summary" style={{ margin: "4px 0 0", paddingLeft: 16, fontSize: 12, color: "var(--hf-text-muted)" }}>
+                      {(e.summary ?? []).map(l => <li key={l}>{l}</li>)}
+                    </ul>)}
+                  {(e.people ?? []).length > 0 && (
+                    <div style={{ marginTop: 4, fontSize: 12, color: "var(--hf-text-muted)" }}>
+                      <strong style={{ color: "var(--hf-text)", fontWeight: 600 }}>People: </strong>{(e.people ?? []).join(" · ")}
+                    </div>)}
                 </div>
                 {e.status && (
                   <span style={{ alignSelf: "flex-start", fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 20,

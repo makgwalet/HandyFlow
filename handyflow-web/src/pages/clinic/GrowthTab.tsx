@@ -1,9 +1,12 @@
 // Growth charts. Measurements always show; curves and z-scores only come from an approved, active reference set.
-import { useQuery } from "@tanstack/react-query"
+import { useState } from "react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AlertTriangle } from "lucide-react"
 import { CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis } from "recharts"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
+import ModalShell from "./ModalShell"
+import { GROWTH_MEASURES, entryProblem, takenAtFor, todayZA } from "./growthEntry"
 import { ageLabel, chartRows, percentileText, sourceLine, zKey, zName, zText, type GrowthChart, type MeasureChart } from "./growthView"
 
 const card: React.CSSProperties = { border: "1px solid var(--hf-border)", borderRadius: 12, background: "var(--hf-surface)", padding: 16, marginBottom: 16 }
@@ -55,8 +58,45 @@ function MeasureCard({ m }: { m: MeasureChart }) {
   )
 }
 
+function PastMeasurement({ patientId, onClose }: { patientId: string; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [f, setF] = useState({ code: "WEIGHT", value: "", date: "", notes: "" })
+  const problem = entryProblem(f.value, f.date)
+  const save = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/clinic/patients/${patientId}/observations`,
+      [{ code: f.code, value: Number(f.value.replace(",", ".")), takenAt: takenAtFor(f.date), notes: f.notes.trim() || undefined }]),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["growth", patientId] }); onClose() },
+  })
+  const err = (save.error as any)?.response?.data?.message ?? (save.isError ? "The measurement could not be saved." : null)
+  const unit = GROWTH_MEASURES.find(m => m.code === f.code)?.unit
+  const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text)", boxSizing: "border-box" }
+  const lab: React.CSSProperties = { display: "block", fontSize: 12, fontWeight: 600, color: "var(--hf-text-muted)", margin: "10px 0 4px" }
+  return (
+    <ModalShell title="Record a past measurement" onClose={onClose} width={440}
+      footer={<><button type="button" onClick={onClose} style={{ ...inp, width: "auto", cursor: "pointer" }}>Cancel</button>
+        <button type="button" disabled={!!problem || save.isPending} onClick={() => save.mutate()}
+          style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "var(--hf-primary)", color: "var(--hf-on-primary, #fff)", fontWeight: 700, cursor: "pointer", opacity: problem || save.isPending ? 0.6 : 1 }}>Save measurement</button></>}>
+      <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Use this for a weight, length or head size measured at an earlier visit or at another clinic. It is added to the chart on the date it was measured.</div>
+      <label style={lab} htmlFor="gm-code">Measurement</label>
+      <select id="gm-code" style={inp} value={f.code} onChange={e => setF(x => ({ ...x, code: e.target.value }))}>
+        {GROWTH_MEASURES.map(m => <option key={m.code} value={m.code}>{m.label} ({m.unit})</option>)}
+      </select>
+      <label style={lab} htmlFor="gm-value">Value{unit ? ` (${unit})` : ""}</label>
+      <input id="gm-value" style={inp} inputMode="decimal" value={f.value} onChange={e => setF(x => ({ ...x, value: e.target.value }))} />
+      <label style={lab} htmlFor="gm-date">Date measured</label>
+      <input id="gm-date" type="date" max={todayZA()} style={inp} value={f.date} onChange={e => setF(x => ({ ...x, date: e.target.value }))} />
+      <label style={lab} htmlFor="gm-notes">Where it was measured (optional)</label>
+      <input id="gm-notes" style={inp} value={f.notes} onChange={e => setF(x => ({ ...x, notes: e.target.value }))} />
+      {(f.value || f.date) && problem && <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 8 }}>{problem}</div>}
+      {err && <div role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)", marginTop: 8 }}>{err}</div>}
+    </ModalShell>
+  )
+}
+
 export default function GrowthTab({ patientId }: { patientId: string }) {
   const canRead = usePermission("CLINIC_GROWTH_READ")
+  const canWrite = usePermission("CLINIC_VITALS_WRITE")
+  const [adding, setAdding] = useState(false)
   const q = useQuery<GrowthChart>({ queryKey: ["growth", patientId], enabled: canRead, retry: false,
     queryFn: async () => { const r = await apiClient.get(`/api/v1/clinic/patients/${patientId}/growth`); return (r?.data?.data ?? r?.data) as GrowthChart } })
   if (!canRead) return <div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>You do not have permission to view growth charts.</div>
@@ -65,6 +105,12 @@ export default function GrowthTab({ patientId }: { patientId: string }) {
   const g = q.data
   return (
     <div>
+      {canWrite && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+          <button type="button" onClick={() => setAdding(true)}
+            style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Record past measurement</button>
+        </div>)}
+      {adding && <PastMeasurement patientId={patientId} onClose={() => setAdding(false)} />}
       {g.notes.map(n => <div key={n} role="note" style={{ fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 8 }}>{n}</div>)}
       {g.measures.map(m => <MeasureCard key={m.code} m={m}/>)}
     </div>

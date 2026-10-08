@@ -5,12 +5,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.clinic.domain.repository.*;
 import za.co.handyflow.platform.clinic.dto.TimelineEvent;
+import za.co.handyflow.platform.clinic.dto.VisitDtos.VisitResponse;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -28,6 +30,7 @@ public class ClinicTimelineService {
     private final ClinicLabResultRepository labRepo;
     private final ClinicClaimRepository claimRepo;
     private final ClinicPaymentRepository paymentRepo;
+    private final ClinicVisitService visitService;
 
     @Transactional(readOnly = true)
     public List<TimelineEvent> timeline(TenantId t, UUID patientId, Set<String> kinds, Instant from, Instant to,
@@ -41,11 +44,18 @@ public class ClinicTimelineService {
                 all.add(new TimelineEvent("APPOINTMENT", a.getId(), a.getScheduledAt(),
                         "Appointment: " + label(a.getAppointmentType()), clean(a.getReason()), a.getStatus())));
 
-        if (want || kinds.contains("CONSULTATION")) consultationRepo.findByPatient(t, patientId).stream()
-                .filter(c -> !"ABANDONED".equals(c.getStatus())).forEach(c ->
-                all.add(new TimelineEvent("CONSULTATION", c.getId(), c.getConsultedAt(),
+        if (want || kinds.contains("CONSULTATION")) {
+            Map<UUID, VisitResponse> visits = visitService.visits(t, patientId).stream()
+                    .collect(Collectors.toMap(VisitResponse::id, v -> v, (a, b) -> a));
+            consultationRepo.findByPatient(t, patientId).stream()
+                    .filter(c -> !"ABANDONED".equals(c.getStatus())).forEach(c -> {
+                TimelineEvent e = new TimelineEvent("CONSULTATION", c.getId(), c.getConsultedAt(),
                         "Consultation: " + (clean(c.getChiefComplaint()) == null ? "no complaint recorded" : c.getChiefComplaint()),
-                        clean(c.getDiagnosis()), c.getStatus())));
+                        clean(c.getDiagnosis()), c.getStatus());
+                VisitResponse v = visits.get(c.getId());
+                all.add(v == null ? e : e.withVisit(TimelineVisitRules.summary(v), TimelineVisitRules.people(v)));
+            });
+        }
 
         if (want || kinds.contains("PRESCRIPTION")) prescriptionRepo.findByPatient(t, patientId).forEach(p ->
                 all.add(new TimelineEvent("PRESCRIPTION", p.getId(), p.getPrescribedAt(),

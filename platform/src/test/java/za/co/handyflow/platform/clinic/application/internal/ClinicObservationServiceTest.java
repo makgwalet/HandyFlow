@@ -75,6 +75,22 @@ class ClinicObservationServiceTest {
     }
 
     @Test
+    @DisplayName("a past measurement is accepted, but not one dated in the future or before the patient was born")
+    void recordChecksTheDate() {
+        var p = ClinicPatient.create(TENANT, "Liam", "Botha", null, java.time.LocalDate.of(2024, 3, 1), null,
+                "+27820000000", null, null, null);
+        when(patientRepo.findActiveById(TENANT, p.getId())).thenReturn(Optional.of(p));
+        java.util.function.Function<Instant, ObservationRequest> at = t ->
+                new ObservationRequest("WEIGHT", new BigDecimal("9.5"), null, null, t, null, null);
+
+        assertThat(service.record(TENANT, p.getId(), List.of(at.apply(Instant.parse("2025-01-10T10:00:00Z"))))).hasSize(1);
+        assertThatThrownBy(() -> service.record(TENANT, p.getId(), List.of(at.apply(Instant.now().plusSeconds(86_400)))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("future");
+        assertThatThrownBy(() -> service.record(TENANT, p.getId(), List.of(at.apply(Instant.parse("2024-02-20T10:00:00Z")))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("born");
+    }
+
+    @Test
     @DisplayName("record rejects unknown codes, missing values, inverted ranges and empty batches")
     void recordValidates() {
         var p = patient();

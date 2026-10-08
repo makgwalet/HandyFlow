@@ -31,6 +31,8 @@ public class ClinicObservationService {
 
     private static final Pattern BP = Pattern.compile("^\\s*(\\d{2,3})\\s*/\\s*(\\d{2,3})\\s*$");
     private static final int MAX_BATCH = 50;
+    /** Clock differences between devices; anything further ahead than this is a typing mistake, not a measurement. */
+    private static final java.time.Duration FUTURE_ALLOWANCE = java.time.Duration.ofMinutes(10);
 
     private final ClinicObservationRepository  observationRepo;
     private final ClinicPatientRepository      patientRepo;
@@ -39,7 +41,8 @@ public class ClinicObservationService {
 
     @Transactional
     public List<ObservationResponse> record(TenantId t, UUID patientId, List<ObservationRequest> reqs) {
-        requirePatient(t, patientId);
+        var patient = patientRepo.findActiveById(t, patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient", patientId.toString()));
         if (reqs == null || reqs.isEmpty()) throw new IllegalArgumentException("At least one observation is required");
         if (reqs.size() > MAX_BATCH) throw new IllegalArgumentException("At most " + MAX_BATCH + " observations per request");
 
@@ -49,6 +52,11 @@ public class ClinicObservationService {
             ObservationCode code = ObservationCode.parse(r.code()).orElseThrow(() ->
                     new IllegalArgumentException("Unknown observation code '" + r.code() + "'"));
             if (r.value() == null) throw new IllegalArgumentException("value is required for " + code);
+            if (r.takenAt() != null && r.takenAt().isAfter(Instant.now().plus(FUTURE_ALLOWANCE)))
+                throw new IllegalArgumentException("A measurement cannot be dated in the future");
+            if (r.takenAt() != null && patient.getDateOfBirth() != null
+                    && r.takenAt().atZone(java.time.ZoneId.of("Africa/Johannesburg")).toLocalDate().isBefore(patient.getDateOfBirth()))
+                throw new IllegalArgumentException("A measurement cannot be dated before the patient was born");
             if (r.refLow() != null && r.refHigh() != null && r.refLow().compareTo(r.refHigh()) > 0) {
                 throw new IllegalArgumentException("refLow cannot be above refHigh for " + code);
             }
