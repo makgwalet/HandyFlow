@@ -51,6 +51,26 @@ public class ClinicBillingController {
                 billingService.getClaims(TenantContext.getTenantIdAsObject(), status)));
     }
 
+    @GetMapping("/claims/page")
+    @PreAuthorize("hasAuthority('CLINIC_CLAIM_READ')")
+    @Operation(summary = "One page of claims, newest first, optionally filtered by status")
+    public ResponseEntity<ApiResponse<ClaimListDtos.ClaimPage>> getClaimPage(
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                billingService.getClaimPage(TenantContext.getTenantIdAsObject(), status, page, size)));
+    }
+
+    @GetMapping("/claims/summary")
+    @PreAuthorize("hasAuthority('CLINIC_CLAIM_READ')")
+    @Operation(summary = "Claim count, outstanding, paid and rejected over every claim of the status")
+    public ResponseEntity<ApiResponse<ClaimListDtos.ClaimSummary>> getClaimSummary(
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                billingService.getClaimSummary(TenantContext.getTenantIdAsObject(), status)));
+    }
+
     @GetMapping("/consultations/{consultationId}/claim")
     @PreAuthorize("hasAuthority('CLINIC_CLAIM_READ')")
     @Operation(summary = "Get claim for a consultation")

@@ -235,7 +235,36 @@ public class ClinicBillingService {
         List<ClinicClaim> claims = status != null
                 ? claimRepo.findByStatus(tenantId, status)
                 : claimRepo.findAll(tenantId);
+        return withNames(tenantId, claims);
+    }
 
+    /** Patch 0178: one page of claims, newest first. Size is held between 1 and 100. */
+    @Transactional(readOnly = true)
+    public ClaimListDtos.ClaimPage getClaimPage(TenantId tenantId, String status, int page, int size) {
+        var pageable = org.springframework.data.domain.PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100));
+        var result = (status != null && !status.isBlank())
+                ? claimRepo.findPageByStatus(tenantId, status, pageable)
+                : claimRepo.findPage(tenantId, pageable);
+        return new ClaimListDtos.ClaimPage(withNames(tenantId, result.getContent()),
+                result.getTotalElements(), pageable.getPageNumber(), pageable.getPageSize());
+    }
+
+    /** Patch 0178: the figures above the claims list, over every claim of the status. */
+    @Transactional(readOnly = true)
+    public ClaimListDtos.ClaimSummary getClaimSummary(TenantId tenantId, String status) {
+        List<Object[]> rows = (status != null && !status.isBlank())
+                ? claimRepo.summaryFactsByStatus(tenantId, status)
+                : claimRepo.summaryFacts(tenantId);
+        Map<UUID, ClaimLedgerRules.Totals> totals = ledger.totalsByClaim(tenantId.getValue());
+        List<ClaimSummaryRules.Fact> facts = rows.stream()
+                .map(r -> new ClaimSummaryRules.Fact((String) r[1], (java.math.BigDecimal) r[2],
+                        totals.getOrDefault((UUID) r[0], ClaimLedgerRules.Totals.NONE)))
+                .toList();
+        var s = ClaimSummaryRules.summarise(facts);
+        return new ClaimListDtos.ClaimSummary(s.total(), s.outstanding(), s.paid(), s.rejected());
+    }
+
+    private List<ClinicClaimResponse> withNames(TenantId tenantId, List<ClinicClaim> claims) {
         // Batch-load names — avoids N+1
         Set<UUID> patientIds     = claims.stream().map(ClinicClaim::getPatientId).filter(Objects::nonNull).collect(Collectors.toSet());
         Set<UUID> practitionerIds = claims.stream().map(ClinicClaim::getPractitionerId).filter(Objects::nonNull).collect(Collectors.toSet());

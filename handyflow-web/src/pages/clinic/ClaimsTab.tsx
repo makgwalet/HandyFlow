@@ -4,6 +4,7 @@ import ClaimAdjustmentModal, { type AdjustmentKind } from "./ClaimAdjustmentModa
 import SchemePaymentModal from "./SchemePaymentModal"
 import { usePermission } from "../../hooks/usePermission"
 import { moneyActions, moneyHasMoved, owed, rand } from "./claimMoney"
+import { CLAIMS_PAGE_SIZE, clampPage, hasNext, hasPrevious, pageRange, type ClaimsPage } from "./claimPaging"
 import React from "react"
 // src/pages/clinic/ClaimsTab.tsx
 // Medical aid claims — per-consultation builder, full lifecycle management
@@ -68,7 +69,9 @@ export default function ClaimsTab() {
   const canAllocate = usePermission("CLINIC_PAYMENT_ALLOCATE")
   const [adjust, setAdjust]             = useState<{claim:Claim;kind:AdjustmentKind}|null>(null)
   const [showSchemePay, setShowSchemePay] = useState(false)
-  const [statusFilter, setStatusFilter] = useState("all")
+  const [statusFilter, setStatusFilterState] = useState("all")
+  const [page, setPage]                 = useState(0)
+  const setStatusFilter = (s:string) => { setStatusFilterState(s); setPage(0) }
   const [expanded, setExpanded]         = useState<string|null>(null)
   const [showCreate, setShowCreate]     = useState(false)
   const [showReject, setShowReject]     = useState<string|null>(null)
@@ -77,14 +80,29 @@ export default function ClaimsTab() {
   const [apiError, setApiError]         = useState("")
   const [selected, setSelected]         = useState<Set<string>>(new Set())
 
-  const { data: claims=[], isLoading } = useQuery<Claim[]>({
-    queryKey: ["clinic-claims", statusFilter],
+  const { data: claimPage, isLoading } = useQuery<ClaimsPage<Claim>>({
+    queryKey: ["clinic-claims", "page", statusFilter, page],
     queryFn: async () => {
-      const p = new URLSearchParams({ size:"100" })
+      const p = new URLSearchParams({ page:String(page), size:String(CLAIMS_PAGE_SIZE) })
       if (statusFilter!=="all") p.set("status", statusFilter)
-      return unwrap(await apiClient.get(`/api/v1/clinic/billing/claims?${p}`))
+      const r = await apiClient.get(`/api/v1/clinic/billing/claims/page?${p}`)
+      return (r.data?.data ?? r.data) as ClaimsPage<Claim>
+    },
+    placeholderData: prev => prev,
+  })
+  const { data: summary } = useQuery<{total:number;outstanding:number;paid:number;rejected:number}>({
+    queryKey: ["clinic-claims", "summary", statusFilter],
+    queryFn: async () => {
+      const q = statusFilter!=="all" ? `?status=${statusFilter}` : ""
+      const r = await apiClient.get(`/api/v1/clinic/billing/claims/summary${q}`)
+      return r.data?.data ?? r.data
     },
   })
+  const claims = claimPage?.content ?? []
+  const totalClaims = claimPage?.total ?? 0
+  // If the last claim on the last page was removed from the filter, step back rather than show an empty page.
+  const safePage = clampPage(page, CLAIMS_PAGE_SIZE, totalClaims)
+  if (claimPage && safePage !== page) setPage(safePage)
 
   const { data: consultations=[] } = useQuery<Consultation[]>({
     queryKey: ["consultations-for-claims"],
@@ -159,12 +177,11 @@ export default function ClaimsTab() {
 
   const displayedClaims = claims as Claim[]
 
-  // Summary stats
-  const total      = displayedClaims.length
-  const outstanding = displayedClaims.filter(c=>["DRAFT","SUBMITTED","ACCEPTED","PARTIAL"].includes(c.status))
-    .reduce((s,c)=>s+(["DRAFT","SUBMITTED"].includes(c.status) ? (c.schemePortion??0) : owed(c)),0)
-  const paid       = displayedClaims.reduce((s,c)=>s+(c.schemePaid??0),0)
-  const rejected   = displayedClaims.filter(c=>c.status==="REJECTED").length
+  // Figures over every claim of the filter (server summary), not only the 25 on screen
+  const total       = summary?.total ?? 0
+  const outstanding = summary?.outstanding ?? 0
+  const paid        = summary?.paid ?? 0
+  const rejected    = summary?.rejected ?? 0
 
   return (
     <div>
@@ -385,6 +402,15 @@ export default function ClaimsTab() {
               </div>
             )
           })}
+          {totalClaims > CLAIMS_PAGE_SIZE && (
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6,fontSize:13,color:GRAY}}>
+              <span>{pageRange(page, CLAIMS_PAGE_SIZE, totalClaims, displayedClaims.length)}</span>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>setPage(p=>p-1)} disabled={!hasPrevious(page)} style={btnCancel}>Previous</button>
+                <button onClick={()=>setPage(p=>p+1)} disabled={!hasNext(page, CLAIMS_PAGE_SIZE, totalClaims)} style={btnCancel}>Next</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
