@@ -6,6 +6,12 @@ spring:
   application:
     name: handyflow-platform
 
+  # Patient documents and lab PDFs (10 MB each). Spring's default of 1 MB refuses a scanned letter or a phone photo.
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
+
   modulith:
     events:
       republish-outstanding-events-on-restart: true

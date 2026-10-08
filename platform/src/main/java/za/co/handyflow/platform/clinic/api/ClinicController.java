@@ -44,6 +44,7 @@ public class ClinicController {
     private final ClinicAppointmentReminderService    appointmentReminderService;
     private final ClinicTelehealthService              telehealthService;
     private final ClinicPdfService                   clinicPdfService;
+    private final za.co.handyflow.platform.clinic.application.internal.ClinicPatientDocumentService documentService;
     private final ClinicReferralPdfService            referralPdfService;
     private final ClinicConsultationSummaryPdfService consultationSummaryPdfService;
     private final ClinicMedicationCatalogueRepository medicationRepo;
@@ -407,6 +408,8 @@ public class ClinicController {
             @RequestParam(required = false) String notes) {
         byte[] pdf = clinicPdfService.generateMedicalCertificate(
                 TenantContext.getTenantIdAsObject(), id, unfitFrom, unfitTo, notes);
+        // A copy is kept in the patient's documents register; failing to keep it never blocks the certificate.
+        documentService.recordIssued(TenantContext.getTenantIdAsObject(), id, "SICK_NOTE", "Medical certificate", pdf);
         return pdfResponse(pdf, "medical-certificate-" + id + ".pdf");
     }
 
@@ -428,6 +431,8 @@ public class ClinicController {
             @RequestParam(required = false) String additionalNotes) {
         byte[] pdf = referralPdfService.generate(
                 TenantContext.getTenantIdAsObject(), id, specialistName, specialty, reason, urgency, additionalNotes);
+        documentService.recordIssued(TenantContext.getTenantIdAsObject(), id, "REFERRAL",
+                specialty == null || specialty.isBlank() ? "Referral letter" : "Referral letter: " + specialty.trim(), pdf);
         return pdfResponse(pdf, "referral-letter-" + id + ".pdf");
     }
 

@@ -183,12 +183,12 @@ user -> role -> permissions -> (later) patient and context rules
 
 | Permission | Kind | What it allows | Auto from | State |
 |---|---|---|---|---|
-| `CLINIC_DOCUMENT_READ` | read | View a document list | `CLINIC_READ` | Reserved |
-| `CLINIC_DOCUMENT_CREATE` | write | Create a document | `CLINIC_WRITE` | Reserved |
-| `CLINIC_DOCUMENT_DOWNLOAD` | read | Download a document | `CLINIC_READ` | Reserved |
+| `CLINIC_DOCUMENT_READ` | read | View a document list | `CLINIC_READ` | Live |
+| `CLINIC_DOCUMENT_CREATE` | write | Create a document | `CLINIC_WRITE` | Live |
+| `CLINIC_DOCUMENT_DOWNLOAD` | read | Download a document | `CLINIC_READ` | Live |
 | `CLINIC_DOCUMENT_PRINT` | read | Print a document | `CLINIC_READ` | Reserved |
 | `CLINIC_DOCUMENT_EMAIL` | send | Email a document to a patient (delivery is separate from signing) | `CLINIC_BILLING_WRITE` | Live |
-| `CLINIC_DOCUMENT_VOID` | manage | Void a document | `CLINIC_ADMIN` | Reserved |
+| `CLINIC_DOCUMENT_VOID` | manage | Void a document | `CLINIC_ADMIN` | Live |
 
 ### Consent
 
@@ -386,7 +386,7 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 
 ## 3. API authorization matrix
 
-173 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
+177 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
 
 | Area | Method | Path | Requires |
 |---|---|---|---|
@@ -506,6 +506,10 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 | PatientClinical | POST | `/patients/{patientId}/medications` | `CLINIC_MEDICATION_WRITE` |
 | PatientClinical | PATCH | `/patients/{patientId}/medications/{id}` | `CLINIC_MEDICATION_WRITE` |
 | PatientDirectory | GET | `/patients/directory` | `CLINIC_PATIENT_READ` |
+| PatientDocument | GET | `/patients/{patientId}/documents` | `CLINIC_DOCUMENT_READ` |
+| PatientDocument | POST | `/patients/{patientId}/documents` | `CLINIC_DOCUMENT_CREATE` |
+| PatientDocument | GET | `/patients/{patientId}/documents/{docId}/file` | `CLINIC_DOCUMENT_DOWNLOAD` |
+| PatientDocument | DELETE | `/patients/{patientId}/documents/{docId}` | `CLINIC_DOCUMENT_VOID` |
 | PatientHistory | GET | `/patients/{patientId}/family-history` | `CLINIC_CLINICAL_HISTORY_READ` |
 | PatientHistory | POST | `/patients/{patientId}/family-history` | `CLINIC_CLINICAL_HISTORY_WRITE` |
 | PatientHistory | PATCH | `/patients/{patientId}/family-history/{id}` | `CLINIC_CLINICAL_HISTORY_WRITE` |

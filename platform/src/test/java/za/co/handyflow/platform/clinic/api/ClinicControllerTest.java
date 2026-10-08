@@ -42,6 +42,7 @@ class ClinicControllerTest {
     @MockitoBean za.co.handyflow.platform.clinic.application.internal.ClinicDispensingService dispensingService;
     @MockitoBean za.co.handyflow.platform.clinic.application.internal.ClinicAllergySnapshotService allergySnapshotService;
     @MockitoBean ClinicPdfService                   clinicPdfService;
+    @MockitoBean za.co.handyflow.platform.clinic.application.internal.ClinicPatientDocumentService documentService;
     @MockitoBean za.co.handyflow.platform.clinic.application.internal.ClinicPatientIdentityService patientIdentityService;
     @MockitoBean ClinicMedicationCatalogueRepository medicationRepo;
     // The controller also needs these; a @WebMvcTest slice does not create services, so each is mocked.
