@@ -9,7 +9,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import za.co.handyflow.platform.clinic.domain.model.*;
 import za.co.handyflow.platform.clinic.domain.repository.*;
 import za.co.handyflow.platform.clinic.dto.LetterDtos.*;
-import za.co.handyflow.platform.identity.TenantFacade;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -26,10 +25,7 @@ import static org.mockito.Mockito.*;
 class ClinicLetterTemplateServiceTest {
 
     @Mock ClinicLetterTemplateRepository repo;
-    @Mock ClinicConsultationRepository consultationRepo;
-    @Mock ClinicPatientRepository patientRepo;
-    @Mock ClinicPractitionerRepository practitionerRepo;
-    @Mock TenantFacade tenantFacade;
+    @Mock ClinicLetterValues letterValues;
     @InjectMocks ClinicLetterTemplateService service;
 
     final TenantId t = TenantId.of(UUID.randomUUID());
@@ -43,16 +39,15 @@ class ClinicLetterTemplateServiceTest {
     void renderFillsFields() {
         var x = template("{{patient.name}} born {{patient.dob}} was seen on {{visit.date}} for {{visit.reason}}.");
         when(repo.findOne(t, x.getId())).thenReturn(Optional.of(x));
-        var patient = ClinicPatient.create(t, "Liam", "Botha", null, LocalDate.of(2019, 3, 12), null, "+27820000000", null, null, null);
-        var visit = ClinicConsultation.create(t, patient.getId(), null, null, "Cough");
-        when(consultationRepo.findActiveById(t, visit.getId())).thenReturn(Optional.of(visit));
-        when(patientRepo.findActiveById(t, patient.getId())).thenReturn(Optional.of(patient));
-        when(tenantFacade.findTenantDetails(any())).thenReturn(Optional.empty());
+        UUID visit = UUID.randomUUID();
+        var values = LetterMerge.values(new LetterMerge.Source("Liam", "Botha", LocalDate.of(2019, 3, 12), null, null, null,
+                LocalDate.of(2026, 10, 7), "Cough", null, null, null, null, null, null, LocalDate.of(2026, 10, 8), null, null));
+        when(letterValues.load(t, null, visit, null, null)).thenReturn(new ClinicLetterValues.Loaded(null, null, null, values));
 
-        RenderedTemplate r = service.render(t, x.getId(), visit.getId());
+        RenderedTemplate r = service.render(t, x.getId(), null, visit, null, null);
 
         assertThat(r.title()).isEqualTo("Letter for Liam");
-        assertThat(r.body()).startsWith("Liam Botha born 12 March 2019 was seen on ").endsWith(" for Cough.");
+        assertThat(r.body()).isEqualTo("Liam Botha born 12 March 2019 was seen on 7 October 2026 for Cough.");
     }
 
     @Test
@@ -61,7 +56,7 @@ class ClinicLetterTemplateServiceTest {
         var x = template("text");
         x.archive();
         when(repo.findOne(t, x.getId())).thenReturn(Optional.of(x));
-        assertThatThrownBy(() -> service.render(t, x.getId(), UUID.randomUUID())).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> service.render(t, x.getId(), null, UUID.randomUUID(), null, null)).isInstanceOf(ResourceNotFoundException.class);
         assertThatThrownBy(() -> service.update(t, x.getId(), new TemplateRequest("GENERAL_LETTER", "n", "T", "b", null, null, null))).isInstanceOf(ResourceNotFoundException.class);
     }
 

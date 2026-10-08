@@ -67,9 +67,12 @@ public class ClinicLetterController {
 
     @GetMapping("/letter-templates/{id}/render")
     @PreAuthorize("hasAuthority('CLINIC_DOCUMENT_READ')")
-    @Operation(summary = "A template with the merge fields filled in for one visit")
-    public ResponseEntity<ApiResponse<RenderedTemplate>> render(@PathVariable UUID id, @RequestParam UUID consultationId) {
-        return ResponseEntity.ok(ApiResponse.success("Success", templates.render(TenantContext.getTenantIdAsObject(), id, consultationId)));
+    @Operation(summary = "A template with the merge fields filled in, for a visit or for a patient (with no visit), optionally addressed to a recipient")
+    public ResponseEntity<ApiResponse<RenderedTemplate>> render(@PathVariable UUID id, @RequestParam(required = false) UUID consultationId,
+                                                                @RequestParam(required = false) UUID patientId,
+                                                                @RequestParam(required = false) String recipientName,
+                                                                @RequestParam(required = false) String recipientCompany) {
+        return ResponseEntity.ok(ApiResponse.success("Success", templates.render(TenantContext.getTenantIdAsObject(), id, patientId, consultationId, recipientName, recipientCompany)));
     }
 
     @PostMapping("/consultations/{id}/letter")
@@ -77,8 +80,20 @@ public class ClinicLetterController {
     @Operation(summary = "Write a general letter PDF for a visit; a copy is kept in the patient's documents")
     public ResponseEntity<byte[]> letter(@PathVariable UUID id, @RequestBody LetterRequest body) {
         var tenant = TenantContext.getTenantIdAsObject();
-        byte[] pdf = letterPdf.generate(tenant, id, body.title(), body.body());
+        byte[] pdf = letterPdf.generate(tenant, null, id, body.title(), body.body(), body.recipientName(), body.recipientCompany());
         documents.recordIssued(tenant, id, "LETTER", body.title().trim(), pdf);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"letter-" + id + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF).contentLength(pdf.length).body(pdf);
+    }
+
+    @PostMapping("/patients/{id}/letter")
+    @PreAuthorize("hasAuthority('CLINIC_DOCUMENT_CREATE')")
+    @Operation(summary = "Write a general letter PDF for a patient (a visit is optional; the letter may be addressed to a person or company); a copy is kept in the patient's documents")
+    public ResponseEntity<byte[]> patientLetter(@PathVariable UUID id, @RequestBody LetterRequest body) {
+        var tenant = TenantContext.getTenantIdAsObject();
+        byte[] pdf = letterPdf.generate(tenant, id, body.consultationId(), body.title(), body.body(), body.recipientName(), body.recipientCompany());
+        documents.recordIssuedFor(tenant, id, body.consultationId(), "LETTER", body.title().trim(), pdf);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"letter-" + id + ".pdf\"")
                 .contentType(MediaType.APPLICATION_PDF).contentLength(pdf.length).body(pdf);

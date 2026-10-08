@@ -23,10 +23,7 @@ public class ClinicLetterTemplateService {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ENGLISH);
 
     private final ClinicLetterTemplateRepository repo;
-    private final ClinicConsultationRepository   consultationRepo;
-    private final ClinicPatientRepository        patientRepo;
-    private final ClinicPractitionerRepository   practitionerRepo;
-    private final TenantFacade                   tenantFacade;
+    private final ClinicLetterValues             letterValues;
 
     @Transactional(readOnly = true)
     public List<TemplateResponse> list(TenantId t, String kind) {
@@ -57,24 +54,11 @@ public class ClinicLetterTemplateService {
         repo.save(x);
     }
 
-    /** The template with {{patient.name}} and the other merge fields filled in for this visit. */
+    /** The template with {{patient.name}} and the other merge fields filled in, for a visit or for a patient with no visit. */
     @Transactional(readOnly = true)
-    public RenderedTemplate render(TenantId t, UUID id, UUID consultationId) {
+    public RenderedTemplate render(TenantId t, UUID id, UUID patientId, UUID consultationId, String recipientName, String recipientCompany) {
         ClinicLetterTemplate x = live(t, id);
-        ClinicConsultation c = consultationRepo.findActiveById(t, consultationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Consultation", consultationId.toString()));
-        ClinicPatient p = patientRepo.findActiveById(t, c.getPatientId())
-                .orElseThrow(() -> new ResourceNotFoundException("Patient", c.getPatientId().toString()));
-        ClinicPractitioner dr = c.getPractitionerId() == null ? null : practitionerRepo.findActiveById(t, c.getPractitionerId()).orElse(null);
-        Map<String, String> v = new HashMap<>();
-        v.put("patient.name", ((p.getFirstName() == null ? "" : p.getFirstName()) + " " + (p.getLastName() == null ? "" : p.getLastName())).trim());
-        v.put("patient.firstName", p.getFirstName());
-        v.put("patient.dob", p.getDateOfBirth() == null ? null : p.getDateOfBirth().format(DATE));
-        v.put("visit.date", c.getConsultedAt() == null ? null : c.getConsultedAt().atZone(AppointmentRules.CLINIC_ZONE).toLocalDate().format(DATE));
-        v.put("visit.reason", c.getChiefComplaint());
-        v.put("doctor.name", dr == null ? null : dr.getFullName());
-        v.put("practice.name", tenantFacade.findTenantDetails(t).map(d -> d.companyName()).orElse(null));
-        v.put("today", LocalDate.now(AppointmentRules.CLINIC_ZONE).format(DATE));
+        var v = letterValues.load(t, patientId, consultationId, recipientName, recipientCompany).values();
         return new RenderedTemplate(x.getId(), x.getKind(), x.getName(), LetterMerge.render(x.getTitle(), v), LetterMerge.render(x.getBody(), v),
                 x.getSpecialty(), x.getUrgency(), x.getUnfitDays());
     }

@@ -8,7 +8,10 @@ import type { Kind, Template } from "./letterView"
 
 const unwrap = (r: any) => r?.data?.data ?? r?.data
 
-export default function LetterTemplatePicker({ kind, consultationId, onApply }: { kind: Kind; consultationId: string; onApply: (t: Template) => void }) {
+/** A template is filled for a visit, or for a patient when there is no visit; the recipient fills {{recipient.*}}. */
+export default function LetterTemplatePicker({ kind, consultationId, patientId, recipientName, recipientCompany, onApply }: {
+  kind: Kind; consultationId?: string; patientId?: string; recipientName?: string; recipientCompany?: string; onApply: (t: Template) => void
+}) {
   const canRead = usePermission("CLINIC_DOCUMENT_READ")
   const [list, setList] = useState<Template[]>([])
   const [error, setError] = useState("")
@@ -23,7 +26,12 @@ export default function LetterTemplatePicker({ kind, consultationId, onApply }: 
   const choose = async (id: string) => {
     if (!id) return
     setError("")
-    try { onApply(unwrap(await apiClient.get(`/api/v1/clinic/letter-templates/${id}/render`, { params: { consultationId } }))) }
+    const params: Record<string, string> = {}
+    if (consultationId) params.consultationId = consultationId
+    else if (patientId) params.patientId = patientId
+    if (recipientName?.trim()) params.recipientName = recipientName.trim()
+    if (recipientCompany?.trim()) params.recipientCompany = recipientCompany.trim()
+    try { onApply(unwrap(await apiClient.get(`/api/v1/clinic/letter-templates/${id}/render`, { params }))) }
     catch (e: any) { setError(e?.response?.data?.message ?? "The template could not be applied.") }
   }
   return (

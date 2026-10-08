@@ -45,7 +45,7 @@ function ChartPanel({ m, sex }: { m: MeasureChart; sex: string | null }) {
                 {Array.from({ length: n }, (_, k) => <Area key={k} type="monotone" dataKey={`band${k + 1}`} stackId="bands" stroke="none" fill="var(--hf-primary)" fillOpacity={bandOpacity(k + 1, n)} legendType="none" isAnimationActive={false}/>)}
                 {lines.map(z => <Line key={z} type="monotone" dataKey={zKey(z)} name={zName(z)} dot={false} strokeWidth={z === 0 ? 2 : 1} stroke="var(--hf-text-muted)" strokeDasharray={z === 0 ? undefined : "4 3"} connectNulls isAnimationActive={false}/>)}
                 <Line type="linear" data={own} dataKey="value" name="This patient" stroke="var(--hf-primary)" strokeWidth={2} dot={{ r: 3 }} connectNulls isAnimationActive={false}/>
-                <Scatter data={own} dataKey="value" fill="var(--hf-primary)" legendType="none"/>
+                <Scatter data={own} dataKey="value" fill="var(--hf-primary)" legendType="none" tooltipType="none"/>
               </ComposedChart>
             </ResponsiveContainer>
           </div>

@@ -32,11 +32,31 @@ class LetterMergeTest {
 
     @Test
     void unknownFieldsAreListedOnceInOrder() {
-        assertEquals(List.of("patient.age", "x.y"), LetterMerge.unknown("{{patient.age}} {{patient.name}} {{x.y}} {{patient.age}}"));
+        assertEquals(List.of("patient.shoeSize", "x.y"), LetterMerge.unknown("{{patient.shoeSize}} {{patient.name}} {{x.y}} {{patient.shoeSize}}"));
         assertTrue(LetterMerge.unknown(null).isEmpty());
         assertTrue(LetterMerge.unknown("no fields { here }").isEmpty());
     }
 
     @Test
     void nullTextStaysNull() { assertNull(LetterMerge.render(null, Map.of())); }
+
+    @Test
+    void everyFieldHasAValueSlotAndVisitFieldsAreDashesWithoutAVisit() {
+        var v = LetterMerge.values(new LetterMerge.Source(" Liam ", "Botha", java.time.LocalDate.of(2019, 3, 12), "1903125000087", "0821234567", "1 Main Rd, Pretoria",
+                null, null, null, null, null, null, null, "Handy Practice", java.time.LocalDate.of(2026, 10, 8), "HR Manager", "Acme (Pty) Ltd"));
+        for (String f : LetterMerge.FIELDS) assertTrue(v.containsKey(f), f);
+        assertEquals("Liam Botha", v.get("patient.name"));
+        assertEquals("7 years", v.get("patient.age"));
+        assertEquals("Dear HR Manager at Acme (Pty) Ltd, — on —.", LetterMerge.render("Dear {{recipient.name}} at {{recipient.company}}, {{visit.diagnosis}} on {{visit.date}}.", v));
+    }
+
+    @Test
+    void ageIsInMonthsUnderTwoYears() {
+        var today = java.time.LocalDate.of(2026, 10, 8);
+        assertEquals("7 months", LetterMerge.age(java.time.LocalDate.of(2026, 3, 1), today));
+        assertEquals("1 month", LetterMerge.age(java.time.LocalDate.of(2026, 9, 1), today));
+        assertEquals("2 years", LetterMerge.age(java.time.LocalDate.of(2024, 10, 8), today));
+        assertNull(LetterMerge.age(java.time.LocalDate.of(2027, 1, 1), today));
+        assertNull(LetterMerge.age(null, today));
+    }
 }

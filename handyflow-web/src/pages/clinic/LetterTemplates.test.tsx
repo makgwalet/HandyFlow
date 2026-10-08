@@ -69,7 +69,7 @@ describe("write a letter", () => {
   it("needs a title and text, inserts merge fields, and posts the letter for the visit", async () => {
     post.mockResolvedValue({ data: new Blob(["x"]) })
     const onClose = vi.fn()
-    render(<WriteLetterModal visits={visits} onClose={onClose} />)
+    render(<WriteLetterModal patientId="p1" visits={visits} onClose={onClose} />)
     const go = screen.getByRole("button", { name: "Download letter" }) as HTMLButtonElement
     expect(go.disabled).toBe(true)
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Repeat prescription" } })
@@ -78,12 +78,12 @@ describe("write a letter", () => {
     expect((screen.getByLabelText("Text") as HTMLTextAreaElement).value).toBe("Dear {{patient.name}}")
     fireEvent.change(screen.getByLabelText("Text"), { target: { value: "Dear Liam" } })
     fireEvent.click(go)
-    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clinic/consultations/c1/letter", { title: "Repeat prescription", body: "Dear Liam" }, { responseType: "blob" }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clinic/patients/p1/letter", { title: "Repeat prescription", body: "Dear Liam", consultationId: "c1" }, { responseType: "blob" }))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
   it("says so when the letter cannot be written", async () => {
     post.mockRejectedValue({ response: { data: new Blob(["x"]) } })
-    render(<WriteLetterModal visits={visits} onClose={() => {}} />)
+    render(<WriteLetterModal patientId="p1" visits={visits} onClose={() => {}} />)
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "T" } })
     fireEvent.change(screen.getByLabelText("Text"), { target: { value: "B" } })
     fireEvent.click(screen.getByRole("button", { name: "Download letter" }))
@@ -115,5 +115,21 @@ describe("template manager", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save template" }))
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clinic/letter-templates",
       { kind: "GENERAL_LETTER", name: "Fitness letter", title: "Fitness to work", body: "{{patient.name}} is fit.", specialty: null, urgency: null, unfitDays: null }))
+  })
+})
+
+describe("letters without a visit, to a company", () => {
+  it("applies a template for the patient with the recipient, and writes the letter without a visit", async () => {
+    perms.CLINIC_DOCUMENT_READ = true
+    get.mockImplementation((url: string) => url.endsWith("/render") ? Promise.resolve({ data: { data: tpl({ title: "Fitness", body: "Dear Acme" }) } }) : Promise.resolve({ data: { data: [tpl()] } }))
+    post.mockResolvedValue({ data: new Blob(["x"]) })
+    render(<WriteLetterModal patientId="p1" visits={[]} onClose={() => {}} />)
+    expect(screen.getByText(/No visit/)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText("Company"), { target: { value: "Acme (Pty) Ltd" } })
+    fireEvent.change(await screen.findByLabelText("Use a template"), { target: { value: "t1" } })
+    await waitFor(() => expect(get).toHaveBeenCalledWith("/api/v1/clinic/letter-templates/t1/render", { params: { patientId: "p1", recipientCompany: "Acme (Pty) Ltd" } }))
+    await waitFor(() => expect((screen.getByLabelText("Text") as HTMLTextAreaElement).value).toBe("Dear Acme"))
+    fireEvent.click(screen.getByRole("button", { name: "Download letter" }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clinic/patients/p1/letter", { title: "Fitness", body: "Dear Acme", recipientCompany: "Acme (Pty) Ltd" }, { responseType: "blob" }))
   })
 })

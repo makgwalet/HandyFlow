@@ -1,5 +1,5 @@
-// Write a general letter (prescription letter, fitness letter, appointment letter, ...) for one visit, from a template or
-// from scratch, and download it as a PDF. A copy is kept in the patient's documents.
+// Write a general letter (prescription letter, fitness letter, letter to an employer or school, ...) for a patient, with or without
+// a visit, optionally addressed to a person or company, from a template or from scratch, and download it as a PDF. A copy is kept in the patient's documents.
 import { useRef, useState } from "react"
 import ModalShell from "./ModalShell"
 import LetterTemplatePicker from "./LetterTemplatePicker"
@@ -8,26 +8,32 @@ import { apiClient } from "../../api/client"
 import { fmtDay } from "./briefing"
 import { BORDER, GRAY, lbl, sinp } from "./patientFile.shared"
 import { primaryBtn, smallBtn } from "./OverviewCard"
-import { MERGE_FIELDS, insertAt, mergeToken, type Kind } from "./letterView"
+import { MERGE_FIELDS, MERGE_LABEL, insertAt, mergeToken, type Kind } from "./letterView"
 
 interface Visit { id: string; consultedAt: string; chiefComplaint?: string }
 
-export default function WriteLetterModal({ visits, onClose }: { visits: Visit[]; onClose: () => void }) {
+export default function WriteLetterModal({ patientId, visits, onClose }: { patientId: string; visits: Visit[]; onClose: () => void }) {
   const [visitId, setVisitId] = useState(visits[0]?.id ?? "")
+  const [toName, setToName] = useState("")
+  const [toCompany, setToCompany] = useState("")
   const [kind, setKind] = useState<Kind>("GENERAL_LETTER")
   const [title, setTitle] = useState("")
   const [body, setBody] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const area = useRef<HTMLTextAreaElement>(null)
-  const ready = !!visitId && title.trim() !== "" && body.trim() !== "" && !busy
+  const ready = title.trim() !== "" && body.trim() !== "" && !busy
 
   const go = async () => {
     setBusy(true); setError("")
     try {
-      const res = await apiClient.post(`/api/v1/clinic/consultations/${visitId}/letter`, { title: title.trim(), body }, { responseType: "blob" } as any)
+      const payload: Record<string, string> = { title: title.trim(), body }
+      if (visitId) payload.consultationId = visitId
+      if (toName.trim()) payload.recipientName = toName.trim()
+      if (toCompany.trim()) payload.recipientCompany = toCompany.trim()
+      const res = await apiClient.post(`/api/v1/clinic/patients/${patientId}/letter`, payload, { responseType: "blob" } as any)
       const link = document.createElement("a")
-      link.href = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" })); link.download = `letter-${visitId}.pdf`; link.click()
+      link.href = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" })); link.download = `letter-${patientId}.pdf`; link.click()
       setTimeout(() => URL.revokeObjectURL(link.href), 60_000)
       onClose()
     } catch (e: any) { setError("Could not write the letter. " + (typeof e?.response?.data?.message === "string" ? e.response.data.message : "Check the title and text.")) }
@@ -44,23 +50,28 @@ export default function WriteLetterModal({ visits, onClose }: { visits: Visit[];
       footer={<><button type="button" style={smallBtn} onClick={onClose}>Cancel</button>
         <button type="button" disabled={!ready} onClick={go} style={{ ...primaryBtn, padding: "9px 18px", fontSize: 14, opacity: ready ? 1 : 0.6 }}>{busy ? "Writing…" : "Download letter"}</button></>}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {visits.length > 1 && <div><label style={lbl} htmlFor="wl-visit">Visit</label>
+        <div><label style={lbl} htmlFor="wl-visit">Visit</label>
           <select id="wl-visit" style={sinp} value={visitId} onChange={e => setVisitId(e.target.value)}>
+            <option value="">No visit (diagnosis and doctor stay blank)</option>
             {visits.map(v => <option key={v.id} value={v.id}>{fmtDay(v.consultedAt)}{v.chiefComplaint ? ` · ${v.chiefComplaint}` : ""}</option>)}
-          </select></div>}
+          </select></div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div><label style={lbl} htmlFor="wl-to-name">Addressed to (name)</label><input id="wl-to-name" style={sinp} value={toName} onChange={e => setToName(e.target.value)} placeholder="e.g. The HR Manager" /></div>
+          <div><label style={lbl} htmlFor="wl-to-company">Company</label><input id="wl-to-company" style={sinp} value={toCompany} onChange={e => setToCompany(e.target.value)} placeholder="e.g. Acme (Pty) Ltd" /></div>
+        </div>
         <div><label style={lbl} htmlFor="wl-kind">Kind of letter</label>
           <select id="wl-kind" style={sinp} value={kind} onChange={e => setKind(e.target.value as Kind)}>
             <option value="GENERAL_LETTER">General letter</option><option value="PRESCRIPTION_LETTER">Prescription letter</option>
           </select></div>
-        {visitId && <LetterTemplatePicker key={kind} kind={kind} consultationId={visitId} onApply={t => { setTitle(t.title ?? ""); setBody(t.body ?? "") }} />}
+        <LetterTemplatePicker key={`${kind}-${visitId}-${toName}-${toCompany}`} kind={kind} consultationId={visitId || undefined} patientId={patientId} recipientName={toName} recipientCompany={toCompany} onApply={t => { setTitle(t.title ?? ""); setBody(t.body ?? "") }} />
         <div><label style={lbl} htmlFor="wl-title">Title</label><input id="wl-title" style={sinp} value={title} onChange={e => setTitle(e.target.value)} /></div>
         <div><label style={lbl} htmlFor="wl-body">Text</label>
           <textarea id="wl-body" ref={area} rows={9} style={{ ...sinp, resize: "vertical" }} value={body} onChange={e => setBody(e.target.value)} />
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }} aria-label="Insert a merge field">
-            {MERGE_FIELDS.map(f => <button key={f} type="button" onClick={() => putField(f)}
+            {MERGE_FIELDS.map(f => <button key={f} type="button" title={MERGE_LABEL[f]} onClick={() => putField(f)}
               style={{ padding: "2px 8px", borderRadius: 20, border: `1px solid ${BORDER}`, background: "transparent", fontSize: 11, color: GRAY, cursor: "pointer" }}>{mergeToken(f)}</button>)}
           </div>
-          <div style={{ fontSize: 11, color: GRAY, marginTop: 4 }}>Merge fields are filled in when a template is applied. Fields you type yourself must be filled in before the letter can be written.</div>
+          <div style={{ fontSize: 11, color: GRAY, marginTop: 4 }}>{"Merge fields (hover for what each one is) are filled in when the letter is written, so typing {{patient.name}} in a letter becomes the patient's name."}</div>
         </div>
         <SaveAsTemplate kind={kind} payload={() => ({ title: title.trim() || undefined, body: body.trim() || undefined })} />
         {error && <div role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}

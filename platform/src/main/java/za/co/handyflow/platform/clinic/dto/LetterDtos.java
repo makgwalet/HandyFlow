@@ -14,7 +14,8 @@ public final class LetterDtos {
     /** A template with its merge fields filled in for one visit. */
     public record RenderedTemplate(UUID id, String kind, String name, String title, String body, String specialty, String urgency, Integer unfitDays) {}
 
-    public record LetterRequest(String title, String body) {}
+    /** {@code recipientName} and {@code recipientCompany} address the letter (an employer, a school, a scheme); both are optional. */
+    public record LetterRequest(String title, String body, String recipientName, String recipientCompany, UUID consultationId) {}
 
     public record MergeFields(List<String> names) {}
 }

@@ -129,7 +129,7 @@ export default function DocumentsTab({ patient, consultations }: { patient: Pati
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {canSick && latest && <button type="button" style={smallBtn} onClick={() => setModal("sick")}>Issue sick note</button>}
           {canRef && latest && <button type="button" style={smallBtn} onClick={() => setModal("referral")}>Write referral</button>}
-          {canUpload && latest && <button type="button" style={smallBtn} onClick={() => setModal("letter")}>Write letter</button>}
+          {canUpload && <button type="button" style={smallBtn} onClick={() => setModal("letter")}>Write letter</button>}
           {canUpload && <button type="button" style={smallBtn} onClick={() => setModal("templates")}>Letter templates</button>}
           {canUpload && <button type="button" style={primaryBtn} onClick={() => setModal("upload")}><Upload size={13} /> Upload document</button>}
         </div>
@@ -171,7 +171,7 @@ export default function DocumentsTab({ patient, consultations }: { patient: Pati
       {modal === "upload" && <UploadModal patientId={patient.id} consultations={consultations} onClose={() => setModal(null)} />}
       {modal === "sick" && latest && <SickNoteModal patientId={patient.id} list={consultations.map(c => ({ id: c.id, consultedAt: c.consultedAt, chiefComplaint: c.chiefComplaint }))} onClose={() => { setModal(null); reload() }} />}
       {modal === "referral" && latest && <ReferralLetterModal consultationId={latest.id} onClose={() => { setModal(null); reload() }} />}
-      {modal === "letter" && latest && <WriteLetterModal visits={consultations.map(c => ({ id: c.id, consultedAt: c.consultedAt, chiefComplaint: c.chiefComplaint }))} onClose={() => { setModal(null); reload() }} />}
+      {modal === "letter" && <WriteLetterModal patientId={patient.id} visits={consultations.map(c => ({ id: c.id, consultedAt: c.consultedAt, chiefComplaint: c.chiefComplaint }))} onClose={() => { setModal(null); reload() }} />}
       {modal === "templates" && <LetterTemplatesManager onClose={() => setModal(null)} />}
       {removing && <RemoveModal patientId={patient.id} item={removing} onClose={() => setRemoving(null)} />}
     </div>

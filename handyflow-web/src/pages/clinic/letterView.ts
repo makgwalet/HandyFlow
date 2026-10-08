@@ -17,7 +17,15 @@ export const FIELDS: Record<Kind, { title: string | null; body: string | null; t
   GENERAL_LETTER: { title: "Letter title", body: "Letter text" },
 }
 
-export const MERGE_FIELDS = ["patient.name", "patient.firstName", "patient.dob", "visit.date", "visit.reason", "doctor.name", "practice.name", "today"]
+/** What each merge field is filled with. Visit and doctor fields show a dash when the letter has no visit. */
+export const MERGE_LABEL: Record<string, string> = {
+  "patient.name": "Patient's full name", "patient.firstName": "Patient's first name", "patient.lastName": "Patient's surname",
+  "patient.dob": "Date of birth", "patient.age": "Age", "patient.idNumber": "ID or passport number", "patient.phone": "Phone", "patient.address": "Home address",
+  "visit.date": "Visit date", "visit.reason": "Reason for the visit", "visit.diagnosis": "Diagnosis (the sickness)", "visit.treatment": "Treatment plan",
+  "doctor.name": "Doctor", "doctor.hpcsa": "Doctor's HPCSA number", "doctor.practiceNumber": "Doctor's practice number",
+  "practice.name": "Practice name", "today": "Today's date", "recipient.name": "Addressed to (name)", "recipient.company": "Addressed to (company)",
+}
+export const MERGE_FIELDS = Object.keys(MERGE_LABEL)
 export const mergeToken = (f: string) => `{{${f}}}`
 
 export function addDays(date: string, days: number): string {

@@ -80,15 +80,21 @@ public class ClinicPatientDocumentService {
     /** A sick note or referral letter has just been issued: keep a copy in the register. Never blocks issuing it. */
     @Transactional
     public void recordIssued(TenantId t, UUID consultationId, String type, String title, byte[] pdf) {
+        ClinicConsultation c = consultationRepo.findActiveById(t, consultationId).orElse(null);
+        if (c == null) return;
+        recordIssuedFor(t, c.getPatientId(), consultationId, type, title, pdf);
+    }
+
+    /** Same, for a letter that may have no visit ({@code consultationId} null). */
+    @Transactional
+    public void recordIssuedFor(TenantId t, UUID patientId, UUID consultationId, String type, String title, byte[] pdf) {
         try {
             if (pdf == null || pdf.length == 0 || !DocumentRules.ISSUED_TYPES.contains(type)) return;
-            ClinicConsultation c = consultationRepo.findActiveById(t, consultationId).orElse(null);
-            if (c == null) return;
             LocalDate today = LocalDate.now(AppointmentRules.CLINIC_ZONE);
             if (title.length() > DocumentRules.TITLE_MAX) title = title.substring(0, DocumentRules.TITLE_MAX);
             String name = DocumentRules.safeName(title, "application/pdf");
-            String key = store(t, c.getPatientId(), name, "application/pdf", pdf);
-            documentRepo.save(ClinicPatientDocument.create(t, c.getPatientId(), consultationId, type, "ISSUED", title, today, null,
+            String key = store(t, patientId, name, "application/pdf", pdf);
+            documentRepo.save(ClinicPatientDocument.create(t, patientId, consultationId, type, "ISSUED", title, today, null,
                     key, name, "application/pdf", pdf.length, currentUserOrNull()));
         } catch (RuntimeException e) {
             log.warn("Could not keep a copy of the issued {} for consultation {}: {}", type, consultationId, e.getMessage());
