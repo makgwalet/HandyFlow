@@ -24,7 +24,7 @@ public class ClinicPatientNoteController {
     private final ClinicPatientNoteService notes;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_NOTE_READ')")
     @Operation(summary = "Open notes and alerts for the patient; includeResolved=true adds the resolved ones")
     public ResponseEntity<ApiResponse<List<NoteResponse>>> list(@PathVariable UUID patientId,
                                                                 @RequestParam(defaultValue = "false") boolean includeResolved) {
@@ -33,7 +33,7 @@ public class ClinicPatientNoteController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_NOTE_CREATE')")
     @Operation(summary = "Add a note or an alert")
     public ResponseEntity<ApiResponse<NoteResponse>> create(@PathVariable UUID patientId, @RequestBody CreateNoteRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -41,7 +41,7 @@ public class ClinicPatientNoteController {
     }
 
     @PostMapping("/{noteId}/resolve")
-    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_NOTE_UPDATE')")
     @Operation(summary = "Mark a note or alert as no longer applying (it stays on record)")
     public ResponseEntity<ApiResponse<NoteResponse>> resolve(@PathVariable UUID patientId, @PathVariable UUID noteId) {
         return ResponseEntity.ok(ApiResponse.success("Success",

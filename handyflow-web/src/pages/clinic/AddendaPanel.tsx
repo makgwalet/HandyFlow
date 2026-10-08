@@ -3,13 +3,13 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { useCan } from "./clinicAccess"
 
 interface Addendum { id: string; text: string; createdAt: string }
 
 export default function AddendaPanel({ consultationId, status }: { consultationId: string; status?: string }) {
   const qc = useQueryClient()
-  const canWrite = usePermission("CLINIC_CLINICAL_WRITE")
+  const canWrite = useCan("addendum")
   const [text, setText] = useState("")
   const [error, setError] = useState("")
 

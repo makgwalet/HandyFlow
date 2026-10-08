@@ -4,7 +4,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { useCan } from "./clinicAccess"
 
 export interface PatientNote {
   id: string; kind: "NOTE" | "ALERT"; severity?: "INFO" | "WARNING" | "CRITICAL" | null; body: string
@@ -49,7 +49,7 @@ export function PatientAlertBanner({ patientId }: { patientId: string }) {
 
 export default function PatientNotesPanel({ patientId }: { patientId: string }) {
   const qc = useQueryClient()
-  const canWrite = usePermission("CLINIC_CLINICAL_WRITE")
+  const canWrite = useCan("addNote")
   const { data, isError } = useNotes(patientId)
   const [kind, setKind] = useState<"NOTE" | "ALERT">("NOTE")
   const [severity, setSeverity] = useState("WARNING")

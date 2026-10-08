@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { useCan } from "./clinicAccess"
 
 interface LabRow {
   id: string; patientId?: string | null; patientNameRaw?: string | null; labReference?: string | null; source: string
@@ -160,7 +160,7 @@ function MatchBox({ result, onClose }: { result: LabRow; onClose: () => void }) 
 
 export default function LabInboxTab() {
   const qc = useQueryClient()
-  const canWrite = usePermission("CLINIC_LAB_WRITE")
+  const canWrite = useCan("reviewResult")
   const [status, setStatus] = useState("UNREVIEWED")
   const [open, setOpen] = useState<{ id: string; mode: "markers" | "match" } | null>(null)
   const [error, setError] = useState("")

@@ -4,7 +4,7 @@
 // as "nothing to do".
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { useCan } from "./clinicAccess"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 
@@ -13,7 +13,7 @@ export const countStatus = (items: QueueItem[] | undefined, status: string) =>
   items ? items.filter(i => i.status === status).length : undefined
 
 export default function MyDayPanel({ onNavigate }: { onNavigate: (section: string) => void }) {
-  const canWrite = usePermission("CLINIC_CLINICAL_WRITE")
+  const canWrite = useCan("startConsultation")
   const drafts = useQuery<any[]>({
     queryKey: ["clinic-myday-drafts"], enabled: canWrite, retry: false,
     queryFn: async () => unwrap(await apiClient.get("/api/v1/clinic/consultations/drafts?mine=true")) ?? [],

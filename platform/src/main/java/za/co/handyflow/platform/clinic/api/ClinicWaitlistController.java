@@ -29,7 +29,7 @@ public class ClinicWaitlistController {
     private final ClinicWaitlistService waitlistService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_APPOINTMENT_READ')")
     @Operation(summary = "List active waitlist entries")
     public ResponseEntity<ApiResponse<List<WaitlistEntryResponse>>> getWaitlist() {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -37,7 +37,7 @@ public class ClinicWaitlistController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_APPOINTMENT_CREATE')")
     @Operation(summary = "Add a patient to the waitlist")
     public ResponseEntity<ApiResponse<WaitlistEntryResponse>> addToWaitlist(
             @Valid @RequestBody CreateWaitlistEntryRequest req) {
@@ -46,7 +46,7 @@ public class ClinicWaitlistController {
     }
 
     @PostMapping("/{id}/contacted")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_APPOINTMENT_UPDATE')")
     @Operation(summary = "Mark a waitlist entry as contacted")
     public ResponseEntity<ApiResponse<Void>> markContacted(@PathVariable UUID id) {
         waitlistService.markContacted(TenantContext.getTenantIdAsObject(), id);
@@ -54,7 +54,7 @@ public class ClinicWaitlistController {
     }
 
     @PostMapping("/{id}/scheduled")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_APPOINTMENT_UPDATE')")
     @Operation(summary = "Mark a waitlist entry as scheduled — remove from the active list")
     public ResponseEntity<ApiResponse<Void>> markScheduled(@PathVariable UUID id) {
         waitlistService.markScheduled(TenantContext.getTenantIdAsObject(), id);
@@ -62,7 +62,7 @@ public class ClinicWaitlistController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_APPOINTMENT_UPDATE')")
     @Operation(summary = "Remove a patient from the waitlist")
     public ResponseEntity<ApiResponse<Void>> cancel(@PathVariable UUID id) {
         waitlistService.cancel(TenantContext.getTenantIdAsObject(), id);

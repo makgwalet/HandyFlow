@@ -3,7 +3,7 @@
 // server with who did it; the server refuses once every authorised fill is used.
 import { useState } from "react"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { useCan } from "./clinicAccess"
 
 export interface RxFillInfo { id: string; repeats: number; dispensed: boolean; fillsUsed?: number; fillsRemaining?: number }
 
@@ -15,7 +15,7 @@ export function fillSummary(rx: RxFillInfo): { used: number; total: number; rema
 }
 
 export default function RxFillControl({ rx, onRecorded }: { rx: RxFillInfo; onRecorded: () => void }) {
-  const canFill = usePermission("CLINIC_PRESCRIPTION_WRITE")
+  const canFill = useCan("dispense")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const { used, total, remaining } = fillSummary(rx)

@@ -10,7 +10,7 @@ import { vitalsLine } from "./consultWizard"
 import { toNotes, workspacePath, type ConsultationLike } from "./workspace"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { useCan } from "./clinicAccess"
 import QuestionAnswersReadOnly from "./QuestionAnswersReadOnly"
 import QuestionForm from "./QuestionForm"
 
@@ -51,7 +51,7 @@ export default function HandoffQueueTab() {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const { confirm, dialogs } = useDialogs()
-  const canSign = usePermission("CLINIC_CLINICAL_SIGN")  // doctor actions
+  const canSign = useCan("acceptHandoff")  // doctor actions
   const [error, setError] = useState("")
   const [returning, setReturning] = useState<QueueItem | null>(null)
   const [reason, setReason] = useState("MISSING_OBSERVATIONS")

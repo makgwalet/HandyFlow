@@ -54,7 +54,7 @@ public class ClinicController {
     // FIX #1 — removed duplicate @GetMapping("/patients").
     // Only the extended version with principalId / includeArchived params is kept.
     @GetMapping("/patients")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_PATIENT_READ')")
     @Operation(summary = "List patients — filter by search, principalId, archived status")
     public ResponseEntity<ApiResponse<Page<PatientResponse>>> getPatients(
             @RequestParam(required = false) String search,
@@ -67,7 +67,7 @@ public class ClinicController {
     }
 
     @GetMapping("/patients/duplicate-check")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_PATIENT_READ')")
     @Operation(summary = "Possible existing patients (same ID number, or same name and date of birth) to show before creating one")
     public ResponseEntity<ApiResponse<List<ClinicPatientIdentityService.Candidate>>> duplicateCheck(
             @RequestParam(required = false) String idNumber,
@@ -79,7 +79,7 @@ public class ClinicController {
     }
 
     @GetMapping("/patients/id-number/validate")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_PATIENT_READ')")
     @Operation(summary = "Check an SA ID number; returns date of birth and sex digit when valid (a hint, not a record)")
     public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> validateIdNumber(@RequestParam String value) {
         String problem = za.co.handyflow.platform.clinic.domain.model.SaIdNumber.problem(value);
@@ -97,7 +97,7 @@ public class ClinicController {
     }
 
     @GetMapping("/patients/{id}")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_PATIENT_READ')")
     @Operation(summary = "Get a single patient by ID")
     public ResponseEntity<ApiResponse<PatientResponse>> getPatient(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -105,7 +105,7 @@ public class ClinicController {
     }
 
     @PostMapping("/patients")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_PATIENT_CREATE')")
     @Operation(summary = "Register a new patient")
     public ResponseEntity<ApiResponse<PatientResponse>> createPatient(
             @Valid @RequestBody CreatePatientRequest req) {
@@ -114,7 +114,7 @@ public class ClinicController {
     }
 
     @PatchMapping("/patients/{id}")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_PATIENT_UPDATE')")
     @Operation(summary = "Partial update — account type, active status, archive, family linkage")
     public ResponseEntity<ApiResponse<PatientResponse>> patchPatient(
             @PathVariable UUID id,
@@ -124,7 +124,7 @@ public class ClinicController {
     }
 
     @GetMapping("/patients/{id}/family")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_PATIENT_RELATIONSHIP_READ')")
     @Operation(summary = "Get all family members linked to this patient")
     public ResponseEntity<ApiResponse<List<PatientResponse>>> getFamily(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -134,7 +134,7 @@ public class ClinicController {
     // ── Practitioners ─────────────────────────────────────────────────────────
 
     @GetMapping("/practitioners")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_PRACTITIONER_READ')")
     @Operation(summary = "List practitioners (paginated)")
     public ResponseEntity<ApiResponse<Page<PractitionerResponse>>> getPractitioners(Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -142,7 +142,7 @@ public class ClinicController {
     }
 
     @GetMapping("/practitioners/list")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_PRACTITIONER_READ')")
     @Operation(summary = "Get all active practitioners as a flat list for dropdowns")
     public ResponseEntity<ApiResponse<List<PractitionerResponse>>> getPractitionersList() {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -150,7 +150,7 @@ public class ClinicController {
     }
 
     @PostMapping("/practitioners")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_PRACTITIONER_MANAGE')")
     @Operation(summary = "Register a practitioner (doctor, physio, dentist, etc.)")
     public ResponseEntity<ApiResponse<PractitionerResponse>> createPractitioner(
             @Valid @RequestBody CreatePractitionerRequest req) {
@@ -161,7 +161,7 @@ public class ClinicController {
     // ── Appointments ──────────────────────────────────────────────────────────
 
     @GetMapping("/appointments")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_APPOINTMENT_READ')")
     @Operation(summary = "List appointments, optionally filter by status")
     public ResponseEntity<ApiResponse<Page<AppointmentResponse>>> getAppointments(
             @RequestParam(required = false) String status, Pageable pageable) {
@@ -170,7 +170,7 @@ public class ClinicController {
     }
 
     @GetMapping("/appointments/range")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_APPOINTMENT_READ')")
     @Operation(summary = "Appointments starting within [from, to) — for calendar views")
     public ResponseEntity<ApiResponse<List<AppointmentResponse>>> getAppointmentsInRange(
             @RequestParam java.time.Instant from, @RequestParam java.time.Instant to) {
@@ -179,7 +179,7 @@ public class ClinicController {
     }
 
     @GetMapping("/appointments/{id}")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_APPOINTMENT_READ')")
     @Operation(summary = "One appointment")
     public ResponseEntity<ApiResponse<AppointmentResponse>> getAppointment(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -187,7 +187,7 @@ public class ClinicController {
     }
 
     @GetMapping("/appointments/{id}/consultation")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_APPOINTMENT_READ')")
     @Operation(summary = "The unsigned consultation for an appointment (draft, nurse handoff or doctor review); 404 when none is open")
     public ResponseEntity<ApiResponse<ConsultationResponse>> getOpenConsultation(@PathVariable UUID id) {
         return clinicService.getOpenConsultationForAppointment(TenantContext.getTenantIdAsObject(), id)
@@ -196,7 +196,7 @@ public class ClinicController {
     }
 
     @GetMapping("/patients/{patientId}/appointments")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_APPOINTMENT_READ')")
     @Operation(summary = "Get all appointments for a specific patient")
     public ResponseEntity<ApiResponse<List<AppointmentResponse>>> getPatientAppointments(
             @PathVariable UUID patientId) {
@@ -205,7 +205,7 @@ public class ClinicController {
     }
 
     @PostMapping("/appointments")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_APPOINTMENT_CREATE')")
     @Operation(summary = "Book an appointment for a patient. Refused with 409 when the practitioner already has an overlapping booking, unless allowOverlap=true.")
     public ResponseEntity<ApiResponse<AppointmentResponse>> createAppointment(
             @Valid @RequestBody CreateAppointmentRequest req,
@@ -215,7 +215,7 @@ public class ClinicController {
     }
 
     @PostMapping("/appointments/{id}/reschedule")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_APPOINTMENT_RESCHEDULE')")
     @Operation(summary = "Move a SCHEDULED or CONFIRMED appointment. Refused with 409 when the practitioner already has an overlapping booking, unless allowOverlap=true.")
     public ResponseEntity<ApiResponse<AppointmentResponse>> rescheduleAppointment(
             @PathVariable UUID id,
@@ -226,7 +226,7 @@ public class ClinicController {
     }
 
     @PostMapping("/appointments/{id}/{action}")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_APPOINTMENT_UPDATE')")
     @Operation(summary = "Update appointment status: confirm | start | complete | cancel | no_show")
     public ResponseEntity<ApiResponse<AppointmentResponse>> updateAppointmentStatus(
             @PathVariable UUID id, @PathVariable String action) {
@@ -241,7 +241,7 @@ public class ClinicController {
      * the nightly ClinicAppointmentReminderScheduler.
      */
     @PostMapping("/appointments/{id}/send-reminder")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_APPOINTMENT_UPDATE')")
     @Operation(summary = "Manually send (or re-send) the appointment reminder email now")
     public ResponseEntity<ApiResponse<Void>> sendAppointmentReminder(@PathVariable UUID id) {
         appointmentReminderService.sendReminder(id);
@@ -255,7 +255,7 @@ public class ClinicController {
      * the same room.
      */
     @PostMapping("/appointments/{id}/video-room")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_TELEHEALTH_ROOM_CREATE')")
     @Operation(summary = "Get or create the video call room for a telehealth appointment")
     public ResponseEntity<ApiResponse<java.util.Map<String, String>>> getVideoRoom(@PathVariable UUID id) {
         String url = telehealthService.getOrCreateVideoRoom(TenantContext.getTenantIdAsObject(), id);
@@ -266,7 +266,7 @@ public class ClinicController {
     // ── Consultations ─────────────────────────────────────────────────────────
 
     @GetMapping("/patients/{patientId}/consultations")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_CONSULTATION_READ')")
     @Operation(summary = "Get full consultation history for a patient")
     public ResponseEntity<ApiResponse<List<ConsultationResponse>>> getPatientConsultations(
             @PathVariable UUID patientId) {
@@ -275,7 +275,7 @@ public class ClinicController {
     }
 
     @PostMapping("/patients/{patientId}/consultations")
-    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CONSULTATION_CREATE')")
     @Operation(summary = "Record a consultation with vitals, clinical notes and diagnosis")
     public ResponseEntity<ApiResponse<ConsultationResponse>> createConsultation(
             @PathVariable UUID patientId,
@@ -285,7 +285,7 @@ public class ClinicController {
     }
 
     @PatchMapping("/consultations/{id}")
-    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CONSULTATION_UPDATE')")
     @Operation(summary = "Partial update of a consultation (autosave target); null fields are left unchanged")
     public ResponseEntity<ApiResponse<ConsultationResponse>> patchConsultation(
             @PathVariable UUID id,
@@ -295,7 +295,7 @@ public class ClinicController {
     }
 
     @PostMapping("/patients/{patientId}/consultations/draft")
-    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CONSULTATION_CREATE')")
     @Operation(summary = "Start a persisted DRAFT consultation (no appointment completion, no email)")
     public ResponseEntity<ApiResponse<ConsultationResponse>> createDraftConsultation(
             @PathVariable UUID patientId,
@@ -305,7 +305,7 @@ public class ClinicController {
     }
 
     @GetMapping("/consultations/drafts")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_CONSULTATION_READ')")
     @Operation(summary = "Open DRAFT consultations for the tenant (drafts tray)")
     public ResponseEntity<ApiResponse<List<ConsultationResponse>>> getDraftConsultations(
             @RequestParam(defaultValue = "false") boolean mine) {
@@ -314,7 +314,7 @@ public class ClinicController {
     }
 
     @GetMapping("/consultations/{id}/edits")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_CONSULTATION_READ')")
     @Operation(summary = "Edit history of a consultation (previous versions, newest first)")
     public ResponseEntity<ApiResponse<List<ConsultationEditResponse>>> getConsultationEdits(
             @PathVariable UUID id) {
@@ -323,7 +323,7 @@ public class ClinicController {
     }
 
     @PostMapping("/consultations/{id}/sign")
-    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_SIGN')")
+    @PreAuthorize("hasAuthority('CLINIC_CONSULTATION_SIGN')")
     @Operation(summary = "Sign a DRAFT consultation: completes the appointment (no automatic email, see DEC-CLINIC-002)")
     public ResponseEntity<ApiResponse<ConsultationResponse>> signConsultation(
             @PathVariable UUID id, @RequestBody(required = false) SignRequest body) {
@@ -333,7 +333,7 @@ public class ClinicController {
     }
 
     @PostMapping("/consultations/{id}/abandon")
-    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CONSULTATION_UPDATE')")
     @Operation(summary = "Abandon a DRAFT consultation")
     public ResponseEntity<ApiResponse<Void>> abandonConsultation(@PathVariable UUID id) {
         clinicService.abandonConsultation(TenantContext.getTenantIdAsObject(), id);
@@ -343,7 +343,7 @@ public class ClinicController {
     // ── Prescriptions ─────────────────────────────────────────────────────────
 
     @GetMapping("/consultations/{consultationId}/prescriptions")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_PRESCRIPTION_READ')")
     @Operation(summary = "Get prescriptions issued in a consultation")
     public ResponseEntity<ApiResponse<List<PrescriptionResponse>>> getPrescriptions(
             @PathVariable UUID consultationId) {
@@ -352,7 +352,7 @@ public class ClinicController {
     }
 
     @PostMapping("/prescriptions/{id}/fills")
-    @PreAuthorize("hasAuthority('CLINIC_PRESCRIPTION_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_PRESCRIPTION_DISPENSE')")
     @Operation(summary = "Record a fill (the original supply or one authorised repeat); refused when all fills are used")
     public ResponseEntity<ApiResponse<FillDtos.FillResponse>> recordFill(
             @PathVariable UUID id, @RequestBody(required = false) FillDtos.FillRequest body) {
@@ -361,7 +361,7 @@ public class ClinicController {
     }
 
     @GetMapping("/prescriptions/{id}/fills")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_PRESCRIPTION_READ')")
     @Operation(summary = "Fills recorded against a prescription")
     public ResponseEntity<ApiResponse<List<FillDtos.FillResponse>>> fills(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -369,7 +369,7 @@ public class ClinicController {
     }
 
     @GetMapping("/consultations/{id}/allergy-snapshot")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_ALLERGY_READ')")
     @Operation(summary = "Allergies on record when the consultation was signed (not captured for older consultations)")
     public ResponseEntity<ApiResponse<AllergySnapshotResponse>> allergySnapshot(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -377,7 +377,7 @@ public class ClinicController {
     }
 
     @PostMapping("/consultations/{consultationId}/prescriptions/allergy-check")
-    @PreAuthorize("hasAuthority('CLINIC_PRESCRIPTION_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_PRESCRIPTION_CREATE')")
     @Operation(summary = "Compare a medicine name with the patient's recorded allergies (name match only; a prompt, not clearance)")
     public ResponseEntity<ApiResponse<AllergyCheckResponse>> checkAllergies(
             @PathVariable UUID consultationId, @RequestBody Map<String, String> body) {
@@ -386,7 +386,7 @@ public class ClinicController {
     }
 
     @PostMapping("/consultations/{consultationId}/prescriptions")
-    @PreAuthorize("hasAuthority('CLINIC_PRESCRIPTION_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_PRESCRIPTION_CREATE')")
     @Operation(summary = "Add a prescription to a consultation")
     public ResponseEntity<ApiResponse<PrescriptionResponse>> addPrescription(
             @PathVariable UUID consultationId,
@@ -398,7 +398,7 @@ public class ClinicController {
     // ── Medical Certificate PDF ───────────────────────────────────────────────
 
     @PostMapping("/consultations/{id}/medical-certificate")
-    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_SIGN')")
+    @PreAuthorize("hasAuthority('CLINIC_SICK_NOTE_SIGN')")
     @Operation(summary = "Generate a medical certificate PDF for a consultation")
     public ResponseEntity<byte[]> generateMedicalCertificate(
             @PathVariable UUID id,
@@ -417,7 +417,7 @@ public class ClinicController {
     // supplied at generation time, nothing stored).
 
     @PostMapping("/consultations/{id}/referral-letter")
-    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_SIGN')")
+    @PreAuthorize("hasAuthority('CLINIC_REFERRAL_SIGN')")
     @Operation(summary = "Generate a referral letter PDF for a consultation")
     public ResponseEntity<byte[]> generateReferralLetter(
             @PathVariable UUID id,
@@ -434,7 +434,7 @@ public class ClinicController {
     // ── Prescription PDF ──────────────────────────────────────────────────────
 
     @GetMapping("/consultations/{id}/prescription-pdf")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_PRESCRIPTION_READ')")
     @Operation(summary = "Download prescription PDF for a consultation")
     public ResponseEntity<byte[]> generatePrescriptionPdf(@PathVariable UUID id) {
         byte[] pdf = clinicPdfService.generatePrescription(
@@ -448,7 +448,7 @@ public class ClinicController {
     // this codebase never generated despite capturing the underlying data.
 
     @GetMapping("/consultations/{id}/summary-pdf")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_CONSULTATION_READ')")
     @Operation(summary = "Download a visit/consultation summary PDF")
     public ResponseEntity<byte[]> generateConsultationSummaryPdf(@PathVariable UUID id) {
         byte[] pdf = consultationSummaryPdfService.generate(TenantContext.getTenantIdAsObject(), id);
@@ -458,7 +458,7 @@ public class ClinicController {
     // ── Medication Catalogue ──────────────────────────────────────────────────
 
     @GetMapping("/medications")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_CATALOGUE_READ')")
     @Operation(summary = "Search NAPPI medication catalogue — used for prescription autocomplete")
     public ResponseEntity<ApiResponse<List<ClinicMedicationCatalogue>>> searchMedications(
             @RequestParam(required = false, defaultValue = "") String search) {
@@ -485,7 +485,7 @@ public class ClinicController {
     // which is seeded from the NRPL gazette (V79). Rate changes only need a DB update.
 
     @GetMapping("/procedures")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_CATALOGUE_READ')")
     @Operation(summary = "Search NRPL procedure tariff catalogue")
     public ResponseEntity<ApiResponse<List<za.co.handyflow.platform.clinic.domain.model.ClinicProcedureCatalogue>>> getProcedures(
             @RequestParam(required = false) String search,

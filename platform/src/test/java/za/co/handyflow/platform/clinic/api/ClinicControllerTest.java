@@ -72,7 +72,7 @@ class ClinicControllerTest {
     // ── GET /patients ─────────────────────────────────────────────────────────
 
     @Test
-    @WithMockUser(authorities = "CLINIC_READ")
+    @WithMockUser(authorities = "CLINIC_PATIENT_READ")
     @DisplayName("GET /patients returns 200 with paginated patients")
     void getPatientsReturns200() throws Exception {
         var patient = patientResponse(UUID.randomUUID(), "Jane", "Dlamini");
@@ -88,7 +88,7 @@ class ClinicControllerTest {
     }
 
     @Test
-    @WithMockUser(authorities = "CLINIC_READ")
+    @WithMockUser(authorities = "CLINIC_PATIENT_READ")
     @DisplayName("GET /patients?search= delegates search parameter")
     void getPatientsWithSearch() throws Exception {
         when(clinicService.getPatients(any(), eq("nkosi"), any(), anyBoolean(), any()))
@@ -108,7 +108,7 @@ class ClinicControllerTest {
     }
 
     @Test
-    @WithMockUser(authorities = "CLINIC_READ")
+    @WithMockUser(authorities = "CLINIC_PATIENT_READ")
     @DisplayName("GET /patients/{id} returns 200 with patient")
     void getPatientByIdReturns200() throws Exception {
         var id      = UUID.randomUUID();
@@ -124,7 +124,7 @@ class ClinicControllerTest {
     // ── POST /patients ────────────────────────────────────────────────────────
 
     @Test
-    @WithMockUser(authorities = "CLINIC_READ")
+    @WithMockUser(authorities = "CLINIC_APPOINTMENT_READ")
     @DisplayName("GET /appointments/range returns 200")
     void getAppointmentsInRangeReturns200() throws Exception {
         when(clinicService.getAppointmentsInRange(any(), any(), any()))
@@ -137,7 +137,7 @@ class ClinicControllerTest {
     }
 
     @Test
-    @WithMockUser(authorities = "CLINIC_WRITE")
+    @WithMockUser(authorities = "CLINIC_PATIENT_CREATE")
     @DisplayName("POST /patients returns 201 with created patient")
     void createPatientReturns201() throws Exception {
         var id = UUID.randomUUID();
@@ -154,8 +154,8 @@ class ClinicControllerTest {
     }
 
     @Test
-    @WithMockUser(authorities = "CLINIC_READ")  // READ only, not WRITE
-    @DisplayName("POST /patients with only CLINIC_READ returns 403")
+    @WithMockUser(authorities = "CLINIC_PATIENT_READ")  // read-only permission, not create
+    @DisplayName("POST /patients with only CLINIC_PATIENT_READ returns 403")
     void createPatientWithReadOnlyReturns403() throws Exception {
         mvc.perform(post(BASE + "/patients").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -166,7 +166,7 @@ class ClinicControllerTest {
     // ── PATCH /patients/{id} ──────────────────────────────────────────────────
 
     @Test
-    @WithMockUser(authorities = "CLINIC_WRITE")
+    @WithMockUser(authorities = "CLINIC_PATIENT_UPDATE")
     @DisplayName("PATCH /patients/{id} returns 200")
     void patchPatientReturns200() throws Exception {
         var id = UUID.randomUUID();
@@ -182,7 +182,7 @@ class ClinicControllerTest {
     // ── GET /patients/{id}/family ─────────────────────────────────────────────
 
     @Test
-    @WithMockUser(authorities = "CLINIC_READ")
+    @WithMockUser(authorities = "CLINIC_PATIENT_RELATIONSHIP_READ")
     @DisplayName("GET /patients/{id}/family returns 200 with list")
     void getFamilyReturns200() throws Exception {
         var id = UUID.randomUUID();
@@ -199,7 +199,7 @@ class ClinicControllerTest {
     // ── Appointments ──────────────────────────────────────────────────────────
 
     @Test
-    @WithMockUser(authorities = "CLINIC_READ")
+    @WithMockUser(authorities = "CLINIC_APPOINTMENT_READ")
     @DisplayName("GET /appointments returns 200")
     void getAppointmentsReturns200() throws Exception {
         when(clinicService.getAppointments(any(), any(), any()))
@@ -210,7 +210,7 @@ class ClinicControllerTest {
     }
 
     @Test
-    @WithMockUser(authorities = "CLINIC_WRITE")
+    @WithMockUser(authorities = "CLINIC_APPOINTMENT_UPDATE")
     @DisplayName("POST /appointments/{id}/confirm returns 200")
     void confirmAppointmentReturns200() throws Exception {
         var id = UUID.randomUUID();
@@ -228,7 +228,7 @@ class ClinicControllerTest {
     // ── Consultations ─────────────────────────────────────────────────────────
 
     @Test
-    @WithMockUser(authorities = "CLINIC_READ")
+    @WithMockUser(authorities = "CLINIC_CONSULTATION_READ")
     @DisplayName("GET /patients/{id}/consultations returns 200")
     void getPatientConsultationsReturns200() throws Exception {
         var patientId = UUID.randomUUID();
@@ -241,7 +241,7 @@ class ClinicControllerTest {
     }
 
     @Test
-    @WithMockUser(authorities = "CLINIC_CLINICAL_WRITE")
+    @WithMockUser(authorities = "CLINIC_CONSULTATION_CREATE")
     @DisplayName("POST /patients/{id}/consultations returns 201")
     void createConsultationReturns201() throws Exception {
         var patientId = UUID.randomUUID();
@@ -269,7 +269,7 @@ class ClinicControllerTest {
     // ── Medications ───────────────────────────────────────────────────────────
 
     @Test
-    @WithMockUser(authorities = "CLINIC_READ")
+    @WithMockUser(authorities = "CLINIC_CATALOGUE_READ")
     @DisplayName("GET /medications?search= returns matching medications")
     void searchMedicationsReturns200() throws Exception {
         var med = new ClinicMedicationCatalogue();
@@ -284,7 +284,7 @@ class ClinicControllerTest {
     // ── Sign override + appointment lookups (workspace) ───────────────────────
 
     @Test
-    @WithMockUser(authorities = "CLINIC_CLINICAL_SIGN")
+    @WithMockUser(authorities = "CLINIC_CONSULTATION_SIGN")
     @DisplayName("POST /consultations/{id}/sign passes the override reason through")
     void signWithOverrideReason() throws Exception {
         var id = UUID.randomUUID();
@@ -297,7 +297,7 @@ class ClinicControllerTest {
     }
 
     @Test
-    @WithMockUser(authorities = "CLINIC_CLINICAL_SIGN")
+    @WithMockUser(authorities = "CLINIC_CONSULTATION_SIGN")
     @DisplayName("POST /consultations/{id}/sign without a body signs with a null reason")
     void signWithoutBody() throws Exception {
         var id = UUID.randomUUID();
@@ -308,7 +308,7 @@ class ClinicControllerTest {
     }
 
     @Test
-    @WithMockUser(authorities = "CLINIC_CLINICAL_WRITE")
+    @WithMockUser(authorities = "CLINIC_CONSULTATION_UPDATE")
     @DisplayName("POST /consultations/{id}/sign needs the SIGN permission")
     void signRequiresSignAuthority() throws Exception {
         mvc.perform(post(BASE + "/consultations/" + UUID.randomUUID() + "/sign").with(csrf()))
@@ -316,7 +316,7 @@ class ClinicControllerTest {
     }
 
     @Test
-    @WithMockUser(authorities = "CLINIC_READ")
+    @WithMockUser(authorities = "CLINIC_APPOINTMENT_READ")
     @DisplayName("GET /appointments/{id} returns 200")
     void getAppointmentReturns200() throws Exception {
         var id = UUID.randomUUID();
@@ -327,7 +327,7 @@ class ClinicControllerTest {
     }
 
     @Test
-    @WithMockUser(authorities = "CLINIC_READ")
+    @WithMockUser(authorities = "CLINIC_APPOINTMENT_READ")
     @DisplayName("GET /appointments/{id}/consultation answers 404 when none is open")
     void openConsultationNotFound() throws Exception {
         var id = UUID.randomUUID();
@@ -336,5 +336,25 @@ class ClinicControllerTest {
 
         mvc.perform(get(BASE + "/appointments/" + id + "/consultation"))
                 .andExpect(status().isNotFound());
+    }
+
+    // ── The coarse permissions no longer open fine-grained endpoints (patch 0148) ──
+
+    @Test
+    @WithMockUser(authorities = "CLINIC_WRITE")
+    @DisplayName("POST /patients with only the old coarse CLINIC_WRITE is refused: endpoints need CLINIC_PATIENT_CREATE")
+    void coarseWriteNoLongerCreatesPatients() throws Exception {
+        mvc.perform(post(BASE + "/patients").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"firstName\":\"A\",\"lastName\":\"B\",\"phone\":\"+27820000001\"}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(clinicService);
+    }
+
+    @Test
+    @WithMockUser(authorities = "CLINIC_CLINICAL_SIGN")
+    @DisplayName("Signing needs CLINIC_CONSULTATION_SIGN; the old coarse CLINIC_CLINICAL_SIGN alone is refused")
+    void coarseSignNoLongerSigns() throws Exception {
+        mvc.perform(post(BASE + "/consultations/" + UUID.randomUUID() + "/sign").with(csrf()))
+                .andExpect(status().isForbidden());
     }
 }

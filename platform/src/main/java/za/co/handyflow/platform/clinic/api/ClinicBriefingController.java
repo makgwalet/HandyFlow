@@ -22,7 +22,7 @@ public class ClinicBriefingController {
     private final ClinicBriefingService briefing;
 
     @GetMapping("/briefing")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_SUMMARY_READ')")
     @Operation(summary = "Last visit, vitals, next appointment, follow-up due, medicines, allergies, conditions, lab flags and alerts")
     public ResponseEntity<ApiResponse<PatientBriefing>> get(@PathVariable UUID patientId) {
         return ResponseEntity.ok(ApiResponse.success("Success",

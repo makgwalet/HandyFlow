@@ -21,7 +21,7 @@ public class ClinicVisitStageController {
     private final ClinicVisitStageService service;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_QUESTIONNAIRE_READ')")
     @Operation(summary = "The stages this visit type requires for this practice (its own, else the platform default, else Symptoms + Diagnosis)")
     public ResponseEntity<ApiResponse<Stages>> get(@PathVariable String visitType) {
         return ResponseEntity.ok(ApiResponse.success("Success", service.get(TenantContext.getTenantIdAsObject(), visitType)));

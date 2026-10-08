@@ -26,14 +26,14 @@ public class ClinicLabMarkerController {
     private final ClinicLabMarkerService markers;
 
     @PutMapping("/results/{id}/markers")
-    @PreAuthorize("hasAuthority('CLINIC_LAB_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_RESULT_UPDATE')")
     @Operation(summary = "Replace the markers of an unreviewed result. Flags are worked out from the reference range and critical limits supplied; nothing is built in.")
     public ResponseEntity<ApiResponse<LabResultResponse>> save(@PathVariable UUID id, @Valid @RequestBody SaveMarkersRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Markers saved", markers.saveMarkers(TenantContext.getTenantIdAsObject(), id, req)));
     }
 
     @GetMapping("/critical")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_RESULT_READ')")
     @Operation(summary = "Unreviewed results with a critical marker, oldest first")
     public ResponseEntity<ApiResponse<List<CriticalLabItem>>> critical() {
         return ResponseEntity.ok(ApiResponse.success("Success", markers.criticalQueue(TenantContext.getTenantIdAsObject())));

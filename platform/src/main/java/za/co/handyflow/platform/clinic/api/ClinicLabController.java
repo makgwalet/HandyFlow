@@ -34,7 +34,7 @@ public class ClinicLabController {
     private final ClinicPractitionerRepository practitionerRepo; // FIX #2 — resolve reviewer
 
     @GetMapping("/results")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_RESULT_READ')")
     @Operation(summary = "List lab results, optionally filter by status")
     public ResponseEntity<ApiResponse<List<LabResultResponse>>> getResults(
             @RequestParam(required = false) String status) {
@@ -43,7 +43,7 @@ public class ClinicLabController {
     }
 
     @GetMapping("/patients/{patientId}/results")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_RESULT_READ')")
     @Operation(summary = "Get all lab results for a specific patient")
     public ResponseEntity<ApiResponse<List<LabResultResponse>>> getPatientResults(
             @PathVariable UUID patientId) {
@@ -55,7 +55,7 @@ public class ClinicLabController {
     // A receptionist (CLINIC_WRITE only) should not be interpreting or signing off lab results.
 
     @PostMapping(value = "/results", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAuthority('CLINIC_LAB_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_RESULT_CREATE')")
     @Operation(summary = "Upload a lab result PDF — the actual file, not just a filename")
     public ResponseEntity<ApiResponse<LabResultResponse>> uploadResult(
             @RequestParam("file") MultipartFile file,
@@ -69,7 +69,7 @@ public class ClinicLabController {
     }
 
     @GetMapping("/results/{id}/pdf")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_RESULT_READ')")
     @Operation(summary = "Download the uploaded lab result PDF")
     public ResponseEntity<byte[]> downloadResultPdf(@PathVariable UUID id) {
         var file = labService.downloadResultPdf(TenantContext.getTenantIdAsObject(), id);
@@ -85,7 +85,7 @@ public class ClinicLabController {
      * formatted document.
      */
     @GetMapping("/results/{id}/summary-pdf")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_RESULT_READ')")
     @Operation(summary = "Download a formatted summary of the lab result (parsed markers + interpretation)")
     public ResponseEntity<byte[]> downloadResultSummaryPdf(@PathVariable UUID id) {
         byte[] pdf = labSummaryPdfService.generate(TenantContext.getTenantIdAsObject(), id);
@@ -96,7 +96,7 @@ public class ClinicLabController {
     }
 
     @PostMapping("/results/{id}/match-patient")
-    @PreAuthorize("hasAuthority('CLINIC_LAB_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_RESULT_MATCH')")
     @Operation(summary = "Manually match a lab result to a patient")
     public ResponseEntity<ApiResponse<LabResultResponse>> matchPatient(
             @PathVariable UUID id, @RequestParam UUID patientId) {
@@ -105,7 +105,7 @@ public class ClinicLabController {
     }
 
     @PostMapping("/results/{id}/interpret")
-    @PreAuthorize("hasAuthority('CLINIC_LAB_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_RESULT_INTERPRET')")
     @Operation(summary = "Save a manually-written plain-language interpretation")
     public ResponseEntity<ApiResponse<LabResultResponse>> setInterpretation(
             @PathVariable UUID id, @RequestParam String interpretation) {
@@ -121,7 +121,7 @@ public class ClinicLabController {
      * server-side instead, where the key actually lives.
      */
     @PostMapping("/results/{id}/interpret-ai")
-    @PreAuthorize("hasAuthority('CLINIC_LAB_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_RESULT_INTERPRET')")
     @Operation(summary = "Generate a Claude-based plain-language interpretation server-side and save it")
     public ResponseEntity<ApiResponse<LabResultResponse>> interpretWithAi(
             @PathVariable UUID id,
@@ -140,7 +140,7 @@ public class ClinicLabController {
      * Only practitioners (who have CLINIC_LAB_WRITE) can sign off results.
      */
     @PostMapping("/results/{id}/review")
-    @PreAuthorize("hasAuthority('CLINIC_LAB_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_RESULT_REVIEW')")
     @Operation(summary = "Mark a lab result as reviewed — reviewer resolved from logged-in user")
     public ResponseEntity<ApiResponse<LabResultResponse>> markReviewed(
             @PathVariable UUID id,
@@ -152,7 +152,7 @@ public class ClinicLabController {
     }
 
     @PostMapping("/results/{id}/file")
-    @PreAuthorize("hasAuthority('CLINIC_LAB_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_RESULT_FILE')")
     @Operation(summary = "File a lab result against a consultation")
     public ResponseEntity<ApiResponse<LabResultResponse>> fileResult(
             @PathVariable UUID id, @RequestParam UUID consultationId) {

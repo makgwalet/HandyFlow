@@ -6,7 +6,7 @@ import { useDialogs } from "./dialogs"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { useCan } from "./clinicAccess"
 import QuestionForm from "./QuestionForm"
 import { VitalsPanel, SoapFields } from "./ConsultationNotesPanels"
 import LiveBillPanel from "./LiveBillPanel"
@@ -103,8 +103,8 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
   const setStatus = (v: string) => { statusRef.current = v; setStatusState(v) }
   const [drawerOpen, setDrawerOpen] = useState(true)
   const [handoffNote, setHandoffNote] = useState<{ comment: string; at: string } | null>(null)
-  const canSign = usePermission("CLINIC_CLINICAL_SIGN")
-  const canWrite = usePermission("CLINIC_CLINICAL_WRITE")
+  const canSign = useCan("signConsultation")
+  const canWrite = useCan("editConsultation")
 
   // Text fields are sent as "" (not null) so clearing a field actually clears it server-side.
   const draftPayload = () => ({

@@ -22,7 +22,7 @@ public class ClinicPatientDirectoryController {
     private final ClinicPatientDirectoryService directory;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_PATIENT_READ')")
     @Operation(summary = "Patients by view (ALL, RECENT, TODAY, MINE, FOLLOW_UP, NEVER_SEEN, DUPLICATES) with last visit, next appointment and flags")
     public ResponseEntity<ApiResponse<PatientDirectoryPage>> list(
             @RequestParam(defaultValue = "ALL") String view,

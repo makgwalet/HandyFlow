@@ -32,7 +32,7 @@ public class ClinicQuestionLibraryController {
     // ── Clinicians ───────────────────────────────────────────────────────────
 
     @GetMapping("/question-groups")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_QUESTIONNAIRE_READ')")
     @Operation(summary = "Question groups for a visit type (ACTIVE content only), filtered for the patient")
     public ResponseEntity<ApiResponse<List<GroupView>>> forVisit(
             @RequestParam String visitType, @RequestParam(required = false) UUID patientId) {
@@ -41,7 +41,7 @@ public class ClinicQuestionLibraryController {
     }
 
     @GetMapping("/question-groups/{code}")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_QUESTIONNAIRE_READ')")
     @Operation(summary = "One served question group by code (for groups opened by a TRIGGER_GROUP rule)")
     public ResponseEntity<ApiResponse<GroupView>> one(@PathVariable String code) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -49,7 +49,7 @@ public class ClinicQuestionLibraryController {
     }
 
     @PostMapping("/question-groups/{code}/evaluate")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_QUESTIONNAIRE_READ')")
     @Operation(summary = "Evaluate answers: what is visible, required, warned, triggered and flagged. Never a diagnosis.")
     public ResponseEntity<ApiResponse<EvaluationView>> evaluate(@PathVariable String code, @RequestBody EvaluateRequest body) {
         return ResponseEntity.ok(ApiResponse.success("Success", library.evaluate(
@@ -57,7 +57,7 @@ public class ClinicQuestionLibraryController {
     }
 
     @GetMapping("/consultations/{id}/form-data")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_QUESTIONNAIRE_READ')")
     @Operation(summary = "Answers stored on a consultation, by group")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getFormData(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -65,7 +65,7 @@ public class ClinicQuestionLibraryController {
     }
 
     @PutMapping("/consultations/{id}/form-data/{groupCode}")
-    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_QUESTIONNAIRE_ANSWER')")
     @Operation(summary = "Save one group's answers on a consultation (validated; hidden answers are dropped)")
     public ResponseEntity<ApiResponse<EvaluationView>> saveAnswers(
             @PathVariable UUID id, @PathVariable String groupCode, @RequestBody SaveAnswersRequest body) {

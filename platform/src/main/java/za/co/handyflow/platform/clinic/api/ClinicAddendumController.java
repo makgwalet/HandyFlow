@@ -25,7 +25,7 @@ public class ClinicAddendumController {
     private final ClinicAddendumService service;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_CONSULTATION_READ')")
     @Operation(summary = "Addenda of a consultation, oldest first")
     public ResponseEntity<ApiResponse<List<AddendumResponse>>> list(@PathVariable UUID consultationId) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -33,7 +33,7 @@ public class ClinicAddendumController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CONSULTATION_AMEND')")
     @Operation(summary = "Add an addendum to a SIGNED or LOCKED consultation")
     public ResponseEntity<ApiResponse<AddendumResponse>> add(@PathVariable UUID consultationId,
                                                              @RequestBody AddAddendumRequest body) {

@@ -26,7 +26,7 @@ public class ClinicClosureController {
     private final ClinicClosureService closures;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_APPOINTMENT_READ')")
     @Operation(summary = "Current and future closures, soonest first")
     public ResponseEntity<ApiResponse<List<ClosureResponse>>> list() {
         return ResponseEntity.ok(ApiResponse.success("Success", closures.upcoming(TenantContext.getTenantIdAsObject(),
@@ -34,7 +34,7 @@ public class ClinicClosureController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('CLINIC_ADMIN')")
+    @PreAuthorize("hasAuthority('CLINIC_CLOSURE_MANAGE')")
     @Operation(summary = "Close the clinic for one or more whole days. Bookings on those days are refused with 409 unless overridden.")
     public ResponseEntity<ApiResponse<ClosureResponse>> create(@Valid @RequestBody CreateClosureRequest req) {
         return ResponseEntity.status(201).body(ApiResponse.success("Closure added",
@@ -42,7 +42,7 @@ public class ClinicClosureController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('CLINIC_ADMIN')")
+    @PreAuthorize("hasAuthority('CLINIC_CLOSURE_MANAGE')")
     @Operation(summary = "Cancel a closure (it is kept in the record as cancelled)")
     public ResponseEntity<ApiResponse<Void>> cancel(@PathVariable UUID id) {
         closures.cancel(TenantContext.getTenantIdAsObject(), id);

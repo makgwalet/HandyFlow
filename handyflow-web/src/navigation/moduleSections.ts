@@ -566,8 +566,8 @@ export const CLINIC_SECTIONS: ModuleSections = {
       label: 'Patient care',
       sections: [
         { id: 'patients', label: 'Patients', icon: Users },
-        { id: 'drafts', label: 'Drafts', icon: FileClock, permission: 'CLINIC_CLINICAL_WRITE' },
-        { id: 'handoff', label: 'Handoff queue', icon: ArrowRightLeft, permission: 'CLINIC_CLINICAL_WRITE' },
+        { id: 'drafts', label: 'Drafts', icon: FileClock, anyPermission: ['CLINIC_CONSULTATION_UPDATE', 'CLINIC_CLINICAL_WRITE'] },
+        { id: 'handoff', label: 'Handoff queue', icon: ArrowRightLeft, anyPermission: ['CLINIC_NURSE_HANDOFF', 'CLINIC_CLINICAL_WRITE'] },
         { id: 'lab-inbox', label: 'Lab inbox', icon: FlaskConical },
       ],
     },
@@ -591,7 +591,7 @@ export const CLINIC_SECTIONS: ModuleSections = {
     {
       label: 'Governance',
       sections: [
-        { id: 'access-log', label: 'Access log', icon: ShieldCheck, permission: 'CLINIC_ADMIN' },
+        { id: 'access-log', label: 'Access log', icon: ShieldCheck, anyPermission: ['CLINIC_ACCESS_LOG_READ', 'CLINIC_ADMIN'] },
         { id: 'question-library', label: 'Question library', icon: ListChecks, anyPermission: ['CLINIC_CONTENT_ADMIN', 'CLINIC_CONTENT_APPROVE'] },
       ],
     },

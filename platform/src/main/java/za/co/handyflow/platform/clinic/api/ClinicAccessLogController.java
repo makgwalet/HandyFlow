@@ -23,7 +23,7 @@ public class ClinicAccessLogController {
     private final ClinicAccessLogService service;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('CLINIC_ADMIN')")
+    @PreAuthorize("hasAuthority('CLINIC_ACCESS_LOG_READ')")
     @Operation(summary = "Recent record reads, newest first; filter by patient or user (max 500)")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> list(
             @RequestParam(required = false) UUID patientId,

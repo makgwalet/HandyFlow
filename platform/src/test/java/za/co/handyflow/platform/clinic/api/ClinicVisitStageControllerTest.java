@@ -44,8 +44,8 @@ class ClinicVisitStageControllerTest {
     }
 
     @Test
-    @WithMockUser(authorities = "CLINIC_READ")
-    @DisplayName("GET stages is open to anyone who can read the clinic and returns the four stages")
+    @WithMockUser(authorities = "CLINIC_QUESTIONNAIRE_READ")
+    @DisplayName("GET stages is open to anyone who can open questionnaires and returns the four stages")
     void getReturnsStages() throws Exception {
         when(service.get(any(TenantId.class), eq("ANTENATAL"))).thenReturn(antenatal());
 

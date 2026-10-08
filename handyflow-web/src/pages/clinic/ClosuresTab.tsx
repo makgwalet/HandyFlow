@@ -5,7 +5,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { useCan } from "./clinicAccess"
 
 export interface Closure { id: string; firstDay: string; lastDay: string; reason?: string | null }
 
@@ -25,7 +25,7 @@ export function closureProblem(first: string, last: string): string | null {
 
 export default function ClosuresTab() {
   const qc = useQueryClient()
-  const canAdmin = usePermission("CLINIC_ADMIN")
+  const canAdmin = useCan("manageClosures")
   const [first, setFirst] = useState("")
   const [last, setLast] = useState("")
   const [reason, setReason] = useState("")

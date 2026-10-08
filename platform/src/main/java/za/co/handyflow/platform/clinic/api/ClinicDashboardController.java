@@ -22,7 +22,7 @@ public class ClinicDashboardController {
     private final ClinicDashboardService dashboard;
 
     @GetMapping("/summary")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_DASHBOARD_READ')")
     @Operation(summary = "Today's appointment counts by status, the day's list, the next booked appointment and the patient total.")
     public ResponseEntity<ApiResponse<DashboardSummary>> summary() {
         return ResponseEntity.ok(ApiResponse.success("Success", dashboard.summary(TenantContext.getTenantIdAsObject())));

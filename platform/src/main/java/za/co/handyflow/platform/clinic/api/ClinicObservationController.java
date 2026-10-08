@@ -27,7 +27,7 @@ public class ClinicObservationController {
     private final ClinicObservationService service;
 
     @PostMapping
-    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_VITALS_WRITE')")
     @Operation(summary = "Record one or more observations (max 50)")
     public ResponseEntity<ApiResponse<List<ObservationResponse>>> record(
             @PathVariable UUID patientId, @RequestBody List<ObservationRequest> body) {
@@ -36,7 +36,7 @@ public class ClinicObservationController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_VITALS_READ')")
     @Operation(summary = "List observations, newest first; filter by code, time range or consultation")
     public ResponseEntity<ApiResponse<List<ObservationResponse>>> list(
             @PathVariable UUID patientId,
@@ -51,7 +51,7 @@ public class ClinicObservationController {
     }
 
     @GetMapping("/latest")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_VITALS_READ')")
     @Operation(summary = "Most recent value of each observation code")
     public ResponseEntity<ApiResponse<List<ObservationResponse>>> latest(@PathVariable UUID patientId) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -59,7 +59,7 @@ public class ClinicObservationController {
     }
 
     @PostMapping("/{id}/void")
-    @PreAuthorize("hasAuthority('CLINIC_CLINICAL_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_VITALS_VOID')")
     @Operation(summary = "Mark an observation entered in error (kept for audit, hidden from lists)")
     public ResponseEntity<ApiResponse<ObservationResponse>> voidObservation(
             @PathVariable UUID patientId, @PathVariable UUID id) {

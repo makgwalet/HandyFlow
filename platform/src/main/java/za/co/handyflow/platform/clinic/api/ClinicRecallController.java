@@ -25,7 +25,7 @@ public class ClinicRecallController {
     private final ClinicRecallService recallService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_RECALL_READ')")
     @Operation(summary = "Recall worklist: search, filter (ALL, OVERDUE, TODAY, NOT_CONTACTED, SNOOZED, DISMISSED), doctor, paging")
     public ResponseEntity<ApiResponse<RecallPage>> worklist(
             @RequestParam(required = false) String q,
@@ -38,7 +38,7 @@ public class ClinicRecallController {
     }
 
     @PostMapping("/{consultationId}/actions")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_RECALL_MANAGE')")
     @Operation(summary = "Log a call, snooze, dismiss (with reason) or reopen a recall")
     public ResponseEntity<ApiResponse<Void>> act(@PathVariable UUID consultationId, @RequestBody RecallActionRequest body) {
         recallService.act(TenantContext.getTenantIdAsObject(), consultationId, body, UserContext.getCurrentUserId(), Instant.now());

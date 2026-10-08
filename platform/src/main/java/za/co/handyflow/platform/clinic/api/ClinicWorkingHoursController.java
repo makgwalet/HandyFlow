@@ -25,7 +25,7 @@ public class ClinicWorkingHoursController {
     private final ClinicWorkingHoursService workingHours;
 
     @GetMapping("/practitioners/{practitionerId}/working-hours")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_APPOINTMENT_READ')")
     @Operation(summary = "Weekly working hours. An empty list means the practitioner can be booked at any time.")
     public ResponseEntity<ApiResponse<List<WindowDto>>> get(@PathVariable UUID practitionerId) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -33,7 +33,7 @@ public class ClinicWorkingHoursController {
     }
 
     @PutMapping("/practitioners/{practitionerId}/working-hours")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_WORKING_HOURS_WRITE')")
     @Operation(summary = "Replace the whole week. Bookings outside these hours are refused with 409 unless overridden.")
     public ResponseEntity<ApiResponse<List<WindowDto>>> save(@PathVariable UUID practitionerId,
                                                              @Valid @RequestBody SaveWorkingHoursRequest req) {

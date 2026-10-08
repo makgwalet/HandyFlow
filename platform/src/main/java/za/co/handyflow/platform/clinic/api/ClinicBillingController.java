@@ -40,7 +40,7 @@ public class ClinicBillingController {
     // ── Claims ────────────────────────────────────────────────────────────────
 
     @GetMapping("/claims")
-    @PreAuthorize("hasAuthority('CLINIC_BILLING_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_CLAIM_READ')")
     @Operation(summary = "List claims, optionally filter by status")
     public ResponseEntity<ApiResponse<List<ClinicClaimResponse>>> getClaims(
             @RequestParam(required = false) String status) {
@@ -49,7 +49,7 @@ public class ClinicBillingController {
     }
 
     @GetMapping("/consultations/{consultationId}/claim")
-    @PreAuthorize("hasAuthority('CLINIC_BILLING_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_CLAIM_READ')")
     @Operation(summary = "Get claim for a consultation")
     public ResponseEntity<ApiResponse<ClinicClaimResponse>> getClaim(
             @PathVariable UUID consultationId) {
@@ -58,7 +58,7 @@ public class ClinicBillingController {
     }
 
     @PostMapping("/consultations/{consultationId}/claim")
-    @PreAuthorize("hasAuthority('CLINIC_BILLING_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLAIM_CREATE')")
     @Operation(summary = "Create a medical aid claim from a consultation")
     public ResponseEntity<ApiResponse<ClinicClaimResponse>> createClaim(
             @PathVariable UUID consultationId,
@@ -68,7 +68,7 @@ public class ClinicBillingController {
     }
 
     @PostMapping("/claims/{id}/submit")
-    @PreAuthorize("hasAuthority('CLINIC_BILLING_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLAIM_SUBMIT')")
     @Operation(summary = "Submit claim to medical aid switch")
     public ResponseEntity<ApiResponse<ClinicClaimResponse>> submitClaim(
             @PathVariable UUID id,
@@ -82,7 +82,7 @@ public class ClinicBillingController {
      * want to submit several claims at once rather than one at a time.
      */
     @PostMapping("/claims/batch-submit")
-    @PreAuthorize("hasAuthority('CLINIC_BILLING_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLAIM_SUBMIT')")
     @Operation(summary = "Submit multiple claims to the medical aid switch in one call")
     public ResponseEntity<ApiResponse<za.co.handyflow.platform.clinic.dto.billing.BatchSubmitClaimsResponse>> batchSubmitClaims(
             @jakarta.validation.Valid @RequestBody za.co.handyflow.platform.clinic.dto.billing.BatchSubmitClaimsRequest req) {
@@ -91,7 +91,7 @@ public class ClinicBillingController {
     }
 
     @PostMapping("/claims/{id}/{action}")
-    @PreAuthorize("hasAuthority('CLINIC_BILLING_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CLAIM_PROGRESS')")
     @Operation(summary = "Update claim status: accept | reject | paid | partial")
     public ResponseEntity<ApiResponse<ClinicClaimResponse>> updateClaimStatus(
             @PathVariable UUID id,
@@ -110,7 +110,7 @@ public class ClinicBillingController {
      * despite ClinicClaim already tracking patientPortion separately.
      */
     @GetMapping("/claims/{id}/patient-invoice-pdf")
-    @PreAuthorize("hasAuthority('CLINIC_BILLING_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_BILL_READ')")
     @Operation(summary = "Download patient-portion invoice/receipt PDF for a claim")
     public ResponseEntity<byte[]> downloadPatientInvoicePdf(@PathVariable UUID id) {
         byte[] pdf = patientInvoicePdfService.generate(TenantContext.getTenantIdAsObject(), id);
@@ -127,7 +127,7 @@ public class ClinicBillingController {
      * of what was actually submitted to the scheme, for dispute resolution.
      */
     @GetMapping("/claims/{id}/submission-pdf")
-    @PreAuthorize("hasAuthority('CLINIC_BILLING_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_CLAIM_READ')")
     @Operation(summary = "Download the claim submission record PDF")
     public ResponseEntity<byte[]> downloadClaimSubmissionPdf(@PathVariable UUID id) {
         byte[] pdf = claimSubmissionPdfService.generate(TenantContext.getTenantIdAsObject(), id);
@@ -144,7 +144,7 @@ public class ClinicBillingController {
      * patient's full billing history across claims/visits into one document.
      */
     @GetMapping("/patients/{patientId}/statement-pdf")
-    @PreAuthorize("hasAuthority('CLINIC_BILLING_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_BILL_READ')")
     @Operation(summary = "Download a statement of account PDF for a patient — omit from/to for all-time")
     public ResponseEntity<byte[]> downloadPatientStatementPdf(
             @PathVariable UUID patientId,
@@ -166,7 +166,7 @@ public class ClinicBillingController {
      * the full reasoning).
      */
     @PostMapping("/patients/{patientId}/statement/email")
-    @PreAuthorize("hasAuthority('CLINIC_BILLING_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_DOCUMENT_EMAIL')")
     @Operation(summary = "Email the statement of account to the patient — omit from/to for all-time")
     public ResponseEntity<ApiResponse<Void>> emailPatientStatement(
             @PathVariable UUID patientId,
@@ -182,7 +182,7 @@ public class ClinicBillingController {
     // module previously had no entity for).
 
     @GetMapping("/outstanding")
-    @PreAuthorize("hasAuthority('CLINIC_BILLING_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_BILL_READ')")
     @Operation(summary = "Outstanding balances per patient (derived from unpaid claims, net of recorded payments)")
     public ResponseEntity<ApiResponse<List<OutstandingBalanceResponse>>> getOutstanding() {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -194,7 +194,7 @@ public class ClinicBillingController {
      * has posted here all along; this endpoint just never existed.
      */
     @PostMapping("/payments")
-    @PreAuthorize("hasAuthority('CLINIC_BILLING_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_PAYMENT_CREATE')")
     @Operation(summary = "Record a payment against a patient")
     public ResponseEntity<ApiResponse<PaymentResponse>> recordPayment(
             @jakarta.validation.Valid @RequestBody RecordPaymentRequest req) {
@@ -204,7 +204,7 @@ public class ClinicBillingController {
     }
 
     @GetMapping("/payments")
-    @PreAuthorize("hasAuthority('CLINIC_BILLING_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_PAYMENT_READ')")
     @Operation(summary = "Payment history for a period")
     public ResponseEntity<ApiResponse<List<PaymentResponse>>> getPayments(
             @RequestParam(required = false, defaultValue = "month") String period) {
@@ -213,7 +213,7 @@ public class ClinicBillingController {
     }
 
     @GetMapping("/revenue")
-    @PreAuthorize("hasAuthority('CLINIC_BILLING_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_BILL_READ')")
     @Operation(summary = "Revenue breakdown by period, bucketed for charting")
     public ResponseEntity<ApiResponse<List<RevenuePointResponse>>> getRevenue(
             @RequestParam(required = false, defaultValue = "month") String period) {
@@ -226,7 +226,7 @@ public class ClinicBillingController {
     // the "Select consultation" dropdown in the New Claim modal.
 
     @GetMapping("/consultations")
-    @PreAuthorize("hasAuthority('CLINIC_BILLING_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_BILL_READ')")
     @Operation(summary = "List consultations — optionally filter to unbilled only (for claim creation)")
     public ResponseEntity<ApiResponse<List<ConsultationResponse>>> getConsultations(
             @RequestParam(required = false, defaultValue = "false") boolean unbilled) {

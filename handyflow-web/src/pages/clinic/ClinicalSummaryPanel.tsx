@@ -6,7 +6,7 @@ import { useDialogs } from "./dialogs"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { useCan } from "./clinicAccess"
 
 interface Allergy { id: string; allergen: string; allergenType?: string; reaction?: string; severity?: string; status: string }
 interface Condition { id: string; conditionName: string; icd10Code?: string; status: string }
@@ -57,7 +57,7 @@ export default function ClinicalSummaryPanel({ patientId, fallbackAllergies = []
   { patientId: string; fallbackAllergies?: string[]; fallbackConditions?: string[] }) {
   const qc = useQueryClient()
   const { confirm, dialogs } = useDialogs()
-  const canWrite = usePermission("CLINIC_CLINICAL_WRITE")
+  const canWrite = useCan("editClinicalSummary")
   const [error, setError] = useState("")
   const refresh = () => { setError(""); qc.invalidateQueries({ queryKey: ["pf-clinical", patientId] }); qc.invalidateQueries({ queryKey: ["clinic-patients"] }) }
   const fail = (e: any) => setError(e?.response?.data?.message ?? "Could not save that change.")

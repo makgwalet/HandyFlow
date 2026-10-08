@@ -27,7 +27,7 @@ public class ClinicConsentController {
     private final ClinicConsentService consentService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_CONSENT_READ')")
     @Operation(summary = "Current consent status for each tracked consent type")
     public ResponseEntity<ApiResponse<List<ConsentStatusResponse>>> getStatus(@PathVariable UUID patientId) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -35,7 +35,7 @@ public class ClinicConsentController {
     }
 
     @GetMapping("/history")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_CONSENT_HISTORY_READ')")
     @Operation(summary = "Full consent event history for a patient")
     public ResponseEntity<ApiResponse<List<ConsentEventResponse>>> getHistory(@PathVariable UUID patientId) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -43,7 +43,7 @@ public class ClinicConsentController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_CONSENT_RECORD')")
     @Operation(summary = "Record a consent grant or revocation")
     public ResponseEntity<ApiResponse<ConsentEventResponse>> recordConsent(
             @PathVariable UUID patientId,

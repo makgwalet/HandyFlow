@@ -5,7 +5,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { useCan } from "./clinicAccess"
 
 export interface TimeOff { id: string; practitionerId: string; startsAt: string; endsAt: string; reason?: string | null }
 interface Practitioner { id: string; fullName: string }
@@ -26,7 +26,7 @@ export function timeOffProblem(from: string, to: string): string | null {
 
 export default function TimeOffTab() {
   const qc = useQueryClient()
-  const canWrite = usePermission("CLINIC_WRITE")
+  const canWrite = useCan("editTimeOff")
   const [practitionerId, setPractitionerId] = useState("")
   const [from, setFrom] = useState("")
   const [to, setTo] = useState("")

@@ -26,21 +26,21 @@ public class ClinicRoomController {
     private final ClinicRoomService rooms;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_APPOINTMENT_READ')")
     @Operation(summary = "Rooms, A to Z. Switched-off rooms are only included with includeInactive=true.")
     public ResponseEntity<ApiResponse<List<RoomResponse>>> list(@RequestParam(defaultValue = "false") boolean includeInactive) {
         return ResponseEntity.ok(ApiResponse.success("Success", rooms.list(TenantContext.getTenantIdAsObject(), includeInactive)));
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('CLINIC_ADMIN')")
+    @PreAuthorize("hasAuthority('CLINIC_ROOM_MANAGE')")
     @Operation(summary = "Add a room. A duplicate name (ignoring case) is refused with 409.")
     public ResponseEntity<ApiResponse<RoomResponse>> create(@Valid @RequestBody CreateRoomRequest req) {
         return ResponseEntity.status(201).body(ApiResponse.success("Room added", rooms.create(TenantContext.getTenantIdAsObject(), req)));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('CLINIC_ADMIN')")
+    @PreAuthorize("hasAuthority('CLINIC_ROOM_MANAGE')")
     @Operation(summary = "Rename a room or switch it on or off. Past appointments keep the room.")
     public ResponseEntity<ApiResponse<RoomResponse>> update(@PathVariable UUID id, @Valid @RequestBody UpdateRoomRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Room updated", rooms.update(TenantContext.getTenantIdAsObject(), id, req)));

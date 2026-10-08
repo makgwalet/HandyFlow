@@ -3,7 +3,7 @@ import MyDayPanel from "./MyDayPanel"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { useCan } from "./clinicAccess"
 import { useAuthStore } from "../../store/auth.store"
 import { myPractitionerId } from "./currentPractitioner"
 import { displayName, greeting, groupQueue, inBuilding, rowAction } from "./dashboardView"
@@ -45,8 +45,8 @@ interface Props {
 export default function ClinicDashboard({ onNavigate, onOpenPatient, onResume }: Props) {
   const qc = useQueryClient()
   const user = useAuthStore(st => st.user)
-  const clinician = usePermission("CLINIC_CLINICAL_WRITE")
-  const canCheckIn = usePermission("CLINIC_WRITE")
+  const clinician = useCan("startConsultation")
+  const canCheckIn = useCan("checkIn")
   const { data: summary } = useQuery({
     queryKey: ["clinic-dashboard-summary"],
     queryFn: async () => { const r = await apiClient.get("/api/v1/clinic/dashboard/summary"); return (r.data?.data ?? r.data) as DashSummary },

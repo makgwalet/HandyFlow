@@ -26,7 +26,7 @@ public class ClinicTimeOffController {
     private final ClinicTimeOffService timeOff;
 
     @GetMapping("/practitioners/{practitionerId}/time-off")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_APPOINTMENT_READ')")
     @Operation(summary = "Current and future time off for a practitioner, soonest first")
     public ResponseEntity<ApiResponse<List<TimeOffResponse>>> list(@PathVariable UUID practitionerId) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -34,7 +34,7 @@ public class ClinicTimeOffController {
     }
 
     @PostMapping("/practitioners/{practitionerId}/time-off")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_TIME_OFF_WRITE')")
     @Operation(summary = "Block out time when the practitioner cannot be booked. Bookings in that time are refused with 409 unless overridden.")
     public ResponseEntity<ApiResponse<TimeOffResponse>> create(@PathVariable UUID practitionerId,
                                                                @Valid @RequestBody CreateTimeOffRequest req) {
@@ -43,7 +43,7 @@ public class ClinicTimeOffController {
     }
 
     @DeleteMapping("/time-off/{id}")
-    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @PreAuthorize("hasAuthority('CLINIC_TIME_OFF_WRITE')")
     @Operation(summary = "Cancel a block of time off (it is kept in the record as cancelled)")
     public ResponseEntity<ApiResponse<Void>> cancel(@PathVariable UUID id) {
         timeOff.cancel(TenantContext.getTenantIdAsObject(), id);

@@ -29,9 +29,9 @@ public class ClinicTimelineController {
     private final ClinicTimelineService timeline;
 
     @GetMapping("/timeline")
-    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @PreAuthorize("hasAuthority('CLINIC_TIMELINE_READ')")
     @Operation(summary = "Newest-first timeline. kinds is a comma list (APPOINTMENT, CONSULTATION, PRESCRIPTION, LAB, CLAIM, PAYMENT); "
-            + "claims and payments are only included for users with CLINIC_BILLING_READ.")
+            + "claims and payments are only included for users with CLINIC_CLAIM_READ.")
     public ResponseEntity<ApiResponse<List<TimelineEvent>>> get(
             @PathVariable UUID patientId,
             @RequestParam(required = false) String kinds,
@@ -40,7 +40,7 @@ public class ClinicTimelineController {
             @RequestParam(required = false) Integer limit,
             Authentication auth) {
         boolean billing = auth != null && auth.getAuthorities().stream()
-                .anyMatch(a -> "CLINIC_BILLING_READ".equals(a.getAuthority()));
+                .anyMatch(a -> "CLINIC_CLAIM_READ".equals(a.getAuthority()));
         Set<String> kindSet = kinds == null || kinds.isBlank() ? null
                 : Arrays.stream(kinds.split(",")).map(String::trim).map(String::toUpperCase)
                         .filter(s -> !s.isEmpty()).collect(Collectors.toCollection(LinkedHashSet::new));

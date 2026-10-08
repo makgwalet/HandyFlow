@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { useCan } from "./clinicAccess"
 
 export interface Period { from: string; to: string }
 export type Week = Record<number, Period[]>
@@ -48,7 +48,7 @@ export function weekProblem(week: Week): string | null {
 
 export default function WorkingHoursTab() {
   const qc = useQueryClient()
-  const canWrite = usePermission("CLINIC_WRITE")
+  const canWrite = useCan("editWorkingHours")
   const [practitionerId, setPractitionerId] = useState("")
   const [week, setWeek] = useState<Week>(emptyWeek())
   const [error, setError] = useState("")

@@ -5,7 +5,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { useCan } from "./clinicAccess"
 
 export interface Room { id: string; name: string; active: boolean }
 
@@ -22,7 +22,7 @@ export function roomNameProblem(name: string): string | null {
 
 export default function RoomsTab() {
   const qc = useQueryClient()
-  const canAdmin = usePermission("CLINIC_ADMIN")
+  const canAdmin = useCan("manageRooms")
   const [name, setName] = useState("")
   const [editing, setEditing] = useState<string | null>(null)
   const [editName, setEditName] = useState("")

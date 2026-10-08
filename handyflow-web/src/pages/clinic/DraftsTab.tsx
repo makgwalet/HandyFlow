@@ -7,7 +7,7 @@ import { useDialogs } from "./dialogs"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { useCan } from "./clinicAccess"
 
 interface Draft {
   id: string; patientId: string; patientName: string; appointmentId?: string | null
@@ -22,7 +22,7 @@ const STATUS: Record<string, string> = { DRAFT: "Draft", NURSE_IN_PROGRESS: "Nur
 export default function DraftsTab({ onResume }: Props) {
   const qc = useQueryClient()
   const { confirm, dialogs } = useDialogs()
-  const canWrite = usePermission("CLINIC_CLINICAL_WRITE")
+  const canWrite = useCan("editConsultation")
   const [error, setError] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
   const [mine, setMine] = useState(true)
