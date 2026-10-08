@@ -128,7 +128,7 @@ class ClinicPermissionTest {
     @Test void breakGlassIsOnlyInTheClinicalPractitionerTemplates() {
         for (var t : ClinicRoleTemplates.all().values()) {
             boolean has = t.permissions().stream().anyMatch(p -> p.group() == ClinicPermission.Group.RESTRICTED
-                    && p != ClinicPermission.CLINIC_RESTRICTED_RECORD_MANAGE);
+                    && p != ClinicPermission.CLINIC_RESTRICTED_RECORD_MANAGE && p != ClinicPermission.CLINIC_BREAK_GLASS_REVIEW);
             assertEquals(t.key().equals("DOCTOR") || t.key().equals("CLINICAL_ASSOCIATE"), has, t.key());
         }
         assertFalse(of("DOCTOR").contains(ClinicPermission.CLINIC_BREAK_GLASS_PRINT));
@@ -160,7 +160,25 @@ class ClinicPermissionTest {
                 .filter(p -> p != ClinicPermission.CLINIC_CONTENT_APPROVE && p != ClinicPermission.CLINIC_TELEHEALTH_ROOM_CREATE
                         && p != ClinicPermission.CLINIC_PRACTITIONER_MANAGE && p != ClinicPermission.CLINIC_WORKING_HOURS_WRITE
                         && p != ClinicPermission.CLINIC_TIME_OFF_WRITE && p != ClinicPermission.CLINIC_ROOM_MANAGE
-                        && p != ClinicPermission.CLINIC_CLOSURE_MANAGE && p != ClinicPermission.CLINIC_CLAIM_PROGRESS)
+                        && p != ClinicPermission.CLINIC_CLOSURE_MANAGE && p != ClinicPermission.CLINIC_CLAIM_PROGRESS
+                        // granted to named people, never by a role template
+                        && p != ClinicPermission.CLINIC_RESTRICTED_RECORD_ACCESS && p != ClinicPermission.CLINIC_BREAK_GLASS_PRINT
+                        && p != ClinicPermission.CLINIC_BREAK_GLASS_EXPORT)
                 .forEach(p -> assertTrue(inAny.contains(p), p + " is enforced on an endpoint but no role template can do it"));
+    }
+
+    @Test void breakGlassReviewIsForTheOversightRolesAndNeverForClinicians() {
+        for (String role : new String[] {"AUDITOR", "PRACTICE_MANAGER", "CLINIC_ADMINISTRATOR"}) {
+            assertTrue(of(role).contains(ClinicPermission.CLINIC_BREAK_GLASS_REVIEW), role);
+        }
+        for (String role : new String[] {"DOCTOR", "CLINICAL_ASSOCIATE", "PROFESSIONAL_NURSE", "RECEPTION"}) {
+            assertFalse(of(role).contains(ClinicPermission.CLINIC_BREAK_GLASS_REVIEW), role + " must not review its own break-glass");
+        }
+    }
+
+    @Test void standingAccessToRestrictedRecordsIsInNoTemplate() {
+        for (var t : ClinicRoleTemplates.all().values()) {
+            assertFalse(t.permissions().contains(ClinicPermission.CLINIC_RESTRICTED_RECORD_ACCESS), t.key());
+        }
     }
 }

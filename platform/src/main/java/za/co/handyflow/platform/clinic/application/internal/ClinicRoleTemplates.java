@@ -119,6 +119,7 @@ public final class ClinicRoleTemplates {
         static final ClinicPermission CLINIC_RESTRICTED_RECORD_ACCESS = ClinicPermission.CLINIC_RESTRICTED_RECORD_ACCESS;
         static final ClinicPermission CLINIC_BREAK_GLASS_VIEW = ClinicPermission.CLINIC_BREAK_GLASS_VIEW;
         static final ClinicPermission CLINIC_BREAK_GLASS_PRINT = ClinicPermission.CLINIC_BREAK_GLASS_PRINT;
+        static final ClinicPermission CLINIC_BREAK_GLASS_REVIEW = ClinicPermission.CLINIC_BREAK_GLASS_REVIEW;
         static final ClinicPermission CLINIC_BREAK_GLASS_EXPORT = ClinicPermission.CLINIC_BREAK_GLASS_EXPORT;
         static final ClinicPermission CLINIC_QUEUE_READ = ClinicPermission.CLINIC_QUEUE_READ;
         static final ClinicPermission CLINIC_APPOINTMENT_READ = ClinicPermission.CLINIC_APPOINTMENT_READ;
@@ -572,6 +573,7 @@ public final class ClinicRoleTemplates {
             P.CLINIC_DASHBOARD_READ,
             P.CLINIC_CATALOGUE_READ,
             P.CLINIC_ACCESS_LOG_READ,
+            P.CLINIC_BREAK_GLASS_REVIEW,
             P.CLINIC_PATIENT_READ,
             P.CLINIC_PATIENT_DEMOGRAPHICS_READ)));
         t.put("PRACTICE_MANAGER", new Template("PRACTICE_MANAGER", "Practice Manager",
@@ -637,7 +639,8 @@ public final class ClinicRoleTemplates {
             P.CLINIC_CONSENT_RECORD,
             P.CLINIC_CONSENT_UPDATE,
             P.CLINIC_CONSENT_REVOKE,
-            P.CLINIC_ACCESS_LOG_READ)));
+            P.CLINIC_ACCESS_LOG_READ,
+            P.CLINIC_BREAK_GLASS_REVIEW)));
         t.put("CLINIC_ADMINISTRATOR", new Template("CLINIC_ADMINISTRATOR", "Clinic Administrator",
             "Practice configuration; everything the Practice Manager has, plus restricted-record flags, content authoring and archive/merge.",
             EnumSet.of(
@@ -702,6 +705,7 @@ public final class ClinicRoleTemplates {
             P.CLINIC_CONSENT_UPDATE,
             P.CLINIC_CONSENT_REVOKE,
             P.CLINIC_ACCESS_LOG_READ,
+            P.CLINIC_BREAK_GLASS_REVIEW,
             P.CLINIC_PATIENT_ARCHIVE,
             P.CLINIC_PATIENT_MERGE,
             P.CLINIC_RESTRICTED_RECORD_MANAGE,

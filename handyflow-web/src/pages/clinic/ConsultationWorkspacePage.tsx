@@ -3,6 +3,7 @@
 // workspace, and when the doctor signs shows the result and who is next. Leaving keeps everything saved (see the dock).
 import { useEffect, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
+import RestrictedRecordGate from "./RestrictedRecordGate"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useAuthStore } from "../../store/auth.store"
@@ -69,10 +70,12 @@ export default function ConsultationWorkspacePage() {
 
   return (
     <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-      <ConsultationSession patient={patient} appointment={appt}
-        onComplete={(_id, summary) => setSigned(summary)}
-        onMinimise={leave}
-        onCancel={() => { qc.invalidateQueries({ queryKey: ["clinic-dock"] }); back() }} />
+      <RestrictedRecordGate patientId={patient.id}>
+        <ConsultationSession patient={patient} appointment={appt}
+          onComplete={(_id, summary) => setSigned(summary)}
+          onMinimise={leave}
+          onCancel={() => { qc.invalidateQueries({ queryKey: ["clinic-dock"] }); back() }} />
+      </RestrictedRecordGate>
     </div>
   )
 }

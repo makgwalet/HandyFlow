@@ -21,6 +21,7 @@ import { AlertCircle, Archive, Calendar, Clock, CreditCard, FileText, FlaskConic
 import OverviewTab from "./PatientOverviewTab"
 import AppointmentsTab from "./PatientAppointmentsTab"
 import ConsultationTab from "./PatientConsultationTab"
+import RestrictedRecordGate from "./RestrictedRecordGate"
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
@@ -235,6 +236,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
       </div>
 
       {/* ── Tab content ─────────────────────────────────────────────────── */}
+      <RestrictedRecordGate patientId={patient.id}>
       <PatientAlertBanner patientId={patient.id}/>
       {activeTab==="overview"     && <OverviewTab patient={patient} idInfo={idInfo} familyMembers={familyMembers as Patient[]} onOpenPatient={onOpenPatient} qc={qc}
         appointments={appointments as any[]} defaultPractitionerId={myPractitionerId(practitioners as any[], userEmail)}
@@ -247,6 +249,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
       {activeTab==="documents"    && <DocumentsTab patient={patient} consultations={consultations as Consultation[]}/>}
       {activeTab==="history"      && <TimelineTab patientId={patient.id}/>}
       {activeTab==="consent"      && <ConsentTab patient={patient}/>}
+      </RestrictedRecordGate>
     </div>
   )
 }
