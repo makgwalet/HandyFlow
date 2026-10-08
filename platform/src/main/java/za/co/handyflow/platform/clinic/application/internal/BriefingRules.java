@@ -22,6 +22,8 @@ final class BriefingRules {
     static final Set<String> FINISHED = Set.of("SIGNED", "LOCKED", "DOCTOR_COMPLETED");
     /** Appointments that are still ahead of the patient. */
     static final Set<String> UPCOMING = Set.of("SCHEDULED", "CONFIRMED");
+    /** Booked and not yet started: still counts as next when its time has passed earlier today. */
+    static final Set<String> OPEN_TODAY = Set.of("SCHEDULED", "CONFIRMED", "CHECKED_IN", "TRIAGED");
     static final Set<String> SEVERE = Set.of("SEVERE", "LIFE_THREATENING");
 
     private BriefingRules() {}
@@ -42,10 +44,16 @@ final class BriefingRules {
         return Math.max(0, ChronoUnit.DAYS.between(then.atZone(zone).toLocalDate(), now.atZone(zone).toLocalDate()));
     }
 
-    /** The earliest appointment still ahead (scheduled or confirmed) at or after now. */
-    static Optional<Appt> nextAppointment(List<Appt> appts, Instant now) {
+    /**
+     * The earliest appointment still on: scheduled or confirmed from now on, plus one booked for earlier today that has
+     * not started yet (the patient is late or the doctor is running behind; it is still the next thing in the diary).
+     * Yesterday's unattended bookings are not counted.
+     */
+    static Optional<Appt> nextAppointment(List<Appt> appts, Instant now, ZoneId zone) {
+        var today = now.atZone(zone).toLocalDate();
         return appts.stream()
-                .filter(a -> a.at() != null && !a.at().isBefore(now) && UPCOMING.contains(a.status()))
+                .filter(a -> a.at() != null && (OPEN_TODAY.contains(a.status()) || UPCOMING.contains(a.status()))
+                        && (!a.at().isBefore(now) || (a.at().atZone(zone).toLocalDate().equals(today) && OPEN_TODAY.contains(a.status()))))
                 .min(Comparator.comparing(Appt::at));
     }
 

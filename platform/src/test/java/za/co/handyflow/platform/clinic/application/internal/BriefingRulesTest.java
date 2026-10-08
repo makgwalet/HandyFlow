@@ -51,8 +51,25 @@ class BriefingRulesTest {
         var later = appt("2026-10-20T08:00:00Z", "CONFIRMED");
         var soon = appt("2026-10-10T08:00:00Z", "SCHEDULED");
         var inProgress = appt("2026-10-08T09:00:00Z", "IN_PROGRESS");
-        assertEquals(soon, BriefingRules.nextAppointment(List.of(past, cancelled, later, soon, inProgress), NOW).orElseThrow());
-        assertTrue(BriefingRules.nextAppointment(List.of(past, cancelled), NOW).isEmpty());
+        assertEquals(soon, BriefingRules.nextAppointment(List.of(past, cancelled, later, soon, inProgress), NOW, ZONE).orElseThrow());
+        assertTrue(BriefingRules.nextAppointment(List.of(past, cancelled), NOW, ZONE).isEmpty());
+    }
+
+    @Test
+    void anAppointmentEarlierTodayThatHasNotStartedIsStillNext() {
+        var late = appt("2026-10-08T05:53:00Z", "SCHEDULED");           // 07:53 in Johannesburg, two hours ago
+        var later = appt("2026-10-10T08:00:00Z", "SCHEDULED");
+        assertEquals(late, BriefingRules.nextAppointment(List.of(later, late), NOW, ZONE).orElseThrow());
+        var arrived = appt("2026-10-08T05:53:00Z", "CHECKED_IN");
+        assertEquals(arrived, BriefingRules.nextAppointment(List.of(arrived), NOW, ZONE).orElseThrow());
+    }
+
+    @Test
+    void yesterdaysUnattendedBookingIsNotNextAndAStartedOneIsNot() {
+        var yesterday = appt("2026-10-07T08:00:00Z", "SCHEDULED");
+        var started = appt("2026-10-08T05:00:00Z", "IN_PROGRESS");
+        var done = appt("2026-10-08T05:00:00Z", "COMPLETED");
+        assertTrue(BriefingRules.nextAppointment(List.of(yesterday, started, done), NOW, ZONE).isEmpty());
     }
 
     @Test

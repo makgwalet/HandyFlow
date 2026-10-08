@@ -24,7 +24,7 @@ public class ClinicPatientDirectoryService {
             "WITH v AS (SELECT patient_id, count(*) AS cnt, max(consulted_at) AS last_at FROM clinic_consultations"
                     + "   WHERE tenant_id = ? AND deleted_at IS NULL AND status IN ('SIGNED','LOCKED','DOCTOR_COMPLETED') GROUP BY patient_id),"
                     + " n AS (SELECT patient_id, min(scheduled_at) AS next_at FROM clinic_appointments"
-                    + "   WHERE tenant_id = ? AND deleted_at IS NULL AND status IN ('SCHEDULED','CONFIRMED') AND scheduled_at >= ? GROUP BY patient_id),"
+                    + "   WHERE tenant_id = ? AND deleted_at IS NULL AND status IN ('SCHEDULED','CONFIRMED','CHECKED_IN','TRIAGED') AND scheduled_at >= ? GROUP BY patient_id),"
                     + " d AS (SELECT lower(btrim(first_name)) AS f, lower(btrim(last_name)) AS l, count(*) AS cnt FROM clinic_patients"
                     + "   WHERE tenant_id = ? AND deleted_at IS NULL AND archived_at IS NULL GROUP BY 1, 2)"
                     + " SELECT p.id, count(*) OVER () AS total, coalesce(v.cnt, 0) AS visits, v.last_at, n.next_at, coalesce(d.cnt, 1) AS same_name"
@@ -60,7 +60,8 @@ public class ClinicPatientDirectoryService {
         var built = PatientDirectoryQuery.build(view, search, includeArchived, practitionerId, followUp, dayStart, dayEnd);
         List<Object> args = new ArrayList<>();
         UUID t = tenantId.getValue();
-        args.add(t); args.add(t); args.add(Timestamp.from(now)); args.add(t);   // CTEs
+        // The next booking counts from the start of today: one earlier today that has not started is still the next one.
+        args.add(t); args.add(t); args.add(Timestamp.from(dayStart)); args.add(t);   // CTEs
         args.add(t);                                                              // WHERE p.tenant_id
         args.addAll(built.params());
         args.add(s); args.add((long) p * s);

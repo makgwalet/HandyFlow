@@ -68,7 +68,7 @@ public class ClinicBriefingService {
                         c.getPulseBpm(), c.getTemperatureC(), c.getOxygenSatPct())).orElse(null);
 
         List<BriefingRules.Appt> apptFacts = appts.stream().map(a -> new BriefingRules.Appt(a.getId(), a.getScheduledAt(), a.getStatus())).toList();
-        NextAppointment next = BriefingRules.nextAppointment(apptFacts, now)
+        NextAppointment next = BriefingRules.nextAppointment(apptFacts, now, BriefingRules.CLINIC_ZONE)
                 .flatMap(n -> appts.stream().filter(a -> a.getId().equals(n.id())).findFirst())
                 .map(a -> new NextAppointment(a.getId(), a.getScheduledAt(), a.getAppointmentType(), a.getStatus(),
                         a.getPractitionerId() == null ? null : names.get(a.getPractitionerId()), a.getReason())).orElse(null);

@@ -33,6 +33,14 @@ beforeEach(() => { get.mockReset(); post.mockReset(); get.mockResolvedValue({ da
 afterEach(cleanup)
 
 describe("PatientBriefingPanel", () => {
+  it("shows today's appointment whose time has passed, and says it has not started", async () => {
+    const at = new Date(Date.now() - 10 * 60_000).toISOString()
+    get.mockResolvedValue({ data: { data: briefing({ nextAppointment: { id: "a1", at, type: "TELEHEALTH", status: "SCHEDULED", practitionerName: "Andile Dlamini" } }) } })
+    show()
+    await screen.findByText("Next appointment")
+    expect(screen.queryByText("Nothing booked")).toBeNull()
+    expect(screen.getByText(/time has passed, not started/)).toBeTruthy()
+  })
   it("puts what must not be missed first, then the story of the last visit", async () => {
     show()
     expect((await screen.findByText("Severe allergy: Penicillin")).closest("[role=alert]")).toBeTruthy()

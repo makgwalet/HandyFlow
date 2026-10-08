@@ -71,7 +71,7 @@ export default function PatientBriefingPanel({ patientId, appointments, defaultP
             sub={last ? `${fmtDay(last.at)}${last.practitionerName ? ` · Dr ${last.practitionerName}` : ""}` : "No finished visits on record"} />
           <Stat label="Next appointment" icon={<CalendarClock size={13} />}
             main={b.nextAppointment ? fmtDay(b.nextAppointment.at) : "Nothing booked"}
-            sub={b.nextAppointment ? `${fmtTimeOfDay(b.nextAppointment.at)}${b.nextAppointment.practitionerName ? ` · Dr ${b.nextAppointment.practitionerName}` : ""}` : "No upcoming appointment"} />
+            sub={b.nextAppointment ? `${fmtTimeOfDay(b.nextAppointment.at)}${new Date(b.nextAppointment.at).getTime() < Date.now() ? " · time has passed, not started" : ""}${b.nextAppointment.practitionerName ? ` · Dr ${b.nextAppointment.practitionerName}` : ""}` : "No upcoming appointment"} />
           <Stat label="Follow-up" icon={<CalendarPlus size={13} />}
             main={recall ?? "None outstanding"}
             tone={b.recall && b.recall.overdueDays > 0 ? "danger" : undefined}
