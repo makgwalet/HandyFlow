@@ -40,6 +40,12 @@ public class ClinicAddendumService {
         return toResponse(a);
     }
 
+    /** An addendum the system writes because of something done after signing (for example a late prescription). */
+    @Transactional
+    public void addSystem(TenantId tenantId, ClinicConsultation c, String text) {
+        addendumRepo.save(ClinicConsultationAddendum.of(c, currentUserIdOrNull(), text.length() > MAX_LENGTH ? text.substring(0, MAX_LENGTH) : text));
+    }
+
     @Transactional(readOnly = true)
     public List<AddendumResponse> list(TenantId tenantId, UUID consultationId) {
         load(tenantId, consultationId);

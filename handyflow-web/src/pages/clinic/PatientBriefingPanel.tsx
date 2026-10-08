@@ -1,11 +1,11 @@
 // The "before you walk in" view: everything a clinician needs about the patient at a glance.
 // One server call (GET /patients/{id}/briefing); starting the consultation lives here too.
-import { useState } from "react"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
+import { startLabel, useStartConsultation } from "./useStartConsultation"
 import { AlertTriangle, CalendarClock, CalendarPlus, FlaskConical, History, Info, PlayCircle, Stethoscope } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { flowCard, masonry } from "./patientFile.shared"
-import { ago, bmi, fmtDay, fmtTimeOfDay, recallText, startPlan, type Briefing, type BriefingVisit } from "./briefing"
+import { ago, bmi, fmtDay, fmtTimeOfDay, recallText, type Briefing, type BriefingVisit } from "./briefing"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 
@@ -26,36 +26,10 @@ export default function PatientBriefingPanel({ patientId, appointments, defaultP
   /** Further cards for the same flowing grid (the editable clinical lists, contact details, family). */
   children?: React.ReactNode
 }) {
-  const qc = useQueryClient()
-  const [error, setError] = useState("")
+  const { plan, begin, error } = useStartConsultation({ patientId, appointments, defaultPractitionerId, onStartSession })
   const { data: b, isLoading, isError } = useQuery<Briefing>({
     queryKey: ["pf-briefing", patientId],
     queryFn: async () => unwrap(await apiClient.get(`/api/v1/clinic/patients/${patientId}/briefing`)),
-  })
-
-  const plan = startPlan(appointments, new Date())
-  const resuming = plan.kind === "resume" || !!b?.openDraft
-
-  const begin = useMutation({
-    mutationFn: async () => {
-      let appt = plan.appt
-      if (!appt) {
-        const res = await apiClient.post("/api/v1/clinic/appointments", {
-          patientId, practitionerId: defaultPractitionerId || null, scheduledAt: new Date().toISOString(),
-          durationMinutes: 30, appointmentType: "CONSULTATION", reason: "Walk-in",
-        })
-        appt = unwrap(res)
-      }
-      for (const step of plan.steps) appt = unwrap(await apiClient.post(`/api/v1/clinic/appointments/${appt!.id}/${step}`)) ?? appt
-      return appt
-    },
-    onSuccess: appt => {
-      setError("")
-      qc.invalidateQueries({ queryKey: ["pf-appointments", patientId] })
-      qc.invalidateQueries({ queryKey: ["pf-briefing", patientId] })
-      onStartSession(appt)
-    },
-    onError: (e: any) => setError(e.response?.data?.message ?? "Could not start the consultation"),
   })
 
   const grid = (kids: React.ReactNode) => <div style={masonry}>{kids}</div>
@@ -109,7 +83,7 @@ export default function PatientBriefingPanel({ patientId, appointments, defaultP
             style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "11px 16px", borderRadius: 10, border: "none", cursor: "pointer",
               background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", fontSize: 14, fontWeight: 700, opacity: begin.isPending ? 0.7 : 1 }}>
             <PlayCircle size={16} />
-            {begin.isPending ? "Starting…" : resuming ? "Resume consultation" : plan.kind === "walk-in" ? "Start walk-in consultation" : "Start consultation"}
+            {startLabel(plan.kind, !!b.openDraft, begin.isPending)}
           </button>
           <div style={{ fontSize: 11, color: "var(--hf-text-muted)", textAlign: "center" }}>
             {plan.kind === "walk-in" ? "No appointment today: one is created now" : "Uses today's appointment"}

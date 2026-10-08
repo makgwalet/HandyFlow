@@ -50,6 +50,7 @@ public class ClinicService {
     private final ClinicRoomService            roomService;
     private final ClinicSignOverrideService    signOverrides;
     private final ClinicVisitStageService      visitStages;
+    private final ClinicAddendumService        addendumService;
 
     // ── Patients ──────────────────────────────────────────────────────────────
 
@@ -768,7 +769,7 @@ public class ClinicService {
         if (!unfinished.isEmpty()) {
             throw new IllegalStateException("Finish the questionnaire before signing. Missing: " + String.join("; ", unfinished) + ".");
         }
-        c.sign();
+        c.sign(currentUserIdOrNull());
         consultationRepo.save(c);
         if (!missingSteps.isEmpty()) signOverrides.record(tenantId, c.getId(), currentUserIdOrNull(), missingSteps, reason);
         allergySnapshot.capture(tenantId, c.getId(), c.getPatientId());
@@ -808,7 +809,7 @@ public class ClinicService {
                                                    CreateConsultationRequest req) {
         ClinicConsultation c = consultationRepo.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Consultation", id.toString()));
-        if (c.isLocked()) {
+        if (c.isLocked() || c.isSigned()) {
             throw new IllegalStateException("Consultation is " + c.getStatus()
                     + " and can no longer be edited; add an addendum instead.");
         }
@@ -817,11 +818,8 @@ public class ClinicService {
                     + ": it is with the other clinician. Accept it, or return it to the nurse, before editing.");
         }
 
-        // Edits to an already-signed record keep the previous version (audit F-02).
-        // DRAFT autosaves are not recorded: they are the working copy, not the record.
-        if (c.isSigned()) {
-            consultationEditRepo.save(ClinicConsultationEdit.snapshotOf(c, currentUserIdOrNull()));
-        }
+        // A signed record is never edited (patch 0160): corrections are addenda. Edit history from before that stays
+        // readable at GET /consultations/{id}/edits. DRAFT autosaves are the working copy, not the record.
 
         boolean hasVitals = req.weightKg() != null || req.heightCm() != null
                 || req.bloodPressure() != null || req.pulseBpm() != null
@@ -920,9 +918,23 @@ public class ClinicService {
             p.recordAllergyOverride(reason, summary);
         }
         prescriptionRepo.save(p);
+        // A medicine added after signing leaves a dated, named addendum, so the signed note shows it was added later.
+        if (c.isSigned() || "LOCKED".equals(c.getStatus())) {
+            addendumService.addSystem(tenantId, c, "Prescription added after signing: " + describe(p)
+                    + (p.getAllergyOverrideReason() == null ? "" : ". Allergy warning overridden: " + p.getAllergyOverrideReason()));
+        } else if ("ABANDONED".equals(c.getStatus())) {
+            throw new IllegalStateException("This consultation was abandoned, so a prescription cannot be added to it.");
+        }
         patientClinicalService.recordPrescribed(tenantId, c.getPatientId(), p.getId(),
                 p.getMedicationName(), p.getNappiCode(), p.getDosage(), p.getFrequency());
         return toPrescriptionResponse(p);
+    }
+
+    private static String describe(ClinicPrescription p) {
+        return java.util.stream.Stream.of(p.getMedicationName(), p.getDosage(), p.getFrequency(), p.getDuration())
+                .filter(x -> x != null && !x.isBlank()).collect(java.util.stream.Collectors.joining(", "))
+                + (p.getQuantity() == null ? "" : ", quantity " + p.getQuantity())
+                + (p.getRepeats() == 0 ? "" : ", repeats " + p.getRepeats());
     }
 
     /** What a medicine name matches among the patient's recorded allergies (a prompt, not a safety clearance). */

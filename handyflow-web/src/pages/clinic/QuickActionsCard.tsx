@@ -22,7 +22,7 @@ function ConsultationSelect({ list, value, onChange }: { list: Cons[]; value: st
   )
 }
 
-function SickNoteModal({ patientId, list, onClose }: { patientId: string; list: Cons[]; onClose: () => void }) {
+export function SickNoteModal({ patientId, list, onClose }: { patientId: string; list: Cons[]; onClose: () => void }) {
   const [f, setF] = useState<CertForm>({ consultationId: list[0]?.id ?? "", unfitFrom: "", unfitTo: "", notes: "" })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")

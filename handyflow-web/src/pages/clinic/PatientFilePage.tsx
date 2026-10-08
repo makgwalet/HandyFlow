@@ -20,7 +20,7 @@ import { ACCOUNT_CFG, AMBER, BORDER, GRAY, GREEN_TEXT, LIGHT, NAVY, PURPLE_TEXT,
 import { AlertCircle, Archive, Calendar, Clock, CreditCard, FileText, FlaskConical, Heart, Link, MoreVertical, Phone, Pill, ShieldCheck, Stethoscope, User, UserCheck, UserX, Users } from "lucide-react"
 import OverviewTab from "./PatientOverviewTab"
 import AppointmentsTab from "./PatientAppointmentsTab"
-import ConsultationTab from "./PatientConsultationTab"
+import PatientVisitsTab from "./PatientVisitsTab"
 import RestrictedRecordGate from "./RestrictedRecordGate"
 import GrowthTab from "./GrowthTab"
 import { usePermission } from "../../hooks/usePermission"
@@ -47,8 +47,6 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
   const pid = patient.id
   const idInfo = saId(patient.idNumber)
 
-  const addToBill = (line: Omit<BillLine,"id">) =>
-    setBillLines(b=>[...b,{...line,id:crypto.randomUUID()}])
   const removeBillLine = (id:string) =>
     setBillLines(b=>b.filter(l=>l.id!==id))
 
@@ -97,7 +95,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
   const TABS: {id:TabId;label:string;icon:React.ElementType;badge?:number}[] = [
     {id:"overview",     label:"Overview",     icon:User},
     {id:"appointments", label:"Appointments", icon:Calendar,   badge:pendingAppts||undefined},
-    {id:"consultation", label:"Consult",      icon:Stethoscope},
+    {id:"consultation", label:"Visits",       icon:Stethoscope},
     {id:"running-bill", label:"Running bill", icon:CreditCard, badge:billLines.length||undefined},
     {id:"rx",           label:"Prescriptions",icon:Pill},
     {id:"labs",         label:"Lab results",  icon:FlaskConical},
@@ -246,7 +244,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
         appointments={appointments as any[]} consultations={consultations as any[]} defaultPractitionerId={myPractitionerId(practitioners as any[], userEmail)}
         onStartSession={startSession} onOpenTab={setActiveTab}/>}
       {activeTab==="appointments" && <AppointmentsTab patient={patient} appointments={appointments as Appointment[]} practitioners={practitioners as Practitioner[]} qc={qc} onStartSession={startSession}/>}
-      {activeTab==="consultation" && <ConsultationTab patient={patient} consultations={consultations as Consultation[]} practitioners={practitioners as Practitioner[]} qc={qc} addToBill={addToBill} onSwitchTab={setActiveTab}/>}
+      {activeTab==="consultation" && <PatientVisitsTab patientId={patient.id} appointments={appointments as any[]} defaultPractitionerId={myPractitionerId(practitioners as any[], userEmail)} onStartSession={startSession}/>}
       {activeTab==="running-bill" && <RunningBillTab billLines={billLines} onRemove={removeBillLine} patient={patient}/>}
       {activeTab==="rx"           && <PrescriptionsTab patient={patient} consultations={consultations as Consultation[]}/>}
       {activeTab==="labs"         && <LabsTabEnhanced patient={patient}/>}

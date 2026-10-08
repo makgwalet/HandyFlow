@@ -51,6 +51,7 @@ public class ClinicConsultation {
     String status = "SIGNED";
     @Column(name = "reviewing_practitioner_id") UUID reviewingPractitionerId;
     @Column(name = "signed_at") Instant signedAt;
+    @Column(name = "signed_by") UUID    signedBy;
 
     // Billing
     boolean billed = false;
@@ -133,9 +134,13 @@ public class ClinicConsultation {
         this.updatedAt = Instant.now();
     }
 
-    public void sign() {
+    public void sign() { sign(null); }
+
+    /** Signs the consultation and records who did (null when unknown, e.g. rows from before this was kept). */
+    public void sign(UUID by) {
         this.status    = "SIGNED";
         this.signedAt  = Instant.now();
+        this.signedBy  = by;
         this.updatedAt = this.signedAt;
     }
 

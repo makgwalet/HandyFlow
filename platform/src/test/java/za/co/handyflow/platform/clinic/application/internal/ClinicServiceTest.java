@@ -49,6 +49,7 @@ class ClinicServiceTest {
     @Mock ClinicRoomService roomService;
     @Mock ClinicSignOverrideService signOverrides;
     @Mock ClinicVisitStageService visitStages;
+    @Mock ClinicAddendumService addendumService;
 
     @org.junit.jupiter.api.BeforeEach
     void defaultVisitStages() {
@@ -941,7 +942,7 @@ class ClinicServiceTest {
         @DisplayName("updates clinical notes without touching vitals when only SOAP sent")
         void updatesClinicalNotesOnly() {
             var id = UUID.randomUUID();
-            var consultation = ClinicConsultation.create(TENANT, UUID.randomUUID(),
+            var consultation = ClinicConsultation.createDraft(TENANT, UUID.randomUUID(),
                     null, null, "Original complaint");
             consultation.recordVitals(
                     new BigDecimal("80"), new BigDecimal("175"),
@@ -1168,21 +1169,21 @@ class ClinicServiceTest {
         }
 
         @Test
-        @DisplayName("editing a SIGNED consultation stores the previous version")
-        void signedEditsKeepPreviousVersion() {
+        @DisplayName("a SIGNED consultation cannot be edited: the server points to an addendum and changes nothing")
+        void signedConsultationIsNotEdited() {
             var c = ClinicConsultation.create(TENANT, UUID.randomUUID(), null, null, "Original");
             c.recordClinical("hist", "exam", "Old diagnosis", List.of("J00"), "plan", 7);
             when(consultationRepo.findActiveById(TENANT, c.getId())).thenReturn(Optional.of(c));
-            when(patientRepo.findActiveById(any(), any())).thenReturn(Optional.of(patientWithId("Jane","D")));
 
             var req = new CreateConsultationRequest(null, null, null,
                     null, null, null, null, null, null,
                     null, null, "New diagnosis", null, null, null);
-            service.updateConsultation(TENANT, c.getId(), req);
+            assertThatThrownBy(() -> service.updateConsultation(TENANT, c.getId(), req))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("addendum");
 
-            verify(consultationEditRepo).save(argThat(e ->
-                    "Old diagnosis".equals(e.getDiagnosis()) && "Original".equals(e.getChiefComplaint())));
-            assertThat(c.getDiagnosis()).isEqualTo("New diagnosis");
+            assertThat(c.getDiagnosis()).isEqualTo("Old diagnosis");
+            verify(consultationRepo, never()).save(any());
+            verify(consultationEditRepo, never()).save(any());
         }
     }
 
@@ -1216,6 +1217,32 @@ class ClinicServiceTest {
             assertThat(result.medicationName()).isEqualTo("Amoxicillin");
             assertThat(result.dosage()).isEqualTo("500mg");
             assertThat(result.frequency()).isEqualTo("3× daily");
+        }
+
+        @Test
+        @DisplayName("a medicine added to a signed visit leaves an addendum saying it was added after signing")
+        void lateMedicineLeavesAnAddendum() {
+            var consultId = UUID.randomUUID();
+            var consult = ClinicConsultation.create(TENANT, UUID.randomUUID(), null, null, "Infection");   // SIGNED
+            when(consultationRepo.findActiveById(TENANT, consultId)).thenReturn(Optional.of(consult));
+
+            service.addPrescription(TENANT, consultId, new AddPrescriptionRequest("Amoxicillin", "500mg", "3x daily", "7 days", 21, 0, null));
+
+            verify(prescriptionRepo).save(any(ClinicPrescription.class));
+            verify(addendumService).addSystem(eq(TENANT), eq(consult), argThat((String t) ->
+                    t.startsWith("Prescription added after signing: Amoxicillin, 500mg, 3x daily, 7 days") && t.contains("quantity 21")));
+        }
+
+        @Test
+        @DisplayName("a medicine added while the visit is still a draft leaves no addendum")
+        void draftMedicineLeavesNoAddendum() {
+            var consultId = UUID.randomUUID();
+            var consult = ClinicConsultation.createDraft(TENANT, UUID.randomUUID(), null, null, "Infection");
+            when(consultationRepo.findActiveById(TENANT, consultId)).thenReturn(Optional.of(consult));
+
+            service.addPrescription(TENANT, consultId, new AddPrescriptionRequest("Amoxicillin", "500mg", "3x daily", "7 days", 21, 0, null));
+
+            verify(addendumService, never()).addSystem(any(), any(), any());
         }
 
         @Test
