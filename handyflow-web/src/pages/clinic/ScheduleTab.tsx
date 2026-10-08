@@ -1,5 +1,6 @@
 // src/pages/clinic/ScheduleTab.tsx
 // Day / Week calendar view per doctor — click slot to book appointment
+import { useVideoDock } from "./VideoDockProvider"
 import { Modal } from "./patientFile.shared"
 import PatientPicker, { type PickerPatient } from "./PatientPicker"
 import { myPractitionerId } from "./currentPractitioner"
@@ -181,16 +182,15 @@ export default function ScheduleTab({ onStartSession, prefill, onPrefillUsed }: 
     onError: (e:any) => setApiError(e.response?.data?.message ?? "Failed to send reminder"),
   })
 
-  // FIX: "no telehealth/video consultation option" gap.
-  const joinVideoCall = useMutation({
-    mutationFn: (id:string) => apiClient.post(`/api/v1/clinic/appointments/${id}/video-room`),
-    onSuccess: (res:any) => {
-      const url = res.data?.videoRoomUrl ?? res.videoRoomUrl
-      if (url) window.open(url, "_blank", "noopener,noreferrer")
-      qc.invalidateQueries({queryKey:["schedule-appts"]})
+  // The call opens in the persistent video dock, so it stays up while the clinician moves around.
+  const videoDock = useVideoDock()
+  const joinVideoCall = {
+    isPending: videoDock.busy,
+    mutate: async (id:string) => {
+      const a = selected
+      if (await videoDock.join(id, a?.patientName)) qc.invalidateQueries({queryKey:["schedule-appts"]})
     },
-    onError: (e:any) => setApiError(e.response?.data?.message ?? "Failed to start video call"),
-  })
+  }
 
   const book = useMutation({
     mutationFn: ({body, allowOverlap}:{body:any; allowOverlap?:boolean}) =>

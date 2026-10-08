@@ -36,6 +36,7 @@ import { BookingsPage }                 from './pages/bookings/BookingsPage'
 import { HrPage }                       from './pages/hr/HrPage'
 import { ClinicPage }                   from './pages/clinic/ClinicPage'
 import ConsultationWorkspacePage        from './pages/clinic/ConsultationWorkspacePage'
+import VideoDockProvider                from './pages/clinic/VideoDockProvider'
 import { EventsPage }                   from './pages/events/EventsPage'
 import ContractingPage                  from './pages/contracting/ContractingPage'
 import SigningPage                      from './pages/contracting/SigningPage'
@@ -205,6 +206,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
       <BrowserRouter>
+        <VideoDockProvider>
         <SessionExpiryModal />
         <Routes>
 {/* Public routes */}
@@ -358,6 +360,7 @@ export default function App() {
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </VideoDockProvider>
       </BrowserRouter>
       </ThemeProvider>
     </QueryClientProvider>

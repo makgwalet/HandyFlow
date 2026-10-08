@@ -16,6 +16,7 @@ import { consultSteps } from "./consultSteps"
 import { FOLLOW_UP_CHOICES, WIZARD_ORDER, nextStep, prevStep, stepNumber, vitalsLine, type WizardStep } from "./consultWizard"
 import SafetyBar from "./SafetyBar"
 import ClinicalContextDrawer, { useBriefing } from "./ClinicalContextDrawer"
+import { useVideoDock } from "./VideoDockProvider"
 import SignReviewPanel from "./SignReviewPanel"
 import type { SignedSummary } from "./NextPatientPanel"
 import { Recap, StepTitle, chipStyle } from "./ConsultationParts"
@@ -68,6 +69,7 @@ interface Props {
 }
 
 export default function ConsultationSession({ patient, appointment, onComplete, onMinimise, onCancel, discardToken = 0 }: Props) {
+  const video = useVideoDock()
   const qc = useQueryClient()
   const { confirm, prompt, notify, dialogs } = useDialogs()
 
@@ -407,6 +409,8 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
         visit={`${(appointment.appointmentType||"Consultation").replace(/_/g," ").toLowerCase().replace(/^./, c=>c.toUpperCase())}${appointment.reason ? ` · ${appointment.reason}` : ""}`}
         stateLabel={lifecycleLabel(status, { ...soap, hasVitals: [soap.weightKg, soap.heightCm, soap.bloodPressure, soap.pulseBpm, soap.temperatureC, soap.oxygenSatPct].some(v => v.trim()) }, required)} timer={fmtTimer(elapsed)}
         saveText={locked ? "Read only" : draftState==="saving" ? "Saving…" : draftState==="saved" ? "Auto-saved" : draftState==="error" ? "Not saved, check connection" : ""}>
+        {appointment.appointmentType === "TELEHEALTH" && <button id="consult-video" onClick={()=>video.join(appointment.id, patient.fullName)} disabled={video.busy} style={barBtn}>
+          {video.call?.appointmentId === appointment.id ? "Show video call" : video.busy ? "Starting…" : "Join video call"}</button>}
         {canSign && !locked && <button id="consult-complete" onClick={()=>setStep("sign")} style={{ ...barBtn, background:TEAL, color:"var(--hf-text-on-solid)", border:"none" }}>Review &amp; sign</button>}
         {canHandoff && !locked && <button onClick={sendToDoctor} disabled={handoffBusy || !draftReady}
           title={handoffError || "Hand this consultation to a doctor; it leaves your drafts until returned"} style={barBtn}>{handoffBusy ? "Sending…" : "Send to doctor"}</button>}
