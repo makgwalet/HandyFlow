@@ -11,6 +11,13 @@ export const KIND_LABEL: Record<string, string> = {
   APPOINTMENT: "Appointments", CONSULTATION: "Consultations", PRESCRIPTION: "Prescriptions",
   LAB: "Lab results", CLAIM: "Claims", PAYMENT: "Payments",
 }
+/** One colour per kind of event, so the line reads at a glance. The label beside it always names the kind: colour is never the only cue. */
+export const KIND_COLOR: Record<string, string> = {
+  APPOINTMENT: "var(--hf-info-text)", CONSULTATION: "var(--hf-success-text)", PRESCRIPTION: "var(--hf-violet-text)",
+  LAB: "var(--hf-warning-text)", CLAIM: "var(--hf-accent-text)", PAYMENT: "var(--hf-primary-text)",
+}
+const colorOf = (kind: string) => KIND_COLOR[kind] ?? "var(--hf-text-muted)"
+
 const CLINICAL = ["APPOINTMENT", "CONSULTATION", "PRESCRIPTION", "LAB"]
 const BILLING = ["CLAIM", "PAYMENT"]
 
@@ -66,36 +73,42 @@ export default function TimelineTab({ patientId }: { patientId: string }) {
       </div>
       {shown.length === 0
         ? <div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>Every kind of event is hidden. Turn one back on above.</div>
-        : groupByDay(shown).map(g => (
-          <div key={g.day} style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", letterSpacing: "0.04em", marginBottom: 6 }}>
-              {dayLabel(g.events[0].at).toUpperCase()}
-            </div>
-            {g.events.map(e => (
-              <div key={`${e.kind}-${e.id}`} style={{ display: "flex", gap: 12, padding: "8px 12px", marginBottom: 6,
-                background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8 }}>
-                <div style={{ width: 54, fontSize: 12, color: "var(--hf-text-muted)", flexShrink: 0 }}>{timeLabel(e.at)}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)" }}>{(KIND_LABEL[e.kind] ?? e.kind).toUpperCase()}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{e.title}</div>
-                  {e.detail && <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{e.detail}</div>}
+        : (
+          <ol aria-label="Patient timeline" style={{ listStyle: "none", margin: 0, padding: "22px 20px 22px 22px", position: "relative",
+            border: "1px solid var(--hf-border)", borderRadius: 12, background: "linear-gradient(180deg, var(--hf-surface) 55%, var(--hf-accent-soft))" }}>
+            <span aria-hidden="true" style={{ position: "absolute", left: 32, top: 34, bottom: 34, width: 2, background: "var(--hf-border-strong, var(--hf-text-faint))", opacity: 0.6 }} />
+            {groupByDay(shown).flatMap(g => g.events.map((e, i) => ({ e, first: i === 0 }))).map(({ e, first }) => {
+              const c = colorOf(e.kind)
+              return (
+                <li key={`${e.kind}-${e.id}`} style={{ position: "relative", paddingLeft: 48, paddingBottom: 26 }}>
+                  <span aria-hidden="true" style={{ position: "absolute", left: 0, top: 2, width: 22, height: 22, boxSizing: "border-box", borderRadius: "50%",
+                    border: `4px solid ${c}`, background: "var(--hf-surface)" }} />
+                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+                    <div style={{ fontSize: first ? 24 : 20, fontWeight: 800, lineHeight: 1.1, color: c }}>{first ? dayLabel(e.at) : timeLabel(e.at)}</div>
+                    {e.status && (
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 20, whiteSpace: "nowrap",
+                        background: "var(--hf-surface-2, var(--hf-border))", color: "var(--hf-text-muted)" }}>{pretty(e.status)}</span>
+                    )}
+                  </div>
+                  <div aria-hidden="true" style={{ borderBottom: "2px dashed var(--hf-border)", margin: "6px 0 8px", maxWidth: 360 }} />
+                  <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.04em", color: c }}>
+                    {(KIND_LABEL[e.kind] ?? e.kind).toUpperCase()}{first ? <span style={{ fontWeight: 600, color: "var(--hf-text-muted)" }}>{` · ${timeLabel(e.at)}`}</span> : null}
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--hf-text)", marginTop: 2 }}>{e.title}</div>
+                  {e.detail && <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 2 }}>{e.detail}</div>}
                   {(e.summary ?? []).length > 0 && (
-                    <ul aria-label="Visit summary" style={{ margin: "4px 0 0", paddingLeft: 16, fontSize: 12, color: "var(--hf-text-muted)" }}>
+                    <ul aria-label="Visit summary" style={{ margin: "6px 0 0", paddingLeft: 16, fontSize: 12, color: "var(--hf-text-muted)", lineHeight: 1.5 }}>
                       {(e.summary ?? []).map(l => <li key={l}>{l}</li>)}
                     </ul>)}
                   {(e.people ?? []).length > 0 && (
-                    <div style={{ marginTop: 4, fontSize: 12, color: "var(--hf-text-muted)" }}>
+                    <div style={{ marginTop: 6, fontSize: 12, color: "var(--hf-text-muted)" }}>
                       <strong style={{ color: "var(--hf-text)", fontWeight: 600 }}>People: </strong>{(e.people ?? []).join(" · ")}
                     </div>)}
-                </div>
-                {e.status && (
-                  <span style={{ alignSelf: "flex-start", fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 20,
-                    background: "var(--hf-surface-2, var(--hf-border))", color: "var(--hf-text-muted)" }}>{pretty(e.status)}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        ))}
+                </li>
+              )
+            })}
+          </ol>
+        )}
     </div>
   )
 }
