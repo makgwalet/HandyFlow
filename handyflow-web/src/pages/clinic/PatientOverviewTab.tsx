@@ -4,7 +4,9 @@ import { useState } from "react"
 import PatientNotesPanel from "./PatientNotes"
 import ObservationMatrix from "./ObservationMatrix"
 import PatientSummaryPrint from "./PatientSummaryPrint"
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
+import { usePermission } from "../../hooks/usePermission"
+import { EMPTY_DEPENDANT, PREGNANCY, PREGNANCY_LABEL, SEX_AT_BIRTH, SEX_LABEL, ageText, applyIdNumber, dependantProblem, pregnancyApplies, profilePatch, sexFromSaId, type DependantForm } from "./overviewView"
 import { apiClient } from "../../api/client"
 import ClinicalSummaryPanel from "./ClinicalSummaryPanel"
 import PatientBriefingPanel from "./PatientBriefingPanel"
@@ -17,23 +19,69 @@ import { ArrowRight, Plus } from "lucide-react"
 export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc, appointments = [], defaultPractitionerId, onStartSession, onOpenTab }: {
   patient:Patient; idInfo:any; familyMembers:Patient[]; onOpenPatient?:(p:Patient)=>void; qc:any
   appointments?: any[]; defaultPractitionerId?: string; onStartSession?: (appt:any)=>void
-  onOpenTab?: (tab:"history"|"labs"|"appointments"|"rx")=>void
+  onOpenTab?: (tab:"history"|"labs"|"appointments"|"rx"|"growth")=>void
 }) {
   const [showAddDep, setShowAddDep] = useState(false)
-  const [depForm, setDepForm] = useState({ firstName:"", lastName:"", idNumber:"", dateOfBirth:"", gender:"", phone:"", relationship:"CHILD" })
+  const [depForm, setDepForm] = useState<DependantForm>(EMPTY_DEPENDANT)
   const [depError, setDepError] = useState("")
+  const canEdit = usePermission("CLINIC_PATIENT_UPDATE")
+  const canGrowth = usePermission("CLINIC_GROWTH_READ")
+  const [editingProfile, setEditingProfile] = useState(false)
+  const [sexDraft, setSexDraft] = useState("")
+  const [pregDraft, setPregDraft] = useState("")
+  const [profileError, setProfileError] = useState("")
+
+  // The list that opened this file is a snapshot; this keeps sex at birth and pregnancy status current after an edit.
+  const profileKey = ["pf-patient-profile", patient.id]
+  const { data: fresh } = useQuery<any>({ queryKey: profileKey, initialData: patient, staleTime: 30000, retry: false,
+    queryFn: async () => { const r = await apiClient.get(`/api/v1/clinic/patients/${patient.id}`); return r?.data?.data ?? r?.data } })
+  const profile: any = { ...patient, ...(fresh ?? {}) }
+  const sexAtBirth: string | null = profile.sexAtBirth ?? null
+  const suggested = sexFromSaId(patient.idNumber)
+  const age = ageText(patient.dateOfBirth)
+
+  const closeAddDep = () => { setShowAddDep(false); setDepError(""); setDepForm(EMPTY_DEPENDANT) }
+
+  const saveProfile = useMutation({
+    mutationFn: (body:object)=>apiClient.patch(`/api/v1/clinic/patients/${patient.id}`, body),
+    onSuccess: (res:any)=>{
+      const next = res?.data?.data ?? res?.data
+      qc.setQueryData(profileKey, (old:any)=>({ ...(old ?? patient), ...(next ?? {}) }))
+      qc.invalidateQueries({queryKey:["growth", patient.id]})
+      qc.invalidateQueries({queryKey:["clinic-patients"]})
+      setEditingProfile(false); setProfileError("")
+    },
+    onError:(e:any)=>setProfileError(e.response?.data?.message??"Could not save"),
+  })
 
   const addDependant = useMutation({
-    mutationFn: (body:any)=>apiClient.post("/api/v1/clinic/patients",body),
-    onSuccess: ()=>{
+    mutationFn: async (f:DependantForm)=>{
+      const created = await apiClient.post("/api/v1/clinic/patients",{
+        firstName:f.firstName.trim(), lastName:f.lastName.trim(),
+        idNumber:f.idNumber||null, dateOfBirth:f.dateOfBirth||null,
+        gender:f.gender||null, phone:f.phone||null,
+        emergencyContactName:patient.fullName,
+        emergencyContactPhone:patient.phone||null,
+        accountType:"DEPENDANT",
+        principalId:patient.id,
+        relationship:f.relationship,
+      })
+      const id = created?.data?.data?.id ?? created?.data?.id
+      // Sex at birth is not part of registration; it is saved straight after, so a failure here does not lose the new dependant.
+      if (id && f.sexAtBirth) {
+        try { await apiClient.patch(`/api/v1/clinic/patients/${id}`, { sexAtBirth: f.sexAtBirth }) }
+        catch { return { sexSaved:false } }
+      }
+      return { sexSaved:true }
+    },
+    onSuccess: (r:{sexSaved:boolean})=>{
       qc.invalidateQueries({queryKey:["pf-family"]})
       qc.invalidateQueries({queryKey:["clinic-patients"]})
-      setShowAddDep(false)
-      setDepForm({firstName:"",lastName:"",idNumber:"",dateOfBirth:"",gender:"",phone:"",relationship:"CHILD"})
+      if (r.sexSaved) closeAddDep()
+      else setDepError("The dependant was added, but their sex at birth could not be saved. Open their file and set it there.")
     },
     onError:(e:any)=>setDepError(e.response?.data?.message??"Failed to add dependant"),
   })
-
 
   return (
     <div>
@@ -47,7 +95,7 @@ export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPati
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
           {[
             {label:"SA ID",             value:patient.idNumber||"—"},
-            {label:"Date of birth",     value:idInfo?`${idInfo.dob} (${idInfo.age} yrs)`:patient.dateOfBirth||"—"},
+            {label:"Date of birth",     value:idInfo?`${idInfo.dob} (${age ?? `${idInfo.age} y`})`:patient.dateOfBirth?`${patient.dateOfBirth}${age?` (${age})`:""}`:"—"},
             {label:"Gender",            value:patient.gender?.replace("_"," ")||"—"},
             {label:"Phone",             value:patient.phone||"—"},
             {label:"Email",             value:patient.email||"—"},
@@ -61,6 +109,47 @@ export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPati
               <div style={{ fontSize:14, color:"var(--hf-text)", fontWeight:500, wordBreak:"break-all" }}>{item.value}</div>
             </div>
           ))}
+        </div>
+
+        {/* Sex at birth and pregnancy status: growth charts and sex-specific questions depend on them */}
+        <div aria-label="Clinical profile" style={{ padding:"11px 14px", background:LIGHT, borderRadius:10, border:`1px solid ${sexAtBirth?BORDER:"var(--hf-warning-border, "+BORDER+")"}`, marginBottom:16 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:10, fontWeight:700, color:GRAY, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:3 }}>Sex at birth</div>
+              <div style={{ fontSize:14, color:"var(--hf-text)", fontWeight:500 }}>
+                {sexAtBirth ? SEX_LABEL[sexAtBirth] ?? sexAtBirth : <span style={{ color:"var(--hf-warning-text, var(--hf-text))" }}>Not recorded</span>}
+                {sexAtBirth==="FEMALE" && profile.pregnancyStatus && <span style={{ color:GRAY, fontWeight:400 }}> · {PREGNANCY_LABEL[profile.pregnancyStatus] ?? profile.pregnancyStatus}</span>}
+              </div>
+              {!sexAtBirth && <div style={{ fontSize:11, color:GRAY, marginTop:2 }}>Growth charts and sex-specific questions need this.{suggested ? ` The ID number suggests ${SEX_LABEL[suggested].toLowerCase()}.` : ""}</div>}
+            </div>
+            {canEdit && !editingProfile && (
+              <button type="button" onClick={()=>{ setSexDraft(sexAtBirth ?? suggested ?? ""); setPregDraft(profile.pregnancyStatus ?? ""); setProfileError(""); setEditingProfile(true) }}
+                style={{ padding:"4px 10px", borderRadius:6, border:`1px solid ${BORDER}`, background:"var(--hf-surface)", fontSize:12, fontWeight:600, cursor:"pointer" }}>{sexAtBirth?"Change":"Set"}</button>
+            )}
+            {canGrowth && onOpenTab && (
+              <button type="button" onClick={()=>onOpenTab("growth")}
+                style={{ padding:"4px 10px", borderRadius:6, border:`1px solid ${BORDER}`, background:"var(--hf-surface)", fontSize:12, fontWeight:600, cursor:"pointer" }}>Growth chart</button>
+            )}
+          </div>
+          {editingProfile && (
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginTop:10, alignItems:"center" }}>
+              <select aria-label="Sex at birth" value={sexDraft} onChange={e=>setSexDraft(e.target.value)} style={sinp}>
+                <option value="">Not recorded</option>
+                {SEX_AT_BIRTH.map(x=><option key={x} value={x}>{SEX_LABEL[x]}</option>)}
+              </select>
+              {pregnancyApplies(sexDraft) && (
+                <select aria-label="Pregnancy status" value={pregDraft} onChange={e=>setPregDraft(e.target.value)} style={sinp}>
+                  <option value="">Pregnancy: not recorded</option>
+                  {PREGNANCY.map(x=><option key={x} value={x}>{PREGNANCY_LABEL[x]}</option>)}
+                </select>
+              )}
+              <button type="button" disabled={saveProfile.isPending} onClick={()=>saveProfile.mutate(profilePatch(sexDraft, pregDraft))}
+                style={{ padding:"6px 12px", borderRadius:6, border:"none", background:"var(--hf-primary)", color:"var(--hf-text-on-solid)", fontSize:12, fontWeight:600, cursor:"pointer" }}>{saveProfile.isPending?"Saving...":"Save"}</button>
+              <button type="button" onClick={()=>setEditingProfile(false)}
+                style={{ padding:"6px 12px", borderRadius:6, border:`1px solid ${BORDER}`, background:"var(--hf-surface)", fontSize:12, cursor:"pointer" }}>Cancel</button>
+            </div>
+          )}
+          {profileError && <div role="alert" style={{ marginTop:8, fontSize:12, color:RED_TEXT }}>{profileError}</div>}
         </div>
 
         {/* Allergies, conditions and medicines: structured records, editable by clinicians */}
@@ -98,7 +187,7 @@ export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPati
                 Family account
               </div>
               {patient.accountType==="PRINCIPAL" && (
-                <button onClick={()=>setShowAddDep(true)}
+                <button onClick={()=>{ setDepError(""); setDepForm(EMPTY_DEPENDANT); setShowAddDep(true) }}
                   style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px",
                     background:"var(--hf-info-soft)", color:"var(--hf-info-text)", border:"1px solid var(--hf-info-border)",
                     borderRadius:6, fontSize:11, fontWeight:600, cursor:"pointer" }}>
@@ -152,7 +241,7 @@ export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPati
 
       {/* Add dependant modal */}
       {showAddDep && (
-        <Modal title="Add dependant to family account" onClose={()=>setShowAddDep(false)}>
+        <Modal title="Add dependant to family account" onClose={closeAddDep}>
           <div style={{ fontSize:12, color:GRAY, marginBottom:16, padding:"8px 12px", background:"var(--hf-info-soft)", borderRadius:8 }}>
             Principal: <strong>{patient.fullName}</strong> · Emergency contact will be auto-filled from principal.
           </div>
@@ -167,18 +256,7 @@ export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPati
             </div>
             <div style={{ gridColumn:"1/-1" }}>
               <label style={lbl}>SA ID number</label>
-              <input value={depForm.idNumber}
-                onChange={e=>{
-                  const v=e.target.value.replace(/\D/g,"").slice(0,13)
-                  const yy=+v.slice(0,2),mm=+v.slice(2,4),dd=+v.slice(4,6)
-                  const yr=yy<=(new Date().getFullYear()%100)?2000+yy:1900+yy
-                  setDepForm(f=>({...f, idNumber:v,
-                    ...(v.length===13?{
-                      dateOfBirth:`${yr}-${String(mm).padStart(2,"0")}-${String(dd).padStart(2,"0")}`,
-                      gender:+v[6]>=5?"MALE":"FEMALE"
-                    }:{})
-                  }))
-                }}
+              <input value={depForm.idNumber} onChange={e=>setDepForm(f=>applyIdNumber(f, e.target.value))}
                 placeholder="ID number" inputMode="numeric" style={sinp}/>
             </div>
             <div>
@@ -200,25 +278,25 @@ export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPati
                 {["MALE","FEMALE","NON_BINARY","PREFER_NOT_TO_SAY"].map(g=><option key={g} value={g}>{g.replace("_"," ")}</option>)}
               </select>
             </div>
+            <div>
+              <label style={lbl}>Sex at birth</label>
+              <select aria-label="Dependant sex at birth" value={depForm.sexAtBirth} onChange={e=>setDepForm(f=>({...f,sexAtBirth:e.target.value}))} style={sinp}>
+                <option value="">Not recorded</option>
+                {SEX_AT_BIRTH.map(x=><option key={x} value={x}>{SEX_LABEL[x]}</option>)}
+              </select>
+            </div>
             <div style={{ gridColumn:"1/-1" }}>
               <label style={lbl}>Phone</label>
               <input value={depForm.phone} onChange={e=>setDepForm(f=>({...f,phone:e.target.value}))} placeholder="+27 82 000 0000" style={sinp}/>
             </div>
           </div>
           {depError && <div style={{ marginTop:10, padding:"8px 12px", background:"var(--hf-danger-soft)", border:"1px solid var(--hf-danger-border)", borderRadius:8, fontSize:13, color:RED_TEXT }}>{depError}</div>}
-          <ModalFooter onCancel={()=>setShowAddDep(false)}
+          <ModalFooter onCancel={closeAddDep}
             onConfirm={()=>{
-              if (!depForm.firstName.trim()||!depForm.lastName.trim()) return
-              addDependant.mutate({
-                firstName:depForm.firstName, lastName:depForm.lastName,
-                idNumber:depForm.idNumber||null, dateOfBirth:depForm.dateOfBirth||null,
-                gender:depForm.gender||null, phone:depForm.phone||null,
-                emergencyContactName:patient.fullName,
-                emergencyContactPhone:patient.phone||null,
-                accountType:"DEPENDANT",
-                principalId:patient.id,
-                relationship:depForm.relationship,
-              })
+              const problem = dependantProblem(depForm)
+              if (problem) { setDepError(problem); return }
+              setDepError("")
+              addDependant.mutate(depForm)
             }}
             confirmLabel={addDependant.isPending?"Adding...":"Add dependant"} loading={addDependant.isPending}/>
         </Modal>
