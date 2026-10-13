@@ -21,6 +21,7 @@ public class ClinicAccountService {
     private final ClinicClaimRepository        claimRepo;
     private final ClinicPaymentRepository      paymentRepo;
     private final ClinicClaimLedgerService     ledger;
+    private final ClinicPatientReceivableService receivables;
 
     @Transactional(readOnly = true)
     public AccountResponse account(TenantId t, UUID patientId) {
@@ -34,6 +35,7 @@ public class ClinicAccountService {
         Map<UUID, ClinicClaim> byVisit = new HashMap<>();
         for (ClinicClaim c : claimRepo.findByPatient(t, patientId)) byVisit.put(c.getConsultationId(), c);
         Map<UUID, ClaimLedgerRules.Totals> totals = ledger.totalsByClaim(t.getValue());
+        Map<UUID, java.math.BigDecimal> linked = receivables.linkedByClaim(t.getValue(), patientId);
 
         List<AccountVisit> visits = new ArrayList<>();
         for (ClinicConsultation c : consultationRepo.findByPatient(t, patientId)) {
@@ -46,7 +48,7 @@ public class ClinicAccountService {
             ClaimLedgerRules.Totals lt = totals.getOrDefault(claim.getId(), ClaimLedgerRules.Totals.NONE);
             visits.add(new AccountVisit(c.getId(), claim.getId(), c.getConsultedAt(), c.getChiefComplaint(), claim.getStatus(),
                     claim.getSchemeName(), claim.getGrossAmount(), claim.getSchemePortion(), claim.getPatientPortion(),
-                    ClaimLedgerRules.outstanding(claim.getSchemePortion(), lt), AccountRules.paidAgainst(claim.getId(), payments)));
+                    ClaimLedgerRules.outstanding(claim.getSchemePortion(), lt), AccountRules.paidAgainst(claim.getId(), payments).add(linked.getOrDefault(claim.getId(), java.math.BigDecimal.ZERO))));
         }
         visits.sort(Comparator.comparing(AccountVisit::visitDate, Comparator.nullsLast(Comparator.reverseOrder())));
         return AccountRules.build(patientId, visits, payments);

@@ -28,7 +28,10 @@ final class AccountRules {
         }
         BigDecimal paid = payments.stream().map(p -> z(p.amount())).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal balance = patient.subtract(paid).max(BigDecimal.ZERO);
-        return new AccountResponse(patientId, charged, scheme, patient, paid, balance, schemeOut, notBilled, visits, payments);
+        // Money paid that no visit carries yet: the patient's payments less what the visits show as paid.
+        BigDecimal onVisits = visits.stream().map(v -> z(v.paidAgainstVisit())).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal onAccount = paid.subtract(onVisits).max(BigDecimal.ZERO);
+        return new AccountResponse(patientId, charged, scheme, patient, paid, balance, schemeOut, notBilled, visits, payments, onAccount);
     }
 
     /** Payments recorded against this claim only; payments with no claim are on account and counted in the total. */

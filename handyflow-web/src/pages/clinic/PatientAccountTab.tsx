@@ -10,7 +10,7 @@ import { fmtDay } from "./briefing"
 import ModalShell from "./ModalShell"
 import { BORDER, Empty, GRAY, LIGHT, RED_TEXT, downloadPdf, fmtR, lbl, sinp } from "./patientFile.shared"
 import { primaryBtn, smallBtn } from "./OverviewCard"
-import { claimStatus, isOwed, methodLabel, type Account } from "./accountView"
+import { claimStatus, isOwed, methodLabel, onAccountNote, payTowardsLabel, payableVisits, type Account } from "./accountView"
 
 const unwrap = (r: any) => r?.data?.data ?? r?.data
 const TONE = { ok: ["var(--hf-success-soft)", "var(--hf-success-text-strong)"], warn: ["var(--hf-warning-soft)", "var(--hf-warning-text)"],
@@ -20,14 +20,19 @@ const TONE = { ok: ["var(--hf-success-soft)", "var(--hf-success-text-strong)"], 
 export default function PatientAccountTab({ patientId }: { patientId: string }) {
   const qc = useQueryClient()
   const canPay = usePermission("CLINIC_PAYMENT_CREATE")
+  const canLink = usePermission("CLINIC_PAYMENT_ALLOCATE")
   const key = ["pf-account", patientId]
   const { data: acc, isLoading, isError } = useQuery<Account>({ queryKey: key, retry: false,
     queryFn: async () => unwrap(await apiClient.get(`/api/v1/clinic/patients/${patientId}/account`)) })
   const [paying, setPaying] = useState(false)
-  const [form, setForm] = useState({ amount: "", method: "CASH", reference: "" })
+  const [form, setForm] = useState({ amount: "", method: "CASH", reference: "", claimId: "" })
   const pay = useMutation({
-    mutationFn: () => apiClient.post("/api/v1/clinic/billing/payments", { patientId, method: form.method, amount: Number(form.amount), reference: form.reference || undefined }),
-    onSuccess: () => { setPaying(false); setForm({ amount: "", method: "CASH", reference: "" }); qc.invalidateQueries({ queryKey: key }) },
+    mutationFn: () => apiClient.post("/api/v1/clinic/billing/payments", { patientId, method: form.method, amount: Number(form.amount), reference: form.reference || undefined, ...(form.claimId ? { claimId: form.claimId } : {}) }),
+    onSuccess: () => { setPaying(false); setForm({ amount: "", method: "CASH", reference: "", claimId: "" }); qc.invalidateQueries({ queryKey: key }) },
+  })
+  const link = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/clinic/billing/patients/${patientId}/payments/link-on-account`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key }),
   })
   const payError = (pay.error as any)?.response?.data?.message ?? (pay.isError ? "The payment could not be saved." : null)
   const amountOk = Number(form.amount) > 0
@@ -64,6 +69,11 @@ export default function PatientAccountTab({ patientId }: { patientId: string }) 
         {stat("Paid by patient", fmtR(acc.paidByPatient))}
         {stat("Balance owing", fmtR(acc.balanceOwing), true)}
       </div>
+      {onAccountNote(acc) && <div style={{ fontSize: 12, color: GRAY, marginBottom: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <span>R {onAccountNote(acc)}</span>
+        {canLink && <button type="button" style={smallBtn} disabled={link.isPending} onClick={() => link.mutate()}>{link.isPending ? "Linking…" : "Link to the visits that owe"}</button>}
+        {link.isError && <span role="alert" style={{ color: RED_TEXT }}>Could not link the payments.</span>}
+      </div>}
       {acc.schemeOutstanding > 0 && <div style={{ fontSize: 12, color: GRAY, marginBottom: 10 }}>The scheme still owes {fmtR(acc.schemeOutstanding)} on submitted claims. That is not part of the patient's balance.</div>}
       {acc.visitsNotBilled > 0 && <div style={{ fontSize: 12, color: "var(--hf-warning-text)", marginBottom: 10 }}>
         {acc.visitsNotBilled} visit{acc.visitsNotBilled !== 1 ? "s have" : " has"} not been billed yet. Create the claim from the visit or on the Claims page.</div>}
@@ -121,6 +131,11 @@ export default function PatientAccountTab({ patientId }: { patientId: string }) 
           <label style={{ ...lbl, marginTop: 10 }}>Method</label>
           <select aria-label="Method" style={sinp} value={form.method} onChange={e => setForm(f => ({ ...f, method: e.target.value }))}>
             <option value="CASH">Cash</option><option value="EFT">EFT</option><option value="CARD">Card</option>
+          </select>
+          <label style={{ ...lbl, marginTop: 10 }} htmlFor="pay-towards">Pay towards</label>
+          <select id="pay-towards" style={sinp} value={form.claimId} onChange={e => setForm(f => ({ ...f, claimId: e.target.value }))}>
+            <option value="">The oldest visit that owes, then the next</option>
+            {payableVisits(acc).map(v => <option key={v.claimId!} value={v.claimId!}>{payTowardsLabel(v, fmtDay, fmtR)}</option>)}
           </select>
           <label style={{ ...lbl, marginTop: 10 }}>Reference (optional)</label>
           <input aria-label="Reference" style={sinp} value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} />

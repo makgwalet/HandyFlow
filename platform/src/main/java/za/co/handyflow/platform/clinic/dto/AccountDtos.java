@@ -23,5 +23,11 @@ public final class AccountDtos {
             BigDecimal totalCharged, BigDecimal schemeShare, BigDecimal patientShare,
             BigDecimal paidByPatient, BigDecimal balanceOwing, BigDecimal schemeOutstanding,
             int visitsNotBilled,
-            List<AccountVisit> visits, List<AccountPayment> payments) {}
+            List<AccountVisit> visits, List<AccountPayment> payments,
+            BigDecimal paidOnAccount) {
+        public AccountResponse(UUID patientId, BigDecimal totalCharged, BigDecimal schemeShare, BigDecimal patientShare, BigDecimal paidByPatient,
+                               BigDecimal balanceOwing, BigDecimal schemeOutstanding, int visitsNotBilled, List<AccountVisit> visits, List<AccountPayment> payments) {
+            this(patientId, totalCharged, schemeShare, patientShare, paidByPatient, balanceOwing, schemeOutstanding, visitsNotBilled, visits, payments, BigDecimal.ZERO);
+        }
+    }
 }

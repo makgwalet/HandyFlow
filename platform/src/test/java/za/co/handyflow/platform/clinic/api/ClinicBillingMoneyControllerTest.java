@@ -33,6 +33,7 @@ class ClinicBillingMoneyControllerTest {
     @MockitoBean ClinicPatientInvoicePdfService patientInvoicePdfService;
     @MockitoBean ClinicClaimSubmissionPdfService claimSubmissionPdfService;
     @MockitoBean ClinicClaimMoneyService money;
+    @MockitoBean za.co.handyflow.platform.clinic.application.internal.ClinicPatientReceivableService receivables;
     @MockitoBean ClinicStatementOfAccountPdfService statementOfAccountPdfService;
 
     final UUID id = UUID.randomUUID();
@@ -94,5 +95,18 @@ class ClinicBillingMoneyControllerTest {
     @Test @WithMockUser(authorities = "CLINIC_BILLING_READ")
     void theCoarseBillingReadIsNoLongerEnoughToReadTheLedger() throws Exception {
         mvc.perform(get(base + "/" + id + "/ledger")).andExpect(status().isForbidden());
+    }
+
+    @Test @WithMockUser(authorities = "CLINIC_PAYMENT_CREATE")
+    void linkingOnAccountPaymentsNeedsTheAllocatePermission() throws Exception {
+        mvc.perform(post("/api/v1/clinic/billing/patients/" + UUID.randomUUID() + "/payments/link-on-account").with(csrf())).andExpect(status().isForbidden());
+        verifyNoInteractions(receivables);
+    }
+
+    @Test @WithMockUser(authorities = "CLINIC_PAYMENT_ALLOCATE")
+    void linkingOnAccountPaymentsWorksWithIt() throws Exception {
+        when(receivables.linkOnAccount(any(), any(), any())).thenReturn(new za.co.handyflow.platform.clinic.dto.PaymentLinkDtos.LinkResult(new BigDecimal("300"), BigDecimal.ZERO, 2));
+        mvc.perform(post("/api/v1/clinic/billing/patients/" + UUID.randomUUID() + "/payments/link-on-account").with(csrf()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.visitsPaidOff").value(2));
     }
 }

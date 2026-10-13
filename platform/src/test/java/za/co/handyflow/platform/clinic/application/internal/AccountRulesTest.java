@@ -62,4 +62,22 @@ class AccountRulesTest {
         assertEquals(0, d("60").compareTo(AccountRules.paidAgainst(c, List.of(pay(c, "60"), pay(UUID.randomUUID(), "40"), pay(null, "10")))));
         assertEquals(0, AccountRules.paidAgainst(null, List.of(pay(null, "10"))).signum());
     }
+
+    @Test
+    void moneyNoVisitCarriesIsOnAccount() {
+        UUID claim = UUID.randomUUID();
+        var linked = new AccountVisit(UUID.randomUUID(), claim, Instant.now(), "Cough", "ACCEPTED", "Discovery",
+                d("500"), d("400"), d("100"), d("0"), d("100"));
+        var r = AccountRules.build(UUID.randomUUID(), List.of(linked), List.of(pay(null, "100"), pay(null, "250")));
+        assertEquals(0, d("350").compareTo(r.paidByPatient()));
+        assertEquals(0, d("250").compareTo(r.paidOnAccount()));
+    }
+
+    @Test
+    void nothingIsOnAccountWhenEveryRandIsLinked() {
+        var linked = new AccountVisit(UUID.randomUUID(), UUID.randomUUID(), Instant.now(), "Cough", "ACCEPTED", "Discovery",
+                d("500"), d("400"), d("100"), d("0"), d("100"));
+        var r = AccountRules.build(UUID.randomUUID(), List.of(linked), List.of(pay(null, "100")));
+        assertEquals(0, d("0").compareTo(r.paidOnAccount()));
+    }
 }

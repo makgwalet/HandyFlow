@@ -13,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.clinic.application.internal.ClinicBillingService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicClaimMoneyService;
+import za.co.handyflow.platform.clinic.application.internal.ClinicPatientReceivableService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicClaimSubmissionPdfService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicPatientInvoicePdfService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicService;
@@ -38,6 +39,7 @@ public class ClinicBillingController {
     private final ClinicPatientInvoicePdfService patientInvoicePdfService;
     private final ClinicClaimSubmissionPdfService claimSubmissionPdfService;
     private final ClinicClaimMoneyService money;
+    private final ClinicPatientReceivableService receivables;
     private final ClinicStatementOfAccountPdfService statementOfAccountPdfService;
 
     // ── Claims ────────────────────────────────────────────────────────────────
@@ -262,9 +264,23 @@ public class ClinicBillingController {
     @Operation(summary = "Record a payment against a patient")
     public ResponseEntity<ApiResponse<PaymentResponse>> recordPayment(
             @jakarta.validation.Valid @RequestBody RecordPaymentRequest req) {
-        return ResponseEntity.status(201).body(ApiResponse.success("Payment recorded",
-                billingService.recordPayment(TenantContext.getTenantIdAsObject(), req,
-                        TenantContext.getCurrentUserId())));
+        var tenant = TenantContext.getTenantIdAsObject();
+        UUID me = TenantContext.getCurrentUserId();
+        // A visit chosen by the person is checked before any money is taken against it.
+        if (req.claimId() != null) receivables.requireOpenVisit(tenant.getValue(), req.patientId(), req.claimId());
+        PaymentResponse saved = billingService.recordPayment(tenant, req, me);
+        // Linking the payment to the visits it pays for is a second step: if it fails the payment is still recorded, on account.
+        try { receivables.linkNew(tenant.getValue(), saved.id(), me, req.claimId()); }
+        catch (RuntimeException e) { org.slf4j.LoggerFactory.getLogger(ClinicBillingController.class).warn("Payment {} was recorded but not linked to a visit: {}", saved.id(), e.getMessage()); }
+        return ResponseEntity.status(201).body(ApiResponse.success("Payment recorded", saved));
+    }
+
+    @PostMapping("/patients/{patientId}/payments/link-on-account")
+    @PreAuthorize("hasAuthority('CLINIC_PAYMENT_ALLOCATE')")
+    @Operation(summary = "Link the patient's payments that are not tied to a visit to the visits that still owe, oldest first")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.clinic.dto.PaymentLinkDtos.LinkResult>> linkOnAccount(@PathVariable UUID patientId) {
+        return ResponseEntity.ok(ApiResponse.success("Done",
+                receivables.linkOnAccount(TenantContext.getTenantIdAsObject().getValue(), patientId, TenantContext.getCurrentUserId())));
     }
 
     @GetMapping("/payments")

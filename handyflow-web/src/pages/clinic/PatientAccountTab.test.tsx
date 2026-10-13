@@ -59,4 +59,26 @@ describe("patient account", () => {
     get.mockRejectedValue(new Error("x")); show()
     expect(await screen.findByRole("alert")).toBeTruthy()
   })
+  it("offers the visits that owe in the payment window and sends the one chosen", async () => {
+    perms.CLINIC_PAYMENT_CREATE = true; post.mockResolvedValue({ data: {} }); show()
+    fireEvent.click(await screen.findByRole("button", { name: /Record payment/ }))
+    const pick = screen.getByLabelText("Pay towards") as HTMLSelectElement
+    expect(Array.from(pick.options).map(o => o.value)).toEqual(["", "k1"])
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "60" } })
+    fireEvent.change(pick, { target: { value: "k1" } })
+    fireEvent.click(screen.getByRole("button", { name: "Save payment" }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clinic/billing/payments", { patientId: "p1", method: "CASH", amount: 60, reference: undefined, claimId: "k1" }))
+  })
+  it("shows money not linked to a visit and links it for someone who may allocate", async () => {
+    perms.CLINIC_PAYMENT_ALLOCATE = true; post.mockResolvedValue({ data: {} })
+    get.mockResolvedValue({ data: { data: { ...account, paidOnAccount: 150 } } }); show()
+    expect(await screen.findByText(/not linked to a visit/)).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Link to the visits that owe" }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clinic/billing/patients/p1/payments/link-on-account"))
+  })
+  it("shows the unlinked money to everyone but the link button only to those who may allocate", async () => {
+    get.mockResolvedValue({ data: { data: { ...account, paidOnAccount: 150 } } }); show()
+    expect(await screen.findByText(/not linked to a visit/)).toBeTruthy()
+    expect(screen.queryByRole("button", { name: "Link to the visits that owe" })).toBeNull()
+  })
 })
