@@ -388,7 +388,7 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 
 ## 3. API authorization matrix
 
-213 endpoints. Each requires exactly the permission shown, except the one marked public. The access catalogue endpoint is `CLINIC_ADMIN`.
+215 endpoints. Each requires exactly the permission shown, except the one marked public. The access catalogue endpoint is `CLINIC_ADMIN`.
 
 | Area | Method | Path | Requires |
 |---|---|---|---|
@@ -491,6 +491,8 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 | Handoff | POST | `/consultations/{id}/doctor-complete` | `CLINIC_NURSE_HANDOFF_COMPLETE` |
 | Handoff | GET | `/consultations/handoff-queue` | `CLINIC_QUEUE_READ` |
 | Handoff | GET | `/consultations/{id}/transitions` | `CLINIC_CONSULTATION_READ` |
+| IssuedDocument | GET | `/issued-documents` | `CLINIC_DOCUMENT_VOID` |
+| IssuedDocument | POST | `/issued-documents/{id}/void` | `CLINIC_DOCUMENT_VOID` |
 | Lab | GET | `/lab/results` | `CLINIC_RESULT_READ` |
 | Lab | GET | `/lab/patients/{patientId}/results` | `CLINIC_RESULT_READ` |
 | Lab | POST | `/lab/results` | `CLINIC_RESULT_CREATE` |

@@ -4,6 +4,7 @@ import { apiClient } from "../../api/client"
 import ModalShell from "./ModalShell"
 import LetterTemplatePicker from "./LetterTemplatePicker"
 import SaveAsTemplate from "./SaveAsTemplate"
+import LetterheadSelect from "./LetterheadSelect"
 import { applyReferral } from "./letterView"
 
 const URGENCIES = [{ id: "ROUTINE", label: "Routine" }, { id: "SEMI_URGENT", label: "Semi-urgent" }, { id: "URGENT", label: "Urgent" }]
@@ -12,6 +13,7 @@ const lab: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 6
 
 export default function ReferralLetterModal({ consultationId, onClose }: { consultationId: string; onClose: () => void }) {
   const [form, setForm] = useState({ specialistName: "", specialty: "", reason: "", urgency: "ROUTINE", additionalNotes: "" })
+  const [letterheadId, setLetterheadId] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm(f => ({ ...f, [k]: e.target.value }))
@@ -20,7 +22,7 @@ export default function ReferralLetterModal({ consultationId, onClose }: { consu
   const generate = async () => {
     setBusy(true); setError("")
     try {
-      const res = await apiClient.post(`/api/v1/clinic/consultations/${consultationId}/referral-letter`, null, { params: form, responseType: "blob" } as any)
+      const res = await apiClient.post(`/api/v1/clinic/consultations/${consultationId}/referral-letter`, null, { params: letterheadId ? { ...form, letterheadId } : form, responseType: "blob" } as any)
       const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }))
       const link = document.createElement("a")
       link.href = url; link.download = `referral-letter-${consultationId}.pdf`; link.click()
@@ -47,6 +49,7 @@ export default function ReferralLetterModal({ consultationId, onClose }: { consu
         <div><label style={lab} htmlFor="ref-urg">Urgency</label>
           <select id="ref-urg" style={inp} value={form.urgency} onChange={set("urgency")}>{URGENCIES.map(u => <option key={u.id} value={u.id}>{u.label}</option>)}</select></div>
         <div style={{ gridColumn: "1 / -1" }}><label style={lab} htmlFor="ref-notes">Additional notes</label><input id="ref-notes" style={inp} value={form.additionalNotes} onChange={set("additionalNotes")} placeholder="Optional" /></div>
+        <div style={{ gridColumn: "1 / -1" }}><LetterheadSelect id="ref-head" value={letterheadId} onChange={setLetterheadId} style={inp} labelStyle={lab} /></div>
         <div style={{ gridColumn: "1 / -1" }}><SaveAsTemplate kind="REFERRAL" payload={() => ({ title: form.reason.trim() || undefined, body: form.additionalNotes.trim() || undefined, specialty: form.specialty.trim() || undefined, urgency: form.urgency })} /></div>
       </div>
       {error && <div role="alert" style={{ marginTop: 14, padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}

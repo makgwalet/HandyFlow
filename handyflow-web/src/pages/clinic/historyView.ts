@@ -78,7 +78,7 @@ export interface ConsultationRef { id: string; consultedAt: string }
 export const newestFirst = <T extends ConsultationRef>(list: T[]): T[] =>
   [...list].sort((a, b) => String(b.consultedAt).localeCompare(String(a.consultedAt)))
 
-export interface CertForm { consultationId: string; unfitFrom: string; unfitTo: string; notes: string }
+export interface CertForm { consultationId: string; unfitFrom: string; unfitTo: string; notes: string; letterheadId?: string }
 
 export function certProblem(f: CertForm): string | null {
   if (!f.consultationId) return "Choose the consultation this certificate belongs to."
@@ -91,5 +91,6 @@ export function certParams(f: CertForm): URLSearchParams {
   if (f.unfitFrom) p.set("unfitFrom", f.unfitFrom)
   if (f.unfitTo) p.set("unfitTo", f.unfitTo)
   if (f.notes.trim()) p.set("notes", f.notes.trim())
+  if (f.letterheadId) p.set("letterheadId", f.letterheadId)
   return p
 }

@@ -75,6 +75,29 @@ public class ClinicIssuedDocumentService {
         if (n == 0) throw new ResourceNotFoundException("Issued document", id.toString());
     }
 
+    /** One issued document as the administrator sees it. Never carries the verification code (only its hash is kept) or the PDF. */
+    public record IssuedRow(UUID id, String number, String type, String typeLabel, UUID patientId, String patientName, String issuerName,
+                            java.time.Instant issuedAt, String status, java.time.Instant voidedAt, String voidReason) {}
+
+    /** Newest first. {@code type} and {@code status} narrow the list when given; a number or patient name fragment in {@code q} narrows it further. */
+    @Transactional(readOnly = true)
+    public java.util.List<IssuedRow> list(UUID tenantId, String type, String status, String q, int limit) {
+        int max = Math.max(1, Math.min(limit <= 0 ? 100 : limit, 500));
+        String like = q == null || q.isBlank() ? null : "%" + q.trim().toLowerCase(java.util.Locale.ROOT).replace("%", "").replace("_", "") + "%";
+        return jdbc.query("""
+                SELECT d.id, d.doc_number, d.doc_type, d.patient_id, p.full_name, d.issuer_name, d.issued_at, d.status, d.voided_at, d.void_reason
+                FROM clinic_issued_documents d LEFT JOIN clinic_patients p ON p.id = d.patient_id AND p.tenant_id = d.tenant_id
+                WHERE d.tenant_id = ? AND (?::text IS NULL OR d.doc_type = ?) AND (?::text IS NULL OR d.status = ?)
+                  AND (?::text IS NULL OR lower(d.doc_number) LIKE ? OR lower(coalesce(p.full_name,'')) LIKE ?)
+                ORDER BY d.issued_at DESC, d.doc_number DESC LIMIT ?""",
+                (rs, i) -> new IssuedRow((UUID) rs.getObject(1), rs.getString(2), rs.getString(3), DocumentNumberRules.label(rs.getString(3)),
+                        (UUID) rs.getObject(4), rs.getString(5), rs.getString(6), rs.getTimestamp(7).toInstant(), rs.getString(8),
+                        rs.getTimestamp(9) == null ? null : rs.getTimestamp(9).toInstant(), rs.getString(10)),
+                tenantId, blank(type), blank(type), blank(status), blank(status), like, like, like, max);
+    }
+
+    private static String blank(String s) { return s == null || s.isBlank() ? null : s.trim(); }
+
     /** The public check. Looks only at the code; answers only with authenticity data. */
     @Transactional(readOnly = true)
     public VerifyResponse verify(String typedCode) {

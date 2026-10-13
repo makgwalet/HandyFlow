@@ -10,6 +10,7 @@ import SaveAsTemplate from "./SaveAsTemplate"
 import { applySickNote } from "./letterView"
 import { downloadPdf, fmtDT, lbl, sinp } from "./patientFile.shared"
 import { Card, primaryBtn, smallBtn } from "./OverviewCard"
+import LetterheadSelect from "./LetterheadSelect"
 import { certParams, certProblem, newestFirst, type CertForm } from "./historyView"
 
 interface Cons { id: string; consultedAt: string; chiefComplaint?: string }
@@ -47,6 +48,7 @@ export function SickNoteModal({ patientId, list, onClose }: { patientId: string;
           <div><label style={lbl} htmlFor="qa-to">Unfit until</label><input id="qa-to" type="date" value={f.unfitTo} onChange={e => setF({ ...f, unfitTo: e.target.value })} style={sinp} /></div>
         </div>
         <div><label style={lbl} htmlFor="qa-notes">Notes</label><textarea id="qa-notes" rows={2} value={f.notes} onChange={e => setF({ ...f, notes: e.target.value })} style={{ ...sinp, resize: "vertical" }} /></div>
+        <LetterheadSelect id="qa-head" value={f.letterheadId ?? ""} onChange={v => setF({ ...f, letterheadId: v })} style={sinp} labelStyle={lbl} />
         <SaveAsTemplate kind="SICK_NOTE" payload={() => ({ body: f.notes.trim() || undefined,
           unfitDays: f.unfitFrom && f.unfitTo && f.unfitTo >= f.unfitFrom ? Math.round((Date.parse(f.unfitTo) - Date.parse(f.unfitFrom)) / 86400000) + 1 : null })} />
         {error && <div role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}

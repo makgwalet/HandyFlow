@@ -31,6 +31,8 @@ import AccessLogTab      from "./AccessLogTab"
 import BreakGlassReviewTab from "./BreakGlassReviewTab"
 import LetterheadsAdminTab from "./LetterheadsAdminTab"
 import VisitStagesAdminTab from "./VisitStagesAdminTab"
+import GrowthReferenceAdminTab from "./GrowthReferenceAdminTab"
+import IssuedDocumentsAdminTab from "./IssuedDocumentsAdminTab"
 import WaitingRoomTab    from "./WaitingRoomTab"
 import TimeOffTab        from "./TimeOffTab"
 import WorkingHoursTab   from "./WorkingHoursTab"
@@ -41,7 +43,7 @@ import QuestionLibraryAdminTab from "./QuestionLibraryAdminTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { CLINIC_SECTIONS } from "../../navigation/moduleSections"
 
-export type ClinicTab = "dashboard"|"patients"|"schedule"|"practitioners"|"claims"|"billing"|"recalls"|"waitlist"|"handoff"|"drafts"|"access-log"|"break-glass"|"waiting-room"|"time-off"|"working-hours"|"closures"|"rooms"|"lab-inbox"|"question-library"|"letterheads"|"visit-stages"
+export type ClinicTab = "dashboard"|"patients"|"schedule"|"practitioners"|"claims"|"billing"|"recalls"|"waitlist"|"handoff"|"drafts"|"access-log"|"break-glass"|"waiting-room"|"time-off"|"working-hours"|"closures"|"rooms"|"lab-inbox"|"question-library"|"letterheads"|"visit-stages"|"growth-reference"|"issued-documents"
 
 interface Patient { id: string; firstName: string; lastName: string; fullName: string; [key: string]: any }
 interface FileState { openPatient?: Patient | null }
@@ -112,6 +114,8 @@ export function ClinicPage() {
           case "break-glass":   return <BreakGlassReviewTab />
           case "letterheads":   return <LetterheadsAdminTab />
           case "visit-stages":  return <VisitStagesAdminTab />
+          case "growth-reference": return <GrowthReferenceAdminTab />
+          case "issued-documents": return <IssuedDocumentsAdminTab />
           case "practitioners": return <PractitionersTab />
           case "claims":        return <ClaimsTab />
           case "billing":       return <BillingTab />

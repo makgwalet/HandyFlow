@@ -52,5 +52,7 @@ describe("quick sick note and referral", () => {
   })
   it("sends only the dates and notes that were filled in", () => {
     expect(certParams({ consultationId: "c", unfitFrom: "2026-10-08", unfitTo: "", notes: " rest " }).toString()).toBe("unfitFrom=2026-10-08&notes=rest")
+    expect(certParams({ consultationId: "c", unfitFrom: "", unfitTo: "", notes: "", letterheadId: "h1" }).toString()).toBe("letterheadId=h1")
+    expect(certParams({ consultationId: "c", unfitFrom: "", unfitTo: "", notes: "", letterheadId: "" }).toString()).toBe("")
   })
 })
