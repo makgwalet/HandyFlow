@@ -6,6 +6,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import za.co.handyflow.platform.clinic.domain.model.ClinicPatient;
+import za.co.handyflow.platform.clinic.domain.model.ClinicPractitioner;
 import za.co.handyflow.platform.clinic.domain.repository.*;
 import za.co.handyflow.platform.identity.TenantFacade;
 import za.co.handyflow.platform.shared.TenantId;
