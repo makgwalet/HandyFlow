@@ -15,7 +15,9 @@ const rows = (r: any) => { const p = r?.data?.data ?? r?.data ?? []; return Arra
 
 export default function SchemePaymentModal({ schemes, onClose }: { schemes: string[]; onClose: () => void }) {
   const qc = useQueryClient()
-  const [scheme, setScheme] = useState(schemes[0] ?? "")
+  // One remittance can cover several schemes: tick each one it pays for.
+  const [chosen, setChosen] = useState<string[]>(schemes.length ? [schemes[0]] : [])
+  const scheme = chosen.join(", ")
   const [amountText, setAmountText] = useState("")
   const [reference, setReference] = useState("")
   const [manual, setManual] = useState(false)
@@ -26,10 +28,10 @@ export default function SchemePaymentModal({ schemes, onClose }: { schemes: stri
   const [done, setDone] = useState(false)
 
   const { data: open = [] } = useQuery<OpenClaim[]>({
-    queryKey: ["clinic-open-scheme-claims", scheme], enabled: !!scheme,
+    queryKey: ["clinic-open-scheme-claims", chosen], enabled: chosen.length > 0,
     queryFn: async () => {
       const [a, p] = await Promise.all(["ACCEPTED", "PARTIAL"].map(s => apiClient.get(`${BASE}?status=${s}`)))
-      return [...rows(a), ...rows(p)].filter((c: OpenClaim) => (c.schemeName ?? "").toLowerCase() === scheme.toLowerCase() && owed(c as any) > 0)
+      return [...rows(a), ...rows(p)].filter((c: OpenClaim) => chosen.some(n => n.toLowerCase() === (c.schemeName ?? "").toLowerCase()) && owed(c as any) > 0)
         .sort((x: OpenClaim, y: OpenClaim) => x.createdAt.localeCompare(y.createdAt))
     },
   })
@@ -37,7 +39,7 @@ export default function SchemePaymentModal({ schemes, onClose }: { schemes: stri
   const problem = allocationProblem(scheme, amountText, manual, amounts, owedById, reason)
 
   const body = (preview: boolean) => ({
-    schemeName: scheme, amount: parseAmount(amountText), reference: reference.trim() || undefined, preview,
+    schemeName: chosen[0], schemeNames: chosen, amount: parseAmount(amountText), reference: reference.trim() || undefined, preview,
     shares: manual ? Object.entries(amounts).filter(([, v]) => v.trim()).map(([claimId, v]) => ({ claimId, amount: parseAmount(v) })) : undefined,
     overrideReason: manual ? reason.trim() : undefined,
   })
@@ -58,12 +60,17 @@ export default function SchemePaymentModal({ schemes, onClose }: { schemes: stri
       {done && plan ? (
         <div role="status" style={{ fontSize: 14 }}>Recorded {rand(plan.amount)} over {plan.shares.length} claim{plan.shares.length === 1 ? "" : "s"}.</div>
       ) : (<>
-        <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 5 }}>Scheme *
-          <select aria-label="Scheme" value={scheme} onChange={e => { setScheme(e.target.value); setPlan(null); setAmounts({}) }}
-            style={{ width: "100%", padding: 8, marginTop: 5, border: "1.5px solid var(--hf-border)", borderRadius: 8 }}>
-            {schemes.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </label>
+        <fieldset style={{ border: "none", padding: 0, margin: 0 }}>
+          <legend style={{ fontSize: 13, fontWeight: 600, marginBottom: 5 }}>Scheme *</legend>
+          {schemes.map(s => (
+            <label key={s} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, marginBottom: 4 }}>
+              <input type="checkbox" aria-label={`Scheme ${s}`} checked={chosen.includes(s)}
+                onChange={e => { setChosen(c => e.target.checked ? [...c, s] : c.filter(x => x !== s)); setPlan(null); setAmounts({}) }} />
+              {s}
+            </label>
+          ))}
+          {chosen.length > 1 && <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>One remittance for {chosen.length} schemes: the oldest claims across all of them are paid first.</div>}
+        </fieldset>
         <label style={{ display: "block", fontSize: 13, fontWeight: 600, margin: "10px 0 5px" }}>Amount received (R) *
           <input aria-label="Amount received" inputMode="decimal" value={amountText} onChange={e => { setAmountText(e.target.value); setPlan(null) }}
             style={{ width: "100%", padding: 8, marginTop: 5, boxSizing: "border-box", border: "1.5px solid var(--hf-border)", borderRadius: 8 }} />

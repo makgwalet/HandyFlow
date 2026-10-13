@@ -195,8 +195,11 @@ public class ClinicClaimMoneyService {
 
     @Transactional
     public AllocationResponse allocate(TenantId tenant, AllocateRequest req) {
-        if (req.schemeName() == null || req.schemeName().isBlank()) throw new IllegalArgumentException("Choose the medical aid scheme");
-        List<OpenClaim> openClaims = ledger.openForScheme(tenant.getValue(), req.schemeName());
+        List<String> schemes = req.schemes();
+        if (schemes.isEmpty()) throw new IllegalArgumentException("Choose the medical aid scheme");
+        // One remittance can cover several schemes (an administrator paying for more than one): their open claims are pooled, oldest first.
+        List<OpenClaim> openClaims = new ArrayList<>();
+        for (String scheme : schemes) openClaims.addAll(ledger.openForScheme(tenant.getValue(), scheme));
         Map<UUID, OpenClaim> byId = openClaims.stream().collect(Collectors.toMap(OpenClaim::id, Function.identity()));
         List<Open> open = openClaims.stream()
                 .map(c -> new Open(c.id(), c.billedAt(), ClaimLedgerRules.outstanding(c.schemePortion(), c.totals())))

@@ -60,4 +60,24 @@ describe("SchemePaymentModal", () => {
     fireEvent.click(screen.getByText("Preview"))
     expect((await screen.findByRole("alert")).textContent).toMatch(/Nothing was recorded/)
   })
+
+  it("one remittance can cover several schemes: all ticked schemes are sent, and their claims are pooled", async () => {
+    get.mockImplementation((url: string) => Promise.resolve({ data: { data: url.includes("ACCEPTED")
+      ? [claim("a", "10", 800), { ...claim("c", "05", 300), schemeName: "Bonitas" }, { ...claim("d", "06", 300), schemeName: "Momentum" }] : [] } }))
+    post.mockResolvedValue({ data: { data: { recorded: false, method: "OLDEST_FIRST", amount: 1000, shares: [] } } })
+    render(<QueryClientProvider client={new QueryClient()}><SchemePaymentModal schemes={["Discovery", "Bonitas", "Momentum"]} onClose={() => {}} /></QueryClientProvider>)
+    expect((screen.getByLabelText("Scheme Discovery") as HTMLInputElement).checked).toBe(true)
+    fireEvent.click(screen.getByLabelText("Scheme Bonitas"))
+    fireEvent.change(screen.getByLabelText("Amount received"), { target: { value: "1000" } })
+    fireEvent.click(screen.getByText("Preview"))
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post.mock.calls[0][1]).toMatchObject({ schemeName: "Discovery", schemeNames: ["Discovery", "Bonitas"] })
+  })
+
+  it("cannot preview with no scheme ticked", () => {
+    show()
+    fireEvent.click(screen.getByLabelText("Scheme Discovery"))
+    fireEvent.change(screen.getByLabelText("Amount received"), { target: { value: "1000" } })
+    expect((screen.getByText("Preview") as HTMLButtonElement).disabled).toBe(true)
+  })
 })

@@ -18,10 +18,23 @@ public final class ClaimMoneyDtos {
 
     /**
      * A scheme payment to spread over claims. Leave {@code shares} empty for oldest-first; give them (and an
-     * {@code overrideReason}) to choose the split yourself. {@code preview=true} shows the split and records nothing.
+     * {@code overrideReason}) to choose the split yourself. Give {@code schemeNames} when one remittance covers several schemes. {@code preview=true} shows the split and records nothing.
      */
     public record AllocateRequest(String schemeName, BigDecimal amount, LocalDate receivedOn, String reference,
-                                  List<ShareRequest> shares, String overrideReason, boolean preview) {}
+                                  List<ShareRequest> shares, String overrideReason, boolean preview, List<String> schemeNames) {
+        public AllocateRequest(String schemeName, BigDecimal amount, LocalDate receivedOn, String reference,
+                               List<ShareRequest> shares, String overrideReason, boolean preview) {
+            this(schemeName, amount, receivedOn, reference, shares, overrideReason, preview, null);
+        }
+
+        /** The schemes this remittance covers: {@code schemeNames} when given (one remittance, several schemes), otherwise {@code schemeName}. Names compare ignoring case. */
+        public List<String> schemes() {
+            List<String> raw = schemeNames != null && !schemeNames.isEmpty() ? schemeNames : (schemeName == null ? List.<String>of() : List.of(schemeName));
+            java.util.LinkedHashMap<String, String> byKey = new java.util.LinkedHashMap<>();
+            for (String n : raw) if (n != null && !n.isBlank()) byKey.putIfAbsent(n.trim().toLowerCase(), n.trim());
+            return List.copyOf(byKey.values());
+        }
+    }
 
     public record ShareResponse(UUID claimId, String patientName, String claimReference, BigDecimal outstandingBefore,
                                 BigDecimal amount, BigDecimal outstandingAfter) {}

@@ -279,4 +279,24 @@ class ClinicClaimMoneyServiceTest {
         assertThat(c.getStatus()).isEqualTo("SUBMITTED");
         verifyNoInteractions(events);
     }
+
+    @Test void oneRemittanceCanCoverSeveralSchemesOldestFirstAcrossAll() {
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID();
+        when(ledger.openForScheme(TENANT_UUID, "Discovery")).thenReturn(List.of(open(b, 2, "500")));
+        when(ledger.openForScheme(TENANT_UUID, "Bonitas")).thenReturn(List.of(open(a, 1, "800")));
+
+        var r = service.allocate(TENANT, new AllocateRequest(null, new BigDecimal("1000"), null, "REM", null, null, true, List.of("Discovery", "bonitas", "Bonitas")));
+
+        assertThat(r.shares()).hasSize(2);
+        assertThat(r.shares().get(0).claimId()).isEqualTo(a);
+        assertThat(r.shares().get(0).amount()).isEqualByComparingTo("800");
+        assertThat(r.shares().get(1).amount()).isEqualByComparingTo("200");
+        verify(ledger, times(1)).openForScheme(TENANT_UUID, "Bonitas");   // a name repeated in another case is asked for once
+    }
+
+    @Test void schemeNamesTakePrecedenceAndASingleNameStillWorks() {
+        assertThat(new AllocateRequest("A", BigDecimal.ONE, null, null, null, null, true).schemes()).containsExactly("A");
+        assertThat(new AllocateRequest("A", BigDecimal.ONE, null, null, null, null, true, List.of("B", " C "))).extracting(AllocateRequest::schemes).isEqualTo(List.of("B", "C"));
+        assertThat(new AllocateRequest(" ", BigDecimal.ONE, null, null, null, null, true).schemes()).isEmpty();
+    }
 }
