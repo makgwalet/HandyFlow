@@ -49,9 +49,11 @@ import java.util.UUID;
  * READ/MANAGE/ADMIN triplet — so this is a pure @PreAuthorize
  * correction, no new permission or migration needed.
  * <p>
- * Every GET/read endpoint below is UNCHANGED — confirmed each one is a
- * genuine read (lists, reports, PDF exports), correctly left on
- * USER_READ, not touched by this fix.
+ * Reads (finance patch F1, 2026-10-13): every read used to need only
+ * USER_READ, so any signed-in user could read the whole ledger. They now
+ * need ACCOUNTING_READ (granted by V383 to roles that already manage or
+ * administer accounting, and to OWNER roles). The bank-account list is
+ * also open to AP, which pays from those accounts.
  */
 @RestController
 @RequestMapping("/api/v1/accounting")
@@ -65,7 +67,7 @@ public class AccountingController {
     // ── Chart of Accounts ─────────────────────────────────────────────────────
 
     @GetMapping("/accounts")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
     @Operation(summary = "Get chart of accounts (seeds standard SA accounts on first call)")
     public ResponseEntity<ApiResponse<List<AccountResponse>>> getAccounts() {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -73,7 +75,7 @@ public class AccountingController {
     }
 
     @GetMapping("/accounts/type/{type}")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
     @Operation(summary = "Get accounts by type: ASSET | LIABILITY | EQUITY | INCOME | EXPENSE")
     public ResponseEntity<ApiResponse<List<AccountResponse>>> getAccountsByType(
             @PathVariable String type) {
@@ -93,7 +95,7 @@ public class AccountingController {
     // ── Journal Entries ───────────────────────────────────────────────────────
 
     @GetMapping("/journal-entries")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
     @Operation(summary = "List journal entries (optionally filter by status: DRAFT | POSTED | REVERSED)")
     public ResponseEntity<ApiResponse<Page<JournalEntryResponse>>> getJournalEntries(
             @RequestParam(required = false) String status, Pageable pageable) {
@@ -135,7 +137,8 @@ public class AccountingController {
     // ── Bank Accounts ─────────────────────────────────────────────────────────
 
     @GetMapping("/bank-accounts")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    // AP pays from these accounts, so its payment screens may list them (names and balances only, no transactions).
+    @PreAuthorize("hasAnyAuthority('ACCOUNTING_READ','AP_READ','AP_MANAGE','BILLING_READ')")
     @Operation(summary = "List bank accounts")
     public ResponseEntity<ApiResponse<List<BankAccountResponse>>> getBankAccounts() {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -172,7 +175,7 @@ public class AccountingController {
     }
 
     @GetMapping("/bank-accounts/{id}/transactions")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
     @Operation(summary = "List transactions for a bank account (paginated, newest first)")
     public ResponseEntity<ApiResponse<Page<BankTransactionResponse>>> getBankTransactions(
             @PathVariable UUID id, Pageable pageable) {
@@ -201,7 +204,7 @@ public class AccountingController {
     }
 
     @GetMapping("/bank-accounts/{id}/transactions/{txId}/match-candidates")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
     @Operation(summary = "Suggested journal line matches for reconciling this bank transaction, best match first")
     public ResponseEntity<ApiResponse<List<MatchCandidateResponse>>> getMatchCandidates(
             @PathVariable UUID id, @PathVariable UUID txId) {
@@ -232,7 +235,7 @@ public class AccountingController {
     // ── VAT ───────────────────────────────────────────────────────────────────
 
     @GetMapping("/vat-periods")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
     @Operation(summary = "List VAT periods")
     public ResponseEntity<ApiResponse<List<VatPeriodResponse>>> getVatPeriods() {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -266,7 +269,7 @@ public class AccountingController {
     }
 
     @GetMapping("/reports/vat201")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
     @Operation(summary = "VAT201 summary — output VAT, input VAT, net payable for a date range")
     public ResponseEntity<ApiResponse<Vat201Response>> getVat201(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -278,7 +281,7 @@ public class AccountingController {
     // ── Financial Reports ─────────────────────────────────────────────────────
 
     @GetMapping("/reports/profit-and-loss")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
     @Operation(summary = "Profit & Loss statement for a date range")
     public ResponseEntity<ApiResponse<FinancialReportResponse>> getProfitAndLoss(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -288,7 +291,7 @@ public class AccountingController {
     }
 
     @GetMapping("/reports/trial-balance")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
     @Operation(summary = "Trial balance with gross debit and credit columns for a date range")
     public ResponseEntity<ApiResponse<FinancialReportResponse>> getTrialBalance(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -298,7 +301,7 @@ public class AccountingController {
     }
 
     @GetMapping("/reports/balance-sheet")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
     @Operation(summary = "Balance sheet as at a date (includes opening balances)")
     public ResponseEntity<ApiResponse<FinancialReportResponse>> getBalanceSheet(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -308,7 +311,7 @@ public class AccountingController {
     }
 
     @GetMapping("/reports/drill-down")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
     @Operation(summary = "Drill down from any P&L / Balance Sheet / Trial Balance line into the underlying posted journal lines for that account and date range")
     public ResponseEntity<ApiResponse<AccountDrillDownResponse>> getAccountDrillDown(
             @RequestParam String accountCode,
@@ -319,7 +322,7 @@ public class AccountingController {
     }
 
     @GetMapping("/reports/ar-aging")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
     @Operation(summary = "Aged debtors report — outstanding invoices bucketed by days overdue")
     public ResponseEntity<ApiResponse<AgingReportResponse>> getArAging() {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -327,7 +330,7 @@ public class AccountingController {
     }
 
     @GetMapping("/reports/profit-and-loss/pdf")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
     @Operation(summary = "Download Profit & Loss as PDF")
     public ResponseEntity<byte[]> getProfitAndLossPdf(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -338,7 +341,7 @@ public class AccountingController {
     }
 
     @GetMapping("/reports/balance-sheet/pdf")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
     @Operation(summary = "Download Balance Sheet as PDF")
     public ResponseEntity<byte[]> getBalanceSheetPdf(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -349,7 +352,7 @@ public class AccountingController {
     }
 
     @GetMapping("/reports/trial-balance/pdf")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
     @Operation(summary = "Download Trial Balance as PDF")
     public ResponseEntity<byte[]> getTrialBalancePdf(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -360,7 +363,7 @@ public class AccountingController {
     }
 
     @GetMapping("/reports/vat201/pdf")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
     @Operation(summary = "Download VAT201 summary as PDF")
     public ResponseEntity<byte[]> getVat201Pdf(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -371,7 +374,7 @@ public class AccountingController {
     }
 
     @GetMapping("/reports/ar-aging/pdf")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
     @Operation(summary = "Download AR aging report as PDF — no date range, always as-at-today like the JSON version")
     public ResponseEntity<byte[]> getArAgingPdf() {
         byte[] pdf = reportPdfService.generateArAging(TenantContext.getTenantIdAsObject());
@@ -381,7 +384,7 @@ public class AccountingController {
     // ── Chart data endpoints ──────────────────────────────────────────────────
 
     @GetMapping("/reports/monthly-summary")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
     @Operation(summary = "Monthly revenue vs expenses for the last N months — used for dashboard charts")
     public ResponseEntity<ApiResponse<List<MonthlySummaryResponse>>> getMonthlySummary(
             @RequestParam(defaultValue = "6") int months) {

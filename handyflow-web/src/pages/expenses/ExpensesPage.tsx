@@ -2,12 +2,13 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { usePermission } from "../../hooks/usePermission"
 import {
   Plus, X, CheckCircle, XCircle, DollarSign, Receipt,
   Search, AlertTriangle, Download, TrendingUp, Clock,
   ChevronRight, User, Calendar, Tag, FileText, Fuel,
-  Utensils, Car, Package, Phone, BookOpen, Wrench,
-  Briefcase, MoreHorizontal, BarChart2, Filter,
+  Utensils, Car, Package, Phone,
+  Briefcase, MoreHorizontal, BarChart2,
 } from "lucide-react"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { EXPENSES_SECTIONS } from "../../navigation/moduleSections"
@@ -84,6 +85,11 @@ function ConfirmModal({ title, message, confirmLabel, danger, onConfirm, onCance
 // ── Main Component ─────────────────────────────────────────────────────────
 export function ExpensesPage() {
   const qc = useQueryClient()
+  // F1 (2026-10-13): approving, paying out and seeing everyone's claims need their own permissions; the server enforces them
+  // and refuses an approval of your own claim. Without EXPENSES_READ the list shows only the claims you submitted.
+  const canSeeAll = usePermission("EXPENSES_READ")
+  const canDecide = usePermission("EXPENSES_MANAGE")
+  const canPay    = usePermission("EXPENSES_ADMIN")
   const [statusFilter, setStatus]   = useState("")
   const [search,       setSearch]   = useState("")
   const [catFilter,    setCat]      = useState("")
@@ -118,7 +124,7 @@ export function ExpensesPage() {
   })
 
   const { data: monthlyTotal } = useQuery<number>({
-    queryKey: ["expenses-monthly"],
+    queryKey: ["expenses-monthly"], enabled: canSeeAll,
     queryFn: async () => {
       const r = await apiClient.get("/api/v1/expenses/summary/monthly")
       return r.data?.data ?? r.data ?? 0
@@ -382,7 +388,7 @@ export function ExpensesPage() {
                             </td>
                             <td style={{ padding: "12px 16px" }}>
                               <div style={{ display: "flex", gap: 5 }}>
-                                {c.status === "PENDING" && (
+                                {c.status === "PENDING" && canDecide && (
                                   <>
                                     <button onClick={e => { e.stopPropagation(); setSelected(c); setShowApproveConfirm(true) }}
                                       style={{ display: "flex", alignItems: "center", gap: 3, padding: "4px 10px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
@@ -394,7 +400,7 @@ export function ExpensesPage() {
                                     </button>
                                   </>
                                 )}
-                                {c.status === "APPROVED" && (
+                                {c.status === "APPROVED" && canPay && (
                                   <button onClick={e => { e.stopPropagation(); setSelected(c); setShowReimburseConfirm(true) }}
                                     style={{ display: "flex", alignItems: "center", gap: 3, padding: "4px 10px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1px solid var(--hf-info-border)", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
                                     <DollarSign size={10} /> Pay
@@ -508,7 +514,7 @@ export function ExpensesPage() {
             {error && <div style={{ marginBottom: 14, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
 
             {/* Actions */}
-            {selected.status === "PENDING" && (
+            {selected.status === "PENDING" && canDecide && (
               <div style={{ display: "flex", gap: 10 }}>
                 <button onClick={() => { setShowReject(true); setError("") }}
                   style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "11px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
@@ -520,7 +526,7 @@ export function ExpensesPage() {
                 </button>
               </div>
             )}
-            {selected.status === "APPROVED" && (
+            {selected.status === "APPROVED" && canPay && (
               <button onClick={() => setShowReimburseConfirm(true)}
                 style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "12px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1.5px solid var(--hf-info-border)", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 <DollarSign size={14} /> Mark as reimbursed

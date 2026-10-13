@@ -22,6 +22,16 @@ public interface ExpenseClaimRepository extends JpaRepository<ExpenseClaim, UUID
     Page<ExpenseClaim> findAll(TenantId tenantId, String status,
                                UUID employeeId, Pageable pageable);
 
+    /** F1: the claims one person submitted (for someone without EXPENSES_READ). */
+    @Query("""
+        SELECT c FROM ExpenseClaim c
+        WHERE c.tenantId = :#{#tenantId.value}
+        AND c.submittedBy = :submittedBy
+        AND (:status IS NULL OR c.status = :status)
+        ORDER BY c.claimDate DESC, c.createdAt DESC
+        """)
+    Page<ExpenseClaim> findMine(TenantId tenantId, UUID submittedBy, String status, Pageable pageable);
+
     @Query("SELECT c FROM ExpenseClaim c WHERE c.tenantId = :#{#tenantId.value} AND c.id = :id")
     Optional<ExpenseClaim> findByTenantAndId(TenantId tenantId, UUID id);
 

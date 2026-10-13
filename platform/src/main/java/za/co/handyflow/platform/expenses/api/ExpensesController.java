@@ -28,6 +28,19 @@ public class ExpensesController {
 
     private final ExpensesService expensesService;
 
+    /*
+     * Finance patch F1 (2026-10-13). Before this, every read needed only USER_READ (anyone saw every claim) and approval needed
+     * USER_UPDATE with no check against approving your own claim. Now:
+     *   submit, list and read your own claims, add receipts to them: USER_CREATE / USER_READ as before;
+     *   see everyone's claims: EXPENSES_READ;  approve or reject: EXPENSES_MANAGE (never your own claim);
+     *   mark reimbursed (paying out is separate from approving): EXPENSES_ADMIN.
+     * V383 grants the new permissions so the people who approve today still can.
+     */
+    private static boolean holds(String authority) {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getAuthorities().stream().anyMatch(a -> authority.equals(a.getAuthority()));
+    }
+
     @GetMapping
     @PreAuthorize("hasAuthority('USER_READ')")
     @Operation(summary = "List expense claims with optional status and employee filters")
@@ -36,8 +49,8 @@ public class ExpensesController {
             @RequestParam(required = false) UUID employeeId,
             Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Success",
-                expensesService.getClaims(TenantContext.getTenantIdAsObject(),
-                        status, employeeId, pageable)));
+                expensesService.getClaimsFor(TenantContext.getTenantIdAsObject(),
+                        status, employeeId, pageable, holds("EXPENSES_READ"), TenantContext.getCurrentUserId())));
     }
 
     @GetMapping("/{id}")
@@ -45,7 +58,7 @@ public class ExpensesController {
     @Operation(summary = "Get expense claim detail")
     public ResponseEntity<ApiResponse<ExpenseClaimResponse>> getClaim(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Success",
-                expensesService.getClaim(TenantContext.getTenantIdAsObject(), id)));
+                expensesService.getClaimFor(TenantContext.getTenantIdAsObject(), id, holds("EXPENSES_READ"), TenantContext.getCurrentUserId())));
     }
 
     @PostMapping
@@ -59,7 +72,7 @@ public class ExpensesController {
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")   // FIXED: was USER_READ
+    @PreAuthorize("hasAuthority('EXPENSES_MANAGE')")
     @Operation(summary = "Approve an expense claim — auto-posts journal entry to Accounting")
     public ResponseEntity<ApiResponse<ExpenseClaimResponse>> approveClaim(
             @PathVariable UUID id) {
@@ -69,7 +82,7 @@ public class ExpensesController {
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")   // FIXED: was USER_READ
+    @PreAuthorize("hasAuthority('EXPENSES_MANAGE')")
     @Operation(summary = "Reject an expense claim with a reason")
     public ResponseEntity<ApiResponse<ExpenseClaimResponse>> rejectClaim(
             @PathVariable UUID id,
@@ -89,7 +102,7 @@ public class ExpensesController {
 //    }
 
     @GetMapping("/summary/monthly")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('EXPENSES_READ')")
     @Operation(summary = "Get total approved expenses for a month")
     public ResponseEntity<ApiResponse<BigDecimal>> getMonthlyTotal(
             @RequestParam(defaultValue = "0") int month,
@@ -102,7 +115,7 @@ public class ExpensesController {
     }
 
     @PostMapping("/{id}/reimburse")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('EXPENSES_ADMIN')")
     @Operation(summary = "Mark an approved claim as reimbursed")
     public ResponseEntity<ApiResponse<ExpenseClaimResponse>> markReimbursed(
             @PathVariable UUID id) {
@@ -111,11 +124,12 @@ public class ExpensesController {
     }
 
     @PostMapping(value = "/{id}/receipt", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('USER_CREATE','EXPENSES_MANAGE')")
     @Operation(summary = "Attach a real receipt file to an existing claim")
     public ResponseEntity<ApiResponse<za.co.handyflow.platform.evidence.dto.EvidenceResponse>> attachReceipt(
             @PathVariable UUID id,
             @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        expensesService.requireAccess(TenantContext.getTenantIdAsObject(), id, holds("EXPENSES_MANAGE"), TenantContext.getCurrentUserId());
         return ResponseEntity.ok(ApiResponse.success("Receipt attached",
               expensesService.attachReceipt(TenantContext.getTenantIdAsObject(), id, file,
                         TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
@@ -126,6 +140,7 @@ public class ExpensesController {
     @Operation(summary = "List real receipt files attached to a claim")
     public ResponseEntity<ApiResponse<List<EvidenceResponse>>> getReceipts(
             @PathVariable UUID id) {
+        expensesService.requireAccess(TenantContext.getTenantIdAsObject(), id, holds("EXPENSES_READ"), TenantContext.getCurrentUserId());
         return ResponseEntity.ok(ApiResponse.success(
                 expensesService.getReceipts(TenantContext.getTenantIdAsObject(), id)));
     }

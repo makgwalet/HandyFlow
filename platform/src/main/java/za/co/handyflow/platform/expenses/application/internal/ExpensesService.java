@@ -54,6 +54,43 @@ public class ExpensesService {
                 .orElseThrow(() -> new ResourceNotFoundException("ExpenseClaim", id.toString()));
     }
 
+    /** F1: the list as this person may see it. Without EXPENSES_READ, only the claims they submitted. */
+    @Transactional(readOnly = true)
+    public Page<ExpenseClaimResponse> getClaimsFor(TenantId tenantId, String status, UUID employeeId, Pageable pageable,
+                                                   boolean seesAll, UUID viewer) {
+        if (seesAll) return getClaims(tenantId, status, employeeId, pageable);
+        if (viewer == null) return Page.empty(pageable);
+        return claimRepo.findMine(tenantId, viewer, status, pageable).map(this::toResponse);
+    }
+
+    /** F1: one claim, if this person may see it; otherwise "not found", so its existence is not revealed. */
+    @Transactional(readOnly = true)
+    public ExpenseClaimResponse getClaimFor(TenantId tenantId, UUID id, boolean seesAll, UUID viewer) {
+        ExpenseClaim claim = findByTenant(tenantId, id);
+        if (!ExpenseRules.maySee(seesAll, claim.getSubmittedBy(), viewer)) throw new ResourceNotFoundException("ExpenseClaim", id.toString());
+        return toResponse(claim);
+    }
+
+    /** F1: the check before receipts are listed or attached. */
+    @Transactional(readOnly = true)
+    public void requireAccess(TenantId tenantId, UUID id, boolean allowed, UUID user) {
+        ExpenseClaim claim = findByTenant(tenantId, id);
+        if (!allowed && (user == null || !user.equals(claim.getSubmittedBy()))) throw new ResourceNotFoundException("ExpenseClaim", id.toString());
+    }
+
+    /** The approver's email, to stop someone approving a claim that pays them. */
+    private String userEmail(UUID userId) {
+        if (userId == null) return null;
+        try { return jdbc.queryForList("SELECT email FROM users WHERE id = ?", String.class, userId).stream().findFirst().orElse(null); }
+        catch (RuntimeException e) { return null; }
+    }
+
+    private String employeeEmail(TenantId tenantId, UUID employeeId) {
+        if (employeeId == null) return null;
+        try { return hrFacade.findEmployeeById(tenantId, employeeId).map(EmployeeResponse::email).orElse(null); }
+        catch (RuntimeException e) { return null; }
+    }
+
     @Transactional
     public ExpenseClaimResponse submitClaim(TenantId tenantId, UUID submittedBy,
                                             CreateExpenseClaimRequest req) {
@@ -73,6 +110,9 @@ public class ExpensesService {
     public ExpenseClaimResponse approveClaim(TenantId tenantId, UUID id,
                                              UUID approvedBy) {
         ExpenseClaim claim = findByTenant(tenantId, id);
+        String problem = ExpenseRules.selfApprovalProblem(claim.getSubmittedBy(), approvedBy,
+                employeeEmail(tenantId, claim.getEmployeeId()), userEmail(approvedBy));
+        if (problem != null) throw new IllegalStateException(problem);
         claim.approve(approvedBy);
         claimRepo.save(claim);
 

@@ -2,11 +2,13 @@ package za.co.handyflow.platform.invoicing.application.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.crm.CrmFacade;
+import za.co.handyflow.platform.invoicing.CreditNoteIssuedEvent;
 import za.co.handyflow.platform.invoicing.domain.model.CreditNote;
 import za.co.handyflow.platform.invoicing.domain.model.Invoice;
 import za.co.handyflow.platform.invoicing.domain.repository.CreditNoteRepository;
@@ -42,6 +44,7 @@ public class CreditNoteService {
     // dead defensive code, same shape as the earlier
     // PosPurchaseOrderItem finding. Resolved here instead.
     private final VatRateProvider vatRateProvider;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public CreditNoteResponse createCreditNote(TenantId tenantId, UUID invoiceId, CreateCreditNoteRequest req) {
@@ -61,6 +64,12 @@ public class CreditNoteService {
         creditNoteRepo.save(creditNote);
         log.info("Created credit note={} invoice={} total={}",
                 number, invoice.getInvoiceNumber(), creditNote.getTotal());
+
+        // Finance patch F1: post the credit note to the ledger (reverses AR, Revenue and VAT output). The accounting
+        // listener runs after this transaction commits, so a credit note that fails to save never reaches the ledger.
+        eventPublisher.publishEvent(CreditNoteIssuedEvent.of(
+                tenantId, creditNote.getId(), number, invoiceId, invoice.getInvoiceNumber(),
+                creditNote.getSubtotal(), creditNote.getVatTotal(), creditNote.getTotal()));
 
         // Same pattern as QuoteService.convertToInvoice / InvoicingScheduler:
         // generate the PDF, email it, never let an SMTP failure roll back

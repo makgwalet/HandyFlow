@@ -30,7 +30,7 @@ public class AccDocumentRequestController {
     private final AccDocumentRequestService requestService;
 
     @PostMapping("/clients/{id}/document-requests")
-    @PreAuthorize("hasAnyAuthority('USER_CREATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Request documents/information from a client")
     public ResponseEntity<ApiResponse<DocumentRequestResponse>> createRequest(
             @PathVariable UUID id, @Valid @RequestBody CreateDocumentRequestRequest req) {
@@ -40,7 +40,7 @@ public class AccDocumentRequestController {
     }
 
     @GetMapping("/clients/{id}/document-requests")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "List document requests for a client")
     public ResponseEntity<ApiResponse<List<DocumentRequestResponse>>> getRequests(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Document requests",
@@ -48,7 +48,7 @@ public class AccDocumentRequestController {
     }
 
     @PostMapping("/clients/{id}/document-requests/{requestId}/status")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Update a document request's status — PENDING, PARTIAL, COMPLETE, or CANCELLED")
     public ResponseEntity<ApiResponse<DocumentRequestResponse>> updateStatus(
             @PathVariable UUID id, @PathVariable UUID requestId,

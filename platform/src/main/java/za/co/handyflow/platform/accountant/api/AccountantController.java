@@ -34,7 +34,7 @@ public class AccountantController {
     // ── Portfolio dashboard ───────────────────────────────────────────────────
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "Portfolio dashboard — all KPIs, urgent deadlines, outstanding invoices")
     public ResponseEntity<ApiResponse<PortfolioDashboardResponse>> getDashboard() {
         return ResponseEntity.ok(ApiResponse.success("Dashboard",
@@ -44,7 +44,7 @@ public class AccountantController {
     // ── Client portfolio ──────────────────────────────────────────────────────
 
     @GetMapping("/clients")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "List all clients in portfolio")
     public ResponseEntity<ApiResponse<Page<ClientResponse>>> getClients(
             @PageableDefault(size = 50) Pageable pageable) {
@@ -53,14 +53,14 @@ public class AccountantController {
     }
 
     @GetMapping("/clients/{id}")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     public ResponseEntity<ApiResponse<ClientResponse>> getClient(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Client",
                 accountantService.getClient(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @PostMapping("/clients")
-    @PreAuthorize("hasAnyAuthority('USER_CREATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Register a new client — entity classification, SARS numbers, year-end config")
     public ResponseEntity<ApiResponse<ClientResponse>> createClient(
             @Valid @RequestBody CreateClientRequest req) {
@@ -69,7 +69,7 @@ public class AccountantController {
     }
 
     @PutMapping("/clients/{id}")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     public ResponseEntity<ApiResponse<ClientResponse>> updateClient(
             @PathVariable UUID id, @RequestBody UpdateClientRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Client updated",
@@ -77,14 +77,14 @@ public class AccountantController {
     }
 
     @DeleteMapping("/clients/{id}")
-    @PreAuthorize("hasAnyAuthority('USER_DELETE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     public ResponseEntity<ApiResponse<Void>> deleteClient(@PathVariable UUID id) {
         accountantService.deleteClient(TenantContext.getTenantIdAsObject(), id);
         return ResponseEntity.ok(ApiResponse.success("Client archived", null));
     }
 
     @PostMapping("/clients/{id}/fica-complete")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Mark FICA compliance as complete for a client")
     public ResponseEntity<ApiResponse<Void>> markFicaComplete(@PathVariable UUID id) {
         accountantService.markFicaComplete(TenantContext.getTenantIdAsObject(), id);
@@ -92,7 +92,7 @@ public class AccountantController {
     }
 
     @PostMapping("/clients/{id}/sars-agent")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Mark SARS agent appointment as completed (POA on file)")
     public ResponseEntity<ApiResponse<Void>> markSarsAgent(@PathVariable UUID id) {
         accountantService.markSarsAgentAppointed(TenantContext.getTenantIdAsObject(), id);
@@ -102,7 +102,7 @@ public class AccountantController {
     // NEW: closes the audit's "client-facing deadline reminder emails"
     // gap — the toggle behind the per-client opt-out.
     @PostMapping("/clients/{id}/deadline-reminders")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Enable or disable client-facing deadline reminder emails for a client")
     public ResponseEntity<ApiResponse<ClientResponse>> setClientDeadlineReminders(
             @PathVariable UUID id, @RequestParam boolean enabled) {
@@ -116,7 +116,7 @@ public class AccountantController {
     // existed with no application-layer code at all.
 
     @GetMapping("/clients/{id}/fica-documents")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "List FICA/KYC documents for a client — metadata only, no file content")
     public ResponseEntity<ApiResponse<List<FicaDocumentResponse>>> getFicaDocuments(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("FICA documents",
@@ -124,7 +124,7 @@ public class AccountantController {
     }
 
     @PostMapping("/clients/{id}/fica-documents")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Upload a FICA/KYC document for a client (max 10MB)")
     public ResponseEntity<ApiResponse<FicaDocumentResponse>> uploadFicaDocument(
             @PathVariable UUID id, @Valid @RequestBody UploadFicaDocumentRequest req) {
@@ -134,7 +134,7 @@ public class AccountantController {
     }
 
     @GetMapping(value = "/clients/{clientId}/fica-documents/{docId}", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "Download a FICA/KYC document")
     public ResponseEntity<byte[]> downloadFicaDocument(
             @PathVariable UUID clientId, @PathVariable UUID docId) {
@@ -146,7 +146,7 @@ public class AccountantController {
     }
 
     @PostMapping("/clients/{clientId}/fica-documents/{docId}/verify")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Mark a FICA/KYC document as verified")
     public ResponseEntity<ApiResponse<FicaDocumentResponse>> verifyFicaDocument(
             @PathVariable UUID clientId, @PathVariable UUID docId) {
@@ -156,7 +156,7 @@ public class AccountantController {
     }
 
     @DeleteMapping("/clients/{clientId}/fica-documents/{docId}")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Delete a FICA/KYC document")
     public ResponseEntity<ApiResponse<Void>> deleteFicaDocument(
             @PathVariable UUID clientId, @PathVariable UUID docId) {
@@ -167,7 +167,7 @@ public class AccountantController {
     // ── SARS tax calendar ─────────────────────────────────────────────────────
 
     @GetMapping("/clients/{id}/deadlines")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "List all SARS deadlines for a client")
     public ResponseEntity<ApiResponse<List<TaxDeadlineResponse>>> getClientDeadlines(
             @PathVariable UUID id) {
@@ -176,7 +176,7 @@ public class AccountantController {
     }
 
     @PostMapping("/clients/{id}/deadlines/generate")
-    @PreAuthorize("hasAnyAuthority('USER_CREATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Auto-generate SARS deadlines for a client for a given year — business-day adjusted")
     public ResponseEntity<ApiResponse<List<TaxDeadlineResponse>>> generateDeadlines(
             @PathVariable UUID id, @Valid @RequestBody GenerateDeadlinesRequest req) {
@@ -189,7 +189,7 @@ public class AccountantController {
     // GET /deadlines' own convention — this is explicitly for every
     // client at once, not nested under a single client's path.
     @PostMapping("/deadlines/generate-all")
-    @PreAuthorize("hasAnyAuthority('USER_CREATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Auto-generate SARS deadlines for every active client for a given year — business-day adjusted")
     public ResponseEntity<ApiResponse<BulkDeadlineGenerationResponse>> generateDeadlinesForAllClients(
             @Valid @RequestBody GenerateDeadlinesRequest req) {
@@ -198,7 +198,7 @@ public class AccountantController {
     }
 
     @PostMapping("/clients/{clientId}/deadlines/{deadlineId}/file")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Mark a filing as submitted — store SARS reference number and amount")
     public ResponseEntity<ApiResponse<TaxDeadlineResponse>> fileDeadline(
             @PathVariable UUID clientId, @PathVariable UUID deadlineId,
@@ -208,7 +208,7 @@ public class AccountantController {
     }
 
     @GetMapping("/deadlines")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "Portfolio deadline view — all clients × all deadline types in date range")
     public ResponseEntity<ApiResponse<List<TaxDeadlineResponse>>> getPortfolioDeadlines(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -222,7 +222,7 @@ public class AccountantController {
     // ── Accounting core ───────────────────────────────────────────────────────
 
     @PostMapping("/clients/{id}/journals")
-    @PreAuthorize("hasAnyAuthority('USER_CREATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Create a journal entry — validates debits = credits before saving")
     public ResponseEntity<ApiResponse<JournalResponse>> createJournal(
             @PathVariable UUID id, @Valid @RequestBody CreateJournalRequest req) {
@@ -237,7 +237,7 @@ public class AccountantController {
     // findByClient() already existed and was never called by anything
     // before this.
     @GetMapping("/clients/{id}/journals")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "List journal entries for a client")
     public ResponseEntity<ApiResponse<Page<JournalResponse>>> getClientJournals(
             @PathVariable UUID id, @PageableDefault(size = 50) Pageable pageable) {
@@ -247,7 +247,7 @@ public class AccountantController {
 
     // NEW: closes the "trial balance" gap.
     @GetMapping("/clients/{id}/trial-balance")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "Trial balance for a client for a given period")
     public ResponseEntity<ApiResponse<TrialBalanceResponse>> getTrialBalance(
             @PathVariable UUID id,
@@ -260,7 +260,7 @@ public class AccountantController {
     // NEW: closes the "minimal COA-seeding capability" gap.
 
     @GetMapping("/clients/{id}/coa-accounts")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "List chart of accounts entries for a client")
     public ResponseEntity<ApiResponse<List<CoaAccountResponse>>> getCoaAccounts(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Chart of accounts",
@@ -268,7 +268,7 @@ public class AccountantController {
     }
 
     @PostMapping("/clients/{id}/coa-accounts")
-    @PreAuthorize("hasAnyAuthority('USER_CREATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Create a chart of accounts entry for a client")
     public ResponseEntity<ApiResponse<CoaAccountResponse>> createCoaAccount(
             @PathVariable UUID id, @Valid @RequestBody CreateCoaAccountRequest req) {
@@ -277,7 +277,7 @@ public class AccountantController {
     }
 
     @PostMapping("/clients/{id}/coa-accounts/seed-standard")
-    @PreAuthorize("hasAnyAuthority('USER_CREATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Seed a standard starter chart of accounts — only for clients with none yet")
     public ResponseEntity<ApiResponse<List<CoaAccountResponse>>> seedStandardChartOfAccounts(@PathVariable UUID id) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Standard chart of accounts seeded",
@@ -285,7 +285,7 @@ public class AccountantController {
     }
 
     @PostMapping("/journals/{id}/review")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Submit journal for review (PREPARED → REVIEWED)")
     public ResponseEntity<ApiResponse<JournalResponse>> reviewJournal(
             @PathVariable UUID id, @RequestParam UUID clientId) {
@@ -295,7 +295,7 @@ public class AccountantController {
     }
 
     @PostMapping("/journals/{id}/post")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Approve and post journal (REVIEWED → APPROVED → POSTED)")
     public ResponseEntity<ApiResponse<JournalResponse>> postJournal(
             @PathVariable UUID id, @RequestParam UUID clientId) {
@@ -307,7 +307,7 @@ public class AccountantController {
     // ── Time tracking ─────────────────────────────────────────────────────────
 
     @PostMapping("/time")
-    @PreAuthorize("hasAnyAuthority('USER_CREATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Log a time entry — billable or non-billable, linked to a client")
     public ResponseEntity<ApiResponse<TimeEntryResponse>> logTime(
             @Valid @RequestBody CreateTimeEntryRequest req) {
@@ -319,7 +319,7 @@ public class AccountantController {
     // NEW: closes the accountant module audit's "staff-level time
     // report" gap.
     @GetMapping("/time/staff-summary")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "Time summary per staff member for a date range — hours, billable hours, amount billed")
     public ResponseEntity<ApiResponse<List<StaffTimeSummaryResponse>>> getStaffTimeSummary(
             @RequestParam java.time.LocalDate from, @RequestParam java.time.LocalDate to) {
@@ -330,7 +330,7 @@ public class AccountantController {
     // NEW: closes the audit's "time entry edit/delete" gap. Both reject
     // BILLED entries — see TimeEntry.isEditable()'s own comment.
     @PutMapping("/time/{id}")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Edit a time entry — only entries that haven't been billed can be edited")
     public ResponseEntity<ApiResponse<TimeEntryResponse>> updateTimeEntry(
             @PathVariable UUID id, @Valid @RequestBody UpdateTimeEntryRequest req) {
@@ -339,7 +339,7 @@ public class AccountantController {
     }
 
     @DeleteMapping("/time/{id}")
-    @PreAuthorize("hasAnyAuthority('USER_DELETE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Delete a time entry — only entries that haven't been billed can be deleted")
     public ResponseEntity<ApiResponse<Void>> deleteTimeEntry(@PathVariable UUID id) {
         accountantService.deleteTimeEntry(TenantContext.getTenantIdAsObject(), id);
@@ -347,7 +347,7 @@ public class AccountantController {
     }
 
     @GetMapping("/clients/{id}/time/unbilled")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "List unbilled (WIP) time entries for a client")
     public ResponseEntity<ApiResponse<List<TimeEntryResponse>>> getUnbilledTime(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Unbilled time",
@@ -356,7 +356,7 @@ public class AccountantController {
 
     // NEW: closes the "unified client detail page" gap.
     @GetMapping("/clients/{id}/time")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "Full time entry history for a client — every status, not just unbilled")
     public ResponseEntity<ApiResponse<Page<TimeEntryResponse>>> getClientTimeEntries(
             @PathVariable UUID id, @PageableDefault(size = 50) Pageable pageable) {
@@ -365,7 +365,7 @@ public class AccountantController {
     }
 
     @GetMapping("/clients/{id}/fee-notes")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "Full fee note history for a client — every status")
     public ResponseEntity<ApiResponse<Page<FeeNoteResponse>>> getClientFeeNotes(
             @PathVariable UUID id, @PageableDefault(size = 50) Pageable pageable) {
@@ -374,7 +374,7 @@ public class AccountantController {
     }
 
     @GetMapping("/clients/{id}/detail")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "Unified client detail — recent deadlines, fee notes, journals, and time in one call")
     public ResponseEntity<ApiResponse<ClientDetailResponse>> getClientDetail(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Client detail",
@@ -396,7 +396,7 @@ public class AccountantController {
     // discoverable where someone looking for it would actually look.
 
     @PostMapping("/clients/{id}/portal-invites")
-    @PreAuthorize("hasAnyAuthority('USER_CREATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Tag(name = "Accountant Client Portal")
     @Operation(summary = "Invite a client contact to the client portal")
     public ResponseEntity<ApiResponse<PortalAccessGrantResponse>> invitePortalUser(
@@ -407,7 +407,7 @@ public class AccountantController {
     }
 
     @GetMapping("/clients/{id}/portal-invites")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Tag(name = "Accountant Client Portal")
     @Operation(summary = "List portal access grants (pending, active, revoked) for a client")
     public ResponseEntity<ApiResponse<List<PortalAccessGrantResponse>>> getPortalAccessGrants(@PathVariable UUID id) {
@@ -416,7 +416,7 @@ public class AccountantController {
     }
 
     @PostMapping("/clients/{clientId}/portal-invites/{grantId}/revoke")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Tag(name = "Accountant Client Portal")
     @Operation(summary = "Revoke a client's portal access")
     public ResponseEntity<ApiResponse<PortalAccessGrantResponse>> revokePortalAccess(
@@ -429,7 +429,7 @@ public class AccountantController {
     // ── Billing ───────────────────────────────────────────────────────────────
 
     @PostMapping("/fee-notes")
-    @PreAuthorize("hasAnyAuthority('USER_CREATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Generate a fee note from unbilled time entries or a fixed fee")
     public ResponseEntity<ApiResponse<FeeNoteResponse>> generateFeeNote(
             @Valid @RequestBody CreateFeeNoteRequest req) {
@@ -438,7 +438,7 @@ public class AccountantController {
     }
 
     @PostMapping("/fee-notes/{id}/send")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Send fee note to client via email")
     public ResponseEntity<ApiResponse<FeeNoteResponse>> sendFeeNote(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Fee note sent",
@@ -449,7 +449,7 @@ public class AccountantController {
     // "billing has no money-in loop". Without this, a sent fee note had
     // no path to ever being marked paid.
     @PostMapping("/fee-notes/{id}/payments")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Record a payment against a fee note — updates status to PARTIAL or PAID")
     public ResponseEntity<ApiResponse<FeeNoteResponse>> recordPayment(
             @PathVariable UUID id, @Valid @RequestBody RecordPaymentRequest req) {
@@ -459,7 +459,7 @@ public class AccountantController {
     }
 
     @GetMapping("/fee-notes/{id}/payments")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "Payment history for a fee note")
     public ResponseEntity<ApiResponse<List<PaymentResponse>>> getPayments(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Payment history",
@@ -469,7 +469,7 @@ public class AccountantController {
     // NEW: closes the "quick win" gap from the accountant module audit —
     // "data model already has everything needed" for a fee note PDF.
     @GetMapping(value = "/fee-notes/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "Download a Fee Note PDF")
     public ResponseEntity<byte[]> downloadFeeNotePdf(@PathVariable UUID id) {
         byte[] pdf = accountantService.generateFeeNotePdf(TenantContext.getTenantIdAsObject(), id);
@@ -480,7 +480,7 @@ public class AccountantController {
     }
 
     @GetMapping("/fee-notes/outstanding")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "Debtors aging — all outstanding invoices across all clients")
     public ResponseEntity<ApiResponse<List<FeeNoteResponse>>> getOutstanding() {
         return ResponseEntity.ok(ApiResponse.success("Outstanding invoices",
@@ -490,7 +490,7 @@ public class AccountantController {
     // ── Practice profile ──────────────────────────────────────────────────────
 
     @GetMapping("/profile")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "Get the accountant firm's practice profile")
     public ResponseEntity<ApiResponse<ProfileResponse>> getProfile() {
         return ResponseEntity.ok(ApiResponse.success("Profile",
@@ -498,7 +498,7 @@ public class AccountantController {
     }
 
     @PostMapping("/profile")
-    @PreAuthorize("hasAnyAuthority('USER_CREATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Create or update the accountant firm's practice profile")
     public ResponseEntity<ApiResponse<ProfileResponse>> upsertProfile(
             @Valid @RequestBody CreateProfileRequest req) {

@@ -8,6 +8,7 @@ import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.accounting.domain.repository.AccAccountRepository;
 import za.co.handyflow.platform.accounting.domain.repository.AccBankAccountRepository;
+import za.co.handyflow.platform.invoicing.CreditNoteIssuedEvent;
 import za.co.handyflow.platform.invoicing.InvoiceIssuedEvent;
 import za.co.handyflow.platform.invoicing.InvoicePaymentRecordedEvent;
 import za.co.handyflow.platform.shared.TenantId;
@@ -152,6 +153,57 @@ class InvoicingAccountingEventHandler {
         } catch (Exception e) {
             log.error("[Accounting] Failed to post payment journal for invoice={} tenant={}: {}",
                     event.invoiceNumber(), event.tenantId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Finance patch F1: a credit note reverses part of an invoice's issuance journal. Debit Revenue (subtotal), Debit VAT
+     * output (vatTotal), Credit Accounts Receivable (total). Same account codes and the same never-fail-the-source rule as
+     * {@link #onInvoiceIssued}.
+     */
+    @ApplicationModuleListener
+    void onCreditNoteIssued(CreditNoteIssuedEvent event) {
+        try {
+            UUID tenant = event.tenantId().getValue();
+            UUID arAccountId = findAccountByCode(tenant, AR_ACCOUNT_CODE);
+            UUID revenueAccountId = findAccountByCode(tenant, REVENUE_ACCOUNT_CODE);
+            if (arAccountId == null || revenueAccountId == null) {
+                log.warn("[Accounting] Chart of Accounts missing AR ({}) or Revenue ({}) for tenant={} — credit note={} not posted",
+                        AR_ACCOUNT_CODE, REVENUE_ACCOUNT_CODE, event.tenantId(), event.creditNoteNumber());
+                return;
+            }
+            boolean hasVat = event.vatTotal() != null && event.vatTotal().compareTo(BigDecimal.ZERO) > 0;
+            UUID vatAccountId = null;
+            if (hasVat) {
+                vatAccountId = findAccountByCode(tenant, VAT_OUTPUT_ACCOUNT_CODE);
+                if (vatAccountId == null) {
+                    log.warn("[Accounting] Chart of Accounts missing VAT Output ({}) for tenant={} — credit note={} not posted",
+                            VAT_OUTPUT_ACCOUNT_CODE, event.tenantId(), event.creditNoteNumber());
+                    return;
+                }
+            }
+
+            String ref = event.creditNoteNumber() + (event.invoiceNumber() != null ? " (" + event.invoiceNumber() + ")" : "");
+            List<CreateJournalEntryRequest.JournalLineRequest> lines = new ArrayList<>();
+            lines.add(new CreateJournalEntryRequest.JournalLineRequest(
+                    revenueAccountId, "Revenue reversed — " + ref, event.subtotal(), null));
+            if (hasVat) {
+                lines.add(new CreateJournalEntryRequest.JournalLineRequest(
+                        vatAccountId, "VAT output reversed — " + ref, event.vatTotal(), null));
+            }
+            lines.add(new CreateJournalEntryRequest.JournalLineRequest(
+                    arAccountId, "Credit note — " + ref, null, event.total()));
+
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(
+                    LocalDate.now(), "Credit note issued: " + ref,
+                    event.creditNoteNumber(), "INVOICE", lines);
+
+            JournalEntryResponse created = accountingService.createJournalEntry(event.tenantId(), req, null);
+            accountingService.postJournalEntry(event.tenantId(), created.id());
+            log.info("[Accounting] Posted credit note journal for credit note={} tenant={}", event.creditNoteNumber(), event.tenantId());
+        } catch (Exception e) {
+            log.error("[Accounting] Failed to post credit note journal for credit note={} tenant={}: {}",
+                    event.creditNoteNumber(), event.tenantId(), e.getMessage(), e);
         }
     }
 

@@ -33,7 +33,7 @@ public class AccWorkpaperController {
     private final AccWorkpaperService workpaperService;
 
     @PostMapping("/clients/{id}/workpaper-folders")
-    @PreAuthorize("hasAnyAuthority('USER_CREATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Create a workpaper folder for a client")
     public ResponseEntity<ApiResponse<WorkpaperFolderResponse>> createFolder(
             @PathVariable UUID id, @Valid @RequestBody CreateFolderRequest req) {
@@ -42,7 +42,7 @@ public class AccWorkpaperController {
     }
 
     @GetMapping("/clients/{id}/workpaper-folders")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "List workpaper folders for a client")
     public ResponseEntity<ApiResponse<List<WorkpaperFolderResponse>>> getFolders(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Workpaper folders",
@@ -50,7 +50,7 @@ public class AccWorkpaperController {
     }
 
     @PostMapping("/clients/{id}/workpaper-files")
-    @PreAuthorize("hasAnyAuthority('USER_CREATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Upload a workpaper file (max 10MB) — re-uploading the same file name in the same folder creates a new version")
     public ResponseEntity<ApiResponse<WorkpaperFileResponse>> uploadFile(
             @PathVariable UUID id, @Valid @RequestBody UploadWorkpaperFileRequest req) {
@@ -60,7 +60,7 @@ public class AccWorkpaperController {
     }
 
     @GetMapping("/clients/{id}/workpaper-folders/{folderId}/files")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "List files in a workpaper folder")
     public ResponseEntity<ApiResponse<List<WorkpaperFileResponse>>> getFiles(
             @PathVariable UUID id, @PathVariable UUID folderId) {
@@ -73,7 +73,7 @@ public class AccWorkpaperController {
     // existed to undo a soft-delete — but nothing ever queried for
     // deleted files, so there was no way to discover one to restore.
     @GetMapping("/clients/{id}/workpaper-folders/{folderId}/files/deleted")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "List soft-deleted files in a workpaper folder — for the Restore action")
     public ResponseEntity<ApiResponse<List<WorkpaperFileResponse>>> getDeletedFiles(
             @PathVariable UUID id, @PathVariable UUID folderId) {
@@ -82,7 +82,7 @@ public class AccWorkpaperController {
     }
 
     @GetMapping(value = "/clients/{id}/workpaper-files/{fileId}", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "Download a workpaper file")
     public ResponseEntity<byte[]> downloadFile(@PathVariable UUID id, @PathVariable UUID fileId) {
         var file = workpaperService.downloadFile(TenantContext.getTenantIdAsObject(), id, fileId,
@@ -94,7 +94,7 @@ public class AccWorkpaperController {
     }
 
     @PostMapping("/clients/{id}/workpaper-files/{fileId}/status")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Move a workpaper file through the review workflow — DRAFT, PREPARED, REVIEWED, or SIGNED_OFF")
     public ResponseEntity<ApiResponse<WorkpaperFileResponse>> updateFileStatus(
             @PathVariable UUID id, @PathVariable UUID fileId, @Valid @RequestBody UpdateWorkpaperStatusRequest req) {
@@ -104,7 +104,7 @@ public class AccWorkpaperController {
     }
 
     @DeleteMapping("/clients/{id}/workpaper-files/{fileId}")
-    @PreAuthorize("hasAnyAuthority('USER_DELETE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Soft-delete a workpaper file")
     public ResponseEntity<ApiResponse<Void>> deleteFile(@PathVariable UUID id, @PathVariable UUID fileId) {
         workpaperService.deleteFile(TenantContext.getTenantIdAsObject(), id, fileId, TenantContext.getCurrentUserId());
@@ -112,7 +112,7 @@ public class AccWorkpaperController {
     }
 
     @PostMapping("/clients/{id}/workpaper-files/{fileId}/restore")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','ACCOUNTANT_WRITE')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_WRITE')")
     @Operation(summary = "Restore a soft-deleted workpaper file")
     public ResponseEntity<ApiResponse<WorkpaperFileResponse>> restoreFile(
             @PathVariable UUID id, @PathVariable UUID fileId) {
@@ -122,7 +122,7 @@ public class AccWorkpaperController {
     }
 
     @GetMapping("/clients/{id}/workpaper-files/{fileId}/audit")
-    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTANT_READ')")
     @Operation(summary = "Audit log for a workpaper file — who uploaded, viewed, downloaded, or changed its status, and when")
     public ResponseEntity<ApiResponse<List<WorkpaperAuditResponse>>> getFileAuditLog(
             @PathVariable UUID id, @PathVariable UUID fileId) {
