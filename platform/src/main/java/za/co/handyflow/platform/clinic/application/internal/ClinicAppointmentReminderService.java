@@ -131,7 +131,7 @@ public class ClinicAppointmentReminderService {
     private String drName(String fullName) {
         if (fullName == null) return "";
         String trimmed = fullName.trim();
-        return trimmed.toLowerCase(java.util.Locale.ROOT).startsWith("dr")
+        return trimmed.matches("(?i)dr\\b.*")
                 ? trimmed : "Dr. " + trimmed;
     }
 }

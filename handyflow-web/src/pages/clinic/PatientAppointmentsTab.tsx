@@ -6,6 +6,7 @@ import { apiClient } from "../../api/client"
 import type { Appointment, Patient, Practitioner } from "./patientFile.shared"
 import { BORDER, Empty, ErrBox, GRAY, Modal, ModalFooter, STATUS_CFG, STATUS_FLOW, btnPrimary, fmtDT, fmtTime, lbl, sinp } from "./patientFile.shared"
 import { Calendar, Plus } from "lucide-react"
+import { drName } from "./drName"
 
 // ── APPOINTMENTS TAB ──────────────────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ export default function AppointmentsTab({ patient, appointments, practitioners, 
                       <span style={{ fontSize:11, color:GRAY }}>{a.appointmentType?.replace("_"," ")}</span>
                     </div>
                     <div style={{ fontSize:12, color:GRAY }}>
-                      {a.practitionerName?`Dr. ${a.practitionerName}`:"No practitioner"}
+                      {a.practitionerName?drName(a.practitionerName):"No practitioner"}
                       {a.reason?` · ${a.reason}`:""}
                       {a.durationMinutes?` · ${a.durationMinutes}min`:""}
                     </div>

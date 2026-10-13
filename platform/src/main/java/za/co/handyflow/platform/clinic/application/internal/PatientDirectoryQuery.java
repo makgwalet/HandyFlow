@@ -55,7 +55,7 @@ final class PatientDirectoryQuery {
             case "TODAY" -> {
                 where.append(" AND ((v.last_at >= ? AND v.last_at < ?) OR EXISTS (SELECT 1 FROM clinic_appointments a"
                         + " WHERE a.tenant_id = p.tenant_id AND a.patient_id = p.id AND a.deleted_at IS NULL"
-                        + " AND a.status NOT IN ('CANCELLED','NO_SHOW') AND a.scheduled_at >= ? AND a.scheduled_at < ?))");
+                        + " AND a.status NOT IN ('CANCELLED','NO_SHOW','NOT_SEEN') AND a.scheduled_at >= ? AND a.scheduled_at < ?))");
                 params.add(Timestamp.from(dayStart)); params.add(Timestamp.from(dayEnd));
                 params.add(Timestamp.from(dayStart)); params.add(Timestamp.from(dayEnd));
                 order = "lower(p.last_name), lower(p.first_name), p.id";

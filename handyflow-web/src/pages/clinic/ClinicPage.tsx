@@ -122,7 +122,7 @@ export function ClinicPage() {
           default:              return null
         }
       }}>
-      <ConsultationDock />
+      <ConsultationDock floating={(section ?? "dashboard") !== "dashboard"} />
     </SectionedModulePage>
   )
 }

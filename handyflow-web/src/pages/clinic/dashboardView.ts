@@ -1,5 +1,6 @@
 // Pure rules for the clinic home screen: the greeting, how today's list is grouped, and who can do what to a row.
 import type { DashItem } from "./ClinicDashboard"
+import { drName } from "./drName"
 
 export const CLINIC_TZ = "Africa/Johannesburg"
 
@@ -43,4 +44,4 @@ export function rowAction(status: string, clinician: boolean, canCheckIn: boolea
 }
 
 export const displayName = (user?: { firstName?: string; lastName?: string } | null, practitionerName?: string | null, clinician?: boolean) =>
-  clinician && practitionerName ? `Dr. ${practitionerName.replace(/^Dr\.?\s+/i, "")}` : (user?.firstName ?? "")
+  clinician && practitionerName ? drName(practitionerName) : (user?.firstName ?? "")

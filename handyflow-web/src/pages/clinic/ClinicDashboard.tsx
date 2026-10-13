@@ -9,6 +9,7 @@ import { useAuthStore } from "../../store/auth.store"
 import { myPractitionerId } from "./currentPractitioner"
 import { displayName, greeting, groupQueue, inBuilding, rowAction } from "./dashboardView"
 import { Users, Calendar, Clock, CheckCircle, ArrowRight, Search, UserPlus, CalendarPlus, CalendarClock, DoorOpen, AlertTriangle } from "lucide-react"
+import { drName } from "./drName"
 
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" })
 
@@ -33,6 +34,7 @@ const STATUS_CFG: Record<string, { color: string; bg: string; label: string }> =
   COMPLETED:   { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", label: "Completed" },
   CANCELLED:   { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", label: "Cancelled" },
   NO_SHOW:     { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)", label: "No Show" },
+  NOT_SEEN:    { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)", label: "Not seen" },
 }
 
 interface Props {
@@ -216,7 +218,7 @@ export default function ClinicDashboard({ onNavigate, onOpenPatient, onResume }:
               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", marginBottom: 12 }}>{next.appointmentType?.replace("_", " ")}</div>
               <div style={{ fontSize: 22, fontWeight: 800 }}>{fmtTime(next.scheduledAt)}</div>
               {dayOf(next.scheduledAt) !== summary?.date && <div style={{ fontSize: 12, marginTop: 2 }}>{dayOf(next.scheduledAt)}</div>}
-              {next.practitionerName && <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 6 }}>Dr. {next.practitionerName}</div>}
+              {next.practitionerName && <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 6 }}>{drName(next.practitionerName)}</div>}
             </div>
           )}
 

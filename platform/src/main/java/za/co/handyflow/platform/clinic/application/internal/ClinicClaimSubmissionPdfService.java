@@ -247,6 +247,6 @@ public class ClinicClaimSubmissionPdfService {
     private String drName(String fullName) {
         if (fullName == null) return "";
         String trimmed = fullName.trim();
-        return trimmed.toLowerCase(Locale.ROOT).startsWith("dr") ? trimmed : "Dr. " + trimmed;
+        return trimmed.matches("(?i)dr\\b.*") ? trimmed : "Dr. " + trimmed;
     }
 }

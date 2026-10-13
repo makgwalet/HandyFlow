@@ -69,12 +69,13 @@ export const STATUS_CFG: Record<string,{color:string;bg:string;label:string;icon
   COMPLETED:   {color:GREEN_TEXT,    bg:"var(--hf-success-soft-strong)",label:"Completed",  icon:CheckCircle},
   CANCELLED:   {color:RED_TEXT,      bg:"var(--hf-danger-soft)",label:"Cancelled",  icon:XCircle},
   NO_SHOW:     {color:GRAY,     bg:LIGHT,    label:"No Show",    icon:User},
+  NOT_SEEN:    {color:GRAY,     bg:LIGHT,    label:"Not seen",   icon:User},
 }
 export const STATUS_FLOW: Record<string,{action:string;label:string;color:string}[]> = {
   SCHEDULED:   [{action:"check_in",label:"Check in",color:"var(--hf-info-text)"},{action:"confirm",label:"Confirm",color:PURPLE_TEXT},{action:"cancel",label:"Cancel",color:RED_TEXT}],
   CONFIRMED:   [{action:"check_in",label:"Check in",color:"var(--hf-info-text)"},{action:"start",label:"Start",color:AMBER},{action:"no_show",label:"No Show",color:GRAY},{action:"cancel",label:"Cancel",color:RED_TEXT}],
-  CHECKED_IN:  [{action:"triage",label:"Triage",color:"var(--hf-violet-text)"},{action:"start",label:"Start",color:"var(--hf-warning-text)"},{action:"cancel",label:"Cancel",color:"var(--hf-danger-text)"}],
-  TRIAGED:     [{action:"start",label:"Start",color:"var(--hf-warning-text)"},{action:"cancel",label:"Cancel",color:"var(--hf-danger-text)"}],
+  CHECKED_IN:  [{action:"triage",label:"Triage",color:"var(--hf-violet-text)"},{action:"start",label:"Start",color:"var(--hf-warning-text)"},{action:"not_seen",label:"Left, not seen",color:GRAY},{action:"cancel",label:"Cancel",color:"var(--hf-danger-text)"}],
+  TRIAGED:     [{action:"start",label:"Start",color:"var(--hf-warning-text)"},{action:"not_seen",label:"Left, not seen",color:GRAY},{action:"cancel",label:"Cancel",color:"var(--hf-danger-text)"}],
   IN_PROGRESS: [{action:"complete",label:"Complete",color:GREEN_TEXT}],
 }
 export const ACCOUNT_CFG: Record<string,{label:string;bg:string;color:string}> = {

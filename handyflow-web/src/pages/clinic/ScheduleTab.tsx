@@ -14,6 +14,8 @@ import {
   ChevronLeft, ChevronRight, Plus, 
   CheckCircle, AlertCircle, Mail, Video,
 } from "lucide-react"
+import { drName } from "./drName"
+import { gridHours, offsetFor } from "./scheduleHours"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -44,22 +46,21 @@ const STATUS_CFG: Record<string,{color:string;bg:string;border:string;label:stri
   COMPLETED:   {color:GREEN,    bg:"var(--hf-success-soft-strong)",border:"var(--hf-success-border)",label:"Completed"},
   CANCELLED:   {color:RED_TEXT,      bg:"var(--hf-danger-soft)",border:"var(--hf-danger-border)",label:"Cancelled"},
   NO_SHOW:     {color:GRAY,     bg:LIGHT,    border:BORDER,   label:"No Show"},
+  NOT_SEEN:    {color:GRAY,     bg:LIGHT,    border:BORDER,   label:"Not seen"},
 }
 
 const STATUS_FLOW: Record<string,{action:string;label:string;color:string}[]> = {
   SCHEDULED:   [{action:"check_in",label:"Check in",color:"var(--hf-info-text)"},{action:"confirm",label:"Confirm",color:PURPLE_TEXT},{action:"cancel",label:"Cancel",color:RED_TEXT}],
   CONFIRMED:   [{action:"check_in",label:"Check in",color:"var(--hf-info-text)"},{action:"start",label:"Start",color:AMBER},{action:"no_show",label:"No Show",color:GRAY},{action:"cancel",label:"Cancel",color:RED_TEXT}],
-  CHECKED_IN:  [{action:"triage",label:"Triage",color:"var(--hf-violet-text)"},{action:"start",label:"Start",color:"var(--hf-warning-text)"},{action:"cancel",label:"Cancel",color:"var(--hf-danger-text)"}],
-  TRIAGED:     [{action:"start",label:"Start",color:"var(--hf-warning-text)"},{action:"cancel",label:"Cancel",color:"var(--hf-danger-text)"}],
+  CHECKED_IN:  [{action:"triage",label:"Triage",color:"var(--hf-violet-text)"},{action:"start",label:"Start",color:"var(--hf-warning-text)"},{action:"not_seen",label:"Left, not seen",color:GRAY},{action:"cancel",label:"Cancel",color:"var(--hf-danger-text)"}],
+  TRIAGED:     [{action:"start",label:"Start",color:"var(--hf-warning-text)"},{action:"not_seen",label:"Left, not seen",color:GRAY},{action:"cancel",label:"Cancel",color:"var(--hf-danger-text)"}],
   IN_PROGRESS: [{action:"complete",label:"Complete",color:GREEN}],
 }
 
 // ── Calendar helpers ──────────────────────────────────────────────────────────
 
 const HOUR_HEIGHT = 64  // px per hour
-const DAY_START   = 7   // 07:00
-const DAY_END     = 19  // 19:00
-const HOURS       = Array.from({length: DAY_END - DAY_START}, (_,i) => DAY_START + i)
+// The visible hours depend on the week's appointments: see scheduleHours.ts (0202).
 
 function startOfWeek(d: Date) {
   const day = new Date(d); day.setDate(d.getDate() - d.getDay() + 1); // Mon
@@ -79,10 +80,6 @@ function fmtDay(d: Date) {
 }
 function fmtHour(h: number) {
   return `${String(h).padStart(2,"0")}:00`
-}
-function topOffset(iso: string) {
-  const d = new Date(iso)
-  return (d.getHours() + d.getMinutes()/60 - DAY_START) * HOUR_HEIGHT
 }
 function apptHeight(minutes: number) {
   return Math.max((minutes / 60) * HOUR_HEIGHT - 4, 20)
@@ -230,6 +227,7 @@ export default function ScheduleTab({ onStartSession, prefill, onPrefillUsed }: 
 
   const today = new Date(); today.setHours(0,0,0,0)
   const nowMinutes = new Date().getHours()*60 + new Date().getMinutes()
+  const { start: DAY_START, hours: HOURS } = gridHours(filtered)
   const nowTop = ((nowMinutes/60) - DAY_START) * HOUR_HEIGHT
 
   const handleSlotClick = (day: Date, hour: number) => {
@@ -268,7 +266,7 @@ export default function ScheduleTab({ onStartSession, prefill, onPrefillUsed }: 
             style={{padding:"7px 12px",border:`1px solid ${BORDER}`,borderRadius:8,fontSize:13,outline:"none",background:"var(--hf-surface)",maxWidth:220}}>
             <option value="all">All practitioners</option>
             {(practitioners as Practitioner[]).map(p=>(
-              <option key={p.id} value={p.id}>Dr. {p.fullName}</option>
+              <option key={p.id} value={p.id}>{drName(p.fullName)}</option>
             ))}
           </select>
 
@@ -358,7 +356,7 @@ export default function ScheduleTab({ onStartSession, prefill, onPrefillUsed }: 
 
                 {/* Appointments */}
                 {dayAppts.map(appt=>{
-                  const top  = topOffset(appt.scheduledAt)
+                  const top  = offsetFor(appt.scheduledAt, DAY_START, HOUR_HEIGHT)
                   const h    = apptHeight(appt.durationMinutes)
                   const s    = STATUS_CFG[appt.status] ?? STATUS_CFG.SCHEDULED
                   if (top < 0 || top > HOURS.length*HOUR_HEIGHT) return null
@@ -398,7 +396,7 @@ export default function ScheduleTab({ onStartSession, prefill, onPrefillUsed }: 
                 ["Date", new Date(selected.scheduledAt).toLocaleDateString("en-ZA",{weekday:"long",day:"numeric",month:"long",year:"numeric"})],
                 ["Time", new Date(selected.scheduledAt).toLocaleTimeString("en-ZA",{hour:"2-digit",minute:"2-digit"})],
                 ["Duration", `${selected.durationMinutes} minutes`],
-                ["Practitioner", selected.practitionerName ? `Dr. ${selected.practitionerName}` : "—"],
+                ["Practitioner", selected.practitionerName ? drName(selected.practitionerName) : "—"],
                 ["Room", selected.roomName || "—"],
                 ["Reason", selected.reason || "—"],
               ].map(([label,value])=>(
@@ -460,7 +458,7 @@ export default function ScheduleTab({ onStartSession, prefill, onPrefillUsed }: 
               <label style={lbl}>Practitioner</label>
               <select value={bookForm.practitionerId} onChange={e=>setBookForm(f=>({...f,practitionerId:e.target.value}))} style={sinp}>
                 <option value="">Any / unassigned</option>
-                {(practitioners as Practitioner[]).map(p=><option key={p.id} value={p.id}>Dr. {p.fullName} — {p.specialty}</option>)}
+                {(practitioners as Practitioner[]).map(p=><option key={p.id} value={p.id}>{drName(p.fullName)} — {p.specialty}</option>)}
               </select>
             </div>
             {rooms.length>0 && (

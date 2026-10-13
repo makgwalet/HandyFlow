@@ -10,6 +10,7 @@ import {
   FILTERS, OUTCOMES, PAGE_SIZE, contactSummary, dateInDays, pageCount, recallsUrl, snoozeProblem,
   type ContactOutcome, type Recall, type RecallFilter, type RecallPage,
 } from "./recalls"
+import { drName } from "./drName"
 
 export interface RecallBookRequest { patientId: string; patientName: string; practitionerId?: string | null; reason: string }
 interface Practitioner { id: string; fullName: string }
@@ -88,7 +89,7 @@ export default function RecallsTab({ onBook }: { onBook?: (r: RecallBookRequest)
         </div>
         <select aria-label="Doctor" value={doctor} onChange={e => { setDoctor(e.target.value); setPage(0) }} style={inp}>
           <option value="">All doctors</option>
-          {practitioners.map(p => <option key={p.id} value={p.id}>Dr. {p.fullName}</option>)}
+          {practitioners.map(p => <option key={p.id} value={p.id}>{drName(p.fullName)}</option>)}
         </select>
         {isFetching && !isLoading && <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Updating…</span>}
       </div>
@@ -147,7 +148,7 @@ function RecallRow({ r, busy, canBook, onLog, onSnooze, onDismiss, onReopen, onB
         </div>
         <div style={{ fontSize: 12, color: "var(--hf-text-muted)", display: "flex", gap: 10, flexWrap: "wrap" }}>
           <span>Seen {fmtDay(r.consultedAt)} · follow-up due {fmtDay(r.dueDate)}</span>
-          {r.practitionerName && <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><Stethoscope size={11} /> Dr. {r.practitionerName}</span>}
+          {r.practitionerName && <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><Stethoscope size={11} /> {drName(r.practitionerName)}</span>}
           {r.diagnosis && <span>· {r.diagnosis}</span>}
         </div>
       </div>

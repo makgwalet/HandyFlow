@@ -160,6 +160,18 @@ class ClinicDomainModelTest {
         }
 
         @Test
+        @DisplayName("0202: an arrived patient can be marked NOT_SEEN; a booking that never arrived cannot")
+        void checkedInToNotSeen() {
+            var appt = newAppt();
+            appt.checkIn(); appt.markNotSeen();
+            assertThat(appt.getStatus()).isEqualTo("NOT_SEEN");
+            assertThat(appt.isActive()).isFalse();
+            var triaged = newAppt(); triaged.checkIn(); triaged.triage(); triaged.markNotSeen();
+            assertThat(triaged.getStatus()).isEqualTo("NOT_SEEN");
+            assertThatThrownBy(() -> newAppt().markNotSeen()).isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
         @DisplayName("create sets correct fields")
         void createSetsFields() {
             var patientId = UUID.randomUUID();

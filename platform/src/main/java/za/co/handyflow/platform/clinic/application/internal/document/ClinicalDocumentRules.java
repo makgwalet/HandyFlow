@@ -34,7 +34,7 @@ public final class ClinicalDocumentRules {
     public static String drName(String fullName) {
         if (fullName == null) return "";
         String s = fullName.trim();
-        return s.toLowerCase(Locale.ROOT).startsWith("dr") ? s : "Dr. " + s;
+        return s.matches("(?i)dr\\b.*") ? s : "Dr. " + s;
     }
 
     /** Dates of absence: either may be blank, but the end may not be before the start. */

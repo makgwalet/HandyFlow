@@ -120,6 +120,18 @@ public class ClinicAppointment {
         this.updatedAt = Instant.now();
     }
 
+    /**
+     * The patient arrived but no consultation was ever recorded (they left, or the visit was never closed). Patch 0202: a past
+     * day's visit left at CHECKED_IN, TRIAGED or IN_PROGRESS is closed this way by the nightly sweep, or by the front desk.
+     */
+    public void markNotSeen() {
+        if (!"CHECKED_IN".equals(status) && !"TRIAGED".equals(status) && !"IN_PROGRESS".equals(status)) {
+            throw new IllegalStateException("Only a patient who has arrived and is not yet finished can be marked not seen (is " + status + ").");
+        }
+        this.status    = "NOT_SEEN";
+        this.updatedAt = Instant.now();
+    }
+
     public void complete() {
         if (!"IN_PROGRESS".equals(this.status) && !"CONFIRMED".equals(this.status)
                 && !"SCHEDULED".equals(this.status) && !"CHECKED_IN".equals(this.status)
@@ -175,7 +187,7 @@ public class ClinicAppointment {
 
     public boolean isActive() {
         return !"CANCELLED".equals(this.status) && !"COMPLETED".equals(this.status)
-                && !"NO_SHOW".equals(this.status) && this.deletedAt == null;
+                && !"NO_SHOW".equals(this.status) && !"NOT_SEEN".equals(this.status) && this.deletedAt == null;
     }
 
     /** Idempotency guard for the reminder scheduler — see reminderSentAt. */

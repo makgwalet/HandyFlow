@@ -7,9 +7,9 @@ const get = vi.fn()
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: any[]) => get(...a) } }))
 import ConsultationDock from "./ConsultationDock"
 
-const show = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+const show = (dock = <ConsultationDock />) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
   <MemoryRouter initialEntries={["/clinic/dashboard"]}><Routes>
-    <Route path="/clinic/dashboard" element={<ConsultationDock />} />
+    <Route path="/clinic/dashboard" element={dock} />
     <Route path="/clinic/consult/:id" element={<div>WORKSPACE</div>} />
   </Routes></MemoryRouter></QueryClientProvider>)
 beforeEach(() => get.mockReset())
@@ -30,5 +30,13 @@ describe("ConsultationDock", () => {
     const { container } = show()
     await new Promise(r => setTimeout(r, 20))
     expect(container.textContent).toBe("")
+  })
+  it("floats over other screens but sits in the page on the Dashboard, so it never hides the end of the queue (0202)", async () => {
+    get.mockResolvedValue({ data: { data: [{ id: "c1", appointmentId: "a1", patientId: "p1", patientName: "Liam Botha", status: "DRAFT", updatedAt: "2026-10-08T09:00:00Z" }] } })
+    show()
+    expect((await screen.findByRole("region", { name: "Consultation in progress" })).style.position).toBe("sticky")
+    cleanup()
+    show(<ConsultationDock floating={false} />)
+    expect((await screen.findByRole("region", { name: "Consultation in progress" })).style.position).toBe("")
   })
 })

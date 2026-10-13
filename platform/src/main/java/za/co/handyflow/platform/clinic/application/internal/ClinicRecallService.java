@@ -45,7 +45,7 @@ public class ClinicRecallService {
                     + " ORDER BY c.patient_id, c.consulted_at DESC, c.id"
                     + ") l WHERE l.follow_up_days IS NOT NULL"
                     + " AND NOT EXISTS (SELECT 1 FROM clinic_appointments a WHERE a.tenant_id = ? AND a.patient_id = l.patient_id"
-                    + "   AND a.deleted_at IS NULL AND a.status NOT IN ('CANCELLED','NO_SHOW')"
+                    + "   AND a.deleted_at IS NULL AND a.status NOT IN ('CANCELLED','NO_SHOW','NOT_SEEN')"
                     + "   AND a.scheduled_at > l.consulted_at AND (l.appointment_id IS NULL OR a.id <> l.appointment_id))"
                     + " ORDER BY l.consulted_at";
 

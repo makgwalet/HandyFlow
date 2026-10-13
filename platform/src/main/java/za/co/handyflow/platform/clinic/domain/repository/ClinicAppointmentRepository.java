@@ -54,4 +54,14 @@ public interface ClinicAppointmentRepository extends JpaRepository<ClinicAppoint
         AND a.deletedAt IS NULL
         """)
     List<ClinicAppointment> findDueForReminder(Instant from, Instant to);
+
+    /** Patch 0202, nightly sweep (cross-tenant, like findDueForReminder): visits from before {@code before} that were never closed. */
+    @Query("""
+        SELECT a FROM ClinicAppointment a
+        WHERE a.status IN ('CHECKED_IN', 'TRIAGED', 'IN_PROGRESS')
+        AND a.scheduledAt < :before
+        AND a.deletedAt IS NULL
+        ORDER BY a.scheduledAt
+        """)
+    List<ClinicAppointment> findUnclosedVisitsBefore(Instant before);
 }

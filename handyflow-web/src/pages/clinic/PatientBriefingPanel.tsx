@@ -6,6 +6,7 @@ import { AlertTriangle, CalendarClock, CalendarPlus, FlaskConical, History, Info
 import { apiClient } from "../../api/client"
 import { flowCard, masonry } from "./patientFile.shared"
 import { ago, bmi, fmtDay, fmtTimeOfDay, recallText, type Briefing, type BriefingVisit } from "./briefing"
+import { drName } from "./drName"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 
@@ -68,10 +69,10 @@ export default function PatientBriefingPanel({ patientId, appointments, defaultP
         <div style={{ ...card, padding: 0, flex: "1 1 560px", minWidth: 0, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
           <Stat first label="Last visit" icon={<History size={13} />}
             main={when ?? "First visit"}
-            sub={last ? `${fmtDay(last.at)}${last.practitionerName ? ` · Dr ${last.practitionerName}` : ""}` : "No finished visits on record"} />
+            sub={last ? `${fmtDay(last.at)}${last.practitionerName ? ` · ${drName(last.practitionerName)}` : ""}` : "No finished visits on record"} />
           <Stat label="Next appointment" icon={<CalendarClock size={13} />}
             main={b.nextAppointment ? fmtDay(b.nextAppointment.at) : "Nothing booked"}
-            sub={b.nextAppointment ? `${fmtTimeOfDay(b.nextAppointment.at)}${new Date(b.nextAppointment.at).getTime() < Date.now() ? " · time has passed, not started" : ""}${b.nextAppointment.practitionerName ? ` · Dr ${b.nextAppointment.practitionerName}` : ""}` : "No upcoming appointment"} />
+            sub={b.nextAppointment ? `${fmtTimeOfDay(b.nextAppointment.at)}${new Date(b.nextAppointment.at).getTime() < Date.now() ? " · time has passed, not started" : ""}${b.nextAppointment.practitionerName ? ` · ${drName(b.nextAppointment.practitionerName)}` : ""}` : "No upcoming appointment"} />
           <Stat label="Follow-up" icon={<CalendarPlus size={13} />}
             main={recall ?? "None outstanding"}
             tone={b.recall && b.recall.overdueDays > 0 ? "danger" : undefined}
@@ -107,7 +108,7 @@ export default function PatientBriefingPanel({ patientId, appointments, defaultP
                   <div style={{ fontSize: 13, color: "var(--hf-text)" }}>
                     <b>{v.diagnosis ?? v.chiefComplaint ?? "No diagnosis recorded"}</b>
                     {v.diagnosis && v.chiefComplaint && <span style={{ color: "var(--hf-text-muted)" }}> · {v.chiefComplaint}</span>}
-                    {v.practitionerName && <span style={{ color: "var(--hf-text-muted)" }}> · Dr {v.practitionerName}</span>}
+                    {v.practitionerName && <span style={{ color: "var(--hf-text-muted)" }}> · {drName(v.practitionerName)}</span>}
                   </div>
                 </div>
               ))}

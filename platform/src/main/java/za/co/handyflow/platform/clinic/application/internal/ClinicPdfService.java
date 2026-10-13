@@ -285,7 +285,7 @@ public class ClinicPdfService {
     private String drName(String fullName) {
         if (fullName == null) return "";
         String trimmed = fullName.trim();
-        return trimmed.toLowerCase(java.util.Locale.ROOT).startsWith("dr") ? trimmed : "Dr. " + trimmed;
+        return trimmed.matches("(?i)dr\\b.*") ? trimmed : "Dr. " + trimmed;
     }
 
     private void footer(Document doc, TenantDetails tenant, PdfFont regular) {

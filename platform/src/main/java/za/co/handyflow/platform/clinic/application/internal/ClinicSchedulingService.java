@@ -28,7 +28,7 @@ public class ClinicSchedulingService {
         return jdbc.query("SELECT p.full_name AS patient_name, a.scheduled_at, a.duration_minutes "
                         + "FROM clinic_appointments a JOIN clinic_patients p ON p.id = a.patient_id "
                         + "WHERE a.tenant_id = ? AND a.practitioner_id = ? AND a.deleted_at IS NULL "
-                        + "AND a.status NOT IN ('CANCELLED','NO_SHOW') "
+                        + "AND a.status NOT IN ('CANCELLED','NO_SHOW','NOT_SEEN') "
                         + "AND a.scheduled_at < ? AND a.scheduled_at + a.duration_minutes * INTERVAL '1 minute' > ? "
                         + "AND (?::uuid IS NULL OR a.id <> ?::uuid) ORDER BY a.scheduled_at",
                 (rs, i) -> new Clash(rs.getString("patient_name"), rs.getTimestamp("scheduled_at").toInstant(),
@@ -47,7 +47,7 @@ public class ClinicSchedulingService {
         return jdbc.query("SELECT pr.full_name AS practitioner_name, a.scheduled_at, a.duration_minutes "
                         + "FROM clinic_appointments a LEFT JOIN clinic_practitioners pr ON pr.id = a.practitioner_id "
                         + "WHERE a.tenant_id = ? AND a.patient_id = ? AND a.deleted_at IS NULL "
-                        + "AND a.status NOT IN ('CANCELLED','NO_SHOW') "
+                        + "AND a.status NOT IN ('CANCELLED','NO_SHOW','NOT_SEEN') "
                         + "AND a.scheduled_at < ? AND a.scheduled_at + a.duration_minutes * INTERVAL '1 minute' > ? "
                         + "AND (?::uuid IS NULL OR a.id <> ?::uuid) ORDER BY a.scheduled_at",
                 (rs, i) -> new Clash(rs.getString("practitioner_name"), rs.getTimestamp("scheduled_at").toInstant(),
@@ -63,7 +63,7 @@ public class ClinicSchedulingService {
         return jdbc.query("SELECT p.full_name AS patient_name, a.scheduled_at, a.duration_minutes "
                         + "FROM clinic_appointments a JOIN clinic_patients p ON p.id = a.patient_id "
                         + "WHERE a.tenant_id = ? AND a.room_id = ? AND a.deleted_at IS NULL "
-                        + "AND a.status NOT IN ('CANCELLED','NO_SHOW') "
+                        + "AND a.status NOT IN ('CANCELLED','NO_SHOW','NOT_SEEN') "
                         + "AND a.scheduled_at < ? AND a.scheduled_at + a.duration_minutes * INTERVAL '1 minute' > ? "
                         + "AND (?::uuid IS NULL OR a.id <> ?::uuid) ORDER BY a.scheduled_at",
                 (rs, i) -> new Clash(rs.getString("patient_name"), rs.getTimestamp("scheduled_at").toInstant(),

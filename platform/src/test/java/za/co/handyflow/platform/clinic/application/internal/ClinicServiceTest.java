@@ -833,6 +833,35 @@ class ClinicServiceTest {
         }
 
         @Test
+        @DisplayName("0202: refuses to check in or start a booking for a later day")
+        void refusesToStartALaterDay() {
+            var id = UUID.randomUUID();
+            var appt = ClinicAppointment.create(TENANT, UUID.randomUUID(), null,
+                    Instant.now().plus(java.time.Duration.ofDays(3)), 30, "CONSULTATION", null);
+            appt.confirm();
+            when(appointmentRepo.findActiveById(TENANT, id)).thenReturn(Optional.of(appt));
+
+            assertThatThrownBy(() -> service.updateAppointmentStatus(TENANT, id, "start")).isInstanceOf(IllegalStateException.class).hasMessageContaining("later day");
+            assertThatThrownBy(() -> service.updateAppointmentStatus(TENANT, id, "check_in")).isInstanceOf(IllegalStateException.class);
+            assertThat(appt.getStatus()).isEqualTo("CONFIRMED");
+            verify(appointmentRepo, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("0202: the front desk can mark an arrived patient as not seen")
+        void marksNotSeen() {
+            var id = UUID.randomUUID();
+            var appt = ClinicAppointment.create(TENANT, UUID.randomUUID(), null,
+                    Instant.now(), 30, "CONSULTATION", null);
+            appt.checkIn();
+            when(appointmentRepo.findActiveById(TENANT, id)).thenReturn(Optional.of(appt));
+            when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+            lenient().when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+
+            assertThat(service.updateAppointmentStatus(TENANT, id, "not_seen").status()).isEqualTo("NOT_SEEN");
+        }
+
+        @Test
         @DisplayName("throws on unknown action")
         void throwsOnUnknownAction() {
             var id = UUID.randomUUID();
@@ -996,7 +1025,7 @@ class ClinicServiceTest {
         }
 
         @Test
-        @DisplayName("createDraftConsultation saves a DRAFT and does not touch the appointment or last visit")
+        @DisplayName("createDraftConsultation saves a DRAFT and does not complete the appointment or touch last visit")
         void draftDoesNotCompleteAppointmentOrTouchPatient() {
             var patientId = UUID.randomUUID();
             when(patientRepo.findActiveById(TENANT, patientId))
@@ -1008,6 +1037,38 @@ class ClinicServiceTest {
             verify(consultationRepo).save(argThat(c -> c.isDraft()));
             verify(appointmentRepo, never()).save(any());
             verify(patientRepo, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("0202: opening a draft for a checked-in appointment puts the appointment in consultation")
+        void draftStartsACheckedInAppointment() {
+            var patientId = UUID.randomUUID();
+            var apptId    = UUID.randomUUID();
+            var appt = ClinicAppointment.create(TENANT, patientId, null, Instant.now(), 30, "CONSULTATION", null);
+            appt.checkIn();
+            when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patientWithId("Jane", "Dlamini")));
+            when(appointmentRepo.findActiveById(TENANT, apptId)).thenReturn(Optional.of(appt));
+
+            service.createDraftConsultation(TENANT, patientId, emptyReq(apptId));
+
+            assertThat(appt.getStatus()).isEqualTo("IN_PROGRESS");
+            verify(appointmentRepo).save(appt);
+        }
+
+        @Test
+        @DisplayName("0202: a draft for an appointment already in consultation leaves it alone")
+        void draftLeavesAnInProgressAppointmentAlone() {
+            var patientId = UUID.randomUUID();
+            var apptId    = UUID.randomUUID();
+            var appt = ClinicAppointment.create(TENANT, patientId, null, Instant.now(), 30, "CONSULTATION", null);
+            appt.confirm(); appt.start();
+            when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patientWithId("Jane", "Dlamini")));
+            when(appointmentRepo.findActiveById(TENANT, apptId)).thenReturn(Optional.of(appt));
+
+            service.createDraftConsultation(TENANT, patientId, emptyReq(apptId));
+
+            assertThat(appt.getStatus()).isEqualTo("IN_PROGRESS");
+            verify(appointmentRepo, never()).save(any());
         }
 
         @Test

@@ -248,7 +248,7 @@ public class ClinicConsultationSummaryPdfService {
     private String drName(String fullName) {
         if (fullName == null) return "";
         String trimmed = fullName.trim();
-        return trimmed.toLowerCase(Locale.ROOT).startsWith("dr") ? trimmed : "Dr. " + trimmed;
+        return trimmed.matches("(?i)dr\\b.*") ? trimmed : "Dr. " + trimmed;
     }
 
     /** Same fix as InvoicePdfService/QuotePdfService/ReceiptPdfService/CreditNotePdfService — logoUrl is a data: URI. */

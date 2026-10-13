@@ -7,7 +7,11 @@ import { dockCandidate, dockStages, openTabs, workspacePath, type ConsultationLi
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return Array.isArray(p) ? p : (p?.content ?? []) }
 const MARK = { done: "✓", attention: "!", todo: "—" } as const
 
-export default function ConsultationDock() {
+/**
+ * `floating` keeps the strip pinned to the bottom of the window while the page scrolls. 0202: on the Dashboard it is not
+ * floating, because a pinned strip hid the end of the queue; the Dashboard's "My day" panel already lists open consultations.
+ */
+export default function ConsultationDock({ floating = true }: { floating?: boolean }) {
   const navigate = useNavigate()
   const { data = [] } = useQuery<(ConsultationLike & { updatedAt?: string })[]>({
     queryKey: ["clinic-dock"],
@@ -18,7 +22,7 @@ export default function ConsultationDock() {
   if (!c) return null
   const others = openTabs(data).filter(t => t.appointmentId !== c.appointmentId)
   return (
-    <div role="region" aria-label="Consultation in progress" style={{ position: "sticky", bottom: 12, zIndex: 20, marginTop: 16, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap",
+    <div role="region" aria-label="Consultation in progress" style={{ ...(floating ? { position: "sticky" as const, bottom: 12, zIndex: 20 } : {}), marginTop: 16, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap",
       padding: "10px 16px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderLeft: "4px solid var(--hf-danger)", borderRadius: 12, boxShadow: "0 6px 24px rgba(0,0,0,0.14)" }}>
       <div style={{ fontSize: 13, fontWeight: 800, color: "var(--hf-text)" }}>Consultation in progress · {c.patientName ?? "patient"}</div>
       <div style={{ flex: 1, fontSize: 12, color: "var(--hf-text-muted)" }}>

@@ -11,6 +11,7 @@ export interface Appointment {
   id: string; patientId: string; patientName: string
   practitionerId: string; practitionerName: string
   appointmentType: string; reason: string; scheduledAt: string
+  status?: string
 }
 export interface BillLine {
   id: string; type: "CONSULTATION"|"PROCEDURE"|"MEDICINE"|"CONSUMABLE"

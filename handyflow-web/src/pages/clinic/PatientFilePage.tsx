@@ -37,8 +37,14 @@ interface Props {
   patient: Patient; onClose: () => void; onNavigate: (tab:any)=>void; onOpenPatient?: (p:Patient)=>void
 }
 
-export default function PatientFilePage({ patient, onOpenPatient }: Props) {
+export default function PatientFilePage({ patient: given, onOpenPatient }: Props) {
   const qc = useQueryClient()
+  // 0202: the file was opened with a copy of the record taken when it was clicked, and kept showing that copy (an "INACTIVE"
+  // label after the patient was reactivated, for example). It now reads the live record, starting from that copy.
+  const { data: patient = given } = useQuery<Patient>({
+    queryKey: ["pf-patient", given.id], initialData: given,
+    queryFn: async () => { const r = await apiClient.get(`/api/v1/clinic/patients/${given.id}`); return (r.data?.data ?? r.data) as Patient },
+  })
   const { prompt, dialogs } = useDialogs()
   const navigate = useNavigate()
   const userEmail = useAuthStore(st => st.user?.email)
@@ -81,15 +87,15 @@ export default function PatientFilePage({ patient, onOpenPatient }: Props) {
   // Account lifecycle mutations
   const deactivate = useMutation({
     mutationFn: ()=>apiClient.patch(`/api/v1/clinic/patients/${pid}`,{active:false}),
-    onSuccess: ()=>{ qc.invalidateQueries({queryKey:["clinic-patients"]}); setShowActions(false) },
+    onSuccess: ()=>{ qc.invalidateQueries({queryKey:["clinic-patients"]}); qc.invalidateQueries({queryKey:["pf-patient",pid]}); setShowActions(false) },
   })
   const reactivate = useMutation({
     mutationFn: ()=>apiClient.patch(`/api/v1/clinic/patients/${pid}`,{active:true}),
-    onSuccess: ()=>{ qc.invalidateQueries({queryKey:["clinic-patients"]}); setShowActions(false) },
+    onSuccess: ()=>{ qc.invalidateQueries({queryKey:["clinic-patients"]}); qc.invalidateQueries({queryKey:["pf-patient",pid]}); setShowActions(false) },
   })
   const archive = useMutation({
     mutationFn: (reason:string)=>apiClient.patch(`/api/v1/clinic/patients/${pid}`,{archivedAt:new Date().toISOString(),archiveReason:reason}),
-    onSuccess: ()=>{ qc.invalidateQueries({queryKey:["clinic-patients"]}); setShowActions(false) },
+    onSuccess: ()=>{ qc.invalidateQueries({queryKey:["clinic-patients"]}); qc.invalidateQueries({queryKey:["pf-patient",pid]}); setShowActions(false) },
   })
   const convertToFamily = useMutation({
     mutationFn: ()=>apiClient.patch(`/api/v1/clinic/patients/${pid}`,{accountType:"PRINCIPAL"}),
@@ -198,7 +204,7 @@ export default function PatientFilePage({ patient, onOpenPatient }: Props) {
                     hint="Same person registered twice — combine the two files"/>
                 )}
                 {/* Deactivate / reactivate */}
-                {patient.active ? (
+                {patient.active !== false ? (
                   <ActionItem icon={UserX} label="Deactivate account"
                     color={AMBER} onClick={()=>deactivate.mutate()}
                     hint="Patient hidden from active list"/>

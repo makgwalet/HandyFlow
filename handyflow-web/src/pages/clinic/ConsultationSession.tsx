@@ -143,6 +143,10 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
         if (existing) {
           draftIdRef.current = existing.id
           setStatus(existing.status)
+          // 0202: resuming a consultation also puts its appointment in consultation (a new draft does this on the server).
+          if (["CONFIRMED", "CHECKED_IN", "TRIAGED"].includes(appointment.status ?? "")) {
+            try { await apiClient.post(`/api/v1/clinic/appointments/${appointment.id}/start`) } catch { /* the notes still open */ }
+          }
           if (existing.status === "READY_FOR_DOCTOR" || existing.status === "DOCTOR_REVIEWING") {
             // What the nurse said when handing over, shown above the notes.
             try {
@@ -181,6 +185,8 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
           setStatus("DRAFT")
         }
         setDraftReady(true); setDraftState("saved")
+        // The appointment is now "in consultation": refresh the lists that show its status.
+        for (const k of ["clinic-appts-dashboard", "schedule-appts", "pf-appointments"]) qc.invalidateQueries({ queryKey: [k] })
       } catch { setDraftState("error") }
     })()
   // eslint-disable-next-line react-hooks/exhaustive-deps

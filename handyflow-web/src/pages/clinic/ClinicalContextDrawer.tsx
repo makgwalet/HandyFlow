@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 import { ChevronRight, ChevronLeft } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { bmi, fmtDay, type Briefing, type BriefingVisit } from "./briefing"
+import { drName } from "./drName"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 
@@ -119,7 +120,7 @@ function VisitPeek({ v }: { v: BriefingVisit }) {
   return (
     <div style={{ padding: "0 0 8px 86px", display: "flex", flexDirection: "column", gap: 2 }}>
       {row("Reason", v.chiefComplaint)}{row("Diagnosis", v.diagnosis)}{row("ICD-10", v.icd10Codes.join(", "))}
-      {row("Seen by", v.practitionerName ? `Dr ${v.practitionerName}` : null)}
+      {row("Seen by", v.practitionerName ? drName(v.practitionerName) : null)}
       {row("Follow-up", v.followUpDays != null ? `in ${v.followUpDays} days` : null)}
     </div>
   )

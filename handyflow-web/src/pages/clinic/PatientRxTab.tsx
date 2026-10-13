@@ -7,6 +7,7 @@ import RxFillControl from "./RxFillControl"
 import { Pill } from "lucide-react"
 import type { Consultation, Patient, Prescription } from "./patientFile.shared"
 import { AMBER, BORDER, Empty, GRAY, GREEN, GREEN_TEXT, NAVY, TEAL, fmtDT, unwrap } from "./patientFile.shared"
+import { drName } from "./drName"
 
 // ── PRESCRIPTIONS TAB ─────────────────────────────────────────────────────────
 
@@ -48,7 +49,7 @@ export default function PrescriptionsTab({ patient, consultations }:
                   <div style={{ fontWeight:700, fontSize:15, color:"var(--hf-text)", marginBottom:4 }}>{rx.medicationName}</div>
                   <div style={{ fontSize:13, color:GRAY, marginBottom:4 }}>{[rx.dosage,rx.frequency,rx.duration].filter(Boolean).join(" · ")}{rx.quantity?` · Qty: ${rx.quantity}`:""}{rx.repeats>0?` · Repeats: ${rx.repeats}`:""}</div>
                   {rx.instructions&&<div style={{ fontSize:12, color:"var(--hf-text-tertiary)", fontStyle:"italic", marginBottom:4 }}>{rx.instructions}</div>}
-                  <div style={{ fontSize:11, color:GRAY }}>Prescribed {fmtDT(rx.prescribedAt)}{rx.practitionerName&&` · Dr. ${rx.practitionerName}`}</div>
+                  <div style={{ fontSize:11, color:GRAY }}>Prescribed {fmtDT(rx.prescribedAt)}{rx.practitionerName&&` · ${drName(rx.practitionerName)}`}</div>
                   <RxFillControl rx={rx} onRecorded={()=>qc.invalidateQueries({queryKey:["pf-all-rx",patient.id]})} />
                 </div>
                 <div style={{ flexShrink:0, marginLeft:12 }}>

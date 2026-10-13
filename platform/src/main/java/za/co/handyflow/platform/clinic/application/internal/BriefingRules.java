@@ -65,7 +65,7 @@ final class BriefingRules {
     static Recall recall(Visit lastFinished, List<Appt> appts, LocalDate today, ZoneId zone) {
         if (lastFinished == null || lastFinished.followUpDays() == null) return null;
         boolean booked = appts.stream().anyMatch(a -> a.at() != null && a.at().isAfter(lastFinished.at())
-                && !"CANCELLED".equals(a.status()) && !"NO_SHOW".equals(a.status())
+                && !"CANCELLED".equals(a.status()) && !"NO_SHOW".equals(a.status()) && !"NOT_SEEN".equals(a.status())
                 && (lastFinished.appointmentId() == null || !a.id().equals(lastFinished.appointmentId())));
         if (booked) return null;
         LocalDate due = RecallRules.dueDate(lastFinished.at(), lastFinished.followUpDays(), zone);

@@ -6,7 +6,7 @@ import ModalShell from "./ModalShell"
 import { saId, saIdDob, saIdParts } from "./patientFile.shared"
 import { myPractitionerId } from "./currentPractitioner"
 import { useAuthStore } from "../../store/auth.store"
-import { availableViews, directoryUrl, toRow, visitsLabel, type DirectoryPage, type PatientView } from "./patients"
+import { ageSexLine, availableViews, directoryUrl, toRow, visitsLabel, type DirectoryPage, type PatientView } from "./patients"
 import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -290,6 +290,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
             <tbody>
               {patients.map((p, i) => {
                 const info = saIdInfo(p.idNumber)
+                const ageSex = ageSexLine(p)
                 const badge = ACCOUNT_BADGE[p.accountType] ?? ACCOUNT_BADGE.INDIVIDUAL
                 const isArchived = !!p.archivedAt
                 return (
@@ -335,7 +336,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                     {/* DOB */}
                     <td style={{ padding:"11px 16px", fontSize:13 }}>
                       <div style={{ color:"var(--hf-text-tertiary)" }}>{p.dateOfBirth ? fmtDT(p.dateOfBirth) : (info?.dob ?? "—")}</div>
-                      {info && <div style={{ fontSize:11, color:"var(--hf-text-faint)" }}>{info.age} yrs · {info.gender}</div>}
+                      {ageSex && <div style={{ fontSize:11, color:"var(--hf-text-faint)" }}>{ageSex}</div>}
                     </td>
 
                     {/* Contact */}

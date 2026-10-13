@@ -98,8 +98,8 @@ export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPati
 
       <Card title="Personal details" aside={
         <span style={{ display:"flex", gap:6 }}>
-          <span style={{ background:patient.active?"var(--hf-success-soft-strong)":"var(--hf-danger-soft)", color:patient.active?GREEN_TEXT:RED_TEXT,
-            padding:"2px 9px", borderRadius:20, fontSize:11, fontWeight:700 }}>{patient.active?"ACTIVE":"INACTIVE"}</span>
+          <span style={{ background:patient.active!==false?"var(--hf-success-soft-strong)":"var(--hf-danger-soft)", color:patient.active!==false?GREEN_TEXT:RED_TEXT,
+            padding:"2px 9px", borderRadius:20, fontSize:11, fontWeight:700 }}>{patient.active===false?"INACTIVE":"ACTIVE"}</span>
           {patient.archivedAt && <span style={{ background:"var(--hf-surface-sunken)", color:GRAY, padding:"2px 9px", borderRadius:20, fontSize:11, fontWeight:700 }}>ARCHIVED</span>}
         </span>}>
         <Fact k="SA ID" v={patient.idNumber||"—"} />

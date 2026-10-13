@@ -126,6 +126,6 @@ public class ClinicLetterPdfService {
     private static String drName(String fullName) {
         if (fullName == null) return "";
         String s = fullName.trim();
-        return s.toLowerCase(Locale.ROOT).startsWith("dr") ? s : "Dr. " + s;
+        return s.matches("(?i)dr\\b.*") ? s : "Dr. " + s;
     }
 }

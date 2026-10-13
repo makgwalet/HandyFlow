@@ -15,6 +15,7 @@ import { startLabel, useStartConsultation } from "./useStartConsultation"
 import { BORDER, Empty, GRAY, LIGHT, RED_TEXT, btnPrimary, downloadPdf, lbl, sinp } from "./patientFile.shared"
 import { primaryBtn, smallBtn } from "./OverviewCard"
 import { ADDENDUM_KINDS, headline, isAmendable, isOpenVisit, resumeProblem, rxLine, statusOf, vitalLines, type Visit } from "./visitView"
+import { drName } from "./drName"
 
 const unwrap = (r: any) => r?.data?.data ?? r?.data
 const TONE = { ok: ["var(--hf-success-soft)", "var(--hf-success-text-strong)"], warn: ["var(--hf-warning-soft)", "var(--hf-warning-text)"],
@@ -66,7 +67,7 @@ export default function PatientVisitsTab({ patientId, appointments, defaultPract
                       </div>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{headline(v)}</div>
-                        <div style={{ fontSize: 12, color: GRAY }}>{v.diagnosis && v.chiefComplaint ? `${v.chiefComplaint} · ` : ""}{v.doctorName ? `Dr ${v.doctorName}` : "No practitioner recorded"}</div>
+                        <div style={{ fontSize: 12, color: GRAY }}>{v.diagnosis && v.chiefComplaint ? `${v.chiefComplaint} · ` : ""}{v.doctorName ? drName(v.doctorName) : "No practitioner recorded"}</div>
                       </div>
                       {open ? <ChevronUp size={15} style={{ color: GRAY, flexShrink: 0 }} /> : <ChevronDown size={15} style={{ color: GRAY, flexShrink: 0 }} />}
                     </button>

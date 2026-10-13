@@ -71,4 +71,12 @@ class AppointmentRulesTest {
         assertEquals("This room is already booked 10:00–10:30 for Sam Nkosi (and 1 more).",
                 AppointmentRules.roomConflictMessage(null, two, AppointmentRules.CLINIC_ZONE));
     }
+
+    @Test void aLaterDayIsJudgedInClinicTime() {   // 0202
+        Instant now = Instant.parse("2026-10-13T20:00:00Z");                      // 22:00 on 13 Oct in Johannesburg
+        assertFalse(AppointmentRules.isLaterDay(Instant.parse("2026-10-13T21:30:00Z"), now));   // 23:30 the same day
+        assertTrue(AppointmentRules.isLaterDay(Instant.parse("2026-10-13T22:30:00Z"), now));    // 00:30 on the 14th
+        assertFalse(AppointmentRules.isLaterDay(Instant.parse("2026-10-12T07:00:00Z"), now));   // yesterday
+        assertFalse(AppointmentRules.isLaterDay(null, now));
+    }
 }

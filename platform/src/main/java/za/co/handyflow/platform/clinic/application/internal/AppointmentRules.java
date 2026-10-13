@@ -18,6 +18,17 @@ final class AppointmentRules {
 
     private static final DateTimeFormatter HM = DateTimeFormatter.ofPattern("HH:mm");
 
+    /** States from which opening a consultation moves the appointment to IN_PROGRESS (see ClinicAppointment.start). */
+    static final java.util.Set<String> STARTABLE = java.util.Set.of("CONFIRMED", "CHECKED_IN", "TRIAGED");
+
+    /**
+     * Patch 0202: a booking for a later day (clinic time) cannot be checked in or started today; doing so is how a future
+     * appointment ended up "Completed". The patient is here now, so the booking should be moved to today first.
+     */
+    static boolean isLaterDay(Instant scheduledAt, Instant now) {
+        return scheduledAt != null && scheduledAt.atZone(CLINIC_ZONE).toLocalDate().isAfter(now.atZone(CLINIC_ZONE).toLocalDate());
+    }
+
     /** One existing booking that clashes with a new one. */
     record Clash(String patientName, Instant start, int minutes) {}
 

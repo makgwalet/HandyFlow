@@ -488,14 +488,18 @@ public class ClinicService {
     private String drName(String fullName) {
         if (fullName == null) return "";
         String trimmed = fullName.trim();
-        return trimmed.toLowerCase(Locale.ROOT).startsWith("dr") ? trimmed : "Dr. " + trimmed;
+        return trimmed.matches("(?i)dr\\b.*") ? trimmed : "Dr. " + trimmed;
     }
 
     @Transactional
     public AppointmentResponse updateAppointmentStatus(TenantId tenantId, UUID id, String action) {
         ClinicAppointment appt = appointmentRepo.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment", id.toString()));
-        switch (action.toUpperCase().replace('-', '_')) {
+        String act = action.toUpperCase().replace('-', '_');
+        if ((act.equals("CHECK_IN") || act.equals("START")) && AppointmentRules.isLaterDay(appt.getScheduledAt(), Instant.now())) {
+            throw new IllegalStateException("This appointment is booked for a later day. Move it to today before checking the patient in or starting.");
+        }
+        switch (act) {
             case "CONFIRM"  -> appt.confirm();
             case "CHECK_IN" -> appt.checkIn();
             case "TRIAGE"   -> appt.triage();
@@ -503,6 +507,7 @@ public class ClinicService {
             case "COMPLETE" -> appt.complete();
             case "CANCEL"   -> appt.cancel();
             case "NO_SHOW"  -> appt.noShow();
+            case "NOT_SEEN" -> appt.markNotSeen();
             default -> throw new IllegalArgumentException("Unknown action: " + action);
         }
         appointmentRepo.save(appt);
@@ -715,6 +720,7 @@ public class ClinicService {
         c.recordClinical(req.history(), req.examination(), req.diagnosis(),
                 req.icd10Codes(), req.treatmentPlan(), req.followUpDays());
         consultationRepo.save(c);
+        markInConsultation(tenantId, req.appointmentId());
         log.info("Created DRAFT consultation={} patient={}", c.getId(), patientId);
 
         Map<UUID, String> patientNames = Map.of(patientId,
@@ -723,6 +729,20 @@ public class ClinicService {
                 ? loadPractitionerNamesById(tenantId, List.of(c.getPractitionerId()))
                 : Map.of();
         return toConsultationResponse(c, patientNames, practNames);
+    }
+
+    /**
+     * Patch 0202: opening a consultation puts its appointment "in consultation", whichever screen it was opened from. The
+     * Schedule's Start button did this, but the Dashboard's "See patient" opened the draft directly, so the appointment stayed
+     * "Checked in" with a Start button while the patient was being seen. Appointments in any other state are left alone.
+     */
+    void markInConsultation(TenantId tenantId, UUID appointmentId) {
+        if (appointmentId == null) return;
+        appointmentRepo.findActiveById(tenantId, appointmentId).ifPresent(a -> {
+            if (AppointmentRules.STARTABLE.contains(a.getStatus()) && !AppointmentRules.isLaterDay(a.getScheduledAt(), Instant.now())) {
+                a.start(); appointmentRepo.save(a);
+            }
+        });
     }
 
     @Transactional(readOnly = true)

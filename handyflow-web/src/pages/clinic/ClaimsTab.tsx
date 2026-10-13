@@ -22,6 +22,7 @@ import {
   CheckCircle, Clock, XCircle, RefreshCw, Send, FileText, 
   CheckSquare, Square, Download,
 } from "lucide-react"
+import { drName } from "./drName"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -330,7 +331,7 @@ export default function ClaimsTab() {
                       </div>
                       <div style={{fontSize:12,color:GRAY}}>
                         {claim.schemeName||"No scheme"} · {fmtDT(claim.createdAt)}
-                        {claim.practitionerName && ` · Dr. ${claim.practitionerName}`}
+                        {claim.practitionerName && ` · ${drName(claim.practitionerName)}`}
                       </div>
                     </div>
                   </div>

@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Plus, Stethoscope, Mail, Phone, AlertCircle } from "lucide-react"
+import { drName } from "./drName"
 
 interface Practitioner {
   id: string; firstName: string; lastName: string; fullName: string
@@ -115,7 +116,7 @@ export default function PractitionersTab() {
                       <span style={{ fontSize: 18, fontWeight: 800, color }}>{p.firstName?.[0]}{p.lastName?.[0]}</span>
                     </div>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>Dr. {p.fullName}</div>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{drName(p.fullName)}</div>
                       <span style={{ background: `color-mix(in srgb, ${color} 8%, transparent)`, color, padding: "2px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{p.specialty}</span>
                     </div>
                   </div>

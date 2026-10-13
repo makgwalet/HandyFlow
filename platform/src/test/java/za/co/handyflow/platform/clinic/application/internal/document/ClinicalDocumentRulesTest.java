@@ -89,5 +89,7 @@ class ClinicalDocumentRulesTest {
         assertEquals("Dr. Sarah Mokoena", ClinicalDocumentRules.drName("Sarah Mokoena"));
         assertEquals("Dr Sarah Mokoena", ClinicalDocumentRules.drName("Dr Sarah Mokoena"));
         assertEquals("", ClinicalDocumentRules.drName(null));
+        assertEquals("Dr.Sarah Mokoena", ClinicalDocumentRules.drName("Dr.Sarah Mokoena"));
+        assertEquals("Dr. Drew Smith", ClinicalDocumentRules.drName("Drew Smith"));   // 0202: "Drew" is a name, not a title
     }
 }

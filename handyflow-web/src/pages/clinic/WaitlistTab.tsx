@@ -8,6 +8,7 @@ import { ListPlus, Phone, CheckCircle, Calendar, Trash2, Users } from "lucide-re
 import ModalShell from "./ModalShell"
 import PatientPicker, { type PickerPatient } from "./PatientPicker"
 import { useDialogs } from "./dialogs"
+import { drName } from "./drName"
 
 interface WaitlistEntry {
   id: string; patientId: string; patientName: string
@@ -105,7 +106,7 @@ export default function WaitlistTab() {
                 </div>
                 <div style={{fontSize:12,color:GRAY}}>
                   {e.appointmentType || "Any appointment type"}
-                  {e.practitionerName ? ` · Prefers Dr. ${e.practitionerName}` : " · Any practitioner"}
+                  {e.practitionerName ? ` · Prefers ${drName(e.practitionerName)}` : " · Any practitioner"}
                   {" · Added " + fmtDT(e.createdAt)}
                   {e.notes && ` · ${e.notes}`}
                 </div>
@@ -149,7 +150,7 @@ export default function WaitlistTab() {
           <select value={form.practitionerId} onChange={e=>setForm(f=>({...f,practitionerId:e.target.value}))}
             style={{width:"100%",padding:"9px 12px",boxSizing:"border-box",border:"1.5px solid var(--hf-border)",borderRadius:8,fontSize:14,background:"var(--hf-surface)",marginBottom:14}}>
             <option value="">Any practitioner</option>
-            {practitioners.map(p => <option key={p.id} value={p.id}>Dr. {p.fullName}</option>)}
+            {practitioners.map(p => <option key={p.id} value={p.id}>{drName(p.fullName)}</option>)}
           </select>
 
           <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:5}}>Appointment type (optional)</label>

@@ -4,6 +4,7 @@
 // The time shown is the scheduled time and how far past it is now; no wait-time target is applied.
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { drName } from "./drName"
 
 export interface BoardAppt {
   id: string; patientName: string; practitionerName?: string; scheduledAt: string; status: string; reason?: string | null
@@ -72,7 +73,7 @@ export default function WaitingRoomTab() {
               <div key={a.id} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "6px 10px", marginBottom: 6 }}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{a.patientName}</div>
                 <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{timeNote(a.scheduledAt, now)}</div>
-                {a.practitionerName && <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Dr {a.practitionerName}</div>}
+                {a.practitionerName && <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{drName(a.practitionerName)}</div>}
               </div>
             ))}
           </section>
