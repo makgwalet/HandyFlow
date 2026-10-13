@@ -95,7 +95,8 @@ public class ClinicLetterController {
     public ResponseEntity<byte[]> letter(@PathVariable UUID id, @RequestBody LetterRequest body) {
         requireMayChooseSigner(body.signedByPractitionerId());
         var tenant = TenantContext.getTenantIdAsObject();
-        byte[] pdf = letterPdf.generate(tenant, null, id, body.title(), body.body(), body.recipientName(), body.recipientCompany(), body.signedByPractitionerId());
+        byte[] pdf = letterPdf.issue(tenant, null, id, body.title(), body.body(), body.recipientName(), body.recipientCompany(),
+                body.signedByPractitionerId(), body.letterheadId(), currentUserOrNull()).pdf();
         documents.recordIssued(tenant, id, "LETTER", body.title().trim(), pdf);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"letter-" + id + ".pdf\"")
@@ -108,10 +109,15 @@ public class ClinicLetterController {
     public ResponseEntity<byte[]> patientLetter(@PathVariable UUID id, @RequestBody LetterRequest body) {
         requireMayChooseSigner(body.signedByPractitionerId());
         var tenant = TenantContext.getTenantIdAsObject();
-        byte[] pdf = letterPdf.generate(tenant, id, body.consultationId(), body.title(), body.body(), body.recipientName(), body.recipientCompany(), body.signedByPractitionerId());
+        byte[] pdf = letterPdf.issue(tenant, id, body.consultationId(), body.title(), body.body(), body.recipientName(), body.recipientCompany(),
+                body.signedByPractitionerId(), body.letterheadId(), currentUserOrNull()).pdf();
         documents.recordIssuedFor(tenant, id, body.consultationId(), "LETTER", body.title().trim(), pdf);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"letter-" + id + ".pdf\"")
                 .contentType(MediaType.APPLICATION_PDF).contentLength(pdf.length).body(pdf);
+    }
+
+    private static UUID currentUserOrNull() {
+        try { return za.co.handyflow.platform.shared.UserContext.getCurrentUserId(); } catch (RuntimeException e) { return null; }
     }
 }

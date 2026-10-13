@@ -15,9 +15,13 @@ public final class LetterDtos {
     public record RenderedTemplate(UUID id, String kind, String name, String title, String body, String specialty, String urgency, Integer unfitDays) {}
 
     /** {@code recipientName} and {@code recipientCompany} address the letter (an employer, a school, a scheme); both are optional. */
-    public record LetterRequest(String title, String body, String recipientName, String recipientCompany, UUID consultationId, UUID signedByPractitionerId) {
+    public record LetterRequest(String title, String body, String recipientName, String recipientCompany, UUID consultationId, UUID signedByPractitionerId,
+                                UUID letterheadId) {
+        public LetterRequest(String title, String body, String recipientName, String recipientCompany, UUID consultationId, UUID signedByPractitionerId) {
+            this(title, body, recipientName, recipientCompany, consultationId, signedByPractitionerId, null);
+        }
         public LetterRequest(String title, String body, String recipientName, String recipientCompany, UUID consultationId) {
-            this(title, body, recipientName, recipientCompany, consultationId, null);
+            this(title, body, recipientName, recipientCompany, consultationId, null, null);
         }
     }
 

@@ -174,7 +174,11 @@ public class SecurityConfig {
                                 // narrow-permitAll convention used for
                                 // every portal auth path above.
                                 "/api/v1/identity/invitations/accept",
-                                "/api/v1/identity/invitations/validate/**"
+                                "/api/v1/identity/invitations/validate/**",
+                                // Clinic Document Studio (patch 0193, CLINIC-DEC-025): anyone holding an issued document may check
+                                // it is genuine. POST only, exact path, rate limited in RateLimitFilter; it answers with
+                                // authenticity data and never a patient or clinical detail.
+                                "/api/v1/public/clinic/document-verification"
                         ).permitAll()
                         // Everything else requires authentication
                         .anyRequest().authenticated()

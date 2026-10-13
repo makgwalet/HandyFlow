@@ -112,6 +112,7 @@ public final class ClinicRoleTemplates {
         static final ClinicPermission CLINIC_DOCUMENT_PRINT = ClinicPermission.CLINIC_DOCUMENT_PRINT;
         static final ClinicPermission CLINIC_DOCUMENT_EMAIL = ClinicPermission.CLINIC_DOCUMENT_EMAIL;
         static final ClinicPermission CLINIC_DOCUMENT_VOID = ClinicPermission.CLINIC_DOCUMENT_VOID;
+        static final ClinicPermission CLINIC_LETTERHEAD_MANAGE = ClinicPermission.CLINIC_LETTERHEAD_MANAGE;
         static final ClinicPermission CLINIC_CONSENT_READ = ClinicPermission.CLINIC_CONSENT_READ;
         static final ClinicPermission CLINIC_CONSENT_HISTORY_READ = ClinicPermission.CLINIC_CONSENT_HISTORY_READ;
         static final ClinicPermission CLINIC_CONSENT_RECORD = ClinicPermission.CLINIC_CONSENT_RECORD;
@@ -655,6 +656,7 @@ public final class ClinicRoleTemplates {
             P.CLINIC_DOCUMENT_PRINT,
             P.CLINIC_DOCUMENT_EMAIL,
             P.CLINIC_DOCUMENT_VOID,
+            P.CLINIC_LETTERHEAD_MANAGE,
             P.CLINIC_CONSENT_READ,
             P.CLINIC_CONSENT_HISTORY_READ,
             P.CLINIC_CONSENT_RECORD,
@@ -723,6 +725,7 @@ public final class ClinicRoleTemplates {
             P.CLINIC_DOCUMENT_PRINT,
             P.CLINIC_DOCUMENT_EMAIL,
             P.CLINIC_DOCUMENT_VOID,
+            P.CLINIC_LETTERHEAD_MANAGE,
             P.CLINIC_CONSENT_READ,
             P.CLINIC_CONSENT_HISTORY_READ,
             P.CLINIC_CONSENT_RECORD,

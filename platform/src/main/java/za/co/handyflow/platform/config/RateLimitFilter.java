@@ -117,6 +117,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
             // ever calls this once) rather than open registration, so
             // the same 5/hour ceiling applies.
             new Limit("identity:invitation-accept", "/api/v1/identity/invitations/accept", 5, 60 * 60 * 1_000L),
+
+            // Clinic document verification (patch 0193): public, and the code is the only secret, so guessing is slowed hard.
+            // The code has about 80 bits, so this is a second layer, not the main defence.
+            new Limit("clinic:document-verification", "/api/v1/public/clinic/document-verification", 30, 10 * 60 * 1_000L),
     };
 
     @Override

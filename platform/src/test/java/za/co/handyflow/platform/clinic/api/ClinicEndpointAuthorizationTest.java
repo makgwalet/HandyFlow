@@ -41,6 +41,9 @@ class ClinicEndpointAuthorizationTest {
         return out;
     }
 
+    /** Public on purpose (CLINIC-DEC-025): the check that a document is genuine. Exact path in SecurityConfig, rate limited, authenticity data only. */
+    private static final java.util.Set<String> PUBLIC = java.util.Set.of("ClinicDocumentVerificationController.verify");
+
     private static String label(Method m) { return m.getDeclaringClass().getSimpleName() + "." + m.getName(); }
 
     @Test void thereAreClinicEndpoints() throws Exception {
@@ -50,7 +53,7 @@ class ClinicEndpointAuthorizationTest {
     @Test void everyEndpointHasAPreAuthorize() throws Exception {
         List<String> bare = new ArrayList<>();
         for (Method m : endpoints()) {
-            if (!m.isAnnotationPresent(PreAuthorize.class) && !m.getDeclaringClass().isAnnotationPresent(PreAuthorize.class)) bare.add(label(m));
+            if (!m.isAnnotationPresent(PreAuthorize.class) && !m.getDeclaringClass().isAnnotationPresent(PreAuthorize.class) && !PUBLIC.contains(label(m))) bare.add(label(m));
         }
         assertTrue(bare.isEmpty(), "Endpoints without @PreAuthorize: " + bare);
     }
@@ -75,5 +78,15 @@ class ClinicEndpointAuthorizationTest {
             while (mt.find()) if (ClinicPermission.LEGACY.contains(mt.group(1))) coarse.add(label(m) + " -> " + mt.group(1));
         }
         assertTrue(coarse.isEmpty(), "Endpoints still on a coarse permission: " + coarse);
+    }
+
+    @Test void theOnlyPublicEndpointsAreTheDocumentedOnesAndLiveUnderPublic() throws Exception {
+        for (Method m : endpoints()) {
+            if (!PUBLIC.contains(label(m))) continue;
+            RequestMapping base = m.getDeclaringClass().getAnnotation(RequestMapping.class);
+            assertTrue(base != null && base.value()[0].startsWith("/api/v1/public/clinic/"), label(m) + " must live under /api/v1/public/clinic/");
+            assertTrue(AnnotatedElementUtils.hasAnnotation(m, org.springframework.web.bind.annotation.PostMapping.class), label(m) + " must be a POST");
+        }
+        assertTrue(endpoints().stream().anyMatch(m -> PUBLIC.contains(label(m))), "the public endpoint was not found");
     }
 }

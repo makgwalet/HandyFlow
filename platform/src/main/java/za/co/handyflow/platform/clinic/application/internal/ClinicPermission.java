@@ -201,6 +201,8 @@ public enum ClinicPermission {
             "Email a document to a patient (delivery is separate from signing)"),
     CLINIC_DOCUMENT_SIGN_AS_OTHER(Group.DOCUMENTS, Kind.SIGN, "CLINIC_CLINICAL_SIGN", true,
             "Sign a letter in the name of another practitioner"),
+    CLINIC_LETTERHEAD_MANAGE(Group.DOCUMENTS, Kind.MANAGE, "CLINIC_ADMIN", true,
+            "Create and change the practice and branch letterheads"),
     CLINIC_DOCUMENT_VOID(Group.DOCUMENTS, Kind.MANAGE, "CLINIC_ADMIN", true,
             "Void a document"),
     CLINIC_CONSENT_READ(Group.CONSENT, Kind.READ, "CLINIC_READ", true,
