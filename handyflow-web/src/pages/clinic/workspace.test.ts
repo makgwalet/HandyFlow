@@ -62,3 +62,21 @@ describe("nextUp", () => {
     expect(nextUp([])).toEqual({ ready: null, upcoming: null, waiting: 0 })
   })
 })
+
+import { openTabs } from "./workspace"
+
+describe("openTabs (0184)", () => {
+  const d = (id: string, appt: string | null, name: string, over: any = {}) => ({ id, appointmentId: appt, patientId: "p" + id, patientName: name, status: "DRAFT", createdAt: "2026-10-13T08:0" + id.slice(-1) + ":00Z", ...over })
+  it("lists each open consultation once, oldest first, with the one on screen marked", () => {
+    const t = openTabs([d("c3", "a3", "Cee"), d("c1", "a1", "Aye"), d("c2", "a2", "Bee")], "a2")
+    expect(t.map(x => x.patientName)).toEqual(["Aye", "Bee", "Cee"])
+    expect(t.map(x => x.current)).toEqual([false, true, false])
+  })
+  it("skips drafts with no appointment and finished ones, and shows an appointment only once", () => {
+    const t = openTabs([d("c1", null, "No appt"), d("c2", "a2", "Signed", { status: "SIGNED" }), d("c3", "a3", "Dup one"), d("c4", "a3", "Dup two")])
+    expect(t.map(x => x.patientName)).toEqual(["Dup one"])
+  })
+  it("carries the stage marks for the tooltip", () => {
+    expect(openTabs([d("c1", "a1", "Aye", { chiefComplaint: "Cough", history: "3 days" })])[0].stages.length).toBeGreaterThan(0)
+  })
+})

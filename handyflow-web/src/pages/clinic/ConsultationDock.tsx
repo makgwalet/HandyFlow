@@ -2,7 +2,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import { apiClient } from "../../api/client"
-import { dockCandidate, dockStages, workspacePath, type ConsultationLike } from "./workspace"
+import { dockCandidate, dockStages, openTabs, workspacePath, type ConsultationLike } from "./workspace"
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return Array.isArray(p) ? p : (p?.content ?? []) }
 const MARK = { done: "✓", attention: "!", todo: "—" } as const
@@ -16,6 +16,7 @@ export default function ConsultationDock() {
   })
   const c = dockCandidate(data)
   if (!c) return null
+  const others = openTabs(data).filter(t => t.appointmentId !== c.appointmentId)
   return (
     <div role="region" aria-label="Consultation in progress" style={{ position: "sticky", bottom: 12, zIndex: 20, marginTop: 16, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap",
       padding: "10px 16px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderLeft: "4px solid var(--hf-danger)", borderRadius: 12, boxShadow: "0 6px 24px rgba(0,0,0,0.14)" }}>
@@ -23,6 +24,17 @@ export default function ConsultationDock() {
       <div style={{ flex: 1, fontSize: 12, color: "var(--hf-text-muted)" }}>
         {dockStages(c).map(s => `${s.label} ${MARK[s.state]}`).join(" · ")}
       </div>
+      {others.length > 0 && (
+        <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>
+          Also open:{" "}
+          {others.map((t, i) => (
+            <span key={t.appointmentId}>{i > 0 ? ", " : ""}
+              <button type="button" onClick={() => navigate(workspacePath(t.appointmentId))}
+                style={{ background: "none", border: "none", padding: 0, color: "var(--hf-accent)", cursor: "pointer", fontSize: 12, textDecoration: "underline" }}>{t.patientName}</button>
+            </span>
+          ))}
+        </div>
+      )}
       <button onClick={() => navigate(workspacePath(c.appointmentId!))}
         style={{ padding: "7px 16px", borderRadius: 8, border: "none", background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Resume</button>
     </div>

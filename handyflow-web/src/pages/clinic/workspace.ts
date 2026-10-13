@@ -63,6 +63,24 @@ export function dockCandidate<T extends ConsultationLike & { updatedAt?: string 
   return [...list].filter(c => !!c.appointmentId).sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""))[0] ?? null
 }
 
+// ── Open consultations (the tab strip) ───────────────────────────────────────
+
+export interface OpenTab { appointmentId: string; consultationId: string; patientName: string; current: boolean; stages: DockStage[] }
+
+/**
+ * The consultations this clinician has open, as tabs. One tab per appointment (a second draft for the same appointment is not shown
+ * twice), in a stable order (first opened first) so tabs never jump when one is touched, with the one on screen marked.
+ */
+export function openTabs<T extends ConsultationLike & { createdAt?: string }>(list: T[], currentAppointmentId?: string): OpenTab[] {
+  const seen = new Set<string>()
+  return [...list]
+    .filter(c => !!c.appointmentId && c.status !== "SIGNED" && c.status !== "LOCKED" && c.status !== "ABANDONED")
+    .sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? "") || a.id.localeCompare(b.id))
+    .filter(c => (seen.has(c.appointmentId!) ? false : (seen.add(c.appointmentId!), true)))
+    .map(c => ({ appointmentId: c.appointmentId!, consultationId: c.id, patientName: c.patientName ?? "Patient",
+      current: c.appointmentId === currentAppointmentId, stages: dockStages(c) }))
+}
+
 // ── Next patient ─────────────────────────────────────────────────────────────
 
 export interface QueueAppt {

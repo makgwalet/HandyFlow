@@ -67,9 +67,11 @@ interface Props {
   onCancel: () => void
   /** Bumped by the parent to discard this draft. */
   discardToken?: number
+  /** Bumped by the parent to step out (saving the latest notes first), for example to switch to another open consultation. */
+  minimiseToken?: number
 }
 
-export default function ConsultationSession({ patient, appointment, onComplete, onMinimise, onCancel, discardToken = 0 }: Props) {
+export default function ConsultationSession({ patient, appointment, onComplete, onMinimise, onCancel, discardToken = 0, minimiseToken = 0 }: Props) {
   const video = useVideoDock()
   const qc = useQueryClient()
   const { confirm, prompt, notify, dialogs } = useDialogs()
@@ -218,6 +220,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
     if (id && !locked) apiClient.patch(`/api/v1/clinic/consultations/${id}`, draftPayload()).catch(() => { /* the autosave has the rest */ })
     onMinimise()
   }
+  useEffect(() => { if (minimiseToken > 0) minimise() }, [minimiseToken])   // eslint-disable-line react-hooks/exhaustive-deps
   const saveForLater = async () => {
     const id = draftIdRef.current
     setLeaveError("")

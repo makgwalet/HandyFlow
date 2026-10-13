@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useAuthStore } from "../../store/auth.store"
 import ConsultationSession from "./ConsultationSession"
+import OpenConsultationsStrip from "./OpenConsultationsStrip"
 import NextPatientPanel, { type SignedSummary } from "./NextPatientPanel"
 import { myPractitionerId } from "./currentPractitioner"
 import { startSteps, workspacePath } from "./workspace"
@@ -16,14 +17,21 @@ import { cancelBtn } from "./consultationSession.shared"
 const one = (r: any) => r.data?.data ?? r.data
 const list = (r: any) => { const p = one(r); return Array.isArray(p) ? p : (p?.content ?? []) }
 
+/** One page instance per appointment: switching to another open consultation starts from a clean slate, so nothing carries over between patients. */
 export default function ConsultationWorkspacePage() {
   const { appointmentId = "" } = useParams<{ appointmentId: string }>()
+  return <Workspace key={appointmentId} appointmentId={appointmentId} />
+}
+
+function Workspace({ appointmentId }: { appointmentId: string }) {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const email = useAuthStore(s => s.user?.email)
   const [signed, setSigned] = useState<SignedSummary | null>(null)
   const [ready, setReady] = useState(false)
   const [problem, setProblem] = useState("")
+  const [minimiseToken, setMinimiseToken] = useState(0)
+  const switchTo = useRef<string | null>(null)       // set while stepping over to another open consultation
   const started = useRef(false)
 
   const { data: appt, isError: apptError } = useQuery<any>({
@@ -70,10 +78,12 @@ export default function ConsultationWorkspacePage() {
 
   return (
     <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+      <OpenConsultationsStrip currentAppointmentId={appt.id}
+        onSwitch={id => { switchTo.current = id; setMinimiseToken(t => t + 1) }} />
       <RestrictedRecordGate patientId={patient.id}>
-        <ConsultationSession patient={patient} appointment={appt}
+        <ConsultationSession patient={patient} appointment={appt} minimiseToken={minimiseToken}
           onComplete={(_id, summary) => setSigned(summary)}
-          onMinimise={leave}
+          onMinimise={() => { const to = switchTo.current; switchTo.current = null; to ? navigate(workspacePath(to)) : leave() }}
           onCancel={() => { qc.invalidateQueries({ queryKey: ["clinic-dock"] }); back() }} />
       </RestrictedRecordGate>
     </div>
