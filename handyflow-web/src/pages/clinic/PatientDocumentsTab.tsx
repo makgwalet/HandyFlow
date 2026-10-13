@@ -15,6 +15,7 @@ import type { Consultation, Patient } from "./patientFile.shared"
 import { BORDER, Empty, GRAY, LIGHT, RED_TEXT, lbl, sinp } from "./patientFile.shared"
 import { primaryBtn, smallBtn } from "./OverviewCard"
 import { UPLOAD_TYPES, kindCounts, sizeLabel, sourceLabel, typeLabel, uploadProblem, type RegisterItem } from "./docsView"
+import NumberedDocuments from "./NumberedDocuments"
 
 const unwrap = (r: any) => r?.data?.data ?? r?.data
 const todayZA = () => new Date(Date.now() + 2 * 3600_000).toISOString().slice(0, 10)
@@ -167,6 +168,8 @@ export default function DocumentsTab({ patient, consultations }: { patient: Pati
               </div>))}
             {shown.length === 0 && <div style={{ padding: 14, fontSize: 13, color: GRAY }}>Nothing of this kind.</div>}
           </div>)}
+
+      <NumberedDocuments patientId={patient.id} />
 
       {modal === "upload" && <UploadModal patientId={patient.id} consultations={consultations} onClose={() => setModal(null)} />}
       {modal === "sick" && latest && <SickNoteModal patientId={patient.id} list={consultations.map(c => ({ id: c.id, consultedAt: c.consultedAt, chiefComplaint: c.chiefComplaint }))} onClose={() => { setModal(null); reload() }} />}

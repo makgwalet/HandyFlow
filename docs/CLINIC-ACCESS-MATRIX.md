@@ -388,7 +388,7 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 
 ## 3. API authorization matrix
 
-215 endpoints. Each requires exactly the permission shown, except the one marked public. The access catalogue endpoint is `CLINIC_ADMIN`.
+221 endpoints (updated by hand for patch 0203). Each requires exactly the permission shown, except the one marked public. The access catalogue endpoint is `CLINIC_ADMIN`.
 
 | Area | Method | Path | Requires |
 |---|---|---|---|
@@ -493,6 +493,12 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 | Handoff | GET | `/consultations/{id}/transitions` | `CLINIC_CONSULTATION_READ` |
 | IssuedDocument | GET | `/issued-documents` | `CLINIC_DOCUMENT_VOID` |
 | IssuedDocument | POST | `/issued-documents/{id}/void` | `CLINIC_DOCUMENT_VOID` |
+| PatientDocumentStudio | GET | `/patients/{patientId}/issued-documents` | `CLINIC_DOCUMENT_READ` |
+| PatientDocumentStudio | GET | `/consultations/{consultationId}/issued-documents` | `CLINIC_DOCUMENT_READ` |
+| PatientDocumentStudio | GET | `/patients/{patientId}/issued-documents/{documentId}/pdf` | `CLINIC_DOCUMENT_DOWNLOAD` |
+| PatientDocumentStudio | POST | `/patients/{patientId}/issued-documents/{documentId}/email` | `CLINIC_DOCUMENT_EMAIL` |
+| PatientDocumentStudio | POST | `/consultations/{consultationId}/reissued-prescription-pdf` | `CLINIC_PRESCRIPTION_CREATE` |
+| PatientDocumentStudio | GET | `/patients/{patientId}/consent/{consentId}/record-pdf` | `CLINIC_CONSENT_HISTORY_READ` |
 | Lab | GET | `/lab/results` | `CLINIC_RESULT_READ` |
 | Lab | GET | `/lab/patients/{patientId}/results` | `CLINIC_RESULT_READ` |
 | Lab | POST | `/lab/results` | `CLINIC_RESULT_CREATE` |

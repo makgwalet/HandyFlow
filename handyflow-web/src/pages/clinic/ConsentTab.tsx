@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useAuthStore } from "../../store/auth.store"
 import { ShieldCheck, ShieldX, ShieldQuestion, Plus, Clock, Info } from "lucide-react"
+import { errorMessage, saveBlob } from "./issuedDocs"
 
 interface Patient { id: string; fullName: string }
 interface ConsentStatus {
@@ -40,6 +41,17 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
   const qc = useQueryClient()
   const [showRecord, setShowRecord] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  // 0203: a numbered record of one consent decision (Document Studio); downloading again returns the same copy.
+  const [printing, setPrinting] = useState<string | null>(null)
+  const [printError, setPrintError] = useState("")
+  const printRecord = async (eventId: string) => {
+    setPrinting(eventId); setPrintError("")
+    try {
+      const res = await apiClient.get(`/api/v1/clinic/patients/${patient.id}/consent/${eventId}/record-pdf`, { responseType: "blob" })
+      saveBlob(res.data, `consent-record-${eventId}.pdf`)
+    } catch (e: any) { setPrintError(await errorMessage(e, "The consent record could not be made.")) }
+    finally { setPrinting(null) }
+  }
 
   const user = useAuthStore.getState().user as any
   const defaultCapturedBy = [user?.firstName, user?.lastName].filter(Boolean).join(" ")
@@ -184,6 +196,7 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
 
       {showHistory && (
         <ModalShell title="Consent history" onClose={()=>setShowHistory(false)} width={560}>
+            {printError && <div role="alert" style={{marginBottom:10,padding:"8px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:7,fontSize:13,color:"var(--hf-danger-text)"}}>{printError}</div>}
             {history.length === 0 ? (
               <div style={{textAlign:"center",padding:30,color:GRAY,fontSize:13}}>No consent events recorded yet.</div>
             ) : (
@@ -205,6 +218,10 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
                         </div>
                         {h.notes && <div style={{fontSize:12,color:"var(--hf-text-secondary)",marginTop:4}}>{h.notes}</div>}
                       </div>
+                      <button type="button" onClick={()=>printRecord(h.id)} disabled={printing===h.id}
+                        style={{alignSelf:"flex-start",padding:"4px 10px",border:"1px solid var(--hf-border)",borderRadius:7,background:"var(--hf-surface)",fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>
+                        {printing===h.id ? "Preparing…" : "Print record"}
+                      </button>
                     </div>
                   )
                 })}

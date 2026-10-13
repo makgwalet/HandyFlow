@@ -34,6 +34,10 @@ export const CAN = {
   mergePatients:      { fine: "CLINIC_PATIENT_MERGE",           legacy: "CLINIC_ADMIN" },
   exportGrowth:       { fine: "CLINIC_GROWTH_EXPORT",           legacy: "CLINIC_READ" },
   manageLetterheads:  { fine: "CLINIC_LETTERHEAD_MANAGE",       legacy: "CLINIC_ADMIN" },
+  // Document Studio (0203)
+  emailDocuments:     { fine: "CLINIC_DOCUMENT_EMAIL",          legacy: "CLINIC_BILLING_WRITE" },
+  downloadDocuments:  { fine: "CLINIC_DOCUMENT_DOWNLOAD",       legacy: "CLINIC_READ" },
+  viewConsentHistory: { fine: "CLINIC_CONSENT_HISTORY_READ",    legacy: "CLINIC_READ" },
 } as const
 
 export type Capability = keyof typeof CAN

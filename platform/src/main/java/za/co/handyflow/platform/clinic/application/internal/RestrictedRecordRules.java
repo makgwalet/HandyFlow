@@ -31,7 +31,7 @@ public final class RestrictedRecordRules {
     private static final Pattern LAB_RESULT   = Pattern.compile("/lab/results/" + UUID_RE + "(/.*)?$");
     private static final Pattern APPT_CONSULT = Pattern.compile("/appointments/" + UUID_RE + "/consultation$");
     private static final Pattern PRESCRIPTION = Pattern.compile("/prescriptions/" + UUID_RE + "(/.*)?$");
-    private static final Pattern DOCUMENT     = Pattern.compile("(-pdf|/pdf|/medical-certificate|/referral-letter)$");
+    private static final Pattern DOCUMENT     = Pattern.compile("(-pdf|/pdf|/medical-certificate|/referral-letter|/issued-documents/[0-9a-fA-F-]{36}/email)$");
 
     /** Parts of a patient path the restriction does not cover: identity, family, scheduling, consent and the break-glass calls themselves. */
     private static final Set<String> OPEN_PATIENT_PARTS = Set.of("", "/family", "/restriction", "/break-glass", "/break-glass/print",

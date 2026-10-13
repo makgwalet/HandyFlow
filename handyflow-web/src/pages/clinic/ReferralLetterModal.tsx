@@ -1,4 +1,5 @@
 // Referral letter for one consultation: collect the specialist and reason, download the PDF.
+// Since 0203 issuing does not email anything: sending a copy to the patient is a separate button, shown after the letter is issued.
 import { useState } from "react"
 import { apiClient } from "../../api/client"
 import ModalShell from "./ModalShell"
@@ -6,6 +7,8 @@ import LetterTemplatePicker from "./LetterTemplatePicker"
 import SaveAsTemplate from "./SaveAsTemplate"
 import LetterheadSelect from "./LetterheadSelect"
 import { applyReferral } from "./letterView"
+import { useCan } from "./clinicAccess"
+import { canSend as sendable, emailToPatient, errorMessage, saveBlob, visitDocuments, type IssuedDoc } from "./issuedDocs"
 
 const URGENCIES = [{ id: "ROUTINE", label: "Routine" }, { id: "SEMI_URGENT", label: "Semi-urgent" }, { id: "URGENT", label: "Urgent" }]
 const inp: React.CSSProperties = { width: "100%", boxSizing: "border-box", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, background: "var(--hf-surface)", color: "var(--hf-text)" }
@@ -16,6 +19,10 @@ export default function ReferralLetterModal({ consultationId, onClose }: { consu
   const [letterheadId, setLetterheadId] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
+  const [issued, setIssued] = useState<{ patientId: string; doc: IssuedDoc | null } | null>(null)
+  const [sent, setSent] = useState("")
+  const [sending, setSending] = useState(false)
+  const mayEmail = useCan("emailDocuments")
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm(f => ({ ...f, [k]: e.target.value }))
   const canSend = form.reason.trim().length > 0 && !busy
 
@@ -23,14 +30,42 @@ export default function ReferralLetterModal({ consultationId, onClose }: { consu
     setBusy(true); setError("")
     try {
       const res = await apiClient.post(`/api/v1/clinic/consultations/${consultationId}/referral-letter`, null, { params: letterheadId ? { ...form, letterheadId } : form, responseType: "blob" } as any)
-      const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }))
-      const link = document.createElement("a")
-      link.href = url; link.download = `referral-letter-${consultationId}.pdf`; link.click()
-      setTimeout(() => URL.revokeObjectURL(url), 60_000)
-      onClose()
+      saveBlob(res.data, `referral-letter-${consultationId}.pdf`)
+      // Find the letter just issued, to show its number and offer sending it.
+      try { const v = await visitDocuments(consultationId, "REFERRAL"); setIssued({ patientId: v.patientId, doc: v.documents[0] ?? null }) }
+      catch { setIssued({ patientId: "", doc: null }) }
     } catch (e: any) {
-      setError(e.response?.data?.message ?? "Could not generate the referral letter.")
+      setError(await errorMessage(e, "Could not generate the referral letter."))
     } finally { setBusy(false) }
+  }
+
+  const send = async () => {
+    if (!issued?.doc) return
+    setSending(true); setError("")
+    try { const r = await emailToPatient(issued.patientId, issued.doc.id); setSent(r.recipient) }
+    catch (e: any) { setError(await errorMessage(e, "The letter could not be sent.")) }
+    finally { setSending(false) }
+  }
+
+  if (issued) {
+    const doc = issued.doc
+    return (
+      <ModalShell title="Referral letter issued" onClose={onClose} width={480}
+        footer={<button onClick={onClose} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer" }}>Close</button>}>
+        <div style={{ fontSize: 14, color: "var(--hf-text)" }}>
+          {doc ? <>Referral letter <b>{doc.number}</b> has been downloaded.</> : "The referral letter has been downloaded."}
+        </div>
+        <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginTop: 6 }}>Nothing has been sent to the patient. Sending a copy is a separate step.</div>
+        {sent ? (
+          <div role="status" style={{ marginTop: 14, fontSize: 13, color: "var(--hf-success-text-strong)" }}>Sent to {sent}.</div>
+        ) : doc && mayEmail && sendable(doc) ? (
+          <button onClick={send} disabled={sending} style={{ marginTop: 14, padding: "9px 18px", border: "none", borderRadius: 9, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", fontSize: 14, fontWeight: 600, cursor: "pointer", opacity: sending ? 0.7 : 1 }}>
+            {sending ? "Sending…" : "Email a copy to the patient"}
+          </button>
+        ) : null}
+        {error && <div role="alert" style={{ marginTop: 14, padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
+      </ModalShell>
+    )
   }
 
   return (

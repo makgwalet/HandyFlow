@@ -7,6 +7,7 @@ import { todayRangeUrl } from "./WaitingRoomTab"
 import { nextUp, type QueueAppt } from "./workspace"
 import { downloadPdf } from "./patientFile.shared"
 import { primaryBtn, cancelBtn, TEAL } from "./consultationSession.shared"
+import { usePrescriptionDownload } from "./usePrescriptionDownload"
 
 export interface SignedSummary { consultationId: string; diagnosis: string; rxCount: number; followUpDays: string; durationMinutes: number }
 
@@ -23,6 +24,7 @@ export default function NextPatientPanel({ patientName, summary, appointmentId, 
   })
   const up = nextUp(data, { mine: practitionerId || null, excludeId: appointmentId })
   const next = up.ready
+  const rx = usePrescriptionDownload()
 
   return (
     <div style={{ maxWidth: 720, margin: "24px auto", display: "flex", flexDirection: "column", gap: 16 }}>
@@ -37,9 +39,11 @@ export default function NextPatientPanel({ patientName, summary, appointmentId, 
         </div>
         <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 14 }}>
           <button style={cancelBtn} onClick={() => downloadPdf(`/api/v1/clinic/consultations/${summary.consultationId}/summary-pdf`, `visit-summary-${summary.consultationId}.pdf`).catch(() => {})}>Visit summary (PDF)</button>
-          {summary.rxCount > 0 && <button style={cancelBtn} onClick={() => downloadPdf(`/api/v1/clinic/consultations/${summary.consultationId}/prescription-pdf`, `rx-${summary.consultationId}.pdf`).catch(() => {})}>Prescription (PDF)</button>}
+          {summary.rxCount > 0 && <button style={cancelBtn} disabled={rx.busy} onClick={() => rx.download(summary.consultationId)}>Prescription (PDF)</button>}
+          {rx.dialogs}
           <button style={cancelBtn} onClick={onOpenFile}>Open patient file</button>
         </div>
+        {rx.error && <div role="alert" style={{ marginTop: 10, fontSize: 13, color: "var(--hf-danger-text)" }}>{rx.error}</div>}
       </section>
 
       <section aria-label="Next patient" style={{ padding: 20, background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14 }}>

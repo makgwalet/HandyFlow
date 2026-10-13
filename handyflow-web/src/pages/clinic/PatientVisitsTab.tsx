@@ -16,6 +16,7 @@ import { BORDER, Empty, GRAY, LIGHT, RED_TEXT, btnPrimary, downloadPdf, lbl, sin
 import { primaryBtn, smallBtn } from "./OverviewCard"
 import { ADDENDUM_KINDS, headline, isAmendable, isOpenVisit, resumeProblem, rxLine, statusOf, vitalLines, type Visit } from "./visitView"
 import { drName } from "./drName"
+import { usePrescriptionDownload } from "./usePrescriptionDownload"
 
 const unwrap = (r: any) => r?.data?.data ?? r?.data
 const TONE = { ok: ["var(--hf-success-soft)", "var(--hf-success-text-strong)"], warn: ["var(--hf-warning-soft)", "var(--hf-warning-text)"],
@@ -38,9 +39,12 @@ export default function PatientVisitsTab({ patientId, appointments, defaultPract
   const expanded = openId === undefined ? visits[0]?.id ?? null : openId
   const [modal, setModal] = useState<{ kind: "addendum" | "rx" | "sick" | "referral"; visit: Visit } | null>(null)
   const done = () => { setModal(null); qc.invalidateQueries({ queryKey: key }) }
+  const rx = usePrescriptionDownload()
 
   return (
     <div>
+      {rx.dialogs}
+      {rx.error && <div role="alert" style={{ marginBottom: 12, padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, fontSize: 13, color: "var(--hf-danger-text)" }}>{rx.error}</div>}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
         <div style={{ fontSize: 15, fontWeight: 700, color: "var(--hf-text)" }}>{visits.length} visit{visits.length !== 1 ? "s" : ""}</div>
         <button type="button" onClick={() => begin.mutate()} disabled={begin.isPending} style={{ ...btnPrimary, opacity: begin.isPending ? 0.7 : 1 }}>
@@ -132,7 +136,7 @@ export default function PatientVisitsTab({ patientId, appointments, defaultPract
                             onClick={() => v.appointmentId && onStartSession({ id: v.appointmentId })}>Resume consultation</button>)}
                         {isAmendable(v.status) && canAmend && <button type="button" style={smallBtn} onClick={() => setModal({ kind: "addendum", visit: v })}>Add addendum</button>}
                         {isAmendable(v.status) && canRx && <button type="button" style={smallBtn} onClick={() => setModal({ kind: "rx", visit: v })}>Add prescription</button>}
-                        {v.prescriptions.length > 0 && <button type="button" style={smallBtn} onClick={() => downloadPdf(`/api/v1/clinic/consultations/${v.id}/prescription-pdf`, `rx-${v.id}.pdf`)}>Prescription PDF</button>}
+                        {v.prescriptions.length > 0 && <button type="button" style={smallBtn} disabled={rx.busy} onClick={() => rx.download(v.id)}>Prescription PDF</button>}
                         <button type="button" style={smallBtn} onClick={() => downloadPdf(`/api/v1/clinic/consultations/${v.id}/summary-pdf`, `visit-${v.id}.pdf`)}>Visit summary PDF</button>
                         {canSick && <button type="button" style={smallBtn} onClick={() => setModal({ kind: "sick", visit: v })}>Sick note</button>}
                         {canRef && <button type="button" style={smallBtn} onClick={() => setModal({ kind: "referral", visit: v })}>Referral letter</button>}

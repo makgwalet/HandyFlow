@@ -105,8 +105,9 @@ describe("visits tab", () => {
     route([signed]); show()
     fireEvent.click(await screen.findByRole("button", { name: "Visit summary PDF" }))
     expect(downloadPdf).toHaveBeenCalledWith("/api/v1/clinic/consultations/v1/summary-pdf", "visit-v1.pdf")
+    // 0203: the prescription goes through Document Studio (same numbered copy each time; reissue asked for if it changed)
     fireEvent.click(screen.getByRole("button", { name: "Prescription PDF" }))
-    expect(downloadPdf).toHaveBeenCalledWith("/api/v1/clinic/consultations/v1/prescription-pdf", "rx-v1.pdf")
+    await waitFor(() => expect(get).toHaveBeenCalledWith("/api/v1/clinic/consultations/v1/prescription-pdf", { responseType: "blob" }))
   })
   it("starts a walk-in from the top button and hands the appointment to the consultation page", async () => {
     route([]); post.mockResolvedValueOnce({ data: { data: { id: "new", status: "SCHEDULED" } } }).mockResolvedValue({ data: { data: { id: "new", status: "IN_PROGRESS" } } })

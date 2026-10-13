@@ -13,7 +13,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.clinic.application.internal.ClinicPatientIdentityService;
-import za.co.handyflow.platform.clinic.application.internal.ClinicPdfService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicReferralPdfService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicConsultationSummaryPdfService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicService;
@@ -43,7 +42,6 @@ public class ClinicController {
     private final ClinicPatientIdentityService       patientIdentityService;
     private final ClinicAppointmentReminderService    appointmentReminderService;
     private final ClinicTelehealthService              telehealthService;
-    private final ClinicPdfService                   clinicPdfService;
     private final za.co.handyflow.platform.clinic.application.internal.ClinicPatientDocumentService documentService;
     private final ClinicReferralPdfService            referralPdfService;
     private final za.co.handyflow.platform.clinic.application.internal.ClinicClinicalDocumentService clinicalDocuments;
@@ -444,11 +442,10 @@ public class ClinicController {
 
     @GetMapping("/consultations/{id}/prescription-pdf")
     @PreAuthorize("hasAuthority('CLINIC_PRESCRIPTION_READ')")
-    @Operation(summary = "Download prescription PDF for a consultation")
-    public ResponseEntity<byte[]> generatePrescriptionPdf(@PathVariable UUID id) {
-        byte[] pdf = clinicPdfService.generatePrescription(
-                TenantContext.getTenantIdAsObject(), id);
-        return pdfResponse(pdf, "prescription-" + id + ".pdf");
+    @Operation(summary = "The visit's prescription: issued and numbered on first download, the same copy after that (409 if it changed since; reissue with a reason)")
+    public ResponseEntity<byte[]> generatePrescriptionPdf(@PathVariable UUID id, @RequestParam(required = false) UUID letterheadId) {
+        var doc = clinicalDocuments.prescription(TenantContext.getTenantIdAsObject(), id, letterheadId, null, currentUserOrNull());
+        return pdfResponse(doc.pdf(), doc.number() == null ? "prescription-not-issued-" + id + ".pdf" : doc.number() + ".pdf");
     }
 
     // ── Consultation Summary PDF ─────────────────────────────────────────────
@@ -459,9 +456,10 @@ public class ClinicController {
     @GetMapping("/consultations/{id}/summary-pdf")
     @PreAuthorize("hasAuthority('CLINIC_CONSULTATION_READ')")
     @Operation(summary = "Download a visit/consultation summary PDF")
-    public ResponseEntity<byte[]> generateConsultationSummaryPdf(@PathVariable UUID id) {
-        byte[] pdf = consultationSummaryPdfService.generate(TenantContext.getTenantIdAsObject(), id);
-        return pdfResponse(pdf, "visit-summary-" + id + ".pdf");
+    public ResponseEntity<byte[]> generateConsultationSummaryPdf(@PathVariable UUID id, @RequestParam(required = false) UUID letterheadId) {
+        // Since 0203: numbered on the letterhead, one standing copy per visit, replaced by an updated one when the visit changes.
+        var doc = clinicalDocuments.visitSummary(TenantContext.getTenantIdAsObject(), id, letterheadId, currentUserOrNull());
+        return pdfResponse(doc.pdf(), doc.number() == null ? "visit-summary-not-issued-" + id + ".pdf" : doc.number() + ".pdf");
     }
 
     // ── Medication Catalogue ──────────────────────────────────────────────────

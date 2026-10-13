@@ -55,6 +55,12 @@ class RestrictedRecordRulesTest {
         assertTrue(RestrictedRecordRules.isDocument(B + "/lab/results/" + ID + "/pdf"));
         assertTrue(RestrictedRecordRules.isDocument(B + "/consultations/" + ID + "/medical-certificate"));
         assertTrue(RestrictedRecordRules.isDocument(B + "/consultations/" + ID + "/referral-letter"));
+        // 0203: sending a document, downloading a kept copy and printing a consent record are documents too
+        assertTrue(RestrictedRecordRules.isDocument(B + "/patients/" + ID + "/issued-documents/" + ID + "/email"));
+        assertTrue(RestrictedRecordRules.isDocument(B + "/patients/" + ID + "/issued-documents/" + ID + "/pdf"));
+        assertTrue(RestrictedRecordRules.isDocument(B + "/patients/" + ID + "/consent/" + ID + "/record-pdf"));
+        assertTrue(RestrictedRecordRules.isDocument(B + "/consultations/" + ID + "/reissued-prescription-pdf"));
+        assertFalse(RestrictedRecordRules.isDocument(B + "/patients/" + ID + "/issued-documents"));
         assertFalse(RestrictedRecordRules.isDocument(B + "/patients/" + ID + "/notes"));
         assertFalse(RestrictedRecordRules.isDocument(null));
     }

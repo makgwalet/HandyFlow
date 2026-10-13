@@ -92,4 +92,77 @@ class ClinicalDocumentRulesTest {
         assertEquals("Dr.Sarah Mokoena", ClinicalDocumentRules.drName("Dr.Sarah Mokoena"));
         assertEquals("Dr. Drew Smith", ClinicalDocumentRules.drName("Drew Smith"));   // 0202: "Drew" is a name, not a title
     }
+
+    // ── 0203 ──────────────────────────────────────────────────────────────────
+
+    static final Prescriber PRESCRIBER = new Prescriber("Sarah Mokoena", "MP0000000", "0000000", "General practice");
+    static final RxLine AMOX = new RxLine("Sample-medicine 500 mg", 4, "000000-001", "1 capsule", "three times a day", "5 days", "Take with food", 15, 0);
+
+    @Test void aPrescriptionListsTheMedicinesWithDirectionsAndTheValidityLine() {
+        Built b = ClinicalDocumentRules.prescription(HEAD, PATIENT, PRESCRIBER, TODAY, List.of(AMOX), true, TODAY);
+        String t = allText(b.model());
+        assertTrue(t.contains("Prescription"));
+        assertTrue(t.contains("Name:Dr. Sarah Mokoena"));
+        assertTrue(t.contains("HPCSA no.:MP0000000"));
+        assertTrue(t.contains("ID number:9001015009087"));
+        assertTrue(t.contains(ClinicalDocumentRules.PRESCRIPTION_VALIDITY));
+        assertFalse(t.contains("NOT ISSUED"));
+        var grid = b.model().blocks().stream().filter(x -> x instanceof Grid).map(x -> (Grid) x).findFirst().orElseThrow();
+        assertEquals(List.of("1", "Sample-medicine 500 mg (Sch 4) · NAPPI 000000-001", "1 capsule  three times a day  for 5 days. Take with food", "15", "0"), grid.rows().get(0));
+        assertFalse(t.contains("Dispensed"), "whether it was dispensed changes after issue and is not on the script");
+    }
+
+    @Test void anUnsignedVisitsPrescriptionSaysItIsNotIssued() {
+        String t = allText(ClinicalDocumentRules.prescription(HEAD, PATIENT, null, TODAY, List.of(), false, TODAY).model());
+        assertTrue(t.contains(ClinicalDocumentRules.NOT_SIGNED));
+        assertTrue(t.contains("No medicines prescribed for this consultation."));
+    }
+
+    @Test void thePrescriptionSnapshotIgnoresTheDateItIsPrintedButNotTheMedicines() {
+        var a = ClinicalDocumentRules.prescription(HEAD, PATIENT, PRESCRIBER, TODAY, List.of(AMOX), true, TODAY).snapshot();
+        var later = ClinicalDocumentRules.prescription(HEAD, PATIENT, PRESCRIBER, TODAY, List.of(AMOX), true, TODAY.plusDays(3)).snapshot();
+        assertEquals(a, later);
+        var more = new RxLine("Sample-medicine 500 mg", 4, "000000-001", "1 capsule", "three times a day", "5 days", "Take with food", 21, 0);
+        assertNotEquals(a, ClinicalDocumentRules.prescription(HEAD, PATIENT, PRESCRIBER, TODAY, List.of(more), true, TODAY).snapshot());
+    }
+
+    @Test void aVisitSummaryHasTheSectionsThatHaveTextAndItsAddenda() {
+        var vitals = new Vitals("72.5 kg", null, "120/80", "70 bpm", null, null);
+        var add = List.of(new Addendum("Correction", "13 Oct 2026 10:00", "Nurse Sample", "Weight was 72.5, not 75."));
+        Built b = ClinicalDocumentRules.visitSummary(HEAD, PATIENT, "Dr Sarah Mokoena", TODAY, vitals, "Cough", "Acute bronchitis", List.of("J20.9"),
+                "Rest", 7, add, true, TODAY);
+        String t = allText(b.model());
+        assertTrue(t.contains("Practitioner:Dr Sarah Mokoena"));
+        assertTrue(t.contains("ICD-10 codes"));
+        assertTrue(t.contains("Follow-up recommended in 7 days."));
+        assertTrue(t.contains("Correction · 13 Oct 2026 10:00 · Nurse Sample"));
+        assertTrue(t.contains(ClinicalDocumentRules.SUMMARY_NOTE));
+        var grid = b.model().blocks().stream().filter(x -> x instanceof Grid).map(x -> (Grid) x).findFirst().orElseThrow();
+        assertEquals(List.of("72.5 kg", "—", "120/80", "70 bpm", "—", "—"), grid.rows().get(0));
+        var noAddendum = ClinicalDocumentRules.visitSummary(HEAD, PATIENT, "Dr Sarah Mokoena", TODAY, vitals, "Cough", "Acute bronchitis", List.of("J20.9"),
+                "Rest", 7, List.of(), true, TODAY).snapshot();
+        assertNotEquals(noAddendum, b.snapshot(), "an addendum changes the summary, so it is replaced");
+    }
+
+    @Test void aVisitSummaryWithoutVitalsHasNoVitalsTable() {
+        Built b = ClinicalDocumentRules.visitSummary(HEAD, PATIENT, null, TODAY, new Vitals(null, null, " ", null, null, null), null, null, null, null, null, null, true, TODAY);
+        assertTrue(b.model().blocks().stream().noneMatch(x -> x instanceof Grid));
+        assertFalse(allText(b.model()).contains("Practitioner"));
+    }
+
+    @Test void aConsentRecordStatesTheDecisionInPlainWordsWithSignatureLines() {
+        var fact = new ConsentFact("MEDICAL_AID_SHARING", "REVOKED", "WRITTEN", "Reception Sample", "13 October 2026 09:15", "Patient asked in writing");
+        Built b = ClinicalDocumentRules.consentRecord(HEAD, PATIENT, fact, TODAY);
+        String t = allText(b.model());
+        assertTrue(t.contains("Record of consent"));
+        assertTrue(t.contains("Consent for:Sharing information with the medical aid"));
+        assertTrue(t.contains("Decision:Withdrawn"));
+        assertTrue(t.contains("How it was given:Written"));
+        assertTrue(t.contains("Recorded on:13 October 2026 09:15"));
+        assertTrue(t.contains("Patient or legal guardian"));
+        assertEquals(2, b.model().blocks().stream().filter(x -> x instanceof Signature).count());
+        assertEquals("Given", ClinicalDocumentRules.decisionLabel("granted"));
+        assertEquals("Not recorded", ClinicalDocumentRules.methodLabel(null));
+        assertEquals("other kind", ClinicalDocumentRules.consentLabel("OTHER_KIND"));
+    }
 }
