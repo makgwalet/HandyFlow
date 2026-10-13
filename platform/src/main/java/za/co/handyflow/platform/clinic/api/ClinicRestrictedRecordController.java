@@ -26,6 +26,7 @@ import java.util.UUID;
 public class ClinicRestrictedRecordController {
 
     private final ClinicRestrictedRecordService service;
+    private final za.co.handyflow.platform.clinic.application.internal.ClinicBreakGlassAlertService alerts;
 
     private static UUID tenant() { return TenantContext.getTenantIdAsObject().getValue(); }
     private static UUID user() { try { return UserContext.getCurrentUserId(); } catch (RuntimeException e) { return null; } }
@@ -60,9 +61,11 @@ public class ClinicRestrictedRecordController {
     public ResponseEntity<ApiResponse<Session>> start(@PathVariable UUID patientId, @RequestBody ReasonRequest body, HttpServletRequest request) {
         UUID u = user();
         if (u == null) throw new IllegalStateException("Sign in again before breaking the glass.");
-        return ResponseEntity.ok(ApiResponse.success("Record opened",
-                service.start(tenant(), patientId, u, body == null ? null : body.reason(), request.getRemoteAddr(),
-                        request.getHeader("User-Agent"), null)));
+        Session session = service.start(tenant(), patientId, u, body == null ? null : body.reason(), request.getRemoteAddr(),
+                request.getHeader("User-Agent"), null);
+        // The session is saved and committed; telling the reviewers can never undo or delay it.
+        alerts.alert(tenant(), session.sessionId(), u, session.startedAt(), session.expiresAt());
+        return ResponseEntity.ok(ApiResponse.success("Record opened", session));
     }
 
     @PostMapping("/patients/{patientId}/break-glass/print")
@@ -89,6 +92,7 @@ public class ClinicRestrictedRecordController {
     @Operation(summary = "Acknowledge a break-glass session after review")
     public ResponseEntity<ApiResponse<Void>> acknowledge(@PathVariable UUID sessionId, @RequestBody(required = false) AcknowledgeRequest body) {
         service.acknowledge(tenant(), sessionId, user(), body == null ? null : body.note());
+        alerts.acknowledged(tenant(), sessionId, user());
         return ResponseEntity.ok(ApiResponse.success("Acknowledged", null));
     }
 }

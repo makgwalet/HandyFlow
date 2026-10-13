@@ -31,6 +31,7 @@ class ClinicRestrictedRecordControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean ClinicRestrictedRecordService service;
+    @MockitoBean za.co.handyflow.platform.clinic.application.internal.ClinicBreakGlassAlertService alerts;
 
     final UUID patient = UUID.randomUUID();
     final String base = "/api/v1/clinic/patients/" + patient;
@@ -87,6 +88,7 @@ class ClinicRestrictedRecordControllerTest {
         mvc.perform(post(base + "/break-glass").with(csrf()).with(authentication(who)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"reason\":\"Emergency admission\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.sessionId").exists());
+        verify(alerts).alert(any(), any(), any(), any(), any());   // the reviewers are told
     }
 
     @Test @WithMockUser(authorities = "CLINIC_BREAK_GLASS_VIEW")

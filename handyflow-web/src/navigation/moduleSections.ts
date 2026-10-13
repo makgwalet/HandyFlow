@@ -592,6 +592,7 @@ export const CLINIC_SECTIONS: ModuleSections = {
       label: 'Governance',
       sections: [
         { id: 'access-log', label: 'Access log', icon: ShieldCheck, anyPermission: ['CLINIC_ACCESS_LOG_READ', 'CLINIC_ADMIN'] },
+        { id: 'break-glass', label: 'Break-glass review', icon: Siren, anyPermission: ['CLINIC_BREAK_GLASS_REVIEW'] },
         { id: 'question-library', label: 'Question library', icon: ListChecks, anyPermission: ['CLINIC_CONTENT_ADMIN', 'CLINIC_CONTENT_APPROVE'] },
       ],
     },
