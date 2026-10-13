@@ -23,6 +23,7 @@ import java.util.UUID;
 public class ClinicGrowthController {
 
     private final ClinicGrowthService service;
+    private final za.co.handyflow.platform.clinic.application.internal.ClinicRestrictedRecordService restricted;
 
     private static UUID tenant() { return TenantContext.getTenantIdAsObject().getValue(); }
 
@@ -31,6 +32,25 @@ public class ClinicGrowthController {
     @Operation(summary = "Weight, height, head circumference and BMI by age. Z-scores and curves only from an ACTIVE approved reference set; otherwise the banner DATA NOT CLINICALLY APPROVED")
     public ResponseEntity<ApiResponse<GrowthChart>> chart(@PathVariable UUID patientId) {
         return ResponseEntity.ok(ApiResponse.success("Success", service.chart(tenant(), patientId)));
+    }
+
+    @GetMapping(value = "/patients/{patientId}/growth/export", produces = "text/csv")
+    @PreAuthorize("hasAuthority('CLINIC_GROWTH_EXPORT')")
+    @Operation(summary = "The growth chart as a CSV file. Needs its own permission; during a break-glass session the export is recorded for the reviewer")
+    public ResponseEntity<byte[]> export(@PathVariable UUID patientId) {
+        var out = service.export(tenant(), patientId);
+        UUID me;
+        try { me = UserContext.getCurrentUserId(); } catch (RuntimeException e) { me = null; }
+        if (me != null) {
+            // A restricted record opened by break-glass: taking data out of it is part of what the reviewer sees.
+            final UUID user = me;
+            restricted.activeSession(tenant(), patientId, user).ifPresent(session ->
+                    restricted.audit(tenant(), session, patientId, user, za.co.handyflow.platform.clinic.application.internal.RestrictedRecordRules.EXPORTED, "DOCUMENT", null, "growth chart (CSV)"));
+        }
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"" + out.fileName() + "\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("text/csv; charset=UTF-8"))
+                .body(out.bytes());
     }
 
     @GetMapping("/growth-reference")

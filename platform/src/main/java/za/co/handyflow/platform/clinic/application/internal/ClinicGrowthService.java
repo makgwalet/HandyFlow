@@ -34,6 +34,20 @@ public class ClinicGrowthService {
 
     public ClinicGrowthService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
+    // ---- export (patch 0191) -----------------------------------------------------------------------------------
+
+    public record Export(String fileName, byte[] bytes) {}
+
+    /** The chart as a spreadsheet file: same data and same approval rules as the screen, nothing more. */
+    @Transactional(readOnly = true)
+    public Export export(UUID tenantId, UUID patientId) {
+        GrowthChart chart = chart(tenantId, patientId);
+        List<String> names = jdbc.query("SELECT full_name FROM clinic_patients WHERE tenant_id = ? AND id = ?", (rs, i) -> rs.getString(1), tenantId, patientId);
+        String name = names.isEmpty() ? null : names.get(0);
+        String day = LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg")).toString();
+        return new Export(GrowthExportRules.fileName(name, day), GrowthExportRules.csv(name, chart, day).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
     // ---- chart -------------------------------------------------------------------------------------------------
 
     @Transactional(readOnly = true)

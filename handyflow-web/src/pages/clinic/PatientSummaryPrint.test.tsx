@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest"
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 
-const get = vi.fn()
-vi.mock("../../api/client", () => ({ apiClient: { get: (...a: any[]) => get(...a) } }))
+const get = vi.fn(); const post = vi.fn()
+vi.mock("../../api/client", () => ({ apiClient: { get: (...a: any[]) => get(...a), post: (...a: any[]) => post(...a) } }))
 import PatientSummaryPrint, { esc, summaryHtml } from "./PatientSummaryPrint"
 
 const data = () => ({
@@ -41,7 +41,7 @@ describe("summaryHtml", () => {
 describe("PatientSummaryPrint", () => {
   let win: any
   beforeEach(() => {
-    get.mockReset(); get.mockResolvedValue({ data: { data: [] } })
+    get.mockReset(); get.mockResolvedValue({ data: { data: [] } }); post.mockReset()
     win = { document: { open: vi.fn(), write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn(), close: vi.fn() }
     vi.stubGlobal("open", vi.fn(() => win))
   })
@@ -49,7 +49,7 @@ describe("PatientSummaryPrint", () => {
     render(<PatientSummaryPrint patient={{ id: "p1", fullName: "Ann" }} />)
     fireEvent.click(screen.getByText("Print summary"))
     await waitFor(() => expect(win.print).toHaveBeenCalled())
-    expect(get).toHaveBeenCalledTimes(5)
+    expect(get).toHaveBeenCalledTimes(6)   // the restriction check, then the five lists
     expect(win.document.write.mock.calls[0][0]).toContain("Ann")
   })
   it("prints nothing and says so when the record cannot be loaded", async () => {
@@ -64,5 +64,21 @@ describe("PatientSummaryPrint", () => {
     render(<PatientSummaryPrint patient={{ id: "p1", fullName: "Ann" }} />)
     fireEvent.click(screen.getByText("Print summary"))
     expect(await screen.findByText(/blocked the print window/)).toBeTruthy()
+  })
+  it("records the print for the reviewer when the record was opened by break-glass, then prints", async () => {
+    get.mockImplementation((u: string) => Promise.resolve({ data: { data: u.endsWith("/restriction") ? { restricted: true, canAccess: true, breakGlassUntil: "2026-10-13T09:00:00Z" } : [] } }))
+    post.mockResolvedValue({ data: {} })
+    render(<PatientSummaryPrint patient={{ id: "p1", fullName: "Ann" }} />)
+    fireEvent.click(screen.getByText("Print summary"))
+    await waitFor(() => expect(win.print).toHaveBeenCalled())
+    expect(post).toHaveBeenCalledWith("/api/v1/clinic/patients/p1/break-glass/print", { document: "patient summary" })
+  })
+  it("prints nothing from a restricted record that cannot be recorded", async () => {
+    get.mockImplementation((u: string) => Promise.resolve({ data: { data: u.endsWith("/restriction") ? { restricted: true, canAccess: true, breakGlassUntil: "2026-10-13T09:00:00Z" } : [] } }))
+    post.mockRejectedValue({ response: { status: 403 } })
+    render(<PatientSummaryPrint patient={{ id: "p1", fullName: "Ann" }} />)
+    fireEvent.click(screen.getByText("Print summary"))
+    expect(await screen.findByText(/restricted/)).toBeTruthy()
+    expect(win.print).not.toHaveBeenCalled(); expect(win.close).toHaveBeenCalled()
   })
 })

@@ -5,10 +5,17 @@ import { AlertTriangle } from "lucide-react"
 import { Area, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis } from "recharts"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
+import { useCan } from "./clinicAccess"
+import { allowPrint } from "./printGuard"
 import ModalShell from "./ModalShell"
 import { GROWTH_MEASURES, entryProblem, takenAtFor, todayZA } from "./growthEntry"
 import { ageLabel, bandCount, bandRows, chartRows, chartTitle, latestOf, mergedTable, sourceLine, tabLabel, trendLine, zKey, zName, type GrowthChart, type MeasureChart } from "./growthView"
 
+// Printing the chart: only the chart area goes to paper, buttons and the rest of the page stay off it.
+const PRINT_CSS = `@media screen { .print-only { display: none; } }
+@media print { body * { visibility: hidden !important; } .growth-print, .growth-print * { visibility: visible !important; }
+  .growth-print { position: absolute; left: 0; top: 0; width: 100%; } .no-print { display: none !important; } }`
+const outBtn: React.CSSProperties = { padding: "7px 14px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13, fontWeight: 600, cursor: "pointer" }
 const card: React.CSSProperties = { border: "1px solid var(--hf-border)", borderRadius: 12, background: "var(--hf-surface)", padding: 16, marginBottom: 16 }
 const th: React.CSSProperties = { textAlign: "left", fontSize: 11, color: "var(--hf-text-muted)", fontWeight: 600, padding: "4px 8px" }
 const td: React.CSSProperties = { fontSize: 13, padding: "4px 8px", borderTop: "1px solid var(--hf-border-subtle)" }
@@ -149,10 +156,31 @@ const SEX: Record<string, string> = { MALE: "Male", FEMALE: "Female" }
 export default function GrowthTab({ patientId, patientName }: { patientId: string; patientName?: string }) {
   const canRead = usePermission("CLINIC_GROWTH_READ")
   const canWrite = usePermission("CLINIC_VITALS_WRITE")
+  const canExport = useCan("exportGrowth")
+  const [takeOutError, setTakeOutError] = useState("")
+  const [busyOut, setBusyOut] = useState(false)
   const [adding, setAdding] = useState(false)
   const [picked, setPicked] = useState<string | null>(null)
   const q = useQuery<GrowthChart>({ queryKey: ["growth", patientId], enabled: canRead, retry: false,
     queryFn: async () => { const r = await apiClient.get(`/api/v1/clinic/patients/${patientId}/growth`); return (r?.data?.data ?? r?.data) as GrowthChart } })
+  const printChart = async () => {
+    setBusyOut(true); setTakeOutError("")
+    const ok = await allowPrint(patientId, "growth chart")
+    setBusyOut(false)
+    if (!ok.ok) { setTakeOutError(ok.message ?? "Could not print."); return }
+    window.print()
+  }
+  const exportCsv = async () => {
+    setBusyOut(true); setTakeOutError("")
+    try {
+      const res: any = await apiClient.get(`/api/v1/clinic/patients/${patientId}/growth/export`, { responseType: "blob" } as any)
+      const link = document.createElement("a")
+      link.href = URL.createObjectURL(new Blob([res.data], { type: "text/csv" })); link.download = `growth-${patientId}.csv`; link.click()
+      setTimeout(() => URL.revokeObjectURL(link.href), 60_000)
+    } catch (e: any) {
+      setTakeOutError(e?.response?.status === 403 ? "You do not have permission to export this record." : "The growth chart could not be exported.")
+    } finally { setBusyOut(false) }
+  }
   if (!canRead) return <div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>You do not have permission to view growth charts.</div>
   if (q.isLoading) return <div style={{ fontSize: 13 }}>Loading growth…</div>
   if (q.isError || !q.data) return <div role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>Could not load the growth chart.</div>
@@ -160,7 +188,8 @@ export default function GrowthTab({ patientId, patientName }: { patientId: strin
   const active = g.measures.find(m => m.code === picked) ?? g.measures[0]
   const who = [g.currentAgeMonths != null ? ageLabel(g.currentAgeMonths) : null, g.sexAtBirth ? SEX[g.sexAtBirth] ?? null : null].filter(Boolean).join(" · ")
   return (
-    <div>
+    <div className="growth-print">
+      <style>{PRINT_CSS}</style>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
         <div aria-hidden style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--hf-accent-soft, var(--hf-surface-sunken))", color: "var(--hf-accent-text, var(--hf-text))", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800 }}>
           {(patientName ?? "?").trim().charAt(0).toUpperCase()}</div>
@@ -168,9 +197,14 @@ export default function GrowthTab({ patientId, patientName }: { patientId: strin
           <div style={{ fontSize: 15, fontWeight: 700, color: "var(--hf-text)" }}>{patientName ?? "Growth"}</div>
           {who && <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{who}</div>}
         </div>
-        {canWrite && <button type="button" onClick={() => setAdding(true)}
+        {canExport && <span className="no-print" style={{ display: "inline-flex", gap: 6 }}>
+          <button type="button" disabled={busyOut} onClick={printChart} style={outBtn}>Print chart</button>
+          <button type="button" disabled={busyOut} onClick={exportCsv} style={outBtn}>Export CSV</button>
+        </span>}
+        {canWrite && <button className="no-print" type="button" onClick={() => setAdding(true)}
           style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Record past measurement</button>}
       </div>
+      {takeOutError && <div role="alert" className="no-print" style={{ fontSize: 13, color: "var(--hf-danger-text)", marginBottom: 8 }}>{takeOutError}</div>}
       {adding && <PastMeasurement patientId={patientId} onClose={() => setAdding(false)} />}
       {g.notes.map(n => <div key={n} role="note" style={{ fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 8 }}>{n}</div>)}
       {active && (
@@ -189,6 +223,7 @@ export default function GrowthTab({ patientId, patientName }: { patientId: strin
           </div>
           <MeasuresTable g={g} activeCode={active.code} active={active} />
         </>)}
+      <div className="print-only" style={{ fontSize: 11, marginTop: 12 }}>Printed {new Date().toLocaleString("en-ZA")}. Reflects the record at that time.{active?.banner ? ` ${active.banner}.` : ""}</div>
     </div>
   )
 }

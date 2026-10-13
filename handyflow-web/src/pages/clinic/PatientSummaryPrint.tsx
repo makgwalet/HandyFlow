@@ -4,6 +4,7 @@
 // Everything printed is escaped, because notes and names are free text.
 import { useState } from "react"
 import { apiClient } from "../../api/client"
+import { allowPrint } from "./printGuard"
 import { buildMatrix, type Observation } from "./ObservationMatrix"
 import type { PatientNote } from "./PatientNotes"
 
@@ -56,6 +57,9 @@ export default function PatientSummaryPrint({ patient }: { patient: SummaryData[
     const w = window.open("", "_blank")
     if (!w) { setError("The browser blocked the print window. Allow pop-ups for this site."); setBusy(false); return }
     try {
+      // A restricted record opened by break-glass is recorded for the reviewer before it goes to paper.
+      const ok = await allowPrint(patient.id, "patient summary")
+      if (!ok.ok) { w.close(); setError(ok.message ?? "Nothing was printed."); setBusy(false); return }
       const base = `/api/v1/clinic/patients/${patient.id}`
       const get = async (path: string) => unwrap(await apiClient.get(`${base}/${path}`)) ?? []
       const [allergies, conditions, medications, notes, observations] =

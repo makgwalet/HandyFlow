@@ -171,7 +171,7 @@ public enum ClinicPermission {
             "Correct a growth measurement"),
     CLINIC_GROWTH_INTERPRET(Group.GROWTH, Kind.SIGN, "CLINIC_CLINICAL_SIGN", false,
             "Record a clinical interpretation of growth"),
-    CLINIC_GROWTH_EXPORT(Group.GROWTH, Kind.READ, "CLINIC_READ", false,
+    CLINIC_GROWTH_EXPORT(Group.GROWTH, Kind.READ, "CLINIC_READ", true,
             "Export or print a growth chart"),
     CLINIC_RESULT_READ(Group.RESULTS, Kind.READ, "CLINIC_READ", true,
             "View lab results and critical flags"),

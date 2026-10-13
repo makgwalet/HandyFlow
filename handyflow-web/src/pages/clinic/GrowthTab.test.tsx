@@ -103,4 +103,44 @@ describe("GrowthTab", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show Height-for-age" }))
     expect(screen.getByRole("tab", { name: "Height-for-age" }).getAttribute("aria-selected")).toBe("true")
   })
+  it("offers print and export only to someone who may take the chart out", async () => {
+    perms.CLINIC_GROWTH_READ = true
+    get.mockResolvedValue({ data: { data: chart() } }); wrap()
+    await screen.findByText("6.5 kg")
+    expect(screen.queryByRole("button", { name: "Print chart" })).toBeNull(); expect(screen.queryByRole("button", { name: "Export CSV" })).toBeNull()
+    cleanup(); perms.CLINIC_GROWTH_EXPORT = true; wrap()
+    expect(await screen.findByRole("button", { name: "Print chart" })).toBeTruthy(); expect(screen.getByRole("button", { name: "Export CSV" })).toBeTruthy()
+  })
+  it("prints an ordinary record after checking it is not restricted", async () => {
+    perms.CLINIC_GROWTH_READ = true; perms.CLINIC_GROWTH_EXPORT = true
+    const print = vi.fn(); vi.stubGlobal("print", print)
+    get.mockImplementation((u: string) => Promise.resolve({ data: { data: u.endsWith("/restriction") ? { restricted: false, canAccess: true } : chart() } })); wrap()
+    fireEvent.click(await screen.findByRole("button", { name: "Print chart" }))
+    await waitFor(() => expect(print).toHaveBeenCalled()); expect(post).not.toHaveBeenCalled()
+  })
+  it("records the print for the reviewer when the record was opened by break-glass", async () => {
+    perms.CLINIC_GROWTH_READ = true; perms.CLINIC_GROWTH_EXPORT = true
+    const print = vi.fn(); vi.stubGlobal("print", print); post.mockResolvedValue({ data: {} })
+    get.mockImplementation((u: string) => Promise.resolve({ data: { data: u.endsWith("/restriction") ? { restricted: true, canAccess: true, breakGlassUntil: "2026-10-13T09:00:00Z" } : chart() } })); wrap()
+    fireEvent.click(await screen.findByRole("button", { name: "Print chart" }))
+    await waitFor(() => expect(print).toHaveBeenCalled())
+    expect(post).toHaveBeenCalledWith("/api/v1/clinic/patients/p1/break-glass/print", { document: "growth chart" })
+  })
+  it("prints nothing when the break-glass print cannot be recorded", async () => {
+    perms.CLINIC_GROWTH_READ = true; perms.CLINIC_GROWTH_EXPORT = true
+    const print = vi.fn(); vi.stubGlobal("print", print); post.mockRejectedValue({ response: { status: 403 } })
+    get.mockImplementation((u: string) => Promise.resolve({ data: { data: u.endsWith("/restriction") ? { restricted: true, canAccess: true, breakGlassUntil: "2026-10-13T09:00:00Z" } : chart() } })); wrap()
+    fireEvent.click(await screen.findByRole("button", { name: "Print chart" }))
+    expect(await screen.findByText(/This record is restricted/)).toBeTruthy()
+    expect(print).not.toHaveBeenCalled()
+  })
+  it("downloads the CSV from the server and says so when it is refused", async () => {
+    perms.CLINIC_GROWTH_READ = true; perms.CLINIC_GROWTH_EXPORT = true
+    vi.stubGlobal("URL", { createObjectURL: () => "blob:x", revokeObjectURL: () => {} })
+    get.mockImplementation((u: string) => u.endsWith("/growth/export")
+      ? Promise.reject({ response: { status: 403 } }) : Promise.resolve({ data: { data: chart() } })); wrap()
+    fireEvent.click(await screen.findByRole("button", { name: "Export CSV" }))
+    expect(await screen.findByText(/permission to export/)).toBeTruthy()
+    expect(get).toHaveBeenCalledWith("/api/v1/clinic/patients/p1/growth/export", { responseType: "blob" })
+  })
 })

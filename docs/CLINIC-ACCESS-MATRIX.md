@@ -164,7 +164,7 @@ user -> role -> permissions -> (later) patient and context rules
 | `CLINIC_GROWTH_RECORD` | write | Record a growth measurement | `CLINIC_CLINICAL_WRITE` | Reserved |
 | `CLINIC_GROWTH_UPDATE` | write | Correct a growth measurement | `CLINIC_CLINICAL_WRITE` | Reserved |
 | `CLINIC_GROWTH_INTERPRET` | sign | Record a clinical interpretation of growth | `CLINIC_CLINICAL_SIGN` | Reserved |
-| `CLINIC_GROWTH_EXPORT` | read | Export or print a growth chart | `CLINIC_READ` | Reserved |
+| `CLINIC_GROWTH_EXPORT` | read | Export or print a growth chart | `CLINIC_READ` | Live |
 
 ### Results
 
@@ -387,7 +387,7 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 
 ## 3. API authorization matrix
 
-200 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
+201 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
 
 | Area | Method | Path | Requires |
 |---|---|---|---|
@@ -469,6 +469,7 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 | Core | GET | `/procedures` | `CLINIC_CATALOGUE_READ` |
 | Dashboard | GET | `/dashboard/summary` | `CLINIC_DASHBOARD_READ` |
 | Growth | GET | `/patients/{patientId}/growth` | `CLINIC_GROWTH_READ` |
+| Growth | GET | `/patients/{patientId}/growth/export` | `CLINIC_GROWTH_EXPORT` |
 | Growth | GET | `/growth-reference` | `CLINIC_CONTENT_ADMIN` or `CLINIC_CONTENT_APPROVE` |
 | Growth | POST | `/growth-reference` | `CLINIC_CONTENT_ADMIN` |
 | Growth | POST | `/growth-reference/{id}/submit` | `CLINIC_CONTENT_ADMIN` |

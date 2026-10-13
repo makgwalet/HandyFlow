@@ -31,6 +31,7 @@ class ClinicGrowthControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean ClinicGrowthService service;
+    @MockitoBean za.co.handyflow.platform.clinic.application.internal.ClinicRestrictedRecordService restricted;
     final UUID id = UUID.randomUUID();
     final UUID patient = UUID.randomUUID();
     final UUID me = UUID.randomUUID();
@@ -90,5 +91,32 @@ class ClinicGrowthControllerTest {
         when(service.activate(any(), any(), any())).thenThrow(new IllegalStateException("The person who reviewed the set cannot approve and activate it"));
         mvc.perform(post("/api/v1/clinic/growth-reference/" + id + "/activate").with(as("CLINIC_CONTENT_APPROVE")).with(csrf()))
                 .andExpect(status().is4xxClientError());
+    }
+
+    @Test @WithMockUser(authorities = "CLINIC_GROWTH_READ")
+    void seeingTheChartIsNotEnoughToExportIt() throws Exception {
+        mvc.perform(get("/api/v1/clinic/patients/" + patient + "/growth/export")).andExpect(status().isForbidden());
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void exportingNeedsItsOwnPermissionAndReturnsAFile() throws Exception {
+        when(service.export(any(), any())).thenReturn(new ClinicGrowthService.Export("growth-x.csv", "a,b\r\n".getBytes()));
+        when(restricted.activeSession(any(), any(), any())).thenReturn(java.util.Optional.empty());
+        mvc.perform(get("/api/v1/clinic/patients/" + patient + "/growth/export").with(as("CLINIC_GROWTH_EXPORT")))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("growth-x.csv")))
+                .andExpect(content().string("a,b\r\n"));
+        verify(restricted, never()).audit(any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void anExportDuringBreakGlassIsRecordedForTheReviewer() throws Exception {
+        UUID session = UUID.randomUUID();
+        when(service.export(any(), any())).thenReturn(new ClinicGrowthService.Export("growth-x.csv", "a\r\n".getBytes()));
+        when(restricted.activeSession(any(), any(), any())).thenReturn(java.util.Optional.of(session));
+        mvc.perform(get("/api/v1/clinic/patients/" + patient + "/growth/export").with(as("CLINIC_GROWTH_EXPORT"))).andExpect(status().isOk());
+        verify(restricted).audit(any(), org.mockito.ArgumentMatchers.eq(session), org.mockito.ArgumentMatchers.eq(patient), any(),
+                org.mockito.ArgumentMatchers.eq("BREAK_GLASS_DOCUMENT_EXPORTED"), any(), any(), any());
     }
 }
