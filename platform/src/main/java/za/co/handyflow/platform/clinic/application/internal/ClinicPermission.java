@@ -29,7 +29,7 @@ public enum ClinicPermission {
             "Edit a patient's registration details"),
     CLINIC_PATIENT_ARCHIVE(Group.PATIENT, Kind.MANAGE, "CLINIC_ADMIN", false,
             "Archive a patient record"),
-    CLINIC_PATIENT_MERGE(Group.PATIENT, Kind.MANAGE, "CLINIC_ADMIN", false,
+    CLINIC_PATIENT_MERGE(Group.PATIENT, Kind.MANAGE, "CLINIC_ADMIN", true,
             "Merge duplicate patient records"),
     CLINIC_PATIENT_DUPLICATE_REVIEW(Group.PATIENT, Kind.WRITE, "CLINIC_WRITE", false,
             "Review and resolve possible duplicate patients"),

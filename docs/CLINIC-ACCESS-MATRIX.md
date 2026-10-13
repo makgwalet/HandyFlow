@@ -26,7 +26,7 @@ user -> role -> permissions -> (later) patient and context rules
 | `CLINIC_PATIENT_CREATE` | write | Register a patient | `CLINIC_WRITE` | Live |
 | `CLINIC_PATIENT_UPDATE` | write | Edit a patient's registration details | `CLINIC_WRITE` | Live |
 | `CLINIC_PATIENT_ARCHIVE` | manage | Archive a patient record | `CLINIC_ADMIN` | Reserved |
-| `CLINIC_PATIENT_MERGE` | manage | Merge duplicate patient records | `CLINIC_ADMIN` | Reserved |
+| `CLINIC_PATIENT_MERGE` | manage | Merge duplicate patient records | `CLINIC_ADMIN` | Live |
 | `CLINIC_PATIENT_DUPLICATE_REVIEW` | write | Review and resolve possible duplicate patients | `CLINIC_WRITE` | Reserved |
 | `CLINIC_PATIENT_DEMOGRAPHICS_READ` | read | View name, date of birth, sex and ID number | `CLINIC_READ` | Live |
 | `CLINIC_PATIENT_DEMOGRAPHICS_WRITE` | write | Change name, date of birth, sex and ID number | `CLINIC_WRITE` | Live |
@@ -387,7 +387,7 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 
 ## 3. API authorization matrix
 
-197 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
+199 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
 
 | Area | Method | Path | Requires |
 |---|---|---|---|
@@ -532,6 +532,8 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 | PatientHistory | GET | `/patients/{patientId}/medical-aid` | `CLINIC_PATIENT_READ` |
 | PatientHistory | PUT | `/patients/{patientId}/medical-aid` | `CLINIC_PATIENT_UPDATE` |
 | PatientHistory | DELETE | `/patients/{patientId}/medical-aid` | `CLINIC_PATIENT_UPDATE` |
+| PatientMerge | GET | `/patients/merge-preview` | `CLINIC_PATIENT_MERGE` |
+| PatientMerge | POST | `/patients/merge` | `CLINIC_PATIENT_MERGE` |
 | PatientNote | GET | `/patients/{patientId}/notes` | `CLINIC_NOTE_READ` |
 | PatientNote | POST | `/patients/{patientId}/notes` | `CLINIC_NOTE_CREATE` |
 | PatientNote | POST | `/patients/{patientId}/notes/{noteId}/resolve` | `CLINIC_NOTE_UPDATE` |

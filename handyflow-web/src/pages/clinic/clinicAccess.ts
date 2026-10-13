@@ -31,6 +31,7 @@ export const CAN = {
   viewTimeline:       { fine: "CLINIC_TIMELINE_READ",           legacy: "CLINIC_READ" },
   viewConsent:        { fine: "CLINIC_CONSENT_READ",            legacy: "CLINIC_READ" },
   signLetterAsOther:  { fine: "CLINIC_DOCUMENT_SIGN_AS_OTHER",  legacy: "CLINIC_CLINICAL_SIGN" },
+  mergePatients:      { fine: "CLINIC_PATIENT_MERGE",           legacy: "CLINIC_ADMIN" },
 } as const
 
 export type Capability = keyof typeof CAN

@@ -25,6 +25,7 @@ import RestrictedRecordGate from "./RestrictedRecordGate"
 import GrowthTab from "./GrowthTab"
 import PatientProfilePage from "./PatientProfilePage"
 import type { SectionId } from "./profileView"
+import MergePatientModal from "./MergePatientModal"
 import { usePermission } from "../../hooks/usePermission"
 import { useCan } from "./clinicAccess"
 
@@ -43,6 +44,8 @@ export default function PatientFilePage({ patient, onOpenPatient }: Props) {
   const userEmail = useAuthStore(st => st.user?.email)
   const canGrowth = usePermission("CLINIC_GROWTH_READ")
   const canAccount = useCan("viewAccount"), canRx = useCan("viewPrescriptions"), canResults = useCan("viewResults")
+  const canMerge = useCan("mergePatients")
+  const [showMerge, setShowMerge] = useState(false)
   const canDocs = useCan("viewDocuments"), canTimeline = useCan("viewTimeline"), canConsent = useCan("viewConsent")
   const [requestedTab, setActiveTab] = useState<TabId>("overview")
   const [showActions, setShowActions] = useState(false)
@@ -189,6 +192,11 @@ export default function PatientFilePage({ patient, onOpenPatient }: Props) {
                 <ActionItem icon={User} label="Complete / update profile"
                   color={TEAL} onClick={()=>{ setShowActions(false); setProfile({}) }}
                   hint="Identity, contact, address, emergency contacts"/>
+                {canMerge && !isArchived && (
+                  <ActionItem icon={Users} label="Merge duplicate record"
+                    color={PURPLE_TEXT} onClick={()=>{ setShowActions(false); setShowMerge(true) }}
+                    hint="Same person registered twice — combine the two files"/>
+                )}
                 {/* Deactivate / reactivate */}
                 {patient.active ? (
                   <ActionItem icon={UserX} label="Deactivate account"
@@ -249,6 +257,13 @@ export default function PatientFilePage({ patient, onOpenPatient }: Props) {
       {/* ── Tab content ─────────────────────────────────────────────────── */}
       <RestrictedRecordGate patientId={patient.id}>
       <PatientAlertBanner patientId={patient.id}/>
+      {showMerge && <MergePatientModal here={{ id: pid, fullName: patient.fullName, patientNumber: (patient as any).patientNumber, dateOfBirth: patient.dateOfBirth }}
+        onClose={()=>setShowMerge(false)}
+        onMerged={async survivorId=>{
+          setShowMerge(false)
+          if (survivorId === pid) return
+          try { const r = await apiClient.get(`/api/v1/clinic/patients/${survivorId}`); onOpenPatient?.((r.data?.data ?? r.data) as Patient) } catch { /* the list refreshes; the person can open the kept record from there */ }
+        }}/>}
       {profile && <PatientProfilePage patient={patient} initialSection={profile.section} onBack={()=>setProfile(null)}
         onPatientChanged={p=>onOpenPatient?.(p)} onOpenConsent={()=>{ setProfile(null); setActiveTab("consent") }}/>}
       {!profile && <>
