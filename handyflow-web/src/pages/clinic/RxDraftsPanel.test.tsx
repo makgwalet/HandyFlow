@@ -25,7 +25,15 @@ describe("RxDraftsPanel", () => {
   })
   it("a cleared quantity box is empty, not NaN", () => {
     show([draft({ quantity: NaN })])
-    expect((screen.getByRole("spinbutton") as HTMLInputElement).value).toBe("")
+    expect((screen.getAllByRole("spinbutton")[0] as HTMLInputElement).value).toBe("")
+  })
+  it("has a repeats box that reports a whole number, and shows 0 when none are set", () => {
+    const update = vi.fn()
+    show([draft({ repeats: 0 })], { update })
+    const repeats = screen.getAllByRole("spinbutton")[1] as HTMLInputElement
+    expect(repeats.value).toBe("0")
+    fireEvent.change(repeats, { target: { value: "2" } })
+    expect(update).toHaveBeenCalledWith("r1", "repeats", 2)
   })
   it("adds a blank prescription on request", () => {
     const add = vi.fn()

@@ -11,7 +11,7 @@ export interface StepNotes {
   /** Comma-separated; a code alone counts as a diagnosis. */
   icd10Codes?: string
 }
-export interface StepRx { medicationName: string; dosage: string; frequency: string; duration: string; quantity: number }
+export interface StepRx { medicationName: string; dosage: string; frequency: string; duration: string; quantity: number; repeats?: number }
 
 export type StepState = "done" | "todo" | "attention"
 export interface ConsultStep { id: "symptoms" | "examination" | "diagnose" | "plan" | "sign"; label: string; state: StepState; hint: string; required?: boolean }
@@ -34,8 +34,23 @@ export function rxGaps(r: StepRx): string[] {
   if (!has(r.dosage)) gaps.push("dosage")
   if (!has(r.frequency)) gaps.push("frequency")
   if (!has(r.duration)) gaps.push("duration")
-  if (!(r.quantity > 0)) gaps.push("quantity")
+  if (!(Number.isInteger(r.quantity) && r.quantity > 0)) gaps.push("quantity")
+  if (r.repeats !== undefined && !(Number.isInteger(r.repeats) && r.repeats >= 0)) gaps.push("repeats")
   return gaps
+}
+
+/**
+ * Entries the server would be sent wrongly if left as they are: a quantity that is not a whole number of at least 1, or repeats that are not a
+ * whole number of 0 or more (patch 0183). Before this, an emptied quantity box was silently sent as 30. Drafts with no medicine are ignored.
+ */
+export function rxBlockingProblems(rx: StepRx[]): string[] {
+  const out: string[] = []
+  for (const r of rx) {
+    if (!has(r.medicationName)) continue
+    if (!(Number.isInteger(r.quantity) && r.quantity >= 1)) out.push(`${r.medicationName.trim()}: quantity must be a whole number of at least 1.`)
+    if (r.repeats !== undefined && !(Number.isInteger(r.repeats) && r.repeats >= 0)) out.push(`${r.medicationName.trim()}: repeats must be a whole number, 0 or more.`)
+  }
+  return out
 }
 
 export function consultSteps(n: StepNotes, rx: StepRx[], req: RequiredStages = DEFAULT_REQUIRED): ConsultStep[] {

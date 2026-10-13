@@ -20,7 +20,7 @@ export interface BillLine {
 export interface RxDraft {
   id: string; medicationName: string; nappiCode?: string
   dosage: string; frequency: string; duration: string
-  quantity: number; instructions: string; fromBill: boolean
+  quantity: number; repeats?: number; instructions: string; fromBill: boolean
   allergyReason?: string
 }
 

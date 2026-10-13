@@ -63,7 +63,13 @@ export default function RxDraftsPanel({ rxDrafts, allergyResults, updateRx, remo
                   </div>
                   <div>
                     <label style={lbl}>Qty</label>
-                    <input type="number" value={Number.isNaN(rx.quantity)?"":rx.quantity} onChange={e=>updateRx(rx.id,"quantity",parseInt(e.target.value))}
+                    <input type="number" min={1} value={Number.isNaN(rx.quantity)?"":rx.quantity} onChange={e=>updateRx(rx.id,"quantity",parseInt(e.target.value))}
+                      style={{...sinp,padding:"5px 8px",fontSize:12}}/>
+                  </div>
+                  <div>
+                    <label style={lbl}>Repeats</label>
+                    <input type="number" min={0} value={rx.repeats===undefined||Number.isNaN(rx.repeats)?"":rx.repeats}
+                      onChange={e=>updateRx(rx.id,"repeats",e.target.value===""?NaN:parseInt(e.target.value))}
                       style={{...sinp,padding:"5px 8px",fontSize:12}}/>
                   </div>
                   <div style={{gridColumn:"1/-1"}}>

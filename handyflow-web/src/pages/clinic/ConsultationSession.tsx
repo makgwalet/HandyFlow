@@ -13,7 +13,7 @@ import { VitalsPanel, SoapFields } from "./ConsultationNotesPanels"
 import LiveBillPanel from "./LiveBillPanel"
 import RxDraftsPanel from "./RxDraftsPanel"
 import ConsultationStepper from "./ConsultationStepper"
-import { consultSteps } from "./consultSteps"
+import { consultSteps, rxBlockingProblems } from "./consultSteps"
 import { FOLLOW_UP_CHOICES, WIZARD_ORDER, nextStep, prevStep, stepNumber, vitalsLine, type WizardStep } from "./consultWizard"
 import SafetyBar from "./SafetyBar"
 import ClinicalContextDrawer, { useBriefing } from "./ClinicalContextDrawer"
@@ -344,7 +344,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
       id:crypto.randomUUID(),
       medicationName:med.medicationName, nappiCode:med.nappiCode,
       dosage:med.dosage||"", frequency:med.frequency||"", duration:med.duration||"",
-      quantity:30, instructions:"", fromBill:true
+      quantity:30, repeats:0, instructions:"", fromBill:true
     }])
     setMedSearch(""); setMedResults([]); setShowMedSearch(false)
   }
@@ -363,6 +363,10 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
       // 1. Save the notes (not again once the doctor has completed their review: the record is then read-only).
       if (statusRef.current !== "DOCTOR_COMPLETED") await apiClient.patch(`/api/v1/clinic/consultations/${draftId}`, draftPayload())
 
+      const unsaved = rxDrafts.filter(r => !savedRxRef.current.has(r.id))
+      const rxBad = rxBlockingProblems(unsaved)
+      if (rxBad.length) throw new Error(rxBad.join(" "))
+
       // 2. Save prescriptions (each only once, so a retry after a later failure cannot duplicate them)
       for (const rx of rxDrafts) {
         if (!rx.medicationName.trim() || savedRxRef.current.has(rx.id)) continue
@@ -372,8 +376,8 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
           dosage:         rx.dosage||null,
           frequency:      rx.frequency||null,
           duration:       rx.duration||null,
-          quantity:       rx.quantity||30,
-          repeats:        0,
+          quantity:       rx.quantity,
+          repeats:        rx.repeats ?? 0,
           instructions:   rx.instructions||null,
           allergyOverrideReason: rx.allergyReason?.trim() || null,
         })
@@ -580,7 +584,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
 
               <RxDraftsPanel rxDrafts={rxDrafts} allergyResults={allergyResults} updateRx={updateRx} removeRx={removeRx}
                 addBlankRx={()=>setRxDrafts(d=>[...d,{id:crypto.randomUUID(),
-                  medicationName:"",dosage:"",frequency:"",duration:"",quantity:30,instructions:"",fromBill:false}])}/>
+                  medicationName:"",dosage:"",frequency:"",duration:"",quantity:30,repeats:0,instructions:"",fromBill:false}])}/>
             </div>
             <div style={{ flex:"1 1 260px", display:"flex", flexDirection:"column", gap:10 }}>
           {/* Quick-add procedures */}
@@ -630,7 +634,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
               <Recap title="Symptoms" onEdit={()=>setStep("symptoms")} rows={[["Chief complaint", soap.chiefComplaint], ["History", soap.history]]} />
               <Recap title="Examination" onEdit={()=>setStep("examination")} rows={[["Vitals", vitalsLine(soap)], ["Findings", soap.examination]]} />
               <Recap title="Assessment & treatment" onEdit={()=>setStep("diagnose")} rows={[["Diagnosis", soap.diagnosis], ["ICD-10", soap.icd10Codes],
-                ["Prescriptions", rxDrafts.filter(r=>r.medicationName.trim()).map(r=>[r.medicationName, r.dosage, r.frequency, r.duration].filter(Boolean).join(" ")).join("\n")]]} />
+                ["Prescriptions", rxDrafts.filter(r=>r.medicationName.trim()).map(r=>[r.medicationName, r.dosage, r.frequency, r.duration, `qty ${Number.isNaN(r.quantity)?"?":r.quantity}`, (r.repeats ?? 0) > 0 ? `${r.repeats} repeat${r.repeats===1?"":"s"}` : ""].filter(Boolean).join(" ")).join("\n")]]} />
               <Recap title="Plan" onEdit={()=>setStep("plan")} rows={[["Treatment plan", soap.treatmentPlan], ["Follow-up", soap.followUpDays.trim() ? `In ${soap.followUpDays.trim()} days` : ""]]} />
             </div>
           </SignReviewPanel>

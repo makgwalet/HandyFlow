@@ -52,3 +52,28 @@ describe("consultSteps", () => {
     expect(by(blank).sign.hint).toBe("Required first: Symptoms, Diagnosis")
   })
 })
+
+import { rxBlockingProblems } from "./consultSteps"
+
+describe("prescription entries that would be sent wrongly (0183)", () => {
+  const rx = (o: any = {}) => ({ medicationName: "Amoxicillin 500mg", dosage: "500mg", frequency: "3x daily", duration: "7 days", quantity: 21, repeats: 0, ...o })
+  it("a good draft has no gaps and no blocking problems", () => {
+    expect(rxGaps(rx())).toEqual([])
+    expect(rxBlockingProblems([rx()])).toEqual([])
+  })
+  it("an emptied or fractional quantity is a problem, not a silent 30", () => {
+    expect(rxBlockingProblems([rx({ quantity: NaN })])[0]).toContain("quantity must be a whole number")
+    expect(rxBlockingProblems([rx({ quantity: 0 })]).length).toBe(1)
+    expect(rxBlockingProblems([rx({ quantity: 2.5 })]).length).toBe(1)
+    expect(rxGaps(rx({ quantity: NaN }))).toContain("quantity")
+  })
+  it("repeats must be a whole number, 0 or more; not set means 0", () => {
+    expect(rxBlockingProblems([rx({ repeats: -1 })])[0]).toContain("repeats must be a whole number")
+    expect(rxBlockingProblems([rx({ repeats: NaN })]).length).toBe(1)
+    expect(rxBlockingProblems([rx({ repeats: undefined })])).toEqual([])
+    expect(rxGaps(rx({ repeats: 1.5 }))).toContain("repeats")
+  })
+  it("a draft with no medicine is ignored", () => {
+    expect(rxBlockingProblems([rx({ medicationName: " ", quantity: NaN })])).toEqual([])
+  })
+})
