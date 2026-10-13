@@ -18,6 +18,7 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.time.LocalDate;
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -131,29 +132,46 @@ public class ClinicQuestionLibraryService {
     }
 
     /**
-     * Questionnaires the clinician started on this consultation that still lack required answers, as readable
-     * lines ("Group name: question, question"). Groups no longer served are skipped: they cannot be finished.
+     * Questionnaires on this consultation that still lack required answers, as readable lines ("Group name: question, question").
+     * Covers the groups the clinician started and, since 0186, groups the answers opened (TRIGGER_GROUP rules) that were never
+     * started: those are listed with "(opened by your answers, not started)". Groups no longer served are skipped: they cannot be finished.
      */
     @Transactional(readOnly = true)
     public List<String> incompleteGroups(TenantId tenantId, ClinicConsultation c) {
         Map<String, Object> formData = readFormData(tenantId, c.getId());
         Object groups = formData.get("groups");
-        if (!(groups instanceof Map<?, ?> started) || started.isEmpty()) return List.of();
+        if (!(groups instanceof Map<?, ?> startedMap) || startedMap.isEmpty()) return List.of();
         PatientFacts facts = patientFacts(tenantId, c.getPatientId());
+        List<String> started = startedMap.keySet().stream().map(String::valueOf).toList();
+        Map<String, GroupView> served = new HashMap<>();
+        Function<String, GroupView> serve = code -> served.computeIfAbsent(code, k -> {
+            try { return servedGroup(tenantId, k); } catch (ResourceNotFoundException e) { return null; }
+        });
         List<String> out = new ArrayList<>();
-        for (Object codeObj : started.keySet()) {
-            String code = String.valueOf(codeObj);
-            GroupView g;
-            try { g = servedGroup(tenantId, code); } catch (ResourceNotFoundException e) { continue; }
-            EvaluationView ev = evaluateView(g, FormData.answersOf(formData, code), facts, null);
-            if (!ev.missingRequired().isEmpty()) {
-                Map<String, String> labels = g.questions().stream()
-                        .collect(Collectors.toMap(QuestionView::code, QuestionView::label, (a, b) -> a));
-                out.add(g.name() + ": " + ev.missingRequired().stream().map(q -> labels.getOrDefault(q, q))
-                        .collect(Collectors.joining(", ")));
-            }
+        for (String code : started) {
+            GroupView g = serve.apply(code);
+            if (g == null) continue;
+            addIfIncomplete(out, g, evaluateView(g, FormData.answersOf(formData, code), facts, null), "");
+        }
+        List<String> opened = TriggerClosureRules.unstarted(started, code -> {
+            GroupView g = serve.apply(code);
+            if (g == null) return List.of();
+            return evaluateView(g, FormData.answersOf(formData, code), facts, null).triggeredGroups();
+        });
+        for (String code : opened) {
+            GroupView g = serve.apply(code);
+            if (g == null) continue;
+            addIfIncomplete(out, g, evaluateView(g, Map.of(), facts, null), " (opened by your answers, not started)");
         }
         return out;
+    }
+
+    private static void addIfIncomplete(List<String> out, GroupView g, EvaluationView ev, String note) {
+        if (ev.missingRequired().isEmpty()) return;
+        Map<String, String> labels = g.questions().stream()
+                .collect(Collectors.toMap(QuestionView::code, QuestionView::label, (a, b) -> a));
+        out.add(g.name() + note + ": " + ev.missingRequired().stream().map(q -> labels.getOrDefault(q, q))
+                .collect(Collectors.joining(", ")));
     }
 
     // ── Red flag review (Q-5) ────────────────────────────────────────────────
