@@ -49,6 +49,7 @@ class ClinicControllerTest {
     @MockitoBean ClinicAppointmentReminderService      appointmentReminderService;
     @MockitoBean ClinicTelehealthService               telehealthService;
     @MockitoBean ClinicReferralPdfService              referralPdfService;
+    @MockitoBean za.co.handyflow.platform.clinic.application.internal.ClinicClinicalDocumentService clinicalDocuments;
     @MockitoBean ClinicConsultationSummaryPdfService   consultationSummaryPdfService;
     @MockitoBean za.co.handyflow.platform.clinic.domain.repository.ClinicProcedureCatalogueRepository procedureRepo;
 

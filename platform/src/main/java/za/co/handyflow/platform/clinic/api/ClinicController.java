@@ -46,6 +46,7 @@ public class ClinicController {
     private final ClinicPdfService                   clinicPdfService;
     private final za.co.handyflow.platform.clinic.application.internal.ClinicPatientDocumentService documentService;
     private final ClinicReferralPdfService            referralPdfService;
+    private final za.co.handyflow.platform.clinic.application.internal.ClinicClinicalDocumentService clinicalDocuments;
     private final ClinicConsultationSummaryPdfService consultationSummaryPdfService;
     private final ClinicMedicationCatalogueRepository medicationRepo;
     private final ClinicProcedureCatalogueRepository procedureRepo;
@@ -401,40 +402,42 @@ public class ClinicController {
 
     @PostMapping("/consultations/{id}/medical-certificate")
     @PreAuthorize("hasAuthority('CLINIC_SICK_NOTE_SIGN')")
-    @Operation(summary = "Generate a medical certificate PDF for a consultation")
+    @Operation(summary = "Issue a sick note (medical certificate) PDF for a consultation")
     public ResponseEntity<byte[]> generateMedicalCertificate(
             @PathVariable UUID id,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate unfitFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate unfitTo,
-            @RequestParam(required = false) String notes) {
-        byte[] pdf = clinicPdfService.generateMedicalCertificate(
-                TenantContext.getTenantIdAsObject(), id, unfitFrom, unfitTo, notes);
+            @RequestParam(required = false) String notes,
+            @RequestParam(required = false) UUID letterheadId) {
+        var tenant = TenantContext.getTenantIdAsObject();
+        byte[] pdf = clinicalDocuments.issueSickNote(tenant, id, unfitFrom, unfitTo, notes, letterheadId, currentUserOrNull()).pdf();
         // A copy is kept in the patient's documents register; failing to keep it never blocks the certificate.
-        documentService.recordIssued(TenantContext.getTenantIdAsObject(), id, "SICK_NOTE", "Medical certificate", pdf);
+        documentService.recordIssued(tenant, id, "SICK_NOTE", "Medical certificate", pdf);
         return pdfResponse(pdf, "medical-certificate-" + id + ".pdf");
     }
 
     // ── Referral Letter PDF ───────────────────────────────────────────────────
-    // FIX: "no referral letter" gap — a very standard GP output with no
-    // equivalent before this. Not backed by a persisted entity — same
-    // convention as the medical certificate above (free-text params
-    // supplied at generation time, nothing stored).
 
     @PostMapping("/consultations/{id}/referral-letter")
     @PreAuthorize("hasAuthority('CLINIC_REFERRAL_SIGN')")
-    @Operation(summary = "Generate a referral letter PDF for a consultation")
+    @Operation(summary = "Issue a referral letter PDF for a consultation")
     public ResponseEntity<byte[]> generateReferralLetter(
             @PathVariable UUID id,
             @RequestParam(required = false) String specialistName,
             @RequestParam(required = false) String specialty,
             @RequestParam(required = false) String reason,
             @RequestParam(required = false) String urgency,
-            @RequestParam(required = false) String additionalNotes) {
-        byte[] pdf = referralPdfService.generate(
-                TenantContext.getTenantIdAsObject(), id, specialistName, specialty, reason, urgency, additionalNotes);
-        documentService.recordIssued(TenantContext.getTenantIdAsObject(), id, "REFERRAL",
+            @RequestParam(required = false) String additionalNotes,
+            @RequestParam(required = false) UUID letterheadId) {
+        var tenant = TenantContext.getTenantIdAsObject();
+        byte[] pdf = referralPdfService.issue(tenant, id, specialistName, specialty, reason, urgency, additionalNotes, letterheadId, currentUserOrNull()).pdf();
+        documentService.recordIssued(tenant, id, "REFERRAL",
                 specialty == null || specialty.isBlank() ? "Referral letter" : "Referral letter: " + specialty.trim(), pdf);
         return pdfResponse(pdf, "referral-letter-" + id + ".pdf");
+    }
+
+    private static UUID currentUserOrNull() {
+        try { return za.co.handyflow.platform.shared.UserContext.getCurrentUserId(); } catch (RuntimeException e) { return null; }
     }
 
     // ── Prescription PDF ──────────────────────────────────────────────────────
