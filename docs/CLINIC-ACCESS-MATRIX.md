@@ -386,7 +386,7 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 
 ## 3. API authorization matrix
 
-192 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
+194 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
 
 | Area | Method | Path | Requires |
 |---|---|---|---|
@@ -541,6 +541,8 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 | QuestionLibrary | POST | `/question-groups/{code}/evaluate` | `CLINIC_QUESTIONNAIRE_READ` |
 | QuestionLibrary | GET | `/consultations/{id}/form-data` | `CLINIC_QUESTIONNAIRE_READ` |
 | QuestionLibrary | PUT | `/consultations/{id}/form-data/{groupCode}` | `CLINIC_QUESTIONNAIRE_ANSWER` |
+| QuestionLibrary | GET | `/consultations/{id}/red-flags` | `CLINIC_QUESTIONNAIRE_READ` |
+| QuestionLibrary | POST | `/consultations/{id}/red-flags/{groupCode}/{flagCode}/review` | `CLINIC_QUESTIONNAIRE_ANSWER` |
 | QuestionLibrary | GET | `/question-groups/admin` | `CLINIC_CONTENT_ADMIN` or `CLINIC_CONTENT_APPROVE` |
 | QuestionLibrary | GET | `/question-groups/{groupId}/definition` | `CLINIC_CONTENT_ADMIN` or `CLINIC_CONTENT_APPROVE` |
 | QuestionLibrary | POST | `/question-groups` | `CLINIC_CONTENT_ADMIN` |

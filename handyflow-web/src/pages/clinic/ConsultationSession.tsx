@@ -8,6 +8,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useCan } from "./clinicAccess"
 import QuestionForm from "./QuestionForm"
+import RedFlagBanner from "./RedFlagBanner"
 import { VitalsPanel, SoapFields } from "./ConsultationNotesPanels"
 import LiveBillPanel from "./LiveBillPanel"
 import RxDraftsPanel from "./RxDraftsPanel"
@@ -350,6 +351,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
 
   // ── Sign ──────────────────────────────────────────────────────────────────
   const [completeError, setCompleteError] = useState("")
+  const flagOverrideRef = useRef("")   // reason typed in the red-flag banner for signing without review
   const savedRxRef = useRef<Set<string>>(new Set())
   const allergyBlocks = missingReasons(rxDrafts.filter(r=>!savedRxRef.current.has(r.id)), allergyResults)
 
@@ -384,7 +386,10 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
         await apiClient.post(`/api/v1/clinic/consultations/${draftId}/doctor-complete`)
         setStatus("DOCTOR_COMPLETED")
       }
-      await apiClient.post(`/api/v1/clinic/consultations/${draftId}/sign`, overrideReason ? { overrideReason } : {})
+      await apiClient.post(`/api/v1/clinic/consultations/${draftId}/sign`, {
+        ...(overrideReason ? { overrideReason } : {}),
+        ...(flagOverrideRef.current ? { redFlagOverrideReason: flagOverrideRef.current } : {}),
+      })
       return draftId
     },
     onSuccess: (consultationId) => {
@@ -460,6 +465,8 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
       {handoffActionError && <div role="alert" style={{ marginTop:8, fontSize:13, color:RED_TEXT }}>{handoffActionError}</div>}
 
       <PatientAlertBanner patientId={patient.id}/>
+      <RedFlagBanner consultationId={draftReady ? (draftIdRef.current ?? null) : null} readOnly={locked}
+        onOverrideReason={r => { flagOverrideRef.current = r }}/>
 
       <div style={{ display:"flex", gap:16, alignItems:"flex-start", flexWrap:"wrap", marginTop:12, flex:1 }}>
       <div style={{ flex:"1 1 560px", minWidth:0, display:"flex", flexDirection:"column" }}>

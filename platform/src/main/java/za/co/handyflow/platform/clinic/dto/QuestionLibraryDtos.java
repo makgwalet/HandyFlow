@@ -42,6 +42,10 @@ public final class QuestionLibraryDtos {
                                  Map<String, Object> effectiveAnswers, List<String> missingRequired,
                                  Map<String, String> problems) {}
 
+    /** A red flag active on a consultation, where it came from, and whether a clinician has reviewed it (patch 0181). */
+    public record ActiveRedFlag(String groupCode, String groupName, int groupVersion, String flagCode, String label,
+                                String severity, String message, boolean reviewed, String reviewedBy, java.time.Instant reviewedAt) {}
+
     public record SaveAnswersRequest(Map<String, Object> answers) {}
 
     public record StatusChangeRequest(String status, String note) {}

@@ -330,7 +330,8 @@ public class ClinicController {
             @PathVariable UUID id, @RequestBody(required = false) SignRequest body) {
         return ResponseEntity.ok(ApiResponse.success("Consultation signed",
                 clinicService.signConsultation(TenantContext.getTenantIdAsObject(), id,
-                        body == null ? null : body.overrideReason())));
+                        body == null ? null : body.overrideReason(),
+                        body == null ? null : body.redFlagOverrideReason())));
     }
 
     @PostMapping("/consultations/{id}/abandon")

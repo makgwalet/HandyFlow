@@ -3,7 +3,7 @@
 // only, or demo content when the server is set to serve it), reveals questions as answers come in, shows
 // warnings and urgent flags, and autosaves answers on the consultation. It never suggests a diagnosis.
 import { useCallback, useEffect, useRef, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import {
   BODY_REGIONS, DURATION_UNITS, applyNormal, blockSummary, cleanAnswers, hasNormalPreset, type GroupStatus, scaleRange, toNumber, toggleInList, unitOptions, withUnit,
@@ -115,6 +115,7 @@ function GroupSection({ group, consultationId, patientId, visitType, readOnly, o
   opened: boolean; onStatus: (code: string, st: GroupStatus) => void
   onTriggered: (codes: string[]) => void
 }) {
+  const qc = useQueryClient()
   const [answers, setAnswers] = useState<Answers>({})
   const [ev, setEv] = useState<Evaluation | null>(null)
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle")
@@ -147,6 +148,7 @@ function GroupSection({ group, consultationId, patientId, visitType, readOnly, o
           setState("saving")
           await apiClient.put(`/api/v1/clinic/consultations/${consultationId}/form-data/${group.code}`, { answers: cleanAnswers(answers) })
           setState("saved")
+          qc.invalidateQueries({ queryKey: ["clinic-red-flags", consultationId] })   // a saved answer may raise or clear a red flag
         }
       } catch { setState("error") }
     }, 700)

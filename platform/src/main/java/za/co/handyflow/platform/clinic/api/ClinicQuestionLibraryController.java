@@ -74,6 +74,25 @@ public class ClinicQuestionLibraryController {
                 TenantContext.getTenantIdAsObject(), id, groupCode, body.answers())));
     }
 
+    @GetMapping("/consultations/{id}/red-flags")
+    @PreAuthorize("hasAuthority('CLINIC_QUESTIONNAIRE_READ')")
+    @Operation(summary = "Red flags active on a consultation, their source group, and whether a clinician has reviewed each")
+    public ResponseEntity<ApiResponse<List<ActiveRedFlag>>> redFlags(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                library.activeRedFlags(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/consultations/{id}/red-flags/{groupCode}/{flagCode}/review")
+    @PreAuthorize("hasAuthority('CLINIC_QUESTIONNAIRE_ANSWER')")
+    @Operation(summary = "Mark a red flag as reviewed by the signed-in clinician (seen, not resolved)")
+    public ResponseEntity<ApiResponse<Void>> reviewRedFlag(
+            @PathVariable UUID id, @PathVariable String groupCode, @PathVariable String flagCode) {
+        UUID me;
+        try { me = za.co.handyflow.platform.shared.UserContext.getCurrentUserId(); } catch (RuntimeException e) { me = null; }
+        library.reviewRedFlag(TenantContext.getTenantIdAsObject(), id, groupCode, flagCode, me);
+        return ResponseEntity.ok(ApiResponse.success("Reviewed", null));
+    }
+
     // ── Governance ───────────────────────────────────────────────────────────
 
     @GetMapping("/question-groups/admin")

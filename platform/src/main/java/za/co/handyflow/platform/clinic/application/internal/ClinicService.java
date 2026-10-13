@@ -748,6 +748,12 @@ public class ClinicService {
      */
     @Transactional
     public ConsultationResponse signConsultation(TenantId tenantId, UUID id, String overrideReason) {
+        return signConsultation(tenantId, id, overrideReason, null);
+    }
+
+    /** As above; {@code redFlagOverrideReason} lets a clinician sign with red flags not yet reviewed (Q-5), audited per flag. */
+    @Transactional
+    public ConsultationResponse signConsultation(TenantId tenantId, UUID id, String overrideReason, String redFlagOverrideReason) {
         ClinicConsultation c = consultationRepo.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Consultation", id.toString()));
         if (!c.isSignable()) {
@@ -769,6 +775,7 @@ public class ClinicService {
         if (!unfinished.isEmpty()) {
             throw new IllegalStateException("Finish the questionnaire before signing. Missing: " + String.join("; ", unfinished) + ".");
         }
+        questionLibraryService.requireFlagsReviewed(tenantId, c, redFlagOverrideReason, currentUserIdOrNull());
         c.sign(currentUserIdOrNull());
         consultationRepo.save(c);
         if (!missingSteps.isEmpty()) signOverrides.record(tenantId, c.getId(), currentUserIdOrNull(), missingSteps, reason);

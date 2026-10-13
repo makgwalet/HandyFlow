@@ -156,6 +156,105 @@ public class ClinicQuestionLibraryService {
         return out;
     }
 
+    // ── Red flag review (Q-5) ────────────────────────────────────────────────
+
+    private record FlagHit(String groupCode, String groupName, int version, RedFlagView flag) {}
+
+    /** Red flags active now on the groups the clinician started, with their review state. Groups no longer served are skipped. */
+    @Transactional(readOnly = true)
+    public List<ActiveRedFlag> activeRedFlags(TenantId tenantId, UUID consultationId) {
+        ClinicConsultation c = consultationRepo.findActiveById(tenantId, consultationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Consultation", consultationId.toString()));
+        Map<String, ReviewState> reviewed = latestReviews(tenantId, consultationId);
+        List<ActiveRedFlag> out = new ArrayList<>();
+        for (FlagHit h : flagHits(tenantId, c)) {
+            ReviewState r = reviewed.get(RedFlagRules.key(h.groupCode(), h.flag().code()));
+            boolean done = r != null && "REVIEWED".equals(r.outcome());
+            out.add(new ActiveRedFlag(h.groupCode(), h.groupName(), h.version(), h.flag().code(), h.flag().label(),
+                    h.flag().severity(), h.flag().message(), done, done ? r.by() : null, done ? r.at() : null));
+        }
+        return out;
+    }
+
+    /** A clinician has seen this flag. Only an active flag on an unsigned consultation can be reviewed. */
+    @Transactional
+    public void reviewRedFlag(TenantId tenantId, UUID consultationId, String groupCode, String flagCode, UUID actor) {
+        ClinicConsultation c = consultationRepo.findActiveById(tenantId, consultationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Consultation", consultationId.toString()));
+        if (c.isLocked() || c.isSigned()) {
+            throw new IllegalStateException("Consultation is " + c.getStatus() + "; red flags can no longer be reviewed here.");
+        }
+        FlagHit hit = flagHits(tenantId, c).stream()
+                .filter(h -> h.groupCode().equals(groupCode) && h.flag().code().equals(flagCode)).findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Red flag", groupCode + "/" + flagCode));
+        recordReview(tenantId, consultationId, hit, "REVIEWED", null, actor);
+    }
+
+    /**
+     * Called when signing. Every active red flag must be reviewed, or the clinician gives a reason, in which case an OVERRIDDEN row is
+     * written for each unreviewed flag. Throws (and writes nothing) when flags are outstanding and no reason was given.
+     */
+    @Transactional
+    public void requireFlagsReviewed(TenantId tenantId, ClinicConsultation c, String overrideReason, UUID actor) {
+        List<FlagHit> hits = flagHits(tenantId, c);
+        if (hits.isEmpty()) return;
+        Map<String, ReviewState> reviewed = latestReviews(tenantId, c.getId());
+        Set<String> done = reviewed.entrySet().stream().filter(e -> "REVIEWED".equals(e.getValue().outcome()))
+                .map(Map.Entry::getKey).collect(Collectors.toSet());
+        List<RedFlagRules.Active> active = hits.stream()
+                .map(h -> new RedFlagRules.Active(h.groupCode(), h.flag().code(), h.flag().label())).toList();
+        List<RedFlagRules.Active> open = RedFlagRules.unreviewed(active, done);
+        String reason = RedFlagRules.requireReviewedOrReason(open, overrideReason);
+        if (reason == null) return;
+        Set<String> openKeys = open.stream().map(RedFlagRules.Active::key).collect(Collectors.toSet());
+        for (FlagHit h : hits) {
+            if (openKeys.contains(RedFlagRules.key(h.groupCode(), h.flag().code()))) {
+                recordReview(tenantId, c.getId(), h, "OVERRIDDEN", reason, actor);
+            }
+        }
+    }
+
+    private List<FlagHit> flagHits(TenantId tenantId, ClinicConsultation c) {
+        Map<String, Object> formData = readFormData(tenantId, c.getId());
+        Object groups = formData.get("groups");
+        if (!(groups instanceof Map<?, ?> started) || started.isEmpty()) return List.of();
+        PatientFacts facts = patientFacts(tenantId, c.getPatientId());
+        List<FlagHit> out = new ArrayList<>();
+        for (Object codeObj : started.keySet()) {
+            String code = String.valueOf(codeObj);
+            GroupView g;
+            try { g = servedGroup(tenantId, code); } catch (ResourceNotFoundException e) { continue; }
+            for (RedFlagView f : evaluateView(g, FormData.answersOf(formData, code), facts, null).redFlags()) {
+                out.add(new FlagHit(g.code(), g.name(), g.version(), f));
+            }
+        }
+        return out;
+    }
+
+    private record ReviewState(String outcome, String by, java.time.Instant at) {}
+
+    private Map<String, ReviewState> latestReviews(TenantId tenantId, UUID consultationId) {
+        Map<String, ReviewState> out = new HashMap<>();
+        jdbc.query("""
+            SELECT DISTINCT ON (r.group_code, r.flag_code) r.group_code, r.flag_code, r.outcome, r.acted_at,
+                   NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), '') AS who
+            FROM clinic_red_flag_review r
+            LEFT JOIN users u ON u.id = r.acted_by AND u.tenant_id = r.tenant_id
+            WHERE r.consultation_id = ? AND r.tenant_id = ?
+            ORDER BY r.group_code, r.flag_code, r.acted_at DESC""", rs -> {
+                out.put(RedFlagRules.key(rs.getString(1), rs.getString(2)),
+                        new ReviewState(rs.getString(3), rs.getString("who"), rs.getTimestamp(4).toInstant()));
+            }, consultationId, tenantId.getValue());
+        return out;
+    }
+
+    private void recordReview(TenantId tenantId, UUID consultationId, FlagHit h, String outcome, String reason, UUID actor) {
+        jdbc.update("""
+            INSERT INTO clinic_red_flag_review (id, tenant_id, consultation_id, group_code, flag_code, flag_label, severity, outcome, reason, acted_by)
+            VALUES (?,?,?,?,?,?,?,?,?,?)""", UUID.randomUUID(), tenantId.getValue(), consultationId, h.groupCode(), h.flag().code(),
+                h.flag().label(), h.flag().severity(), outcome, reason, actor);
+    }
+
     /** A measurable answer that maps to an observation type. */
     public record MeasuredAnswer(String observationCode, BigDecimal value) {}
 
