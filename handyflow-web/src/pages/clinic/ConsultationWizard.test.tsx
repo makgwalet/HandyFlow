@@ -72,9 +72,9 @@ describe("consultation wizard pages", () => {
   })
   it("keeps the question form mounted so unsaved answers survive a page change", async () => {
     show()
-    await screen.findByTestId("question-form")
+    await screen.findAllByTestId("question-form")
     fireEvent.click(screen.getByRole("button", { name: /2\. Examination/ }))
-    expect(screen.getByTestId("question-form")).toBeTruthy()
+    expect(screen.getAllByTestId("question-form")).toHaveLength(2)
   })
 })
 

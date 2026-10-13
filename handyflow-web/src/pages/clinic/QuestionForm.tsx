@@ -2,11 +2,11 @@
 // Clinician-facing form for the question library. Shows the groups served for the visit type (ACTIVE content
 // only, or demo content when the server is set to serve it), reveals questions as answers come in, shows
 // warnings and urgent flags, and autosaves answers on the consultation. It never suggests a diagnosis.
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import {
-  BODY_REGIONS, DURATION_UNITS, applyNormal, cleanAnswers, hasNormalPreset, scaleRange, toNumber, toggleInList, unitOptions, withUnit,
+  BODY_REGIONS, DURATION_UNITS, applyNormal, blockSummary, cleanAnswers, hasNormalPreset, type GroupStatus, scaleRange, toNumber, toggleInList, unitOptions, withUnit,
   type AnswerValue, type Answers, type QuestionOption,
 } from "./questionForm.logic"
 
@@ -72,21 +72,47 @@ export default function QuestionForm({ consultationId, patientId, visitType, rea
   })
 
   const shown = [...groups, ...extraGroups.filter(g => !groups.some(x => x.code === g.code))]
+  const [status, setStatus] = useState<Record<string, GroupStatus>>({})
+  const report = useCallback((code: string, st: GroupStatus) => {
+    setStatus(prev => {
+      const old = prev[code]
+      return old && old.answered === st.answered && old.missing === st.missing && old.urgent === st.urgent ? prev : { ...prev, [code]: st }
+    })
+  }, [])
+  // Open by default when something has to be answered, when groups are being reviewed, or for examination; otherwise tucked away.
+  const [openChoice, setOpenChoice] = useState<boolean | null>(null)
+  const triggered = extraGroups.map(g => g.code)
   if (shown.length === 0) return null
+  const summary = blockSummary(shown.map(g => ({ code: g.code, required: g.required, ...(status[g.code] ?? { answered: 0, missing: 0, urgent: false }) })))
+  const open = openChoice ?? (!!readOnly || kind === "EXAMINATION" || summary.attention || triggered.length > 0 || summary.started > 0 || shown.some(g => g.required))
+  const title = kind === "EXAMINATION" ? "Examination libraries" : "Questionnaires"
 
   return (
     <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, background: "var(--hf-surface)", overflow: "hidden" }}>
-      {shown.map(g => (
-        <GroupSection key={g.code} group={g} consultationId={consultationId} patientId={patientId}
-          visitType={visitType} readOnly={!!readOnly}
-          onTriggered={codes => setExtraCodes(prev => Array.from(new Set([...prev, ...codes])))} />
-      ))}
+      <button type="button" onClick={() => setOpenChoice(!open)} aria-expanded={open} aria-label={title}
+        style={{ width: "100%", textAlign: "left", padding: "10px 14px", background: "var(--hf-surface-muted)", border: "none",
+          cursor: "pointer", display: "flex", gap: 10, alignItems: "center", fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>
+        <span style={{ flex: 1 }}>{title}</span>
+        {summary.urgent && <span role="status" style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-danger-text)" }}>Needs attention</span>}
+        {!summary.urgent && summary.missing > 0 && <span style={{ fontSize: 11, fontWeight: 600, color: "var(--hf-warning-text)" }}>{summary.missing} required to answer</span>}
+        <span style={{ fontSize: 11, fontWeight: 500, color: "var(--hf-text-muted)" }}>{summary.text}</span>
+        <span aria-hidden>{open ? "▾" : "▸"}</span>
+      </button>
+      {/* Stays mounted while folded so answers still being saved are never cut off. */}
+      <div hidden={!open}>
+        {shown.map(g => (
+          <GroupSection key={g.code} group={g} consultationId={consultationId} patientId={patientId}
+            visitType={visitType} readOnly={!!readOnly} opened={triggered.includes(g.code)} onStatus={report}
+            onTriggered={codes => { setExtraCodes(prev => Array.from(new Set([...prev, ...codes]))); setOpenChoice(true) }} />
+        ))}
+      </div>
     </div>
   )
 }
 
-function GroupSection({ group, consultationId, patientId, visitType, readOnly, onTriggered }: {
+function GroupSection({ group, consultationId, patientId, visitType, readOnly, opened, onStatus, onTriggered }: {
   group: Group; consultationId: string | null; patientId: string; visitType: string; readOnly: boolean
+  opened: boolean; onStatus: (code: string, st: GroupStatus) => void
   onTriggered: (codes: string[]) => void
 }) {
   const [answers, setAnswers] = useState<Answers>({})
@@ -128,6 +154,9 @@ function GroupSection({ group, consultationId, patientId, visitType, readOnly, o
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answers, consultationId])
 
+  useEffect(() => {
+    onStatus(group.code, { answered: Object.keys(cleanAnswers(answers)).length, missing: ev?.missingRequired?.length ?? 0, urgent: !!ev?.urgent })
+  }, [answers, ev, group.code, onStatus])
   const markNormal = () => { touched.current = true; setAnswers(p => applyNormal(group.questions, p)) }
   const set = (code: string, v: AnswerValue) => { touched.current = true; setAnswers(p => ({ ...p, [code]: v })) }
   const visible = new Set(ev?.visible ?? group.questions.filter(q => !q.rules.some(r => r.kind === "SHOW_WHEN")).map(q => q.code))
@@ -137,7 +166,9 @@ function GroupSection({ group, consultationId, patientId, visitType, readOnly, o
       <button onClick={() => setOpen(o => !o)} aria-expanded={open}
         style={{ width: "100%", textAlign: "left", padding: "10px 14px", background: "var(--hf-surface-muted)", border: "none",
           cursor: "pointer", display: "flex", gap: 8, alignItems: "center", fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>
-        <span style={{ flex: 1 }}>{group.name}{group.required ? " *" : ""}</span>
+        <span style={{ flex: 1 }}>{group.name}{group.required ? " *" : ""}
+          {opened && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 6, background: "var(--hf-info-soft)", color: "var(--hf-info-text)" }}>Opened by your answers</span>}
+        </span>
         {group.demo && <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 6, background: "var(--hf-warning-soft)", color: "var(--hf-warning-text)" }}>DEMO</span>}
         <span style={{ fontSize: 11, fontWeight: 500, color: "var(--hf-text-muted)" }}>
           {state === "saving" ? "Saving…" : state === "saved" ? "Saved" : state === "error" ? "Not saved" : ""}

@@ -99,3 +99,15 @@ export function applyNormal(questions: { code: string; normalValue?: AnswerValue
 
 export const hasNormalPreset = (questions: { normalValue?: AnswerValue }[]) =>
   questions.some(q => q.normalValue !== undefined && q.normalValue !== null)
+
+/** What one group reports to the Questionnaires block. */
+export interface GroupStatus { answered: number; missing: number; urgent: boolean }
+
+/** The one-line summary on the folded Questionnaires block (patch 0180). Counts only; it never interprets an answer. */
+export function blockSummary(groups: (GroupStatus & { code: string; required: boolean })[]) {
+  const started = groups.filter(g => g.answered > 0).length
+  const missing = groups.reduce((n, g) => n + (g.answered > 0 || g.required ? g.missing : 0), 0)
+  const urgent = groups.some(g => g.urgent)
+  const text = `${groups.length} ${groups.length === 1 ? "group" : "groups"}${started ? ` · ${started} started` : ""}`
+  return { started, missing, urgent, text, attention: urgent || missing > 0 }
+}
