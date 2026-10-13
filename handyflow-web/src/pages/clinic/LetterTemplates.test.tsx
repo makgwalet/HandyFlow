@@ -81,6 +81,28 @@ describe("write a letter", () => {
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clinic/patients/p1/letter", { title: "Repeat prescription", body: "Dear Liam", consultationId: "c1" }, { responseType: "blob" }))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
+  it("offers a letterhead choice only when the practice has more than one, and sends the chosen one", async () => {
+    const heads = [{ id: "h1", name: "Main", branchName: null, practiceName: "P", lines: [], isDefault: true, active: true, hasLogo: true },
+                   { id: "h2", name: "North", branchName: "Northside", practiceName: "P", lines: [], isDefault: false, active: true, hasLogo: false }]
+    get.mockImplementation(async (url: string) => url.endsWith("/letterheads") ? { data: { data: heads } } : { data: { data: [] } })
+    post.mockResolvedValue({ data: new Blob(["x"]) })
+    render(<WriteLetterModal patientId="p1" visits={[]} onClose={() => {}} />)
+    const pick = await screen.findByLabelText("Letterhead") as HTMLSelectElement
+    expect(pick.textContent).toContain("Main (default)")
+    expect(pick.textContent).toContain("North (Northside)")
+    fireEvent.change(pick, { target: { value: "h2" } })
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "T" } })
+    fireEvent.change(screen.getByLabelText("Text"), { target: { value: "B" } })
+    fireEvent.click(screen.getByRole("button", { name: "Download letter" }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clinic/patients/p1/letter", { title: "T", body: "B", letterheadId: "h2" }, { responseType: "blob" }))
+  })
+  it("shows no letterhead choice for one letterhead or none", async () => {
+    get.mockImplementation(async (url: string) => url.endsWith("/letterheads") ? { data: { data: [{ id: "h1", name: "Main", branchName: null, practiceName: "P", lines: [], isDefault: true, active: true, hasLogo: false }] } } : { data: { data: [] } })
+    render(<WriteLetterModal patientId="p1" visits={[]} onClose={() => {}} />)
+    await screen.findByLabelText("Title")
+    await waitFor(() => expect(get.mock.calls.some(c => String(c[0]).endsWith("/letterheads"))).toBe(true))
+    expect(screen.queryByLabelText("Letterhead")).toBeNull()
+  })
   it("lets the writer choose who signs off, and sends that practitioner with the letter", async () => {
     perms["CLINIC_DOCUMENT_SIGN_AS_OTHER"] = true
     get.mockImplementation(async (url: string) => url.includes("practitioners") ? { data: { data: [{ id: "d1", fullName: "Dr Priya Govender", active: true }, { id: "d2", fullName: "Dr Gone", active: false }] } } : { data: { data: [] } })

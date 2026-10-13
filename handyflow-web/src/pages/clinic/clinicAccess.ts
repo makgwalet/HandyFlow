@@ -33,6 +33,7 @@ export const CAN = {
   signLetterAsOther:  { fine: "CLINIC_DOCUMENT_SIGN_AS_OTHER",  legacy: "CLINIC_CLINICAL_SIGN" },
   mergePatients:      { fine: "CLINIC_PATIENT_MERGE",           legacy: "CLINIC_ADMIN" },
   exportGrowth:       { fine: "CLINIC_GROWTH_EXPORT",           legacy: "CLINIC_READ" },
+  manageLetterheads:  { fine: "CLINIC_LETTERHEAD_MANAGE",       legacy: "CLINIC_ADMIN" },
 } as const
 
 export type Capability = keyof typeof CAN

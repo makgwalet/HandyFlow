@@ -79,6 +79,7 @@ import { EarthMovingPage } from "./pages/earthmoving/EarthMovingPage"
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage"
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage"
 import { VerifyEmailPage } from "./pages/auth/VerifyEmailPage"
+import { VerifyDocumentPage } from "./pages/auth/VerifyDocumentPage"
 import { AccountLockedPage } from "./pages/auth/AccountLockedPage"
 import { SessionExpiryModal } from "./components/SessionExpiryModal"
 import { CareersListPage } from "./pages/careers/CareersListPage"
@@ -216,6 +217,7 @@ export default function App() {
           <Route path="/forgot-password"           element={<ForgotPasswordPage />} />
           <Route path="/reset-password"            element={<ResetPasswordPage />} />
           <Route path="/verify-email"              element={<VerifyEmailPage />} />
+          <Route path="/verify-document"           element={<VerifyDocumentPage />} />
           <Route path="/account-locked"            element={<AccountLockedPage />} />
 
           <Route path="/projects/portal/:token" element={<ClientPortalPage />} />

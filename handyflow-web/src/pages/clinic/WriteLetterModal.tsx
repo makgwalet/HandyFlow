@@ -9,6 +9,7 @@ import { useCan } from "./clinicAccess"
 import { fmtDay } from "./briefing"
 import { BORDER, GRAY, lbl, sinp } from "./patientFile.shared"
 import { primaryBtn, smallBtn } from "./OverviewCard"
+import { choiceLabel, type Letterhead } from "./letterheadView"
 import { MERGE_FIELDS, MERGE_LABEL, insertAt, mergeToken, type Kind } from "./letterView"
 
 interface Visit { id: string; consultedAt: string; chiefComplaint?: string }
@@ -22,6 +23,8 @@ export default function WriteLetterModal({ patientId, visits, onClose }: { patie
   const mayChooseSigner = useCan("signLetterAsOther")   // naming another practitioner is signing in their name (DEC-027)
   const [signedBy, setSignedBy] = useState("")
   const [people, setPeople] = useState<Practitioner[]>([])
+  const [heads, setHeads] = useState<Letterhead[]>([])
+  const [headId, setHeadId] = useState("")
   const [kind, setKind] = useState<Kind>("GENERAL_LETTER")
   const [title, setTitle] = useState("")
   const [body, setBody] = useState("")
@@ -41,6 +44,18 @@ export default function WriteLetterModal({ patientId, visits, onClose }: { patie
     })()
     return () => { live = false }
   }, [mayChooseSigner])
+  // The practice's letterheads. With none (or if the lookup fails) the letter prints as before, with the practice name only.
+  useEffect(() => {
+    let live = true
+    ;(async () => {
+      try {
+        const r: any = await apiClient.get("/api/v1/clinic/letterheads")
+        const d = r?.data?.data ?? r?.data
+        if (live) setHeads(Array.isArray(d) ? d : [])
+      } catch { if (live) setHeads([]) }
+    })()
+    return () => { live = false }
+  }, [])
   const ready = title.trim() !== "" && body.trim() !== "" && !busy
 
   const go = async () => {
@@ -49,6 +64,7 @@ export default function WriteLetterModal({ patientId, visits, onClose }: { patie
       const payload: Record<string, string> = { title: title.trim(), body }
       if (visitId) payload.consultationId = visitId
       if (signedBy) payload.signedByPractitionerId = signedBy
+      if (headId) payload.letterheadId = headId
       if (toName.trim()) payload.recipientName = toName.trim()
       if (toCompany.trim()) payload.recipientCompany = toCompany.trim()
       const res = await apiClient.post(`/api/v1/clinic/patients/${patientId}/letter`, payload, { responseType: "blob" } as any)
@@ -79,6 +95,11 @@ export default function WriteLetterModal({ patientId, visits, onClose }: { patie
           <div><label style={lbl} htmlFor="wl-to-name">Addressed to (name)</label><input id="wl-to-name" style={sinp} value={toName} onChange={e => setToName(e.target.value)} placeholder="e.g. The HR Manager" /></div>
           <div><label style={lbl} htmlFor="wl-to-company">Company</label><input id="wl-to-company" style={sinp} value={toCompany} onChange={e => setToCompany(e.target.value)} placeholder="e.g. Acme (Pty) Ltd" /></div>
         </div>
+        {heads.length > 1 && <div><label style={lbl} htmlFor="wl-head">Letterhead</label>
+          <select id="wl-head" style={sinp} value={headId} onChange={e => setHeadId(e.target.value)}>
+            <option value="">The practice default</option>
+            {heads.map(h => <option key={h.id} value={h.id}>{choiceLabel(h)}</option>)}
+          </select></div>}
         {mayChooseSigner && people.length > 0 && <div><label style={lbl} htmlFor="wl-signer">Signed off by</label>
           <select id="wl-signer" style={sinp} value={signedBy} onChange={e => setSignedBy(e.target.value)}>
             <option value="">{visitId ? "The doctor of the visit" : "The practice (no named doctor)"}</option>

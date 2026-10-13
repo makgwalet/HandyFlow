@@ -586,6 +586,7 @@ export const CLINIC_SECTIONS: ModuleSections = {
         { id: 'working-hours', label: 'Working hours', icon: Clock, anyPermission: ['CLINIC_APPOINTMENT_READ', 'CLINIC_READ'] },
         { id: 'time-off', label: 'Time off', icon: CalendarRange, anyPermission: ['CLINIC_APPOINTMENT_READ', 'CLINIC_READ'] },
         { id: 'closures', label: 'Closures', icon: Lock, anyPermission: ['CLINIC_APPOINTMENT_READ', 'CLINIC_READ'] },
+        { id: 'letterheads', label: 'Letterheads', icon: FileText, anyPermission: ['CLINIC_LETTERHEAD_MANAGE', 'CLINIC_ADMIN'] },
       ],
     },
     {
@@ -594,6 +595,7 @@ export const CLINIC_SECTIONS: ModuleSections = {
         { id: 'access-log', label: 'Access log', icon: ShieldCheck, anyPermission: ['CLINIC_ACCESS_LOG_READ', 'CLINIC_ADMIN'] },
         { id: 'break-glass', label: 'Break-glass review', icon: Siren, anyPermission: ['CLINIC_BREAK_GLASS_REVIEW'] },
         { id: 'question-library', label: 'Question library', icon: ListChecks, anyPermission: ['CLINIC_CONTENT_ADMIN', 'CLINIC_CONTENT_APPROVE'] },
+        { id: 'visit-stages', label: 'Required stages', icon: ClipboardCheck, anyPermission: ['CLINIC_CONTENT_ADMIN', 'CLINIC_CONTENT_APPROVE'] },
       ],
     },
   ],
