@@ -19,6 +19,7 @@ import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,6 +36,19 @@ import java.util.stream.Collectors;
  * tenant-wide outstanding list client-side. That list is expected to stay
  * small enough per tenant for this to be fine; if it isn't, the fix is a
  * new InvoicingFacade method, not a workaround here.
+ * <p>
+ * PAID INVOICES (fix). An invoice that has left invoicing's outstanding list has been paid. That is only an
+ * error when a case is being OPENED or an invoice is being newly LINKED (you cannot collect on something not
+ * owed): those paths are strict. Every other path — refreshOutstanding(), unlinkInvoice(), and the re-total
+ * after linkInvoice() — treats an already-linked invoice that is no longer outstanding as paid and counts it as
+ * zero. Previously these paths threw as soon as ONE linked invoice was paid, which made it impossible to refresh
+ * a partly paid case (exactly when refreshing matters most). A case whose invoices are all paid refreshes to 0;
+ * closing it stays a deliberate staff action.
+ * <p>
+ * AUDIT. Every mutating operation (open, balance refresh, invoice link/unlink, assignment, next action, notes,
+ * status change, write-off, close, contract link, delete) writes an append-only CaseAuditEvent in the same
+ * transaction via CaseAuditService, recording who did it (from the request's TenantContext, or "system") and the
+ * before → after values. recordContact() is not audited here: the contact log is itself the compliance trail.
  */
 @Service
 @RequiredArgsConstructor
@@ -44,6 +58,7 @@ public class DebtCollectionCaseService {
     private final DebtCollectionNumberGenerator numberGenerator;
     private final InvoicingFacade invoicingFacade;
     private final CrmFacade crmFacade;
+    private final CaseAuditService audit;
 
     @Transactional
     public DebtCollectionCase open(TenantId tenantId, UUID customerId, String debtorName, String debtorEmail,
@@ -57,11 +72,15 @@ public class DebtCollectionCaseService {
                     "An open debt collection case already exists for this customer — link the new invoice(s) to "
                             + "that case (see linkInvoice()) instead of opening a duplicate case for the same debtor");
         }
-        BigDecimal total = sumOutstanding(tenantId, invoiceIds);
+        BigDecimal total = sumOutstanding(outstandingByInvoice(tenantId), invoiceIds, true);
         String caseNumber = numberGenerator.nextCaseNumber(tenantId);
         DebtCollectionCase c = DebtCollectionCase.open(tenantId, caseNumber, customerId, debtorName, debtorEmail,
                 debtorPhone, total, invoiceIds, openedDate, assignedToUserId, assignedToUserName, notes, createdBy);
-        return repository.save(c);
+        DebtCollectionCase saved = repository.save(c);
+        audit.record(tenantId, saved.getId(), "CASE_OPENED", caseNumber + " opened for " + debtorName + ": R" + total
+                + " across " + invoiceIds.size() + " invoice(s)"
+                + (assignedToUserName != null ? ", assigned to " + assignedToUserName : ""));
+        return saved;
     }
 
     /**
@@ -92,40 +111,56 @@ public class DebtCollectionCaseService {
                 .toList();
     }
 
+    /** Tolerant: invoices already paid in full count as zero (see class Javadoc). */
     @Transactional
     public DebtCollectionCase refreshOutstanding(TenantId tenantId, UUID id) {
         DebtCollectionCase c = findActive(tenantId, id);
-        c.refreshTotalOutstanding(sumOutstanding(tenantId, c.getLinkedInvoiceIds()));
+        BigDecimal before = c.getTotalOutstanding();
+        c.refreshTotalOutstanding(sumOutstanding(outstandingByInvoice(tenantId), c.getLinkedInvoiceIds(), false));
+        if (before.compareTo(c.getTotalOutstanding()) != 0) {
+            audit.record(tenantId, id, "BALANCE_REFRESHED", "R" + before + " → R" + c.getTotalOutstanding());
+        }
         return repository.save(c);
     }
 
+    /** The NEW invoice must currently be outstanding (strict); the re-total then tolerates earlier-linked invoices that have since been paid. */
     @Transactional
     public DebtCollectionCase linkInvoice(TenantId tenantId, UUID id, UUID invoiceId) {
         DebtCollectionCase c = findActive(tenantId, id);
+        Map<UUID, BigDecimal> outstanding = outstandingByInvoice(tenantId);
+        sumOutstanding(outstanding, Set.of(invoiceId), true);
+        BigDecimal before = c.getTotalOutstanding();
         c.linkInvoice(invoiceId);
-        c.refreshTotalOutstanding(sumOutstanding(tenantId, c.getLinkedInvoiceIds()));
+        c.refreshTotalOutstanding(sumOutstanding(outstanding, c.getLinkedInvoiceIds(), false));
+        audit.record(tenantId, id, "INVOICE_LINKED", "invoice " + invoiceId + "; balance R" + before + " → R" + c.getTotalOutstanding());
         return repository.save(c);
     }
 
     @Transactional
     public DebtCollectionCase unlinkInvoice(TenantId tenantId, UUID id, UUID invoiceId) {
         DebtCollectionCase c = findActive(tenantId, id);
+        BigDecimal before = c.getTotalOutstanding();
         c.unlinkInvoice(invoiceId);
-        c.refreshTotalOutstanding(sumOutstanding(tenantId, c.getLinkedInvoiceIds()));
+        c.refreshTotalOutstanding(sumOutstanding(outstandingByInvoice(tenantId), c.getLinkedInvoiceIds(), false));
+        audit.record(tenantId, id, "INVOICE_UNLINKED", "invoice " + invoiceId + "; balance R" + before + " → R" + c.getTotalOutstanding());
         return repository.save(c);
     }
 
     @Transactional
     public DebtCollectionCase assign(TenantId tenantId, UUID id, UUID userId, String userName) {
         DebtCollectionCase c = findActive(tenantId, id);
+        String from = c.getAssignedToUserName();
         c.assign(userId, userName);
+        audit.record(tenantId, id, "ASSIGNED", (from != null ? from : "unassigned") + " → " + (userName != null ? userName : userId));
         return repository.save(c);
     }
 
     @Transactional
     public DebtCollectionCase scheduleNextAction(TenantId tenantId, UUID id, LocalDate date) {
         DebtCollectionCase c = findActive(tenantId, id);
+        LocalDate before = c.getNextActionDate();
         c.scheduleNextAction(date);
+        audit.record(tenantId, id, "NEXT_ACTION_SCHEDULED", (before != null ? before : "none") + " → " + date);
         return repository.save(c);
     }
 
@@ -133,27 +168,36 @@ public class DebtCollectionCaseService {
     public DebtCollectionCase updateNotes(TenantId tenantId, UUID id, String notes) {
         DebtCollectionCase c = findActive(tenantId, id);
         c.updateNotes(notes);
+        audit.record(tenantId, id, "NOTES_UPDATED", "notes edited (" + (notes == null ? 0 : notes.length()) + " characters)");
         return repository.save(c);
     }
 
     @Transactional
     public DebtCollectionCase advanceStatus(TenantId tenantId, UUID id, CaseStatus newStatus) {
         DebtCollectionCase c = findActive(tenantId, id);
+        CaseStatus before = c.getStatus();
         c.advanceStatus(newStatus);
+        audit.record(tenantId, id, "STATUS_CHANGED", before + " → " + newStatus);
         return repository.save(c);
     }
 
     @Transactional
     public DebtCollectionCase writeOff(TenantId tenantId, UUID id, BigDecimal amount, String reason) {
         DebtCollectionCase c = findActive(tenantId, id);
+        CaseStatus before = c.getStatus();
         c.writeOff(amount, reason);
+        audit.record(tenantId, id, "WRITTEN_OFF", "R" + amount + " (status was " + before + ")"
+                + (reason != null && !reason.isBlank() ? ": " + reason : ""));
         return repository.save(c);
     }
 
     @Transactional
     public DebtCollectionCase close(TenantId tenantId, UUID id, ClosureReason reason, String outcomeNotes) {
         DebtCollectionCase c = findActive(tenantId, id);
+        CaseStatus before = c.getStatus();
         c.close(reason, outcomeNotes);
+        audit.record(tenantId, id, "CASE_CLOSED", "reason " + reason + " (status was " + before + ")"
+                + (outcomeNotes != null && !outcomeNotes.isBlank() ? ": " + outcomeNotes : ""));
         return repository.save(c);
     }
 
@@ -161,6 +205,7 @@ public class DebtCollectionCaseService {
     public DebtCollectionCase linkContract(TenantId tenantId, UUID id, UUID contractId) {
         DebtCollectionCase c = findActive(tenantId, id);
         c.linkContract(contractId);
+        audit.record(tenantId, id, "CONTRACT_LINKED", "contract " + contractId);
         return repository.save(c);
     }
 
@@ -197,6 +242,7 @@ public class DebtCollectionCaseService {
     public void delete(TenantId tenantId, UUID id, UUID deletedBy) {
         DebtCollectionCase c = findActive(tenantId, id);
         c.softDelete(deletedBy);
+        audit.record(tenantId, id, "CASE_DELETED", "soft-deleted " + c.getCaseNumber());
         repository.save(c);
     }
 
@@ -206,21 +252,36 @@ public class DebtCollectionCaseService {
     }
 
     /**
-     * amountPaid may be null on OutstandingInvoiceSummary — treated as zero,
-     * same null-handling InvoicingFacade's own Javadoc documents
-     * AccountingService already applies to this exact field.
+     * Invoice id → amount still owed, for every invoice invoicing currently reports as outstanding.
+     * amountPaid may be null on OutstandingInvoiceSummary — treated as zero, same null-handling
+     * InvoicingFacade's own Javadoc documents AccountingService already applies to this exact field.
+     * Duplicate ids (should not happen) keep the first entry instead of failing the whole request.
      */
-    private BigDecimal sumOutstanding(TenantId tenantId, Set<UUID> invoiceIds) {
-        Map<UUID, OutstandingInvoiceSummary> byId = invoicingFacade.findOutstandingInvoices(tenantId).stream()
-                .collect(Collectors.toMap(OutstandingInvoiceSummary::id, Function.identity()));
+    private Map<UUID, BigDecimal> outstandingByInvoice(TenantId tenantId) {
+        Map<UUID, BigDecimal> out = new HashMap<>();
+        for (OutstandingInvoiceSummary inv : invoicingFacade.findOutstandingInvoices(tenantId)) {
+            BigDecimal paid = inv.amountPaid() != null ? inv.amountPaid() : BigDecimal.ZERO;
+            out.putIfAbsent(inv.id(), inv.total().subtract(paid));
+        }
+        return out;
+    }
+
+    /**
+     * Sums the amount owed on the given invoices. strict=true throws if any id is not currently outstanding
+     * (open / link-new-invoice); strict=false counts a missing id as paid (zero). Pure — no I/O — so the rules
+     * are unit-tested directly. Package-visible for that test.
+     */
+    static BigDecimal sumOutstanding(Map<UUID, BigDecimal> outstandingByInvoice, Set<UUID> invoiceIds, boolean strict) {
         BigDecimal total = BigDecimal.ZERO;
         for (UUID invoiceId : invoiceIds) {
-            OutstandingInvoiceSummary inv = byId.get(invoiceId);
-            if (inv == null) {
-                throw new IllegalArgumentException("Invoice " + invoiceId + " is not a current outstanding invoice for this tenant");
+            BigDecimal owed = outstandingByInvoice.get(invoiceId);
+            if (owed == null) {
+                if (strict) {
+                    throw new IllegalArgumentException("Invoice " + invoiceId + " is not a current outstanding invoice for this tenant");
+                }
+                continue;
             }
-            BigDecimal paid = inv.amountPaid() != null ? inv.amountPaid() : BigDecimal.ZERO;
-            total = total.add(inv.total().subtract(paid));
+            total = total.add(owed);
         }
         return total;
     }

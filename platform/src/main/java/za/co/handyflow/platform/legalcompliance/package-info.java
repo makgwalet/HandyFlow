@@ -27,8 +27,14 @@
  *                   (Fleet/Security/Contracting).
  *   contracting   — ContractingFacade only (read-only contract summaries), per the design
  *                   decision above.
+ *   debtcollection — ONE-WAY integration for legal handover of unpaid debt: this module implements
+ *                   debtcollection.application.LegalMatterGateway (DebtHandoverMatterGateway opens a
+ *                   LitigationMatter from a reviewed handover) and calls
+ *                   debtcollection.application.LegalHandoverStatusSync after matter status changes.
+ *                   Debt Collection does NOT depend on this module — it only exposes those two
+ *                   interfaces — so there is no cycle.
  */
 @org.springframework.modulith.ApplicationModule(
-        allowedDependencies = {"shared", "billing", "evidence", "notifications", "contracting"}
+        allowedDependencies = {"shared", "billing", "evidence", "notifications", "contracting", "debtcollection"}
 )
 package za.co.handyflow.platform.legalcompliance;
