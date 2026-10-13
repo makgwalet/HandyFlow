@@ -2,6 +2,7 @@ import ModalShell from "./ModalShell"
 import PartialPaymentModal from "./PartialPaymentModal"
 import ClaimAdjustmentModal, { type AdjustmentKind } from "./ClaimAdjustmentModal"
 import SchemePaymentModal from "./SchemePaymentModal"
+import UnpostedPaymentsBanner from "./UnpostedPaymentsBanner"
 import { usePermission } from "../../hooks/usePermission"
 import { moneyActions, moneyHasMoved, owed, rand } from "./claimMoney"
 import { CLAIMS_PAGE_SIZE, clampPage, hasNext, hasPrevious, pageRange, type ClaimsPage } from "./claimPaging"
@@ -185,6 +186,7 @@ export default function ClaimsTab() {
 
   return (
     <div>
+      <UnpostedPaymentsBanner />
       {/* ── KPI strip ───────────────────────────────────────────────────── */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:24}}>
         {[

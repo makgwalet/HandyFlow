@@ -387,7 +387,7 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 
 ## 3. API authorization matrix
 
-194 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
+197 endpoints. Each requires exactly the permission shown. The access catalogue endpoint is `CLINIC_ADMIN`.
 
 | Area | Method | Path | Requires |
 |---|---|---|---|
@@ -503,6 +503,9 @@ Practice configuration; everything the Practice Manager has, plus restricted-rec
 | Letter | GET | `/letter-templates/{id}/render` | `CLINIC_DOCUMENT_READ` |
 | Letter | POST | `/consultations/{id}/letter` | `CLINIC_DOCUMENT_CREATE` |
 | Letter | POST | `/patients/{id}/letter` | `CLINIC_DOCUMENT_CREATE` |
+| MoneyPosting | GET | `/billing/money-postings` | `CLINIC_CLAIM_READ` |
+| MoneyPosting | GET | `/billing/money-postings/banks` | `CLINIC_PAYMENT_ALLOCATE` |
+| MoneyPosting | POST | `/billing/money-postings/post` | `CLINIC_PAYMENT_ALLOCATE` |
 | Observation | POST | `/patients/{patientId}/observations` | `CLINIC_VITALS_WRITE` |
 | Observation | GET | `/patients/{patientId}/observations` | `CLINIC_VITALS_READ` |
 | Observation | GET | `/patients/{patientId}/observations/latest` | `CLINIC_VITALS_READ` |

@@ -97,4 +97,12 @@ public class AccountingFacade {
     public java.util.Optional<UUID> resolveBankAccountGL(TenantId tenantId, UUID bankAccountId) {
         return accountingService.resolveBankAccountGL(tenantId, bankAccountId);
     }
+
+    /**
+     * The tenant's active bank accounts, so another module can offer them in a picker (Clinic scheme payments, patch 0185) without
+     * reaching into accounting's repositories. A bank account with a null {@code accountId()} is not linked to the ledger yet.
+     */
+    public List<za.co.handyflow.platform.accounting.dto.BankAccountResponse> getBankAccounts(TenantId tenantId) {
+        return accountingService.getBankAccounts(tenantId);
+    }
 }
