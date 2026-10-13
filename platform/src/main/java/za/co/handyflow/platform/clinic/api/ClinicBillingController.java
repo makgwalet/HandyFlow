@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.clinic.application.internal.ClinicBillingService;
+import za.co.handyflow.platform.clinic.application.internal.ClinicClaimCorrectionService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicClaimMoneyService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicPatientReceivableService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicClaimSubmissionPdfService;
@@ -23,6 +24,7 @@ import za.co.handyflow.platform.clinic.dto.billing.ClaimMoneyDtos.*;
 import za.co.handyflow.platform.clinic.dto.ConsultationResponse;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
+import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -39,6 +41,7 @@ public class ClinicBillingController {
     private final ClinicPatientInvoicePdfService patientInvoicePdfService;
     private final ClinicClaimSubmissionPdfService claimSubmissionPdfService;
     private final ClinicClaimMoneyService money;
+    private final ClinicClaimCorrectionService correctionService;
     private final ClinicPatientReceivableService receivables;
     private final ClinicStatementOfAccountPdfService statementOfAccountPdfService;
 
@@ -160,6 +163,45 @@ public class ClinicBillingController {
     public ResponseEntity<ApiResponse<ClinicClaimResponse>> voidClaim(@PathVariable UUID id, @RequestBody VoidRequest body) {
         money.voidClaim(TenantContext.getTenantIdAsObject(), id, body == null ? null : body.reason());
         return ResponseEntity.ok(ApiResponse.success("Claim voided", billingService.getClaimById(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    /** CLINIC-DEC-002/003: a scheme payment recorded in error is reversed, with a reason. The payment stays on the history. */
+    @PostMapping("/claims/{id}/payments/{paymentId}/reverse")
+    @PreAuthorize("hasAuthority('CLINIC_PAYMENT_REVERSE')")
+    @Operation(summary = "Reverse a scheme payment recorded in error")
+    public ResponseEntity<ApiResponse<ClinicClaimResponse>> reverseSchemePayment(
+            @PathVariable UUID id, @PathVariable UUID paymentId, @RequestBody ReversePaymentRequest body) {
+        TenantId tenant = TenantContext.getTenantIdAsObject();
+        money.reversePayment(tenant, id, paymentId, body.reason());
+        return ResponseEntity.ok(ApiResponse.success("Payment reversed", billingService.getClaimById(tenant, id)));
+    }
+
+    /** CLINIC-DEC-004: notes stay editable after submission; the amounts and lines do not. */
+    @PutMapping("/claims/{id}/notes")
+    @PreAuthorize("hasAuthority('CLINIC_CLAIM_PROGRESS')")
+    @Operation(summary = "Change the notes on a claim (allowed after submission)")
+    public ResponseEntity<ApiResponse<ClinicClaimResponse>> changeClaimNotes(@PathVariable UUID id, @RequestBody NotesRequest body) {
+        TenantId tenant = TenantContext.getTenantIdAsObject();
+        money.changeNotes(tenant, id, body.notes());
+        return ResponseEntity.ok(ApiResponse.success("Notes saved", billingService.getClaimById(tenant, id)));
+    }
+
+    /** CLINIC-DEC-003/004: void the claim and create a linked draft for the same consultation. */
+    @PostMapping("/claims/{id}/correct")
+    @PreAuthorize("hasAuthority('CLINIC_CLAIM_CORRECT')")
+    @Operation(summary = "Correct a claim: void it and create a linked draft replacement")
+    public ResponseEntity<ApiResponse<ClinicClaimResponse>> correctClaim(@PathVariable UUID id, @RequestBody CorrectClaimRequest body) {
+        return ResponseEntity.ok(ApiResponse.success("Claim corrected; the replacement is a draft",
+                correctionService.correct(TenantContext.getTenantIdAsObject(), id, body.reason(), body.corrected())));
+    }
+
+    @PostMapping("/claims/{id}/resubmit")
+    @PreAuthorize("hasAuthority('CLINIC_CLAIM_RESUBMIT')")
+    @Operation(summary = "Submit a corrected claim again")
+    public ResponseEntity<ApiResponse<ClinicClaimResponse>> resubmitClaim(
+            @PathVariable UUID id, @RequestParam(required = false) String referenceNumber) {
+        return ResponseEntity.ok(ApiResponse.success("Claim resubmitted",
+                correctionService.resubmit(TenantContext.getTenantIdAsObject(), id, referenceNumber)));
     }
 
     @PostMapping("/claims/scheme-payments")

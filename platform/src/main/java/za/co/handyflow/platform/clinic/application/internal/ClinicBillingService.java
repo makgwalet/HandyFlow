@@ -701,6 +701,7 @@ public class ClinicBillingService {
                 c.getGrossAmount(), c.getSchemePortion(), c.getPatientPortion(),
                 c.getSubmittedAt(), c.getReferenceNumber(), c.getRejectionReason(),
                 lines, c.getCreatedAt(),
-                t.paid(), t.writtenOff(), t.credited(), ClaimLedgerRules.outstanding(c.getSchemePortion(), t));
+                t.paid(), t.writtenOff(), t.credited(), ClaimLedgerRules.outstanding(c.getSchemePortion(), t),
+                c.getNotes(), c.getCorrectsClaimId());
     }
 }

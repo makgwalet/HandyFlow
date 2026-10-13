@@ -26,7 +26,7 @@ public class ClinicClaimLedgerService {
 
     private static final String TOTALS_SELECT =
             "SELECT c.id, COALESCE(p.s,0), COALESCE(w.s,0), COALESCE(k.s,0) FROM clinic_claims c "
-          + "LEFT JOIN (SELECT claim_id, SUM(amount) s FROM clinic_claim_scheme_payments WHERE tenant_id = ? GROUP BY claim_id) p ON p.claim_id = c.id "
+          + "LEFT JOIN (SELECT claim_id, SUM(amount) s FROM clinic_claim_net_payments WHERE tenant_id = ? GROUP BY claim_id) p ON p.claim_id = c.id "
           + "LEFT JOIN (SELECT claim_id, SUM(amount) s FROM clinic_claim_adjustments WHERE tenant_id = ? AND kind = 'WRITE_OFF' GROUP BY claim_id) w ON w.claim_id = c.id "
           + "LEFT JOIN (SELECT claim_id, SUM(amount) s FROM clinic_claim_adjustments WHERE tenant_id = ? AND kind = 'CREDIT_NOTE' GROUP BY claim_id) k ON k.claim_id = c.id "
           + "WHERE c.tenant_id = ? ";
@@ -77,23 +77,45 @@ public class ClinicClaimLedgerService {
 
     public List<LedgerEntry> entries(UUID tenantId, UUID claimId) {
         List<LedgerEntry> out = new ArrayList<>(jdbc.query(
-                "SELECT amount, received_on, reference, allocation, override_reason, recorded_by, recorded_at FROM clinic_claim_scheme_payments WHERE tenant_id = ? AND claim_id = ?",
+                "SELECT p.amount, p.received_on, p.reference, p.allocation, p.override_reason, p.recorded_by, p.recorded_at, p.id, "
+                        + "EXISTS (SELECT 1 FROM clinic_claim_payment_reversals r WHERE r.payment_id = p.id) "
+                        + "FROM clinic_claim_scheme_payments p WHERE p.tenant_id = ? AND p.claim_id = ?",
                 (rs, i) -> new LedgerEntry("SCHEME_PAYMENT", rs.getBigDecimal(1), rs.getDate(2).toLocalDate(), rs.getString(3),
                         rs.getString(5) != null ? rs.getString(4) + ": " + rs.getString(5) : rs.getString(4),
-                        (UUID) rs.getObject(6), rs.getTimestamp(7).toInstant()), tenantId, claimId));
+                        (UUID) rs.getObject(6), rs.getTimestamp(7).toInstant(), (UUID) rs.getObject(8), rs.getBoolean(9)), tenantId, claimId));
         out.addAll(jdbc.query(
                 "SELECT kind, amount, adjusted_on, credit_note_no, reason, authorised_by, recorded_at FROM clinic_claim_adjustments WHERE tenant_id = ? AND claim_id = ?",
                 (rs, i) -> new LedgerEntry(rs.getString(1), rs.getBigDecimal(2), rs.getDate(3).toLocalDate(), rs.getString(4), rs.getString(5),
                         (UUID) rs.getObject(6), rs.getTimestamp(7).toInstant()), tenantId, claimId));
+        out.addAll(jdbc.query(
+                "SELECT amount, reversed_on, reason, reversed_by, recorded_at, payment_id FROM clinic_claim_payment_reversals WHERE tenant_id = ? AND claim_id = ?",
+                (rs, i) -> new LedgerEntry("PAYMENT_REVERSAL", rs.getBigDecimal(1), rs.getDate(2).toLocalDate(), null, rs.getString(3),
+                        (UUID) rs.getObject(4), rs.getTimestamp(5).toInstant(), (UUID) rs.getObject(6), false), tenantId, claimId));
         out.sort(Comparator.comparing(LedgerEntry::recordedAt).reversed());
         return out;
+    }
+
+    /** A payment on a claim, with whether it has already been reversed. Empty when the payment is not on this claim. */
+    public record PaymentRef(UUID id, BigDecimal amount, boolean reversed) {}
+
+    public java.util.Optional<PaymentRef> payment(UUID tenantId, UUID claimId, UUID paymentId) {
+        return jdbc.query("SELECT p.id, p.amount, EXISTS (SELECT 1 FROM clinic_claim_payment_reversals r WHERE r.payment_id = p.id) "
+                        + "FROM clinic_claim_scheme_payments p WHERE p.tenant_id = ? AND p.claim_id = ? AND p.id = ?",
+                (rs, i) -> new PaymentRef((UUID) rs.getObject(1), rs.getBigDecimal(2), rs.getBoolean(3)), tenantId, claimId, paymentId)
+                .stream().findFirst();
+    }
+
+    public void addReversal(UUID tenantId, UUID claimId, UUID paymentId, BigDecimal amount, String reason, UUID userId, LocalDate on) {
+        jdbc.update("INSERT INTO clinic_claim_payment_reversals (id, tenant_id, claim_id, payment_id, amount, reason, reversed_by, reversed_on, recorded_at) "
+                        + "VALUES (?,?,?,?,?,?,?,?,?)",
+                UUID.randomUUID(), tenantId, claimId, paymentId, amount, reason, userId, java.sql.Date.valueOf(on), Timestamp.from(Instant.now()));
     }
 
     /** Scheme payments with their time, for the revenue chart. */
     public record PaymentAt(Instant at, BigDecimal amount) {}
 
     public List<PaymentAt> paymentsSince(UUID tenantId, Instant since) {
-        return jdbc.query("SELECT recorded_at, amount FROM clinic_claim_scheme_payments WHERE tenant_id = ? AND recorded_at >= ?",
+        return jdbc.query("SELECT recorded_at, amount FROM clinic_claim_net_payments WHERE tenant_id = ? AND recorded_at >= ?",
                 (rs, i) -> new PaymentAt(rs.getTimestamp(1).toInstant(), rs.getBigDecimal(2)), tenantId, Timestamp.from(since));
     }
 
@@ -104,7 +126,7 @@ public class ClinicClaimLedgerService {
         String sql = "SELECT c.id, c.status, pt.full_name, c.reference_number, COALESCE(c.submitted_at, c.created_at), c.scheme_portion, "
                 + "COALESCE(p.s,0), COALESCE(w.s,0), COALESCE(k.s,0) FROM clinic_claims c "
                 + "LEFT JOIN clinic_patients pt ON pt.id = c.patient_id "
-                + "LEFT JOIN (SELECT claim_id, SUM(amount) s FROM clinic_claim_scheme_payments WHERE tenant_id = ? GROUP BY claim_id) p ON p.claim_id = c.id "
+                + "LEFT JOIN (SELECT claim_id, SUM(amount) s FROM clinic_claim_net_payments WHERE tenant_id = ? GROUP BY claim_id) p ON p.claim_id = c.id "
                 + "LEFT JOIN (SELECT claim_id, SUM(amount) s FROM clinic_claim_adjustments WHERE tenant_id = ? AND kind = 'WRITE_OFF' GROUP BY claim_id) w ON w.claim_id = c.id "
                 + "LEFT JOIN (SELECT claim_id, SUM(amount) s FROM clinic_claim_adjustments WHERE tenant_id = ? AND kind = 'CREDIT_NOTE' GROUP BY claim_id) k ON k.claim_id = c.id "
                 + "WHERE c.tenant_id = ? AND c.status IN ('ACCEPTED','PARTIAL') AND c.scheme_portion > 0 AND lower(c.scheme_name) = lower(?)";

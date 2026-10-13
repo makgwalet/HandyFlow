@@ -35,4 +35,15 @@ describe("ClaimAdjustmentModal", () => {
     render(<ClaimAdjustmentModal kind="CREDIT_NOTE" outstanding={100} error="A claim that is PAID cannot be credited" onConfirm={() => {}} onClose={() => {}} />)
     expect(screen.getByRole("alert").textContent).toMatch(/PAID/)
   })
+
+  it("reversing a payment asks only for a reason", () => {
+    const onConfirm = vi.fn()
+    render(<ClaimAdjustmentModal kind="REVERSE_PAYMENT" outstanding={0} onConfirm={onConfirm} onClose={() => {}} />)
+    expect(screen.queryByLabelText("Amount")).toBeNull()
+    const go = screen.getByText("Reverse payment", { selector: "button" }) as HTMLButtonElement
+    expect(go.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "Entered twice by mistake" } })
+    fireEvent.click(go)
+    expect(onConfirm).toHaveBeenCalledWith({ amount: undefined, reason: "Entered twice by mistake" })
+  })
 })

@@ -113,4 +113,40 @@ class ClaimLedgerRulesTest {
         assertThrows(IllegalArgumentException.class, () -> ClaimLedgerRules.manual(d("100"), o, List.of(new Share(UUID.randomUUID(), d("100"))), "Scheme remittance names one"));
         assertThrows(IllegalArgumentException.class, () -> ClaimLedgerRules.manual(d("200"), o, List.of(new Share(a, d("100")), new Share(a, d("100"))), "Scheme remittance names one"));
     }
+
+    // ── Claims, second half (0198) ───────────────────────────────────────────────────────────────────────────────────
+
+    @Test void aReversedPaymentTakesTheClaimBackToWhatTheLedgerNowSays() {
+        assertEquals("ACCEPTED", ClaimLedgerRules.statusAfterReversal(d("1000"), t("0", "0", "0")), "the only payment reversed");
+        assertEquals("PARTIAL", ClaimLedgerRules.statusAfterReversal(d("1000"), t("400", "0", "0")), "another payment still stands");
+        assertEquals("PAID", ClaimLedgerRules.statusAfterReversal(d("1000"), t("1000", "0", "0")));
+        assertEquals("CLOSED", ClaimLedgerRules.statusAfterReversal(d("1000"), t("600", "400", "0")));
+        assertEquals("ACCEPTED", ClaimLedgerRules.statusAfterReversal(d("1000"), t("0", "300", "0")), "a write-off alone does not close it");
+    }
+
+    @Test void aPaymentIsReversedOnceAndOnlyOnAClaimThatReceivedMoney() {
+        for (String s : List.of("ACCEPTED", "PARTIAL", "PAID", "CLOSED")) assertDoesNotThrow(() -> ClaimLedgerRules.requireReversible(s, false), s);
+        for (String s : List.of("DRAFT", "SUBMITTED", "REJECTED", "VOIDED")) assertThrows(IllegalStateException.class, () -> ClaimLedgerRules.requireReversible(s, false), s);
+        assertThrows(IllegalStateException.class, () -> ClaimLedgerRules.requireReversible("PAID", true));
+    }
+
+    @Test void notesChangeAfterSubmissionButNotOnAVoidedClaim() {
+        assertEquals("Called the scheme", ClaimLedgerRules.notes("SUBMITTED", "  Called the scheme  "));
+        assertEquals("x", ClaimLedgerRules.notes("PAID", "x"));
+        assertNull(ClaimLedgerRules.notes("ACCEPTED", "   "), "blank clears the notes");
+        assertNull(ClaimLedgerRules.notes("ACCEPTED", null));
+        assertThrows(IllegalStateException.class, () -> ClaimLedgerRules.notes("VOIDED", "late"));
+        assertThrows(IllegalArgumentException.class, () -> ClaimLedgerRules.notes("DRAFT", "x".repeat(1001)));
+        assertEquals(1000, ClaimLedgerRules.notes("DRAFT", "x".repeat(1000)).length());
+    }
+
+    @Test void aClaimIsCorrectedOnlyWhileNothingStandsAgainstIt() {
+        assertDoesNotThrow(() -> ClaimLedgerRules.requireCorrectable("REJECTED", Totals.NONE));
+        assertDoesNotThrow(() -> ClaimLedgerRules.requireCorrectable("SUBMITTED", Totals.NONE));
+        assertDoesNotThrow(() -> ClaimLedgerRules.requireCorrectable("ACCEPTED", t("0", "0", "0")), "a reversed payment nets to nothing");
+        assertThrows(IllegalStateException.class, () -> ClaimLedgerRules.requireCorrectable("PARTIAL", t("10", "0", "0")));
+        assertThrows(IllegalStateException.class, () -> ClaimLedgerRules.requireCorrectable("ACCEPTED", t("0", "5", "0")));
+        assertThrows(IllegalStateException.class, () -> ClaimLedgerRules.requireCorrectable("PAID", Totals.NONE));
+        assertThrows(IllegalStateException.class, () -> ClaimLedgerRules.requireCorrectable("VOIDED", Totals.NONE));
+    }
 }

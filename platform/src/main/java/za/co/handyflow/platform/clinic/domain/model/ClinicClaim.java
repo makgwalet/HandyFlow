@@ -33,6 +33,7 @@ public class ClinicClaim {
     @Column(name = "reference_number") String referenceNumber;
     @Column(name = "rejection_reason") String rejectionReason;
     String notes;
+    @Column(name = "corrects_claim_id") UUID correctsClaimId;
     @Column(name = "voided_at")   Instant voidedAt;
     @Column(name = "voided_by")   UUID    voidedBy;
     @Column(name = "void_reason") String  voidReason;
@@ -111,6 +112,19 @@ public class ClinicClaim {
     public void markRejected(String reason) {
         this.status          = "REJECTED";
         this.rejectionReason = reason;
+        this.updatedAt       = Instant.now();
+    }
+
+    /** CLINIC-DEC-004: notes are the one thing that may change after submission; the caller has validated them. */
+    public void changeNotes(String notes) {
+        this.notes     = notes;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Marks this draft as the replacement for a claim that was voided to correct it. */
+    public void correct(UUID voidedClaimId, String notes) {
+        this.correctsClaimId = voidedClaimId;
+        this.notes           = notes;
         this.updatedAt       = Instant.now();
     }
 

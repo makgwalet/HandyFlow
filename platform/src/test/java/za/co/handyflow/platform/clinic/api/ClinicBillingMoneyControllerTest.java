@@ -33,6 +33,7 @@ class ClinicBillingMoneyControllerTest {
     @MockitoBean ClinicPatientInvoicePdfService patientInvoicePdfService;
     @MockitoBean ClinicClaimSubmissionPdfService claimSubmissionPdfService;
     @MockitoBean ClinicClaimMoneyService money;
+    @MockitoBean ClinicClaimCorrectionService correctionService;
     @MockitoBean za.co.handyflow.platform.clinic.application.internal.ClinicPatientReceivableService receivables;
     @MockitoBean ClinicStatementOfAccountPdfService statementOfAccountPdfService;
 
@@ -108,5 +109,52 @@ class ClinicBillingMoneyControllerTest {
         when(receivables.linkOnAccount(any(), any(), any())).thenReturn(new za.co.handyflow.platform.clinic.dto.PaymentLinkDtos.LinkResult(new BigDecimal("300"), BigDecimal.ZERO, 2));
         mvc.perform(post("/api/v1/clinic/billing/patients/" + UUID.randomUUID() + "/payments/link-on-account").with(csrf()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.visitsPaidOff").value(2));
+    }
+
+    // ── Claims, second half (0198) ───────────────────────────────────────────────────────────────────────────────────
+
+    @Test @WithMockUser(authorities = {"CLINIC_CLAIM_REVERSE", "CLINIC_PAYMENT_ALLOCATE", "CLINIC_WRITE_OFF"})
+    void reversingAPaymentNeedsItsOwnPermission() throws Exception {
+        UUID pay = UUID.randomUUID();
+        mvc.perform(post(base + "/" + id + "/payments/" + pay + "/reverse").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\":\"Entered twice by mistake\"}")).andExpect(status().isForbidden());
+        verifyNoInteractions(money);
+    }
+
+    @Test @WithMockUser(authorities = "CLINIC_PAYMENT_REVERSE")
+    void reversingAPaymentWorksWithIt() throws Exception {
+        UUID pay = UUID.randomUUID();
+        mvc.perform(post(base + "/" + id + "/payments/" + pay + "/reverse").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\":\"Entered twice by mistake\"}")).andExpect(status().isOk());
+        verify(money).reversePayment(any(), org.mockito.ArgumentMatchers.eq(id), org.mockito.ArgumentMatchers.eq(pay), org.mockito.ArgumentMatchers.eq("Entered twice by mistake"));
+    }
+
+    @Test @WithMockUser(authorities = {"CLINIC_CLAIM_REVERSE", "CLINIC_CLAIM_SUBMIT", "CLINIC_CLAIM_PROGRESS"})
+    void correctingAndResubmittingNeedTheirOwnPermissions() throws Exception {
+        mvc.perform(post(base + "/" + id + "/correct").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\":\"Wrong member number captured\"}")).andExpect(status().isForbidden());
+        mvc.perform(post(base + "/" + id + "/resubmit").with(csrf())).andExpect(status().isForbidden());
+        verifyNoInteractions(correctionService);
+    }
+
+    @Test @WithMockUser(authorities = {"CLINIC_CLAIM_CORRECT", "CLINIC_CLAIM_RESUBMIT"})
+    void correctingAndResubmittingWorkWithThem() throws Exception {
+        mvc.perform(post(base + "/" + id + "/correct").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\":\"Wrong member number captured\"}")).andExpect(status().isOk());
+        mvc.perform(post(base + "/" + id + "/resubmit").with(csrf())).andExpect(status().isOk());
+        verify(correctionService).correct(any(), org.mockito.ArgumentMatchers.eq(id), org.mockito.ArgumentMatchers.eq("Wrong member number captured"), org.mockito.ArgumentMatchers.isNull());
+        verify(correctionService).resubmit(any(), org.mockito.ArgumentMatchers.eq(id), org.mockito.ArgumentMatchers.isNull());
+    }
+
+    @Test @WithMockUser(authorities = "CLINIC_READ")
+    void notesNeedTheClaimWorkPermission() throws Exception {
+        mvc.perform(put(base + "/" + id + "/notes").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"notes\":\"Called\"}")).andExpect(status().isForbidden());
+        verifyNoInteractions(money);
+    }
+
+    @Test @WithMockUser(authorities = "CLINIC_CLAIM_PROGRESS")
+    void notesWorkWithIt() throws Exception {
+        mvc.perform(put(base + "/" + id + "/notes").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"notes\":\"Called\"}")).andExpect(status().isOk());
+        verify(money).changeNotes(any(), org.mockito.ArgumentMatchers.eq(id), org.mockito.ArgumentMatchers.eq("Called"));
     }
 }

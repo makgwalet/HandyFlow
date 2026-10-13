@@ -28,8 +28,21 @@ public final class ClaimMoneyDtos {
 
     public record AllocationResponse(boolean recorded, String method, UUID batchId, BigDecimal amount, List<ShareResponse> shares) {}
 
+    /**
+     * One movement on the claim. {@code id} is the payment's id for SCHEME_PAYMENT and PAYMENT_REVERSAL (the payment reversed);
+     * {@code reversed} is true on a payment that has since been reversed.
+     */
     public record LedgerEntry(String kind, BigDecimal amount, LocalDate date, String reference, String note,
-                              UUID byUserId, Instant recordedAt) {}
+                              UUID byUserId, Instant recordedAt, UUID id, boolean reversed) {
+        public LedgerEntry(String kind, BigDecimal amount, LocalDate date, String reference, String note, UUID byUserId, Instant recordedAt) {
+            this(kind, amount, date, reference, note, byUserId, recordedAt, null, false);
+        }
+    }
+
+    public record ReversePaymentRequest(String reason) {}
+    public record NotesRequest(String notes) {}
+    /** Give {@code corrected} to change the scheme details or lines; leave it out to copy the claim as it stands. */
+    public record CorrectClaimRequest(String reason, za.co.handyflow.platform.clinic.dto.billing.CreateClaimRequest corrected) {}
 
     public record Ledger(UUID claimId, String status, BigDecimal schemeDue, BigDecimal paid, BigDecimal writtenOff,
                          BigDecimal credited, BigDecimal outstanding, List<LedgerEntry> entries) {}

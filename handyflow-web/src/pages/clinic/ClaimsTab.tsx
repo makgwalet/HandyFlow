@@ -2,6 +2,11 @@ import ModalShell from "./ModalShell"
 import PartialPaymentModal from "./PartialPaymentModal"
 import ClaimAdjustmentModal, { type AdjustmentKind } from "./ClaimAdjustmentModal"
 import SchemePaymentModal from "./SchemePaymentModal"
+import ClaimLedgerModal from "./ClaimLedgerModal"
+import ClaimCorrectionModal from "./ClaimCorrectionModal"
+import ClaimNotesModal from "./ClaimNotesModal"
+import { canCorrect } from "./claimCorrection"
+import type { LedgerEntry } from "./claimHistory"
 import UnpostedPaymentsBanner from "./UnpostedPaymentsBanner"
 import { usePermission } from "../../hooks/usePermission"
 import { moneyActions, moneyHasMoved, owed, rand } from "./claimMoney"
@@ -28,6 +33,7 @@ interface Claim {
   submittedAt?: string; referenceNumber?: string; rejectionReason?: string
   createdAt: string; lines?: ClaimLine[]
   schemePaid?: number; writtenOff?: number; credited?: number; schemeOutstanding?: number
+  notes?: string; correctsClaimId?: string
 }
 interface ClaimLine {
   id: string; lineType: string; tariffCode?: string; nappiCode?: string
@@ -68,6 +74,14 @@ export default function ClaimsTab() {
   const canWriteOff = usePermission("CLINIC_WRITE_OFF")
   const canReverse  = usePermission("CLINIC_CLAIM_REVERSE")
   const canAllocate = usePermission("CLINIC_PAYMENT_ALLOCATE")
+  const canReversePay = usePermission("CLINIC_PAYMENT_REVERSE")
+  const canCorrectClaim = usePermission("CLINIC_CLAIM_CORRECT")
+  const canResubmit = usePermission("CLINIC_CLAIM_RESUBMIT")
+  const canEditNotes = usePermission("CLINIC_CLAIM_PROGRESS")
+  const [ledgerFor, setLedgerFor]       = useState<string|null>(null)
+  const [reversing, setReversing]       = useState<{claimId:string;payment:LedgerEntry}|null>(null)
+  const [correcting, setCorrecting]     = useState<Claim|null>(null)
+  const [notesFor, setNotesFor]         = useState<Claim|null>(null)
   const [adjust, setAdjust]             = useState<{claim:Claim;kind:AdjustmentKind}|null>(null)
   const [showSchemePay, setShowSchemePay] = useState(false)
   const [statusFilter, setStatusFilterState] = useState("all")
@@ -130,9 +144,29 @@ export default function ClaimsTab() {
     onError: (e:any) => setApiError(e.response?.data?.message ?? "Action failed"),
   })
 
+  const reverseMutation = useMutation({
+    mutationFn: ({claimId,paymentId,reason}:{claimId:string;paymentId:string;reason:string}) =>
+      apiClient.post(`/api/v1/clinic/billing/claims/${claimId}/payments/${paymentId}/reverse`, {reason}),
+    onSuccess: (_d, v) => { qc.invalidateQueries({queryKey:["clinic-claims"]}); qc.invalidateQueries({queryKey:["clinic-claim-ledger", v.claimId]}); setReversing(null); setApiError("") },
+    onError: (e:any) => setApiError(e.response?.data?.message ?? "Could not reverse the payment"),
+  })
+
+  const correctMutation = useMutation({
+    mutationFn: ({claimId,body}:{claimId:string;body:unknown}) => apiClient.post(`/api/v1/clinic/billing/claims/${claimId}/correct`, body),
+    onSuccess: () => { qc.invalidateQueries({queryKey:["clinic-claims"]}); setCorrecting(null); setApiError("") },
+    onError: (e:any) => setApiError(e.response?.data?.message ?? "Could not correct the claim"),
+  })
+
+  const notesMutation = useMutation({
+    mutationFn: ({claimId,notes}:{claimId:string;notes:string}) => apiClient.put(`/api/v1/clinic/billing/claims/${claimId}/notes`, {notes}),
+    onSuccess: () => { qc.invalidateQueries({queryKey:["clinic-claims"]}); setNotesFor(null); setApiError("") },
+    onError: (e:any) => setApiError(e.response?.data?.message ?? "Could not save the notes"),
+  })
+
   const doAction = useMutation({
     mutationFn: ({id,action,reason,schemeAmount}:{id:string;action:string;reason?:string;schemeAmount?:number}) => {
       if (action==="submit") return apiClient.post(`/api/v1/clinic/billing/claims/${id}/submit`)
+      if (action==="resubmit") return apiClient.post(`/api/v1/clinic/billing/claims/${id}/resubmit`)
       if (action==="reject") return apiClient.post(`/api/v1/clinic/billing/claims/${id}/reject`,null,{params:{reason}})
       if (action==="partial") return apiClient.post(`/api/v1/clinic/billing/claims/${id}/partial`,null,{params:{schemeAmount}})
       return apiClient.post(`/api/v1/clinic/billing/claims/${id}/${action}`)
@@ -265,14 +299,14 @@ export default function ClaimsTab() {
             const s   = STATUS_CFG[claim.status] ?? STATUS_CFG.DRAFT
             const Icon = s.icon
             const isOpen = expanded===claim.id
-            const actions = getClaimActions(claim, { writeOff: canWriteOff, reverse: canReverse })
+            const actions = getClaimActions(claim, { writeOff: canWriteOff, reverse: canReverse, correct: canCorrectClaim, resubmit: canResubmit })
             return (
               <div key={claim.id} style={{border:`1px solid ${s.border}`,borderLeft:`4px solid ${s.color}`,borderRadius:10,overflow:"hidden",background:"var(--hf-surface)"}}>
                 {/* Header row */}
                 <div onClick={()=>setExpanded(isOpen?null:claim.id)}
                   style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 18px",cursor:"pointer",background:isOpen?LIGHT:"var(--hf-surface)"}}>
                   <div style={{display:"flex",alignItems:"center",gap:12}}>
-                    {["DRAFT","REJECTED"].includes(claim.status) && (
+                    {claim.status === "DRAFT" && (
                       <button onClick={e=>{
                         e.stopPropagation()
                         setSelected(prev => {
@@ -328,6 +362,27 @@ export default function ClaimsTab() {
                         <span>Still owed <b style={{color:owed(claim)>0?AMBER_TEXT:GRAY}}>{rand(owed(claim))}</b></span>
                       </div>
                     )}
+
+                    {claim.correctsClaimId && (
+                      <div style={{marginBottom:10,fontSize:12,color:GRAY}}>This claim replaces an earlier one that was corrected.</div>
+                    )}
+                    <div style={{marginBottom:14,display:"flex",gap:10,alignItems:"flex-start",flexWrap:"wrap"}} onClick={e=>e.stopPropagation()}>
+                      <div style={{flex:1,minWidth:220,fontSize:13}}>
+                        <span style={{fontWeight:700}}>Notes: </span>{claim.notes ? claim.notes : <span style={{color:GRAY}}>none</span>}
+                      </div>
+                      {canEditNotes && claim.status !== "VOIDED" && (
+                        <button onClick={()=>{ setApiError(""); setNotesFor(claim) }}
+                          style={{padding:"5px 12px",background:"var(--hf-surface)",color:NAVY_TEXT,border:`1px solid ${BORDER}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                          Edit notes
+                        </button>
+                      )}
+                      {claim.status !== "DRAFT" && (
+                        <button onClick={()=>setLedgerFor(claim.id)}
+                          style={{padding:"5px 12px",background:"var(--hf-surface)",color:NAVY_TEXT,border:`1px solid ${BORDER}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                          Money history
+                        </button>
+                      )}
+                    </div>
 
                     {/* FIX: patient invoice/receipt PDF — the self-pay/co-pay amount */}
                     <div style={{marginBottom:14,display:"flex",gap:8,flexWrap:"wrap"}} onClick={e=>e.stopPropagation()}>
@@ -390,6 +445,7 @@ export default function ClaimsTab() {
                               if (btn.action==="writeOff") { setAdjust({claim,kind:"WRITE_OFF"}); return }
                               if (btn.action==="creditNote") { setAdjust({claim,kind:"CREDIT_NOTE"}); return }
                               if (btn.action==="void") { setAdjust({claim,kind:"VOID"}); return }
+                              if (btn.action==="correct") { setCorrecting(claim); return }
                               doAction.mutate({id:claim.id, action:btn.action})
                             }}
                             disabled={doAction.isPending}
@@ -426,6 +482,26 @@ export default function ClaimsTab() {
         <ClaimAdjustmentModal kind={adjust.kind} outstanding={owed(adjust.claim)} busy={adjustMutation.isPending} error={apiError}
           onClose={()=>{ setAdjust(null); setApiError("") }}
           onConfirm={v=>{ setApiError(""); adjustMutation.mutate({claim:adjust.claim,kind:adjust.kind,amount:v.amount,reason:v.reason}) }}/>
+      )}
+      {ledgerFor && (
+        <ClaimLedgerModal claimId={ledgerFor} canReverse={canReversePay}
+          onReverse={p=>{ setApiError(""); setReversing({claimId:ledgerFor,payment:p}) }}
+          onClose={()=>setLedgerFor(null)}/>
+      )}
+      {reversing && (
+        <ClaimAdjustmentModal kind="REVERSE_PAYMENT" outstanding={0} busy={reverseMutation.isPending} error={apiError}
+          onClose={()=>{ setReversing(null); setApiError("") }}
+          onConfirm={v=>{ setApiError(""); reverseMutation.mutate({claimId:reversing.claimId,paymentId:reversing.payment.id!,reason:v.reason}) }}/>
+      )}
+      {correcting && (
+        <ClaimCorrectionModal claim={correcting} busy={correctMutation.isPending} error={apiError}
+          onClose={()=>{ setCorrecting(null); setApiError("") }}
+          onConfirm={body=>{ setApiError(""); correctMutation.mutate({claimId:correcting.id,body}) }}/>
+      )}
+      {notesFor && (
+        <ClaimNotesModal initial={notesFor.notes ?? ""} busy={notesMutation.isPending} error={apiError}
+          onClose={()=>{ setNotesFor(null); setApiError("") }}
+          onSave={notes=>{ setApiError(""); notesMutation.mutate({claimId:notesFor.id,notes}) }}/>
       )}
       {showSchemePay && <SchemePaymentModal schemes={schemeNames} onClose={()=>setShowSchemePay(false)}/>}
 
@@ -620,22 +696,28 @@ function CreateClaimModal({ consultations, onClose, onCreated }:
 
 type ClaimButton = {action:string;label:string;color:string;icon:any}
 
-export function getClaimActions(claim: Claim, can: {writeOff:boolean;reverse:boolean}): ClaimButton[] {
+export function getClaimActions(claim: Claim, can: {writeOff:boolean;reverse:boolean;correct?:boolean;resubmit?:boolean}): ClaimButton[] {
   const money = moneyActions(claim)
   const out: ClaimButton[] = []
   switch(claim.status) {
-    case "DRAFT":     out.push({action:"submit",  label:"Submit to scheme", color:AMBER_TEXT,  icon:Send}); break
+    case "DRAFT":
+      // A corrected claim goes back through the resubmit check; anyone who may not resubmit still has the ordinary Submit.
+      if (claim.correctsClaimId && can.resubmit) out.push({action:"resubmit", label:"Resubmit to scheme", color:AMBER_TEXT, icon:RefreshCw})
+      else out.push({action:"submit", label:"Submit to scheme", color:AMBER_TEXT, icon:Send})
+      break
     case "SUBMITTED": out.push({action:"accept",  label:"Mark accepted",   color:TEAL,   icon:CheckCircle},{action:"reject",label:"Reject",color:RED_TEXT,icon:XCircle}); break
     case "ACCEPTED":
     case "PARTIAL":
       // CLINIC-DEC-001: Mark paid receives whatever the scheme still owes.
       if (money.includes("paid")) out.push({action:"paid", label:`Mark paid (${rand(owed(claim))})`, color:GREEN, icon:CheckCircle},{action:"partial",label:"Partial payment",color:PURPLE,icon:Clock})
       break
-    case "REJECTED":  out.push({action:"submit",  label:"Resubmit",        color:AMBER_TEXT,  icon:RefreshCw}); break
+    // A rejected claim cannot be submitted again as it stands: it is corrected (voided and re-created as a draft), then resubmitted.
+    case "REJECTED":  break
   }
   if (can.writeOff && money.includes("writeOff")) out.push({action:"writeOff", label:"Write off…", color:RED_TEXT, icon:XCircle})
   if (can.reverse && money.includes("creditNote")) out.push({action:"creditNote", label:"Credit note…", color:PURPLE, icon:FileText})
   if (can.reverse && money.includes("void")) out.push({action:"void", label:"Void claim…", color:RED_TEXT, icon:X})
+  if (can.correct && canCorrect(claim)) out.push({action:"correct", label: claim.status==="REJECTED" ? "Correct and resubmit…" : "Correct claim…", color:NAVY_TEXT, icon:RefreshCw})
   return out
 }
 

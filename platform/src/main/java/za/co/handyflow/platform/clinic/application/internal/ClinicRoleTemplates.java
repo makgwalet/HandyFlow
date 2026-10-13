@@ -738,7 +738,8 @@ public final class ClinicRoleTemplates {
             P.CLINIC_RESTRICTED_RECORD_MANAGE,
             P.CLINIC_CONTENT_ADMIN,
             P.CLINIC_WRITE_OFF,
-            P.CLINIC_CLAIM_REVERSE)));
+            P.CLINIC_CLAIM_REVERSE,
+            P.CLINIC_PAYMENT_REVERSE)));
         return Collections.unmodifiableMap(t);
     }
 

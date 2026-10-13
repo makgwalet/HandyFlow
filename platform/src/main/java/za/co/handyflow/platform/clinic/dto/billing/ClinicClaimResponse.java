@@ -29,5 +29,7 @@ public record ClinicClaimResponse(
         BigDecimal schemePaid,
         BigDecimal writtenOff,
         BigDecimal credited,
-        BigDecimal schemeOutstanding
+        BigDecimal schemeOutstanding,
+        String notes,
+        UUID   correctsClaimId     // the voided claim this one replaces (correction workflow, 0198)
 ) {}

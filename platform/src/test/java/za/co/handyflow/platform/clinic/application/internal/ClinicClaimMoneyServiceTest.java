@@ -226,4 +226,57 @@ class ClinicClaimMoneyServiceTest {
         assertThatThrownBy(() -> service.allocate(TENANT, new AllocateRequest(" ", new BigDecimal("1"), null, null, null, null, true)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    // ── Claims, second half (0198) ───────────────────────────────────────────────────────────────────────────────────
+
+    @Test void reversingAPaymentRecordsAReversalAndTakesThePaidClaimBackToAccepted() {
+        ClinicClaim c = claim("PAID");
+        UUID pay = UUID.randomUUID();
+        when(claimRepo.findActiveById(TENANT, c.getId())).thenReturn(Optional.of(c));
+        when(ledger.payment(TENANT_UUID, c.getId(), pay)).thenReturn(Optional.of(new ClinicClaimLedgerService.PaymentRef(pay, new BigDecimal("1000.00"), false)));
+        when(ledger.totals(TENANT_UUID, c.getId())).thenReturn(Totals.NONE);   // net of the reversal
+
+        service.reversePayment(TENANT, c.getId(), pay, "Entered against the wrong claim");
+
+        verify(ledger).addReversal(eq(TENANT_UUID), eq(c.getId()), eq(pay), eq(new BigDecimal("1000.00")), eq("Entered against the wrong claim"), eq(user), any());
+        assertThat(c.getStatus()).isEqualTo("ACCEPTED");
+        ArgumentCaptor<ClaimMoneyEvent> ev = ArgumentCaptor.forClass(ClaimMoneyEvent.class);
+        verify(events).publishEvent(ev.capture());
+        assertThat(ev.getValue().type()).isEqualTo(ClaimMoneyEvent.SCHEME_PAYMENT_REVERSED);
+        assertThat(ev.getValue().amount()).isEqualByComparingTo("1000.00");
+    }
+
+    @Test void aPaymentAlreadyReversedIsRefusedAndNothingIsRecorded() {
+        ClinicClaim c = claim("ACCEPTED");
+        UUID pay = UUID.randomUUID();
+        when(claimRepo.findActiveById(TENANT, c.getId())).thenReturn(Optional.of(c));
+        when(ledger.payment(TENANT_UUID, c.getId(), pay)).thenReturn(Optional.of(new ClinicClaimLedgerService.PaymentRef(pay, new BigDecimal("400.00"), true)));
+
+        assertThatThrownBy(() -> service.reversePayment(TENANT, c.getId(), pay, "Entered against the wrong claim"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("already been reversed");
+        verify(ledger, never()).addReversal(any(), any(), any(), any(), any(), any(), any());
+        verify(events, never()).publishEvent(any(ClaimMoneyEvent.class));
+    }
+
+    @Test void aPaymentThatIsNotOnThisClaimIsNotFoundAndAReasonIsRequired() {
+        ClinicClaim c = claim("PAID");
+        UUID pay = UUID.randomUUID();
+        assertThatThrownBy(() -> service.reversePayment(TENANT, c.getId(), pay, "short")).isInstanceOf(IllegalArgumentException.class);
+        when(claimRepo.findActiveById(TENANT, c.getId())).thenReturn(Optional.of(c));
+        when(ledger.payment(TENANT_UUID, c.getId(), pay)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.reversePayment(TENANT, c.getId(), pay, "Entered against the wrong claim"))
+                .isInstanceOf(za.co.handyflow.platform.shared.ResourceNotFoundException.class);
+        verify(ledger, never()).addReversal(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test void notesChangeAfterSubmissionWithoutTouchingTheAmounts() {
+        ClinicClaim c = claim("SUBMITTED");
+        when(claimRepo.findActiveById(TENANT, c.getId())).thenReturn(Optional.of(c));
+        BigDecimal gross = c.getGrossAmount();
+        service.changeNotes(TENANT, c.getId(), "  Phoned the scheme  ");
+        assertThat(c.getNotes()).isEqualTo("Phoned the scheme");
+        assertThat(c.getGrossAmount()).isEqualByComparingTo(gross);
+        assertThat(c.getStatus()).isEqualTo("SUBMITTED");
+        verifyNoInteractions(events);
+    }
 }

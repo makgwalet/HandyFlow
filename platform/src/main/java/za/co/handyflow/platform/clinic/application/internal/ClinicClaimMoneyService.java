@@ -163,6 +163,34 @@ public class ClinicClaimMoneyService {
         return claim;
     }
 
+    /**
+     * CLINIC-DEC-002/003: a scheme payment recorded in error is reversed by a new ledger row that points at it. The payment stays
+     * on the history; the claim goes back to what the ledger now says. The opposite journal is posted by Accounting (it needs a bank account).
+     */
+    @Transactional
+    public ClinicClaim reversePayment(TenantId tenant, UUID claimId, UUID paymentId, String rawReason) {
+        UUID by = requireUser();
+        String reason = ClaimLedgerRules.reason(rawReason);
+        ClinicClaim claim = lockedClaim(tenant, claimId);
+        var payment = ledger.payment(tenant.getValue(), claimId, paymentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment", paymentId.toString()));
+        ClaimLedgerRules.requireReversible(claim.getStatus(), payment.reversed());
+        ledger.addReversal(tenant.getValue(), claimId, paymentId, payment.amount(), reason, by, today());
+        claim.applyLedgerStatus(ClaimLedgerRules.statusAfterReversal(claim.getSchemePortion(), ledger.totals(tenant.getValue(), claimId)));
+        claimRepo.save(claim);
+        publish(tenant, ClaimMoneyEvent.SCHEME_PAYMENT_REVERSED, claim, payment.amount(), paymentId.toString(), by);
+        log.warn("PAYMENT REVERSED claim={} payment={} amount={} by={}", claimId, paymentId, payment.amount(), by);
+        return claim;
+    }
+
+    /** CLINIC-DEC-004: the notes on a claim stay editable after submission; nothing the scheme was told changes. */
+    @Transactional
+    public ClinicClaim changeNotes(TenantId tenant, UUID claimId, String rawNotes) {
+        ClinicClaim claim = claimRepo.findActiveById(tenant, claimId).orElseThrow(() -> new ResourceNotFoundException("Claim", claimId.toString()));
+        claim.changeNotes(ClaimLedgerRules.notes(claim.getStatus(), rawNotes));
+        return claimRepo.save(claim);
+    }
+
     // ── CLINIC-DEC-006: one scheme payment across many claims ────────────────────────────────────────────────────────
 
     @Transactional

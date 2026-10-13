@@ -39,6 +39,16 @@ final class ClaimLedgerRules {
         return t.paid().signum() > 0 ? "PARTIAL" : current;
     }
 
+    /**
+     * The status once a payment has been reversed. {@link #statusAfter} never moves a claim back, so this is separate: a claim
+     * that was PAID goes back to ACCEPTED (or PARTIAL while other payments stand), and stays CLOSED only if a write-off or credit note still closes it.
+     */
+    static String statusAfterReversal(BigDecimal schemePortion, Totals t) {
+        boolean adjusted = t.writtenOff().signum() > 0 || t.credited().signum() > 0;
+        if (outstanding(schemePortion, t).signum() == 0) return adjusted ? "CLOSED" : "PAID";
+        return t.paid().signum() > 0 ? "PARTIAL" : "ACCEPTED";
+    }
+
     private static final Set<String> RECEIVES_PAYMENT = Set.of("ACCEPTED", "PARTIAL");
     private static final Set<String> CAN_WRITE_OFF = Set.of("ACCEPTED", "PARTIAL");
     private static final Set<String> CAN_CREDIT = Set.of("ACCEPTED", "PARTIAL", "REJECTED");
@@ -80,6 +90,30 @@ final class ClaimLedgerRules {
         requireStatus(status, CAN_VOID, "be voided");
         if (!t.untouched()) throw new IllegalStateException(
                 "This claim has a payment, write-off or credit note, so it cannot be voided. Issue a credit note or a correction instead");
+    }
+
+    private static final Set<String> HAS_RECEIVED_MONEY = Set.of("ACCEPTED", "PARTIAL", "PAID", "CLOSED");
+
+    /** CLINIC-DEC-002/003: a payment received in error is reversed by a new entry, once, with a reason; the payment stays on the ledger. */
+    static void requireReversible(String claimStatus, boolean alreadyReversed) {
+        requireStatus(claimStatus, HAS_RECEIVED_MONEY, "have a payment reversed");
+        if (alreadyReversed) throw new IllegalStateException("This payment has already been reversed");
+    }
+
+    /** Notes stay editable after submission (CLINIC-DEC-004); they are not part of what the claim says to the scheme. Up to 1000 characters. */
+    static String notes(String status, String raw) {
+        if ("VOIDED".equals(status)) throw new IllegalStateException("A voided claim's notes cannot be changed");
+        String t = raw == null ? "" : raw.trim();
+        if (t.length() > 1000) throw new IllegalArgumentException("Keep the notes under 1000 characters");
+        return t.isEmpty() ? null : t;
+    }
+
+    /** A claim can be corrected only while the same rule that allows a void holds: no payment standing, no write-off, no credit note. */
+    static void requireCorrectable(String status, Totals t) {
+        if (!CAN_VOID.contains(status)) throw new IllegalStateException(
+                "A claim that is " + status + " cannot be corrected (allowed from: " + String.join(", ", CAN_VOID.stream().sorted().toList()) + ")");
+        if (!t.untouched()) throw new IllegalStateException(
+                "This claim has a payment, write-off or credit note standing against it. Reverse the payment first; a write-off or credit note cannot be undone, so issue a credit note and bill again instead");
     }
 
     private static BigDecimal adjustment(BigDecimal outstanding, BigDecimal supplied, String verb) {

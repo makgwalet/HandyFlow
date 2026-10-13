@@ -17,6 +17,7 @@ class MoneyPostingRulesTest {
     void onlyPaymentsAndWriteOffsAreHandled() {
         assertTrue(MoneyPostingRules.handles("SCHEME_PAYMENT_RECEIVED"));
         assertTrue(MoneyPostingRules.handles("CLAIM_WRITTEN_OFF"));
+        assertTrue(MoneyPostingRules.handles("SCHEME_PAYMENT_REVERSED"));
         assertFalse(MoneyPostingRules.handles("CREDIT_NOTE_ISSUED"));   // already reversed by the claim service
         assertFalse(MoneyPostingRules.handles("CLAIM_VOIDED"));
     }
@@ -78,5 +79,18 @@ class MoneyPostingRulesTest {
     void descriptionNamesTheClaimAndReference() {
         assertTrue(MoneyPostingRules.description("SCHEME_PAYMENT_RECEIVED", CLAIM, " REM-77 ").contains("(REM-77)"));
         assertFalse(MoneyPostingRules.description("CLAIM_WRITTEN_OFF", CLAIM, null).contains("("));
+    }
+
+    @Test
+    void aReversedPaymentPostsTheOppositeOfThePaymentAndNeedsABank() {
+        assertTrue(MoneyPostingRules.needsBank("SCHEME_PAYMENT_REVERSED"));
+        assertNotNull(MoneyPostingRules.blocker("SCHEME_PAYMENT_REVERSED", TEN, AR, BAD, null));
+        assertNull(MoneyPostingRules.blocker("SCHEME_PAYMENT_REVERSED", TEN, AR, BAD, BANK));
+        var lines = MoneyPostingRules.lines("SCHEME_PAYMENT_REVERSED", TEN, AR, BAD, BANK);
+        assertEquals(AR, lines.get(0).accountId());
+        assertEquals(TEN, lines.get(0).debit());
+        assertEquals(BANK, lines.get(1).accountId());
+        assertEquals(TEN, lines.get(1).credit());
+        assertTrue(MoneyPostingRules.description("SCHEME_PAYMENT_REVERSED", CLAIM, null).startsWith("Scheme payment reversed"));
     }
 }
