@@ -65,6 +65,18 @@ public class ClinicLetterController {
         return ResponseEntity.ok(ApiResponse.success("Template archived", null));
     }
 
+    /** Naming a signer is signing in that practitioner's name (CLINIC-DEC-027); it needs its own permission. */
+    private static void requireMayChooseSigner(UUID signedBy) {
+        if (signedBy == null) return;
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        var held = auth == null ? java.util.List.<String>of()
+                : auth.getAuthorities().stream().map(a -> a.getAuthority()).toList();
+        if (!za.co.handyflow.platform.clinic.application.internal.LetterSignerRules.allowed(signedBy, held)) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "You are not allowed to sign a letter in another practitioner's name.");
+        }
+    }
+
     @GetMapping("/letter-templates/{id}/render")
     @PreAuthorize("hasAuthority('CLINIC_DOCUMENT_READ')")
     @Operation(summary = "A template with the merge fields filled in, for a visit or for a patient (with no visit), optionally addressed to a recipient")
@@ -73,6 +85,7 @@ public class ClinicLetterController {
                                                                 @RequestParam(required = false) String recipientName,
                                                                 @RequestParam(required = false) String recipientCompany,
                                                                 @RequestParam(required = false) UUID signedBy) {
+        requireMayChooseSigner(signedBy);
         return ResponseEntity.ok(ApiResponse.success("Success", templates.render(TenantContext.getTenantIdAsObject(), id, patientId, consultationId, recipientName, recipientCompany, signedBy)));
     }
 
@@ -80,6 +93,7 @@ public class ClinicLetterController {
     @PreAuthorize("hasAuthority('CLINIC_DOCUMENT_CREATE')")
     @Operation(summary = "Write a general letter PDF for a visit; a copy is kept in the patient's documents")
     public ResponseEntity<byte[]> letter(@PathVariable UUID id, @RequestBody LetterRequest body) {
+        requireMayChooseSigner(body.signedByPractitionerId());
         var tenant = TenantContext.getTenantIdAsObject();
         byte[] pdf = letterPdf.generate(tenant, null, id, body.title(), body.body(), body.recipientName(), body.recipientCompany(), body.signedByPractitionerId());
         documents.recordIssued(tenant, id, "LETTER", body.title().trim(), pdf);
@@ -92,6 +106,7 @@ public class ClinicLetterController {
     @PreAuthorize("hasAuthority('CLINIC_DOCUMENT_CREATE')")
     @Operation(summary = "Write a general letter PDF for a patient (a visit is optional; the letter may be addressed to a person or company); a copy is kept in the patient's documents")
     public ResponseEntity<byte[]> patientLetter(@PathVariable UUID id, @RequestBody LetterRequest body) {
+        requireMayChooseSigner(body.signedByPractitionerId());
         var tenant = TenantContext.getTenantIdAsObject();
         byte[] pdf = letterPdf.generate(tenant, id, body.consultationId(), body.title(), body.body(), body.recipientName(), body.recipientCompany(), body.signedByPractitionerId());
         documents.recordIssuedFor(tenant, id, body.consultationId(), "LETTER", body.title().trim(), pdf);

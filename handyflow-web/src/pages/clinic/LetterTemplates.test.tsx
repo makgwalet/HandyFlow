@@ -82,6 +82,7 @@ describe("write a letter", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
   it("lets the writer choose who signs off, and sends that practitioner with the letter", async () => {
+    perms["CLINIC_DOCUMENT_SIGN_AS_OTHER"] = true
     get.mockImplementation(async (url: string) => url.includes("practitioners") ? { data: { data: [{ id: "d1", fullName: "Dr Priya Govender", active: true }, { id: "d2", fullName: "Dr Gone", active: false }] } } : { data: { data: [] } })
     post.mockResolvedValue({ data: new Blob(["x"]) })
     render(<WriteLetterModal patientId="p1" visits={[]} onClose={() => {}} />)
@@ -94,7 +95,22 @@ describe("write a letter", () => {
     fireEvent.click(screen.getByRole("button", { name: "Download letter" }))
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clinic/patients/p1/letter", { title: "T", body: "B", signedByPractitionerId: "d1" }, { responseType: "blob" }))
   })
+  it("offers no signer choice, and asks for no practitioner list, without the sign-as-other permission", async () => {
+    delete perms["CLINIC_DOCUMENT_SIGN_AS_OTHER"]; delete perms["CLINIC_CLINICAL_SIGN"]
+    get.mockImplementation(async () => ({ data: { data: [{ id: "d1", fullName: "Dr Priya Govender" }] } }))
+    render(<WriteLetterModal patientId="p1" visits={[]} onClose={() => {}} />)
+    await screen.findByLabelText("Title")
+    expect(screen.queryByLabelText("Signed off by")).toBeNull()
+    expect(get.mock.calls.some(c => String(c[0]).includes("practitioners"))).toBe(false)
+  })
+  it("the old coarse clinical-sign permission still allows the choice", async () => {
+    delete perms["CLINIC_DOCUMENT_SIGN_AS_OTHER"]; perms["CLINIC_CLINICAL_SIGN"] = true
+    get.mockImplementation(async (url: string) => url.includes("practitioners") ? { data: { data: [{ id: "d1", fullName: "Dr Priya Govender" }] } } : { data: { data: [] } })
+    render(<WriteLetterModal patientId="p1" visits={[]} onClose={() => {}} />)
+    expect(await screen.findByLabelText("Signed off by")).toBeTruthy()
+  })
   it("sends no signer when none is chosen", async () => {
+    perms["CLINIC_DOCUMENT_SIGN_AS_OTHER"] = true; delete perms["CLINIC_CLINICAL_SIGN"]
     get.mockImplementation(async (url: string) => url.includes("practitioners") ? { data: { data: [{ id: "d1", fullName: "Dr Priya Govender" }] } } : { data: { data: [] } })
     post.mockResolvedValue({ data: new Blob(["x"]) })
     render(<WriteLetterModal patientId="p1" visits={[]} onClose={() => {}} />)

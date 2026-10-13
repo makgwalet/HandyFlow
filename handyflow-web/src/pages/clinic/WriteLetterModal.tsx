@@ -5,6 +5,7 @@ import ModalShell from "./ModalShell"
 import LetterTemplatePicker from "./LetterTemplatePicker"
 import SaveAsTemplate from "./SaveAsTemplate"
 import { apiClient } from "../../api/client"
+import { useCan } from "./clinicAccess"
 import { fmtDay } from "./briefing"
 import { BORDER, GRAY, lbl, sinp } from "./patientFile.shared"
 import { primaryBtn, smallBtn } from "./OverviewCard"
@@ -18,6 +19,7 @@ export default function WriteLetterModal({ patientId, visits, onClose }: { patie
   const [visitId, setVisitId] = useState(visits[0]?.id ?? "")
   const [toName, setToName] = useState("")
   const [toCompany, setToCompany] = useState("")
+  const mayChooseSigner = useCan("signLetterAsOther")   // naming another practitioner is signing in their name (DEC-027)
   const [signedBy, setSignedBy] = useState("")
   const [people, setPeople] = useState<Practitioner[]>([])
   const [kind, setKind] = useState<Kind>("GENERAL_LETTER")
@@ -28,6 +30,7 @@ export default function WriteLetterModal({ patientId, visits, onClose }: { patie
   const area = useRef<HTMLTextAreaElement>(null)
   // Who the letter is signed off by: the visit's doctor or the practice unless one is chosen. A failed lookup just leaves the default.
   useEffect(() => {
+    if (!mayChooseSigner) return
     let live = true
     ;(async () => {
       try {
@@ -37,7 +40,7 @@ export default function WriteLetterModal({ patientId, visits, onClose }: { patie
       } catch { if (live) setPeople([]) }
     })()
     return () => { live = false }
-  }, [])
+  }, [mayChooseSigner])
   const ready = title.trim() !== "" && body.trim() !== "" && !busy
 
   const go = async () => {
@@ -76,7 +79,7 @@ export default function WriteLetterModal({ patientId, visits, onClose }: { patie
           <div><label style={lbl} htmlFor="wl-to-name">Addressed to (name)</label><input id="wl-to-name" style={sinp} value={toName} onChange={e => setToName(e.target.value)} placeholder="e.g. The HR Manager" /></div>
           <div><label style={lbl} htmlFor="wl-to-company">Company</label><input id="wl-to-company" style={sinp} value={toCompany} onChange={e => setToCompany(e.target.value)} placeholder="e.g. Acme (Pty) Ltd" /></div>
         </div>
-        {people.length > 0 && <div><label style={lbl} htmlFor="wl-signer">Signed off by</label>
+        {mayChooseSigner && people.length > 0 && <div><label style={lbl} htmlFor="wl-signer">Signed off by</label>
           <select id="wl-signer" style={sinp} value={signedBy} onChange={e => setSignedBy(e.target.value)}>
             <option value="">{visitId ? "The doctor of the visit" : "The practice (no named doctor)"}</option>
             {people.map(p => <option key={p.id} value={p.id}>{pname(p)}</option>)}
