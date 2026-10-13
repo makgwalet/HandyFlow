@@ -14,7 +14,9 @@ public final class VisitDtos {
     public record VisitPrescription(UUID id, String medicationName, String dosage, String frequency, String duration,
                                     Integer quantity, int repeats, String instructions, Instant prescribedAt, boolean dispensed) {}
 
-    public record VisitAddendum(UUID id, String text, String authorName, Instant createdAt) {}
+    public record VisitAddendum(UUID id, String text, String authorName, Instant createdAt, String kind, String kindLabel) {
+        public VisitAddendum(UUID id, String text, String authorName, Instant createdAt) { this(id, text, authorName, createdAt, "OTHER", "Note"); }
+    }
 
     public record VisitResponse(
             UUID id, UUID appointmentId, String status, Instant consultedAt, Instant signedAt,

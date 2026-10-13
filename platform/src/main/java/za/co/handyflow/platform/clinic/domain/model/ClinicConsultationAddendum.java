@@ -19,15 +19,21 @@ public class ClinicConsultationAddendum {
     @Column(name = "consultation_id") UUID    consultationId;
     @Column(name = "author_user_id")  UUID    authorUserId;
     String text;
+    String kind;
     @Column(name = "created_at")      Instant createdAt;
 
     public static ClinicConsultationAddendum of(ClinicConsultation c, UUID authorUserId, String text) {
+        return of(c, authorUserId, text, "OTHER");
+    }
+
+    public static ClinicConsultationAddendum of(ClinicConsultation c, UUID authorUserId, String text, String kind) {
         ClinicConsultationAddendum a = new ClinicConsultationAddendum();
         a.id             = UUID.randomUUID();
         a.tenantId       = c.getTenantId();
         a.consultationId = c.getId();
         a.authorUserId   = authorUserId;
         a.text           = text;
+        a.kind           = kind;
         a.createdAt      = Instant.now();
         return a;
     }

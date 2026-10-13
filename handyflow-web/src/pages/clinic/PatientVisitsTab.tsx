@@ -14,7 +14,7 @@ import { SickNoteModal } from "./QuickActionsCard"
 import { startLabel, useStartConsultation } from "./useStartConsultation"
 import { BORDER, Empty, GRAY, LIGHT, RED_TEXT, btnPrimary, downloadPdf, lbl, sinp } from "./patientFile.shared"
 import { primaryBtn, smallBtn } from "./OverviewCard"
-import { headline, isAmendable, isOpenVisit, resumeProblem, rxLine, statusOf, vitalLines, type Visit } from "./visitView"
+import { ADDENDUM_KINDS, headline, isAmendable, isOpenVisit, resumeProblem, rxLine, statusOf, vitalLines, type Visit } from "./visitView"
 
 const unwrap = (r: any) => r?.data?.data ?? r?.data
 const TONE = { ok: ["var(--hf-success-soft)", "var(--hf-success-text-strong)"], warn: ["var(--hf-warning-soft)", "var(--hf-warning-text)"],
@@ -119,7 +119,7 @@ export default function PatientVisitsTab({ patientId, appointments, defaultPract
                           <Block title="Addenda (added after signing)">
                             {v.addenda.map(a => (
                               <div key={a.id} style={{ padding: "6px 0", borderTop: `1px solid ${BORDER}` }}>
-                                <div style={{ fontSize: 11, color: GRAY }}>{fmtDay(a.createdAt)} {fmtTimeOfDay(a.createdAt)} · {a.authorName ?? "Author not recorded"}</div>
+                                <div style={{ fontSize: 11, color: GRAY }}>{a.kindLabel ? <b>{a.kindLabel} · </b> : null}{fmtDay(a.createdAt)} {fmtTimeOfDay(a.createdAt)} · {a.authorName ?? "Author not recorded"}</div>
                                 <div style={{ fontSize: 13, whiteSpace: "pre-wrap" }}>{a.text}</div>
                               </div>))}
                           </Block>
@@ -155,14 +155,19 @@ export default function PatientVisitsTab({ patientId, appointments, defaultPract
 
 function AddendumModal({ visit, onClose, onDone }: { visit: Visit; onClose: () => void; onDone: () => void }) {
   const [text, setText] = useState("")
+  const [kind, setKind] = useState("OTHER")
   const [error, setError] = useState("")
-  const save = useMutation({ mutationFn: () => apiClient.post(`/api/v1/clinic/consultations/${visit.id}/addenda`, { text: text.trim() }),
+  const save = useMutation({ mutationFn: () => apiClient.post(`/api/v1/clinic/consultations/${visit.id}/addenda`, { text: text.trim(), kind }),
     onSuccess: onDone, onError: (e: any) => setError(e?.response?.data?.message ?? "Could not save the addendum.") })
   return (
     <ModalShell title={`Addendum — visit of ${fmtDay(visit.consultedAt)}`} onClose={onClose} width={560}
       footer={<><button onClick={onClose} style={smallBtn}>Cancel</button>
         <button onClick={() => save.mutate()} disabled={!text.trim() || save.isPending} style={{ ...primaryBtn, padding: "9px 18px", fontSize: 14, opacity: text.trim() ? 1 : 0.6 }}>{save.isPending ? "Saving…" : "Add addendum"}</button></>}>
       <div style={{ fontSize: 12, color: GRAY, marginBottom: 10 }}>The signed note stays exactly as it was. This is added under it with your name and the time.</div>
+      <label style={lbl} htmlFor="addendum-kind">Type</label>
+      <select id="addendum-kind" value={kind} onChange={e => setKind(e.target.value)} style={{ ...sinp, marginBottom: 10 }}>
+        {ADDENDUM_KINDS.map(k => <option key={k.value} value={k.value}>{k.label}</option>)}
+      </select>
       <label style={lbl} htmlFor="addendum-text">Addendum</label>
       <textarea id="addendum-text" rows={5} maxLength={5000} value={text} onChange={e => setText(e.target.value)} style={{ ...sinp, resize: "vertical" }} />
       {error && <div role="alert" style={{ marginTop: 8, fontSize: 13, color: RED_TEXT }}>{error}</div>}

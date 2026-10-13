@@ -64,6 +64,8 @@ public class ClinicConsultationSummaryPdfService {
     private final ClinicPatientRepository patientRepo;
     private final ClinicPractitionerRepository practitionerRepo;
     private final TenantFacade tenantFacade;
+    private final za.co.handyflow.platform.clinic.domain.repository.ClinicConsultationAddendumRepository addendumRepo;
+    private final ClinicStaffNames staffNames;
 
     private static final DeviceRgb BRAND_DARK = new DeviceRgb(15, 76, 92);
     private static final DeviceRgb TEAL       = new DeviceRgb(13, 148, 136);
@@ -94,6 +96,7 @@ public class ClinicConsultationSummaryPdfService {
             addPatientInfo(document, consultation, patient, practitioner, bold, regular);
             addVitals(document, consultation, bold, regular);
             addClinicalSummary(document, consultation, bold, regular);
+            addAddenda(document, tenantId, consultation, bold, regular);
             addFooter(document, regular);
 
             document.close();
@@ -194,6 +197,24 @@ public class ClinicConsultationSummaryPdfService {
             doc.add(new Paragraph("Follow-up recommended in " + c.getFollowUpDays() + " day"
                     + (c.getFollowUpDays() == 1 ? "" : "s") + ".")
                     .setFont(regular).setFontSize(10).setMarginBottom(14));
+        }
+    }
+
+    /** Notes added after signing, after the signed record, each with its type, date and author (S1-1, patch 0187). */
+    private void addAddenda(Document doc, TenantId tenantId, ClinicConsultation c, PdfFont bold, PdfFont regular) {
+        var list = addendumRepo.findByConsultation(tenantId, c.getId());
+        if (list.isEmpty()) return;
+        java.util.Set<UUID> ids = new java.util.HashSet<>();
+        list.forEach(a -> ids.add(a.getAuthorUserId()));
+        var names = staffNames.names(tenantId.getValue(), ids);
+        doc.add(new Paragraph("ADDENDA (ADDED AFTER SIGNING)").setFont(bold).setFontSize(10).setFontColor(TEXT_MUTED).setMarginTop(6).setMarginBottom(4));
+        java.time.format.DateTimeFormatter when = java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy HH:mm", Locale.ENGLISH)
+                .withZone(java.time.ZoneId.of("Africa/Johannesburg"));
+        for (var a : list) {
+            String who = names.get(a.getAuthorUserId());
+            doc.add(new Paragraph(AddendumRules.label(a.getKind()) + " · " + when.format(a.getCreatedAt()) + " · " + (who == null ? "author not recorded" : who))
+                    .setFont(bold).setFontSize(9).setMarginBottom(1));
+            doc.add(new Paragraph(a.getText()).setFont(regular).setFontSize(10).setMarginBottom(8));
         }
     }
 

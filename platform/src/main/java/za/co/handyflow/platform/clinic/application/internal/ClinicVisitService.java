@@ -63,7 +63,7 @@ public class ClinicVisitService {
                     c.isBilled(), c.getBillingAmount(),
                     rx.get(c.getId()).stream().map(p -> new VisitPrescription(p.getId(), p.getMedicationName(), p.getDosage(), p.getFrequency(),
                             p.getDuration(), p.getQuantity(), p.getRepeats(), p.getInstructions(), p.getPrescribedAt(), p.isDispensed())).toList(),
-                    addenda.get(c.getId()).stream().map(a -> new VisitAddendum(a.getId(), a.getText(), names.get(a.getAuthorUserId()), a.getCreatedAt())).toList()));
+                    addenda.get(c.getId()).stream().map(a -> new VisitAddendum(a.getId(), a.getText(), names.get(a.getAuthorUserId()), a.getCreatedAt(), a.getKind(), AddendumRules.label(a.getKind()))).toList()));
         }
         return out;
     }

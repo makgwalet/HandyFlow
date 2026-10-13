@@ -38,6 +38,6 @@ public class ClinicAddendumController {
     public ResponseEntity<ApiResponse<AddendumResponse>> add(@PathVariable UUID consultationId,
                                                              @RequestBody AddAddendumRequest body) {
         return ResponseEntity.status(201).body(ApiResponse.success("Addendum added",
-                service.add(TenantContext.getTenantIdAsObject(), consultationId, body.text())));
+                service.add(TenantContext.getTenantIdAsObject(), consultationId, body.text(), body.kind())));
     }
 }

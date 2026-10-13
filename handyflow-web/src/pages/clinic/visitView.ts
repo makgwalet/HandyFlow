@@ -4,7 +4,13 @@ import { bmi } from "./briefing"
 export interface VisitTeam { role: string; name: string; at?: string | null }
 export interface VisitRx { id: string; medicationName: string; dosage?: string | null; frequency?: string | null; duration?: string | null
   quantity?: number | null; repeats: number; instructions?: string | null; prescribedAt?: string | null; dispensed: boolean }
-export interface VisitAddendum { id: string; text: string; authorName?: string | null; createdAt: string }
+export interface VisitAddendum { id: string; text: string; authorName?: string | null; createdAt: string; kind?: string; kindLabel?: string }
+
+/** What a person may choose when adding an addendum (the system's own type, medicine added after signing, is not offered). */
+export const ADDENDUM_KINDS: { value: string; label: string }[] = [
+  { value: "OTHER", label: "Note" }, { value: "CORRECTION", label: "Correction" }, { value: "ADDITIONAL_INFO", label: "Additional information" },
+  { value: "RESULT", label: "Result received" }, { value: "LATE_ENTRY", label: "Late entry" },
+]
 export interface Visit {
   id: string; appointmentId?: string | null; status: string; consultedAt: string; signedAt?: string | null
   doctorName?: string | null; team: VisitTeam[]

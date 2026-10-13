@@ -17,7 +17,7 @@ const signed: any = { id: "v1", appointmentId: "a1", status: "SIGNED", consulted
   team: [{ role: "Prepared by", name: "Sister Zodwa Nkosi" }, { role: "Signed by", name: "Dr Andile Dlamini" }],
   chiefComplaint: "Cough", history: "Two weeks of cough", examination: "Chest clear", diagnosis: "Acute bronchitis", icd10Codes: ["J20.9"], treatmentPlan: "Rest and fluids", followUpDays: 7,
   bloodPressure: "128/82", pulseBpm: 72, weightKg: 70, heightCm: 175, billed: false, prescriptions: [{ id: "r1", medicationName: "Amoxicillin", dosage: "500mg", frequency: "3x daily", duration: "7 days", quantity: 21, repeats: 0, dispensed: false }],
-  addenda: [{ id: "ad1", text: "Patient phoned: rash settled", authorName: "Dr Andile Dlamini", createdAt: "2026-10-08T07:00:00Z" }] }
+  addenda: [{ id: "ad1", text: "Patient phoned: rash settled", authorName: "Dr Andile Dlamini", createdAt: "2026-10-08T07:00:00Z", kind: "ADDITIONAL_INFO", kindLabel: "Additional information" }] }
 const draft: any = { ...signed, id: "v2", appointmentId: "a2", status: "DRAFT", consultedAt: "2026-10-08T09:00:00Z", signedAt: null, team: [], prescriptions: [], addenda: [], diagnosis: null }
 
 const route = (visits: any[]) => get.mockImplementation((url: string) => url.endsWith("/visits") ? Promise.resolve({ data: { data: visits } }) : Promise.resolve({ data: { data: [] } }))
@@ -41,7 +41,7 @@ describe("visits tab", () => {
     expect(screen.getByText("Amoxicillin")).toBeTruthy()
     expect(screen.getByText("Sister Zodwa Nkosi")).toBeTruthy()
     expect(screen.getByText("Prepared by")).toBeTruthy()
-    expect(screen.getByText("Patient phoned: rash settled")).toBeTruthy()
+    expect(screen.getByText("Patient phoned: rash settled")).toBeTruthy(); expect(screen.getByText(/Additional information/)).toBeTruthy()
     expect(screen.getByText(/A signed visit is not changed/)).toBeTruthy()
   })
   it("says so when there are no visits, and when they cannot be loaded", async () => {
@@ -79,7 +79,19 @@ describe("visits tab", () => {
     fireEvent.change(screen.getByLabelText("Addendum"), { target: { value: " Rash settled " } })
     const buttons = screen.getAllByRole("button", { name: "Add addendum" })
     fireEvent.click(buttons[buttons.length - 1])
-    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clinic/consultations/v1/addenda", { text: "Rash settled" }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clinic/consultations/v1/addenda", { text: "Rash settled", kind: "OTHER" }))
+  })
+  it("sends the type chosen for the addendum, and never offers the system's own type", async () => {
+    perms.CLINIC_CONSULTATION_AMEND = true; post.mockResolvedValue({ data: {} })
+    route([signed]); show()
+    fireEvent.click(await screen.findByRole("button", { name: "Add addendum" }))
+    const options = Array.from((screen.getByLabelText("Type") as HTMLSelectElement).options).map(o => o.value)
+    expect(options).toContain("CORRECTION"); expect(options).not.toContain("LATE_MEDICINE")
+    fireEvent.change(screen.getByLabelText("Type"), { target: { value: "CORRECTION" } })
+    fireEvent.change(screen.getByLabelText("Addendum"), { target: { value: "Left, not right" } })
+    const buttons = screen.getAllByRole("button", { name: "Add addendum" })
+    fireEvent.click(buttons[buttons.length - 1])
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clinic/consultations/v1/addenda", { text: "Left, not right", kind: "CORRECTION" }))
   })
   it("adds a late prescription to the signed visit", async () => {
     perms.CLINIC_PRESCRIPTION_CREATE = true; post.mockResolvedValue({ data: {} })

@@ -27,6 +27,9 @@ class ClinicAddendumServiceTest {
     @Mock ClinicConsultationRepository         consultationRepo;
     @Mock ClinicConsultationAddendumRepository addendumRepo;
 
+    @Mock ClinicTaskService                    tasks;
+    @Mock ClinicStaffNames                     staffNames;
+
     @InjectMocks ClinicAddendumService service;
 
     static final UUID TENANT_UUID = UUID.fromString("9ecb3dc7-75d4-4e56-b0a2-c95d3c7c584f");
@@ -97,5 +100,49 @@ class ClinicAddendumServiceTest {
         when(consultationRepo.findActiveById(TENANT, id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.list(TENANT, id)).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("the chosen type is kept and returned with its label")
+    void keepsTheKind() {
+        ClinicConsultation c = signed();
+        var out = service.add(TENANT, c.getId(), "Wrong side recorded", "correction");
+        assertThat(out.kind()).isEqualTo("CORRECTION");
+        assertThat(out.kindLabel()).isEqualTo("Correction");
+    }
+
+    @Test
+    @DisplayName("the system's own type cannot be chosen by a person")
+    void systemTypeRefused() {
+        ClinicConsultation c = signed();
+        assertThatThrownBy(() -> service.add(TENANT, c.getId(), "x", "LATE_MEDICINE")).isInstanceOf(IllegalArgumentException.class);
+        verify(addendumRepo, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("the person who signed is given a task when the addendum has a different author (no author known here counts as different)")
+    void signerIsTold() {
+        UUID signer = UUID.randomUUID();
+        ClinicConsultation c = ClinicConsultation.createDraft(TENANT, UUID.randomUUID(), null, null, "Cough");
+        c.sign(signer);
+        when(consultationRepo.findActiveById(TENANT, c.getId())).thenReturn(Optional.of(c));
+
+        service.add(TENANT, c.getId(), "Result received", "RESULT");
+
+        verify(tasks).create(eq(TENANT_UUID), any(), argThat(r -> signer.equals(r.assignedTo()) && "ADDENDUM".equals(r.sourceType())));
+    }
+
+    @Test
+    @DisplayName("a failing task never undoes the addendum")
+    void taskFailureKeepsTheAddendum() {
+        ClinicConsultation c = ClinicConsultation.createDraft(TENANT, UUID.randomUUID(), null, null, "Cough");
+        c.sign(UUID.randomUUID());
+        when(consultationRepo.findActiveById(TENANT, c.getId())).thenReturn(Optional.of(c));
+        when(tasks.create(any(), any(), any())).thenThrow(new RuntimeException("down"));
+
+        var out = service.add(TENANT, c.getId(), "Note", null);
+
+        assertThat(out.kind()).isEqualTo("OTHER");
+        verify(addendumRepo).save(any());
     }
 }
