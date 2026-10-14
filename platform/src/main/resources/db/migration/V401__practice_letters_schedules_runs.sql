@@ -1,5 +1,5 @@
 -- Finance F22: engagement letters, recurring service schedules and the runs they produce.
-CREATE TABLE IF NOT EXISTS acc_engagement_letters (
+CREATE TABLE IF NOT EXISTS acc_practice_letters (
     id                UUID PRIMARY KEY,
     tenant_id         UUID NOT NULL,
     client_id         UUID NOT NULL REFERENCES acc_clients (id) ON DELETE CASCADE,
@@ -26,9 +26,9 @@ CREATE TABLE IF NOT EXISTS acc_engagement_letters (
     ended_at          TIMESTAMPTZ,
     CONSTRAINT uq_acc_letter_version UNIQUE (client_id, version)
 );
-CREATE INDEX IF NOT EXISTS idx_acc_letters_client ON acc_engagement_letters (tenant_id, client_id, version DESC);
+CREATE INDEX IF NOT EXISTS idx_acc_letters_client ON acc_practice_letters (tenant_id, client_id, version DESC);
 -- At most one accepted letter per client.
-CREATE UNIQUE INDEX IF NOT EXISTS uq_acc_letter_accepted ON acc_engagement_letters (client_id) WHERE status = 'ACCEPTED';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_acc_letter_accepted ON acc_practice_letters (client_id) WHERE status = 'ACCEPTED';
 
 CREATE TABLE IF NOT EXISTS acc_service_schedules (
     id             UUID PRIMARY KEY,

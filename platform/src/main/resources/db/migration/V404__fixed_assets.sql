@@ -1,5 +1,5 @@
 -- Finance F25: fixed-asset register, monthly depreciation runs (as draft journals), disposals.
-CREATE TABLE acc_fixed_assets (
+CREATE TABLE acc_asset_register (
     id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id            UUID NOT NULL REFERENCES tenants(id),
     asset_number         VARCHAR(20)  NOT NULL,
@@ -27,8 +27,8 @@ CREATE TABLE acc_fixed_assets (
     CONSTRAINT chk_fa_method_fields CHECK (
         (method = 'STRAIGHT_LINE' AND life_months IS NOT NULL) OR (method = 'REDUCING_BALANCE' AND rate_percent IS NOT NULL))
 );
-CREATE UNIQUE INDEX uq_acc_fixed_assets_number ON acc_fixed_assets (tenant_id, asset_number);
-CREATE INDEX idx_acc_fixed_assets_status ON acc_fixed_assets (tenant_id, status);
+CREATE UNIQUE INDEX uq_acc_asset_register_number ON acc_asset_register (tenant_id, asset_number);
+CREATE INDEX idx_acc_asset_register_status ON acc_asset_register (tenant_id, status);
 
 CREATE TABLE acc_depreciation_runs (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -46,7 +46,7 @@ CREATE TABLE acc_depreciation_lines (
     id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id),
     run_id    UUID NOT NULL REFERENCES acc_depreciation_runs(id),
-    asset_id  UUID NOT NULL REFERENCES acc_fixed_assets(id),
+    asset_id  UUID NOT NULL REFERENCES acc_asset_register(id),
     amount    NUMERIC(15,2) NOT NULL CHECK (amount > 0),
     UNIQUE (run_id, asset_id)
 );

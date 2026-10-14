@@ -39,7 +39,7 @@ public class FixedAssetService {
                    a.cost_account_id, a.accumulated_account_id, a.expense_account_id, a.cost_centre_id,
                    a.acquired_on, a.cost, a.residual_value, a.method, a.life_months, a.rate_percent,
                    a.status, a.disposed_on, a.disposal_proceeds, %s
-              FROM acc_fixed_assets a WHERE a.tenant_id = ?""".formatted(ACCUMULATED_SQL);
+              FROM acc_asset_register a WHERE a.tenant_id = ?""".formatted(ACCUMULATED_SQL);
 
     private final JdbcTemplate jdbc;
     private final AccountingService accounting;
@@ -98,12 +98,12 @@ public class FixedAssetService {
         requireAccounts(tenantId, req);
         requireCentre(tenantId, req.costCentreId());
         Integer next = jdbc.queryForObject("""
-                SELECT COALESCE(MAX(CAST(SUBSTRING(asset_number FROM 4) AS INT)), 0) + 1 FROM acc_fixed_assets
+                SELECT COALESCE(MAX(CAST(SUBSTRING(asset_number FROM 4) AS INT)), 0) + 1 FROM acc_asset_register
                  WHERE tenant_id = ? AND asset_number ~ '^FA-[0-9]+$'""", Integer.class, tenantId.getValue());
         UUID id = UUID.randomUUID();
         try {
             jdbc.update("""
-                    INSERT INTO acc_fixed_assets (id, tenant_id, asset_number, name, description, serial_number, location, cost_account_id,
+                    INSERT INTO acc_asset_register (id, tenant_id, asset_number, name, description, serial_number, location, cost_account_id,
                         accumulated_account_id, expense_account_id, cost_centre_id, acquired_on, cost, residual_value, method, life_months, rate_percent, created_by)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     id, tenantId.getValue(), String.format("FA-%04d", next), req.name().trim(), blank(req.description()), blank(req.serialNumber()), blank(req.location()),
@@ -139,7 +139,7 @@ public class FixedAssetService {
             if (!same) throw bad("Cost, dates, method and accounts are locked once depreciation has been recorded. You can still change the name, description, serial number, location and cost centre.");
         }
         jdbc.update("""
-                UPDATE acc_fixed_assets SET name = ?, description = ?, serial_number = ?, location = ?, cost_centre_id = ?,
+                UPDATE acc_asset_register SET name = ?, description = ?, serial_number = ?, location = ?, cost_centre_id = ?,
                        cost_account_id = ?, accumulated_account_id = ?, expense_account_id = ?, acquired_on = ?, cost = ?, residual_value = ?,
                        method = ?, life_months = ?, rate_percent = ?
                  WHERE id = ? AND tenant_id = ?""",
@@ -268,7 +268,7 @@ public class FixedAssetService {
         JournalEntryResponse j = accounting.createJournalEntry(tenantId, request(req.disposedOn(), "Disposal of " + a.assetNumber() + " " + a.name(),
                 "DISP-" + a.assetNumber(), "ADJUSTMENT", lines), by);
         int changed = jdbc.update("""
-                UPDATE acc_fixed_assets SET status = 'DISPOSED', disposed_on = ?, disposal_proceeds = ?, disposal_journal_id = ?
+                UPDATE acc_asset_register SET status = 'DISPOSED', disposed_on = ?, disposal_proceeds = ?, disposal_journal_id = ?
                  WHERE id = ? AND tenant_id = ? AND status = 'ACTIVE'""", Date.valueOf(req.disposedOn()), proceeds, j.id(), id, tenantId.getValue());
         if (changed == 0) throw bad("This asset has already been disposed of.");
         return new Disposal(id, j.id(), j.entryNumber(), a.cost().subtract(a.accumulated()), FixedAssetRules.gainOrLoss(proceeds, a.cost(), a.accumulated()));

@@ -45,12 +45,12 @@ public class EngagementLetterService {
     @Transactional(readOnly = true)
     public List<LetterResponse> list(TenantId tenantId, UUID clientId) {
         access.require(tenantId, clientId);
-        return jdbc.query("SELECT " + COLS + " FROM acc_engagement_letters WHERE tenant_id = ? AND client_id = ? ORDER BY version DESC",
+        return jdbc.query("SELECT " + COLS + " FROM acc_practice_letters WHERE tenant_id = ? AND client_id = ? ORDER BY version DESC",
                 EngagementLetterService::map, tenantId.getValue(), clientId);
     }
 
     private LetterResponse load(TenantId tenantId, UUID id) {
-        List<LetterResponse> r = jdbc.query("SELECT " + COLS + " FROM acc_engagement_letters WHERE tenant_id = ? AND id = ?",
+        List<LetterResponse> r = jdbc.query("SELECT " + COLS + " FROM acc_practice_letters WHERE tenant_id = ? AND id = ?",
                 EngagementLetterService::map, tenantId.getValue(), id);
         if (r.isEmpty()) throw missing();
         access.require(tenantId, r.get(0).clientId());
@@ -64,10 +64,10 @@ public class EngagementLetterService {
             throw new HandyFlowException("Client not found", HttpStatus.NOT_FOUND, "NOT_FOUND");
         String problem = EngagementLetterRules.draftProblem(draft(req));
         if (problem != null) throw bad(problem);
-        Integer max = jdbc.queryForObject("SELECT COALESCE(MAX(version), 0) FROM acc_engagement_letters WHERE client_id = ?", Integer.class, clientId);
+        Integer max = jdbc.queryForObject("SELECT COALESCE(MAX(version), 0) FROM acc_practice_letters WHERE client_id = ?", Integer.class, clientId);
         UUID id = UUID.randomUUID();
         jdbc.update("""
-                INSERT INTO acc_engagement_letters (id, tenant_id, client_id, version, title, scope, exclusions, fee_basis, fee_amount, fee_notes, start_date, end_date, created_by)
+                INSERT INTO acc_practice_letters (id, tenant_id, client_id, version, title, scope, exclusions, fee_basis, fee_amount, fee_notes, start_date, end_date, created_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 id, tenantId.getValue(), clientId, max + 1, req.title().trim(), req.scope().trim(), blank(req.exclusions()), req.feeBasis(),
                 req.feeAmount(), blank(req.feeNotes()), Date.valueOf(req.startDate()), req.endDate() == null ? null : Date.valueOf(req.endDate()), by);
@@ -81,7 +81,7 @@ public class EngagementLetterService {
         if (problem == null) problem = EngagementLetterRules.draftProblem(draft(req));
         if (problem != null) throw bad(problem);
         jdbc.update("""
-                UPDATE acc_engagement_letters SET title = ?, scope = ?, exclusions = ?, fee_basis = ?, fee_amount = ?, fee_notes = ?, start_date = ?, end_date = ?
+                UPDATE acc_practice_letters SET title = ?, scope = ?, exclusions = ?, fee_basis = ?, fee_amount = ?, fee_notes = ?, start_date = ?, end_date = ?
                  WHERE id = ? AND tenant_id = ? AND status = 'DRAFT'""",
                 req.title().trim(), req.scope().trim(), blank(req.exclusions()), req.feeBasis(), req.feeAmount(), blank(req.feeNotes()),
                 Date.valueOf(req.startDate()), req.endDate() == null ? null : Date.valueOf(req.endDate()), id, tenantId.getValue());
@@ -95,7 +95,7 @@ public class EngagementLetterService {
         String problem = EngagementLetterRules.sendProblem(cur.status(), d);
         if (problem != null) throw bad(problem);
         String text = EngagementLetterRules.render(practice(tenantId), clientName(cur.clientId()), cur.version(), d, LocalDate.now());
-        jdbc.update("UPDATE acc_engagement_letters SET status = 'SENT', body_text = ?, sent_by = ?, sent_at = now() WHERE id = ? AND tenant_id = ?",
+        jdbc.update("UPDATE acc_practice_letters SET status = 'SENT', body_text = ?, sent_by = ?, sent_at = now() WHERE id = ? AND tenant_id = ?",
                 text, by, id, tenantId.getValue());
         return load(tenantId, id);
     }
@@ -105,9 +105,9 @@ public class EngagementLetterService {
         LetterResponse cur = load(tenantId, id);
         String problem = EngagementLetterRules.acceptProblem(cur.status(), req.acceptedByName(), req.method(), req.acceptedOn(), LocalDate.now());
         if (problem != null) throw bad(problem);
-        jdbc.update("UPDATE acc_engagement_letters SET status = 'SUPERSEDED' WHERE client_id = ? AND tenant_id = ? AND status = 'ACCEPTED'", cur.clientId(), tenantId.getValue());
+        jdbc.update("UPDATE acc_practice_letters SET status = 'SUPERSEDED' WHERE client_id = ? AND tenant_id = ? AND status = 'ACCEPTED'", cur.clientId(), tenantId.getValue());
         jdbc.update("""
-                UPDATE acc_engagement_letters SET status = 'ACCEPTED', accepted_by_name = ?, accepted_method = ?, accepted_on = ?, accepted_recorded_by = ?
+                UPDATE acc_practice_letters SET status = 'ACCEPTED', accepted_by_name = ?, accepted_method = ?, accepted_on = ?, accepted_recorded_by = ?
                  WHERE id = ? AND tenant_id = ?""",
                 req.acceptedByName().trim(), req.method(), Date.valueOf(req.acceptedOn()), by, id, tenantId.getValue());
         return load(tenantId, id);
@@ -119,7 +119,7 @@ public class EngagementLetterService {
         String problem = EngagementLetterRules.declineProblem(cur.status());
         if (problem != null) throw bad(problem);
         String reason = req == null || req.reason() == null ? null : req.reason().trim();
-        jdbc.update("UPDATE acc_engagement_letters SET status = 'DECLINED', decline_reason = ? WHERE id = ? AND tenant_id = ?",
+        jdbc.update("UPDATE acc_practice_letters SET status = 'DECLINED', decline_reason = ? WHERE id = ? AND tenant_id = ?",
                 reason == null || reason.isEmpty() ? null : reason.substring(0, Math.min(reason.length(), 500)), id, tenantId.getValue());
         return load(tenantId, id);
     }
@@ -129,7 +129,7 @@ public class EngagementLetterService {
         LetterResponse cur = load(tenantId, id);
         String problem = EngagementLetterRules.endProblem(cur.status());
         if (problem != null) throw bad(problem);
-        jdbc.update("UPDATE acc_engagement_letters SET status = 'ENDED', ended_at = now() WHERE id = ? AND tenant_id = ?", id, tenantId.getValue());
+        jdbc.update("UPDATE acc_practice_letters SET status = 'ENDED', ended_at = now() WHERE id = ? AND tenant_id = ?", id, tenantId.getValue());
         return load(tenantId, id);
     }
 
@@ -137,7 +137,7 @@ public class EngagementLetterService {
     @Transactional(readOnly = true)
     public LetterText text(TenantId tenantId, UUID id) {
         LetterResponse cur = load(tenantId, id);
-        String frozen = jdbc.queryForObject("SELECT body_text FROM acc_engagement_letters WHERE id = ?", String.class, id);
+        String frozen = jdbc.queryForObject("SELECT body_text FROM acc_practice_letters WHERE id = ?", String.class, id);
         String text = frozen != null ? frozen : EngagementLetterRules.render(practice(tenantId), clientName(cur.clientId()), cur.version(),
                 new Draft(cur.title(), cur.scope(), cur.exclusions(), cur.feeBasis(), cur.feeAmount(), cur.feeNotes(), cur.startDate(), cur.endDate()), LocalDate.now());
         return new LetterText(id, cur.version(), cur.status(), text);
