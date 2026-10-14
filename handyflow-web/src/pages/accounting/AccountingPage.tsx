@@ -21,6 +21,8 @@ import CostCentresTab from "./CostCentresTab"
 import ByCostCentreTab from "./ByCostCentreTab"
 import FixedAssetsTab from "./FixedAssetsTab"
 import DepreciationTab from "./DepreciationTab"
+import GroupTab from "./GroupTab"
+import ConsolidationTab from "./ConsolidationTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { ACCOUNTING_SECTIONS } from "../../navigation/moduleSections"
 
@@ -44,6 +46,8 @@ export function AccountingPage() {
         case "bycentre":  return <ByCostCentreTab />
         case "assets":    return <FixedAssetsTab />
         case "depreciation": return <DepreciationTab />
+        case "group":     return <GroupTab />
+        case "consolidation": return <ConsolidationTab />
         case "reports":   return <ReportsTab />
         case "vat":       return <VatReturnsTab />
         case "aging":     return <AgingTab />
