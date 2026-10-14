@@ -220,7 +220,7 @@ public class AccountingController {
 
     @GetMapping("/bank-accounts")
     // AP pays from these accounts, so its payment screens may list them (names and balances only, no transactions).
-    @PreAuthorize("hasAnyAuthority('ACCOUNTING_READ','AP_READ','AP_MANAGE','BILLING_READ')")
+    @PreAuthorize("hasAnyAuthority('ACCOUNTING_READ','AP_READ','AP_MANAGE','BILLING_READ','EXPENSES_ADMIN')")
     @Operation(summary = "List bank accounts")
     public ResponseEntity<ApiResponse<List<BankAccountResponse>>> getBankAccounts() {
         return ResponseEntity.ok(ApiResponse.success("Success",

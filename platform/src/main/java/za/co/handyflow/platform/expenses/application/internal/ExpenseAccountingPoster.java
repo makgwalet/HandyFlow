@@ -137,6 +137,39 @@ public class ExpenseAccountingPoster {
         }
     }
 
+    /**
+     * Finance patch F7: paying a claim out clears what the business owes the employee. Debit Accrued Expenses (2400),
+     * credit the bank account it was paid from. Once per claim; a failure is queued in Accounting's posting problems and
+     * the payout still stands. Never throws.
+     */
+    public Optional<UUID> postReimbursementJournal(TenantId tenantId, UUID claimId, String claimNumber,
+                                                   String employeeName, BigDecimal amount, UUID bankAccountId,
+                                                   String reference) {
+        String key = PostingKeys.of("expenses", "claim-reimbursed", claimId);
+        String summary = "Expense claim paid out: " + claimNumber;
+        try {
+            UUID payableAccountId = findAccountByCode(accountingFacade.getAccounts(tenantId), PAYABLE_ACCOUNT_CODE);
+            UUID bankGl = accountingFacade.resolveBankAccountGL(tenantId, bankAccountId).orElse(null);
+            if (payableAccountId == null || bankGl == null) {
+                accountingFacade.recordPostingFailure(tenantId, key, summary, payableAccountId == null
+                        ? "The chart of accounts has no Accrued Expenses (" + PAYABLE_ACCOUNT_CODE + ") account"
+                        : "The bank account the claim was paid from is missing or not linked to a ledger account");
+                return Optional.empty();
+            }
+            String memo = "Paid " + employeeName + " — " + claimNumber + (reference != null ? " (" + reference + ")" : "");
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(LocalDate.now(), summary,
+                    reference != null ? reference : claimNumber, "PAYMENT", List.of(
+                    new CreateJournalEntryRequest.JournalLineRequest(payableAccountId, memo, amount, null),
+                    new CreateJournalEntryRequest.JournalLineRequest(bankGl, memo, null, amount)));
+            JournalEntryResponse posted = accountingFacade.postOnceOrRecord(tenantId, key, req);
+            log.info("Posted reimbursement journal {} for claim {}", posted.entryNumber(), claimNumber);
+            return Optional.of(posted.id());
+        } catch (Exception e) {
+            log.error("Failed to post reimbursement for expense {}: {}", claimNumber, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
     private UUID findAccountByCode(List<za.co.handyflow.platform.accounting.dto.AccountResponse> accounts, String code) {
         return accounts.stream()
                 .filter(a -> code.equals(a.accountCode()))

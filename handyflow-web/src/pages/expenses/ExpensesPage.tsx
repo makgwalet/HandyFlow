@@ -3,6 +3,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
+import { useAuth } from "../../hooks/useAuth"
 import {
   Plus, X, CheckCircle, XCircle, DollarSign, Receipt,
   Search, AlertTriangle, Download, TrendingUp, Clock,
@@ -23,15 +24,30 @@ interface Claim {
   rejectionReason: string | null; journalEntryId: string | null
   notes: string | null; approvedAt: string | null; reimbursedAt: string | null
   createdAt: string
+  // Finance patch F7
+  submittedBy?: string | null; submittedAt?: string | null; submissionCount?: number
+  reimbursementReference?: string | null; reimbursementJournalId?: string | null
 }
+interface BankAccount { id: string; bankName: string; accountName: string; accountNumber?: string | null; active?: boolean; accountId?: string | null }
 interface Employee { id: string; fullName: string }
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const STATUS: Record<string, { color: string; bg: string; border: string; dot: string; label: string }> = {
+  DRAFT:      { color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)", border: "var(--hf-border)", dot: "var(--hf-text-faint)", label: "Draft" },
   PENDING:    { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", border: "var(--hf-warning-border)", dot: "var(--hf-warning)", label: "Pending" },
   APPROVED:   { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", border: "var(--hf-success-border)", dot: "var(--hf-success)", label: "Approved" },
   REJECTED:   { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)", dot: "var(--hf-danger)", label: "Rejected" },
   REIMBURSED: { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", border: "var(--hf-info-border)", dot: "var(--hf-info)", label: "Reimbursed" },
+  CANCELLED:  { color: "var(--hf-text-faint)", bg: "var(--hf-surface-sunken)", border: "var(--hf-border)", dot: "var(--hf-text-disabled)", label: "Withdrawn" },
+}
+
+/** What the claimant can do with their own claim (finance patch F7); mirrors the server's ExpenseLifecycle. */
+export function claimantActions(status: string): { edit: boolean; submit: boolean; withdraw: boolean } {
+  return {
+    edit: status === "DRAFT" || status === "REJECTED",
+    submit: status === "DRAFT" || status === "REJECTED",
+    withdraw: status === "DRAFT" || status === "PENDING",
+  }
 }
 
 const CATEGORIES: Record<string, { label: string; icon: any; color: string }> = {
@@ -100,6 +116,12 @@ export function ExpensesPage() {
   const [showApproveConfirm, setShowApproveConfirm] = useState(false)
   const [showReimburseConfirm, setShowReimburseConfirm] = useState(false)
   const [rejectReason, setRejectReason] = useState("")
+  // Finance patch F7: drafts, edits and resubmission by the claimant; payouts record the bank account and post.
+  const { user } = useAuth()
+  const mine = (c: Claim) => !!c.submittedBy && c.submittedBy === user?.userId
+  const [editing, setEditing] = useState<Claim | null>(null)
+  const [payFrom, setPayFrom] = useState("")
+  const [payRef, setPayRef] = useState("")
   const [error,        setError]      = useState("")
 
   const today = new Date().toISOString().split("T")[0]
@@ -146,11 +168,50 @@ export function ExpensesPage() {
     qc.invalidateQueries({ queryKey: ["expenses-monthly"] })
   }
 
-  const submitClaim = useMutation({
-    mutationFn: (body: any) => apiClient.post("/api/v1/expenses", body),
-    onSuccess: () => { invalidate(); setShowCreate(false); setForm(initForm()); setError("") },
-    onError: (e: any) => setError(e.response?.data?.message || "Failed to submit claim"),
+  const formBody = () => ({
+    employeeId: form.employeeId || null,
+    employeeName: form.employeeName,
+    claimDate: form.claimDate,
+    category: form.category,
+    description: form.description,
+    amount: parseFloat(form.amount),
+    receiptUrl: form.receiptUrl || null,
+    notes: form.notes || null,
   })
+  const closeForm = () => { setShowCreate(false); setEditing(null); setForm(initForm()) }
+
+  /** Saves the form: a new claim or changes to a draft/rejected one; then, unless saving a draft, sends it for approval. */
+  const submitClaim = useMutation({
+    mutationFn: async ({ draft }: { draft: boolean }) => {
+      if (!editing) return apiClient.post(`/api/v1/expenses${draft ? "?draft=true" : ""}`, formBody())
+      const saved = await apiClient.put(`/api/v1/expenses/${editing.id}`, formBody())
+      return draft ? saved : apiClient.post(`/api/v1/expenses/${editing.id}/submit`)
+    },
+    onSuccess: (r: any) => {
+      invalidate(); closeForm(); setError("")
+      if (selected) setSelected(r.data?.data ?? r.data)
+    },
+    onError: (e: any) => setError(e.response?.data?.message || "Failed to save the claim"),
+  })
+
+  const sendClaim = useMutation({
+    mutationFn: (id: string) => apiClient.post(`/api/v1/expenses/${id}/submit`),
+    onSuccess: (r: any) => { invalidate(); setError(""); setSelected(r.data?.data ?? r.data) },
+    onError: (e: any) => setError(e.response?.data?.message || "The claim could not be submitted"),
+  })
+
+  const withdrawClaim = useMutation({
+    mutationFn: (id: string) => apiClient.post(`/api/v1/expenses/${id}/withdraw`),
+    onSuccess: (r: any) => { invalidate(); setError(""); setSelected(r.data?.data ?? r.data) },
+    onError: (e: any) => setError(e.response?.data?.message || "The claim could not be withdrawn"),
+  })
+
+  const startEdit = (c: Claim) => {
+    setEditing(c)
+    setForm({ employeeName: c.employeeName, employeeId: c.employeeId ?? "", claimDate: c.claimDate, category: c.category,
+      description: c.description, amount: String(c.amount), receiptUrl: c.receiptUrl ?? "", notes: c.notes ?? "" })
+    setError(""); setShowCreate(true)
+  }
 
   const approveClaim = useMutation({
     mutationFn: (id: string) => apiClient.post(`/api/v1/expenses/${id}/approve`),
@@ -171,10 +232,21 @@ export function ExpensesPage() {
     onError: (e: any) => setError(e.response?.data?.message || "Rejection failed"),
   })
 
+  const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
+    queryKey: ["expense-pay-from-accounts"], enabled: canPay, retry: false, staleTime: 60_000,
+    queryFn: async () => {
+      const r = await apiClient.get("/api/v1/accounting/bank-accounts")
+      const d = r.data?.data ?? r.data
+      return (Array.isArray(d) ? d : []).filter((b: BankAccount) => b.active !== false && !!b.accountId)
+    },
+  })
+  const payFromId = payFrom || (bankAccounts.length === 1 ? bankAccounts[0].id : "")
+
   const reimburse = useMutation({
-    mutationFn: (id: string) => apiClient.post(`/api/v1/expenses/${id}/reimburse`),
+    mutationFn: (id: string) => apiClient.post(`/api/v1/expenses/${id}/reimburse`,
+      { bankAccountId: payFromId || null, reference: payRef.trim() || null }),
     onSuccess: (r: any) => {
-      invalidate(); setShowReimburseConfirm(false)
+      invalidate(); setShowReimburseConfirm(false); setPayFrom(""); setPayRef("")
       setSelected(r.data?.data ?? r.data)
     },
     onError: (e: any) => setError(e.response?.data?.message || "Failed to mark reimbursed"),
@@ -259,7 +331,7 @@ export function ExpensesPage() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   {/* Status filters */}
-                  {["", "PENDING", "APPROVED", "REJECTED", "REIMBURSED"].map(s => {
+                  {["", "DRAFT", "PENDING", "APPROVED", "REJECTED", "REIMBURSED", "CANCELLED"].map(s => {
                     const cfg = STATUS[s]
                     const active = statusFilter === s
                     return (
@@ -388,7 +460,7 @@ export function ExpensesPage() {
                             </td>
                             <td style={{ padding: "12px 16px" }}>
                               <div style={{ display: "flex", gap: 5 }}>
-                                {c.status === "PENDING" && canDecide && (
+                                {c.status === "PENDING" && canDecide && !mine(c) && (
                                   <>
                                     <button onClick={e => { e.stopPropagation(); setSelected(c); setShowApproveConfirm(true) }}
                                       style={{ display: "flex", alignItems: "center", gap: 3, padding: "4px 10px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
@@ -400,7 +472,7 @@ export function ExpensesPage() {
                                     </button>
                                   </>
                                 )}
-                                {c.status === "APPROVED" && canPay && (
+                                {c.status === "APPROVED" && canPay && !mine(c) && (
                                   <button onClick={e => { e.stopPropagation(); setSelected(c); setShowReimburseConfirm(true) }}
                                     style={{ display: "flex", alignItems: "center", gap: 3, padding: "4px 10px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1px solid var(--hf-info-border)", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
                                     <DollarSign size={10} /> Pay
@@ -500,8 +572,19 @@ export function ExpensesPage() {
 
             {selected.journalEntryId && (
               <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--hf-success-soft)", borderRadius: 9, border: "1px solid var(--hf-success-border)", display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--hf-success-text-strong)", fontWeight: 600 }}>
-                <CheckCircle size={14} /> Journal entry posted to Accounting
+                <CheckCircle size={14} /> {selected.reimbursementJournalId ? "Approval and payout posted to Accounting" : "Journal entry posted to Accounting"}
               </div>
+            )}
+            {["APPROVED", "REIMBURSED"].includes(selected.status) && !selected.journalEntryId && (
+              <div role="status" style={{ marginBottom: 16, padding: "10px 14px", background: "var(--hf-warning-soft)", borderRadius: 9, border: "1px solid var(--hf-warning-border)", display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--hf-warning-text-deep)" }}>
+                <AlertTriangle size={14} aria-hidden="true" /> Not in the ledger yet. Accounting sees it under Posting problems.
+              </div>
+            )}
+            {(selected.submissionCount ?? 0) > 1 && (
+              <div style={{ marginBottom: 12, fontSize: 12, color: "var(--hf-text-muted)" }}>Submitted {selected.submissionCount} times (corrected after rejection).</div>
+            )}
+            {selected.reimbursementReference && (
+              <div style={{ marginBottom: 12, fontSize: 12, color: "var(--hf-text-muted)" }}>Payment reference: {selected.reimbursementReference}</div>
             )}
 
             {selected.receiptUrl && (
@@ -514,7 +597,25 @@ export function ExpensesPage() {
             {error && <div style={{ marginBottom: 14, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
 
             {/* Actions */}
-            {selected.status === "PENDING" && canDecide && (
+            {mine(selected) && (() => {
+              const can = claimantActions(selected.status)
+              if (!can.edit && !can.submit && !can.withdraw) return null
+              return (
+                <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+                  {can.edit && <button onClick={() => startEdit(selected)} style={btnSecondary}>Edit</button>}
+                  {can.submit && (
+                    <button onClick={() => sendClaim.mutate(selected.id)} disabled={sendClaim.isPending} style={btnPrimary}>
+                      {selected.status === "REJECTED" ? "Submit again" : "Submit for approval"}
+                    </button>
+                  )}
+                  {can.withdraw && (
+                    <button onClick={() => { if (window.confirm(`Withdraw claim ${selected.claimNumber}?`)) withdrawClaim.mutate(selected.id) }}
+                      disabled={withdrawClaim.isPending} style={{ ...btnSecondary, color: "var(--hf-danger-text)" }}>Withdraw</button>
+                  )}
+                </div>
+              )
+            })()}
+            {selected.status === "PENDING" && canDecide && !mine(selected) && (
               <div style={{ display: "flex", gap: 10 }}>
                 <button onClick={() => { setShowReject(true); setError("") }}
                   style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "11px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
@@ -526,7 +627,7 @@ export function ExpensesPage() {
                 </button>
               </div>
             )}
-            {selected.status === "APPROVED" && canPay && (
+            {selected.status === "APPROVED" && canPay && !mine(selected) && (
               <button onClick={() => setShowReimburseConfirm(true)}
                 style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "12px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1.5px solid var(--hf-info-border)", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 <DollarSign size={14} /> Mark as reimbursed
@@ -561,9 +662,9 @@ export function ExpensesPage() {
             {error && <div style={{ marginTop: 10, padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => { setShowReject(false); setRejectReason(""); setError("") }} style={btnSecondary}>Cancel</button>
-              <button disabled={!rejectReason.trim() || rejectClaim.isPending}
+              <button disabled={rejectReason.trim().length < 5 || rejectClaim.isPending}
                 onClick={() => rejectClaim.mutate({ id: selected.id, reason: rejectReason })}
-                style={{ ...btnPrimary, background: !rejectReason.trim() ? "var(--hf-text-faint)" : "var(--hf-danger)", opacity: !rejectReason.trim() ? 0.7 : 1 }}>
+                style={{ ...btnPrimary, background: rejectReason.trim().length < 5 ? "var(--hf-text-faint)" : "var(--hf-danger)", opacity: rejectReason.trim().length < 5 ? 0.7 : 1 }}>
                 {rejectClaim.isPending ? "Rejecting..." : "Reject claim"}
               </button>
             </div>
@@ -577,10 +678,10 @@ export function ExpensesPage() {
           <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 580, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 25px 80px rgba(0,0,0,0.25)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>Submit Expense Claim</h3>
-                <p style={{ margin: "3px 0 0", fontSize: 13, color: "var(--hf-text-muted)" }}>Claims require approval before reimbursement</p>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>{editing ? `Edit claim ${editing.claimNumber}` : "New expense claim"}</h3>
+                <p style={{ margin: "3px 0 0", fontSize: 13, color: "var(--hf-text-muted)" }}>Save a draft to finish later, or submit it for approval</p>
               </div>
-              <button onClick={() => { setShowCreate(false); setForm(initForm()) }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
+              <button onClick={closeForm} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -635,27 +736,22 @@ export function ExpensesPage() {
             </div>
 
             <div style={{ marginTop: 14, padding: "11px 14px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border)", borderRadius: 9, fontSize: 12, color: "var(--hf-success-text-strong)" }}>
-              Once approved, a journal entry (DR Expenses / CR Accounts Payable) will automatically be posted to Accounting.
+              Once approved, it is posted to Accounting (Dr Staff expenses / Cr Accrued expenses); paying it out posts the payment from the bank account.
             </div>
 
             {error && <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
-              <button onClick={() => { setShowCreate(false); setForm(initForm()) }} style={btnSecondary}>Cancel</button>
+              <button onClick={closeForm} style={btnSecondary}>Cancel</button>
+              <button disabled={!form.employeeName || !form.description || !form.amount || !form.claimDate || submitClaim.isPending}
+                onClick={() => submitClaim.mutate({ draft: true })} style={btnSecondary}>
+                Save draft
+              </button>
               <button
                 disabled={!form.employeeName || !form.description || !form.amount || !form.claimDate || submitClaim.isPending}
-                onClick={() => submitClaim.mutate({
-                  employeeId: form.employeeId || null,
-                  employeeName: form.employeeName,
-                  claimDate: form.claimDate,
-                  category: form.category,
-                  description: form.description,
-                  amount: parseFloat(form.amount),
-                  receiptUrl: form.receiptUrl || null,
-                  notes: form.notes || null,
-                })}
+                onClick={() => submitClaim.mutate({ draft: false })}
                 style={{ ...btnPrimary, opacity: (!form.employeeName || !form.description || !form.amount) ? 0.5 : 1 }}>
-                {submitClaim.isPending ? "Submitting..." : <><Receipt size={13} /> Submit claim</>}
+                {submitClaim.isPending ? "Saving..." : <><Receipt size={13} /> Submit for approval</>}
               </button>
             </div>
           </div>
@@ -673,13 +769,35 @@ export function ExpensesPage() {
         />
       )}
       {showReimburseConfirm && selected && (
-        <ConfirmModal
-          title="Mark as reimbursed?"
-          message={`Confirm that ${fmtR(selected.amount)} has been paid out to ${selected.employeeName} for "${selected.description}".`}
-          confirmLabel="Mark reimbursed"
-          onConfirm={() => reimburse.mutate(selected.id)}
-          onCancel={() => setShowReimburseConfirm(false)}
-        />
+        <div role="dialog" aria-label="Pay out claim" style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 16 }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 24, width: 440, maxWidth: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
+            <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 800 }}>Pay out {fmtR(selected.amount)}</h3>
+            <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--hf-text-muted)" }}>
+              To {selected.employeeName} for “{selected.description}”. The payment is posted to Accounting from the account you choose.
+            </p>
+            {bankAccounts.length > 0 && (
+              <label style={{ display: "block", marginBottom: 12 }}>
+                <span style={lbl}>Paid from *</span>
+                <select aria-label="Paid from" value={payFromId} onChange={e => setPayFrom(e.target.value)} style={inp}>
+                  {bankAccounts.length > 1 && <option value="">Choose an account</option>}
+                  {bankAccounts.map(b => <option key={b.id} value={b.id}>{b.bankName} · {b.accountName}{b.accountNumber ? ` ···${String(b.accountNumber).slice(-4)}` : ""}</option>)}
+                </select>
+              </label>
+            )}
+            <label style={{ display: "block", marginBottom: 12 }}>
+              <span style={lbl}>Payment reference (optional)</span>
+              <input aria-label="Payment reference" value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="For example the EFT reference" style={inp} />
+            </label>
+            {error && <div role="alert" style={{ marginBottom: 12, padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button onClick={() => { setShowReimburseConfirm(false); setError("") }} style={btnSecondary}>Cancel</button>
+              <button onClick={() => reimburse.mutate(selected.id)} disabled={reimburse.isPending || (bankAccounts.length > 0 && !payFromId)}
+                style={{ ...btnPrimary, opacity: bankAccounts.length > 0 && !payFromId ? 0.6 : 1 }}>
+                {reimburse.isPending ? "Saving..." : "Mark paid out"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </SectionedModulePage>
   )

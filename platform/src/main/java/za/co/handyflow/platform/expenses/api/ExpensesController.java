@@ -63,12 +63,40 @@ public class ExpensesController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('USER_CREATE')")   // FIXED: was USER_READ
-    @Operation(summary = "Submit a new expense claim")
+    @Operation(summary = "Make an expense claim: sent for approval, or saved as a draft with ?draft=true")
     public ResponseEntity<ApiResponse<ExpenseClaimResponse>> submitClaim(
-            @Valid @RequestBody CreateExpenseClaimRequest req) {
-        return ResponseEntity.status(201).body(ApiResponse.success("Claim submitted",
+            @Valid @RequestBody CreateExpenseClaimRequest req,
+            @RequestParam(defaultValue = "false") boolean draft) {
+        return ResponseEntity.status(201).body(ApiResponse.success(draft ? "Draft saved" : "Claim submitted",
                 expensesService.submitClaim(TenantContext.getTenantIdAsObject(),
-                        TenantContext.getCurrentUserId(), req)));
+                        TenantContext.getCurrentUserId(), req, draft)));
+    }
+
+    // ── Finance patch F7: drafts, resubmission and withdrawal (the claimant only) ──
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @Operation(summary = "Change a draft or rejected claim (the claimant only)")
+    public ResponseEntity<ApiResponse<ExpenseClaimResponse>> updateClaim(
+            @PathVariable UUID id, @Valid @RequestBody CreateExpenseClaimRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Claim updated",
+                expensesService.updateClaim(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId(), req)));
+    }
+
+    @PostMapping("/{id}/submit")
+    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @Operation(summary = "Send a draft, or a corrected rejected claim, for approval (the claimant only)")
+    public ResponseEntity<ApiResponse<ExpenseClaimResponse>> submitExisting(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Claim submitted",
+                expensesService.submitExisting(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/{id}/withdraw")
+    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @Operation(summary = "Withdraw a draft or a claim waiting for approval (the claimant only)")
+    public ResponseEntity<ApiResponse<ExpenseClaimResponse>> withdrawClaim(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Claim withdrawn",
+                expensesService.withdrawClaim(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/{id}/approve")
@@ -92,15 +120,6 @@ public class ExpensesController {
                         id, TenantContext.getCurrentUserId(), req.reason())));
     }
 
-//    @PostMapping("/{id}/reimburse")
-//    @PreAuthorize("hasAuthority('USER_UPDATE')")   // FIXED: was USER_READ
-//    @Operation(summary = "Mark an approved claim as reimbursed")
-//    public ResponseEntity<ApiResponse<ExpenseClaimResponse>> markReimbursed(
-//            @PathVariable UUID id) {
-//        return ResponseEntity.ok(ApiResponse.success("Claim reimbursed",
-//                expensesService.markReimbursed(TenantContext.getTenantIdAsObject(), id)));
-//    }
-
     @GetMapping("/summary/monthly")
     @PreAuthorize("hasAuthority('EXPENSES_READ')")
     @Operation(summary = "Get total approved expenses for a month")
@@ -116,12 +135,15 @@ public class ExpensesController {
 
     @PostMapping("/{id}/reimburse")
     @PreAuthorize("hasAuthority('EXPENSES_ADMIN')")
-    @Operation(summary = "Mark an approved claim as reimbursed")
+    @Operation(summary = "Pay an approved claim out and post the payment (Dr Accrued Expenses, Cr the bank account it was paid from)")
     public ResponseEntity<ApiResponse<ExpenseClaimResponse>> markReimbursed(
-            @PathVariable UUID id) {
+            @PathVariable UUID id, @RequestBody(required = false) ReimburseRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Claim reimbursed",
-                expensesService.markReimbursed(TenantContext.getTenantIdAsObject(), id)));
+                expensesService.markReimbursed(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId(),
+                        req != null ? req.bankAccountId() : null, req != null ? req.reference() : null)));
     }
+
+    public record ReimburseRequest(UUID bankAccountId, String reference) {}
 
     @PostMapping(value = "/{id}/receipt", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyAuthority('USER_CREATE','EXPENSES_MANAGE')")

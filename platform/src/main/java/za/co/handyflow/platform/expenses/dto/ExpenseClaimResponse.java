@@ -22,5 +22,13 @@ public record ExpenseClaimResponse(
         String notes,
         Instant approvedAt,
         Instant reimbursedAt,
-        Instant createdAt
+        Instant createdAt,
+        // Finance patch F7
+        UUID submittedBy,
+        Instant submittedAt,
+        int submissionCount,
+        Instant cancelledAt,
+        UUID reimbursedBy,
+        String reimbursementReference,
+        UUID reimbursementJournalId
 ) {}

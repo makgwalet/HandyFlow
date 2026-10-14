@@ -37,6 +37,14 @@ public class ExpenseClaim {
     String notes;
     @Column(name = "created_at")    Instant createdAt;
     @Column(name = "updated_at")    Instant updatedAt;
+    // Finance patch F7: the claim's life (draft, submissions, withdrawal, payout).
+    @Column(name = "submitted_at")     Instant submittedAt;
+    @Column(name = "submission_count") int     submissionCount;
+    @Column(name = "cancelled_at")     Instant cancelledAt;
+    @Column(name = "reimbursed_by")    UUID    reimbursedBy;
+    @Column(name = "reimbursement_bank_account_id") UUID reimbursementBankAccountId;
+    @Column(name = "reimbursement_reference")       String reimbursementReference;
+    @Column(name = "reimbursement_journal_id")      UUID reimbursementJournalId;
 
     public static ExpenseClaim create(TenantId tenantId, String claimNumber,
                                       UUID employeeId, UUID submittedBy,
@@ -57,11 +65,51 @@ public class ExpenseClaim {
         c.amount       = amount;
         c.currency     = "ZAR";
         c.receiptUrl   = receiptUrl;
-        c.status       = "PENDING";
+        c.status       = "DRAFT";
         c.notes        = notes;
         c.createdAt    = Instant.now();
         c.updatedAt    = Instant.now();
         return c;
+    }
+
+    /** Changes a draft or rejected claim (finance patch F7). */
+    public void edit(UUID employeeId, String employeeName, LocalDate claimDate, String category, String description,
+                     BigDecimal amount, String receiptUrl, String notes) {
+        require(za.co.handyflow.platform.expenses.application.internal.ExpenseLifecycle.Action.EDIT);
+        this.employeeId   = employeeId;
+        this.employeeName = employeeName;
+        this.claimDate    = claimDate;
+        this.category     = category;
+        this.description  = description;
+        this.amount       = amount;
+        this.receiptUrl   = receiptUrl;
+        this.notes        = notes;
+        this.updatedAt    = Instant.now();
+    }
+
+    /** Sends a draft, or a rejected claim that was fixed, for approval (finance patch F7). */
+    public void submit() {
+        require(za.co.handyflow.platform.expenses.application.internal.ExpenseLifecycle.Action.SUBMIT);
+        this.status          = "PENDING";
+        this.rejectionReason = null;
+        this.approvedBy      = null;
+        this.approvedAt      = null;
+        this.submittedAt     = Instant.now();
+        this.submissionCount = this.submissionCount + 1;
+        this.updatedAt       = this.submittedAt;
+    }
+
+    /** The claimant withdraws a draft or a claim waiting for approval (finance patch F7). */
+    public void withdraw() {
+        require(za.co.handyflow.platform.expenses.application.internal.ExpenseLifecycle.Action.WITHDRAW);
+        this.status      = "CANCELLED";
+        this.cancelledAt = Instant.now();
+        this.updatedAt   = this.cancelledAt;
+    }
+
+    private void require(za.co.handyflow.platform.expenses.application.internal.ExpenseLifecycle.Action action) {
+        String problem = za.co.handyflow.platform.expenses.application.internal.ExpenseLifecycle.problem(action, status);
+        if (problem != null) throw new IllegalStateException(problem);
     }
 
     public void approve(UUID approvedBy) {
@@ -83,12 +131,16 @@ public class ExpenseClaim {
         this.updatedAt       = Instant.now();
     }
 
-    public void markReimbursed() {
-        if (!"APPROVED".equals(status))
-            throw new IllegalStateException("Only APPROVED claims can be reimbursed");
-        this.status        = "REIMBURSED";
-        this.reimbursedAt  = Instant.now();
-        this.updatedAt     = Instant.now();
+    /** Records the payout (finance patch F7): who paid it, from which bank account, the reference and its journal. */
+    public void markReimbursed(UUID by, UUID bankAccountId, String reference, UUID journalId) {
+        require(za.co.handyflow.platform.expenses.application.internal.ExpenseLifecycle.Action.REIMBURSE);
+        this.status                     = "REIMBURSED";
+        this.reimbursedAt               = Instant.now();
+        this.reimbursedBy               = by;
+        this.reimbursementBankAccountId = bankAccountId;
+        this.reimbursementReference     = reference;
+        this.reimbursementJournalId     = journalId;
+        this.updatedAt                  = this.reimbursedAt;
     }
 
     public void linkJournalEntry(UUID journalEntryId) {

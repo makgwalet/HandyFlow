@@ -7,7 +7,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import za.co.handyflow.platform.approvals.application.ApprovalFacade;
+import za.co.handyflow.platform.approvals.dto.ApprovalRequestResponse;
+import za.co.handyflow.platform.approvals.dto.ApprovalStepResponse;
+import za.co.handyflow.platform.expenses.application.internal.ExpenseLifecycle.Action;
 import za.co.handyflow.platform.expenses.domain.model.ExpenseClaim;
+import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.expenses.domain.repository.ExpenseClaimRepository;
 import za.co.handyflow.platform.expenses.dto.*;
 import za.co.handyflow.platform.hr.dto.EmployeeResponse;
@@ -39,6 +47,11 @@ public class ExpensesService {
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private final ExpenseAccountingPoster accountingPoster;
     private final za.co.handyflow.platform.evidence.application.EvidenceFacade evidenceFacade;
+    // Finance patch F7: claims go through the approval engine (platform default: one EXPENSES_MANAGE approver).
+    private final ApprovalFacade approvalFacade;
+    private final za.co.handyflow.platform.accounting.application.AccountingFacade accountingFacade;
+
+    private static final String MODULE = "expenses", ENTITY = "CLAIM";
 
     @Transactional(readOnly = true)
     public Page<ExpenseClaimResponse> getClaims(TenantId tenantId, String status,
@@ -91,70 +104,248 @@ public class ExpensesService {
         catch (RuntimeException e) { return null; }
     }
 
+    /**
+     * Saves a new claim (finance patch F7): as a draft when {@code asDraft}, otherwise sent for approval at once (what the
+     * form did before drafts existed).
+     */
     @Transactional
     public ExpenseClaimResponse submitClaim(TenantId tenantId, UUID submittedBy,
-                                            CreateExpenseClaimRequest req) {
+                                            CreateExpenseClaimRequest req, boolean asDraft) {
         String number = numberGen.next(tenantId);
         ExpenseClaim claim = ExpenseClaim.create(tenantId, number,
                 req.employeeId(), submittedBy, req.employeeName(),
                 req.claimDate(), req.category(), req.description(),
                 req.amount(), req.receiptUrl(), req.notes());
         claimRepo.save(claim);
-        log.info("Expense claim {} submitted by={} amount={}",
-                number, req.employeeName(), req.amount());
+        if (asDraft) {
+            log.info("Expense claim {} saved as draft by={}", number, submittedBy);
+            return toResponse(claim);
+        }
+        return sendForApproval(tenantId, claim);
+    }
+
+    /** Changes a draft or a rejected claim; only the claimant (finance patch F7). */
+    @Transactional
+    public ExpenseClaimResponse updateClaim(TenantId tenantId, UUID id, UUID user, CreateExpenseClaimRequest req) {
+        ExpenseClaim claim = findByTenant(tenantId, id);
+        requireClaimant(claim, user);
+        claim.edit(req.employeeId(), req.employeeName(), req.claimDate(), req.category(), req.description(),
+                req.amount(), req.receiptUrl(), req.notes());
+        claimRepo.save(claim);
+        return toResponse(claim);
+    }
+
+    /** Sends a draft, or a fixed rejected claim, for approval; only the claimant (finance patch F7). */
+    @Transactional
+    public ExpenseClaimResponse submitExisting(TenantId tenantId, UUID id, UUID user) {
+        ExpenseClaim claim = findByTenant(tenantId, id);
+        requireClaimant(claim, user);
+        return sendForApproval(tenantId, claim);
+    }
+
+    /** The claimant withdraws a draft or a claim waiting for approval (finance patch F7). */
+    @Transactional
+    public ExpenseClaimResponse withdrawClaim(TenantId tenantId, UUID id, UUID user) {
+        ExpenseClaim claim = findByTenant(tenantId, id);
+        requireClaimant(claim, user);
+        claim.withdraw();
+        claimRepo.save(claim);
+        log.info("Expense claim {} withdrawn by={}", claim.getClaimNumber(), user);
+        return toResponse(claim);
+    }
+
+    private ExpenseClaimResponse sendForApproval(TenantId tenantId, ExpenseClaim claim) {
+        String incomplete = ExpenseLifecycle.submitProblem(claim.getEmployeeName(), claim.getClaimDate(),
+                claim.getCategory(), claim.getDescription(), claim.getAmount(), LocalDate.now());
+        if (incomplete != null) throw new HandyFlowException(incomplete, HttpStatus.BAD_REQUEST, "CLAIM_INCOMPLETE");
+        boolean resubmission = "REJECTED".equals(claim.getStatus());
+        claim.submit();
+        claimRepo.save(claim);
+
+        var latest = approvalFacade.getLatestRequestForEntity(tenantId, MODULE, ENTITY, claim.getId());
+        ApprovalRequestResponse request = resubmission && latest.isPresent() && "REJECTED".equals(latest.get().status())
+                ? approvalFacade.resubmit(tenantId, latest.get().id(), claim.getSubmittedBy(), approvalMetadata(tenantId, claim))
+                : approvalFacade.submit(tenantId, MODULE, ENTITY, claim.getId(), claim.getSubmittedBy(), approvalMetadata(tenantId, claim));
+        log.info("Expense claim {} sent for approval (submission {}) by={} amount={}",
+                claim.getClaimNumber(), claim.getSubmissionCount(), claim.getSubmittedBy(), claim.getAmount());
+        if ("APPROVED".equals(request.status())) {
+            // A tenant rule with no step that applies to this claim approves it at once.
+            completeApproval(tenantId, claim.getId(), null);
+            return toResponse(findByTenant(tenantId, claim.getId()));
+        }
         notifySubmitted(tenantId, claim);
         return toResponse(claim);
     }
 
+    /**
+     * Gives this person's approval (finance patch F7). The claim is approved, and posted to the ledger, when the approval
+     * engine's last step is done; with the default rule that is the first approval. Claims sent before F7 have no
+     * approval request yet; one is made here.
+     */
     @Transactional
     public ExpenseClaimResponse approveClaim(TenantId tenantId, UUID id,
                                              UUID approvedBy) {
         ExpenseClaim claim = findByTenant(tenantId, id);
+        requireAction(claim, Action.APPROVE);
         String problem = ExpenseRules.selfApprovalProblem(claim.getSubmittedBy(), approvedBy,
                 employeeEmail(tenantId, claim.getEmployeeId()), userEmail(approvedBy));
         if (problem != null) throw new IllegalStateException(problem);
-        claim.approve(approvedBy);
-        claimRepo.save(claim);
 
-        // Auto-post to accounting journal
-        postToAccounting(tenantId, claim);
-
-        log.info("Expense claim {} approved amount={}", claim.getClaimNumber(),
-                claim.getAmount());
-        notifyEmployee(tenantId, claim, NotificationType.EXPENSE_CLAIM_APPROVED,
-                "Expense claim approved: " + claim.getClaimNumber(),
-                "Your expense claim " + claim.getClaimNumber() + " for R"
-                        + claim.getAmount().stripTrailingZeros().toPlainString()
-                        + " has been approved and will be paid out.");
-        return toResponse(claim);
+        ApprovalRequestResponse result = actOnPendingStep(tenantId, claim, approvedBy, "APPROVE", null);
+        if ("APPROVED".equals(result.status())) {
+            completeApproval(tenantId, id, approvedBy);
+        } else {
+            log.info("Expense claim {} approval recorded by={}, further approval still needed", claim.getClaimNumber(), approvedBy);
+        }
+        return toResponse(findByTenant(tenantId, id));
     }
 
     @Transactional
     public ExpenseClaimResponse rejectClaim(TenantId tenantId, UUID id,
                                             UUID approvedBy, String reason) {
         ExpenseClaim claim = findByTenant(tenantId, id);
-        claim.reject(approvedBy, reason);
+        requireAction(claim, Action.REJECT);
+        String noReason = ExpenseLifecycle.reasonProblem(reason);
+        if (noReason != null) throw new HandyFlowException(noReason, HttpStatus.BAD_REQUEST, "REASON_REQUIRED");
+        actOnPendingStep(tenantId, claim, approvedBy, "REJECT", reason.trim());
+        rejectFromEngine(tenantId, id, approvedBy, reason.trim());
+        return toResponse(findByTenant(tenantId, id));
+    }
+
+    /**
+     * Approves the claim and posts it, once (finance patch F7). Called when this module's approve completes the last step,
+     * and by ExpensesApprovalEventHandler when the last step is done from the Approvals inbox; whichever runs second finds
+     * the claim no longer waiting and does nothing.
+     */
+    @Transactional
+    public void completeApproval(TenantId tenantId, UUID id, UUID approvedBy) {
+        ExpenseClaim claim = findByTenant(tenantId, id);
+        if (!"PENDING".equals(claim.getStatus())) return;
+        claim.approve(approvedBy != null ? approvedBy : lastApprover(tenantId, id));
         claimRepo.save(claim);
-        log.info("Expense claim {} rejected reason={}", claim.getClaimNumber(), reason);
+        postToAccounting(tenantId, claim);
+        log.info("Expense claim {} approved amount={}", claim.getClaimNumber(), claim.getAmount());
+        notifyEmployee(tenantId, claim, NotificationType.EXPENSE_CLAIM_APPROVED,
+                "Expense claim approved: " + claim.getClaimNumber(),
+                "Your expense claim " + claim.getClaimNumber() + " for R"
+                        + claim.getAmount().stripTrailingZeros().toPlainString()
+                        + " has been approved and will be paid out.");
+    }
+
+    /** Rejects the claim, once; the claimant can fix and resubmit it (finance patch F7). */
+    @Transactional
+    public void rejectFromEngine(TenantId tenantId, UUID id, UUID by, String reason) {
+        ExpenseClaim claim = findByTenant(tenantId, id);
+        if (!"PENDING".equals(claim.getStatus())) return;
+        String why = reason != null ? reason : rejectionComment(tenantId, id);
+        claim.reject(by, why);
+        claimRepo.save(claim);
+        log.info("Expense claim {} rejected reason={}", claim.getClaimNumber(), why);
         notifyEmployee(tenantId, claim, NotificationType.EXPENSE_CLAIM_REJECTED,
                 "Expense claim rejected: " + claim.getClaimNumber(),
                 "Your expense claim " + claim.getClaimNumber() + " was rejected. Reason: "
-                        + (reason != null && !reason.isBlank() ? reason : "No reason provided") + ".");
-        return toResponse(claim);
+                        + (why != null && !why.isBlank() ? why : "No reason provided")
+                        + ". You can correct it and submit it again.");
     }
 
+    /**
+     * Pays the claim out (finance patch F7) and posts the payment: Dr Accrued Expenses, Cr the bank account it was paid
+     * from. Where the business keeps bank accounts in Accounting, the account is required. Never by the claimant or the
+     * person it pays.
+     */
     @Transactional
-    public ExpenseClaimResponse markReimbursed(TenantId tenantId, UUID id) {
+    public ExpenseClaimResponse markReimbursed(TenantId tenantId, UUID id, UUID by, UUID bankAccountId, String reference) {
         ExpenseClaim claim = findByTenant(tenantId, id);
-        claim.markReimbursed();
+        requireAction(claim, Action.REIMBURSE);
+        String self = ExpenseRules.selfApprovalProblem(claim.getSubmittedBy(), by,
+                employeeEmail(tenantId, claim.getEmployeeId()), userEmail(by));
+        if (self != null) throw new IllegalStateException(self.replace("approve", "pay out").replace("approved", "paid out"));
+        boolean keepsBankAccounts = !accountingFacade.getBankAccounts(tenantId).isEmpty();
+        if (bankAccountId == null && keepsBankAccounts)
+            throw new HandyFlowException("Choose the bank account the claim was paid from", HttpStatus.BAD_REQUEST, "BANK_ACCOUNT_REQUIRED");
+        String ref = reference == null || reference.isBlank() ? null : reference.trim();
+        UUID journalId = bankAccountId == null ? null : accountingPoster.postReimbursementJournal(tenantId, claim.getId(),
+                claim.getClaimNumber(), claim.getEmployeeName(), claim.getAmount(), bankAccountId, ref).orElse(null);
+        claim.markReimbursed(by, bankAccountId, ref, journalId);
         claimRepo.save(claim);
-        log.info("Expense claim {} reimbursed", claim.getClaimNumber());
+        log.info("Expense claim {} reimbursed by={} journal={}", claim.getClaimNumber(), by, journalId);
         notifyEmployee(tenantId, claim, NotificationType.EXPENSE_CLAIM_REIMBURSED,
                 "Expense claim reimbursed: " + claim.getClaimNumber(),
                 "Your expense claim " + claim.getClaimNumber() + " for R"
                         + claim.getAmount().stripTrailingZeros().toPlainString()
                         + " has been paid out.");
         return toResponse(claim);
+    }
+
+    // ── Approval engine helpers (finance patch F7) ────────────────────────────
+
+    private ApprovalRequestResponse actOnPendingStep(TenantId tenantId, ExpenseClaim claim, UUID actor,
+                                                     String decision, String comment) {
+        var latest = approvalFacade.getLatestRequestForEntity(tenantId, MODULE, ENTITY, claim.getId());
+        ApprovalRequestResponse request = latest.filter(this::isOpen).orElse(null);
+        if (request == null) {
+            // Sent before F7 (or the engine request is missing): open one now, then act on it.
+            request = approvalFacade.submit(tenantId, MODULE, ENTITY, claim.getId(), claim.getSubmittedBy(),
+                    approvalMetadata(tenantId, claim));
+            if (!isOpen(request)) return request;
+        }
+        ApprovalStepResponse step = request.steps().stream()
+                .filter(st -> "PENDING".equals(st.status()))
+                .min(java.util.Comparator.comparingInt(ApprovalStepResponse::stepOrder))
+                .orElseThrow(() -> new HandyFlowException("This claim's approval has no step waiting — needs a manual look",
+                        HttpStatus.CONFLICT, "NO_PENDING_STEP"));
+        return approvalFacade.actOnStep(tenantId, step.id(), actor, currentAuthorities(), decision, comment, null);
+    }
+
+    /** The approval engine's view of a claim; the claimant and the person paid may not approve any step. */
+    private java.util.Map<String, Object> approvalMetadata(TenantId tenantId, ExpenseClaim claim) {
+        java.util.Map<String, Object> m = new java.util.HashMap<>();
+        m.put("totalAmount", claim.getAmount());
+        m.put("category", claim.getCategory());
+        java.util.Set<String> excluded = new java.util.LinkedHashSet<>();
+        if (claim.getSubmittedBy() != null) excluded.add(claim.getSubmittedBy().toString());
+        String payee = employeeEmail(tenantId, claim.getEmployeeId());
+        if (payee != null && !payee.isBlank()) {
+            try {
+                excluded.addAll(jdbc.queryForList("SELECT id::text FROM users WHERE tenant_id = ? AND lower(email) = lower(?)",
+                        String.class, tenantId.getValue(), payee.trim()));
+            } catch (RuntimeException ignored) { /* the claimant check still applies */ }
+        }
+        if (!excluded.isEmpty()) m.put("excludedActors", List.copyOf(excluded));
+        return m;
+    }
+
+    private boolean isOpen(ApprovalRequestResponse r) {
+        return "SUBMITTED".equals(r.status()) || "IN_PROGRESS".equals(r.status());
+    }
+
+    private UUID lastApprover(TenantId tenantId, UUID id) {
+        return approvalFacade.getLatestRequestForEntity(tenantId, MODULE, ENTITY, id)
+                .flatMap(r -> r.steps().stream().filter(st -> st.actedBy() != null)
+                        .max(java.util.Comparator.comparingInt(ApprovalStepResponse::stepOrder)))
+                .map(ApprovalStepResponse::actedBy).orElse(null);
+    }
+
+    private String rejectionComment(TenantId tenantId, UUID id) {
+        return approvalFacade.getLatestRequestForEntity(tenantId, MODULE, ENTITY, id)
+                .flatMap(r -> r.steps().stream().filter(st -> "REJECTED".equals(st.status())).findFirst())
+                .map(ApprovalStepResponse::comment).orElse(null);
+    }
+
+    private List<String> currentAuthorities() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return List.of();
+        return auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList();
+    }
+
+    private void requireClaimant(ExpenseClaim claim, UUID user) {
+        String p = ExpenseLifecycle.claimantProblem(claim.getSubmittedBy(), user);
+        if (p != null) throw new HandyFlowException(p, HttpStatus.FORBIDDEN, "NOT_CLAIMANT");
+    }
+
+    private void requireAction(ExpenseClaim claim, Action action) {
+        String p = ExpenseLifecycle.problem(action, claim.getStatus());
+        if (p != null) throw new IllegalStateException(p);
     }
 
     @Transactional(readOnly = true)
@@ -218,7 +409,9 @@ public class ExpensesService {
                 c.getCategory(), c.getDescription(), c.getAmount(), c.getCurrency(),
                 c.getReceiptUrl(), c.getStatus(), c.getRejectionReason(),
                 c.getJournalEntryId(), c.getNotes(), c.getApprovedAt(),
-                c.getReimbursedAt(), c.getCreatedAt());
+                c.getReimbursedAt(), c.getCreatedAt(),
+                c.getSubmittedBy(), c.getSubmittedAt(), c.getSubmissionCount(), c.getCancelledAt(),
+                c.getReimbursedBy(), c.getReimbursementReference(), c.getReimbursementJournalId());
     }
 
     // NEW (Tier 1 gap analysis): no explicit approver field exists on
