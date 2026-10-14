@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.accounting.application.internal.ConsolidationService;
 import za.co.handyflow.platform.accounting.application.internal.GroupService;
 import za.co.handyflow.platform.accounting.dto.GroupDtos.*;
+import za.co.handyflow.platform.accounting.dto.GroupDtos.Mapping;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
