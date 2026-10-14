@@ -54,4 +54,11 @@ class ReceiptRulesTest {
         assertEquals(r("10.00"), s[0]);
         assertEquals(r("0.00"), s[1]);
     }
+    @Test void refundsComeOutOfCreditWithABankAndReason() {
+        assertNull(ReceiptRules.refundProblem(r("50"), r("85"), true, "Customer cancelled the order"));
+        assertTrue(ReceiptRules.refundProblem(r("85.01"), r("85"), true, "Customer cancelled").contains("R 85.00"));
+        assertNotNull(ReceiptRules.refundProblem(r("50"), r("85"), false, "Customer cancelled"));
+        assertNotNull(ReceiptRules.refundProblem(r("50"), r("85"), true, "oops"));
+        assertNotNull(ReceiptRules.refundProblem(null, r("85"), true, "Customer cancelled"));
+    }
 }

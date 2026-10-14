@@ -76,7 +76,7 @@ public class StatementOfAccountService {
 
         List<InvoiceStatementLine> lines = new ArrayList<>();
         for (Invoice inv : invoices) {
-            BigDecimal creditedTotal = creditNoteRepo.findByInvoice(tenantId, inv.getId()).stream()
+            BigDecimal creditedTotal = creditNoteRepo.findByInvoice(tenantId, inv.getId()).stream().filter(CreditNote::isIssued)
                     .map(CreditNote::getTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
             BigDecimal balance = inv.getBalanceDue();   // finance patch F8: the same balance everywhere
 

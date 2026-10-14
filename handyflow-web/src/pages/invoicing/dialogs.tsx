@@ -8,7 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AlertTriangle } from "lucide-react"
 import { apiClient } from "../../api/client"
 import {
-  allocateOldestFirst, allocationError, balanceOf, billableHours, creditNoteError, creditNoteTotals, cycleHoursError, fmtR, hoursError, num, paymentError, retainerUse, wouldExceed,
+  CREDIT_NOTE_APPROVAL_LIMIT, allocateOldestFirst, allocationError, balanceOf, billableHours, creditNoteError, creditNoteTotals, cycleHoursError, fmtR, hoursError, num, paymentError, retainerUse, wouldExceed,
   type Invoice, type RecurringSchedule,
 } from "./billing.logic"
 import { apiMessage, useCustomerNames } from "./queries"
@@ -131,6 +131,7 @@ export function CreditNoteDialog({ invoice, onClose, onDone }: { invoice: Invoic
       </div>
       <Field label="Description (optional)">{id => <input id={id} value={f.description} onChange={e => setF({ ...f, description: e.target.value })} style={fieldStyle} />}</Field>
       {t.subtotal > 0 && <Notice tone="info">Credit of {fmtR(t.subtotal)} plus {fmtR(t.vat)} VAT: {fmtR(t.total)} in total.</Notice>}
+      {t.total >= CREDIT_NOTE_APPROVAL_LIMIT && <Notice tone="warn">Credit notes of {fmtR(CREDIT_NOTE_APPROVAL_LIMIT)} or more wait for someone else to approve them before they take effect.</Notice>}
       {err && <Notice tone="bad">{err}</Notice>}
     </Dialog>
   )
@@ -182,7 +183,7 @@ export function ReceivePaymentDialog({ onClose, onDone, customerId: fixedCustome
   const names = useCustomerNames()
   const accounts = useReceivingAccounts()
   const today = new Date().toISOString().slice(0, 10)
-  const [f, setF] = useState({ customerId: fixedCustomer ?? "", amount: "", receivedOn: today, method: "EFT", reference: "", bank: "" })
+  const [f, setF] = useState({ customerId: fixedCustomer ?? "", amount: "", receivedOn: today, method: "EFT", reference: "", bank: "", notes: "" })
   const [alloc, setAlloc] = useState<Record<string, number> | null>(null)
   const [err, setErr] = useState("")
   const account = useCustomerAccount(f.customerId || null)
@@ -196,7 +197,7 @@ export function ReceivePaymentDialog({ onClose, onDone, customerId: fixedCustome
   const save = useMutation({
     mutationFn: () => apiClient.post("/api/v1/invoicing/receipts", {
       customerId: f.customerId, amount, receivedOn: f.receivedOn, method: f.method, reference: f.reference.trim() || undefined,
-      bankAccountId: bank || undefined,
+      bankAccountId: bank || undefined, notes: f.notes.trim() || undefined,
       allocations: open.filter(o => (allocations[o.id] ?? 0) > 0).map(o => ({ invoiceId: o.id, amount: allocations[o.id] })),
     }),
     onSuccess: () => {
@@ -240,6 +241,7 @@ export function ReceivePaymentDialog({ onClose, onDone, customerId: fixedCustome
         </Field>
       )}
       <Field label="Reference (optional)">{id => <input id={id} value={f.reference} onChange={e => setF({ ...f, reference: e.target.value })} style={fieldStyle} />}</Field>
+      <Field label="Note (optional)" hint="For a deposit before invoicing, say what it is for; it stays as credit until an invoice uses it.">{id => <input id={id} value={f.notes} onChange={e => setF({ ...f, notes: e.target.value })} style={fieldStyle} placeholder="e.g. Deposit for quote QT-0012" />}</Field>
       {f.customerId && (
         <div role="group" aria-label="Allocate to invoices" style={{ marginTop: 8 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 6 }}>
@@ -257,6 +259,61 @@ export function ReceivePaymentDialog({ onClose, onDone, customerId: fixedCustome
           {amount > 0 && <Notice tone={keptAsCredit > 0 ? "info" : "ok"}>{keptAsCredit > 0 ? `${fmtR(keptAsCredit)} will be kept as the customer's credit.` : "The full amount settles invoices."}</Notice>}
         </div>
       )}
+      {err && <Notice tone="bad">{err}</Notice>}
+    </Dialog>
+  )
+}
+
+// ── Finance patch F9: paying customer credit back ──
+
+export interface CreditSource { id: string; receiptNumber: string; available: number }
+
+export function RefundDialog({ credits, onClose, onDone }: { credits: CreditSource[]; onClose: () => void; onDone?: () => void }) {
+  const qc = useQueryClient()
+  const accounts = useReceivingAccounts()
+  const usable = credits.filter(c => Number(c.available) > 0)
+  const [f, setF] = useState({ receiptId: usable[0]?.id ?? "", amount: String(usable[0]?.available ?? ""), bank: "", reference: "", reason: "" })
+  const [err, setErr] = useState("")
+  const chosen = usable.find(c => c.id === f.receiptId)
+  const bank = f.bank || (accounts.length === 1 ? accounts[0].id : "")
+  const save = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/invoicing/receipts/${f.receiptId}/refunds`, {
+      amount: Number(f.amount), bankAccountId: bank, reference: f.reference.trim() || undefined, reason: f.reason.trim() }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["customer-account"] }); qc.invalidateQueries({ queryKey: ["invoice-credit"] })
+      onDone?.(); onClose()
+    },
+    onError: (e: any) => setErr(apiMessage(e, "The refund could not be recorded.")),
+  })
+  const submit = () => {
+    const a = Number(f.amount)
+    const m = !chosen ? "Choose the credit to refund."
+      : !(a > 0) ? "Enter the amount to refund."
+      : a > Number(chosen.available) + 0.005 ? `Only ${fmtR(chosen.available)} of this credit is left.`
+      : !bank ? "Choose the bank account the refund is paid from."
+      : f.reason.trim().length < 5 ? "Say why the money is refunded."
+      : null
+    if (m) setErr(m); else { setErr(""); save.mutate() }
+  }
+  return (
+    <Dialog title="Refund credit" onClose={onClose} subtitle="Pay customer credit back. It is posted from the bank account you choose."
+      footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="danger" onClick={submit} disabled={save.isPending}>{save.isPending ? "Saving..." : "Record refund"}</Btn></>}>
+      {usable.length > 1 && (
+        <Field label="Credit">{id => (
+          <select id={id} value={f.receiptId} onChange={e => { const c = usable.find(x => x.id === e.target.value); setF({ ...f, receiptId: e.target.value, amount: String(c?.available ?? "") }) }} style={fieldStyle}>
+            {usable.map(c => <option key={c.id} value={c.id}>{c.receiptNumber} · {fmtR(c.available)} left</option>)}
+          </select>)}
+        </Field>
+      )}
+      <Field label="Amount to refund (R)">{id => <input id={id} type="number" min="0.01" step="0.01" value={f.amount} onChange={e => setF({ ...f, amount: e.target.value })} style={fieldStyle} />}</Field>
+      <Field label="Paid from">{id => (
+        <select id={id} value={bank} onChange={e => setF({ ...f, bank: e.target.value })} style={fieldStyle}>
+          {accounts.length !== 1 && <option value="">Choose an account</option>}
+          {accounts.map(b => <option key={b.id} value={b.id}>{accountLabel(b)}</option>)}
+        </select>)}
+      </Field>
+      <Field label="Reference (optional)">{id => <input id={id} value={f.reference} onChange={e => setF({ ...f, reference: e.target.value })} style={fieldStyle} />}</Field>
+      <Field label="Reason">{id => <input id={id} value={f.reason} onChange={e => setF({ ...f, reason: e.target.value })} style={fieldStyle} placeholder="e.g. Order cancelled, deposit returned" />}</Field>
       {err && <Notice tone="bad">{err}</Notice>}
     </Dialog>
   )

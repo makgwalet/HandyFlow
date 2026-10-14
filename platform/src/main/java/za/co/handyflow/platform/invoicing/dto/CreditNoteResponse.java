@@ -16,5 +16,10 @@ public record CreditNoteResponse(
         BigDecimal total,
         String currency,
         Instant issuedAt,
-        Instant createdAt
+        Instant createdAt,
+        // Finance patch F9
+        String status,
+        UUID createdBy,
+        Instant decidedAt,
+        String rejectionReason
 ) {}

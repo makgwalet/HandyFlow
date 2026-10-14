@@ -24,6 +24,7 @@ public interface CreditNoteRepository extends JpaRepository<CreditNote, UUID> {
     List<CreditNote> findByInvoice(TenantId tenantId, UUID invoiceId);
 
     // Credit notes netted per invoice, excluding VAT: rows are [invoiceId, sum of subtotals]. Callers must not pass an empty collection.
-    @Query("SELECT c.invoiceId, SUM(c.subtotal) FROM CreditNote c WHERE c.tenantId = :tenantId AND c.invoiceId IN :invoiceIds GROUP BY c.invoiceId")
+    // Finance patch F9: only credit notes that took effect.
+    @Query("SELECT c.invoiceId, SUM(c.subtotal) FROM CreditNote c WHERE c.tenantId = :tenantId AND c.invoiceId IN :invoiceIds AND c.status = 'ISSUED' GROUP BY c.invoiceId")
     List<Object[]> sumSubtotalByInvoice(TenantId tenantId, Collection<UUID> invoiceIds);
 }

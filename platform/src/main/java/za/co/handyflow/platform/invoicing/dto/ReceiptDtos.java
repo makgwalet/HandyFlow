@@ -29,7 +29,13 @@ public final class ReceiptDtos {
     public record ReceiptResponse(UUID id, String receiptNumber, UUID customerId, String kind, BigDecimal amount,
                                   BigDecimal allocated, BigDecimal available, LocalDate receivedOn, String method,
                                   String reference, UUID bankAccountId, String notes, Instant createdAt,
-                                  List<AllocationResponse> allocations) {}
+                                  List<AllocationResponse> allocations, List<RefundResponse> refunds) {}
+
+    /** Finance patch F9: money paid back to a customer out of a receipt's credit. */
+    public record RefundRequest(BigDecimal amount, LocalDate refundedOn, UUID bankAccountId, String reference, String reason) {}
+
+    public record RefundResponse(UUID id, String refundNumber, BigDecimal amount, LocalDate refundedOn, UUID bankAccountId,
+                                 String reference, String reason, Instant createdAt) {}
 
     public record OpenInvoice(UUID id, String invoiceNumber, LocalDate dueDate, BigDecimal total, BigDecimal amountPaid,
                               BigDecimal creditedAmount, BigDecimal balanceDue, String status) {}

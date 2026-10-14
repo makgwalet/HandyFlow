@@ -60,8 +60,18 @@ public class CreditNote {
     @Column(nullable = false)
     private String currency = "ZAR";
 
-    @Column(name = "issued_at", nullable = false)
+    /** Finance patch F9: when it took effect; null while waiting for approval or after rejection. */
+    @Column(name = "issued_at")
     private Instant issuedAt;
+
+    /** Finance patch F9: PENDING_APPROVAL, ISSUED or REJECTED. */
+    @Column(nullable = false)
+    private String status = "ISSUED";
+
+    @Column(name = "created_by")       private UUID createdBy;
+    @Column(name = "decided_by")       private UUID decidedBy;
+    @Column(name = "decided_at")       private Instant decidedAt;
+    @Column(name = "rejection_reason") private String rejectionReason;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -91,8 +101,31 @@ public class CreditNote {
                 .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
         cn.total = cn.subtotal.add(cn.vatTotal);
         cn.currency = currency != null ? currency : "ZAR";
-        cn.issuedAt = Instant.now();
+        cn.issuedAt = null;
+        cn.status = "PENDING_APPROVAL";
         cn.createdAt = Instant.now();
         return cn;
     }
+
+    /** Finance patch F9: who raised it. */
+    public void raisedBy(UUID by) { this.createdBy = by; }
+
+    /** Finance patch F9: takes effect (applied to the invoice, emailed and posted by the caller). */
+    public void issue(UUID decidedBy) {
+        if (!"PENDING_APPROVAL".equals(status)) throw new IllegalStateException("Only a credit note waiting for approval can be issued");
+        this.status = "ISSUED";
+        this.issuedAt = Instant.now();
+        this.decidedBy = decidedBy;
+        this.decidedAt = this.issuedAt;
+    }
+
+    public void reject(UUID decidedBy, String reason) {
+        if (!"PENDING_APPROVAL".equals(status)) throw new IllegalStateException("Only a credit note waiting for approval can be rejected");
+        this.status = "REJECTED";
+        this.decidedBy = decidedBy;
+        this.decidedAt = Instant.now();
+        this.rejectionReason = reason;
+    }
+
+    public boolean isIssued() { return "ISSUED".equals(status); }
 }

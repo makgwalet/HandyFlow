@@ -12,6 +12,7 @@ import za.co.handyflow.platform.invoicing.CreditNoteIssuedEvent;
 import za.co.handyflow.platform.invoicing.InvoiceIssuedEvent;
 import za.co.handyflow.platform.invoicing.InvoicePaymentRecordedEvent;
 import za.co.handyflow.platform.invoicing.ReceiptRecordedEvent;
+import za.co.handyflow.platform.invoicing.RefundIssuedEvent;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
@@ -207,6 +208,33 @@ class InvoicingAccountingEventHandler {
             log.info("[Accounting] Posted receipt={} tenant={}", event.receiptNumber(), event.tenantId());
         } catch (Exception e) {
             log.error("[Accounting] Failed to post receipt={} tenant={}: {}", event.receiptNumber(), event.tenantId(), e.getMessage(), e);
+        }
+    }
+
+    /** Finance patch F9: a refund of customer credit, posted once: Dr Accounts Receivable, Cr the bank it was paid from. */
+    @ApplicationModuleListener
+    void onRefundIssued(RefundIssuedEvent event) {
+        String key = PostingKeys.of("invoicing", "refund", event.refundId());
+        String summary = "Refund to customer: " + event.refundNumber() + " R " + event.amount() + " (credit " + event.receiptNumber() + ")";
+        try {
+            var bankAccount = bankAccountRepo.findActiveById(event.tenantId(), event.bankAccountId()).orElse(null);
+            UUID arAccountId = findAccountByCode(event.tenantId().getValue(), AR_ACCOUNT_CODE);
+            if (bankAccount == null || bankAccount.getAccountId() == null || arAccountId == null) {
+                ledgerPosting.recordFailure(event.tenantId(), key, summary, arAccountId == null
+                        ? "The chart of accounts has no Accounts Receivable (" + AR_ACCOUNT_CODE + ") account"
+                        : "The bank account the refund was paid from is missing or not linked to a ledger account");
+                return;
+            }
+            String memo = "Refund " + event.refundNumber() + " of credit " + event.receiptNumber();
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(
+                    event.refundedOn() != null ? event.refundedOn() : LocalDate.now(), summary,
+                    event.reference() != null ? event.reference() : event.refundNumber(), "PAYMENT", List.of(
+                    new CreateJournalEntryRequest.JournalLineRequest(arAccountId, memo, event.amount(), null),
+                    new CreateJournalEntryRequest.JournalLineRequest(bankAccount.getAccountId(), memo, null, event.amount())));
+            ledgerPosting.postOnceOrRecord(event.tenantId(), key, req);
+            log.info("[Accounting] Posted refund={} tenant={}", event.refundNumber(), event.tenantId());
+        } catch (Exception e) {
+            log.error("[Accounting] Failed to post refund={} tenant={}: {}", event.refundNumber(), event.tenantId(), e.getMessage(), e);
         }
     }
 

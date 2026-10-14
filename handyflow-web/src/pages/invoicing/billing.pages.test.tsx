@@ -193,7 +193,8 @@ describe('InvoicesListPage', () => {
 
 describe('InvoiceDetailPage', () => {
   const open = (inv: any, extra: Record<string, any> = {}) => {
-    route({ '/credit-notes': { data: { data: [] } }, '/invoicing/invoices/i1': one(inv), '/crm/customers/c1': one({ name: 'Acme Mining', email: 'ap@acme.test' }), ...extra })
+    // extra first so more specific paths (e.g. /invoices/i1/credit) match before /invoicing/invoices/i1; then again so it overrides
+    route({ ...extra, '/credit-notes': { data: { data: [] } }, '/invoicing/invoices/i1': one(inv), '/crm/customers/c1': one({ name: 'Acme Mining', email: 'ap@acme.test' }), ...extra })
     return renderAt('/invoices/i1', '/invoices/:id', <InvoiceDetailPage />)
   }
   it('shows what is owing, the customer and the lines', async () => {
@@ -216,6 +217,33 @@ describe('InvoiceDetailPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Use credit \(R 60,00\)/ }))
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/v1/invoicing/receipts/r2/allocations', { allocations: [{ invoiceId: 'i1', amount: 35 }] }))
     expect(api.post).toHaveBeenCalledWith('/api/v1/invoicing/receipts/r1/allocations', { allocations: [{ invoiceId: 'i1', amount: 25 }] })
+  })
+  it('shows a credit note waiting for approval and lets an approver decide (finance F9)', async () => {
+    perms.add('CREDIT_NOTE_APPROVE')
+    api.post.mockResolvedValue({ data: {} })
+    open(invoice({ status: 'ISSUED' }), { '/credit-notes': { data: { data: [
+      { id: 'cn1', creditNoteNumber: 'CN-0007', invoiceId: 'i1', invoiceNumber: 'INV-0001', reason: 'Damaged goods', description: null,
+        subtotal: 5000, vatTotal: 750, total: 5750, currency: 'ZAR', issuedAt: null, createdAt: day(-1), status: 'PENDING_APPROVAL' }] } } })
+    expect(await screen.findByText(/waiting for approval/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Download CN-0007 PDF/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/v1/invoicing/credit-notes/cn1/approve', {}))
+  })
+  it("refunds a walk-in client's credit from a bank account with a reason (finance F9)", async () => {
+    perms.add('INVOICE_REFUND')
+    api.post.mockResolvedValue({ data: {} })
+    open(invoice({ customerId: null, walkinClientName: 'Sipho', status: 'PAID', amountPaid: 115 }), {
+      '/invoices/i1/credit': { data: { data: [{ id: 'r9', receiptNumber: 'RC-0009', available: 40 }] } },
+      '/accounting/bank-accounts': { data: { data: [{ id: 'b1', bankName: 'FNB', accountName: 'Cheque', accountNumber: '62001234', active: true, accountId: 'gl1' }] } } })
+    fireEvent.click(await screen.findByRole('button', { name: /Refund credit \(R 40,00\)/ }))
+    const d = screen.getByRole('dialog')
+    await within(d).findByRole('option', { name: /FNB/ })
+    fireEvent.click(within(d).getByRole('button', { name: 'Record refund' }))
+    expect((await within(d).findByRole('alert')).textContent).toMatch(/why/)
+    fireEvent.change(within(d).getByLabelText('Reason'), { target: { value: 'Returned the goods' } })
+    fireEvent.click(within(d).getByRole('button', { name: 'Record refund' }))
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/v1/invoicing/receipts/r9/refunds',
+      { amount: 40, bankAccountId: 'b1', reference: undefined, reason: 'Returned the goods' }))
   })
   it('shows retainer hours with an overage warning and offers Log hours', async () => {
     perms.add('INVOICE_CREATE')

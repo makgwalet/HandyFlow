@@ -39,10 +39,32 @@ public class CreditNoteController {
     public ResponseEntity<ApiResponse<CreditNoteResponse>> createCreditNote(
             @PathVariable UUID invoiceId,
             @Valid @RequestBody CreateCreditNoteRequest req) {
-        var result = creditNoteService.createCreditNote(TenantContext.getTenantIdAsObject(), invoiceId, req);
+        var result = creditNoteService.createCreditNote(TenantContext.getTenantIdAsObject(), invoiceId, req,
+                TenantContext.getCurrentUserId());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Credit note issued", result));
+                .body(ApiResponse.success("ISSUED".equals(result.status()) ? "Credit note issued" : "Credit note waiting for approval", result));
     }
+
+    // ── Finance patch F9: approval of credit notes above the limit ──
+
+    @PostMapping("/credit-notes/{id}/approve")
+    @PreAuthorize("hasAuthority('CREDIT_NOTE_APPROVE')")
+    @Operation(summary = "Approve a credit note waiting for approval (never your own); it is issued when the last approval is given")
+    public ResponseEntity<ApiResponse<CreditNoteResponse>> approve(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Credit note approved",
+                creditNoteService.approve(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/credit-notes/{id}/reject")
+    @PreAuthorize("hasAuthority('CREDIT_NOTE_APPROVE')")
+    @Operation(summary = "Reject a credit note waiting for approval, with the reason")
+    public ResponseEntity<ApiResponse<CreditNoteResponse>> reject(@PathVariable UUID id, @RequestBody RejectCreditNoteRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Credit note rejected",
+                creditNoteService.reject(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId(),
+                        req != null ? req.reason() : null)));
+    }
+
+    public record RejectCreditNoteRequest(String reason) {}
 
     @GetMapping("/invoices/{invoiceId}/credit-notes")
     @PreAuthorize("hasAuthority('INVOICE_READ')")
@@ -67,8 +89,12 @@ public class CreditNoteController {
     @Operation(summary = "Download credit note PDF")
     public ResponseEntity<byte[]> downloadPdf(@PathVariable UUID id) {
         var tenantId = TenantContext.getTenantIdAsObject();
-        byte[] pdf = creditNotePdfService.generateCreditNotePdf(id, tenantId);
         var creditNote = creditNoteService.getCreditNote(tenantId, id);
+        // Finance patch F9: a credit note waiting for approval, or rejected, is not a document to hand out.
+        if (!"ISSUED".equals(creditNote.status()))
+            throw new za.co.handyflow.platform.shared.HandyFlowException(
+                    "This credit note has not been issued", org.springframework.http.HttpStatus.CONFLICT, "NOT_ISSUED");
+        byte[] pdf = creditNotePdfService.generateCreditNotePdf(id, tenantId);
         String filename = creditNote.creditNoteNumber() + ".pdf";
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")

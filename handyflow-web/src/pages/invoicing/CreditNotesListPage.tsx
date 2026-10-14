@@ -61,9 +61,11 @@ export default function CreditNotesListPage() {
                     <td style={td}>{n.invoiceNumber}</td>
                     <td style={td}>{n.reason}</td>
                     <td style={{ ...td, textAlign: "right", fontWeight: 700, color: "var(--hf-danger-text-strong)" }}>{fmtR(n.total)}</td>
-                    <td style={td}>{fmtDate(n.issuedAt ?? n.createdAt)}</td>
+                    <td style={td}>{n.status === "PENDING_APPROVAL" ? <strong style={{ color: "var(--hf-warning-text-deep)" }}>Waiting for approval</strong>
+                      : n.status === "REJECTED" ? <span style={{ color: "var(--hf-text-muted)" }}>Rejected</span>
+                      : fmtDate(n.issuedAt ?? n.createdAt)}</td>
                     <td style={td} onClick={e => e.stopPropagation()}>
-                      <Btn small icon={Download} aria-label={`Download ${n.creditNoteNumber} PDF`} onClick={async () => setMsg((await downloadPdf(`/api/v1/invoicing/credit-notes/${n.id}/pdf`, `${n.creditNoteNumber}.pdf`)) ?? "")}>PDF</Btn>
+                      {(!n.status || n.status === "ISSUED") && <Btn small icon={Download} aria-label={`Download ${n.creditNoteNumber} PDF`} onClick={async () => setMsg((await downloadPdf(`/api/v1/invoicing/credit-notes/${n.id}/pdf`, `${n.creditNoteNumber}.pdf`)) ?? "")}>PDF</Btn>}
                     </td>
                   </tr>
                 ))}

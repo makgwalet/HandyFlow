@@ -28,8 +28,15 @@ export interface Invoice {
 }
 export interface CreditNote {
   id: string; creditNoteNumber: string; invoiceId: string; invoiceNumber: string; reason: string; description: string | null
-  subtotal: number; vatTotal: number; total: number; currency: string; issuedAt: string; createdAt: string
+  subtotal: number; vatTotal: number; total: number; currency: string; issuedAt: string | null; createdAt: string
+  /** Finance patch F9: PENDING_APPROVAL until approved (above the limit), then ISSUED; or REJECTED. */
+  status?: "PENDING_APPROVAL" | "ISSUED" | "REJECTED"; createdBy?: string | null; rejectionReason?: string | null
 }
+
+/** Finance patch F9: credit notes at or above this (incl. VAT) wait for approval under the platform's default rule. */
+export const CREDIT_NOTE_APPROVAL_LIMIT = 5000
+/** Credit notes that took effect (older ones have no status and were issued). */
+export const isIssuedCredit = (cn: Pick<CreditNote, "status">) => !cn.status || cn.status === "ISSUED"
 export interface RecurringSchedule {
   id: string; title: string; status: RecurringStatus; frequency: string; customIntervalDays: number | null
   nextRunAt: string; lastRunAt: string | null; total: number; subtotal: number; vatTotal: number

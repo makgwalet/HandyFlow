@@ -40,6 +40,22 @@ public class ReceiptController {
                 receiptService.allocate(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
     }
 
+    @PostMapping("/receipts/{id}/refunds")
+    @PreAuthorize("hasAuthority('INVOICE_REFUND')")
+    @Operation(summary = "Pay (part of) this credit back to the customer from a bank account, with the reason")
+    public ResponseEntity<ApiResponse<ReceiptResponse>> refund(@PathVariable UUID id, @RequestBody RefundRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Refund recorded",
+                receiptService.refund(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
+    }
+
+    @GetMapping("/invoices/{invoiceId}/credit")
+    @PreAuthorize("hasAuthority('INVOICE_READ')")
+    @Operation(summary = "Credit that came from this invoice's credit notes (a walk-in client's credit is found here)")
+    public ResponseEntity<ApiResponse<List<ReceiptResponse>>> creditFromInvoice(@PathVariable UUID invoiceId) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                receiptService.creditFromInvoice(TenantContext.getTenantIdAsObject(), invoiceId)));
+    }
+
     @GetMapping("/receipts/{id}")
     @PreAuthorize("hasAuthority('INVOICE_READ')")
     @Operation(summary = "A receipt and the invoices it settled")

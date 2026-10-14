@@ -11,10 +11,10 @@ import { PageHeader } from "../../components/ui/PageHeader"
 import Chip from "../../components/ui/Chip"
 import { usePermission } from "../../hooks/usePermission"
 import {
-  INVOICE_LABEL, INVOICE_TONE, OPEN_INVOICE_STATUSES, TYPE_LABEL, balanceOf, dueLabel, fmtDate, fmtR, label, retainerBarColour, retainerUse, num,
+  INVOICE_LABEL, INVOICE_TONE, OPEN_INVOICE_STATUSES, TYPE_LABEL, balanceOf, dueLabel, fmtDate, fmtR, label, retainerBarColour, retainerUse, num, isIssuedCredit,
   type CreditNote, type Invoice,
 } from "./billing.logic"
-import { CreditNoteDialog, LogHoursDialog, RecordPaymentDialog, useCustomerAccount } from "./dialogs"
+import { CreditNoteDialog, LogHoursDialog, RecordPaymentDialog, RefundDialog, useCustomerAccount, type CreditSource } from "./dialogs"
 import { apiMessage, downloadPdf } from "./queries"
 import { Btn, Facts, Loading, Meter, Notice, StateBox, Totals, panel, sectionTitle, td } from "./ui"
 
@@ -28,6 +28,10 @@ export default function InvoiceDetailPage() {
   // Finance patch F8: payments and credit notes have their own permissions; customer credit can settle this invoice.
   const canPay = usePermission("INVOICE_PAYMENT")
   const canCredit = usePermission("CREDIT_NOTE_ISSUE")
+  // Finance patch F9: approving large credit notes and refunding credit have their own permissions.
+  const canApproveCredit = usePermission("CREDIT_NOTE_APPROVE")
+  const canRefund = usePermission("INVOICE_REFUND")
+  const [refunding, setRefunding] = useState(false)
   const [dialog, setDialog] = useState<"pay" | "hours" | "credit" | null>(null)
   const [msg, setMsg] = useState("")
 
@@ -43,7 +47,20 @@ export default function InvoiceDetailPage() {
     queryKey: ["credit-notes", id], enabled: !!id && !!inv && inv.status !== "DRAFT",
     queryFn: async () => { const r = await apiClient.get(`/api/v1/invoicing/invoices/${id}/credit-notes`); return r.data?.data ?? r.data ?? [] },
   })
-  const account = useCustomerAccount(inv?.customerId && inv.status !== "DRAFT" && OPEN_INVOICE_STATUSES.includes(inv.status) ? inv.customerId : null)
+  const account = useCustomerAccount(inv?.customerId && inv.status !== "DRAFT" ? inv.customerId : null)
+  const { data: invoiceCredit = [] } = useQuery<CreditSource[]>({
+    queryKey: ["invoice-credit", id], enabled: !!id && !!inv && !inv.customerId && canRefund && inv.status !== "DRAFT",
+    queryFn: async () => { const r = await apiClient.get(`/api/v1/invoicing/invoices/${id}/credit`); const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : [] },
+  })
+  const decideCredit = useMutation({
+    mutationFn: ({ cnId, approve, reason }: { cnId: string; approve: boolean; reason?: string }) =>
+      apiClient.post(`/api/v1/invoicing/credit-notes/${cnId}/${approve ? "approve" : "reject"}`, approve ? {} : { reason }),
+    onSuccess: () => {
+      setMsg(""); qc.invalidateQueries({ queryKey: ["credit-notes", id] }); qc.invalidateQueries({ queryKey: ["invoice", id] })
+      qc.invalidateQueries({ queryKey: ["customer-account"] })
+    },
+    onError: (e: any) => setMsg(apiMessage(e, "The credit note could not be decided.")),
+  })
   const applyCredit = useMutation({
     mutationFn: async () => {
       // Oldest credit first, until this invoice is settled or the credit runs out.
@@ -80,7 +97,9 @@ export default function InvoiceDetailPage() {
   const paidPct = num(inv.total) > 0 ? Math.min(100, (num(inv.amountPaid) / num(inv.total)) * 100) : 0
   const use = inv.invoiceType === "RETAINER" ? retainerUse(inv) : null
   const due = dueLabel(inv)
-  const credited = creditNotes.reduce((s, c) => s + num(c.total), 0)
+  const credited = creditNotes.filter(isIssuedCredit).reduce((s, c) => s + num(c.total), 0)
+  const refundable: CreditSource[] = inv.customerId ? (account.data?.creditReceipts ?? []) : invoiceCredit.filter(c => Number(c.available) > 0)
+  const refundableTotal = refundable.reduce((s, c) => s + num(c.available), 0)
   const when = (d: string | null) => d ? fmtDate(d) : undefined
   const timeline: { label: string; at?: string; done: boolean }[] = [
     { label: "Created", at: when(inv.createdAt), done: true },
@@ -104,6 +123,7 @@ export default function InvoiceDetailPage() {
           {inv.customerId && <Btn icon={FileText} onClick={async () => setMsg((await downloadPdf(`/api/v1/invoicing/customers/${inv.customerId}/statement`, `statement-${name ?? "customer"}.pdf`)) ?? "")}>Statement</Btn>}
           {canCreate && inv.status === "DRAFT" && <Btn variant="primary" icon={Send} onClick={() => issue.mutate()} disabled={issue.isPending || inv.lineItems.length === 0}>{issue.isPending ? "Issuing..." : "Issue invoice"}</Btn>}
           {canPay && open && <Btn variant="success" icon={CheckCircle} onClick={() => setDialog("pay")}>Record payment</Btn>}
+          {canRefund && refundableTotal > 0 && <Btn icon={Wallet} onClick={() => setRefunding(true)}>Refund credit ({fmtR(refundableTotal)})</Btn>}
           {canPay && open && (account.data?.creditAvailable ?? 0) > 0 && (
             <Btn icon={Wallet} onClick={() => applyCredit.mutate()} disabled={applyCredit.isPending}>
               {applyCredit.isPending ? "Using credit..." : `Use credit (${fmtR(Math.min(account.data!.creditAvailable, balance))})`}
@@ -169,10 +189,14 @@ export default function InvoiceDetailPage() {
                 <div style={{ display: "grid", gap: 8 }}>
                   {creditNotes.map(cn => (
                     <div key={cn.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, padding: "8px 12px" }}>
-                      <div><span style={{ fontWeight: 700, color: "var(--hf-text-primary)" }}>{cn.creditNoteNumber}</span><span style={{ fontSize: 12, color: "var(--hf-text-muted)", marginLeft: 8 }}>{cn.reason} · {fmtDate(cn.issuedAt)}</span></div>
+                      <div><span style={{ fontWeight: 700, color: "var(--hf-text-primary)" }}>{cn.creditNoteNumber}</span><span style={{ fontSize: 12, color: "var(--hf-text-muted)", marginLeft: 8 }}>{cn.reason} · {cn.status === "PENDING_APPROVAL" ? "waiting for approval" : cn.status === "REJECTED" ? `rejected${cn.rejectionReason ? `: ${cn.rejectionReason}` : ""}` : fmtDate(cn.issuedAt)}</span></div>
                       <span style={{ display: "inline-flex", gap: 10, alignItems: "center" }}>
-                        <strong style={{ color: "var(--hf-danger-text-strong)" }}>{fmtR(cn.total)}</strong>
-                        <Btn small icon={Download} aria-label={`Download ${cn.creditNoteNumber} PDF`} onClick={async () => setMsg((await downloadPdf(`/api/v1/invoicing/credit-notes/${cn.id}/pdf`, `${cn.creditNoteNumber}.pdf`)) ?? "")}>PDF</Btn>
+                        <strong style={{ color: isIssuedCredit(cn) ? "var(--hf-danger-text-strong)" : "var(--hf-text-muted)", textDecoration: cn.status === "REJECTED" ? "line-through" : undefined }}>{fmtR(cn.total)}</strong>
+                        {cn.status === "PENDING_APPROVAL" && canApproveCredit && <>
+                          <Btn small variant="success" onClick={() => decideCredit.mutate({ cnId: cn.id, approve: true })} disabled={decideCredit.isPending}>Approve</Btn>
+                          <Btn small onClick={() => { const reason = window.prompt(`Why is ${cn.creditNoteNumber} rejected?`); if (reason && reason.trim()) decideCredit.mutate({ cnId: cn.id, approve: false, reason: reason.trim() }) }} disabled={decideCredit.isPending}>Reject</Btn>
+                        </>}
+                        {isIssuedCredit(cn) && <Btn small icon={Download} aria-label={`Download ${cn.creditNoteNumber} PDF`} onClick={async () => setMsg((await downloadPdf(`/api/v1/invoicing/credit-notes/${cn.id}/pdf`, `${cn.creditNoteNumber}.pdf`)) ?? "")}>PDF</Btn>}
                       </span>
                     </div>))}
                 </div>)}
@@ -221,6 +245,7 @@ export default function InvoiceDetailPage() {
       {dialog === "pay" && <RecordPaymentDialog invoice={inv} onClose={() => setDialog(null)} />}
       {dialog === "hours" && <LogHoursDialog invoice={inv} onClose={() => setDialog(null)} />}
       {dialog === "credit" && <CreditNoteDialog invoice={inv} onClose={() => setDialog(null)} />}
+      {refunding && <RefundDialog credits={refundable} onClose={() => setRefunding(false)} />}
     </div>
   )
 }

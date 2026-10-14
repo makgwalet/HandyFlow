@@ -94,4 +94,17 @@ public final class ReceiptRules {
         BigDecimal toInvoice = money(money(creditTotal).min(money(invoiceBalance).max(BigDecimal.ZERO)));
         return new BigDecimal[] { toInvoice, money(creditTotal).subtract(toInvoice) };
     }
+
+    /**
+     * Finance patch F9: null when {@code amount} may be refunded out of credit of {@code available}, otherwise why not.
+     * Money going out always says from which bank account and why.
+     */
+    public static String refundProblem(BigDecimal amount, BigDecimal available, boolean hasBankAccount, String reason) {
+        if (amount == null || money(amount).signum() <= 0) return "Enter the amount to refund";
+        if (money(amount).compareTo(money(available).add(CENT)) > 0)
+            return "Only R " + money(available).toPlainString() + " of this credit is left to refund";
+        if (!hasBankAccount) return "Choose the bank account the refund is paid from";
+        if (reason == null || reason.trim().length() < 5) return "Say why the money is refunded (at least 5 characters)";
+        return null;
+    }
 }

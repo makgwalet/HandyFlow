@@ -110,7 +110,8 @@ public class ReceiptService {
     @Transactional
     public UUID creditFromCreditNote(TenantId tenantId, UUID customerId, UUID creditNoteId, String creditNoteNumber,
                                      BigDecimal amount, UUID by) {
-        if (customerId == null || amount == null || amount.signum() <= 0) return null;
+        // Finance patch F9: a walk-in client's credit (no customer) is kept too, against the credit note, to be refunded.
+        if (amount == null || amount.signum() <= 0) return null;
         return insert(tenantId, customerId, "CREDIT_NOTE", creditNoteId, ReceiptRules.money(amount), LocalDate.now(), null,
                 creditNoteNumber, null, "From credit note " + creditNoteNumber, by);
     }
@@ -126,7 +127,54 @@ public class ReceiptService {
                  WHERE a.receipt_id = ? AND a.tenant_id = ? ORDER BY a.allocated_at""",
                 (rs, n) -> new AllocationResponse(rs.getObject(1, UUID.class), rs.getString(2), rs.getBigDecimal(3),
                         rs.getTimestamp(4).toInstant()), id, tenantId.getValue());
-        return r.toResponse(allocations);
+        List<RefundResponse> refunds = jdbc.query("""
+                SELECT id, refund_number, amount, refunded_on, bank_account_id, reference, reason, created_at
+                  FROM customer_refunds WHERE receipt_id = ? AND tenant_id = ? ORDER BY created_at""",
+                (rs, n) -> new RefundResponse(rs.getObject(1, UUID.class), rs.getString(2), rs.getBigDecimal(3),
+                        rs.getDate(4).toLocalDate(), rs.getObject(5, UUID.class), rs.getString(6), rs.getString(7),
+                        rs.getTimestamp(8).toInstant()), id, tenantId.getValue());
+        return r.toResponse(allocations, refunds);
+    }
+
+    /**
+     * Pays (part of) a receipt's remaining credit back to the customer (finance patch F9): from a bank account, with a
+     * reason; posted as Dr Accounts Receivable, Cr the bank (RefundIssuedEvent). Works for a walk-in client's credit too.
+     */
+    @Transactional
+    public ReceiptResponse refund(TenantId tenantId, UUID receiptId, RefundRequest req, UUID by) {
+        Row r = row(tenantId, receiptId, true);
+        BigDecimal available = r.amount.subtract(r.allocated);
+        String problem = ReceiptRules.refundProblem(req != null ? req.amount() : null, available,
+                req != null && req.bankAccountId() != null, req != null ? req.reason() : null);
+        if (problem != null) throw bad(problem, "REFUND_REFUSED");
+        LocalDate on = receivedOn(req.refundedOn());
+        BigDecimal amount = ReceiptRules.money(req.amount());
+        UUID id = UUID.randomUUID();
+        String number = numbering.next(tenantId, "REFUND", "RF");
+        jdbc.update("""
+                INSERT INTO customer_refunds (id, tenant_id, refund_number, receipt_id, customer_id, amount, refunded_on,
+                                              bank_account_id, reference, reason, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                id, tenantId.getValue(), number, receiptId, r.customerId, amount, Date.valueOf(on), req.bankAccountId(),
+                trim(req.reference(), 100), trim(req.reason(), 500), by);
+        int updated = jdbc.update("UPDATE customer_receipts SET allocated = allocated + ? WHERE id = ? AND tenant_id = ? AND allocated + ? <= amount",
+                amount, receiptId, tenantId.getValue(), amount);
+        if (updated != 1) throw bad("This credit has already been used or refunded", "OVER_ALLOCATED");
+        events.publishEvent(za.co.handyflow.platform.invoicing.RefundIssuedEvent.of(tenantId, id, number, r.number,
+                r.customerId, amount, req.bankAccountId(), on, trim(req.reference(), 100)));
+        log.warn("[Invoicing] Refund {} R {} from receipt {} customer={} tenant={} by={} reason={}",
+                number, amount, r.number, r.customerId, tenantId, by, req.reason());
+        return get(tenantId, receiptId);
+    }
+
+    /** Credit that came from this invoice's credit notes (finance patch F9): where a walk-in client's credit is found. */
+    @Transactional(readOnly = true)
+    public List<ReceiptResponse> creditFromInvoice(TenantId tenantId, UUID invoiceId) {
+        return jdbc.query("""
+                SELECT r.id FROM customer_receipts r JOIN credit_notes cn ON cn.id = r.source_id
+                 WHERE r.tenant_id = ? AND r.kind = 'CREDIT_NOTE' AND cn.invoice_id = ? ORDER BY r.created_at""",
+                (rs, n) -> rs.getObject(1, UUID.class), tenantId.getValue(), invoiceId)
+                .stream().map(id -> get(tenantId, id)).toList();
     }
 
     @Transactional(readOnly = true)
@@ -208,9 +256,9 @@ public class ReceiptService {
 
     private record Row(UUID id, String number, UUID customerId, String kind, BigDecimal amount, BigDecimal allocated,
                        LocalDate receivedOn, String method, String reference, UUID bankAccountId, String notes, Instant createdAt) {
-        ReceiptResponse toResponse(List<AllocationResponse> allocations) {
+        ReceiptResponse toResponse(List<AllocationResponse> allocations, List<RefundResponse> refunds) {
             return new ReceiptResponse(id, number, customerId, kind, amount, allocated, ReceiptRules.money(amount.subtract(allocated)),
-                    receivedOn, method, reference, bankAccountId, notes, createdAt, allocations);
+                    receivedOn, method, reference, bankAccountId, notes, createdAt, allocations, refunds);
         }
     }
 
