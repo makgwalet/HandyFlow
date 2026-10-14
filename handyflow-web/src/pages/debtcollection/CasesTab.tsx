@@ -12,20 +12,23 @@
 // payment plans, evidence, PDF exports — maps 1:1 to a real endpoint;
 // none of this is inferred.
 //
-// No staff/customer picker is wired up for this module (no confirmed
-// user-list or customer-search endpoint in scope here) — customerId and
-// assignedToUserId are plain UUID text inputs, same flagged simplification
-// used in Module 1's Assign DSAR flow.
+// Customers, invoices and collectors are chosen from lists (CustomerPicker,
+// NewCaseDialog, CollectorSelect) — no IDs are typed.
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import DisputesPanel from "./DisputesPanel"
 import StrategyNote from "./StrategyNote"
+import NewCaseDialog from "./NewCaseDialog"
+import CollectorSelect from "./CollectorSelect"
+import { useAuth } from "../../hooks/useAuth"
+import { QUEUES, inQueue, queueCounts, searchCases, type Queue } from "./collections.logic"
+import { pill } from "./ui"
 import {
   Plus, Landmark, ChevronDown, ChevronUp, X, UserPlus, CalendarClock,
   ArrowRightCircle, Flag, AlertOctagon, Trash2, Download, FileDown,
-  Phone, Wallet, Paperclip, FileText, AlertCircle, Link2, RefreshCw,
+  Phone, Wallet, Paperclip, FileText, AlertCircle, Link2, Search,
 } from "lucide-react"
 
 interface Case {
@@ -47,7 +50,6 @@ interface PaymentPlan {
   frequency: string; startDate: string; nextDueDate: string | null; numberOfInstallments: number
   installmentsPaid: number; notes: string | null; createdAt: string
 }
-interface OutstandingInvoice { id: string; invoiceNumber: string; dueDate: string | null; total: number; amountPaid: number; outstanding: number }
 interface Evidence { id: string; fileName: string; contentType: string; fileSizeBytes: number; evidenceType: string; status: string; uploadedByName: string; createdAt: string }
 
 const STATUSES = ["OPEN", "DEMAND_SENT", "PAYMENT_PLAN_ACTIVE", "DISPUTED", "HANDED_TO_LEGAL", "SETTLED", "WRITTEN_OFF", "CLOSED"]
@@ -79,8 +81,6 @@ const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA"
 const fmtR = (n: number | null | undefined) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
 const fmtBytes = (b: number) => b < 1024 ? `${b} B` : b < 1024 * 1024 ? `${(b / 1024).toFixed(1)} KB` : `${(b / (1024 * 1024)).toFixed(1)} MB`
 const daysUntil = (d: string) => Math.ceil((new Date(d).getTime() - Date.now()) / 86400000)
-
-const EMPTY_NEW_CASE = { mode: "customer" as "customer" | "manual", customerId: "", debtorName: "", debtorEmail: "", debtorPhone: "", openedDate: new Date().toISOString().split("T")[0], assignedToUserName: "", notes: "", selectedInvoiceIds: [] as string[], manualInvoiceIds: "" }
 
 async function downloadCaseRegisterPdf() {
   const res = await apiClient.get("/api/v1/debtcollection/cases/export/pdf", { responseType: "blob" })
@@ -312,9 +312,10 @@ export default function CasesTab() {
   const [filterStatus, setFilterStatus] = useState("ALL")
   const [expanded, setExpanded] = useState<string | null>(null)
   const [showNewCase, setShowNewCase] = useState(false)
-  const [newCase, setNewCase] = useState(EMPTY_NEW_CASE)
-  const [outstandingInvoices, setOutstandingInvoices] = useState<OutstandingInvoice[]>([])
-  const [loadingInvoices, setLoadingInvoices] = useState(false)
+  const [queue, setQueue] = useState<Queue>("all")
+  const [search, setSearch] = useState("")
+  const { user } = useAuth()
+  const myId: string | null = (user as any)?.userId ?? (user as any)?.id ?? null
 
   const [showAssign, setShowAssign] = useState<Case | null>(null)
   const [assignUserId, setAssignUserId] = useState("")
@@ -339,17 +340,6 @@ export default function CasesTab() {
   })
 
   const invalidate = () => { qc.invalidateQueries({ queryKey: ["dc-cases"] }); qc.invalidateQueries({ queryKey: ["dc-cases-all"] }) }
-
-  const openManual = useMutation({
-    mutationFn: (body: any) => apiClient.post("/api/v1/debtcollection/cases", body),
-    onSuccess: () => { invalidate(); setShowNewCase(false); setNewCase(EMPTY_NEW_CASE); setOutstandingInvoices([]); setApiError("") },
-    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to open case"),
-  })
-  const openForCustomer = useMutation({
-    mutationFn: (body: any) => apiClient.post("/api/v1/debtcollection/cases/open-for-customer", body),
-    onSuccess: () => { invalidate(); setShowNewCase(false); setNewCase(EMPTY_NEW_CASE); setOutstandingInvoices([]); setApiError("") },
-    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to open case"),
-  })
 
   const refreshOutstanding = useMutation({
     mutationFn: (id: string) => apiClient.post(`/api/v1/debtcollection/cases/${id}/refresh-outstanding`),
@@ -386,20 +376,8 @@ export default function CasesTab() {
     onSuccess: () => invalidate(),
   })
 
-  const loadOutstandingInvoices = async () => {
-    if (!newCase.customerId.trim()) return
-    setLoadingInvoices(true)
-    try {
-      const res = await apiClient.get(`/api/v1/debtcollection/cases/outstanding-invoices?customerId=${newCase.customerId.trim()}`)
-      setOutstandingInvoices(unwrap(res))
-    } catch (e: any) {
-      setApiError(e.response?.data?.message ?? "Failed to load outstanding invoices")
-    } finally {
-      setLoadingInvoices(false)
-    }
-  }
-
-  const toggleInvoice = (id: string) => setNewCase(f => ({ ...f, selectedInvoiceIds: f.selectedInvoiceIds.includes(id) ? f.selectedInvoiceIds.filter(x => x !== id) : [...f.selectedInvoiceIds, id] }))
+  const counts = queueCounts(cases as any, myId, new Date().toISOString().split("T")[0])
+  const visible = searchCases(cases.filter(c => inQueue(c as any, queue, myId, new Date().toISOString().split("T")[0])) as any, search) as unknown as Case[]
 
   const stats = [
     { label: "Total",           value: cases.length,                                                    color: "var(--hf-orange-text-strong)" },
@@ -426,6 +404,16 @@ export default function CasesTab() {
         ))}
       </div>
 
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+        {QUEUES.map(q => (
+          <button key={q.id} onClick={() => setQueue(q.id)} style={pill(queue === q.id)}>{q.label} <span style={{ opacity: 0.7 }}>({counts[q.id]})</span></button>
+        ))}
+        <div style={{ position: "relative", marginLeft: "auto", minWidth: 220 }}>
+          <Search size={14} style={{ position: "absolute", left: 10, top: 11, color: "var(--hf-text-faint)" }} />
+          <input aria-label="Search cases" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search case, debtor or collector" style={{ ...inp, paddingLeft: 30 }} />
+        </div>
+      </div>
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {["ALL", ...STATUSES].map(s => (
@@ -442,7 +430,7 @@ export default function CasesTab() {
             <Download size={14} /> Export PDF
           </button>
           {canManage && (
-            <button onClick={() => { setShowNewCase(true); setNewCase(EMPTY_NEW_CASE); setOutstandingInvoices([]); setApiError("") }}
+            <button onClick={() => setShowNewCase(true)}
               style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-orange-solid-strong)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
               <Plus size={15} /> Open Case
             </button>
@@ -452,14 +440,14 @@ export default function CasesTab() {
 
       {isLoading ? (
         <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading cases...</div>
-      ) : cases.length === 0 ? (
+      ) : visible.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Landmark size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No cases found</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>{search || queue !== "all" ? "No cases match this view" : "No cases found"}</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {cases.map(c => {
+          {visible.map(c => {
             const isOpen = expanded === c.id
             const cfg = STATUS_CFG[c.status] ?? STATUS_CFG.OPEN
             const isTerminal = TERMINAL.has(c.status)
@@ -510,102 +498,14 @@ export default function CasesTab() {
         </div>
       )}
 
-      {showNewCase && (
-        <Overlay onClose={() => { setShowNewCase(false); setApiError("") }}>
-          <MHead title="Open Debt Collection Case" onClose={() => { setShowNewCase(false); setApiError("") }} />
-          <div style={{ display: "flex", gap: 6, marginBottom: 18 }}>
-            <button onClick={() => setNewCase(f => ({ ...f, mode: "customer" }))} style={{ flex: 1, padding: "8px", borderRadius: 8, border: `2px solid ${newCase.mode === "customer" ? "var(--hf-orange-solid-strong)" : "var(--hf-border)"}`, background: newCase.mode === "customer" ? "var(--hf-orange-soft)" : "var(--hf-surface)", color: newCase.mode === "customer" ? "var(--hf-orange-text-strong)" : "var(--hf-text-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>From CRM Customer</button>
-            <button onClick={() => setNewCase(f => ({ ...f, mode: "manual" }))} style={{ flex: 1, padding: "8px", borderRadius: 8, border: `2px solid ${newCase.mode === "manual" ? "var(--hf-orange-solid-strong)" : "var(--hf-border)"}`, background: newCase.mode === "manual" ? "var(--hf-orange-soft)" : "var(--hf-surface)", color: newCase.mode === "manual" ? "var(--hf-orange-text-strong)" : "var(--hf-text-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Manual / Walk-in</button>
-          </div>
-
-          {newCase.mode === "customer" ? (
-            <>
-              <div style={{ padding: "10px 12px", background: "var(--hf-indigo-soft)", border: "1px solid var(--hf-indigo-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-indigo-text)", marginBottom: 14 }}>
-                Pulls debtor contact details and ALL outstanding invoices for this customer automatically.
-              </div>
-              <div style={{ marginBottom: 14 }}>
-                <label style={lbl}>Customer ID (UUID) *</label>
-                <input value={newCase.customerId} onChange={e => setNewCase(f => ({ ...f, customerId: e.target.value }))} placeholder="CRM customer ID" style={inp} />
-              </div>
-            </>
-          ) : (
-            <>
-              <div style={{ marginBottom: 14 }}>
-                <label style={lbl}>Customer ID (UUID) <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional — link to a CRM customer, or leave blank for a walk-in debtor)</span></label>
-                <input value={newCase.customerId} onChange={e => setNewCase(f => ({ ...f, customerId: e.target.value, selectedInvoiceIds: [] }))} style={inp} />
-              </div>
-              {newCase.customerId.trim() && (
-                <div style={{ marginBottom: 14 }}>
-                  <button onClick={loadOutstandingInvoices} disabled={loadingInvoices} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, color: "var(--hf-orange-text-strong)", cursor: "pointer" }}>
-                    <RefreshCw size={12} /> {loadingInvoices ? "Loading..." : "Load outstanding invoices"}
-                  </button>
-                  {outstandingInvoices.length > 0 && (
-                    <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6, maxHeight: 160, overflowY: "auto" }}>
-                      {outstandingInvoices.map(inv => (
-                        <label key={inv.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12, cursor: "pointer" }}>
-                          <input type="checkbox" checked={newCase.selectedInvoiceIds.includes(inv.id)} onChange={() => toggleInvoice(inv.id)} />
-                          <span style={{ fontWeight: 600 }}>{inv.invoiceNumber}</span>
-                          <span style={{ color: "var(--hf-text-faint)" }}>Due {fmtDate(inv.dueDate)}</span>
-                          <span style={{ marginLeft: "auto", fontWeight: 700 }}>{fmtR(inv.outstanding)}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-              <div style={{ marginBottom: 14 }}>
-                <label style={lbl}>Manual invoice IDs <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(comma-separated UUIDs — required if not selecting above)</span></label>
-                <input value={newCase.manualInvoiceIds} onChange={e => setNewCase(f => ({ ...f, manualInvoiceIds: e.target.value }))} placeholder="invoice-uuid-1, invoice-uuid-2" style={inp} />
-              </div>
-              <div style={{ marginBottom: 14 }}>
-                <label style={lbl}>Debtor name *</label>
-                <input value={newCase.debtorName} onChange={e => setNewCase(f => ({ ...f, debtorName: e.target.value }))} style={inp} />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-                <div><label style={lbl}>Debtor email</label><input type="email" value={newCase.debtorEmail} onChange={e => setNewCase(f => ({ ...f, debtorEmail: e.target.value }))} style={inp} /></div>
-                <div><label style={lbl}>Debtor phone</label><input value={newCase.debtorPhone} onChange={e => setNewCase(f => ({ ...f, debtorPhone: e.target.value }))} style={inp} /></div>
-              </div>
-            </>
-          )}
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-            <div><label style={lbl}>Opened date</label><input type="date" value={newCase.openedDate} onChange={e => setNewCase(f => ({ ...f, openedDate: e.target.value }))} style={inp} /></div>
-            <div><label style={lbl}>Assigned to (name)</label><input value={newCase.assignedToUserName} onChange={e => setNewCase(f => ({ ...f, assignedToUserName: e.target.value }))} style={inp} /></div>
-          </div>
-          <div style={{ marginBottom: 14 }}>
-            <label style={lbl}>Notes</label>
-            <textarea value={newCase.notes} onChange={e => setNewCase(f => ({ ...f, notes: e.target.value }))} rows={2} style={{ ...inp, resize: "vertical" as const }} />
-          </div>
-
-          {apiError && <ErrBanner msg={apiError} />}
-          <MFoot
-            onCancel={() => { setShowNewCase(false); setApiError("") }}
-            onSubmit={() => {
-              if (newCase.mode === "customer") {
-                if (!newCase.customerId.trim()) { setApiError("Customer ID is required"); return }
-                openForCustomer.mutate({ customerId: newCase.customerId.trim(), openedDate: newCase.openedDate || null, assignedToUserId: null, assignedToUserName: newCase.assignedToUserName || null, notes: newCase.notes || null })
-              } else {
-                const invoiceIds = newCase.selectedInvoiceIds.length > 0
-                  ? newCase.selectedInvoiceIds
-                  : newCase.manualInvoiceIds.split(",").map(s => s.trim()).filter(Boolean)
-                if (!newCase.debtorName.trim()) { setApiError("Debtor name is required"); return }
-                if (invoiceIds.length === 0) { setApiError("At least one invoice must be selected or entered"); return }
-                openManual.mutate({ customerId: newCase.customerId.trim() || null, debtorName: newCase.debtorName, debtorEmail: newCase.debtorEmail || null, debtorPhone: newCase.debtorPhone || null, invoiceIds, openedDate: newCase.openedDate || null, assignedToUserId: null, assignedToUserName: newCase.assignedToUserName || null, notes: newCase.notes || null })
-              }
-            }}
-            loading={openManual.isPending || openForCustomer.isPending}
-            label="Open Case"
-          />
-        </Overlay>
-      )}
+      {showNewCase && <NewCaseDialog onClose={() => setShowNewCase(false)} onOpened={invalidate} />}
 
       {showAssign && (
         <Overlay onClose={() => { setShowAssign(null); setApiError("") }}>
           <MHead title={`Assign — ${showAssign.caseNumber}`} onClose={() => { setShowAssign(null); setApiError("") }} />
-          <div style={{ marginBottom: 14 }}><label style={lbl}>User ID (UUID)</label><input value={assignUserId} onChange={e => setAssignUserId(e.target.value)} style={inp} /></div>
-          <div><label style={lbl}>User name</label><input value={assignUserName} onChange={e => setAssignUserName(e.target.value)} style={inp} /></div>
+          <CollectorSelect label="Collector" blankLabel="Choose a collector" value={assignUserId} onChange={(id, c) => { setAssignUserId(id); setAssignUserName(c?.userName ?? "") }} />
           {apiError && <ErrBanner msg={apiError} />}
-          <MFoot onCancel={() => { setShowAssign(null); setApiError("") }} onSubmit={() => assign.mutate({ id: showAssign.id, userId: assignUserId.trim(), userName: assignUserName.trim() })} loading={assign.isPending} label="Assign" disabled={!assignUserId.trim() || !assignUserName.trim()} />
+          <MFoot onCancel={() => { setShowAssign(null); setApiError("") }} onSubmit={() => assign.mutate({ id: showAssign.id, userId: assignUserId, userName: assignUserName })} loading={assign.isPending} label="Assign" disabled={!assignUserId} />
         </Overlay>
       )}
 

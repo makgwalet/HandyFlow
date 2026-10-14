@@ -1,140 +1,122 @@
 // src/pages/debtcollection/DebtCollectionDashboard.tsx
 //
-// Every number here is computed client-side from GET /cases?size=200 — no
-// dedicated summary endpoint exists on the real DebtCollectionCaseController
-// (only GET /count, which returns a single total, not a status breakdown).
+// Real dashboard endpoints: /dashboard/summary (with previous-period comparison),
+// /aging, /top-debtors, /trend and /recovery. Recovery needs MANAGE; if the user
+// lacks it that card simply shows nothing.
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { AlertTriangle, ArrowRight, CalendarClock, Landmark, Plus, TrendingDown, Wallet, CheckCircle } from "lucide-react"
 import { apiClient } from "../../api/client"
 import {
-  Landmark, AlertTriangle, ArrowRight, TrendingDown, CalendarClock, CheckCircle,
-} from "lucide-react"
-
-const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
-const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
-const fmtR = (n: number | null | undefined) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "R 0.00"
-const daysUntil = (d: string) => Math.ceil((new Date(d).getTime() - Date.now()) / 86400000)
-
-const TERMINAL = new Set(["SETTLED", "WRITTEN_OFF", "CLOSED"])
+  PERIODS, changeText, dayText, donutArcs, linePoints, money, moneyShort, objOf, overdueText, periodRange, rowsOf,
+  type Aging, type Period, type Recovery, type Summary, type TopDebtor, type TrendPoint,
+} from "./collections.logic"
+import { card, pill } from "./ui"
 
 type Tab = "dashboard" | "cases"
+const get = (path: string, from?: string, to?: string) => apiClient.get(`/api/v1/debtcollection/dashboard/${path}${from ? `?from=${from}&to=${to}` : ""}`)
+
+function Kpi({ label, value, icon: Icon, change, tone = "var(--hf-orange-text-strong)", onClick }: { label: string; value: string | number; icon: any; change?: { text: string; up: boolean } | null; tone?: string; onClick?: () => void }) {
+  return (
+    <div onClick={onClick} style={{ ...card, cursor: onClick ? "pointer" : "default" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-muted)" }}>{label}</span>
+        <Icon size={16} style={{ color: tone }} />
+      </div>
+      <div style={{ fontSize: 24, fontWeight: 800, color: tone }}>{value}</div>
+      {change && <div style={{ fontSize: 12, marginTop: 4, color: change.up ? "var(--hf-success-text-strong)" : "var(--hf-danger-text)" }}>{change.text}</div>}
+    </div>
+  )
+}
 
 export default function DebtCollectionDashboard({ onNavigate }: { onNavigate: (t: Tab) => void }) {
-  const { data: cases = [] } = useQuery<any[]>({
-    queryKey: ["dc-cases-all"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/debtcollection/cases?size=200")),
-  })
+  const [period, setPeriod] = useState<Period>("month")
+  const [from, to] = periodRange(period, new Date())
 
-  const cs = cases as any[]
-  const openCases = cs.filter(c => !TERMINAL.has(c.status))
-  const totalOutstanding = openCases.reduce((s, c) => s + (c.totalOutstanding ?? 0), 0)
-  const overdueAction = openCases.filter(c => c.nextActionDate && daysUntil(c.nextActionDate) < 0)
-  const dueSoonAction = openCases.filter(c => c.nextActionDate && daysUntil(c.nextActionDate) >= 0 && daysUntil(c.nextActionDate) <= 7)
-  const onPlan = cs.filter(c => c.status === "PAYMENT_PLAN_ACTIVE")
-  const disputed = cs.filter(c => c.status === "DISPUTED")
-  const writtenOffTotal = cs.filter(c => c.status === "WRITTEN_OFF").reduce((s, c) => s + (c.writeOffAmount ?? 0), 0)
+  const summary = useQuery<Summary>({ queryKey: ["dc-dash-summary", from, to], queryFn: async () => objOf<Summary>(await get("summary", from, to)) })
+  const aging = useQuery<Aging>({ queryKey: ["dc-dash-aging"], queryFn: async () => objOf<Aging>(await get("aging")) })
+  const debtors = useQuery<TopDebtor[]>({ queryKey: ["dc-dash-top"], queryFn: async () => rowsOf<TopDebtor>(await get("top-debtors?limit=8")) })
+  const trend = useQuery<TrendPoint[]>({ queryKey: ["dc-dash-trend", from, to], queryFn: async () => rowsOf<TrendPoint>(await get("trend", from, to)) })
+  const recovery = useQuery<Recovery>({ queryKey: ["dc-dash-recovery", from, to], retry: false, queryFn: async () => objOf<Recovery>(await get("recovery", from, to)) })
 
-  const kpis = [
-    { label: "Open cases",        value: openCases.length,            color: "var(--hf-orange-text-strong)", bg: "var(--hf-orange-soft)", icon: Landmark },
-    { label: "Outstanding (open)",value: fmtR(totalOutstanding),      color: "var(--hf-orange-text-strong)", bg: "var(--hf-orange-soft)", icon: TrendingDown },
-    { label: "Next action overdue", value: overdueAction.length,      color: overdueAction.length > 0 ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)", bg: overdueAction.length > 0 ? "var(--hf-danger-soft)" : "var(--hf-success-soft-strong)", icon: AlertTriangle },
-    { label: "On payment plan",   value: onPlan.length,               color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", icon: CheckCircle },
-  ]
-
-  const followUps = [...overdueAction, ...dueSoonAction]
-    .sort((a, b) => new Date(a.nextActionDate).getTime() - new Date(b.nextActionDate).getTime())
-    .slice(0, 8)
+  const s = summary.data
+  const arcs = donutArcs(aging.data?.buckets ?? [], 52)
+  const points = trend.data ?? []
+  const [outLine, recLine] = linePoints([points.map(p => p.outstanding), points.map(p => p.recoveredNet)], 520, 150)
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 28 }}>
-        {kpis.map(k => (
-          <div key={k.label} onClick={() => onNavigate("cases")}
-            style={{ background: k.bg, borderRadius: 12, padding: "18px 20px", cursor: "pointer" }}
-            onMouseEnter={e => (e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)")}
-            onMouseLeave={e => (e.currentTarget.style.boxShadow = "none")}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: k.color, textTransform: "uppercase" as const }}>{k.label}</div>
-              <k.icon size={16} style={{ color: k.color }} />
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: k.color }}>{k.value}</div>
-          </div>
-        ))}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
+        {PERIODS.map(p => <button key={p.id} style={pill(period === p.id)} onClick={() => setPeriod(p.id)}>{p.label}</button>)}
+        <button onClick={() => onNavigate("cases")} style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "var(--hf-orange-solid-strong)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+          <Plus size={14} /> Open a case
+        </button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 18 }}>
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Follow-ups due</span>
-            <button onClick={() => onNavigate("cases")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-orange-text-strong)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
-              All cases <ArrowRight size={13} />
-            </button>
-          </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14, marginBottom: 18 }}>
+        <Kpi label="Total outstanding" value={money(s?.totalOutstanding)} icon={TrendingDown} onClick={() => onNavigate("cases")} />
+        <Kpi label="Active cases" value={s?.activeCases ?? "—"} icon={Landmark} onClick={() => onNavigate("cases")} />
+        <Kpi label="Cases opened" value={s?.current.casesOpened ?? "—"} icon={Plus} change={changeText(s?.current.casesOpened, s?.previous.casesOpened)} />
+        <Kpi label="Recovered (net)" value={recovery.data ? money(recovery.data.netRecovered) : "—"} icon={Wallet} tone="var(--hf-success-text-strong)" />
+        <Kpi label="Overdue follow-ups" value={s?.overdueWorkItems ?? "—"} icon={AlertTriangle} tone={s && s.overdueWorkItems > 0 ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)"} />
+      </div>
 
-          {followUps.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 20px", border: "1px dashed var(--hf-border)", borderRadius: 12, color: "var(--hf-text-faint)" }}>
-              <CheckCircle size={32} style={{ color: 'var(--hf-text-disabled)', marginBottom: 10 }} />
-              <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>Nothing due in the next 7 days</div>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {followUps.map((c: any) => {
-                const days = daysUntil(c.nextActionDate)
-                return (
-                  <div key={c.id} onClick={() => onNavigate("cases")} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", border: "1px solid var(--hf-border)", borderRadius: 10, background: "var(--hf-surface)", cursor: "pointer" }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 9, background: "var(--hf-orange-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <CalendarClock size={16} style={{ color: 'var(--hf-orange-text-strong)' }} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>{c.caseNumber} — {c.debtorName}</div>
-                      <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{c.status.replace(/_/g, " ")} · {fmtR(c.totalOutstanding)}</div>
-                    </div>
-                    <div style={{ textAlign: "right" as const, flexShrink: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 12, color: days < 0 ? "var(--hf-danger-text)" : "var(--hf-warning-text)" }}>
-                        {days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? "Today" : `in ${days}d`}
-                      </div>
-                      <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{fmtDate(c.nextActionDate)}</div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ background: "var(--hf-orange-solid-strong)", borderRadius: 12, padding: 20, color: "var(--hf-text-on-solid)" }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginBottom: 14, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>At a glance</div>
-            {[
-              { label: "Total cases",        value: cs.length },
-              { label: "Disputed",           value: disputed.length },
-              { label: "On payment plan",    value: onPlan.length },
-              { label: "Written off (total)",value: fmtR(writtenOffTotal) },
-            ].map(s => (
-              <div key={s.label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-                <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)" }}>{s.label}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text-on-solid)" }}>{s.value}</span>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr)", gap: 14, marginBottom: 14 }}>
+        <div style={card}>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: "var(--hf-text)" }}>Outstanding and recovered</div>
+          {points.length < 2 ? <div style={{ color: "var(--hf-text-faint)", fontSize: 13, padding: "30px 0" }}>The trend fills in as daily snapshots build up.</div> : (
+            <>
+              <svg viewBox="0 0 520 150" width="100%" role="img" aria-label="Outstanding and recovered trend">
+                <polyline fill="none" stroke="#f97316" strokeWidth="2.5" points={outLine} />
+                <polyline fill="none" stroke="#22c55e" strokeWidth="2.5" points={recLine} />
+              </svg>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--hf-text-faint)" }}>
+                <span>{dayText(points[0].date)}</span>
+                <span><span style={{ color: "#f97316" }}>●</span> Outstanding {moneyShort(points[points.length - 1].outstanding)} &nbsp; <span style={{ color: "#22c55e" }}>●</span> Recovered {moneyShort(points[points.length - 1].recoveredNet)}</span>
+                <span>{dayText(points[points.length - 1].date)}</span>
               </div>
-            ))}
-          </div>
+            </>
+          )}
+        </div>
 
-          {disputed.length > 0 && (
-            <div style={{ background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-warning-text-deep)", marginBottom: 6 }}>{disputed.length} case{disputed.length === 1 ? "" : "s"} disputed</div>
-              <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>Collection activity is paused pending resolution.</div>
-              <button onClick={() => onNavigate("cases")} style={{ marginTop: 10, width: "100%", padding: "7px", background: "var(--hf-surface)", color: "var(--hf-warning-text)", border: "1px solid var(--hf-warning-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                Review disputed cases →
-              </button>
+        <div style={card}>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: "var(--hf-text)" }}>Aging of what is owed</div>
+          {arcs.length === 0 ? <div style={{ color: "var(--hf-text-faint)", fontSize: 13, padding: "30px 0" }}>Nothing outstanding on active cases.</div> : (
+            <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+              <svg viewBox="0 0 120 120" width={120} height={120} role="img" aria-label="Aging">
+                <g transform="rotate(-90 60 60)">
+                  {arcs.map(a => <circle key={a.label} cx="60" cy="60" r="52" fill="none" stroke={a.colour} strokeWidth="14" strokeDasharray={`${a.dash} ${a.gap}`} strokeDashoffset={a.offset} />)}
+                </g>
+                <text x="60" y="64" textAnchor="middle" fontSize="13" fontWeight="700" fill="currentColor">{moneyShort(aging.data!.totalOutstanding)}</text>
+              </svg>
+              <div style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+                {arcs.map(a => <div key={a.label}><span style={{ color: a.colour }}>●</span> {a.label} · {a.share}%</div>)}
+              </div>
             </div>
           )}
-
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 10 }}>Quick action</div>
-            <button onClick={() => onNavigate("cases")}
-              style={{ width: "100%", padding: "9px 14px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "var(--hf-orange-text-strong)", cursor: "pointer", textAlign: "left" as const, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              Open a case <ArrowRight size={13} />
-            </button>
-          </div>
         </div>
+      </div>
+
+      <div style={card}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+          <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>Top debtors</span>
+          <button onClick={() => onNavigate("cases")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-orange-text-strong)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>All cases <ArrowRight size={13} /></button>
+        </div>
+        {(debtors.data ?? []).length === 0 ? (
+          <div style={{ textAlign: "center", padding: "26px 0", color: "var(--hf-text-faint)", fontSize: 13 }}><CheckCircle size={26} style={{ marginBottom: 6, opacity: 0.5 }} /><div>No open debtors.</div></div>
+        ) : (debtors.data ?? []).map(d => (
+          <div key={d.caseId} onClick={() => onNavigate("cases")} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderTop: "1px solid var(--hf-border)", cursor: "pointer" }}>
+            <CalendarClock size={15} style={{ color: "var(--hf-orange-text-strong)" }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, color: "var(--hf-text)" }}>{d.debtorName} <span style={{ color: "var(--hf-text-faint)", fontWeight: 400 }}>{d.caseNumber}</span></div>
+              <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{d.assignedToUserName ?? "Unassigned"}{d.nextActionDate ? ` · next action ${dayText(d.nextActionDate)}` : ""}</div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontWeight: 700, fontSize: 13 }}>{money(d.outstanding)}</div>
+              <div style={{ fontSize: 11, color: d.maxDaysOverdue > 60 ? "var(--hf-danger-text)" : "var(--hf-text-faint)" }}>{overdueText(d.maxDaysOverdue)}</div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
