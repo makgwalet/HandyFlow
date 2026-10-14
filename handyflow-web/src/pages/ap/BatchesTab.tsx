@@ -13,6 +13,8 @@ interface Bill {
   id: string; supplierName: string; billNumber: string
   dueDate: string; totalAmount: number; status: string
   description: string; category: string; hasPop: boolean
+  // Finance patch F10: a batch pays what the bill still owes.
+  balance?: number; batchId?: string | null
 }
 interface Batch {
   id: string; batchNumber: string; bankAccountId: string | null
@@ -103,10 +105,10 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
   const { data: approvableBills = [] } = useQuery<Bill[]>({
     queryKey: ["ap-bills-approved"],
     queryFn: async () => {
-      const r = await apiClient.get("/api/v1/ap/bills?status=APPROVED&size=200")
+      const r = await apiClient.get("/api/v1/ap/bills?size=200")
       const p = r.data?.data ?? r.data
       const all = p?.content ?? p ?? []
-      return all.filter((b: Bill) => !b.status || b.status === "APPROVED")
+      return all.filter((b: Bill) => ["APPROVED", "OVERDUE", "PARTIALLY_PAID"].includes(b.status) && !b.batchId)
     },
     enabled: showCreate,
   })
@@ -200,7 +202,7 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
     }))
   }
 
-  const selectedBillsTotal = (approvableBills as Bill[]).filter(b => createForm.billIds.includes(b.id)).reduce((s, b) => s + Number(b.totalAmount), 0)
+  const selectedBillsTotal = (approvableBills as Bill[]).filter(b => createForm.billIds.includes(b.id)).reduce((s, b) => s + Number(b.balance ?? b.totalAmount), 0)
 
   const batches: Batch[] = batchPage?.content ?? batchPage ?? []
 
@@ -399,7 +401,7 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
                           <div style={{ fontWeight: 600, fontSize: 13, color: "var(--hf-text)" }}>{bill.supplierName}</div>
                           <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>#{bill.billNumber} · Due {fmtDate(bill.dueDate)}</div>
                         </div>
-                        <div style={{ fontWeight: 800, fontSize: 13, color: "var(--hf-text)" }}>{fmtR(bill.totalAmount)}</div>
+                        <div style={{ fontWeight: 800, fontSize: 13, color: "var(--hf-text)" }}>{fmtR(bill.balance ?? bill.totalAmount)}</div>
                       </div>
                     )
                   })}

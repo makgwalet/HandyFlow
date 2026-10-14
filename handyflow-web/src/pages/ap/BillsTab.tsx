@@ -3,6 +3,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
+import { PAYABLE, amountToPay, balanceOf, paymentError } from "./ap.logic"
 import { Plus, X, CheckCircle, XCircle, Search, Download, FileText, Upload, AlertTriangle, ChevronRight, DollarSign, Edit3, Paperclip, Loader2, Mail } from "lucide-react"
 interface Bill {
   id: string; supplierId: string | null; supplierName: string
@@ -18,13 +19,17 @@ interface Bill {
   // FIX (P1 backlog): was already returned by the API (added in a prior
   // fix, per that DTO's own comment) but never typed or displayed here.
   rejectionReason: string | null
+  // Finance patch F10: balance = total - paid - credited
+  paidAmount?: number; creditedAmount?: number; balance?: number
 }
+interface Payment { id: string; amount: number; paidOn: string; reference: string | null; batchId: string | null }
 
 const STATUS: Record<string, { color: string; bg: string; border: string; dot: string; label: string }> = {
   DRAFT:            { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)", dot: "var(--hf-border-strong)", label: "Draft" },
   SECOND_APPROVAL:  { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", border: "var(--hf-violet-border)", dot: "var(--hf-violet-dot)", label: "Awaiting 2nd approval" },
   APPROVED:  { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", border: "var(--hf-success-border)", dot: "var(--hf-success)", label: "Approved" },
   PAID:      { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", border: "var(--hf-info-border)", dot: "var(--hf-info)", label: "Paid" },
+  PARTIALLY_PAID: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", border: "var(--hf-warning-border)", dot: "var(--hf-warning)", label: "Part paid" },
   OVERDUE:   { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)", dot: "var(--hf-danger)", label: "Overdue" },
   CANCELLED: { color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)", dot: "var(--hf-border-strong)", label: "Cancelled" },
   // FIX (P1 backlog): this key was simply missing — a rejected bill was
@@ -91,6 +96,7 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
   const [remittanceNotice, setRemittanceNotice] = useState("")
   const [duplicateWarning, setDuplicateWarning] = useState("")
   const [payRef, setPayRef] = useState("")
+  const [payAmount, setPayAmount] = useState("")
   const [popFile, setPopFile] = useState(""); const [popName, setPopName] = useState("")
   const [attFile, setAttFile] = useState(""); const [attName, setAttName] = useState("")
 
@@ -127,6 +133,15 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
     },
   })
 
+  const { data: payments = [] } = useQuery<Payment[]>({
+    queryKey: ["ap-bill-payments", selected?.id],
+    queryFn: async () => {
+      const r = await apiClient.get(`/api/v1/ap/bills/${selected!.id}/payments`)
+      return r.data?.data ?? r.data ?? []
+    },
+    enabled: !!selected && Number(selected.paidAmount ?? 0) > 0,
+  })
+
   const createBill = useMutation({
     mutationFn: (body: any) => apiClient.post("/api/v1/ap/bills", body),
     onSuccess: (r: any) => {
@@ -153,8 +168,11 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
   })
 
   const payBill = useMutation({
-    mutationFn: () => apiClient.post(`/api/v1/ap/bills/${selected?.id}/pay`, { paymentRef: payRef || null, bankAccountId: bankAccounts[0]?.id ?? null }),
-    onSuccess: (r: any) => { invalidate(); setShowPayModal(false); setPayRef(""); setSelected(r.data?.data ?? r.data) },
+    mutationFn: () => apiClient.post(`/api/v1/ap/bills/${selected?.id}/pay`, {
+      paymentRef: payRef || null, bankAccountId: bankAccounts[0]?.id ?? null,
+      amount: payAmount.trim() === "" ? null : amountToPay(payAmount, balanceOf(selected!)),
+    }),
+    onSuccess: (r: any) => { invalidate(); qc.invalidateQueries({ queryKey: ["ap-bill-payments"] }); setShowPayModal(false); setPayRef(""); setPayAmount(""); setSelected(r.data?.data ?? r.data) },
     onError: (e: any) => setError(e.response?.data?.message || "Payment failed"),
   })
 
@@ -405,6 +423,11 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
                 ["Description",  selected.description],
                 ["Payment ref",  selected.paymentRef ?? "—"],
                 ["Paid",         selected.paidAt ? fmtDT(selected.paidAt) : "—"],
+                ...(Number(selected.paidAmount ?? 0) > 0 || Number(selected.creditedAmount ?? 0) > 0 ? [
+                  ["Paid so far",   fmtR(selected.paidAmount ?? 0)],
+                  ["Credit notes",  fmtR(selected.creditedAmount ?? 0)],
+                  ["Still owed",    fmtR(balanceOf(selected))],
+                ] : []),
               ].map(([k, v]) => (
                 <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--hf-border-subtle)", fontSize: 13 }}>
                   <span style={{ color: "var(--hf-text-faint)", fontWeight: 600, minWidth: 110 }}>{k}</span>
@@ -412,6 +435,17 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
                 </div>
               ))}
             </div>
+
+            {payments.length > 1 && (
+              <div style={{ marginBottom: 14, fontSize: 12, color: "var(--hf-text-muted)" }}>
+                <div style={{ fontWeight: 700, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em", fontSize: 10 }}>Payments</div>
+                {payments.map(p => (
+                  <div key={p.id} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
+                    <span>{fmtDate(p.paidOn)}{p.reference ? ` · ${p.reference}` : ""}</span><span>{fmtR(p.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {selected.notes && (
               <div style={{ marginBottom: 14, padding: "12px 14px", background: "var(--hf-warning-soft)", borderRadius: 9, border: "1px solid var(--hf-warning-border)", fontSize: 13, color: "var(--hf-text-secondary)" }}>
@@ -463,10 +497,10 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
                   <CheckCircle size={14} /> Give second approval
                 </button>
               )}
-              {canPay && ["APPROVED","OVERDUE"].includes(selected.status) && !selected.batchId && (
+              {canPay && PAYABLE.includes(selected.status) && !selected.batchId && (
                 <button onClick={() => setShowPayModal(true)}
                   style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1.5px solid var(--hf-info-border)", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                  <DollarSign size={14} /> Mark as paid
+                  <DollarSign size={14} /> {selected.status === "PARTIALLY_PAID" ? "Pay balance" : "Pay bill"}
                 </button>
               )}
               {selected.batchId && (
@@ -474,7 +508,7 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
                   Included in EFT batch — payment handled via batch
                 </div>
               )}
-              {!["PAID","CANCELLED"].includes(selected.status) && (
+              {!["PAID","CANCELLED"].includes(selected.status) && !(Number(selected.paidAmount ?? 0) > 0 || Number(selected.creditedAmount ?? 0) > 0) && (
                 <button onClick={() => setShowCancel(true)}
                   style={{ padding: "10px 14px", background: "var(--hf-surface-muted)", color: "var(--hf-text-faint)", border: "1.5px solid var(--hf-border)", borderRadius: 9, fontSize: 13, cursor: "pointer" }}>
                   <XCircle size={14} />
@@ -560,28 +594,38 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, backdropFilter: "blur(2px)" }}>
           <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Mark as paid</h3>
-              <button onClick={() => setShowPayModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={18} /></button>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Pay bill</h3>
+              <button onClick={() => { setShowPayModal(false); setPayAmount("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={18} /></button>
             </div>
             <div style={{ padding: "14px", background: "var(--hf-surface-muted)", borderRadius: 9, marginBottom: 16, textAlign: "center" as const }}>
-              <div style={{ fontSize: 24, fontWeight: 800, color: "var(--hf-text)" }}>{fmtR(selected.totalAmount)}</div>
-              <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{selected.supplierName} · #{selected.billNumber}</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: "var(--hf-text)" }}>{fmtR(balanceOf(selected))}</div>
+              <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{selected.supplierName} · #{selected.billNumber} · still owed</div>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={lbl} htmlFor="ap-pay-amount">Amount to pay</label>
+              <input id="ap-pay-amount" inputMode="decimal" value={payAmount} onChange={e => setPayAmount(e.target.value)}
+                placeholder={`Leave empty to pay all ${fmtR(balanceOf(selected))}`} style={inp} autoFocus />
             </div>
             <div>
               <label style={lbl}>Payment reference (optional)</label>
-              <input value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="EFT ref, cheque number, transaction ID..." style={inp} autoFocus />
+              <input value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="EFT ref, cheque number, transaction ID..." style={inp} />
             </div>
             {bankAccounts.length > 0 && (
               <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--hf-info-soft)", borderRadius: 8, fontSize: 12, color: "var(--hf-info-text)" }}>
                 Payment from: {bankAccounts[0]?.accountName ?? "Primary bank account"}
               </div>
             )}
-            {error && <div style={{ marginTop: 10, padding: "8px 12px", background: "var(--hf-danger-soft)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
+            {(() => {
+              const why = paymentError(payAmount, balanceOf(selected), bankAccounts.length > 0)
+              const shown = error || (payAmount.trim() !== "" ? why : null)
+              return shown ? <div role="alert" style={{ marginTop: 10, padding: "8px 12px", background: "var(--hf-danger-soft)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{shown}</div> : null
+            })()}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-              <button onClick={() => setShowPayModal(false)} style={btnS}>Cancel</button>
-              <button onClick={() => payBill.mutate()} disabled={payBill.isPending}
+              <button onClick={() => { setShowPayModal(false); setPayAmount("") }} style={btnS}>Cancel</button>
+              <button onClick={() => { setError(""); payBill.mutate() }}
+                disabled={payBill.isPending || paymentError(payAmount, balanceOf(selected), bankAccounts.length > 0) !== null}
                 style={{ ...btnP, background: "var(--hf-success-solid-strong)", opacity: payBill.isPending ? 0.6 : 1 }}>
-                <DollarSign size={13} /> {payBill.isPending ? "Marking..." : "Mark paid"}
+                <DollarSign size={13} /> {payBill.isPending ? "Paying..." : (payAmount.trim() !== "" ? "Pay this amount" : "Pay in full")}
               </button>
             </div>
           </div>

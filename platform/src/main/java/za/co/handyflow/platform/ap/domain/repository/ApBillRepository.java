@@ -75,9 +75,9 @@ public interface ApBillRepository extends JpaRepository<ApBill, UUID> {
     long countByStatus(TenantId tenantId, String status);
 
     @Query("""
-        SELECT COALESCE(SUM(b.totalAmount), 0) FROM ApBill b
+        SELECT COALESCE(SUM(b.totalAmount - b.paidAmount - b.creditedAmount), 0) FROM ApBill b
         WHERE b.tenantId = :tenantId
-        AND b.status IN ('APPROVED', 'OVERDUE')
+        AND b.status IN ('APPROVED', 'OVERDUE', 'PARTIALLY_PAID')
         AND b.deletedAt IS NULL
         """)
     BigDecimal sumOutstanding(TenantId tenantId);
@@ -88,7 +88,7 @@ public interface ApBillRepository extends JpaRepository<ApBill, UUID> {
     @Query("""
         SELECT b FROM ApBill b
         WHERE b.tenantId = :tenantId
-        AND b.status IN ('APPROVED', 'OVERDUE')
+        AND b.status IN ('APPROVED', 'OVERDUE', 'PARTIALLY_PAID')
         AND b.deletedAt IS NULL
         ORDER BY b.dueDate ASC
         """)
@@ -132,11 +132,22 @@ public interface ApBillRepository extends JpaRepository<ApBill, UUID> {
     List<String> findDistinctSupplierNames(TenantId tenantId);
 
     @Query("""
-        SELECT COALESCE(SUM(b.totalAmount), 0) FROM ApBill b
+        SELECT COALESCE(SUM(b.totalAmount - b.paidAmount - b.creditedAmount), 0) FROM ApBill b
         WHERE b.tenantId = :tenantId
-        AND b.status IN ('APPROVED', 'OVERDUE')
+        AND b.status IN ('APPROVED', 'OVERDUE', 'PARTIALLY_PAID')
         AND b.dueDate BETWEEN :from AND :to
         AND b.deletedAt IS NULL
         """)
     BigDecimal sumDueBetween(TenantId tenantId, LocalDate from, LocalDate to);
+
+    /** Finance patch F10: a supplier's bills that can still be paid or credited, oldest due first (supplier matched by name). */
+    @Query("""
+        SELECT b FROM ApBill b
+        WHERE b.tenantId = :tenantId
+        AND LOWER(b.supplierName) = LOWER(:supplierName)
+        AND b.status IN ('APPROVED', 'OVERDUE', 'PARTIALLY_PAID')
+        AND b.deletedAt IS NULL
+        ORDER BY b.dueDate ASC, b.billDate ASC
+        """)
+    List<ApBill> findOpenForSupplier(TenantId tenantId, String supplierName);
 }

@@ -11,11 +11,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.ap.domain.ApPaymentRules;
 import za.co.handyflow.platform.ap.domain.model.ApBatchItem;
 import za.co.handyflow.platform.ap.domain.model.ApBill;
 import za.co.handyflow.platform.ap.domain.model.ApEftBatch;
 import za.co.handyflow.platform.ap.domain.repository.ApBatchItemRepository;
 import za.co.handyflow.platform.ap.domain.repository.ApBillRepository;
+import za.co.handyflow.platform.ap.domain.repository.ApCreditNoteRepository;
 import za.co.handyflow.platform.ap.domain.repository.ApEftBatchRepository;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
@@ -80,6 +82,8 @@ public class ApPdfGenerator {
     private final ApEftBatchRepository  batchRepo;
     private final ApBatchItemRepository batchItemRepo;
     private final JdbcTemplate          jdbc;
+    // Finance patch F10: the statement shows credit held with the supplier.
+    private final ApCreditNoteRepository creditRepo;
 
     // SA currency formatting — "R 51 750,00", not raw BigDecimal.toString()
     // ("R 51750.00", no thousands separator, comma/period reversed, and
@@ -156,8 +160,9 @@ public class ApPdfGenerator {
     public byte[] generateBillRemittance(TenantId tenantId, UUID billId) {
         ApBill bill = billRepo.findByIdAndTenantId(billId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Bill", billId.toString()));
-        if (!"PAID".equals(bill.getStatus())) {
-            throw new HandyFlowException("Only paid bills have a remittance advice",
+        // Finance patch F10: a part-paid bill has a remittance too, for what has been paid so far.
+        if (ApPaymentRules.money(bill.getPaidAmount()).signum() <= 0) {
+            throw new HandyFlowException("Only bills that have been paid have a remittance advice",
                     HttpStatus.BAD_REQUEST, "BILL_NOT_PAID");
         }
         String tenantName = fetchTenantName(tenantId);
@@ -185,7 +190,7 @@ public class ApPdfGenerator {
     private byte[] renderRemittance(String tenantName, String supplierName, String paymentRef,
                                     Instant paidAt, List<ApBill> bills) {
         BigDecimal total = bills.stream()
-                .map(ApBill::getTotalAmount)
+                .map(ApBill::getPaidAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -208,9 +213,9 @@ public class ApPdfGenerator {
             meta.setSpacingAfter(16);
             doc.add(meta);
 
-            PdfPTable table = billTable();
+            PdfPTable table = billTable("Amount paid");
             for (ApBill b : bills) {
-                addBillRow(table, b);
+                addBillRow(table, b, b.getPaidAmount());
             }
             doc.add(table);
 
@@ -246,10 +251,13 @@ public class ApPdfGenerator {
             throw new ResourceNotFoundException("Supplier", supplierName);
         }
 
-        BigDecimal outstanding = bills.stream()
-                .filter(b -> "APPROVED".equals(b.getStatus()) || "OVERDUE".equals(b.getStatus()))
-                .map(ApBill::getTotalAmount)
+        BigDecimal owed = bills.stream()
+                .filter(b -> ApPaymentRules.payable(b.getStatus()))
+                .map(ApBill::getBalance)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Finance patch F10: credit notes received and not yet applied reduce what is owed.
+        BigDecimal creditHeld = ApPaymentRules.money(creditRepo.creditLeft(tenantId, supplierName));
+        BigDecimal outstanding = owed.subtract(creditHeld);
 
         String tenantName = fetchTenantName(tenantId);
 
@@ -261,10 +269,10 @@ public class ApPdfGenerator {
 
             doc.add(titled(tenantName, "Supplier Statement — " + supplierName));
 
-            PdfPTable table = new PdfPTable(5);
+            PdfPTable table = new PdfPTable(6);
             table.setWidthPercentage(100);
-            table.setWidths(new float[]{1.3f, 1.1f, 1.1f, 1f, 1f});
-            for (String h : List.of("Bill #", "Bill date", "Due date", "Amount", "Status")) {
+            table.setWidths(new float[]{1.3f, 1.1f, 1.1f, 1f, 1f, 1f});
+            for (String h : List.of("Bill #", "Bill date", "Due date", "Amount", "Balance", "Status")) {
                 PdfPCell header = new PdfPCell(new Phrase(h, HEADING_FONT));
                 header.setBackgroundColor(BRAND_NAVY);
                 header.setBorderColor(BRAND_NAVY);
@@ -276,16 +284,23 @@ public class ApPdfGenerator {
                 addCell(table, DATE_FMT.format(b.getBillDate()));
                 addCell(table, DATE_FMT.format(b.getDueDate()));
                 addCell(table, fmtR(b.getTotalAmount()));
+                addCell(table, fmtR(ApPaymentRules.payable(b.getStatus()) ? b.getBalance() : BigDecimal.ZERO));
                 addCell(table, b.getStatus());
             }
             doc.add(table);
+
+            if (creditHeld.signum() > 0) {
+                Paragraph credit = new Paragraph("Credit held with supplier (credit notes not yet applied): " + fmtR(creditHeld), BODY_FONT);
+                credit.setSpacingBefore(10);
+                doc.add(credit);
+            }
 
             Paragraph outstandingP = new Paragraph("Outstanding balance: " + fmtR(outstanding), TOTAL_FONT);
             outstandingP.setSpacingBefore(14);
             doc.add(outstandingP);
 
             Paragraph asAt = new Paragraph(
-                    "As at " + DATE_FMT.format(java.time.LocalDate.now()) + ". Outstanding balance includes APPROVED and OVERDUE bills only.",
+                    "As at " + DATE_FMT.format(java.time.LocalDate.now()) + ". Outstanding balance is what approved, overdue and part-paid bills still owe, less credit held with the supplier.",
                     META_FONT);
             asAt.setSpacingBefore(6);
             doc.add(asAt);
@@ -320,11 +335,13 @@ public class ApPdfGenerator {
         return p;
     }
 
-    private PdfPTable billTable() {
+    private PdfPTable billTable() { return billTable("Amount"); }
+
+    private PdfPTable billTable(String amountHeader) {
         PdfPTable table = new PdfPTable(4);
         table.setWidthPercentage(100);
         table.setWidths(new float[]{1.3f, 1.1f, 2.2f, 1f});
-        for (String h : List.of("Bill #", "Bill date", "Description", "Amount")) {
+        for (String h : List.of("Bill #", "Bill date", "Description", amountHeader)) {
             PdfPCell header = new PdfPCell(new Phrase(h, HEADING_FONT));
             header.setBackgroundColor(BRAND_NAVY);
             header.setBorderColor(BRAND_NAVY);
@@ -334,11 +351,13 @@ public class ApPdfGenerator {
         return table;
     }
 
-    private void addBillRow(PdfPTable table, ApBill b) {
+    private void addBillRow(PdfPTable table, ApBill b) { addBillRow(table, b, b.getTotalAmount()); }
+
+    private void addBillRow(PdfPTable table, ApBill b, BigDecimal amount) {
         addCell(table, b.getBillNumber());
         addCell(table, DATE_FMT.format(b.getBillDate()));
         addCell(table, b.getDescription());
-        addCell(table, fmtR(b.getTotalAmount()));
+        addCell(table, fmtR(amount));
     }
 
     private void addCell(PdfPTable table, String text) {

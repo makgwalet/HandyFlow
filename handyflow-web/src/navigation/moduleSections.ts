@@ -511,6 +511,7 @@ export const AP_SECTIONS: ModuleSections = {
       sections: [
         { id: 'bills', label: 'Bills', icon: FileText },
         { id: 'batches', label: 'EFT Batches', icon: CreditCard },
+        { id: 'credit-notes', label: 'Credit Notes', icon: FileText },
         { id: 'recurring', label: 'Recurring', icon: RefreshCw },
       ],
     },

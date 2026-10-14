@@ -3,6 +3,7 @@ package za.co.handyflow.platform.ap.domain.model;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import za.co.handyflow.platform.ap.domain.ApPaymentRules;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
@@ -64,6 +65,10 @@ public class ApBill {
     @Column(name = "pop_name")        private String popName;
     @Column(name = "pop_uploaded_at") private Instant popUploadedAt;
     @Column(name = "pop_uploaded_by") private UUID    popUploadedBy;
+
+    // Finance patch F10: balance = totalAmount - paidAmount - creditedAmount.
+    @Column(name = "paid_amount",     nullable = false, precision = 15, scale = 2) private BigDecimal paidAmount     = BigDecimal.ZERO;
+    @Column(name = "credited_amount", nullable = false, precision = 15, scale = 2) private BigDecimal creditedAmount = BigDecimal.ZERO;
 
     // Payment
     @Column(name = "paid_at")      private Instant paidAt;
@@ -211,16 +216,41 @@ public class ApBill {
         this.updatedAt        = Instant.now();
     }
 
-    public void markPaid(UUID paymentJournalId, String paymentRef, UUID paidBy) {
-        // Finance patch F3: OVERDUE is an approved bill past its due date; payBill() accepts it, so marking it paid must too.
-        if (!"APPROVED".equals(status) && !"OVERDUE".equals(status))
-            throw new IllegalStateException("Only approved or overdue bills can be marked paid — this bill is " + status);
-        this.status             = "PAID";
+    /** What this bill still owes: total less payments and supplier credit notes; never below zero. */
+    public BigDecimal getBalance() {
+        return ApPaymentRules.balance(totalAmount, paidAmount, creditedAmount);
+    }
+
+    /**
+     * Finance patch F10: records a payment of {@code amount} (part or all of the balance). The bill is PAID when nothing is
+     * left, otherwise PARTIALLY_PAID. The journal, reference and payer are those of the latest payment.
+     */
+    public void applyPayment(BigDecimal amount, UUID paymentJournalId, String paymentRef, UUID paidBy) {
+        if (!ApPaymentRules.payable(status))
+            throw new IllegalStateException("Only approved, overdue or part-paid bills can be paid - this bill is " + status);
+        if (ApPaymentRules.money(amount).signum() <= 0)
+            throw new IllegalStateException("A payment must be more than zero");
+        this.paidAmount         = ApPaymentRules.money(paidAmount).add(ApPaymentRules.money(amount));
         this.paymentJournalId   = paymentJournalId;
         this.paymentRef         = paymentRef;
         this.paidBy             = paidBy;
         this.paidAt             = Instant.now();
-        this.updatedAt          = Instant.now();
+        settle();
+    }
+
+    /** Finance patch F10: a supplier credit note of {@code amount} reduces what this bill owes. */
+    public void applyCredit(BigDecimal amount) {
+        if (!ApPaymentRules.payable(status))
+            throw new IllegalStateException("Only approved, overdue or part-paid bills can be credited - this bill is " + status);
+        if (ApPaymentRules.money(amount).signum() <= 0) return;
+        this.creditedAmount = ApPaymentRules.money(creditedAmount).add(ApPaymentRules.money(amount));
+        settle();
+    }
+
+    private void settle() {
+        String next = ApPaymentRules.settledStatus(totalAmount, paidAmount, creditedAmount);
+        if (next != null) this.status = next;
+        this.updatedAt = Instant.now();
     }
 
     // KNOWN LIMITATION, not an oversight: only APPROVED bills get marked

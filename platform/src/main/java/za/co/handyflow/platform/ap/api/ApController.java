@@ -38,6 +38,7 @@ public class ApController {
     private final ApSupplierBankingService supplierBankingService;
     private final ApRemittanceEmailService remittanceEmailService;
     private final ApPdfGenerator apPdfGenerator;
+    private final ApCreditNoteService creditNoteService;
 
     // ── Summary ───────────────────────────────────────────────────────────────
 
@@ -129,6 +130,64 @@ public class ApController {
     public ResponseEntity<ApiResponse<BillResponse>> cancelBill(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Bill cancelled",
                 apService.cancelBill(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @GetMapping("/bills/{id}/payments")
+    @PreAuthorize("hasAnyAuthority('AP_READ','BILLING_READ')")
+    @Operation(summary = "Payments made against a bill (finance patch F10: a bill can be paid in parts)")
+    public ResponseEntity<ApiResponse<List<BillPaymentResponse>>> billPayments(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(apService.getPayments(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    // ── Supplier credit notes (finance patch F10) ─────────────────────────────
+
+    @GetMapping("/credit-notes")
+    @PreAuthorize("hasAnyAuthority('AP_READ','BILLING_READ')")
+    @Operation(summary = "Credit notes received from suppliers, with the credit still held on each")
+    public ResponseEntity<ApiResponse<List<ApCreditNoteResponse>>> creditNotes() {
+        return ResponseEntity.ok(ApiResponse.success(creditNoteService.list(TenantContext.getTenantIdAsObject())));
+    }
+
+    @GetMapping("/credit-notes/{id}")
+    @PreAuthorize("hasAnyAuthority('AP_READ','BILLING_READ')")
+    @Operation(summary = "One supplier credit note, with the bills it was applied to")
+    public ResponseEntity<ApiResponse<ApCreditNoteResponse>> creditNote(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(creditNoteService.get(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/credit-notes")
+    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
+    @Operation(summary = "Capture a supplier's credit note. Large ones wait for approval; small ones are issued at once")
+    public ResponseEntity<ApiResponse<ApCreditNoteResponse>> createCreditNote(@RequestBody CreateApCreditNoteRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Credit note captured",
+                creditNoteService.create(TenantContext.getTenantIdAsObject(), req, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/credit-notes/{id}/approve")
+    @PreAuthorize("hasAuthority('AP_APPROVE')")
+    @Operation(summary = "Approve a supplier credit note that is waiting (never your own)")
+    public ResponseEntity<ApiResponse<ApCreditNoteResponse>> approveCreditNote(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Credit note approved",
+                creditNoteService.approve(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/credit-notes/{id}/reject")
+    @PreAuthorize("hasAuthority('AP_APPROVE')")
+    @Operation(summary = "Reject a supplier credit note that is waiting, with the reason")
+    public ResponseEntity<ApiResponse<ApCreditNoteResponse>> rejectCreditNote(
+            @PathVariable UUID id, @RequestBody RejectApCreditNoteRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Credit note rejected",
+                creditNoteService.reject(TenantContext.getTenantIdAsObject(), id,
+                        TenantContext.getCurrentUserId(), req != null ? req.reason() : null)));
+    }
+
+    @PostMapping("/credit-notes/{id}/allocate")
+    @PreAuthorize("hasAuthority('AP_PAY')")
+    @Operation(summary = "Apply the credit still held on a supplier credit note to that supplier's open bills")
+    public ResponseEntity<ApiResponse<ApCreditNoteResponse>> allocateCreditNote(
+            @PathVariable UUID id, @RequestBody(required = false) AllocateApCreditRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Credit applied",
+                creditNoteService.allocate(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
     }
 
     // ── Evidence uploads ──────────────────────────────────────────────────────

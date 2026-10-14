@@ -11,6 +11,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.ap.domain.ApPaymentRules;
 import za.co.handyflow.platform.ap.domain.model.*;
 import za.co.handyflow.platform.ap.domain.repository.*;
 import za.co.handyflow.platform.ap.dto.*;
@@ -52,6 +53,8 @@ public class ApService {
     private final ApEftBatchRepository  batchRepo;
     private final ApBatchItemRepository batchItemRepo;
     private final ApSupplierBankingRepository supplierBankingRepo;
+    // Finance patch F10: every payment is its own record (part payments, and a key for the ledger posting).
+    private final ApBillPaymentRepository paymentRepo;
     private final JdbcTemplate          jdbc;
     private final AccountingFacade      accountingFacade;
     private final NotificationService   notificationService;
@@ -76,6 +79,11 @@ public class ApService {
             Map.entry("MARKETING",        "5180"),
             Map.entry("OTHER",            "5100")
     );
+
+    /** The expense account a bill category is booked to (finance patch F10: a supplier credit note reverses the same one). */
+    static String expenseAccountCode(String category) {
+        return CATEGORY_ACCOUNT.getOrDefault(category, "5100");
+    }
 
     // WHY a dedicated constant, not baked into the SQL string? Same
     // reasoning as CATEGORY_ACCOUNT above — one place to change if this
@@ -378,25 +386,51 @@ public class ApService {
         return auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList();
     }
 
+    /**
+     * Pays a bill, whole or in part (finance patch F10). {@code amount} left empty pays the balance. Each payment is its
+     * own record and its own ledger posting. A bill in an EFT batch is paid through the batch, never here as well.
+     */
     @Transactional
     public BillResponse payBill(TenantId tenantId, UUID id, PayBillRequest req, UUID paidBy) {
         ApBill bill = findBill(tenantId, id);
         duties.require(tenantId, ApDutyRules.Duty.PAY_OWN_BILL, "AP_PAY", bill.getCreatedBy(), paidBy,
                 "bill=" + bill.getBillNumber());
-        if (!"APPROVED".equals(bill.getStatus()) && !"OVERDUE".equals(bill.getStatus())) {
-            throw new HandyFlowException("Only APPROVED or OVERDUE bills can be paid",
+        if (!ApPaymentRules.payable(bill.getStatus())) {
+            throw new HandyFlowException("Only APPROVED, OVERDUE or PARTIALLY_PAID bills can be paid",
                     HttpStatus.BAD_REQUEST, "BILL_NOT_APPROVED");
         }
+        if (bill.getBatchId() != null) {
+            throw new HandyFlowException("Bill " + bill.getBillNumber() + " is in an EFT batch; pay it through the batch",
+                    HttpStatus.CONFLICT, "BILL_IN_BATCH");
+        }
+        BigDecimal amount = ApPaymentRules.amountToPay(req.amount(), bill.getBalance());
+        String problem = ApPaymentRules.paymentProblem(amount, bill.getBalance(), req.bankAccountId() != null);
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.BAD_REQUEST, "PAYMENT_NOT_ALLOWED");
 
-        // Post payment journal: debit AP (2010), credit bank account.
-        // Same rollback-on-failure reasoning as approveBill() above.
-        UUID paymentJournalId = postPaymentJournal(
-                tenantId, bill, req.bankAccountId(), req.paymentRef());
-
-        bill.markPaid(paymentJournalId, req.paymentRef(), paidBy);
-        billRepo.save(bill);
-        log.info("Paid bill={} ref={}", id, req.paymentRef());
+        recordPayment(tenantId, bill, amount, req.bankAccountId(), req.paymentRef(), null, paidBy);
+        log.info("Paid bill={} amount={} ref={} balance={}", id, amount, req.paymentRef(), bill.getBalance());
         return toBillResponse(bill);
+    }
+
+    /** Saves the payment, posts it once, and settles the bill. A failed posting stops the payment (the caller's transaction rolls back). */
+    private void recordPayment(TenantId tenantId, ApBill bill, BigDecimal amount, UUID bankAccountId,
+                               String ref, UUID batchId, UUID paidBy) {
+        ApBillPayment payment = ApBillPayment.of(tenantId, bill.getId(), amount, bankAccountId, ref, batchId, paidBy);
+        paymentRepo.save(payment);
+        UUID journalId = postPaymentJournal(tenantId, bill, payment, bankAccountId, ref);
+        payment.postedAs(journalId);
+        paymentRepo.save(payment);
+        bill.applyPayment(amount, journalId, ref, paidBy);
+        billRepo.save(bill);
+    }
+
+    @Transactional(readOnly = true)
+    public List<BillPaymentResponse> getPayments(TenantId tenantId, UUID billId) {
+        findBill(tenantId, billId);
+        return paymentRepo.findByBill(tenantId, billId).stream()
+                .map(p -> new BillPaymentResponse(p.getId(), p.getAmount(), p.getPaidOn(), p.getReference(),
+                        p.getBatchId(), p.getJournalEntryId(), p.getPaidBy(), p.getCreatedAt()))
+                .toList();
     }
 
     @Transactional
@@ -405,6 +439,10 @@ public class ApService {
         if ("PAID".equals(bill.getStatus())) {
             throw new HandyFlowException("Paid bills cannot be cancelled",
                     HttpStatus.BAD_REQUEST, "BILL_PAID");
+        }
+        if (ApPaymentRules.money(bill.getPaidAmount()).signum() > 0 || ApPaymentRules.money(bill.getCreditedAmount()).signum() > 0) {
+            throw new HandyFlowException("A bill that has been part paid or credited cannot be cancelled",
+                    HttpStatus.BAD_REQUEST, "BILL_PART_SETTLED");
         }
         bill.cancel();
         billRepo.save(bill);
@@ -474,8 +512,8 @@ public class ApService {
     /**
      * AP aging report — mirrors Accounting's AR aging exactly (same
      * bucket boundaries: CURRENT, 1-30, 31-60, 61-90, 90+ days overdue),
-     * sourced from ApBill instead of Invoice. Only APPROVED and OVERDUE
-     * bills count, matching sumOutstanding()'s own status filter above —
+     * sourced from ApBill instead of Invoice. Only APPROVED, OVERDUE and PARTIALLY_PAID
+     * bills count, each at what it still owes (finance patch F10), matching sumOutstanding()'s own status filter above —
      * not a new definition of "outstanding" invented for this report.
      */
     @Transactional(readOnly = true)
@@ -490,14 +528,14 @@ public class ApService {
         for (ApBill b : bills) {
             long daysOverdue = ChronoUnit.DAYS.between(b.getDueDate(), today);
             String bucket;
-            if (daysOverdue <= 0)       { bucket = "CURRENT"; current = current.add(b.getTotalAmount()); }
-            else if (daysOverdue <= 30) { bucket = "1-30";    d1to30  = d1to30.add(b.getTotalAmount()); }
-            else if (daysOverdue <= 60) { bucket = "31-60";   d31to60 = d31to60.add(b.getTotalAmount()); }
-            else if (daysOverdue <= 90) { bucket = "61-90";   d61to90 = d61to90.add(b.getTotalAmount()); }
-            else                        { bucket = "90+";     over90  = over90.add(b.getTotalAmount()); }
+            if (daysOverdue <= 0)       { bucket = "CURRENT"; current = current.add(b.getBalance()); }
+            else if (daysOverdue <= 30) { bucket = "1-30";    d1to30  = d1to30.add(b.getBalance()); }
+            else if (daysOverdue <= 60) { bucket = "31-60";   d31to60 = d31to60.add(b.getBalance()); }
+            else if (daysOverdue <= 90) { bucket = "61-90";   d61to90 = d61to90.add(b.getBalance()); }
+            else                        { bucket = "90+";     over90  = over90.add(b.getBalance()); }
 
             lines.add(new ApAgingReportResponse.AgingLine(b.getId(), b.getBillNumber(), b.getSupplierName(),
-                    b.getDueDate(), (int) Math.max(daysOverdue, 0), b.getTotalAmount(), bucket));
+                    b.getDueDate(), (int) Math.max(daysOverdue, 0), b.getBalance(), bucket));
         }
 
         BigDecimal total = current.add(d1to30).add(d31to60).add(d61to90).add(over90);
@@ -538,7 +576,7 @@ public class ApService {
             ApBill bill = billRepo.findByIdAndTenantId(billId, tenantId)
                     .orElseThrow(() -> new ResourceNotFoundException("Bill", billId.toString()));
 
-            if (!"APPROVED".equals(bill.getStatus()) && !"OVERDUE".equals(bill.getStatus())) {
+            if (!ApPaymentRules.payable(bill.getStatus()) || bill.getBalance().signum() <= 0) {
                 throw new HandyFlowException(
                         "Bill " + bill.getBillNumber() + " is not approved",
                         HttpStatus.BAD_REQUEST, "BILL_NOT_APPROVED");
@@ -549,9 +587,10 @@ public class ApService {
                         HttpStatus.BAD_REQUEST, "BILL_IN_BATCH");
             }
 
-            ApBatchItem item = ApBatchItem.of(batch.getId(), billId, bill.getTotalAmount());
+            // Finance patch F10: the batch pays what the bill still owes, not what it was first for.
+            ApBatchItem item = ApBatchItem.of(batch.getId(), billId, bill.getBalance());
             batchItemRepo.save(item);
-            batch.addBill(bill.getTotalAmount());
+            batch.addBill(bill.getBalance());
             bill.assignToBatch(batch.getId());
             billRepo.save(bill);
         }
@@ -570,6 +609,7 @@ public class ApService {
         duties.require(tenantId, ApDutyRules.Duty.RELEASE_OWN_BATCH, "AP_PAY", batch.getCreatedBy(), releasedBy,
                 "batch=" + batch.getBatchNumber());
         requireCheckedBanking(tenantId, id);
+        requireBatchAmountsCurrent(tenantId, id);
         batch.submit();
         batchRepo.save(batch);
 
@@ -587,16 +627,16 @@ public class ApService {
     public BatchResponse confirmBatchPaid(TenantId tenantId, UUID id,
                                           ConfirmBatchPaidRequest req, UUID paidBy) {
         ApEftBatch batch = findBatch(tenantId, id);
+        if (!paymentRepo.findByBatch(tenantId, id).isEmpty()) {
+            throw new HandyFlowException("This batch has already been paid", HttpStatus.CONFLICT, "BATCH_PAID");
+        }
+        requireBatchAmountsCurrent(tenantId, id);
 
-        // Mark each bill as paid
+        // Finance patch F10: pay each bill what the batch planned (its balance when the batch was made), as its own payment.
         List<ApBatchItem> items = batchItemRepo.findByBatchId(id);
         for (ApBatchItem item : items) {
-            billRepo.findByIdAndTenantId(item.getBillId(), tenantId).ifPresent(bill -> {
-                UUID payJournalId = postPaymentJournal(
-                        tenantId, bill, batch.getBankAccountId(), req.paymentRef());
-                bill.markPaid(payJournalId, req.paymentRef(), paidBy);
-                billRepo.save(bill);
-            });
+            billRepo.findByIdAndTenantId(item.getBillId(), tenantId).ifPresent(bill ->
+                    recordPayment(tenantId, bill, item.getAmount(), batch.getBankAccountId(), req.paymentRef(), id, paidBy));
         }
 
         batch.confirmPaid(req.paymentRef(), paidBy);
@@ -627,6 +667,7 @@ public class ApService {
         ApEftBatch batch = findBatch(tenantId, id);
         // Finance patch F6: the bank file is what moves the money; it never carries unchecked bank details.
         requireCheckedBanking(tenantId, id);
+        requireBatchAmountsCurrent(tenantId, id);
         List<ApBatchItem> items = batchItemRepo.findByBatchId(id);
 
         StringBuilder csv = new StringBuilder();
@@ -794,7 +835,7 @@ public class ApService {
         return posted.id();
     }
 
-    private UUID postPaymentJournal(TenantId tenantId, ApBill bill,
+    private UUID postPaymentJournal(TenantId tenantId, ApBill bill, ApBillPayment payment,
                                     UUID bankAccountId, String ref) {
         if (bankAccountId == null) {
             throw new HandyFlowException(
@@ -816,16 +857,16 @@ public class ApService {
 
         List<CreateJournalEntryRequest.JournalLineRequest> lines = List.of(
                 new CreateJournalEntryRequest.JournalLineRequest(
-                        apAccountId, "Payment to " + bill.getSupplierName(), bill.getTotalAmount(), null),
+                        apAccountId, "Payment to " + bill.getSupplierName(), payment.getAmount(), null),
                 new CreateJournalEntryRequest.JournalLineRequest(
-                        bankAccountGL, "Payment ref: " + ref, null, bill.getTotalAmount()));
+                        bankAccountGL, "Payment ref: " + ref, null, payment.getAmount()));
 
         CreateJournalEntryRequest req = new CreateJournalEntryRequest(
                 LocalDate.now(), "Payment: " + bill.getBillNumber() + " ref:" + ref,
                 ref, "PAYMENT", lines);
 
-        // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
-        JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("ap", "bill-paid", bill.getId()), req);
+        // Finance patch F3/F10: posted once per payment (each payment has its own id), so a retry cannot pay twice.
+        JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("ap", "bill-payment", payment.getId()), req);
         JournalEntryResponse posted  = created;
         return posted.id();
     }
@@ -858,6 +899,17 @@ public class ApService {
             m.put("excludedActors", List.of(bill.getCreatedBy().toString()));
         }
         return m;
+    }
+
+    /** Refuses (409 BATCH_AMOUNTS_CHANGED) when a payment or credit note since made means a bill owes less than the batch will pay. */
+    private void requireBatchAmountsCurrent(TenantId tenantId, UUID batchId) {
+        Map<String, BigDecimal[]> lines = new java.util.LinkedHashMap<>();
+        for (ApBatchItem item : batchItemRepo.findByBatchId(batchId)) {
+            billRepo.findByIdAndTenantId(item.getBillId(), tenantId).ifPresent(bill ->
+                    lines.put(bill.getBillNumber(), new BigDecimal[] { item.getAmount(), bill.getBalance() }));
+        }
+        String problem = ApPaymentRules.batchProblem(lines);
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.CONFLICT, "BATCH_AMOUNTS_CHANGED");
     }
 
     /** Refuses (409 BANKING_NOT_CHECKED) while any supplier in the batch has bank details waiting for a second person. */
@@ -903,7 +955,8 @@ public class ApService {
                 b.getJournalEntryId(), b.getPaymentJournalId(),
                 b.getFirstApprovedBy(), b.getFirstApprovedAt(),
                 b.getPaidAt(), b.getCreatedAt(), possibleDuplicateWarning,
-                b.getRejectionReason());
+                b.getRejectionReason(),
+                b.getPaidAmount(), b.getCreditedAmount(), b.getBalance());
     }
 
     private BatchResponse toBatchResponse(ApEftBatch b, List<BillResponse> bills) {

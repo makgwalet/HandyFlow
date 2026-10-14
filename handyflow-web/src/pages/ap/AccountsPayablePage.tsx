@@ -7,6 +7,7 @@ import { BatchesTab } from "./BatchesTab"
 import AgingTab from "./AgingTab"
 import { RecurringBillsTab } from "./RecurringBillsTab"
 import { SupplierBankingTab } from "./SupplierBankingTab"
+import { SupplierCreditNotesTab } from "./SupplierCreditNotesTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { AP_SECTIONS } from "../../navigation/moduleSections"
 
@@ -82,6 +83,7 @@ export function AccountsPayablePage() {
           case "bills":     return <BillsTab onRefreshSummary={refreshSummary} />
           case "batches":   return <BatchesTab onRefreshSummary={refreshSummary} />
           case "aging":     return <AgingTab />
+          case "credit-notes": return <SupplierCreditNotesTab onRefreshSummary={refreshSummary} />
           case "recurring": return <RecurringBillsTab onRefreshSummary={refreshSummary} />
           case "suppliers": return <SupplierBankingTab />
           default:          return null

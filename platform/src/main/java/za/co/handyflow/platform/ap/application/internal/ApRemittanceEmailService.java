@@ -66,7 +66,7 @@ public class ApRemittanceEmailService {
 
         String subject = "Remittance Advice — " + bill.getBillNumber();
         String body = EmailTemplates.remittanceAdvice(
-                tenantCompanyName(tenantId), bill.getSupplierName(), bill.getTotalAmount(), bill.getPaymentRef());
+                tenantCompanyName(tenantId), bill.getSupplierName(), bill.getPaidAmount(), bill.getPaymentRef());
         emailService.sendWithAttachment(email, subject, body, "remittance-advice.pdf", pdf);
 
         log.info("Sent remittance email for bill={} to={}", billId, email);

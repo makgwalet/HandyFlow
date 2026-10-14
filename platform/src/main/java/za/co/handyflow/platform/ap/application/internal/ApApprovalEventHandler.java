@@ -32,9 +32,21 @@ import za.co.handyflow.platform.approvals.ApprovalCompletedEvent;
 class ApApprovalEventHandler {
 
     private final ApService apService;
+    // Finance patch F10: supplier credit notes use the same engine.
+    private final ApCreditNoteService creditNoteService;
 
     @ApplicationModuleListener
     void onApprovalCompleted(ApprovalCompletedEvent event) {
+        if ("ap".equals(event.module()) && "CREDIT_NOTE".equals(event.entityType())) {
+            try {
+                if ("APPROVED".equals(event.outcome())) creditNoteService.completeApproval(event.tenantId(), event.entityId(), null);
+                else if ("REJECTED".equals(event.outcome())) creditNoteService.rejectFromEngine(event.tenantId(), event.entityId(), null, null);
+            } catch (Exception e) {
+                log.error("[AP] Failed to apply approval outcome={} supplier credit note={} tenant={}: {}",
+                        event.outcome(), event.entityId(), event.tenantId(), e.getMessage(), e);
+            }
+            return;
+        }
         if (!"ap".equals(event.module()) || !"BILL".equals(event.entityType())) {
             return; // not ours
         }

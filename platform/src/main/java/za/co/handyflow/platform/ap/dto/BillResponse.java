@@ -26,5 +26,7 @@ public record BillResponse(
         UUID journalEntryId, UUID paymentJournalId,
         UUID firstApprovedBy, Instant firstApprovedAt,
         Instant paidAt, Instant createdAt, String possibleDuplicateWarning,
-        String rejectionReason
+        String rejectionReason,
+        // Finance patch F10: balance = totalAmount - paidAmount - creditedAmount
+        BigDecimal paidAmount, BigDecimal creditedAmount, BigDecimal balance
 ) {}
