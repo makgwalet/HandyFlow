@@ -25,7 +25,12 @@ public interface AccJournalEntryRepository extends JpaRepository<AccJournalEntry
     @Query("SELECT e FROM AccJournalEntry e WHERE e.tenantId = :#{#tenantId.value} AND e.id = :id AND e.deletedAt IS NULL")
     Optional<AccJournalEntry> findActiveById(TenantId tenantId, UUID id);
 
-    @Query("SELECT e FROM AccJournalEntry e WHERE e.tenantId = :#{#tenantId.value} AND e.entryDate BETWEEN :from AND :to AND e.status = 'POSTED' AND e.deletedAt IS NULL ORDER BY e.entryDate")
+    /**
+     * Journals that count in the books between two dates: POSTED, and REVERSED ones too. Posting a reversal marks the
+     * original REVERSED, but the original's lines still happened: the reversal is its equal and opposite, so both must be
+     * counted or every report is out by the reversed amount (finance patch F11).
+     */
+    @Query("SELECT e FROM AccJournalEntry e WHERE e.tenantId = :#{#tenantId.value} AND e.entryDate BETWEEN :from AND :to AND e.status IN ('POSTED', 'REVERSED') AND e.deletedAt IS NULL ORDER BY e.entryDate")
     List<AccJournalEntry> findPostedInRange(TenantId tenantId, LocalDate from, LocalDate to);
 
     /** The live (not reversed, not discarded) journal for a business event, if any (finance patch F3). */
