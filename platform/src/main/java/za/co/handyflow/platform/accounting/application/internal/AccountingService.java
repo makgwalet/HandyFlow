@@ -46,6 +46,8 @@ public class AccountingService {
     private final EmailService                  emailService;
     // Finance patch F12: a bank account signed off through a date takes no new statement lines dated on or before it.
     private final AccBankReconciliationRepository bankRecRepo;
+    // Finance patch F24: lines may carry a cost centre, department, branch or project.
+    private final CostCentreService            costCentres;
 
     // ── Chart of Accounts ─────────────────────────────────────────────────────
 
@@ -150,6 +152,8 @@ public class AccountingService {
                                 + "each line must be one or the other, not both");
         }
 
+        costCentres.requireUsable(tenantId, req.lines().stream().map(CreateJournalEntryRequest.JournalLineRequest::costCentreId).toList());
+
         String entryNumber = numberGen.next(tenantId);
         AccJournalEntry entry = AccJournalEntry.create(
                 tenantId, entryNumber, req.entryDate(),
@@ -164,6 +168,7 @@ public class AccountingService {
             AccJournalLine line = debit.compareTo(BigDecimal.ZERO) > 0
                     ? AccJournalLine.debit(tenantId.getValue(),  entry.getId(), lr.accountId(), debit,  lr.description(), i)
                     : AccJournalLine.credit(tenantId.getValue(), entry.getId(), lr.accountId(), credit, lr.description(), i);
+            line.withCostCentre(lr.costCentreId());
             entry.addLine(line);
             i++;
         }
@@ -317,6 +322,7 @@ public class AccountingService {
                         origLine.getAccountId(), origLine.getCreditAmount(),
                         "Reversal: " + origLine.getDescription(), i);
             }
+            reversalLine.withCostCentre(origLine.getCostCentreId());
             reversal.addLine(reversalLine);
             i++;
         }
@@ -1037,7 +1043,7 @@ public class AccountingService {
                             l.getId(), l.getAccountId(),
                             acc != null ? acc.getAccountCode() : null,
                             acc != null ? acc.getAccountName() : null,
-                            l.getDescription(), l.getDebitAmount(), l.getCreditAmount());
+                            l.getDescription(), l.getDebitAmount(), l.getCreditAmount(), l.getCostCentreId());
                 }).toList();
         return new JournalEntryResponse(e.getId(), e.getEntryNumber(), e.getEntryDate(),
                 e.getDescription(), e.getReference(), e.getEntryType(), e.getStatus(),

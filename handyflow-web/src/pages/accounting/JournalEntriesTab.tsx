@@ -5,10 +5,11 @@ import { Plus, ChevronDown, ChevronUp, CheckCircle, RotateCcw, AlertCircle, X, T
 import { apiClient } from "../../api/client"
 import { useAuth } from "../../hooks/useAuth"
 import { usePermission } from "../../hooks/usePermission"
+import { labelOf, treeOrder, type CostCentre } from "./costCentre.logic"
 
 interface Account { id: string; accountCode: string; accountName: string; accountType: string }
 interface JournalLine { id: string; accountId: string; accountCode: string; accountName: string
-  description: string; debitAmount: number; creditAmount: number }
+  description: string; debitAmount: number; creditAmount: number; costCentreId?: string | null }
 interface Journal { id: string; entryNumber: string; entryDate: string; description: string
   reference: string; entryType: string; status: string; totalDebit: number; totalCredit: number
   balanced: boolean; lines: JournalLine[]; createdBy: string | null; createdAt: string
@@ -27,7 +28,7 @@ const inp: React.CSSProperties = {
   borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box",
 }
 
-interface DraftLine { tempId: string; accountId: string; description: string; debit: string; credit: string }
+interface DraftLine { tempId: string; accountId: string; description: string; debit: string; credit: string; costCentreId?: string }
 
 export default function JournalEntriesTab() {
   const qc = useQueryClient()
@@ -62,6 +63,18 @@ export default function JournalEntriesTab() {
     },
   })
 
+  // Finance F24: only active cost centres can be chosen on a new line; all of them are used to name the tag on an existing one.
+  const { data: centres = [] } = useQuery<CostCentre[]>({
+    queryKey: ["acc-cost-centres"],
+    queryFn: async () => {
+      const res = await apiClient.get("/api/v1/accounting/cost-centres")
+      return ((res.data?.data ?? res.data) ?? []) as CostCentre[]
+    },
+  })
+  const centreName = (id?: string | null) => { const c = centres.find(x => x.id === id); return c ? labelOf(c) : "" }
+  const hasCentres = centres.length > 0
+  const lineCols = hasCentres ? "3fr 2fr 2fr 1fr 1fr 32px" : "3fr 2fr 1fr 1fr 32px"
+
   const { data, isLoading } = useQuery({
     queryKey: ["journals", statusFilter],
     queryFn: async () => {
@@ -93,6 +106,7 @@ export default function JournalEntriesTab() {
         accountId: l.accountId, description: l.description || undefined,
         debitAmount:  parseFloat(l.debit)  || 0,
         creditAmount: parseFloat(l.credit) || 0,
+        costCentreId: l.costCentreId || undefined,
       })),
     }),
     onSuccess: () => {
@@ -286,7 +300,7 @@ export default function JournalEntriesTab() {
                             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                               <thead>
                                 <tr style={{ borderBottom: "1px solid var(--hf-border)" }}>
-                                  {["Account", "Description", "Debit", "Credit"].map(h => (
+                                  {["Account", "Description", ...(hasCentres ? ["Cost centre"] : []), "Debit", "Credit"].map(h => (
                                     <th key={h} style={{ textAlign: "left", padding: "6px 10px", fontSize: 11,
                                       fontWeight: 600, color: "var(--hf-text-muted)", textTransform: "uppercase" }}>{h}</th>
                                   ))}
@@ -300,6 +314,7 @@ export default function JournalEntriesTab() {
                                       <span style={{ fontSize: 12, color: "var(--hf-text-secondary)", marginLeft: 8 }}>{l.accountName}</span>
                                     </td>
                                     <td style={{ padding: "7px 10px", fontSize: 12, color: "var(--hf-text-muted)" }}>{l.description || "—"}</td>
+                                    {hasCentres && <td style={{ padding: "7px 10px", fontSize: 12, color: "var(--hf-text-muted)" }}>{centreName(l.costCentreId) || "—"}</td>}
                                     <td style={{ padding: "7px 10px", fontSize: 13, fontWeight: l.debitAmount > 0 ? 600 : 400,
                                       color: l.debitAmount > 0 ? "var(--hf-primary-text)" : "var(--hf-text-faint)" }}>
                                       {l.debitAmount > 0 ? fmtR(l.debitAmount) : "—"}
@@ -377,8 +392,8 @@ export default function JournalEntriesTab() {
 
             {/* Lines */}
             <div style={{ marginBottom: 12 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr 1fr 1fr 32px", gap: 8, marginBottom: 6 }}>
-                {["Account", "Description", "Debit (R)", "Credit (R)", ""].map(h => (
+              <div style={{ display: "grid", gridTemplateColumns: lineCols, gap: 8, marginBottom: 6 }}>
+                {(hasCentres ? ["Account", "Description", "Cost centre", "Debit (R)", "Credit (R)", ""] : ["Account", "Description", "Debit (R)", "Credit (R)", ""]).map(h => (
                   <div key={h} style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</div>
                 ))}
               </div>
@@ -386,7 +401,7 @@ export default function JournalEntriesTab() {
                 const isMixed = (parseFloat(l.debit) || 0) > 0 && (parseFloat(l.credit) || 0) > 0
                 return (
                 <div key={l.tempId}>
-                  <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr 1fr 1fr 32px", gap: 8, marginBottom: isMixed ? 3 : 8, alignItems: "center" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: lineCols, gap: 8, marginBottom: isMixed ? 3 : 8, alignItems: "center" }}>
                     <select value={l.accountId} onChange={e => updateLine(l.tempId, "accountId", e.target.value)}
                       style={{ ...inp, fontSize: 12 }}>
                       <option value="">Select account...</option>
@@ -396,6 +411,15 @@ export default function JournalEntriesTab() {
                     </select>
                     <input value={l.description} onChange={e => updateLine(l.tempId, "description", e.target.value)}
                       placeholder="Optional note" style={{ ...inp, fontSize: 12 }} />
+                    {hasCentres && (
+                      <select aria-label="Cost centre" value={l.costCentreId ?? ""} onChange={e => updateLine(l.tempId, "costCentreId", e.target.value)}
+                        style={{ ...inp, fontSize: 12 }}>
+                        <option value="">None</option>
+                        {treeOrder(centres.filter(c => c.active)).map(({ c, depth }) => (
+                          <option key={c.id} value={c.id}>{"\u00a0\u00a0".repeat(depth)}{labelOf(c)}</option>
+                        ))}
+                      </select>
+                    )}
                     <input type="number" value={l.debit} onChange={e => updateLine(l.tempId, "debit", e.target.value)}
                       placeholder="0.00" style={{ ...inp, fontSize: 12, ...(isMixed ? { borderColor: "var(--hf-danger-border)", background: "var(--hf-danger-soft)" } : {}) }} />
                     <input type="number" value={l.credit} onChange={e => updateLine(l.tempId, "credit", e.target.value)}

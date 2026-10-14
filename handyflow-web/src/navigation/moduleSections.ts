@@ -236,6 +236,8 @@ export const ACCOUNTING_SECTIONS: ModuleSections = {
       label: 'Books',
       sections: [
         { id: 'accounts', label: 'Chart of Accounts', icon: BookOpen },
+        // Finance patch F24: cost centres, departments, branches and projects.
+        { id: 'centres', label: 'Cost centres', icon: LayoutGrid, permission: 'ACCOUNTING_READ' },
         { id: 'journal', label: 'Journal Entries', icon: JournalIcon },
         { id: 'bank', label: 'Bank Accounts', icon: Landmark },
         // Finance patch F12: reconcile to the statement, sign off, matching rules.
@@ -259,6 +261,7 @@ export const ACCOUNTING_SECTIONS: ModuleSections = {
         // Finance patch F21: yearly budgets against actual, and 13 weeks of expected cash.
         { id: 'budgets', label: 'Budgets', icon: Wallet, permission: 'ACCOUNTING_READ' },
         { id: 'forecast', label: 'Cash forecast', icon: TrendingUp, permission: 'ACCOUNTING_READ' },
+        { id: 'bycentre', label: 'By cost centre', icon: FileBarChart, permission: 'ACCOUNTING_READ' },
         { id: 'aging', label: 'AR / AP Aging', icon: Users },
       ],
     },

@@ -19,6 +19,12 @@ public record CreateJournalEntryRequest(
             @NotNull UUID accountId,
             String description,
             BigDecimal debitAmount,
-            BigDecimal creditAmount
-    ) {}
+            BigDecimal creditAmount,
+            UUID costCentreId
+    ) {
+        /** Without a cost centre, for the postings that existed before cost centres. */
+        public JournalLineRequest(UUID accountId, String description, BigDecimal debitAmount, BigDecimal creditAmount) {
+            this(accountId, description, debitAmount, creditAmount, null);
+        }
+    }
 }

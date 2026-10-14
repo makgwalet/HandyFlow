@@ -23,6 +23,8 @@ public class AccJournalLine {
     @Column(name = "credit_amount")    BigDecimal creditAmount = BigDecimal.ZERO;
     @Column(name = "sort_order")       int sortOrder;
     @Column(name = "created_at")       Instant createdAt;
+    /** Optional cost centre, department, branch or project (finance F24). */
+    @Column(name = "cost_centre_id")   UUID costCentreId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "journal_entry_id", insertable = false, updatable = false)
@@ -58,5 +60,11 @@ public class AccJournalLine {
         l.sortOrder      = sortOrder;
         l.createdAt      = Instant.now();
         return l;
+    }
+
+    /** Tags the line with a cost centre; null leaves it unallocated. */
+    public AccJournalLine withCostCentre(UUID costCentreId) {
+        this.costCentreId = costCentreId;
+        return this;
     }
 }

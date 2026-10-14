@@ -31,6 +31,7 @@ public record JournalEntryResponse(
             String accountName,
             String description,
             BigDecimal debitAmount,
-            BigDecimal creditAmount
+            BigDecimal creditAmount,
+            UUID costCentreId
     ) {}
 }
