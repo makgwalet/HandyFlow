@@ -245,6 +245,8 @@ export const ACCOUNTING_SECTIONS: ModuleSections = {
         // Finance patch F5: the lock date that closes the books.
         { id: 'lock', label: 'Period lock', icon: Lock, permission: 'ACCOUNTING_READ' },
         // Finance patch F13: month-end checklist that ends by closing the books.
+        // Finance patch F17: journals made on a schedule, accruals, prepayments.
+        { id: 'recurring', label: 'Recurring journals', icon: Repeat, permission: 'ACCOUNTING_READ' },
         { id: 'close', label: 'Month-end close', icon: ListChecks, permission: 'ACCOUNTING_READ' },
       ],
     },

@@ -14,6 +14,7 @@ import PeriodLockTab from "./PeriodLockTab"
 import BankReconciliationTab from "./BankReconciliationTab"
 import MonthEndCloseTab from "./MonthEndCloseTab"
 import CashFlowTab from "./CashFlowTab"
+import RecurringJournalsTab from "./RecurringJournalsTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { ACCOUNTING_SECTIONS } from "../../navigation/moduleSections"
 
@@ -28,6 +29,7 @@ export function AccountingPage() {
         case "reconcile": return <BankReconciliationTab />
         case "posting":   return <PostingProblemsTab />
         case "lock":      return <PeriodLockTab />
+        case "recurring": return <RecurringJournalsTab />
         case "close":     return <MonthEndCloseTab />
         case "cashflow":  return <CashFlowTab />
         case "reports":   return <ReportsTab />
