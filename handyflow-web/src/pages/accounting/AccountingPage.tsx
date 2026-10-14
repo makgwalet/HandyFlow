@@ -15,6 +15,8 @@ import BankReconciliationTab from "./BankReconciliationTab"
 import MonthEndCloseTab from "./MonthEndCloseTab"
 import CashFlowTab from "./CashFlowTab"
 import RecurringJournalsTab from "./RecurringJournalsTab"
+import BudgetsTab from "./BudgetsTab"
+import CashForecastTab from "./CashForecastTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { ACCOUNTING_SECTIONS } from "../../navigation/moduleSections"
 
@@ -32,6 +34,8 @@ export function AccountingPage() {
         case "recurring": return <RecurringJournalsTab />
         case "close":     return <MonthEndCloseTab />
         case "cashflow":  return <CashFlowTab />
+        case "budgets":   return <BudgetsTab />
+        case "forecast":  return <CashForecastTab />
         case "reports":   return <ReportsTab />
         case "vat":       return <VatReturnsTab />
         case "aging":     return <AgingTab />

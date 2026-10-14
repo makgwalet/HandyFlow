@@ -256,6 +256,9 @@ export const ACCOUNTING_SECTIONS: ModuleSections = {
         { id: 'reports', label: 'Reports', icon: BarChart2 },
         // Finance patch F13
         { id: 'cashflow', label: 'Cash flow', icon: TrendingUp, permission: 'ACCOUNTING_READ' },
+        // Finance patch F21: yearly budgets against actual, and 13 weeks of expected cash.
+        { id: 'budgets', label: 'Budgets', icon: Wallet, permission: 'ACCOUNTING_READ' },
+        { id: 'forecast', label: 'Cash forecast', icon: TrendingUp, permission: 'ACCOUNTING_READ' },
         { id: 'aging', label: 'AR / AP Aging', icon: Users },
       ],
     },

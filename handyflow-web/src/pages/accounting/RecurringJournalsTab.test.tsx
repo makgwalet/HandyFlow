@@ -13,7 +13,7 @@ const schedule = (over: any = {}) => ({ id: "s1", name: "Office rent", kind: "RE
 
 function mount(list: any[]) {
   api.get.mockImplementation(async (url: string) => url.endsWith("/accounts")
-    ? { data: { data: [{ id: "a", code: "5000", name: "Rent" }, { id: "b", code: "1000", name: "Bank" }] } }
+    ? { data: { data: [{ id: "a", accountCode: "5000", accountName: "Rent" }, { id: "b", accountCode: "1000", accountName: "Bank" }] } }
     : { data: { data: list } })
   api.post.mockResolvedValue({ data: { data: { made: 1, problems: [] } } })
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RecurringJournalsTab /></QueryClientProvider>)

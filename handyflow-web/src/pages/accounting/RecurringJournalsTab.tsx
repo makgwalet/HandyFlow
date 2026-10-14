@@ -8,7 +8,7 @@ import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { type FormLine, type ScheduleForm, emptyForm, emptyLine, formProblem, FREQ_LABEL, KIND_LABEL, lineTotals, nextText, STATUS_LABEL, toRequest } from "./recurring.logic"
 
-interface Account { id: string; code: string; name: string }
+interface Account { id: string; accountCode: string; accountName: string }
 const unwrap = (r: any) => r.data?.data ?? r.data
 const errorOf = (e: any) => e?.response?.data?.message ?? "Something went wrong. Please try again."
 const today = () => new Date().toISOString().slice(0, 10)
@@ -61,7 +61,7 @@ export default function RecurringJournalsTab() {
   const acctSelect = (value: string, onChange: (v: string) => void, label: string) => (
     <select aria-label={label} value={value} onChange={e => onChange(e.target.value)} style={input}>
       <option value="">{label}…</option>
-      {accounts.map(a => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+      {accounts.map(a => <option key={a.id} value={a.id}>{a.accountCode} {a.accountName}</option>)}
     </select>
   )
 
