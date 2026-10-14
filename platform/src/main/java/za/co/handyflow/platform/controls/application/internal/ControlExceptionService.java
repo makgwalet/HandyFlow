@@ -56,6 +56,14 @@ public class ControlExceptionService implements ControlExceptionFacade {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<ControlExceptionResponse> listByIds(TenantId tenantId, java.util.Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) return List.of();
+        return repo.findAllByTenant(tenantId.getValue()).stream()
+                .filter(e -> ids.contains(e.getId())).map(this::toResponse).toList();
+    }
+
+    @Override
     @Transactional
     public ControlExceptionResponse resolve(TenantId tenantId, UUID exceptionId,
                                             UUID resolvedBy, String resolvedByName, String resolutionNotes) {

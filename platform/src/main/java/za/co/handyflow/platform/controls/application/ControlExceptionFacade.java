@@ -35,6 +35,9 @@ public interface ControlExceptionFacade {
      */
     List<ControlExceptionResponse> listAll(TenantId tenantId);
 
+    /** Only the named exceptions, and only those that belong to this tenant (others are silently left out). */
+    List<ControlExceptionResponse> listByIds(TenantId tenantId, java.util.Collection<UUID> ids);
+
     ControlExceptionResponse resolve(TenantId tenantId, UUID exceptionId,
                                      UUID resolvedBy, String resolvedByName, String resolutionNotes);
 

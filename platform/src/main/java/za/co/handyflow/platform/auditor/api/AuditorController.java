@@ -23,27 +23,38 @@ public class AuditorController {
 
     private final AuditorService auditorService;
 
-    public record InviteAuditorRequest(@NotBlank String email, @NotBlank String businessName) {}
+    public record InviteAuditorRequest(@NotBlank String email, @NotBlank String businessName,
+                                       java.time.LocalDate expiresOn, String scopeNote) {}
+    public record ChangeExpiryRequest(java.time.LocalDate expiresOn) {}
 
     @PostMapping("/invite")
-    @PreAuthorize("hasAuthority('SETTINGS_MANAGE')")
+    @PreAuthorize("hasAuthority('EXTERNAL_AUDIT_INVITE')")
     @Operation(summary = "Invite an external auditor to review this business's records")
     public ResponseEntity<ApiResponse<AuditorAccessGrantResponse>> invite(@RequestBody InviteAuditorRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Invite sent",
                 auditorService.inviteAuditor(TenantContext.getTenantIdAsObject(), req.email(),
-                        req.businessName(), TenantContext.getCurrentUserId())));
+                        req.businessName(), TenantContext.getCurrentUserId(), req.expiresOn(), req.scopeNote())));
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('SETTINGS_MANAGE')")
+    @PreAuthorize("hasAuthority('EXTERNAL_AUDIT_INVITE')")
     @Operation(summary = "List every auditor grant for this business")
     public ResponseEntity<ApiResponse<List<AuditorAccessGrantResponse>>> list() {
         return ResponseEntity.ok(ApiResponse.success(
                 auditorService.listAuditorGrants(TenantContext.getTenantIdAsObject())));
     }
 
+    @PostMapping("/{id}/expiry")
+    @PreAuthorize("hasAuthority('EXTERNAL_AUDIT_INVITE')")
+    @Operation(summary = "Change the date an auditor's access ends")
+    public ResponseEntity<ApiResponse<AuditorAccessGrantResponse>> changeExpiry(@PathVariable UUID id,
+                                                                                 @RequestBody ChangeExpiryRequest req) {
+        return ResponseEntity.ok(ApiResponse.success(
+                auditorService.changeExpiry(TenantContext.getTenantIdAsObject(), id, req.expiresOn())));
+    }
+
     @PostMapping("/{id}/revoke")
-    @PreAuthorize("hasAuthority('SETTINGS_MANAGE')")
+    @PreAuthorize("hasAuthority('EXTERNAL_AUDIT_INVITE')")
     @Operation(summary = "Revoke an auditor's access")
     public ResponseEntity<ApiResponse<AuditorAccessGrantResponse>> revoke(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(

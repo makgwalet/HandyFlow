@@ -40,6 +40,9 @@ public interface EvidenceFacade {
      */
     List<EvidenceResponse> listAllForTenant(TenantId tenantId);
 
+    /** Only the named items, and only those that belong to this tenant (others are silently left out). */
+    List<EvidenceResponse> listByIds(TenantId tenantId, java.util.Collection<UUID> ids);
+
     /** Filename/content-type alongside the bytes, for the calling controller to set response headers. */
     record DownloadedEvidence(byte[] content, String fileName, String contentType) {}
 

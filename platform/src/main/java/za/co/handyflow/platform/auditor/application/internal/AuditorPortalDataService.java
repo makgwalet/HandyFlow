@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import za.co.handyflow.platform.auditor.domain.model.AuditorAccessGrant;
+import za.co.handyflow.platform.auditor.domain.model.AuditShare;
+import za.co.handyflow.platform.auditor.domain.repository.AuditShareRepository;
 import za.co.handyflow.platform.auditor.domain.repository.AuditorAccessGrantRepository;
 import za.co.handyflow.platform.auditor.dto.SharedFindingResponse;
 import za.co.handyflow.platform.controls.application.ControlExceptionFacade;
@@ -28,24 +30,25 @@ public class AuditorPortalDataService {
     // FIX: closes the confirmed "no internal-audit engine reachable by
     // an external auditor" gap.
     private final AuditFindingRepository findingRepo;
+    private final AuditShareRepository shareRepo;
 
     public record AuditorTenantAccess(UUID tenantId, java.time.Instant acceptedAt) {}
 
     public List<AuditorTenantAccess> getMyTenants(UUID portalUserId) {
         return grantRepo.findByPortalUserId(portalUserId).stream()
-                .filter(AuditorAccessGrant::isActive)
+                .filter(g -> g.isUsableAt(java.time.Instant.now()))
                 .map(g -> new AuditorTenantAccess(g.getTenantId(), g.getAcceptedAt()))
                 .toList();
     }
 
     public List<EvidenceResponse> getEvidence(UUID portalUserId, UUID tenantId) {
         requireActiveGrant(portalUserId, tenantId);
-        return evidenceFacade.listAllForTenant(TenantId.of(tenantId));
+        return evidenceFacade.listByIds(TenantId.of(tenantId), sharedIds(tenantId, AuditShare.EVIDENCE));
     }
 
     public List<ControlExceptionResponse> getControlExceptions(UUID portalUserId, UUID tenantId) {
         requireActiveGrant(portalUserId, tenantId);
-        return controlExceptionFacade.listAll(TenantId.of(tenantId));
+        return controlExceptionFacade.listByIds(TenantId.of(tenantId), sharedIds(tenantId, AuditShare.CONTROL_EXCEPTION));
     }
 
     // FIX: closes the confirmed "no internal-audit engine reachable by
@@ -69,12 +72,16 @@ public class AuditorPortalDataService {
                 f.getSharedAt(), f.getSharingReason());
     }
 
+    private java.util.Set<UUID> sharedIds(UUID tenantId, String itemType) {
+        return shareRepo.findLive(tenantId, itemType).stream().map(AuditShare::getItemId).collect(java.util.stream.Collectors.toSet());
+    }
+
     private void requireActiveGrant(UUID portalUserId, UUID tenantId) {
         boolean hasAccess = grantRepo.findByTenantId(tenantId).stream()
-                .anyMatch(g -> portalUserId.equals(g.getPortalUserId()) && g.isActive());
+                .anyMatch(g -> portalUserId.equals(g.getPortalUserId()) && g.isUsableAt(java.time.Instant.now()));
         if (!hasAccess) {
             throw new HandyFlowException(
-                    "You don't have access to this business's records", HttpStatus.FORBIDDEN, "NO_ACCESS");
+                    "You don't have access to this business's records (it may have expired)", HttpStatus.FORBIDDEN, "NO_ACCESS");
         }
     }
 }

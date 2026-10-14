@@ -34,9 +34,22 @@ public class AuditorAccessGrant {
     @Column(name = "revoked_by") private UUID revokedBy;
     @Column(name = "revoked_at") private Instant revokedAt;
 
+    /** After this moment the grant gives no access, whatever its status. */
+    @Column(name = "expires_at") private Instant expiresAt;
+    /** What the auditor was engaged to look at, in the owner's words. Shown in the invite screen. */
+    @Column(name = "scope_note", columnDefinition = "TEXT") private String scopeNote;
+
+    public static final int DEFAULT_GRANT_DAYS = 90;
+    public static final int MAX_GRANT_DAYS = 366;
+
     private static final SecureRandom RANDOM = new SecureRandom();
 
     public static AuditorAccessGrant createInvite(UUID tenantId, String inviteEmail, UUID invitedBy) {
+        return createInvite(tenantId, inviteEmail, invitedBy, null, null);
+    }
+
+    /** expiresAt null means the default period from now. */
+    public static AuditorAccessGrant createInvite(UUID tenantId, String inviteEmail, UUID invitedBy, Instant expiresAt, String scopeNote) {
         AuditorAccessGrant g = new AuditorAccessGrant();
         g.tenantId = tenantId;
         g.inviteEmail = inviteEmail.toLowerCase().trim();
@@ -45,6 +58,8 @@ public class AuditorAccessGrant {
         g.status = "PENDING";
         g.inviteToken = generateToken();
         g.inviteTokenExpiresAt = Instant.now().plusSeconds(7L * 24 * 60 * 60);
+        g.expiresAt = expiresAt != null ? expiresAt : Instant.now().plus(java.time.Duration.ofDays(DEFAULT_GRANT_DAYS));
+        g.scopeNote = scopeNote == null || scopeNote.isBlank() ? null : scopeNote.trim();
         return g;
     }
 
@@ -57,7 +72,8 @@ public class AuditorAccessGrant {
     public boolean isInviteValid() {
         return "PENDING".equals(status)
                 && inviteTokenExpiresAt != null
-                && Instant.now().isBefore(inviteTokenExpiresAt);
+                && Instant.now().isBefore(inviteTokenExpiresAt)
+                && (expiresAt == null || Instant.now().isBefore(expiresAt));
     }
 
     public void acceptInvite(UUID portalUserId) {
@@ -81,5 +97,16 @@ public class AuditorAccessGrant {
 
     public boolean isActive() {
         return "ACTIVE".equals(status);
+    }
+
+    /** Accepted, not revoked, and not past its expiry date. This is the test every portal call must pass. */
+    public boolean isUsableAt(Instant now) {
+        return isActive() && (expiresAt == null || now.isBefore(expiresAt));
+    }
+
+    /** Move the expiry. Only a live grant can be re-dated; a revoked one must be re-invited. */
+    public void changeExpiry(Instant newExpiry) {
+        if ("REVOKED".equals(status)) throw new IllegalStateException("This access has been revoked; invite the auditor again");
+        this.expiresAt = newExpiry;
     }
 }

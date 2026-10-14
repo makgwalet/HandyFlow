@@ -15,6 +15,9 @@ import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,6 +35,13 @@ public class AuditorService {
     @Transactional
     public AuditorAccessGrantResponse inviteAuditor(TenantId tenantId, String email,
                                                     String businessName, UUID invitedBy) {
+        return inviteAuditor(tenantId, email, businessName, invitedBy, null, null);
+    }
+
+    @Transactional
+    public AuditorAccessGrantResponse inviteAuditor(TenantId tenantId, String email, String businessName, UUID invitedBy,
+                                                    LocalDate expiresOn, String scopeNote) {
+        Instant expiry = expiryFrom(expiresOn);
         boolean alreadyGranted = grantRepo.findByTenantId(tenantId.getValue()).stream()
                 .anyMatch(g -> g.getInviteEmail().equalsIgnoreCase(email) && !"REVOKED".equals(g.getStatus()));
         if (alreadyGranted) {
@@ -40,7 +50,7 @@ public class AuditorService {
                     HttpStatus.CONFLICT, "ALREADY_INVITED");
         }
 
-        AuditorAccessGrant grant = AuditorAccessGrant.createInvite(tenantId.getValue(), email, invitedBy);
+        AuditorAccessGrant grant = AuditorAccessGrant.createInvite(tenantId.getValue(), email, invitedBy, expiry, scopeNote);
         grantRepo.save(grant);
 
         emailService.send(email, businessName + " has invited you to review their financial records",
@@ -48,6 +58,34 @@ public class AuditorService {
                         frontendUrl + "/auditor/portal/auth/accept-invite?token=" + grant.getInviteToken()));
 
         log.info("Auditor invite sent: {} -> tenant={}", email, tenantId.getValue());
+        return toResponse(grant);
+    }
+
+    /** The last moment of the chosen day (South African time). Null means the default period. */
+    static Instant expiryFrom(LocalDate expiresOn) {
+        if (expiresOn == null) return null;
+        LocalDate today = LocalDate.now(ZoneId.of("Africa/Johannesburg"));
+        if (!expiresOn.isAfter(today)) {
+            throw new HandyFlowException("The expiry date must be in the future", HttpStatus.BAD_REQUEST, "EXPIRY_IN_PAST");
+        }
+        if (expiresOn.isAfter(today.plusDays(AuditorAccessGrant.MAX_GRANT_DAYS))) {
+            throw new HandyFlowException("Access can be granted for at most " + AuditorAccessGrant.MAX_GRANT_DAYS
+                    + " days at a time; re-date it later if the audit runs longer", HttpStatus.BAD_REQUEST, "EXPIRY_TOO_FAR");
+        }
+        return expiresOn.plusDays(1).atStartOfDay(ZoneId.of("Africa/Johannesburg")).toInstant();
+    }
+
+    @Transactional
+    public AuditorAccessGrantResponse changeExpiry(TenantId tenantId, UUID grantId, LocalDate expiresOn) {
+        if (expiresOn == null) throw new HandyFlowException("An expiry date is required", HttpStatus.BAD_REQUEST, "EXPIRY_REQUIRED");
+        AuditorAccessGrant grant = grantRepo.findByTenantIdAndId(tenantId.getValue(), grantId)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditorAccessGrant", grantId.toString()));
+        try {
+            grant.changeExpiry(expiryFrom(expiresOn));
+        } catch (IllegalStateException e) {
+            throw new HandyFlowException(e.getMessage(), HttpStatus.CONFLICT, "GRANT_REVOKED");
+        }
+        grantRepo.save(grant);
         return toResponse(grant);
     }
 
@@ -68,6 +106,7 @@ public class AuditorService {
 
     private AuditorAccessGrantResponse toResponse(AuditorAccessGrant g) {
         return new AuditorAccessGrantResponse(g.getId(), g.getInviteEmail(), g.getStatus(),
-                g.getInvitedAt(), g.getAcceptedAt(), g.getRevokedAt());
+                g.getInvitedAt(), g.getAcceptedAt(), g.getRevokedAt(), g.getExpiresAt(), g.getScopeNote(),
+                g.getExpiresAt() != null && !Instant.now().isBefore(g.getExpiresAt()));
     }
 }

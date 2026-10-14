@@ -31,7 +31,7 @@ public class ControlExceptionController {
     private final ControlExceptionFacade controlExceptionFacade;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('CONTROL_EXCEPTION_READ')")
     @Operation(summary = "List every open exception across every module")
     public ResponseEntity<ApiResponse<List<ControlExceptionResponse>>> listOpen() {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
@@ -41,7 +41,7 @@ public class ControlExceptionController {
     public record ResolveExceptionRequest(String resolutionNotes) {}
 
     @PostMapping("/{id}/resolve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('CONTROL_EXCEPTION_RESOLVE')")
     @Operation(summary = "Mark an exception as resolved")
     public ResponseEntity<ApiResponse<ControlExceptionResponse>> resolve(@PathVariable UUID id,
                                                                          @RequestBody(required = false) ResolveExceptionRequest req) {

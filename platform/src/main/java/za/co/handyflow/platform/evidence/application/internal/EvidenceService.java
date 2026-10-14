@@ -115,6 +115,17 @@ public class EvidenceService implements EvidenceFacade {
 
     @Override
     @Transactional(readOnly = true)
+    public List<EvidenceResponse> listByIds(TenantId tenantId, java.util.Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) return List.of();
+        return evidenceRepo.findAllActiveForTenant(tenantId.getValue()).stream()
+                .filter(p -> ids.contains(p.getId()))
+                .map(p -> new EvidenceResponse(p.getId(), p.getFileName(), p.getContentType(), p.getFileSizeBytes(),
+                        p.getEvidenceType(), p.getStatus(), p.getUploadedByName(), p.getCreatedAt()))
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public DownloadedEvidence download(TenantId tenantId, UUID evidenceId) {
         Evidence evidence = evidenceRepo.findByTenantAndId(tenantId.getValue(), evidenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Evidence", evidenceId.toString()));

@@ -48,7 +48,7 @@ public class EvidenceController {
     private final EvidenceFacade evidenceFacade;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('EVIDENCE_WRITE')")
     @Operation(summary = "Attach a file as evidence against any module's entity")
     public ResponseEntity<ApiResponse<EvidenceResponse>> attach(
             @RequestParam("file") MultipartFile file,
@@ -66,7 +66,7 @@ public class EvidenceController {
     }
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('EVIDENCE_READ')")
     @Operation(summary = "List active evidence attached to a specific entity")
     public ResponseEntity<ApiResponse<List<EvidenceResponse>>> list(
             @RequestParam String sourceModule,
@@ -78,7 +78,7 @@ public class EvidenceController {
     }
 
     @GetMapping("/{evidenceId}/download")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('EVIDENCE_READ')")
     @Operation(summary = "Download a piece of evidence")
     public ResponseEntity<byte[]> download(@PathVariable UUID evidenceId) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
@@ -90,7 +90,7 @@ public class EvidenceController {
     }
 
     @PostMapping("/{evidenceId}/detach")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('EVIDENCE_WRITE')")
     @Operation(summary = "Detach evidence (soft — the record and underlying file are preserved)")
     public ResponseEntity<ApiResponse<Void>> detach(@PathVariable UUID evidenceId) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
