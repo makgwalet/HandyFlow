@@ -11,6 +11,7 @@ import AgingTab from "./AgingTab"
 import DashboardTab from "./AccountingDashboard"
 import PostingProblemsTab from "./PostingProblemsTab"
 import PeriodLockTab from "./PeriodLockTab"
+import BankReconciliationTab from "./BankReconciliationTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { ACCOUNTING_SECTIONS } from "../../navigation/moduleSections"
 
@@ -22,6 +23,7 @@ export function AccountingPage() {
         case "accounts":  return <ChartOfAccountsTab />
         case "journal":   return <JournalEntriesTab />
         case "bank":      return <BankAccountsTab />
+        case "reconcile": return <BankReconciliationTab />
         case "posting":   return <PostingProblemsTab />
         case "lock":      return <PeriodLockTab />
         case "reports":   return <ReportsTab />

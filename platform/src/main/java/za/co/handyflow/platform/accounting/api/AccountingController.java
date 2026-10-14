@@ -301,7 +301,8 @@ public class AccountingController {
             @PathVariable UUID id, @PathVariable UUID txId,
             @Valid @RequestBody ReconcileRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Transaction reconciled",
-                accountingService.reconcileTransaction(TenantContext.getTenantIdAsObject(), id, txId, req)));
+                accountingService.reconcileTransaction(TenantContext.getTenantIdAsObject(), id, txId, req,
+                        TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/bank-accounts/{id}/transactions/{txId}/reconcile-new")

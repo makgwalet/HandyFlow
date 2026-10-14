@@ -44,4 +44,16 @@ public interface AccBankTransactionRepository extends JpaRepository<AccBankTrans
         AND t.journalLineId IS NOT NULL
         """)
     java.util.List<UUID> findLinkedJournalLineIds(TenantId tenantId);
+
+    // Finance patch F12 - reconciliation report and rules.
+
+    @Query("SELECT t FROM AccBankTransaction t WHERE t.tenantId = :#{#tenantId.value} AND t.bankAccountId = :bankAccountId AND t.reconciled = false AND t.transactionDate <= :asAt ORDER BY t.transactionDate, t.createdAt")
+    java.util.List<AccBankTransaction> findUnreconciledUpTo(TenantId tenantId, UUID bankAccountId, java.time.LocalDate asAt);
+
+    @Query("SELECT t FROM AccBankTransaction t WHERE t.tenantId = :#{#tenantId.value} AND t.bankAccountId = :bankAccountId AND t.transactionDate <= :asAt ORDER BY t.transactionDate DESC, t.createdAt DESC")
+    java.util.List<AccBankTransaction> findLatestUpTo(TenantId tenantId, UUID bankAccountId, java.time.LocalDate asAt, Pageable pageable);
+
+    /** Lines booked by a new journal or a rule between two dates: what a reviewer checks before signing off. */
+    @Query("SELECT t FROM AccBankTransaction t WHERE t.tenantId = :#{#tenantId.value} AND t.bankAccountId = :bankAccountId AND t.reconcileKind IN ('NEW_JOURNAL', 'RULE') AND t.transactionDate > :after AND t.transactionDate <= :asAt ORDER BY t.transactionDate, t.createdAt")
+    java.util.List<AccBankTransaction> findBookedFromLines(TenantId tenantId, UUID bankAccountId, java.time.LocalDate after, java.time.LocalDate asAt);
 }

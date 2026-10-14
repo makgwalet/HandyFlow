@@ -44,6 +44,8 @@ public class AccountingService {
     private final InvoicingFacade               invoicingFacade;
     private final CrmFacade                     crmFacade;
     private final EmailService                  emailService;
+    // Finance patch F12: a bank account signed off through a date takes no new statement lines dated on or before it.
+    private final AccBankReconciliationRepository bankRecRepo;
 
     // ── Chart of Accounts ─────────────────────────────────────────────────────
 
@@ -384,6 +386,8 @@ public class AccountingService {
 
         AccBankAccount bank = bankAccountRepo.findActiveById(tenantId, bankAccountId)
                 .orElseThrow(() -> new ResourceNotFoundException("BankAccount", bankAccountId.toString()));
+        String signedOff = BankReconRules.signedOffLineProblem(req.transactionDate(), bankRecRepo.signedOffThrough(tenantId, bankAccountId));
+        if (signedOff != null) throw new HandyFlowException(signedOff, HttpStatus.CONFLICT, "BANK_SIGNED_OFF");
 
         BigDecimal newBalance = "CREDIT".equals(req.transactionType())
                 ? bank.getCurrentBalance().add(req.amount())
@@ -441,6 +445,7 @@ public class AccountingService {
         int imported = 0, skipped = 0, failed = 0;
         List<String> errors = new ArrayList<>();
         BigDecimal runningBalance = bank.getCurrentBalance();
+        LocalDate signedThrough = bankRecRepo.signedOffThrough(tenantId, bankAccountId);
 
         // Row 0 assumed to be a header — skipped unconditionally, matching
         // "Date,Description,Reference,Amount" as documented.
@@ -463,6 +468,10 @@ public class AccountingService {
 
                 String transactionType = signedAmount.compareTo(BigDecimal.ZERO) >= 0 ? "CREDIT" : "DEBIT";
                 BigDecimal amount = signedAmount.abs();
+
+                // Finance patch F12: a period that has been signed off takes no new lines.
+                String signedOff = BankReconRules.signedOffLineProblem(date, signedThrough);
+                if (signedOff != null) throw new IllegalStateException(signedOff);
 
                 if (bankTxRepo.existsDuplicate(tenantId, bankAccountId, date, amount, description)) {
                     skipped++;
@@ -595,6 +604,13 @@ public class AccountingService {
     @Transactional
     public BankTransactionResponse reconcileTransaction(TenantId tenantId, UUID bankAccountId,
                                                         UUID transactionId, ReconcileRequest req) {
+        return reconcileTransaction(tenantId, bankAccountId, transactionId, req, null);
+    }
+
+    /** Finance patch F12: records who matched the line. */
+    @Transactional
+    public BankTransactionResponse reconcileTransaction(TenantId tenantId, UUID bankAccountId,
+                                                        UUID transactionId, ReconcileRequest req, UUID userId) {
         bankAccountRepo.findActiveById(tenantId, bankAccountId)
                 .orElseThrow(() -> new ResourceNotFoundException("BankAccount", bankAccountId.toString()));
         AccBankTransaction tx = bankTxRepo.findById(transactionId)
@@ -606,7 +622,7 @@ public class AccountingService {
         if (bankTxRepo.findLinkedJournalLineIds(tenantId).contains(req.journalLineId()))
             throw new IllegalStateException("That journal line is already linked to a different transaction");
 
-        tx.reconcile(req.journalLineId());
+        tx.reconcile(req.journalLineId(), userId, "MATCHED", null);
         bankTxRepo.save(tx);
         log.info("Reconciled bank transaction={} to journalLine={}", transactionId, req.journalLineId());
         return toBankTransactionResponse(tx);
@@ -636,6 +652,14 @@ public class AccountingService {
     public BankTransactionResponse reconcileWithNewJournal(TenantId tenantId, UUID bankAccountId,
                                                            UUID transactionId, ReconcileWithNewJournalRequest req,
                                                            UUID userId) {
+        return reconcileWithNewJournal(tenantId, bankAccountId, transactionId, req, userId, null);
+    }
+
+    /** Finance patch F12: {@code ruleId} is the matching rule that chose the account, or null when a person chose it. */
+    @Transactional
+    public BankTransactionResponse reconcileWithNewJournal(TenantId tenantId, UUID bankAccountId,
+                                                           UUID transactionId, ReconcileWithNewJournalRequest req,
+                                                           UUID userId, UUID ruleId) {
         AccBankAccount bank = bankAccountRepo.findActiveById(tenantId, bankAccountId)
                 .orElseThrow(() -> new ResourceNotFoundException("BankAccount", bankAccountId.toString()));
         AccBankTransaction tx = bankTxRepo.findById(transactionId)
@@ -682,7 +706,7 @@ public class AccountingService {
                 .orElseThrow(() -> new IllegalStateException(
                         "Could not find the bank account's line in the newly created journal entry"));
 
-        tx.reconcile(bankLineId);
+        tx.reconcile(bankLineId, userId, ruleId == null ? "NEW_JOURNAL" : "RULE", ruleId);
         bankTxRepo.save(tx);
         log.info("Reconciled bank transaction={} via new journal={}", transactionId, posted.entryNumber());
         return toBankTransactionResponse(tx);

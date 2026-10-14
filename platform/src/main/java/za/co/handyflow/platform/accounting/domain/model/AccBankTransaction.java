@@ -28,6 +28,10 @@ public class AccBankTransaction {
     boolean reconciled = false;
     @Column(name = "reconciled_at")    Instant reconciledAt;
     @Column(name = "journal_line_id")  UUID journalLineId;
+    // Finance patch F12: who matched this line, how (MATCHED, NEW_JOURNAL or RULE), and by which rule.
+    @Column(name = "reconciled_by")    UUID reconciledBy;
+    @Column(name = "reconcile_kind")   String reconcileKind;
+    @Column(name = "rule_id")          UUID ruleId;
     @Column(name = "created_at")       Instant createdAt;
     @Column(name = "updated_at")       Instant updatedAt;
 
@@ -49,6 +53,14 @@ public class AccBankTransaction {
         t.createdAt       = Instant.now();
         t.updatedAt       = Instant.now();
         return t;
+    }
+
+    /** Finance patch F12: reconciles and records who did it and how. */
+    public void reconcile(UUID journalLineId, UUID by, String kind, UUID ruleId) {
+        reconcile(journalLineId);
+        this.reconciledBy  = by;
+        this.reconcileKind = kind;
+        this.ruleId        = ruleId;
     }
 
     public void reconcile(UUID journalLineId) {

@@ -238,6 +238,8 @@ export const ACCOUNTING_SECTIONS: ModuleSections = {
         { id: 'accounts', label: 'Chart of Accounts', icon: BookOpen },
         { id: 'journal', label: 'Journal Entries', icon: JournalIcon },
         { id: 'bank', label: 'Bank Accounts', icon: Landmark },
+        // Finance patch F12: reconcile to the statement, sign off, matching rules.
+        { id: 'reconcile', label: 'Bank reconciliation', icon: CheckSquare, permission: 'ACCOUNTING_READ' },
         // Finance patch F4: postings that failed, to retry or dismiss.
         { id: 'posting', label: 'Posting problems', icon: AlertTriangle, liveBadge: 'posting-failures', permission: 'ACCOUNTING_READ' },
         // Finance patch F5: the lock date that closes the books.
