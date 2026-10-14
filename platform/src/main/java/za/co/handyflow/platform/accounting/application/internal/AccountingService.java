@@ -782,8 +782,7 @@ public class AccountingService {
         List<AgingReportResponse.AgingLine> lines = new ArrayList<>();
 
         for (InvoicingFacade.OutstandingInvoiceSummary inv : outstanding) {
-            BigDecimal balance = inv.total().subtract(
-                    inv.amountPaid() != null ? inv.amountPaid() : BigDecimal.ZERO);
+            BigDecimal balance = inv.total().subtract(inv.settled());   // finance patch F8: credit notes count
             if (balance.compareTo(BigDecimal.ZERO) <= 0) continue;
 
             LocalDate due = inv.dueDate() != null ? inv.dueDate() : today;

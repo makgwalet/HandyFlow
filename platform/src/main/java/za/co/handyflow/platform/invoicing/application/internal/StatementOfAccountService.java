@@ -78,7 +78,7 @@ public class StatementOfAccountService {
         for (Invoice inv : invoices) {
             BigDecimal creditedTotal = creditNoteRepo.findByInvoice(tenantId, inv.getId()).stream()
                     .map(CreditNote::getTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal balance = inv.getTotal().subtract(inv.getAmountPaid()).subtract(creditedTotal).max(BigDecimal.ZERO);
+            BigDecimal balance = inv.getBalanceDue();   // finance patch F8: the same balance everywhere
 
             LocalDate issuedDate = inv.getIssuedAt().atZone(SAST).toLocalDate();
             // FIX: invoices with no explicit dueDate previously always

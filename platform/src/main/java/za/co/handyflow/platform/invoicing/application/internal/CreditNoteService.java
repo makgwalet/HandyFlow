@@ -45,6 +45,7 @@ public class CreditNoteService {
     // PosPurchaseOrderItem finding. Resolved here instead.
     private final VatRateProvider vatRateProvider;
     private final ApplicationEventPublisher eventPublisher;
+    private final ReceiptService receiptService;
 
     @Transactional
     public CreditNoteResponse createCreditNote(TenantId tenantId, UUID invoiceId, CreateCreditNoteRequest req) {
@@ -61,7 +62,26 @@ public class CreditNoteService {
         CreditNote creditNote = CreditNote.create(
                 tenantId, invoiceId, number, req.reason(), req.description(),
                 req.amount(), vatRate, invoice.getCurrency());
+
+        // Finance patch F8: credit notes on an invoice never add up to more than it was for; a credit note reduces what
+        // the invoice owes, and any part beyond that goes on the customer's account as credit to use or refund.
+        BigDecimal alreadyCredited = creditNoteRepo.findByInvoice(tenantId, invoiceId).stream()
+                .map(CreditNote::getTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
+        String tooMuch = ReceiptRules.creditNoteProblem(invoice.getTotal(), alreadyCredited, creditNote.getTotal());
+        if (tooMuch != null) throw new IllegalStateException(tooMuch);
         creditNoteRepo.save(creditNote);
+
+        BigDecimal[] split = ReceiptRules.splitCredit(creditNote.getTotal(), invoice.getBalanceDue());
+        invoice.applyCredit(split[0]);
+        invoiceRepo.save(invoice);
+        if (split[1].signum() > 0) {
+            if (invoice.getCustomerId() != null) {
+                receiptService.creditFromCreditNote(tenantId, invoice.getCustomerId(), creditNote.getId(), number, split[1], null);
+            } else {
+                log.warn("Credit note={} leaves R {} owed to a walk-in client on invoice={}; refund it by hand",
+                        number, split[1], invoice.getInvoiceNumber());
+            }
+        }
         log.info("Created credit note={} invoice={} total={}",
                 number, invoice.getInvoiceNumber(), creditNote.getTotal());
 

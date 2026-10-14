@@ -80,7 +80,9 @@ public class InvoiceQueryService {
                 // ── walk-in ───────────────────────────────────────────────
                 inv.getWalkinClientName(),
                 inv.getWalkinClientEmail(),
-                inv.getWalkinClientPhone()
+                inv.getWalkinClientPhone(),
+                inv.getCreditedAmount(),
+                inv.getBalanceDue()
         );
     }
 }

@@ -23,6 +23,8 @@ export interface Invoice {
   lineItems: LineItem[]; createdAt: string; invoiceType: InvoiceType; recurringScheduleId: string | null
   committedHours: number | null; ratePerHour: number | null; hoursConsumed: number | null; creditAmount?: number | null
   walkinClientName: string | null; walkinClientEmail?: string | null; walkinClientPhone?: string | null
+  /** Finance patch F8: credit notes applied, and what is still owed (total - paid - credited). */
+  creditedAmount?: number | null; balanceDue?: number | null
 }
 export interface CreditNote {
   id: string; creditNoteNumber: string; invoiceId: string; invoiceNumber: string; reason: string; description: string | null
@@ -96,7 +98,36 @@ export function quoteExpiryLabel(q: Pick<Quote, "status" | "expiresAt">, now: Da
 }
 
 // ── Money ─────────────────────────────────────────────────────────────────────
-export const balanceOf = (inv: Pick<Invoice, "total" | "amountPaid">) => Math.max(0, Math.round((num(inv.total) - num(inv.amountPaid)) * 100) / 100)
+/** What is still owed: the server's balance when given, otherwise total less payments and credit notes (finance patch F8). */
+export const balanceOf = (inv: Pick<Invoice, "total" | "amountPaid"> & Partial<Pick<Invoice, "creditedAmount" | "balanceDue">>) =>
+  inv.balanceDue != null ? Math.max(0, Math.round(num(inv.balanceDue) * 100) / 100)
+    : Math.max(0, Math.round((num(inv.total) - num(inv.amountPaid) - num(inv.creditedAmount ?? 0)) * 100) / 100)
+
+/** Finance patch F8: spreads money over open invoices in the order given (oldest first); the rest stays as credit. */
+export function allocateOldestFirst(amount: number, open: { id: string; balanceDue: number }[]): Record<string, number> {
+  const out: Record<string, number> = {}
+  let left = Math.round(amount * 100)
+  for (const o of open) {
+    if (left <= 0) break
+    const take = Math.min(left, Math.round(num(o.balanceDue) * 100))
+    if (take > 0) { out[o.id] = take / 100; left -= take }
+  }
+  return out
+}
+
+/** Finance patch F8: what is wrong with allocations of {@code amount}, or null. */
+export function allocationError(amount: number, allocations: Record<string, number>, open: { id: string; balanceDue: number }[]): string | null {
+  if (!(amount > 0)) return "Enter the amount received."
+  let sum = 0
+  for (const o of open) {
+    const a = num(allocations[o.id] ?? 0)
+    if (a < 0) return "Allocations cannot be negative."
+    if (a > num(o.balanceDue) + 0.005) return "An allocation is more than that invoice still owes."
+    sum += a
+  }
+  if (sum > amount + 0.005) return `Allocations of ${fmtR(sum)} are more than the ${fmtR(amount)} received.`
+  return null
+}
 
 /** The amount a payment form may take: more than zero and not more than what is still owing. */
 export function paymentError(amount: string, inv: Pick<Invoice, "total" | "amountPaid">): string | null {

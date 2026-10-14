@@ -87,12 +87,13 @@ public class InvoiceController {
     }
 
     @PostMapping("/{id}/payments")
-    @PreAuthorize("hasAuthority('INVOICE_CREATE')")
-    @Operation(summary = "Record a payment — auto-marks PAID when amountPaid >= total")
+    @PreAuthorize("hasAuthority('INVOICE_PAYMENT')")
+    @Operation(summary = "Record a payment against this invoice; anything above what it owes stays on the customer's account as credit")
     public ResponseEntity<ApiResponse<InvoiceResponse>> recordPayment(
             @PathVariable UUID id,
             @Valid @RequestBody RecordPaymentRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Payment recorded",
-                invoiceService.recordPayment(TenantContext.getTenantIdAsObject(), id, req)));
+                invoiceService.recordPayment(TenantContext.getTenantIdAsObject(), id, req,
+                        TenantContext.getCurrentUserId())));
     }
 }

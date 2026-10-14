@@ -34,7 +34,7 @@ public class CreditNoteController {
     private final CreditNotePdfService creditNotePdfService;
 
     @PostMapping("/invoices/{invoiceId}/credit-notes")
-    @PreAuthorize("hasAuthority('INVOICE_CREATE')")
+    @PreAuthorize("hasAuthority('CREDIT_NOTE_ISSUE')")
     @Operation(summary = "Issue a credit note against an invoice")
     public ResponseEntity<ApiResponse<CreditNoteResponse>> createCreditNote(
             @PathVariable UUID invoiceId,

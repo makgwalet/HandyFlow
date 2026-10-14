@@ -70,7 +70,8 @@ class InvoicingFacadeImpl implements InvoicingFacade {
                         inv.getWalkinClientName(),
                         inv.getDueDate(),
                         inv.getTotal(),
-                        inv.getAmountPaid()))
+                        inv.getAmountPaid(),
+                        inv.getCreditedAmount()))
                 .toList();
     }
 

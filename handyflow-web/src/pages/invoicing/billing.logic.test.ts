@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  balanceOf, billableHours, creditNoteError, creditNoteTotals, cycleHoursError, daysUntil, dueLabel, frequencyLabel, hoursError,
+  allocateOldestFirst, allocationError, balanceOf, billableHours, creditNoteError, creditNoteTotals, cycleHoursError, daysUntil, dueLabel, frequencyLabel, hoursError,
   invoiceStats, isTruncated, matches, monthlyValue, nextRunLabel, paginate, partyName, paymentError, quoteExpiryLabel, quoteStats,
   recurringStats, retainerStats, retainerUse, sortBy, countBy, wouldExceed, fmtR, label, INVOICE_LABEL,
   type Invoice, type Quote, type RecurringSchedule,
@@ -67,6 +67,14 @@ describe('payments and credit notes', () => {
   it('works out what is still owing', () => {
     expect(balanceOf({ total: 115, amountPaid: 15 })).toBe(100)
     expect(balanceOf({ total: 115, amountPaid: 200 })).toBe(0)
+    expect(balanceOf({ total: 115, amountPaid: 15, creditedAmount: 40 })).toBe(60)
+    expect(balanceOf({ total: 115, amountPaid: 15, creditedAmount: 40, balanceDue: 55 })).toBe(55)
+    expect(allocateOldestFirst(130, [{ id: 'a', balanceDue: 100 }, { id: 'b', balanceDue: 50 }])).toEqual({ a: 100, b: 30 })
+    expect(allocateOldestFirst(0.1 + 0.2, [{ id: 'a', balanceDue: 1 }])).toEqual({ a: 0.3 })
+    expect(allocationError(100, { a: 60, b: 40 }, [{ id: 'a', balanceDue: 60 }, { id: 'b', balanceDue: 50 }])).toBeNull()
+    expect(allocationError(100, { a: 61 }, [{ id: 'a', balanceDue: 60 }])).toMatch(/more than that invoice/)
+    expect(allocationError(50, { a: 60 }, [{ id: 'a', balanceDue: 60 }])).toMatch(/more than the/)
+    expect(allocationError(0, {}, [])).toMatch(/Enter/)
   })
   it('rejects a payment that is empty, zero or more than owing', () => {
     const i = inv({ total: 115, amountPaid: 15 })

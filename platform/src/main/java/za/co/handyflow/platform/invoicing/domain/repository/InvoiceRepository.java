@@ -35,6 +35,19 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
         """)
     Optional<Invoice> findActiveByIdWithLineItems(TenantId tenantId, UUID id);
 
+    /** Finance patch F8: a customer's invoices that still owe something, oldest due first. */
+    @Query("""
+        SELECT i FROM Invoice i
+        WHERE i.tenantId = :tenantId
+        AND i.customerId = :customerId
+        AND i.deletedAt IS NULL
+        AND i.status IN (za.co.handyflow.platform.invoicing.domain.model.InvoiceStatus.ISSUED,
+                         za.co.handyflow.platform.invoicing.domain.model.InvoiceStatus.PARTIALLY_PAID,
+                         za.co.handyflow.platform.invoicing.domain.model.InvoiceStatus.OVERDUE)
+        ORDER BY i.dueDate ASC NULLS LAST, i.issuedAt ASC
+        """)
+    List<Invoice> findOpenForCustomer(TenantId tenantId, UUID customerId);
+
     // JPQL with SpEL — TenantId works here via :#{#tenantId.value} unwrapping
     @Query("SELECT COUNT(i) FROM Invoice i WHERE i.tenantId.value = :#{#tenantId.value} AND i.deletedAt IS NULL")
     long countAllByTenantId(TenantId tenantId);

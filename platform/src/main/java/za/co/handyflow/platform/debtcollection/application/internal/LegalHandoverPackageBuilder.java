@@ -78,7 +78,7 @@ public class LegalHandoverPackageBuilder {
             if (inv == null) {
                 line.put("status", "NOT_OUTSTANDING_PER_INVOICING");
             } else {
-                BigDecimal paid = inv.amountPaid() != null ? inv.amountPaid() : BigDecimal.ZERO;
+                BigDecimal paid = inv.settled();   // finance patch F8: paid plus credit notes
                 BigDecimal open = inv.total().subtract(paid);
                 line.put("status", "OUTSTANDING");
                 line.put("invoiceNumber", inv.invoiceNumber());

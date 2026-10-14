@@ -4,7 +4,7 @@
 // actions that apply to its status. Works for standard, recurring-instance and retainer invoices.
 import { useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
-import { AlertTriangle, CheckCircle, Download, FileMinus, FileText, Receipt, Send, Timer } from "lucide-react"
+import { AlertTriangle, CheckCircle, Download, FileMinus, FileText, Receipt, Send, Timer, Wallet } from "lucide-react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { PageHeader } from "../../components/ui/PageHeader"
@@ -14,7 +14,7 @@ import {
   INVOICE_LABEL, INVOICE_TONE, OPEN_INVOICE_STATUSES, TYPE_LABEL, balanceOf, dueLabel, fmtDate, fmtR, label, retainerBarColour, retainerUse, num,
   type CreditNote, type Invoice,
 } from "./billing.logic"
-import { CreditNoteDialog, LogHoursDialog, RecordPaymentDialog } from "./dialogs"
+import { CreditNoteDialog, LogHoursDialog, RecordPaymentDialog, useCustomerAccount } from "./dialogs"
 import { apiMessage, downloadPdf } from "./queries"
 import { Btn, Facts, Loading, Meter, Notice, StateBox, Totals, panel, sectionTitle, td } from "./ui"
 
@@ -25,6 +25,9 @@ export default function InvoiceDetailPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const canCreate = usePermission("INVOICE_CREATE")
+  // Finance patch F8: payments and credit notes have their own permissions; customer credit can settle this invoice.
+  const canPay = usePermission("INVOICE_PAYMENT")
+  const canCredit = usePermission("CREDIT_NOTE_ISSUE")
   const [dialog, setDialog] = useState<"pay" | "hours" | "credit" | null>(null)
   const [msg, setMsg] = useState("")
 
@@ -39,6 +42,25 @@ export default function InvoiceDetailPage() {
   const { data: creditNotes = [] } = useQuery<CreditNote[]>({
     queryKey: ["credit-notes", id], enabled: !!id && !!inv && inv.status !== "DRAFT",
     queryFn: async () => { const r = await apiClient.get(`/api/v1/invoicing/invoices/${id}/credit-notes`); return r.data?.data ?? r.data ?? [] },
+  })
+  const account = useCustomerAccount(inv?.customerId && inv.status !== "DRAFT" && OPEN_INVOICE_STATUSES.includes(inv.status) ? inv.customerId : null)
+  const applyCredit = useMutation({
+    mutationFn: async () => {
+      // Oldest credit first, until this invoice is settled or the credit runs out.
+      let left = Math.round(balanceOf(inv!) * 100)
+      for (const r of account.data?.creditReceipts ?? []) {
+        if (left <= 0) break
+        const take = Math.min(left, Math.round(Number(r.available) * 100))
+        if (take <= 0) continue
+        await apiClient.post(`/api/v1/invoicing/receipts/${r.id}/allocations`, { allocations: [{ invoiceId: inv!.id, amount: take / 100 }] })
+        left -= take
+      }
+    },
+    onSuccess: () => {
+      setMsg(""); qc.invalidateQueries({ queryKey: ["invoice", id] }); qc.invalidateQueries({ queryKey: ["invoices"] })
+      qc.invalidateQueries({ queryKey: ["customer-account"] })
+    },
+    onError: (e: any) => setMsg(apiMessage(e, "The credit could not be used.")),
   })
   const issue = useMutation({
     mutationFn: () => apiClient.post(`/api/v1/invoicing/invoices/${id}/issue`),
@@ -81,9 +103,14 @@ export default function InvoiceDetailPage() {
           <Btn icon={Download} onClick={async () => setMsg((await downloadPdf(`/api/v1/invoicing/invoices/${inv.id}/pdf`, `${inv.invoiceNumber}.pdf`)) ?? "")}>Download PDF</Btn>
           {inv.customerId && <Btn icon={FileText} onClick={async () => setMsg((await downloadPdf(`/api/v1/invoicing/customers/${inv.customerId}/statement`, `statement-${name ?? "customer"}.pdf`)) ?? "")}>Statement</Btn>}
           {canCreate && inv.status === "DRAFT" && <Btn variant="primary" icon={Send} onClick={() => issue.mutate()} disabled={issue.isPending || inv.lineItems.length === 0}>{issue.isPending ? "Issuing..." : "Issue invoice"}</Btn>}
-          {canCreate && open && <Btn variant="success" icon={CheckCircle} onClick={() => setDialog("pay")}>Record payment</Btn>}
+          {canPay && open && <Btn variant="success" icon={CheckCircle} onClick={() => setDialog("pay")}>Record payment</Btn>}
+          {canPay && open && (account.data?.creditAvailable ?? 0) > 0 && (
+            <Btn icon={Wallet} onClick={() => applyCredit.mutate()} disabled={applyCredit.isPending}>
+              {applyCredit.isPending ? "Using credit..." : `Use credit (${fmtR(Math.min(account.data!.creditAvailable, balance))})`}
+            </Btn>
+          )}
           {canCreate && use && ["ISSUED", "PARTIALLY_PAID", "PAID"].includes(inv.status) && <Btn icon={Timer} onClick={() => setDialog("hours")}>Log hours</Btn>}
-          {canCreate && inv.status !== "DRAFT" && inv.status !== "CANCELLED" && <Btn icon={FileMinus} onClick={() => setDialog("credit")}>Credit note</Btn>}
+          {canCredit && inv.status !== "DRAFT" && inv.status !== "CANCELLED" && <Btn icon={FileMinus} onClick={() => setDialog("credit")}>Credit note</Btn>}
         </>} />
       {msg && <div style={{ marginBottom: 14 }}><Notice tone="bad">{msg}</Notice></div>}
 
@@ -162,7 +189,9 @@ export default function InvoiceDetailPage() {
             <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 10 }}>{inv.status === "DRAFT" ? "to be invoiced" : balance > 0 ? "still owing" : "nothing owing"}</div>
             {inv.status !== "DRAFT" && <Meter percent={paidPct} colour="var(--hf-success)" label="Paid so far" />}
             <div style={{ marginTop: 12 }}>
-              <Facts rows={[["Total", fmtR(inv.total)], ["Paid", fmtR(inv.amountPaid)], ["Due date", fmtDate(inv.dueDate)], ...(due ? [["", due] as [string, string]] : [])]} />
+              <Facts rows={[["Total", fmtR(inv.total)], ["Paid", fmtR(inv.amountPaid)],
+                ...(num(inv.creditedAmount ?? 0) > 0 ? [["Credited", fmtR(inv.creditedAmount)] as [string, string]] : []),
+                ["Due date", fmtDate(inv.dueDate)], ...(due ? [["", due] as [string, string]] : [])]} />
             </div>
           </section>
 

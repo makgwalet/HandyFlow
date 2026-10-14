@@ -105,7 +105,7 @@ class InvoicingScheduler {
             if (clientEmail != null && !clientEmail.isBlank()) {
                 String clientName = resolveClientName(invoice);
                 String amount = "R " + String.format(java.util.Locale.US, "%,.2f",
-                        invoice.getTotal().subtract(invoice.getAmountPaid()));
+                        invoice.getBalanceDue());   // finance patch F8: credit notes count
                 // FIX: same "PDF and the email that should carry it exist
                 // independently" gap as ClinicBillingService's claim-status
                 // email — this fires an escalating collections email

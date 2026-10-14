@@ -238,7 +238,7 @@ public class DebtCollectionDashboardService {
             for (UUID invoiceId : c.getLinkedInvoiceIds()) {
                 OutstandingInvoiceSummary inv = byId.get(invoiceId);
                 if (inv == null) continue; // no longer outstanding => paid
-                BigDecimal paid = inv.amountPaid() != null ? inv.amountPaid() : BigDecimal.ZERO;
+                BigDecimal paid = inv.settled();   // finance patch F8: paid plus credit notes
                 BigDecimal open = inv.total().subtract(paid);
                 if (open.signum() <= 0) continue;
                 long days = inv.dueDate() != null ? ChronoUnit.DAYS.between(inv.dueDate(), today) : 0;

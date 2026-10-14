@@ -11,6 +11,7 @@ import za.co.handyflow.platform.accounting.domain.repository.AccBankAccountRepos
 import za.co.handyflow.platform.invoicing.CreditNoteIssuedEvent;
 import za.co.handyflow.platform.invoicing.InvoiceIssuedEvent;
 import za.co.handyflow.platform.invoicing.InvoicePaymentRecordedEvent;
+import za.co.handyflow.platform.invoicing.ReceiptRecordedEvent;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
@@ -162,6 +163,50 @@ class InvoicingAccountingEventHandler {
         } catch (Exception e) {
             log.error("[Accounting] Failed to post payment journal for invoice={} tenant={}: {}",
                     event.invoiceNumber(), event.tenantId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Finance patch F8: money received from a customer, posted once per receipt: Dr the bank account it arrived in,
+     * Cr Accounts Receivable for the whole amount, whether it settled invoices or sits on the customer's account as credit.
+     */
+    @ApplicationModuleListener
+    void onReceiptRecorded(ReceiptRecordedEvent event) {
+        String key = PostingKeys.of("invoicing", "receipt", event.receiptId());
+        String what = event.invoiceNumbers() != null && !event.invoiceNumbers().isBlank() ? event.invoiceNumbers() : "on account";
+        String summary = "Payment received: " + event.receiptNumber() + " R " + event.amount() + " (" + what + ")";
+        try {
+            if (event.bankAccountId() == null) {
+                log.warn("[Accounting] Receipt={} tenant={} has no bank account — not posted", event.receiptNumber(), event.tenantId());
+                if (!bankAccountRepo.findAllActive(event.tenantId()).isEmpty()) {
+                    ledgerPosting.recordFailure(event.tenantId(), key, summary,
+                            "The payment was recorded without the bank account that received it. Post it by hand "
+                                    + "(debit the bank, credit Accounts Receivable " + AR_ACCOUNT_CODE + "), then dismiss this");
+                }
+                return;
+            }
+            var bankAccount = bankAccountRepo.findActiveById(event.tenantId(), event.bankAccountId()).orElse(null);
+            if (bankAccount == null || bankAccount.getAccountId() == null) {
+                ledgerPosting.recordFailure(event.tenantId(), key, summary,
+                        "The bank account that received the payment is missing or not linked to a ledger account");
+                return;
+            }
+            UUID arAccountId = findAccountByCode(event.tenantId().getValue(), AR_ACCOUNT_CODE);
+            if (arAccountId == null) {
+                ledgerPosting.recordFailure(event.tenantId(), key, summary,
+                        "The chart of accounts has no Accounts Receivable (" + AR_ACCOUNT_CODE + ") account");
+                return;
+            }
+            String memo = "Payment received — " + event.receiptNumber() + " (" + what + ")";
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(
+                    event.receivedOn() != null ? event.receivedOn() : LocalDate.now(), summary,
+                    event.reference() != null ? event.reference() : event.receiptNumber(), "PAYMENT", List.of(
+                    new CreateJournalEntryRequest.JournalLineRequest(bankAccount.getAccountId(), memo, event.amount(), null),
+                    new CreateJournalEntryRequest.JournalLineRequest(arAccountId, memo, null, event.amount())));
+            ledgerPosting.postOnceOrRecord(event.tenantId(), key, req);
+            log.info("[Accounting] Posted receipt={} tenant={}", event.receiptNumber(), event.tenantId());
+        } catch (Exception e) {
+            log.error("[Accounting] Failed to post receipt={} tenant={}: {}", event.receiptNumber(), event.tenantId(), e.getMessage(), e);
         }
     }
 

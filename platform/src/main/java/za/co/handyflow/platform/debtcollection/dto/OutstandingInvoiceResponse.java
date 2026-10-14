@@ -16,7 +16,7 @@ public record OutstandingInvoiceResponse(
         BigDecimal outstanding
 ) {
     public static OutstandingInvoiceResponse of(OutstandingInvoiceSummary s) {
-        BigDecimal paid = s.amountPaid() != null ? s.amountPaid() : BigDecimal.ZERO;
+        BigDecimal paid = s.settled();   // finance patch F8: paid plus credit notes
         return new OutstandingInvoiceResponse(s.id(), s.invoiceNumber(), s.dueDate(), s.total(), paid,
                 s.total().subtract(paid));
     }

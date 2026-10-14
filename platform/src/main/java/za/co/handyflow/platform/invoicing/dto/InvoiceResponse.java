@@ -43,7 +43,13 @@ public record InvoiceResponse(
         // ── Walk-in (mirrors QuoteResponse) ────────────────────────────────
         String walkinClientName,
         String walkinClientEmail,
-        String walkinClientPhone
+        String walkinClientPhone,
+
+        // ── Finance patch F8 ────────────────────────────────────────────────
+        /** Credit notes applied to this invoice. */
+        BigDecimal creditedAmount,
+        /** What is still owed: total - amountPaid - creditedAmount. */
+        BigDecimal balanceDue
 ) {
     /** Convenience: how many hours remain before the retainer is exhausted. */
     public BigDecimal remainingHours() {

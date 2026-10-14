@@ -80,8 +80,15 @@ public interface InvoicingFacade {
             String walkinClientName,
             LocalDate dueDate,
             BigDecimal total,
-            BigDecimal amountPaid
-    ) {}
+            BigDecimal amountPaid,
+            // Finance patch F8: credit notes applied; what is still owed is total - amountPaid - creditedAmount.
+            BigDecimal creditedAmount
+    ) {
+        /** Paid plus credited: what no longer needs collecting. */
+        public BigDecimal settled() {
+            return (amountPaid != null ? amountPaid : BigDecimal.ZERO).add(creditedAmount != null ? creditedAmount : BigDecimal.ZERO);
+        }
+    }
 
     // ---- Read-only sale lines (ADR-001, W2): lets Agriculture link invoice lines to production without owning any sales data ----
 

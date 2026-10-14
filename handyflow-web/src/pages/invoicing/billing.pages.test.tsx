@@ -114,7 +114,7 @@ describe('InvoicesListPage', () => {
     expect(screen.getByText('INV-0001')).toBeTruthy()
   })
   it('records a payment: refuses more than is owing, then posts the amount', async () => {
-    perms.add('INVOICE_CREATE')
+    perms.add('INVOICE_PAYMENT')
     route({ '/invoices': page([invoice({ total: 115, amountPaid: 15 })]), '/crm/customers': customers })
     api.post.mockResolvedValue({ data: {} })
     renderAt('/invoices', '/invoices', <InvoicesListPage />)
@@ -132,7 +132,7 @@ describe('InvoicesListPage', () => {
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/v1/invoicing/invoices/i1/payments', { amountPaid: 60, paymentMethod: 'EFT', reference: 'EFT-1' }))
   })
   it('asks which bank account received a payment, so it reaches the ledger (finance F4)', async () => {
-    perms.add('INVOICE_CREATE')
+    perms.add('INVOICE_PAYMENT')
     const banks = { data: { data: [
       { id: 'b1', bankName: 'FNB', accountName: 'Cheque', accountNumber: '62001234', active: true, accountId: 'gl1' },
       { id: 'b2', bankName: 'Nedbank', accountName: 'Savings', accountNumber: '1009876', active: true, accountId: 'gl2' },
@@ -164,6 +164,25 @@ describe('InvoicesListPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Issue' }))
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/v1/invoicing/invoices/i1/issue'))
   })
+  it('receives a payment over several invoices and keeps the rest as credit (finance F8)', async () => {
+    perms.add('INVOICE_PAYMENT')
+    const account = { data: { data: { customerId: 'c1', owed: 150, creditAvailable: 0, creditReceipts: [], openInvoices: [
+      { id: 'i1', invoiceNumber: 'INV-0001', dueDate: day(-5), balanceDue: 100 },
+      { id: 'i2', invoiceNumber: 'INV-0002', dueDate: day(5), balanceDue: 50 }] } } }
+    route({ '/customers/c1/account': account, '/accounting/bank-accounts': { data: { data: [] } }, '/invoices': page([invoice()]), '/crm/customers': customers })
+    api.post.mockResolvedValue({ data: {} })
+    renderAt('/invoices', '/invoices', <InvoicesListPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Receive payment' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('Customer'), { target: { value: 'c1' } })
+    fireEvent.change(within(dialog).getByLabelText('Amount received (R)'), { target: { value: '180' } })
+    expect(((await within(dialog).findByLabelText('Allocate to INV-0001')) as HTMLInputElement).value).toBe('100')
+    expect((within(dialog).getByLabelText('Allocate to INV-0002') as HTMLInputElement).value).toBe('50')
+    expect(within(dialog).getByText(/R 30,00 will be kept as the customer's credit/)).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Record payment' }))
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/v1/invoicing/receipts', expect.objectContaining({
+      customerId: 'c1', amount: 180, allocations: [{ invoiceId: 'i1', amount: 100 }, { invoiceId: 'i2', amount: 50 }] })))
+  })
   it('opens an invoice on click', async () => {
     route({ '/invoices': page([invoice()]), '/crm/customers': customers })
     renderAt('/invoices', '/invoices', <InvoicesListPage />)
@@ -185,6 +204,19 @@ describe('InvoiceDetailPage', () => {
     expect(within(pay).getByText('R 100,00', { exact: false })).toBeTruthy()
     expect(screen.getByText('Part paid')).toBeTruthy()
   })
+  it('counts credit notes in what is owing and uses customer credit to settle it (finance F8)', async () => {
+    perms.add('INVOICE_PAYMENT')
+    api.post.mockResolvedValue({ data: {} })
+    open(invoice({ total: 115, amountPaid: 15, creditedAmount: 40, balanceDue: 60, status: 'PARTIALLY_PAID' }), {
+      '/customers/c1/account': { data: { data: { customerId: 'c1', owed: 60, creditAvailable: 85, openInvoices: [],
+        creditReceipts: [{ id: 'r1', receiptNumber: 'RC-1', available: 25 }, { id: 'r2', receiptNumber: 'RC-2', available: 60 }] } } } })
+    const pay = await screen.findByRole('region', { name: 'Payment' })
+    expect(within(pay).getByText('R 60,00', { exact: false })).toBeTruthy()
+    expect(within(pay).getByText('Credited')).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: /Use credit \(R 60,00\)/ }))
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/v1/invoicing/receipts/r2/allocations', { allocations: [{ invoiceId: 'i1', amount: 35 }] }))
+    expect(api.post).toHaveBeenCalledWith('/api/v1/invoicing/receipts/r1/allocations', { allocations: [{ invoiceId: 'i1', amount: 25 }] })
+  })
   it('shows retainer hours with an overage warning and offers Log hours', async () => {
     perms.add('INVOICE_CREATE')
     open(invoice({ invoiceType: 'RETAINER', committedHours: 100, hoursConsumed: 112.5, ratePerHour: 500 }))
@@ -192,7 +224,7 @@ describe('InvoiceDetailPage', () => {
     expect(screen.getByRole('button', { name: 'Log hours' })).toBeTruthy()
   })
   it('issues a credit note after checking the form', async () => {
-    perms.add('INVOICE_CREATE')
+    perms.add('CREDIT_NOTE_ISSUE')
     api.post.mockResolvedValue({ data: {} })
     open(invoice())
     fireEvent.click(await screen.findByRole('button', { name: 'Credit note' }))

@@ -260,7 +260,7 @@ public class DebtCollectionCaseService {
     private Map<UUID, BigDecimal> outstandingByInvoice(TenantId tenantId) {
         Map<UUID, BigDecimal> out = new HashMap<>();
         for (OutstandingInvoiceSummary inv : invoicingFacade.findOutstandingInvoices(tenantId)) {
-            BigDecimal paid = inv.amountPaid() != null ? inv.amountPaid() : BigDecimal.ZERO;
+            BigDecimal paid = inv.settled();   // finance patch F8: paid plus credit notes
             out.putIfAbsent(inv.id(), inv.total().subtract(paid));
         }
         return out;

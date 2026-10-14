@@ -308,7 +308,7 @@ public class PtpService {
         for (UUID id : invoiceIds) {
             OutstandingInvoiceSummary inv = byId.get(id);
             if (inv == null) continue;
-            BigDecimal paid = inv.amountPaid() != null ? inv.amountPaid() : BigDecimal.ZERO;
+            BigDecimal paid = inv.settled();   // finance patch F8: paid plus credit notes
             total = total.add(inv.total().subtract(paid));
         }
         return total;

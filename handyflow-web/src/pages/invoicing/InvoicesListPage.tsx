@@ -11,7 +11,7 @@ import {
   INVOICE_LABEL, INVOICE_TONE, OPEN_INVOICE_STATUSES, TYPE_LABEL, balanceOf, countBy, dueLabel, fmtDate, fmtR, fmtRShort, invoiceStats, isTruncated, label, LIST_LIMIT,
   matches, paginate, partyName, sortBy, type Invoice, type SortDir,
 } from "./billing.logic"
-import { RecordPaymentDialog } from "./dialogs"
+import { ReceivePaymentDialog, RecordPaymentDialog } from "./dialogs"
 import { apiMessage, downloadPdf, useCustomerNames, useInvoices } from "./queries"
 import { BillingNav, Btn, FilterPills, Kpis, Loading, LoadError, Notice, Pager, SearchBox, StateBox, TableShell, Th, td, trStyle } from "./ui"
 
@@ -22,6 +22,9 @@ export default function InvoicesListPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const canCreate = usePermission("INVOICE_CREATE")
+  // Finance patch F8: recording customer payments has its own permission.
+  const canPay = usePermission("INVOICE_PAYMENT")
+  const [receiving, setReceiving] = useState(false)
   const { data, isLoading, isError, refetch } = useInvoices()
   const names = useCustomerNames()
   const [status, setStatus] = useState("ALL")
@@ -60,7 +63,10 @@ export default function InvoicesListPage() {
   return (
     <div>
       <PageHeader title="Invoices" icon={Receipt} subtitle="Quotes, invoices, recurring billing and retainers"
-        action={canCreate && <Btn variant="primary" icon={Plus} onClick={() => navigate("/invoices/retainer/new")}>Retainer invoice</Btn>} />
+        action={<>
+          {canPay && <Btn variant="success" icon={Wallet} onClick={() => setReceiving(true)}>Receive payment</Btn>}
+          {canCreate && <Btn variant="primary" icon={Plus} onClick={() => navigate("/invoices/retainer/new")}>Retainer invoice</Btn>}
+        </>} />
       <BillingNav />
 
       <Kpis items={[
@@ -111,7 +117,7 @@ export default function InvoicesListPage() {
                       <td style={td} onClick={e => e.stopPropagation()}>
                         <div style={{ display: "flex", gap: 6 }}>
                           {canCreate && inv.status === "DRAFT" && <Btn small icon={Send} onClick={() => issue.mutate(inv.id)} disabled={issue.isPending}>Issue</Btn>}
-                          {canCreate && OPEN_INVOICE_STATUSES.includes(inv.status) && <Btn small variant="success" icon={CheckCircle} onClick={() => setPaying(inv)}>Record payment</Btn>}
+                          {canPay && OPEN_INVOICE_STATUSES.includes(inv.status) && <Btn small variant="success" icon={CheckCircle} onClick={() => setPaying(inv)}>Record payment</Btn>}
                           <Btn small icon={Download} aria-label={`Download ${inv.invoiceNumber} PDF`} onClick={() => pdf(inv)}>PDF</Btn>
                         </div>
                       </td>
@@ -124,6 +130,7 @@ export default function InvoicesListPage() {
           </>
         )}
       {paying && <RecordPaymentDialog invoice={paying} onClose={() => setPaying(null)} />}
+      {receiving && <ReceivePaymentDialog onClose={() => setReceiving(false)} />}
     </div>
   )
 }

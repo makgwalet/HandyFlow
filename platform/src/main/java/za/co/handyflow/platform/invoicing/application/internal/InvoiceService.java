@@ -48,10 +48,21 @@ public class InvoiceService {
     // InvoiceIssuedEvent's own Javadoc for why this is an event, not a
     // direct AccountingFacade call.
     private final ApplicationEventPublisher eventPublisher;
+    private final ReceiptService receiptService;
 
     @Transactional
     public InvoiceResponse recordPayment(TenantId tenantId, UUID id,
                                          RecordPaymentRequest req) {
+        return recordPayment(tenantId, id, req, null);
+    }
+
+    /**
+     * Finance patch F8: a payment is now a receipt (ReceiptService) settling this invoice; anything above what it owes stays
+     * on the customer's account as credit. The receipt, not this invoice, is posted to the ledger.
+     */
+    @Transactional
+    public InvoiceResponse recordPayment(TenantId tenantId, UUID id,
+                                         RecordPaymentRequest req, UUID recordedBy) {
         Invoice invoice = invoiceRepo.findActiveByIdWithLineItems(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", id.toString()));
 
@@ -64,9 +75,14 @@ public class InvoiceService {
         if (invoice.getIssuedAt() == null) {
             LocalDate dueDate = paymentTermsResolver.resolveDueDate(tenantId, LocalDate.now());
             invoice.markIssued(dueDate);
+            invoiceRepo.save(invoice);
+            // Finance patch F8: issuing here used to skip the ledger; the invoice's revenue now posts like any issue.
+            eventPublisher.publishEvent(InvoiceIssuedEvent.of(
+                    tenantId, invoice.getId(), invoice.getInvoiceNumber(), invoice.getCustomerId(),
+                    invoice.getSubtotal(), invoice.getVatTotal(), invoice.getTotal()));
         }
-        invoice.recordPayment(req.amountPaid(), paidAt);
-        invoiceRepo.save(invoice);
+        receiptService.receiveForInvoice(tenantId, invoice, req.amountPaid(), req.paymentMethod(), req.reference(),
+                req.bankAccountId(), paidAt, recordedBy);
 
         log.info("Payment recorded invoice={} amount={} status={}",
                 invoice.getInvoiceNumber(), req.amountPaid(), invoice.getStatus());
@@ -118,9 +134,7 @@ public class InvoiceService {
         // notification call so a notification failure above (already
         // wrapped in its own try/catch) can never prevent the ledger event
         // from firing.
-        eventPublisher.publishEvent(InvoicePaymentRecordedEvent.of(
-                tenantId, invoice.getId(), invoice.getInvoiceNumber(),
-                req.amountPaid(), req.bankAccountId()));
+        // Finance patch F8: the ledger posting now comes from the receipt (ReceiptRecordedEvent), once per receipt.
 
         return queryService.getInvoice(tenantId, id);
     }

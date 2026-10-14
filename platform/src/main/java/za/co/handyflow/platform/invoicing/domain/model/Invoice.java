@@ -125,6 +125,10 @@ public class Invoice {
     @Column(name = "credit_amount", nullable = false)
     private BigDecimal creditAmount = BigDecimal.ZERO;
 
+    /** Finance patch F8: credit notes applied to this invoice. balance = total - amountPaid - creditedAmount. */
+    @Column(name = "credited_amount", nullable = false, precision = 15, scale = 2)
+    private BigDecimal creditedAmount = BigDecimal.ZERO;
+
     @Column(name = "overdue_reminder_stage")
     private Integer overdueReminderStage;
 
@@ -180,6 +184,44 @@ public class Invoice {
         this.updatedAt = Instant.now();
     }
 
+    /** What is still owed (finance patch F8): total less payments allocated and credit notes applied; never below zero. */
+    public BigDecimal getBalanceDue() {
+        return za.co.handyflow.platform.invoicing.application.internal.ReceiptRules.balance(total, amountPaid, creditedAmount);
+    }
+
+    /**
+     * Settles part of this invoice with money from a receipt (finance patch F8). Never more than it still owes; money beyond
+     * that stays on the customer's account as credit.
+     */
+    public void allocatePayment(BigDecimal amount, Instant paidAt) {
+        if (status == InvoiceStatus.CANCELLED) throw new IllegalStateException("Cannot settle a cancelled invoice");
+        if (status == InvoiceStatus.DRAFT) throw new IllegalStateException("Issue the invoice before settling it");
+        if (amount.compareTo(getBalanceDue().add(new BigDecimal("0.005"))) > 0)
+            throw new IllegalStateException("R " + amount + " is more than the R " + getBalanceDue() + " invoice "
+                    + invoiceNumber + " still owes");
+        this.amountPaid = (this.amountPaid == null ? BigDecimal.ZERO : this.amountPaid).add(amount);
+        this.paidAt     = paidAt;
+        resettle();
+    }
+
+    /** Applies (part of) a credit note to this invoice (finance patch F8). */
+    public void applyCredit(BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0) return;
+        this.creditedAmount = (this.creditedAmount == null ? BigDecimal.ZERO : this.creditedAmount).add(amount);
+        resettle();
+    }
+
+    private void resettle() {
+        String settled = za.co.handyflow.platform.invoicing.application.internal.ReceiptRules.settledStatus(total, amountPaid, creditedAmount);
+        if (settled != null && status != InvoiceStatus.CANCELLED && status != InvoiceStatus.DRAFT) {
+            this.status = InvoiceStatus.valueOf(settled);
+            this.creditAmount = BigDecimal.ZERO;
+        }
+        this.updatedAt = Instant.now();
+    }
+
+    /** @deprecated finance patch F8: payments go through receipts and {@link #allocatePayment}; kept for older callers. */
+    @Deprecated
     public void recordPayment(BigDecimal amount, Instant paidAt) {
         if (status == InvoiceStatus.CANCELLED) {
             throw new IllegalStateException("Cannot record payment on a cancelled invoice");

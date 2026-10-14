@@ -390,13 +390,19 @@ public class InvoicePdfService {
                         .setFont(bold).setFontSize(14).setFontColor(WHITE)));
 
         // Amount paid / balance
-        if (invoice.getAmountPaid() != null &&
-                invoice.getAmountPaid().compareTo(BigDecimal.ZERO) > 0) {
-            inner.addCell(totLabel("Amount paid:", regular));
-            inner.addCell(totValue(fmt(invoice.getAmountPaid()), regular));
-            BigDecimal balance = invoice.getTotal().subtract(invoice.getAmountPaid());
+        boolean paidSome = invoice.getAmountPaid() != null && invoice.getAmountPaid().compareTo(BigDecimal.ZERO) > 0;
+        boolean creditedSome = invoice.getCreditedAmount() != null && invoice.getCreditedAmount().compareTo(BigDecimal.ZERO) > 0;
+        if (paidSome || creditedSome) {
+            if (paidSome) {
+                inner.addCell(totLabel("Amount paid:", regular));
+                inner.addCell(totValue(fmt(invoice.getAmountPaid()), regular));
+            }
+            if (creditedSome) {   // finance patch F8: credit notes reduce the balance
+                inner.addCell(totLabel("Credited:", regular));
+                inner.addCell(totValue(fmt(invoice.getCreditedAmount()), regular));
+            }
             inner.addCell(totLabel("Balance due:", bold));
-            inner.addCell(totValue(fmt(balance.max(BigDecimal.ZERO)), bold));
+            inner.addCell(totValue(fmt(invoice.getBalanceDue()), bold));
         }
 
         // Overpaid credit
