@@ -26,6 +26,7 @@ import za.co.handyflow.platform.notifications.application.internal.NotificationS
 import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.notifications.domain.model.NotificationSeverity;
 import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.application.PostingKeys;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 
@@ -998,8 +999,8 @@ public class PosService {
                     LocalDate.now(), "POS session closed: " + session.getSessionNumber(),
                     session.getSessionNumber(), "MANUAL", lines);
 
-            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
-            accountingFacade.postJournalEntry(tenantId, created.id());
+            // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
+            JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("pos", "session-closed", session.getId()), req);
             log.info("[POS] Posted sales journal for session={} tenant={} total={}",
                     session.getSessionNumber(), tenantId, totalSales);
         } catch (Exception e) {

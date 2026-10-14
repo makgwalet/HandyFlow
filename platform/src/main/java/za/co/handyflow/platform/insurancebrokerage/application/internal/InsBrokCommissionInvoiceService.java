@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.application.PostingKeys;
 import za.co.handyflow.platform.accounting.dto.AccountResponse;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
@@ -170,8 +171,8 @@ public class InsBrokCommissionInvoiceService {
                     LocalDate.now(), "Commission — " + invoice.getInvoiceNumber(), invoice.getInvoiceNumber(),
                     "MANUAL", lines);
 
-            JournalEntryResponse entry = accountingFacade.createJournalEntry(tenantId, req);
-            accountingFacade.postJournalEntry(tenantId, entry.id());
+            // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
+            JournalEntryResponse entry = accountingFacade.postOnce(tenantId, PostingKeys.of("insurancebrokerage", "commission-invoice-issued", invoice.getId()), req);
         } catch (Exception e) {
             log.error("[InsuranceBrokerage] Failed to post GL journal for commission invoice={} tenant={}: {}",
                     invoice.getInvoiceNumber(), tenantId.getValue(), e.getMessage(), e);

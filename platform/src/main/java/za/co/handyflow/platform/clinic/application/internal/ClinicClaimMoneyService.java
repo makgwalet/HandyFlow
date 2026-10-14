@@ -5,6 +5,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.application.PostingKeys;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.clinic.ClaimMoneyEvent;
 import za.co.handyflow.platform.clinic.application.internal.ClaimLedgerRules.Open;
@@ -141,7 +142,8 @@ public class ClinicClaimMoneyService {
         BigDecimal amount = ClaimLedgerRules.creditNote(claim.getStatus(), ClaimLedgerRules.outstanding(claim.getSchemePortion(), t), supplied);
         String number = ledger.addAdjustment(tenant.getValue(), claimId, "CREDIT_NOTE", amount, reason, by, today());
         refreshStatus(tenant, claim);
-        postReversal(tenant, claim, amount, "Credit note " + number + " on claim " + claim.getId());
+        postReversal(tenant, claim, amount, "Credit note " + number + " on claim " + claim.getId(),
+                PostingKeys.of("clinic", "claim-credit-note", number));
         publish(tenant, ClaimMoneyEvent.CREDIT_NOTE_ISSUED, claim, amount, number, by);
         log.warn("CREDIT NOTE {} claim={} amount={} by={}", number, claimId, amount, by);
         return claim;
@@ -157,7 +159,8 @@ public class ClinicClaimMoneyService {
         claim.voidClaim(by, reason);
         claimRepo.save(claim);
         consultationRepo.findById(claim.getConsultationId()).ifPresent(c -> { c.markUnbilled(); consultationRepo.save(c); });
-        postReversal(tenant, claim, claim.getGrossAmount(), "Claim voided: " + claim.getId());
+        postReversal(tenant, claim, claim.getGrossAmount(), "Claim voided: " + claim.getId(),
+                PostingKeys.of("clinic", "claim-voided", claim.getId()));
         publish(tenant, ClaimMoneyEvent.CLAIM_VOIDED, claim, claim.getGrossAmount(), null, by);
         log.warn("CLAIM VOIDED claim={} by={}", claimId, by);
         return claim;
@@ -252,7 +255,8 @@ public class ClinicClaimMoneyService {
     // ── Reversing what this module posted ────────────────────────────────────────────────────────────────────────────
 
     /** Credit AR, debit Revenue: the opposite of the entry written when the claim was created. Never lets a posting failure undo the claim. */
-    private void postReversal(TenantId tenant, ClinicClaim claim, BigDecimal amount, String memo) {
+    /** Finance patch F3: {@code sourceKey} names the credit note or void, so it posts once. */
+    private void postReversal(TenantId tenant, ClinicClaim claim, BigDecimal amount, String memo, String sourceKey) {
         try {
             UUID ar = accountId(tenant, AR_ACCOUNT_CODE), revenue = accountId(tenant, REVENUE_ACCOUNT_CODE);
             if (ar == null || revenue == null) {
@@ -262,9 +266,8 @@ public class ClinicClaimMoneyService {
             var lines = List.of(
                     new CreateJournalEntryRequest.JournalLineRequest(revenue, memo, amount, null),
                     new CreateJournalEntryRequest.JournalLineRequest(ar, memo, null, amount));
-            var created = accountingFacade.createJournalEntry(tenant,
+            accountingFacade.postOnce(tenant, sourceKey,
                     new CreateJournalEntryRequest(today(), memo, claim.getId().toString(), "MANUAL", lines));
-            accountingFacade.postJournalEntry(tenant, created.id());
         } catch (Exception e) {
             log.error("Failed to post reversal for claim={} tenant={}: {}", claim.getId(), tenant, e.getMessage(), e);
         }

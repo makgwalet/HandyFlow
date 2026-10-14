@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.application.PostingKeys;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.property.domain.model.*;
@@ -483,8 +484,8 @@ public class PropertyService {
                     LocalDate.now(), "Rent due: " + payment.getPeriodMonth() + "/" + payment.getPeriodYear(),
                     payment.getId().toString(), "MANUAL", lines);
 
-            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
-            accountingFacade.postJournalEntry(tenantId, created.id());
+            // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
+            JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("property", "rent-charged", payment.getId()), req);
             log.info("Posted rental revenue journal for payment={} tenant={}", payment.getId(), tenantId);
         } catch (Exception e) {
             log.error("Failed to post rental revenue journal for payment={} tenant={}: {}",

@@ -50,6 +50,8 @@ public class AccJournalEntry {
     @Column(name = "posted_by")    UUID postedBy;
     /** Finance patch F2: on a reversal, the journal it reverses. */
     @Column(name = "reverses_entry_id") UUID reversesEntryId;
+    /** Finance patch F3: the business event this journal posts ({@code module:event:id}); null for journals people make. */
+    @Column(name = "source_key") String sourceKey;
     @Column(name = "created_at")   Instant createdAt;
     @Column(name = "updated_at")   Instant updatedAt;
     @Column(name = "deleted_at")   Instant deletedAt;
@@ -121,6 +123,12 @@ public class AccJournalEntry {
         this.reference = (this.reference != null ? this.reference + " | " : "")
                 + "Reversed by: " + reversalEntryNumber;
         this.updatedAt = java.time.Instant.now();
+    }
+
+    /** Ties a new draft to the business event it posts (finance patch F3). */
+    public void markSource(String sourceKey) {
+        if (!"DRAFT".equals(status)) throw new IllegalStateException("Only a draft can be tied to its business event");
+        this.sourceKey = sourceKey;
     }
 
     /** Marks a new draft as the reversal of {@code originalId} (finance patch F2). */

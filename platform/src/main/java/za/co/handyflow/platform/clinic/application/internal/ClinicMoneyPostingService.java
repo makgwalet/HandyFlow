@@ -7,6 +7,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.application.PostingKeys;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.clinic.ClaimMoneyEvent;
 import za.co.handyflow.platform.clinic.dto.billing.MoneyPostingDtos.*;
@@ -89,9 +90,9 @@ public class ClinicMoneyPostingService {
             String memo = MoneyPostingRules.description(r.type(), r.claimId(), r.reference());
             var lines = MoneyPostingRules.lines(r.type(), r.amount(), ar, badDebt, bankGl).stream()
                     .map(l -> new CreateJournalEntryRequest.JournalLineRequest(l.accountId(), memo, l.debit(), l.credit())).toList();
-            var created = accounting.createJournalEntry(tenant,
+            // Finance patch F3: one journal per posting record, so a retry after a half-finished attempt cannot post twice.
+            var created = accounting.postOnce(tenant, PostingKeys.of("clinic", "money-posting", postingId),
                     new CreateJournalEntryRequest(r.on(), memo, r.claimId().toString(), "MANUAL", lines));
-            accounting.postJournalEntry(tenant, created.id());
             jdbc.update("""
                 UPDATE clinic_money_posting SET status = 'POSTED', reason = NULL, bank_account_id = ?, journal_entry_id = ?, posted_at = now(), posted_by = ?
                 WHERE id = ? AND tenant_id = ?""", bankAccountId, created.id(), by, postingId, tenant.getValue());

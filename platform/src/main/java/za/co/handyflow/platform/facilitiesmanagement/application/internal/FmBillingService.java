@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.application.PostingKeys;
 import za.co.handyflow.platform.accounting.dto.AccountResponse;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
@@ -189,8 +190,8 @@ public class FmBillingService {
                     LocalDate.now(), "Facilities management invoice " + invoice.getInvoiceNumber(),
                     invoice.getInvoiceNumber(), "MANUAL", lines);
 
-            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
-            accountingFacade.postJournalEntry(tenantId, created.id());
+            // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
+            JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("facilitiesmanagement", "invoice-issued", invoice.getId()), req);
             log.info("Posted revenue journal for FM invoice={} tenant={} amount={}",
                     invoice.getInvoiceNumber(), tenantId.getValue(), invoice.getTotal());
         } catch (Exception e) {

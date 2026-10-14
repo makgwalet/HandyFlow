@@ -212,8 +212,9 @@ public class ApBill {
     }
 
     public void markPaid(UUID paymentJournalId, String paymentRef, UUID paidBy) {
-        if (!"APPROVED".equals(status))
-            throw new IllegalStateException("Only APPROVED bills can be marked paid");
+        // Finance patch F3: OVERDUE is an approved bill past its due date; payBill() accepts it, so marking it paid must too.
+        if (!"APPROVED".equals(status) && !"OVERDUE".equals(status))
+            throw new IllegalStateException("Only approved or overdue bills can be marked paid — this bill is " + status);
         this.status             = "PAID";
         this.paymentJournalId   = paymentJournalId;
         this.paymentRef         = paymentRef;

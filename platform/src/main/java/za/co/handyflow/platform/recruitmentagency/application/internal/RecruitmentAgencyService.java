@@ -16,6 +16,7 @@ import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.shared.VatRateProvider;
 import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.application.PostingKeys;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 
@@ -683,8 +684,8 @@ public class RecruitmentAgencyService {
                     LocalDate.now(), "Recruitment agency invoice: " + invoice.getInvoiceNumber(),
                     invoice.getInvoiceNumber(), "MANUAL", lines);
 
-            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
-            accountingFacade.postJournalEntry(tenantId, created.id());
+            // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
+            JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("recruitmentagency", "invoice-issued", invoice.getId()), req);
             log.info("Posted revenue journal for recruitment agency invoice={} tenant={}",
                     invoice.getInvoiceNumber(), tenantId);
         } catch (Exception e) {

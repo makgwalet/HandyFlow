@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
+import za.co.handyflow.platform.accounting.application.PostingKeys;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.accounting.domain.repository.AccAccountRepository;
@@ -95,8 +96,8 @@ class InvoicingAccountingEventHandler {
                     LocalDate.now(), "Invoice issued: " + event.invoiceNumber(),
                     event.invoiceNumber(), "MANUAL", lines);
 
-            JournalEntryResponse created = accountingService.createJournalEntry(event.tenantId(), req, null);
-            accountingService.postJournalEntry(event.tenantId(), created.id());
+            // Finance patch F3: once per invoice, so a redelivered event cannot post the invoice twice.
+            accountingService.postOnce(event.tenantId(), PostingKeys.of("invoicing", "invoice-issued", event.invoiceId()), req);
             log.info("[Accounting] Posted issuance journal for invoice={} tenant={}", event.invoiceNumber(), event.tenantId());
         } catch (Exception e) {
             // Same principle as every other cross-module side-effect hookup
@@ -147,8 +148,14 @@ class InvoicingAccountingEventHandler {
                     LocalDate.now(), "Payment received: " + event.invoiceNumber(),
                     event.invoiceNumber(), "PAYMENT", lines);
 
-            JournalEntryResponse created = accountingService.createJournalEntry(event.tenantId(), req, null);
-            accountingService.postJournalEntry(event.tenantId(), created.id());
+            // Finance patch F3: once per payment. Events stored before F3 carry no payment id and post as before.
+            if (event.paymentEventId() != null) {
+                accountingService.postOnce(event.tenantId(),
+                        PostingKeys.of("invoicing", "payment-received", event.paymentEventId()), req);
+            } else {
+                JournalEntryResponse created = accountingService.createJournalEntry(event.tenantId(), req, null);
+                accountingService.postJournalEntry(event.tenantId(), created.id());
+            }
             log.info("[Accounting] Posted payment journal for invoice={} tenant={}", event.invoiceNumber(), event.tenantId());
         } catch (Exception e) {
             log.error("[Accounting] Failed to post payment journal for invoice={} tenant={}: {}",
@@ -198,8 +205,8 @@ class InvoicingAccountingEventHandler {
                     LocalDate.now(), "Credit note issued: " + ref,
                     event.creditNoteNumber(), "INVOICE", lines);
 
-            JournalEntryResponse created = accountingService.createJournalEntry(event.tenantId(), req, null);
-            accountingService.postJournalEntry(event.tenantId(), created.id());
+            // Finance patch F3: once per credit note.
+            accountingService.postOnce(event.tenantId(), PostingKeys.of("invoicing", "credit-note-issued", event.creditNoteId()), req);
             log.info("[Accounting] Posted credit note journal for credit note={} tenant={}", event.creditNoteNumber(), event.tenantId());
         } catch (Exception e) {
             log.error("[Accounting] Failed to post credit note journal for credit note={} tenant={}: {}",

@@ -30,12 +30,16 @@ public record InvoicePaymentRecordedEvent(
         String invoiceNumber,
         BigDecimal amountPaid,
         UUID bankAccountId,
-        Instant occurredOn
+        Instant occurredOn,
+        // Finance patch F3: this payment's own id, made once when the payment is recorded and kept with the stored
+        // event, so a redelivered event posts once. An invoice can take several payments, so the invoice id is not
+        // enough. Null on events stored before F3.
+        UUID paymentEventId
 ) implements DomainEvent {
 
     public static InvoicePaymentRecordedEvent of(TenantId tenantId, UUID invoiceId, String invoiceNumber,
                                                  BigDecimal amountPaid, UUID bankAccountId) {
         return new InvoicePaymentRecordedEvent(tenantId, invoiceId, invoiceNumber,
-                amountPaid, bankAccountId, Instant.now());
+                amountPaid, bankAccountId, Instant.now(), UUID.randomUUID());
     }
 }

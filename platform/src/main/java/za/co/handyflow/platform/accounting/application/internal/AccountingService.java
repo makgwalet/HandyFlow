@@ -107,6 +107,11 @@ public class AccountingService {
     public JournalEntryResponse createJournalEntry(TenantId tenantId,
                                                    CreateJournalEntryRequest req,
                                                    UUID createdBy) {
+        return createJournalEntry(tenantId, req, createdBy, null);
+    }
+
+    private JournalEntryResponse createJournalEntry(TenantId tenantId, CreateJournalEntryRequest req,
+                                                    UUID createdBy, String sourceKey) {
         coaSeeder.seedForTenant(tenantId);
 
         if (req.lines() == null || req.lines().size() < 2)
@@ -144,6 +149,7 @@ public class AccountingService {
         AccJournalEntry entry = AccJournalEntry.create(
                 tenantId, entryNumber, req.entryDate(),
                 req.description(), req.reference(), req.entryType(), createdBy);
+        if (sourceKey != null) entry.markSource(sourceKey);
         journalRepo.save(entry);
 
         int i = 0;
@@ -183,6 +189,32 @@ public class AccountingService {
             throw new HandyFlowException(
                     "This journal was made by a person — a different person must post it from Journal Entries",
                     HttpStatus.CONFLICT, "NEEDS_REVIEW");
+        return doPost(tenantId, entry, null);
+    }
+
+    /**
+     * Posts the journal for one business event exactly once (finance patch F3). When a live journal already exists for
+     * {@code sourceKey} (see PostingKeys) it is returned and nothing new is posted, so a redelivered event, a retried
+     * approval or a second payment run cannot post the same thing twice. A journal that was reversed no longer counts.
+     * The database's unique index on the key is the backstop if two posts race.
+     */
+    @Transactional
+    public JournalEntryResponse postOnce(TenantId tenantId, String sourceKey, CreateJournalEntryRequest req) {
+        String key = za.co.handyflow.platform.accounting.application.PostingKeys.check(sourceKey);
+        AccJournalEntry existing = journalRepo.findLiveBySourceKey(tenantId, key).orElse(null);
+        if (existing != null) {
+            if ("DRAFT".equals(existing.getStatus())) {
+                log.info("Posting the waiting draft={} for source={} tenant={}", existing.getEntryNumber(), key, tenantId);
+                return doPost(tenantId, existing, null);
+            }
+            log.info("Already posted source={} as entry={} tenant={} — not posted again", key, existing.getEntryNumber(), tenantId);
+            Map<UUID, AccAccount> accountMap = accountRepo.findAllActive(tenantId)
+                    .stream().collect(Collectors.toMap(AccAccount::getId, a -> a));
+            return toJournalResponse(existing, accountMap);
+        }
+        JournalEntryResponse created = createJournalEntry(tenantId, req, null, key);
+        AccJournalEntry entry = journalRepo.findActiveById(tenantId, created.id())
+                .orElseThrow(() -> new ResourceNotFoundException("JournalEntry", created.id().toString()));
         return doPost(tenantId, entry, null);
     }
 

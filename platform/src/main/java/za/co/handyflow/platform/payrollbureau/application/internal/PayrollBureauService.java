@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.application.PostingKeys;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.payrollbureau.domain.model.*;
@@ -457,8 +458,8 @@ public class PayrollBureauService {
                     LocalDate.now(), "Payroll bureau fee note: " + feeNote.getInvoiceNumber(),
                     feeNote.getInvoiceNumber(), "MANUAL", lines);
 
-            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
-            accountingFacade.postJournalEntry(tenantId, created.id());
+            // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
+            JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("payrollbureau", "fee-note-issued", feeNote.getId()), req);
             log.info("Posted revenue journal for fee note={} tenant={}", feeNote.getInvoiceNumber(), tenantId);
         } catch (Exception e) {
             log.error("Failed to post revenue journal for feeNote={} tenant={}: {}",

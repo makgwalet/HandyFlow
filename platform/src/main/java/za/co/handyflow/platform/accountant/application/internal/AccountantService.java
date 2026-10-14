@@ -13,6 +13,7 @@ import za.co.handyflow.platform.accountant.domain.model.*;
 import za.co.handyflow.platform.accountant.domain.repository.*;
 import za.co.handyflow.platform.accountant.dto.*;
 import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.application.PostingKeys;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.shared.EmailService;
@@ -955,8 +956,8 @@ public class AccountantService {
                     java.time.LocalDate.now(), "Accountant fee note: " + feeNote.getInvoiceNumber(),
                     feeNote.getInvoiceNumber(), "MANUAL", lines);
 
-            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
-            accountingFacade.postJournalEntry(tenantId, created.id());
+            // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
+            JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("accountant", "fee-note-issued", feeNote.getId()), req);
             log.info("Posted revenue journal for fee note={} tenant={}", feeNote.getInvoiceNumber(), tenantId);
         } catch (Exception e) {
             log.error("Failed to post revenue journal for feeNote={} tenant={}: {}",

@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.application.PostingKeys;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.bookingagency.domain.model.*;
@@ -431,8 +432,8 @@ public class BookingAgencyService {
                     java.time.LocalDate.now(), "Booking agency invoice: " + invoice.getInvoiceNumber(),
                     invoice.getInvoiceNumber(), "MANUAL", lines);
 
-            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
-            accountingFacade.postJournalEntry(tenantId, created.id());
+            // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
+            JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("bookingagency", "invoice-issued", invoice.getId()), req);
             log.info("Posted revenue journal for booking agency invoice={} tenant={}",
                     invoice.getInvoiceNumber(), tenantId);
         } catch (Exception e) {

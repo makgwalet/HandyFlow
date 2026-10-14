@@ -62,6 +62,15 @@ public class AccountingFacade {
     }
 
     /**
+     * Creates and posts the journal for one business event, once (finance patch F3). Build the key with
+     * {@link PostingKeys#of}. If the event was already posted, the existing journal is returned and nothing is posted.
+     * Prefer this to createJournalEntry + postJournalEntry for anything that posts because something happened.
+     */
+    public JournalEntryResponse postOnce(TenantId tenantId, String sourceKey, CreateJournalEntryRequest req) {
+        return accountingService.postOnce(tenantId, sourceKey, req);
+    }
+
+    /**
      * Posts a DRAFT journal entry — locks it, makes it real. Throws
      * IllegalStateException if the entry isn't currently DRAFT (e.g.
      * already posted).

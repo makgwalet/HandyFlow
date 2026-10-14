@@ -21,6 +21,7 @@ import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
 import za.co.handyflow.platform.notifications.application.internal.NotificationService;
 import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.application.PostingKeys;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.approvals.application.ApprovalFacade;
@@ -770,8 +771,9 @@ public class ApService {
                 "AP bill approved: " + bill.getBillNumber() + " — " + bill.getSupplierName(),
                 bill.getBillNumber(), "MANUAL", lines);
 
-        JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
-        JournalEntryResponse posted  = accountingFacade.postJournalEntry(tenantId, created.id());
+        // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
+        JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("ap", "bill-approved", bill.getId()), req);
+        JournalEntryResponse posted  = created;
         return posted.id();
     }
 
@@ -805,8 +807,9 @@ public class ApService {
                 LocalDate.now(), "Payment: " + bill.getBillNumber() + " ref:" + ref,
                 ref, "PAYMENT", lines);
 
-        JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
-        JournalEntryResponse posted  = accountingFacade.postJournalEntry(tenantId, created.id());
+        // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
+        JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("ap", "bill-paid", bill.getId()), req);
+        JournalEntryResponse posted  = created;
         return posted.id();
     }
 
