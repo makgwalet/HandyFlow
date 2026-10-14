@@ -13,6 +13,8 @@ import {
 } from "lucide-react"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { EXPENSES_SECTIONS } from "../../navigation/moduleSections"
+import ExpensePoliciesTab from "./ExpensePoliciesTab"
+import ReimbursementBatchesTab from "./ReimbursementBatchesTab"
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Claim {
@@ -27,6 +29,8 @@ interface Claim {
   // Finance patch F7
   submittedBy?: string | null; submittedAt?: string | null; submissionCount?: number
   reimbursementReference?: string | null; reimbursementJournalId?: string | null
+  // Finance patch F18
+  policyFlags?: string[]
 }
 interface BankAccount { id: string; bankName: string; accountName: string; accountNumber?: string | null; active?: boolean; accountId?: string | null }
 interface Employee { id: string; fullName: string }
@@ -504,6 +508,8 @@ export function ExpensesPage() {
               )}
             </>
           )
+          case "policies": return <ExpensePoliciesTab />
+          case "batches":  return <ReimbursementBatchesTab />
           default: return null
         }
       }}>
@@ -560,6 +566,13 @@ export function ExpensesPage() {
               <div style={{ marginBottom: 16, padding: "12px 14px", background: "var(--hf-warning-soft)", borderRadius: 9, border: "1px solid var(--hf-warning-border)" }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-warning-text)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Notes</div>
                 <div style={{ fontSize: 13, color: "var(--hf-text-secondary)" }}>{selected.notes}</div>
+              </div>
+            )}
+
+            {(selected.policyFlags ?? []).length > 0 && (
+              <div role="status" style={{ marginBottom: 16, padding: "12px 14px", background: "var(--hf-warning-soft)", borderRadius: 9, border: "1px solid var(--hf-warning-border)" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-warning-text)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Check before approving</div>
+                {selected.policyFlags!.map((t, i) => <div key={i} style={{ fontSize: 13, color: "var(--hf-text-secondary)" }}>{t}</div>)}
               </div>
             )}
 

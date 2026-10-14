@@ -786,7 +786,17 @@ export const EXPENSES_SECTIONS: ModuleSections = {
   title: 'Expenses',
   icon: Wallet,
   defaultSection: 'claims',
-  groups: [{ label: 'Overview', sections: [{ id: 'claims', label: 'Claims', icon: Receipt }] }],
+  groups: [
+    { label: 'Overview', sections: [{ id: 'claims', label: 'Claims', icon: Receipt }] },
+    {
+      label: 'Control',
+      sections: [
+        // Finance patch F18: limits and receipt rules; paying claims out in batches.
+        { id: 'policies', label: 'Policies', icon: ListChecks, permission: 'USER_CREATE' },
+        { id: 'batches', label: 'Payouts', icon: Wallet, permission: 'EXPENSES_READ' },
+      ],
+    },
+  ],
 }
 
 export const POS_SECTIONS: ModuleSections = {

@@ -30,5 +30,7 @@ public record ExpenseClaimResponse(
         Instant cancelledAt,
         UUID reimbursedBy,
         String reimbursementReference,
-        UUID reimbursementJournalId
+        UUID reimbursementJournalId,
+        // Finance patch F18: what the policy and duplicate checks raised, for the approver
+        java.util.List<String> policyFlags
 ) {}

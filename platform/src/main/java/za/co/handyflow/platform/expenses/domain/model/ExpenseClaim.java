@@ -45,6 +45,8 @@ public class ExpenseClaim {
     @Column(name = "reimbursement_bank_account_id") UUID reimbursementBankAccountId;
     @Column(name = "reimbursement_reference")       String reimbursementReference;
     @Column(name = "reimbursement_journal_id")      UUID reimbursementJournalId;
+    // Finance patch F18: what the policy and duplicate checks raised at the last submission, one per line.
+    @Column(name = "policy_flags")                  String policyFlags;
 
     public static ExpenseClaim create(TenantId tenantId, String claimNumber,
                                       UUID employeeId, UUID submittedBy,
@@ -141,6 +143,11 @@ public class ExpenseClaim {
         this.reimbursementReference     = reference;
         this.reimbursementJournalId     = journalId;
         this.updatedAt                  = this.reimbursedAt;
+    }
+
+    /** Keeps what the policy checks raised, for the approver to see (finance patch F18). */
+    public void recordPolicyFlags(String flags) {
+        this.policyFlags = flags == null || flags.isBlank() ? null : flags;
     }
 
     public void linkJournalEntry(UUID journalEntryId) {

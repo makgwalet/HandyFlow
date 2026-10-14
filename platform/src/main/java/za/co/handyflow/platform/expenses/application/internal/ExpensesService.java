@@ -50,6 +50,8 @@ public class ExpensesService {
     // Finance patch F7: claims go through the approval engine (platform default: one EXPENSES_MANAGE approver).
     private final ApprovalFacade approvalFacade;
     private final za.co.handyflow.platform.accounting.application.AccountingFacade accountingFacade;
+    // Finance patch F18: limits, receipt rules and duplicate checks at submission.
+    private final ExpensePolicyService policyService;
 
     private static final String MODULE = "expenses", ENTITY = "CLAIM";
 
@@ -158,6 +160,12 @@ public class ExpensesService {
         String incomplete = ExpenseLifecycle.submitProblem(claim.getEmployeeName(), claim.getClaimDate(),
                 claim.getCategory(), claim.getDescription(), claim.getAmount(), LocalDate.now());
         if (incomplete != null) throw new HandyFlowException(incomplete, HttpStatus.BAD_REQUEST, "CLAIM_INCOMPLETE");
+        // Finance patch F18: a claim that breaks a blocking rule is not sent; warnings travel with it to the approver.
+        var findings = policyService.evaluate(tenantId, claim);
+        if (ExpensePolicyRules.blocked(findings)) {
+            throw new HandyFlowException(ExpensePolicyRules.blockText(findings), HttpStatus.BAD_REQUEST, "CLAIM_BREAKS_POLICY");
+        }
+        claim.recordPolicyFlags(String.join("\n", findings.stream().map(ExpensePolicyRules.Finding::text).toList()));
         boolean resubmission = "REJECTED".equals(claim.getStatus());
         claim.submit();
         claimRepo.save(claim);
@@ -411,7 +419,8 @@ public class ExpensesService {
                 c.getJournalEntryId(), c.getNotes(), c.getApprovedAt(),
                 c.getReimbursedAt(), c.getCreatedAt(),
                 c.getSubmittedBy(), c.getSubmittedAt(), c.getSubmissionCount(), c.getCancelledAt(),
-                c.getReimbursedBy(), c.getReimbursementReference(), c.getReimbursementJournalId());
+                c.getReimbursedBy(), c.getReimbursementReference(), c.getReimbursementJournalId(),
+                c.getPolicyFlags() == null ? List.of() : List.of(c.getPolicyFlags().split("\n")));
     }
 
     // NEW (Tier 1 gap analysis): no explicit approver field exists on
