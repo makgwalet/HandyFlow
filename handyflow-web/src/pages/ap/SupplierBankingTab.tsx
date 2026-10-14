@@ -2,12 +2,15 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, X, Landmark, Edit3, Trash2, AlertTriangle } from "lucide-react"
+import { usePermission } from "../../hooks/usePermission"
+import { Plus, X, Landmark, Edit3, Trash2, AlertTriangle, ShieldCheck } from "lucide-react"
 
 interface Banking {
   id: string; supplierName: string; bankName: string | null
   accountHolder: string | null; accountNumber: string; branchCode: string
   vatNumber: string | null; notes: string | null; createdAt: string
+  // Finance patch F6: changed bank details wait for a second person's check before money is paid to them.
+  verified?: boolean; changedAt?: string | null; verifiedAt?: string | null; verificationNote?: string | null
 }
 
 const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "var(--hf-surface)", outline: "none" }
@@ -20,6 +23,8 @@ export function SupplierBankingTab() {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Banking | null>(null)
   const [error, setError] = useState("")
+  const [listError, setListError] = useState("")
+  const canEdit = usePermission("AP_SUPPLIER_BANKING")
 
   const initForm = () => ({ supplierName: "", bankName: "", accountHolder: "", accountNumber: "", branchCode: "", vatNumber: "", notes: "" })
   const [form, setForm] = useState(initForm())
@@ -57,8 +62,21 @@ export function SupplierBankingTab() {
 
   const remove = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/api/v1/ap/suppliers/banking/${id}`),
-    onSuccess: invalidate,
+    onSuccess: () => { setListError(""); invalidate() },
+    onError: (e: any) => setListError(e.response?.data?.message || "Could not remove the bank details"),
   })
+
+  const verify = useMutation({
+    mutationFn: (id: string) => apiClient.post(`/api/v1/ap/suppliers/banking/${id}/verify`, {}),
+    onSuccess: () => { setListError(""); invalidate() },
+    onError: (e: any) => setListError(e.response?.data?.message || "Could not mark the bank details as checked"),
+  })
+  const askVerify = (b: Banking) => {
+    if (window.confirm(`Check ${b.supplierName}'s bank details: account ${b.accountNumber}, branch ${b.branchCode}.\n\n`
+      + "Confirm them with the supplier on a phone number you already had, not one from the email or letter that sent the change. Mark as checked?")) {
+      verify.mutate(b.id)
+    }
+  }
 
   const startEdit = (b: Banking) => {
     setEditing(b)
@@ -79,8 +97,12 @@ export function SupplierBankingTab() {
             Matched to bills by supplier name — used to fill in account number and branch code when exporting an EFT batch CSV
           </p>
         </div>
-        <button onClick={() => { setEditing(null); setForm(initForm()); setShowForm(true); setError("") }} style={btnP}><Plus size={14} /> Add Supplier</button>
+        {canEdit && <button onClick={() => { setEditing(null); setForm(initForm()); setShowForm(true); setError("") }} style={btnP}><Plus size={14} /> Add Supplier</button>}
       </div>
+
+      {listError && (
+        <div role="alert" style={{ padding: "10px 14px", marginBottom: 16, background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{listError}</div>
+      )}
 
       {unconfiguredNames.length > 0 && (
         <div style={{ padding: "12px 16px", background: "var(--hf-warning-soft)", border: "1.5px solid var(--hf-warning-border)", borderRadius: 10, marginBottom: 16, display: "flex", gap: 10, alignItems: "flex-start" }}>
@@ -107,7 +129,7 @@ export function SupplierBankingTab() {
           <table style={{ width: "100%", borderCollapse: "collapse" as const, fontSize: 13 }}>
             <thead>
               <tr style={{ background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border)" }}>
-                {["Supplier", "Bank", "Account Number", "Branch Code", "VAT Number", ""].map(h => (
+                {["Supplier", "Bank", "Account Number", "Branch Code", "VAT Number", "Checked", ""].map(h => (
                   <th key={h} style={{ padding: "10px 16px", textAlign: "left" as const, fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", letterSpacing: "0.05em" }}>{h}</th>
                 ))}
               </tr>
@@ -123,11 +145,26 @@ export function SupplierBankingTab() {
                   <td style={{ padding: "12px 16px", fontFamily: "monospace", fontSize: 12, color: "var(--hf-text-secondary)" }}>{b.accountNumber}</td>
                   <td style={{ padding: "12px 16px", fontFamily: "monospace", fontSize: 12, color: "var(--hf-text-secondary)" }}>{b.branchCode}</td>
                   <td style={{ padding: "12px 16px", fontSize: 12, color: "var(--hf-text-muted)" }}>{b.vatNumber || "—"}</td>
+                  <td style={{ padding: "12px 16px", fontSize: 12 }}>
+                    {b.verified === false ? (
+                      <span style={{ color: "var(--hf-warning-text-deep)", fontWeight: 700 }}>Waiting for a second person</span>
+                    ) : (
+                      <span title={b.verificationNote ?? undefined} style={{ color: "var(--hf-success-text-strong)", fontWeight: 600 }}>Checked</span>
+                    )}
+                  </td>
                   <td style={{ padding: "12px 16px" }}>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button onClick={() => startEdit(b)} title="Edit" style={{ padding: "5px 8px", background: "var(--hf-surface-muted)", color: "var(--hf-text-muted)", border: "1px solid var(--hf-border)", borderRadius: 6, cursor: "pointer", display: "flex" }}><Edit3 size={11} /></button>
-                      <button onClick={() => remove.mutate(b.id)} title="Remove" style={{ padding: "5px 8px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, cursor: "pointer", display: "flex" }}><Trash2 size={11} /></button>
-                    </div>
+                    {canEdit && (
+                      <div style={{ display: "flex", gap: 6 }}>
+                        {b.verified === false && (
+                          <button onClick={() => askVerify(b)} disabled={verify.isPending} aria-label={`Mark ${b.supplierName}'s bank details as checked`}
+                            style={{ padding: "5px 9px", background: "var(--hf-success-soft)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border-subtle)", borderRadius: 6, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700 }}>
+                            <ShieldCheck size={11} aria-hidden="true" /> Check
+                          </button>
+                        )}
+                        <button onClick={() => startEdit(b)} title="Edit" aria-label={`Edit ${b.supplierName}`} style={{ padding: "5px 8px", background: "var(--hf-surface-muted)", color: "var(--hf-text-muted)", border: "1px solid var(--hf-border)", borderRadius: 6, cursor: "pointer", display: "flex" }}><Edit3 size={11} /></button>
+                        <button onClick={() => remove.mutate(b.id)} title="Remove" aria-label={`Remove ${b.supplierName}`} style={{ padding: "5px 8px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, cursor: "pointer", display: "flex" }}><Trash2 size={11} /></button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

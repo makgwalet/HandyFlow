@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { usePermission } from "../../hooks/usePermission"
 import {
   Plus, X, CheckCircle, XCircle, AlertTriangle,
   Download, Upload, FileText, ChevronDown, ChevronUp,
@@ -73,6 +74,10 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
   const [showCreate,  setShowCreate]  = useState(false)
   const [showSubmit,  setShowSubmit]  = useState(false)
   const [showConfirmPaid, setShowConfirmPaid] = useState(false)
+  // Finance patch F6: releasing a batch and confirming it paid need AP_PAY; the server refuses your own batch and
+  // unchecked supplier bank details.
+  const canPay = usePermission("AP_PAY")
+  const [listError, setListError] = useState("")
   const [showCancel,  setShowCancel]  = useState(false)
   const [showPopUpload, setShowPopUpload] = useState(false)
   const [payRef,   setPayRef]   = useState("")
@@ -147,13 +152,13 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
   const submitBatch = useMutation({
     mutationFn: () => apiClient.post(`/api/v1/ap/batches/${selectedBatch?.id}/submit`),
     onSuccess: async () => { await loadBatchDetail(selectedBatch!); invalidate(); setShowSubmit(false) },
-    onError: (e: any) => setError(e.response?.data?.message || "Failed to submit"),
+    onError: (e: any) => { setShowSubmit(false); setListError(e.response?.data?.message || "Failed to submit") },
   })
 
   const confirmPaid = useMutation({
     mutationFn: () => apiClient.post(`/api/v1/ap/batches/${selectedBatch?.id}/confirm-paid`, { paymentRef: payRef || null }),
     onSuccess: async () => { await loadBatchDetail(selectedBatch!); invalidate(); setShowConfirmPaid(false); setPayRef("") },
-    onError: (e: any) => setError(e.response?.data?.message || "Failed to confirm"),
+    onError: (e: any) => { setShowConfirmPaid(false); setListError(e.response?.data?.message || "Failed to confirm") },
   })
 
   const cancelBatch = useMutation({
@@ -168,10 +173,18 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
   })
 
   const exportBatch = async (batchId: string, batchNumber: string) => {
-    const r = await apiClient.get(`/api/v1/ap/batches/${batchId}/export`, { responseType: "blob" })
-    const a = document.createElement("a")
-    a.href = URL.createObjectURL(r.data)
-    a.download = `eft-${batchNumber}.csv`; a.click()
+    try {
+      const r = await apiClient.get(`/api/v1/ap/batches/${batchId}/export`, { responseType: "blob" })
+      const a = document.createElement("a")
+      a.href = URL.createObjectURL(r.data)
+      a.download = `eft-${batchNumber}.csv`; a.click()
+      setListError("")
+    } catch (e: any) {
+      // A refused export comes back as a blob; read the server's reason out of it.
+      let message = "The bank file could not be made"
+      try { const text = await e?.response?.data?.text?.(); if (text) message = JSON.parse(text).message || message } catch { /* keep the default */ }
+      setListError(message)
+    }
   }
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -193,6 +206,9 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
 
   return (
     <div>
+      {listError && (
+        <div role="alert" style={{ marginBottom: 14, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{listError}</div>
+      )}
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
@@ -242,14 +258,14 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
                       <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{fmtDate(batch.createdAt)}</div>
                     </div>
                     <div style={{ display: "flex", gap: 6 }}>
-                      {batch.status === "DRAFT" && (
-                        <button onClick={e => { e.stopPropagation(); loadBatchDetail(batch).then(() => setShowSubmit(true)) }}
+                      {canPay && batch.status === "DRAFT" && (
+                        <button onClick={e => { e.stopPropagation(); setListError(""); loadBatchDetail(batch).then(() => setShowSubmit(true)) }}
                           style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 11px", background: "var(--hf-warning-soft)", color: "var(--hf-warning-text)", border: "1px solid var(--hf-warning-border)", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
                           <Send size={10} /> Submit
                         </button>
                       )}
-                      {batch.status === "SUBMITTED" && (
-                        <button onClick={e => { e.stopPropagation(); loadBatchDetail(batch).then(() => setShowConfirmPaid(true)) }}
+                      {canPay && batch.status === "SUBMITTED" && (
+                        <button onClick={e => { e.stopPropagation(); setListError(""); loadBatchDetail(batch).then(() => setShowConfirmPaid(true)) }}
                           style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 11px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
                           <CheckCircle size={10} /> Confirm paid
                         </button>

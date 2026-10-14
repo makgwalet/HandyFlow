@@ -39,6 +39,12 @@ public class ApSupplierBanking {
     @Column(name = "created_by") private UUID createdBy;
     @Column(name = "created_at") private Instant createdAt;
     @Column(name = "updated_at") private Instant updatedAt;
+    // Finance patch F6: changed bank details must be checked by a second person before money is paid to them.
+    @Column(name = "changed_by")        private UUID    changedBy;
+    @Column(name = "changed_at")        private Instant changedAt;
+    @Column(name = "verified_by")       private UUID    verifiedBy;
+    @Column(name = "verified_at")       private Instant verifiedAt;
+    @Column(name = "verification_note") private String  verificationNote;
 
     public static ApSupplierBanking create(TenantId tenantId, String supplierName,
                                            String bankName, String accountHolder,
@@ -57,11 +63,17 @@ public class ApSupplierBanking {
         b.createdBy      = createdBy;
         b.createdAt      = Instant.now();
         b.updatedAt      = Instant.now();
+        b.changedBy      = createdBy;
+        b.changedAt      = b.createdAt;
         return b;
     }
 
-    public void update(String bankName, String accountHolder, String accountNumber,
-                       String branchCode, String vatNumber, String email, String notes) {
+    /** True when money would now go somewhere different; the details then wait for a second person's check. */
+    public boolean update(String bankName, String accountHolder, String accountNumber,
+                          String branchCode, String vatNumber, String email, String notes, UUID changedBy) {
+        boolean moneyChanges = za.co.handyflow.platform.ap.application.internal.ApDutyRules.bankingChanged(
+                this.bankName, this.accountHolder, this.accountNumber, this.branchCode,
+                bankName, accountHolder, accountNumber, branchCode);
         this.bankName      = bankName;
         this.accountHolder = accountHolder;
         this.accountNumber = accountNumber;
@@ -70,5 +82,23 @@ public class ApSupplierBanking {
         this.email         = email;
         this.notes         = notes;
         this.updatedAt     = Instant.now();
+        if (moneyChanges) {
+            this.changedBy        = changedBy;
+            this.changedAt        = this.updatedAt;
+            this.verifiedBy       = null;
+            this.verifiedAt       = null;
+            this.verificationNote = null;
+        }
+        return moneyChanges;
+    }
+
+    public boolean isVerified() { return verifiedAt != null; }
+
+    public void verify(UUID by, String note) {
+        if (verifiedAt != null) throw new IllegalStateException("These bank details are already checked");
+        this.verifiedBy       = by;
+        this.verifiedAt       = Instant.now();
+        this.verificationNote = note;
+        this.updatedAt        = this.verifiedAt;
     }
 }

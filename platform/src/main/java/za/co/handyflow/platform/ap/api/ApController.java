@@ -101,7 +101,7 @@ public class ApController {
     }
 
     @PostMapping("/bills/{id}/approve")
-    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
+    @PreAuthorize("hasAuthority('AP_APPROVE')")
     @Operation(summary = "Approve a bill — posts accounting journal entry (debit expense, credit AP). "
             + "Bills above the second-approval threshold require two approvals from different people: "
             + "the first moves status to SECOND_APPROVAL with no journal posted yet; the second "
@@ -113,7 +113,7 @@ public class ApController {
     }
 
     @PostMapping("/bills/{id}/pay")
-    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
+    @PreAuthorize("hasAuthority('AP_PAY')")
     @Operation(summary = "Mark bill as paid directly — posts payment journal entry")
     public ResponseEntity<ApiResponse<BillResponse>> payBill(
             @PathVariable UUID id,
@@ -227,7 +227,7 @@ public class ApController {
     }
 
     @PostMapping("/suppliers/banking")
-    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
+    @PreAuthorize("hasAuthority('AP_SUPPLIER_BANKING')")
     @Operation(summary = "Add banking details for a supplier, matched by name to bills — fixes the EFT CSV export, which previously always exported blank account/branch columns")
     public ResponseEntity<ApiResponse<SupplierBankingResponse>> createSupplierBanking(
             @Valid @RequestBody SupplierBankingRequest req) {
@@ -237,16 +237,29 @@ public class ApController {
     }
 
     @PutMapping("/suppliers/banking/{id}")
-    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
+    @PreAuthorize("hasAuthority('AP_SUPPLIER_BANKING')")
     @Operation(summary = "Update a supplier's banking details")
     public ResponseEntity<ApiResponse<SupplierBankingResponse>> updateSupplierBanking(
             @PathVariable UUID id, @Valid @RequestBody SupplierBankingRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Supplier banking details updated",
-                supplierBankingService.update(TenantContext.getTenantIdAsObject(), id, req)));
+                supplierBankingService.update(TenantContext.getTenantIdAsObject(), id, req,
+                        TenantContext.getCurrentUserId())));
     }
 
+    @PostMapping("/suppliers/banking/{id}/verify")
+    @PreAuthorize("hasAuthority('AP_SUPPLIER_BANKING')")
+    @Operation(summary = "Confirm a supplier's bank details as a second person (finance patch F6). Not by whoever entered them, unless nobody else can.")
+    public ResponseEntity<ApiResponse<SupplierBankingResponse>> verifySupplierBanking(
+            @PathVariable UUID id, @RequestBody(required = false) VerifyBankingRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Bank details checked",
+                supplierBankingService.verify(TenantContext.getTenantIdAsObject(), id,
+                        TenantContext.getCurrentUserId(), req != null ? req.note() : null)));
+    }
+
+    public record VerifyBankingRequest(String note) {}
+
     @DeleteMapping("/suppliers/banking/{id}")
-    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
+    @PreAuthorize("hasAuthority('AP_SUPPLIER_BANKING')")
     @Operation(summary = "Remove a supplier's banking details")
     public ResponseEntity<ApiResponse<Void>> deleteSupplierBanking(@PathVariable UUID id) {
         supplierBankingService.delete(TenantContext.getTenantIdAsObject(), id);
@@ -348,15 +361,15 @@ public class ApController {
     }
 
     @PostMapping("/batches/{id}/submit")
-    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
-    @Operation(summary = "Mark batch as submitted to bank")
+    @PreAuthorize("hasAuthority('AP_PAY')")
+    @Operation(summary = "Release the batch to the bank. Not by whoever made the batch; refused while any supplier's bank details wait for a second person's check.")
     public ResponseEntity<ApiResponse<BatchResponse>> submitBatch(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Batch submitted",
-                apService.submitBatch(TenantContext.getTenantIdAsObject(), id)));
+                apService.submitBatch(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/batches/{id}/confirm-paid")
-    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
+    @PreAuthorize("hasAuthority('AP_PAY')")
     @Operation(summary = "Confirm batch payment received — marks all bills paid, posts journal entries")
     public ResponseEntity<ApiResponse<BatchResponse>> confirmBatchPaid(
             @PathVariable UUID id,

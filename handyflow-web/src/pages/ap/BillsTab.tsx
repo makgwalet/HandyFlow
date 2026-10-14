@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { usePermission } from "../../hooks/usePermission"
 import { Plus, X, CheckCircle, XCircle, Search, Download, FileText, Upload, AlertTriangle, ChevronRight, DollarSign, Edit3, Paperclip, Loader2, Mail } from "lucide-react"
 interface Bill {
   id: string; supplierId: string | null; supplierName: string
@@ -79,6 +80,9 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
   const [showCreate, setShowCreate] = useState(false)
   const [showEdit,   setShowEdit]   = useState(false)
   const [showApprove, setShowApprove] = useState(false)
+  // Finance patch F6: approving and paying are separate permissions; the server also refuses your own bill.
+  const canApprove = usePermission("AP_APPROVE")
+  const canPay = usePermission("AP_PAY")
   const [showCancel,  setShowCancel]  = useState(false)
   const [showPayModal, setShowPayModal] = useState(false)
   const [showPopUpload, setShowPopUpload] = useState(false)
@@ -316,13 +320,13 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
                     </td>
                     <td style={{ padding: "12px 16px" }}>
                       <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                        {["DRAFT","SECOND_APPROVAL"].includes(b.status) && (
+                        {canApprove && ["DRAFT","SECOND_APPROVAL"].includes(b.status) && (
                           <button onClick={e => { e.stopPropagation(); setSelected(b); setShowApprove(true) }}
                             style={{ padding: "4px 10px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}>
                             <CheckCircle size={10} /> {b.status === "SECOND_APPROVAL" ? "Approve (2nd)" : "Approve"}
                           </button>
                         )}
-                        {["APPROVED","OVERDUE"].includes(b.status) && !b.batchId && (
+                        {canPay && ["APPROVED","OVERDUE"].includes(b.status) && !b.batchId && (
                           <button onClick={e => { e.stopPropagation(); setSelected(b); setShowPayModal(true) }}
                             style={{ padding: "4px 10px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1px solid var(--hf-info-border)", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}>
                             <DollarSign size={10} /> Pay
@@ -448,18 +452,18 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
               {selected.status === "DRAFT" && <>
                 <button onClick={() => { setShowEdit(true); setForm({ supplierName: selected.supplierName, billNumber: selected.billNumber, billDate: selected.billDate, dueDate: selected.dueDate, category: selected.category, description: selected.description, amount: String(selected.amount), vatAmount: String(selected.vatAmount), notes: selected.notes ?? "" }); setError("") }}
                   style={{ ...btnS, fontSize: 12, padding: "8px 12px" }}><Edit3 size={12} /> Edit</button>
-                <button onClick={() => setShowApprove(true)}
+                {canApprove && <button onClick={() => setShowApprove(true)}
                   style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                   <CheckCircle size={14} /> Approve bill
-                </button>
+                </button>}
               </>}
-              {selected.status === "SECOND_APPROVAL" && (
+              {canApprove && selected.status === "SECOND_APPROVAL" && (
                 <button onClick={() => setShowApprove(true)}
                   style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px", background: "var(--hf-violet-soft)", color: "var(--hf-violet-text)", border: "1.5px solid var(--hf-violet-border)", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                   <CheckCircle size={14} /> Give second approval
                 </button>
               )}
-              {["APPROVED","OVERDUE"].includes(selected.status) && !selected.batchId && (
+              {canPay && ["APPROVED","OVERDUE"].includes(selected.status) && !selected.batchId && (
                 <button onClick={() => setShowPayModal(true)}
                   style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1.5px solid var(--hf-info-border)", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                   <DollarSign size={14} /> Mark as paid

@@ -319,6 +319,13 @@ public class ApprovalEngineService implements ApprovalFacade {
                     HttpStatus.BAD_REQUEST, "REQUEST_ALREADY_TERMINAL");
         }
 
+        // Finance patch F6: the submitting module can name people who must not act on any step of this request (AP names
+        // the person who captured the bill), in the request metadata as "excludedActors": ["<user id>", ...].
+        if (actingUserId != null && excludedActors(request).contains(actingUserId.toString())) {
+            throw new HandyFlowException("You prepared this item, so someone else must approve it",
+                    HttpStatus.FORBIDDEN, "EXCLUDED_ACTOR");
+        }
+
         List<ApprovalStep> allSteps = stepRepo.findByApprovalRequest(request.getId());
 
         if (step.isExcludeActorOfPreviousStep()) {
@@ -503,6 +510,20 @@ public class ApprovalEngineService implements ApprovalFacade {
         } catch (Exception e) {
             log.error("[Approvals] Unparseable conditions JSON '{}': {}", conditionsJson, e.getMessage());
             return false;
+        }
+    }
+
+    /** The "excludedActors" listed in a request's metadata (finance patch F6); empty when none or unreadable. */
+    private java.util.Set<String> excludedActors(ApprovalRequest request) {
+        try {
+            if (request.getMetadata() == null || request.getMetadata().isBlank()) return java.util.Set.of();
+            JsonNode node = objectMapper.readTree(request.getMetadata()).get("excludedActors");
+            if (node == null || !node.isArray()) return java.util.Set.of();
+            java.util.Set<String> out = new java.util.HashSet<>();
+            node.forEach(n -> { if (n.isTextual()) out.add(n.asText()); });
+            return out;
+        } catch (Exception e) {
+            return java.util.Set.of();
         }
     }
 

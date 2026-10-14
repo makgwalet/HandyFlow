@@ -29,6 +29,7 @@ public class ApSupplierBankingService {
 
     private final ApSupplierBankingRepository bankingRepo;
     private final ApBillRepository            billRepo;
+    private final ApDutyChecks                duties;
 
     @Transactional(readOnly = true)
     public List<SupplierBankingResponse> getAll(TenantId tenantId) {
@@ -56,12 +57,36 @@ public class ApSupplierBankingService {
     }
 
     @Transactional
-    public SupplierBankingResponse update(TenantId tenantId, UUID id, SupplierBankingRequest req) {
+    public SupplierBankingResponse update(TenantId tenantId, UUID id, SupplierBankingRequest req, UUID changedBy) {
         ApSupplierBanking b = bankingRepo.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("SupplierBanking", id.toString()));
-        b.update(req.bankName(), req.accountHolder(), req.accountNumber(),
-                req.branchCode(), req.vatNumber(), req.email(), req.notes());
+        boolean moneyChanges = b.update(req.bankName(), req.accountHolder(), req.accountNumber(),
+                req.branchCode(), req.vatNumber(), req.email(), req.notes(), changedBy);
         bankingRepo.save(b);
+        if (moneyChanges) {
+            // Finance patch F6: the classic payment fraud is a changed account number; nothing is paid to it until checked.
+            log.warn("[AP] Bank details CHANGED for supplier={} tenant={} by={} — waiting for a second person's check",
+                    b.getSupplierName(), tenantId, changedBy);
+        }
+        return toResponse(b);
+    }
+
+    /**
+     * A second person confirms the bank details (finance patch F6), ideally after phoning the supplier on a number they
+     * already had. The person who entered them cannot, unless nobody else can.
+     */
+    @Transactional
+    public SupplierBankingResponse verify(TenantId tenantId, UUID id, UUID by, String note) {
+        ApSupplierBanking b = bankingRepo.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("SupplierBanking", id.toString()));
+        if (b.isVerified())
+            throw new HandyFlowException("These bank details are already checked", HttpStatus.CONFLICT, "ALREADY_VERIFIED");
+        duties.require(tenantId, ApDutyRules.Duty.VERIFY_OWN_BANKING, "AP_SUPPLIER_BANKING",
+                b.getChangedBy(), by, "supplier=" + b.getSupplierName());
+        String trimmed = note == null || note.isBlank() ? null : note.trim();
+        b.verify(by, trimmed != null && trimmed.length() > 200 ? trimmed.substring(0, 200) : trimmed);
+        bankingRepo.save(b);
+        log.info("[AP] Bank details checked for supplier={} tenant={} by={}", b.getSupplierName(), tenantId, by);
         return toResponse(b);
     }
 
@@ -76,6 +101,8 @@ public class ApSupplierBankingService {
     private SupplierBankingResponse toResponse(ApSupplierBanking b) {
         return new SupplierBankingResponse(b.getId(), b.getSupplierName(), b.getBankName(),
                 b.getAccountHolder(), b.getAccountNumber(), b.getBranchCode(),
-                b.getVatNumber(), b.getEmail(), b.getNotes(), b.getCreatedAt());
+                b.getVatNumber(), b.getEmail(), b.getNotes(), b.getCreatedAt(),
+                b.isVerified(), b.getChangedBy(), b.getChangedAt(), b.getVerifiedBy(), b.getVerifiedAt(),
+                b.getVerificationNote());
     }
 }

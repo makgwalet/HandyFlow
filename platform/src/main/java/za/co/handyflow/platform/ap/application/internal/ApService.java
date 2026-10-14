@@ -59,6 +59,8 @@ public class ApService {
     // FIX: backlog 1.1 — the shared approval engine. See approveBill()'s
     // own comment block below for the full migration rationale.
     private final ApprovalFacade        approvalFacade;
+    // Finance patch F6: separation of duties (preparer, approvers, payer and releaser are different people).
+    private final ApDutyChecks          duties;
 
     // ── Category → expense account code mapping ───────────────────────────────
     private static final Map<String, String> CATEGORY_ACCOUNT = Map.ofEntries(
@@ -215,6 +217,12 @@ public class ApService {
     @Transactional
     public BillResponse approveBill(TenantId tenantId, UUID id, UUID approvedBy) {
         ApBill bill = findBill(tenantId, id);
+        duties.require(tenantId, ApDutyRules.Duty.APPROVE_OWN_BILL, "AP_APPROVE", bill.getCreatedBy(), approvedBy,
+                "bill=" + bill.getBillNumber());
+        if ("SECOND_APPROVAL".equals(bill.getStatus())) {
+            duties.require(tenantId, ApDutyRules.Duty.SECOND_APPROVAL, "AP_APPROVE", bill.getFirstApprovedBy(), approvedBy,
+                    "bill=" + bill.getBillNumber());
+        }
 
         var existing = approvalFacade.getLatestRequestForEntity(tenantId, "ap", "BILL", id);
         ApprovalRequestResponse approvalResult;
@@ -226,7 +234,7 @@ public class ApService {
             bill.backToDraftForResubmission();
             billRepo.save(bill);
             approvalResult = approvalFacade.resubmit(tenantId, existing.get().id(), approvedBy,
-                    Map.of("totalAmount", bill.getTotalAmount()));
+                    approvalMetadata(tenantId, bill));
             if (isOpen(approvalResult)) {
                 ApprovalStepResponse firstStep = firstPendingStep(approvalResult)
                         .orElseThrow(() -> new IllegalStateException("A freshly-resubmitted request has no pending step"));
@@ -242,7 +250,7 @@ public class ApService {
                     currentUserAuthorities(), "APPROVE", null, null);
         } else {
             approvalResult = approvalFacade.submit(tenantId, "ap", "BILL", id, approvedBy,
-                    Map.of("totalAmount", bill.getTotalAmount()));
+                    approvalMetadata(tenantId, bill));
             // submit() only creates the steps, it doesn't act on any of
             // them — this very call is also the first approver's action,
             // so act on step 1 immediately rather than requiring a
@@ -373,6 +381,8 @@ public class ApService {
     @Transactional
     public BillResponse payBill(TenantId tenantId, UUID id, PayBillRequest req, UUID paidBy) {
         ApBill bill = findBill(tenantId, id);
+        duties.require(tenantId, ApDutyRules.Duty.PAY_OWN_BILL, "AP_PAY", bill.getCreatedBy(), paidBy,
+                "bill=" + bill.getBillNumber());
         if (!"APPROVED".equals(bill.getStatus()) && !"OVERDUE".equals(bill.getStatus())) {
             throw new HandyFlowException("Only APPROVED or OVERDUE bills can be paid",
                     HttpStatus.BAD_REQUEST, "BILL_NOT_APPROVED");
@@ -553,8 +563,13 @@ public class ApService {
     }
 
     @Transactional
-    public BatchResponse submitBatch(TenantId tenantId, UUID id) {
+    public BatchResponse submitBatch(TenantId tenantId, UUID id, UUID releasedBy) {
         ApEftBatch batch = findBatch(tenantId, id);
+        // Finance patch F6: releasing is the step that sends money; not by whoever made the batch, and never to bank
+        // details that were changed and not yet checked by a second person.
+        duties.require(tenantId, ApDutyRules.Duty.RELEASE_OWN_BATCH, "AP_PAY", batch.getCreatedBy(), releasedBy,
+                "batch=" + batch.getBatchNumber());
+        requireCheckedBanking(tenantId, id);
         batch.submit();
         batchRepo.save(batch);
 
@@ -610,6 +625,8 @@ public class ApService {
     @Transactional(readOnly = true)
     public String exportBatchCsv(TenantId tenantId, UUID id) {
         ApEftBatch batch = findBatch(tenantId, id);
+        // Finance patch F6: the bank file is what moves the money; it never carries unchecked bank details.
+        requireCheckedBanking(tenantId, id);
         List<ApBatchItem> items = batchItemRepo.findByBatchId(id);
 
         StringBuilder csv = new StringBuilder();
@@ -828,6 +845,32 @@ public class ApService {
                     "SELECT account_id FROM acc_bank_accounts WHERE id = ?",
                     UUID.class, bankAccountId);
         } catch (Exception e) { return null; }
+    }
+
+    /**
+     * What the approval engine sees for a bill. Finance patch F6: names the person who captured it in "excludedActors" so
+     * they cannot approve any step, including from the general Approvals inbox, unless nobody else can approve bills.
+     */
+    private Map<String, Object> approvalMetadata(TenantId tenantId, ApBill bill) {
+        Map<String, Object> m = new java.util.HashMap<>();
+        m.put("totalAmount", bill.getTotalAmount());
+        if (bill.getCreatedBy() != null && duties.otherHolders(tenantId, "AP_APPROVE", bill.getCreatedBy()) > 0) {
+            m.put("excludedActors", List.of(bill.getCreatedBy().toString()));
+        }
+        return m;
+    }
+
+    /** Refuses (409 BANKING_NOT_CHECKED) while any supplier in the batch has bank details waiting for a second person. */
+    private void requireCheckedBanking(TenantId tenantId, UUID batchId) {
+        List<String> waiting = batchItemRepo.findByBatchId(batchId).stream()
+                .map(item -> billRepo.findByIdAndTenantId(item.getBillId(), tenantId).orElse(null))
+                .filter(java.util.Objects::nonNull)
+                .map(ApBill::getSupplierName)
+                .filter(name -> name != null && supplierBankingRepo.findByTenantIdAndSupplierName(tenantId, name)
+                        .map(b -> !b.isVerified()).orElse(false))
+                .toList();
+        String problem = ApDutyRules.unverifiedProblem(waiting);
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.CONFLICT, "BANKING_NOT_CHECKED");
     }
 
     private String[] fetchSupplierBanking(TenantId tenantId, String supplierName) {

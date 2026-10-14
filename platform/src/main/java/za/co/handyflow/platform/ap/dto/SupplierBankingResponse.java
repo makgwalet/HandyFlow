@@ -13,5 +13,12 @@ public record SupplierBankingResponse(
         String  vatNumber,
         String  email,
         String  notes,
-        Instant createdAt
+        Instant createdAt,
+        // Finance patch F6: who last changed the details money is paid to, and who checked them.
+        boolean verified,
+        UUID    changedBy,
+        Instant changedAt,
+        UUID    verifiedBy,
+        Instant verifiedAt,
+        String  verificationNote
 ) {}
