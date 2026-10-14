@@ -45,6 +45,7 @@ class AccountingServiceEscapingTest {
     @Mock private AccVatPeriodRepository vatPeriodRepo;
     @Mock private ChartOfAccountsSeeder coaSeeder;
     @Mock private JournalNumberGenerator numberGen;
+    @Mock private PeriodLockService periodLock;
     @Mock private InvoicingFacade invoicingFacade;
     @Mock private CrmFacade crmFacade;
     @Mock private EmailService emailService;
@@ -54,7 +55,7 @@ class AccountingServiceEscapingTest {
 
     private AccountingService service() {
         return new AccountingService(accountRepo, journalRepo, bankAccountRepo, bankTxRepo,
-                vatPeriodRepo, coaSeeder, numberGen, invoicingFacade, crmFacade, emailService);
+                vatPeriodRepo, coaSeeder, numberGen, periodLock, invoicingFacade, crmFacade, emailService);
     }
 
     @Test
