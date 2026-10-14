@@ -39,6 +39,8 @@ public class AccountingService {
     private final AccVatPeriodRepository       vatPeriodRepo;
     private final ChartOfAccountsSeeder        coaSeeder;
     private final JournalNumberGenerator       numberGen;
+    // Finance patch F5: no journal dated on or before the lock date is created or posted, whoever asks.
+    private final PeriodLockService            periodLock;
     private final InvoicingFacade               invoicingFacade;
     private final CrmFacade                     crmFacade;
     private final EmailService                  emailService;
@@ -113,6 +115,7 @@ public class AccountingService {
     private JournalEntryResponse createJournalEntry(TenantId tenantId, CreateJournalEntryRequest req,
                                                     UUID createdBy, String sourceKey) {
         coaSeeder.seedForTenant(tenantId);
+        periodLock.requireOpen(tenantId, req.entryDate());
 
         if (req.lines() == null || req.lines().size() < 2)
             throw new IllegalArgumentException("Journal entry requires at least 2 lines");
@@ -248,6 +251,7 @@ public class AccountingService {
         if (!"DRAFT".equals(entry.getStatus()))
             throw new IllegalStateException(
                     "Only DRAFT entries can be posted — current status: " + entry.getStatus());
+        periodLock.requireOpen(tenantId, entry.getEntryDate());
         AccJournalEntry original = null;
         if (entry.getReversesEntryId() != null) {
             original = journalRepo.findActiveById(tenantId, entry.getReversesEntryId()).orElse(null);
@@ -289,6 +293,7 @@ public class AccountingService {
         if (problem != null) throw new IllegalStateException(problem);
 
         LocalDate date = reversalDate != null ? reversalDate : LocalDate.now();
+        periodLock.requireOpen(tenantId, date);
         String reversalNumber = numberGen.next(tenantId);
 
         AccJournalEntry reversal = AccJournalEntry.create(

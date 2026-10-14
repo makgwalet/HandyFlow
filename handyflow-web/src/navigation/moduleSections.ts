@@ -240,6 +240,8 @@ export const ACCOUNTING_SECTIONS: ModuleSections = {
         { id: 'bank', label: 'Bank Accounts', icon: Landmark },
         // Finance patch F4: postings that failed, to retry or dismiss.
         { id: 'posting', label: 'Posting problems', icon: AlertTriangle, liveBadge: 'posting-failures', permission: 'ACCOUNTING_READ' },
+        // Finance patch F5: the lock date that closes the books.
+        { id: 'lock', label: 'Period lock', icon: Lock, permission: 'ACCOUNTING_READ' },
       ],
     },
     {

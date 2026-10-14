@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.accounting.application.internal.AccountingReportPdfService;
 import za.co.handyflow.platform.accounting.application.internal.AccountingService;
 import za.co.handyflow.platform.accounting.application.internal.LedgerPostingService;
+import za.co.handyflow.platform.accounting.application.internal.PeriodLockService;
 import za.co.handyflow.platform.accounting.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -65,6 +66,7 @@ public class AccountingController {
     private final AccountingService accountingService;
     private final AccountingReportPdfService reportPdfService;
     private final LedgerPostingService ledgerPosting;
+    private final PeriodLockService periodLock;
 
     // ── Chart of Accounts ─────────────────────────────────────────────────────
 
@@ -144,6 +146,36 @@ public class AccountingController {
         accountingService.discardDraft(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId());
         return ResponseEntity.ok(ApiResponse.success("Draft journal discarded", null));
     }
+
+    // ── Period lock (finance patch F5) ────────────────────────────────────────
+
+    @GetMapping("/period-lock")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
+    @Operation(summary = "The lock date (no journal on or before it can be created or posted) and its history")
+    public ResponseEntity<ApiResponse<PeriodLockResponse>> getPeriodLock() {
+        return ResponseEntity.ok(ApiResponse.success("Success", periodLock.get(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/period-lock")
+    @PreAuthorize("hasAuthority('ACCOUNTING_ADMIN')")
+    @Operation(summary = "Close the books up to and including a date (moves the lock date forward only)")
+    public ResponseEntity<ApiResponse<PeriodLockResponse>> lockPeriod(@RequestBody LockPeriodRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Books closed",
+                periodLock.lock(TenantContext.getTenantIdAsObject(), req != null ? req.lockedThrough() : null,
+                        req != null ? req.note() : null, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/period-lock/reopen")
+    @PreAuthorize("hasAuthority('ACCOUNTING_PERIOD_REOPEN')")
+    @Operation(summary = "Reopen closed periods: move the lock date back (or clear it), with the reason")
+    public ResponseEntity<ApiResponse<PeriodLockResponse>> reopenPeriod(@RequestBody ReopenPeriodRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Period reopened",
+                periodLock.reopen(TenantContext.getTenantIdAsObject(), req != null ? req.lockedThrough() : null,
+                        req != null ? req.reason() : null, TenantContext.getCurrentUserId())));
+    }
+
+    public record LockPeriodRequest(LocalDate lockedThrough, String note) {}
+    public record ReopenPeriodRequest(LocalDate lockedThrough, String reason) {}
 
     // ── Posting problems (finance patch F4) ───────────────────────────────────
 
