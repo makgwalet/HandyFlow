@@ -19,6 +19,8 @@ import BudgetsTab from "./BudgetsTab"
 import CashForecastTab from "./CashForecastTab"
 import CostCentresTab from "./CostCentresTab"
 import ByCostCentreTab from "./ByCostCentreTab"
+import FixedAssetsTab from "./FixedAssetsTab"
+import DepreciationTab from "./DepreciationTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { ACCOUNTING_SECTIONS } from "../../navigation/moduleSections"
 
@@ -40,6 +42,8 @@ export function AccountingPage() {
         case "forecast":  return <CashForecastTab />
         case "centres":   return <CostCentresTab />
         case "bycentre":  return <ByCostCentreTab />
+        case "assets":    return <FixedAssetsTab />
+        case "depreciation": return <DepreciationTab />
         case "reports":   return <ReportsTab />
         case "vat":       return <VatReturnsTab />
         case "aging":     return <AgingTab />

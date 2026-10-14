@@ -238,6 +238,9 @@ export const ACCOUNTING_SECTIONS: ModuleSections = {
         { id: 'accounts', label: 'Chart of Accounts', icon: BookOpen },
         // Finance patch F24: cost centres, departments, branches and projects.
         { id: 'centres', label: 'Cost centres', icon: LayoutGrid, permission: 'ACCOUNTING_READ' },
+        // Finance patch F25: fixed-asset register and monthly depreciation.
+        { id: 'assets', label: 'Fixed assets', icon: Package, permission: 'ACCOUNTING_READ' },
+        { id: 'depreciation', label: 'Depreciation', icon: CalendarClock, permission: 'ACCOUNTING_READ' },
         { id: 'journal', label: 'Journal Entries', icon: JournalIcon },
         { id: 'bank', label: 'Bank Accounts', icon: Landmark },
         // Finance patch F12: reconcile to the statement, sign off, matching rules.
