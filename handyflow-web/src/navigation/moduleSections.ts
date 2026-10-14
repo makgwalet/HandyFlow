@@ -35,7 +35,7 @@ export interface ModuleSection {
    * A count fetched live for this section (see sectionBadges.ts), shown as
    * the badge while it is above zero. Hidden while the section is open.
    */
-  liveBadge?: 'bookings-pending'
+  liveBadge?: 'bookings-pending' | 'posting-failures'
   /**
    * Permission required to see this section. Hidden from the sidebar and
    * redirected away from in the page when missing. This mirrors the server's
@@ -238,6 +238,8 @@ export const ACCOUNTING_SECTIONS: ModuleSections = {
         { id: 'accounts', label: 'Chart of Accounts', icon: BookOpen },
         { id: 'journal', label: 'Journal Entries', icon: JournalIcon },
         { id: 'bank', label: 'Bank Accounts', icon: Landmark },
+        // Finance patch F4: postings that failed, to retry or dismiss.
+        { id: 'posting', label: 'Posting problems', icon: AlertTriangle, liveBadge: 'posting-failures', permission: 'ACCOUNTING_READ' },
       ],
     },
     {

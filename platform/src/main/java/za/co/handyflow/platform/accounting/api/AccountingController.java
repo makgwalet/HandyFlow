@@ -14,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.accounting.application.internal.AccountingReportPdfService;
 import za.co.handyflow.platform.accounting.application.internal.AccountingService;
+import za.co.handyflow.platform.accounting.application.internal.LedgerPostingService;
 import za.co.handyflow.platform.accounting.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -63,6 +64,7 @@ public class AccountingController {
 
     private final AccountingService accountingService;
     private final AccountingReportPdfService reportPdfService;
+    private final LedgerPostingService ledgerPosting;
 
     // ── Chart of Accounts ─────────────────────────────────────────────────────
 
@@ -142,6 +144,45 @@ public class AccountingController {
         accountingService.discardDraft(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId());
         return ResponseEntity.ok(ApiResponse.success("Draft journal discarded", null));
     }
+
+    // ── Posting problems (finance patch F4) ───────────────────────────────────
+
+    @GetMapping("/posting-failures")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
+    @Operation(summary = "Postings that failed: OPEN (default), RESOLVED, DISMISSED or ALL")
+    public ResponseEntity<ApiResponse<List<PostingFailureResponse>>> getPostingFailures(
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                ledgerPosting.list(TenantContext.getTenantIdAsObject(), status)));
+    }
+
+    @GetMapping("/posting-failures/count")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
+    @Operation(summary = "How many postings are waiting to be fixed")
+    public ResponseEntity<ApiResponse<Long>> countPostingFailures() {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                ledgerPosting.openCount(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/posting-failures/{id}/retry")
+    @PreAuthorize("hasAuthority('ACCOUNTING_ADMIN')")
+    @Operation(summary = "Post the failed journal again")
+    public ResponseEntity<ApiResponse<PostingFailureResponse>> retryPostingFailure(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Posted",
+                ledgerPosting.retry(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/posting-failures/{id}/dismiss")
+    @PreAuthorize("hasAuthority('ACCOUNTING_ADMIN')")
+    @Operation(summary = "Close a failed posting that should not be posted, with the reason")
+    public ResponseEntity<ApiResponse<PostingFailureResponse>> dismissPostingFailure(
+            @PathVariable UUID id, @RequestBody DismissPostingFailureRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Dismissed",
+                ledgerPosting.dismiss(TenantContext.getTenantIdAsObject(), id, req != null ? req.note() : null,
+                        TenantContext.getCurrentUserId())));
+    }
+
+    public record DismissPostingFailureRequest(String note) {}
 
     // ── Bank Accounts ─────────────────────────────────────────────────────────
 

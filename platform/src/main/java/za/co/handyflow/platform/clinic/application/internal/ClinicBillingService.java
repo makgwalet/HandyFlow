@@ -204,8 +204,8 @@ public class ClinicBillingService {
                     LocalDate.now(), "Clinic claim created: " + claim.getId(),
                     claim.getId().toString(), "MANUAL", lines);
 
-            // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
-            JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("clinic", "claim-revenue", claim.getId()), req);
+            // Finance patch F3/F4: posted once per business event, in its own transaction; a failure is queued in Accounting.
+            JournalEntryResponse created = accountingFacade.postOnceOrRecord(tenantId, PostingKeys.of("clinic", "claim-revenue", claim.getId()), req);
             log.info("Posted revenue journal for claim={} tenant={} amount={}",
                     claim.getId(), tenantId, claim.getGrossAmount());
         } catch (Exception e) {
@@ -513,8 +513,8 @@ public class ClinicBillingService {
                     LocalDate.now(), "Clinic payment received: " + payment.getId(),
                     payment.getReference(), "PAYMENT", lines);
 
-            // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
-            JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("clinic", "payment-received", payment.getId()), req);
+            // Finance patch F3/F4: posted once per business event, in its own transaction; a failure is queued in Accounting.
+            JournalEntryResponse created = accountingFacade.postOnceOrRecord(tenantId, PostingKeys.of("clinic", "payment-received", payment.getId()), req);
             log.info("Posted payment journal for patient={} tenant={} amount={}",
                     payment.getPatientId(), tenantId, payment.getAmount());
         } catch (Exception e) {

@@ -281,8 +281,8 @@ public class WhseBillingService {
                     LocalDate.now(), "Warehousing billing: " + invoice.getInvoiceNumber(),
                     invoice.getInvoiceNumber(), "MANUAL", lines);
 
-            // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
-            JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("warehousing", "invoice-issued", invoice.getId()), req);
+            // Finance patch F3/F4: posted once per business event, in its own transaction; a failure is queued in Accounting.
+            JournalEntryResponse created = accountingFacade.postOnceOrRecord(tenantId, PostingKeys.of("warehousing", "invoice-issued", invoice.getId()), req);
             log.info("[Warehousing] Posted billing revenue journal for invoice={} tenant={}",
                     invoice.getInvoiceNumber(), tenantId.getValue());
         } catch (Exception e) {

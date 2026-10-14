@@ -181,8 +181,8 @@ public class BkBillingService {
                     LocalDate.now(), "Bookkeeping invoice " + invoice.getInvoiceNumber(),
                     invoice.getInvoiceNumber(), "MANUAL", lines);
 
-            // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
-            JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("bookkeeping", "invoice-issued", invoice.getId()), req);
+            // Finance patch F3/F4: posted once per business event, in its own transaction; a failure is queued in Accounting.
+            JournalEntryResponse created = accountingFacade.postOnceOrRecord(tenantId, PostingKeys.of("bookkeeping", "invoice-issued", invoice.getId()), req);
             log.info("Posted revenue journal for bookkeeping invoice={} tenant={} amount={}",
                     invoice.getInvoiceNumber(), tenantId.getValue(), invoice.getTotal());
         } catch (Exception e) {

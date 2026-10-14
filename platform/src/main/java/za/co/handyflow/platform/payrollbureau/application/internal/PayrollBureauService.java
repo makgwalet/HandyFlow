@@ -458,8 +458,8 @@ public class PayrollBureauService {
                     LocalDate.now(), "Payroll bureau fee note: " + feeNote.getInvoiceNumber(),
                     feeNote.getInvoiceNumber(), "MANUAL", lines);
 
-            // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
-            JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("payrollbureau", "fee-note-issued", feeNote.getId()), req);
+            // Finance patch F3/F4: posted once per business event, in its own transaction; a failure is queued in Accounting.
+            JournalEntryResponse created = accountingFacade.postOnceOrRecord(tenantId, PostingKeys.of("payrollbureau", "fee-note-issued", feeNote.getId()), req);
             log.info("Posted revenue journal for fee note={} tenant={}", feeNote.getInvoiceNumber(), tenantId);
         } catch (Exception e) {
             log.error("Failed to post revenue journal for feeNote={} tenant={}: {}",
@@ -547,8 +547,10 @@ public class PayrollBureauService {
                     LocalDate.now(), "Payment received: " + feeNote.getInvoiceNumber(),
                     feeNote.getInvoiceNumber(), "PAYMENT", lines);
 
-            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
-            accountingFacade.postJournalEntry(tenantId, created.id());
+            // Finance patch F4: own transaction, failures queued in Accounting. No payment record id exists yet, so the key
+            // is a fresh id per payment: it makes a retry from the queue safe, but not a second click (see finance backlog).
+            JournalEntryResponse created = accountingFacade.postOnceOrRecord(tenantId,
+                    PostingKeys.of("payrollbureau", "payment-received", java.util.UUID.randomUUID()), req);
             log.info("Posted payment journal for feeNote={} tenant={}", feeNote.getInvoiceNumber(), tenantId);
         } catch (Exception e) {
             log.error("Failed to post payment journal for feeNote={} tenant={}: {}",

@@ -105,6 +105,11 @@ public class ExpenseAccountingPoster {
             if (expenseAccountId == null || payableAccountId == null) {
                 log.warn("Chart of Accounts missing account {} or {} for tenant={} — expense claim={} not posted",
                         EXPENSE_ACCOUNT_CODE, PAYABLE_ACCOUNT_CODE, tenantId, claimNumber);
+                // Finance patch F4: shown in Accounting's posting problems, not only in the log.
+                accountingFacade.recordPostingFailure(tenantId, PostingKeys.of("expenses", "claim-approved", claimId),
+                        "Expense claim approved: " + claimNumber,
+                        "The chart of accounts has no Staff Expense (" + EXPENSE_ACCOUNT_CODE + ") or Accrued Expenses ("
+                                + PAYABLE_ACCOUNT_CODE + ") account");
                 return Optional.empty();
             }
 
@@ -118,8 +123,8 @@ public class ExpenseAccountingPoster {
                     LocalDate.now(), "Expense claim: " + description + " (" + claimNumber + ")",
                     claimNumber, "MANUAL", lines);
 
-            // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
-            JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("expenses", "claim-approved", claimId), req);
+            // Finance patch F3/F4: posted once per business event, in its own transaction; a failure is queued in Accounting.
+            JournalEntryResponse created = accountingFacade.postOnceOrRecord(tenantId, PostingKeys.of("expenses", "claim-approved", claimId), req);
 
             log.info("Posted expense journal entry {} for claim {}", created.entryNumber(), claimNumber);
             return Optional.of(created.id());

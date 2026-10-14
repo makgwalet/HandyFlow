@@ -4,7 +4,7 @@
 // the hours for a variable-hours cycle. They are used from both the lists and the detail pages, so each one runs its own
 // request and tells the caller when it is done. Every form is checked before it is sent.
 import { useState } from "react"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AlertTriangle } from "lucide-react"
 import { apiClient } from "../../api/client"
 import {
@@ -20,17 +20,48 @@ const refreshInvoices = (qc: ReturnType<typeof useQueryClient>, id?: string) => 
   qc.invalidateQueries({ queryKey: ["credit-notes-all"] })
 }
 
+/** A bank account a payment can be received into (only those linked to a ledger account, so the payment can post). */
+interface ReceivingAccount { id: string; bankName: string; accountName: string; accountNumber?: string | null; active?: boolean; accountId?: string | null }
+
+const accountLabel = (b: ReceivingAccount) =>
+  `${b.bankName} · ${b.accountName}${b.accountNumber ? ` ···${String(b.accountNumber).slice(-4)}` : ""}`
+
+/**
+ * Finance patch F4: the bank accounts this business receives money into. Until now the payment form never said which
+ * account received the money, so no invoice payment reached the ledger. Empty when the business keeps no bank accounts in
+ * Accounting or the person may not see them; the form then records the payment as before.
+ */
+function useReceivingAccounts() {
+  const q = useQuery({
+    queryKey: ["receiving-bank-accounts"],
+    queryFn: async () => {
+      const res = await apiClient.get("/api/v1/accounting/bank-accounts")
+      const d = res.data?.data ?? res.data
+      return (Array.isArray(d) ? d : []).filter((b: ReceivingAccount) => b.active !== false && !!b.accountId) as ReceivingAccount[]
+    },
+    retry: false,
+    staleTime: 60_000,
+  })
+  return q.data ?? []
+}
+
 export function RecordPaymentDialog({ invoice, onClose, onDone }: { invoice: Invoice; onClose: () => void; onDone?: () => void }) {
   const qc = useQueryClient()
-  const [f, setF] = useState({ amount: String(balanceOf(invoice)), method: "EFT", reference: "" })
+  const [f, setF] = useState({ amount: String(balanceOf(invoice)), method: "EFT", reference: "", bank: "" })
   const [err, setErr] = useState("")
+  const accounts = useReceivingAccounts()
+  const bank = f.bank || (accounts.length === 1 ? accounts[0].id : "")
   const save = useMutation({
     mutationFn: () => apiClient.post(`/api/v1/invoicing/invoices/${invoice.id}/payments`, {
-      amountPaid: Number(f.amount), paymentMethod: f.method, reference: f.reference.trim() || undefined }),
+      amountPaid: Number(f.amount), paymentMethod: f.method, reference: f.reference.trim() || undefined,
+      bankAccountId: bank || undefined }),
     onSuccess: () => { refreshInvoices(qc, invoice.id); onDone?.(); onClose() },
     onError: (e: any) => setErr(apiMessage(e, "The payment could not be recorded.")),
   })
-  const submit = () => { const m = paymentError(f.amount, invoice); if (m) setErr(m); else { setErr(""); save.mutate() } }
+  const submit = () => {
+    const m = paymentError(f.amount, invoice) ?? (accounts.length > 0 && !bank ? "Choose the bank account that received the money." : null)
+    if (m) setErr(m); else { setErr(""); save.mutate() }
+  }
   return (
     <Dialog title="Record payment" onClose={onClose}
       subtitle={`${invoice.invoiceNumber} · total ${fmtR(invoice.total)} · still owing ${fmtR(balanceOf(invoice))}`}
@@ -41,6 +72,14 @@ export function RecordPaymentDialog({ invoice, onClose, onDone }: { invoice: Inv
           {["EFT", "CASH", "CARD", "CHEQUE", "OTHER"].map(m => <option key={m}>{m}</option>)}
         </select>)}
       </Field>
+      {accounts.length > 0 && (
+        <Field label="Received into" hint="The bank account the money arrived in, so the payment reaches the ledger.">{id => (
+          <select id={id} value={bank} onChange={e => setF({ ...f, bank: e.target.value })} style={fieldStyle}>
+            {accounts.length > 1 && <option value="">Choose an account</option>}
+            {accounts.map(b => <option key={b.id} value={b.id}>{accountLabel(b)}</option>)}
+          </select>)}
+        </Field>
+      )}
       <Field label="Reference (optional)" hint="For example the EFT reference from the bank statement.">{id => <input id={id} value={f.reference} onChange={e => setF({ ...f, reference: e.target.value })} style={fieldStyle} />}</Field>
       {err && <Notice tone="bad">{err}</Notice>}
     </Dialog>

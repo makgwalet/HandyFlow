@@ -3,6 +3,7 @@ package za.co.handyflow.platform.accounting.application;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import za.co.handyflow.platform.accounting.application.internal.AccountingService;
+import za.co.handyflow.platform.accounting.application.internal.LedgerPostingService;
 import za.co.handyflow.platform.accounting.dto.AccountResponse;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
@@ -48,6 +49,7 @@ import java.util.UUID;
 public class AccountingFacade {
 
     private final AccountingService accountingService;
+    private final LedgerPostingService ledgerPosting;
 
     /**
      * Creates a DRAFT journal entry — validated (balanced, minimum 2
@@ -68,6 +70,24 @@ public class AccountingFacade {
      */
     public JournalEntryResponse postOnce(TenantId tenantId, String sourceKey, CreateJournalEntryRequest req) {
         return accountingService.postOnce(tenantId, sourceKey, req);
+    }
+
+    /**
+     * Like {@link #postOnce}, for postings that must never undo the business record they follow (finance patch F4). The
+     * attempt runs in its own transaction; if it fails, the failure is kept in Accounting's posting-problems queue (with
+     * the journal, so it can be retried) and the exception is rethrown for the caller to log. Use {@link #postOnce} where
+     * a failed posting should stop the business action (AP approval and payment).
+     */
+    public JournalEntryResponse postOnceOrRecord(TenantId tenantId, String sourceKey, CreateJournalEntryRequest req) {
+        return ledgerPosting.postOnceOrRecord(tenantId, sourceKey, req);
+    }
+
+    /**
+     * Records a posting that could not even be built (for example the chart of accounts is missing an account), so it
+     * shows in the posting-problems queue instead of only in a log (finance patch F4). Never throws.
+     */
+    public void recordPostingFailure(TenantId tenantId, String sourceKey, String summary, String reason) {
+        ledgerPosting.recordFailure(tenantId, sourceKey, summary, reason);
     }
 
     /**

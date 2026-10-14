@@ -131,6 +131,28 @@ describe('InvoicesListPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Record payment' }))
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/v1/invoicing/invoices/i1/payments', { amountPaid: 60, paymentMethod: 'EFT', reference: 'EFT-1' }))
   })
+  it('asks which bank account received a payment, so it reaches the ledger (finance F4)', async () => {
+    perms.add('INVOICE_CREATE')
+    const banks = { data: { data: [
+      { id: 'b1', bankName: 'FNB', accountName: 'Cheque', accountNumber: '62001234', active: true, accountId: 'gl1' },
+      { id: 'b2', bankName: 'Nedbank', accountName: 'Savings', accountNumber: '1009876', active: true, accountId: 'gl2' },
+      { id: 'b3', bankName: 'Old', accountName: 'Closed', accountNumber: '1', active: false, accountId: 'gl3' },
+    ] } }
+    route({ '/accounting/bank-accounts': banks, '/invoices': page([invoice({ total: 115, amountPaid: 15 })]), '/crm/customers': customers })
+    api.post.mockResolvedValue({ data: {} })
+    renderAt('/invoices', '/invoices', <InvoicesListPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Record payment' }))
+    const dialog = screen.getByRole('dialog')
+    const into = await within(dialog).findByLabelText('Received into') as HTMLSelectElement
+    expect(Array.from(into.options).map(o => o.textContent)).toEqual(['Choose an account', 'FNB · Cheque ···1234', 'Nedbank · Savings ···9876'])
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Record payment' }))
+    expect((await within(dialog).findByRole('alert')).textContent).toMatch(/bank account/)
+    expect(api.post).not.toHaveBeenCalled()
+    fireEvent.change(into, { target: { value: 'b2' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Record payment' }))
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/v1/invoicing/invoices/i1/payments',
+      { amountPaid: 100, paymentMethod: 'EFT', reference: undefined, bankAccountId: 'b2' }))
+  })
   it('issues a draft, and hides actions without permission', async () => {
     route({ '/invoices': page([invoice({ status: 'DRAFT' })]), '/crm/customers': customers })
     api.post.mockResolvedValue({ data: {} })

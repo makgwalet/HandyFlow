@@ -171,8 +171,8 @@ public class InsBrokCommissionInvoiceService {
                     LocalDate.now(), "Commission — " + invoice.getInvoiceNumber(), invoice.getInvoiceNumber(),
                     "MANUAL", lines);
 
-            // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
-            JournalEntryResponse entry = accountingFacade.postOnce(tenantId, PostingKeys.of("insurancebrokerage", "commission-invoice-issued", invoice.getId()), req);
+            // Finance patch F3/F4: posted once per business event, in its own transaction; a failure is queued in Accounting.
+            JournalEntryResponse entry = accountingFacade.postOnceOrRecord(tenantId, PostingKeys.of("insurancebrokerage", "commission-invoice-issued", invoice.getId()), req);
         } catch (Exception e) {
             log.error("[InsuranceBrokerage] Failed to post GL journal for commission invoice={} tenant={}: {}",
                     invoice.getInvoiceNumber(), tenantId.getValue(), e.getMessage(), e);

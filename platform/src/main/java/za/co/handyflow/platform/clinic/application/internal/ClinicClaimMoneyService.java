@@ -266,7 +266,7 @@ public class ClinicClaimMoneyService {
             var lines = List.of(
                     new CreateJournalEntryRequest.JournalLineRequest(revenue, memo, amount, null),
                     new CreateJournalEntryRequest.JournalLineRequest(ar, memo, null, amount));
-            accountingFacade.postOnce(tenant, sourceKey,
+            accountingFacade.postOnceOrRecord(tenant, sourceKey,
                     new CreateJournalEntryRequest(today(), memo, claim.getId().toString(), "MANUAL", lines));
         } catch (Exception e) {
             log.error("Failed to post reversal for claim={} tenant={}: {}", claim.getId(), tenant, e.getMessage(), e);

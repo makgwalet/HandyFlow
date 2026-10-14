@@ -332,8 +332,10 @@ public class PropertyService {
                     LocalDate.now(), "Rent payment received: payment " + payment.getId(),
                     payment.getId().toString(), "PAYMENT", lines);
 
-            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
-            accountingFacade.postJournalEntry(tenantId, created.id());
+            // Finance patch F4: own transaction, failures queued in Accounting. No payment record id exists yet, so the key
+            // is a fresh id per payment: it makes a retry from the queue safe, but not a second click (see finance backlog).
+            JournalEntryResponse created = accountingFacade.postOnceOrRecord(tenantId,
+                    PostingKeys.of("property", "rent-payment-received", java.util.UUID.randomUUID()), req);
             log.info("Posted rent payment journal for payment={} tenant={}", payment.getId(), tenantId);
         } catch (Exception e) {
             log.error("Failed to post rent payment journal for payment={} tenant={}: {}",
@@ -484,8 +486,8 @@ public class PropertyService {
                     LocalDate.now(), "Rent due: " + payment.getPeriodMonth() + "/" + payment.getPeriodYear(),
                     payment.getId().toString(), "MANUAL", lines);
 
-            // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
-            JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("property", "rent-charged", payment.getId()), req);
+            // Finance patch F3/F4: posted once per business event, in its own transaction; a failure is queued in Accounting.
+            JournalEntryResponse created = accountingFacade.postOnceOrRecord(tenantId, PostingKeys.of("property", "rent-charged", payment.getId()), req);
             log.info("Posted rental revenue journal for payment={} tenant={}", payment.getId(), tenantId);
         } catch (Exception e) {
             log.error("Failed to post rental revenue journal for payment={} tenant={}: {}",

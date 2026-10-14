@@ -6,7 +6,6 @@ import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
 import za.co.handyflow.platform.accounting.application.PostingKeys;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
-import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.accounting.domain.repository.AccAccountRepository;
 import za.co.handyflow.platform.accounting.domain.repository.AccBankAccountRepository;
 import za.co.handyflow.platform.invoicing.CreditNoteIssuedEvent;
@@ -56,18 +55,22 @@ class InvoicingAccountingEventHandler {
     private static final String REVENUE_ACCOUNT_CODE     = "4000";
     private static final String VAT_OUTPUT_ACCOUNT_CODE  = "2100";
 
-    private final AccountingService        accountingService;
     private final AccAccountRepository     accountRepo;
     private final AccBankAccountRepository bankAccountRepo;
+    // Finance patch F4: posts in its own transaction and queues failures where people can see and retry them.
+    private final LedgerPostingService     ledgerPosting;
 
     @ApplicationModuleListener
     void onInvoiceIssued(InvoiceIssuedEvent event) {
+        String key = PostingKeys.of("invoicing", "invoice-issued", event.invoiceId());
+        String summary = "Invoice issued: " + event.invoiceNumber();
         try {
             UUID arAccountId = findAccountByCode(event.tenantId().getValue(), AR_ACCOUNT_CODE);
             UUID revenueAccountId = findAccountByCode(event.tenantId().getValue(), REVENUE_ACCOUNT_CODE);
             if (arAccountId == null || revenueAccountId == null) {
-                log.warn("[Accounting] Chart of Accounts missing AR ({}) or Revenue ({}) for tenant={} — invoice={} not posted",
-                        AR_ACCOUNT_CODE, REVENUE_ACCOUNT_CODE, event.tenantId(), event.invoiceNumber());
+                ledgerPosting.recordFailure(event.tenantId(), key, summary,
+                        "The chart of accounts has no Accounts Receivable (" + AR_ACCOUNT_CODE + ") or Revenue ("
+                                + REVENUE_ACCOUNT_CODE + ") account");
                 return;
             }
 
@@ -76,8 +79,8 @@ class InvoicingAccountingEventHandler {
             if (hasVat) {
                 vatAccountId = findAccountByCode(event.tenantId().getValue(), VAT_OUTPUT_ACCOUNT_CODE);
                 if (vatAccountId == null) {
-                    log.warn("[Accounting] Chart of Accounts missing VAT Output ({}) for tenant={} — invoice={} not posted",
-                            VAT_OUTPUT_ACCOUNT_CODE, event.tenantId(), event.invoiceNumber());
+                    ledgerPosting.recordFailure(event.tenantId(), key, summary,
+                            "The chart of accounts has no VAT Output (" + VAT_OUTPUT_ACCOUNT_CODE + ") account");
                     return;
                 }
             }
@@ -96,8 +99,8 @@ class InvoicingAccountingEventHandler {
                     LocalDate.now(), "Invoice issued: " + event.invoiceNumber(),
                     event.invoiceNumber(), "MANUAL", lines);
 
-            // Finance patch F3: once per invoice, so a redelivered event cannot post the invoice twice.
-            accountingService.postOnce(event.tenantId(), PostingKeys.of("invoicing", "invoice-issued", event.invoiceId()), req);
+            // Finance patch F3/F4: once per invoice, in its own transaction; a failure is queued.
+            ledgerPosting.postOnceOrRecord(event.tenantId(), key, req);
             log.info("[Accounting] Posted issuance journal for invoice={} tenant={}", event.invoiceNumber(), event.tenantId());
         } catch (Exception e) {
             // Same principle as every other cross-module side-effect hookup
@@ -111,30 +114,36 @@ class InvoicingAccountingEventHandler {
 
     @ApplicationModuleListener
     void onInvoicePaymentRecorded(InvoicePaymentRecordedEvent event) {
+        // Finance patch F3: once per payment. Events stored before F3 carry no payment id; they get a fresh one here.
+        String key = PostingKeys.of("invoicing", "payment-received",
+                event.paymentEventId() != null ? event.paymentEventId() : UUID.randomUUID());
+        String summary = "Payment received: " + event.invoiceNumber() + " R " + event.amountPaid();
         try {
             if (event.bankAccountId() == null) {
-                // KNOWN GAP, not silently skipped: RecordPaymentRequest's
-                // bankAccountId is a new, optional field — the existing
-                // frontend doesn't send it yet. Logging clearly rather
-                // than guessing a "default" bank account for real money.
-                log.warn("[Accounting] Payment recorded for invoice={} tenant={} with no bankAccountId — " +
-                                "cannot post a directed payment journal without knowing which account received the funds. " +
-                                "Invoice.amountPaid was still updated normally; this is a ledger-posting gap only.",
+                // Never guess which bank account received real money. Finance patch F4: the payment dialog now asks for
+                // it; a payment recorded without it is queued for a person (only where the business keeps bank accounts
+                // here, so tenants that do not use Accounting do not fill the queue).
+                log.warn("[Accounting] Payment recorded for invoice={} tenant={} with no bankAccountId — not posted",
                         event.invoiceNumber(), event.tenantId());
+                if (!bankAccountRepo.findAllActive(event.tenantId()).isEmpty()) {
+                    ledgerPosting.recordFailure(event.tenantId(), key, summary,
+                            "The payment was recorded without the bank account that received it. Post it by hand "
+                                    + "(debit the bank, credit Accounts Receivable " + AR_ACCOUNT_CODE + "), then dismiss this");
+                }
                 return;
             }
 
             var bankAccount = bankAccountRepo.findActiveById(event.tenantId(), event.bankAccountId()).orElse(null);
             if (bankAccount == null || bankAccount.getAccountId() == null) {
-                log.warn("[Accounting] Bank account={} for tenant={} not found or not linked to a Chart of Accounts entry — " +
-                        "payment for invoice={} not posted", event.bankAccountId(), event.tenantId(), event.invoiceNumber());
+                ledgerPosting.recordFailure(event.tenantId(), key, summary,
+                        "The bank account that received the payment is missing or not linked to a ledger account");
                 return;
             }
 
             UUID arAccountId = findAccountByCode(event.tenantId().getValue(), AR_ACCOUNT_CODE);
             if (arAccountId == null) {
-                log.warn("[Accounting] Chart of Accounts missing AR ({}) for tenant={} — payment for invoice={} not posted",
-                        AR_ACCOUNT_CODE, event.tenantId(), event.invoiceNumber());
+                ledgerPosting.recordFailure(event.tenantId(), key, summary,
+                        "The chart of accounts has no Accounts Receivable (" + AR_ACCOUNT_CODE + ") account");
                 return;
             }
 
@@ -148,14 +157,7 @@ class InvoicingAccountingEventHandler {
                     LocalDate.now(), "Payment received: " + event.invoiceNumber(),
                     event.invoiceNumber(), "PAYMENT", lines);
 
-            // Finance patch F3: once per payment. Events stored before F3 carry no payment id and post as before.
-            if (event.paymentEventId() != null) {
-                accountingService.postOnce(event.tenantId(),
-                        PostingKeys.of("invoicing", "payment-received", event.paymentEventId()), req);
-            } else {
-                JournalEntryResponse created = accountingService.createJournalEntry(event.tenantId(), req, null);
-                accountingService.postJournalEntry(event.tenantId(), created.id());
-            }
+            ledgerPosting.postOnceOrRecord(event.tenantId(), key, req);
             log.info("[Accounting] Posted payment journal for invoice={} tenant={}", event.invoiceNumber(), event.tenantId());
         } catch (Exception e) {
             log.error("[Accounting] Failed to post payment journal for invoice={} tenant={}: {}",
@@ -170,13 +172,16 @@ class InvoicingAccountingEventHandler {
      */
     @ApplicationModuleListener
     void onCreditNoteIssued(CreditNoteIssuedEvent event) {
+        String key = PostingKeys.of("invoicing", "credit-note-issued", event.creditNoteId());
+        String summary = "Credit note issued: " + event.creditNoteNumber();
         try {
             UUID tenant = event.tenantId().getValue();
             UUID arAccountId = findAccountByCode(tenant, AR_ACCOUNT_CODE);
             UUID revenueAccountId = findAccountByCode(tenant, REVENUE_ACCOUNT_CODE);
             if (arAccountId == null || revenueAccountId == null) {
-                log.warn("[Accounting] Chart of Accounts missing AR ({}) or Revenue ({}) for tenant={} — credit note={} not posted",
-                        AR_ACCOUNT_CODE, REVENUE_ACCOUNT_CODE, event.tenantId(), event.creditNoteNumber());
+                ledgerPosting.recordFailure(event.tenantId(), key, summary,
+                        "The chart of accounts has no Accounts Receivable (" + AR_ACCOUNT_CODE + ") or Revenue ("
+                                + REVENUE_ACCOUNT_CODE + ") account");
                 return;
             }
             boolean hasVat = event.vatTotal() != null && event.vatTotal().compareTo(BigDecimal.ZERO) > 0;
@@ -184,8 +189,8 @@ class InvoicingAccountingEventHandler {
             if (hasVat) {
                 vatAccountId = findAccountByCode(tenant, VAT_OUTPUT_ACCOUNT_CODE);
                 if (vatAccountId == null) {
-                    log.warn("[Accounting] Chart of Accounts missing VAT Output ({}) for tenant={} — credit note={} not posted",
-                            VAT_OUTPUT_ACCOUNT_CODE, event.tenantId(), event.creditNoteNumber());
+                    ledgerPosting.recordFailure(event.tenantId(), key, summary,
+                            "The chart of accounts has no VAT Output (" + VAT_OUTPUT_ACCOUNT_CODE + ") account");
                     return;
                 }
             }
@@ -205,8 +210,8 @@ class InvoicingAccountingEventHandler {
                     LocalDate.now(), "Credit note issued: " + ref,
                     event.creditNoteNumber(), "INVOICE", lines);
 
-            // Finance patch F3: once per credit note.
-            accountingService.postOnce(event.tenantId(), PostingKeys.of("invoicing", "credit-note-issued", event.creditNoteId()), req);
+            // Finance patch F3/F4: once per credit note, in its own transaction; a failure is queued.
+            ledgerPosting.postOnceOrRecord(event.tenantId(), key, req);
             log.info("[Accounting] Posted credit note journal for credit note={} tenant={}", event.creditNoteNumber(), event.tenantId());
         } catch (Exception e) {
             log.error("[Accounting] Failed to post credit note journal for credit note={} tenant={}: {}",

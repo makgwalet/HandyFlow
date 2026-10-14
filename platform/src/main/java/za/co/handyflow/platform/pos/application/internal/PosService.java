@@ -999,8 +999,8 @@ public class PosService {
                     LocalDate.now(), "POS session closed: " + session.getSessionNumber(),
                     session.getSessionNumber(), "MANUAL", lines);
 
-            // Finance patch F3: posted once per business event, so a retry or redelivery cannot post it twice.
-            JournalEntryResponse created = accountingFacade.postOnce(tenantId, PostingKeys.of("pos", "session-closed", session.getId()), req);
+            // Finance patch F3/F4: posted once per business event, in its own transaction; a failure is queued in Accounting.
+            JournalEntryResponse created = accountingFacade.postOnceOrRecord(tenantId, PostingKeys.of("pos", "session-closed", session.getId()), req);
             log.info("[POS] Posted sales journal for session={} tenant={} total={}",
                     session.getSessionNumber(), tenantId, totalSales);
         } catch (Exception e) {

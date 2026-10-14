@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.application.PostingKeys;
 import za.co.handyflow.platform.accounting.dto.AccountResponse;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
@@ -65,8 +66,10 @@ public class LpAccountingPoster {
             CreateJournalEntryRequest req = new CreateJournalEntryRequest(
                     LocalDate.now(), "Legal fees — " + invoiceNumber, invoiceNumber, "MANUAL", lines);
 
-            JournalEntryResponse entry = accountingFacade.createJournalEntry(tenantId, req);
-            accountingFacade.postJournalEntry(tenantId, entry.id());
+            // Finance patch F4: own transaction, failures queued in Accounting. No payment record id exists yet, so the key
+            // is a fresh id per payment: it makes a retry from the queue safe, but not a second click (see finance backlog).
+            JournalEntryResponse entry = accountingFacade.postOnceOrRecord(tenantId,
+                    PostingKeys.of("legalpractice", "payment-revenue", java.util.UUID.randomUUID()), req);
         } catch (Exception e) {
             log.error("Failed to post GL journal for invoice={} tenant={}: {}",
                     invoiceNumber, tenantId, e.getMessage(), e);
