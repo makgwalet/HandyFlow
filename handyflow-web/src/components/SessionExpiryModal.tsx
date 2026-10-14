@@ -24,6 +24,31 @@ const WARNING_WINDOW_MS = 2 * 60 * 1000
 // coarse on purpose, this only needs to catch "have we crossed into the
 // warning window yet", not drive a live countdown display.
 const CHECK_INTERVAL_MS = 5000
+// Someone who has touched the page within this long is working, so their
+// session is extended quietly instead of interrupting them with a warning.
+const ACTIVE_WITHIN_MS = 2 * 60 * 1000
+// Start the quiet extension this long before expiry, comfortably earlier
+// than the warning window so a failed attempt can be retried.
+const REFRESH_AHEAD_MS = 5 * 60 * 1000
+const ACTIVITY_EVENTS = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'wheel'] as const
+
+async function refreshSession() {
+  const response = await apiClient.post('/api/v1/auth/refresh')
+  const data = response.data as {
+    accessToken: string; userId: string; tenantId: string; email: string
+    firstName: string; lastName: string; permissions: string[]
+  }
+  const currentUser = useAuthStore.getState().user
+  useAuthStore.getState().setAuth(data.accessToken, {
+    ...(currentUser ?? {}),
+    userId: data.userId,
+    tenantId: data.tenantId,
+    email: data.email,
+    firstName: data.firstName,
+    lastName: data.lastName,
+    permissions: data.permissions,
+  } as any)
+}
 
 export function SessionExpiryModal() {
   const token = useAuthStore((s) => s.token)
@@ -33,6 +58,15 @@ export function SessionExpiryModal() {
   const [showWarning, setShowWarning] = useState(false)
   const [secondsRemaining, setSecondsRemaining] = useState(0)
   const [extending, setExtending] = useState(false)
+  const lastActivity = useRef(Date.now())
+  const quietRefresh = useRef(false)
+
+  // Remember when the user last did anything; the clock is only read, never rendered.
+  useEffect(() => {
+    const touch = () => { lastActivity.current = Date.now() }
+    ACTIVITY_EVENTS.forEach(e => window.addEventListener(e, touch, { passive: true }))
+    return () => ACTIVITY_EVENTS.forEach(e => window.removeEventListener(e, touch))
+  }, [])
 
   useEffect(() => {
     if (!isAuthenticated || !token) {
@@ -46,6 +80,8 @@ export function SessionExpiryModal() {
     // interceptor already handles a token that's genuinely expired on
     // the next real request regardless of whether this modal ever shows.
     if (!expiryMs) return
+    // A fresh token (quiet or manual extension) clears any warning left over from the old one.
+    setShowWarning(false)
 
     const checkInterval = setInterval(() => {
       const msRemaining = expiryMs - Date.now()
@@ -61,7 +97,16 @@ export function SessionExpiryModal() {
         return
       }
 
-      if (msRemaining <= WARNING_WINDOW_MS) {
+      const working = Date.now() - lastActivity.current < ACTIVE_WITHIN_MS
+
+      // Working: extend the session in the background; no interruption.
+      if (working && msRemaining <= REFRESH_AHEAD_MS && !quietRefresh.current) {
+        quietRefresh.current = true
+        refreshSession().catch(() => { /* the warning below still covers it */ }).finally(() => { quietRefresh.current = false })
+      }
+
+      // Idle (or the quiet extension failed): warn as before.
+      if (msRemaining <= WARNING_WINDOW_MS && (!working || msRemaining <= WARNING_WINDOW_MS / 2)) {
         setShowWarning(true)
         setSecondsRemaining(Math.ceil(msRemaining / 1000))
       }
@@ -98,21 +143,7 @@ export function SessionExpiryModal() {
       // interceptor already calls — no separate extension mechanism,
       // just triggering the real rotation deliberately and early instead
       // of waiting for a failed request to trigger it reactively.
-      const response = await apiClient.post('/api/v1/auth/refresh')
-      const data = response.data as {
-        accessToken: string; userId: string; tenantId: string; email: string
-        firstName: string; lastName: string; permissions: string[]
-      }
-      const currentUser = useAuthStore.getState().user
-      useAuthStore.getState().setAuth(data.accessToken, {
-        ...(currentUser ?? {}),
-        userId: data.userId,
-        tenantId: data.tenantId,
-        email: data.email,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        permissions: data.permissions,
-      } as any)
+      await refreshSession()
       setShowWarning(false)
     } catch {
       // Refresh itself failed — the session genuinely can't be extended
