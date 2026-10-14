@@ -1,9 +1,9 @@
 import { useRef, useState } from "react"
 import { apiClient } from "../../api/client"
-import { type Capture, isPdf } from "./capture.logic"
+import { type Capture, isReadable } from "./capture.logic"
 
 /**
- * "Read from a PDF": sends the file to be read and hands the suggested fields back.
+ * "Read from a file": sends the file to be read and hands the suggested fields back.
  * Nothing is saved; the person checks the form and saves as usual.
  */
 export default function CaptureFromFile({ onRead }: { onRead: (c: Capture) => void }) {
@@ -17,8 +17,8 @@ export default function CaptureFromFile({ onRead }: { onRead: (c: Capture) => vo
     e.target.value = ""
     if (!file) return
     setError(""); setNotes([])
-    if (!isPdf(file.name, file.type)) {
-      setError("Only PDF files can be read for now. Fill the fields in by hand.")
+    if (!isReadable(file.name, file.type)) {
+      setError("Only PDF, JPEG and PNG files can be read. Fill the fields in by hand.")
       return
     }
     setBusy(true)
@@ -38,10 +38,10 @@ export default function CaptureFromFile({ onRead }: { onRead: (c: Capture) => vo
 
   return (
     <div style={{ border: "1.5px dashed var(--hf-border)", borderRadius: 10, padding: 10, marginBottom: 14, fontSize: 12 }}>
-      <input ref={input} type="file" accept="application/pdf,.pdf" onChange={pick} style={{ display: "none" }} aria-label="Invoice or receipt PDF" />
+      <input ref={input} type="file" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" onChange={pick} style={{ display: "none" }} aria-label="Invoice or receipt file" />
       <button type="button" disabled={busy} onClick={() => input.current?.click()}
         style={{ padding: "6px 12px", borderRadius: 8, border: "1.5px solid var(--hf-border)", background: "var(--hf-surface)", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
-        {busy ? "Reading…" : "Read from a PDF"}
+        {busy ? "Reading…" : "Read from a file"}
       </button>
       <span style={{ marginLeft: 8, color: "var(--hf-text-faint)" }}>Fills in what it can find. Check every field before saving.</span>
       {error && <div role="alert" style={{ marginTop: 6, color: "var(--hf-danger-text, #b91c1c)" }}>{error}</div>}

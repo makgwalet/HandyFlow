@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { billFields, claimFields, isPdf, type Capture } from "./capture.logic"
+import { billFields, claimFields, isReadable, type Capture } from "./capture.logic"
 
 const base: Capture = { textFound: true, supplierName: "ACME", documentNumber: "INV-1", documentDate: "2026-10-01", dueDate: "2026-10-31",
   total: 920, vatAmount: 120, supplierVatNumber: null, notes: [] }
@@ -19,8 +19,9 @@ describe("capture fields", () => {
   it("fills a claim with the total", () => {
     expect(claimFields(base).amount).toBe("920.00")
   })
-  it("accepts only pdf", () => {
-    expect(isPdf("a.PDF", "")).toBe(true)
-    expect(isPdf("a.jpg", "image/jpeg")).toBe(false)
+  it("accepts pdf and photos", () => {
+    expect(isReadable("a.PDF", "")).toBe(true)
+    expect(isReadable("a.jpg", "image/jpeg")).toBe(true)
+    expect(isReadable("a.docx", "")).toBe(false)
   })
 })

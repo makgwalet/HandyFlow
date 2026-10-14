@@ -223,3 +223,11 @@ notifications:
 # Permissions travel in the JWT (packed, see PermissionCodec); headroom for the token plus cookies.
 server:
   max-http-request-header-size: 16KB
+
+# Reading photos and scanned PDFs (receipts, supplier invoices). Runs Tesseract on this server, so the
+# document never leaves it. Needs `tesseract` (plus `pdftoppm` for scanned PDFs, from poppler-utils)
+# installed on the host, e.g. apt-get install tesseract-ocr poppler-utils. Off by default.
+capture:
+  ocr:
+    enabled: ${CAPTURE_OCR_ENABLED:false}
+    languages: ${CAPTURE_OCR_LANGUAGES:eng}   # e.g. eng+afr once tesseract-ocr-afr is installed

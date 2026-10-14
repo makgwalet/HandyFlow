@@ -36,4 +36,5 @@ export function claimFields(c: Capture): Record<string, string> {
   return out
 }
 
-export const isPdf = (name: string, type: string) => type === "application/pdf" || /\.pdf$/i.test(name)
+export const isReadable = (name: string, type: string) =>
+  type === "application/pdf" || /\.(pdf|jpe?g|png)$/i.test(name) || type === "image/jpeg" || type === "image/png"
