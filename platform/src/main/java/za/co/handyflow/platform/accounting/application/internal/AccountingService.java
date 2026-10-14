@@ -48,6 +48,8 @@ public class AccountingService {
     private final AccBankReconciliationRepository bankRecRepo;
     // Finance patch F24: lines may carry a cost centre, department, branch or project.
     private final CostCentreService            costCentres;
+    // Finance patch F28: lines without a cost centre are tagged by the business's own rules.
+    private final TagRuleService               tagRules;
 
     // ── Chart of Accounts ─────────────────────────────────────────────────────
 
@@ -116,6 +118,26 @@ public class AccountingService {
         return createJournalEntry(tenantId, req, createdBy, null);
     }
 
+    /** The cost centre for each line: the one the poster gave, else the first matching tag rule's, else none. */
+    private List<UUID> autoTag(TenantId tenantId, CreateJournalEntryRequest req) {
+        List<UUID> out = new ArrayList<>();
+        boolean needs = req.lines().stream().anyMatch(l -> l.costCentreId() == null);
+        List<TagRules.Rule> rules = needs ? tagRules.activeRules(tenantId) : List.of();
+        Map<UUID, AccAccount> accounts = rules.isEmpty() ? Map.of()
+                : accountRepo.findAllActive(tenantId).stream().collect(Collectors.toMap(AccAccount::getId, a -> a));
+        for (var lr : req.lines()) {
+            UUID centre = lr.costCentreId();
+            AccAccount acc = accounts.get(lr.accountId());
+            if (centre == null && acc != null) {
+                TagRules.Rule r = TagRules.pick(rules, new TagRules.Line(acc.getAccountCode(), acc.getAccountType(), lr.description(),
+                        req.description(), req.reference(), req.entryType(), null));
+                if (r != null) centre = r.costCentreId();
+            }
+            out.add(centre);
+        }
+        return out;
+    }
+
     private JournalEntryResponse createJournalEntry(TenantId tenantId, CreateJournalEntryRequest req,
                                                     UUID createdBy, String sourceKey) {
         coaSeeder.seedForTenant(tenantId);
@@ -152,7 +174,9 @@ public class AccountingService {
                                 + "each line must be one or the other, not both");
         }
 
-        costCentres.requireUsable(tenantId, req.lines().stream().map(CreateJournalEntryRequest.JournalLineRequest::costCentreId).toList());
+        // F28: a line the poster left untagged takes the first matching rule's cost centre (income and expense lines only).
+        List<UUID> centreFor = autoTag(tenantId, req);
+        costCentres.requireUsable(tenantId, centreFor);
 
         String entryNumber = numberGen.next(tenantId);
         AccJournalEntry entry = AccJournalEntry.create(
@@ -168,7 +192,7 @@ public class AccountingService {
             AccJournalLine line = debit.compareTo(BigDecimal.ZERO) > 0
                     ? AccJournalLine.debit(tenantId.getValue(),  entry.getId(), lr.accountId(), debit,  lr.description(), i)
                     : AccJournalLine.credit(tenantId.getValue(), entry.getId(), lr.accountId(), credit, lr.description(), i);
-            line.withCostCentre(lr.costCentreId());
+            line.withCostCentre(centreFor.get(i));
             entry.addLine(line);
             i++;
         }

@@ -9,6 +9,9 @@ export const KINDS: { value: string; label: string }[] = [
   { value: "DEPARTMENT", label: "Department" },
   { value: "BRANCH", label: "Branch" },
   { value: "PROJECT", label: "Project" },
+  { value: "SITE", label: "Site" },
+  { value: "VEHICLE", label: "Vehicle" },
+  { value: "PERSON", label: "Person (guard, driver, consultant)" },
 ]
 
 export const kindLabel = (k: string | null | undefined) => KINDS.find(x => x.value === k)?.label ?? "—"

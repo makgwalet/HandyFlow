@@ -51,13 +51,14 @@ class AccountingServiceEscapingTest {
     @Mock private EmailService emailService;
     @Mock private za.co.handyflow.platform.accounting.domain.repository.AccBankReconciliationRepository bankRecRepo;
     @Mock private CostCentreService costCentres;
+    @Mock private TagRuleService tagRules;
 
     private static final String PAYLOAD = "<script>alert(1)</script>";
     private static final String ESCAPED = "&lt;script&gt;alert(1)&lt;/script&gt;";
 
     private AccountingService service() {
         return new AccountingService(accountRepo, journalRepo, bankAccountRepo, bankTxRepo,
-                vatPeriodRepo, coaSeeder, numberGen, periodLock, invoicingFacade, crmFacade, emailService, bankRecRepo, costCentres);
+                vatPeriodRepo, coaSeeder, numberGen, periodLock, invoicingFacade, crmFacade, emailService, bankRecRepo, costCentres, tagRules);
     }
 
     @Test

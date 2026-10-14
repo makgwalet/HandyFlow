@@ -23,6 +23,8 @@ import FixedAssetsTab from "./FixedAssetsTab"
 import DepreciationTab from "./DepreciationTab"
 import GroupTab from "./GroupTab"
 import ConsolidationTab from "./ConsolidationTab"
+import ProfitabilityTab from "./ProfitabilityTab"
+import TagRulesTab from "./TagRulesTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { ACCOUNTING_SECTIONS } from "../../navigation/moduleSections"
 
@@ -48,6 +50,8 @@ export function AccountingPage() {
         case "depreciation": return <DepreciationTab />
         case "group":     return <GroupTab />
         case "consolidation": return <ConsolidationTab />
+        case "profitability": return <ProfitabilityTab />
+        case "tagrules":  return <TagRulesTab />
         case "reports":   return <ReportsTab />
         case "vat":       return <VatReturnsTab />
         case "aging":     return <AgingTab />

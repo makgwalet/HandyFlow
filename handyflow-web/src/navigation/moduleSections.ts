@@ -238,6 +238,8 @@ export const ACCOUNTING_SECTIONS: ModuleSections = {
         { id: 'accounts', label: 'Chart of Accounts', icon: BookOpen },
         // Finance patch F24: cost centres, departments, branches and projects.
         { id: 'centres', label: 'Cost centres', icon: LayoutGrid, permission: 'ACCOUNTING_READ' },
+        // Finance patch F28: automatic tagging of journal lines.
+        { id: 'tagrules', label: 'Tagging rules', icon: GitBranch, permission: 'ACCOUNTING_READ' },
         // Finance patch F25: fixed-asset register and monthly depreciation.
         { id: 'assets', label: 'Fixed assets', icon: Package, permission: 'ACCOUNTING_READ' },
         { id: 'depreciation', label: 'Depreciation', icon: CalendarClock, permission: 'ACCOUNTING_READ' },
@@ -265,6 +267,7 @@ export const ACCOUNTING_SECTIONS: ModuleSections = {
         { id: 'budgets', label: 'Budgets', icon: Wallet, permission: 'ACCOUNTING_READ' },
         { id: 'forecast', label: 'Cash forecast', icon: TrendingUp, permission: 'ACCOUNTING_READ' },
         { id: 'bycentre', label: 'By cost centre', icon: FileBarChart, permission: 'ACCOUNTING_READ' },
+        { id: 'profitability', label: 'Profitability', icon: TrendingUp, permission: 'ACCOUNTING_READ' },
         // Finance patch F26: groups of companies and consolidated statements.
         { id: 'group', label: 'Company group', icon: Building2, permission: 'ACCOUNTING_READ' },
         { id: 'consolidation', label: 'Consolidation', icon: Scale, permission: 'ACCOUNTING_READ' },

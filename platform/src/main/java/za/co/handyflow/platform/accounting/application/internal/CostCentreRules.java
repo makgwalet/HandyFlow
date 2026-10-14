@@ -7,7 +7,7 @@ import java.util.*;
 public final class CostCentreRules {
     private CostCentreRules() {}
 
-    public static final Set<String> KINDS = Set.of("COST_CENTRE", "DEPARTMENT", "BRANCH", "PROJECT");
+    public static final Set<String> KINDS = Set.of("COST_CENTRE", "DEPARTMENT", "BRANCH", "PROJECT", "SITE", "VEHICLE", "PERSON");
     /** Deepest nesting allowed, so reports stay readable. */
     public static final int MAX_DEPTH = 4;
 
@@ -18,7 +18,7 @@ public final class CostCentreRules {
         if (!c.matches("[A-Za-z0-9._-]+")) return "A code uses letters, digits, dots, dashes and underscores only.";
         if (name == null || name.isBlank()) return "Give it a name.";
         if (name.trim().length() > 120) return "The name is too long (120 characters at most).";
-        if (kind == null || !KINDS.contains(kind)) return "Choose cost centre, department, branch or project.";
+        if (kind == null || !KINDS.contains(kind)) return "Choose cost centre, department, branch, project, site, vehicle or person.";
         return null;
     }
 
