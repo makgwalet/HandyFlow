@@ -101,13 +101,8 @@ public class AccountingService {
         return createJournalEntry(tenantId, req, null);
     }
 
-    // New overload — the only caller that should ever pass a real
-    // createdBy is the controller's own POST /journal-entries endpoint
-    // (the manual "New Journal Entry" flow). AccountingFacade and
-    // reconcileWithNewJournal() keep calling the 2-arg version above
-    // unchanged, so createdBy stays null for AP- and reconciliation-
-    // triggered journals — correct, since those already went through
-    // their own review elsewhere and don't need a second one here.
+    // createdBy is the person making the journal (the Journal Entries screen, a reconciliation with a new journal);
+    // null for journals the system makes. See AccJournalEntry.create and JournalReviewRules (finance patch F2).
     @Transactional
     public JournalEntryResponse createJournalEntry(TenantId tenantId,
                                                    CreateJournalEntryRequest req,
@@ -175,44 +170,70 @@ public class AccountingService {
         return toJournalResponse(entry, accountMap);
     }
 
+    /**
+     * The system's post, for journals the system made from a transaction approved where it started (issued invoice,
+     * approved bill or expense claim, credit note, POS session). Finance patch F2: a journal a person made is refused here,
+     * because it must be posted by a different person through {@link #postJournalEntryWithReview}.
+     */
     @Transactional
     public JournalEntryResponse postJournalEntry(TenantId tenantId, UUID id) {
         AccJournalEntry entry = journalRepo.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("JournalEntry", id.toString()));
-        if (!"DRAFT".equals(entry.getStatus()))
-            throw new IllegalStateException(
-                    "Only DRAFT entries can be posted — current status: " + entry.getStatus());
-        entry.post();
-        journalRepo.save(entry);
-        log.info("Posted journal entry={}", entry.getEntryNumber());
-        Map<UUID, AccAccount> accountMap = accountRepo.findAllActive(tenantId)
-                .stream().collect(Collectors.toMap(AccAccount::getId, a -> a));
-        return toJournalResponse(entry, accountMap);
+        if (entry.getCreatedBy() != null || entry.getReversesEntryId() != null)
+            throw new HandyFlowException(
+                    "This journal was made by a person — a different person must post it from Journal Entries",
+                    HttpStatus.CONFLICT, "NEEDS_REVIEW");
+        return doPost(tenantId, entry, null);
     }
 
     /**
-     * The maker-checker-enforcing post — this is what the controller's
-     * own POST /journal-entries/{id}/post endpoint calls, NOT
-     * postJournalEntry() directly. AccountingFacade (AP) and
-     * reconcileWithNewJournal() both still call the plain
-     * postJournalEntry() above, unchanged — this check only applies to
-     * journals posted through the manual Journal Entries UI.
+     * A person posts a draft: what POST /journal-entries/{id}/post calls. The person who made the journal cannot post it
+     * (JournalReviewRules). Posting a drafted reversal marks the journal it reverses as REVERSED.
      * <p>
-     * createdBy == null (every entry created before this feature existed,
-     * or anything created via the facade/reconciliation paths) skips the
-     * check entirely rather than blocking — this is a going-forward
-     * control, not a retroactive lockout of existing data.
+     * Journals with no maker (made by the system, or by a person before makers were recorded) may be posted by anyone
+     * allowed to post; this is a going-forward control, not a lockout of existing drafts.
      */
     @Transactional
     public JournalEntryResponse postJournalEntryWithReview(TenantId tenantId, UUID id, UUID postedBy) {
         AccJournalEntry entry = journalRepo.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("JournalEntry", id.toString()));
-        if (entry.getCreatedBy() != null && entry.getCreatedBy().equals(postedBy)) {
-            throw new HandyFlowException(
-                    "This journal entry was created by you — a different person must post it",
-                    HttpStatus.BAD_REQUEST, "SAME_PERSON");
+        String problem = JournalReviewRules.postProblem(entry.getCreatedBy(), postedBy);
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.BAD_REQUEST, "SAME_PERSON");
+        return doPost(tenantId, entry, postedBy);
+    }
+
+    /** Discards a draft journal (finance patch F2), e.g. a reversal the reviewer will not post. Posted journals are reversed, never discarded. */
+    @Transactional
+    public void discardDraft(TenantId tenantId, UUID id, UUID discardedBy) {
+        AccJournalEntry entry = journalRepo.findActiveById(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("JournalEntry", id.toString()));
+        entry.discard();
+        journalRepo.save(entry);
+        log.info("Discarded draft journal entry={} tenant={} by={}", entry.getEntryNumber(), tenantId, discardedBy);
+    }
+
+    private JournalEntryResponse doPost(TenantId tenantId, AccJournalEntry entry, UUID postedBy) {
+        if (!"DRAFT".equals(entry.getStatus()))
+            throw new IllegalStateException(
+                    "Only DRAFT entries can be posted — current status: " + entry.getStatus());
+        AccJournalEntry original = null;
+        if (entry.getReversesEntryId() != null) {
+            original = journalRepo.findActiveById(tenantId, entry.getReversesEntryId()).orElse(null);
+            String problem = JournalReviewRules.postReversalProblem(original != null ? original.getStatus() : null);
+            if (problem != null) throw new IllegalStateException(problem);
         }
-        return postJournalEntry(tenantId, id);
+        entry.post(postedBy);
+        journalRepo.save(entry);
+        if (original != null) {
+            original.markReversed(entry.getEntryNumber());
+            journalRepo.save(original);
+            log.info("Posted reversal={} of entry={} by={}", entry.getEntryNumber(), original.getEntryNumber(), postedBy);
+        } else {
+            log.info("Posted journal entry={} by={}", entry.getEntryNumber(), postedBy);
+        }
+        Map<UUID, AccAccount> accountMap = accountRepo.findAllActive(tenantId)
+                .stream().collect(Collectors.toMap(AccAccount::getId, a -> a));
+        return toJournalResponse(entry, accountMap);
     }
 
     @Transactional(readOnly = true)
@@ -221,13 +242,19 @@ public class AccountingService {
                 .map(AccBankAccount::getAccountId);
     }
 
+    /**
+     * Drafts the reversal of a posted journal (finance patch F2). Before this, the reversal was posted at once by whoever
+     * clicked Reverse; now it is a draft made by {@code requestedBy} that a different person posts, and the original is
+     * marked REVERSED only then. One reversal per journal.
+     */
     @Transactional
     public JournalEntryResponse reverseJournalEntry(TenantId tenantId, UUID id,
-                                                    LocalDate reversalDate) {
+                                                    LocalDate reversalDate, UUID requestedBy) {
         AccJournalEntry original = journalRepo.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("JournalEntry", id.toString()));
-        if (!"POSTED".equals(original.getStatus()))
-            throw new IllegalStateException("Only POSTED entries can be reversed");
+        String pending = journalRepo.findReversalOf(tenantId, id).map(AccJournalEntry::getEntryNumber).orElse(null);
+        String problem = JournalReviewRules.reversalProblem(original.getStatus(), pending);
+        if (problem != null) throw new IllegalStateException(problem);
 
         LocalDate date = reversalDate != null ? reversalDate : LocalDate.now();
         String reversalNumber = numberGen.next(tenantId);
@@ -235,7 +262,8 @@ public class AccountingService {
         AccJournalEntry reversal = AccJournalEntry.create(
                 tenantId, reversalNumber, date,
                 "REVERSAL of " + original.getEntryNumber() + ": " + original.getDescription(),
-                "REV-" + original.getEntryNumber(), "ADJUSTMENT");
+                "REV-" + original.getEntryNumber(), "ADJUSTMENT", requestedBy);
+        reversal.markAsReversalOf(original.getId());
         journalRepo.save(reversal);
 
         int i = 0;
@@ -253,13 +281,9 @@ public class AccountingService {
             reversal.addLine(reversalLine);
             i++;
         }
-
-        reversal.post();
         journalRepo.save(reversal);
-        original.markReversed(reversalNumber);
-        journalRepo.save(original);
 
-        log.info("Reversed entry={} → reversal={}", original.getEntryNumber(), reversalNumber);
+        log.info("Drafted reversal={} of entry={} by={}", reversalNumber, original.getEntryNumber(), requestedBy);
         Map<UUID, AccAccount> accountMap = accountRepo.findAllActive(tenantId)
                 .stream().collect(Collectors.toMap(AccAccount::getId, a -> a));
         return toJournalResponse(reversal, accountMap);
@@ -563,6 +587,18 @@ public class AccountingService {
     @Transactional
     public BankTransactionResponse reconcileWithNewJournal(TenantId tenantId, UUID bankAccountId,
                                                            UUID transactionId, ReconcileWithNewJournalRequest req) {
+        return reconcileWithNewJournal(tenantId, bankAccountId, transactionId, req, null);
+    }
+
+    /**
+     * Finance patch F2: records who made and posted the journal. It still posts at once: the amount, date and bank side
+     * come from the imported bank statement, so the person chooses only the other account, and the bank line itself is the
+     * evidence. Month-end review of these is covered by the reconciliation sign-off (plan step 12).
+     */
+    @Transactional
+    public BankTransactionResponse reconcileWithNewJournal(TenantId tenantId, UUID bankAccountId,
+                                                           UUID transactionId, ReconcileWithNewJournalRequest req,
+                                                           UUID userId) {
         AccBankAccount bank = bankAccountRepo.findActiveById(tenantId, bankAccountId)
                 .orElseThrow(() -> new ResourceNotFoundException("BankAccount", bankAccountId.toString()));
         AccBankTransaction tx = bankTxRepo.findById(transactionId)
@@ -597,8 +633,10 @@ public class AccountingService {
         CreateJournalEntryRequest createReq = new CreateJournalEntryRequest(
                 tx.getTransactionDate(), description, tx.getReference(), "MANUAL", lines);
 
-        JournalEntryResponse created = createJournalEntry(tenantId, createReq);
-        JournalEntryResponse posted  = postJournalEntry(tenantId, created.id());
+        JournalEntryResponse created = createJournalEntry(tenantId, createReq, userId);
+        AccJournalEntry createdEntry = journalRepo.findActiveById(tenantId, created.id())
+                .orElseThrow(() -> new ResourceNotFoundException("JournalEntry", created.id().toString()));
+        JournalEntryResponse posted  = doPost(tenantId, createdEntry, userId);
 
         UUID bankLineId = posted.lines().stream()
                 .filter(l -> bank.getAccountId().equals(l.accountId()))
@@ -944,7 +982,7 @@ public class AccountingService {
         return new JournalEntryResponse(e.getId(), e.getEntryNumber(), e.getEntryDate(),
                 e.getDescription(), e.getReference(), e.getEntryType(), e.getStatus(),
                 e.getTotalDebit(), e.getTotalCredit(), e.isBalanced(), lines,
-                e.getCreatedBy(), e.getCreatedAt());
+                e.getCreatedBy(), e.getCreatedAt(), e.getPostedBy(), e.getPostedAt(), e.getReversesEntryId());
     }
 
     private BankAccountResponse toBankAccountResponse(AccBankAccount b) {

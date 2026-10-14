@@ -1,15 +1,18 @@
 // src/pages/accounting/JournalEntriesTab.tsx
-import { useState } from "react"
+import { Fragment, useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, ChevronDown, ChevronUp, CheckCircle, RotateCcw, AlertCircle, X, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
+import { useAuth } from "../../hooks/useAuth"
+import { usePermission } from "../../hooks/usePermission"
 
 interface Account { id: string; accountCode: string; accountName: string; accountType: string }
 interface JournalLine { id: string; accountId: string; accountCode: string; accountName: string
   description: string; debitAmount: number; creditAmount: number }
 interface Journal { id: string; entryNumber: string; entryDate: string; description: string
   reference: string; entryType: string; status: string; totalDebit: number; totalCredit: number
-  balanced: boolean; lines: JournalLine[]; createdBy: string | null; createdAt: string }
+  balanced: boolean; lines: JournalLine[]; createdBy: string | null; createdAt: string
+  postedBy?: string | null; postedAt?: string | null; reversesEntryId?: string | null }
 
 const STATUS: Record<string, { label: string; bg: string; color: string }> = {
   DRAFT:    { label: "Draft",    bg: "var(--hf-surface-sunken)", color: "var(--hf-text-tertiary)" },
@@ -34,6 +37,12 @@ export default function JournalEntriesTab() {
   const [reverseTarget, setReverseTarget] = useState<Journal | null>(null)
   const [reversalDate, setReversalDate] = useState(new Date().toISOString().split("T")[0])
   const [error, setError] = useState("")
+  const [notice, setNotice] = useState("")
+  // Finance patch F2: whoever made a journal (including a drafted reversal) cannot post it.
+  const { user } = useAuth()
+  const canPost = usePermission("ACCOUNTING_ADMIN")
+  const canDraft = usePermission("ACCOUNTING_MANAGE")
+  const madeByMe = (j: Journal) => !!j.createdBy && j.createdBy === user?.userId
 
   // Form state
   const [form, setForm] = useState({
@@ -101,8 +110,14 @@ export default function JournalEntriesTab() {
 
   const post = useMutation({
     mutationFn: (id: string) => apiClient.post(`/api/v1/accounting/journal-entries/${id}/post`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["journals"] }),
+    onSuccess: () => { setNotice(""); qc.invalidateQueries({ queryKey: ["journals"] }) },
     onError: (e: any) => setError(e.response?.data?.message ?? "Failed to post journal entry"),
+  })
+
+  const discard = useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/api/v1/accounting/journal-entries/${id}`),
+    onSuccess: () => { setNotice(""); qc.invalidateQueries({ queryKey: ["journals"] }) },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to discard draft"),
   })
 
   const reverse = useMutation({
@@ -110,6 +125,7 @@ export default function JournalEntriesTab() {
       apiClient.post(`/api/v1/accounting/journal-entries/${id}/reverse`, { reversalDate: date }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["journals"] })
+      setNotice(`Reversal of ${reverseTarget?.entryNumber ?? "the journal"} drafted. A different person must post it; the original is marked Reversed then.`)
       setReverseTarget(null)
     },
     onError: (e: any) => setError(e.response?.data?.message ?? "Failed to reverse entry"),
@@ -155,6 +171,14 @@ export default function JournalEntriesTab() {
           from within a modal, so it needs its own visible error area
           rather than relying on the Create/Reverse modals' error blocks,
           which a Post failure would never reach. */}
+      {notice && !error && (
+        <div role="status" style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px",
+          background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border-subtle)", borderRadius: 8,
+          fontSize: 13, color: "var(--hf-success-text-strong)", marginBottom: 16 }}>
+          <CheckCircle size={14} />{notice}
+        </div>
+      )}
+
       {error && !showCreate && !reverseTarget && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px",
           background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8,
@@ -186,7 +210,7 @@ export default function JournalEntriesTab() {
                 const ss = STATUS[j.status] ?? STATUS.DRAFT
                 const isExp = expanded === j.id
                 return (
-                  <>
+                  <Fragment key={j.id}>
                     <tr key={j.id}
                       onClick={() => setExpanded(isExp ? null : j.id)}
                       style={{ borderBottom: "1px solid var(--hf-border-subtle)", cursor: "pointer",
@@ -214,7 +238,14 @@ export default function JournalEntriesTab() {
                       </td>
                       <td style={{ padding: "12px 14px" }}>
                         <div style={{ display: "flex", gap: 5 }} onClick={e => e.stopPropagation()}>
-                          {j.status === "DRAFT" && (
+                          {j.status === "DRAFT" && canPost && madeByMe(j) && (
+                            <span title="You made this journal, so a different person must post it"
+                              style={{ padding: "5px 10px", fontSize: 11, color: "var(--hf-text-tertiary)",
+                                border: "1px dashed var(--hf-border)", borderRadius: 6 }}>
+                              Awaiting another person
+                            </span>
+                          )}
+                          {j.status === "DRAFT" && canPost && !madeByMe(j) && (
                             <button onClick={() => { setError(""); post.mutate(j.id) }} disabled={post.isPending}
                               style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px",
                                 background: "var(--hf-success-soft)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border-subtle)",
@@ -222,7 +253,20 @@ export default function JournalEntriesTab() {
                               <CheckCircle size={11} /> Post
                             </button>
                           )}
-                          {j.status === "POSTED" && (
+                          {j.status === "DRAFT" && canDraft && (
+                            <button aria-label={`Discard draft ${j.entryNumber}`} title="Discard this draft"
+                              onClick={() => {
+                                if (!window.confirm(`Discard draft ${j.entryNumber}? It will not be posted.`)) return
+                                setError(""); discard.mutate(j.id)
+                              }}
+                              disabled={discard.isPending}
+                              style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 8px",
+                                background: "var(--hf-surface)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)",
+                                borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                              <Trash2 size={11} />
+                            </button>
+                          )}
+                          {j.status === "POSTED" && canPost && (
                             <button onClick={() => { setReverseTarget(j); setError("") }}
                               style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px",
                                 background: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text-deep)", border: "1px solid var(--hf-warning-border-strong)",
@@ -279,7 +323,7 @@ export default function JournalEntriesTab() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 )
               })}
             </tbody>
@@ -427,7 +471,7 @@ export default function JournalEntriesTab() {
           <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700 }}>Reverse Journal Entry</h3>
             <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: "0 0 20px" }}>
-              Creates an equal-and-opposite posted journal entry. The original will be marked REVERSED.
+              Drafts an equal-and-opposite journal. A different person must post it, and the original is marked Reversed when they do.
             </p>
             <div style={{ background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 8,
               padding: "10px 14px", marginBottom: 20, fontSize: 13, color: "var(--hf-warning-text-deep)" }}>
@@ -450,7 +494,7 @@ export default function JournalEntriesTab() {
                 onClick={() => reverse.mutate({ id: reverseTarget.id, date: reversalDate })}
                 style={{ padding: "9px 20px", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700,
                   background: "var(--hf-warning)", color: "var(--hf-text-on-solid)", cursor: "pointer" }}>
-                {reverse.isPending ? "Reversing..." : "Confirm Reversal"}
+                {reverse.isPending ? "Drafting..." : "Draft reversal"}
               </button>
             </div>
           </div>

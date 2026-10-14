@@ -125,13 +125,22 @@ public class AccountingController {
 
     @PostMapping("/journal-entries/{id}/reverse")
     @PreAuthorize("hasAuthority('ACCOUNTING_ADMIN')")
-    @Operation(summary = "Reverse a POSTED journal entry — creates equal-and-opposite entry dated today (or supplied date)")
+    @Operation(summary = "Draft the reversal of a POSTED journal entry (equal and opposite, dated today or the supplied date). A different person posts the draft; the original is marked REVERSED then.")
     public ResponseEntity<ApiResponse<JournalEntryResponse>> reverseJournalEntry(
             @PathVariable UUID id,
             @RequestBody(required = false) ReverseJournalRequest req) {
         LocalDate reversalDate = req != null ? req.reversalDate() : null;
-        return ResponseEntity.ok(ApiResponse.success("Journal entry reversed",
-                accountingService.reverseJournalEntry(TenantContext.getTenantIdAsObject(), id, reversalDate)));
+        return ResponseEntity.ok(ApiResponse.success("Reversal drafted. A different person must post it",
+                accountingService.reverseJournalEntry(TenantContext.getTenantIdAsObject(), id, reversalDate,
+                        TenantContext.getCurrentUserId())));
+    }
+
+    @DeleteMapping("/journal-entries/{id}")
+    @PreAuthorize("hasAuthority('ACCOUNTING_MANAGE')")
+    @Operation(summary = "Discard a DRAFT journal entry (for example a reversal that will not be posted). Posted entries cannot be discarded; reverse them.")
+    public ResponseEntity<ApiResponse<Void>> discardJournalEntry(@PathVariable UUID id) {
+        accountingService.discardDraft(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId());
+        return ResponseEntity.ok(ApiResponse.success("Draft journal discarded", null));
     }
 
     // ── Bank Accounts ─────────────────────────────────────────────────────────
@@ -229,7 +238,8 @@ public class AccountingController {
             @PathVariable UUID id, @PathVariable UUID txId,
             @Valid @RequestBody ReconcileWithNewJournalRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Transaction reconciled",
-                accountingService.reconcileWithNewJournal(TenantContext.getTenantIdAsObject(), id, txId, req)));
+                accountingService.reconcileWithNewJournal(TenantContext.getTenantIdAsObject(), id, txId, req,
+                        TenantContext.getCurrentUserId())));
     }
 
     // ── VAT ───────────────────────────────────────────────────────────────────

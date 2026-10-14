@@ -46,6 +46,10 @@ public class AccJournalEntry {
     @Column(name = "total_credit") BigDecimal totalCredit = BigDecimal.ZERO;
     @Column(name = "posted_at")    Instant postedAt;
     @Column(name = "created_by")   UUID createdBy;
+    /** Finance patch F2: who posted it; null when the system posted it. */
+    @Column(name = "posted_by")    UUID postedBy;
+    /** Finance patch F2: on a reversal, the journal it reverses. */
+    @Column(name = "reverses_entry_id") UUID reversesEntryId;
     @Column(name = "created_at")   Instant createdAt;
     @Column(name = "updated_at")   Instant updatedAt;
     @Column(name = "deleted_at")   Instant deletedAt;
@@ -61,14 +65,11 @@ public class AccJournalEntry {
         return create(tenantId, entryNumber, entryDate, description, reference, entryType, null);
     }
 
-    // Overload, not a signature change — AccountingFacade (AP) and
-    // reconcileWithNewJournal() both call the 6-arg version above and
-    // stay completely untouched. createdBy is only ever real for entries
-    // created through the manual "New Journal Entry" flow — those two
-    // other paths represent business events that are already reviewed
-    // elsewhere (AP's own bill maker-checker, a staff member's deliberate
-    // reconciliation click), so createdBy stays null for them, and the
-    // maker-checker check added alongside this treats null as "skip".
+    // createdBy is the person who made the journal: the manual "New Journal Entry" flow, a drafted reversal, or a
+    // bank line reconciled with a new journal (finance patch F2). It stays null for journals the system makes from a
+    // transaction approved where it started (invoice, bill, expense claim, credit note, POS session). A journal with a
+    // maker must be posted by a different person (JournalReviewRules); reconciliation journals are the one exception,
+    // see AccountingService.reconcileWithNewJournal.
     public static AccJournalEntry create(TenantId tenantId, String entryNumber,
                                          LocalDate entryDate, String description,
                                          String reference, String entryType,
@@ -98,12 +99,18 @@ public class AccJournalEntry {
     }
 
     public void post() {
+        post(null);
+    }
+
+    /** Posts the journal and records who posted it (null for the system). */
+    public void post(UUID postedBy) {
         if (!"DRAFT".equals(status))
             throw new IllegalStateException("Only DRAFT entries can be posted");
         if (totalDebit.compareTo(totalCredit) != 0)
             throw new IllegalStateException("Journal does not balance — debits must equal credits");
         this.status   = "POSTED";
         this.postedAt = Instant.now();
+        this.postedBy = postedBy;
         this.updatedAt = Instant.now();
     }
 
@@ -114,6 +121,19 @@ public class AccJournalEntry {
         this.reference = (this.reference != null ? this.reference + " | " : "")
                 + "Reversed by: " + reversalEntryNumber;
         this.updatedAt = java.time.Instant.now();
+    }
+
+    /** Marks a new draft as the reversal of {@code originalId} (finance patch F2). */
+    public void markAsReversalOf(UUID originalId) {
+        if (!"DRAFT".equals(status)) throw new IllegalStateException("Only a draft can be made a reversal");
+        this.reversesEntryId = originalId;
+    }
+
+    /** Discards a draft that should not be posted. Posted journals are never discarded; they are reversed. */
+    public void discard() {
+        if (!"DRAFT".equals(status)) throw new IllegalStateException("Only draft journals can be discarded");
+        this.deletedAt = Instant.now();
+        this.updatedAt = Instant.now();
     }
 
     public boolean isBalanced() {

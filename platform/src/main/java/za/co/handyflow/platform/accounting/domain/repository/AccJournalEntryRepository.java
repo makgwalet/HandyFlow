@@ -28,6 +28,10 @@ public interface AccJournalEntryRepository extends JpaRepository<AccJournalEntry
     @Query("SELECT e FROM AccJournalEntry e WHERE e.tenantId = :#{#tenantId.value} AND e.entryDate BETWEEN :from AND :to AND e.status = 'POSTED' AND e.deletedAt IS NULL ORDER BY e.entryDate")
     List<AccJournalEntry> findPostedInRange(TenantId tenantId, LocalDate from, LocalDate to);
 
+    /** The reversal of {@code originalId} that is drafted or posted, if any (finance patch F2). */
+    @Query("SELECT e FROM AccJournalEntry e WHERE e.tenantId = :#{#tenantId.value} AND e.reversesEntryId = :originalId AND e.deletedAt IS NULL")
+    Optional<AccJournalEntry> findReversalOf(TenantId tenantId, UUID originalId);
+
     @Query("SELECT COUNT(e) FROM AccJournalEntry e WHERE e.tenantId = :#{#tenantId.value}")
     long countByTenant(TenantId tenantId);
 }

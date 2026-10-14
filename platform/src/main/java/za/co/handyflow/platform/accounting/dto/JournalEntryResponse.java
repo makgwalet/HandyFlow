@@ -19,7 +19,10 @@ public record JournalEntryResponse(
         boolean balanced,
         List<JournalLineResponse> lines,
         UUID createdBy,
-        Instant createdAt
+        Instant createdAt,
+        UUID postedBy,
+        Instant postedAt,
+        UUID reversesEntryId
 ) {
     public record JournalLineResponse(
             UUID id,
