@@ -244,12 +244,16 @@ export const ACCOUNTING_SECTIONS: ModuleSections = {
         { id: 'posting', label: 'Posting problems', icon: AlertTriangle, liveBadge: 'posting-failures', permission: 'ACCOUNTING_READ' },
         // Finance patch F5: the lock date that closes the books.
         { id: 'lock', label: 'Period lock', icon: Lock, permission: 'ACCOUNTING_READ' },
+        // Finance patch F13: month-end checklist that ends by closing the books.
+        { id: 'close', label: 'Month-end close', icon: ListChecks, permission: 'ACCOUNTING_READ' },
       ],
     },
     {
       label: 'Reporting',
       sections: [
         { id: 'reports', label: 'Reports', icon: BarChart2 },
+        // Finance patch F13
+        { id: 'cashflow', label: 'Cash flow', icon: TrendingUp, permission: 'ACCOUNTING_READ' },
         { id: 'aging', label: 'AR / AP Aging', icon: Users },
       ],
     },
