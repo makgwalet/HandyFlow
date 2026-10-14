@@ -20,6 +20,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
+import DisputesPanel from "./DisputesPanel"
 import {
   Plus, Landmark, ChevronDown, ChevronUp, X, UserPlus, CalendarClock,
   ArrowRightCircle, Flag, AlertOctagon, Trash2, Download, FileDown,
@@ -173,6 +174,8 @@ function CaseDetailPanel({ c, canManage, canAdmin, invalidate }: { c: Case; canM
         ))}
       </div>
       {c.notes && <div style={{ marginBottom: 14, padding: "8px 12px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-text-secondary)" }}>{c.notes}</div>}
+
+      <DisputesPanel caseId={c.id} invoiceIds={c.linkedInvoiceIds} canManage={canManage} onChanged={invalidate} />
 
       {/* Contact log */}
       <div style={{ marginBottom: 18, paddingTop: 14, borderTop: "1px solid var(--hf-border)" }}>
