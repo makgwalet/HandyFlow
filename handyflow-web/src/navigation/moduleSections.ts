@@ -894,6 +894,17 @@ export const BOOKKEEPING_SECTIONS: ModuleSections = {
         { id: 'queries', label: 'Client queries', icon: MessageSquare, anyPermission: ['BOOKKEEPING_READ', 'BOOKKEEPING_MANAGE', 'BOOKKEEPING_ADMIN'] },
         { id: 'handover', label: 'Handover', icon: Send, anyPermission: ['BOOKKEEPING_READ', 'BOOKKEEPING_MANAGE', 'BOOKKEEPING_ADMIN'] },
         { id: 'periods', label: 'Months', icon: Calendar, anyPermission: ['BOOKKEEPING_READ', 'BOOKKEEPING_MANAGE', 'BOOKKEEPING_ADMIN'] },
+        { id: 'accounts', label: 'Chart of accounts', icon: BookIcon, anyPermission: ['BOOKKEEPING_READ', 'BOOKKEEPING_MANAGE', 'BOOKKEEPING_ADMIN'] },
+        { id: 'journals', label: 'Journals', icon: FileText, anyPermission: ['BOOKKEEPING_READ', 'BOOKKEEPING_MANAGE', 'BOOKKEEPING_ADMIN'] },
+      ],
+    },
+    {
+      label: 'Billing the client',
+      sections: [
+        { id: 'time', label: 'Time', icon: Clock, anyPermission: ['BOOKKEEPING_READ', 'BOOKKEEPING_MANAGE', 'BOOKKEEPING_ADMIN'] },
+        { id: 'agreements', label: 'Agreements', icon: Handshake, anyPermission: ['BOOKKEEPING_READ', 'BOOKKEEPING_MANAGE', 'BOOKKEEPING_ADMIN'] },
+        { id: 'invoices', label: 'Invoices', icon: Receipt, anyPermission: ['BOOKKEEPING_READ', 'BOOKKEEPING_MANAGE', 'BOOKKEEPING_ADMIN'] },
+        { id: 'portal', label: 'Client portal', icon: Users, anyPermission: ['BOOKKEEPING_READ', 'BOOKKEEPING_MANAGE', 'BOOKKEEPING_ADMIN'] },
       ],
     },
   ],

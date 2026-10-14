@@ -7,6 +7,12 @@ import BankRulesTab from "./BankRulesTab"
 import QueriesTab from "./QueriesTab"
 import HandoverTab from "./HandoverTab"
 import PeriodsTab from "./PeriodsTab"
+import AccountsTab from "./AccountsTab"
+import JournalsTab from "./JournalsTab"
+import TimeTab from "./TimeTab"
+import AgreementsTab from "./AgreementsTab"
+import InvoicesTab from "./InvoicesTab"
+import PortalUsersTab from "./PortalUsersTab"
 
 export function BookkeepingPage() {
   return (
@@ -19,6 +25,12 @@ export function BookkeepingPage() {
         case "queries":  return <QueriesTab />
         case "handover": return <HandoverTab />
         case "periods":  return <PeriodsTab />
+        case "accounts": return <AccountsTab />
+        case "journals": return <JournalsTab />
+        case "time":     return <TimeTab />
+        case "agreements": return <AgreementsTab />
+        case "invoices": return <InvoicesTab />
+        case "portal":   return <PortalUsersTab />
         default:         return null
       }
     }} />
