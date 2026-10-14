@@ -17,6 +17,7 @@
 // components/shell/SectionedModulePage).
 import DebtCollectionDashboard from "./DebtCollectionDashboard"
 import CasesTab from "./CasesTab"
+import StrategiesTab from "./StrategiesTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { DEBT_COLLECTION_SECTIONS } from "../../navigation/moduleSections"
 
@@ -28,6 +29,7 @@ export function DebtCollectionPage() {
         switch (id) {
           case "dashboard": return <DebtCollectionDashboard onNavigate={goTo} />
           case "cases":     return <CasesTab />
+          case "strategies": return <StrategiesTab />
           default:          return null
         }
       }} />

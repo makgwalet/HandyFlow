@@ -631,6 +631,8 @@ export const DEBT_COLLECTION_SECTIONS: ModuleSections = {
   groups: [
     { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
     { label: 'Collections', sections: [{ id: 'cases', label: 'Cases', icon: Landmark }] },
+    // Finance patch F23: when to call, remind, demand or review, by balance and days overdue.
+    { label: 'Setup', sections: [{ id: 'strategies', label: 'Strategies', icon: GitBranch, permission: 'DEBTCOLLECTION_READ' }] },
   ],
 }
 
