@@ -177,8 +177,12 @@ public class InvoicePdfService {
                 .setPaddingRight(40).setPaddingTop(24).setPaddingBottom(24).setPaddingLeft(20)
                 .setTextAlignment(TextAlignment.RIGHT);
 
-        right.add(new Paragraph("TAX INVOICE")
-                .setFont(bold).setFontSize(26).setFontColor(TEAL)
+        // Finance patch F14: only a VAT vendor issues a "Tax Invoice", and a draft is not yet a document.
+        boolean issuedDoc = invoice.getStatus() != null && !"DRAFT".equals(invoice.getStatus().name());
+        String heading = TaxDocumentRules.invoiceHeading(issuedDoc,
+                tenant.vatNumber() != null && !tenant.vatNumber().isBlank());
+        right.add(new Paragraph(heading)
+                .setFont(bold).setFontSize(heading.length() > 12 ? 18 : 26).setFontColor(TEAL)
                 .setMarginBottom(8));
 
         right.add(new Paragraph(invoice.getInvoiceNumber())
@@ -267,7 +271,7 @@ public class InvoicePdfService {
                             if (c.email() != null) billTo.add(bodyLine(c.email(), regular));
                             if (c.phone() != null) billTo.add(bodyLine(c.phone(), regular));
                             if (c.taxNumber() != null)
-                                billTo.add(bodyLine("VAT: " + c.taxNumber(), regular));
+                                billTo.add(bodyLine("VAT Reg No: " + c.taxNumber(), regular));
                         });
             } catch (Exception ignored) {}
         }
@@ -369,8 +373,19 @@ public class InvoicePdfService {
         inner.addCell(totLabel("Subtotal (excl. VAT):", regular));
         inner.addCell(totValue(fmt(invoice.getSubtotal()), regular));
 
-        inner.addCell(totLabel("VAT (" + primaryVatRate(invoice) + "%):", regular));
-        inner.addCell(totValue(fmt(invoice.getVatTotal()), regular));
+        // Finance patch F14: one VAT line per rate, so 15% and 0% lines are not shown as a single rate.
+        java.util.List<TaxDocumentRules.RateTotal> rates = TaxDocumentRules.byRate(invoice.getLineItems().stream()
+                .map(li -> new TaxDocumentRules.LineAmount(li.getVatRate(), li.getLineTotal(), li.getVatAmount()))
+                .toList());
+        if (rates.size() <= 1) {
+            inner.addCell(totLabel("VAT (" + primaryVatRate(invoice) + "%):", regular));
+            inner.addCell(totValue(fmt(invoice.getVatTotal()), regular));
+        } else {
+            for (TaxDocumentRules.RateTotal rt : rates) {
+                inner.addCell(totLabel("VAT " + rt.rate().toPlainString() + "% on " + fmt(rt.base()) + ":", regular));
+                inner.addCell(totValue(fmt(rt.vat()), regular));
+            }
+        }
 
         // Divider row
         inner.addCell(new Cell(1, 2)
@@ -469,7 +484,8 @@ public class InvoicePdfService {
         doc.add(new Paragraph().setMarginTop(24));
         addFullWidthLine(doc);
         doc.add(new Paragraph(
-                "This is a computer-generated tax invoice. Valid without a signature. "
+                "This is a computer-generated " + (tenant.vatNumber() != null && !tenant.vatNumber().isBlank() ? "tax invoice" : "invoice")
+                        + ". Valid without a signature. "
                         + "Issued by HandyFlow Business Operating System.")
                 .setFont(regular).setFontSize(8).setFontColor(TEXT_GRAY)
                 .setTextAlignment(TextAlignment.CENTER)

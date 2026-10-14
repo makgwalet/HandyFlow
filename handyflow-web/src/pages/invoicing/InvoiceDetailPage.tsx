@@ -16,6 +16,7 @@ import {
 } from "./billing.logic"
 import { CreditNoteDialog, LogHoursDialog, RecordPaymentDialog, RefundDialog, useCustomerAccount, type CreditSource } from "./dialogs"
 import { apiMessage, downloadPdf } from "./queries"
+import TaxCheckNotice from "./TaxCheckNotice"
 import { Btn, Facts, Loading, Meter, Notice, StateBox, Totals, panel, sectionTitle, td } from "./ui"
 
 interface CustomerLite { name: string; email?: string; phone?: string; taxNumber?: string }
@@ -133,6 +134,7 @@ export default function InvoiceDetailPage() {
           {canCredit && inv.status !== "DRAFT" && inv.status !== "CANCELLED" && <Btn icon={FileMinus} onClick={() => setDialog("credit")}>Credit note</Btn>}
         </>} />
       {msg && <div style={{ marginBottom: 14 }}><Notice tone="bad">{msg}</Notice></div>}
+      {inv.status !== "DRAFT" && inv.status !== "CANCELLED" && <TaxCheckNotice invoiceId={inv.id} />}
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
         <div style={{ display: "grid", gap: 16, flex: "2 1 480px", minWidth: 0 }}>

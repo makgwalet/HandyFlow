@@ -63,8 +63,10 @@ public class CreditNotePdfService {
         Invoice invoice = invoiceRepo.findActiveByIdWithLineItems(tenantId, creditNote.getInvoiceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", creditNote.getInvoiceId().toString()));
 
-        String companyName = tenantFacade.findTenantDetails(tenantId).map(t -> t.companyName()).orElse("");
-        String logoUrl = tenantFacade.findTenantDetails(tenantId).map(t -> t.logoUrl()).orElse(null);
+        var tenant = tenantFacade.findTenantDetails(tenantId).orElse(null);
+        String companyName = tenant != null ? tenant.companyName() : "";
+        String logoUrl = tenant != null ? tenant.logoUrl() : null;
+        boolean issued = creditNote.getIssuedAt() != null && "ISSUED".equals(creditNote.getStatus());
 
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             PdfDocument pdfDoc = new PdfDocument(new PdfWriter(baos));
@@ -74,7 +76,8 @@ public class CreditNotePdfService {
             PdfFont regular = PdfFontFactory.createFont(StandardFonts.HELVETICA);
             PdfFont bold    = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
 
-            addHeader(document, companyName, logoUrl, bold, regular);
+            addHeader(document, companyName, logoUrl, issued, bold, regular);
+            addParties(document, tenant, invoice, tenantId, bold, regular);
             addCreditNoteDetails(document, creditNote, invoice, tenantId, bold, regular);
             addFooter(document, regular);
 
@@ -86,7 +89,7 @@ public class CreditNotePdfService {
         }
     }
 
-    private void addHeader(Document document, String companyName, String logoUrl,
+    private void addHeader(Document document, String companyName, String logoUrl, boolean issued,
                            PdfFont bold, PdfFont regular) {
         Table headerTable = new Table(UnitValue.createPercentArray(new float[]{1, 1})).useAllAvailableWidth();
 
@@ -110,8 +113,8 @@ public class CreditNotePdfService {
                     .setFontColor(TEXT_MUTED).setMarginTop(4)));
         }
 
-        Paragraph title = new Paragraph("CREDIT NOTE")
-                .setFont(bold).setFontSize(22).setFontColor(BRAND_RED)
+        Paragraph title = new Paragraph(TaxDocumentRules.creditNoteHeading(issued))
+                .setFont(bold).setFontSize(issued ? 22 : 14).setFontColor(BRAND_RED)
                 .setTextAlignment(TextAlignment.RIGHT);
 
         headerTable.addCell(cellOf(left));
@@ -132,19 +135,22 @@ public class CreditNotePdfService {
         // resolved this correctly via CrmFacade in CreditNoteService, said
         // "Dear Black Flamingo"). Same resolution logic as
         // CreditNoteService.resolveClientName, now actually used here too.
-        String clientName = resolveClientName(invoice, tenantId);
 
         DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ENGLISH);
-        String issuedDateStr = creditNote.getIssuedAt().atZone(ZoneId.systemDefault()).format(dateFmt);
+        // Finance patch F14: a credit note waiting for approval has no issue date yet (this used to throw).
+        String issuedDateStr = creditNote.getIssuedAt() != null
+                ? creditNote.getIssuedAt().atZone(ZoneId.systemDefault()).format(dateFmt) : "not yet issued";
+        String invoiceDateStr = invoice.getIssuedAt() != null
+                ? invoice.getIssuedAt().atZone(ZoneId.systemDefault()).format(dateFmt) : "";
 
         Table infoTable = new Table(UnitValue.createPercentArray(new float[]{1, 1})).useAllAvailableWidth()
                 .setMarginBottom(16);
-        infoTable.addCell(cellOf(new Paragraph("Issued to: " + clientName).setFont(regular).setFontSize(10)));
+        infoTable.addCell(cellOf(new Paragraph("Credit note: " + creditNote.getCreditNoteNumber()).setFont(bold).setFontSize(10)));
         infoTable.addCell(cellOf(new Paragraph("Credit note date: " + issuedDateStr).setFont(regular).setFontSize(10)
                 .setTextAlignment(TextAlignment.RIGHT)));
-        infoTable.addCell(cellOf(new Paragraph("Credit note: " + creditNote.getCreditNoteNumber()).setFont(bold).setFontSize(10)));
-        infoTable.addCell(cellOf(new Paragraph("Against invoice: " + invoice.getInvoiceNumber())
-                .setFont(regular).setFontSize(10).setTextAlignment(TextAlignment.RIGHT)));
+        infoTable.addCell(cellOf(new Paragraph("Against invoice: " + invoice.getInvoiceNumber()
+                + (invoiceDateStr.isEmpty() ? "" : " of " + invoiceDateStr)).setFont(regular).setFontSize(10)));
+        infoTable.addCell(cellOf(new Paragraph("").setFont(regular).setFontSize(10)));
         document.add(infoTable);
 
         if (creditNote.getReason() != null && !creditNote.getReason().isBlank()) {
@@ -169,6 +175,42 @@ public class CreditNotePdfService {
         addSummaryRow(summary, "VAT", formatZar(creditNote.getVatTotal()), regular);
         addSummaryRow(summary, "Total credited", formatZar(creditNote.getTotal()), bold);
         document.add(summary);
+    }
+
+    /**
+     * Finance patch F14: section 21 asks for the supplier's name, address and VAT number and the recipient's name and
+     * address, and the recipient's VAT number when they are a VAT vendor.
+     */
+    private void addParties(Document document, za.co.handyflow.platform.identity.TenantDetails tenant, Invoice invoice,
+                            TenantId tenantId, PdfFont bold, PdfFont regular) {
+        Table parties = new Table(UnitValue.createPercentArray(new float[]{1, 1})).useAllAvailableWidth().setMarginBottom(14);
+
+        Table from = new Table(1).useAllAvailableWidth();
+        from.addCell(cellOf(new Paragraph("FROM").setFont(bold).setFontSize(8).setFontColor(TEXT_MUTED)));
+        if (tenant != null) {
+            from.addCell(cellOf(new Paragraph(tenant.companyName()).setFont(bold).setFontSize(10)));
+            String a = TaxDocumentRules.addressText(tenant.address());
+            if (!a.isEmpty()) from.addCell(cellOf(new Paragraph(a).setFont(regular).setFontSize(9)));
+            if (tenant.vatNumber() != null && !tenant.vatNumber().isBlank())
+                from.addCell(cellOf(new Paragraph("VAT Reg No: " + tenant.vatNumber()).setFont(regular).setFontSize(9)));
+        }
+
+        Table to = new Table(1).useAllAvailableWidth();
+        to.addCell(cellOf(new Paragraph("ISSUED TO").setFont(bold).setFontSize(8).setFontColor(TEXT_MUTED)));
+        to.addCell(cellOf(new Paragraph(resolveClientName(invoice, tenantId)).setFont(bold).setFontSize(10)));
+        if (invoice.getCustomerId() != null) {
+            try {
+                crmFacade.findCustomerById(tenantId, invoice.getCustomerId()).ifPresent(c -> {
+                    String a = TaxDocumentRules.addressText(c.address());
+                    if (!a.isEmpty()) to.addCell(cellOf(new Paragraph(a).setFont(regular).setFontSize(9)));
+                    if (c.taxNumber() != null && !c.taxNumber().isBlank())
+                        to.addCell(cellOf(new Paragraph("VAT Reg No: " + c.taxNumber()).setFont(regular).setFontSize(9)));
+                });
+            } catch (Exception ignored) { /* the credit note still prints without the customer's extra details */ }
+        }
+        parties.addCell(cellOf(from));
+        parties.addCell(cellOf(to));
+        document.add(parties);
     }
 
     private void addSummaryRow(Table table, String label, String value, PdfFont font) {
