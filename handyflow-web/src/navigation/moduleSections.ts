@@ -21,7 +21,7 @@ import {
   PartyPopper, FilePlus, LayoutTemplate, CreditCard,
   Stethoscope, ListPlus, ArrowRightLeft, FileClock,
   Megaphone, Warehouse, Handshake, UserCog,
-  Database, CalendarRange,
+  Database, CalendarRange, MessageSquare, Send, BookOpen as BookIcon,
   UserCheck, Palette, Headphones, Wallet, Receipt, CheckSquare, LayoutGrid, ListChecks, Sprout, FlaskConical,
 } from 'lucide-react'
 
@@ -877,7 +877,30 @@ export const TASKS_SECTIONS: ModuleSections = {
   ],
 }
 
+export const BOOKKEEPING_SECTIONS: ModuleSections = {
+  moduleKey: 'bookkeeping',
+  basePath: '/bookkeeping',
+  title: 'Bookkeeping',
+  icon: BookIcon,
+  defaultSection: 'queue',
+  groups: [
+    { label: 'Overview', sections: [{ id: 'queue', label: 'Work queue', icon: ListChecks, anyPermission: ['BOOKKEEPING_READ', 'BOOKKEEPING_MANAGE', 'BOOKKEEPING_ADMIN'] }] },
+    { label: 'Clients', sections: [{ id: 'clients', label: 'Clients', icon: Users, anyPermission: ['BOOKKEEPING_READ', 'BOOKKEEPING_MANAGE', 'BOOKKEEPING_ADMIN'] }] },
+    {
+      label: 'Client books',
+      sections: [
+        { id: 'bank', label: 'Bank lines', icon: Landmark, anyPermission: ['BOOKKEEPING_READ', 'BOOKKEEPING_MANAGE', 'BOOKKEEPING_ADMIN'] },
+        { id: 'rules', label: 'Bank rules', icon: GitBranch, anyPermission: ['BOOKKEEPING_READ', 'BOOKKEEPING_MANAGE', 'BOOKKEEPING_ADMIN'] },
+        { id: 'queries', label: 'Client queries', icon: MessageSquare, anyPermission: ['BOOKKEEPING_READ', 'BOOKKEEPING_MANAGE', 'BOOKKEEPING_ADMIN'] },
+        { id: 'handover', label: 'Handover', icon: Send, anyPermission: ['BOOKKEEPING_READ', 'BOOKKEEPING_MANAGE', 'BOOKKEEPING_ADMIN'] },
+        { id: 'periods', label: 'Months', icon: Calendar, anyPermission: ['BOOKKEEPING_READ', 'BOOKKEEPING_MANAGE', 'BOOKKEEPING_ADMIN'] },
+      ],
+    },
+  ],
+}
+
 const REGISTRY: ModuleSections[] = [
+  BOOKKEEPING_SECTIONS,
   SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS, FLEET_SECTIONS, ACCOUNTING_SECTIONS, ACCOUNTANT_SECTIONS,
   HR_SECTIONS, BOOKINGS_SECTIONS, TRAINING_PROVIDER_SECTIONS, LEGAL_COMPLIANCE_SECTIONS, EARTHMOVING_SECTIONS,
   SUPPLY_CHAIN_SECTIONS, COMPLIANCE_TENDER_SECTIONS,

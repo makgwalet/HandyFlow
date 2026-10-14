@@ -32,6 +32,7 @@ import { PropertyPage }                 from "./pages/property/PropertyPage"
 import { FleetPage }                    from "./pages/fleet/FleetPage"
 import { SettingsPage }                 from './pages/settings/SettingsPage'
 import { AccountingPage }               from './pages/accounting/AccountingPage'
+import { BookkeepingPage }              from "./pages/bookkeeping/BookkeepingPage"
 import { BookingsPage }                 from './pages/bookings/BookingsPage'
 import { HrPage }                       from './pages/hr/HrPage'
 import { ClinicPage }                   from './pages/clinic/ClinicPage'
@@ -312,6 +313,7 @@ export default function App() {
  <Route path="/fleet/:section?" element={<FleetPage />} />
             <Route path="/bookings/:section?" element={<BookingsPage />} />
             <Route path="/accounting/:section?" element={<AccountingPage />} />
+            <Route path="/bookkeeping/:section?" element={<BookkeepingPage />} />
             <Route path="/settings"    element={<SettingsPage />} />
             <Route path="/hr/:section?" element={<HrPage />} />
             <Route path="/clinic/consult/:appointmentId" element={<ConsultationWorkspacePage />} />

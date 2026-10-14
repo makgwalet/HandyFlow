@@ -63,6 +63,7 @@ export const MODULE_REGISTRY: Record<string, Omit<ModuleNavItem, 'key'>> = {
   supply_chain: { icon: Truck,         label: 'Supply Chain', route: '/supply-chain' },
   ap:           { icon: Receipt,       label: 'Payables',     route: '/ap'           },
   accountant:   { icon: UserCog,       label: 'Accountant',   route: '/accountant'   },
+  bookkeeping:  { icon: BookOpen,      label: 'Bookkeeping',  route: '/bookkeeping'  },
   'internal-audit': { icon: ShieldCheck, label: 'Internal Audit', route: '/internal-audit' },
   agriculture:  { icon: Wheat,         label: 'Agriculture',  route: '/agriculture'  },
   // Present on the dashboard but missing here until now, so they were absent
