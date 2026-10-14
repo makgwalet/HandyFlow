@@ -1,4 +1,6 @@
 // src/pages/expenses/ExpensesPage.tsx
+import CaptureFromFile from "../../components/capture/CaptureFromFile"
+import { claimFields } from "../../components/capture/capture.logic"
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -697,6 +699,7 @@ export function ExpensesPage() {
               <button onClick={closeForm} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
 
+            {!editing && <CaptureFromFile onRead={c => setForm(p => ({ ...p, ...claimFields(c) }))} />}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div style={{ gridColumn: "1/-1" }}>
                 <label style={lbl}>Employee *</label>

@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { PAYABLE, amountToPay, balanceOf, paymentError } from "./ap.logic"
+import CaptureFromFile from "../../components/capture/CaptureFromFile"
+import { billFields } from "../../components/capture/capture.logic"
 import { Plus, X, CheckCircle, XCircle, Search, Download, FileText, Upload, AlertTriangle, ChevronRight, DollarSign, Edit3, Paperclip, Loader2, Mail } from "lucide-react"
 interface Bill {
   id: string; supplierId: string | null; supplierName: string
@@ -527,6 +529,7 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>{showEdit ? "Edit Bill" : "Add Supplier Bill"}</h3>
               <button onClick={() => { setShowCreate(false); setShowEdit(false); setError("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
+            {showCreate && <CaptureFromFile onRead={c => setForm(p => ({ ...p, ...billFields(c) }))} />}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div style={{ gridColumn: "1/-1" }}>
                 <label style={lbl}>Supplier name *</label>
