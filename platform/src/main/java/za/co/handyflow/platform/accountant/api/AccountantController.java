@@ -65,7 +65,7 @@ public class AccountantController {
     public ResponseEntity<ApiResponse<ClientResponse>> createClient(
             @Valid @RequestBody CreateClientRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Client created",
-                accountantService.createClient(TenantContext.getTenantIdAsObject(), req)));
+                accountantService.createClient(TenantContext.getTenantIdAsObject(), req, TenantContext.getCurrentUserId())));
     }
 
     @PutMapping("/clients/{id}")

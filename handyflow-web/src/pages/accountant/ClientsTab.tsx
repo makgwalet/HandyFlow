@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import ClientSignoffPanel from "./ClientSignoffPanel"
 import { Plus, X, ChevronDown, ChevronUp, CheckCircle, Users, Search, Paperclip, Trash2 } from "lucide-react"
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
 const fmtD   = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA") : "—"
@@ -566,6 +567,9 @@ export default function ClientsTab({ onNavigate }: { onNavigate?: (tab: string, 
                 <div style={{ textAlign: "center", padding: 40, color: "var(--hf-danger-text)" }}>Couldn't load this client's workspace.</div>
               ) : clientDetail && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+
+                  {/* Team and sign-off (finance F15) */}
+                  <ClientSignoffPanel clientId={workspaceFor.id} />
 
                   {/* Deadlines */}
                   <div>

@@ -52,6 +52,10 @@ public class AccountantService {
     private final AccCoaAccountRepository   coaAccountRepo;
     private final AccJournalLineRepository  journalLineRepo;
     private final AccPortalAccessGrantRepository portalGrantRepo;
+    // Finance patch F15: client-level access, auto-assignment of a new client's creator, and signed-off years.
+    private final ClientAccessService       clientAccess;
+    private final ClientAssignmentService   clientAssignments;
+    private final EngagementService         engagements;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
@@ -69,8 +73,16 @@ public class AccountantService {
 
     @Transactional(readOnly = true)
     public Page<ClientResponse> getClients(TenantId tenantId, Pageable pageable) {
-        return clientRepo.findAllActive(tenantId, pageable)
-                .map(c -> toClientResponse(c, tenantId));
+        if (clientAccess.seesAll()) {
+            return clientRepo.findAllActive(tenantId, pageable).map(c -> toClientResponse(c, tenantId));
+        }
+        // Finance patch F15: staff without ACCOUNTANT_ALL_CLIENTS see only the clients they are assigned to.
+        List<AccClient> mine = clientAccess.visible(tenantId,
+                clientRepo.findAllActive(tenantId, Pageable.unpaged()).getContent(), AccClient::getId);
+        int from = (int) Math.min(pageable.getOffset(), mine.size());
+        int to = (int) Math.min(from + (long) pageable.getPageSize(), mine.size());
+        return new org.springframework.data.domain.PageImpl<>(
+                mine.subList(from, to).stream().map(c -> toClientResponse(c, tenantId)).toList(), pageable, mine.size());
     }
 
     @Transactional(readOnly = true)
@@ -82,6 +94,12 @@ public class AccountantService {
 
     @Transactional
     public ClientResponse createClient(TenantId tenantId, CreateClientRequest req) {
+        return createClient(tenantId, req, null);
+    }
+
+    /** Finance patch F15: the person who registers a client is assigned to it as preparer. */
+    @Transactional
+    public ClientResponse createClient(TenantId tenantId, CreateClientRequest req, UUID createdBy) {
         AccClient client = AccClient.create(tenantId, req.entityType(), req.tradingName(),
                 req.registeredName(), req.registrationNumber(), req.taxReferenceNumber(),
                 req.vatNumber(), req.vatCategory(), req.yearEndMonth(),
@@ -89,6 +107,7 @@ public class AccountantService {
         client.updateAddress(req.addressStreet(), req.addressSuburb(), req.addressCity(),
                 req.addressProvince(), req.addressPostalCode());
         clientRepo.save(client);
+        clientAssignments.assignCreator(tenantId, client.getId(), createdBy);
         log.info("Created acc_client={} entity={} tenant={}", client.getTradingName(), client.getEntityType(), tenantId);
 
         if (req.sendWelcomeEmail()) {
@@ -202,8 +221,8 @@ public class AccountantService {
 
     @Transactional(readOnly = true)
     public List<TaxDeadlineResponse> getPortfolioDeadlines(TenantId tenantId, LocalDate from, LocalDate to) {
-        return deadlineRepo.findInDateRange(tenantId.getValue(), from, to).stream()
-                .map(this::toDeadlineResponse)
+        return clientAccess.visible(tenantId, deadlineRepo.findInDateRange(tenantId.getValue(), from, to), TaxDeadline::getClientId)
+                .stream().map(this::toDeadlineResponse)
                 .toList();
     }
 
@@ -227,6 +246,8 @@ public class AccountantService {
     public JournalResponse createJournal(TenantId tenantId, UUID clientId,
                                          CreateJournalRequest req, UUID preparedBy) {
         findActive(tenantId, clientId);
+        clientAccess.require(tenantId, clientId);
+        engagements.requireNotSignedOff(tenantId, clientId, req.periodYear(), req.periodMonth());
 
         BigDecimal debits  = req.lines().stream()
                 .map(l -> l.debit()  != null ? l.debit()  : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -266,6 +287,7 @@ public class AccountantService {
 
     @Transactional
     public JournalResponse approveJournal(TenantId tenantId, UUID clientId, UUID journalId, UUID reviewer) {
+        clientAccess.require(tenantId, clientId);
         AccJournal journal = journalRepo.findByTenantIdAndId(tenantId.getValue(), journalId)
                 .orElseThrow(() -> new ResourceNotFoundException("Journal", journalId.toString()));
         if (!journal.getClientId().equals(clientId)) {
@@ -288,6 +310,7 @@ public class AccountantService {
     // against.
     @Transactional
     public JournalResponse postJournal(TenantId tenantId, UUID clientId, UUID journalId, UUID approver) {
+        clientAccess.require(tenantId, clientId);
         AccJournal journal = journalRepo.findByTenantIdAndId(tenantId.getValue(), journalId)
                 .orElseThrow(() -> new ResourceNotFoundException("Journal", journalId.toString()));
         if (!journal.getClientId().equals(clientId)) {
@@ -508,6 +531,7 @@ public class AccountantService {
     public TimeEntryResponse logTime(TenantId tenantId, CreateTimeEntryRequest req,
                                      UUID practitionerId, String practitionerName) {
         findActive(tenantId, req.clientId());
+        clientAccess.require(tenantId, req.clientId());
         TimeEntry entry = TimeEntry.create(tenantId.getValue(), req.clientId(), practitionerId, practitionerName,
                 req.entryDate(), req.activityType(), req.description(),
                 req.hours(), req.hourlyRate(), req.billable());
@@ -517,7 +541,11 @@ public class AccountantService {
 
     @Transactional(readOnly = true)
     public List<StaffTimeSummaryResponse> getStaffTimeSummary(TenantId tenantId, LocalDate from, LocalDate to) {
+        boolean all = clientAccess.seesAll();
+        UUID me = za.co.handyflow.platform.shared.TenantContext.getCurrentUserId();
         return timeEntryRepo.findStaffSummary(tenantId.getValue(), from, to).stream()
+                // Finance patch F15: without ACCOUNTANT_ALL_CLIENTS you see your own hours, not the whole practice's
+                .filter(p -> all || (me != null && me.equals(p.getPractitionerId())))
                 .map(p -> new StaffTimeSummaryResponse(
                         p.getPractitionerId(),
                         p.getPractitionerId() == null ? "Unassigned" : (p.getPractitionerName() != null ? p.getPractitionerName() : "Unknown"),
@@ -552,13 +580,16 @@ public class AccountantService {
     }
 
     private TimeEntry findOwnTimeEntry(TenantId tenantId, UUID entryId) {
-        return timeEntryRepo.findByTenantIdAndId(tenantId.getValue(), entryId)
+        TimeEntry entry = timeEntryRepo.findByTenantIdAndId(tenantId.getValue(), entryId)
                 .orElseThrow(() -> new ResourceNotFoundException("TimeEntry", entryId.toString()));
+        clientAccess.require(tenantId, entry.getClientId());
+        return entry;
     }
 
     @Transactional
     public FeeNoteResponse generateFeeNote(TenantId tenantId, CreateFeeNoteRequest req) {
         findActive(tenantId, req.clientId());
+        clientAccess.require(tenantId, req.clientId());
 
         List<TimeEntry> entries = req.timeEntryIds().isEmpty()
                 ? timeEntryRepo.findUnbilledByClient(req.clientId())
@@ -604,6 +635,7 @@ public class AccountantService {
     public FeeNoteResponse sendFeeNote(TenantId tenantId, UUID feeNoteId) {
         FeeNote feeNote = feeNoteRepo.findByTenantIdAndId(tenantId.getValue(), feeNoteId)
                 .orElseThrow(() -> new ResourceNotFoundException("FeeNote", feeNoteId.toString()));
+        clientAccess.require(tenantId, feeNote.getClientId());
         AccClient client = clientRepo.findById(feeNote.getClientId())
                 .orElseThrow(() -> new ResourceNotFoundException("Client", feeNote.getClientId().toString()));
 
@@ -629,6 +661,7 @@ public class AccountantService {
                                          UUID recordedBy, String recordedByName) {
         FeeNote feeNote = feeNoteRepo.findByTenantIdAndId(tenantId.getValue(), feeNoteId)
                 .orElseThrow(() -> new ResourceNotFoundException("FeeNote", feeNoteId.toString()));
+        clientAccess.require(tenantId, feeNote.getClientId());
 
         AccPaymentReceived payment = AccPaymentReceived.create(tenantId.getValue(), feeNoteId,
                 feeNote.getClientId(), req.amount(), req.paymentDate(), req.paymentMethod(),
@@ -662,8 +695,9 @@ public class AccountantService {
 
     @Transactional(readOnly = true)
     public List<PaymentResponse> getPayments(TenantId tenantId, UUID feeNoteId) {
-        feeNoteRepo.findByTenantIdAndId(tenantId.getValue(), feeNoteId)
+        FeeNote owner = feeNoteRepo.findByTenantIdAndId(tenantId.getValue(), feeNoteId)
                 .orElseThrow(() -> new ResourceNotFoundException("FeeNote", feeNoteId.toString()));
+        clientAccess.require(tenantId, owner.getClientId());
         return paymentRepo.findByFeeNoteId(feeNoteId).stream()
                 .map(this::toPaymentResponse).toList();
     }
@@ -672,6 +706,7 @@ public class AccountantService {
     public byte[] generateFeeNotePdf(TenantId tenantId, UUID feeNoteId) {
         FeeNote feeNote = feeNoteRepo.findByTenantIdAndId(tenantId.getValue(), feeNoteId)
                 .orElseThrow(() -> new ResourceNotFoundException("FeeNote", feeNoteId.toString()));
+        clientAccess.require(tenantId, feeNote.getClientId());
         AccClient client = clientRepo.findActiveById(tenantId, feeNote.getClientId())
                 .orElseThrow(() -> new ResourceNotFoundException("Client", feeNote.getClientId().toString()));
         AccountantProfile profile = profileRepo.findByTenantId(tenantId)
@@ -777,7 +812,7 @@ public class AccountantService {
 
     @Transactional(readOnly = true)
     public List<FeeNoteResponse> getOutstandingInvoices(TenantId tenantId) {
-        return feeNoteRepo.findAllUnpaid(tenantId.getValue()).stream()
+        return clientAccess.visible(tenantId, feeNoteRepo.findAllUnpaid(tenantId.getValue()), FeeNote::getClientId).stream()
                 .map(this::toFeeNoteResponse).toList();
     }
 
@@ -785,7 +820,9 @@ public class AccountantService {
 
     @Transactional(readOnly = true)
     public PortfolioDashboardResponse getPortfolioDashboard(TenantId tenantId) {
-        List<AccClient> clients = clientRepo.findAllActive(tenantId, Pageable.unpaged()).getContent();
+        List<AccClient> clients = clientAccess.visible(tenantId,
+                clientRepo.findAllActive(tenantId, Pageable.unpaged()).getContent(), AccClient::getId);
+        java.util.Set<UUID> visibleIds = clients.stream().map(AccClient::getId).collect(java.util.stream.Collectors.toSet());
         int total     = clients.size();
         int highRisk  = (int) clients.stream().filter(c -> "HIGH".equals(c.getRiskRating())).count();
         int ficaGap   = (int) clients.stream().filter(c -> !c.isFicaCompleted()).count();
@@ -794,7 +831,8 @@ public class AccountantService {
         LocalDate in30  = now.plusDays(30);
         LocalDate in7   = now.plusDays(7);
 
-        List<TaxDeadline> allDeadlines = deadlineRepo.findInDateRange(tenantId.getValue(), now, in30);
+        List<TaxDeadline> allDeadlines = deadlineRepo.findInDateRange(tenantId.getValue(), now, in30).stream()
+                .filter(d -> visibleIds.contains(d.getClientId())).toList();
         int overdue    = (int) deadlineRepo.findOverdue(now).stream()
                 .filter(d -> clients.stream().anyMatch(c -> c.getId().equals(d.getClientId()))).count();
         int upcoming   = allDeadlines.size();
@@ -802,6 +840,7 @@ public class AccountantService {
                 .filter(d -> d.getAdjustedDueDate().getMonthValue() == now.getMonthValue()).count();
 
         List<TaxDeadlineResponse> urgent = deadlineRepo.findInDateRange(tenantId.getValue(), now, in7).stream()
+                .filter(d -> visibleIds.contains(d.getClientId()))
                 .map(this::toDeadlineResponse).toList();
 
         BigDecimal totalWip = clients.stream()
@@ -809,7 +848,8 @@ public class AccountantService {
                 .filter(java.util.Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        List<FeeNote> outstanding = feeNoteRepo.findOutstanding(tenantId.getValue());
+        List<FeeNote> outstanding = feeNoteRepo.findOutstanding(tenantId.getValue()).stream()
+                .filter(f -> visibleIds.contains(f.getClientId())).toList();
         BigDecimal totalOutstanding = outstanding.stream()
                 .map(FeeNote::getTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
 
