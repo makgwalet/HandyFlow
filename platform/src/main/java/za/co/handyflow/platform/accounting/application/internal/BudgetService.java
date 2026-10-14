@@ -14,7 +14,7 @@ import java.time.LocalDate;
 import java.util.*;
 
 /** Budgets by account and month, and budget against actual (finance F21). JDBC, like the other finance services. */
-@Service
+@Service("accountingBudgetService")
 public class BudgetService {
 
     private final JdbcTemplate jdbc;
