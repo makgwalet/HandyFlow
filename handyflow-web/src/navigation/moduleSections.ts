@@ -286,6 +286,9 @@ export const ACCOUNTANT_SECTIONS: ModuleSections = {
       sections: [
         { id: 'time', label: 'Time', icon: Clock },
         { id: 'billing', label: 'Billing', icon: FileText },
+        // Finance patch F22: recurring services with runs to bill, and who has how much on.
+        { id: 'services', label: 'Recurring services', icon: Repeat },
+        { id: 'workload', label: 'Workload & WIP', icon: BarChart2 },
       ],
     },
     {

@@ -631,6 +631,28 @@ public class AccountantService {
         return toFeeNoteResponse(feeNote);
     }
 
+    /**
+     * Finance F22: a fee note for a fixed amount with one line and no time entries (a retainer or scheduled service).
+     * It does not touch unbilled time, and posts revenue the same way {@link #generateFeeNote} does.
+     */
+    @Transactional
+    public FeeNoteResponse generateFixedFeeNote(TenantId tenantId, UUID clientId, LocalDate invoiceDate, LocalDate dueDate,
+                                                BigDecimal amount, String description, boolean includeVat) {
+        findActive(tenantId, clientId);
+        clientAccess.require(tenantId, clientId);
+        BigDecimal vatAmount = includeVat
+                ? amount.multiply(vatRateProvider.rateFraction()).setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+        String invoiceNumber = feeNoteNumberGen.next(tenantId);
+        FeeNote feeNote = FeeNote.create(tenantId.getValue(), clientId, invoiceNumber, invoiceDate, dueDate, amount, vatAmount);
+        feeNote.getLines().add(FeeNoteLine.fixedFeeAtRate(feeNote.getId(), description, amount,
+                includeVat ? vatRateProvider.ratePercent() : BigDecimal.ZERO, 0));
+        feeNoteRepo.save(feeNote);
+        postFeeNoteRevenueJournal(tenantId, feeNote, amount, vatAmount);
+        log.info("Generated scheduled fee note={} client={} amount={}", invoiceNumber, clientId, feeNote.getTotal());
+        return toFeeNoteResponse(feeNote);
+    }
+
     @Transactional
     public FeeNoteResponse sendFeeNote(TenantId tenantId, UUID feeNoteId) {
         FeeNote feeNote = feeNoteRepo.findByTenantIdAndId(tenantId.getValue(), feeNoteId)

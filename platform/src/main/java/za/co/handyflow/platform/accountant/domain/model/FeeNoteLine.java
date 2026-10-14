@@ -54,6 +54,19 @@ public class FeeNoteLine {
         return l;
     }
 
+    /** One fixed-fee line with the VAT rate stated by the caller (finance F22: scheduled retainer billing). */
+    public static FeeNoteLine fixedFeeAtRate(UUID feeNoteId, String description, BigDecimal amount, BigDecimal vatRate, int order) {
+        FeeNoteLine l = new FeeNoteLine();
+        l.feeNoteId   = feeNoteId;
+        l.description = description;
+        l.quantity    = BigDecimal.ONE;
+        l.unitPrice   = amount;
+        l.vatRate     = vatRate;
+        l.amount      = amount;
+        l.lineOrder   = order;
+        return l;
+    }
+
     /**
      * Fixed-fee line — description and amount supplied directly.
      */

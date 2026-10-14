@@ -3,6 +3,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import ClientSignoffPanel from "./ClientSignoffPanel"
+import ClientLettersPanel from "./ClientLettersPanel"
 import { Plus, X, ChevronDown, ChevronUp, CheckCircle, Users, Search, Paperclip, Trash2 } from "lucide-react"
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
 const fmtD   = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA") : "—"
@@ -570,6 +571,9 @@ export default function ClientsTab({ onNavigate }: { onNavigate?: (tab: string, 
 
                   {/* Team and sign-off (finance F15) */}
                   <ClientSignoffPanel clientId={workspaceFor.id} />
+
+                  {/* Engagement letters (finance F22) */}
+                  <ClientLettersPanel clientId={workspaceFor.id} />
 
                   {/* Deadlines */}
                   <div>

@@ -14,6 +14,8 @@ import BillingTab          from "./BillingTab"
 import JournalsTab         from "./JournalsTab"
 // NEW: closes the "larger workpaper system" gap.
 import WorkpapersTab       from "./WorkpapersTab"
+import ServicesTab         from "./ServicesTab"
+import WorkloadTab         from "./WorkloadTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { ACCOUNTANT_SECTIONS } from "../../navigation/moduleSections"
 
@@ -137,6 +139,8 @@ export function AccountantPage() {
           case "billing":    return <BillingTab key={clientId ?? "all"} initialClientId={clientId} />
           case "journals":   return <JournalsTab />
           case "workpapers": return <WorkpapersTab />
+          case "services":   return <ServicesTab />
+          case "workload":   return <WorkloadTab />
           default:           return null
         }
       }}
