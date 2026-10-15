@@ -155,6 +155,13 @@ export interface MeterReading {
   source: string; reason: string | null; actorUserId: string | null; recordedAt: string
 }
 
+// ── Inspections ──────────────────────────────────────────────────────────
+export interface InspectionItem { item: string; outcome: string; comment: string | null; incidentId: string | null }
+export interface Inspection {
+  id: string; assetId: string; machine: string; inspectorUserId: string | null; performedAt: string
+  meterReading: number | null; result: string; notes: string | null; items: InspectionItem[]
+}
+
 // ── Hire charges ─────────────────────────────────────────────────────────
 export interface HireCharge {
   id: string | null; deploymentId: string; assetId: string; machine: string; customerId: string | null; customerName: string | null

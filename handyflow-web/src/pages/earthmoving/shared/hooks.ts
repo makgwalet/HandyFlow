@@ -1,7 +1,7 @@
 // src/pages/earthmoving/shared/hooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, HireCharge, DeploymentOption, DraftInvoiceResult } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, HireCharge, DeploymentOption, DraftInvoiceResult } from "./types"
 
 // Central query keys — every tab imports these instead of typing the
 // literal string, so a rename is a one-line change instead of a grep.
@@ -17,6 +17,7 @@ export const QK = {
   sites: ["em-sites"] as const,
   reconciliation: ["em-site-reconciliation"] as const,
   hireCharges: ["em-hire-charges"] as const,
+  inspections: ["em-inspections"] as const,
 }
 
 // ── Assets ───────────────────────────────────────────────────────────────
@@ -359,6 +360,28 @@ export function useChangeMeter(onSuccess?: () => void) {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) => api.changeMeter(id, body),
     onSuccess: done,
+  })
+}
+
+// ── Inspections ──────────────────────────────────────────────────────────
+
+export function useChecklist() {
+  return useQuery<string[]>({ queryKey: ["em-checklist"], queryFn: api.fetchChecklist, staleTime: 300_000 })
+}
+
+export function useInspections(assetId: string) {
+  return useQuery<Inspection[]>({ queryKey: [...QK.inspections, assetId], queryFn: () => api.fetchInspections(assetId), staleTime: 15_000 })
+}
+
+export function useCreateInspection(onSuccess?: (i: Inspection) => void) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) => api.createInspection(body),
+    // An unsafe finding changes the machine's status and raises incidents and work orders, so refresh those too.
+    onSuccess: i => {
+      for (const key of [QK.inspections, QK.assets, QK.incidents, QK.workOrders, QK.alerts]) qc.invalidateQueries({ queryKey: key })
+      onSuccess?.(i)
+    },
   })
 }
 

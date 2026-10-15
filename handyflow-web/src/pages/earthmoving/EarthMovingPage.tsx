@@ -13,6 +13,7 @@ import PlansTab         from "./PlansTab"
 import AlertsTab        from "./AlertsTab"
 import SitesTab         from "./SitesTab"
 import HireTab          from "./HireTab"
+import InspectionsTab   from "./InspectionsTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { EARTHMOVING_SECTIONS } from "../../navigation/moduleSections"
 
@@ -26,6 +27,7 @@ export function EarthMovingPage() {
           case "assets":      return <AssetsTab />
           case "sites":       return <SitesTab />
           case "deployments": return <DeploymentsTab />
+          case "inspections": return <InspectionsTab />
           case "hire":        return <HireTab />
           case "workorders":  return <WorkOrdersTab />
           case "plans":       return <PlansTab />
