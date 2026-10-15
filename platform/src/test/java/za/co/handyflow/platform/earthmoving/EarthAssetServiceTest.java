@@ -34,6 +34,7 @@ class EarthAssetServiceTest {
     EarthWorkOrderRepository workOrders = mock(EarthWorkOrderRepository.class);
     EarthAlertService alerts = mock(EarthAlertService.class);
     EarthSiteService sites = mock(EarthSiteService.class);
+    EarthMeterService meters = mock(EarthMeterService.class);
     AuditTrailFacade trail = mock(AuditTrailFacade.class);
     NotificationService notifications = mock(NotificationService.class);
     TenantAdminRecipients admins = mock(TenantAdminRecipients.class);
@@ -48,7 +49,7 @@ class EarthAssetServiceTest {
     @BeforeEach
     void setUp() {
         service = new EarthAssetService(assets, maintenance, logs, deployments, events, incidents, workOrders, access, trail,
-                notifications, admins, alerts, sites);
+                notifications, admins, alerts, sites, meters);
         when(assets.save(any())).thenAnswer(i -> i.getArgument(0));
         when(assets.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
         when(admins.resolveTenantAdmins(any())).thenReturn(List.of());
@@ -200,6 +201,33 @@ class EarthAssetServiceTest {
     }
 
     @Test
+    void anHourUpdateIsKeptInTheMeterHistory() {
+        EarthAsset a = machine(AssetStatus.AVAILABLE);
+        granted.add("EARTHMOVING_WRITE");
+        BigDecimal before = a.getCurrentHours();
+        service.updateHours(tenant, a.getId(), new UpdateHoursRequest(new BigDecimal("19000")), actor);
+        verify(meters).record(eq(tenant), eq(a), eq(before), eq("MANUAL"), eq(actor));
+    }
+
+    @Test
+    void aNewMachineCanBeRegisteredWithAKilometreMeter() {
+        granted.add("EARTHMOVING_WRITE");
+        var r = service.createAsset(tenant, new CreateAssetRequest("Tipper", "TRUCK", "T-01", null, null, null, null, null,
+                "OWN", null, null, null, null, null, null, "kilometres"));
+        assertEquals("KILOMETRES", r.meterType());
+        assertEquals("km", r.meterUnit());
+    }
+
+    @Test
+    void aMachineWithoutAMeterTypeCountsHours() {
+        granted.add("EARTHMOVING_WRITE");
+        var r = service.createAsset(tenant, new CreateAssetRequest("Dozer", "DOZER", "D-01", null, null, null, null, null,
+                "OWN", null, null, null, null, null, null));
+        assertEquals("HOURS", r.meterType());
+        assertEquals("hrs", r.meterUnit());
+    }
+
+    @Test
     void aBreakdownAlsoTellsTheSiteSupervisor() {
         EarthAsset a = machine(AssetStatus.AVAILABLE);
         granted.add("EARTHMOVING_WRITE");
@@ -334,7 +362,7 @@ class EarthAssetServiceTest {
         when(assets.findActiveById(other, a.getId())).thenReturn(Optional.empty());
         granted.addAll(Set.of("EARTHMOVING_WRITE", "EARTHMOVING_DEPLOY"));
         assertThrows(ResourceNotFoundException.class, () -> service.updateStatus(other, a.getId(), status("BREAKDOWN", "Hydraulic failure"), actor));
-        assertThrows(ResourceNotFoundException.class, () -> service.updateHours(other, a.getId(), new UpdateHoursRequest(new BigDecimal("5"))));
+        assertThrows(ResourceNotFoundException.class, () -> service.updateHours(other, a.getId(), new UpdateHoursRequest(new BigDecimal("5")), actor));
         assertThrows(ResourceNotFoundException.class, () -> service.getStatusHistory(other, a.getId(), org.springframework.data.domain.Pageable.unpaged()));
     }
 

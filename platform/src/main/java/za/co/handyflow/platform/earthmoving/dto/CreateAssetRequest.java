@@ -18,5 +18,14 @@ public record CreateAssetRequest(
         LocalDate hireEndDate,       // HIRED_IN/HIRED_OUT: hire period end
         BigDecimal dailyRate,
         BigDecimal hourlyRate,
-        String notes
-) {}
+        String notes,
+        String meterType             // HOURS | KILOMETRES (defaults to HOURS)
+) {
+    /** The form without a meter type: hours. */
+    public CreateAssetRequest(String name, String assetType, String fleetNumber, String make, String model, Integer year,
+                              String serialNumber, String registration, String ownershipType, String hireSupplier,
+                              LocalDate hireStartDate, LocalDate hireEndDate, BigDecimal dailyRate, BigDecimal hourlyRate, String notes) {
+        this(name, assetType, fleetNumber, make, model, year, serialNumber, registration, ownershipType, hireSupplier,
+                hireStartDate, hireEndDate, dailyRate, hourlyRate, notes, null);
+    }
+}

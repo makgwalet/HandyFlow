@@ -99,7 +99,7 @@ public class EarthAssetController {
             @Valid @RequestBody UpdateHoursRequest request) {
         featureGuard.requireModule("earthmoving");
         return ResponseEntity.ok(ApiResponse.success("Hour meter updated",
-                earthAssetService.updateHours(TenantContext.getTenantIdAsObject(), id, request)));
+                earthAssetService.updateHours(TenantContext.getTenantIdAsObject(), id, request, UserContext.getCurrentUserId())));
     }
 
     @PutMapping("/{id}")

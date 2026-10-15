@@ -15,7 +15,7 @@
 // PUT (backend endpoint is still @PutMapping). Create is POST.
 
 import { apiClient } from "../../../api/client"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading } from "./types"
 
 export function unwrap<T>(r: { data?: { data?: unknown } & Record<string, unknown> }): T {
   const p = (r.data?.data ?? r.data) as { content?: unknown } | undefined
@@ -167,3 +167,14 @@ export const fetchCustomerOptions = async (): Promise<PickOption[]> =>
 
 export const fetchProjectOptions = async (): Promise<PickOption[]> =>
   (await fetchAllPages<{ id: string; name: string }>("/api/v1/projects", 100, 10)).map(p => ({ id: p.id, name: p.name }))
+
+// ── Meters ───────────────────────────────────────────────────────────────
+
+export const fetchMeterReadings = async (assetId: string): Promise<MeterReading[]> =>
+  unwrap<MeterReading[]>(await apiClient.get(`${BASE}/assets/${assetId}/meter/readings`))
+
+export const correctMeterReading = (assetId: string, body: { reading: number; reason: string }) =>
+  apiClient.post(`${BASE}/assets/${assetId}/meter/correction`, body)
+
+export const changeMeter = (assetId: string, body: Record<string, unknown>) =>
+  apiClient.put(`${BASE}/assets/${assetId}/meter`, body)

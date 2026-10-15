@@ -1,7 +1,7 @@
 // src/pages/earthmoving/shared/hooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading } from "./types"
 
 // Central query keys — every tab imports these instead of typing the
 // literal string, so a rename is a one-line change instead of a grep.
@@ -326,4 +326,37 @@ export function useReconcileActions(onDone?: (message: string) => void) {
     onSuccess: r => { refresh(); onDone?.(`Linked ${r.deploymentsLinkedToSite} to a site, ${r.deploymentsLinkedToCustomer} to a customer, ${r.deploymentsLinkedToProject} to a project.`) },
   })
   return { apply, resolve }
+}
+
+// ── Meters ───────────────────────────────────────────────────────────────
+
+export function useMeterReadings(assetId: string) {
+  return useQuery<MeterReading[]>({ queryKey: ["em-meter-readings", assetId], queryFn: () => api.fetchMeterReadings(assetId), enabled: !!assetId })
+}
+
+/** A new reading, a correction or a meter change all alter the machine and its history. */
+function useRefreshAfterMeter(onSuccess?: () => void) {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: QK.assets })
+    qc.invalidateQueries({ queryKey: ["em-meter-readings"] })
+    qc.invalidateQueries({ queryKey: QK.alerts })
+    onSuccess?.()
+  }
+}
+
+export function useCorrectReading(onSuccess?: () => void) {
+  const done = useRefreshAfterMeter(onSuccess)
+  return useMutation({
+    mutationFn: ({ id, reading, reason }: { id: string; reading: number; reason: string }) => api.correctMeterReading(id, { reading, reason }),
+    onSuccess: done,
+  })
+}
+
+export function useChangeMeter(onSuccess?: () => void) {
+  const done = useRefreshAfterMeter(onSuccess)
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) => api.changeMeter(id, body),
+    onSuccess: done,
+  })
 }

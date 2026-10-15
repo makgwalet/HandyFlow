@@ -30,6 +30,9 @@ export interface Asset {
   currentHours: number
   lastServiceHours: number
   serviceIntervalHours: number
+  /** HOURS or KILOMETRES: the unit of the three numbers above (their names are older than meter types). */
+  meterType?: string
+  meterUnit?: string
   dueForService: boolean
   notes: string | null
   createdAt: string
@@ -146,3 +149,8 @@ export interface Reconciliation {
 }
 export interface LinkResult { deploymentsLinkedToSite: number; deploymentsLinkedToCustomer: number; deploymentsLinkedToProject: number; groupsStillUnresolved: number }
 export interface PickOption { id: string; name: string }
+
+export interface MeterReading {
+  id: string; meterType: string; reading: number; previousReading: number | null
+  source: string; reason: string | null; actorUserId: string | null; recordedAt: string
+}

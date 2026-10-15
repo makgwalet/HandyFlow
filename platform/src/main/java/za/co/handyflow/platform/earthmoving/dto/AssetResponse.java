@@ -26,5 +26,7 @@ public record AssetResponse(
         BigDecimal serviceIntervalHours,
         boolean dueForService,
         String notes,
-        Instant createdAt
+        Instant createdAt,
+        String meterType,           // HOURS | KILOMETRES: the unit of currentHours, lastServiceHours and serviceIntervalHours
+        String meterUnit            // hrs | km
 ) {}

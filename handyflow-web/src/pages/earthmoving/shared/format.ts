@@ -20,3 +20,7 @@ export function apiMessage(e: unknown, fallback: string): string {
   const m = (e as { response?: { data?: { message?: unknown } } } | null)?.response?.data?.message
   return typeof m === "string" && m ? m : fallback
 }
+
+/** "hrs" or "km": the unit a machine's meter counts in. Machines from before meter types count hours. */
+export const meterUnitOf = (a: { meterUnit?: string } | null | undefined) => a?.meterUnit ?? "hrs"
+export const meterWordOf = (a: { meterType?: string } | null | undefined) => (a?.meterType === "KILOMETRES" ? "kilometres" : "hours")

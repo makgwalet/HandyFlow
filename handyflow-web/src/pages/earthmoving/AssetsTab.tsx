@@ -10,16 +10,17 @@ import {
   STATUS_TRANSITIONS, authorityForStatusChange, isRelease, needsReason,
 } from "./shared/constants"
 import { useEarthPerms } from "./shared/useEarthPerms"
-import { fmtCurrency, apiMessage } from "./shared/format"
+import { fmtCurrency, apiMessage, meterUnitOf, meterWordOf } from "./shared/format"
 import { Overlay, ModalHead, ModalFoot, Sect, ErrBanner, lbl, inputStyle } from "./shared/Modal"
 import StatusHistoryDialog from "./StatusHistoryDialog"
+import MeterDialog from "./MeterDialog"
 import { useAssets, useCreateAsset, useUpdateAsset, useUpdateAssetStatus, useUpdateAssetHours } from "./shared/hooks"
 
 const EMPTY_FORM = {
   name: "", fleetNumber: "", assetType: "DOZER", make: "", model: "",
   year: "", serialNumber: "", registration: "",
   ownershipType: "OWN", hireSupplier: "", hireStartDate: "", hireEndDate: "",
-  dailyRate: "", hourlyRate: "", serviceIntervalHours: "", notes: "",
+  dailyRate: "", hourlyRate: "", serviceIntervalHours: "", notes: "", meterType: "HOURS",
 }
 
 const formFromAsset = (a: Asset) => ({
@@ -29,6 +30,7 @@ const formFromAsset = (a: Asset) => ({
   hireStartDate: a.hireStartDate ?? "", hireEndDate: a.hireEndDate ?? "",
   dailyRate: a.dailyRate != null ? String(a.dailyRate) : "", hourlyRate: a.hourlyRate != null ? String(a.hourlyRate) : "",
   serviceIntervalHours: a.serviceIntervalHours != null ? String(a.serviceIntervalHours) : "", notes: a.notes ?? "",
+  meterType: a.meterType ?? "HOURS",
 })
 
 const omit = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
@@ -50,6 +52,7 @@ export default function AssetsTab() {
   const [showStatus, setShowStatus]     = useState<Asset | null>(null)
   const [showHours, setShowHours]       = useState<Asset | null>(null)
   const [showHistory, setShowHistory]   = useState<Asset | null>(null)
+  const [showMeter, setShowMeter]       = useState<Asset | null>(null)
   const [overrideOn, setOverrideOn]     = useState(false)
   const [overrideReason, setOverrideReason] = useState("")
   const [viewing, setViewing]           = useState<Asset | null>(null)
@@ -240,7 +243,7 @@ export default function AssetsTab() {
 
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{Number(asset.currentHours ?? 0).toLocaleString()} hrs</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{Number(asset.currentHours ?? 0).toLocaleString()} {meterUnitOf(asset)}</div>
                       <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{fmtCurrency(asset.dailyRate)}/day</div>
                     </div>
                     <StatusBadge status={asset.status} />
@@ -250,7 +253,7 @@ export default function AssetsTab() {
                         <Eye size={13} />
                       </button>
                       {perms.canWrite && (
-                        <button onClick={() => { setShowHours(asset); setNewHours(String(asset.currentHours ?? 0)) }} title="Update hour meter" aria-label="Update hour meter"
+                        <button onClick={() => { setShowHours(asset); setNewHours(String(asset.currentHours ?? 0)) }} title={asset.meterType === "KILOMETRES" ? "Update odometer" : "Update hour meter"} aria-label={asset.meterType === "KILOMETRES" ? "Update odometer" : "Update hour meter"}
                           style={{ background: "var(--hf-success-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-success-text-strong)" }}>
                           <Clock size={13} />
                         </button>
@@ -278,7 +281,7 @@ export default function AssetsTab() {
                 <div style={{ padding: "0 20px 12px", background: "var(--hf-surface)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--hf-text-faint)", marginBottom: 3 }}>
                     <span>Service interval</span>
-                    <span>{hoursUsed.toFixed(0)} / {asset.serviceIntervalHours || 250} hrs since last service</span>
+                    <span>{hoursUsed.toFixed(0)} / {asset.serviceIntervalHours || 250} {meterUnitOf(asset)} since last service</span>
                   </div>
                   <div style={{ height: 5, background: "var(--hf-surface-sunken)", borderRadius: 99, overflow: "hidden" }}>
                     <div style={{ height: "100%", width: `${svcPct}%`, borderRadius: 99, transition: "width 0.4s",
@@ -400,6 +403,15 @@ export default function AssetsTab() {
                   placeholder="2021" style={inputStyle(!!fieldErrors.year)} />
                 {renderFErr("year")}
               </div>
+              {!editing && (
+                <div>
+                  <label htmlFor="asset-meter" style={lbl}>Meter counts</label>
+                  <select id="asset-meter" value={form.meterType} onChange={e => setForm(f => ({ ...f, meterType: e.target.value }))} style={{ ...inputStyle(), background: "var(--hf-surface)" }}>
+                    <option value="HOURS">Hours (plant)</option>
+                    <option value="KILOMETRES">Kilometres (trucks)</option>
+                  </select>
+                </div>
+              )}
               <div>
                 <label style={lbl}>Registration</label>
                 <input value={form.registration} onChange={e => setForm(f => ({ ...f, registration: e.target.value }))} placeholder="GP-CAT-001" style={inputStyle()} />
@@ -426,7 +438,7 @@ export default function AssetsTab() {
               </div>
               {editing && (
                 <div>
-                  <label style={lbl}>Service interval (hours)</label>
+                  <label style={lbl}>Service interval ({editing ? meterWordOf(editing) : form.meterType === "KILOMETRES" ? "kilometres" : "hours"})</label>
                   <input type="number" value={form.serviceIntervalHours} onChange={e => setForm(f => ({ ...f, serviceIntervalHours: e.target.value }))} placeholder="250" style={inputStyle()} />
                 </div>
               )}
@@ -464,7 +476,7 @@ export default function AssetsTab() {
               if (editing) {
                 updateAsset.mutate({ id: editing.id, body: { ...body, serviceIntervalHours: form.serviceIntervalHours ? Number(form.serviceIntervalHours) : null } }, { onError })
               } else {
-                createAsset.mutate(body, { onError })
+                createAsset.mutate({ ...body, meterType: form.meterType }, { onError })
               }
             }}
             loading={createAsset.isPending || updateAsset.isPending}
@@ -566,17 +578,18 @@ export default function AssetsTab() {
       })()}
 
       {showHistory && <StatusHistoryDialog asset={showHistory} onClose={() => setShowHistory(null)} />}
+      {showMeter && <MeterDialog asset={showMeter} onClose={() => setShowMeter(null)} />}
 
       {/* ── Hour Meter Modal ────────────────────────────────────────────── */}
       {showHours && (
         <Overlay onClose={() => { setShowHours(null); setApiError("") }}>
-          <ModalHead title={`Hour Meter — ${showHours.fleetNumber ?? showHours.name}`} onClose={() => { setShowHours(null); setApiError("") }} />
+          <ModalHead title={`${showHours.meterType === "KILOMETRES" ? "Odometer" : "Hour Meter"} — ${showHours.fleetNumber ?? showHours.name}`} onClose={() => { setShowHours(null); setApiError("") }} />
           <div style={{ marginBottom: 20, padding: "16px 18px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, marginBottom: 4 }}>Current reading</div>
-            <div style={{ fontSize: 30, fontWeight: 800, color: "var(--hf-primary-text)" }}>{Number(showHours.currentHours ?? 0).toLocaleString()} hrs</div>
+            <div style={{ fontSize: 30, fontWeight: 800, color: "var(--hf-primary-text)" }}>{Number(showHours.currentHours ?? 0).toLocaleString()} {meterUnitOf(showHours)}</div>
           </div>
           <div style={{ marginBottom: 14 }}>
-            <label style={lbl}>New Hour Meter Reading *</label>
+            <label style={lbl}>{showHours.meterType === "KILOMETRES" ? "New Odometer Reading *" : "New Hour Meter Reading *"}</label>
             <input type="number" value={newHours} onChange={e => setNewHours(e.target.value)} autoFocus
               placeholder="Enter current meter reading"
               style={{ ...inputStyle(), width: "100%", fontSize: 20, fontWeight: 700 }} />
@@ -646,8 +659,8 @@ export default function AssetsTab() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
             {[
-              { l: "Current Hours", v: `${Number(viewing.currentHours ?? 0).toLocaleString()} hrs` },
-              { l: "Last Service", v: `${Number(viewing.lastServiceHours ?? 0).toLocaleString()} hrs` },
+              { l: viewing.meterType === "KILOMETRES" ? "Current Kilometres" : "Current Hours", v: `${Number(viewing.currentHours ?? 0).toLocaleString()} ${meterUnitOf(viewing)}` },
+              { l: "Last Service", v: `${Number(viewing.lastServiceHours ?? 0).toLocaleString()} ${meterUnitOf(viewing)}` },
               { l: "Serial Number", v: viewing.serialNumber || "—" },
               { l: "Daily Rate", v: fmtCurrency(viewing.dailyRate) },
               { l: "Current Site", v: viewing.currentSite || "—" },
@@ -663,7 +676,7 @@ export default function AssetsTab() {
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 6 }}>
               <span>Service interval progress</span>
-              <span>{(Number(viewing.currentHours ?? 0) - Number(viewing.lastServiceHours ?? 0)).toFixed(0)} / {viewing.serviceIntervalHours || 250} hrs</span>
+              <span>{(Number(viewing.currentHours ?? 0) - Number(viewing.lastServiceHours ?? 0)).toFixed(0)} / {viewing.serviceIntervalHours || 250} {meterUnitOf(viewing)}</span>
             </div>
             <div style={{ height: 8, background: "var(--hf-surface-sunken)", borderRadius: 99, overflow: "hidden" }}>
               {(() => {
@@ -700,6 +713,8 @@ export default function AssetsTab() {
               style={{ flex: 1, padding: "10px", background: "var(--hf-warning-soft)", color: "var(--hf-warning-text)", border: "1px solid var(--hf-warning-border)", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               Change Status
             </button>}
+            <button onClick={() => { setShowMeter(viewing); setViewing(null) }}
+              style={{ padding: "10px 16px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Meter</button>
             <button onClick={() => { setShowHistory(viewing); setViewing(null) }}
               style={{ padding: "10px 16px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>History</button>
             <button onClick={() => setViewing(null)} style={{ padding: "10px 16px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Close</button>

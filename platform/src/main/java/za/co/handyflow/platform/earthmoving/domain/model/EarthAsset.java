@@ -68,6 +68,10 @@ public class EarthAsset {
     @Column(name = "last_service_hours", precision = 10, scale = 1)
     private BigDecimal lastServiceHours = BigDecimal.ZERO;
 
+    /** HOURS or KILOMETRES: the unit of current_hours, last_service_hours and service_interval_hours (the column names are older than meter types). */
+    @Column(name = "meter_type", nullable = false)
+    private String meterType = MeterRules.HOURS;
+
     @Column(name = "service_interval_hours", precision = 10, scale = 1)
     private BigDecimal serviceIntervalHours = new BigDecimal("250");
 
@@ -238,6 +242,26 @@ public class EarthAsset {
                             + currentHours + "). Hour meters only count up.");
         }
         this.currentHours = newHours;
+        this.updatedAt = Instant.now();
+    }
+
+    /** For a machine being registered: choose its meter. A machine with history changes meter through changeMeter. */
+    public void useMeter(String type) {
+        this.meterType = MeterRules.normalizeType(type);
+    }
+
+    /** Fixes a wrong reading. The only way a reading goes down; the caller has checked the rules (MeterRules.checkCorrection). */
+    public void correctReading(BigDecimal corrected) {
+        this.currentHours = corrected;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Switches the meter type and restarts the three numbers in the new unit. The caller has checked MeterRules.checkChange. */
+    public void changeMeter(String type, BigDecimal current, BigDecimal lastService, BigDecimal interval) {
+        this.meterType = MeterRules.normalizeType(type);
+        this.currentHours = current;
+        this.lastServiceHours = lastService;
+        this.serviceIntervalHours = interval;
         this.updatedAt = Instant.now();
     }
 

@@ -15,6 +15,7 @@ import za.co.handyflow.platform.earthmoving.domain.model.AlertRules;
 import za.co.handyflow.platform.earthmoving.domain.repository.EarthWorkOrderRepository;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthmovingRules;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthAsset;
+import za.co.handyflow.platform.earthmoving.domain.model.MeterRules;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthDeployment;
 import za.co.handyflow.platform.earthmoving.domain.model.MaintenanceRecord;
 import za.co.handyflow.platform.earthmoving.domain.model.OperatorLog;
@@ -61,6 +62,7 @@ public class EarthAssetService {
     private final TenantAdminRecipients tenantAdminRecipients;
     private final EarthAlertService alerts;
     private final EarthSiteService sites;
+    private final EarthMeterService meters;
 
     // ── Assets ────────────────────────────────────────────────────────────
 
@@ -104,6 +106,7 @@ public class EarthAssetService {
                 req.hireSupplier(), req.hireStartDate(), req.hireEndDate(),
                 req.dailyRate(), req.hourlyRate(), req.notes()
         );
+        asset.useMeter(req.meterType());
         saveAssetOrExplain(asset);
         trail.record(tenantId, "EARTHMOVING_ASSET_CREATED", "EARTHMOVING_ASSET", asset.getId(), null, snapshot(asset));
         log.info("Registered earthmoving asset={} fleet={} tenant={}",
@@ -229,7 +232,7 @@ public class EarthAssetService {
     }
 
     @Transactional
-    public AssetResponse updateHours(TenantId tenantId, UUID id, UpdateHoursRequest req) {
+    public AssetResponse updateHours(TenantId tenantId, UUID id, UpdateHoursRequest req, UUID actor) {
         access.require(EarthmovingRules.WRITE, "update an hour meter");
         EarthAsset asset = findActive(tenantId, id);
         boolean wasDue = asset.isDueForService();
@@ -237,6 +240,7 @@ public class EarthAssetService {
 
         asset.updateHours(req.currentHours());
         assetRepository.save(asset);
+        meters.record(tenantId, asset, before, "MANUAL", actor);
         trail.record(tenantId, "EARTHMOVING_HOURS_UPDATED", "EARTHMOVING_ASSET", id,
                 Map.of("hours", String.valueOf(before)), Map.of("hours", String.valueOf(req.currentHours())));
         log.info("Hour meter updated asset={} hours={}", id, req.currentHours());
@@ -342,7 +346,9 @@ public class EarthAssetService {
             asset.recordService(req.hoursAtService());
             // A service reading above the recorded hours means the meter was not yet updated: bring it up.
             if (asset.getCurrentHours() == null || req.hoursAtService().compareTo(asset.getCurrentHours()) > 0) {
+                BigDecimal beforeReading = asset.getCurrentHours();
                 asset.updateHours(req.hoursAtService());
+                meters.record(tenantId, asset, beforeReading, "SERVICE", null);
             }
             assetRepository.save(asset);
             alerts.resolveByKey(tenantId, "SERVICE_DUE:" + assetId, null, "Service recorded");
@@ -404,8 +410,10 @@ public class EarthAssetService {
         // The shift's closing reading is the machine's latest reading when it is higher than what we hold.
         if (req.endHours() != null && (asset.getCurrentHours() == null || req.endHours().compareTo(asset.getCurrentHours()) > 0)) {
             boolean wasDue = asset.isDueForService();
+            BigDecimal beforeReading = asset.getCurrentHours();
             asset.updateHours(req.endHours());
             assetRepository.save(asset);
+            meters.record(tenantId, asset, beforeReading, "SHIFT", null);
             if (!wasDue && asset.isDueForService()) notifyServiceDue(tenantId, asset);
         }
         log.info("Operator log completed asset={} log={} hoursLogged={}", assetId, logId, opLog.getHoursLogged());
@@ -428,8 +436,8 @@ public class EarthAssetService {
     private void notifyServiceDue(TenantId tenantId, EarthAsset asset) {
         alerts.raise(tenantId, "SERVICE_DUE", "WARNING", asset.getId(), "ASSET", asset.getId(),
                 "Service due: " + displayName(asset),
-                displayName(asset) + " has reached " + asset.getCurrentHours() + " hours and is due for service (interval: "
-                        + asset.getServiceIntervalHours() + " hrs).",
+                displayName(asset) + " has reached " + asset.getCurrentHours() + " " + MeterRules.word(asset.getMeterType()) + " and is due for service (interval: "
+                        + asset.getServiceIntervalHours() + " " + MeterRules.unit(asset.getMeterType()) + ").",
                 "SERVICE_DUE:" + asset.getId(), null);
     }
 
@@ -475,6 +483,7 @@ public class EarthAssetService {
         m.put("serialNumber", a.getSerialNumber());
         m.put("registration", a.getRegistration());
         m.put("ownershipType", a.getOwnershipType());
+        m.put("meterType", a.getMeterType());
         m.put("hireSupplier", a.getHireSupplier());
         m.put("dailyRate", a.getDailyRate() == null ? null : a.getDailyRate().toPlainString());
         m.put("hourlyRate", a.getHourlyRate() == null ? null : a.getHourlyRate().toPlainString());
@@ -512,7 +521,8 @@ public class EarthAssetService {
                 a.getDailyRate(), a.getHourlyRate(),
                 a.getCurrentHours(), a.getLastServiceHours(),
                 a.getServiceIntervalHours(), a.isDueForService(),
-                a.getNotes(), a.getCreatedAt()
+                a.getNotes(), a.getCreatedAt(),
+                a.getMeterType(), MeterRules.unit(a.getMeterType())
         );
     }
 
