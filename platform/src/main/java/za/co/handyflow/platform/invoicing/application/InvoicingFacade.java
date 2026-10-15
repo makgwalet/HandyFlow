@@ -131,4 +131,25 @@ public interface InvoicingFacade {
      * read (not the lines), at most 500.
      */
     List<SaleLine> searchSaleLines(TenantId tenantId, Instant from, Instant to, Collection<String> statuses, int maxInvoices);
+
+    // ---- Draft invoices raised by other modules (Earthmoving hire charges) ----
+
+    /** One line of a draft invoice. {@code vatRate} is a percentage, for example 15.00. */
+    record DraftInvoiceLine(String description, String unit, BigDecimal quantity, BigDecimal unitPrice, BigDecimal vatRate) {}
+
+    /** A draft invoice for an existing customer. {@code dueDate} may be null. */
+    record DraftInvoice(UUID customerId, String title, String notes, LocalDate dueDate, List<DraftInvoiceLine> lines) {}
+
+    record DraftInvoiceResult(UUID id, String invoiceNumber, BigDecimal subtotal, BigDecimal vatTotal, BigDecimal total) {}
+
+    /**
+     * Creates an invoice in DRAFT and nothing more: it is never issued here, so nobody is billed until a person reviews and
+     * issues it in Invoicing. The customer must belong to the tenant and there must be at least one line.
+     *
+     * @throws IllegalArgumentException if the customer is unknown to the tenant, there are no lines, or a line is invalid
+     */
+    DraftInvoiceResult createDraftInvoice(TenantId tenantId, DraftInvoice request);
+
+    /** The InvoiceStatus name (DRAFT, ISSUED, ... CANCELLED) of this tenant's invoice, or empty if it does not exist or was deleted. */
+    Optional<String> findInvoiceStatus(TenantId tenantId, UUID invoiceId);
 }

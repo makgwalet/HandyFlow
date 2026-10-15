@@ -42,6 +42,7 @@ class InvoicingFacadeImpl implements InvoicingFacade {
     private final InvoiceRepository invoiceRepo;
     private final CreditNoteRepository creditNoteRepo;
     private final CrmFacade crmFacade;
+    private final InvoiceNumberGenerator invoiceNumberGenerator;
 
     @Override
     public VatSummary getVatSummary(TenantId tenantId, LocalDate from, LocalDate to) {
@@ -128,5 +129,37 @@ class InvoicingFacadeImpl implements InvoicingFacade {
             }
         }
         return out;
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public DraftInvoiceResult createDraftInvoice(TenantId tenantId, DraftInvoice request) {
+        if (request == null || request.customerId() == null || !crmFacade.customerExists(tenantId, request.customerId()))
+            throw new IllegalArgumentException("That customer was not found.");
+        if (request.lines() == null || request.lines().isEmpty())
+            throw new IllegalArgumentException("A draft invoice needs at least one line.");
+        for (DraftInvoiceLine l : request.lines()) {
+            if (l.description() == null || l.description().isBlank()) throw new IllegalArgumentException("Every invoice line needs a description.");
+            if (l.quantity() == null || l.quantity().signum() <= 0) throw new IllegalArgumentException("Every invoice line needs a quantity above zero.");
+            if (l.unitPrice() == null || l.unitPrice().signum() < 0) throw new IllegalArgumentException("A line's unit price cannot be negative.");
+            if (l.vatRate() == null || l.vatRate().signum() < 0 || l.vatRate().compareTo(new BigDecimal("100")) > 0)
+                throw new IllegalArgumentException("A line's VAT rate must be between 0 and 100.");
+        }
+        Invoice invoice = Invoice.createDraft(tenantId, request.customerId(), invoiceNumberGenerator.next(tenantId),
+                request.title(), request.notes(), request.dueDate());
+        int order = 0;
+        for (DraftInvoiceLine l : request.lines()) {
+            invoice.addLineItem(InvoiceLineItem.create(invoice, tenantId, null, l.description().trim(),
+                    l.unit() == null || l.unit().isBlank() ? "each" : l.unit().trim(), l.quantity(), l.unitPrice(), l.vatRate(), order++));
+        }
+        invoice.recalculateTotals();
+        invoiceRepo.save(invoice);
+        return new DraftInvoiceResult(invoice.getId(), invoice.getInvoiceNumber(), invoice.getSubtotal(), invoice.getVatTotal(), invoice.getTotal());
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public Optional<String> findInvoiceStatus(TenantId tenantId, UUID invoiceId) {
+        return invoiceRepo.findActiveByIdWithLineItems(tenantId, invoiceId).map(i -> i.getStatus().name());
     }
 }

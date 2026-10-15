@@ -1,7 +1,7 @@
 // src/pages/earthmoving/shared/hooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, HireCharge, DeploymentOption, DraftInvoiceResult } from "./types"
 
 // Central query keys — every tab imports these instead of typing the
 // literal string, so a rename is a one-line change instead of a grep.
@@ -16,6 +16,7 @@ export const QK = {
   alertRules: ["em-alert-rules"] as const,
   sites: ["em-sites"] as const,
   reconciliation: ["em-site-reconciliation"] as const,
+  hireCharges: ["em-hire-charges"] as const,
 }
 
 // ── Assets ───────────────────────────────────────────────────────────────
@@ -358,5 +359,44 @@ export function useChangeMeter(onSuccess?: () => void) {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) => api.changeMeter(id, body),
     onSuccess: done,
+  })
+}
+
+// ── Hire charges ─────────────────────────────────────────────────────────
+
+export function useHireCharges(status: string) {
+  return useQuery<HireCharge[]>({ queryKey: [...QK.hireCharges, status], queryFn: () => api.fetchHireCharges(status), staleTime: 15_000 })
+}
+
+export function useAssetDeployments(assetId: string) {
+  return useQuery<DeploymentOption[]>({ queryKey: ["em-asset-deployments", assetId], queryFn: () => api.fetchAssetDeployments(assetId), enabled: !!assetId, staleTime: 30_000 })
+}
+
+export function usePreviewHireCharge() {
+  return useMutation({ mutationFn: (body: Record<string, unknown>) => api.previewHireCharge(body) })
+}
+
+export function useCreateHireCharge(onSuccess?: () => void) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) => api.createHireCharge(body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: QK.hireCharges }); onSuccess?.() },
+  })
+}
+
+export function useHireChargeAction(onSuccess?: () => void) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, kind, reason }: { id: string; kind: "void" | "reopen"; reason: string }) =>
+      kind === "void" ? api.voidHireCharge(id, reason) : api.reopenHireCharge(id, reason),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: QK.hireCharges }); onSuccess?.() },
+  })
+}
+
+export function useDraftInvoice(onDone?: (r: DraftInvoiceResult) => void) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) => api.draftInvoiceFromCharges(body),
+    onSuccess: r => { qc.invalidateQueries({ queryKey: QK.hireCharges }); onDone?.(r) },
   })
 }

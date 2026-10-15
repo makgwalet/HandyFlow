@@ -28,4 +28,9 @@ public interface OperatorLogRepository extends JpaRepository<OperatorLog, UUID> 
     // any number of times in a row with no such check.
     @Query("SELECT l FROM OperatorLog l WHERE l.assetId = :assetId AND l.endedAt IS NULL")
     Optional<OperatorLog> findOpenLogForAsset(UUID assetId);
+
+    /** Hours on completed shifts that started in [from, to). The asset is already checked against the tenant by the caller. */
+    @Query("SELECT COALESCE(SUM(l.hoursLogged), 0) FROM OperatorLog l WHERE l.assetId = :assetId AND l.endedAt IS NOT NULL " +
+            "AND l.startedAt >= :from AND l.startedAt < :to")
+    java.math.BigDecimal sumHoursBetween(UUID assetId, java.time.Instant from, java.time.Instant to);
 }

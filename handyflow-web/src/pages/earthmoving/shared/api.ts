@@ -15,7 +15,7 @@
 // PUT (backend endpoint is still @PutMapping). Create is POST.
 
 import { apiClient } from "../../../api/client"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, HireCharge, DeploymentOption, DraftInvoiceResult } from "./types"
 
 export function unwrap<T>(r: { data?: { data?: unknown } & Record<string, unknown> }): T {
   const p = (r.data?.data ?? r.data) as { content?: unknown } | undefined
@@ -178,3 +178,24 @@ export const correctMeterReading = (assetId: string, body: { reading: number; re
 
 export const changeMeter = (assetId: string, body: Record<string, unknown>) =>
   apiClient.put(`${BASE}/assets/${assetId}/meter`, body)
+
+// ── Hire charges ─────────────────────────────────────────────────────────
+
+export const fetchHireCharges = async (status: string): Promise<HireCharge[]> =>
+  unwrap<HireCharge[]>(await apiClient.get(`${BASE}/hire-charges${status ? `?status=${status}` : ""}`))
+
+export const fetchAssetDeployments = (assetId: string): Promise<DeploymentOption[]> =>
+  fetchAllPages<DeploymentOption>(`${BASE}/assets/${assetId}/deployments`, 50, 10)
+
+export const previewHireCharge = async (body: Record<string, unknown>): Promise<HireCharge> =>
+  unwrap<HireCharge>(await apiClient.post(`${BASE}/hire-charges/preview`, body))
+
+export const createHireCharge = async (body: Record<string, unknown>): Promise<HireCharge> =>
+  unwrap<HireCharge>(await apiClient.post(`${BASE}/hire-charges`, body))
+
+export const voidHireCharge = (id: string, reason: string) => apiClient.patch(`${BASE}/hire-charges/${id}/void`, { reason })
+
+export const reopenHireCharge = (id: string, reason: string) => apiClient.patch(`${BASE}/hire-charges/${id}/reopen`, { reason })
+
+export const draftInvoiceFromCharges = async (body: Record<string, unknown>): Promise<DraftInvoiceResult> =>
+  unwrap<DraftInvoiceResult>(await apiClient.post(`${BASE}/hire-charges/draft-invoice`, body))

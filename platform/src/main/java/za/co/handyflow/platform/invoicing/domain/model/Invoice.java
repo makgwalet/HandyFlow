@@ -297,6 +297,34 @@ public class Invoice {
         return inv;
     }
 
+    /**
+     * A plain STANDARD invoice in DRAFT, built by another module through InvoicingFacade. It is never issued here: a
+     * person reviews the draft in Invoicing and issues it. Totals are calculated from the lines.
+     */
+    public static Invoice createDraft(TenantId tenantId, UUID customerId, String invoiceNumber, String title,
+                                      String notes, java.time.LocalDate dueDate) {
+        var inv = new Invoice();
+        inv.id            = java.util.UUID.randomUUID();
+        inv.tenantId      = tenantId;
+        inv.customerId    = customerId;
+        inv.invoiceNumber = invoiceNumber;
+        inv.title         = title;
+        inv.notes         = notes;
+        inv.dueDate       = dueDate;
+        inv.invoiceType   = InvoiceType.STANDARD;
+        inv.hoursConsumed = java.math.BigDecimal.ZERO;
+        inv.creditAmount  = java.math.BigDecimal.ZERO;
+        inv.amountPaid    = java.math.BigDecimal.ZERO;
+        inv.subtotal      = java.math.BigDecimal.ZERO;
+        inv.vatTotal      = java.math.BigDecimal.ZERO;
+        inv.total         = java.math.BigDecimal.ZERO;
+        inv.status        = InvoiceStatus.DRAFT;
+        inv.currency      = "ZAR";
+        inv.createdAt     = java.time.Instant.now();
+        inv.updatedAt     = java.time.Instant.now();
+        return inv;
+    }
+
     /** Factory for invoices spawned by a recurring schedule. */
     public static Invoice createFromSchedule(
             TenantId tenantId,

@@ -429,6 +429,7 @@ export const EARTHMOVING_SECTIONS: ModuleSections = {
         { id: 'assets', label: 'Fleet', icon: Truck },
         { id: 'sites', label: 'Sites', icon: MapPin },
         { id: 'deployments', label: 'Deployments', icon: PinIcon },
+        { id: 'hire', label: 'Hire charges', icon: Receipt },
       ],
     },
     {

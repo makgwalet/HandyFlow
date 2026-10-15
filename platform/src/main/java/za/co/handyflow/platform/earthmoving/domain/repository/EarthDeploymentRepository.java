@@ -41,4 +41,7 @@ public interface EarthDeploymentRepository extends JpaRepository<EarthDeployment
 
     @Query("SELECT COUNT(d) FROM EarthDeployment d WHERE d.tenantId = :tenantId AND d.customerId IS NOT NULL")
     long countWithCustomer(TenantId tenantId);
+
+    @Query("SELECT d FROM EarthDeployment d WHERE d.tenantId = :tenantId AND d.id = :id")
+    java.util.Optional<EarthDeployment> findByTenantAndId(TenantId tenantId, java.util.UUID id);
 }

@@ -10,6 +10,7 @@ import org.mockito.quality.Strictness;
 import za.co.handyflow.platform.crm.CrmFacade;
 import za.co.handyflow.platform.crm.CustomerSummary;
 import za.co.handyflow.platform.invoicing.application.InvoicingFacade.SaleLine;
+import za.co.handyflow.platform.invoicing.application.InvoicingFacade;
 import za.co.handyflow.platform.invoicing.domain.model.Invoice;
 import za.co.handyflow.platform.invoicing.domain.model.InvoiceLineItem;
 import za.co.handyflow.platform.invoicing.domain.model.InvoiceStatus;
@@ -42,11 +43,12 @@ class InvoicingFacadeImplTest {
     @Mock InvoiceRepository invoiceRepo;
     @Mock CreditNoteRepository creditNoteRepo;
     @Mock CrmFacade crmFacade;
+    @Mock InvoiceNumberGenerator numbers;
 
     static final TenantId TENANT = TenantId.of(UUID.randomUUID());
     static final Instant ISSUED = Instant.parse("2026-09-18T08:00:00Z");
 
-    private InvoicingFacadeImpl facade() { return new InvoicingFacadeImpl(invoiceRepo, creditNoteRepo, crmFacade); }
+    private InvoicingFacadeImpl facade() { return new InvoicingFacadeImpl(invoiceRepo, creditNoteRepo, crmFacade, numbers); }
 
     private static void assertNumber(String expected, BigDecimal actual) {
         assertEquals(0, new BigDecimal(expected).compareTo(actual), "expected " + expected + " but was " + actual);
@@ -192,5 +194,46 @@ class InvoicingFacadeImplTest {
 
         verify(invoiceRepo).findIssuedBetween(eq(TENANT), any(), any(), any(), eq(org.springframework.data.domain.PageRequest.of(0, 500)));
         verify(invoiceRepo).findIssuedBetween(eq(TENANT), any(), any(), any(), eq(org.springframework.data.domain.PageRequest.of(0, 1)));
+    }
+
+    // ── draft invoices raised by other modules ───────────────────────────────
+
+    private static InvoicingFacade.DraftInvoiceLine draftLine(String qty, String price, String vat) {
+        return new InvoicingFacade.DraftInvoiceLine("Hire: CAT D9", "day", new BigDecimal(qty), new BigDecimal(price), new BigDecimal(vat));
+    }
+
+    @org.junit.jupiter.api.Test
+    void aDraftInvoiceIsSavedAsADraftWithTotalsAndNothingIsIssued() {
+        UUID customer = UUID.randomUUID();
+        when(crmFacade.customerExists(TENANT, customer)).thenReturn(true);
+        when(numbers.next(TENANT)).thenReturn("FPS-INV-00007");
+        var result = facade().createDraftInvoice(TENANT, new InvoicingFacade.DraftInvoice(customer, "Hire charges", "Earthmoving", null,
+                java.util.List.of(draftLine("3", "1000.00", "15.00"))));
+        var saved = org.mockito.ArgumentCaptor.forClass(Invoice.class);
+        verify(invoiceRepo).save(saved.capture());
+        assertEquals(InvoiceStatus.DRAFT, saved.getValue().getStatus());
+        assertEquals("FPS-INV-00007", result.invoiceNumber());
+        assertNumber("3000.00", result.subtotal());
+        assertNumber("450.00", result.vatTotal());
+        assertNumber("3450.00", result.total());
+        org.junit.jupiter.api.Assertions.assertNull(saved.getValue().getIssuedAt());
+    }
+
+    @org.junit.jupiter.api.Test
+    void aDraftInvoiceForAnUnknownCustomerOrWithoutLinesOrWithABadLineIsRefused() {
+        UUID customer = UUID.randomUUID();
+        when(crmFacade.customerExists(TENANT, customer)).thenReturn(false);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> facade().createDraftInvoice(TENANT,
+                new InvoicingFacade.DraftInvoice(customer, "t", null, null, java.util.List.of(draftLine("1", "10", "15")))));
+        when(crmFacade.customerExists(TENANT, customer)).thenReturn(true);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> facade().createDraftInvoice(TENANT,
+                new InvoicingFacade.DraftInvoice(customer, "t", null, null, java.util.List.of())));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> facade().createDraftInvoice(TENANT,
+                new InvoicingFacade.DraftInvoice(customer, "t", null, null, java.util.List.of(draftLine("0", "10", "15")))));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> facade().createDraftInvoice(TENANT,
+                new InvoicingFacade.DraftInvoice(customer, "t", null, null, java.util.List.of(draftLine("1", "-1", "15")))));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> facade().createDraftInvoice(TENANT,
+                new InvoicingFacade.DraftInvoice(customer, "t", null, null, java.util.List.of(draftLine("1", "10", "150")))));
+        verify(invoiceRepo, org.mockito.Mockito.never()).save(org.mockito.ArgumentMatchers.any());
     }
 }

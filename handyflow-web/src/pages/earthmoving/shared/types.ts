@@ -154,3 +154,14 @@ export interface MeterReading {
   id: string; meterType: string; reading: number; previousReading: number | null
   source: string; reason: string | null; actorUserId: string | null; recordedAt: string
 }
+
+// ── Hire charges ─────────────────────────────────────────────────────────
+export interface HireCharge {
+  id: string | null; deploymentId: string; assetId: string; machine: string; customerId: string | null; customerName: string | null
+  siteName: string | null; periodFrom: string; periodTo: string; basis: string; quantity: number; unitRate: number
+  vatRate: number; amount: number; vatAmount: number; total: number; description: string
+  status: string // PENDING | INVOICED | VOIDED (PREVIEW when not saved yet)
+  invoiceId: string | null; invoiceNumber: string | null; note: string | null; createdAt: string | null
+}
+export interface DeploymentOption { id: string; assetId: string; siteName: string | null; clientName: string | null; deployedAt: string | null; returnedAt: string | null }
+export interface DraftInvoiceResult { invoiceId: string; invoiceNumber: string; subtotal: number; vatTotal: number; total: number; charges: number }

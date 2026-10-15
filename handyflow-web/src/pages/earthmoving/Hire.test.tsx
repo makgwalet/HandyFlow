@@ -1,0 +1,83 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+
+const get = vi.fn()
+const post = vi.fn()
+const patch = vi.fn()
+let perms: string[] = []
+vi.mock("../../api/client", () => ({
+  apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a), put: vi.fn(), patch: (...a: unknown[]) => patch(...a), delete: vi.fn() },
+}))
+vi.mock("../../store/auth.store", () => ({
+  useAuthStore: (sel: (s: unknown) => unknown) => sel({ user: { userId: "u1", permissions: perms } }),
+}))
+
+import HireTab from "./HireTab"
+
+afterEach(cleanup)
+
+const charge = (over: Record<string, unknown> = {}) => ({
+  id: "h1", deploymentId: "d1", assetId: "a1", machine: "Excavator 1", customerId: "c1", customerName: "Anglo", siteName: "Mine A",
+  periodFrom: "2026-10-01", periodTo: "2026-10-03", basis: "DAILY", quantity: 3, unitRate: 1000, vatRate: 15, amount: 3000,
+  vatAmount: 450, total: 3450, description: "Hire", status: "PENDING", invoiceId: null, invoiceNumber: null, note: null, createdAt: null, ...over,
+})
+const mount = () => {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(<QueryClientProvider client={qc}><HireTab /></QueryClientProvider>)
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  perms = []
+  get.mockImplementation((url: string) => Promise.resolve(
+    url.includes("/hire-charges") ? { data: { data: [charge(), charge({ id: "h2", machine: "Loader 2", customerId: "c2", customerName: "Twin" })] } }
+      : { data: { data: { content: [], last: true } } }))
+  post.mockResolvedValue({ data: { data: { invoiceId: "i1", invoiceNumber: "INV-0001", subtotal: 3000, vatTotal: 450, total: 3450, charges: 1 } } })
+  patch.mockResolvedValue({ data: { data: charge({ status: "VOIDED" }) } })
+})
+
+describe("Hire charges", () => {
+  it("shows charges to a reader without any action buttons", async () => {
+    perms = ["EARTHMOVING_READ"]
+    mount()
+    expect(await screen.findByText(/Excavator 1 · Anglo/)).toBeTruthy()
+    expect(screen.queryByText("New hire charge")).toBeNull()
+    expect(screen.queryByText("Void")).toBeNull()
+    expect(screen.queryByRole("checkbox")).toBeNull()
+  })
+
+  it("creates a draft invoice from charges of one customer", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_ADMIN"]
+    mount()
+    fireEvent.click(await screen.findByLabelText(/Select Excavator 1/))
+    fireEvent.click(screen.getByText("Create draft invoice"))
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post.mock.calls[0][0]).toContain("/hire-charges/draft-invoice")
+    expect(post.mock.calls[0][1].chargeIds).toEqual(["h1"])
+    expect(await screen.findByText(/Draft invoice INV-0001 created/)).toBeTruthy()
+  })
+
+  it("refuses to mix customers on one invoice", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_ADMIN"]
+    mount()
+    const boxes = await screen.findAllByRole("checkbox")
+    fireEvent.click(boxes[0]); fireEvent.click(boxes[1])
+    expect(screen.getByText(/different customers/)).toBeTruthy()
+    expect((screen.getByText("Create draft invoice") as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it("needs a reason of at least five characters to void", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_ADMIN"]
+    mount()
+    fireEvent.click((await screen.findAllByText("Void"))[0])
+    const submit = screen.getByText("Void charge") as HTMLButtonElement
+    expect(submit.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText(/Reason/), { target: { value: "Entered twice" } })
+    expect(submit.disabled).toBe(false)
+    fireEvent.click(submit)
+    await waitFor(() => expect(patch).toHaveBeenCalled())
+    expect(patch.mock.calls[0][0]).toContain("/hire-charges/h1/void")
+    expect(patch.mock.calls[0][1]).toEqual({ reason: "Entered twice" })
+  })
+})
