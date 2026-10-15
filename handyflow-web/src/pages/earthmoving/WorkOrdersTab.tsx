@@ -5,7 +5,7 @@
 import { useState } from "react"
 import { Plus, ClipboardList, Lock } from "lucide-react"
 import { MAINTENANCE_TYPES } from "./shared/constants"
-import { fmtDate, fmtCurrency2dp, apiMessage } from "./shared/format"
+import { fmtDate, fmtCurrency2dp, apiMessage, meterUnitOf, meterWordOf } from "./shared/format"
 import { Overlay, ModalHead, ModalFoot, ErrBanner, Sect, lbl, inputStyle } from "./shared/Modal"
 import { useEarthPerms } from "./shared/useEarthPerms"
 import {
@@ -171,7 +171,7 @@ export default function WorkOrdersTab() {
             <div style={{ fontSize: 13 }}>
               <div><strong>Work done:</strong> {w.workDone}</div>
               {w.testResult && <div><strong>Test result:</strong> {w.testResult}</div>}
-              {w.meterHours != null && <div><strong>Meter:</strong> {w.meterHours} hrs</div>}
+              {w.meterHours != null && <div><strong>Meter:</strong> {w.meterHours} {meterUnitOf(assets.find(x => x.id === w.assetId))}</div>}
               {w.downtimeHours != null && <div><strong>Downtime:</strong> {w.downtimeHours} hrs</div>}
               <div style={{ marginTop: 6, color: "var(--hf-text-faint)" }}>Completed {fmtDate(w.completedAt)}. The machine still has to be released from Fleet by someone with release authority.</div>
             </div>
@@ -210,7 +210,7 @@ export default function WorkOrdersTab() {
           <label style={{ ...lbl, marginTop: 12 }} htmlFor="wo-test">Test result{needsTest ? " *" : ""}</label>
           <textarea id="wo-test" rows={2} value={done.testResult} placeholder="What was checked after the work, and what it showed" onChange={e => setDone(f => ({ ...f, testResult: e.target.value }))} style={inputStyle()} />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 12 }}>
-            <div><label style={lbl} htmlFor="wo-meter">Meter hours{meterNeeded ? " *" : ""}</label>
+            <div><label style={lbl} htmlFor="wo-meter">Meter {meterWordOf(assets.find(x => x.id === w.assetId))}{meterNeeded ? " *" : ""}</label>
               <input id="wo-meter" type="number" min="0" step="0.1" value={done.meterHours} onChange={e => setDone(f => ({ ...f, meterHours: e.target.value }))} style={inputStyle()} /></div>
             <div><label style={lbl} htmlFor="wo-down">Downtime hrs</label>
               <input id="wo-down" type="number" min="0" step="0.1" value={done.downtimeHours} onChange={e => setDone(f => ({ ...f, downtimeHours: e.target.value }))} style={inputStyle()} /></div>

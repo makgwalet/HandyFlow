@@ -1,9 +1,9 @@
 // src/pages/earthmoving/StatusHistoryDialog.tsx
-// Every status change on one machine: who, when, why, the hour reading, and for a release the work order behind it and
+// Every status change on one machine: who, when, why, the meter reading, and for a release the work order behind it and
 // any override reason.
 import { Overlay, ModalHead } from "./shared/Modal"
 import { STATUS_CFG } from "./shared/constants"
-import { fmtDateTime } from "./shared/format"
+import { fmtDateTime, meterUnitOf } from "./shared/format"
 import { useStatusHistory, useAssignableUsers, useWorkOrders } from "./shared/hooks"
 import type { Asset } from "./shared/types"
 
@@ -32,7 +32,7 @@ export default function StatusHistoryDialog({ asset, onClose }: { asset: Asset; 
                   <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>{fmtDateTime(e.happenedAt)}</span>
                 </div>
                 <div style={{ fontSize: 12, color: "var(--hf-text-secondary)", marginTop: 3 }}>
-                  {who(e.actorUserId)}{e.meterHours != null && ` · ${e.meterHours} hrs`}{wo && ` · work order ${wo.number}`}
+                  {who(e.actorUserId)}{e.meterHours != null && ` · ${e.meterHours} ${meterUnitOf(asset)}`}{wo && ` · work order ${wo.number}`}
                 </div>
                 {e.reason && <div style={{ fontSize: 13, marginTop: 4 }}>{e.reason}</div>}
                 {e.overrideReason && (
