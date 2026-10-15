@@ -36,12 +36,20 @@ public class EarthInspection {
     @Column(nullable = false)
     private String result;
 
+    /** PRE_USE, HANDOVER or RETURN. */
+    @Column(name = "inspection_type", nullable = false)
+    private String inspectionType = InspectionRules.PRE_USE;
+
     private String notes;
 
     @Column(name = "performed_at", nullable = false)
     private Instant performedAt;
 
     public static EarthInspection create(TenantId tenantId, UUID assetId, UUID inspector, BigDecimal meterReading, String result, String notes) {
+        return create(tenantId, assetId, inspector, meterReading, result, notes, InspectionRules.PRE_USE);
+    }
+
+    public static EarthInspection create(TenantId tenantId, UUID assetId, UUID inspector, BigDecimal meterReading, String result, String notes, String type) {
         if (meterReading != null && meterReading.signum() < 0) throw new IllegalArgumentException("A meter reading cannot be negative.");
         EarthInspection i = new EarthInspection();
         i.tenantId = tenantId;
@@ -49,6 +57,7 @@ public class EarthInspection {
         i.inspectorUserId = inspector;
         i.meterReading = meterReading;
         i.result = result;
+        i.inspectionType = InspectionRules.type(type);
         i.notes = notes == null || notes.isBlank() ? null : notes.trim();
         i.performedAt = Instant.now();
         return i;

@@ -19,7 +19,7 @@ afterEach(cleanup)
 const CHECK = ["Tyres or tracks", "Brakes"]
 const inspection = (over: Record<string, unknown> = {}) => ({
   id: "i1", assetId: "a1", machine: "T-01 — Tipper", inspectorUserId: "u2", performedAt: "2026-10-15T06:00:00Z", meterReading: null,
-  result: "DEFECTS", notes: null, items: [{ item: "Brakes", outcome: "DEFECT", comment: "Soft pedal", incidentId: "x" }], ...over,
+  result: "DEFECTS", notes: null, items: [{ item: "Brakes", outcome: "DEFECT", comment: "Soft pedal", incidentId: "x" }], inspectionType: "PRE_USE", ...over,
 })
 const mount = () => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -70,6 +70,35 @@ describe("Inspections", () => {
       { item: "Brakes", outcome: "UNSAFE", comment: "Pedal to the floor" },
     ])
     expect(await screen.findByText(/taken out of service/)).toBeTruthy()
+  })
+
+  it("asks for the meter on a return inspection and sends its type", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_WRITE"]
+    mount()
+    fireEvent.click(await screen.findByText("New inspection"))
+    await screen.findByLabelText("Brakes: Unsafe")
+    await waitFor(() => expect(screen.getAllByRole("option", { name: /T-01/, hidden: true }).length).toBe(2))
+    fireEvent.change(screen.getByLabelText(/Machine \*/), { target: { value: "a1" } })
+    fireEvent.change(screen.getByLabelText("Type of inspection"), { target: { value: "RETURN" } })
+    const save = screen.getByText("Save inspection") as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText(/Meter reading/), { target: { value: "1250" } })
+    expect(save.disabled).toBe(false)
+    fireEvent.click(save)
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post.mock.calls[0][1].inspectionType).toBe("RETURN")
+    expect(post.mock.calls[0][1].meterReading).toBe(1250)
+  })
+
+  it("shows what kind of inspection each one was", async () => {
+    perms = ["EARTHMOVING_READ"]
+    get.mockImplementation((url: string) => Promise.resolve(
+      url.includes("/inspections/checklist") ? { data: { data: CHECK } }
+        : url.includes("/inspections") ? { data: { data: [inspection({ inspectionType: "HANDOVER" })] } }
+        : url.includes("assignable-users") ? { data: [] }
+        : { data: { data: { content: [], last: true } } }))
+    mount()
+    expect(await screen.findByText(/Handover to customer/)).toBeTruthy()
   })
 })
 

@@ -54,7 +54,7 @@ class EarthInspectionServiceTest {
             String[] f = findings.get(item);
             list.add(new CreateInspectionRequest.Item(item, f == null ? "OK" : f[0], f == null ? null : f[1]));
         }
-        return new CreateInspectionRequest(asset.getId(), null, null, list);
+        return new CreateInspectionRequest(asset.getId(), null, null, list, null);
     }
 
     @Test void aCleanInspectionRaisesNothing() {
@@ -85,7 +85,7 @@ class EarthInspectionServiceTest {
 
     @Test void anIncompleteChecklistIsRefusedAndNothingIsSaved() {
         CreateInspectionRequest partial = new CreateInspectionRequest(asset.getId(), null, null,
-                List.of(new CreateInspectionRequest.Item("Brakes", "OK", null)));
+                List.of(new CreateInspectionRequest.Item("Brakes", "OK", null)), null);
         assertThrows(IllegalArgumentException.class, () -> service.create(tenant, partial, actor));
         verify(inspections, never()).save(any());
     }
@@ -100,5 +100,19 @@ class EarthInspectionServiceTest {
         assertEquals(asset.getId(), r.get(0).assetId());
         granted.clear();
         assertThrows(HandyFlowException.class, () -> service.latest(tenant));
+    }
+
+    @Test void anInspectionIsPreUseUnlessItSaysOtherwise() {
+        assertEquals("PRE_USE", service.create(tenant, request(Map.of()), actor).inspectionType());
+    }
+
+    @Test void aHandoverOrReturnNeedsAMeterReadingAndIsKeptWithItsType() {
+        CreateInspectionRequest base = request(Map.of());
+        CreateInspectionRequest noMeter = new CreateInspectionRequest(asset.getId(), null, null, base.items(), "return");
+        assertThrows(IllegalArgumentException.class, () -> service.create(tenant, noMeter, actor));
+        CreateInspectionRequest ok = new CreateInspectionRequest(asset.getId(), new java.math.BigDecimal("1250.5"), null, base.items(), "return");
+        assertEquals("RETURN", service.create(tenant, ok, actor).inspectionType());
+        assertThrows(IllegalArgumentException.class, () -> service.create(tenant,
+                new CreateInspectionRequest(asset.getId(), null, null, base.items(), "SERVICE"), actor));
     }
 }

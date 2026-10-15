@@ -1,6 +1,6 @@
 // src/pages/earthmoving/InspectionsTab.tsx
 //
-// Pre-use inspections: the operator's walk-round before the machine is used. Every item is answered OK, Defect or Unsafe.
+// Inspections: the walk-round before a machine is used, and the condition check when it is handed to a customer or comes back. Every item is answered OK, Defect or Unsafe.
 // A defect or unsafe finding needs a note. One unsafe finding takes the machine out of service as a critical breakdown;
 // it comes back only through the normal release, which needs release authority. A defect is tracked as an incident and
 // does not stop the machine.
@@ -21,6 +21,7 @@ const btn = (primary = false): React.CSSProperties => ({
 const card: React.CSSProperties = { border: "1px solid var(--hf-border)", borderRadius: 10, padding: "14px 18px", background: "var(--hf-surface)" }
 
 const RESULT_LABEL: Record<string, string> = { PASS: "Passed", DEFECTS: "Passed with defects", UNSAFE: "Unsafe: taken out of service" }
+export const TYPE_LABEL: Record<string, string> = { PRE_USE: "Pre-use", HANDOVER: "Handover to customer", RETURN: "Return from hire" }
 const OUTCOMES = [["OK", "OK"], ["DEFECT", "Defect"], ["UNSAFE", "Unsafe"]] as const
 
 type Answer = { outcome: string; comment: string }
@@ -31,6 +32,7 @@ export default function InspectionsTab() {
   const [open, setOpen] = useState(false)
   const [formAsset, setFormAsset] = useState("")
   const [answers, setAnswers] = useState<Record<string, Answer>>({})
+  const [type, setType] = useState("PRE_USE")
   const [meter, setMeter] = useState("")
   const [notes, setNotes] = useState("")
   const [err, setErr] = useState("")
@@ -52,11 +54,11 @@ export default function InspectionsTab() {
   const missingNote = checklist.filter(i => answer(i).outcome !== "OK" && answer(i).comment.trim().length < 5)
   const unsafeCount = checklist.filter(i => answer(i).outcome === "UNSAFE").length
 
-  const openForm = () => { setFormAsset(assetId); setAnswers({}); setMeter(""); setNotes(""); setErr(""); setNotice(""); setOpen(true) }
+  const openForm = () => { setFormAsset(assetId); setAnswers({}); setType("PRE_USE"); setMeter(""); setNotes(""); setErr(""); setNotice(""); setOpen(true) }
   const submit = () => {
     setErr("")
     create.mutate({
-      assetId: formAsset, meterReading: meter.trim() === "" ? null : Number(meter), notes: notes.trim() || null,
+      assetId: formAsset, inspectionType: type, meterReading: meter.trim() === "" ? null : Number(meter), notes: notes.trim() || null,
       items: checklist.map(i => ({ item: i, outcome: answer(i).outcome, comment: answer(i).comment.trim() || null })),
     }, { onError: (e: unknown) => setErr(apiMessage(e, "Could not save the inspection")) })
   }
@@ -67,7 +69,7 @@ export default function InspectionsTab() {
     return (
       <div key={i.id} style={card}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-          <div style={{ fontWeight: 700, color: "var(--hf-text)" }}>{i.machine}</div>
+          <div style={{ fontWeight: 700, color: "var(--hf-text)" }}>{i.machine} <span style={{ fontWeight: 500, fontSize: 12, color: "var(--hf-text-muted)" }}>· {TYPE_LABEL[i.inspectionType] ?? "Pre-use"}</span></div>
           <div style={{ fontSize: 13, fontWeight: 600, color: i.result === "UNSAFE" ? "var(--hf-danger-text)" : "var(--hf-text-secondary)" }}>{RESULT_LABEL[i.result] ?? i.result}</div>
         </div>
         <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 2 }}>{fmtDateTime(i.performedAt)} · {who(i.inspectorUserId)}</div>
@@ -104,12 +106,15 @@ export default function InspectionsTab() {
 
   const renderForm = () => (
     <Overlay onClose={() => setOpen(false)} width={620}>
-      <ModalHead title="Pre-use inspection" onClose={() => setOpen(false)} />
+      <ModalHead title={`${TYPE_LABEL[type]} inspection`} onClose={() => setOpen(false)} />
+      <div style={{ marginBottom: 10 }}><label htmlFor="in-type" style={lbl}>Type of inspection</label>
+        <select id="in-type" value={type} onChange={e => setType(e.target.value)} style={inputStyle()}>
+          {Object.entries(TYPE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12, marginBottom: 10 }}>
         <div><label htmlFor="in-asset" style={lbl}>Machine *</label>
           <select id="in-asset" value={formAsset} onChange={e => setFormAsset(e.target.value)} style={inputStyle()}>
             <option value="">Choose…</option>{usable.map(a => <option key={a.id} value={a.id}>{a.fleetNumber ? `${a.fleetNumber} — ` : ""}{a.name}</option>)}</select></div>
-        <div><label htmlFor="in-meter" style={lbl}>Meter reading</label>
+        <div><label htmlFor="in-meter" style={lbl}>Meter reading{type === "PRE_USE" ? "" : " *"}</label>
           <input id="in-meter" type="number" min="0" value={meter} onChange={e => setMeter(e.target.value)} style={inputStyle()} /></div>
       </div>
       <div style={{ maxHeight: 340, overflowY: "auto", paddingRight: 4 }}>{checklist.map(renderItem)}</div>
@@ -122,7 +127,7 @@ export default function InspectionsTab() {
       )}
       {err && <ErrBanner msg={err} />}
       <ModalFoot onCancel={() => setOpen(false)} onSubmit={submit} loading={create.isPending} label="Save inspection"
-        disabled={!formAsset || checklist.length === 0 || missingNote.length > 0} />
+        disabled={!formAsset || checklist.length === 0 || missingNote.length > 0 || (type !== "PRE_USE" && meter.trim() === "")} />
     </Overlay>
   )
 

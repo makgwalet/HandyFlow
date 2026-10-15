@@ -6,7 +6,7 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * The pre-use walk-round. Every item on the checklist must be answered. A defect or an unsafe finding needs a comment
+ * The inspection walk-round, done before a machine is used, when it is handed to a customer and when it comes back. Every item on the checklist must be answered. A defect or an unsafe finding needs a comment
  * saying what was seen. One UNSAFE finding makes the whole inspection UNSAFE: the machine is not to be used until a
  * person with the authority has looked at it and released it.
  */
@@ -17,6 +17,25 @@ public final class InspectionRules {
     public static final String DEFECT = "DEFECT";
     public static final String UNSAFE = "UNSAFE";
     public static final Set<String> OUTCOMES = Set.of(OK, DEFECT, UNSAFE);
+
+    public static final String PRE_USE = "PRE_USE";
+    public static final String HANDOVER = "HANDOVER";
+    public static final String RETURN = "RETURN";
+    public static final Set<String> TYPES = Set.of(PRE_USE, HANDOVER, RETURN);
+
+    /** Blank means the usual pre-use walk-round. */
+    public static String type(String t) {
+        if (t == null || t.isBlank()) return PRE_USE;
+        String v = t.trim().toUpperCase(Locale.ROOT);
+        if (!TYPES.contains(v)) throw new IllegalArgumentException("An inspection is a PRE_USE, HANDOVER or RETURN inspection.");
+        return v;
+    }
+
+    /** A handover or a return records the meter, so the hours or kilometres of the hire can be shown. */
+    public static void checkMeter(String type, java.math.BigDecimal meterReading) {
+        if (!PRE_USE.equals(type) && meterReading == null)
+            throw new IllegalArgumentException("Enter the meter reading for a " + (HANDOVER.equals(type) ? "handover" : "return") + " inspection.");
+    }
 
     public static final String PASS = "PASS";
     public static final String DEFECTS = "DEFECTS";

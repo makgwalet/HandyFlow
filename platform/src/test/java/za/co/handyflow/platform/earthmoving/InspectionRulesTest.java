@@ -58,4 +58,16 @@ class InspectionRulesTest {
     @Test void aCommentOnAnOkItemIsKept() {
         assertEquals("Slight stain, wiped", InspectionRules.check(with(4, "OK", " Slight stain, wiped ")).get(4).comment());
     }
+
+    @Test void typeDefaultsToPreUseAndRejectsUnknownTypes() {
+        assertEquals("PRE_USE", InspectionRules.type(null));
+        assertEquals("PRE_USE", InspectionRules.type("  "));
+        assertEquals("HANDOVER", InspectionRules.type(" handover "));
+        assertThrows(IllegalArgumentException.class, () -> InspectionRules.type("WEEKLY"));
+    }
+    @Test void onlyHandoverAndReturnNeedAMeterReading() {
+        assertDoesNotThrow(() -> InspectionRules.checkMeter("PRE_USE", null));
+        assertDoesNotThrow(() -> InspectionRules.checkMeter("RETURN", java.math.BigDecimal.ONE));
+        assertThrows(IllegalArgumentException.class, () -> InspectionRules.checkMeter("HANDOVER", null));
+    }
 }

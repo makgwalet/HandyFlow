@@ -20,7 +20,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Pre-use inspections. An UNSAFE finding is reported as a critical breakdown: the machine goes out of service, a work
+ * Inspections (pre-use, handover and return). An UNSAFE finding is reported as a critical breakdown: the machine goes out of service, a work
  * order is raised and the people on the alert route are told, all through the existing incident path. It comes back only
  * through the normal release, which needs release authority. A DEFECT is reported as a medium incident so it is tracked
  * and does not get lost, without stopping the machine.
@@ -45,11 +45,13 @@ public class EarthInspectionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Asset", req.assetId().toString()));
         if (asset.getStatus() == AssetStatus.RETIRED) throw new IllegalStateException("A retired machine cannot be inspected.");
 
+        String type = InspectionRules.type(req.inspectionType());
+        InspectionRules.checkMeter(type, req.meterReading());
         List<InspectionRules.Answer> answers = InspectionRules.check(req.items().stream()
                 .map(i -> new InspectionRules.Answer(i.item(), i.outcome(), i.comment())).toList());
         String result = InspectionRules.overall(answers);
 
-        EarthInspection inspection = inspections.save(EarthInspection.create(tenantId, asset.getId(), inspector, req.meterReading(), result, req.notes()));
+        EarthInspection inspection = inspections.save(EarthInspection.create(tenantId, asset.getId(), inspector, req.meterReading(), result, req.notes(), type));
         List<EarthInspectionItem> saved = new ArrayList<>();
         for (int n = 0; n < answers.size(); n++) {
             InspectionRules.Answer a = answers.get(n);
@@ -58,7 +60,7 @@ public class EarthInspectionService {
             saved.add(items.save(row));
         }
         trail.record(tenantId, "EARTHMOVING_INSPECTION_RECORDED", "EARTHMOVING_INSPECTION", inspection.getId(),
-                Map.of("machine", asset.getName()), Map.of("result", result, "findings", String.valueOf(answers.stream().filter(a -> !InspectionRules.OK.equals(a.outcome())).count())));
+                Map.of("machine", asset.getName()), Map.of("type", type, "result", result, "findings", String.valueOf(answers.stream().filter(a -> !InspectionRules.OK.equals(a.outcome())).count())));
         return toResponse(inspection, asset.getName(), saved);
     }
 
@@ -96,6 +98,7 @@ public class EarthInspectionService {
     private static InspectionResponse toResponse(EarthInspection i, String machine, List<EarthInspectionItem> rows) {
         return new InspectionResponse(i.getId(), i.getAssetId(), machine, i.getInspectorUserId(), i.getPerformedAt(), i.getMeterReading(), i.getResult(), i.getNotes(),
                 rows.stream().sorted(Comparator.comparingInt(EarthInspectionItem::getPosition))
-                        .map(x -> new InspectionResponse.Item(x.getItem(), x.getOutcome(), x.getComment(), x.getIncidentId())).toList());
+                        .map(x -> new InspectionResponse.Item(x.getItem(), x.getOutcome(), x.getComment(), x.getIncidentId())).toList(),
+                i.getInspectionType());
     }
 }

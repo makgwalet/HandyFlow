@@ -160,6 +160,7 @@ export interface InspectionItem { item: string; outcome: string; comment: string
 export interface Inspection {
   id: string; assetId: string; machine: string; inspectorUserId: string | null; performedAt: string
   meterReading: number | null; result: string; notes: string | null; items: InspectionItem[]
+  inspectionType: string // PRE_USE | HANDOVER | RETURN
 }
 
 export interface LatestInspection { assetId: string; performedAt: string; result: string }
