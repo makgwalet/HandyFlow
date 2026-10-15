@@ -10,6 +10,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import za.co.handyflow.platform.audittrail.application.AuditTrailFacade;
 import za.co.handyflow.platform.earthmoving.domain.model.AssetStatus;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthStatusEvent;
+import za.co.handyflow.platform.earthmoving.domain.repository.EarthWorkOrderRepository;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthmovingRules;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthAsset;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthDeployment;
@@ -44,6 +45,7 @@ public class EarthAssetService {
     private final EarthDeploymentRepository deploymentRepository;
     private final EarthStatusEventRepository statusEvents;
     private final EarthmovingIncidentRepository incidentRepository;
+    private final EarthWorkOrderRepository workOrders;
     private final EarthmovingAccess access;
     private final AuditTrailFacade trail;
     private final NotificationService notificationService;
@@ -147,6 +149,16 @@ public class EarthAssetService {
             throw new IllegalStateException(
                     "This machine has an unresolved critical incident. Resolve it before releasing the machine.");
         }
+        UUID releaseWorkOrder = null;
+        if (release) {
+            var blocking = workOrders.findOpenBlocking(tenantId, id);
+            if (!blocking.isEmpty()) {
+                throw new IllegalStateException("Open work orders must be completed or cancelled before this machine is released: "
+                        + blocking.stream().map(w -> w.getNumber()).collect(java.util.stream.Collectors.joining(", ")) + ".");
+            }
+            var last = workOrders.findCompletedForAsset(tenantId, id, org.springframework.data.domain.PageRequest.of(0, 1));
+            if (!last.isEmpty()) releaseWorkOrder = last.get(0).getId();
+        }
 
         switch (target) {
             case AVAILABLE -> asset.returnToYard();
@@ -159,7 +171,7 @@ public class EarthAssetService {
         // EarthAsset.changeStatus() throws InvalidAssetStatusTransitionException (409) for an illegal transition.
 
         assetRepository.save(asset);
-        statusEvents.save(EarthStatusEvent.of(tenantId, id, previousStatus, target, reason, actor, asset.getCurrentHours()));
+        statusEvents.save(EarthStatusEvent.of(tenantId, id, previousStatus, target, reason, actor, asset.getCurrentHours()).withWorkOrder(releaseWorkOrder));
         trail.record(tenantId, release ? "EARTHMOVING_ASSET_RELEASED" : "EARTHMOVING_ASSET_STATUS_CHANGED",
                 "EARTHMOVING_ASSET", id,
                 Map.of("status", previousStatus.name()),

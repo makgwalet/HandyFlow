@@ -44,6 +44,15 @@ public class EarthStatusEvent {
     @Column(name = "happened_at", nullable = false)
     private Instant happenedAt;
 
+    /** The latest completed work order when this was a release; lets the history show what repair backed it. */
+    @Column(name = "work_order_id")
+    private UUID workOrderId;
+
+    public EarthStatusEvent withWorkOrder(UUID workOrderId) {
+        this.workOrderId = workOrderId;
+        return this;
+    }
+
     public static EarthStatusEvent of(TenantId tenantId, UUID assetId, AssetStatus from, AssetStatus to,
                                       String reason, UUID actor, BigDecimal meterHours) {
         EarthStatusEvent e = new EarthStatusEvent();

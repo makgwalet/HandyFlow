@@ -15,7 +15,7 @@
 // PUT (backend endpoint is still @PutMapping). Create is POST.
 
 import { apiClient } from "../../../api/client"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan } from "./types"
 
 export function unwrap<T>(r: { data?: { data?: unknown } & Record<string, unknown> }): T {
   const p = (r.data?.data ?? r.data) as { content?: unknown } | undefined
@@ -87,3 +87,36 @@ export const reportIncident = (body: Record<string, unknown>) =>
 
 export const resolveIncident = (id: string, resolutionNotes: string | null) =>
   apiClient.patch(`${BASE}/incidents/${id}/resolve`, { resolutionNotes })
+
+// ── Work orders and maintenance plans ───────────────────────────────────
+
+export const fetchWorkOrders = (): Promise<WorkOrder[]> => fetchAllPages<WorkOrder>(`${BASE}/work-orders`)
+
+export const createWorkOrder = (body: Record<string, unknown>) => apiClient.post(`${BASE}/work-orders`, body)
+
+// action: assign | start | awaiting-parts | resume | cancel | blocks-release | complete
+export const workOrderAction = (id: string, action: string, body?: Record<string, unknown>) =>
+  apiClient.patch(`${BASE}/work-orders/${id}/${action}`, body ?? {})
+
+export const addWorkOrderLine = (id: string, body: Record<string, unknown>) =>
+  apiClient.post(`${BASE}/work-orders/${id}/lines`, body)
+
+export const removeWorkOrderLine = (id: string, lineId: string) =>
+  apiClient.delete(`${BASE}/work-orders/${id}/lines/${lineId}`)
+
+export const fetchPlans = async (): Promise<MaintenancePlan[]> => unwrap<MaintenancePlan[]>(await apiClient.get(`${BASE}/maintenance-plans`))
+
+export const createPlan = (body: Record<string, unknown>) => apiClient.post(`${BASE}/maintenance-plans`, body)
+
+export const updatePlan = (id: string, body: Record<string, unknown>) => apiClient.put(`${BASE}/maintenance-plans/${id}`, body)
+
+export const scanPlans = async (): Promise<PlanScan> => {
+  const r = await apiClient.post(`${BASE}/maintenance-plans/scan`)
+  return (r.data?.data ?? r.data) as PlanScan
+}
+
+export const fetchAssignableUsers = async (): Promise<{ id: string; name: string }[]> => {
+  const r = await apiClient.get("/api/v1/tasks/assignable-users")
+  const d = r.data?.data ?? r.data
+  return (Array.isArray(d) ? d : d?.content ?? []) as { id: string; name: string }[]
+}

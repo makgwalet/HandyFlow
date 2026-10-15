@@ -1,7 +1,7 @@
 // src/pages/earthmoving/shared/hooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan } from "./types"
 
 // Central query keys — every tab imports these instead of typing the
 // literal string, so a rename is a one-line change instead of a grep.
@@ -10,6 +10,8 @@ export const QK = {
   maintenance: (assetId: string) => ["em-maintenance", assetId] as const,
   operatorLogs: (assetId: string) => ["em-oplogs", assetId] as const,
   incidents: ["em-incidents"] as const,
+  workOrders: ["em-work-orders"] as const,
+  plans: ["em-plans"] as const,
 }
 
 // ── Assets ───────────────────────────────────────────────────────────────
@@ -178,4 +180,66 @@ export function useResolveIncident() {
       api.resolveIncident(id, resolutionNotes),
     onSuccess: () => qc.invalidateQueries({ queryKey: QK.incidents }),
   })
+}
+
+// ── Work orders and plans ────────────────────────────────────────────────
+
+export function useWorkOrders() {
+  return useQuery<WorkOrder[]>({ queryKey: QK.workOrders, queryFn: api.fetchWorkOrders, staleTime: 10_000 })
+}
+
+export function useAssignableUsers() {
+  return useQuery({ queryKey: ["em-assignable-users"], queryFn: api.fetchAssignableUsers, staleTime: 60_000 })
+}
+
+/** Any change to a work order can change a machine's release state, a plan's state and the maintenance history. */
+function useRefreshAfterWorkOrder() {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: QK.workOrders })
+    qc.invalidateQueries({ queryKey: QK.plans })
+    qc.invalidateQueries({ queryKey: QK.assets })
+    qc.invalidateQueries({ queryKey: ["em-maintenance"] })
+    qc.invalidateQueries({ queryKey: QK.incidents })
+  }
+}
+
+export function useCreateWorkOrder(onSuccess?: () => void) {
+  const refresh = useRefreshAfterWorkOrder()
+  return useMutation({ mutationFn: api.createWorkOrder, onSuccess: () => { refresh(); onSuccess?.() } })
+}
+
+export function useWorkOrderAction(onSuccess?: () => void) {
+  const refresh = useRefreshAfterWorkOrder()
+  return useMutation({
+    mutationFn: ({ id, action, body }: { id: string; action: string; body?: Record<string, unknown> }) =>
+      api.workOrderAction(id, action, body),
+    onSuccess: () => { refresh(); onSuccess?.() },
+  })
+}
+
+export function useWorkOrderLine(onSuccess?: () => void) {
+  const refresh = useRefreshAfterWorkOrder()
+  return useMutation({
+    mutationFn: ({ id, body, remove }: { id: string; body?: Record<string, unknown>; remove?: string }) =>
+      remove ? api.removeWorkOrderLine(id, remove) : api.addWorkOrderLine(id, body ?? {}),
+    onSuccess: () => { refresh(); onSuccess?.() },
+  })
+}
+
+export function usePlans() {
+  return useQuery<MaintenancePlan[]>({ queryKey: QK.plans, queryFn: api.fetchPlans, staleTime: 10_000 })
+}
+
+export function useSavePlan(onSuccess?: () => void) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id?: string; body: Record<string, unknown> }) => id ? api.updatePlan(id, body) : api.createPlan(body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: QK.plans }); onSuccess?.() },
+  })
+}
+
+export function useScanPlans(onSuccess?: (r: { checked: number; workOrdersRaised: number; raised: string[] }) => void) {
+  const refresh = useRefreshAfterWorkOrder()
+  return useMutation({ mutationFn: api.scanPlans, onSuccess: (r) => { refresh(); onSuccess?.(r) } })
 }

@@ -31,6 +31,7 @@ class EarthAssetServiceTest {
     EarthDeploymentRepository deployments = mock(EarthDeploymentRepository.class);
     EarthStatusEventRepository events = mock(EarthStatusEventRepository.class);
     EarthmovingIncidentRepository incidents = mock(EarthmovingIncidentRepository.class);
+    EarthWorkOrderRepository workOrders = mock(EarthWorkOrderRepository.class);
     AuditTrailFacade trail = mock(AuditTrailFacade.class);
     NotificationService notifications = mock(NotificationService.class);
     TenantAdminRecipients admins = mock(TenantAdminRecipients.class);
@@ -44,7 +45,7 @@ class EarthAssetServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new EarthAssetService(assets, maintenance, logs, deployments, events, incidents, access, trail,
+        service = new EarthAssetService(assets, maintenance, logs, deployments, events, incidents, workOrders, access, trail,
                 notifications, admins);
         when(assets.save(any())).thenAnswer(i -> i.getArgument(0));
         when(assets.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
@@ -74,6 +75,43 @@ class EarthAssetServiceTest {
         assertTrue(e.getMessage().contains("EARTHMOVING_RELEASE"));
         assertEquals(AssetStatus.MAINTENANCE, a.getStatus());
         verify(events, never()).save(any());
+    }
+
+    @Test
+    void releaseIsRefusedWhileAWorkOrderThatBlocksReleaseIsOpen() {
+        EarthAsset a = machine(AssetStatus.BREAKDOWN);
+        granted.addAll(Set.of("EARTHMOVING_RELEASE"));
+        var wo = mock(za.co.handyflow.platform.earthmoving.domain.model.EarthWorkOrder.class);
+        when(wo.getNumber()).thenReturn("WO-0007");
+        when(workOrders.findOpenBlocking(tenant, a.getId())).thenReturn(List.of(wo));
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> service.updateStatus(tenant, a.getId(), status("AVAILABLE", "Repair complete and tested"), actor));
+        assertTrue(e.getMessage().contains("WO-0007"));
+        assertEquals(AssetStatus.BREAKDOWN, a.getStatus());
+        verify(events, never()).save(any());
+    }
+
+    @Test
+    void aReleaseIsLinkedToTheLatestCompletedWorkOrder() {
+        EarthAsset a = machine(AssetStatus.BREAKDOWN);
+        granted.addAll(Set.of("EARTHMOVING_RELEASE"));
+        UUID woId = UUID.randomUUID();
+        var wo = mock(za.co.handyflow.platform.earthmoving.domain.model.EarthWorkOrder.class);
+        when(wo.getId()).thenReturn(woId);
+        when(workOrders.findOpenBlocking(tenant, a.getId())).thenReturn(List.of());
+        when(workOrders.findCompletedForAsset(eq(tenant), eq(a.getId()), any())).thenReturn(List.of(wo));
+        service.updateStatus(tenant, a.getId(), status("AVAILABLE", "Repair complete and tested"), actor);
+        var saved = org.mockito.ArgumentCaptor.forClass(za.co.handyflow.platform.earthmoving.domain.model.EarthStatusEvent.class);
+        verify(events).save(saved.capture());
+        assertEquals(woId, saved.getValue().getWorkOrderId());
+    }
+
+    @Test
+    void aStatusChangeThatIsNotAReleaseNeverLooksAtWorkOrders() {
+        EarthAsset a = machine(AssetStatus.AVAILABLE);
+        granted.addAll(Set.of("EARTHMOVING_MAINTAIN"));
+        service.updateStatus(tenant, a.getId(), status("MAINTENANCE", "Scheduled 250h service"), actor);
+        verify(workOrders, never()).findOpenBlocking(any(), any());
     }
 
     @Test

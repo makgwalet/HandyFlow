@@ -56,6 +56,7 @@ public class EarthmovingIncidentService {
     // backed by a no-op stub and never actually notified anyone.
     private final TenantAdminRecipients tenantAdminRecipients;
     private final EarthmovingAccess access;
+    private final EarthWorkOrderService workOrderService;
     private final AuditTrailFacade trail;
 
     @Transactional(readOnly = true)
@@ -94,6 +95,9 @@ public class EarthmovingIncidentService {
                 incident.getId(), req.assetId(), incident.getType(), incident.getSeverity());
 
         maybeAutoBreakdown(asset, incident);
+        if (AUTO_BREAKDOWN_TYPES.contains(incident.getType())) {
+            workOrderService.raiseFromIncident(tenantId, asset.getId(), incident.getId(), incident.getTitle(), incident.getSeverity(), reportedByUserId);
+        }
         notifyIncidentReported(tenantId, asset, incident);
 
         return toResponse(incident);

@@ -76,3 +76,32 @@ export interface Incident {
   resolvedAt: string | null
   resolutionNotes: string | null
 }
+
+export interface WorkOrderLine {
+  id: string; kind: string; description: string; quantity: number; unitCost: number; total: number; supplier: string | null
+}
+
+export interface WorkOrder {
+  id: string; assetId: string; number: string; title: string; description: string | null
+  type: string; priority: string // LOW | NORMAL | HIGH | URGENT
+  status: string // OPEN | IN_PROGRESS | AWAITING_PARTS | COMPLETED | CANCELLED
+  assignedToUserId: string | null; assignedToName: string | null
+  dueDate: string | null; overdue: boolean
+  source: string // MANUAL | PLAN | INCIDENT
+  planId: string | null; incidentId: string | null; blocksRelease: boolean
+  startedAt: string | null; completedAt: string | null
+  meterHours: number | null; downtimeHours: number | null; labourHours: number | null
+  workDone: string | null; testResult: string | null; maintenanceRecordId: string | null; cancelReason: string | null
+  totalCost: number; lines: WorkOrderLine[]; createdAt: string
+}
+
+export interface MaintenancePlan {
+  id: string; assetId: string; name: string; taskType: string
+  triggerType: string // HOURS | DAYS
+  intervalValue: number; leadValue: number; lastDoneHours: number | null; lastDoneDate: string | null
+  priority: string; blocksRelease: boolean; active: boolean
+  state: string // OK | DUE_SOON | DUE | OVERDUE
+  used: number; remaining: number; unit: string
+}
+
+export interface PlanScan { checked: number; workOrdersRaised: number; raised: string[] }
