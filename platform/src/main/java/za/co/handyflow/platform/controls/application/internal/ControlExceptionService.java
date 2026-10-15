@@ -65,22 +65,11 @@ public class ControlExceptionService implements ControlExceptionFacade {
 
     @Override
     @Transactional
-    public ControlExceptionResponse resolve(TenantId tenantId, UUID exceptionId,
-                                            UUID resolvedBy, String resolvedByName, String resolutionNotes) {
-        ControlException exception = repo.findByTenantIdAndId(tenantId.getValue(), exceptionId)
-                .orElseThrow(() -> new ResourceNotFoundException("ControlException", exceptionId.toString()));
-        exception.resolve(resolvedBy, resolvedByName, resolutionNotes);
-        repo.save(exception);
-        return toResponse(exception);
-    }
-
-    @Override
-    @Transactional
     public void resolveForEntity(TenantId tenantId, String relatedEntityType, UUID relatedEntityId,
                                  UUID resolvedBy, String resolvedByName, String resolutionNotes) {
         List<ControlException> open = repo.findOpenForEntity(tenantId.getValue(), relatedEntityType, relatedEntityId);
         for (ControlException e : open) {
-            e.resolve(resolvedBy, resolvedByName, resolutionNotes);
+            e.resolveBySystem(resolvedBy, resolvedByName, resolutionNotes);
             repo.save(e);
         }
         if (!open.isEmpty()) {

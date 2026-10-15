@@ -7,11 +7,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.controls.application.ControlExceptionFacade;
+import za.co.handyflow.platform.controls.application.internal.ControlExceptionManagementService;
+import za.co.handyflow.platform.controls.dto.ControlExceptionDetail;
 import za.co.handyflow.platform.controls.dto.ControlExceptionResponse;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,6 +32,7 @@ import java.util.UUID;
 public class ControlExceptionController {
 
     private final ControlExceptionFacade controlExceptionFacade;
+    private final ControlExceptionManagementService management;
 
     @GetMapping
     @PreAuthorize("hasAuthority('CONTROL_EXCEPTION_READ')")
@@ -38,16 +42,58 @@ public class ControlExceptionController {
         return ResponseEntity.ok(ApiResponse.success(controlExceptionFacade.listOpen(tenantId)));
     }
 
-    public record ResolveExceptionRequest(String resolutionNotes) {}
+    // ---- Management (A15): rate, assign, respond, resolve, follow up ----
+
+    @GetMapping("/detailed")
+    @PreAuthorize("hasAuthority('CONTROL_EXCEPTION_READ')")
+    @Operation(summary = "Exceptions with rating, owner, response and follow-up (scope: open, follow-ups, all)")
+    public ResponseEntity<ApiResponse<List<ControlExceptionDetail>>> detailed(@RequestParam(defaultValue = "open") String scope) {
+        return ResponseEntity.ok(ApiResponse.success(management.list(TenantContext.getTenantIdAsObject(), scope, LocalDate.now())));
+    }
+
+    public record RateRequest(String rating, String rationale) {}
+    public record AssignRequest(UUID ownerId, LocalDate targetDate) {}
+    public record RespondRequest(String response) {}
+    public record ResolveExceptionRequest(String resolutionNotes, LocalDate followUpDate) {}
+    public record FollowUpRequest(String outcome, String note) {}
+
+    @PostMapping("/{id}/rate")
+    @PreAuthorize("hasAuthority('CONTROL_EXCEPTION_RESOLVE')")
+    @Operation(summary = "Rate the risk of an exception")
+    public ResponseEntity<ApiResponse<ControlExceptionDetail>> rate(@PathVariable UUID id, @RequestBody RateRequest req) {
+        return ResponseEntity.ok(ApiResponse.success(management.rate(TenantContext.getTenantIdAsObject(), id,
+                TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName(), req.rating(), req.rationale(), LocalDate.now())));
+    }
+
+    @PostMapping("/{id}/assign")
+    @PreAuthorize("hasAuthority('CONTROL_EXCEPTION_RESOLVE')")
+    @Operation(summary = "Give an exception an owner and a target date")
+    public ResponseEntity<ApiResponse<ControlExceptionDetail>> assign(@PathVariable UUID id, @RequestBody AssignRequest req) {
+        return ResponseEntity.ok(ApiResponse.success(management.assign(TenantContext.getTenantIdAsObject(), id,
+                req.ownerId(), req.targetDate(), LocalDate.now())));
+    }
+
+    @PostMapping("/{id}/respond")
+    @PreAuthorize("hasAuthority('CONTROL_EXCEPTION_RESOLVE')")
+    @Operation(summary = "Record management's response")
+    public ResponseEntity<ApiResponse<ControlExceptionDetail>> respond(@PathVariable UUID id, @RequestBody RespondRequest req) {
+        return ResponseEntity.ok(ApiResponse.success(management.respond(TenantContext.getTenantIdAsObject(), id,
+                TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName(), req.response(), LocalDate.now())));
+    }
 
     @PostMapping("/{id}/resolve")
     @PreAuthorize("hasAuthority('CONTROL_EXCEPTION_RESOLVE')")
-    @Operation(summary = "Mark an exception as resolved")
-    public ResponseEntity<ApiResponse<ControlExceptionResponse>> resolve(@PathVariable UUID id,
-                                                                         @RequestBody(required = false) ResolveExceptionRequest req) {
-        TenantId tenantId = TenantContext.getTenantIdAsObject();
-        String notes = req != null ? req.resolutionNotes() : null;
-        return ResponseEntity.ok(ApiResponse.success(controlExceptionFacade.resolve(tenantId, id,
-                TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName(), notes)));
+    @Operation(summary = "Resolve an exception (must be rated; high and critical also need a response, evidence, a different resolver and a follow-up date)")
+    public ResponseEntity<ApiResponse<ControlExceptionDetail>> resolve(@PathVariable UUID id, @RequestBody ResolveExceptionRequest req) {
+        return ResponseEntity.ok(ApiResponse.success(management.resolve(TenantContext.getTenantIdAsObject(), id,
+                TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName(), req.resolutionNotes(), req.followUpDate(), LocalDate.now())));
+    }
+
+    @PostMapping("/{id}/follow-up")
+    @PreAuthorize("hasAuthority('CONTROL_EXCEPTION_RESOLVE')")
+    @Operation(summary = "Record the follow-up check: HOLDING or RECURRED (reopens)")
+    public ResponseEntity<ApiResponse<ControlExceptionDetail>> followUp(@PathVariable UUID id, @RequestBody FollowUpRequest req) {
+        return ResponseEntity.ok(ApiResponse.success(management.completeFollowUp(TenantContext.getTenantIdAsObject(), id,
+                TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName(), req.outcome(), req.note(), LocalDate.now())));
     }
 }
