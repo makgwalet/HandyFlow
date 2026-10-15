@@ -81,6 +81,7 @@ public class InternalAuditService {
     private final AccJournalEntryRepository journalEntryRepo;
     private final AuditFindingRepository findingRepo;
     private final ApprovalFacade approvalFacade;
+    private final za.co.handyflow.platform.internalaudit.domain.repository.AuditReportAmendmentRepository amendmentRepo;
 
     // ── Universe ─────────────────────────────────────────────────────────────
 
@@ -294,6 +295,7 @@ public class InternalAuditService {
     public EngagementResponse updatePlanning(TenantId tenantId, UUID engagementId, UpdatePlanningRequest req) {
         AuditEngagement e = engagementRepo.findByTenantAndId(tenantId.getValue(), engagementId)
                 .orElseThrow(() -> new ResourceNotFoundException("AuditEngagement", engagementId.toString()));
+        requireReportNotLocked(tenantId, engagementId);
         e.updatePlanning(req.objectives(), req.scope(), req.auditCriteria(),
                 req.overallMateriality(), req.performanceMateriality(), req.clearlyTrivialThreshold());
         engagementRepo.save(e);
@@ -329,6 +331,7 @@ public class InternalAuditService {
                                                           CreateWorkpaperFolderRequest req) {
         engagementRepo.findByTenantAndId(tenantId.getValue(), engagementId)
                 .orElseThrow(() -> new ResourceNotFoundException("AuditEngagement", engagementId.toString()));
+        requireReportNotLocked(tenantId, engagementId);
         AuditWorkpaperFolder f = AuditWorkpaperFolder.create(tenantId.getValue(), engagementId,
                 req.parentId(), req.name(), req.folderType(), req.sortOrder());
         workpaperFolderRepo.save(f);
@@ -346,6 +349,7 @@ public class InternalAuditService {
                                                       UploadWorkpaperFileRequest req) {
         engagementRepo.findByTenantAndId(tenantId.getValue(), engagementId)
                 .orElseThrow(() -> new ResourceNotFoundException("AuditEngagement", engagementId.toString()));
+        requireReportNotLocked(tenantId, engagementId);
         AuditWorkpaperFolder folder = workpaperFolderRepo.findByTenantAndId(tenantId.getValue(), req.folderId())
                 .orElseThrow(() -> new HandyFlowException("Folder not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
         if (!folder.getEngagementId().equals(engagementId)) {
@@ -406,6 +410,7 @@ public class InternalAuditService {
                                                             UpdateWorkpaperStatusRequest req, UUID actingUserId) {
         AuditWorkpaperFile file = workpaperFileRepo.findByTenantAndId(tenantId.getValue(), fileId)
                 .orElseThrow(() -> new ResourceNotFoundException("WorkpaperFile", fileId.toString()));
+        requireReportNotLocked(tenantId, file.getEngagementId());
         try {
             switch (req.action()) {
                 case "PREPARE" -> file.markPrepared(actingUserId);
@@ -425,6 +430,7 @@ public class InternalAuditService {
     public void deleteWorkpaperFile(TenantId tenantId, UUID fileId) {
         AuditWorkpaperFile file = workpaperFileRepo.findByTenantAndId(tenantId.getValue(), fileId)
                 .orElseThrow(() -> new ResourceNotFoundException("WorkpaperFile", fileId.toString()));
+        requireReportNotLocked(tenantId, file.getEngagementId());
         file.softDelete();
         workpaperFileRepo.save(file);
     }
@@ -433,6 +439,7 @@ public class InternalAuditService {
     public WorkpaperFileResponse restoreWorkpaperFile(TenantId tenantId, UUID fileId) {
         AuditWorkpaperFile file = workpaperFileRepo.findByTenantAndId(tenantId.getValue(), fileId)
                 .orElseThrow(() -> new ResourceNotFoundException("WorkpaperFile", fileId.toString()));
+        requireReportNotLocked(tenantId, file.getEngagementId());
         file.restore();
         workpaperFileRepo.save(file);
         return toFileResponse(file);
@@ -588,6 +595,7 @@ public class InternalAuditService {
     public FindingResponse createFinding(TenantId tenantId, UUID engagementId, CreateFindingRequest req, UUID createdBy) {
         engagementRepo.findByTenantAndId(tenantId.getValue(), engagementId)
                 .orElseThrow(() -> new ResourceNotFoundException("AuditEngagement", engagementId.toString()));
+        requireReportNotLocked(tenantId, engagementId);
 
         AuditFinding finding = AuditFinding.create(tenantId.getValue(), engagementId, req.sourceExceptionId(),
                 req.title(), req.description(), req.rootCause(), req.recommendation(), req.severity(),
@@ -722,6 +730,7 @@ public class InternalAuditService {
                         "No one holds the Head of Internal Audit role on this engagement yet — assign one before submitting the report for sign-off",
                         HttpStatus.CONFLICT, "NO_APPROVER"));
 
+        amendmentRepo.findOpen(tenantId.getValue(), engagementId).ifPresent(a -> { a.markResubmitted(); amendmentRepo.save(a); });
         return approvalFacade.submitAdHoc(tenantId, "internalaudit", "ENGAGEMENT_REPORT", engagementId, submittedBy,
                 ApprovalRule.ApprovalMode.SEQUENTIAL,
                 List.of(new ChainEntryInput("USER", headOfInternalAudit.toString(), null, false)),
@@ -731,8 +740,47 @@ public class InternalAuditService {
     @Transactional(readOnly = true)
     public ReportSignOffStatusResponse getReportApprovalStatus(TenantId tenantId, UUID engagementId) {
         return approvalFacade.getLatestRequestForEntity(tenantId, "internalaudit", "ENGAGEMENT_REPORT", engagementId)
-                .map(r -> new ReportSignOffStatusResponse(r.status(), r.approvalMode()))
+                .map(r -> new ReportSignOffStatusResponse(r.status(), r.approvalMode(), isReportLocked(tenantId, engagementId)))
                 .orElse(null);
+    }
+
+    /** True while the engagement's findings, workpapers and planning are frozen by a report that is out for sign-off or approved. */
+    public boolean isReportLocked(TenantId tenantId, UUID engagementId) {
+        String latest = approvalFacade.getLatestRequestForEntity(tenantId, "internalaudit", "ENGAGEMENT_REPORT", engagementId)
+                .map(r -> r.status()).orElse(null);
+        return ReportLock.isLocked(latest, amendmentRepo.findOpen(tenantId.getValue(), engagementId).isPresent());
+    }
+
+    private void requireReportNotLocked(TenantId tenantId, UUID engagementId) {
+        if (isReportLocked(tenantId, engagementId)) {
+            throw new HandyFlowException(
+                    "This engagement's report has gone for sign-off, so its findings and workpapers are locked. "
+                            + "The Head of Internal Audit can reopen it for amendment, with a reason.",
+                    HttpStatus.CONFLICT, "REPORT_LOCKED");
+        }
+    }
+
+    /** Reopen a locked engagement for changes. Head of Internal Audit only; the reason is kept; resubmitting the report locks it again. */
+    @Transactional
+    public ReportSignOffStatusResponse amendReport(TenantId tenantId, UUID engagementId, String reason, UUID actingUserId) {
+        engagementRepo.findByTenantAndId(tenantId.getValue(), engagementId)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditEngagement", engagementId.toString()));
+        boolean isHead = assignmentRepo.findByEngagement(tenantId.getValue(), engagementId).stream()
+                .anyMatch(a -> "HEAD_OF_INTERNAL_AUDIT".equals(a.getRole()) && a.getUserId().equals(actingUserId));
+        if (!isHead) {
+            throw new HandyFlowException("Only the Head of Internal Audit on this engagement can reopen a report",
+                    HttpStatus.FORBIDDEN, "NOT_HEAD_OF_INTERNAL_AUDIT");
+        }
+        if (!isReportLocked(tenantId, engagementId)) {
+            throw new HandyFlowException("The report is not locked, so there is nothing to reopen", HttpStatus.CONFLICT, "NOT_LOCKED");
+        }
+        try {
+            amendmentRepo.save(za.co.handyflow.platform.internalaudit.domain.model.AuditReportAmendment.open(
+                    tenantId.getValue(), engagementId, reason, actingUserId));
+        } catch (IllegalArgumentException e) {
+            throw new HandyFlowException(e.getMessage(), HttpStatus.BAD_REQUEST, "REASON_REQUIRED");
+        }
+        return getReportApprovalStatus(tenantId, engagementId);
     }
 
     private FindingResponse toFindingResponse(AuditFinding f) {

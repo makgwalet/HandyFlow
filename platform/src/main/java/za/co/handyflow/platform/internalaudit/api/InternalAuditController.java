@@ -468,6 +468,18 @@ public class InternalAuditController {
                         TenantContext.getCurrentUserId())));
     }
 
+    public record AmendReportRequest(String reason) {}
+
+    @PostMapping("/engagements/{id}/report/amend")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    @Operation(summary = "Reopen a locked engagement for changes",
+            description = "Head of Internal Audit on this engagement only. The reason is recorded; resubmitting the report locks the engagement again.")
+    public ResponseEntity<ApiResponse<ReportSignOffStatusResponse>> amendReport(@PathVariable UUID id, @RequestBody AmendReportRequest req) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success("Reopened for amendment",
+                auditService.amendReport(TenantContext.getTenantIdAsObject(), id, req.reason(), TenantContext.getCurrentUserId())));
+    }
+
     @GetMapping("/engagements/{id}/report/status")
     @PreAuthorize("hasAuthority('AUDIT_READ')")
     public ResponseEntity<ApiResponse<ReportSignOffStatusResponse>> getReportApprovalStatus(@PathVariable UUID id) {

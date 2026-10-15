@@ -72,7 +72,7 @@ interface FindingResp {
   owner: string | null; ownerName: string | null; dueDate: string | null; status: string
   createdBy: string | null; createdAt: string; resolvedAt: string | null
 }
-interface ReportSignOffStatus { status: string; approvalMode: string | null }
+interface ReportSignOffStatus { status: string; approvalMode: string | null; locked?: boolean }
 interface AuditTestResp {
   id: string; sampleItemId: string; procedure: string; result: string; notes: string | null
   testedBy: string | null; testedAt: string | null; exceptions: AuditExceptionResp[]
@@ -680,6 +680,13 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
     onError: (e: any) => setError(e.response?.data?.message ?? "Failed to submit report for sign-off"),
   })
 
+  const amendReport = useMutation({
+    mutationFn: ({ engagementId, reason }: { engagementId: string; reason: string }) =>
+      apiClient.post(`/api/v1/internal-audit/engagements/${engagementId}/report/amend`, { reason }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ia-report-status", expanded] }); setError("") },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to reopen the report"),
+  })
+
   const updatePlanning = useMutation({
     mutationFn: (engagementId: string) => apiClient.put(`/api/v1/internal-audit/engagements/${engagementId}/planning`, {
       objectives: planningForm.objectives || null, scope: planningForm.scope || null, auditCriteria: planningForm.auditCriteria || null,
@@ -1110,6 +1117,16 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                             </div>
                           ) : (
                             <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>Not yet submitted for sign-off.</div>
+                          )}
+                          {reportStatusQuery.data?.locked && (
+                            <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--hf-warning-text-strong)" }}>
+                              Findings and workpapers are locked while the report is out for sign-off or approved.{" "}
+                              <button onClick={() => { const reason = window.prompt("Why is this report being reopened? (at least 10 characters)"); if (reason) amendReport.mutate({ engagementId: e.id, reason }) }}
+                                disabled={amendReport.isPending}
+                                style={{ background: "none", border: "none", padding: 0, color: "var(--hf-primary)", fontWeight: 700, cursor: "pointer", fontSize: 11.5 }}>
+                                Reopen for amendment
+                              </button>
+                            </div>
                           )}
                         </div>
                         <button onClick={() => submitReport.mutate(e.id)} disabled={submitReport.isPending}
