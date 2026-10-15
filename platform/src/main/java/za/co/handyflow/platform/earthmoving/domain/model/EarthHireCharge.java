@@ -110,6 +110,9 @@ public class EarthHireCharge {
         return c;
     }
 
+    /** Keeps why a different rate was charged. Void and reopen later write their own reason, and the audit trail keeps this one. */
+    public void noteRateOverride(String text) { if (text != null) this.note = text; }
+
     public BigDecimal getVatAmount() { return HireRules.vatAmount(amount, vatRate); }
 
     public BigDecimal getTotal() { return amount.add(getVatAmount()); }

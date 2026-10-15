@@ -130,4 +130,14 @@ class HireRulesTest {
         assertNull(c.getInvoiceId());
         assertNull(c.getInvoiceNumber());
     }
+    @Test void anAgreedRateNeedsAReasonAndBeatsTheMachineRate() {
+        assertEquals(n("900"), HireRules.rate("DAILY", n("1000"), null, n("900"), "Agreed with the client"));
+        assertEquals(n("1000"), HireRules.rate("DAILY", n("1000"), null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> HireRules.rate("DAILY", n("1000"), null, n("900"), " "));
+        assertThrows(IllegalArgumentException.class, () -> HireRules.rate("DAILY", n("1000"), null, n("-5"), "Agreed with the client"));
+    }
+    @Test void aMachineWithNoRateCanStillBeChargedAtAnAgreedRate() {
+        assertEquals(n("750"), HireRules.rate("HOURLY", null, null, n("750"), "Rate set by the contract"));
+        assertThrows(IllegalArgumentException.class, () -> HireRules.rate("HOURLY", null, null, null, null));
+    }
 }

@@ -24,7 +24,7 @@ const card: React.CSSProperties = { border: "1px solid var(--hf-border)", border
 
 const STATUS_LABEL: Record<string, string> = { PENDING: "Not invoiced", INVOICED: "On an invoice", VOIDED: "Voided" }
 const FILTERS = [["PENDING", "Not invoiced"], ["INVOICED", "On an invoice"], ["VOIDED", "Voided"], ["", "All"]] as const
-const EMPTY = { assetId: "", deploymentId: "", basis: "DAILY", periodFrom: "", periodTo: "", vatRate: "15" }
+const EMPTY = { assetId: "", deploymentId: "", basis: "DAILY", periodFrom: "", periodTo: "", vatRate: "15", unitRate: "", rateReason: "" }
 
 export default function HireTab() {
   const perms = useEarthPerms()
@@ -52,8 +52,11 @@ export default function HireTab() {
   const body = () => ({
     deploymentId: form.deploymentId, basis: form.basis, periodFrom: form.periodFrom, periodTo: form.periodTo,
     vatRate: form.vatRate.trim() === "" ? null : Number(form.vatRate),
+    unitRate: form.unitRate.trim() === "" ? null : Number(form.unitRate),
+    rateReason: form.unitRate.trim() === "" ? null : form.rateReason.trim(),
   })
-  const formReady = !!form.deploymentId && !!form.periodFrom && !!form.periodTo
+  const rateOk = form.unitRate.trim() === "" || (Number(form.unitRate) > 0 && form.rateReason.trim().length >= 5)
+  const formReady = !!form.deploymentId && !!form.periodFrom && !!form.periodTo && rateOk
 
   const openCreate = () => { setForm(EMPTY); setPreview(null); setErr(""); setCreating(true) }
   const change = (patch: Partial<typeof EMPTY>) => { setForm(f => ({ ...f, ...patch })); setPreview(null) }
@@ -131,6 +134,12 @@ export default function HireTab() {
           <input id="hc-from" type="date" value={form.periodFrom} onChange={e => change({ periodFrom: e.target.value })} style={inputStyle()} /></div>
         <div><label htmlFor="hc-to" style={lbl}>To *</label>
           <input id="hc-to" type="date" value={form.periodTo} onChange={e => change({ periodTo: e.target.value })} style={inputStyle()} /></div>
+        <div><label htmlFor="hc-rate" style={lbl}>Agreed rate (leave blank for the machine's rate)</label>
+          <input id="hc-rate" type="number" min="0" value={form.unitRate} onChange={e => change({ unitRate: e.target.value })} style={inputStyle()} /></div>
+        {form.unitRate.trim() !== "" && (
+          <div><label htmlFor="hc-rate-why" style={lbl}>Why this rate? * (at least 5 characters)</label>
+            <input id="hc-rate-why" value={form.rateReason} onChange={e => change({ rateReason: e.target.value })} style={inputStyle()} /></div>
+        )}
       </div>
       {preview && (
         <div role="status" style={{ ...card, marginBottom: 10, fontSize: 13 }}>

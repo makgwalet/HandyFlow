@@ -51,7 +51,7 @@ public class EarthHireService {
     private final AuditTrailFacade trail;
 
     private record Quote(EarthDeployment deployment, EarthAsset asset, String machine, String basis, BigDecimal quantity,
-                         BigDecimal rate, BigDecimal vat, String description) {}
+                         BigDecimal rate, BigDecimal vat, String description, String rateNote) {}
 
     // ── reading ──────────────────────────────────────────────────────────────
 
@@ -183,7 +183,8 @@ public class EarthHireService {
         LocalDate deployedOn = d.getDeployedAt().atZone(ZONE).toLocalDate();
         LocalDate returnedOn = d.getReturnedAt() == null ? null : d.getReturnedAt().atZone(ZONE).toLocalDate();
         HireRules.checkPeriod(req.periodFrom(), req.periodTo(), deployedOn, returnedOn, today);
-        BigDecimal rate = HireRules.rateFor(basis, asset.getDailyRate(), asset.getHourlyRate());
+        BigDecimal rate = HireRules.rate(basis, asset.getDailyRate(), asset.getHourlyRate(), req.unitRate(), req.rateReason());
+        String rateNote = req.unitRate() == null ? null : "Rate agreed for this charge: " + req.rateReason().trim();
         BigDecimal quantity = HireRules.DAILY.equals(basis)
                 ? BigDecimal.valueOf(HireRules.days(req.periodFrom(), req.periodTo())).setScale(2)
                 : HireRules.hours(logs.sumHoursBetween(asset.getId(),
@@ -196,12 +197,14 @@ public class EarthHireService {
         }
         String machine = label(asset);
         return new Quote(d, asset, machine, basis, quantity, rate, HireRules.vatRate(req.vatRate()),
-                HireRules.describe(machine, d.getSiteName(), basis, req.periodFrom(), req.periodTo(), quantity, rate));
+                HireRules.describe(machine, d.getSiteName(), basis, req.periodFrom(), req.periodTo(), quantity, rate), rateNote);
     }
 
     private EarthHireCharge build(TenantId tenantId, Quote q, HireChargeRequest req, UUID actor) {
-        return EarthHireCharge.create(tenantId, q.deployment().getId(), q.asset().getId(), q.deployment().getCustomerId(),
+        EarthHireCharge c = EarthHireCharge.create(tenantId, q.deployment().getId(), q.asset().getId(), q.deployment().getCustomerId(),
                 req.periodFrom(), req.periodTo(), q.basis(), q.quantity(), q.rate(), q.vat(), q.description(), actor);
+        c.noteRateOverride(q.rateNote());
+        return c;
     }
 
     private EarthHireCharge find(TenantId tenantId, UUID id) {

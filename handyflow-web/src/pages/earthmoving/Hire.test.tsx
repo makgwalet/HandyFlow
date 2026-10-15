@@ -80,4 +80,30 @@ describe("Hire charges", () => {
     expect(patch.mock.calls[0][0]).toContain("/hire-charges/h1/void")
     expect(patch.mock.calls[0][1]).toEqual({ reason: "Entered twice" })
   })
+
+  it("asks for a reason before a different rate can be previewed or saved, and sends both", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_ADMIN"]
+    get.mockImplementation((url: string) => Promise.resolve(
+      url.includes("/hire-charges") ? { data: { data: [] } }
+        : url.includes("/deployments") ? { data: { data: { content: [{ id: "d1", assetId: "a1", siteName: "Mine A", clientName: "Anglo", deployedAt: "2026-10-01T06:00:00Z", returnedAt: null }], last: true } } }
+        : { data: { data: { content: [{ id: "a1", name: "Excavator", fleetNumber: "E-01", status: "DEPLOYED" }], last: true } } }))
+    post.mockResolvedValue({ data: { data: charge({ id: null, status: "PREVIEW", unitRate: 900 }) } })
+    mount()
+    fireEvent.click(await screen.findByText("New hire charge"))
+    await screen.findByRole("option", { name: "Excavator", hidden: true })
+    fireEvent.change(screen.getByLabelText(/Machine \*/), { target: { value: "a1" } })
+    await screen.findByText(/Mine A · Anglo/)
+    fireEvent.change(screen.getByLabelText(/Deployment \*/), { target: { value: "d1" } })
+    fireEvent.change(screen.getByLabelText(/From \*/), { target: { value: "2026-10-01" } })
+    fireEvent.change(screen.getByLabelText(/To \*/), { target: { value: "2026-10-03" } })
+    const preview = screen.getByText("Work out the charge") as HTMLButtonElement
+    expect(preview.disabled).toBe(false)
+    fireEvent.change(screen.getByLabelText(/Agreed rate/), { target: { value: "900" } })
+    expect(preview.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText(/Why this rate/), { target: { value: "Long-term discount" } })
+    expect(preview.disabled).toBe(false)
+    fireEvent.click(preview)
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post.mock.calls[0][1]).toMatchObject({ unitRate: 900, rateReason: "Long-term discount", deploymentId: "d1" })
+  })
 })

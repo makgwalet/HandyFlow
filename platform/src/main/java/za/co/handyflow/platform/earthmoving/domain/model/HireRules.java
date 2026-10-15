@@ -63,6 +63,14 @@ public final class HireRules {
         return rate;
     }
 
+    /** The machine's own rate, or, when one is agreed for this charge, that rate. A different rate always needs a reason. */
+    public static BigDecimal rate(String basis, BigDecimal dailyRate, BigDecimal hourlyRate, BigDecimal agreed, String reason) {
+        if (agreed == null) return rateFor(basis, dailyRate, hourlyRate);
+        if (agreed.signum() <= 0) throw new IllegalArgumentException("The agreed rate must be more than nothing.");
+        EarthmovingRules.requireReason(reason, "charging a different rate");
+        return agreed;
+    }
+
     /** Hours worked in the period: needs at least some. */
     public static BigDecimal hours(BigDecimal worked) {
         if (worked == null || worked.signum() <= 0) throw new IllegalArgumentException("No completed shifts were logged on this machine in that period.");

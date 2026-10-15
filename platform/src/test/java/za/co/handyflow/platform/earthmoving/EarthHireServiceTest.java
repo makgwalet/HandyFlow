@@ -67,7 +67,7 @@ class EarthHireServiceTest {
     }
 
     HireChargeRequest daily(String from, String to) {
-        return new HireChargeRequest(deployment.getId(), "DAILY", LocalDate.parse(from), LocalDate.parse(to), null);
+        return new HireChargeRequest(deployment.getId(), "DAILY", LocalDate.parse(from), LocalDate.parse(to), null, null, null);
     }
     EarthHireCharge pending(UUID forCustomer, String from, String to) {
         return EarthHireCharge.create(tenant, deployment.getId(), asset.getId(), forCustomer, LocalDate.parse(from), LocalDate.parse(to),
@@ -75,6 +75,28 @@ class EarthHireServiceTest {
     }
 
     // ── permissions ──────────────────────────────────────────────────────────
+
+    HireChargeRequest atRate(String rate, String reason) {
+        return new HireChargeRequest(deployment.getId(), "DAILY", LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"), null,
+                rate == null ? null : n(rate), reason);
+    }
+
+    @Test void anAgreedRateReplacesTheMachinesRateForThatChargeOnly() {
+        granted.add("EARTHMOVING_ADMIN");
+        HireChargeResponse r = service.create(tenant, atRate("15000", "Long-term hire discount agreed with the client"), actor, TODAY);
+        assertEquals(n("15000.00"), r.unitRate());
+        assertEquals(n("45000.00"), r.amount());
+        assertTrue(r.note().contains("Long-term hire discount"));
+        assertEquals(n("18500"), asset.getDailyRate());
+    }
+
+    @Test void aDifferentRateNeedsAReasonAndMustBePositive() {
+        granted.add("EARTHMOVING_ADMIN");
+        assertThrows(IllegalArgumentException.class, () -> service.create(tenant, atRate("15000", null), actor, TODAY));
+        assertThrows(IllegalArgumentException.class, () -> service.create(tenant, atRate("15000", "disc"), actor, TODAY));
+        assertThrows(IllegalArgumentException.class, () -> service.create(tenant, atRate("0", "Agreed free of charge"), actor, TODAY));
+        verify(charges, never()).saveAndFlush(any());
+    }
 
     @Test void raisingAChargeNeedsAdmin() {
         granted.add("EARTHMOVING_MAINTAIN");
@@ -121,7 +143,7 @@ class EarthHireServiceTest {
     @Test void anHourlyChargeUsesTheHoursOnCompletedShifts() {
         granted.add("EARTHMOVING_ADMIN");
         when(logs.sumHoursBetween(eq(asset.getId()), any(), any())).thenReturn(n("12.5"));
-        HireChargeResponse r = service.create(tenant, new HireChargeRequest(deployment.getId(), "HOURLY", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 7), null), actor, TODAY);
+        HireChargeResponse r = service.create(tenant, new HireChargeRequest(deployment.getId(), "HOURLY", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 7), null, null, null), actor, TODAY);
         assertEquals(n("12.50"), r.quantity());
         assertEquals(n("27500.00"), r.amount());
     }
@@ -129,7 +151,7 @@ class EarthHireServiceTest {
     @Test void anHourlyChargeWithNoShiftsIsRefused() {
         granted.add("EARTHMOVING_ADMIN");
         assertThrows(IllegalArgumentException.class, () -> service.create(tenant,
-                new HireChargeRequest(deployment.getId(), "HOURLY", STARTED, STARTED.plusDays(2), null), actor, TODAY));
+                new HireChargeRequest(deployment.getId(), "HOURLY", STARTED, STARTED.plusDays(2), null, null, null), actor, TODAY));
         verify(charges, never()).saveAndFlush(any());
     }
 
