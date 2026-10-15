@@ -11,6 +11,8 @@ import { auditorApi, type AuditorAccessGrant, type AuditEngagement } from "../..
 import { EngagementsPanel } from "./EngagementsPanel"
 import { EvidenceRequests } from "../../components/evidenceRequests/EvidenceRequests"
 import { businessEvidenceRequestApi } from "../../api/evidenceRequests.api"
+import { AuditQueries } from "../../components/auditQueries/AuditQueries"
+import { businessAuditQueryApi } from "../../api/auditQueries.api"
 
 const NAVY = "var(--hf-primary)"
 const BORDER = "var(--hf-border)"
@@ -82,6 +84,11 @@ export function AuditorAccessSection() {
       <div style={{ background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: 16, marginBottom: 20 }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: INK, marginBottom: 8 }}>Evidence requests</div>
         <EvidenceRequests side="business" api={businessEvidenceRequestApi} engagements={engagements.filter(g => g.status === "PLANNED" || g.status === "ACTIVE")} />
+      </div>
+
+      <div style={{ background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: 16, marginBottom: 20 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: INK, marginBottom: 8 }}>Auditor queries and review notes</div>
+        <AuditQueries side="business" api={businessAuditQueryApi} />
       </div>
 
       <div style={{ background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: 16, marginBottom: 20 }}>

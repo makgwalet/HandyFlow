@@ -4,6 +4,8 @@ import { useParams, useNavigate } from "react-router-dom"
 import { auditorPortalApi, type EvidenceItem, type ControlExceptionItem } from "../../api/auditorPortal.api"
 import { EvidenceRequests } from "../../components/evidenceRequests/EvidenceRequests"
 import { auditorEvidenceRequestApi } from "../../api/evidenceRequests.api"
+import { AuditQueries } from "../../components/auditQueries/AuditQueries"
+import { auditorAuditQueryApi } from "../../api/auditQueries.api"
 
 const NAVY = "var(--hf-primary)"
 const NAVY_TEXT = "var(--hf-primary-text)";
@@ -16,7 +18,7 @@ const FAINT = "var(--hf-text-faint)"
 const fmtD = (d: string) => new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })
 const fmtSize = (bytes: number) => bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(0)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 
-type Tab = "exceptions" | "evidence" | "requests"
+type Tab = "exceptions" | "evidence" | "requests" | "queries"
 
 export function AuditorPortalTenantDetailPage() {
   const { tenantId } = useParams<{ tenantId: string }>()
@@ -25,6 +27,7 @@ export function AuditorPortalTenantDetailPage() {
   const [exceptions, setExceptions] = useState<ControlExceptionItem[]>([])
   const [evidence, setEvidence] = useState<EvidenceItem[]>([])
   const [loading, setLoading] = useState(true)
+  const queryApi = useMemo(() => (tenantId ? auditorAuditQueryApi(tenantId) : null), [tenantId])
   const requestApi = useMemo(() => (tenantId ? auditorEvidenceRequestApi(tenantId) : null), [tenantId])
 
   useEffect(() => {
@@ -48,7 +51,7 @@ export function AuditorPortalTenantDetailPage() {
         <h1 style={{ fontSize: 18, fontWeight: 800, color: INK, marginBottom: 16 }}>Review</h1>
 
         <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${BORDER}`, marginBottom: 20 }}>
-          {([["exceptions", "Control Exceptions"], ["evidence", "Evidence"], ["requests", "Requests"]] as [Tab, string][]).map(([id, label]) => (
+          {([["exceptions", "Control Exceptions"], ["evidence", "Evidence"], ["requests", "Requests"], ["queries", "Queries"]] as [Tab, string][]).map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} style={{
               padding: "8px 14px", background: "none", border: "none",
               borderBottom: tab === id ? `2px solid ${NAVY}` : "2px solid transparent",
@@ -57,7 +60,9 @@ export function AuditorPortalTenantDetailPage() {
           ))}
         </div>
 
-        {tab === "requests" && requestApi ? (
+        {tab === "queries" && queryApi ? (
+          <AuditQueries side="auditor" api={queryApi} />
+        ) : tab === "requests" && requestApi ? (
           <EvidenceRequests side="auditor" api={requestApi} />
         ) : loading ? (
           <div style={{ color: FAINT, fontSize: 13 }}>Loading…</div>
