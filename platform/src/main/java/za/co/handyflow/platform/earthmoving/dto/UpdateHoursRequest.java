@@ -4,5 +4,5 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 public record UpdateHoursRequest(
-        @NotNull BigDecimal currentHours
+        @NotNull @jakarta.validation.constraints.PositiveOrZero BigDecimal currentHours
 ) {}

@@ -17,7 +17,7 @@ export default function EarthDashboard({ onNavigate }: { onNavigate: (tab: Tab) 
   const deployed     = assets.filter(a => a.status === "DEPLOYED" || a.status === "HIRED_OUT")
   const openIncidents = incidents.filter(i => i.status === "OPEN").slice(0, 5)
 
-  const fleetValue = assets.reduce((sum, a) => sum + (a.dailyRate ?? 0), 0)
+  const combinedDailyRate = assets.reduce((sum, a) => sum + (a.dailyRate ?? 0), 0)
 
   const stats = [
     { label: "Total fleet", value: assets.length, color: "var(--hf-primary-text)", icon: Truck, tab: "assets" as Tab },
@@ -155,7 +155,7 @@ export default function EarthDashboard({ onNavigate }: { onNavigate: (tab: Tab) 
       {/* Fleet value footer */}
       <div style={{ marginTop: 16, padding: "12px 16px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--hf-text-muted)" }}>
         <Clock size={13} />
-        Combined daily rate across active fleet: <strong style={{ color: "var(--hf-text)" }}>{fmtCurrency(fleetValue)}/day</strong>
+        Combined daily rate across active fleet: <strong style={{ color: "var(--hf-text)" }}>{fmtCurrency(combinedDailyRate)}/day</strong>
       </div>
     </div>
   )

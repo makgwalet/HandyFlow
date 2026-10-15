@@ -2,8 +2,9 @@
 import { useState } from "react"
 import { Plus, Wrench, AlertTriangle } from "lucide-react"
 import { MAINTENANCE_TYPES, MAINTENANCE_TYPE_CFG } from "./shared/constants"
-import { fmtDate, fmtCurrency2dp } from "./shared/format"
+import { fmtDate, fmtCurrency2dp, apiMessage } from "./shared/format"
 import { Overlay, ModalHead, ModalFoot, ErrBanner, lbl, inputStyle } from "./shared/Modal"
+import { useEarthPerms } from "./shared/useEarthPerms"
 import { useAssets, useMaintenanceHistory, useCreateMaintenance } from "./shared/hooks"
 
 const EMPTY_FORM = {
@@ -12,6 +13,7 @@ const EMPTY_FORM = {
 }
 
 export default function MaintenanceTab() {
+  const perms = useEarthPerms()
   const [selectedAsset, setSelectedAsset] = useState("")
   const [showAdd, setShowAdd]             = useState(false)
   const [apiError, setApiError]           = useState("")
@@ -52,13 +54,20 @@ export default function MaintenanceTab() {
             ))}
           </select>
         </div>
-        {selectedAsset && (
+        {selectedAsset && perms.canMaintain && (
           <button onClick={() => { setShowAdd(true); setApiError(""); if (selectedAssetObj) setForm(f => ({ ...f, hoursAtService: String(selectedAssetObj.currentHours) })) }}
             style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             <Plus size={15} /> Record Maintenance
           </button>
         )}
       </div>
+
+      {selectedAssetObj && (selectedAssetObj.status === "MAINTENANCE" || selectedAssetObj.status === "BREAKDOWN") && (
+        <div role="note" style={{ marginBottom: 18, padding: "12px 16px", background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)", borderRadius: 10, fontSize: 13, color: "var(--hf-info-text)" }}>
+          This machine is {selectedAssetObj.status === "MAINTENANCE" ? "in maintenance" : "broken down"}. Recording work here does not put it back in service.
+          Release it from Fleet → Change status, by someone with release authority, once the repair is checked.
+        </div>
+      )}
 
       {selectedAssetObj && (
         <div style={{ marginBottom: 18, padding: "14px 18px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, display: "flex", gap: 24, flexWrap: "wrap" }}>
@@ -182,7 +191,7 @@ export default function MaintenanceTab() {
               supplier: form.supplier || null,
               invoiceRef: form.invoiceRef || null,
             }, {
-              onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to record maintenance"),
+              onError: (e: unknown) => setApiError(apiMessage(e, "Failed to record maintenance")),
             })}
             loading={addMaintenance.isPending}
             label="Record Maintenance"

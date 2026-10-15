@@ -1,8 +1,10 @@
 // src/pages/earthmoving/DeploymentsTab.tsx
 import { useState } from "react"
-import { Plus, MapPin, Clock, AlertCircle } from "lucide-react"
+import { Plus, MapPin, Clock } from "lucide-react"
 import { EMOJI } from "./shared/constants"
+import { apiMessage } from "./shared/format"
 import { Overlay, ModalHead, ModalFoot, ErrBanner, lbl, inputStyle } from "./shared/Modal"
+import { useEarthPerms } from "./shared/useEarthPerms"
 import { useAssets, useDeployAsset, useReturnToYard } from "./shared/hooks"
 
 const EMPTY_FORM = {
@@ -11,6 +13,7 @@ const EMPTY_FORM = {
 }
 
 export default function DeploymentsTab() {
+  const perms = useEarthPerms()
   const [showDeploy, setShowDeploy] = useState(false)
   const [apiError, setApiError]     = useState("")
   const [form, setForm]             = useState(EMPTY_FORM)
@@ -38,10 +41,10 @@ export default function DeploymentsTab() {
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
         <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Active Deployments</span>
-        <button onClick={() => { setShowDeploy(true); setApiError("") }}
+        {perms.canDeploy && <button onClick={() => { setShowDeploy(true); setApiError("") }}
           style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Deploy Equipment
-        </button>
+        </button>}
       </div>
 
       {deployedAssets.length === 0 ? (
@@ -71,12 +74,12 @@ export default function DeploymentsTab() {
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => returnToYard.mutate(a.id, { onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to return asset") })}
+                {perms.canDeploy && <button
+                  onClick={() => returnToYard.mutate(a.id, { onError: (e: unknown) => setApiError(apiMessage(e, "Failed to return asset")) })}
                   disabled={returnToYard.isPending}
                   style={{ padding: "7px 14px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                   Return to Yard
-                </button>
+                </button>}
               </div>
             </div>
           ))}
@@ -147,11 +150,11 @@ export default function DeploymentsTab() {
               contactName: form.contactName || null, contactPhone: form.contactPhone || null,
               notes: form.notes || null,
             }, {
-              onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to deploy asset"),
+              onError: (e: unknown) => setApiError(apiMessage(e, "Failed to deploy asset")),
             })}
             loading={deploy.isPending}
             label="Deploy Equipment"
-            disabled={!form.assetId || !form.siteName}
+            disabled={!form.assetId || !form.siteName.trim()}
           />
         </Overlay>
       )}

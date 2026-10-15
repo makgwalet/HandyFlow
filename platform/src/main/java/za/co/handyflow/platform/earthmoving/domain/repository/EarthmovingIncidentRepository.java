@@ -26,4 +26,9 @@ public interface EarthmovingIncidentRepository extends JpaRepository<Earthmoving
 
     @Query("SELECT i FROM EarthmovingIncident i WHERE i.tenantId = :tenantId AND i.assetId = :assetId ORDER BY i.reportedAt DESC")
     Page<EarthmovingIncident> findByAsset(TenantId tenantId, UUID assetId, Pageable pageable);
+
+    /** Unresolved critical incidents on a machine: they block deployment and release (patch E1). */
+    @Query("SELECT COUNT(i) FROM EarthmovingIncident i WHERE i.tenantId = :tenantId AND i.assetId = :assetId "
+            + "AND i.severity = 'CRITICAL' AND i.status = 'OPEN'")
+    long countOpenCritical(TenantId tenantId, UUID assetId);
 }

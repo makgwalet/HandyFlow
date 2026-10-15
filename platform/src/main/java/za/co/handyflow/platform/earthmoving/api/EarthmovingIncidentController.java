@@ -32,7 +32,7 @@ public class EarthmovingIncidentController {
     private final FeatureGuard featureGuard;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('EARTHMOVING_READ')")
     @Operation(summary = "List incidents, optionally filtered by status or severity")
     public ResponseEntity<ApiResponse<Page<IncidentResponse>>> getIncidents(
             @RequestParam(required = false) String status,
@@ -44,7 +44,7 @@ public class EarthmovingIncidentController {
     }
 
     @GetMapping("/asset/{assetId}")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('EARTHMOVING_READ')")
     @Operation(summary = "List incidents for one asset")
     public ResponseEntity<ApiResponse<Page<IncidentResponse>>> getIncidentsForAsset(
             @PathVariable UUID assetId,
@@ -55,7 +55,7 @@ public class EarthmovingIncidentController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('EARTHMOVING_WRITE')")
     @Operation(summary = "Report an incident — BREAKDOWN/ACCIDENT types auto-transition the asset to BREAKDOWN status where legal")
     public ResponseEntity<ApiResponse<IncidentResponse>> reportIncident(@Valid @RequestBody CreateIncidentRequest request) {
         featureGuard.requireModule("earthmoving");
@@ -65,7 +65,7 @@ public class EarthmovingIncidentController {
     }
 
     @PatchMapping("/{id}/resolve")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('EARTHMOVING_MAINTAIN')")
     @Operation(summary = "Mark an incident as resolved")
     public ResponseEntity<ApiResponse<IncidentResponse>> resolveIncident(
             @PathVariable UUID id,

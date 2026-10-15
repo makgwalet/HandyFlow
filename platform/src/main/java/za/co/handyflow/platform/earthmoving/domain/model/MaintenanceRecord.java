@@ -67,7 +67,7 @@ public class MaintenanceRecord {
                                            String type, String description,
                                            Instant performedAt, BigDecimal hoursAtService,
                                            BigDecimal cost, String supplier,
-                                           String invoiceRef) {
+                                           String invoiceRef, BigDecimal nextServiceHours) {
         MaintenanceRecord r = new MaintenanceRecord();
         r.tenantId       = tenantId;
         r.assetId        = assetId;
@@ -75,6 +75,7 @@ public class MaintenanceRecord {
         r.description    = description;
         r.performedAt    = performedAt;
         r.hoursAtService = hoursAtService;
+        r.nextServiceHours = nextServiceHours;
         r.cost           = cost;
         r.supplier       = supplier;
         r.invoiceRef     = invoiceRef;

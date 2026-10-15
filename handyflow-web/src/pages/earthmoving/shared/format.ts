@@ -14,3 +14,9 @@ export const fmtDateTime = (iso: string | null | undefined): string =>
 
 export const fmtTime = (iso: string | null | undefined): string =>
   iso ? new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" }) : "—"
+
+/** The server's message from a failed request, or the fallback. Replaces `(e: any) => e.response?.data?.message`. */
+export function apiMessage(e: unknown, fallback: string): string {
+  const m = (e as { response?: { data?: { message?: unknown } } } | null)?.response?.data?.message
+  return typeof m === "string" && m ? m : fallback
+}

@@ -17,17 +17,32 @@
 import { apiClient } from "../../../api/client"
 import type { Asset, MaintenanceRecord, OperatorLog, Incident } from "./types"
 
-export const unwrap = (r: any) => {
-  const p = r.data?.data ?? r.data
-  return p?.content ?? p ?? []
+export function unwrap<T>(r: { data?: { data?: unknown } & Record<string, unknown> }): T {
+  const p = (r.data?.data ?? r.data) as { content?: unknown } | undefined
+  return (p?.content ?? p ?? []) as T
 }
 
 const BASE = "/api/v1/earthmoving"
 
 // ── Assets ───────────────────────────────────────────────────────────────
 
-export const fetchAssets = async (): Promise<Asset[]> =>
-  unwrap(await apiClient.get(`${BASE}/assets?size=200`))
+// Reads every page. Before patch E1 the lists loaded only the first 200 rows and silently cut off a larger fleet.
+async function fetchAllPages<T>(url: string, pageSize = 200, maxPages = 25): Promise<T[]> {
+  const out: T[] = []
+  for (let page = 0; page < maxPages; page++) {
+    const r = await apiClient.get(`${url}${url.includes("?") ? "&" : "?"}size=${pageSize}&page=${page}`)
+    const p = r.data?.data ?? r.data
+    const content: T[] = p?.content ?? (Array.isArray(p) ? p : [])
+    out.push(...content)
+    if (p?.last !== false || content.length === 0) break
+  }
+  return out
+}
+
+export const fetchAssets = (): Promise<Asset[]> => fetchAllPages<Asset>(`${BASE}/assets`)
+
+export const updateAsset = (id: string, body: Record<string, unknown>) =>
+  apiClient.put(`${BASE}/assets/${id}`, body)
 
 export const createAsset = (body: Record<string, unknown>) =>
   apiClient.post(`${BASE}/assets`, body)
@@ -65,8 +80,7 @@ export const completeOperatorLog = (assetId: string, logId: string, body: Record
 
 // ── Incidents ────────────────────────────────────────────────────────────
 
-export const fetchIncidents = async (): Promise<Incident[]> =>
-  unwrap(await apiClient.get(`${BASE}/incidents?size=200`))
+export const fetchIncidents = (): Promise<Incident[]> => fetchAllPages<Incident>(`${BASE}/incidents`)
 
 export const reportIncident = (body: Record<string, unknown>) =>
   apiClient.post(`${BASE}/incidents`, body)

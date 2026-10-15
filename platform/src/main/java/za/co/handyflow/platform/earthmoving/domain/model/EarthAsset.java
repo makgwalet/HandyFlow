@@ -203,6 +203,34 @@ public class EarthAsset {
 
     // ── Other behaviour ──────────────────────────────────────────────────
 
+    /**
+     * Edit descriptive details (patch E1; there was no way to correct an asset before). Status, hours, site and client are
+     * deliberately not here: they change through their own audited actions. Rules are checked by the caller with
+     * {@link EarthmovingRules#checkAssetDetails}.
+     */
+    public void updateDetails(String name, String fleetNumber, String assetType, String make, String model, Integer year,
+                              String serialNumber, String registration, String ownershipType, String hireSupplier,
+                              LocalDate hireStartDate, LocalDate hireEndDate, BigDecimal dailyRate, BigDecimal hourlyRate,
+                              BigDecimal serviceIntervalHours, String notes) {
+        this.name = name.trim();
+        this.fleetNumber = fleetNumber == null || fleetNumber.isBlank() ? null : fleetNumber.trim();
+        this.assetType = assetType.trim().toUpperCase();
+        this.make = make;
+        this.model = model;
+        this.year = year;
+        this.serialNumber = serialNumber;
+        this.registration = registration;
+        this.ownershipType = ownershipType;
+        this.hireSupplier = hireSupplier;
+        this.hireStartDate = hireStartDate;
+        this.hireEndDate = hireEndDate;
+        this.dailyRate = dailyRate;
+        this.hourlyRate = hourlyRate;
+        if (serviceIntervalHours != null) this.serviceIntervalHours = serviceIntervalHours;
+        this.notes = notes;
+        this.updatedAt = Instant.now();
+    }
+
     public void updateHours(BigDecimal newHours) {
         if (newHours != null && currentHours != null && newHours.compareTo(currentHours) < 0) {
             throw new IllegalArgumentException(

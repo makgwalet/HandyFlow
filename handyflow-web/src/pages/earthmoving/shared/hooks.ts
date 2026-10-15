@@ -38,6 +38,17 @@ export function useCreateAsset(onSuccess?: (asset: Asset) => void) {
   })
 }
 
+export function useUpdateAsset(onSuccess?: (asset: Asset) => void) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) => api.updateAsset(id, body),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: QK.assets })
+      onSuccess?.(res.data?.data ?? res.data)
+    },
+  })
+}
+
 export function useUpdateAssetStatus(onSuccess?: (asset: Asset) => void) {
   const qc = useQueryClient()
   return useMutation({
@@ -64,7 +75,7 @@ export function useUpdateAssetHours(onSuccess?: () => void) {
 export function useDeployAsset(onSuccess?: () => void) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: any) => api.deployAsset(body.assetId, body),
+    mutationFn: (body: Record<string, unknown> & { assetId: string }) => api.deployAsset(body.assetId, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QK.assets })
       onSuccess?.()

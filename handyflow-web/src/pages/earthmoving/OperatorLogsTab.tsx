@@ -2,11 +2,13 @@
 import { useState } from "react"
 import { Plus, Users, CheckCircle2 } from "lucide-react"
 import type { OperatorLog } from "./shared/types"
-import { fmtDate, fmtTime } from "./shared/format"
+import { fmtDate, fmtTime, apiMessage } from "./shared/format"
 import { Overlay, ModalHead, ModalFoot, ErrBanner, lbl, inputStyle } from "./shared/Modal"
+import { useEarthPerms } from "./shared/useEarthPerms"
 import { useAssets, useOperatorLogs, useStartOperatorLog, useCompleteOperatorLog } from "./shared/hooks"
 
 export default function OperatorLogsTab() {
+  const perms = useEarthPerms()
   const [selectedAsset, setSelectedAsset] = useState("")
   const [showAdd, setShowAdd]             = useState(false)
   const [completing, setCompleting]       = useState<OperatorLog | null>(null)
@@ -47,7 +49,7 @@ export default function OperatorLogsTab() {
             {assets.map(a => <option key={a.id} value={a.id}>{a.fleetNumber ? `${a.fleetNumber} — ` : ""}{a.name}</option>)}
           </select>
         </div>
-        {selectedAsset && (
+        {selectedAsset && perms.canWrite && (
           <button onClick={() => { setShowAdd(true); setApiError(""); if (selectedAssetObj) setForm(f => ({ ...f, startHours: String(selectedAssetObj.currentHours) })) }}
             style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             <Plus size={15} /> Log Session
@@ -119,7 +121,7 @@ export default function OperatorLogsTab() {
                       {log.fuelUsedLitres != null ? `${log.fuelUsedLitres.toFixed(1)} L` : "—"}
                     </td>
                     <td style={{ padding: "13px 16px" }}>
-                      {isOpen && (
+                      {isOpen && perms.canWrite && (
                         <button
                           onClick={() => {
                             setCompleting(log)
@@ -183,7 +185,7 @@ export default function OperatorLogsTab() {
               startedAt: new Date(form.startedAt).toISOString(),
               startHours: form.startHours ? Number(form.startHours) : selectedAssetObj.currentHours,
             }, {
-              onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to log session — this asset may already have an open shift."),
+              onError: (e: unknown) => setApiError(apiMessage(e, "Failed to log session — this asset may already have an open shift.")),
             })}
             loading={addLog.isPending}
             label="Start Session"
@@ -230,7 +232,7 @@ export default function OperatorLogsTab() {
                 notes: completeForm.notes || null,
               },
             }, {
-              onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to complete shift"),
+              onError: (e: unknown) => setApiError(apiMessage(e, "Failed to complete shift")),
             })}
             loading={completeLog.isPending}
             label="Complete Shift"

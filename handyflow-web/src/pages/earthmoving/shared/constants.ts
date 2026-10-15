@@ -69,3 +69,36 @@ export const SEVERITY_CFG: Record<string, { color: string; bg: string; border: s
   MEDIUM:   { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", border: "var(--hf-warning-border)" },
   LOW:      { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)" },
 }
+
+// Mirrors AssetStatus.java's transition table (keep in step). DEPLOYED is never set from the status dialog: use Deploy,
+// which records the site and client.
+export const STATUS_TRANSITIONS: Record<string, string[]> = {
+  AVAILABLE:   ["MAINTENANCE", "HIRED_OUT", "RETIRED"],
+  DEPLOYED:    ["AVAILABLE", "BREAKDOWN", "MAINTENANCE"],
+  MAINTENANCE: ["AVAILABLE", "BREAKDOWN", "RETIRED"],
+  BREAKDOWN:   ["AVAILABLE", "MAINTENANCE", "RETIRED"],
+  HIRED_OUT:   ["AVAILABLE", "BREAKDOWN"],
+  RETIRED:     [],
+}
+
+/** The permission needed to move from one status to another (mirrors EarthmovingRules.authorityForStatusChange). */
+export function authorityForStatusChange(from: string, to: string): string {
+  switch (to) {
+    case "BREAKDOWN":   return "EARTHMOVING_WRITE"
+    case "MAINTENANCE": return "EARTHMOVING_MAINTAIN"
+    case "HIRED_OUT":   return "EARTHMOVING_DEPLOY"
+    case "RETIRED":     return "EARTHMOVING_ADMIN"
+    default:            return from === "MAINTENANCE" || from === "BREAKDOWN" ? "EARTHMOVING_RELEASE" : "EARTHMOVING_DEPLOY"
+  }
+}
+
+export const isRelease = (from: string, to: string) =>
+  to === "AVAILABLE" && (from === "MAINTENANCE" || from === "BREAKDOWN")
+
+/** Returning a deployed machine to the yard needs no written reason; every other change does. */
+export const needsReason = (from: string, to: string) => !(from === "DEPLOYED" && to === "AVAILABLE")
+
+export const EARTHMOVING_PERMS = {
+  READ: "EARTHMOVING_READ", WRITE: "EARTHMOVING_WRITE", DEPLOY: "EARTHMOVING_DEPLOY",
+  MAINTAIN: "EARTHMOVING_MAINTAIN", RELEASE: "EARTHMOVING_RELEASE", ADMIN: "EARTHMOVING_ADMIN",
+} as const

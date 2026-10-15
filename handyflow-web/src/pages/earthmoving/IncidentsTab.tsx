@@ -2,8 +2,9 @@
 import { useState } from "react"
 import { Plus, AlertTriangle, CheckCircle2 } from "lucide-react"
 import { SEVERITY_CFG, INCIDENT_TYPES, EMOJI } from "./shared/constants"
-import { fmtDateTime } from "./shared/format"
+import { fmtDateTime, apiMessage } from "./shared/format"
 import { Overlay, ModalHead, ModalFoot, ErrBanner, lbl, inputStyle } from "./shared/Modal"
+import { useEarthPerms } from "./shared/useEarthPerms"
 import { useAssets, useIncidents, useReportIncident, useResolveIncident } from "./shared/hooks"
 
 const EMPTY_FORM = {
@@ -12,6 +13,9 @@ const EMPTY_FORM = {
 }
 
 export default function IncidentsTab() {
+  const perms = useEarthPerms()
+  const [resolving, setResolving]   = useState<string | null>(null)
+  const [resolveNotes, setResolveNotes] = useState("")
   const [showCreate, setShowCreate] = useState(false)
   const [sevFilter, setSevFilter]   = useState("ALL")
   const [form, setForm]             = useState(EMPTY_FORM)
@@ -52,13 +56,14 @@ export default function IncidentsTab() {
       // EarthmovingIncidentService.maybeAutoBreakdown) and always succeeds in
       // recording the incident even when the status change isn't legal — so
       // this onError only fires for genuine failures, and the user sees them.
-      onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to report incident"),
+      onError: (e: unknown) => setApiError(apiMessage(e, "Failed to report incident")),
     })
   }
 
   const handleResolve = (id: string) => {
-    resolveIncident.mutate({ id, resolutionNotes: null }, {
-      onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to resolve incident"),
+    resolveIncident.mutate({ id, resolutionNotes: resolveNotes.trim() }, {
+      onSuccess: () => { setResolving(null); setResolveNotes(""); setApiError("") },
+      onError: (e: unknown) => setApiError(apiMessage(e, "Failed to resolve incident")),
     })
   }
 
@@ -89,10 +94,10 @@ export default function IncidentsTab() {
             </button>
           ))}
         </div>
-        <button onClick={() => { setShowCreate(true); setApiError("") }}
+        {perms.canWrite && <button onClick={() => { setShowCreate(true); setApiError("") }}
           style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Report Incident
-        </button>
+        </button>}
       </div>
 
       {assets.filter(a => a.status === "BREAKDOWN").length > 0 && (
@@ -107,7 +112,7 @@ export default function IncidentsTab() {
         </div>
       )}
 
-      {apiError && <ErrBanner msg={apiError} />}
+      {apiError && !resolving && <ErrBanner msg={apiError} />}
 
       {isLoading ? (
         <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading incidents...</div>
@@ -145,8 +150,8 @@ export default function IncidentsTab() {
                       {inc.resolvedAt && ` · Resolved ${fmtDateTime(inc.resolvedAt)}`}
                     </div>
                   </div>
-                  {inc.status === "OPEN" && (
-                    <button onClick={() => handleResolve(inc.id)} disabled={resolveIncident.isPending}
+                  {inc.status === "OPEN" && perms.canMaintain && (
+                    <button onClick={() => { setResolving(inc.id); setResolveNotes(""); setApiError("") }} disabled={resolveIncident.isPending}
                       style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 14px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
                       <CheckCircle2 size={13} /> Resolve
                     </button>
@@ -243,6 +248,30 @@ export default function IncidentsTab() {
             loading={reportIncident.isPending}
             label="Report Incident"
             disabled={!form.assetId || !form.title}
+          />
+        </Overlay>
+      )}
+
+      {resolving && (
+        <Overlay onClose={() => { setResolving(null); setApiError("") }} width={480}>
+          <ModalHead title="Resolve incident" subtitle="Say what was done. This is kept on the record." onClose={() => { setResolving(null); setApiError("") }} />
+          <div style={{ marginBottom: 14 }}>
+            <label style={lbl} htmlFor="resolution-notes">What was done *</label>
+            <textarea id="resolution-notes" value={resolveNotes} onChange={e => setResolveNotes(e.target.value)} rows={3} autoFocus
+              placeholder="Cause found, repair or action taken, who checked it…"
+              style={{ ...inputStyle(), resize: "vertical" as const, width: "100%" }} />
+            <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 3 }}>At least 5 characters.</div>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 12 }}>
+            Resolving an incident does not return the machine to service. Release it from Fleet → Change status.
+          </div>
+          {apiError && <ErrBanner msg={apiError} />}
+          <ModalFoot
+            onCancel={() => { setResolving(null); setApiError("") }}
+            onSubmit={() => handleResolve(resolving)}
+            loading={resolveIncident.isPending}
+            label="Resolve"
+            disabled={resolveNotes.trim().length < 5}
           />
         </Overlay>
       )}

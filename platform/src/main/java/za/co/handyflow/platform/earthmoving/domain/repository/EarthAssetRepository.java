@@ -40,4 +40,8 @@ public interface EarthAssetRepository extends JpaRepository<EarthAsset, UUID> {
     // guarantee this is a friendly, fast-failing check in front of.
     @Query("SELECT COUNT(a) > 0 FROM EarthAsset a WHERE a.tenantId = :tenantId AND a.fleetNumber = :fleetNumber AND a.deletedAt IS NULL")
     boolean existsActiveByFleetNumber(TenantId tenantId, String fleetNumber);
+
+    /** Same check for an edit: the asset being edited does not count against itself. */
+    @Query("SELECT COUNT(a) > 0 FROM EarthAsset a WHERE a.tenantId = :tenantId AND a.fleetNumber = :fleetNumber AND a.id <> :excludeId AND a.deletedAt IS NULL")
+    boolean existsActiveByFleetNumberExcluding(TenantId tenantId, String fleetNumber, UUID excludeId);
 }

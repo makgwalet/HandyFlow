@@ -30,7 +30,7 @@ public class EarthAssetController {
     private final FeatureGuard featureGuard;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('EARTHMOVING_READ')")
     @Operation(summary = "List all assets, optionally filter by status or type")
     public ResponseEntity<ApiResponse<Page<AssetResponse>>> getAssets(
             @RequestParam(required = false) String status,
@@ -43,7 +43,7 @@ public class EarthAssetController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('EARTHMOVING_READ')")
     public ResponseEntity<ApiResponse<AssetResponse>> getAsset(@PathVariable UUID id) {
         featureGuard.requireModule("earthmoving");
         return ResponseEntity.ok(ApiResponse.success(
@@ -51,7 +51,7 @@ public class EarthAssetController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('EARTHMOVING_WRITE')")
     @Operation(summary = "Register a new heavy equipment asset (owned, hired-in or hired-out)")
     public ResponseEntity<ApiResponse<AssetResponse>> createAsset(@Valid @RequestBody CreateAssetRequest request) {
         featureGuard.requireModule("earthmoving");
@@ -81,18 +81,18 @@ public class EarthAssetController {
     // allowedMethods. That fixes CORS for every PATCH endpoint at once,
     // instead of every controller quietly avoiding a valid HTTP verb.
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('EARTHMOVING_WRITE','EARTHMOVING_DEPLOY','EARTHMOVING_MAINTAIN','EARTHMOVING_RELEASE','EARTHMOVING_ADMIN')")
     @Operation(summary = "Update asset status: AVAILABLE, DEPLOYED, MAINTENANCE, BREAKDOWN, HIRED_OUT, RETIRED")
     public ResponseEntity<ApiResponse<AssetResponse>> updateStatus(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateAssetStatusRequest request) {
         featureGuard.requireModule("earthmoving");
         return ResponseEntity.ok(ApiResponse.success("Status updated",
-                earthAssetService.updateStatus(TenantContext.getTenantIdAsObject(), id, request)));
+                earthAssetService.updateStatus(TenantContext.getTenantIdAsObject(), id, request, UserContext.getCurrentUserId())));
     }
 
     @PatchMapping("/{id}/hours")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('EARTHMOVING_WRITE')")
     @Operation(summary = "Update the current hour meter reading on an asset")
     public ResponseEntity<ApiResponse<AssetResponse>> updateHours(
             @PathVariable UUID id,
@@ -102,22 +102,44 @@ public class EarthAssetController {
                 earthAssetService.updateHours(TenantContext.getTenantIdAsObject(), id, request)));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('EARTHMOVING_WRITE')")
+    @Operation(summary = "Edit an asset's details (not its status, hours, site or client, which have their own actions)")
+    public ResponseEntity<ApiResponse<AssetResponse>> updateAsset(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateAssetRequest request) {
+        featureGuard.requireModule("earthmoving");
+        return ResponseEntity.ok(ApiResponse.success("Asset updated",
+                earthAssetService.updateAsset(TenantContext.getTenantIdAsObject(), id, request)));
+    }
+
+    @GetMapping("/{id}/status-history")
+    @PreAuthorize("hasAuthority('EARTHMOVING_READ')")
+    @Operation(summary = "Every status change on an asset with who, when, why and the meter reading")
+    public ResponseEntity<ApiResponse<Page<StatusEventResponse>>> getStatusHistory(
+            @PathVariable UUID id,
+            @PageableDefault(size = 50) Pageable pageable) {
+        featureGuard.requireModule("earthmoving");
+        return ResponseEntity.ok(ApiResponse.success(
+                earthAssetService.getStatusHistory(TenantContext.getTenantIdAsObject(), id, pageable)));
+    }
+
     @PutMapping("/{id}/deploy")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('EARTHMOVING_DEPLOY')")
     @Operation(summary = "Deploy asset to a site and client")
     public ResponseEntity<ApiResponse<AssetResponse>> deploy(
             @PathVariable UUID id,
-            @RequestBody DeployAssetRequest request) {
+            @Valid @RequestBody DeployAssetRequest request) {
         featureGuard.requireModule("earthmoving");
         return ResponseEntity.ok(ApiResponse.success("Asset deployed",
-                earthAssetService.deploy(TenantContext.getTenantIdAsObject(), id, request)));
+                earthAssetService.deploy(TenantContext.getTenantIdAsObject(), id, request, UserContext.getCurrentUserId())));
     }
 
     // NEW: deployment history was previously invisible — EarthAsset.currentSite/
     // currentClient only ever held the latest value, overwritten on every
     // redeployment. See EarthDeployment's Javadoc for the full rationale.
     @GetMapping("/{id}/deployments")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('EARTHMOVING_READ')")
     @Operation(summary = "Deployment history for an asset — every site it's been sent to, with contact and date details")
     public ResponseEntity<ApiResponse<Page<DeploymentResponse>>> getDeploymentHistory(
             @PathVariable UUID id,
@@ -128,7 +150,7 @@ public class EarthAssetController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('USER_DELETE')")
+    @PreAuthorize("hasAuthority('EARTHMOVING_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteAsset(@PathVariable UUID id) {
         featureGuard.requireModule("earthmoving");
         // FIX: previously always deleted with deletedBy=null, losing the
@@ -141,7 +163,7 @@ public class EarthAssetController {
     // ── Maintenance ───────────────────────────────────────────────────────
 
     @GetMapping("/{id}/maintenance")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('EARTHMOVING_READ')")
     public ResponseEntity<ApiResponse<Page<MaintenanceResponse>>> getMaintenance(
             @PathVariable UUID id,
             @PageableDefault(size = 50) Pageable pageable) {
@@ -151,7 +173,7 @@ public class EarthAssetController {
     }
 
     @PostMapping("/{id}/maintenance")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('EARTHMOVING_MAINTAIN')")
     @Operation(summary = "Record a maintenance event — updates last service hours if type is SERVICE")
     public ResponseEntity<ApiResponse<MaintenanceResponse>> recordMaintenance(
             @PathVariable UUID id,
@@ -165,7 +187,7 @@ public class EarthAssetController {
     // ── Operator Logs ─────────────────────────────────────────────────────
 
     @GetMapping("/{id}/operator-logs")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('EARTHMOVING_READ')")
     public ResponseEntity<ApiResponse<Page<OperatorLogResponse>>> getOperatorLogs(
             @PathVariable UUID id,
             @PageableDefault(size = 50) Pageable pageable) {
@@ -175,7 +197,7 @@ public class EarthAssetController {
     }
 
     @PostMapping("/{id}/operator-logs")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('EARTHMOVING_WRITE')")
     @Operation(summary = "Log an operator starting a shift on an asset")
     public ResponseEntity<ApiResponse<OperatorLogResponse>> startLog(
             @PathVariable UUID id,
@@ -189,7 +211,7 @@ public class EarthAssetController {
     // NEW: OperatorLog.complete() existed on the entity with no way to reach
     // it via the API — a shift could be started but never ended.
     @PatchMapping("/{id}/operator-logs/{logId}/complete")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('EARTHMOVING_WRITE')")
     @Operation(summary = "Complete an operator's shift — records end time, end hours and fuel used")
     public ResponseEntity<ApiResponse<OperatorLogResponse>> completeLog(
             @PathVariable UUID id,

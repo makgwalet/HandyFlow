@@ -78,6 +78,7 @@ public class OperatorLog {
 
     public void complete(Instant endedAt, BigDecimal endHours,
                          BigDecimal fuelUsedLitres, String notes) {
+        EarthmovingRules.checkShiftEnd(this.startedAt, endedAt, this.startHours, endHours, fuelUsedLitres);
         this.endedAt        = endedAt;
         this.endHours       = endHours;
         this.fuelUsedLitres = fuelUsedLitres;

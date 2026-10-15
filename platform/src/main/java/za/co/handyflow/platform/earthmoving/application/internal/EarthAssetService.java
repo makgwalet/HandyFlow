@@ -6,7 +6,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
+import za.co.handyflow.platform.audittrail.application.AuditTrailFacade;
 import za.co.handyflow.platform.earthmoving.domain.model.AssetStatus;
+import za.co.handyflow.platform.earthmoving.domain.model.EarthStatusEvent;
+import za.co.handyflow.platform.earthmoving.domain.model.EarthmovingRules;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthAsset;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthDeployment;
 import za.co.handyflow.platform.earthmoving.domain.model.MaintenanceRecord;
@@ -21,7 +25,12 @@ import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.Year;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -33,6 +42,10 @@ public class EarthAssetService {
     private final MaintenanceRepository maintenanceRepository;
     private final OperatorLogRepository operatorLogRepository;
     private final EarthDeploymentRepository deploymentRepository;
+    private final EarthStatusEventRepository statusEvents;
+    private final EarthmovingIncidentRepository incidentRepository;
+    private final EarthmovingAccess access;
+    private final AuditTrailFacade trail;
     private final NotificationService notificationService;
     // FIX: was a bespoke earthmoving-only FleetNotificationRecipients port,
     // permanently backed by a no-op stub. TenantAdminRecipients already
@@ -66,61 +79,94 @@ public class EarthAssetService {
 
     @Transactional
     public AssetResponse createAsset(TenantId tenantId, CreateAssetRequest req) {
-        // FIX: fleet_number is now unique per tenant at the DB level (see
-        // uq_earthmoving_assets_tenant_fleet_number). Checking here first
-        // means a duplicate produces a clear 400 with the actual fleet
-        // number named, instead of a raw constraint-violation stack trace
-        // surfacing as a generic 500. The DB constraint remains the real
-        // guarantee against a race between two concurrent creates — this is
-        // just a friendlier fast path in front of it.
+        access.require(EarthmovingRules.WRITE, "register equipment");
+        String ownership = EarthmovingRules.checkAssetDetails(req.name(), req.assetType(), req.ownershipType(), req.year(),
+                req.hourlyRate(), req.dailyRate(), req.hireStartDate(), req.hireEndDate(), null, Year.now().getValue());
+        // The unique index (V424) is the real guarantee against two concurrent creates; this gives a clear message first.
         if (req.fleetNumber() != null && !req.fleetNumber().isBlank()
-                && assetRepository.existsActiveByFleetNumber(tenantId, req.fleetNumber())) {
+                && assetRepository.existsActiveByFleetNumber(tenantId, req.fleetNumber().trim())) {
             throw new IllegalArgumentException(
                     "Fleet number \"" + req.fleetNumber() + "\" is already in use by another asset.");
         }
 
         EarthAsset asset = EarthAsset.create(
-                tenantId, req.name(), req.fleetNumber(), req.assetType(),
+                tenantId, req.name().trim(), blankToNull(req.fleetNumber()), req.assetType().trim().toUpperCase(),
                 req.make(), req.model(), req.year(),
                 req.serialNumber(), req.registration(),
-                req.ownershipType() != null ? req.ownershipType() : "OWN",
+                ownership,
                 req.hireSupplier(), req.hireStartDate(), req.hireEndDate(),
                 req.dailyRate(), req.hourlyRate(), req.notes()
         );
-        assetRepository.save(asset);
+        saveAssetOrExplain(asset);
+        trail.record(tenantId, "EARTHMOVING_ASSET_CREATED", "EARTHMOVING_ASSET", asset.getId(), null, snapshot(asset));
         log.info("Registered earthmoving asset={} fleet={} tenant={}",
                 asset.getName(), asset.getFleetNumber(), tenantId);
         return toResponse(asset);
     }
 
+    /** Edit descriptive details. Before patch E1 there was no way to correct a wrong serial number or rate. */
     @Transactional
-    public AssetResponse updateStatus(TenantId tenantId, UUID id, UpdateAssetStatusRequest req) {
+    public AssetResponse updateAsset(TenantId tenantId, UUID id, UpdateAssetRequest req) {
+        access.require(EarthmovingRules.WRITE, "edit equipment");
+        EarthAsset asset = findActive(tenantId, id);
+        String ownership = EarthmovingRules.checkAssetDetails(req.name(), req.assetType(), req.ownershipType(), req.year(),
+                req.hourlyRate(), req.dailyRate(), req.hireStartDate(), req.hireEndDate(),
+                req.serviceIntervalHours(), Year.now().getValue());
+        String fleet = blankToNull(req.fleetNumber());
+        if (fleet != null && assetRepository.existsActiveByFleetNumberExcluding(tenantId, fleet, id)) {
+            throw new IllegalArgumentException("Fleet number \"" + fleet + "\" is already in use by another asset.");
+        }
+        Map<String, Object> before = snapshot(asset);
+        asset.updateDetails(req.name(), fleet, req.assetType(), req.make(), req.model(), req.year(),
+                req.serialNumber(), req.registration(), ownership, req.hireSupplier(), req.hireStartDate(),
+                req.hireEndDate(), req.dailyRate(), req.hourlyRate(), req.serviceIntervalHours(), req.notes());
+        saveAssetOrExplain(asset);
+        trail.record(tenantId, "EARTHMOVING_ASSET_UPDATED", "EARTHMOVING_ASSET", id, before, snapshot(asset));
+        return toResponse(asset);
+    }
+
+    @Transactional
+    public AssetResponse updateStatus(TenantId tenantId, UUID id, UpdateAssetStatusRequest req, UUID actor) {
         EarthAsset asset = findActive(tenantId, id);
         AssetStatus previousStatus = asset.getStatus();
         AssetStatus target = parseStatus(req.status());
 
+        String needed = EarthmovingRules.authorityForStatusChange(previousStatus, target);
+        if (needed == null) {
+            throw new IllegalArgumentException(
+                    "A machine is deployed with the Deploy action, which records the site and client. Use that instead.");
+        }
+        access.require(needed, "make this status change");
+
+        String reason = req.note() == null ? null : req.note().trim();
+        if (EarthmovingRules.needsReason(previousStatus, target)) {
+            reason = EarthmovingRules.requireReason(reason, "this status change");
+        }
+        boolean release = EarthmovingRules.isRelease(previousStatus, target);
+        if (release && incidentRepository.countOpenCritical(tenantId, id) > 0) {
+            throw new IllegalStateException(
+                    "This machine has an unresolved critical incident. Resolve it before releasing the machine.");
+        }
+
         switch (target) {
             case AVAILABLE -> asset.returnToYard();
-            case DEPLOYED -> asset.markDeployed();
             case MAINTENANCE -> asset.sendToMaintenance();
             case BREAKDOWN -> asset.breakdown();
             case HIRED_OUT -> asset.hireOut();
             case RETIRED -> asset.retire();
+            case DEPLOYED -> throw new IllegalStateException("unreachable");
         }
-        // NOTE: EarthAsset.changeStatus() throws InvalidAssetStatusTransitionException
-        // (a subclass of IllegalStateException) if the transition isn't legal from
-        // the asset's current state — see AssetStatus for the full transition table.
-        // The global exception handler maps that to HTTP 409 Conflict.
+        // EarthAsset.changeStatus() throws InvalidAssetStatusTransitionException (409) for an illegal transition.
 
         assetRepository.save(asset);
-        log.info("Asset status changed asset={} status={}", id, target);
+        statusEvents.save(EarthStatusEvent.of(tenantId, id, previousStatus, target, reason, actor, asset.getCurrentHours()));
+        trail.record(tenantId, release ? "EARTHMOVING_ASSET_RELEASED" : "EARTHMOVING_ASSET_STATUS_CHANGED",
+                "EARTHMOVING_ASSET", id,
+                Map.of("status", previousStatus.name()),
+                reason == null ? Map.of("status", target.name()) : Map.of("status", target.name(), "reason", reason));
+        log.info("Asset status changed asset={} {}->{} actor={}", id, previousStatus, target, actor);
 
-        // Close the deployment record whenever the asset LEAVES DEPLOYED, for
-        // any reason — not only when it's formally "returned to yard". A
-        // machine that breaks down or gets pulled into maintenance mid-job
-        // has, just as much, stopped being deployed. See EarthDeployment's
-        // Javadoc for why this matters (without it, a broken-down machine
-        // would show as "still deployed" forever).
+        // The deployment closes whenever the machine leaves DEPLOYED, for any reason (see EarthDeployment).
         if (previousStatus == AssetStatus.DEPLOYED && target != AssetStatus.DEPLOYED) {
             closeOpenDeploymentIfAny(tenantId, id, target.name());
         }
@@ -131,18 +177,28 @@ public class EarthAssetService {
         return toResponse(asset);
     }
 
+    @Transactional(readOnly = true)
+    public Page<StatusEventResponse> getStatusHistory(TenantId tenantId, UUID id, Pageable pageable) {
+        findActive(tenantId, id);
+        return statusEvents.findByAsset(tenantId, id, pageable).map(e -> new StatusEventResponse(
+                e.getId(), e.getAssetId(), e.getFromStatus(), e.getToStatus(), e.getReason(),
+                e.getActorUserId(), e.getMeterHours(), e.getHappenedAt()));
+    }
+
     @Transactional
     public AssetResponse updateHours(TenantId tenantId, UUID id, UpdateHoursRequest req) {
+        access.require(EarthmovingRules.WRITE, "update an hour meter");
         EarthAsset asset = findActive(tenantId, id);
         boolean wasDue = asset.isDueForService();
+        BigDecimal before = asset.getCurrentHours();
 
         asset.updateHours(req.currentHours());
         assetRepository.save(asset);
+        trail.record(tenantId, "EARTHMOVING_HOURS_UPDATED", "EARTHMOVING_ASSET", id,
+                Map.of("hours", String.valueOf(before)), Map.of("hours", String.valueOf(req.currentHours())));
         log.info("Hour meter updated asset={} hours={}", id, req.currentHours());
 
-        // Only notify on the transition into "due", not on every subsequent
-        // hour update while it remains due — otherwise every reading after
-        // the threshold spams a fresh notification.
+        // Only notify on the transition into "due", not on every later reading while it stays due.
         if (!wasDue && asset.isDueForService()) {
             notifyServiceDue(tenantId, asset);
         }
@@ -150,24 +206,28 @@ public class EarthAssetService {
     }
 
     @Transactional
-    public AssetResponse deploy(TenantId tenantId, UUID id, DeployAssetRequest req) {
+    public AssetResponse deploy(TenantId tenantId, UUID id, DeployAssetRequest req, UUID actor) {
+        access.require(EarthmovingRules.DEPLOY, "deploy equipment");
         EarthAsset asset = findActive(tenantId, id);
-        asset.deployTo(req.siteName(), req.clientName());
-        // NOTE: throws InvalidAssetStatusTransitionException if the asset isn't
-        // currently AVAILABLE — the original code let you "deploy" a machine
-        // that was mid-service or already deployed elsewhere.
+        EarthmovingRules.checkDeployDates(req.startDate(), req.expectedEndDate());
+        EarthmovingRules.checkDeployable(asset.getStatus(), incidentRepository.countOpenCritical(tenantId, id),
+                asset.getOwnershipType(), asset.getHireEndDate(), LocalDate.now());
+        AssetStatus previous = asset.getStatus();
+        asset.deployTo(req.siteName().trim(), req.clientName());
         assetRepository.save(asset);
 
-        // FIX: contactName/contactPhone/startDate/expectedEndDate/notes were
-        // accepted by this DTO from day one but never persisted anywhere —
-        // only siteName/clientName made it onto the asset. See EarthDeployment
-        // for the full explanation; this is now a proper history record.
         EarthDeployment deployment = EarthDeployment.create(
-                tenantId, id, req.siteName(), req.clientName(),
+                tenantId, id, req.siteName().trim(), req.clientName(),
                 req.contactName(), req.contactPhone(),
                 req.startDate(), req.expectedEndDate(), req.notes()
         );
         deploymentRepository.save(deployment);
+        statusEvents.save(EarthStatusEvent.of(tenantId, id, previous, AssetStatus.DEPLOYED,
+                "Deployed to " + req.siteName().trim(), actor, asset.getCurrentHours()));
+        trail.record(tenantId, "EARTHMOVING_ASSET_DEPLOYED", "EARTHMOVING_ASSET", id,
+                Map.of("status", previous.name()),
+                Map.of("status", "DEPLOYED", "site", req.siteName().trim(),
+                        "client", req.clientName() == null ? "" : req.clientName()));
 
         log.info("Asset deployed asset={} site={} client={}", id, req.siteName(), req.clientName());
         return toResponse(asset);
@@ -175,10 +235,14 @@ public class EarthAssetService {
 
     @Transactional
     public void deleteAsset(TenantId tenantId, UUID id, UUID deletedByUserId) {
+        access.require(EarthmovingRules.ADMIN, "delete equipment");
         EarthAsset asset = findActive(tenantId, id);
-        // FIX: previously always passed null here, losing who deleted the asset.
+        if (asset.getStatus() == AssetStatus.DEPLOYED) {
+            throw new IllegalStateException("A deployed machine cannot be deleted. Return it first.");
+        }
         asset.softDelete(deletedByUserId);
         assetRepository.save(asset);
+        trail.record(tenantId, "EARTHMOVING_ASSET_DELETED", "EARTHMOVING_ASSET", id, snapshot(asset), null);
     }
 
     // ── Deployments ───────────────────────────────────────────────────────
@@ -189,12 +253,7 @@ public class EarthAssetService {
         return deploymentRepository.findByAsset(tenantId, assetId, pageable).map(this::toDeploymentResponse);
     }
 
-    /**
-     * No-op if there's no open deployment for this asset — that's the
-     * expected, common case for every status transition that ISN'T "leaving
-     * DEPLOYED" (this is only called from those specific transitions, but
-     * stays defensive rather than assuming a row must exist).
-     */
+    /** No-op if there is no open deployment for this asset. */
     private void closeOpenDeploymentIfAny(TenantId tenantId, UUID assetId, String endReason) {
         deploymentRepository.findOpenForAsset(tenantId, assetId)
                 .ifPresent(d -> {
@@ -211,27 +270,39 @@ public class EarthAssetService {
         return maintenanceRepository.findByAsset(assetId, pageable).map(this::toMaintenanceResponse);
     }
 
+    /**
+     * Records maintenance that was done. It no longer puts the machine back in service by itself: finishing the work and
+     * releasing the machine are separate events (patch E1). Release is a status change needing EARTHMOVING_RELEASE.
+     */
     @Transactional
     public MaintenanceResponse recordMaintenance(TenantId tenantId, UUID assetId, CreateMaintenanceRequest req) {
+        access.require(EarthmovingRules.MAINTAIN, "record maintenance");
         EarthAsset asset = findActive(tenantId, assetId);
+        String type = req.type().trim().toUpperCase();
+        EarthmovingRules.checkMaintenance(asset.getStatus(), type, req.hoursAtService(), asset.getLastServiceHours(), req.cost());
+
+        boolean isService = "SERVICE".equals(type) && req.hoursAtService() != null;
+        BigDecimal next = isService && asset.getServiceIntervalHours() != null
+                ? req.hoursAtService().add(asset.getServiceIntervalHours()) : null;
         MaintenanceRecord record = MaintenanceRecord.create(
-                tenantId, assetId, req.type(), req.description(),
+                tenantId, assetId, type, req.description(),
                 req.performedAt(), req.hoursAtService(),
-                req.cost(), req.supplier(), req.invoiceRef()
+                req.cost(), req.supplier(), req.invoiceRef(), next
         );
         maintenanceRepository.save(record);
 
-        if ("SERVICE".equalsIgnoreCase(req.type()) && req.hoursAtService() != null) {
+        if (isService) {
             asset.recordService(req.hoursAtService());
-            if (asset.getStatus() == AssetStatus.MAINTENANCE) {
-                // Any deployment this asset had would already have been closed
-                // when it transitioned INTO MAINTENANCE (see updateStatus) —
-                // nothing further to do here regarding deployment history.
-                asset.returnToYard();
+            // A service reading above the recorded hours means the meter was not yet updated: bring it up.
+            if (asset.getCurrentHours() == null || req.hoursAtService().compareTo(asset.getCurrentHours()) > 0) {
+                asset.updateHours(req.hoursAtService());
             }
             assetRepository.save(asset);
         }
-        log.info("Maintenance recorded asset={} type={}", assetId, req.type());
+        trail.record(tenantId, "EARTHMOVING_MAINTENANCE_RECORDED", "EARTHMOVING_ASSET", assetId, null,
+                Map.of("type", type, "description", req.description(),
+                        "cost", req.cost() == null ? "" : req.cost().toPlainString()));
+        log.info("Maintenance recorded asset={} type={}", assetId, type);
         notifyMaintenanceRecorded(tenantId, asset, record);
         return toMaintenanceResponse(record);
     }
@@ -246,11 +317,10 @@ public class EarthAssetService {
 
     @Transactional
     public OperatorLogResponse startOperatorLog(TenantId tenantId, UUID assetId, CreateOperatorLogRequest req) {
-        findActive(tenantId, assetId);
+        access.require(EarthmovingRules.WRITE, "start a shift");
+        EarthAsset asset = findActive(tenantId, assetId);
+        EarthmovingRules.checkShiftStart(asset.getStatus(), req.startHours(), asset.getCurrentHours());
 
-        // FIX: nothing previously stopped a second shift starting on a machine
-        // that already had one open — you'd end up with two concurrent
-        // "active" operators on record for the same machine.
         operatorLogRepository.findOpenLogForAsset(assetId).ifPresent(open -> {
             throw new IllegalStateException(
                     "Asset already has an open operator shift (started " + open.getStartedAt()
@@ -261,17 +331,20 @@ public class EarthAssetService {
                 tenantId, assetId, req.guardId(), req.operatorName(), req.siteName(),
                 req.startedAt(), req.startHours()
         );
-        operatorLogRepository.save(opLog);
+        try {
+            // flush now so the one-open-shift index catches two submissions made at the same moment
+            operatorLogRepository.saveAndFlush(opLog);
+        } catch (DataIntegrityViolationException e) {
+            throw new IllegalStateException("Asset already has an open operator shift — complete it before starting a new one.");
+        }
         return toLogResponse(opLog);
     }
 
-    // NEW: OperatorLog.complete() existed on the entity but had no service
-    // method or endpoint wired to it — operators could start a shift but the
-    // API gave you no way to end one.
     @Transactional
     public OperatorLogResponse completeOperatorLog(TenantId tenantId, UUID assetId, UUID logId,
                                                    CompleteOperatorLogRequest req) {
-        findActive(tenantId, assetId);
+        access.require(EarthmovingRules.WRITE, "complete a shift");
+        EarthAsset asset = findActive(tenantId, assetId);
         OperatorLog opLog = operatorLogRepository.findByIdAndAssetId(logId, assetId)
                 .orElseThrow(() -> new ResourceNotFoundException("OperatorLog", logId.toString()));
 
@@ -279,6 +352,14 @@ public class EarthAssetService {
             throw new IllegalStateException("Operator log " + logId + " is already completed");
         }
         opLog.complete(req.endedAt(), req.endHours(), req.fuelUsedLitres(), req.notes());
+
+        // The shift's closing reading is the machine's latest reading when it is higher than what we hold.
+        if (req.endHours() != null && (asset.getCurrentHours() == null || req.endHours().compareTo(asset.getCurrentHours()) > 0)) {
+            boolean wasDue = asset.isDueForService();
+            asset.updateHours(req.endHours());
+            assetRepository.save(asset);
+            if (!wasDue && asset.isDueForService()) notifyServiceDue(tenantId, asset);
+        }
         log.info("Operator log completed asset={} log={} hoursLogged={}", assetId, logId, opLog.getHoursLogged());
         return toLogResponse(opLog);
     }
@@ -348,6 +429,37 @@ public class EarthAssetService {
     private EarthAsset findActive(TenantId tenantId, UUID id) {
         return assetRepository.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Asset", id.toString()));
+    }
+
+    private static String blankToNull(String v) {
+        return v == null || v.isBlank() ? null : v.trim();
+    }
+
+    private static Map<String, Object> snapshot(EarthAsset a) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("name", a.getName());
+        m.put("fleetNumber", a.getFleetNumber());
+        m.put("assetType", a.getAssetType());
+        m.put("make", a.getMake());
+        m.put("model", a.getModel());
+        m.put("year", a.getYear());
+        m.put("serialNumber", a.getSerialNumber());
+        m.put("registration", a.getRegistration());
+        m.put("ownershipType", a.getOwnershipType());
+        m.put("hireSupplier", a.getHireSupplier());
+        m.put("dailyRate", a.getDailyRate() == null ? null : a.getDailyRate().toPlainString());
+        m.put("hourlyRate", a.getHourlyRate() == null ? null : a.getHourlyRate().toPlainString());
+        m.put("status", a.getStatus() == null ? null : a.getStatus().name());
+        return m;
+    }
+
+    /** Flush now so a duplicate fleet number caught by the unique index comes back as a clear message, not a 500. */
+    private void saveAssetOrExplain(EarthAsset asset) {
+        try {
+            assetRepository.saveAndFlush(asset);
+        } catch (DataIntegrityViolationException e) {
+            throw new IllegalArgumentException("Fleet number \"" + asset.getFleetNumber() + "\" is already in use by another asset.");
+        }
     }
 
     private AssetStatus parseStatus(String raw) {

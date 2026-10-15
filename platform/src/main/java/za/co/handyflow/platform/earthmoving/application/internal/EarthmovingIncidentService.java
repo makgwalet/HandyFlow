@@ -1,6 +1,8 @@
 package za.co.handyflow.platform.earthmoving.application.internal;
 
 import lombok.RequiredArgsConstructor;
+import za.co.handyflow.platform.audittrail.application.AuditTrailFacade;
+import za.co.handyflow.platform.earthmoving.domain.model.EarthmovingRules;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +28,7 @@ import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -52,6 +55,8 @@ public class EarthmovingIncidentService {
     // earthmoving-only FleetNotificationRecipients, which was permanently
     // backed by a no-op stub and never actually notified anyone.
     private final TenantAdminRecipients tenantAdminRecipients;
+    private final EarthmovingAccess access;
+    private final AuditTrailFacade trail;
 
     @Transactional(readOnly = true)
     public Page<IncidentResponse> getIncidents(TenantId tenantId, String status, String severity, Pageable pageable) {
@@ -73,11 +78,14 @@ public class EarthmovingIncidentService {
 
     @Transactional
     public IncidentResponse reportIncident(TenantId tenantId, CreateIncidentRequest req, UUID reportedByUserId) {
+        access.require(EarthmovingRules.WRITE, "report an incident");
+        String type = EarthmovingRules.oneOf(req.type(), EarthmovingRules.INCIDENT_TYPES, "Incident type");
+        String severity = EarthmovingRules.oneOf(req.severity(), EarthmovingRules.SEVERITIES, "Severity");
         EarthAsset asset = assetRepository.findActiveById(tenantId, req.assetId())
                 .orElseThrow(() -> new ResourceNotFoundException("Asset", req.assetId().toString()));
 
         EarthmovingIncident incident = EarthmovingIncident.create(
-                tenantId, req.assetId(), req.type().toUpperCase(), req.severity().toUpperCase(),
+                tenantId, req.assetId(), type, severity,
                 req.title(), req.description(), req.operatorName(), req.siteName(),
                 req.latitude(), req.longitude(), reportedByUserId
         );
@@ -93,9 +101,13 @@ public class EarthmovingIncidentService {
 
     @Transactional
     public IncidentResponse resolveIncident(TenantId tenantId, UUID id, ResolveIncidentRequest req, UUID resolvedByUserId) {
+        access.require(EarthmovingRules.MAINTAIN, "resolve an incident");
         EarthmovingIncident incident = incidentRepository.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Incident", id.toString()));
-        incident.resolve(resolvedByUserId, req.resolutionNotes());
+        String notes = EarthmovingRules.requireReason(req.resolutionNotes(), "resolving an incident");
+        incident.resolve(resolvedByUserId, notes);
+        trail.record(tenantId, "EARTHMOVING_INCIDENT_RESOLVED", "EARTHMOVING_INCIDENT", id,
+                Map.of("status", "OPEN"), Map.of("status", "RESOLVED", "notes", notes));
         log.info("Incident resolved id={}", id);
         return toResponse(incident);
     }
