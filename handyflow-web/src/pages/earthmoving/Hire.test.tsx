@@ -106,4 +106,33 @@ describe("Hire charges", () => {
     await waitFor(() => expect(post).toHaveBeenCalled())
     expect(post.mock.calls[0][1]).toMatchObject({ unitRate: 900, rateReason: "Long-term discount", deploymentId: "d1" })
   })
+
+  it("charges by kilometre only with a rate and a reason, and sends the included allowance", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_ADMIN"]
+    get.mockImplementation((url: string) => Promise.resolve(
+      url.includes("/hire-charges") ? { data: { data: [] } }
+        : url.includes("/deployments") ? { data: { data: { content: [{ id: "d1", assetId: "a1", siteName: "Mine A", clientName: "Anglo", deployedAt: "2026-10-01T06:00:00Z", returnedAt: null }], last: true } } }
+        : { data: { data: { content: [{ id: "a1", name: "Truck", fleetNumber: "T-01", status: "DEPLOYED" }], last: true } } }))
+    post.mockResolvedValue({ data: { data: charge({ id: null, status: "PREVIEW", basis: "KILOMETRE", quantity: 350, unitRate: 12.5 }) } })
+    mount()
+    fireEvent.click(await screen.findByText("New hire charge"))
+    await screen.findByRole("option", { name: "Truck", hidden: true })
+    fireEvent.change(screen.getByLabelText(/Machine \*/), { target: { value: "a1" } })
+    await screen.findByText(/Mine A · Anglo/)
+    fireEvent.change(screen.getByLabelText(/Deployment \*/), { target: { value: "d1" } })
+    fireEvent.change(screen.getByLabelText(/From \*/), { target: { value: "2026-10-01" } })
+    fireEvent.change(screen.getByLabelText(/To \*/), { target: { value: "2026-10-10" } })
+    fireEvent.change(screen.getByLabelText("Charge by"), { target: { value: "KILOMETRE" } })
+    const preview = screen.getByText("Work out the charge") as HTMLButtonElement
+    expect(preview.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText(/Rate per kilometre/), { target: { value: "12.5" } })
+    expect(preview.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText(/Why this rate/), { target: { value: "Rate in signed contract" } })
+    fireEvent.change(screen.getByLabelText(/Kilometres included/), { target: { value: "500" } })
+    expect(preview.disabled).toBe(false)
+    fireEvent.click(preview)
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post.mock.calls[0][1]).toMatchObject({ basis: "KILOMETRE", unitRate: 12.5, includedKm: 500 })
+    expect(await screen.findByText(/350 km at/)).toBeTruthy()
+  })
 })

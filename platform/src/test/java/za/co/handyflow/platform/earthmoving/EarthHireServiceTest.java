@@ -34,6 +34,7 @@ class EarthHireServiceTest {
     EarthAssetRepository assets = mock(EarthAssetRepository.class);
     EarthHireChargeRepository charges = mock(EarthHireChargeRepository.class);
     OperatorLogRepository logs = mock(OperatorLogRepository.class);
+    EarthMeterReadingRepository meters = mock(EarthMeterReadingRepository.class);
     CrmFacade crm = mock(CrmFacade.class);
     InvoicingFacade invoicing = mock(InvoicingFacade.class);
     AuditTrailFacade trail = mock(AuditTrailFacade.class);
@@ -52,7 +53,7 @@ class EarthHireServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new EarthHireService(deployments, assets, charges, logs, crm, invoicing, access, trail);
+        service = new EarthHireService(deployments, assets, charges, logs, meters, crm, invoicing, access, trail);
         asset = EarthAsset.create(tenant, "CAT D9", "D9-001", "DOZER", "Caterpillar", "D9T", 2020, "S1", "GP1",
                 "OWN", null, null, null, n("18500"), n("2200"), null);
         deployment = EarthDeployment.create(tenant, asset.getId(), "Mine A", "Anglo", null, null, STARTED, null, null).withLinks(null, customer, null);
@@ -64,6 +65,7 @@ class EarthHireServiceTest {
         when(charges.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
         when(charges.save(any())).thenAnswer(i -> i.getArgument(0));
         when(logs.sumHoursBetween(any(), any(), any())).thenReturn(BigDecimal.ZERO);
+        when(meters.findBefore(any(TenantId.class), any(), any(), any())).thenReturn(List.of());
     }
 
     HireChargeRequest daily(String from, String to) {
@@ -319,5 +321,54 @@ class EarthHireServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.draftInvoice(tenant, new DraftFromChargesRequest(List.of(a.getId()), "Plant hire", null), actor));
         assertEquals("PENDING", a.getStatus());
         verify(charges, never()).saveAll(any());
+    }
+
+    // ── kilometre billing ────────────────────────────────────────────────────
+
+    EarthMeterReading odo(String km) {
+        return EarthMeterReading.of(tenant, asset.getId(), "KILOMETRES", n(km), null, "MANUAL", null, actor);
+    }
+    HireChargeRequest km(String rate, String reason, String included) {
+        return new HireChargeRequest(deployment.getId(), "KILOMETRE", LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-10"), null,
+                rate == null ? null : n(rate), reason, included == null ? null : n(included));
+    }
+    /** Readings answer by moment: the start-of-period query gets the first value, the end-of-period query the second. */
+    void odometer(String start, String end) {
+        asset.changeMeter("KILOMETRES", n("0"), null, null);
+        var startAt = LocalDate.parse("2026-10-01").atStartOfDay(ZONE).toInstant();
+        when(meters.findBefore(any(TenantId.class), any(), eq(startAt), any())).thenReturn(start == null ? List.of() : List.of(odo(start)));
+        when(meters.findBefore(any(TenantId.class), any(), eq(LocalDate.parse("2026-10-11").atStartOfDay(ZONE).toInstant()), any()))
+                .thenReturn(end == null ? List.of() : List.of(odo(end)));
+    }
+
+    @Test void kilometresAreChargedFromTheOdometerAtTheAgreedRate() {
+        granted.add("EARTHMOVING_ADMIN");
+        odometer("10000", "10850");
+        HireChargeResponse r = service.create(tenant, km("12.50", "Per-km rate in the signed contract", null), actor, TODAY);
+        assertEquals("KILOMETRE", r.basis());
+        assertEquals(n("850.00"), r.quantity());
+        assertEquals(n("10625.00"), r.amount());
+        assertTrue(r.description().contains("odometer 10000 to 10850"));
+    }
+    @Test void anIncludedAllowanceIsNotCharged() {
+        granted.add("EARTHMOVING_ADMIN");
+        odometer("10000", "10850");
+        HireChargeResponse r = service.create(tenant, km("12.50", "Per-km rate in the signed contract", "500"), actor, TODAY);
+        assertEquals(n("350.00"), r.quantity());
+        assertTrue(r.description().contains("500 km included"));
+    }
+    @Test void kilometresNeedAnAgreedRateAndReadingsAtBothEnds() {
+        granted.add("EARTHMOVING_ADMIN");
+        odometer("10000", "10850");
+        assertThrows(IllegalArgumentException.class, () -> service.create(tenant, km(null, null, null), actor, TODAY));
+        odometer(null, "10850");
+        assertThrows(IllegalArgumentException.class, () -> service.create(tenant, km("12.50", "Per-km rate in the signed contract", null), actor, TODAY));
+        odometer("10000", null);
+        assertThrows(IllegalArgumentException.class, () -> service.create(tenant, km("12.50", "Per-km rate in the signed contract", null), actor, TODAY));
+        verify(charges, never()).saveAndFlush(any());
+    }
+    @Test void anHourMeterMachineCannotBeBilledByKilometre() {
+        granted.add("EARTHMOVING_ADMIN");
+        assertThrows(IllegalArgumentException.class, () -> service.create(tenant, km("12.50", "Per-km rate in the signed contract", null), actor, TODAY));
     }
 }

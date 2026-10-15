@@ -10,11 +10,14 @@ import za.co.handyflow.platform.crm.CustomerSummary;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthAsset;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthDeployment;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthHireCharge;
+import za.co.handyflow.platform.earthmoving.domain.model.EarthMeterReading;
+import za.co.handyflow.platform.earthmoving.domain.model.MeterRules;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthmovingRules;
 import za.co.handyflow.platform.earthmoving.domain.model.HireRules;
 import za.co.handyflow.platform.earthmoving.domain.repository.EarthAssetRepository;
 import za.co.handyflow.platform.earthmoving.domain.repository.EarthDeploymentRepository;
 import za.co.handyflow.platform.earthmoving.domain.repository.EarthHireChargeRepository;
+import za.co.handyflow.platform.earthmoving.domain.repository.EarthMeterReadingRepository;
 import za.co.handyflow.platform.earthmoving.domain.repository.OperatorLogRepository;
 import za.co.handyflow.platform.earthmoving.dto.DraftFromChargesRequest;
 import za.co.handyflow.platform.earthmoving.dto.DraftInvoiceResponse;
@@ -45,6 +48,7 @@ public class EarthHireService {
     private final EarthAssetRepository assets;
     private final EarthHireChargeRepository charges;
     private final OperatorLogRepository logs;
+    private final EarthMeterReadingRepository meters;
     private final CrmFacade crm;
     private final InvoicingFacade invoicing;
     private final EarthmovingAccess access;
@@ -156,7 +160,7 @@ public class EarthHireService {
         picked.sort(Comparator.comparing(EarthHireCharge::getPeriodFrom).thenComparing(EarthHireCharge::getCreatedAt));
 
         List<InvoicingFacade.DraftInvoiceLine> lines = picked.stream().map(c -> new InvoicingFacade.DraftInvoiceLine(
-                c.getDescription(), HireRules.DAILY.equals(c.getBasis()) ? "day" : "hour", c.getQuantity(), c.getUnitRate(), c.getVatRate())).toList();
+                c.getDescription(), HireRules.unit(c.getBasis()), c.getQuantity(), c.getUnitRate(), c.getVatRate())).toList();
         String title = req.title() == null || req.title().isBlank() ? "Plant hire" : req.title().trim();
         InvoicingFacade.DraftInvoiceResult invoice = invoicing.createDraftInvoice(tenantId,
                 new InvoicingFacade.DraftInvoice(customer, title, "Raised from hire charges in HandyFlow Earthmoving.", req.dueDate(), lines));
@@ -185,7 +189,16 @@ public class EarthHireService {
         HireRules.checkPeriod(req.periodFrom(), req.periodTo(), deployedOn, returnedOn, today);
         BigDecimal rate = HireRules.rate(basis, asset.getDailyRate(), asset.getHourlyRate(), req.unitRate(), req.rateReason());
         String rateNote = req.unitRate() == null ? null : "Rate agreed for this charge: " + req.rateReason().trim();
-        BigDecimal quantity = HireRules.DAILY.equals(basis)
+        BigDecimal quantity;
+        String describedAs = null;
+        if (HireRules.KILOMETRE.equals(basis)) {
+            if (!MeterRules.KILOMETRES.equals(asset.getMeterType()))
+                throw new IllegalArgumentException("This machine's meter counts hours, not kilometres, so it cannot be billed by kilometre.");
+            BigDecimal start = readingBefore(tenantId, asset.getId(), req.periodFrom().atStartOfDay(ZONE).toInstant());
+            BigDecimal end = readingBefore(tenantId, asset.getId(), req.periodTo().plusDays(1).atStartOfDay(ZONE).toInstant());
+            quantity = HireRules.kilometres(start, end, req.includedKm());
+            describedAs = HireRules.describeKm(label(asset), d.getSiteName(), req.periodFrom(), req.periodTo(), start, end, req.includedKm(), quantity, rate);
+        } else quantity = HireRules.DAILY.equals(basis)
                 ? BigDecimal.valueOf(HireRules.days(req.periodFrom(), req.periodTo())).setScale(2)
                 : HireRules.hours(logs.sumHoursBetween(asset.getId(),
                         req.periodFrom().atStartOfDay(ZONE).toInstant(), req.periodTo().plusDays(1).atStartOfDay(ZONE).toInstant()));
@@ -197,7 +210,13 @@ public class EarthHireService {
         }
         String machine = label(asset);
         return new Quote(d, asset, machine, basis, quantity, rate, HireRules.vatRate(req.vatRate()),
-                HireRules.describe(machine, d.getSiteName(), basis, req.periodFrom(), req.periodTo(), quantity, rate), rateNote);
+                describedAs != null ? describedAs : HireRules.describe(machine, d.getSiteName(), basis, req.periodFrom(), req.periodTo(), quantity, rate), rateNote);
+    }
+
+    /** The newest odometer reading recorded before a moment: the machine's reading at that time. */
+    private BigDecimal readingBefore(TenantId tenantId, UUID assetId, java.time.Instant before) {
+        return meters.findBefore(tenantId, assetId, before, org.springframework.data.domain.PageRequest.of(0, 1)).stream()
+                .filter(r -> MeterRules.KILOMETRES.equals(r.getMeterType())).findFirst().map(EarthMeterReading::getReading).orElse(null);
     }
 
     private EarthHireCharge build(TenantId tenantId, Quote q, HireChargeRequest req, UUID actor) {

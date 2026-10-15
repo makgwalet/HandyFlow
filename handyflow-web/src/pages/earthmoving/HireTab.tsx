@@ -24,7 +24,8 @@ const card: React.CSSProperties = { border: "1px solid var(--hf-border)", border
 
 const STATUS_LABEL: Record<string, string> = { PENDING: "Not invoiced", INVOICED: "On an invoice", VOIDED: "Voided" }
 const FILTERS = [["PENDING", "Not invoiced"], ["INVOICED", "On an invoice"], ["VOIDED", "Voided"], ["", "All"]] as const
-const EMPTY = { assetId: "", deploymentId: "", basis: "DAILY", periodFrom: "", periodTo: "", vatRate: "15", unitRate: "", rateReason: "" }
+const basisWord = (b: string) => (b === "DAILY" ? "days" : b === "KILOMETRE" ? "km" : "hours")
+const EMPTY = { assetId: "", deploymentId: "", basis: "DAILY", periodFrom: "", periodTo: "", vatRate: "15", unitRate: "", rateReason: "", includedKm: "" }
 
 export default function HireTab() {
   const perms = useEarthPerms()
@@ -54,8 +55,11 @@ export default function HireTab() {
     vatRate: form.vatRate.trim() === "" ? null : Number(form.vatRate),
     unitRate: form.unitRate.trim() === "" ? null : Number(form.unitRate),
     rateReason: form.unitRate.trim() === "" ? null : form.rateReason.trim(),
+    includedKm: form.basis === "KILOMETRE" && form.includedKm.trim() !== "" ? Number(form.includedKm) : null,
   })
-  const rateOk = form.unitRate.trim() === "" || (Number(form.unitRate) > 0 && form.rateReason.trim().length >= 5)
+  const km = form.basis === "KILOMETRE"
+  const rateGiven = Number(form.unitRate) > 0 && form.rateReason.trim().length >= 5
+  const rateOk = km ? rateGiven : form.unitRate.trim() === "" || rateGiven
   const formReady = !!form.deploymentId && !!form.periodFrom && !!form.periodTo && rateOk
 
   const openCreate = () => { setForm(EMPTY); setPreview(null); setErr(""); setCreating(true) }
@@ -98,7 +102,7 @@ export default function HireTab() {
           {c.siteName ?? "No site"} · {fmtDate(c.periodFrom)} to {fmtDate(c.periodTo)}
         </div>
         <div style={{ fontSize: 12, color: "var(--hf-text-secondary)", marginTop: 6 }}>
-          {c.quantity} {c.basis === "DAILY" ? "days" : "hours"} at {fmtCurrency2dp(c.unitRate)} = {fmtCurrency2dp(c.amount)}
+          {c.quantity} {basisWord(c.basis)} at {fmtCurrency2dp(c.unitRate)} = {fmtCurrency2dp(c.amount)}
           {" "}+ VAT {fmtCurrency2dp(c.vatAmount)} = <strong>{fmtCurrency2dp(c.total)}</strong>
         </div>
         <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 4 }}>
@@ -127,15 +131,19 @@ export default function HireTab() {
             {deployments.map(d => <option key={d.id} value={d.id}>{d.siteName ?? "No site"} · {d.clientName ?? "No client"} · {fmtDate(d.deployedAt)}</option>)}</select></div>
         <div><label htmlFor="hc-basis" style={lbl}>Charge by</label>
           <select id="hc-basis" value={form.basis} onChange={e => change({ basis: e.target.value })} style={inputStyle()}>
-            <option value="DAILY">Day</option><option value="HOURLY">Hour (from operator logs)</option></select></div>
+            <option value="DAILY">Day</option><option value="HOURLY">Hour (from operator logs)</option><option value="KILOMETRE">Kilometre (from odometer readings)</option></select></div>
         <div><label htmlFor="hc-vat" style={lbl}>VAT %</label>
           <input id="hc-vat" value={form.vatRate} onChange={e => change({ vatRate: e.target.value })} style={inputStyle()} /></div>
         <div><label htmlFor="hc-from" style={lbl}>From *</label>
           <input id="hc-from" type="date" value={form.periodFrom} onChange={e => change({ periodFrom: e.target.value })} style={inputStyle()} /></div>
         <div><label htmlFor="hc-to" style={lbl}>To *</label>
           <input id="hc-to" type="date" value={form.periodTo} onChange={e => change({ periodTo: e.target.value })} style={inputStyle()} /></div>
-        <div><label htmlFor="hc-rate" style={lbl}>Agreed rate (leave blank for the machine's rate)</label>
+        <div><label htmlFor="hc-rate" style={lbl}>{km ? "Rate per kilometre *" : "Agreed rate (leave blank for the machine's rate)"}</label>
           <input id="hc-rate" type="number" min="0" value={form.unitRate} onChange={e => change({ unitRate: e.target.value })} style={inputStyle()} /></div>
+        {km && (
+          <div><label htmlFor="hc-incl" style={lbl}>Kilometres included (not charged)</label>
+            <input id="hc-incl" type="number" min="0" value={form.includedKm} onChange={e => change({ includedKm: e.target.value })} style={inputStyle()} /></div>
+        )}
         {form.unitRate.trim() !== "" && (
           <div><label htmlFor="hc-rate-why" style={lbl}>Why this rate? * (at least 5 characters)</label>
             <input id="hc-rate-why" value={form.rateReason} onChange={e => change({ rateReason: e.target.value })} style={inputStyle()} /></div>
@@ -144,7 +152,7 @@ export default function HireTab() {
       {preview && (
         <div role="status" style={{ ...card, marginBottom: 10, fontSize: 13 }}>
           {preview.description}<br />
-          {preview.quantity} {preview.basis === "DAILY" ? "days" : "hours"} at {fmtCurrency2dp(preview.unitRate)} = {fmtCurrency2dp(preview.amount)}
+          {preview.quantity} {basisWord(preview.basis)} at {fmtCurrency2dp(preview.unitRate)} = {fmtCurrency2dp(preview.amount)}
           {" "}+ VAT {fmtCurrency2dp(preview.vatAmount)} = <strong>{fmtCurrency2dp(preview.total)}</strong>
         </div>
       )}

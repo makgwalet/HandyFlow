@@ -14,7 +14,8 @@ public final class HireRules {
 
     public static final String DAILY = "DAILY";
     public static final String HOURLY = "HOURLY";
-    public static final List<String> BASES = List.of(DAILY, HOURLY);
+    public static final String KILOMETRE = "KILOMETRE";
+    public static final List<String> BASES = List.of(DAILY, HOURLY, KILOMETRE);
     public static final String PENDING = "PENDING";
     public static final String INVOICED = "INVOICED";
     public static final String VOIDED = "VOIDED";
@@ -24,7 +25,7 @@ public final class HireRules {
 
     public static String basis(String basis) {
         if (basis == null || !BASES.contains(basis.trim().toUpperCase()))
-            throw new IllegalArgumentException("Bill by DAILY (days on hire) or HOURLY (hours worked).");
+            throw new IllegalArgumentException("Bill by DAILY (days on hire), HOURLY (hours worked) or KILOMETRE (kilometres driven).");
         return basis.trim().toUpperCase();
     }
 
@@ -55,8 +56,9 @@ public final class HireRules {
         return vat.setScale(2, RoundingMode.HALF_UP);
     }
 
-    /** The rate for this basis, or a message saying which rate to set. */
+    /** The rate for this basis, or a message saying which rate to set. A kilometre rate is always agreed per charge. */
     public static BigDecimal rateFor(String basis, BigDecimal dailyRate, BigDecimal hourlyRate) {
+        if (KILOMETRE.equals(basis)) throw new IllegalArgumentException("Give the agreed rate per kilometre, with a reason.");
         BigDecimal rate = DAILY.equals(basis) ? dailyRate : hourlyRate;
         if (rate == null || rate.signum() <= 0)
             throw new IllegalArgumentException("Set the machine's " + (DAILY.equals(basis) ? "daily" : "hourly") + " rate first.");
@@ -98,5 +100,33 @@ public final class HireRules {
         String qty = DAILY.equals(basis) ? quantity.stripTrailingZeros().toPlainString() + (quantity.compareTo(BigDecimal.ONE) == 0 ? " day" : " days")
                 : quantity.stripTrailingZeros().toPlainString() + " hrs";
         return "Hire: " + machine + (site == null || site.isBlank() ? "" : " at " + site) + ", " + span + " (" + qty + " @ R" + rate.setScale(2, RoundingMode.HALF_UP).toPlainString() + ")";
+    }
+
+    /**
+     * Kilometres to charge: end odometer minus start odometer, less any allowance, never below nothing. Readings that go
+     * backwards are refused rather than guessed at, and a period with nothing left to charge says so.
+     */
+    public static BigDecimal kilometres(BigDecimal start, BigDecimal end, BigDecimal included) {
+        if (start == null || end == null) throw new IllegalArgumentException("The machine needs an odometer reading before and at the end of that period.");
+        if (end.compareTo(start) < 0) throw new IllegalArgumentException("The odometer reading at the end (" + end.stripTrailingZeros().toPlainString()
+                + ") is lower than at the start (" + start.stripTrailingZeros().toPlainString() + "). Correct the reading first.");
+        if (included != null && included.signum() < 0) throw new IllegalArgumentException("The included kilometres cannot be negative.");
+        BigDecimal billable = end.subtract(start).subtract(included == null ? BigDecimal.ZERO : included);
+        if (billable.signum() <= 0) throw new IllegalArgumentException("No kilometres to charge for that period"
+                + (included != null && included.signum() > 0 ? " after the included " + included.stripTrailingZeros().toPlainString() + " km." : "."));
+        return billable.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /** The invoice-line unit for a basis. */
+    public static String unit(String basis) { return DAILY.equals(basis) ? "day" : KILOMETRE.equals(basis) ? "km" : "hour"; }
+
+    /** The line text for a kilometre charge, showing the readings it came from. */
+    public static String describeKm(String machine, String site, LocalDate from, LocalDate to, BigDecimal start, BigDecimal end,
+                                    BigDecimal included, BigDecimal quantity, BigDecimal rate) {
+        String span = from.equals(to) ? D.format(from) : D.format(from) + " to " + D.format(to);
+        String allowance = included != null && included.signum() > 0 ? ", " + included.stripTrailingZeros().toPlainString() + " km included" : "";
+        return "Hire: " + machine + (site == null || site.isBlank() ? "" : " at " + site) + ", " + span + " (odometer "
+                + start.stripTrailingZeros().toPlainString() + " to " + end.stripTrailingZeros().toPlainString() + allowance + "; "
+                + quantity.stripTrailingZeros().toPlainString() + " km @ R" + rate.setScale(2, RoundingMode.HALF_UP).toPlainString() + ")";
     }
 }

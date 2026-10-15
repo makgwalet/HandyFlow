@@ -14,4 +14,8 @@ public interface EarthMeterReadingRepository extends JpaRepository<EarthMeterRea
     /** Newest first. */
     @Query("SELECT r FROM EarthMeterReading r WHERE r.tenantId = :tenantId AND r.assetId = :assetId ORDER BY r.recordedAt DESC")
     List<EarthMeterReading> findByAsset(TenantId tenantId, UUID assetId, Pageable pageable);
+
+    /** The newest reading recorded before a moment, newest first (take the first). */
+    @Query("SELECT r FROM EarthMeterReading r WHERE r.tenantId = :tenantId AND r.assetId = :assetId AND r.recordedAt < :before ORDER BY r.recordedAt DESC")
+    List<EarthMeterReading> findBefore(TenantId tenantId, UUID assetId, java.time.Instant before, Pageable pageable);
 }

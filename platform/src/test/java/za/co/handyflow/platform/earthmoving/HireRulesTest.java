@@ -18,6 +18,7 @@ class HireRulesTest {
     @Test void basisIsDailyOrHourly() {
         assertEquals("DAILY", HireRules.basis(" daily "));
         assertEquals("HOURLY", HireRules.basis("HOURLY"));
+        assertEquals("KILOMETRE", HireRules.basis("kilometre"));
         assertThrows(IllegalArgumentException.class, () -> HireRules.basis("WEEKLY"));
         assertThrows(IllegalArgumentException.class, () -> HireRules.basis(null));
     }
@@ -139,5 +140,40 @@ class HireRulesTest {
     @Test void aMachineWithNoRateCanStillBeChargedAtAnAgreedRate() {
         assertEquals(n("750"), HireRules.rate("HOURLY", null, null, n("750"), "Rate set by the contract"));
         assertThrows(IllegalArgumentException.class, () -> HireRules.rate("HOURLY", null, null, null, null));
+    }
+
+    // ── kilometres ───────────────────────────────────────────────────────────
+
+    @Test void kilometresAreTheOdometerDifference() {
+        assertEquals(n("850.00"), HireRules.kilometres(n("10000"), n("10850"), null));
+        assertEquals(n("0.50"), HireRules.kilometres(n("10000.25"), n("10000.75"), null));
+    }
+    @Test void anAllowanceIsTakenOffAndCannotGoBelowNothing() {
+        assertEquals(n("350.00"), HireRules.kilometres(n("10000"), n("10850"), n("500")));
+        assertThrows(IllegalArgumentException.class, () -> HireRules.kilometres(n("10000"), n("10400"), n("500")));
+        assertThrows(IllegalArgumentException.class, () -> HireRules.kilometres(n("10000"), n("10500"), n("500")));
+        assertThrows(IllegalArgumentException.class, () -> HireRules.kilometres(n("10000"), n("10850"), n("-1")));
+    }
+    @Test void missingOrBackwardsReadingsAreRefusedNotGuessed() {
+        assertThrows(IllegalArgumentException.class, () -> HireRules.kilometres(null, n("10850"), null));
+        assertThrows(IllegalArgumentException.class, () -> HireRules.kilometres(n("10000"), null, null));
+        assertThrows(IllegalArgumentException.class, () -> HireRules.kilometres(n("10850"), n("10000"), null));
+        assertThrows(IllegalArgumentException.class, () -> HireRules.kilometres(n("10000"), n("10000"), null));
+    }
+    @Test void aKilometreRateIsNeverTakenFromTheMachine() {
+        assertThrows(IllegalArgumentException.class, () -> HireRules.rateFor("KILOMETRE", n("1200"), n("150")));
+        assertEquals(n("12.50"), HireRules.rate("KILOMETRE", null, null, n("12.50"), "Per-km rate in the contract"));
+        assertThrows(IllegalArgumentException.class, () -> HireRules.rate("KILOMETRE", null, null, n("12.50"), null));
+    }
+    @Test void theInvoiceUnitFollowsTheBasis() {
+        assertEquals("day", HireRules.unit("DAILY"));
+        assertEquals("hour", HireRules.unit("HOURLY"));
+        assertEquals("km", HireRules.unit("KILOMETRE"));
+    }
+    @Test void theLineShowsTheReadingsAndAllowance() {
+        String s = HireRules.describeKm("D9", "Mine A", START, START.plusDays(9), n("10000"), n("10850"), n("500"), n("350.00"), n("12.5"));
+        assertTrue(s.contains("odometer 10000 to 10850"));
+        assertTrue(s.contains("500 km included"));
+        assertTrue(s.contains("350 km @ R12.50"));
     }
 }
