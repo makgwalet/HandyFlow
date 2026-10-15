@@ -43,6 +43,7 @@ public class EarthWorkOrderService {
     private final EarthmovingAccess access;
     private final AuditTrailFacade trail;
     private final UserRecipientResolver users;
+    private final EarthAlertService alerts;
 
     // ── reading ──────────────────────────────────────────────────────────────
 
@@ -150,6 +151,7 @@ public class EarthWorkOrderService {
         access.require(EarthmovingRules.MAINTAIN, "cancel a work order");
         EarthWorkOrder w = find(tenantId, id);
         w.cancel(reason);
+        closeAlerts(tenantId, w, actorOrNull(), "Work order " + w.getNumber() + " cancelled");
         trail.record(tenantId, "EARTHMOVING_WORK_ORDER_CANCELLED", "EARTHMOVING_WORK_ORDER", id, null,
                 Map.of("number", w.getNumber(), "reason", w.getCancelReason()));
         return toResponse(w, lines.findForWorkOrder(tenantId, id));
@@ -221,9 +223,33 @@ public class EarthWorkOrderService {
                 p.markDone(hours, LocalDate.now(ZONE));
             });
         }
+        closeAlerts(tenantId, w, actor, "Work order " + w.getNumber() + " completed");
         trail.record(tenantId, "EARTHMOVING_WORK_ORDER_COMPLETED", "EARTHMOVING_WORK_ORDER", id, null,
                 Map.of("number", w.getNumber(), "cost", total.toPlainString(), "testResult", w.getTestResult() == null ? "" : w.getTestResult()));
         return toResponse(w, costLines);
+    }
+
+    private void closeAlerts(TenantId tenantId, EarthWorkOrder w, UUID actor, String note) {
+        if (w.getPlanId() != null) alerts.resolveByKey(tenantId, "PLAN:" + w.getPlanId(), actor, note);
+        alerts.resolveByKey(tenantId, "WO_OVERDUE:" + w.getId(), actor, note);
+    }
+
+    private static UUID actorOrNull() {
+        try { return za.co.handyflow.platform.shared.UserContext.getCurrentUserId(); } catch (RuntimeException e) { return null; }
+    }
+
+    /** Alerts the assignee and the overdue-work-order recipients about every open job past its due date. Returns how many alerts were raised. */
+    @Transactional
+    public int alertOverdue(TenantId tenantId, LocalDate today) {
+        int n = 0;
+        for (EarthWorkOrder w : workOrders.findOpenOverdue(tenantId, today)) {
+            alerts.raise(tenantId, "WORK_ORDER_OVERDUE", "WARNING", w.getAssetId(), "WORK_ORDER", w.getId(),
+                    "Overdue: " + w.getNumber() + " " + w.getTitle(),
+                    w.getNumber() + " was due " + w.getDueDate() + " and is still " + w.getStatus().name().toLowerCase().replace('_', ' ') + ".",
+                    "WO_OVERDUE:" + w.getId(), w.getAssignedToUserId() == null ? null : List.of(w.getAssignedToUserId()));
+            n++;
+        }
+        return n;
     }
 
     /** Open work orders that stop this machine being released. */

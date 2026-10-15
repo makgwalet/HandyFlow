@@ -10,7 +10,7 @@
 // (and bundle) a module's pages just to render its navigation.
 import type { ElementType } from 'react'
 import {
-  AlertTriangle, CheckCircle2, Coins, Camera, ClipboardList, Clock, Crosshair, DoorOpen, FileBarChart,
+  AlertTriangle, Bell, CheckCircle2, Coins, Camera, ClipboardList, Clock, Crosshair, DoorOpen, FileBarChart,
   GitBranch, Key, LayoutDashboard, Lock, MapPin, Radio, RefreshCw, Repeat, Route,
   Footprints, QrCode, Gauge, Shield, ShieldCheck, Siren, Tablet, DollarSign, Wheat, Tractor, PawPrint,
   Droplets, ArrowDownToLine, Fuel, Truck, Users, TrendingUp, Car, Wrench,
@@ -439,7 +439,10 @@ export const EARTHMOVING_SECTIONS: ModuleSections = {
         { id: 'operators', label: 'Operator Logs', icon: Users },
       ],
     },
-    { label: 'Safety', sections: [{ id: 'incidents', label: 'Incidents', icon: AlertTriangle }] },
+    { label: 'Safety', sections: [
+      { id: 'incidents', label: 'Incidents', icon: AlertTriangle },
+      { id: 'alerts', label: 'Alerts', icon: Bell },
+    ] },
   ],
 }
 

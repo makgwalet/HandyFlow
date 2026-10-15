@@ -111,3 +111,19 @@ export interface StatusEvent {
   actorUserId: string | null; meterHours: number | null; happenedAt: string
   workOrderId: string | null; overrideReason: string | null
 }
+
+export interface AlertDelivery { userId: string | null; level: number; status: string; detail: string | null; sentAt: string }
+
+export interface EarthAlert {
+  id: string; alertType: string; severity: string // INFO | WARNING | CRITICAL
+  assetId: string | null; refType: string | null; refId: string | null
+  title: string; message: string; status: string // OPEN | ACKNOWLEDGED | RESOLVED
+  level: number; createdAt: string; escalatedAt: string | null
+  acknowledgedBy: string | null; acknowledgedAt: string | null; resolvedAt: string | null; resolutionNote: string | null
+  deliveries: AlertDelivery[]
+}
+
+export interface AlertRule {
+  alertType: string; enabled: boolean; escalateAfterMinutes: number | null
+  initialUserIds: string[]; escalationUserIds: string[]; usesAdminFallback: boolean; canBeDisabled: boolean
+}

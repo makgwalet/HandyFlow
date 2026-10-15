@@ -72,6 +72,10 @@ export const SEVERITY_CFG: Record<string, { color: string; bg: string; border: s
 
 // Mirrors AssetStatus.java's transition table (keep in step). DEPLOYED is never set from the status dialog: use Deploy,
 // which records the site and client.
+export const ALERT_TYPE_LABEL: Record<string, string> = {
+  SERVICE_DUE: "Service due", BREAKDOWN: "Breakdown or accident", WORK_ORDER_OVERDUE: "Overdue work order",
+}
+
 export const STATUS_TRANSITIONS: Record<string, string[]> = {
   AVAILABLE:   ["MAINTENANCE", "HIRED_OUT", "RETIRED"],
   DEPLOYED:    ["AVAILABLE", "BREAKDOWN", "MAINTENANCE"],

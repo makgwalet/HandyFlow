@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import za.co.handyflow.platform.earthmoving.domain.repository.EarthMaintenancePlanRepository;
+import za.co.handyflow.platform.earthmoving.domain.repository.EarthWorkOrderRepository;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.LocalDate;
@@ -18,6 +19,8 @@ import java.util.UUID;
 public class EarthmovingPlanScheduler {
     private final EarthMaintenancePlanRepository plans;
     private final EarthMaintenancePlanService service;
+    private final EarthWorkOrderRepository workOrders;
+    private final EarthWorkOrderService workOrderService;
 
     @Scheduled(cron = "0 15 5 * * *", zone = "Africa/Johannesburg")
     public void daily() { sweep(LocalDate.now(ZoneId.of("Africa/Johannesburg"))); }
@@ -28,6 +31,10 @@ public class EarthmovingPlanScheduler {
         for (UUID t : plans.findTenantIdsWithActivePlans()) {
             try { raised += service.scan(TenantId.of(t), today).workOrdersRaised(); }
             catch (Exception e) { log.error("[Earthmoving] Plan check failed for tenant {}: {}", t, e.getMessage(), e); }
+        }
+        for (UUID t : workOrders.findTenantIdsWithOverdue(today)) {
+            try { workOrderService.alertOverdue(TenantId.of(t), today); }
+            catch (Exception e) { log.error("[Earthmoving] Overdue check failed for tenant {}: {}", t, e.getMessage(), e); }
         }
         return raised;
     }

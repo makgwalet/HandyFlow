@@ -40,4 +40,14 @@ public interface EarthWorkOrderRepository extends JpaRepository<EarthWorkOrder, 
             + "AND w.status NOT IN (za.co.handyflow.platform.earthmoving.domain.model.WorkOrderStatus.COMPLETED, "
             + "za.co.handyflow.platform.earthmoving.domain.model.WorkOrderStatus.CANCELLED)")
     boolean existsOpenForPlan(UUID planId);
+
+    @Query("SELECT w FROM EarthWorkOrder w WHERE w.tenantId = :tenantId AND w.dueDate < :today AND w.status NOT IN ("
+            + "za.co.handyflow.platform.earthmoving.domain.model.WorkOrderStatus.COMPLETED, "
+            + "za.co.handyflow.platform.earthmoving.domain.model.WorkOrderStatus.CANCELLED) ORDER BY w.dueDate")
+    List<EarthWorkOrder> findOpenOverdue(TenantId tenantId, java.time.LocalDate today);
+
+    @Query("SELECT DISTINCT w.tenantId.value FROM EarthWorkOrder w WHERE w.dueDate < :today AND w.status NOT IN ("
+            + "za.co.handyflow.platform.earthmoving.domain.model.WorkOrderStatus.COMPLETED, "
+            + "za.co.handyflow.platform.earthmoving.domain.model.WorkOrderStatus.CANCELLED)")
+    List<UUID> findTenantIdsWithOverdue(java.time.LocalDate today);
 }

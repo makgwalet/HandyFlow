@@ -44,8 +44,7 @@ public class EarthMaintenancePlanService {
     private final EarthWorkOrderService workOrderService;
     private final EarthmovingAccess access;
     private final AuditTrailFacade trail;
-    private final NotificationService notificationService;
-    private final TenantAdminRecipients tenantAdminRecipients;
+    private final EarthAlertService alerts;
 
     @Transactional(readOnly = true)
     public List<PlanResponse> list(TenantId tenantId, UUID assetId) {
@@ -118,8 +117,11 @@ public class EarthMaintenancePlanService {
                             + " since it was last done; the plan is every " + p.getIntervalValue() + " " + unit + ".",
                     p.getTaskType(), priority, today, "PLAN", p.getId(), null, p.isBlocksRelease(), null);
             raised.add(w.getNumber() + " " + displayName(asset) + " — " + p.getName());
+            alerts.raise(tenantId, "SERVICE_DUE", "WARNING", asset.getId(), "WORK_ORDER", w.getId(),
+                    "Service due: " + displayName(asset) + " — " + p.getName(),
+                    w.getNumber() + " raised: " + p.getName() + " is " + (s.state() == WorkOrderRules.PlanState.OVERDUE ? "overdue" : "due") + ".",
+                    "PLAN:" + p.getId(), null);
         }
-        if (!raised.isEmpty()) notifyRaised(tenantId, raised);
         return new PlanScanResponse(active.size(), raised.size(), raised);
     }
 
@@ -134,20 +136,6 @@ public class EarthMaintenancePlanService {
 
     private static String displayName(EarthAsset a) {
         return a.getFleetNumber() != null ? a.getFleetNumber() + " (" + a.getName() + ")" : a.getName();
-    }
-
-    private void notifyRaised(TenantId tenantId, List<String> raised) {
-        List<Recipient> recipients = tenantAdminRecipients.resolveTenantAdmins(tenantId);
-        if (recipients.isEmpty()) return;
-        notificationService.send(NotificationRequest.builder()
-                .tenantId(tenantId)
-                .type(NotificationType.ASSET_SERVICE_DUE)
-                .title(raised.size() + " planned maintenance job" + (raised.size() == 1 ? "" : "s") + " now due")
-                .message(String.join("; ", raised.stream().limit(5).toList()) + (raised.size() > 5 ? " and " + (raised.size() - 5) + " more" : ""))
-                .actionUrl("/earthmoving/workorders")
-                .sourceModule("earthmoving")
-                .recipients(recipients)
-                .build());
     }
 
     PlanResponse toResponse(EarthMaintenancePlan p, EarthAsset asset, LocalDate today) {

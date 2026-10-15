@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.earthmoving.domain.model.AssetStatus;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthAsset;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthmovingIncident;
+import za.co.handyflow.platform.earthmoving.domain.model.AlertRules;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthStatusEvent;
 import za.co.handyflow.platform.earthmoving.domain.repository.EarthStatusEventRepository;
 import za.co.handyflow.platform.earthmoving.domain.model.InvalidAssetStatusTransitionException;
@@ -60,6 +61,7 @@ public class EarthmovingIncidentService {
     private final EarthmovingAccess access;
     private final EarthStatusEventRepository statusEvents;
     private final EarthWorkOrderService workOrderService;
+    private final EarthAlertService alerts;
     private final AuditTrailFacade trail;
 
     @Transactional(readOnly = true)
@@ -100,8 +102,15 @@ public class EarthmovingIncidentService {
         maybeAutoBreakdown(tenantId, asset, incident, reportedByUserId);
         if (AUTO_BREAKDOWN_TYPES.contains(incident.getType())) {
             workOrderService.raiseFromIncident(tenantId, asset.getId(), incident.getId(), incident.getTitle(), incident.getSeverity(), reportedByUserId);
+            // Breakdowns and accidents go through alert routing (who is told, and who is told next) instead of the blanket notice.
+            String label = asset.getFleetNumber() != null ? asset.getFleetNumber() + " (" + asset.getName() + ")" : asset.getName();
+            alerts.raise(tenantId, "BREAKDOWN", AlertRules.severityFor("BREAKDOWN", incident.getSeverity()), asset.getId(), "INCIDENT", incident.getId(),
+                    "[" + incident.getSeverity() + "] " + incident.getType() + ": " + label,
+                    incident.getTitle() + (incident.getSiteName() != null ? " at " + incident.getSiteName() : ""),
+                    "BREAKDOWN:" + asset.getId(), null);
+        } else {
+            notifyIncidentReported(tenantId, asset, incident);
         }
-        notifyIncidentReported(tenantId, asset, incident);
 
         return toResponse(incident);
     }

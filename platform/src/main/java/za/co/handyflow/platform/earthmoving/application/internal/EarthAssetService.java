@@ -11,6 +11,7 @@ import za.co.handyflow.platform.audittrail.application.AuditTrailFacade;
 import za.co.handyflow.platform.earthmoving.domain.model.AssetStatus;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthStatusEvent;
 import za.co.handyflow.platform.earthmoving.domain.model.ReleaseRules;
+import za.co.handyflow.platform.earthmoving.domain.model.AlertRules;
 import za.co.handyflow.platform.earthmoving.domain.repository.EarthWorkOrderRepository;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthmovingRules;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthAsset;
@@ -58,6 +59,7 @@ public class EarthAssetService {
     // now depends on that instead of maintaining its own parallel,
     // never-implemented port. This is what actually turns notifications on.
     private final TenantAdminRecipients tenantAdminRecipients;
+    private final EarthAlertService alerts;
 
     // ── Assets ────────────────────────────────────────────────────────────
 
@@ -193,6 +195,9 @@ public class EarthAssetService {
                 "EARTHMOVING_ASSET", id,
                 Map.of("status", previousStatus.name()),
                 reason == null ? Map.of("status", target.name()) : Map.of("status", target.name(), "reason", reason));
+        if (release && target == AssetStatus.AVAILABLE && previousStatus == AssetStatus.BREAKDOWN) {
+            alerts.resolveByKey(tenantId, "BREAKDOWN:" + id, actor, "Machine released from breakdown");
+        }
         if (overrideReason != null) {
             trail.record(tenantId, "EARTHMOVING_ASSET_RELEASE_OVERRIDDEN", "EARTHMOVING_ASSET", id,
                     Map.of("problems", String.join(" ", releaseProblems)),
@@ -332,6 +337,7 @@ public class EarthAssetService {
                 asset.updateHours(req.hoursAtService());
             }
             assetRepository.save(asset);
+            alerts.resolveByKey(tenantId, "SERVICE_DUE:" + assetId, null, "Service recorded");
         }
         trail.record(tenantId, "EARTHMOVING_MAINTENANCE_RECORDED", "EARTHMOVING_ASSET", assetId, null,
                 Map.of("type", type, "description", req.description(),
@@ -405,37 +411,18 @@ public class EarthAssetService {
     // (they only actually deliver email/SMS after this transaction commits).
 
     private void notifyBreakdown(TenantId tenantId, EarthAsset asset) {
-        List<Recipient> recipients = tenantAdminRecipients.resolveTenantAdmins(tenantId);
-        if (recipients.isEmpty()) return;
-
-        notificationService.send(NotificationRequest.builder()
-                .tenantId(tenantId)
-                .type(NotificationType.ASSET_BREAKDOWN)
-                .title("Breakdown reported: " + displayName(asset))
-                .message(displayName(asset) + " was reported as broken down"
-                        + (asset.getCurrentSite() != null ? " at " + asset.getCurrentSite() : "") + ".")
-                .actionUrl("/earthmoving/assets/" + asset.getId())
-                .sourceModule("earthmoving")
-                .sourceEntityId(asset.getId().toString())
-                .recipients(recipients)
-                .build());
+        alerts.raise(tenantId, "BREAKDOWN", AlertRules.severityFor("BREAKDOWN", "HIGH"), asset.getId(), "ASSET", asset.getId(),
+                "Breakdown reported: " + displayName(asset),
+                displayName(asset) + " was reported as broken down" + (asset.getCurrentSite() != null ? " at " + asset.getCurrentSite() : "") + ".",
+                "BREAKDOWN:" + asset.getId(), null);
     }
 
     private void notifyServiceDue(TenantId tenantId, EarthAsset asset) {
-        List<Recipient> recipients = tenantAdminRecipients.resolveTenantAdmins(tenantId);
-        if (recipients.isEmpty()) return;
-
-        notificationService.send(NotificationRequest.builder()
-                .tenantId(tenantId)
-                .type(NotificationType.ASSET_SERVICE_DUE)
-                .title("Service due: " + displayName(asset))
-                .message(displayName(asset) + " has reached " + asset.getCurrentHours()
-                        + " hours and is due for service (interval: " + asset.getServiceIntervalHours() + " hrs).")
-                .actionUrl("/earthmoving/assets/" + asset.getId())
-                .sourceModule("earthmoving")
-                .sourceEntityId(asset.getId().toString())
-                .recipients(recipients)
-                .build());
+        alerts.raise(tenantId, "SERVICE_DUE", "WARNING", asset.getId(), "ASSET", asset.getId(),
+                "Service due: " + displayName(asset),
+                displayName(asset) + " has reached " + asset.getCurrentHours() + " hours and is due for service (interval: "
+                        + asset.getServiceIntervalHours() + " hrs).",
+                "SERVICE_DUE:" + asset.getId(), null);
     }
 
     private void notifyMaintenanceRecorded(TenantId tenantId, EarthAsset asset, MaintenanceRecord record) {

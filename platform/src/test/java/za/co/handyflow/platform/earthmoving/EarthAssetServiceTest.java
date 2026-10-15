@@ -32,6 +32,7 @@ class EarthAssetServiceTest {
     EarthStatusEventRepository events = mock(EarthStatusEventRepository.class);
     EarthmovingIncidentRepository incidents = mock(EarthmovingIncidentRepository.class);
     EarthWorkOrderRepository workOrders = mock(EarthWorkOrderRepository.class);
+    EarthAlertService alerts = mock(EarthAlertService.class);
     AuditTrailFacade trail = mock(AuditTrailFacade.class);
     NotificationService notifications = mock(NotificationService.class);
     TenantAdminRecipients admins = mock(TenantAdminRecipients.class);
@@ -46,7 +47,7 @@ class EarthAssetServiceTest {
     @BeforeEach
     void setUp() {
         service = new EarthAssetService(assets, maintenance, logs, deployments, events, incidents, workOrders, access, trail,
-                notifications, admins);
+                notifications, admins, alerts);
         when(assets.save(any())).thenAnswer(i -> i.getArgument(0));
         when(assets.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
         when(admins.resolveTenantAdmins(any())).thenReturn(List.of());
@@ -169,6 +170,25 @@ class EarthAssetServiceTest {
         verify(events).save(ev.capture());
         assertNull(ev.getValue().getOverrideReason());
         verify(trail, never()).record(any(), eq("EARTHMOVING_ASSET_RELEASE_OVERRIDDEN"), any(), any(), any(), any());
+    }
+
+    @Test
+    void aReleaseFromBreakdownClosesTheBreakdownAlert() {
+        EarthAsset a = machine(AssetStatus.BREAKDOWN);
+        granted.add("EARTHMOVING_RELEASE");
+        evidenceFor(a, UUID.randomUUID());
+        service.updateStatus(tenant, a.getId(), status("AVAILABLE", "Repaired and tested"), actor);
+        verify(alerts).resolveByKey(eq(tenant), eq("BREAKDOWN:" + a.getId()), eq(actor), any());
+    }
+
+    @Test
+    void reportingABreakdownRaisesOneRoutedAlert() {
+        EarthAsset a = machine(AssetStatus.AVAILABLE);
+        granted.add("EARTHMOVING_WRITE");
+        service.updateStatus(tenant, a.getId(), status("BREAKDOWN", "Hydraulic hose burst"), actor);
+        verify(alerts).raise(eq(tenant), eq("BREAKDOWN"), eq("CRITICAL"), eq(a.getId()), any(), any(), any(), any(),
+                eq("BREAKDOWN:" + a.getId()), any());
+        verify(admins, never()).resolveTenantAdmins(any());
     }
 
     @Test

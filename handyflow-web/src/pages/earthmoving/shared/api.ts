@@ -15,7 +15,7 @@
 // PUT (backend endpoint is still @PutMapping). Create is POST.
 
 import { apiClient } from "../../../api/client"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule } from "./types"
 
 export function unwrap<T>(r: { data?: { data?: unknown } & Record<string, unknown> }): T {
   const p = (r.data?.data ?? r.data) as { content?: unknown } | undefined
@@ -123,3 +123,15 @@ export const fetchAssignableUsers = async (): Promise<{ id: string; name: string
   const d = r.data?.data ?? r.data
   return (Array.isArray(d) ? d : d?.content ?? []) as { id: string; name: string }[]
 }
+
+// ── Alerts ──────────────────────────────────────────────────────────────
+
+export const fetchAlerts = (openOnly: boolean): Promise<EarthAlert[]> =>
+  fetchAllPages<EarthAlert>(`${BASE}/alerts?openOnly=${openOnly}`)
+
+export const alertAction = (id: string, action: "acknowledge" | "resolve", body?: Record<string, unknown>) =>
+  apiClient.patch(`${BASE}/alerts/${id}/${action}`, body ?? {})
+
+export const fetchAlertRules = async (): Promise<AlertRule[]> => unwrap<AlertRule[]>(await apiClient.get(`${BASE}/alerts/rules`))
+
+export const saveAlertRule = (type: string, body: Record<string, unknown>) => apiClient.put(`${BASE}/alerts/rules/${type}`, body)

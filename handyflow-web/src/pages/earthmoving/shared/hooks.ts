@@ -1,7 +1,7 @@
 // src/pages/earthmoving/shared/hooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule } from "./types"
 
 // Central query keys — every tab imports these instead of typing the
 // literal string, so a rename is a one-line change instead of a grep.
@@ -12,6 +12,8 @@ export const QK = {
   incidents: ["em-incidents"] as const,
   workOrders: ["em-work-orders"] as const,
   plans: ["em-plans"] as const,
+  alerts: ["em-alerts"] as const,
+  alertRules: ["em-alert-rules"] as const,
 }
 
 // ── Assets ───────────────────────────────────────────────────────────────
@@ -247,4 +249,31 @@ export function useScanPlans(onSuccess?: (r: { checked: number; workOrdersRaised
 
 export function useStatusHistory(assetId: string) {
   return useQuery<StatusEvent[]>({ queryKey: ["em-status-history", assetId], queryFn: () => api.fetchStatusHistory(assetId), enabled: !!assetId })
+}
+
+// ── Alerts ───────────────────────────────────────────────────────────────
+
+export function useAlerts(openOnly: boolean) {
+  return useQuery<EarthAlert[]>({ queryKey: [...QK.alerts, openOnly], queryFn: () => api.fetchAlerts(openOnly), staleTime: 10_000, refetchInterval: 60_000 })
+}
+
+export function useAlertAction(onSuccess?: () => void) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, action, body }: { id: string; action: "acknowledge" | "resolve"; body?: Record<string, unknown> }) =>
+      api.alertAction(id, action, body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: QK.alerts }); onSuccess?.() },
+  })
+}
+
+export function useAlertRules(enabled: boolean) {
+  return useQuery<AlertRule[]>({ queryKey: QK.alertRules, queryFn: api.fetchAlertRules, enabled })
+}
+
+export function useSaveAlertRule(onSuccess?: () => void) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ type, body }: { type: string; body: Record<string, unknown> }) => api.saveAlertRule(type, body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: QK.alertRules }); onSuccess?.() },
+  })
 }
