@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { EvidenceRequestApi, EvidenceRequestView } from "./types"
-import { actionsFor, isFinished, MIN_REASON, needsAttention, reasonOk, sortRequests, STATUS_TEXT, type Side } from "./requests.logic"
+import { actionsFor, MIN_REASON, needsAttention, reasonOk, sortRequests, STATUS_TEXT, type Side } from "./requests.logic"
 
 const BORDER = "var(--hf-border)"
 const MUTED = "var(--hf-text-muted)"

@@ -10,7 +10,7 @@
 // (and bundle) a module's pages just to render its navigation.
 import type { ElementType } from 'react'
 import {
-  AlertTriangle, Coins, Camera, ClipboardList, Clock, Crosshair, DoorOpen, FileBarChart,
+  AlertTriangle, CheckCircle2, Coins, Camera, ClipboardList, Clock, Crosshair, DoorOpen, FileBarChart,
   GitBranch, Key, LayoutDashboard, Lock, MapPin, Radio, RefreshCw, Repeat, Route,
   Footprints, QrCode, Gauge, Shield, ShieldCheck, Siren, Tablet, DollarSign, Wheat, Tractor, PawPrint,
   Droplets, ArrowDownToLine, Fuel, Truck, Users, TrendingUp, Car, Wrench,
@@ -748,6 +748,7 @@ export const INTERNAL_AUDIT_SECTIONS: ModuleSections = {
         { id: 'universe', label: 'Audit Universe', icon: Database, permission: 'AUDIT_READ' },
         { id: 'plans', label: 'Annual Plans', icon: CalendarRange, permission: 'AUDIT_READ' },
         { id: 'engagements', label: 'Engagements', icon: ClipboardList, permission: 'AUDIT_READ' },
+        { id: 'quality', label: 'Quality', icon: CheckCircle2, permission: 'AUDIT_READ' },
       ],
     },
   ],

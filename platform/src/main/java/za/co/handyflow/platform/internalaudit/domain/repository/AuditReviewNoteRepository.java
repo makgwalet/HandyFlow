@@ -19,4 +19,7 @@ public interface AuditReviewNoteRepository extends JpaRepository<AuditReviewNote
 
     @Query("SELECT n FROM AuditReviewNote n WHERE n.tenantId = :tenantId AND n.engagementId = :engagementId AND n.status <> 'CLEARED' ORDER BY n.raisedAt")
     List<AuditReviewNote> findUnclearedByEngagement(@Param("tenantId") UUID tenantId, @Param("engagementId") UUID engagementId);
+
+    @Query("SELECT n FROM AuditReviewNote n WHERE n.tenantId = :tenantId")
+    List<AuditReviewNote> findAllForTenant(@Param("tenantId") UUID tenantId);
 }
