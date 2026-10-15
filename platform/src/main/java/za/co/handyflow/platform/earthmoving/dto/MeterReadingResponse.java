@@ -5,4 +5,6 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record MeterReadingResponse(UUID id, String meterType, BigDecimal reading, BigDecimal previousReading,
-                                   String source, String reason, UUID actorUserId, Instant recordedAt) {}
+                                   String source, String reason, UUID actorUserId, Instant recordedAt,
+                                   UUID correctsId, UUID disputeId, String disputeStatus, String disputeReason,
+                                   Integer chargesRecalculated, Integer chargesHeld, Integer chargesInvoiced) {}

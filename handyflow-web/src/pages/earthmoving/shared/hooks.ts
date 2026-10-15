@@ -1,7 +1,7 @@
 // src/pages/earthmoving/shared/hooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates } from "./types"
 
 // Central query keys — every tab imports these instead of typing the
 // literal string, so a rename is a one-line change instead of a grep.
@@ -343,15 +343,32 @@ function useRefreshAfterMeter(onSuccess?: () => void) {
     qc.invalidateQueries({ queryKey: QK.assets })
     qc.invalidateQueries({ queryKey: ["em-meter-readings"] })
     qc.invalidateQueries({ queryKey: QK.alerts })
+    qc.invalidateQueries({ queryKey: QK.hireCharges }) // a correction or dispute can recalculate or hold kilometre charges
     onSuccess?.()
   }
 }
 
-export function useCorrectReading(onSuccess?: () => void) {
-  const done = useRefreshAfterMeter(onSuccess)
+export function useCorrectReading(onSuccess?: (r: MeterReading) => void) {
+  const refresh = useRefreshAfterMeter()
   return useMutation({
     mutationFn: ({ id, reading, reason }: { id: string; reading: number; reason: string }) => api.correctMeterReading(id, { reading, reason }),
-    onSuccess: done,
+    onSuccess: r => { refresh(); onSuccess?.(r) },
+  })
+}
+
+export function useDisputeReading(onSuccess?: (r: MeterReading) => void) {
+  const refresh = useRefreshAfterMeter()
+  return useMutation({
+    mutationFn: ({ assetId, readingId, reason }: { assetId: string; readingId: string; reason: string }) => api.disputeMeterReading(assetId, readingId, reason),
+    onSuccess: r => { refresh(); onSuccess?.(r) },
+  })
+}
+
+export function useConfirmDispute(onSuccess?: (r: MeterReading) => void) {
+  const refresh = useRefreshAfterMeter()
+  return useMutation({
+    mutationFn: ({ assetId, disputeId, note }: { assetId: string; disputeId: string; note: string }) => api.confirmMeterDispute(assetId, disputeId, note),
+    onSuccess: r => { refresh(); onSuccess?.(r) },
   })
 }
 
@@ -476,6 +493,34 @@ export function useExtendHire(deploymentId: string) {
   return useMutation({
     mutationFn: ({ newEndDate, reason }: { newEndDate: string; reason: string }) => api.extendHire(deploymentId, newEndDate, reason),
     onSuccess: r => qc.setQueryData(["em-deployment-contract", deploymentId], r),
+  })
+}
+
+/** The rates held on the deployment's hire contract. Anything unexpected from the server reads as no rates. */
+export function useContractRates(deploymentId: string) {
+  return useQuery<ContractRates>({
+    queryKey: ["em-contract-rates", deploymentId],
+    queryFn: async () => {
+      const r = await api.fetchContractRates(deploymentId)
+      return r && Array.isArray(r.rates) ? r : { deploymentId, contractId: null, contractNumber: null, rates: [] }
+    },
+    enabled: !!deploymentId, staleTime: 0,
+  })
+}
+
+export function useSaveContractRate(deploymentId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { basis: string; unitRate: number; includedKm: number | null }) => api.saveContractRate(deploymentId, body),
+    onSuccess: r => qc.setQueryData(["em-contract-rates", deploymentId], r),
+  })
+}
+
+export function useRemoveContractRate(deploymentId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (basis: string) => api.removeContractRate(deploymentId, basis),
+    onSuccess: r => qc.setQueryData(["em-contract-rates", deploymentId], r),
   })
 }
 

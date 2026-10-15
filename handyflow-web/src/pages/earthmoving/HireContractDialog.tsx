@@ -2,12 +2,12 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
 import { Overlay, ModalHead, ErrBanner, lbl, inputStyle } from "./shared/Modal"
-import { CONTRACT_STATUS_LABEL } from "./shared/constants"
+import { CONTRACT_STATUS_LABEL, HIRE_BASIS_LABEL } from "./shared/constants"
 import { apiMessage, fmtCurrency2dp } from "./shared/format"
 import { useEarthPerms } from "./shared/useEarthPerms"
 import {
   useAssetDeployments, useDeploymentContract, useDraftHireContract, useLinkHireContract, useExtendHire,
-  useHireContractOptions, useEarthSettings, useSaveSettings,
+  useHireContractOptions, useEarthSettings, useSaveSettings, useContractRates, useSaveContractRate, useRemoveContractRate,
 } from "./shared/hooks"
 import type { Asset, ContractRef } from "./shared/types"
 
@@ -20,6 +20,62 @@ function ContractLine({ c }: { c: ContractRef }) {
     <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13 }}>
       <span><strong>{c.number ?? "Contract"}</strong> — {c.title}</span>
       <span style={{ fontWeight: 700, color: signed ? "var(--hf-success-text-strong)" : "var(--hf-warning-text)" }}>{CONTRACT_STATUS_LABEL[c.status] ?? c.status}</span>
+    </div>
+  )
+}
+
+/**
+ * The rates agreed in the contract. A hire charge uses these before the machine's own rate. Changing one affects charges
+ * raised afterwards, never ones already raised. Everyone with read access sees them; administrators change them.
+ */
+function ContractRates({ deploymentId, canEdit }: { deploymentId: string; canEdit: boolean }) {
+  const { data } = useContractRates(deploymentId)
+  const save = useSaveContractRate(deploymentId)
+  const remove = useRemoveContractRate(deploymentId)
+  const [basis, setBasis] = useState("DAILY")
+  const [rate, setRate] = useState("")
+  const [included, setIncluded] = useState("")
+  const [err, setErr] = useState("")
+  const rates = data?.rates ?? []
+  const km = basis === "KILOMETRE"
+  const valid = Number(rate) > 0 && (!km || included.trim() === "" || Number(included) >= 0)
+  const edit = (b: string) => {
+    const r = rates.find(x => x.basis === b)
+    setBasis(b); setRate(r ? String(r.unitRate) : ""); setIncluded(r?.includedKm != null ? String(r.includedKm) : ""); setErr("")
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={lbl}>Rates on this contract</div>
+      {rates.length === 0 ? <div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No rates yet. Charges use the machine's own rate, or a rate agreed per charge.</div>
+        : rates.map(r => (
+          <div key={r.basis} style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", padding: "6px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13 }}>
+            <span>{HIRE_BASIS_LABEL[r.basis] ?? r.basis}: <strong>{fmtCurrency2dp(r.unitRate)}</strong>{r.includedKm != null ? ` · ${r.includedKm} km included` : ""}</span>
+            {canEdit && (
+              <span style={{ display: "flex", gap: 6 }}>
+                <button style={btn} onClick={() => edit(r.basis)}>Change</button>
+                <button style={btn} disabled={remove.isPending} aria-label={`Remove ${HIRE_BASIS_LABEL[r.basis] ?? r.basis} rate`}
+                  onClick={() => { setErr(""); remove.mutate(r.basis, { onError: (e: unknown) => setErr(apiMessage(e, "Could not remove the rate")) }) }}>Remove</button>
+              </span>
+            )}
+          </div>
+        ))}
+      {canEdit && (
+        <div style={{ display: "grid", gridTemplateColumns: km ? "1fr 1fr 1fr" : "1fr 1fr", gap: 10, alignItems: "end" }}>
+          <div><label htmlFor="cr-basis" style={lbl}>Rate for</label>
+            <select id="cr-basis" value={basis} onChange={e => edit(e.target.value)} style={{ ...inputStyle(), background: "var(--hf-surface)" }}>
+              {Object.entries(HIRE_BASIS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+          <div><label htmlFor="cr-rate" style={lbl}>Rate (rand)</label>
+            <input id="cr-rate" type="number" min="0" value={rate} onChange={e => setRate(e.target.value)} style={inputStyle()} /></div>
+          {km && <div><label htmlFor="cr-incl" style={lbl}>Kilometres included</label>
+            <input id="cr-incl" type="number" min="0" value={included} onChange={e => setIncluded(e.target.value)} style={inputStyle()} /></div>}
+          <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end" }}>
+            <button style={primary} disabled={!valid || save.isPending}
+              onClick={() => { setErr(""); save.mutate({ basis, unitRate: Number(rate), includedKm: km && included.trim() !== "" ? Number(included) : null },
+                { onError: (e: unknown) => setErr(apiMessage(e, "Could not save the rate")), onSuccess: () => { setRate(""); setIncluded("") } }) }}>Save rate</button>
+          </div>
+        </div>
+      )}
+      {err && <ErrBanner msg={err} />}
     </div>
   )
 }
@@ -62,6 +118,8 @@ export function HireContractDialog({ asset, onClose }: { asset: Asset; onClose: 
                 <Link to="/contracts" style={{ fontSize: 12 }}>Open Contracting to complete, send or sign it</Link>
               </>
             ) : <div style={{ fontSize: 13 }}>No contract is linked to this hire.</div>}
+
+            {panel.contract && <ContractRates deploymentId={id} canEdit={perms.canAdmin} />}
 
             {panel.addenda.length > 0 && (
               <div>

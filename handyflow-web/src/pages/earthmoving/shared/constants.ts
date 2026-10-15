@@ -113,3 +113,11 @@ export const CONTRACT_STATUS_LABEL: Record<string, string> = {
   DRAFT: "Draft", UNDER_REVIEW: "Under review", SENT: "Sent, not signed", SIGNED: "Signed",
   EXPIRED: "Expired", TERMINATED: "Terminated", ARCHIVED: "Archived",
 }
+
+/** How a hire charge is counted, for choosing a basis and for labelling a rate. */
+export const HIRE_BASIS_LABEL: Record<string, string> = {
+  DAILY: "Per day", WEEKLY: "Per week", MONTHLY: "Per month", HOURLY: "Per hour", KILOMETRE: "Per kilometre",
+}
+export const HIRE_RATE_SOURCE_LABEL: Record<string, string> = {
+  CONTRACT: "rate from the contract", ASSET: "machine's own rate", AGREED: "rate agreed for this charge",
+}

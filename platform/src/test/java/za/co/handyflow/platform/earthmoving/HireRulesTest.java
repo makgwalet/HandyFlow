@@ -19,7 +19,9 @@ class HireRulesTest {
         assertEquals("DAILY", HireRules.basis(" daily "));
         assertEquals("HOURLY", HireRules.basis("HOURLY"));
         assertEquals("KILOMETRE", HireRules.basis("kilometre"));
-        assertThrows(IllegalArgumentException.class, () -> HireRules.basis("WEEKLY"));
+        assertEquals("WEEKLY", HireRules.basis("weekly"));
+        assertEquals("MONTHLY", HireRules.basis(" Monthly"));
+        assertThrows(IllegalArgumentException.class, () -> HireRules.basis("FORTNIGHTLY"));
         assertThrows(IllegalArgumentException.class, () -> HireRules.basis(null));
     }
     @Test void daysCountBothEnds() {
@@ -175,5 +177,60 @@ class HireRulesTest {
         assertTrue(s.contains("odometer 10000 to 10850"));
         assertTrue(s.contains("500 km included"));
         assertTrue(s.contains("350 km @ R12.50"));
+    }
+
+    // ── weeks and months ─────────────────────────────────────────────────────
+
+    @Test void everyWeekStartedIsAWholeWeek() {
+        assertEquals(1, HireRules.weeks(START, START));
+        assertEquals(1, HireRules.weeks(START, START.plusDays(6)));
+        assertEquals(2, HireRules.weeks(START, START.plusDays(7)));
+        assertEquals(2, HireRules.weeks(START, START.plusDays(13)));
+        assertEquals(5, HireRules.weeks(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31)));
+    }
+    @Test void everyMonthStartedIsAWholeMonth() {
+        assertEquals(1, HireRules.months(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31)));
+        assertEquals(2, HireRules.months(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 11, 1)));
+        assertEquals(1, HireRules.months(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 1)));
+        assertEquals(3, HireRules.months(LocalDate.of(2026, 10, 15), LocalDate.of(2027, 1, 14)));
+        assertEquals(4, HireRules.months(LocalDate.of(2026, 10, 15), LocalDate.of(2027, 1, 15)));
+    }
+    @Test void aMonthStartingOnThe31stDoesNotDrift() {
+        assertEquals(1, HireRules.months(LocalDate.of(2026, 1, 31), LocalDate.of(2026, 2, 27)));
+        assertEquals(2, HireRules.months(LocalDate.of(2026, 1, 31), LocalDate.of(2026, 3, 1)));
+        assertEquals(2, HireRules.months(LocalDate.of(2026, 1, 31), LocalDate.of(2026, 3, 30)));
+    }
+    @Test void weeklyAndMonthlyRatesComeFromTheContractOrAreAgreed() {
+        assertThrows(IllegalArgumentException.class, () -> HireRules.rateFor("WEEKLY", n("1000"), n("100")));
+        assertThrows(IllegalArgumentException.class, () -> HireRules.rateFor("MONTHLY", n("1000"), n("100")));
+        assertThrows(IllegalArgumentException.class, () -> HireRules.choose("MONTHLY", null, null, null, n("1000"), n("100")));
+        assertEquals(n("30000.00"), HireRules.choose("MONTHLY", null, null, n("30000.00"), n("1000"), n("100")).value());
+    }
+    @Test void theRateComesFromAgreedThenContractThenMachine() {
+        var agreed = HireRules.choose("DAILY", n("900"), "Long-term discount", n("950"), n("1000"), n("100"));
+        assertEquals(n("900"), agreed.value());
+        assertEquals("AGREED", agreed.source());
+        var contract = HireRules.choose("DAILY", null, null, n("950"), n("1000"), n("100"));
+        assertEquals(n("950"), contract.value());
+        assertEquals("CONTRACT", contract.source());
+        var machine = HireRules.choose("DAILY", null, null, null, n("1000"), n("100"));
+        assertEquals(n("1000"), machine.value());
+        assertEquals("ASSET", machine.source());
+        assertEquals(n("100"), HireRules.choose("HOURLY", null, null, null, n("1000"), n("100")).value());
+        assertThrows(IllegalArgumentException.class, () -> HireRules.choose("DAILY", n("900"), null, n("950"), n("1000"), n("100")));
+        assertThrows(IllegalArgumentException.class, () -> HireRules.choose("KILOMETRE", null, null, null, n("1000"), n("100")));
+    }
+    @Test void aContractRateMustBeMoreThanNothing() {
+        assertEquals(n("12.50"), HireRules.contractRate("KILOMETRE", n("12.5")));
+        assertThrows(IllegalArgumentException.class, () -> HireRules.contractRate("KILOMETRE", n("0")));
+        assertThrows(IllegalArgumentException.class, () -> HireRules.contractRate("WEEKLY", null));
+    }
+    @Test void invoiceLinesNameWeeksAndMonths() {
+        assertEquals("week", HireRules.unit("WEEKLY"));
+        assertEquals("month", HireRules.unit("MONTHLY"));
+        String w = HireRules.describe("D9", "Mine A", "WEEKLY", START, START.plusDays(13), n("2.00"), n("5000"));
+        assertTrue(w.contains("2 weeks @ R5000.00"));
+        String m = HireRules.describe("D9", null, "MONTHLY", START, START.plusDays(29), n("1.00"), n("30000"));
+        assertTrue(m.contains("1 month @ R30000.00"));
     }
 }

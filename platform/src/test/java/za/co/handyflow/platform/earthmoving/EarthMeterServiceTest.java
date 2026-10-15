@@ -24,6 +24,8 @@ class EarthMeterServiceTest {
     EarthMeterReadingRepository readings = mock(EarthMeterReadingRepository.class);
     EarthMaintenancePlanRepository plans = mock(EarthMaintenancePlanRepository.class);
     EarthAlertService alerts = mock(EarthAlertService.class);
+    EarthMeterDisputeRepository disputes = mock(EarthMeterDisputeRepository.class);
+    EarthHireService hire = mock(EarthHireService.class);
     AuditTrailFacade trail = mock(AuditTrailFacade.class);
     Set<String> granted = new HashSet<>();
     EarthmovingAccess access = new EarthmovingAccess() {
@@ -38,7 +40,7 @@ class EarthMeterServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new EarthMeterService(assets, readings, plans, alerts, access, trail);
+        service = new EarthMeterService(assets, readings, plans, alerts, disputes, hire, access, trail);
         asset = EarthAsset.create(tenant, "CAT D9", "D9-001", "DOZER", null, null, null, null, null,
                 "OWN", null, null, null, null, null, null);
         asset.updateHours(n("5000"));
@@ -46,6 +48,11 @@ class EarthMeterServiceTest {
         when(readings.save(any())).thenAnswer(i -> i.getArgument(0));
         when(readings.findByAsset(any(), any(), any())).thenReturn(List.of());
         when(plans.findForAsset(any(), any())).thenReturn(List.of());
+        when(disputes.findOpenForReadings(any(), any())).thenReturn(List.of());
+        when(disputes.findByAsset(any(), any())).thenReturn(List.of());
+        when(disputes.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
+        when(disputes.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(hire.refreshKilometreCharges(any(), any(), any(), any())).thenReturn(new EarthHireService.Refresh(0, 0, 0));
     }
 
     EarthMeterReading last(String source, String prev) {
@@ -151,5 +158,95 @@ class EarthMeterServiceTest {
         granted.add("EARTHMOVING_READ");
         assertTrue(service.history(tenant, asset.getId()).isEmpty());
         assertThrows(ResourceNotFoundException.class, () -> service.history(TenantId.generate(), asset.getId()));
+    }
+
+    // ── disputed readings ────────────────────────────────────────────────────
+
+    EarthMeterReading odometer(String km, String source, String prev) {
+        EarthMeterReading r = EarthMeterReading.of(tenant, asset.getId(), "KILOMETRES", n(km), prev == null ? null : n(prev), source, null, null);
+        when(readings.findById(r.getId())).thenReturn(Optional.of(r));
+        return r;
+    }
+    DisputeReadingRequest because(String why) { return new DisputeReadingRequest(why); }
+
+    @Test void disputingAReadingNeedsMaintainOrAdmin() {
+        granted.add("EARTHMOVING_READ");
+        EarthMeterReading r = odometer("10850", "MANUAL", "10000");
+        assertThrows(HandyFlowException.class, () -> service.dispute(tenant, asset.getId(), r.getId(), because("Driver says 10800"), actor));
+        verify(disputes, never()).saveAndFlush(any());
+    }
+    @Test void aKilometreReadingCanBeDisputedAndTheHeldChargesAreReported() {
+        granted.add("EARTHMOVING_ADMIN");
+        EarthMeterReading r = odometer("10850", "MANUAL", "10000");
+        when(readings.findByAsset(any(), any(), any())).thenReturn(List.of(r));
+        when(hire.refreshKilometreCharges(tenant, asset.getId(), actor, "reading disputed")).thenReturn(new EarthHireService.Refresh(0, 2, 0));
+        var resp = service.dispute(tenant, asset.getId(), r.getId(), because("Driver says 10800"), actor);
+        assertEquals("OPEN", resp.disputeStatus());
+        assertEquals("Driver says 10800", resp.disputeReason());
+        assertEquals(2, resp.chargesHeld());
+        verify(trail).record(eq(tenant), eq("EARTHMOVING_METER_DISPUTED"), any(), eq(asset.getId()), any(), any());
+    }
+    @Test void aDisputeNeedsAReasonAndCannotBeRaisedTwice() {
+        granted.add("EARTHMOVING_MAINTAIN");
+        EarthMeterReading r = odometer("10850", "MANUAL", "10000");
+        when(readings.findByAsset(any(), any(), any())).thenReturn(List.of(r));
+        assertThrows(IllegalArgumentException.class, () -> service.dispute(tenant, asset.getId(), r.getId(), because(" "), actor));
+        when(disputes.findOpenForReadings(any(), any())).thenReturn(List.of(EarthMeterDispute.raise(tenant, asset.getId(), r.getId(), "Already queried", actor)));
+        assertThrows(IllegalStateException.class, () -> service.dispute(tenant, asset.getId(), r.getId(), because("Driver says 10800"), actor));
+    }
+    @Test void anHourReadingOrAReplacedReadingCannotBeDisputed() {
+        granted.add("EARTHMOVING_MAINTAIN");
+        EarthMeterReading hours = EarthMeterReading.of(tenant, asset.getId(), "HOURS", n("5000"), null, "MANUAL", null, null);
+        when(readings.findById(hours.getId())).thenReturn(Optional.of(hours));
+        assertThrows(IllegalArgumentException.class, () -> service.dispute(tenant, asset.getId(), hours.getId(), because("Looks too high"), actor));
+        EarthMeterReading old = odometer("10900", "MANUAL", "10000");
+        EarthMeterReading fix = EarthMeterReading.correctionOf(tenant, asset.getId(), "KILOMETRES", n("10850"), n("10900"), "Typed twice", actor, old.getId());
+        when(readings.findByAsset(any(), any(), any())).thenReturn(List.of(fix, old));
+        assertThrows(IllegalStateException.class, () -> service.dispute(tenant, asset.getId(), old.getId(), because("Looks too high"), actor));
+    }
+    @Test void aReadingOfAnotherMachineIsNotFound() {
+        granted.add("EARTHMOVING_MAINTAIN");
+        EarthMeterReading other = EarthMeterReading.of(tenant, UUID.randomUUID(), "KILOMETRES", n("10850"), null, "MANUAL", null, null);
+        when(readings.findById(other.getId())).thenReturn(Optional.of(other));
+        assertThrows(ResourceNotFoundException.class, () -> service.dispute(tenant, asset.getId(), other.getId(), because("Driver says 10800"), actor));
+    }
+    @Test void confirmingNeedsMaintainAndANoteAndReleasesHeldCharges() {
+        EarthMeterReading r = odometer("10850", "MANUAL", "10000");
+        var d = EarthMeterDispute.raise(tenant, asset.getId(), r.getId(), "Driver says 10800", actor);
+        when(disputes.findByTenantAndId(tenant, d.getId())).thenReturn(Optional.of(d));
+        granted.add("EARTHMOVING_ADMIN");
+        assertThrows(HandyFlowException.class, () -> service.confirm(tenant, asset.getId(), d.getId(), new ResolveDisputeRequest("Logbook agrees"), actor));
+        granted.add("EARTHMOVING_MAINTAIN");
+        assertThrows(IllegalArgumentException.class, () -> service.confirm(tenant, asset.getId(), d.getId(), new ResolveDisputeRequest(" "), actor));
+        var resp = service.confirm(tenant, asset.getId(), d.getId(), new ResolveDisputeRequest("Logbook agrees"), actor);
+        assertEquals("CONFIRMED", resp.disputeStatus());
+        verify(hire).refreshKilometreCharges(tenant, asset.getId(), actor, "dispute confirmed");
+        verify(trail).record(eq(tenant), eq("EARTHMOVING_METER_DISPUTE_CONFIRMED"), any(), eq(asset.getId()), any(), any());
+    }
+    @Test void correctingADisputedReadingClosesTheDisputeAndRecalculatesCharges() {
+        granted.add("EARTHMOVING_MAINTAIN");
+        asset.changeMeter("KILOMETRES", n("10900"), n("9000"), n("1000"));
+        EarthMeterReading wrong = odometer("10900", "MANUAL", "10000");
+        when(readings.findByAsset(any(), any(), any())).thenReturn(List.of(wrong));
+        var d = EarthMeterDispute.raise(tenant, asset.getId(), wrong.getId(), "Driver says 10850", actor);
+        when(disputes.findOpenForReadings(any(), any())).thenReturn(List.of(d));
+        when(hire.refreshKilometreCharges(tenant, asset.getId(), actor, "reading corrected")).thenReturn(new EarthHireService.Refresh(1, 0, 0));
+
+        var resp = service.correct(tenant, asset.getId(), new CorrectReadingRequest(n("10850"), "Typed it twice"), actor);
+
+        assertEquals(wrong.getId(), resp.correctsId());
+        assertEquals(1, resp.chargesRecalculated());
+        assertEquals("CORRECTED", d.getStatus());
+        verify(trail).record(eq(tenant), eq("EARTHMOVING_METER_DISPUTE_CORRECTED"), any(), eq(asset.getId()), any(), any());
+    }
+    @Test void historyShowsTheLatestDisputeOnEachReading() {
+        granted.add("EARTHMOVING_READ");
+        EarthMeterReading r = odometer("10850", "MANUAL", "10000");
+        var d = EarthMeterDispute.raise(tenant, asset.getId(), r.getId(), "Driver says 10800", actor);
+        when(readings.findByAsset(any(), any(), any())).thenReturn(List.of(r));
+        when(disputes.findByAsset(tenant, asset.getId())).thenReturn(List.of(d));
+        var rows = service.history(tenant, asset.getId());
+        assertEquals("OPEN", rows.get(0).disputeStatus());
+        assertEquals(d.getId(), rows.get(0).disputeId());
     }
 }

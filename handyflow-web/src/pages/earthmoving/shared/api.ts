@@ -15,7 +15,7 @@
 // PUT (backend endpoint is still @PutMapping). Create is POST.
 
 import { apiClient } from "../../../api/client"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates } from "./types"
 
 export function unwrap<T>(r: { data?: { data?: unknown } & Record<string, unknown> }): T {
   const p = (r.data?.data ?? r.data) as { content?: unknown } | undefined
@@ -173,8 +173,14 @@ export const fetchProjectOptions = async (): Promise<PickOption[]> =>
 export const fetchMeterReadings = async (assetId: string): Promise<MeterReading[]> =>
   unwrap<MeterReading[]>(await apiClient.get(`${BASE}/assets/${assetId}/meter/readings`))
 
-export const correctMeterReading = (assetId: string, body: { reading: number; reason: string }) =>
-  apiClient.post(`${BASE}/assets/${assetId}/meter/correction`, body)
+export const correctMeterReading = async (assetId: string, body: { reading: number; reason: string }): Promise<MeterReading> =>
+  unwrap<MeterReading>(await apiClient.post(`${BASE}/assets/${assetId}/meter/correction`, body))
+
+export const disputeMeterReading = async (assetId: string, readingId: string, reason: string): Promise<MeterReading> =>
+  unwrap<MeterReading>(await apiClient.post(`${BASE}/assets/${assetId}/meter/readings/${readingId}/dispute`, { reason }))
+
+export const confirmMeterDispute = async (assetId: string, disputeId: string, note: string): Promise<MeterReading> =>
+  unwrap<MeterReading>(await apiClient.patch(`${BASE}/assets/${assetId}/meter/disputes/${disputeId}/confirm`, { note }))
 
 export const changeMeter = (assetId: string, body: Record<string, unknown>) =>
   apiClient.put(`${BASE}/assets/${assetId}/meter`, body)
@@ -262,6 +268,15 @@ export const fetchSettings = async (): Promise<EarthSettings> => {
 
 export const saveSettings = async (contractThreshold: number | null): Promise<EarthSettings> =>
   unwrap<EarthSettings>(await apiClient.put(`${BASE}/settings`, { contractThreshold }))
+
+export const fetchContractRates = async (deploymentId: string): Promise<ContractRates> =>
+  unwrap<ContractRates>(await apiClient.get(`${BASE}/deployments/${deploymentId}/contract-rates`))
+
+export const saveContractRate = async (deploymentId: string, body: { basis: string; unitRate: number; includedKm: number | null }): Promise<ContractRates> =>
+  unwrap<ContractRates>(await apiClient.put(`${BASE}/deployments/${deploymentId}/contract-rates`, body))
+
+export const removeContractRate = async (deploymentId: string, basis: string): Promise<ContractRates> =>
+  unwrap<ContractRates>(await apiClient.delete(`${BASE}/deployments/${deploymentId}/contract-rates/${basis}`))
 
 /** Hire agreements in Contracting, for linking an existing one. Needs the Contracting read permission. */
 export const fetchHireContracts = async (): Promise<ContractRef[]> => {

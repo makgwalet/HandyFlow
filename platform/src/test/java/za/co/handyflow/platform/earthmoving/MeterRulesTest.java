@@ -5,6 +5,8 @@ import za.co.handyflow.platform.earthmoving.domain.model.*;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -66,5 +68,61 @@ class MeterRulesTest {
         var r = EarthMeterReading.of(TenantId.generate(), UUID.randomUUID(), "HOURS", n("10"), n("5"), "MANUAL", null, null);
         assertEquals("MANUAL", r.getSource());
         assertThrows(IllegalArgumentException.class, () -> EarthMeterReading.of(TenantId.generate(), UUID.randomUUID(), "HOURS", n("10"), null, "GUESS", null, null));
+    }
+
+    // ── readings as they stand, and disputes ─────────────────────────────────
+
+    static MeterRules.Point pt(UUID id, String km, String at, UUID corrects) {
+        return new MeterRules.Point(id, "KILOMETRES", n(km), Instant.parse(at), corrects);
+    }
+
+    @Test void theReadingAtAMomentIsTheNewestRecordedBeforeIt() {
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID();
+        var all = List.of(pt(b, "10900", "2026-10-10T10:00:00Z", null), pt(a, "10000", "2026-09-30T10:00:00Z", null));
+        assertEquals(a, MeterRules.standingBefore(all, "KILOMETRES", Instant.parse("2026-10-05T00:00:00Z")).id());
+        assertEquals(n("10900"), MeterRules.standingBefore(all, "KILOMETRES", Instant.parse("2026-10-11T00:00:00Z")).reading());
+        assertNull(MeterRules.standingBefore(all, "KILOMETRES", Instant.parse("2026-09-01T00:00:00Z")));
+        assertNull(MeterRules.standingBefore(all, "HOURS", Instant.parse("2026-10-11T00:00:00Z")));
+    }
+    @Test void aCorrectionTakesThePlaceInTimeOfTheReadingItReplaces() {
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID(), c = UUID.randomUUID();
+        var all = List.of(pt(c, "10850", "2026-10-12T08:00:00Z", b), pt(b, "10900", "2026-10-10T10:00:00Z", null), pt(a, "10000", "2026-09-30T10:00:00Z", null));
+        // The period ended on the 10th, before the correction was made, but it sees the corrected figure.
+        var end = MeterRules.standingBefore(all, "KILOMETRES", Instant.parse("2026-10-11T00:00:00Z"));
+        assertEquals(c, end.id());
+        assertEquals(n("10850"), end.reading());
+        // Before the replaced reading was taken, nothing changes.
+        assertEquals(a, MeterRules.standingBefore(all, "KILOMETRES", Instant.parse("2026-10-05T00:00:00Z")).id());
+        // A later reading still wins over the correction.
+        UUID d = UUID.randomUUID();
+        var later = new java.util.ArrayList<>(all);
+        later.add(pt(d, "11200", "2026-10-14T08:00:00Z", null));
+        assertEquals(d, MeterRules.standingBefore(later, "KILOMETRES", Instant.parse("2026-10-15T00:00:00Z")).id());
+    }
+    @Test void aDisputeAndItsResolutionNeedWords() {
+        assertEquals("Driver says 10850", MeterRules.checkDispute(" Driver says 10850 "));
+        assertThrows(IllegalArgumentException.class, () -> MeterRules.checkDispute("no"));
+        assertThrows(IllegalArgumentException.class, () -> MeterRules.checkDispute(null));
+        assertEquals("Checked against the logbook", MeterRules.checkResolution("Checked against the logbook"));
+        assertThrows(IllegalArgumentException.class, () -> MeterRules.checkResolution(" "));
+    }
+    @Test void aDisputeIsOpenUntilConfirmedOrCorrectedAndOnlyClosesOnce() {
+        var d = EarthMeterDispute.raise(TenantId.generate(), UUID.randomUUID(), UUID.randomUUID(), "Driver says 10850", null);
+        assertTrue(d.isOpen());
+        d.confirm("Checked against the logbook", null);
+        assertEquals("CONFIRMED", d.getStatus());
+        assertNotNull(d.getResolvedAt());
+        assertThrows(IllegalStateException.class, () -> d.confirm("again please", null));
+        assertThrows(IllegalStateException.class, () -> d.corrected("fixed", null));
+        var e = EarthMeterDispute.raise(TenantId.generate(), UUID.randomUUID(), UUID.randomUUID(), "Looks too high", null);
+        e.corrected("Corrected to 10850", null);
+        assertEquals("CORRECTED", e.getStatus());
+    }
+    @Test void aCorrectionRemembersWhichReadingItReplaces() {
+        UUID replaced = UUID.randomUUID();
+        var r = EarthMeterReading.correctionOf(TenantId.generate(), UUID.randomUUID(), "KILOMETRES", n("10850"), n("10900"), "Typed it twice", null, replaced);
+        assertEquals("CORRECTION", r.getSource());
+        assertEquals(replaced, r.getCorrectsId());
+        assertEquals(replaced, r.point().correctsId());
     }
 }

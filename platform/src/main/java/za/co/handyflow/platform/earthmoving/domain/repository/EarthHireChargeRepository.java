@@ -31,4 +31,9 @@ public interface EarthHireChargeRepository extends JpaRepository<EarthHireCharge
     @Query("SELECT c FROM EarthHireCharge c WHERE c.tenantId = :tenantId AND c.deploymentId = :deploymentId AND c.status <> 'VOIDED' " +
             "AND c.periodFrom <= :to AND c.periodTo >= :from")
     List<EarthHireCharge> findLiveOverlapping(TenantId tenantId, UUID deploymentId, LocalDate from, LocalDate to);
+
+    /** Kilometre charges on a machine that are still live (pending or invoiced), oldest period first. */
+    @Query("SELECT c FROM EarthHireCharge c WHERE c.tenantId = :tenantId AND c.assetId = :assetId AND c.basis = 'KILOMETRE' " +
+            "AND c.status <> 'VOIDED' ORDER BY c.periodFrom")
+    List<EarthHireCharge> findLiveKilometreByAsset(TenantId tenantId, UUID assetId);
 }

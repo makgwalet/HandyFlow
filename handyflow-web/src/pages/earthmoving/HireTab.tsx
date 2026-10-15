@@ -1,6 +1,8 @@
 // src/pages/earthmoving/HireTab.tsx
 //
-// Hire charges: one billing period of one deployment, priced from the machine's own rate. Pending charges for one
+// Hire charges: one billing period of one deployment, counted in days, weeks, months, hours or kilometres and priced from
+// the rate on the hire contract, else the machine's own rate (or a rate agreed for that charge, with a reason).
+// A kilometre charge that depends on a disputed reading is held back until the dispute is closed. Pending charges for one
 // customer can be put on a single DRAFT invoice in Invoicing. Nothing here issues an invoice: the draft is reviewed and
 // issued there. A charge that is on an invoice cannot be voided; if the draft is deleted or cancelled the charge can be
 // reopened, with a reason.
@@ -9,8 +11,9 @@ import { Receipt } from "lucide-react"
 import { apiMessage, fmtCurrency2dp, fmtDate } from "./shared/format"
 import { Overlay, ModalHead, ModalFoot, ErrBanner, lbl, inputStyle } from "./shared/Modal"
 import { useEarthPerms } from "./shared/useEarthPerms"
+import { HIRE_RATE_SOURCE_LABEL } from "./shared/constants"
 import {
-  useHireCharges, useAssets, useAssetDeployments, usePreviewHireCharge, useCreateHireCharge, useHireChargeAction, useDraftInvoice,
+  useHireCharges, useAssets, useAssetDeployments, useContractRates, usePreviewHireCharge, useCreateHireCharge, useHireChargeAction, useDraftInvoice,
 } from "./shared/hooks"
 import type { HireCharge } from "./shared/types"
 
@@ -24,7 +27,8 @@ const card: React.CSSProperties = { border: "1px solid var(--hf-border)", border
 
 const STATUS_LABEL: Record<string, string> = { PENDING: "Not invoiced", INVOICED: "On an invoice", VOIDED: "Voided" }
 const FILTERS = [["PENDING", "Not invoiced"], ["INVOICED", "On an invoice"], ["VOIDED", "Voided"], ["", "All"]] as const
-const basisWord = (b: string) => (b === "DAILY" ? "days" : b === "KILOMETRE" ? "km" : "hours")
+const basisWord = (b: string) => (b === "DAILY" ? "days" : b === "WEEKLY" ? "weeks" : b === "MONTHLY" ? "months" : b === "KILOMETRE" ? "km" : "hours")
+const BASIS_UNIT: Record<string, string> = { DAILY: "day", WEEKLY: "week", MONTHLY: "month", HOURLY: "hour", KILOMETRE: "kilometre" }
 const EMPTY = { assetId: "", deploymentId: "", basis: "DAILY", periodFrom: "", periodTo: "", vatRate: "15", unitRate: "", rateReason: "", includedKm: "" }
 
 export default function HireTab() {
@@ -42,6 +46,7 @@ export default function HireTab() {
   const { data: charges = [], isLoading } = useHireCharges(status)
   const { data: assets = [] } = useAssets()
   const { data: deployments = [] } = useAssetDeployments(form.assetId)
+  const { data: held } = useContractRates(form.deploymentId)
   const previewM = usePreviewHireCharge()
   const create = useCreateHireCharge(() => { setCreating(false); setPreview(null) })
   const action = useHireChargeAction(() => { setActing(null); setReason("") })
@@ -59,7 +64,9 @@ export default function HireTab() {
   })
   const km = form.basis === "KILOMETRE"
   const rateGiven = Number(form.unitRate) > 0 && form.rateReason.trim().length >= 5
-  const rateOk = km ? rateGiven : form.unitRate.trim() === "" || rateGiven
+  // Without a typed rate the server uses the contract's, else the machine's; it says so if there is none to use.
+  const rateOk = form.unitRate.trim() === "" || rateGiven
+  const contractRate = held?.rates?.find(r => r.basis === form.basis)
   const formReady = !!form.deploymentId && !!form.periodFrom && !!form.periodTo && rateOk
 
   const openCreate = () => { setForm(EMPTY); setPreview(null); setErr(""); setCreating(true) }
@@ -94,7 +101,7 @@ export default function HireTab() {
   const renderCharge = (c: HireCharge) => (
     <div key={c.id ?? c.description} style={{ ...card, display: "flex", gap: 12, alignItems: "flex-start", opacity: c.status === "VOIDED" ? 0.6 : 1 }}>
       {perms.canAdmin && c.status === "PENDING" && c.id && (
-        <input type="checkbox" aria-label={`Select ${c.machine} ${c.periodFrom}`} checked={selected.includes(c.id)} onChange={() => toggle(c.id as string)} style={{ marginTop: 4 }} />
+        <input type="checkbox" aria-label={`Select ${c.machine} ${c.periodFrom}`} checked={selected.includes(c.id)} disabled={!!c.attention} onChange={() => toggle(c.id as string)} style={{ marginTop: 4 }} />
       )}
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 700, color: "var(--hf-text)" }}>{c.machine} · {c.customerName ?? "No customer linked"}</div>
@@ -106,8 +113,15 @@ export default function HireTab() {
           {" "}+ VAT {fmtCurrency2dp(c.vatAmount)} = <strong>{fmtCurrency2dp(c.total)}</strong>
         </div>
         <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 4 }}>
-          {STATUS_LABEL[c.status] ?? c.status}{c.invoiceNumber ? ` · ${c.invoiceNumber}` : ""}{c.note ? ` · ${c.note}` : ""}
+          {STATUS_LABEL[c.status] ?? c.status}{c.invoiceNumber ? ` · ${c.invoiceNumber}` : ""}
+          {c.rateSource ? ` · ${HIRE_RATE_SOURCE_LABEL[c.rateSource] ?? c.rateSource}` : ""}{c.note ? ` · ${c.note}` : ""}
+          {c.recalculatedAt ? ` · recalculated ${fmtDate(c.recalculatedAt)} after a reading changed` : ""}
         </div>
+        {c.attention && (
+          <div role="alert" style={{ fontSize: 12, marginTop: 4, fontWeight: 700, color: "var(--hf-warning-text)" }}>
+            On hold, cannot be invoiced yet: {c.attention}
+          </div>
+        )}
       </div>
       {perms.canAdmin && c.id && (
         <div style={{ display: "flex", gap: 8 }}>
@@ -131,17 +145,27 @@ export default function HireTab() {
             {deployments.map(d => <option key={d.id} value={d.id}>{d.siteName ?? "No site"} · {d.clientName ?? "No client"} · {fmtDate(d.deployedAt)}</option>)}</select></div>
         <div><label htmlFor="hc-basis" style={lbl}>Charge by</label>
           <select id="hc-basis" value={form.basis} onChange={e => change({ basis: e.target.value })} style={inputStyle()}>
-            <option value="DAILY">Day</option><option value="HOURLY">Hour (from operator logs)</option><option value="KILOMETRE">Kilometre (from odometer readings)</option></select></div>
+            <option value="DAILY">Day</option><option value="WEEKLY">Week (part of a week counts as a week)</option>
+            <option value="MONTHLY">Month (part of a month counts as a month)</option>
+            <option value="HOURLY">Hour (from operator logs)</option><option value="KILOMETRE">Kilometre (from odometer readings)</option></select></div>
         <div><label htmlFor="hc-vat" style={lbl}>VAT %</label>
           <input id="hc-vat" value={form.vatRate} onChange={e => change({ vatRate: e.target.value })} style={inputStyle()} /></div>
         <div><label htmlFor="hc-from" style={lbl}>From *</label>
           <input id="hc-from" type="date" value={form.periodFrom} onChange={e => change({ periodFrom: e.target.value })} style={inputStyle()} /></div>
         <div><label htmlFor="hc-to" style={lbl}>To *</label>
           <input id="hc-to" type="date" value={form.periodTo} onChange={e => change({ periodTo: e.target.value })} style={inputStyle()} /></div>
-        <div><label htmlFor="hc-rate" style={lbl}>{km ? "Rate per kilometre *" : "Agreed rate (leave blank for the machine's rate)"}</label>
-          <input id="hc-rate" type="number" min="0" value={form.unitRate} onChange={e => change({ unitRate: e.target.value })} style={inputStyle()} /></div>
+        <div><label htmlFor="hc-rate" style={lbl}>{`Agreed rate per ${BASIS_UNIT[form.basis] ?? "unit"} (leave blank to use the contract's or machine's rate)`}</label>
+          <input id="hc-rate" type="number" min="0" value={form.unitRate} onChange={e => change({ unitRate: e.target.value })} style={inputStyle()} />
+          {form.unitRate.trim() === "" && form.deploymentId && (
+            <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 4 }}>
+              {contractRate
+                ? `The contract's rate: ${fmtCurrency2dp(contractRate.unitRate)} per ${BASIS_UNIT[form.basis]}${contractRate.includedKm != null ? `, ${contractRate.includedKm} km included` : ""}.`
+                : form.basis === "DAILY" || form.basis === "HOURLY" ? "The contract has no rate for this, so the machine's own rate is used."
+                : `The contract has no ${BASIS_UNIT[form.basis]} rate. Agree one here, or add it to the contract.`}
+            </div>
+          )}</div>
         {km && (
-          <div><label htmlFor="hc-incl" style={lbl}>Kilometres included (not charged)</label>
+          <div><label htmlFor="hc-incl" style={lbl}>Kilometres included (not charged; blank uses the contract's)</label>
             <input id="hc-incl" type="number" min="0" value={form.includedKm} onChange={e => change({ includedKm: e.target.value })} style={inputStyle()} /></div>
         )}
         {form.unitRate.trim() !== "" && (

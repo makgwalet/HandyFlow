@@ -107,7 +107,7 @@ describe("Hire charges", () => {
     expect(post.mock.calls[0][1]).toMatchObject({ unitRate: 900, rateReason: "Long-term discount", deploymentId: "d1" })
   })
 
-  it("charges by kilometre only with a rate and a reason, and sends the included allowance", async () => {
+  it("charges by kilometre, and a rate typed here needs a reason, and sends the included allowance", async () => {
     perms = ["EARTHMOVING_READ", "EARTHMOVING_ADMIN"]
     get.mockImplementation((url: string) => Promise.resolve(
       url.includes("/hire-charges") ? { data: { data: [] } }
@@ -124,8 +124,8 @@ describe("Hire charges", () => {
     fireEvent.change(screen.getByLabelText(/To \*/), { target: { value: "2026-10-10" } })
     fireEvent.change(screen.getByLabelText("Charge by"), { target: { value: "KILOMETRE" } })
     const preview = screen.getByText("Work out the charge") as HTMLButtonElement
-    expect(preview.disabled).toBe(true)
-    fireEvent.change(screen.getByLabelText(/Rate per kilometre/), { target: { value: "12.5" } })
+    expect(preview.disabled).toBe(false) // with no rate typed, the contract's rate is used
+    fireEvent.change(screen.getByLabelText(/Agreed rate per kilometre/), { target: { value: "12.5" } })
     expect(preview.disabled).toBe(true)
     fireEvent.change(screen.getByLabelText(/Why this rate/), { target: { value: "Rate in signed contract" } })
     fireEvent.change(screen.getByLabelText(/Kilometres included/), { target: { value: "500" } })
@@ -134,5 +134,62 @@ describe("Hire charges", () => {
     await waitFor(() => expect(post).toHaveBeenCalled())
     expect(post.mock.calls[0][1]).toMatchObject({ basis: "KILOMETRE", unitRate: 12.5, includedKm: 500 })
     expect(await screen.findByText(/350 km at/)).toBeTruthy()
+  })
+
+  const openForm = async (contract: unknown) => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_ADMIN"]
+    get.mockImplementation((url: string) => Promise.resolve(
+      url.includes("/hire-charges") ? { data: { data: [] } }
+        : url.includes("/contract-rates") ? { data: { data: contract } }
+        : url.includes("/deployments") ? { data: { data: { content: [{ id: "d1", assetId: "a1", siteName: "Mine A", clientName: "Anglo", deployedAt: "2026-10-01T06:00:00Z", returnedAt: null }], last: true } } }
+        : { data: { data: { content: [{ id: "a1", name: "Truck", fleetNumber: "T-01", status: "DEPLOYED" }], last: true } } }))
+    mount()
+    fireEvent.click(await screen.findByText("New hire charge"))
+    await screen.findByRole("option", { name: "Truck", hidden: true })
+    fireEvent.change(screen.getByLabelText(/Machine \*/), { target: { value: "a1" } })
+    await screen.findByText(/Mine A · Anglo/)
+    fireEvent.change(screen.getByLabelText(/Deployment \*/), { target: { value: "d1" } })
+    fireEvent.change(screen.getByLabelText(/From \*/), { target: { value: "2026-10-01" } })
+    fireEvent.change(screen.getByLabelText(/To \*/), { target: { value: "2026-10-10" } })
+  }
+
+  it("charges by the week or month without typing a rate, and shows the contract's rate for it", async () => {
+    await openForm({ deploymentId: "d1", contractId: "k1", contractNumber: "CON-0001", rates: [
+      { basis: "WEEKLY", unitRate: 9000, includedKm: null, updatedAt: null }, { basis: "MONTHLY", unitRate: 30000, includedKm: null, updatedAt: null }] })
+    post.mockResolvedValue({ data: { data: charge({ id: null, status: "PREVIEW", basis: "WEEKLY", quantity: 2, unitRate: 9000, rateSource: "CONTRACT" }) } })
+    fireEvent.change(screen.getByLabelText("Charge by"), { target: { value: "WEEKLY" } })
+    expect(await screen.findByText(/The contract's rate: .*per week/)).toBeTruthy()
+    const preview = screen.getByText("Work out the charge") as HTMLButtonElement
+    expect(preview.disabled).toBe(false)
+    fireEvent.click(preview)
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post.mock.calls[0][1]).toMatchObject({ basis: "WEEKLY", unitRate: null, rateReason: null })
+    expect(await screen.findByText(/2 weeks at/)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText("Charge by"), { target: { value: "MONTHLY" } })
+    expect(await screen.findByText(/The contract's rate: .*per month/)).toBeTruthy()
+  })
+
+  it("says so when the contract has no rate for the chosen basis", async () => {
+    await openForm({ deploymentId: "d1", contractId: "k1", contractNumber: "CON-0001", rates: [] })
+    expect(await screen.findByText(/machine's own rate is used/)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText("Charge by"), { target: { value: "MONTHLY" } })
+    expect(await screen.findByText(/no month rate\. Agree one here, or add it to the contract/)).toBeTruthy()
+  })
+
+  it("shows where a charge's rate came from, and holds back a charge that is on hold", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_ADMIN"]
+    get.mockImplementation((url: string) => Promise.resolve(
+      url.includes("/hire-charges") ? { data: { data: [
+        charge({ rateSource: "CONTRACT" }),
+        charge({ id: "h2", machine: "Truck 2", basis: "KILOMETRE", quantity: 900, rateSource: "AGREED", recalculatedAt: "2026-10-12T08:00:00Z",
+          attention: "An odometer reading is disputed: Driver says 10850" })] } }
+        : { data: { data: { content: [], last: true } } }))
+    mount()
+    expect(await screen.findByText(/rate from the contract/)).toBeTruthy()
+    expect(screen.getByText(/rate agreed for this charge/)).toBeTruthy()
+    expect(screen.getByText(/recalculated .* after a reading changed/)).toBeTruthy()
+    expect(screen.getByText(/On hold, cannot be invoiced yet: An odometer reading is disputed/)).toBeTruthy()
+    expect((screen.getByLabelText(/Select Truck 2/) as HTMLInputElement).disabled).toBe(true)
+    expect((screen.getByLabelText(/Select Excavator 1/) as HTMLInputElement).disabled).toBe(false)
   })
 })

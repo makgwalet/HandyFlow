@@ -5,10 +5,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 const get = vi.fn()
 const post = vi.fn()
 const put = vi.fn()
+const patch = vi.fn()
 let perms: string[] = []
 vi.mock("../../api/client", () => ({
   apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a), put: (...a: unknown[]) => put(...a),
-    patch: vi.fn(), delete: vi.fn() },
+    patch: (...a: unknown[]) => patch(...a), delete: vi.fn() },
 }))
 vi.mock("../../store/auth.store", () => ({
   useAuthStore: (sel: (s: unknown) => unknown) => sel({ user: { userId: "u1", permissions: perms } }),
@@ -89,5 +90,67 @@ describe("Meter", () => {
     fireEvent.change(document.getElementById("mt-reason") as HTMLInputElement, { target: { value: "typed wrongly" } })
     fireEvent.click(screen.getByText("Correct reading"))
     expect(await screen.findByText(/cannot be below the earlier reading/)).toBeTruthy()
+  })
+
+  it("disputes a kilometre reading with a reason and says how many charges were held", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_ADMIN"]
+    post.mockResolvedValue({ data: { data: { ...rows[0], disputeStatus: "OPEN", chargesHeld: 2, chargesRecalculated: 0, chargesInvoiced: 1 } } })
+    mount()
+    fireEvent.click((await screen.findAllByText("Dispute"))[0])
+    const send = screen.getByText("Dispute reading") as HTMLButtonElement
+    expect(send.disabled).toBe(true)
+    fireEvent.change(document.getElementById("mt-query") as HTMLInputElement, { target: { value: "Driver says 51 900" } })
+    expect(send.disabled).toBe(false)
+    fireEvent.click(send)
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post.mock.calls[0][0]).toContain("/assets/a1/meter/readings/r2/dispute")
+    expect(post.mock.calls[0][1]).toEqual({ reason: "Driver says 51 900" })
+    expect(await screen.findByText(/2 hire charges held back from invoicing/)).toBeTruthy()
+    expect(screen.getByText(/1 invoiced charge no longer match this reading/)).toBeTruthy()
+  })
+
+  it("a reader cannot dispute, and an hour reading has no dispute button", async () => {
+    mount()
+    await screen.findByText(/5,200 → 52,000 km/)
+    expect(screen.queryByText("Dispute")).toBeNull()
+  })
+
+  it("shows an open dispute, and only a maintainer can confirm the reading is right", async () => {
+    const disputed = [{ ...rows[0], disputeId: "x9", disputeStatus: "OPEN", disputeReason: "Driver says 51 900" }, rows[1]]
+    get.mockImplementation((url: string) => Promise.resolve(url.includes("/meter/readings") ? { data: { data: disputed } } : { data: { data: [] } }))
+    patch.mockResolvedValue({ data: { data: { ...rows[0], disputeStatus: "CONFIRMED", chargesHeld: 0, chargesRecalculated: 0, chargesInvoiced: 0 } } })
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_ADMIN"]
+    const first = mount()
+    expect(await screen.findByText(/Disputed: Driver says 51 900/)).toBeTruthy()
+    expect(screen.queryByText("Confirm reading is right")).toBeNull()
+    first.unmount()
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_MAINTAIN"]
+    mount()
+    fireEvent.click(await screen.findByText("Confirm reading is right"))
+    fireEvent.change(document.getElementById("mt-query") as HTMLInputElement, { target: { value: "Checked the logbook" } })
+    fireEvent.click(screen.getByText("Confirm reading"))
+    await waitFor(() => expect(patch).toHaveBeenCalled())
+    expect(patch.mock.calls[0][0]).toContain("/assets/a1/meter/disputes/x9/confirm")
+    expect(patch.mock.calls[0][1]).toEqual({ note: "Checked the logbook" })
+  })
+
+  it("does not offer to dispute a reading that has been corrected", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_MAINTAIN"]
+    const fixed = [{ ...rows[0], id: "r3", source: "CORRECTION", correctsId: "r2", reading: 51900 }, rows[0], rows[1]]
+    get.mockImplementation((url: string) => Promise.resolve(url.includes("/meter/readings") ? { data: { data: fixed } } : { data: { data: [] } }))
+    mount()
+    await screen.findByText(/51,900 km/)
+    expect(screen.getAllByText("Dispute").length).toBe(2) // the correction and the first reading, not the one it replaced
+  })
+
+  it("tells the user what a correction did to the kilometre charges", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_MAINTAIN"]
+    post.mockResolvedValue({ data: { data: { ...rows[0], source: "CORRECTION", chargesRecalculated: 1, chargesHeld: 0, chargesInvoiced: 0 } } })
+    mount()
+    fireEvent.click(await screen.findByText("Correct a reading"))
+    fireEvent.change(document.getElementById("mt-corrected") as HTMLInputElement, { target: { value: "51900" } })
+    fireEvent.change(document.getElementById("mt-reason") as HTMLInputElement, { target: { value: "typed an extra digit" } })
+    fireEvent.click(screen.getByText("Correct reading"))
+    expect(await screen.findByText(/1 hire charge recalculated/)).toBeTruthy()
   })
 })

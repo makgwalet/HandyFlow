@@ -153,6 +153,12 @@ export interface PickOption { id: string; name: string }
 export interface MeterReading {
   id: string; meterType: string; reading: number; previousReading: number | null
   source: string; reason: string | null; actorUserId: string | null; recordedAt: string
+  /** The reading this one replaces, when it is a correction. */
+  correctsId?: string | null
+  /** The latest dispute on this reading: OPEN, CONFIRMED or CORRECTED. */
+  disputeId?: string | null; disputeStatus?: string | null; disputeReason?: string | null
+  /** Only on the answer to a correction, dispute or confirmation: what happened to the kilometre charges on this machine. */
+  chargesRecalculated?: number | null; chargesHeld?: number | null; chargesInvoiced?: number | null
 }
 
 // ── Inspections ──────────────────────────────────────────────────────────
@@ -186,7 +192,13 @@ export interface HireCharge {
   vatRate: number; amount: number; vatAmount: number; total: number; description: string
   status: string // PENDING | INVOICED | VOIDED (PREVIEW when not saved yet)
   invoiceId: string | null; invoiceNumber: string | null; note: string | null; createdAt: string | null
+  /** CONTRACT, ASSET (the machine's own rate) or AGREED (for this charge only). */
+  rateSource?: string | null; includedKm?: number | null
+  /** Why a pending charge cannot be invoiced yet; null when it can. */
+  attention?: string | null; recalculatedAt?: string | null
 }
+export interface ContractRate { basis: string; unitRate: number; includedKm: number | null; updatedAt: string | null }
+export interface ContractRates { deploymentId: string; contractId: string | null; contractNumber: string | null; rates: ContractRate[] }
 export interface DeploymentOption { id: string; assetId: string; siteName: string | null; clientName: string | null; deployedAt: string | null; returnedAt: string | null }
 export interface DraftInvoiceResult { invoiceId: string; invoiceNumber: string; subtotal: number; vatTotal: number; total: number; charges: number }
 

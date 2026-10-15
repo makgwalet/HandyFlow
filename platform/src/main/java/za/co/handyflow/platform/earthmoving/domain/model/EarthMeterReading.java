@@ -47,6 +47,10 @@ public class EarthMeterReading {
     @Column(name = "recorded_at", nullable = false)
     private Instant recordedAt;
 
+    /** For a correction: the reading it replaces. A past period then sees this figure at the replaced reading's place in time. */
+    @Column(name = "corrects_id")
+    private UUID correctsId;
+
     public static EarthMeterReading of(TenantId tenantId, UUID assetId, String meterType, BigDecimal reading, BigDecimal previous,
                                        String source, String reason, UUID actor) {
         if (!MeterRules.SOURCES.contains(source)) throw new IllegalArgumentException("Unknown reading source " + source);
@@ -61,5 +65,17 @@ public class EarthMeterReading {
         r.actorUserId = actor;
         r.recordedAt = Instant.now();
         return r;
+    }
+
+    /** A correction that replaces one reading. */
+    public static EarthMeterReading correctionOf(TenantId tenantId, UUID assetId, String meterType, BigDecimal reading, BigDecimal previous,
+                                                 String reason, UUID actor, UUID replaces) {
+        EarthMeterReading r = of(tenantId, assetId, meterType, reading, previous, "CORRECTION", reason, actor);
+        r.correctsId = replaces;
+        return r;
+    }
+
+    public MeterRules.Point point() {
+        return new MeterRules.Point(id, meterType, reading, recordedAt, correctsId);
     }
 }

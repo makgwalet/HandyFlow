@@ -11,6 +11,8 @@ import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.earthmoving.application.internal.EarthMeterService;
 import za.co.handyflow.platform.earthmoving.dto.ChangeMeterRequest;
 import za.co.handyflow.platform.earthmoving.dto.CorrectReadingRequest;
+import za.co.handyflow.platform.earthmoving.dto.DisputeReadingRequest;
+import za.co.handyflow.platform.earthmoving.dto.ResolveDisputeRequest;
 import za.co.handyflow.platform.earthmoving.dto.MeterReadingResponse;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -43,6 +45,26 @@ public class EarthMeterController {
         featureGuard.requireModule("earthmoving");
         return ResponseEntity.ok(ApiResponse.success("Reading corrected",
                 meters.correct(TenantContext.getTenantIdAsObject(), id, request, UserContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/readings/{readingId}/dispute")
+    @PreAuthorize("hasAnyAuthority('EARTHMOVING_MAINTAIN','EARTHMOVING_ADMIN')")
+    @Operation(summary = "Dispute a kilometre reading; charges built on it are held until it is confirmed or corrected")
+    public ResponseEntity<ApiResponse<MeterReadingResponse>> dispute(@PathVariable UUID id, @PathVariable UUID readingId,
+                                                                      @Valid @RequestBody DisputeReadingRequest request) {
+        featureGuard.requireModule("earthmoving");
+        return ResponseEntity.ok(ApiResponse.success("Reading disputed",
+                meters.dispute(TenantContext.getTenantIdAsObject(), id, readingId, request, UserContext.getCurrentUserId())));
+    }
+
+    @PatchMapping("/disputes/{disputeId}/confirm")
+    @PreAuthorize("hasAuthority('EARTHMOVING_MAINTAIN')")
+    @Operation(summary = "Confirm a disputed reading stands (note required)")
+    public ResponseEntity<ApiResponse<MeterReadingResponse>> confirm(@PathVariable UUID id, @PathVariable UUID disputeId,
+                                                                      @Valid @RequestBody ResolveDisputeRequest request) {
+        featureGuard.requireModule("earthmoving");
+        return ResponseEntity.ok(ApiResponse.success("Dispute closed",
+                meters.confirm(TenantContext.getTenantIdAsObject(), id, disputeId, request, UserContext.getCurrentUserId())));
     }
 
     @PutMapping

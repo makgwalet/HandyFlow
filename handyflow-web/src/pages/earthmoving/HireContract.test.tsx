@@ -104,6 +104,73 @@ describe("Hire contract panel", () => {
   })
 })
 
+describe("Rates on the hire contract", () => {
+  const ratesOf = (rates: unknown[]) => ({ deploymentId: "d1", contractId: "c1", contractNumber: "CON-0001", rates })
+  const withRates = (rates: unknown[]) => {
+    current = panel({ contract: signed, warning: null })
+    get.mockImplementation((url: string) => Promise.resolve(
+      url.includes("/contract-rates") ? { data: { data: ratesOf(rates) } }
+        : url.includes("/deployments/d1/contract") ? { data: { data: current } }
+        : url.includes("/assets/a1/deployments") ? { data: { data: { content: [{ id: "d1", returnedAt: null }], last: true } } }
+        : { data: { data: [] } }))
+  }
+
+  it("lists the rates and the kilometres included, with no edit buttons for a reader", async () => {
+    perms = ["EARTHMOVING_READ"]
+    withRates([{ basis: "MONTHLY", unitRate: 30000, includedKm: null, updatedAt: null }, { basis: "KILOMETRE", unitRate: 12.5, includedKm: 500, updatedAt: null }])
+    mount(<HireContractDialog asset={asset} onClose={() => {}} />)
+    expect(await screen.findByText(/Per month:/)).toBeTruthy()
+    expect(screen.getByText(/500 km included/)).toBeTruthy()
+    expect(screen.queryByText("Save rate")).toBeNull()
+    expect(screen.queryByText("Remove")).toBeNull()
+  })
+
+  it("lets an administrator set a kilometre rate with its allowance", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_ADMIN"]
+    withRates([])
+    put.mockResolvedValue({ data: { data: ratesOf([{ basis: "KILOMETRE", unitRate: 12.5, includedKm: 500, updatedAt: null }]) } })
+    mount(<HireContractDialog asset={asset} onClose={() => {}} />)
+    await screen.findByText(/No rates yet/)
+    const save = screen.getByText("Save rate") as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText("Rate for"), { target: { value: "KILOMETRE" } })
+    fireEvent.change(screen.getByLabelText("Rate (rand)"), { target: { value: "12.5" } })
+    fireEvent.change(screen.getByLabelText("Kilometres included"), { target: { value: "500" } })
+    expect(save.disabled).toBe(false)
+    fireEvent.click(save)
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/earthmoving/deployments/d1/contract-rates", { basis: "KILOMETRE", unitRate: 12.5, includedKm: 500 }))
+    expect(await screen.findByText(/Per kilometre:/)).toBeTruthy()
+  })
+
+  it("only offers the allowance on the kilometre rate, and a rate must be more than nothing", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_ADMIN"]
+    withRates([])
+    mount(<HireContractDialog asset={asset} onClose={() => {}} />)
+    await screen.findByText(/No rates yet/)
+    expect(screen.queryByLabelText("Kilometres included")).toBeNull()
+    fireEvent.change(screen.getByLabelText("Rate (rand)"), { target: { value: "0" } })
+    expect((screen.getByText("Save rate") as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it("removes a rate", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_ADMIN"]
+    withRates([{ basis: "WEEKLY", unitRate: 9000, includedKm: null, updatedAt: null }])
+    const del = vi.fn().mockResolvedValue({ data: { data: ratesOf([]) } })
+    const client = await import("../../api/client")
+    ;(client.apiClient as unknown as { delete: unknown }).delete = del
+    mount(<HireContractDialog asset={asset} onClose={() => {}} />)
+    fireEvent.click(await screen.findByLabelText("Remove Per week rate"))
+    await waitFor(() => expect(del).toHaveBeenCalledWith("/api/v1/earthmoving/deployments/d1/contract-rates/WEEKLY"))
+  })
+
+  it("has no rates section until a contract is linked", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_ADMIN"]
+    mount(<HireContractDialog asset={asset} onClose={() => {}} />)
+    await screen.findByText(/no contract is linked to it/)
+    expect(screen.queryByText("Rates on this contract")).toBeNull()
+  })
+})
+
 describe("Contract threshold", () => {
   it("lets an administrator change it and clear it", async () => {
     perms = ["EARTHMOVING_READ", "EARTHMOVING_ADMIN"]

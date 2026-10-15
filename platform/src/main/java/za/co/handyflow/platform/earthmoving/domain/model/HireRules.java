@@ -15,7 +15,13 @@ public final class HireRules {
     public static final String DAILY = "DAILY";
     public static final String HOURLY = "HOURLY";
     public static final String KILOMETRE = "KILOMETRE";
-    public static final List<String> BASES = List.of(DAILY, HOURLY, KILOMETRE);
+    public static final String WEEKLY = "WEEKLY";
+    public static final String MONTHLY = "MONTHLY";
+    public static final List<String> BASES = List.of(DAILY, WEEKLY, MONTHLY, HOURLY, KILOMETRE);
+    /** Where a charge's rate came from. */
+    public static final String FROM_CONTRACT = "CONTRACT";
+    public static final String FROM_ASSET = "ASSET";
+    public static final String FROM_AGREED = "AGREED";
     public static final String PENDING = "PENDING";
     public static final String INVOICED = "INVOICED";
     public static final String VOIDED = "VOIDED";
@@ -25,13 +31,29 @@ public final class HireRules {
 
     public static String basis(String basis) {
         if (basis == null || !BASES.contains(basis.trim().toUpperCase()))
-            throw new IllegalArgumentException("Bill by DAILY (days on hire), HOURLY (hours worked) or KILOMETRE (kilometres driven).");
+            throw new IllegalArgumentException("Bill by DAILY (days on hire), WEEKLY (weeks), MONTHLY (months), HOURLY (hours worked) or KILOMETRE (kilometres driven).");
         return basis.trim().toUpperCase();
     }
 
     /** Calendar days from the first to the last day, both counted. */
     public static int days(LocalDate from, LocalDate to) {
         return (int) ChronoUnit.DAYS.between(from, to) + 1;
+    }
+
+    /** Weeks charged: every week started counts as a whole week (1 to 7 days is one week, 8 to 14 is two). */
+    public static int weeks(LocalDate from, LocalDate to) {
+        return (days(from, to) + 6) / 7;
+    }
+
+    /**
+     * Months charged: every month started counts as a whole month, counted from the first day. 1 Oct to 31 Oct is one month,
+     * 1 Oct to 1 Nov is two. Each month is counted from the first day, so a start on the 31st does not drift.
+     */
+    public static int months(LocalDate from, LocalDate to) {
+        LocalDate end = to.plusDays(1);
+        int n = 1;
+        while (from.plusMonths(n).isBefore(end)) n++;
+        return n;
     }
 
     /**
@@ -56,9 +78,11 @@ public final class HireRules {
         return vat.setScale(2, RoundingMode.HALF_UP);
     }
 
-    /** The rate for this basis, or a message saying which rate to set. A kilometre rate is always agreed per charge. */
+    /** The rate for this basis, or a message saying which rate to set. Kilometre, weekly and monthly rates come from the contract or are agreed per charge. */
     public static BigDecimal rateFor(String basis, BigDecimal dailyRate, BigDecimal hourlyRate) {
         if (KILOMETRE.equals(basis)) throw new IllegalArgumentException("Give the agreed rate per kilometre, with a reason.");
+        if (WEEKLY.equals(basis) || MONTHLY.equals(basis))
+            throw new IllegalArgumentException("Give the agreed rate per " + (WEEKLY.equals(basis) ? "week" : "month") + ", with a reason, or set it on the hire contract.");
         BigDecimal rate = DAILY.equals(basis) ? dailyRate : hourlyRate;
         if (rate == null || rate.signum() <= 0)
             throw new IllegalArgumentException("Set the machine's " + (DAILY.equals(basis) ? "daily" : "hourly") + " rate first.");
@@ -71,6 +95,32 @@ public final class HireRules {
         if (agreed.signum() <= 0) throw new IllegalArgumentException("The agreed rate must be more than nothing.");
         EarthmovingRules.requireReason(reason, "charging a different rate");
         return agreed;
+    }
+
+    /** A rate and where it came from. */
+    public record Rate(BigDecimal value, String source) {}
+
+    /**
+     * The rate to charge: one agreed for this charge (needs a reason), else the rate held on the hire contract, else the
+     * machine's own daily or hourly rate. Weekly, monthly and kilometre rates exist only on a contract or per charge.
+     */
+    public static Rate choose(String basis, BigDecimal agreed, String reason, BigDecimal contractRate, BigDecimal dailyRate, BigDecimal hourlyRate) {
+        if (agreed != null) return new Rate(rate(basis, dailyRate, hourlyRate, agreed, reason), FROM_AGREED);
+        if (contractRate != null && contractRate.signum() > 0) return new Rate(contractRate, FROM_CONTRACT);
+        return new Rate(rateFor(basis, dailyRate, hourlyRate), FROM_ASSET);
+    }
+
+    /** The rate held on a contract must be more than nothing. */
+    public static BigDecimal contractRate(String basis, BigDecimal rate) {
+        if (rate == null || rate.signum() <= 0) throw new IllegalArgumentException("The " + word(basis) + " rate must be more than nothing.");
+        return rate.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /** The unit as people say it in a sentence: "per day". */
+    public static String word(String basis) {
+        return switch (basis) {
+            case DAILY -> "daily"; case WEEKLY -> "weekly"; case MONTHLY -> "monthly"; case KILOMETRE -> "kilometre"; default -> "hourly";
+        };
     }
 
     /** Hours worked in the period: needs at least some. */
@@ -97,8 +147,12 @@ public final class HireRules {
     /** The text that appears on the invoice line. */
     public static String describe(String machine, String site, String basis, LocalDate from, LocalDate to, BigDecimal quantity, BigDecimal rate) {
         String span = from.equals(to) ? D.format(from) : D.format(from) + " to " + D.format(to);
-        String qty = DAILY.equals(basis) ? quantity.stripTrailingZeros().toPlainString() + (quantity.compareTo(BigDecimal.ONE) == 0 ? " day" : " days")
-                : quantity.stripTrailingZeros().toPlainString() + " hrs";
+        String n = quantity.stripTrailingZeros().toPlainString();
+        boolean one = quantity.compareTo(BigDecimal.ONE) == 0;
+        String qty = DAILY.equals(basis) ? n + (one ? " day" : " days")
+                : WEEKLY.equals(basis) ? n + (one ? " week" : " weeks")
+                : MONTHLY.equals(basis) ? n + (one ? " month" : " months")
+                : n + " hrs";
         return "Hire: " + machine + (site == null || site.isBlank() ? "" : " at " + site) + ", " + span + " (" + qty + " @ R" + rate.setScale(2, RoundingMode.HALF_UP).toPlainString() + ")";
     }
 
@@ -118,7 +172,9 @@ public final class HireRules {
     }
 
     /** The invoice-line unit for a basis. */
-    public static String unit(String basis) { return DAILY.equals(basis) ? "day" : KILOMETRE.equals(basis) ? "km" : "hour"; }
+    public static String unit(String basis) {
+        return DAILY.equals(basis) ? "day" : WEEKLY.equals(basis) ? "week" : MONTHLY.equals(basis) ? "month" : KILOMETRE.equals(basis) ? "km" : "hour";
+    }
 
     /** The line text for a kilometre charge, showing the readings it came from. */
     public static String describeKm(String machine, String site, LocalDate from, LocalDate to, BigDecimal start, BigDecimal end,
