@@ -1,7 +1,7 @@
 // src/pages/earthmoving/shared/hooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent } from "./types"
 
 // Central query keys — every tab imports these instead of typing the
 // literal string, so a rename is a one-line change instead of a grep.
@@ -54,10 +54,11 @@ export function useUpdateAsset(onSuccess?: (asset: Asset) => void) {
 export function useUpdateAssetStatus(onSuccess?: (asset: Asset) => void) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, status, note }: { id: string; status: string; note: string }) =>
-      api.updateAssetStatus(id, status, note),
+    mutationFn: ({ id, status, note, overrideReason }: { id: string; status: string; note: string; overrideReason?: string }) =>
+      api.updateAssetStatus(id, status, note, overrideReason),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: QK.assets })
+      qc.invalidateQueries({ queryKey: ["em-status-history"] })
       onSuccess?.(res.data?.data ?? res.data)
     },
   })
@@ -242,4 +243,8 @@ export function useSavePlan(onSuccess?: () => void) {
 export function useScanPlans(onSuccess?: (r: { checked: number; workOrdersRaised: number; raised: string[] }) => void) {
   const refresh = useRefreshAfterWorkOrder()
   return useMutation({ mutationFn: api.scanPlans, onSuccess: (r) => { refresh(); onSuccess?.(r) } })
+}
+
+export function useStatusHistory(assetId: string) {
+  return useQuery<StatusEvent[]>({ queryKey: ["em-status-history", assetId], queryFn: () => api.fetchStatusHistory(assetId), enabled: !!assetId })
 }

@@ -105,3 +105,9 @@ export interface MaintenancePlan {
 }
 
 export interface PlanScan { checked: number; workOrdersRaised: number; raised: string[] }
+
+export interface StatusEvent {
+  id: string; assetId: string; fromStatus: string | null; toStatus: string; reason: string | null
+  actorUserId: string | null; meterHours: number | null; happenedAt: string
+  workOrderId: string | null; overrideReason: string | null
+}

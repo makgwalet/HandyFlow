@@ -10,6 +10,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import za.co.handyflow.platform.audittrail.application.AuditTrailFacade;
 import za.co.handyflow.platform.earthmoving.domain.model.AssetStatus;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthStatusEvent;
+import za.co.handyflow.platform.earthmoving.domain.model.ReleaseRules;
 import za.co.handyflow.platform.earthmoving.domain.repository.EarthWorkOrderRepository;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthmovingRules;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthAsset;
@@ -27,6 +28,7 @@ import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Year;
 import java.util.LinkedHashMap;
@@ -150,14 +152,29 @@ public class EarthAssetService {
                     "This machine has an unresolved critical incident. Resolve it before releasing the machine.");
         }
         UUID releaseWorkOrder = null;
+        String overrideReason = null;
+        List<String> releaseProblems = List.of();
         if (release) {
             var blocking = workOrders.findOpenBlocking(tenantId, id);
             if (!blocking.isEmpty()) {
                 throw new IllegalStateException("Open work orders must be completed or cancelled before this machine is released: "
                         + blocking.stream().map(w -> w.getNumber()).collect(java.util.stream.Collectors.joining(", ")) + ".");
             }
-            var last = workOrders.findCompletedForAsset(tenantId, id, org.springframework.data.domain.PageRequest.of(0, 1));
-            if (!last.isEmpty()) releaseWorkOrder = last.get(0).getId();
+            var last = workOrders.findCompletedForAsset(tenantId, id, org.springframework.data.domain.PageRequest.of(0, 1))
+                    .stream().findFirst().orElse(null);
+            Instant wentOut = statusEvents.findLatestInto(tenantId, id, previousStatus.name(), org.springframework.data.domain.PageRequest.of(0, 1))
+                    .stream().findFirst().map(EarthStatusEvent::getHappenedAt).orElse(null);
+            releaseProblems = ReleaseRules.problems(wentOut, last == null ? null : last.getCompletedAt(),
+                    last == null ? null : last.getCompletedBy(), actor);
+            if (!releaseProblems.isEmpty()) {
+                String why = req.overrideReason() == null ? "" : req.overrideReason().trim();
+                if (why.isEmpty()) {
+                    throw new IllegalStateException(String.join(" ", releaseProblems)
+                            + " To release anyway, give a reason for overriding this check.");
+                }
+                overrideReason = EarthmovingRules.requireReason(why, "overriding the release check");
+            }
+            if (last != null && ReleaseRules.isEvidence(wentOut, last.getCompletedAt())) releaseWorkOrder = last.getId();
         }
 
         switch (target) {
@@ -171,11 +188,16 @@ public class EarthAssetService {
         // EarthAsset.changeStatus() throws InvalidAssetStatusTransitionException (409) for an illegal transition.
 
         assetRepository.save(asset);
-        statusEvents.save(EarthStatusEvent.of(tenantId, id, previousStatus, target, reason, actor, asset.getCurrentHours()).withWorkOrder(releaseWorkOrder));
+        statusEvents.save(EarthStatusEvent.of(tenantId, id, previousStatus, target, reason, actor, asset.getCurrentHours()).withWorkOrder(releaseWorkOrder).withOverride(overrideReason));
         trail.record(tenantId, release ? "EARTHMOVING_ASSET_RELEASED" : "EARTHMOVING_ASSET_STATUS_CHANGED",
                 "EARTHMOVING_ASSET", id,
                 Map.of("status", previousStatus.name()),
                 reason == null ? Map.of("status", target.name()) : Map.of("status", target.name(), "reason", reason));
+        if (overrideReason != null) {
+            trail.record(tenantId, "EARTHMOVING_ASSET_RELEASE_OVERRIDDEN", "EARTHMOVING_ASSET", id,
+                    Map.of("problems", String.join(" ", releaseProblems)),
+                    Map.of("status", target.name(), "overrideReason", overrideReason));
+        }
         log.info("Asset status changed asset={} {}->{} actor={}", id, previousStatus, target, actor);
 
         // The deployment closes whenever the machine leaves DEPLOYED, for any reason (see EarthDeployment).
@@ -194,7 +216,7 @@ public class EarthAssetService {
         findActive(tenantId, id);
         return statusEvents.findByAsset(tenantId, id, pageable).map(e -> new StatusEventResponse(
                 e.getId(), e.getAssetId(), e.getFromStatus(), e.getToStatus(), e.getReason(),
-                e.getActorUserId(), e.getMeterHours(), e.getHappenedAt()));
+                e.getActorUserId(), e.getMeterHours(), e.getHappenedAt(), e.getWorkOrderId(), e.getOverrideReason()));
     }
 
     @Transactional

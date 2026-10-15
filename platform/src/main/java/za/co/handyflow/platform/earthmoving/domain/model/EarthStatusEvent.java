@@ -48,6 +48,14 @@ public class EarthStatusEvent {
     @Column(name = "work_order_id")
     private UUID workOrderId;
 
+    @Column(name = "override_reason")
+    private String overrideReason;
+
+    public EarthStatusEvent withOverride(String reason) {
+        this.overrideReason = reason;
+        return this;
+    }
+
     public EarthStatusEvent withWorkOrder(UUID workOrderId) {
         this.workOrderId = workOrderId;
         return this;

@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.earthmoving.domain.model.AssetStatus;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthAsset;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthmovingIncident;
+import za.co.handyflow.platform.earthmoving.domain.model.EarthStatusEvent;
+import za.co.handyflow.platform.earthmoving.domain.repository.EarthStatusEventRepository;
 import za.co.handyflow.platform.earthmoving.domain.model.InvalidAssetStatusTransitionException;
 import za.co.handyflow.platform.earthmoving.domain.repository.EarthAssetRepository;
 import za.co.handyflow.platform.earthmoving.domain.repository.EarthmovingIncidentRepository;
@@ -56,6 +58,7 @@ public class EarthmovingIncidentService {
     // backed by a no-op stub and never actually notified anyone.
     private final TenantAdminRecipients tenantAdminRecipients;
     private final EarthmovingAccess access;
+    private final EarthStatusEventRepository statusEvents;
     private final EarthWorkOrderService workOrderService;
     private final AuditTrailFacade trail;
 
@@ -94,7 +97,7 @@ public class EarthmovingIncidentService {
         log.info("Incident reported id={} asset={} type={} severity={}",
                 incident.getId(), req.assetId(), incident.getType(), incident.getSeverity());
 
-        maybeAutoBreakdown(asset, incident);
+        maybeAutoBreakdown(tenantId, asset, incident, reportedByUserId);
         if (AUTO_BREAKDOWN_TYPES.contains(incident.getType())) {
             workOrderService.raiseFromIncident(tenantId, asset.getId(), incident.getId(), incident.getTitle(), incident.getSeverity(), reportedByUserId);
         }
@@ -116,13 +119,17 @@ public class EarthmovingIncidentService {
         return toResponse(incident);
     }
 
-    private void maybeAutoBreakdown(EarthAsset asset, EarthmovingIncident incident) {
+    private void maybeAutoBreakdown(TenantId tenantId, EarthAsset asset, EarthmovingIncident incident, UUID actor) {
         if (!AUTO_BREAKDOWN_TYPES.contains(incident.getType())) return;
         if (asset.getStatus() == AssetStatus.BREAKDOWN) return;
 
         try {
+            AssetStatus before = asset.getStatus();
             asset.breakdown();
             assetRepository.save(asset);
+            // Recorded so the history shows when the machine went out of service: release is judged against this time.
+            statusEvents.save(EarthStatusEvent.of(tenantId, asset.getId(), before, AssetStatus.BREAKDOWN,
+                    "Incident reported: " + incident.getTitle(), actor, asset.getCurrentHours()));
             log.info("Asset auto-transitioned to BREAKDOWN by incident={} asset={}", incident.getId(), asset.getId());
         } catch (InvalidAssetStatusTransitionException e) {
             log.warn("Could not auto-transition asset={} to BREAKDOWN for incident={}: {}",

@@ -62,6 +62,15 @@ class EarthAssetServiceTest {
         return a;
     }
 
+    /** A work order completed by someone else, just now: the evidence a release needs. */
+    private void evidenceFor(EarthAsset a, UUID completedBy) {
+        var wo = mock(za.co.handyflow.platform.earthmoving.domain.model.EarthWorkOrder.class);
+        when(wo.getId()).thenReturn(UUID.randomUUID());
+        when(wo.getCompletedAt()).thenReturn(java.time.Instant.now());
+        when(wo.getCompletedBy()).thenReturn(completedBy);
+        when(workOrders.findCompletedForAsset(eq(tenant), eq(a.getId()), any())).thenReturn(List.of(wo));
+    }
+
     private UpdateAssetStatusRequest status(String to, String note) { return new UpdateAssetStatusRequest(to, note); }
 
     // ── release ──────────────────────────────────────────────────────────────
@@ -98,6 +107,8 @@ class EarthAssetServiceTest {
         UUID woId = UUID.randomUUID();
         var wo = mock(za.co.handyflow.platform.earthmoving.domain.model.EarthWorkOrder.class);
         when(wo.getId()).thenReturn(woId);
+        when(wo.getCompletedAt()).thenReturn(java.time.Instant.now());
+        when(wo.getCompletedBy()).thenReturn(UUID.randomUUID());
         when(workOrders.findOpenBlocking(tenant, a.getId())).thenReturn(List.of());
         when(workOrders.findCompletedForAsset(eq(tenant), eq(a.getId()), any())).thenReturn(List.of(wo));
         service.updateStatus(tenant, a.getId(), status("AVAILABLE", "Repair complete and tested"), actor);
@@ -112,6 +123,52 @@ class EarthAssetServiceTest {
         granted.addAll(Set.of("EARTHMOVING_MAINTAIN"));
         service.updateStatus(tenant, a.getId(), status("MAINTENANCE", "Scheduled 250h service"), actor);
         verify(workOrders, never()).findOpenBlocking(any(), any());
+    }
+
+    @Test
+    void releaseWithNoCompletedWorkOrderIsRefusedUnlessOverriddenWithAReason() {
+        EarthAsset a = machine(AssetStatus.BREAKDOWN);
+        granted.add("EARTHMOVING_RELEASE");
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> service.updateStatus(tenant, a.getId(), status("AVAILABLE", "Looks fine to me now"), actor));
+        assertTrue(e.getMessage().contains("No work order has been completed"));
+        assertEquals(AssetStatus.BREAKDOWN, a.getStatus());
+        verify(events, never()).save(any());
+
+        service.updateStatus(tenant, a.getId(), new UpdateAssetStatusRequest("AVAILABLE", "Fault was a loose connector",
+                "Supplier mechanic fixed it on site; no job card raised"), actor);
+        assertEquals(AssetStatus.AVAILABLE, a.getStatus());
+        var ev = org.mockito.ArgumentCaptor.forClass(EarthStatusEvent.class);
+        verify(events).save(ev.capture());
+        assertEquals("Supplier mechanic fixed it on site; no job card raised", ev.getValue().getOverrideReason());
+        verify(trail).record(eq(tenant), eq("EARTHMOVING_ASSET_RELEASE_OVERRIDDEN"), eq("EARTHMOVING_ASSET"), eq(a.getId()), any(), any());
+    }
+
+    @Test
+    void releasingYourOwnCompletedWorkNeedsAnOverrideReason() {
+        EarthAsset a = machine(AssetStatus.MAINTENANCE);
+        granted.add("EARTHMOVING_RELEASE");
+        evidenceFor(a, actor);
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> service.updateStatus(tenant, a.getId(), status("AVAILABLE", "Service done and checked"), actor));
+        assertTrue(e.getMessage().contains("different person"));
+        assertThrows(IllegalArgumentException.class, () -> service.updateStatus(tenant, a.getId(),
+                new UpdateAssetStatusRequest("AVAILABLE", "Service done and checked", "ok"), actor));
+        service.updateStatus(tenant, a.getId(), new UpdateAssetStatusRequest("AVAILABLE", "Service done and checked",
+                "Only one qualified person on site"), actor);
+        assertEquals(AssetStatus.AVAILABLE, a.getStatus());
+    }
+
+    @Test
+    void anOverrideReasonIsIgnoredAndNotRecordedWhenTheEvidenceIsThere() {
+        EarthAsset a = machine(AssetStatus.BREAKDOWN);
+        granted.add("EARTHMOVING_RELEASE");
+        evidenceFor(a, UUID.randomUUID());
+        service.updateStatus(tenant, a.getId(), new UpdateAssetStatusRequest("AVAILABLE", "Repaired and tested", "not needed"), actor);
+        var ev = org.mockito.ArgumentCaptor.forClass(EarthStatusEvent.class);
+        verify(events).save(ev.capture());
+        assertNull(ev.getValue().getOverrideReason());
+        verify(trail, never()).record(any(), eq("EARTHMOVING_ASSET_RELEASE_OVERRIDDEN"), any(), any(), any(), any());
     }
 
     @Test
@@ -138,6 +195,7 @@ class EarthAssetServiceTest {
         EarthAsset a = machine(AssetStatus.BREAKDOWN);
         a.updateHours(new BigDecimal("812.0"));
         granted.add("EARTHMOVING_RELEASE");
+        evidenceFor(a, UUID.randomUUID());
         service.updateStatus(tenant, a.getId(), status("AVAILABLE", "Pump replaced, tested under load"), actor);
         assertEquals(AssetStatus.AVAILABLE, a.getStatus());
         var ev = org.mockito.ArgumentCaptor.forClass(EarthStatusEvent.class);

@@ -13,4 +13,8 @@ public interface EarthStatusEventRepository extends JpaRepository<EarthStatusEve
 
     @Query("SELECT e FROM EarthStatusEvent e WHERE e.tenantId = :tenantId AND e.assetId = :assetId ORDER BY e.happenedAt DESC")
     Page<EarthStatusEvent> findByAsset(TenantId tenantId, UUID assetId, Pageable pageable);
+
+    /** Newest events that put the machine into the given status; used to find when it went out of service. */
+    @Query("SELECT e FROM EarthStatusEvent e WHERE e.tenantId = :tenantId AND e.assetId = :assetId AND e.toStatus = :toStatus ORDER BY e.happenedAt DESC")
+    java.util.List<EarthStatusEvent> findLatestInto(TenantId tenantId, UUID assetId, String toStatus, Pageable pageable);
 }

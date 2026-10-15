@@ -15,7 +15,7 @@
 // PUT (backend endpoint is still @PutMapping). Create is POST.
 
 import { apiClient } from "../../../api/client"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent } from "./types"
 
 export function unwrap<T>(r: { data?: { data?: unknown } & Record<string, unknown> }): T {
   const p = (r.data?.data ?? r.data) as { content?: unknown } | undefined
@@ -47,8 +47,11 @@ export const updateAsset = (id: string, body: Record<string, unknown>) =>
 export const createAsset = (body: Record<string, unknown>) =>
   apiClient.post(`${BASE}/assets`, body)
 
-export const updateAssetStatus = (id: string, status: string, note: string) =>
-  apiClient.patch(`${BASE}/assets/${id}/status`, { status, note })
+export const updateAssetStatus = (id: string, status: string, note: string, overrideReason?: string) =>
+  apiClient.patch(`${BASE}/assets/${id}/status`, { status, note, overrideReason: overrideReason || null })
+
+export const fetchStatusHistory = (id: string): Promise<StatusEvent[]> =>
+  fetchAllPages<StatusEvent>(`${BASE}/assets/${id}/status-history`)
 
 export const updateAssetHours = (id: string, currentHours: number) =>
   apiClient.patch(`${BASE}/assets/${id}/hours`, { currentHours })

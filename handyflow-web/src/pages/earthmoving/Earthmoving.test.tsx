@@ -37,6 +37,7 @@ const incident = (over: Record<string, unknown> = {}) => ({
 
 let assets: unknown[] = []
 let incidents: unknown[] = []
+let history: unknown[] = []
 const page = (content: unknown[]) => ({ data: { data: { content, last: true } } })
 
 const mount = (ui: React.ReactElement) => {
@@ -49,8 +50,9 @@ beforeEach(() => {
   perms = []
   assets = [asset()]
   incidents = []
+  history = []
   get.mockImplementation((url: string) => Promise.resolve(
-    url.includes("/incidents") ? page(incidents) : url.includes("/assets") && !url.includes("/maintenance") ? page(assets) : page([])))
+    url.includes("status-history") ? page(history) : url.includes("assignable-users") ? { data: [{ id: "u2", name: "Thandi Supervisor" }] } : url.includes("/incidents") ? page(incidents) : url.includes("/assets") && !url.includes("/maintenance") ? page(assets) : page([])))
   patch.mockResolvedValue({ data: { data: asset() } })
   put.mockResolvedValue({ data: { data: asset() } })
 })
@@ -142,7 +144,36 @@ describe("Fleet screen", () => {
     fireEvent.click(submit)
     await waitFor(() => expect(patch).toHaveBeenCalled())
     expect(patch.mock.calls[0][0]).toBe("/api/v1/earthmoving/assets/a1/status")
-    expect(patch.mock.calls[0][1]).toEqual({ status: "AVAILABLE", note: "Pump replaced, tested under load" })
+    expect(patch.mock.calls[0][1]).toEqual({ status: "AVAILABLE", note: "Pump replaced, tested under load", overrideReason: null })
+  })
+
+  it("an override needs its own reason and is sent only when ticked", async () => {
+    perms = ["EARTHMOVING_WRITE", "EARTHMOVING_RELEASE"]
+    assets = [asset({ status: "BREAKDOWN" })]
+    mount(<AssetsTab />)
+    fireEvent.click(await screen.findByLabelText("Change status"))
+    fireEvent.click((await screen.findByText("Release to service")).closest("button") as HTMLButtonElement)
+    fireEvent.change(screen.getByLabelText(/^Reason/), { target: { value: "Fault was a loose connector" } })
+    const submit = screen.getByRole("button", { name: "Release" }) as HTMLButtonElement
+    fireEvent.click(screen.getByLabelText(/Release without a completed work order/))
+    expect(submit.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText(/Why is this release allowed/), { target: { value: "Supplier fixed it on site" } })
+    expect(submit.disabled).toBe(false)
+    fireEvent.click(submit)
+    await waitFor(() => expect(patch).toHaveBeenCalled())
+    expect(patch.mock.calls[0][1]).toEqual({ status: "AVAILABLE", note: "Fault was a loose connector", overrideReason: "Supplier fixed it on site" })
+  })
+
+  it("shows the status history with names, the work order and any override", async () => {
+    perms = ["EARTHMOVING_READ"]
+    history = [{ id: "e1", assetId: "a1", fromStatus: "BREAKDOWN", toStatus: "AVAILABLE", reason: "Pump replaced", actorUserId: "u2",
+      meterHours: 812, happenedAt: "2026-10-15T08:00:00Z", workOrderId: null, overrideReason: "Supplier fixed it on site" }]
+    mount(<AssetsTab />)
+    fireEvent.click(await screen.findByLabelText("View profile"))
+    fireEvent.click(await screen.findByRole("button", { name: "History" }))
+    expect(await screen.findByText(/Thandi Supervisor/)).toBeTruthy()
+    expect(screen.getByText(/Pump replaced/)).toBeTruthy()
+    expect(screen.getByText(/Supplier fixed it on site/)).toBeTruthy()
   })
 
   it("a server refusal is shown in the dialog", async () => {

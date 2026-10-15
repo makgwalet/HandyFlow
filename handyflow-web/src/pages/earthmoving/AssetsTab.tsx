@@ -12,6 +12,7 @@ import {
 import { useEarthPerms } from "./shared/useEarthPerms"
 import { fmtCurrency, apiMessage } from "./shared/format"
 import { Overlay, ModalHead, ModalFoot, Sect, ErrBanner, lbl, inputStyle } from "./shared/Modal"
+import StatusHistoryDialog from "./StatusHistoryDialog"
 import { useAssets, useCreateAsset, useUpdateAsset, useUpdateAssetStatus, useUpdateAssetHours } from "./shared/hooks"
 
 const EMPTY_FORM = {
@@ -48,6 +49,9 @@ export default function AssetsTab() {
   const [editing, setEditing]           = useState<Asset | null>(null)
   const [showStatus, setShowStatus]     = useState<Asset | null>(null)
   const [showHours, setShowHours]       = useState<Asset | null>(null)
+  const [showHistory, setShowHistory]   = useState<Asset | null>(null)
+  const [overrideOn, setOverrideOn]     = useState(false)
+  const [overrideReason, setOverrideReason] = useState("")
   const [viewing, setViewing]           = useState<Asset | null>(null)
   const [expanded, setExpanded]         = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState("ALL")
@@ -83,7 +87,7 @@ export default function AssetsTab() {
   }))
 
   const updateStatus = useUpdateAssetStatus((updated) => {
-    setShowStatus(null); setNewStatus(""); setStatusNote(""); setApiError("")
+    setShowStatus(null); setNewStatus(""); setStatusNote(""); setApiError(""); setOverrideOn(false); setOverrideReason("")
     if (updated?.id) setViewing(updated)
   })
 
@@ -476,7 +480,8 @@ export default function AssetsTab() {
         const release = newStatus !== "" && isRelease(from, newStatus)
         const reasonNeeded = newStatus !== "" && needsReason(from, newStatus)
         const reasonOk = !reasonNeeded || statusNote.trim().length >= 5
-        const close = () => { setShowStatus(null); setNewStatus(""); setApiError("") }
+        const close = () => { setShowStatus(null); setNewStatus(""); setApiError(""); setOverrideOn(false); setOverrideReason("") }
+        const overrideOk = !release || !overrideOn || overrideReason.trim().length >= 5
         return (
           <Overlay onClose={close}>
             <ModalHead title={`Change Status — ${showStatus.fleetNumber ?? showStatus.name}`} subtitle={`Now: ${STATUS_CFG[from]?.label ?? from}`} onClose={close} />
@@ -524,7 +529,23 @@ export default function AssetsTab() {
                   style={{ ...inputStyle(), width: "100%" }} />
                 {release && (
                   <div style={{ marginTop: 8, fontSize: 12, color: "var(--hf-text-muted)" }}>
-                    A release is recorded with your name, the time, this reason and the current hour reading. It is refused while the machine has an unresolved critical incident.
+                    A release is recorded with your name, the time, this reason and the current hour reading. It is refused while the machine has an unresolved critical incident or an open job that blocks release.
+                    It also needs a work order completed since the machine went out of service, finished by someone other than you.
+                  </div>
+                )}
+                {release && (
+                  <div style={{ marginTop: 10 }}>
+                    <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+                      <input type="checkbox" checked={overrideOn} onChange={e => setOverrideOn(e.target.checked)} />
+                      Release without a completed work order, or after finishing the work myself
+                    </label>
+                    {overrideOn && (
+                      <div style={{ marginTop: 8 }}>
+                        <label style={lbl} htmlFor="release-override">Why is this release allowed? *</label>
+                        <input id="release-override" value={overrideReason} onChange={e => setOverrideReason(e.target.value)} style={{ ...inputStyle(), width: "100%" }} />
+                        <div style={{ marginTop: 4, fontSize: 12, color: "var(--hf-text-faint)" }}>Recorded in the status history and the audit trail.</div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -533,16 +554,18 @@ export default function AssetsTab() {
             <ModalFoot
               onCancel={close}
               onSubmit={() => updateStatus.mutate(
-                { id: showStatus.id, status: newStatus, note: statusNote.trim() },
+                { id: showStatus.id, status: newStatus, note: statusNote.trim(), overrideReason: release && overrideOn ? overrideReason.trim() : undefined },
                 { onError: (e: unknown) => setApiError(apiMessage(e, "Failed to update status — that change may not be allowed from the machine's current status.")) }
               )}
               loading={updateStatus.isPending}
               label={release ? "Release" : "Update Status"}
-              disabled={!newStatus || !reasonOk}
+              disabled={!newStatus || !reasonOk || !overrideOk}
             />
           </Overlay>
         )
       })()}
+
+      {showHistory && <StatusHistoryDialog asset={showHistory} onClose={() => setShowHistory(null)} />}
 
       {/* ── Hour Meter Modal ────────────────────────────────────────────── */}
       {showHours && (
@@ -677,6 +700,8 @@ export default function AssetsTab() {
               style={{ flex: 1, padding: "10px", background: "var(--hf-warning-soft)", color: "var(--hf-warning-text)", border: "1px solid var(--hf-warning-border)", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               Change Status
             </button>}
+            <button onClick={() => { setShowHistory(viewing); setViewing(null) }}
+              style={{ padding: "10px 16px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>History</button>
             <button onClick={() => setViewing(null)} style={{ padding: "10px 16px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Close</button>
           </div>
         </Overlay>
