@@ -15,7 +15,7 @@
 // PUT (backend endpoint is still @PutMapping). Create is POST.
 
 import { apiClient } from "../../../api/client"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, Profitability, HireCharge, DeploymentOption, DraftInvoiceResult } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, HireCharge, DeploymentOption, DraftInvoiceResult } from "./types"
 
 export function unwrap<T>(r: { data?: { data?: unknown } & Record<string, unknown> }): T {
   const p = (r.data?.data ?? r.data) as { content?: unknown } | undefined
@@ -203,6 +203,9 @@ export const createInspection = async (body: Record<string, unknown>): Promise<I
 
 export const fetchProfitability = async (from: string, to: string): Promise<Profitability> =>
   unwrap<Profitability>(await apiClient.get(`${BASE}/reports/profitability?from=${from}&to=${to}`))
+
+export const fetchUtilisation = async (days: number): Promise<Utilisation> =>
+  unwrap<Utilisation>(await apiClient.get(`${BASE}/reports/utilisation?days=${days}`))
 
 // ── Hire charges ─────────────────────────────────────────────────────────
 

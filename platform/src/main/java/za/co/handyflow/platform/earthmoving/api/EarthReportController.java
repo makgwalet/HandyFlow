@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.earthmoving.application.internal.EarthReportService;
 import za.co.handyflow.platform.earthmoving.dto.ProfitabilityResponse;
+import za.co.handyflow.platform.earthmoving.dto.UtilisationResponse;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
@@ -32,5 +33,13 @@ public class EarthReportController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         featureGuard.requireModule("earthmoving");
         return ResponseEntity.ok(ApiResponse.success("Profitability", reports.profitability(TenantContext.getTenantIdAsObject(), from, to)));
+    }
+
+    @GetMapping("/utilisation")
+    @PreAuthorize("hasAuthority('EARTHMOVING_READ')")
+    @Operation(summary = "Hours worked per day on hour-metered machines over the last N days")
+    public ResponseEntity<ApiResponse<UtilisationResponse>> utilisation(@RequestParam(defaultValue = "30") int days) {
+        featureGuard.requireModule("earthmoving");
+        return ResponseEntity.ok(ApiResponse.success("Utilisation", reports.utilisation(TenantContext.getTenantIdAsObject(), days)));
     }
 }

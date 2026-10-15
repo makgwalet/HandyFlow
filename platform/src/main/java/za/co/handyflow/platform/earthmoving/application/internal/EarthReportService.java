@@ -7,7 +7,9 @@ import za.co.handyflow.platform.earthmoving.domain.model.*;
 import za.co.handyflow.platform.earthmoving.domain.repository.EarthAssetRepository;
 import za.co.handyflow.platform.earthmoving.domain.repository.EarthHireChargeRepository;
 import za.co.handyflow.platform.earthmoving.domain.repository.MaintenanceRepository;
+import za.co.handyflow.platform.earthmoving.domain.repository.OperatorLogRepository;
 import za.co.handyflow.platform.earthmoving.dto.ProfitabilityResponse;
+import za.co.handyflow.platform.earthmoving.dto.UtilisationResponse;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
@@ -24,6 +26,7 @@ public class EarthReportService {
     private final EarthHireChargeRepository charges;
     private final MaintenanceRepository maintenance;
     private final EarthAssetRepository assets;
+    private final OperatorLogRepository operatorLogs;
     private final EarthmovingAccess access;
 
     private static final class Acc {
@@ -57,6 +60,24 @@ public class EarthReportService {
         }
         rows.sort(Comparator.comparing(ProfitabilityResponse.Row::margin).reversed().thenComparing(ProfitabilityResponse.Row::machine));
         return new ProfitabilityResponse(from, to, row(null, "All machines", all), rows);
+    }
+
+    /** Hours worked per day over the last {@code days} days on hour-metered machines. Anyone who can read the module may see it. */
+    @Transactional(readOnly = true)
+    public UtilisationResponse utilisation(TenantId tenantId, int days) {
+        access.require(EarthmovingRules.READ, "view utilisation");
+        UtilisationRules.checkDays(days);
+        LocalDate today = LocalDate.now(ZONE);
+        LocalDate first = today.minusDays(days - 1L);
+        Set<UUID> hourMachines = new HashSet<>();
+        for (EarthAsset a : assets.findAllActive(tenantId, org.springframework.data.domain.Pageable.unpaged()))
+            if (MeterRules.HOURS.equals(a.getMeterType())) hourMachines.add(a.getId());
+        List<UtilisationRules.Shift> shifts = new ArrayList<>();
+        for (OperatorLog l : operatorLogs.findCompletedBetween(tenantId, first.atStartOfDay(ZONE).toInstant(), today.plusDays(1).atStartOfDay(ZONE).toInstant()))
+            if (hourMachines.contains(l.getAssetId())) shifts.add(new UtilisationRules.Shift(l.getStartedAt(), l.getHoursLogged()));
+        List<BigDecimal> perDay = UtilisationRules.perDay(shifts, today, days, ZONE);
+        BigDecimal total = perDay.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new UtilisationResponse(first, today, hourMachines.size(), total, perDay);
     }
 
     private static ProfitabilityResponse.Row row(UUID id, String machine, Acc a) {

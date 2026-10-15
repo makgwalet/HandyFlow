@@ -4,13 +4,26 @@ import {
 } from "lucide-react"
 import { STATUS_CFG, EMOJI, SEVERITY_CFG } from "./shared/constants"
 import { fmtCurrency } from "./shared/format"
-import { useAssets, useIncidents } from "./shared/hooks"
+import { useAssets, useIncidents, usePlans, useUtilisation } from "./shared/hooks"
+import { statusCounts, upcomingPlans, remainingText } from "./shared/dashboard"
+import { useState } from "react"
 
 type Tab = "dashboard" | "assets" | "maintenance" | "operators" | "deployments" | "incidents"
 
 export default function EarthDashboard({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
   const { data: assets = [], isLoading: assetsLoading } = useAssets()
   const { data: incidents = [] } = useIncidents()
+  const { data: plans = [] } = usePlans()
+  const [days, setDays] = useState(30)
+  const { data: util, isLoading: utilLoading, isError: utilError } = useUtilisation(days)
+  const counts = statusCounts(assets)
+  const upcoming = upcomingPlans(plans)
+  const nameOf = (id: string) => { const a = assets.find(x => x.id === id); return a ? (a.fleetNumber ?? a.name) : "Removed machine" }
+  const peak = Math.max(1, ...(util?.perDay ?? [0]))
+  const donut = counts.length === 0 ? "var(--hf-border)" : `conic-gradient(${(() => {
+    let at = 0
+    return counts.map(c => { const from = at; at += (c.count / assets.filter(a => a.status !== "RETIRED").length) * 100; return `${STATUS_CFG[c.status]?.color} ${from}% ${at}%` }).join(", ")
+  })()})`
 
   const breakdowns   = assets.filter(a => a.status === "BREAKDOWN")
   const serviceDue   = assets.filter(a => a.dueForService)
@@ -82,6 +95,78 @@ export default function EarthDashboard({ onNavigate }: { onNavigate: (tab: Tab) 
           )}
         </div>
       )}
+
+      {/* Status mix, hours per day, upcoming maintenance */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr 1fr", gap: 16, marginBottom: 16 }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, padding: "12px 16px" }} aria-label="Fleet status">
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 12 }}>Fleet status</div>
+          {counts.length === 0 ? (
+            <div style={{ padding: 16, textAlign: "center", color: "var(--hf-text-faint)", fontSize: 13 }}>No machines yet</div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <div style={{ width: 96, height: 96, borderRadius: "50%", background: donut, position: "relative", flexShrink: 0 }}>
+                <div style={{ position: "absolute", inset: 18, borderRadius: "50%", background: "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, color: "var(--hf-text)" }}>
+                  {counts.reduce((n, c) => n + c.count, 0)}
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 12 }}>
+                {counts.map(c => (
+                  <div key={c.status} style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--hf-text)" }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 2, background: STATUS_CFG[c.status]?.color }} />
+                    <span>{STATUS_CFG[c.status]?.label ?? c.status}</span>
+                    <strong>{c.count}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, padding: "12px 16px" }} aria-label="Hours worked">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)" }}>Hours worked per day</span>
+            <select aria-label="Chart period" value={days} onChange={e => setDays(Number(e.target.value))}
+              style={{ fontSize: 12, border: "1px solid var(--hf-border)", borderRadius: 6, padding: "2px 6px", background: "var(--hf-surface)", color: "var(--hf-text)" }}>
+              <option value={7}>Last 7 days</option>
+              <option value={30}>Last 30 days</option>
+              <option value={90}>Last 90 days</option>
+            </select>
+          </div>
+          {utilLoading ? (
+            <div style={{ padding: 24, textAlign: "center", color: "var(--hf-text-faint)", fontSize: 13 }}>Loading...</div>
+          ) : utilError || !util ? (
+            <div style={{ padding: 24, textAlign: "center", color: "var(--hf-text-faint)", fontSize: 13 }}>Hours worked could not be loaded</div>
+          ) : (
+            <>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 80 }} role="img" aria-label={`${util.totalHours} hours worked in the last ${days} days`}>
+                {util.perDay.map((h, i) => (
+                  <div key={i} title={`${h} hrs`} style={{ flex: 1, height: `${Math.max(h > 0 ? 4 : 1, (h / peak) * 100)}%`, background: h > 0 ? "var(--hf-info-text)" : "var(--hf-border)", borderRadius: 2 }} />
+                ))}
+              </div>
+              <div style={{ marginTop: 8, fontSize: 12, color: "var(--hf-text-muted)" }}>
+                <strong style={{ color: "var(--hf-text)" }}>{util.totalHours} hrs</strong> in {days} days on {util.machines} hour-metered machine{util.machines !== 1 ? "s" : ""} · busiest day {Math.max(0, ...util.perDay)} hrs
+              </div>
+            </>
+          )}
+        </div>
+
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }} aria-label="Upcoming maintenance">
+          <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--hf-border-subtle)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)" }}>Upcoming maintenance</span>
+            <button onClick={() => onNavigate("maintenance")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--hf-info-text)", fontWeight: 600 }}>View</button>
+          </div>
+          {upcoming.length === 0 ? (
+            <div style={{ padding: 24, textAlign: "center", color: "var(--hf-text-faint)", fontSize: 13 }}>Nothing due soon</div>
+          ) : upcoming.map((p, i) => (
+            <div key={p.id} style={{ padding: "9px 16px", borderBottom: i < upcoming.length - 1 ? "1px solid var(--hf-border-subtle)" : "none" }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{nameOf(p.assetId)} — {p.name}</div>
+              <div style={{ fontSize: 11, color: p.state === "DUE_SOON" ? "var(--hf-warning-text)" : "var(--hf-danger-text)" }}>
+                {p.state === "OVERDUE" ? "Overdue" : p.state === "DUE" ? "Due now" : "Due soon"} · {remainingText(p)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 16 }}>
         {/* Deployed equipment */}

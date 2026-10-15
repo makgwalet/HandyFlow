@@ -33,4 +33,9 @@ public interface OperatorLogRepository extends JpaRepository<OperatorLog, UUID> 
     @Query("SELECT COALESCE(SUM(l.hoursLogged), 0) FROM OperatorLog l WHERE l.assetId = :assetId AND l.endedAt IS NOT NULL " +
             "AND l.startedAt >= :from AND l.startedAt < :to")
     java.math.BigDecimal sumHoursBetween(UUID assetId, java.time.Instant from, java.time.Instant to);
+
+    /** Completed shifts of the tenant that started in [from, to). */
+    @Query("SELECT l FROM OperatorLog l WHERE l.tenantId = :tenantId AND l.endedAt IS NOT NULL AND l.hoursLogged IS NOT NULL " +
+            "AND l.startedAt >= :from AND l.startedAt < :to")
+    java.util.List<OperatorLog> findCompletedBetween(za.co.handyflow.platform.shared.TenantId tenantId, java.time.Instant from, java.time.Instant to);
 }

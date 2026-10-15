@@ -6,6 +6,7 @@ import za.co.handyflow.platform.earthmoving.application.internal.*;
 import za.co.handyflow.platform.earthmoving.domain.model.*;
 import za.co.handyflow.platform.earthmoving.domain.repository.*;
 import za.co.handyflow.platform.earthmoving.dto.ProfitabilityResponse;
+import za.co.handyflow.platform.earthmoving.dto.UtilisationResponse;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -21,6 +22,7 @@ class EarthReportServiceTest {
     EarthHireChargeRepository charges = mock(EarthHireChargeRepository.class);
     MaintenanceRepository maintenance = mock(MaintenanceRepository.class);
     EarthAssetRepository assets = mock(EarthAssetRepository.class);
+    OperatorLogRepository logs = mock(OperatorLogRepository.class);
     Set<String> granted = new HashSet<>();
     EarthmovingAccess access = new EarthmovingAccess() {
         @Override public boolean has(String authority) { return granted.contains(authority); }
@@ -34,7 +36,7 @@ class EarthReportServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new EarthReportService(charges, maintenance, assets, access);
+        service = new EarthReportService(charges, maintenance, assets, logs, access);
         d9 = EarthAsset.create(tenant, "CAT D9", "D9-001", "DOZER", null, null, null, null, null, "OWN", null, null, null, n("1000"), null, null);
         loader = EarthAsset.create(tenant, "Volvo L120", "L-02", "LOADER", null, null, null, null, null, "OWN", null, null, null, n("500"), null, null);
         when(assets.findActiveById(tenant, d9.getId())).thenReturn(Optional.of(d9));
@@ -93,5 +95,27 @@ class EarthReportServiceTest {
         granted.clear();
         granted.add("EARTHMOVING_READ");
         assertThrows(HandyFlowException.class, () -> service.profitability(tenant, FROM, TO));
+    }
+
+    @Test void utilisationCountsOnlyHourMeteredMachinesAndNeedsReadAuthority() {
+        loader.changeMeter(za.co.handyflow.platform.earthmoving.domain.model.MeterRules.KILOMETRES, java.math.BigDecimal.ZERO, java.math.BigDecimal.ZERO, java.math.BigDecimal.ZERO);
+        when(assets.findAllActive(eq(tenant), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(d9, loader)));
+        java.time.Instant now = java.time.Instant.now();
+        OperatorLog a = OperatorLog.create(tenant, d9.getId(), null, "A", null, now, n("10"));
+        a.complete(now.plusSeconds(3600), n("18"), null, null);
+        OperatorLog b = OperatorLog.create(tenant, loader.getId(), null, "B", null, now, n("100"));
+        b.complete(now.plusSeconds(3600), n("160"), null, null);
+        when(logs.findCompletedBetween(eq(tenant), any(), any())).thenReturn(List.of(a, b));
+        granted.clear();
+        granted.add("EARTHMOVING_READ");
+        UtilisationResponse r = service.utilisation(tenant, 30);
+        assertEquals(30, r.perDay().size());
+        assertEquals(1, r.machines());
+        assertEquals(0, n("8").compareTo(r.totalHours()));
+        granted.clear();
+        assertThrows(HandyFlowException.class, () -> service.utilisation(tenant, 30));
+        granted.add("EARTHMOVING_READ");
+        assertThrows(IllegalArgumentException.class, () -> service.utilisation(tenant, 3));
     }
 }
