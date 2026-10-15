@@ -63,6 +63,7 @@ public class EarthAssetService {
     private final EarthAlertService alerts;
     private final EarthSiteService sites;
     private final EarthMeterService meters;
+    private final org.springframework.context.ApplicationEventPublisher publisher;
 
     // ── Assets ────────────────────────────────────────────────────────────
 
@@ -244,6 +245,7 @@ public class EarthAssetService {
         trail.record(tenantId, "EARTHMOVING_HOURS_UPDATED", "EARTHMOVING_ASSET", id,
                 Map.of("hours", String.valueOf(before)), Map.of("hours", String.valueOf(req.currentHours())));
         log.info("Hour meter updated asset={} hours={}", id, req.currentHours());
+        publisher.publishEvent(new MeterChanged(tenantId, id));
 
         // Only notify on the transition into "due", not on every later reading while it stays due.
         if (!wasDue && asset.isDueForService()) {
@@ -415,6 +417,7 @@ public class EarthAssetService {
             assetRepository.save(asset);
             meters.record(tenantId, asset, beforeReading, "SHIFT", null);
             if (!wasDue && asset.isDueForService()) notifyServiceDue(tenantId, asset);
+            publisher.publishEvent(new MeterChanged(tenantId, assetId));
         }
         log.info("Operator log completed asset={} log={} hoursLogged={}", assetId, logId, opLog.getHoursLogged());
         return toLogResponse(opLog);

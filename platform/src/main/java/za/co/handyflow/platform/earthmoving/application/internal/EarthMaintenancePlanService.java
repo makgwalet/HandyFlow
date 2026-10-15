@@ -103,26 +103,39 @@ public class EarthMaintenancePlanService {
         List<EarthMaintenancePlan> active = plans.findActive(tenantId);
         Map<UUID, EarthAsset> byId = active.isEmpty() ? Map.of() : assetsById(tenantId, active);
         List<String> raised = new ArrayList<>();
-        for (EarthMaintenancePlan p : active) {
-            EarthAsset asset = byId.get(p.getAssetId());
-            if (asset == null || asset.getStatus() == AssetStatus.RETIRED) continue;
-            WorkOrderRules.PlanStatus s = p.status(asset.getCurrentHours(), today);
-            if (s.state() != WorkOrderRules.PlanState.DUE && s.state() != WorkOrderRules.PlanState.OVERDUE) continue;
-            if (workOrders.existsOpenForPlan(p.getId())) continue;
-            String priority = s.state() == WorkOrderRules.PlanState.OVERDUE && ("LOW".equals(p.getPriority()) || "NORMAL".equals(p.getPriority()))
-                    ? "HIGH" : p.getPriority();
-            String unit = "HOURS".equals(p.getTriggerType()) ? "hours" : "days";
-            EarthWorkOrder w = workOrderService.raise(tenantId, asset.getId(), p.getName() + " due",
-                    "Planned maintenance: " + p.getName() + ". " + s.used().stripTrailingZeros().toPlainString() + " " + unit
-                            + " since it was last done; the plan is every " + p.getIntervalValue() + " " + unit + ".",
-                    p.getTaskType(), priority, today, "PLAN", p.getId(), null, p.isBlocksRelease(), null);
-            raised.add(w.getNumber() + " " + displayName(asset) + " — " + p.getName());
-            alerts.raise(tenantId, "SERVICE_DUE", "WARNING", asset.getId(), "WORK_ORDER", w.getId(),
-                    "Service due: " + displayName(asset) + " — " + p.getName(),
-                    w.getNumber() + " raised: " + p.getName() + " is " + (s.state() == WorkOrderRules.PlanState.OVERDUE ? "overdue" : "due") + ".",
-                    "PLAN:" + p.getId(), null);
-        }
+        for (EarthMaintenancePlan p : active) checkPlan(tenantId, p, byId.get(p.getAssetId()), today, raised);
         return new PlanScanResponse(active.size(), raised.size(), raised);
+    }
+
+    /** A meter reading changed: check that one machine's plans now rather than waiting for the nightly run. */
+    @Transactional
+    public int scanAsset(TenantId tenantId, UUID assetId, LocalDate today) {
+        EarthAsset asset = assets.findActiveById(tenantId, assetId).orElse(null);
+        if (asset == null) return 0;
+        List<String> raised = new ArrayList<>();
+        for (EarthMaintenancePlan p : plans.findForAsset(tenantId, assetId)) {
+            if (p.isActive()) checkPlan(tenantId, p, asset, today, raised);
+        }
+        return raised.size();
+    }
+
+    private void checkPlan(TenantId tenantId, EarthMaintenancePlan p, EarthAsset asset, LocalDate today, List<String> raised) {
+        if (asset == null || asset.getStatus() == AssetStatus.RETIRED) return;
+        WorkOrderRules.PlanStatus s = p.status(asset.getCurrentHours(), today);
+        if (s.state() != WorkOrderRules.PlanState.DUE && s.state() != WorkOrderRules.PlanState.OVERDUE) return;
+        if (workOrders.existsOpenForPlan(p.getId())) return;
+        String priority = s.state() == WorkOrderRules.PlanState.OVERDUE && ("LOW".equals(p.getPriority()) || "NORMAL".equals(p.getPriority()))
+                ? "HIGH" : p.getPriority();
+        String unit = "HOURS".equals(p.getTriggerType()) ? "hours" : "days";
+        EarthWorkOrder w = workOrderService.raise(tenantId, asset.getId(), p.getName() + " due",
+                "Planned maintenance: " + p.getName() + ". " + s.used().stripTrailingZeros().toPlainString() + " " + unit
+                        + " since it was last done; the plan is every " + p.getIntervalValue() + " " + unit + ".",
+                p.getTaskType(), priority, today, "PLAN", p.getId(), null, p.isBlocksRelease(), null);
+        raised.add(w.getNumber() + " " + displayName(asset) + " — " + p.getName());
+        alerts.raise(tenantId, "SERVICE_DUE", "WARNING", asset.getId(), "WORK_ORDER", w.getId(),
+                "Service due: " + displayName(asset) + " — " + p.getName(),
+                w.getNumber() + " raised: " + p.getName() + " is " + (s.state() == WorkOrderRules.PlanState.OVERDUE ? "overdue" : "due") + ".",
+                "PLAN:" + p.getId(), null);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

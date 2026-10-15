@@ -34,6 +34,7 @@ class EarthAssetServiceTest {
     EarthAlertService alerts = mock(EarthAlertService.class);
     EarthSiteService sites = mock(EarthSiteService.class);
     EarthMeterService meters = mock(EarthMeterService.class);
+    org.springframework.context.ApplicationEventPublisher publisher = mock(org.springframework.context.ApplicationEventPublisher.class);
     AuditTrailFacade trail = mock(AuditTrailFacade.class);
     NotificationService notifications = mock(NotificationService.class);
     TenantAdminRecipients admins = mock(TenantAdminRecipients.class);
@@ -48,7 +49,7 @@ class EarthAssetServiceTest {
     @BeforeEach
     void setUp() {
         service = new EarthAssetService(assets, maintenance, logs, deployments, events, incidents, workOrders, access, trail,
-                notifications, admins, alerts, sites, meters);
+                notifications, admins, alerts, sites, meters, publisher);
         when(assets.save(any())).thenAnswer(i -> i.getArgument(0));
         when(assets.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
         when(admins.resolveTenantAdmins(any(TenantId.class))).thenReturn(List.of());
@@ -206,6 +207,14 @@ class EarthAssetServiceTest {
         BigDecimal before = a.getCurrentHours();
         service.updateHours(tenant, a.getId(), new UpdateHoursRequest(new BigDecimal("19000")), actor);
         verify(meters).record(eq(tenant), eq(a), eq(before), eq("MANUAL"), eq(actor));
+    }
+
+    @Test
+    void anHourUpdateAsksForTheMachinesPlansToBeCheckedNow() {
+        EarthAsset a = machine(AssetStatus.AVAILABLE);
+        granted.add("EARTHMOVING_WRITE");
+        service.updateHours(tenant, a.getId(), new UpdateHoursRequest(new BigDecimal("19000")), actor);
+        verify(publisher).publishEvent(new MeterChanged(tenant, a.getId()));
     }
 
     @Test
@@ -452,6 +461,7 @@ class EarthAssetServiceTest {
         service.completeOperatorLog(tenant, a.getId(), UUID.randomUUID(),
                 new CompleteOperatorLogRequest(t.plusSeconds(36000), new BigDecimal("108.5"), new BigDecimal("140"), null));
         assertEquals(new BigDecimal("108.5"), a.getCurrentHours());
+        verify(publisher).publishEvent(new MeterChanged(tenant, a.getId()));
     }
 
     @Test
