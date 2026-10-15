@@ -15,6 +15,7 @@ import SitesTab         from "./SitesTab"
 import HireTab          from "./HireTab"
 import ProfitabilityTab from "./ProfitabilityTab"
 import InspectionsTab   from "./InspectionsTab"
+import { UtilisationReport, CustomerRevenueReport, DowntimeReport, ComplianceReport } from "./ReportsTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { EARTHMOVING_SECTIONS } from "../../navigation/moduleSections"
 
@@ -30,6 +31,10 @@ export function EarthMovingPage() {
           case "deployments": return <DeploymentsTab />
           case "inspections": return <InspectionsTab />
           case "profitability": return <ProfitabilityTab />
+          case "report-utilisation": return <UtilisationReport />
+          case "report-revenue": return <CustomerRevenueReport />
+          case "report-downtime": return <DowntimeReport />
+          case "report-compliance": return <ComplianceReport />
           case "hire":        return <HireTab />
           case "workorders":  return <WorkOrdersTab />
           case "plans":       return <PlansTab />

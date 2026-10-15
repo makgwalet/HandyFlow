@@ -15,7 +15,7 @@
 // PUT (backend endpoint is still @PutMapping). Create is POST.
 
 import { apiClient } from "../../../api/client"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, HireCharge, DeploymentOption, DraftInvoiceResult } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult } from "./types"
 
 export function unwrap<T>(r: { data?: { data?: unknown } & Record<string, unknown> }): T {
   const p = (r.data?.data ?? r.data) as { content?: unknown } | undefined
@@ -206,6 +206,13 @@ export const fetchProfitability = async (from: string, to: string): Promise<Prof
 
 export const fetchUtilisation = async (days: number): Promise<Utilisation> =>
   unwrap<Utilisation>(await apiClient.get(`${BASE}/reports/utilisation?days=${days}`))
+
+export const fetchMachineUtilisation = async (from: string, to: string): Promise<MachineUtilisation> =>
+  unwrap<MachineUtilisation>(await apiClient.get(`${BASE}/reports/machine-utilisation?from=${from}&to=${to}`))
+export const fetchCustomerRevenue = async (from: string, to: string): Promise<CustomerRevenue> =>
+  unwrap<CustomerRevenue>(await apiClient.get(`${BASE}/reports/customer-revenue?from=${from}&to=${to}`))
+export const fetchDowntime = async (from: string, to: string): Promise<Downtime> =>
+  unwrap<Downtime>(await apiClient.get(`${BASE}/reports/downtime?from=${from}&to=${to}`))
 
 // ── Hire charges ─────────────────────────────────────────────────────────
 

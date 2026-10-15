@@ -42,4 +42,13 @@ class UtilisationRulesTest {
         assertThrows(IllegalArgumentException.class, () -> UtilisationRules.checkDays(6));
         assertThrows(IllegalArgumentException.class, () -> UtilisationRules.checkDays(91));
     }
+
+    @Test void daysWorkedCountsDifferentDaysOnly() {
+        assertEquals(2, UtilisationRules.daysWorked(java.util.Arrays.asList(at(TODAY, 6), at(TODAY, 14), at(TODAY.minusDays(1), 8), null), Z));
+        assertEquals(0, UtilisationRules.daysWorked(List.of(), Z));
+    }
+    @Test void percentOfDaysIsToOneDecimal() {
+        assertEquals(n("33.3"), UtilisationRules.percentOfDays(10, 30));
+        assertEquals(n("0.0"), UtilisationRules.percentOfDays(0, 0));
+    }
 }

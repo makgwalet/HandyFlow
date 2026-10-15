@@ -11,6 +11,9 @@ import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.earthmoving.application.internal.EarthReportService;
 import za.co.handyflow.platform.earthmoving.dto.ProfitabilityResponse;
 import za.co.handyflow.platform.earthmoving.dto.UtilisationResponse;
+import za.co.handyflow.platform.earthmoving.dto.MachineUtilisationResponse;
+import za.co.handyflow.platform.earthmoving.dto.CustomerRevenueResponse;
+import za.co.handyflow.platform.earthmoving.dto.DowntimeResponse;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
@@ -41,5 +44,35 @@ public class EarthReportController {
     public ResponseEntity<ApiResponse<UtilisationResponse>> utilisation(@RequestParam(defaultValue = "30") int days) {
         featureGuard.requireModule("earthmoving");
         return ResponseEntity.ok(ApiResponse.success("Utilisation", reports.utilisation(TenantContext.getTenantIdAsObject(), days)));
+    }
+
+    @GetMapping("/machine-utilisation")
+    @PreAuthorize("hasAuthority('EARTHMOVING_READ')")
+    @Operation(summary = "Hours worked per hour-metered machine for a period")
+    public ResponseEntity<ApiResponse<MachineUtilisationResponse>> machineUtilisation(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        featureGuard.requireModule("earthmoving");
+        return ResponseEntity.ok(ApiResponse.success("Machine utilisation", reports.machineUtilisation(TenantContext.getTenantIdAsObject(), from, to)));
+    }
+
+    @GetMapping("/customer-revenue")
+    @PreAuthorize("hasAuthority('EARTHMOVING_ADMIN')")
+    @Operation(summary = "Hire revenue per customer for a period")
+    public ResponseEntity<ApiResponse<CustomerRevenueResponse>> customerRevenue(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        featureGuard.requireModule("earthmoving");
+        return ResponseEntity.ok(ApiResponse.success("Customer revenue", reports.customerRevenue(TenantContext.getTenantIdAsObject(), from, to)));
+    }
+
+    @GetMapping("/downtime")
+    @PreAuthorize("hasAuthority('EARTHMOVING_READ')")
+    @Operation(summary = "Time in breakdown and in maintenance per machine for a period")
+    public ResponseEntity<ApiResponse<DowntimeResponse>> downtime(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        featureGuard.requireModule("earthmoving");
+        return ResponseEntity.ok(ApiResponse.success("Downtime", reports.downtime(TenantContext.getTenantIdAsObject(), from, to)));
     }
 }

@@ -170,6 +170,12 @@ export interface ProfitRow {
   assetId: string | null; machine: string; charges: number; revenue: number; invoiced: number; notInvoiced: number
   maintenanceCost: number; margin: number; marginPercent: number | null
 }
+export interface MachineUtilisationRow { assetId: string; machine: string; shifts: number; hours: number; daysWorked: number; daysWorkedPercent: number }
+export interface MachineUtilisation { from: string; to: string; days: number; totalHours: number; machines: MachineUtilisationRow[] }
+export interface CustomerRevenueRow { customerId: string | null; customer: string; charges: number; revenue: number; invoiced: number; notInvoiced: number; sharePercent: number }
+export interface CustomerRevenue { from: string; to: string; totals: CustomerRevenueRow; customers: CustomerRevenueRow[] }
+export interface DowntimeRow { assetId: string | null; machine: string; breakdowns: number; breakdownHours: number; maintenanceHours: number; totalHours: number; availabilityPercent: number | null }
+export interface Downtime { from: string; to: string; totals: DowntimeRow; machines: DowntimeRow[] }
 export interface Utilisation { from: string; to: string; machines: number; totalHours: number; perDay: number[] }
 export interface Profitability { from: string; to: string; totals: ProfitRow; machines: ProfitRow[] }
 

@@ -448,6 +448,10 @@ export const EARTHMOVING_SECTIONS: ModuleSections = {
     ] },
     { label: 'Reports', sections: [
       { id: 'profitability', label: 'Profitability', icon: FileBarChart },
+      { id: 'report-revenue', label: 'Revenue by customer', icon: Coins },
+      { id: 'report-utilisation', label: 'Machine utilisation', icon: Gauge },
+      { id: 'report-downtime', label: 'Downtime', icon: AlertTriangle },
+      { id: 'report-compliance', label: 'Service compliance', icon: ShieldCheck },
     ] },
   ],
 }

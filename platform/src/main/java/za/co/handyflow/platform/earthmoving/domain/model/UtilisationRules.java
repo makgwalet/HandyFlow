@@ -40,4 +40,15 @@ public final class UtilisationRules {
         for (BigDecimal b : sums) out.add(b.setScale(1, java.math.RoundingMode.HALF_UP));
         return out;
     }
+
+    /** How many different days had at least one shift start, out of the days in the period. */
+    public static int daysWorked(List<Instant> starts, ZoneId zone) {
+        return (int) starts.stream().filter(java.util.Objects::nonNull).map(t -> t.atZone(zone).toLocalDate()).distinct().count();
+    }
+
+    /** Share of the days in the period that were worked, to one decimal. */
+    public static BigDecimal percentOfDays(int daysWorked, long daysInPeriod) {
+        if (daysInPeriod <= 0) return BigDecimal.ZERO.setScale(1);
+        return BigDecimal.valueOf(daysWorked * 100L).divide(BigDecimal.valueOf(daysInPeriod), 1, java.math.RoundingMode.HALF_UP);
+    }
 }

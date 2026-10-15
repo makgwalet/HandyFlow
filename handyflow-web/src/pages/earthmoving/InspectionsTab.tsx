@@ -8,6 +8,7 @@ import { useState } from "react"
 import { ClipboardCheck } from "lucide-react"
 import { apiMessage, fmtDateTime } from "./shared/format"
 import { Overlay, ModalHead, ModalFoot, ErrBanner, lbl, inputStyle } from "./shared/Modal"
+import { INSPECTION_TYPE_LABEL as TYPE_LABEL } from "./shared/constants"
 import { useEarthPerms } from "./shared/useEarthPerms"
 import { useAssets, useChecklist, useInspections, useCreateInspection, useAssignableUsers } from "./shared/hooks"
 import type { Inspection } from "./shared/types"
@@ -21,7 +22,6 @@ const btn = (primary = false): React.CSSProperties => ({
 const card: React.CSSProperties = { border: "1px solid var(--hf-border)", borderRadius: 10, padding: "14px 18px", background: "var(--hf-surface)" }
 
 const RESULT_LABEL: Record<string, string> = { PASS: "Passed", DEFECTS: "Passed with defects", UNSAFE: "Unsafe: taken out of service" }
-export const TYPE_LABEL: Record<string, string> = { PRE_USE: "Pre-use", HANDOVER: "Handover to customer", RETURN: "Return from hire" }
 const OUTCOMES = [["OK", "OK"], ["DEFECT", "Defect"], ["UNSAFE", "Unsafe"]] as const
 
 type Answer = { outcome: string; comment: string }

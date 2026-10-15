@@ -1,7 +1,7 @@
 // src/pages/earthmoving/shared/hooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, HireCharge, DeploymentOption, DraftInvoiceResult } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult } from "./types"
 
 // Central query keys — every tab imports these instead of typing the
 // literal string, so a rename is a one-line change instead of a grep.
@@ -402,6 +402,17 @@ export function useProfitability(from: string, to: string, enabled = true) {
 
 export function useUtilisation(days: number) {
   return useQuery<Utilisation>({ queryKey: ["em-utilisation", days], queryFn: () => api.fetchUtilisation(days), staleTime: 60_000 })
+}
+
+const okRange = (from: string, to: string, enabled: boolean) => enabled && !!from && !!to && from <= to
+export function useMachineUtilisation(from: string, to: string, enabled = true) {
+  return useQuery<MachineUtilisation>({ queryKey: ["em-machine-utilisation", from, to], queryFn: () => api.fetchMachineUtilisation(from, to), enabled: okRange(from, to, enabled), staleTime: 30_000 })
+}
+export function useCustomerRevenue(from: string, to: string, enabled = true) {
+  return useQuery<CustomerRevenue>({ queryKey: ["em-customer-revenue", from, to], queryFn: () => api.fetchCustomerRevenue(from, to), enabled: okRange(from, to, enabled), staleTime: 30_000 })
+}
+export function useDowntime(from: string, to: string, enabled = true) {
+  return useQuery<Downtime>({ queryKey: ["em-downtime", from, to], queryFn: () => api.fetchDowntime(from, to), enabled: okRange(from, to, enabled), staleTime: 30_000 })
 }
 
 // ── Hire charges ─────────────────────────────────────────────────────────
