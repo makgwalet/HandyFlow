@@ -16,4 +16,8 @@ public interface AuditUniverseEntryRepository extends JpaRepository<AuditUnivers
 
     @Query("SELECT e FROM AuditUniverseEntry e WHERE e.tenantId = :tenantId AND e.active = true ORDER BY e.name")
     List<AuditUniverseEntry> findAllActive(@Param("tenantId") UUID tenantId);
+
+    /** Companies that use internal audit at all, for the nightly monitoring run. */
+    @Query("SELECT DISTINCT e.tenantId FROM AuditUniverseEntry e")
+    List<UUID> findTenantIdsWithAudit();
 }

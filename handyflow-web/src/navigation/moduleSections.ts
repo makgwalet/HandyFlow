@@ -750,6 +750,7 @@ export const INTERNAL_AUDIT_SECTIONS: ModuleSections = {
         { id: 'engagements', label: 'Engagements', icon: ClipboardList, permission: 'AUDIT_READ' },
         { id: 'quality', label: 'Quality', icon: CheckCircle2, permission: 'AUDIT_READ' },
         { id: 'programme', label: 'Programme library', icon: ClipboardList, permission: 'AUDIT_READ' },
+        { id: 'monitoring', label: 'Monitoring', icon: Radio, permission: 'AUDIT_READ' },
         { id: 'follow-ups', label: 'Follow-ups', icon: Repeat, permission: 'AUDIT_READ' },
         { id: 'investigations', label: 'Investigations', icon: Lock, permission: 'AUDIT_INVESTIGATE' },
       ],

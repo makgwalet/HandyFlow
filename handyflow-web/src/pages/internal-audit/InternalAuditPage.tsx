@@ -16,6 +16,7 @@ import { CommitteeReport } from "./CommitteeReport"
 import { ReportsSection } from "./ReportsSection"
 import { QualitySection } from "./QualitySection"
 import { ProgrammeSection } from "./ProgrammeSection"
+import { MonitoringSection } from "./MonitoringSection"
 import { FollowUpSection } from "./FollowUpSection"
 import { InvestigationsSection } from "./InvestigationsSection"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
@@ -168,6 +169,7 @@ export default function InternalAuditPage() {
           case "reports":     return <ReportsSection />
           case "quality":     return <QualitySection />
           case "programme":   return <ProgrammeSection />
+          case "monitoring":  return <MonitoringSection />
           case "follow-ups":  return <FollowUpSection />
           case "investigations": return <InvestigationsSection />
           case "committee":   return <CommitteeReport />
