@@ -36,4 +36,8 @@ public interface EarthHireChargeRepository extends JpaRepository<EarthHireCharge
     @Query("SELECT c FROM EarthHireCharge c WHERE c.tenantId = :tenantId AND c.assetId = :assetId AND c.basis = 'KILOMETRE' " +
             "AND c.status <> 'VOIDED' ORDER BY c.periodFrom")
     List<EarthHireCharge> findLiveKilometreByAsset(TenantId tenantId, UUID assetId);
+
+    /** Pending charges whose period starts inside the dates, oldest first: what is waiting to be invoiced for a month. */
+    @Query("SELECT c FROM EarthHireCharge c WHERE c.tenantId = :tenantId AND c.status = 'PENDING' AND c.periodFrom >= :from AND c.periodFrom <= :to ORDER BY c.periodFrom, c.createdAt")
+    List<EarthHireCharge> findPendingStartingBetween(TenantId tenantId, LocalDate from, LocalDate to);
 }

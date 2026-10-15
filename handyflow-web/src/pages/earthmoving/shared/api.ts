@@ -15,7 +15,7 @@
 // PUT (backend endpoint is still @PutMapping). Create is POST.
 
 import { apiClient } from "../../../api/client"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling } from "./types"
 
 export function unwrap<T>(r: { data?: { data?: unknown } & Record<string, unknown> }): T {
   const p = (r.data?.data ?? r.data) as { content?: unknown } | undefined
@@ -284,3 +284,23 @@ export const fetchHireContracts = async (): Promise<ContractRef[]> => {
   return (Array.isArray(r) ? r : []).map((c: { id: string; contractNumber?: string; title: string; status: string; startDate?: string | null; endDate?: string | null }) =>
     ({ id: c.id, number: c.contractNumber ?? null, title: c.title, status: c.status, startDate: c.startDate ?? null, endDate: c.endDate ?? null }))
 }
+
+// ── Monthly billing ──────────────────────────────────────────────────────
+
+export const previewBilling = async (month: string): Promise<BillingRun> =>
+  unwrap<BillingRun>(await apiClient.get(`${BASE}/billing/preview?month=${encodeURIComponent(month)}`))
+
+export const runBilling = async (month: string, createDrafts: boolean): Promise<BillingRun> =>
+  unwrap<BillingRun>(await apiClient.post(`${BASE}/billing/run`, { month, createDrafts }))
+
+export const fetchBillingHistory = async (): Promise<BillingHistory> =>
+  unwrap<BillingHistory>(await apiClient.get(`${BASE}/billing/runs`))
+
+export const switchScheduledBilling = async (enabled: boolean): Promise<BillingHistory> =>
+  unwrap<BillingHistory>(await apiClient.put(`${BASE}/billing/scheduled`, { enabled }))
+
+export const fetchAutoBilling = async (deploymentId: string): Promise<AutoBilling> =>
+  unwrap<AutoBilling>(await apiClient.get(`${BASE}/deployments/${deploymentId}/auto-billing`))
+
+export const saveAutoBilling = async (deploymentId: string, basis: string | null): Promise<AutoBilling> =>
+  unwrap<AutoBilling>(await apiClient.put(`${BASE}/deployments/${deploymentId}/auto-billing`, { basis }))

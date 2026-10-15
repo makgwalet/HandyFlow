@@ -44,4 +44,9 @@ public interface EarthDeploymentRepository extends JpaRepository<EarthDeployment
 
     @Query("SELECT d FROM EarthDeployment d WHERE d.tenantId = :tenantId AND d.id = :id")
     java.util.Optional<EarthDeployment> findByTenantAndId(TenantId tenantId, java.util.UUID id);
+
+    /** Deployments on the monthly billing run that were on hire at some point in [from, toExclusive). */
+    @Query("SELECT d FROM EarthDeployment d WHERE d.tenantId = :tenantId AND d.autoBillingBasis IS NOT NULL " +
+            "AND d.deployedAt < :toExclusive AND (d.returnedAt IS NULL OR d.returnedAt >= :from) ORDER BY d.deployedAt")
+    java.util.List<EarthDeployment> findAutoBilled(TenantId tenantId, java.time.Instant from, java.time.Instant toExclusive);
 }

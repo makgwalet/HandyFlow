@@ -45,6 +45,9 @@ import java.util.*;
 public class EarthHireService {
 
     static final ZoneId ZONE = ZoneId.of("Africa/Johannesburg");
+
+    /** Today in the company's time zone. */
+    static LocalDate today() { return LocalDate.now(ZONE); }
     private static final int MAX_CHARGES_PER_INVOICE = 100;
 
     private final EarthDeploymentRepository deployments;
@@ -95,6 +98,12 @@ public class EarthHireService {
 
     public HireChargeResponse preview(TenantId tenantId, HireChargeRequest req, LocalDate today) {
         access.require(EarthmovingRules.ADMIN, "raise a hire charge");
+        return quote(tenantId, req, today);
+    }
+
+    /** What a charge would be, with no permission check: for the monthly billing run, whose caller has checked it (or is the schedule). */
+    @Transactional(readOnly = true)
+    public HireChargeResponse quote(TenantId tenantId, HireChargeRequest req, LocalDate today) {
         Quote q = checked(tenantId, req, today);
         EarthHireCharge c = build(tenantId, q, req, null);
         return new HireChargeResponse(null, c.getDeploymentId(), c.getAssetId(), q.machine(), c.getCustomerId(), customerName(tenantId, c.getCustomerId()),
@@ -111,6 +120,12 @@ public class EarthHireService {
     @Transactional
     public HireChargeResponse create(TenantId tenantId, HireChargeRequest req, UUID actor, LocalDate today) {
         access.require(EarthmovingRules.ADMIN, "raise a hire charge");
+        return raise(tenantId, req, actor, today);
+    }
+
+    /** Raises a charge with no permission check: for the monthly billing run, whose caller has checked it (or is the schedule). */
+    @Transactional
+    public HireChargeResponse raise(TenantId tenantId, HireChargeRequest req, UUID actor, LocalDate today) {
         Quote q = checked(tenantId, req, today);
         EarthHireCharge c = build(tenantId, q, req, actor);
         try {
@@ -157,6 +172,12 @@ public class EarthHireService {
     @Transactional
     public DraftInvoiceResponse draftInvoice(TenantId tenantId, DraftFromChargesRequest req, UUID actor) {
         access.require(EarthmovingRules.ADMIN, "raise a draft invoice");
+        return draftFrom(tenantId, req, actor);
+    }
+
+    /** The draft invoice with no permission check: for the monthly billing run, whose caller has checked it (or is the schedule). */
+    @Transactional
+    public DraftInvoiceResponse draftFrom(TenantId tenantId, DraftFromChargesRequest req, UUID actor) {
         List<UUID> ids = req.chargeIds() == null ? List.of() : req.chargeIds().stream().filter(Objects::nonNull).distinct().toList();
         if (ids.isEmpty()) throw new IllegalArgumentException("Choose at least one charge.");
         if (ids.size() > MAX_CHARGES_PER_INVOICE) throw new IllegalArgumentException("Put at most " + MAX_CHARGES_PER_INVOICE + " charges on one invoice.");

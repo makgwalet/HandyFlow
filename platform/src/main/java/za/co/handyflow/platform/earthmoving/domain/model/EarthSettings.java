@@ -25,6 +25,10 @@ public class EarthSettings {
     @Column(name = "contract_threshold", precision = 14, scale = 2)
     private BigDecimal contractThreshold;
 
+    /** Whether the monthly billing run happens by itself on the 2nd of each month (draft invoices only). */
+    @Column(name = "auto_billing_enabled", nullable = false)
+    private boolean autoBillingEnabled;
+
     @Column(name = "updated_by")
     private UUID updatedBy;
 
@@ -39,6 +43,12 @@ public class EarthSettings {
 
     public void setContractThreshold(BigDecimal threshold, UUID actor) {
         this.contractThreshold = ContractRules.checkThreshold(threshold);
+        this.updatedBy = actor;
+        this.updatedAt = Instant.now();
+    }
+
+    public void setAutoBillingEnabled(boolean enabled, UUID actor) {
+        this.autoBillingEnabled = enabled;
         this.updatedBy = actor;
         this.updatedAt = Instant.now();
     }

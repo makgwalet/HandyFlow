@@ -85,6 +85,10 @@ public class EarthDeployment {
     @Column(name = "contract_id")
     private UUID contractId;
 
+    /** How the monthly billing run charges this deployment (one of HireRules.BASES); null means it is not billed automatically. */
+    @Column(name = "auto_billing_basis")
+    private String autoBillingBasis;
+
     /** Why the deployment ended: RETURNED, BREAKDOWN, or MAINTENANCE. Null while open. */
     @Column(name = "end_reason")
     private String endReason;
@@ -126,6 +130,11 @@ public class EarthDeployment {
     public boolean linkProjectIfEmpty(UUID id) { if (projectId != null || id == null) return false; projectId = id; return true; }
 
     public void linkContract(UUID contractId) { this.contractId = contractId; }
+
+    /** Puts the deployment on (or, with null, off) the monthly billing run. */
+    public void setAutoBilling(String basis) {
+        this.autoBillingBasis = basis == null || basis.isBlank() ? null : HireRules.basis(basis);
+    }
 
     public boolean isOpen() {
         return returnedAt == null;

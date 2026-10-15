@@ -1,7 +1,7 @@
 // src/pages/earthmoving/shared/hooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling } from "./types"
 
 // Central query keys — every tab imports these instead of typing the
 // literal string, so a rename is a one-line change instead of a grep.
@@ -538,4 +538,45 @@ export function useSaveSettings(onSuccess?: () => void) {
 
 export function useHireContractOptions(enabled: boolean) {
   return useQuery<ContractRef[]>({ queryKey: ["em-hire-contract-options"], queryFn: api.fetchHireContracts, enabled, retry: false, staleTime: 30_000 })
+}
+
+// ── Monthly billing ──────────────────────────────────────────────────────
+
+/** What the run would do for a finished month. Only asked for when a month is chosen. */
+export function useBillingPreview(month: string, enabled: boolean) {
+  return useQuery<BillingRun>({ queryKey: ["em-billing-preview", month], queryFn: () => api.previewBilling(month), enabled: enabled && !!month, retry: false, staleTime: 0 })
+}
+
+export function useBillingHistory() {
+  return useQuery<BillingHistory>({ queryKey: ["em-billing-history"], queryFn: api.fetchBillingHistory, staleTime: 15_000 })
+}
+
+export function useRunBilling(onDone?: (r: BillingRun) => void) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ month, createDrafts }: { month: string; createDrafts: boolean }) => api.runBilling(month, createDrafts),
+    onSuccess: r => {
+      qc.invalidateQueries({ queryKey: ["em-billing-preview"] })
+      qc.invalidateQueries({ queryKey: ["em-billing-history"] })
+      qc.invalidateQueries({ queryKey: QK.hireCharges })
+      onDone?.(r)
+    },
+  })
+}
+
+export function useSwitchScheduledBilling() {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: (enabled: boolean) => api.switchScheduledBilling(enabled), onSuccess: r => qc.setQueryData(["em-billing-history"], r) })
+}
+
+export function useAutoBilling(deploymentId: string) {
+  return useQuery<AutoBilling>({ queryKey: ["em-auto-billing", deploymentId], queryFn: () => api.fetchAutoBilling(deploymentId), enabled: !!deploymentId, staleTime: 0 })
+}
+
+export function useSaveAutoBilling(deploymentId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (basis: string | null) => api.saveAutoBilling(deploymentId, basis),
+    onSuccess: r => { qc.setQueryData(["em-auto-billing", deploymentId], r); qc.invalidateQueries({ queryKey: ["em-billing-preview"] }) },
+  })
 }

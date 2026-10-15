@@ -197,6 +197,22 @@ export interface HireCharge {
   /** Why a pending charge cannot be invoiced yet; null when it can. */
   attention?: string | null; recalculatedAt?: string | null
 }
+export interface BillingLine {
+  deploymentId: string | null; assetId: string | null; machine: string | null; customerName: string | null; siteName: string | null
+  basis: string | null; periodFrom: string; periodTo: string
+  state: string // READY | ALREADY_BILLED | EXCEPTION
+  message: string | null; quantity: number | null; unitRate: number | null; amount: number | null; total: number | null; rateSource: string | null
+}
+export interface BillingRun {
+  month: string; applied: boolean; lines: BillingLine[]; ready: number; alreadyBilled: number; exceptions: number
+  chargesCreated: number; invoices: DraftInvoiceResult[]
+}
+export interface BillingHistory {
+  autoBillingEnabled: boolean
+  runs: { id: string; month: string; trigger: string; draftsRequested: boolean; chargesCreated: number; alreadyBilled: number
+    exceptions: number; invoicesCreated: number; createdBy: string | null; createdAt: string }[]
+}
+export interface AutoBilling { deploymentId: string; basis: string | null }
 export interface ContractRate { basis: string; unitRate: number; includedKm: number | null; updatedAt: string | null }
 export interface ContractRates { deploymentId: string; contractId: string | null; contractNumber: string | null; rates: ContractRate[] }
 export interface DeploymentOption { id: string; assetId: string; siteName: string | null; clientName: string | null; deployedAt: string | null; returnedAt: string | null }

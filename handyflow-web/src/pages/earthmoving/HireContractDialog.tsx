@@ -7,7 +7,7 @@ import { apiMessage, fmtCurrency2dp } from "./shared/format"
 import { useEarthPerms } from "./shared/useEarthPerms"
 import {
   useAssetDeployments, useDeploymentContract, useDraftHireContract, useLinkHireContract, useExtendHire,
-  useHireContractOptions, useEarthSettings, useSaveSettings, useContractRates, useSaveContractRate, useRemoveContractRate,
+  useHireContractOptions, useEarthSettings, useSaveSettings, useContractRates, useSaveContractRate, useRemoveContractRate, useAutoBilling, useSaveAutoBilling,
 } from "./shared/hooks"
 import type { Asset, ContractRef } from "./shared/types"
 
@@ -80,6 +80,37 @@ function ContractRates({ deploymentId, canEdit }: { deploymentId: string; canEdi
   )
 }
 
+/** Whether the monthly billing run charges this deployment, and by what. Administrators change it. */
+function AutoBillingSection({ deploymentId, canEdit }: { deploymentId: string; canEdit: boolean }) {
+  const { data } = useAutoBilling(deploymentId)
+  const save = useSaveAutoBilling(deploymentId)
+  const [pick, setPick] = useState<string | null>(null)
+  const [err, setErr] = useState("")
+  const current = data?.basis ?? ""
+  const shown = pick ?? current
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={lbl}>Monthly billing</div>
+      {canEdit ? (
+        <div style={{ display: "flex", gap: 8, alignItems: "end" }}>
+          <div style={{ flex: 1 }}>
+            <label htmlFor="ab-basis" style={lbl}>Charge this hire each month</label>
+            <select id="ab-basis" value={shown} onChange={e => setPick(e.target.value)} style={{ ...inputStyle(), background: "var(--hf-surface)" }}>
+              <option value="">Not automatically</option>
+              {Object.entries(HIRE_BASIS_LABEL).map(([v, l]) => <option key={v} value={v}>{l.replace("Per ", "By the ")}</option>)}
+            </select>
+          </div>
+          <button style={primary} disabled={shown === current || save.isPending}
+            onClick={() => { setErr(""); save.mutate(shown === "" ? null : shown, { onError: (e: unknown) => setErr(apiMessage(e, "Could not save")), onSuccess: () => setPick(null) }) }}>Save</button>
+        </div>
+      ) : (
+        <div style={{ fontSize: 13 }}>{current ? `Billed automatically each month: ${(HIRE_BASIS_LABEL[current] ?? current).toLowerCase()}.` : "Not billed automatically."}</div>
+      )}
+      {err && <ErrBanner msg={err} />}
+    </div>
+  )
+}
+
 /** The hire contract of the machine's current deployment: see it, make a draft, link one, or record an extension. */
 export function HireContractDialog({ asset, onClose }: { asset: Asset; onClose: () => void }) {
   const perms = useEarthPerms()
@@ -120,6 +151,8 @@ export function HireContractDialog({ asset, onClose }: { asset: Asset; onClose: 
             ) : <div style={{ fontSize: 13 }}>No contract is linked to this hire.</div>}
 
             {panel.contract && <ContractRates deploymentId={id} canEdit={perms.canAdmin} />}
+
+            <AutoBillingSection deploymentId={id} canEdit={perms.canAdmin} />
 
             {panel.addenda.length > 0 && (
               <div>
