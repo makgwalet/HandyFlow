@@ -25,4 +25,7 @@ public interface AuditFindingRepository extends JpaRepository<AuditFinding, UUID
     // stops accepting new shares.
     @Query("SELECT f FROM AuditFinding f WHERE f.tenantId = :tenantId AND f.externalVisibility = 'SHARED' ORDER BY f.sharedAt DESC")
     List<AuditFinding> findSharedForTenant(@Param("tenantId") UUID tenantId);
+
+    @Query("SELECT f FROM AuditFinding f WHERE f.tenantId = :tenantId ORDER BY f.createdAt DESC")
+    List<AuditFinding> findAllForTenant(@Param("tenantId") UUID tenantId);
 }

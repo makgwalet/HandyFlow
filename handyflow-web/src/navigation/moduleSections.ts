@@ -730,11 +730,12 @@ export const INTERNAL_AUDIT_SECTIONS: ModuleSections = {
   basePath: '/internal-audit',
   title: 'Internal Audit',
   icon: ShieldCheck,
-  defaultSection: 'universe',
+  defaultSection: 'dashboard',
   groups: [
     {
       label: 'Audit programme',
       sections: [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'universe', label: 'Audit Universe', icon: Database },
         { id: 'plans', label: 'Annual Plans', icon: CalendarRange },
         { id: 'engagements', label: 'Engagements', icon: ClipboardList },

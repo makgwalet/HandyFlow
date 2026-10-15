@@ -12,6 +12,7 @@ import { EngagementsPanel } from "./EngagementsPanel"
 import { EvidenceRequests } from "../../components/evidenceRequests/EvidenceRequests"
 import { businessEvidenceRequestApi } from "../../api/evidenceRequests.api"
 import { AuditPackPanel } from "./AuditPackPanel"
+import { ExternalAuditDashboard } from "./ExternalAuditDashboard"
 import { AuditQueries } from "../../components/auditQueries/AuditQueries"
 import { businessAuditQueryApi } from "../../api/auditQueries.api"
 
@@ -79,6 +80,11 @@ export function AuditorAccessSection() {
       <p style={{ fontSize: 12.5, color: MUTED, marginBottom: 20 }}>
         Give an external auditor or accountant a read-only login to review your evidence and control exceptions directly.
       </p>
+
+      <div style={{ background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: 16, marginBottom: 20 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: INK, marginBottom: 8 }}>Audit dashboard</div>
+        <ExternalAuditDashboard engagements={engagements} />
+      </div>
 
       <EngagementsPanel engagements={engagements} onChange={refetch} />
 

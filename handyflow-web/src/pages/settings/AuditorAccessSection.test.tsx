@@ -7,6 +7,7 @@ vi.mock("../../api/auditor.api", () => ({ auditorApi: api }))
 vi.mock("../../api/auditPack.api", () => ({ auditPackApi: { runs: () => Promise.resolve([]) } }))
 vi.mock("../../api/auditQueries.api", () => ({ businessAuditQueryApi: { list: () => Promise.resolve([]) } }))
 vi.mock("../../api/evidenceRequests.api", () => ({ businessEvidenceRequestApi: { list: () => Promise.resolve([]) } }))
+vi.mock("../../api/auditDashboards.api", () => ({ auditDashboardsApi: { external: () => Promise.resolve({ requests: { awaitingBusiness: 0, overdue: 0, dueSoon: 0, awaitingAuditor: 0, rejectedBefore: 0, approved: 0, notAvailable: 0 }, queries: { awaitingBusiness: 0, overdue: 0, awaitingAuditor: 0, reopenedBefore: 0, resolved: 0 }, reviewNotes: { unresolved: 0, overdue: 0 }, overdueTotal: 0, engagements: [], overdueItems: [] }) } }))
 afterEach(cleanup)
 beforeEach(() => { Object.values(api).forEach(f => f.mockReset()); api.list.mockResolvedValue([]); api.engagements.mockResolvedValue([]) })
 
