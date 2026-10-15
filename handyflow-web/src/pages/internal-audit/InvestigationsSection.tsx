@@ -69,7 +69,7 @@ function CaseDetail({ id, onBack }: { id: string; onBack: () => void }) {
 
   useEffect(() => {
     api.get(id).then(setV).catch(e => setError(msg(e, "That case could not be found")))
-    api.users().then(setUsers).catch(() => setUsers([]))
+    api.users().then(setUsers).catch(() => { setUsers([]); setError("Could not load the list of people. Refresh to try again.") })
   }, [id])
 
   const run = async (fn: () => Promise<InvView | null>, fallback: string, after?: () => void) => {

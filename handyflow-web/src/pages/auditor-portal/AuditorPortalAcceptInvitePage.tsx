@@ -28,7 +28,7 @@ export function AuditorPortalAcceptInvitePage() {
     setLoading(true); setError("")
     try {
       const res = await auditorPortalApi.register({ inviteToken, password, fullName })
-      setAuth(res.token, { id: res.portalUserId, email: res.email, fullName: res.fullName })
+      setAuth(res.token, { portalUserId: res.portalUserId, email: res.email, fullName: res.fullName })
       navigate("/auditor/portal")
     } catch (err: any) {
       setError(err.response?.data?.message ?? "Failed to accept this invite")
@@ -41,19 +41,19 @@ export function AuditorPortalAcceptInvitePage() {
         <h1 style={{ fontSize: 18, fontWeight: 800, color: INK, marginBottom: 4 }}>Accept Invite</h1>
         <p style={{ fontSize: 13, color: MUTED, marginBottom: 20 }}>Set your password to finish setting up your auditor access.</p>
 
-        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 4 }}>Full name</label>
-        <input required value={fullName} onChange={e => setFullName(e.target.value)}
+        <label htmlFor="portal-fullname" style={{ display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 4 }}>Full name</label>
+        <input id="portal-fullname" required autoComplete="name" value={fullName} onChange={e => setFullName(e.target.value)}
           style={{ width: "100%", padding: "11px 13px", border: `1.5px solid ${BORDER}`, borderRadius: 8, fontSize: 14, marginBottom: 14, boxSizing: "border-box" as const }} />
 
-        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 4 }}>Password</label>
-        <input type="password" required minLength={8} value={password} onChange={e => setPassword(e.target.value)}
+        <label htmlFor="portal-password" style={{ display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 4 }}>Password</label>
+        <input id="portal-password" type="password" required minLength={8} autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)}
           style={{ width: "100%", padding: "11px 13px", border: `1.5px solid ${BORDER}`, borderRadius: 8, fontSize: 14, marginBottom: 14, boxSizing: "border-box" as const }} />
 
-        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 4 }}>Confirm password</label>
-        <input type="password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+        <label htmlFor="portal-confirm" style={{ display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 4 }}>Confirm password</label>
+        <input id="portal-confirm" type="password" required autoComplete="new-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
           style={{ width: "100%", padding: "11px 13px", border: `1.5px solid ${BORDER}`, borderRadius: 8, fontSize: 14, marginBottom: 18, boxSizing: "border-box" as const }} />
 
-        {error && <div style={{ padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 12.5, color: "var(--hf-danger-text)", marginBottom: 14 }}>{error}</div>}
+        {error && <div role="alert" style={{ padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 12.5, color: "var(--hf-danger-text)", marginBottom: 14 }}>{error}</div>}
 
         <button type="submit" disabled={loading}
           style={{ width: "100%", padding: "11px 13px", background: NAVY, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>

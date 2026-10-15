@@ -27,16 +27,17 @@ export function AuditorPortalTenantDetailPage() {
   const [exceptions, setExceptions] = useState<ControlExceptionItem[]>([])
   const [evidence, setEvidence] = useState<EvidenceItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const queryApi = useMemo(() => (tenantId ? auditorAuditQueryApi(tenantId) : null), [tenantId])
   const requestApi = useMemo(() => (tenantId ? auditorEvidenceRequestApi(tenantId) : null), [tenantId])
 
   useEffect(() => {
     if (!tenantId) return
-    setLoading(true)
     Promise.all([
       auditorPortalApi.getControlExceptions(tenantId),
       auditorPortalApi.getEvidence(tenantId),
     ]).then(([exc, ev]) => { setExceptions(exc); setEvidence(ev) })
+      .catch(e => setError(e?.response?.data?.message ?? "Could not load this business's records. Try again shortly."))
       .finally(() => setLoading(false))
   }, [tenantId])
 
@@ -50,9 +51,9 @@ export function AuditorPortalTenantDetailPage() {
       <div style={{ padding: "24px 32px", maxWidth: 800 }}>
         <h1 style={{ fontSize: 18, fontWeight: 800, color: INK, marginBottom: 16 }}>Review</h1>
 
-        <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${BORDER}`, marginBottom: 20 }}>
+        <div role="tablist" aria-label="Review sections" style={{ display: "flex", gap: 4, borderBottom: `1px solid ${BORDER}`, marginBottom: 20 }}>
           {([["exceptions", "Control Exceptions"], ["evidence", "Evidence"], ["requests", "Requests"], ["queries", "Queries"]] as [Tab, string][]).map(([id, label]) => (
-            <button key={id} onClick={() => setTab(id)} style={{
+            <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)} style={{
               padding: "8px 14px", background: "none", border: "none",
               borderBottom: tab === id ? `2px solid ${NAVY}` : "2px solid transparent",
               color: tab === id ? NAVY_TEXT : MUTED, fontWeight: tab === id ? 700 : 500, fontSize: 13, cursor: "pointer", marginBottom: -1,
@@ -66,6 +67,8 @@ export function AuditorPortalTenantDetailPage() {
           <EvidenceRequests side="auditor" api={requestApi} />
         ) : loading ? (
           <div style={{ color: FAINT, fontSize: 13 }}>Loading…</div>
+        ) : error ? (
+          <div role="alert" style={{ padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 12.5, color: "var(--hf-danger-text)" }}>{error}</div>
         ) : tab === "exceptions" ? (
           exceptions.length === 0 ? (
             <Empty text="No control exceptions on record." />

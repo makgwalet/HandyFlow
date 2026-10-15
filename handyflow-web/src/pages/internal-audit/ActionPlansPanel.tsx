@@ -15,14 +15,16 @@ const MIN_NOTE = 10
 const listOf = <T,>(d: any): T[] => (Array.isArray(d) ? d : d?.data ?? d?.content ?? [])
 const errorOf = (e: any, fallback: string) => e?.response?.data?.message ?? fallback
 
-export const STATUS_TEXT: Record<ActionPlan["status"], string> = { OPEN: "To do", COMPLETED: "Awaiting check", VALIDATED: "Checked", CANCELLED: "Cancelled" }
+const STATUS_TEXT: Record<ActionPlan["status"], string> = { OPEN: "To do", COMPLETED: "Awaiting check", VALIDATED: "Checked", CANCELLED: "Cancelled" }
 
 /** What management will do about one finding, and whether an auditor has checked it. */
 export default function ActionPlansPanel({ findingId, findingClosed, users }: { findingId: string; findingClosed: boolean; users: UserOption[] }) {
   const qc = useQueryClient()
   const { user } = useAuth()
   const myId: string | null = (user as any)?.userId ?? (user as any)?.id ?? null
-  const canManage = usePermission("AUDIT_MANAGE") || usePermission("AUDIT_ADMIN")
+  const canManageAudit = usePermission("AUDIT_MANAGE")   // both hooks are always called; `||` between them would skip the second
+  const canAdminAudit = usePermission("AUDIT_ADMIN")
+  const canManage = canManageAudit || canAdminAudit
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ description: "", owner: "", dueDate: "" })
   const [error, setError] = useState("")

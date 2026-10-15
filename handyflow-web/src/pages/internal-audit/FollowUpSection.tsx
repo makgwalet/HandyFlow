@@ -20,7 +20,7 @@ export function FollowUpSection() {
   const [error, setError] = useState("")
 
   const load = () => auditFollowUpApi.list().then(setList).catch(e => { setList([]); setError(msg(e, "Failed to load the follow-up audits")) })
-  useEffect(() => { load(); auditFollowUpApi.engagements().then(setEngagements).catch(() => setEngagements([])) }, [])
+  useEffect(() => { load(); auditFollowUpApi.engagements().then(setEngagements).catch(() => { setEngagements([]); setError("Could not load the list of engagements. Refresh to try again.") }) }, [])
 
   const start = async () => {
     setError("")

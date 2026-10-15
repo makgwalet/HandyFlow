@@ -22,7 +22,7 @@ export function AuditorPortalLoginPage() {
     setLoading(true); setError("")
     try {
       const res = await auditorPortalApi.login({ email, password })
-      setAuth(res.token, { id: res.portalUserId, email: res.email, fullName: res.fullName })
+      setAuth(res.token, { portalUserId: res.portalUserId, email: res.email, fullName: res.fullName })
       navigate("/auditor/portal")
     } catch (err: any) {
       setError(err.response?.data?.message ?? "Invalid email or password")
@@ -39,15 +39,15 @@ export function AuditorPortalLoginPage() {
         <h1 style={{ fontSize: 18, fontWeight: 800, color: INK, marginBottom: 4 }}>Sign in</h1>
         <p style={{ fontSize: 13, color: MUTED, marginBottom: 20 }}>Review the records you've been granted access to.</p>
 
-        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 4 }}>Email</label>
-        <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
+        <label htmlFor="portal-email" style={{ display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 4 }}>Email</label>
+        <input id="portal-email" type="email" required autoComplete="username" value={email} onChange={e => setEmail(e.target.value)}
           style={{ width: "100%", padding: "11px 13px", border: `1.5px solid ${BORDER}`, borderRadius: 8, fontSize: 14, marginBottom: 14, boxSizing: "border-box" as const }} />
 
-        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 4 }}>Password</label>
-        <input type="password" required value={password} onChange={e => setPassword(e.target.value)}
+        <label htmlFor="portal-password" style={{ display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 4 }}>Password</label>
+        <input id="portal-password" type="password" required autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)}
           style={{ width: "100%", padding: "11px 13px", border: `1.5px solid ${BORDER}`, borderRadius: 8, fontSize: 14, marginBottom: 18, boxSizing: "border-box" as const }} />
 
-        {error && <div style={{ padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 12.5, color: "var(--hf-danger-text)", marginBottom: 14 }}>{error}</div>}
+        {error && <div role="alert" style={{ padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 12.5, color: "var(--hf-danger-text)", marginBottom: 14 }}>{error}</div>}
 
         <button type="submit" disabled={loading}
           style={{ width: "100%", padding: "11px 13px", background: NAVY, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>

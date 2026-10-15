@@ -24,14 +24,14 @@ export function ProgrammeSection() {
   const [edit, setEdit] = useState<{ code: string; status: string; conclusion: string; note: string } | null>(null)
 
   useEffect(() => {
-    api.engagements().then(setEngagements).catch(() => setEngagements([]))
+    api.engagements().then(setEngagements).catch(() => { setEngagements([]); setError("Could not load the list of engagements. Refresh to try again.") })
     api.library().then(setLib).catch(e => setError(msg(e, "Failed to load the library")))
   }, [])
+  const choose = (id: string) => { setEngagementId(id); setP(null); setEdit(null); setPicked([]); setError("") }
   useEffect(() => {
-    setP(null); setEdit(null); setPicked([])
     if (!engagementId) return
     api.get(engagementId).then(setP).catch(e => setError(msg(e, "Failed to load the programme")))
-    api.findings(engagementId).then(setFindings).catch(() => setFindings([]))
+    api.findings(engagementId).then(setFindings).catch(() => { setFindings([]); setError("Could not load the list of findings. Refresh to try again.") })
   }, [engagementId])
 
   const run = async (fn: () => Promise<PgProgramme>, fallback: string, after?: () => void) => {
@@ -44,7 +44,7 @@ export function ProgrammeSection() {
     <div>
       {error && <div role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 13, marginBottom: 8 }}>{error}</div>}
       <Card title="Engagement">
-        <select aria-label="Engagement" value={engagementId} onChange={e => setEngagementId(e.target.value)}>
+        <select aria-label="Engagement" value={engagementId} onChange={e => choose(e.target.value)}>
           <option value="">Choose an engagement…</option>{engagements.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
         </select>
       </Card>

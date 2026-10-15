@@ -24,8 +24,8 @@ export function ReportsSection() {
   const load = () => auditReportsApi.list().then(setList).catch(e => setError(msg(e, "Failed to load reports")))
   useEffect(() => {
     load()
-    auditReportsApi.templates().then(setTemplates).catch(() => setTemplates([]))
-    auditReportsApi.engagements().then(setEngagements).catch(() => setEngagements([]))
+    auditReportsApi.templates().then(setTemplates).catch(() => { setTemplates([]); setError("Could not load the list of report templates. Refresh to try again.") })
+    auditReportsApi.engagements().then(setEngagements).catch(() => { setEngagements([]); setError("Could not load the list of engagements. Refresh to try again.") })
   }, [])
 
   const create = async () => {
@@ -80,7 +80,7 @@ function ReportDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const [answers, setAnswers] = useState<Record<string, string>>({})
 
   useEffect(() => { auditReportsApi.get(id).then(setV).catch(e => setError(msg(e, "Failed to load the report"))) }, [id])
-  useEffect(() => { if (v?.manager) auditReportsApi.users().then(setUsers).catch(() => setUsers([])) }, [v?.manager])
+  useEffect(() => { if (v?.manager) auditReportsApi.users().then(setUsers).catch(() => { setUsers([]); setError("Could not load the list of people. Refresh to try again.") }) }, [v?.manager])
 
   const run = async (fn: () => Promise<ReportView>, fallback: string) => {
     setBusy(true); setError("")

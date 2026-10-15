@@ -23,7 +23,7 @@ export function MonitoringSection() {
 
   useEffect(() => {
     api.list().then(setData).catch(e => setError(msg(e, "Failed to load the alerts")))
-    api.findings().then(setFindings).catch(() => setFindings([]))
+    api.findings().then(setFindings).catch(() => { setFindings([]); setError("Could not load the list of findings. Refresh to try again.") })
   }, [])
 
   const runScan = async () => {

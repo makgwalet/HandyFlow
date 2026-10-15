@@ -15,7 +15,9 @@ const STATUS_TEXT = { OPEN: "Waiting for an answer", RESPONDED: "Answered, to be
 /** A reviewer's notes on one workpaper. The workpaper cannot be signed off until every note is cleared. */
 export default function ReviewNotesPanel({ workpaperId }: { workpaperId: string }) {
   const qc = useQueryClient()
-  const canManage = usePermission("AUDIT_MANAGE") || usePermission("AUDIT_ADMIN")
+  const canManageAudit = usePermission("AUDIT_MANAGE")   // both hooks are always called; `||` between them would skip the second
+  const canAdminAudit = usePermission("AUDIT_ADMIN")
+  const canManage = canManageAudit || canAdminAudit
   const [text, setText] = useState("")
   const [error, setError] = useState("")
   const key = ["ia-review-notes", workpaperId]

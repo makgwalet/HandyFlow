@@ -25,12 +25,12 @@ export function QualitySection() {
 
   const load = () => {
     auditQualityApi.metrics().then(setMetrics).catch(e => setError(msg(e, "Failed to load the quality figures")))
-    auditQualityApi.list().then(setList).catch(() => setList([]))
+    auditQualityApi.list().then(setList).catch(() => { setList([]); setError("Could not load the list of quality reviews. Refresh to try again.") })
   }
   useEffect(() => {
     load()
-    auditQualityApi.engagements().then(setEngagements).catch(() => setEngagements([]))
-    auditQualityApi.users().then(setUsers).catch(() => setUsers([]))
+    auditQualityApi.engagements().then(setEngagements).catch(() => { setEngagements([]); setError("Could not load the list of engagements. Refresh to try again.") })
+    auditQualityApi.users().then(setUsers).catch(() => { setUsers([]); setError("Could not load the list of people. Refresh to try again.") })
   }, [])
 
   const request = async () => {

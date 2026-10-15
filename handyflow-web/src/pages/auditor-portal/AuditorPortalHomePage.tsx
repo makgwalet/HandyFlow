@@ -26,6 +26,7 @@ export function AuditorPortalHomePage() {
   const logout = usePortalAuthStore(s => s.logout)
   const [tenants, setTenants] = useState<AuditorTenantAccess[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
   useEffect(() => {
     auditorPortalApi.getMyTenants().then(res => {
@@ -37,7 +38,8 @@ export function AuditorPortalHomePage() {
         return
       }
       setTenants(res)
-    }).finally(() => setLoading(false))
+    }).catch(e => setError(e?.response?.data?.message ?? "Could not load the businesses you can review. Try again shortly."))
+      .finally(() => setLoading(false))
   }, [navigate])
 
   return (
@@ -61,6 +63,8 @@ export function AuditorPortalHomePage() {
 
         {loading ? (
           <div style={{ color: FAINT, fontSize: 13 }}>Loading…</div>
+        ) : error ? (
+          <div role="alert" style={{ padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 12.5, color: "var(--hf-danger-text)" }}>{error}</div>
         ) : tenants.length === 0 ? (
           <div style={{ padding: 40, textAlign: "center" as const, color: FAINT, fontSize: 14, background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
             No businesses have granted you access yet.
