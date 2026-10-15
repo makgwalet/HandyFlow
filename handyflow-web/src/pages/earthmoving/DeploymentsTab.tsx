@@ -5,7 +5,7 @@ import { EMOJI } from "./shared/constants"
 import { apiMessage, meterUnitOf } from "./shared/format"
 import { Overlay, ModalHead, ModalFoot, ErrBanner, lbl, inputStyle } from "./shared/Modal"
 import { useEarthPerms } from "./shared/useEarthPerms"
-import { useAssets, useDeployAsset, useReturnToYard, useSites, useCustomerOptions } from "./shared/hooks"
+import { useDeployWarnings, useAssets, useDeployAsset, useReturnToYard, useSites, useCustomerOptions } from "./shared/hooks"
 
 const EMPTY_FORM = {
   assetId: "", siteId: "", customerId: "", siteName: "", clientName: "", startDate: "", expectedEndDate: "",
@@ -27,6 +27,7 @@ export default function DeploymentsTab() {
   const chosenSite = sites.find(s => s.id === form.siteId)
   const deploy = useDeployAsset(() => { setShowDeploy(false); setForm(EMPTY_FORM); setApiError("") })
   const returnToYard = useReturnToYard()
+  const { data: warnings = [] } = useDeployWarnings(showDeploy ? form.assetId : "")
 
   return (
     <div>
@@ -108,6 +109,13 @@ export default function DeploymentsTab() {
                     <option key={a.id} value={a.id}>{a.fleetNumber ? `${a.fleetNumber} — ` : ""}{a.name} ({a.assetType})</option>
                   ))}
                 </select>
+              )}
+              {warnings.length > 0 && (
+                <div role="status" style={{ marginTop: 8, padding: "10px 12px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 8, fontSize: 13, color: "var(--hf-warning-text)" }}>
+                  <strong>Before you send it out</strong>
+                  <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>{warnings.map(w => <li key={w}>{w}</li>)}</ul>
+                  <div style={{ marginTop: 4 }}>These are warnings. You can still deploy.</div>
+                </div>
               )}
             </div>
 

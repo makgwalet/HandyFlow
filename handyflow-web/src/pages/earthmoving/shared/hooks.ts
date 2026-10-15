@@ -373,6 +373,11 @@ export function useLatestInspections(enabled = true) {
   return useQuery<LatestInspection[]>({ queryKey: [...QK.inspections, "latest"], queryFn: api.fetchLatestInspections, staleTime: 30_000, enabled })
 }
 
+/** Warnings only (overdue service, no recent inspection). They never block a deployment. */
+export function useDeployWarnings(assetId: string) {
+  return useQuery<string[]>({ queryKey: ["em-deploy-warnings", assetId], queryFn: () => api.fetchDeployWarnings(assetId), enabled: !!assetId, staleTime: 0 })
+}
+
 export function useInspections(assetId: string) {
   return useQuery<Inspection[]>({ queryKey: [...QK.inspections, assetId], queryFn: () => api.fetchInspections(assetId), staleTime: 15_000 })
 }

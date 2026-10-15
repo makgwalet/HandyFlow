@@ -191,6 +191,11 @@ export const fetchLatestInspections = async (): Promise<LatestInspection[]> => {
   return Array.isArray(r) ? (r as LatestInspection[]) : []
 }
 
+export const fetchDeployWarnings = async (assetId: string): Promise<string[]> => {
+  const r = unwrap<{ warnings?: string[] }>(await apiClient.get(`${BASE}/assets/${assetId}/deploy-warnings`))
+  return Array.isArray(r?.warnings) ? r.warnings : []
+}
+
 export const createInspection = async (body: Record<string, unknown>): Promise<Inspection> =>
   unwrap<Inspection>(await apiClient.post(`${BASE}/inspections`, body))
 
