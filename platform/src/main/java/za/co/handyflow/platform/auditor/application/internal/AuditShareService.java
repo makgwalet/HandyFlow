@@ -26,6 +26,7 @@ public class AuditShareService {
     private final AuditShareRepository repo;
     private final EvidenceFacade evidenceFacade;
     private final ControlExceptionFacade controlExceptionFacade;
+    private final za.co.handyflow.platform.audittrail.application.AuditTrailFacade trail;
 
     @Transactional
     public AuditShare share(TenantId tenantId, String itemType, UUID itemId, String reason, UUID by, String byName) {
@@ -45,7 +46,10 @@ public class AuditShareService {
         if (repo.findLiveFor(tenantId.getValue(), itemType, itemId).isPresent()) {
             throw new HandyFlowException("This item is already shared with auditors", HttpStatus.CONFLICT, "ALREADY_SHARED");
         }
-        return repo.save(AuditShare.share(tenantId.getValue(), itemType, itemId, reason, by, byName));
+        AuditShare saved = repo.save(AuditShare.share(tenantId.getValue(), itemType, itemId, reason, by, byName));
+        trail.record(tenantId, "SHARED_WITH_AUDITORS", itemType, itemId, java.util.Map.of("sharedWithAuditors", false),
+                java.util.Map.of("sharedWithAuditors", true, "reason", reason.trim()));
+        return saved;
     }
 
     @Transactional
@@ -59,6 +63,8 @@ public class AuditShareService {
         } catch (IllegalArgumentException e) {
             throw new HandyFlowException(e.getMessage(), HttpStatus.BAD_REQUEST, "REASON_REQUIRED");
         }
+        trail.record(tenantId, "SHARING_WITHDRAWN", s.getItemType(), s.getItemId(), java.util.Map.of("sharedWithAuditors", true),
+                java.util.Map.of("sharedWithAuditors", false, "reason", why.trim()));
         return repo.save(s);
     }
 

@@ -21,6 +21,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class AuditShareAndExpiryTest {
@@ -28,13 +29,14 @@ class AuditShareAndExpiryTest {
     AuditShareRepository repo = mock(AuditShareRepository.class);
     EvidenceFacade evidence = mock(EvidenceFacade.class);
     ControlExceptionFacade exceptions = mock(ControlExceptionFacade.class);
+    za.co.handyflow.platform.audittrail.application.AuditTrailFacade trail = mock(za.co.handyflow.platform.audittrail.application.AuditTrailFacade.class);
     AuditShareService service;
     TenantId tenant = TenantId.generate();
     UUID item = UUID.randomUUID(), user = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        service = new AuditShareService(repo, evidence, exceptions);
+        service = new AuditShareService(repo, evidence, exceptions, trail);
         when(repo.save(any())).thenAnswer(i -> i.getArgument(0));
     }
 
@@ -50,6 +52,7 @@ class AuditShareAndExpiryTest {
         AuditShare s = service.share(tenant, AuditShare.EVIDENCE, item, "Needed for year-end", user, "Owner");
         assertTrue(s.isLive());
         assertEquals(tenant.getValue(), s.getTenantId());
+        verify(trail).record(eq(tenant), eq("SHARED_WITH_AUDITORS"), eq(AuditShare.EVIDENCE), eq(item), any(), any());
     }
 
     @Test
@@ -57,6 +60,7 @@ class AuditShareAndExpiryTest {
         when(evidence.listByIds(tenant, List.of(item))).thenReturn(List.of());
         assertThrows(ResourceNotFoundException.class, () -> service.share(tenant, AuditShare.EVIDENCE, item, "why", user, "Owner"));
         verify(repo, never()).save(any());
+        verifyNoInteractions(trail);
     }
 
     @Test
@@ -80,6 +84,7 @@ class AuditShareAndExpiryTest {
         service.withdraw(tenant, s.getId(), "Wrong file", user, "Owner");
         assertFalse(s.isLive());
         assertEquals("Wrong file", s.getWithdrawnReason());
+        verify(trail).record(eq(tenant), eq("SHARING_WITHDRAWN"), eq(AuditShare.EVIDENCE), eq(item), any(), any());
     }
 
     @Test

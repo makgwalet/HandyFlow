@@ -28,6 +28,7 @@ public class AuditorService {
 
     private final AuditorAccessGrantRepository grantRepo;
     private final EmailService emailService;
+    private final za.co.handyflow.platform.audittrail.application.AuditTrailFacade trail;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
@@ -52,6 +53,8 @@ public class AuditorService {
 
         AuditorAccessGrant grant = AuditorAccessGrant.createInvite(tenantId.getValue(), email, invitedBy, expiry, scopeNote);
         grantRepo.save(grant);
+        trail.record(tenantId, "AUDITOR_INVITED", "AUDITOR_GRANT", grant.getId(), null,
+                java.util.Map.of("email", grant.getInviteEmail(), "expiresAt", String.valueOf(grant.getExpiresAt()), "scope", String.valueOf(grant.getScopeNote())));
 
         emailService.send(email, businessName + " has invited you to review their financial records",
                 EmailTemplates.portalInvite(businessName, "Auditor Access",
@@ -80,12 +83,15 @@ public class AuditorService {
         if (expiresOn == null) throw new HandyFlowException("An expiry date is required", HttpStatus.BAD_REQUEST, "EXPIRY_REQUIRED");
         AuditorAccessGrant grant = grantRepo.findByTenantIdAndId(tenantId.getValue(), grantId)
                 .orElseThrow(() -> new ResourceNotFoundException("AuditorAccessGrant", grantId.toString()));
+        String beforeExpiry = String.valueOf(grant.getExpiresAt());
         try {
             grant.changeExpiry(expiryFrom(expiresOn));
         } catch (IllegalStateException e) {
             throw new HandyFlowException(e.getMessage(), HttpStatus.CONFLICT, "GRANT_REVOKED");
         }
         grantRepo.save(grant);
+        trail.record(tenantId, "AUDITOR_REDATED", "AUDITOR_GRANT", grantId, java.util.Map.of("expiresAt", beforeExpiry),
+                java.util.Map.of("expiresAt", String.valueOf(grant.getExpiresAt())));
         return toResponse(grant);
     }
 
@@ -93,8 +99,10 @@ public class AuditorService {
     public AuditorAccessGrantResponse revokeAuditorAccess(TenantId tenantId, UUID grantId, UUID revokedBy) {
         AuditorAccessGrant grant = grantRepo.findByTenantIdAndId(tenantId.getValue(), grantId)
                 .orElseThrow(() -> new ResourceNotFoundException("AuditorAccessGrant", grantId.toString()));
+        String before = grant.getStatus();
         grant.revoke(revokedBy);
         grantRepo.save(grant);
+        trail.record(tenantId, "AUDITOR_REVOKED", "AUDITOR_GRANT", grantId, java.util.Map.of("status", before), java.util.Map.of("status", "REVOKED"));
         log.info("Auditor access revoked: grant={} tenant={}", grantId, tenantId.getValue());
         return toResponse(grant);
     }

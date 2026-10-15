@@ -81,6 +81,7 @@ public class InternalAuditService {
     private final AccJournalEntryRepository journalEntryRepo;
     private final AuditFindingRepository findingRepo;
     private final ApprovalFacade approvalFacade;
+    private final za.co.handyflow.platform.audittrail.application.AuditTrailFacade trail;
     private final za.co.handyflow.platform.internalaudit.domain.repository.AuditReportAmendmentRepository amendmentRepo;
 
     // ── Universe ─────────────────────────────────────────────────────────────
@@ -376,6 +377,9 @@ public class InternalAuditService {
         AuditWorkpaperFile file = AuditWorkpaperFile.create(tenantId.getValue(), engagementId, req.folderId(),
                 req.fileName(), mimeType, req.fileSizeBytes(), req.fileContentBase64(), nextVersion);
         workpaperFileRepo.save(file);
+        trail(tenantId, "WORKPAPER_UPLOADED", "WORKPAPER", file.getId(),
+                previous == null ? null : Map.of("supersedes", previous.getId().toString(), "version", previous.getVersionNumber()),
+                Map.of("fileName", req.fileName(), "version", nextVersion, "engagementId", engagementId.toString()));
 
         if (previous != null) {
             previous.markSuperseded(file.getId());
@@ -411,6 +415,7 @@ public class InternalAuditService {
         AuditWorkpaperFile file = workpaperFileRepo.findByTenantAndId(tenantId.getValue(), fileId)
                 .orElseThrow(() -> new ResourceNotFoundException("WorkpaperFile", fileId.toString()));
         requireReportNotLocked(tenantId, file.getEngagementId());
+        String beforeReview = file.getReviewStatus();
         try {
             switch (req.action()) {
                 case "PREPARE" -> file.markPrepared(actingUserId);
@@ -423,6 +428,8 @@ public class InternalAuditService {
             throw new HandyFlowException(ex.getMessage(), HttpStatus.CONFLICT, "INVALID_STATUS");
         }
         workpaperFileRepo.save(file);
+        trail(tenantId, "WORKPAPER_" + req.action(), "WORKPAPER", fileId, Map.of("reviewStatus", beforeReview),
+                Map.of("reviewStatus", file.getReviewStatus()));
         return toFileResponse(file);
     }
 
@@ -433,6 +440,7 @@ public class InternalAuditService {
         requireReportNotLocked(tenantId, file.getEngagementId());
         file.softDelete();
         workpaperFileRepo.save(file);
+        trail(tenantId, "WORKPAPER_DELETED", "WORKPAPER", fileId, null, Map.of("fileName", file.getFileName()));
     }
 
     @Transactional
@@ -601,6 +609,8 @@ public class InternalAuditService {
                 req.title(), req.description(), req.rootCause(), req.recommendation(), req.severity(),
                 req.owner(), req.dueDate(), createdBy);
         findingRepo.save(finding);
+        trail(tenantId, "FINDING_CREATED", "FINDING", finding.getId(), null,
+                Map.of("title", finding.getTitle(), "severity", String.valueOf(finding.getSeverity()), "status", finding.getStatus()));
 
         if (req.sourceExceptionId() != null) {
             AuditException ex = auditExceptionRepo.findByTenantAndId(tenantId.getValue(), req.sourceExceptionId())
@@ -625,8 +635,11 @@ public class InternalAuditService {
     public FindingResponse recordManagementResponse(TenantId tenantId, UUID findingId, RecordManagementResponseRequest req) {
         AuditFinding f = findingRepo.findByTenantAndId(tenantId.getValue(), findingId)
                 .orElseThrow(() -> new ResourceNotFoundException("AuditFinding", findingId.toString()));
+        String beforeResponse = f.getManagementResponse();
         f.recordManagementResponse(req.response());
         findingRepo.save(f);
+        trail(tenantId, "FINDING_RESPONSE_RECORDED", "FINDING", findingId,
+                Map.of("managementResponse", String.valueOf(beforeResponse)), Map.of("managementResponse", String.valueOf(f.getManagementResponse())));
         return toFindingResponse(f);
     }
 
@@ -634,8 +647,10 @@ public class InternalAuditService {
     public FindingResponse resolveFinding(TenantId tenantId, UUID findingId) {
         AuditFinding f = findingRepo.findByTenantAndId(tenantId.getValue(), findingId)
                 .orElseThrow(() -> new ResourceNotFoundException("AuditFinding", findingId.toString()));
+        String beforeStatus = f.getStatus();
         f.resolve();
         findingRepo.save(f);
+        trail(tenantId, "FINDING_RESOLVED", "FINDING", findingId, Map.of("status", beforeStatus), Map.of("status", f.getStatus()));
         return toFindingResponse(f);
     }
 
@@ -643,12 +658,14 @@ public class InternalAuditService {
     public FindingResponse closeFinding(TenantId tenantId, UUID findingId) {
         AuditFinding f = findingRepo.findByTenantAndId(tenantId.getValue(), findingId)
                 .orElseThrow(() -> new ResourceNotFoundException("AuditFinding", findingId.toString()));
+        String beforeStatus = f.getStatus();
         try {
             f.close();
         } catch (IllegalStateException e) {
             throw new HandyFlowException(e.getMessage(), HttpStatus.CONFLICT, "INVALID_STATUS");
         }
         findingRepo.save(f);
+        trail(tenantId, "FINDING_CLOSED", "FINDING", findingId, Map.of("status", beforeStatus), Map.of("status", f.getStatus()));
         return toFindingResponse(f);
     }
 
@@ -656,8 +673,11 @@ public class InternalAuditService {
     public FindingResponse reopenFinding(TenantId tenantId, UUID findingId, ReopenFindingRequest req) {
         AuditFinding f = findingRepo.findByTenantAndId(tenantId.getValue(), findingId)
                 .orElseThrow(() -> new ResourceNotFoundException("AuditFinding", findingId.toString()));
+        String beforeStatus = f.getStatus();
         f.reopen(req.reason());
         findingRepo.save(f);
+        trail(tenantId, "FINDING_REOPENED", "FINDING", findingId, Map.of("status", beforeStatus),
+                Map.of("status", f.getStatus(), "reason", String.valueOf(req.reason())));
         return toFindingResponse(f);
     }
 
@@ -678,6 +698,8 @@ public class InternalAuditService {
             throw new HandyFlowException(e.getMessage(), HttpStatus.CONFLICT, "INVALID_STATUS");
         }
         findingRepo.save(f);
+        trail(tenantId, "FINDING_SHARED_EXTERNALLY", "FINDING", findingId, Map.of("externalVisibility", "INTERNAL_ONLY"),
+                Map.of("externalVisibility", String.valueOf(f.getExternalVisibility()), "reason", String.valueOf(req.reason())));
         return toFindingResponse(f);
     }
 
@@ -692,6 +714,8 @@ public class InternalAuditService {
             throw new HandyFlowException(e.getMessage(), HttpStatus.CONFLICT, "INVALID_STATUS");
         }
         findingRepo.save(f);
+        trail(tenantId, "FINDING_SHARING_WITHDRAWN", "FINDING", findingId, Map.of("externalVisibility", "SHARED"),
+                Map.of("externalVisibility", String.valueOf(f.getExternalVisibility())));
         return toFindingResponse(f);
     }
 
@@ -731,6 +755,7 @@ public class InternalAuditService {
                         HttpStatus.CONFLICT, "NO_APPROVER"));
 
         amendmentRepo.findOpen(tenantId.getValue(), engagementId).ifPresent(a -> { a.markResubmitted(); amendmentRepo.save(a); });
+        trail(tenantId, "REPORT_SUBMITTED", "ENGAGEMENT", engagementId, null, Map.of("approver", headOfInternalAudit.toString()));
         return approvalFacade.submitAdHoc(tenantId, "internalaudit", "ENGAGEMENT_REPORT", engagementId, submittedBy,
                 ApprovalRule.ApprovalMode.SEQUENTIAL,
                 List.of(new ChainEntryInput("USER", headOfInternalAudit.toString(), null, false)),
@@ -749,6 +774,10 @@ public class InternalAuditService {
         String latest = approvalFacade.getLatestRequestForEntity(tenantId, "internalaudit", "ENGAGEMENT_REPORT", engagementId)
                 .map(r -> r.status()).orElse(null);
         return ReportLock.isLocked(latest, amendmentRepo.findOpen(tenantId.getValue(), engagementId).isPresent());
+    }
+
+    private void trail(TenantId tenantId, String action, String itemType, UUID itemId, Map<String, ?> before, Map<String, ?> after) {
+        trail.record(tenantId, action, itemType, itemId, before, after);
     }
 
     private void requireReportNotLocked(TenantId tenantId, UUID engagementId) {
@@ -780,6 +809,7 @@ public class InternalAuditService {
         } catch (IllegalArgumentException e) {
             throw new HandyFlowException(e.getMessage(), HttpStatus.BAD_REQUEST, "REASON_REQUIRED");
         }
+        trail(tenantId, "REPORT_REOPENED", "ENGAGEMENT", engagementId, Map.of("locked", true), Map.of("locked", false, "reason", reason.trim()));
         return getReportApprovalStatus(tenantId, engagementId);
     }
 

@@ -45,6 +45,7 @@ public class EvidenceService implements EvidenceFacade {
 
     private final EvidenceRepository evidenceRepo;
     private final FileStorageService fileStorageService;
+    private final za.co.handyflow.platform.audittrail.application.AuditTrailFacade trail;
 
     @Override
     @Transactional
@@ -84,6 +85,8 @@ public class EvidenceService implements EvidenceFacade {
                 evidenceType, sourceModule, relatedEntityType, relatedEntityId, periodId,
                 hash, uploadedBy, uploadedByName);
         evidenceRepo.save(evidence);
+        trail.record(tenantId, "EVIDENCE_ATTACHED", "EVIDENCE", evidence.getId(), null,
+                java.util.Map.of("fileName", String.valueOf(file.getOriginalFilename()), "sourceModule", sourceModule, "sha256", hash));
 
         log.info("Evidence attached: type={} source={} entity={}:{} tenant={}",
                 evidenceType, sourceModule, relatedEntityType, relatedEntityId, tenantId.getValue());
@@ -125,12 +128,13 @@ public class EvidenceService implements EvidenceFacade {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public DownloadedEvidence download(TenantId tenantId, UUID evidenceId) {
         Evidence evidence = evidenceRepo.findByTenantAndId(tenantId.getValue(), evidenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Evidence", evidenceId.toString()));
         try {
             byte[] content = fileStorageService.retrieve(evidence.getStorageKey());
+            trail.record(tenantId, "EVIDENCE_DOWNLOADED", "EVIDENCE", evidenceId, null, java.util.Map.of("fileName", evidence.getFileName()));
             return new DownloadedEvidence(content, evidence.getFileName(), evidence.getContentType());
         } catch (IOException e) {
             log.error("Failed to retrieve evidence={}: {}", evidenceId, e.getMessage(), e);
@@ -150,6 +154,7 @@ public class EvidenceService implements EvidenceFacade {
         // present with status=DETACHED preserves that.
         evidence.detach();
         evidenceRepo.save(evidence);
+        trail.record(tenantId, "EVIDENCE_DETACHED", "EVIDENCE", evidenceId, java.util.Map.of("status", "ACTIVE"), java.util.Map.of("status", "DETACHED"));
         log.info("Evidence detached={} tenant={}", evidenceId, tenantId.getValue());
     }
 

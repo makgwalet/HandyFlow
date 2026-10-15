@@ -31,6 +31,7 @@ public class AuditorPortalDataService {
     // an external auditor" gap.
     private final AuditFindingRepository findingRepo;
     private final AuditShareRepository shareRepo;
+    private final za.co.handyflow.platform.audittrail.application.AuditTrailFacade trail;
 
     public record AuditorTenantAccess(UUID tenantId, java.time.Instant acceptedAt) {}
 
@@ -43,11 +44,13 @@ public class AuditorPortalDataService {
 
     public List<EvidenceResponse> getEvidence(UUID portalUserId, UUID tenantId) {
         requireActiveGrant(portalUserId, tenantId);
+        trail.recordAs(TenantId.of(tenantId), "AUDITOR", portalUserId, null, "AUDITOR_VIEWED_EVIDENCE", "TENANT", tenantId, null, null);
         return evidenceFacade.listByIds(TenantId.of(tenantId), sharedIds(tenantId, AuditShare.EVIDENCE));
     }
 
     public List<ControlExceptionResponse> getControlExceptions(UUID portalUserId, UUID tenantId) {
         requireActiveGrant(portalUserId, tenantId);
+        trail.recordAs(TenantId.of(tenantId), "AUDITOR", portalUserId, null, "AUDITOR_VIEWED_EXCEPTIONS", "TENANT", tenantId, null, null);
         return controlExceptionFacade.listByIds(TenantId.of(tenantId), sharedIds(tenantId, AuditShare.CONTROL_EXCEPTION));
     }
 
@@ -60,6 +63,7 @@ public class AuditorPortalDataService {
     // comment for why).
     public List<SharedFindingResponse> getSharedFindings(UUID portalUserId, UUID tenantId) {
         requireActiveGrant(portalUserId, tenantId);
+        trail.recordAs(TenantId.of(tenantId), "AUDITOR", portalUserId, null, "AUDITOR_VIEWED_FINDINGS", "TENANT", tenantId, null, null);
         return findingRepo.findSharedForTenant(tenantId).stream()
                 .map(this::toSharedFindingResponse)
                 .toList();

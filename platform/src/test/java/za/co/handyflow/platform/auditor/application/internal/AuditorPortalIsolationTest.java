@@ -35,13 +35,14 @@ class AuditorPortalIsolationTest {
     ControlExceptionFacade exceptions = mock(ControlExceptionFacade.class);
     AuditFindingRepository findings = mock(AuditFindingRepository.class);
     AuditShareRepository shares = mock(AuditShareRepository.class);
+    za.co.handyflow.platform.audittrail.application.AuditTrailFacade trail = mock(za.co.handyflow.platform.audittrail.application.AuditTrailFacade.class);
     AuditorPortalDataService service;
 
     UUID auditor = UUID.randomUUID(), tenantA = UUID.randomUUID(), tenantB = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        service = new AuditorPortalDataService(grants, evidence, exceptions, findings, shares);
+        service = new AuditorPortalDataService(grants, evidence, exceptions, findings, shares, trail);
     }
 
     private AuditorAccessGrant grantFor(UUID tenant) {
@@ -63,6 +64,22 @@ class AuditorPortalIsolationTest {
         assertTrue(service.getEvidence(auditor, tenantA).isEmpty());
         verify(evidence, never()).listAllForTenant(any());
         verify(evidence).listByIds(eq(TenantId.of(tenantA)), eq(Set.<UUID>of()));
+    }
+
+    @Test
+    void anAuditorViewingEvidenceLeavesATrailEntryInTheirName() {
+        grantFor(tenantA);
+        when(shares.findLive(any(), any())).thenReturn(List.of());
+        when(evidence.listByIds(any(), any())).thenReturn(List.of());
+        service.getEvidence(auditor, tenantA);
+        verify(trail).recordAs(eq(TenantId.of(tenantA)), eq("AUDITOR"), eq(auditor), any(), eq("AUDITOR_VIEWED_EVIDENCE"), eq("TENANT"), eq(tenantA), any(), any());
+    }
+
+    @Test
+    void aRefusedAuditorLeavesNoViewEntry() {
+        when(grants.findByTenantId(tenantB)).thenReturn(List.of());
+        assertThrows(HandyFlowException.class, () -> service.getEvidence(auditor, tenantB));
+        verifyNoInteractions(trail);
     }
 
     @Test
