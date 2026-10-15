@@ -342,7 +342,13 @@ public enum NotificationType {
     // separate concept from a registration's expiryDate.
     COMPLIANCE_REGISTRATION_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
     COMPLIANCE_REGISTRATION_EXPIRED(CRITICAL, Set.of(IN_APP, EMAIL)),
-    COMPLIANCE_DEADLINE_DUE(WARNING, Set.of(IN_APP, EMAIL));
+    COMPLIANCE_DEADLINE_DUE(WARNING, Set.of(IN_APP, EMAIL)),
+
+    // ── Internal audit reports and follow-up (A18) ───────────────────────────
+    AUDIT_REPORT_REVIEW_REQUESTED(INFO, Set.of(IN_APP, EMAIL)),
+    AUDIT_REPORT_ISSUED(INFO, Set.of(IN_APP, EMAIL)),
+    AUDIT_ACTION_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
+    AUDIT_ACTION_ESCALATED(CRITICAL, Set.of(IN_APP, EMAIL));
 
     private final NotificationSeverity defaultSeverity;
     private final Set<NotificationChannel> defaultChannels;

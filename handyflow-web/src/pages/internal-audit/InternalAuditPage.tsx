@@ -13,6 +13,7 @@ import ActionPlansPanel from "./ActionPlansPanel"
 import ReviewNotesPanel from "./ReviewNotesPanel"
 import { InternalAuditDashboard } from "./InternalAuditDashboard"
 import { CommitteeReport } from "./CommitteeReport"
+import { ReportsSection } from "./ReportsSection"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { INTERNAL_AUDIT_SECTIONS } from "../../navigation/moduleSections"
 import {
@@ -160,6 +161,7 @@ export default function InternalAuditPage() {
       subtitle="Risk-based audit planning — Phase 1: universe, risk scoring, annual plan, engagements"
       render={id => {
         switch (id) {
+          case "reports":     return <ReportsSection />
           case "committee":   return <CommitteeReport />
           case "dashboard":   return <InternalAuditDashboard />
           case "universe":    return <UniverseSection universe={universe} isLoading={universeLoading} qc={qc} />
