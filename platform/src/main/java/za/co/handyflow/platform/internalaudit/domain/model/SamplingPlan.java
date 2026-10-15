@@ -50,6 +50,9 @@ public class SamplingPlan {
     @Column(name = "sample_period_to") private LocalDate samplePeriodTo;
     @Column(name = "exclusions") private String exclusions;
     @Column(name = "rationale") private String rationale;
+    @Column(name = "population_definition", columnDefinition = "TEXT") private String populationDefinition;
+    @Column(name = "selection_seed") private Long selectionSeed;
+    @Column(name = "selection_start") private Integer selectionStart;
     @Column(name = "prepared_by") private UUID preparedBy;
     @Column(name = "reviewed_by") private UUID reviewedBy;
     @Column(name = "status", nullable = false) private String status = "DRAFT"; // DRAFT | FINALIZED
@@ -78,6 +81,13 @@ public class SamplingPlan {
         p.preparedBy = preparedBy;
         p.createdAt = Instant.now();
         return p;
+    }
+
+    /** What was counted, and the seed (and start, for systematic selection) that makes the draw repeatable. */
+    public void recordSelection(String populationDefinition, long seed, Integer start) {
+        this.populationDefinition = populationDefinition;
+        this.selectionSeed = seed;
+        this.selectionStart = start;
     }
 
     public void review(UUID reviewedBy) {

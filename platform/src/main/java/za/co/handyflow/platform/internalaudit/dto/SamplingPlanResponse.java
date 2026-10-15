@@ -12,5 +12,6 @@ public record SamplingPlanResponse(
         String riskLevel, BigDecimal confidenceLevel, BigDecimal expectedErrorRate, BigDecimal tolerableErrorRate,
         int sampleSize, String selectionMethod, LocalDate samplePeriodFrom, LocalDate samplePeriodTo,
         String exclusions, String rationale, UUID preparedBy, UUID reviewedBy, String status, Instant createdAt,
-        List<SampleItemResponse> items
+        List<SampleItemResponse> items,
+        String populationDefinition, Long selectionSeed, Integer selectionStart
 ) {}

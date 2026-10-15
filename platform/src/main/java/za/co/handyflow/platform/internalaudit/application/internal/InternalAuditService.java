@@ -82,6 +82,7 @@ public class InternalAuditService {
     private final AuditFindingRepository findingRepo;
     private final ApprovalFacade approvalFacade;
     private final za.co.handyflow.platform.audittrail.application.AuditTrailFacade trail;
+    private final WorkpaperReviewService reviewService;
     private final za.co.handyflow.platform.internalaudit.domain.repository.AuditActionPlanRepository actionPlanRepo;
     private final za.co.handyflow.platform.internalaudit.domain.repository.AuditReportAmendmentRepository amendmentRepo;
 
@@ -421,7 +422,7 @@ public class InternalAuditService {
             switch (req.action()) {
                 case "PREPARE" -> file.markPrepared(actingUserId);
                 case "REVIEW" -> file.markReviewed(actingUserId);
-                case "SIGN_OFF" -> file.signOff(actingUserId);
+                case "SIGN_OFF" -> { reviewService.requireNotesCleared(tenantId, fileId); file.signOff(actingUserId); }
                 case "REOPEN" -> file.reopen();
                 default -> throw new HandyFlowException("Unknown action: " + req.action(), HttpStatus.BAD_REQUEST, "INVALID_ACTION");
             }
@@ -481,8 +482,15 @@ public class InternalAuditService {
         engagementRepo.findByTenantAndId(tenantId.getValue(), engagementId)
                 .orElseThrow(() -> new ResourceNotFoundException("AuditEngagement", engagementId.toString()));
 
-        List<AccJournalEntry> population = journalEntryRepo.findPostedInRange(
-                tenantId, req.samplePeriodFrom(), req.samplePeriodTo());
+        String method = req.selectionMethod() != null ? req.selectionMethod() : "RANDOM";
+        if (!"RANDOM".equals(method) && !"SYSTEMATIC".equals(method)) {
+            throw new HandyFlowException("Only random and systematic selection are supported. Judgmental samples cannot be drawn by the system; "
+                    + "use a random or systematic sample and note your reasoning.", HttpStatus.BAD_REQUEST, "UNSUPPORTED_SELECTION_METHOD");
+        }
+        // A fixed order, so the same seed always gives the same sample.
+        List<AccJournalEntry> population = new ArrayList<>(journalEntryRepo.findPostedInRange(
+                tenantId, req.samplePeriodFrom(), req.samplePeriodTo()));
+        population.sort(java.util.Comparator.comparing(AccJournalEntry::getEntryDate).thenComparing(AccJournalEntry::getEntryNumber));
         if (req.sampleSize() > population.size()) {
             throw new HandyFlowException(
                     "Sample size (" + req.sampleSize() + ") cannot exceed the population (" + population.size() + " posted journal entries in this period)",
@@ -493,16 +501,23 @@ public class InternalAuditService {
 
         SamplingPlan plan = SamplingPlan.create(tenantId.getValue(), engagementId, population.size(), populationValue,
                 req.samplingObjective(), req.riskLevel(), req.expectedErrorRate(), req.tolerableErrorRate(),
-                req.sampleSize(), req.selectionMethod() != null ? req.selectionMethod() : "RANDOM",
+                req.sampleSize(), method,
                 req.samplePeriodFrom(), req.samplePeriodTo(), req.exclusions(), req.rationale(), preparedBy);
+        long seed = new java.security.SecureRandom().nextLong();
+        SampleSelector.Draw draw = SampleSelector.select(population.size(), req.sampleSize(), method, seed);
+        plan.recordSelection("All posted journal entries dated " + req.samplePeriodFrom() + " to " + req.samplePeriodTo()
+                + ": " + population.size() + " entries, total debits " + populationValue.toPlainString()
+                + ", in date then entry-number order."
+                + (req.exclusions() != null && !req.exclusions().isBlank()
+                        ? " Exclusions noted by the preparer (" + req.exclusions().trim() + ") are NOT removed by the system." : ""),
+                seed, draw.start());
         samplingPlanRepo.save(plan);
 
         // Draw the sample immediately — the plan and its drawn items are
         // one atomic unit; there's no meaningful "plan exists with no
         // sample drawn yet" state worth modeling separately in V1.
-        List<AccJournalEntry> shuffled = new ArrayList<>(population);
-        Collections.shuffle(shuffled);
-        for (AccJournalEntry je : shuffled.subList(0, req.sampleSize())) {
+        for (int pos : draw.positions()) {
+            AccJournalEntry je = population.get(pos);
             SampleItem item = SampleItem.create(tenantId.getValue(), plan.getId(), je.getId(),
                     je.getEntryNumber(), je.getEntryDate(), je.getTotalDebit());
             sampleItemRepo.save(item);
@@ -576,7 +591,8 @@ public class InternalAuditService {
                 p.getSamplingObjective(), p.getSamplingMethod(), p.getRiskLevel(), p.getConfidenceLevel(),
                 p.getExpectedErrorRate(), p.getTolerableErrorRate(), p.getSampleSize(), p.getSelectionMethod(),
                 p.getSamplePeriodFrom(), p.getSamplePeriodTo(), p.getExclusions(), p.getRationale(),
-                p.getPreparedBy(), p.getReviewedBy(), p.getStatus(), p.getCreatedAt(), items);
+                p.getPreparedBy(), p.getReviewedBy(), p.getStatus(), p.getCreatedAt(), items,
+                p.getPopulationDefinition(), p.getSelectionSeed(), p.getSelectionStart());
     }
 
     private SampleItemResponse toSampleItemResponse(SampleItem s) {

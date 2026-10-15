@@ -10,6 +10,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import ActionPlansPanel from "./ActionPlansPanel"
+import ReviewNotesPanel from "./ReviewNotesPanel"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { INTERNAL_AUDIT_SECTIONS } from "../../navigation/moduleSections"
 import {
@@ -89,6 +90,7 @@ interface SamplingPlanResp {
   riskLevel: string | null; expectedErrorRate: number | null; tolerableErrorRate: number | null
   sampleSize: number; selectionMethod: string; samplePeriodFrom: string | null; samplePeriodTo: string | null
   exclusions: string | null; rationale: string | null; preparedBy: string | null; reviewedBy: string | null
+  populationDefinition?: string | null; selectionSeed?: number | null; selectionStart?: number | null
   status: string; createdAt: string; items: SampleItemResp[]
 }
 
@@ -963,7 +965,7 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                                   {filesQuery.data.map(f => {
                                     const sc = WP_STATUS_CFG[f.reviewStatus] ?? WP_STATUS_CFG.DRAFT
                                     return (
-                                      <div key={f.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
+                                      <div key={f.id}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                           <FileText size={13} style={{ color: 'var(--hf-text-faint)' }} />
                                           <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{f.fileName}</span>
@@ -983,6 +985,8 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                                             </>
                                           )}
                                         </div>
+                                      </div>
+                                      {!showDeletedFiles && <ReviewNotesPanel workpaperId={f.id} />}
                                       </div>
                                     )
                                   })}
@@ -1033,6 +1037,14 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                               {expandedPlan === p.id && (
                                 <div style={{ padding: "0 12px 12px", borderTop: "1px solid var(--hf-border-subtle)" }}>
                                   {p.rationale && <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: "10px 0" }}>{p.rationale}</p>}
+                                  {p.populationDefinition && (
+                                    <div data-testid="sampling-basis" style={{ fontSize: 11, color: "var(--hf-text-muted)", margin: "8px 0", padding: "8px 10px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 7 }}>
+                                      <div><b>Population:</b> {p.populationDefinition}</div>
+                                      {p.selectionSeed != null && (
+                                        <div style={{ marginTop: 4 }}><b>Method:</b> {p.selectionMethod}{p.selectionStart != null ? `, starting at position ${p.selectionStart + 1}` : ""} · <b>Seed:</b> {p.selectionSeed} (the same population and seed give the same sample)</div>
+                                      )}
+                                    </div>
+                                  )}
                                   <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
                                     {p.items.map(item => (
                                       <div key={item.id} style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 7, padding: "8px 10px" }}>
@@ -1367,7 +1379,7 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
               <div style={{ flex: 1 }}>
                 <label style={lbl}>Selection Method</label>
                 <select value={planForm.selectionMethod} onChange={e => setPlanForm(f => ({ ...f, selectionMethod: e.target.value }))} style={inp}>
-                  <option value="RANDOM">Random</option><option value="SYSTEMATIC">Systematic</option><option value="JUDGMENTAL">Judgmental</option>
+                  <option value="RANDOM">Random</option><option value="SYSTEMATIC">Systematic</option>
                 </select>
               </div>
             </div>
