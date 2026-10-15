@@ -53,6 +53,10 @@ class EarthHireServiceTest {
 
     static BigDecimal n(String s) { return new BigDecimal(s); }
 
+    void vat(boolean registered, String rate) {
+        when(invoicing.vatTreatment(any(), any())).thenReturn(new InvoicingFacade.VatTreatment(registered, n(rate), true, null));
+    }
+
     @BeforeEach
     void setUp() {
         service = new EarthHireService(deployments, assets, charges, logs, meters, contractRates, disputes, crm, invoicing, access, trail);
@@ -60,6 +64,7 @@ class EarthHireServiceTest {
                 "OWN", null, null, null, n("18500"), n("2200"), null);
         deployment = EarthDeployment.create(tenant, asset.getId(), "Mine A", "Anglo", null, null, STARTED, null, null).withLinks(null, customer, null);
         ReflectionTestUtils.setField(deployment, "deployedAt", STARTED.atStartOfDay(ZONE).toInstant());
+        vat(true, "15.00");
         when(deployments.findByTenantAndId(tenant, deployment.getId())).thenReturn(Optional.of(deployment));
         when(assets.findActiveById(tenant, asset.getId())).thenReturn(Optional.of(asset));
         when(crm.customerExists(tenant, customer)).thenReturn(true);
@@ -564,5 +569,30 @@ class EarthHireServiceTest {
         verify(invoicing, never()).createDraftInvoice(any(), any());
         c.release();
         assertNull(c.getAttention());
+    }
+
+    @Test void aChargeUsesTheCompanysVatRateWhenNoneIsGiven() {
+        vat(true, "16.00");
+        HireChargeResponse r = service.preview(tenant, daily("2026-10-01", "2026-10-03"), TODAY);
+        assertEquals(n("16.00"), r.vatRate());
+    }
+
+    @Test void aCompanyNotRegisteredForVatChargesNoVat() {
+        vat(false, "0.00");
+        HireChargeResponse r = service.preview(tenant, daily("2026-10-01", "2026-10-03"), TODAY);
+        assertEquals(n("0.00"), r.vatRate());
+        assertEquals(n("0.00"), r.vatAmount());
+    }
+
+    @Test void aCompanyNotRegisteredForVatCannotPutVatOnACharge() {
+        vat(false, "0.00");
+        HireChargeRequest withVat = new HireChargeRequest(deployment.getId(), "DAILY", LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"), n("15"), null, null);
+        assertThrows(IllegalArgumentException.class, () -> service.preview(tenant, withVat, TODAY));
+    }
+
+    @Test void aRegisteredCompanyMayStillGiveAnotherRateForOneCharge() {
+        vat(true, "15.00");
+        HireChargeRequest zero = new HireChargeRequest(deployment.getId(), "DAILY", LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"), n("0"), null, null);
+        assertEquals(n("0.00"), service.preview(tenant, zero, TODAY).vatRate());
     }
 }

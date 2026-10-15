@@ -233,4 +233,15 @@ class HireRulesTest {
         String m = HireRules.describe("D9", null, "MONTHLY", START, START.plusDays(29), n("1.00"), n("30000"));
         assertTrue(m.contains("1 month @ R30000.00"));
     }
+
+    @Test void vatFollowsTheCompanysTreatment() {
+        assertEquals(n("15.00"), HireRules.vatFor(null, true, n("15.00")));
+        assertEquals(n("16.00"), HireRules.vatFor(null, true, n("16.00")));
+        assertEquals(n("0.00"), HireRules.vatFor(n("0"), true, n("15.00")));
+        assertEquals(n("5.00"), HireRules.vatFor(n("5"), true, n("15.00")));
+        assertThrows(IllegalArgumentException.class, () -> HireRules.vatFor(n("101"), true, n("15.00")));
+        assertEquals(n("0.00"), HireRules.vatFor(null, false, n("0.00")));
+        assertEquals(n("0.00"), HireRules.vatFor(n("0"), false, n("0.00")));
+        assertThrows(IllegalArgumentException.class, () -> HireRules.vatFor(n("15"), false, n("0.00")));
+    }
 }

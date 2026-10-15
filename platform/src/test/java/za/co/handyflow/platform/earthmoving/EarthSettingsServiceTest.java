@@ -9,6 +9,7 @@ import za.co.handyflow.platform.earthmoving.domain.repository.EarthSettingsRepos
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.TenantId;
 
+import za.co.handyflow.platform.invoicing.application.InvoicingFacade;
 import java.math.BigDecimal;
 import java.util.*;
 
@@ -19,6 +20,7 @@ import static org.mockito.Mockito.*;
 class EarthSettingsServiceTest {
     EarthSettingsRepository repo = mock(EarthSettingsRepository.class);
     AuditTrailFacade trail = mock(AuditTrailFacade.class);
+    InvoicingFacade invoicing = mock(InvoicingFacade.class);
     Set<String> granted = new HashSet<>();
     EarthmovingAccess access = new EarthmovingAccess() {
         @Override public boolean has(String authority) { return granted.contains(authority); }
@@ -28,7 +30,8 @@ class EarthSettingsServiceTest {
     UUID actor = UUID.randomUUID();
 
     @BeforeEach void setUp() {
-        service = new EarthSettingsService(repo, access, trail);
+        service = new EarthSettingsService(repo, invoicing, access, trail);
+        when(invoicing.vatTreatment(any(), any())).thenReturn(new InvoicingFacade.VatTreatment(true, new BigDecimal("15.00"), false, null));
         when(repo.findById(tenant.getValue())).thenReturn(Optional.empty());
         when(repo.save(any())).thenAnswer(i -> i.getArgument(0));
     }

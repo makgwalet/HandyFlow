@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Building2, Upload, Save, CreditCard, MapPin, Phone, X, Check, Users, Receipt } from "lucide-react"
 import TeamTab from "./TeamTab"
+import VatSettingsSection from "./VatSettingsSection"
 
 interface TenantProfile {
   id: string
@@ -329,6 +330,10 @@ export function SettingsPage() {
               <textarea value={form.paymentTerms} onChange={e => { setForm(f => ({ ...f, paymentTerms: e.target.value })); setFieldErrors(er => ({ ...er, paymentTerms: "" })) }} placeholder="Payment due within 30 days of invoice date. EFT payments only." rows={3}
                 style={{ width: "100%", padding: "9px 12px", border: `1px solid ${fieldErrors.paymentTerms ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 8, fontSize: 14, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit", color: "var(--hf-text)" }} />
             </Field>
+          </Section>
+
+          <Section title="VAT" icon={Receipt}>
+            <VatSettingsSection />
           </Section>
 
           {error && <div style={{ padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, color: "var(--hf-danger-text)", fontSize: 13 }}>{error}</div>}

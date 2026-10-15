@@ -311,7 +311,8 @@ public class EarthHireService {
                     + ", " + o.getStatus().toLowerCase() + "). Void that charge first if it is wrong.");
         }
         String machine = label(asset);
-        return new Quote(d, asset, machine, basis, quantity, rate, HireRules.vatRate(req.vatRate()),
+        InvoicingFacade.VatTreatment treatment = invoicing.vatTreatment(tenantId, today);
+        return new Quote(d, asset, machine, basis, quantity, rate, HireRules.vatFor(req.vatRate(), treatment.registered(), treatment.ratePercent()),
                 describedAs != null ? describedAs : HireRules.describe(machine, d.getSiteName(), basis, req.periodFrom(), req.periodTo(), quantity, rate), rateNote,
                 chosen.source(), included, start, end);
     }

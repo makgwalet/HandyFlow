@@ -150,6 +150,16 @@ public interface InvoicingFacade {
      */
     DraftInvoiceResult createDraftInvoice(TenantId tenantId, DraftInvoice request);
 
+    // ---- The company's VAT treatment (effective-dated), for modules that supply taxable lines ----
+
+    /**
+     * The company's VAT treatment on a day. {@code ratePercent} is the standard rate for a registered company and zero for one that is not.
+     * {@code configured} is false when the company has not set it: it is then treated as registered at the platform rate, as before.
+     */
+    record VatTreatment(boolean registered, BigDecimal ratePercent, boolean configured, LocalDate effectiveFrom) {}
+
+    VatTreatment vatTreatment(TenantId tenantId, LocalDate on);
+
     /** The InvoiceStatus name (DRAFT, ISSUED, ... CANCELLED) of this tenant's invoice, or empty if it does not exist or was deleted. */
     Optional<String> findInvoiceStatus(TenantId tenantId, UUID invoiceId);
 }

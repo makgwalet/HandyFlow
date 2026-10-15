@@ -246,6 +246,7 @@ export interface DeploymentContract {
   deploymentId: string; contract: ContractRef | null; addenda: ContractRef[]
   expectedValue: number | null; threshold: number | null; expected: boolean; warning: string | null
 }
-export interface EarthSettings { contractThreshold: number | null }
+/** vatRegistered and vatRate are the company's VAT treatment today (Settings > Company > VAT). */
+export interface EarthSettings { contractThreshold: number | null; vatRegistered?: boolean; vatRate?: number }
 /** What a deployment is for, so the warnings can say whether a signed contract is expected. */
 export interface HireContext { customerId?: string; siteId?: string; from?: string; to?: string }

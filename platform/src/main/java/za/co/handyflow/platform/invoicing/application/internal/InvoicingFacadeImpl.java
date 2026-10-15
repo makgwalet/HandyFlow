@@ -43,6 +43,7 @@ class InvoicingFacadeImpl implements InvoicingFacade {
     private final CreditNoteRepository creditNoteRepo;
     private final CrmFacade crmFacade;
     private final InvoiceNumberGenerator invoiceNumberGenerator;
+    private final VatSettingService vatSettings;
 
     @Override
     public VatSummary getVatSummary(TenantId tenantId, LocalDate from, LocalDate to) {
@@ -161,5 +162,12 @@ class InvoicingFacadeImpl implements InvoicingFacade {
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public Optional<String> findInvoiceStatus(TenantId tenantId, UUID invoiceId) {
         return invoiceRepo.findActiveByIdWithLineItems(tenantId, invoiceId).map(i -> i.getStatus().name());
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public VatTreatment vatTreatment(TenantId tenantId, LocalDate on) {
+        var t = vatSettings.treatment(tenantId, on);
+        return new VatTreatment(t.registered(), t.ratePercent(), t.configured(), t.effectiveFrom());
     }
 }

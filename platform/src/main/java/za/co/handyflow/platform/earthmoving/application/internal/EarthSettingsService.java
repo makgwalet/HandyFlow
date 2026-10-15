@@ -8,6 +8,7 @@ import za.co.handyflow.platform.earthmoving.domain.model.EarthSettings;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthmovingRules;
 import za.co.handyflow.platform.earthmoving.domain.repository.EarthSettingsRepository;
 import za.co.handyflow.platform.earthmoving.dto.SettingsResponse;
+import za.co.handyflow.platform.invoicing.application.InvoicingFacade;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
@@ -19,13 +20,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class EarthSettingsService {
     private final EarthSettingsRepository settings;
+    private final InvoicingFacade invoicing;
     private final EarthmovingAccess access;
     private final AuditTrailFacade trail;
 
     @Transactional(readOnly = true)
     public SettingsResponse get(TenantId tenantId) {
         access.require(EarthmovingRules.READ, "view settings");
-        return new SettingsResponse(contractThreshold(tenantId));
+        return response(tenantId, contractThreshold(tenantId));
     }
 
     /** The threshold with no permission check, for the checks that run inside an already authorised action. Null when not set. */
@@ -44,6 +46,11 @@ public class EarthSettingsService {
         trail.record(tenantId, "EARTHMOVING_SETTINGS_CHANGED", "EARTHMOVING_SETTINGS", tenantId.getValue(),
                 Map.of("contractThreshold", before == null ? "off" : before.toPlainString()),
                 Map.of("contractThreshold", s.getContractThreshold() == null ? "off" : s.getContractThreshold().toPlainString()));
-        return new SettingsResponse(s.getContractThreshold());
+        return response(tenantId, s.getContractThreshold());
+    }
+
+    private SettingsResponse response(TenantId tenantId, BigDecimal threshold) {
+        InvoicingFacade.VatTreatment vat = invoicing.vatTreatment(tenantId, EarthHireService.today());
+        return new SettingsResponse(threshold, vat.registered(), vat.ratePercent());
     }
 }

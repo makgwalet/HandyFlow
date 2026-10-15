@@ -72,6 +72,19 @@ public final class HireRules {
         if (days(from, to) > MAX_PERIOD_DAYS) throw new IllegalArgumentException("A charge covers at most " + MAX_PERIOD_DAYS + " days. Split it.");
     }
 
+    /**
+     * The VAT rate for a charge under the company's VAT treatment. Blank means the company's rate (none when it is not registered). A company that
+     * is not registered for VAT cannot put VAT on a charge; a registered one may give another rate (zero-rated hire, say) between 0 and 100.
+     */
+    public static BigDecimal vatFor(BigDecimal requested, boolean registered, BigDecimal companyRate) {
+        if (!registered) {
+            if (requested != null && requested.signum() != 0)
+                throw new IllegalArgumentException("This company is not registered for VAT, so hire charges carry no VAT. Leave the VAT rate blank or at 0.");
+            return BigDecimal.ZERO.setScale(2);
+        }
+        return vatRate(requested == null ? companyRate : requested);
+    }
+
     public static BigDecimal vatRate(BigDecimal vat) {
         if (vat == null) return DEFAULT_VAT;
         if (vat.signum() < 0 || vat.compareTo(new BigDecimal("100")) > 0) throw new IllegalArgumentException("VAT must be between 0 and 100.");

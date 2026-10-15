@@ -192,4 +192,31 @@ describe("Hire charges", () => {
     expect((screen.getByLabelText(/Select Truck 2/) as HTMLInputElement).disabled).toBe(true)
     expect((screen.getByLabelText(/Select Excavator 1/) as HTMLInputElement).disabled).toBe(false)
   })
+
+  it("uses the company's VAT rate when the field is left blank, and sends no VAT rate", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_ADMIN"]
+    get.mockImplementation((url: string) => Promise.resolve(
+      url.includes("/settings") ? { data: { data: { contractThreshold: null, vatRegistered: true, vatRate: 16 } } }
+        : url.includes("/hire-charges") ? { data: { data: [] } }
+        : { data: { data: { content: [], last: true } } }))
+    mount()
+    fireEvent.click(await screen.findByText("New hire charge"))
+    const vat = (await screen.findByLabelText("VAT %")) as HTMLInputElement
+    await waitFor(() => expect(vat.placeholder).toBe("Company rate (16%)"))
+    expect(vat.value).toBe("")
+    expect(vat.disabled).toBe(false)
+  })
+
+  it("shows that no VAT is charged when the company is not registered", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_ADMIN"]
+    get.mockImplementation((url: string) => Promise.resolve(
+      url.includes("/settings") ? { data: { data: { contractThreshold: null, vatRegistered: false, vatRate: 0 } } }
+        : url.includes("/hire-charges") ? { data: { data: [] } }
+        : { data: { data: { content: [], last: true } } }))
+    mount()
+    fireEvent.click(await screen.findByText("New hire charge"))
+    const vat = (await screen.findByLabelText("VAT %")) as HTMLInputElement
+    await waitFor(() => expect(vat.disabled).toBe(true))
+    expect(vat.placeholder).toBe("Not registered for VAT")
+  })
 })

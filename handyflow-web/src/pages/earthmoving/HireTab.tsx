@@ -13,7 +13,7 @@ import { Overlay, ModalHead, ModalFoot, ErrBanner, lbl, inputStyle } from "./sha
 import { useEarthPerms } from "./shared/useEarthPerms"
 import { HIRE_RATE_SOURCE_LABEL } from "./shared/constants"
 import {
-  useHireCharges, useAssets, useAssetDeployments, useContractRates, usePreviewHireCharge, useCreateHireCharge, useHireChargeAction, useDraftInvoice,
+  useHireCharges, useAssets, useAssetDeployments, useContractRates, usePreviewHireCharge, useCreateHireCharge, useHireChargeAction, useDraftInvoice, useEarthSettings,
 } from "./shared/hooks"
 import type { HireCharge } from "./shared/types"
 
@@ -29,7 +29,7 @@ const STATUS_LABEL: Record<string, string> = { PENDING: "Not invoiced", INVOICED
 const FILTERS = [["PENDING", "Not invoiced"], ["INVOICED", "On an invoice"], ["VOIDED", "Voided"], ["", "All"]] as const
 const basisWord = (b: string) => (b === "DAILY" ? "days" : b === "WEEKLY" ? "weeks" : b === "MONTHLY" ? "months" : b === "KILOMETRE" ? "km" : "hours")
 const BASIS_UNIT: Record<string, string> = { DAILY: "day", WEEKLY: "week", MONTHLY: "month", HOURLY: "hour", KILOMETRE: "kilometre" }
-const EMPTY = { assetId: "", deploymentId: "", basis: "DAILY", periodFrom: "", periodTo: "", vatRate: "15", unitRate: "", rateReason: "", includedKm: "" }
+const EMPTY = { assetId: "", deploymentId: "", basis: "DAILY", periodFrom: "", periodTo: "", vatRate: "", unitRate: "", rateReason: "", includedKm: "" }
 
 export default function HireTab() {
   const perms = useEarthPerms()
@@ -47,6 +47,9 @@ export default function HireTab() {
   const { data: assets = [] } = useAssets()
   const { data: deployments = [] } = useAssetDeployments(form.assetId)
   const { data: held } = useContractRates(form.deploymentId)
+  const { data: settings } = useEarthSettings()
+  const vatRegistered = settings?.vatRegistered !== false
+  const companyVat = settings?.vatRate ?? 15
   const previewM = usePreviewHireCharge()
   const create = useCreateHireCharge(() => { setCreating(false); setPreview(null) })
   const action = useHireChargeAction(() => { setActing(null); setReason("") })
@@ -149,7 +152,9 @@ export default function HireTab() {
             <option value="MONTHLY">Month (part of a month counts as a month)</option>
             <option value="HOURLY">Hour (from operator logs)</option><option value="KILOMETRE">Kilometre (from odometer readings)</option></select></div>
         <div><label htmlFor="hc-vat" style={lbl}>VAT %</label>
-          <input id="hc-vat" value={form.vatRate} onChange={e => change({ vatRate: e.target.value })} style={inputStyle()} /></div>
+          <input id="hc-vat" value={vatRegistered ? form.vatRate : ""} disabled={!vatRegistered}
+            placeholder={vatRegistered ? `Company rate (${companyVat}%)` : "Not registered for VAT"}
+            onChange={e => change({ vatRate: e.target.value })} style={inputStyle()} /></div>
         <div><label htmlFor="hc-from" style={lbl}>From *</label>
           <input id="hc-from" type="date" value={form.periodFrom} onChange={e => change({ periodFrom: e.target.value })} style={inputStyle()} /></div>
         <div><label htmlFor="hc-to" style={lbl}>To *</label>
