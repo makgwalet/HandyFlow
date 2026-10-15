@@ -22,6 +22,7 @@ class EarthInspectionServiceTest {
     EarthInspectionRepository inspections = mock(EarthInspectionRepository.class);
     EarthInspectionItemRepository items = mock(EarthInspectionItemRepository.class);
     EarthmovingIncidentService incidents = mock(EarthmovingIncidentService.class);
+    EarthChecklistService checklists = mock(EarthChecklistService.class);
     AuditTrailFacade trail = mock(AuditTrailFacade.class);
     Set<String> granted = new HashSet<>();
     EarthmovingAccess access = new EarthmovingAccess() {
@@ -34,7 +35,8 @@ class EarthInspectionServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new EarthInspectionService(assets, inspections, items, incidents, access, trail);
+        service = new EarthInspectionService(assets, inspections, items, incidents, checklists, access, trail);
+        when(checklists.resolve(any(), any(), any())).thenAnswer(i -> ChecklistRules.builtInActive(i.getArgument(1)));
         asset = EarthAsset.create(tenant, "CAT D9", "D9-001", "DOZER", null, null, null, null, null,
                 "OWN", null, null, null, null, null, null);
         when(assets.findActiveById(tenant, asset.getId())).thenReturn(Optional.of(asset));
@@ -114,5 +116,41 @@ class EarthInspectionServiceTest {
         assertEquals("RETURN", service.create(tenant, ok, actor).inspectionType());
         assertThrows(IllegalArgumentException.class, () -> service.create(tenant,
                 new CreateInspectionRequest(asset.getId(), null, null, base.items(), "SERVICE"), actor));
+    }
+
+    @Test void aCompanyChecklistIsUsedAndTheVersionAndSignOffAreKept() {
+        UUID versionId = UUID.randomUUID();
+        List<ChecklistRules.Question> qs = new ArrayList<>(ChecklistRules.builtIn());
+        qs.add(new ChecklistRules.Question(null, "Hydraulics", "Hydraulic pressure", "NUMERIC", true, false,
+                new java.math.BigDecimal("180"), new java.math.BigDecimal("220"), "bar", "UNSAFE"));
+        when(checklists.resolve(any(), any(), any())).thenReturn(new ChecklistRules.Active(versionId, 3, "PRE_USE", true, null, qs));
+        List<CreateInspectionRequest.Item> list = new ArrayList<>();
+        for (String item : InspectionRules.CHECKLIST) list.add(new CreateInspectionRequest.Item(item, "OK", null));
+        list.add(new CreateInspectionRequest.Item("Hydraulic pressure", null, null, new java.math.BigDecimal("200"), null, null));
+        InspectionResponse r = service.create(tenant, new CreateInspectionRequest(asset.getId(), null, null, list, null, versionId, "Thabo M"), actor);
+        assertEquals("PASS", r.result());
+        assertEquals(3, r.templateVersionNo());
+        assertEquals(versionId, r.templateVersionId());
+        assertEquals("Thabo M", r.signOffName());
+        InspectionResponse.Item n = r.items().get(10);
+        assertEquals("NUMERIC", n.answerType());
+        assertEquals(new java.math.BigDecimal("200"), n.valueNumber());
+        assertEquals("bar", n.unit());
+    }
+
+    @Test void aNumberOutOfRangeRaisesTheQuestionsFailOutcome() {
+        List<ChecklistRules.Question> qs = List.of(new ChecklistRules.Question(null, null, "Hydraulic pressure", "NUMERIC", true, false,
+                new java.math.BigDecimal("180"), new java.math.BigDecimal("220"), "bar", "UNSAFE"));
+        when(checklists.resolve(any(), any(), any())).thenReturn(new ChecklistRules.Active(UUID.randomUUID(), 1, "MAINTENANCE", false, null, qs));
+        InspectionResponse r = service.create(tenant, new CreateInspectionRequest(asset.getId(), null, null,
+                List.of(new CreateInspectionRequest.Item("Hydraulic pressure", null, "Reads 250 after warm-up", new java.math.BigDecimal("250"), null, null)), "MAINTENANCE"), actor);
+        assertEquals("UNSAFE", r.result());
+        verify(incidents).reportIncident(eq(tenant), argThat(q -> "BREAKDOWN".equals(q.type()) && q.title().contains("Hydraulic pressure")), eq(actor));
+    }
+
+    @Test void aMissingSignOffIsRefusedWhenTheChecklistRequiresIt() {
+        when(checklists.resolve(any(), any(), any())).thenReturn(new ChecklistRules.Active(UUID.randomUUID(), 1, "PRE_USE", true, null, ChecklistRules.builtIn()));
+        assertThrows(IllegalArgumentException.class, () -> service.create(tenant, request(Map.of()), actor));
+        verify(inspections, never()).save(any());
     }
 }

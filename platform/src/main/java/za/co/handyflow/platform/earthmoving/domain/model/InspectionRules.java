@@ -21,19 +21,21 @@ public final class InspectionRules {
     public static final String PRE_USE = "PRE_USE";
     public static final String HANDOVER = "HANDOVER";
     public static final String RETURN = "RETURN";
-    public static final Set<String> TYPES = Set.of(PRE_USE, HANDOVER, RETURN);
+    public static final String MAINTENANCE = "MAINTENANCE";
+    public static final String SAFETY = "SAFETY";
+    public static final Set<String> TYPES = Set.of(PRE_USE, HANDOVER, RETURN, MAINTENANCE, SAFETY);
 
     /** Blank means the usual pre-use walk-round. */
     public static String type(String t) {
         if (t == null || t.isBlank()) return PRE_USE;
         String v = t.trim().toUpperCase(Locale.ROOT);
-        if (!TYPES.contains(v)) throw new IllegalArgumentException("An inspection is a PRE_USE, HANDOVER or RETURN inspection.");
+        if (!TYPES.contains(v)) throw new IllegalArgumentException("An inspection is a PRE_USE, HANDOVER, RETURN, MAINTENANCE or SAFETY inspection.");
         return v;
     }
 
     /** A handover or a return records the meter, so the hours or kilometres of the hire can be shown. */
     public static void checkMeter(String type, java.math.BigDecimal meterReading) {
-        if (!PRE_USE.equals(type) && meterReading == null)
+        if ((HANDOVER.equals(type) || RETURN.equals(type)) && meterReading == null)
             throw new IllegalArgumentException("Enter the meter reading for a " + (HANDOVER.equals(type) ? "handover" : "return") + " inspection.");
     }
 

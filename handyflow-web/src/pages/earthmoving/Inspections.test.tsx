@@ -16,7 +16,13 @@ import InspectionsTab from "./InspectionsTab"
 
 afterEach(cleanup)
 
-const CHECK = ["Tyres or tracks", "Brakes"]
+const q = (text: string, over: Record<string, unknown> = {}) => ({
+  id: null, section: null, text, answerType: "PASS_FAIL", required: true, builtIn: true, min: null, max: null, unit: null, failOutcome: "DEFECT", ...over,
+})
+const active = (questions: unknown[], over: Record<string, unknown> = {}) => ({
+  versionId: null, versionNo: null, inspectionType: "PRE_USE", requiresSignoff: false, effectiveFrom: null, source: "BUILT_IN", questions, ...over,
+})
+const CHECK = active([q("Tyres or tracks"), q("Brakes")])
 const inspection = (over: Record<string, unknown> = {}) => ({
   id: "i1", assetId: "a1", machine: "T-01 — Tipper", inspectorUserId: "u2", performedAt: "2026-10-15T06:00:00Z", meterReading: null,
   result: "DEFECTS", notes: null, items: [{ item: "Brakes", outcome: "DEFECT", comment: "Soft pedal", incidentId: "x" }], inspectionType: "PRE_USE", ...over,
@@ -30,7 +36,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   perms = []
   get.mockImplementation((url: string) => Promise.resolve(
-    url.includes("/inspections/checklist") ? { data: { data: CHECK } }
+    url.includes("/checklists/active") ? { data: { data: CHECK } }
       : url.includes("/inspections") ? { data: { data: [inspection()] } }
       : url.includes("assignable-users") ? { data: [{ id: "u2", name: "Sipho Operator" }] }
       : { data: { data: { content: [{ id: "a1", name: "Tipper", fleetNumber: "T-01", status: "AVAILABLE" }], last: true } } }))
@@ -83,17 +89,66 @@ describe("Inspections", () => {
     const save = screen.getByText("Save inspection") as HTMLButtonElement
     expect(save.disabled).toBe(true)
     fireEvent.change(screen.getByLabelText(/Meter reading/), { target: { value: "1250" } })
-    expect(save.disabled).toBe(false)
+    await waitFor(() => expect(save.disabled).toBe(false)) // the return checklist loads first
     fireEvent.click(save)
     await waitFor(() => expect(post).toHaveBeenCalled())
     expect(post.mock.calls[0][1].inspectionType).toBe("RETURN")
     expect(post.mock.calls[0][1].meterReading).toBe(1250)
   })
 
+  it("asks the company's own questions: a number out of range needs a note, a sign-off is required, and the version is sent", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_WRITE"]
+    const own = active([q("Brakes"), q("Hydraulic pressure", { builtIn: false, answerType: "NUMERIC", min: 180, max: 220, unit: "bar", failOutcome: "UNSAFE", section: "Hydraulics" }),
+      q("Operator remarks", { builtIn: false, answerType: "TEXT", required: false })], { versionId: "v3", versionNo: 3, source: "COMPANY", requiresSignoff: true })
+    get.mockImplementation((url: string) => Promise.resolve(
+      url.includes("/checklists/active") ? { data: { data: own } }
+        : url.includes("/inspections") ? { data: { data: [] } }
+        : url.includes("assignable-users") ? { data: [] }
+        : { data: { data: { content: [{ id: "a1", name: "Tipper", fleetNumber: "T-01", status: "AVAILABLE" }], last: true } } }))
+    mount()
+    fireEvent.click(await screen.findByText("New inspection"))
+    await screen.findByLabelText(/Hydraulic pressure/)
+    await waitFor(() => expect(screen.getAllByRole("option", { name: /T-01/, hidden: true }).length).toBe(2))
+    fireEvent.change(screen.getByLabelText(/Machine \*/), { target: { value: "a1" } })
+    expect(screen.getByText(/Company checklist, version 3/)).toBeTruthy()
+    const save = screen.getByText("Save inspection") as HTMLButtonElement
+    expect(save.disabled).toBe(true) // the required number is missing
+    fireEvent.change(screen.getByLabelText(/Hydraulic pressure/), { target: { value: "250" } })
+    expect(save.disabled).toBe(true) // out of range: needs what was seen
+    expect(screen.getByRole("alert").textContent).toMatch(/out of service/)
+    fireEvent.change(screen.getByLabelText("What was seen: Hydraulic pressure"), { target: { value: "Gauge reads high when warm" } })
+    expect(save.disabled).toBe(true) // sign-off still missing
+    fireEvent.change(screen.getByLabelText(/Sign-off/), { target: { value: "Thabo M" } })
+    expect(save.disabled).toBe(false)
+    fireEvent.click(save)
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    const body = post.mock.calls[0][1]
+    expect(body.templateVersionId).toBe("v3")
+    expect(body.signOffName).toBe("Thabo M")
+    expect(body.items).toEqual([
+      { item: "Brakes", outcome: "OK", comment: null },
+      { item: "Hydraulic pressure", comment: "Gauge reads high when warm", valueNumber: 250 },
+    ])
+  })
+
+  it("says so when a kind of inspection has no checklist yet", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_WRITE"]
+    get.mockImplementation((url: string) => Promise.resolve(
+      url.includes("/checklists/active") ? { data: { data: null } }
+        : url.includes("/inspections") ? { data: { data: [] } }
+        : url.includes("assignable-users") ? { data: [] }
+        : { data: { data: { content: [], last: true } } }))
+    mount()
+    fireEvent.click(await screen.findByText("New inspection"))
+    fireEvent.change(await screen.findByLabelText("Type of inspection"), { target: { value: "MAINTENANCE" } })
+    expect(await screen.findByText(/There is no maintenance checklist yet/)).toBeTruthy()
+    expect((screen.getByText("Save inspection") as HTMLButtonElement).disabled).toBe(true)
+  })
+
   it("shows what kind of inspection each one was", async () => {
     perms = ["EARTHMOVING_READ"]
     get.mockImplementation((url: string) => Promise.resolve(
-      url.includes("/inspections/checklist") ? { data: { data: CHECK } }
+      url.includes("/checklists/active") ? { data: { data: CHECK } }
         : url.includes("/inspections") ? { data: { data: [inspection({ inspectionType: "HANDOVER" })] } }
         : url.includes("assignable-users") ? { data: [] }
         : { data: { data: { content: [], last: true } } }))

@@ -15,7 +15,7 @@
 // PUT (backend endpoint is still @PutMapping). Create is POST.
 
 import { apiClient } from "../../../api/client"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, ActiveChecklist, ChecklistVersion, ChecklistTypeOverview, ChecklistQuestion, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling } from "./types"
 
 export function unwrap<T>(r: { data?: { data?: unknown } & Record<string, unknown> }): T {
   const p = (r.data?.data ?? r.data) as { content?: unknown } | undefined
@@ -188,6 +188,20 @@ export const changeMeter = (assetId: string, body: Record<string, unknown>) =>
 // ── Inspections ──────────────────────────────────────────────────────────
 
 export const fetchChecklist = async (): Promise<string[]> => unwrap<string[]>(await apiClient.get(`${BASE}/inspections/checklist`))
+
+export const fetchActiveChecklist = async (type: string): Promise<ActiveChecklist | null> =>
+  ((await apiClient.get(`${BASE}/checklists/active?type=${encodeURIComponent(type)}`)).data?.data ?? null) as ActiveChecklist | null
+export const fetchChecklists = async (): Promise<ChecklistTypeOverview[]> => {
+  const r = unwrap<unknown>(await apiClient.get(`${BASE}/checklists`))
+  return Array.isArray(r) ? (r as ChecklistTypeOverview[]) : []
+}
+export const startChecklistDraft = async (type: string): Promise<ChecklistVersion> =>
+  unwrap<ChecklistVersion>(await apiClient.post(`${BASE}/checklists/draft?type=${encodeURIComponent(type)}`))
+export const saveChecklistDraft = async (id: string, body: { requiresSignoff: boolean; note: string | null; questions: ChecklistQuestion[] }): Promise<ChecklistVersion> =>
+  unwrap<ChecklistVersion>(await apiClient.put(`${BASE}/checklists/versions/${id}`, body))
+export const publishChecklist = async (id: string, effectiveFrom: string | null): Promise<ChecklistVersion> =>
+  unwrap<ChecklistVersion>(await apiClient.post(`${BASE}/checklists/versions/${id}/publish`, { effectiveFrom }))
+export const discardChecklistDraft = async (id: string): Promise<void> => { await apiClient.delete(`${BASE}/checklists/versions/${id}`) }
 
 export const fetchInspections = async (assetId: string): Promise<Inspection[]> =>
   unwrap<Inspection[]>(await apiClient.get(`${BASE}/inspections${assetId ? `?assetId=${assetId}` : ""}`))

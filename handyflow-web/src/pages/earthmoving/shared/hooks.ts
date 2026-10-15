@@ -1,7 +1,7 @@
 // src/pages/earthmoving/shared/hooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, ActiveChecklist, ChecklistVersion, ChecklistTypeOverview, ChecklistQuestion, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling } from "./types"
 
 // Central query keys — every tab imports these instead of typing the
 // literal string, so a rename is a one-line change instead of a grep.
@@ -385,6 +385,33 @@ export function useChangeMeter(onSuccess?: () => void) {
 export function useChecklist() {
   return useQuery<string[]>({ queryKey: ["em-checklist"], queryFn: api.fetchChecklist, staleTime: 300_000 })
 }
+
+export function useActiveChecklist(type: string, enabled = true) {
+  return useQuery<ActiveChecklist | null>({ queryKey: ["em-checklist-active", type], queryFn: () => api.fetchActiveChecklist(type), staleTime: 60_000, enabled })
+}
+
+export function useChecklists() {
+  return useQuery<ChecklistTypeOverview[]>({ queryKey: ["em-checklists"], queryFn: api.fetchChecklists, staleTime: 15_000 })
+}
+
+function useChecklistMutation<A, R>(fn: (a: A) => Promise<R>, onSuccess?: (r: R) => void) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: r => {
+      qc.invalidateQueries({ queryKey: ["em-checklists"] })
+      qc.invalidateQueries({ queryKey: ["em-checklist-active"] })
+      onSuccess?.(r)
+    },
+  })
+}
+export const useStartChecklistDraft = (onSuccess?: (v: ChecklistVersion) => void) => useChecklistMutation((type: string) => api.startChecklistDraft(type), onSuccess)
+export const useSaveChecklistDraft = (onSuccess?: (v: ChecklistVersion) => void) =>
+  useChecklistMutation((a: { id: string; requiresSignoff: boolean; note: string | null; questions: ChecklistQuestion[] }) =>
+    api.saveChecklistDraft(a.id, { requiresSignoff: a.requiresSignoff, note: a.note, questions: a.questions }), onSuccess)
+export const usePublishChecklist = (onSuccess?: (v: ChecklistVersion) => void) =>
+  useChecklistMutation((a: { id: string; effectiveFrom: string | null }) => api.publishChecklist(a.id, a.effectiveFrom), onSuccess)
+export const useDiscardChecklistDraft = (onSuccess?: () => void) => useChecklistMutation((id: string) => api.discardChecklistDraft(id), onSuccess)
 
 export function useLatestInspections(enabled = true) {
   return useQuery<LatestInspection[]>({ queryKey: [...QK.inspections, "latest"], queryFn: api.fetchLatestInspections, staleTime: 30_000, enabled })

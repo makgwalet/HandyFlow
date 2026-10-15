@@ -33,6 +33,7 @@ public class EarthInspectionService {
     private final EarthInspectionRepository inspections;
     private final EarthInspectionItemRepository items;
     private final EarthmovingIncidentService incidents;
+    private final EarthChecklistService checklists;
     private final EarthmovingAccess access;
     private final AuditTrailFacade trail;
 
@@ -47,20 +48,24 @@ public class EarthInspectionService {
 
         String type = InspectionRules.type(req.inspectionType());
         InspectionRules.checkMeter(type, req.meterReading());
-        List<InspectionRules.Answer> answers = InspectionRules.check(req.items().stream()
-                .map(i -> new InspectionRules.Answer(i.item(), i.outcome(), i.comment())).toList());
-        String result = InspectionRules.overall(answers);
+        ChecklistRules.Active checklist = checklists.resolve(tenantId, type, req.templateVersionId());
+        ChecklistRules.checkSignoff(checklist.requiresSignoff(), req.signOffName());
+        List<ChecklistRules.Checked> answers = ChecklistRules.check(checklist.questions(), req.items().stream()
+                .map(i -> new ChecklistRules.Given(i.item(), i.outcome(), i.comment(), i.valueNumber(), i.valueText(), i.evidenceRef())).toList());
+        String result = ChecklistRules.overall(answers);
 
-        EarthInspection inspection = inspections.save(EarthInspection.create(tenantId, asset.getId(), inspector, req.meterReading(), result, req.notes(), type));
+        EarthInspection inspection = EarthInspection.create(tenantId, asset.getId(), inspector, req.meterReading(), result, req.notes(), type);
+        inspection.stamp(checklist.versionId(), checklist.versionNo(), req.signOffName());
+        inspection = inspections.save(inspection);
         List<EarthInspectionItem> saved = new ArrayList<>();
         for (int n = 0; n < answers.size(); n++) {
-            InspectionRules.Answer a = answers.get(n);
+            ChecklistRules.Checked a = answers.get(n);
             EarthInspectionItem row = EarthInspectionItem.of(tenantId, inspection.getId(), n + 1, a);
             if (!InspectionRules.OK.equals(a.outcome())) row.linkIncident(raiseIncident(tenantId, asset, a, inspector));
             saved.add(items.save(row));
         }
         trail.record(tenantId, "EARTHMOVING_INSPECTION_RECORDED", "EARTHMOVING_INSPECTION", inspection.getId(),
-                Map.of("machine", asset.getName()), Map.of("type", type, "result", result, "findings", String.valueOf(answers.stream().filter(a -> !InspectionRules.OK.equals(a.outcome())).count())));
+                Map.of("machine", asset.getName()), Map.of("type", type, "version", String.valueOf(checklist.versionNo()), "result", result, "findings", String.valueOf(answers.stream().filter(a -> !InspectionRules.OK.equals(a.outcome())).count())));
         return toResponse(inspection, asset.getName(), saved);
     }
 
@@ -86,11 +91,12 @@ public class EarthInspectionService {
         return byAsset.values().stream().map(i -> new LatestInspectionResponse(i.getAssetId(), i.getPerformedAt(), i.getResult())).toList();
     }
 
-    private UUID raiseIncident(TenantId tenantId, EarthAsset asset, InspectionRules.Answer a, UUID inspector) {
+    private UUID raiseIncident(TenantId tenantId, EarthAsset asset, ChecklistRules.Checked a, UUID inspector) {
+        String item = a.question().text();
         boolean unsafe = InspectionRules.UNSAFE.equals(a.outcome());
         return incidents.reportIncident(tenantId, new CreateIncidentRequest(asset.getId(),
                 unsafe ? "BREAKDOWN" : "OTHER", unsafe ? "CRITICAL" : "MEDIUM",
-                (unsafe ? "Unsafe at inspection: " : "Defect at inspection: ") + a.item(), a.comment(), null, asset.getCurrentSite(), null, null), inspector).id();
+                (unsafe ? "Unsafe at inspection: " : "Defect at inspection: ") + item, a.comment(), null, asset.getCurrentSite(), null, null), inspector).id();
     }
 
     private static String label(EarthAsset a) { return a.getFleetNumber() != null ? a.getFleetNumber() + " — " + a.getName() : a.getName(); }
@@ -98,7 +104,8 @@ public class EarthInspectionService {
     private static InspectionResponse toResponse(EarthInspection i, String machine, List<EarthInspectionItem> rows) {
         return new InspectionResponse(i.getId(), i.getAssetId(), machine, i.getInspectorUserId(), i.getPerformedAt(), i.getMeterReading(), i.getResult(), i.getNotes(),
                 rows.stream().sorted(Comparator.comparingInt(EarthInspectionItem::getPosition))
-                        .map(x -> new InspectionResponse.Item(x.getItem(), x.getOutcome(), x.getComment(), x.getIncidentId())).toList(),
-                i.getInspectionType());
+                        .map(x -> new InspectionResponse.Item(x.getItem(), x.getOutcome(), x.getComment(), x.getIncidentId(), x.getSection(), x.getAnswerType(),
+                                x.getValueNumber(), x.getValueText(), x.getEvidenceRef(), x.getUnit())).toList(),
+                i.getInspectionType(), i.getTemplateVersionId(), i.getTemplateVersionNo(), i.getSignOffName());
     }
 }

@@ -36,14 +36,31 @@ public class EarthInspection {
     @Column(nullable = false)
     private String result;
 
-    /** PRE_USE, HANDOVER or RETURN. */
+    /** PRE_USE, HANDOVER, RETURN, MAINTENANCE or SAFETY. */
     @Column(name = "inspection_type", nullable = false)
     private String inspectionType = InspectionRules.PRE_USE;
 
     private String notes;
 
+    /** The checklist version this was answered against; empty when the built-in walk-round was used. */
+    @Column(name = "template_version_id")
+    private UUID templateVersionId;
+
+    @Column(name = "template_version_no")
+    private Integer templateVersionNo;
+
+    @Column(name = "sign_off_name")
+    private String signOffName;
+
     @Column(name = "performed_at", nullable = false)
     private Instant performedAt;
+
+    /** Records which checklist version was used and who signed it off. */
+    public void stamp(UUID versionId, Integer versionNo, String signOff) {
+        this.templateVersionId = versionId;
+        this.templateVersionNo = versionNo;
+        this.signOffName = signOff == null || signOff.isBlank() ? null : signOff.trim();
+    }
 
     public static EarthInspection create(TenantId tenantId, UUID assetId, UUID inspector, BigDecimal meterReading, String result, String notes) {
         return create(tenantId, assetId, inspector, meterReading, result, notes, InspectionRules.PRE_USE);

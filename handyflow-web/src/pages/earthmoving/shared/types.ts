@@ -162,11 +162,34 @@ export interface MeterReading {
 }
 
 // ── Inspections ──────────────────────────────────────────────────────────
-export interface InspectionItem { item: string; outcome: string; comment: string | null; incidentId: string | null }
+export interface InspectionItem {
+  item: string; outcome: string; comment: string | null; incidentId: string | null
+  section?: string | null; answerType?: string; valueNumber?: number | null; valueText?: string | null; evidenceRef?: string | null; unit?: string | null
+}
 export interface Inspection {
   id: string; assetId: string; machine: string; inspectorUserId: string | null; performedAt: string
   meterReading: number | null; result: string; notes: string | null; items: InspectionItem[]
-  inspectionType: string // PRE_USE | HANDOVER | RETURN
+  inspectionType: string // PRE_USE | HANDOVER | RETURN | MAINTENANCE | SAFETY
+  templateVersionId?: string | null; templateVersionNo?: number | null; signOffName?: string | null
+}
+
+// ── Inspection checklists ────────────────────────────────────────────────
+export interface ChecklistQuestion {
+  id?: string | null; section: string | null; text: string; answerType: string; required: boolean; builtIn: boolean
+  min: number | null; max: number | null; unit: string | null; failOutcome: string
+}
+/** The checklist in force for one inspection type. source is BUILT_IN until the company publishes its own. */
+export interface ActiveChecklist {
+  versionId: string | null; versionNo: number | null; inspectionType: string; requiresSignoff: boolean
+  effectiveFrom: string | null; source: "COMPANY" | "BUILT_IN"; questions: ChecklistQuestion[]
+}
+export interface ChecklistVersion {
+  id: string; inspectionType: string; versionNo: number; status: "DRAFT" | "PUBLISHED"; effectiveFrom: string | null
+  requiresSignoff: boolean; note: string | null; createdAt: string; publishedAt: string | null; questions: ChecklistQuestion[]
+}
+export interface ChecklistTypeOverview {
+  inspectionType: string; active: ActiveChecklist | null; draft: ChecklistVersion | null
+  history: { id: string; versionNo: number; status: string; effectiveFrom: string | null; publishedAt: string | null; questions: number }[]
 }
 
 export interface LatestInspection { assetId: string; performedAt: string; result: string }

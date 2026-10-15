@@ -107,7 +107,7 @@ export const EARTHMOVING_PERMS = {
   MAINTAIN: "EARTHMOVING_MAINTAIN", RELEASE: "EARTHMOVING_RELEASE", ADMIN: "EARTHMOVING_ADMIN",
 } as const
 
-export const INSPECTION_TYPE_LABEL: Record<string, string> = { PRE_USE: "Pre-use", HANDOVER: "Handover to customer", RETURN: "Return from hire" }
+export const INSPECTION_TYPE_LABEL: Record<string, string> = { PRE_USE: "Pre-use", HANDOVER: "Handover to customer", RETURN: "Return from hire", MAINTENANCE: "Maintenance", SAFETY: "Safety" }
 
 export const CONTRACT_STATUS_LABEL: Record<string, string> = {
   DRAFT: "Draft", UNDER_REVIEW: "Under review", SENT: "Sent, not signed", SIGNED: "Signed",
@@ -121,3 +121,5 @@ export const HIRE_BASIS_LABEL: Record<string, string> = {
 export const HIRE_RATE_SOURCE_LABEL: Record<string, string> = {
   CONTRACT: "rate from the contract", ASSET: "machine's own rate", AGREED: "rate agreed for this charge",
 }
+
+export const ANSWER_TYPE_LABEL: Record<string, string> = { PASS_FAIL: "Pass or fail", NUMERIC: "A number", TEXT: "A note", PHOTO: "A photo" }
