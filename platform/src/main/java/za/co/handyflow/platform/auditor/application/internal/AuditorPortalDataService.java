@@ -88,6 +88,15 @@ public class AuditorPortalDataService {
         return engagementRepo.findById(g.getEngagementId()).map(e -> e.grantsAccess()).orElse(false);
     }
 
+    /** The auditor's usable grant for this business, or a refusal. Callers that need the engagement read it from the grant. */
+    public za.co.handyflow.platform.auditor.domain.model.AuditorAccessGrant requireGrant(UUID portalUserId, UUID tenantId) {
+        return grantRepo.findByTenantId(tenantId).stream()
+                .filter(g -> portalUserId.equals(g.getPortalUserId()) && usable(g))
+                .findFirst()
+                .orElseThrow(() -> new HandyFlowException(
+                        "You don't have access to this business's records (it may have expired)", HttpStatus.FORBIDDEN, "NO_ACCESS"));
+    }
+
     private void requireActiveGrant(UUID portalUserId, UUID tenantId) {
         boolean hasAccess = grantRepo.findByTenantId(tenantId).stream()
                 .anyMatch(g -> portalUserId.equals(g.getPortalUserId()) && usable(g));

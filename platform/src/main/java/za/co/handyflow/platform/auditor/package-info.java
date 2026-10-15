@@ -11,5 +11,5 @@
  * own established pattern of depending directly on evidence/controls
  * rather than through an intermediary layer.
  */
-@org.springframework.modulith.ApplicationModule(allowedDependencies = {"shared", "evidence", "controls", "internalaudit", "audittrail"})
+@org.springframework.modulith.ApplicationModule(allowedDependencies = {"shared", "evidence", "controls", "internalaudit", "audittrail", "identity"})
 package za.co.handyflow.platform.auditor;

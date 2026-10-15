@@ -9,6 +9,8 @@
 import { useEffect, useState } from "react"
 import { auditorApi, type AuditorAccessGrant, type AuditEngagement } from "../../api/auditor.api"
 import { EngagementsPanel } from "./EngagementsPanel"
+import { EvidenceRequests } from "../../components/evidenceRequests/EvidenceRequests"
+import { businessEvidenceRequestApi } from "../../api/evidenceRequests.api"
 
 const NAVY = "var(--hf-primary)"
 const BORDER = "var(--hf-border)"
@@ -76,6 +78,11 @@ export function AuditorAccessSection() {
       </p>
 
       <EngagementsPanel engagements={engagements} onChange={refetch} />
+
+      <div style={{ background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: 16, marginBottom: 20 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: INK, marginBottom: 8 }}>Evidence requests</div>
+        <EvidenceRequests side="business" api={businessEvidenceRequestApi} engagements={engagements.filter(g => g.status === "PLANNED" || g.status === "ACTIVE")} />
+      </div>
 
       <div style={{ background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: 16, marginBottom: 20 }}>
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
