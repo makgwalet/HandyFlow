@@ -1,11 +1,11 @@
 // src/pages/earthmoving/PlansTab.tsx
 //
 // Service plans: "every 250 hours" or "every 90 days". A plan that falls due raises one work order (never two for the
-// same plan). The check runs each morning and on "Check now"; it does not run the moment hours are updated.
+// same plan). The check runs each morning, on "Check now", and the moment a machine's meter is updated.
 import { useState } from "react"
 import { Plus, CalendarClock, RefreshCw } from "lucide-react"
 import { MAINTENANCE_TYPES } from "./shared/constants"
-import { fmtDate, apiMessage } from "./shared/format"
+import { fmtDate, apiMessage, meterWordOf } from "./shared/format"
 import { Overlay, ModalHead, ModalFoot, ErrBanner, lbl, inputStyle } from "./shared/Modal"
 import { useEarthPerms } from "./shared/useEarthPerms"
 import { useAssets, usePlans, useSavePlan, useScanPlans } from "./shared/hooks"
@@ -83,7 +83,8 @@ export default function PlansTab() {
   const renderForm = () => {
     const isNew = editing === "new"
     const ok = form.name.trim() !== "" && (!isNew || form.assetId !== "") && Number(form.intervalValue) > 0
-    const unit = form.triggerType === "HOURS" ? "hours" : "days"
+    const meterWord = meterWordOf(assets.find(x => x.id === form.assetId))
+    const unit = form.triggerType === "HOURS" ? meterWord : "days"
     return (
       <Overlay onClose={() => setEditing(null)} width={540}>
         <ModalHead title={isNew ? "New service plan" : "Edit service plan"} onClose={() => setEditing(null)} />
@@ -105,7 +106,7 @@ export default function PlansTab() {
                 {MAINTENANCE_TYPES.map(t => <option key={t}>{t}</option>)}</select></div>
             <div><label style={lbl} htmlFor="pl-trig">Counted in</label>
               <select id="pl-trig" value={form.triggerType} onChange={e => setForm(f => ({ ...f, triggerType: e.target.value }))} style={inputStyle()}>
-                <option value="HOURS">Operating hours</option><option value="DAYS">Days</option></select></div>
+                <option value="HOURS">{meterWord === "kilometres" ? "Kilometres" : "Operating hours"}</option><option value="DAYS">Days</option></select></div>
           </div>
         )}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 12 }}>
@@ -119,7 +120,7 @@ export default function PlansTab() {
         </div>
         {isNew && (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
-            <div><label style={lbl} htmlFor="pl-lh">Last done at (hours)</label>
+            <div><label style={lbl} htmlFor="pl-lh">Last done at ({meterWord})</label>
               <input id="pl-lh" type="number" min="0" step="0.1" placeholder="Leave blank to count from now" value={form.lastDoneHours} onChange={e => setForm(f => ({ ...f, lastDoneHours: e.target.value }))} style={inputStyle()} /></div>
             <div><label style={lbl} htmlFor="pl-ld">Last done on</label>
               <input id="pl-ld" type="date" value={form.lastDoneDate} onChange={e => setForm(f => ({ ...f, lastDoneDate: e.target.value }))} style={inputStyle()} /></div>

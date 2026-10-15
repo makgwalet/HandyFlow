@@ -126,7 +126,7 @@ public class EarthMaintenancePlanService {
         if (workOrders.existsOpenForPlan(p.getId())) return;
         String priority = s.state() == WorkOrderRules.PlanState.OVERDUE && ("LOW".equals(p.getPriority()) || "NORMAL".equals(p.getPriority()))
                 ? "HIGH" : p.getPriority();
-        String unit = "HOURS".equals(p.getTriggerType()) ? "hours" : "days";
+        String unit = unitWord(p, asset);
         EarthWorkOrder w = workOrderService.raise(tenantId, asset.getId(), p.getName() + " due",
                 "Planned maintenance: " + p.getName() + ". " + s.used().stripTrailingZeros().toPlainString() + " " + unit
                         + " since it was last done; the plan is every " + p.getIntervalValue() + " " + unit + ".",
@@ -155,6 +155,12 @@ public class EarthMaintenancePlanService {
         WorkOrderRules.PlanStatus s = p.status(asset == null ? null : asset.getCurrentHours(), today);
         return new PlanResponse(p.getId(), p.getAssetId(), p.getName(), p.getTaskType(), p.getTriggerType(), p.getIntervalValue(),
                 p.getLeadValue(), p.getLastDoneHours(), p.getLastDoneDate(), p.getPriority(), p.isBlocksRelease(), p.isActive(),
-                s.state().name(), s.used(), s.remaining(), "HOURS".equals(p.getTriggerType()) ? "hours" : "days");
+                s.state().name(), s.used(), s.remaining(), unitWord(p, asset));
+    }
+
+    /** "days" for a calendar plan; otherwise what the machine's meter counts (hours, or kilometres for a truck). */
+    static String unitWord(EarthMaintenancePlan p, EarthAsset asset) {
+        if (!"HOURS".equals(p.getTriggerType())) return "days";
+        return asset == null ? "hours" : za.co.handyflow.platform.earthmoving.domain.model.MeterRules.word(asset.getMeterType());
     }
 }
