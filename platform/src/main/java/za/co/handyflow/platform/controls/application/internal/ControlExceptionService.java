@@ -64,6 +64,24 @@ public class ControlExceptionService implements ControlExceptionFacade {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Summary summary(TenantId tenantId, java.time.LocalDate today) {
+        List<ControlException> all = repo.findAllByTenant(tenantId.getValue());
+        int open = 0, unrated = 0, serious = 0, overdue = 0, due = 0, reopened = 0;
+        for (ControlException e : all) {
+            if ("OPEN".equals(e.getStatus())) {
+                open++;
+                if (e.getRiskRating() == null) unrated++;
+                if (e.isSerious()) serious++;
+                if (e.overdueOn(today)) overdue++;
+            }
+            if (e.followUpDueOn(today)) due++;
+            if (e.getTimesReopened() > 0) reopened++;
+        }
+        return new Summary(open, unrated, serious, overdue, due, reopened);
+    }
+
+    @Override
     @Transactional
     public void resolveForEntity(TenantId tenantId, String relatedEntityType, UUID relatedEntityId,
                                  UUID resolvedBy, String resolvedByName, String resolutionNotes) {

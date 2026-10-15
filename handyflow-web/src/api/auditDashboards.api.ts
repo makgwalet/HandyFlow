@@ -21,10 +21,22 @@ export interface ExternalDashboard {
   overdueItems: { type: string; reference: string; title: string; engagement: string; dueDate: string; daysOverdue: number }[]
 }
 
-const unwrap = <T,>(d: any): T => (d && typeof d === "object" && "data" in d && !("plan" in d) && !("requests" in d) ? d.data : d) as T
+export interface CommitteeReport {
+  asOf: string
+  plan: { year: number | null; status: string | null; committed: number; completed: number; deferred: number; completionPct: number; quarters: { quarter: number; planned: number; completed: number }[] }
+  reports: { approved: number; awaitingSignOff: number; closedWithoutApproval: number; recentlyApproved: { engagement: string; approvedAt: string | null }[] }
+  risk: { byLevel: { level: string; count: number }[]; highRiskNotYetAudited: string[] }
+  findings: { openHighOrCritical: number; pastDue: number }
+  overdueHighRiskActionCount: number
+  overdueHighRiskActions: { id: string; description: string; finding: string; severity: string; owner: string | null; dueDate: string; daysOverdue: number }[]
+  controls: { open: number; unrated: number; highOrCritical: number; overdue: number; followUpsDue: number; reopenedEver: number }
+}
+
+const unwrap = <T,>(d: any): T => (d && typeof d === "object" && "data" in d && !("plan" in d) && !("requests" in d) && !("asOf" in d) ? d.data : d) as T
 
 export const auditDashboardsApi = {
   internal: () => apiClient.get("/api/v1/internal-audit/dashboard").then(r => unwrap<InternalDashboard>(r.data)),
+  committee: () => apiClient.get("/api/v1/internal-audit/committee-report").then(r => unwrap<CommitteeReport>(r.data)),
   external: (engagementId?: string) =>
     apiClient.get("/api/v1/auditors/dashboard", { params: engagementId ? { engagementId } : {} }).then(r => unwrap<ExternalDashboard>(r.data)),
 }

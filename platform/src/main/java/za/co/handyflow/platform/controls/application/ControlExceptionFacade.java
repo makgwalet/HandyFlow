@@ -35,6 +35,11 @@ public interface ControlExceptionFacade {
      */
     List<ControlExceptionResponse> listAll(TenantId tenantId);
 
+    /** Counts for a board or committee report: what is open, how serious, how late. Rating and follow-up come from the management fields. */
+    record Summary(int open, int unrated, int highOrCritical, int overdue, int followUpsDue, int reopenedEver) {}
+
+    Summary summary(TenantId tenantId, java.time.LocalDate today);
+
     /** Only the named exceptions, and only those that belong to this tenant (others are silently left out). */
     List<ControlExceptionResponse> listByIds(TenantId tenantId, java.util.Collection<UUID> ids);
 

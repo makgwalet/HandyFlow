@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/react"
 
-vi.mock("../../api/auditDashboards.api", () => ({ auditDashboardsApi: { internal: vi.fn(), external: vi.fn() } }))
+vi.mock("../../api/auditDashboards.api", () => ({ auditDashboardsApi: { internal: vi.fn(), external: vi.fn(), committee: vi.fn() } }))
 import { auditDashboardsApi } from "../../api/auditDashboards.api"
 import { InternalAuditDashboard } from "./InternalAuditDashboard"
 import { ExternalAuditDashboard } from "../settings/ExternalAuditDashboard"
@@ -64,5 +64,42 @@ describe("External audit dashboard", () => {
     await screen.findByText("Requests waiting on us")
     fireEvent.change(screen.getByLabelText("Dashboard engagement"), { target: { value: "g1" } })
     await waitFor(() => expect(m.external).toHaveBeenLastCalledWith("g1"))
+  })
+})
+
+import { CommitteeReport } from "./CommitteeReport"
+const committee = {
+  asOf: "2026-10-15",
+  plan: { year: 2026, status: "ACTIVE", committed: 3, completed: 1, deferred: 1, completionPct: 33, quarters: [{ quarter: 1, planned: 2, completed: 1 }] },
+  reports: { approved: 2, awaitingSignOff: 1, closedWithoutApproval: 1, recentlyApproved: [{ engagement: "Payroll audit", approvedAt: "2026-10-01T08:00:00Z" }] },
+  risk: { byLevel: [{ level: "HIGH", count: 2 }, { level: "UNASSESSED", count: 1 }], highRiskNotYetAudited: ["Treasury"] },
+  findings: { openHighOrCritical: 2, pastDue: 1 },
+  overdueHighRiskActionCount: 1,
+  overdueHighRiskActions: [{ id: "a1", description: "Lock payment run", finding: "Open payment run", severity: "CRITICAL", owner: "Bob", dueDate: "2026-10-01", daysOverdue: 14 }],
+  controls: { open: 5, unrated: 2, highOrCritical: 1, overdue: 1, followUpsDue: 0, reopenedEver: 3 },
+}
+describe("Audit committee report", () => {
+  it("shows plan delivery, approved reports, overdue high-risk actions and the control position", async () => {
+    m.committee = vi.fn().mockResolvedValue(committee)
+    render(<CommitteeReport />)
+    expect(await screen.findByText("Position as at 2026-10-15")).toBeTruthy()
+    expect(screen.getByText("33%")).toBeTruthy()
+    expect(screen.getByText("Lock payment run — Open payment run (CRITICAL), Bob; due 2026-10-01, 14 days late")).toBeTruthy()
+    expect(screen.getByText("Payroll audit — 2026-10-01")).toBeTruthy()
+    expect(screen.getByText("high: 2 · unassessed: 1")).toBeTruthy()
+    expect(screen.getByText("High or critical risk, not yet audited this year: Treasury")).toBeTruthy()
+    expect(screen.getByText("Not yet rated")).toBeTruthy()
+  })
+  it("says so when there is nothing to report", async () => {
+    m.committee = vi.fn().mockResolvedValue({ ...committee, plan: { ...committee.plan, year: null, quarters: [] }, overdueHighRiskActionCount: 0, overdueHighRiskActions: [], reports: { ...committee.reports, recentlyApproved: [] } })
+    render(<CommitteeReport />)
+    expect(await screen.findByText("None overdue.")).toBeTruthy()
+    expect(screen.getByText("No reports approved yet.")).toBeTruthy()
+    expect(screen.getByText("No plan")).toBeTruthy()
+  })
+  it("shows the server's reason on failure", async () => {
+    m.committee = vi.fn().mockRejectedValue({ response: { data: { message: "No access" } } })
+    render(<CommitteeReport />)
+    expect((await screen.findByRole("alert")).textContent).toContain("No access")
   })
 })

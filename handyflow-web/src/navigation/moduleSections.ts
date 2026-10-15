@@ -730,15 +730,22 @@ export const INTERNAL_AUDIT_SECTIONS: ModuleSections = {
   basePath: '/internal-audit',
   title: 'Internal Audit',
   icon: ShieldCheck,
-  defaultSection: 'dashboard',
+  // The committee report is the landing section because it is the one every audit user, including a committee reader, may open.
+  defaultSection: 'committee',
   groups: [
+    {
+      label: 'Overview',
+      sections: [
+        { id: 'committee', label: 'Risk & Control Report', icon: ShieldCheck, anyPermission: ['AUDIT_COMMITTEE_READ', 'AUDIT_READ'] },
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'AUDIT_READ' },
+      ],
+    },
     {
       label: 'Audit programme',
       sections: [
-        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'universe', label: 'Audit Universe', icon: Database },
-        { id: 'plans', label: 'Annual Plans', icon: CalendarRange },
-        { id: 'engagements', label: 'Engagements', icon: ClipboardList },
+        { id: 'universe', label: 'Audit Universe', icon: Database, permission: 'AUDIT_READ' },
+        { id: 'plans', label: 'Annual Plans', icon: CalendarRange, permission: 'AUDIT_READ' },
+        { id: 'engagements', label: 'Engagements', icon: ClipboardList, permission: 'AUDIT_READ' },
       ],
     },
   ],
