@@ -9,6 +9,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import ActionPlansPanel from "./ActionPlansPanel"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { INTERNAL_AUDIT_SECTIONS } from "../../navigation/moduleSections"
 import {
@@ -71,6 +72,7 @@ interface FindingResp {
   rootCause: string | null; recommendation: string | null; managementResponse: string | null; severity: string
   owner: string | null; ownerName: string | null; dueDate: string | null; status: string
   createdBy: string | null; createdAt: string; resolvedAt: string | null
+  criteria?: string | null; condition?: string | null; consequence?: string | null
 }
 interface ReportSignOffStatus { status: string; approvalMode: string | null; locked?: boolean }
 interface AuditTestResp {
@@ -628,7 +630,7 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
 
   // Phase 4 — findings, remediation, report sign-off
   const [showNewFinding, setShowNewFinding] = useState(false)
-  const [findingForm, setFindingForm] = useState({ sourceExceptionId: "", title: "", description: "", rootCause: "", recommendation: "", severity: "MEDIUM", owner: "", dueDate: "" })
+  const [findingForm, setFindingForm] = useState({ sourceExceptionId: "", title: "", description: "", rootCause: "", recommendation: "", severity: "MEDIUM", owner: "", dueDate: "", criteria: "", condition: "", consequence: "" })
   const [showMgmtResponse, setShowMgmtResponse] = useState<string | null>(null)
   const [mgmtResponseText, setMgmtResponseText] = useState("")
 
@@ -647,7 +649,7 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
 
   const createFinding = useMutation({
     mutationFn: (engagementId: string) => apiClient.post(`/api/v1/internal-audit/engagements/${engagementId}/findings`, {
-      ...findingForm, sourceExceptionId: findingForm.sourceExceptionId || null, owner: findingForm.owner || null, dueDate: findingForm.dueDate || null,
+      ...findingForm, criteria: findingForm.criteria || null, condition: findingForm.condition || null, consequence: findingForm.consequence || null, sourceExceptionId: findingForm.sourceExceptionId || null, owner: findingForm.owner || null, dueDate: findingForm.dueDate || null,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ia-findings", expanded] })
@@ -1137,7 +1139,7 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
 
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, paddingTop: 12, borderTop: "1px solid var(--hf-border-subtle)" }}>
                         <span style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const }}>Findings — {findingsQuery.data?.length ?? 0}</span>
-                        <button onClick={() => { setFindingForm({ sourceExceptionId: "", title: "", description: "", rootCause: "", recommendation: "", severity: "MEDIUM", owner: "", dueDate: "" }); setShowNewFinding(true); setError("") }}
+                        <button onClick={() => { setFindingForm({ sourceExceptionId: "", title: "", description: "", rootCause: "", recommendation: "", severity: "MEDIUM", owner: "", dueDate: "", criteria: "", condition: "", consequence: "" }); setShowNewFinding(true); setError("") }}
                           style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, border: "1px solid var(--hf-primary)", background: "var(--hf-info-soft)", color: "var(--hf-primary-text)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                           <Plus size={11} /> Raise Finding
                         </button>
@@ -1164,6 +1166,9 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                                   </div>
                                 </div>
                                 <p style={{ margin: "0 0 6px", color: "var(--hf-text-secondary)" }}>{f.description}</p>
+                                {f.criteria && <p style={{ margin: "0 0 4px", color: "var(--hf-text-faint)" }}><strong>Criteria (what should be):</strong> {f.criteria}</p>}
+                                {f.condition && <p style={{ margin: "0 0 4px", color: "var(--hf-text-faint)" }}><strong>Condition (what was found):</strong> {f.condition}</p>}
+                                {f.consequence && <p style={{ margin: "0 0 4px", color: "var(--hf-text-faint)" }}><strong>Consequence (why it matters):</strong> {f.consequence}</p>}
                                 {f.rootCause && <p style={{ margin: "0 0 4px", color: "var(--hf-text-faint)" }}><strong>Root cause:</strong> {f.rootCause}</p>}
                                 {f.recommendation && <p style={{ margin: "0 0 4px", color: "var(--hf-text-faint)" }}><strong>Recommendation:</strong> {f.recommendation}</p>}
                                 {f.managementResponse && <p style={{ margin: "0 0 4px", color: "var(--hf-info-text)" }}><strong>Management response:</strong> {f.managementResponse}</p>}
@@ -1198,6 +1203,7 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                                     )}
                                   </div>
                                 </div>
+                                <ActionPlansPanel findingId={f.id} findingClosed={f.status === "CLOSED"} users={users} />
                               </div>
                             )
                           })}
@@ -1489,6 +1495,18 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Description *</label>
               <textarea value={findingForm.description} onChange={e => setFindingForm(f => ({ ...f, description: e.target.value }))} rows={2} style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl}>Criteria <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(what should be the case: policy, standard, law)</span></label>
+              <textarea value={findingForm.criteria} onChange={e => setFindingForm(f => ({ ...f, criteria: e.target.value }))} rows={2} style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl}>Condition <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(what was actually found)</span></label>
+              <textarea value={findingForm.condition} onChange={e => setFindingForm(f => ({ ...f, condition: e.target.value }))} rows={2} style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl}>Consequence <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(why it matters)</span></label>
+              <textarea value={findingForm.consequence} onChange={e => setFindingForm(f => ({ ...f, consequence: e.target.value }))} rows={2} style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Root Cause</label>

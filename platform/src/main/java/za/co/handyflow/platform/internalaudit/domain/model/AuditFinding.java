@@ -38,6 +38,12 @@ public class AuditFinding {
     @Column(name = "root_cause") private String rootCause;
     @Column(name = "recommendation") private String recommendation;
     @Column(name = "management_response") private String managementResponse;
+    /** What should have been the case (policy, standard, law). With condition and consequence, the structured form of the finding. */
+    @Column(name = "criteria", columnDefinition = "TEXT") private String criteria;
+    /** What was actually found. */
+    @Column(name = "condition", columnDefinition = "TEXT") private String condition;
+    /** Why it matters. */
+    @Column(name = "consequence", columnDefinition = "TEXT") private String consequence;
     @Column(name = "severity", nullable = false) private String severity;
     @Column(name = "owner") private UUID owner;
     @Column(name = "due_date") private LocalDate dueDate;
@@ -98,6 +104,14 @@ public class AuditFinding {
         f.createdAt = Instant.now();
         return f;
     }
+
+    public void setStructure(String criteria, String condition, String consequence) {
+        this.criteria = blankToNull(criteria);
+        this.condition = blankToNull(condition);
+        this.consequence = blankToNull(consequence);
+    }
+
+    private static String blankToNull(String s) { return s == null || s.isBlank() ? null : s.trim(); }
 
     public void recordManagementResponse(String response) {
         this.managementResponse = response;

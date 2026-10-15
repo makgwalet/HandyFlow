@@ -14,5 +14,6 @@ public record FindingResponse(
         // this session's own established convention for extending an
         // existing response.
         Instant closedAt, Instant previouslyClosedAt, Instant reopenedAt, String reopenReason,
-        String externalVisibility, Instant sharedAt, UUID sharedBy, String sharingReason
+        String externalVisibility, Instant sharedAt, UUID sharedBy, String sharingReason,
+        String criteria, String condition, String consequence
 ) {}

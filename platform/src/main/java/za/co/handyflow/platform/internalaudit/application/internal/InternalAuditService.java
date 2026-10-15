@@ -82,6 +82,7 @@ public class InternalAuditService {
     private final AuditFindingRepository findingRepo;
     private final ApprovalFacade approvalFacade;
     private final za.co.handyflow.platform.audittrail.application.AuditTrailFacade trail;
+    private final za.co.handyflow.platform.internalaudit.domain.repository.AuditActionPlanRepository actionPlanRepo;
     private final za.co.handyflow.platform.internalaudit.domain.repository.AuditReportAmendmentRepository amendmentRepo;
 
     // ── Universe ─────────────────────────────────────────────────────────────
@@ -608,6 +609,7 @@ public class InternalAuditService {
         AuditFinding finding = AuditFinding.create(tenantId.getValue(), engagementId, req.sourceExceptionId(),
                 req.title(), req.description(), req.rootCause(), req.recommendation(), req.severity(),
                 req.owner(), req.dueDate(), createdBy);
+        finding.setStructure(req.criteria(), req.condition(), req.consequence());
         findingRepo.save(finding);
         trail(tenantId, "FINDING_CREATED", "FINDING", finding.getId(), null,
                 Map.of("title", finding.getTitle(), "severity", String.valueOf(finding.getSeverity()), "status", finding.getStatus()));
@@ -659,6 +661,12 @@ public class InternalAuditService {
         AuditFinding f = findingRepo.findByTenantAndId(tenantId.getValue(), findingId)
                 .orElseThrow(() -> new ResourceNotFoundException("AuditFinding", findingId.toString()));
         String beforeStatus = f.getStatus();
+        long unfinished = actionPlanRepo.findByFinding(tenantId.getValue(), findingId).stream().filter(p -> p.blocksClosing()).count();
+        if (unfinished > 0) {
+            throw new HandyFlowException(unfinished + " action" + (unfinished == 1 ? "" : "s") + " on this finding "
+                    + (unfinished == 1 ? "has" : "have") + " not been validated yet. Validate or cancel them first.",
+                    HttpStatus.CONFLICT, "ACTIONS_NOT_VALIDATED");
+        }
         try {
             f.close();
         } catch (IllegalStateException e) {
@@ -822,6 +830,7 @@ public class InternalAuditService {
                 f.getSeverity(), f.getOwner(), ownerName, f.getDueDate(), f.getStatus(),
                 f.getCreatedBy(), f.getCreatedAt(), f.getResolvedAt(),
                 f.getClosedAt(), f.getPreviouslyClosedAt(), f.getReopenedAt(), f.getReopenReason(),
-                f.getExternalVisibility(), f.getSharedAt(), f.getSharedBy(), f.getSharingReason());
+                f.getExternalVisibility(), f.getSharedAt(), f.getSharedBy(), f.getSharingReason(),
+                f.getCriteria(), f.getCondition(), f.getConsequence());
     }
 }
