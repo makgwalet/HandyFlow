@@ -7,7 +7,8 @@
 // and render <AuditorAccessSection /> wherever a new settings section
 // belongs in that file.
 import { useEffect, useState } from "react"
-import { auditorApi, type AuditorAccessGrant } from "../../api/auditor.api"
+import { auditorApi, type AuditorAccessGrant, type AuditEngagement } from "../../api/auditor.api"
+import { EngagementsPanel } from "./EngagementsPanel"
 
 const NAVY = "var(--hf-primary)"
 const BORDER = "var(--hf-border)"
@@ -30,12 +31,15 @@ export function AuditorAccessSection() {
   const [revokingId, setRevokingId] = useState<string | null>(null)
   const [expiresOn, setExpiresOn] = useState(defaultExpiry())
   const [scopeNote, setScopeNote] = useState("")
+  const [engagements, setEngagements] = useState<AuditEngagement[]>([])
+  const [engagementId, setEngagementId] = useState("")
   const [redating, setRedating] = useState<string | null>(null)
   const [newDate, setNewDate] = useState(defaultExpiry())
 
   const refetch = () => {
     setLoading(true)
     auditorApi.list().then(setGrants).finally(() => setLoading(false))
+    auditorApi.engagements().then(setEngagements).catch(() => setEngagements([]))
   }
   useEffect(refetch, [])
 
@@ -43,8 +47,8 @@ export function AuditorAccessSection() {
     if (!email || !businessName) { setError("Email and business name are both required"); return }
     setInviting(true); setError("")
     try {
-      await auditorApi.invite(email, businessName, expiresOn, scopeNote)
-      setEmail(""); setBusinessName(""); setScopeNote(""); setExpiresOn(defaultExpiry())
+      await auditorApi.invite(email, businessName, expiresOn, scopeNote, engagementId || undefined)
+      setEmail(""); setBusinessName(""); setScopeNote(""); setEngagementId(""); setExpiresOn(defaultExpiry())
       refetch()
     } catch (e: any) {
       setError(e.response?.data?.message ?? "Failed to send invite")
@@ -70,6 +74,8 @@ export function AuditorAccessSection() {
       <p style={{ fontSize: 12.5, color: MUTED, marginBottom: 20 }}>
         Give an external auditor or accountant a read-only login to review your evidence and control exceptions directly.
       </p>
+
+      <EngagementsPanel engagements={engagements} onChange={refetch} />
 
       <div style={{ background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: 16, marginBottom: 20 }}>
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
@@ -97,6 +103,14 @@ export function AuditorAccessSection() {
             <input id="aud-scope" value={scopeNote} onChange={e => setScopeNote(e.target.value)} placeholder="e.g. Year-end audit, FY2026"
               style={{ width: "100%", padding: "8px 10px", border: `1.5px solid ${BORDER}`, borderRadius: 6, fontSize: 13, boxSizing: "border-box" as const }} />
           </div>
+        </div>
+        <div style={{ marginBottom: 10 }}>
+          <label htmlFor="aud-eng" style={{ display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 4 }}>Engagement (optional)</label>
+          <select id="aud-eng" value={engagementId} onChange={e => setEngagementId(e.target.value)}
+            style={{ width: "100%", padding: "8px 10px", border: `1.5px solid ${BORDER}`, borderRadius: 6, fontSize: 13, boxSizing: "border-box" as const }}>
+            <option value="">Not part of an engagement</option>
+            {engagements.filter(g => g.status === "PLANNED" || g.status === "ACTIVE").map(g => <option key={g.id} value={g.id}>{g.name} — {g.firmName}</option>)}
+          </select>
         </div>
         <div style={{ fontSize: 12, color: FAINT, marginBottom: 10 }}>The auditor sees only the items you choose to share with them. Access stops on the date above unless you extend it.</div>
         {error && <div style={{ padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 12.5, color: "var(--hf-danger-text)", marginBottom: 10 }}>{error}</div>}

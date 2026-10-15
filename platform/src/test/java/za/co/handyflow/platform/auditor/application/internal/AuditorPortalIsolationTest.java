@@ -19,6 +19,7 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -35,6 +36,7 @@ class AuditorPortalIsolationTest {
     ControlExceptionFacade exceptions = mock(ControlExceptionFacade.class);
     AuditFindingRepository findings = mock(AuditFindingRepository.class);
     AuditShareRepository shares = mock(AuditShareRepository.class);
+    za.co.handyflow.platform.auditor.domain.repository.ExternalAuditEngagementRepository engagements = mock(za.co.handyflow.platform.auditor.domain.repository.ExternalAuditEngagementRepository.class);
     za.co.handyflow.platform.audittrail.application.AuditTrailFacade trail = mock(za.co.handyflow.platform.audittrail.application.AuditTrailFacade.class);
     AuditorPortalDataService service;
 
@@ -42,7 +44,7 @@ class AuditorPortalIsolationTest {
 
     @BeforeEach
     void setUp() {
-        service = new AuditorPortalDataService(grants, evidence, exceptions, findings, shares, trail);
+        service = new AuditorPortalDataService(grants, evidence, exceptions, findings, shares, engagements, trail);
     }
 
     private AuditorAccessGrant grantFor(UUID tenant) {
@@ -135,6 +137,54 @@ class AuditorPortalIsolationTest {
     void aRevokedGrantIsRefused() {
         AuditorAccessGrant g = grantFor(tenantA);
         g.revoke(UUID.randomUUID());
+        assertThrows(HandyFlowException.class, () -> service.getEvidence(auditor, tenantA));
+    }
+
+    // --- A11: access follows the engagement ---
+
+    private za.co.handyflow.platform.auditor.domain.model.ExternalAuditEngagement engagementFor(UUID tenant, AuditorAccessGrant g, int stage) {
+        var e = za.co.handyflow.platform.auditor.domain.model.ExternalAuditEngagement.create(tenant, "FY2026", "Firm LLP",
+                java.time.LocalDate.of(2025, 3, 1), java.time.LocalDate.of(2026, 2, 28), null, null, UUID.randomUUID());
+        if (stage >= 1) e.start();
+        if (stage >= 2) e.complete(UUID.randomUUID());
+        g.attachToEngagement(e.getId());
+        when(engagements.findById(e.getId())).thenReturn(Optional.of(e));
+        return e;
+    }
+
+    private void quietShares() {
+        when(shares.findLive(any(), any())).thenReturn(List.of());
+        when(evidence.listByIds(any(), any())).thenReturn(List.of());
+    }
+
+    @Test
+    void aGrantOnAnEngagementThatHasNotStartedGivesNoAccess() {
+        var g = grantFor(tenantA);
+        engagementFor(tenantA, g, 0);
+        assertThrows(HandyFlowException.class, () -> service.getEvidence(auditor, tenantA));
+        assertTrue(service.getMyTenants(auditor).isEmpty());
+    }
+
+    @Test
+    void aGrantOnARunningEngagementWorks() {
+        var g = grantFor(tenantA);
+        engagementFor(tenantA, g, 1);
+        quietShares();
+        assertTrue(service.getEvidence(auditor, tenantA).isEmpty());
+        assertEquals(1, service.getMyTenants(auditor).size());
+    }
+
+    @Test
+    void completingTheEngagementEndsAccessAtOnce() {
+        var g = grantFor(tenantA);
+        engagementFor(tenantA, g, 2);
+        assertThrows(HandyFlowException.class, () -> service.getEvidence(auditor, tenantA));
+    }
+
+    @Test
+    void aGrantWhoseEngagementIsMissingGivesNoAccess() {
+        var g = grantFor(tenantA);
+        g.attachToEngagement(UUID.randomUUID());
         assertThrows(HandyFlowException.class, () -> service.getEvidence(auditor, tenantA));
     }
 }

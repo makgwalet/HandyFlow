@@ -24,7 +24,7 @@ public class AuditorController {
     private final AuditorService auditorService;
 
     public record InviteAuditorRequest(@NotBlank String email, @NotBlank String businessName,
-                                       java.time.LocalDate expiresOn, String scopeNote) {}
+                                       java.time.LocalDate expiresOn, String scopeNote, UUID engagementId) {}
     public record ChangeExpiryRequest(java.time.LocalDate expiresOn) {}
 
     @PostMapping("/invite")
@@ -33,7 +33,7 @@ public class AuditorController {
     public ResponseEntity<ApiResponse<AuditorAccessGrantResponse>> invite(@RequestBody InviteAuditorRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Invite sent",
                 auditorService.inviteAuditor(TenantContext.getTenantIdAsObject(), req.email(),
-                        req.businessName(), TenantContext.getCurrentUserId(), req.expiresOn(), req.scopeNote())));
+                        req.businessName(), TenantContext.getCurrentUserId(), req.expiresOn(), req.scopeNote(), req.engagementId())));
     }
 
     @GetMapping

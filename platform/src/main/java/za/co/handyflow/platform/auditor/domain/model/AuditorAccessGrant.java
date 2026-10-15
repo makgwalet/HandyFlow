@@ -39,6 +39,9 @@ public class AuditorAccessGrant {
     /** What the auditor was engaged to look at, in the owner's words. Shown in the invite screen. */
     @Column(name = "scope_note", columnDefinition = "TEXT") private String scopeNote;
 
+    /** The external audit this access belongs to. Empty for access granted before engagements existed. */
+    @Column(name = "engagement_id") private UUID engagementId;
+
     public static final int DEFAULT_GRANT_DAYS = 90;
     public static final int MAX_GRANT_DAYS = 366;
 
@@ -62,6 +65,8 @@ public class AuditorAccessGrant {
         g.scopeNote = scopeNote == null || scopeNote.isBlank() ? null : scopeNote.trim();
         return g;
     }
+
+    public void attachToEngagement(UUID engagementId) { this.engagementId = engagementId; }
 
     private static String generateToken() {
         byte[] bytes = new byte[32];

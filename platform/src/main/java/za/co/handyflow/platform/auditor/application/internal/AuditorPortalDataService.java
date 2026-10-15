@@ -31,13 +31,14 @@ public class AuditorPortalDataService {
     // an external auditor" gap.
     private final AuditFindingRepository findingRepo;
     private final AuditShareRepository shareRepo;
+    private final za.co.handyflow.platform.auditor.domain.repository.ExternalAuditEngagementRepository engagementRepo;
     private final za.co.handyflow.platform.audittrail.application.AuditTrailFacade trail;
 
     public record AuditorTenantAccess(UUID tenantId, java.time.Instant acceptedAt) {}
 
     public List<AuditorTenantAccess> getMyTenants(UUID portalUserId) {
         return grantRepo.findByPortalUserId(portalUserId).stream()
-                .filter(g -> g.isUsableAt(java.time.Instant.now()))
+                .filter(this::usable)
                 .map(g -> new AuditorTenantAccess(g.getTenantId(), g.getAcceptedAt()))
                 .toList();
     }
@@ -80,9 +81,16 @@ public class AuditorPortalDataService {
         return shareRepo.findLive(tenantId, itemType).stream().map(AuditShare::getItemId).collect(java.util.stream.Collectors.toSet());
     }
 
+    /** A grant works if it is live and not past its date, and, when it belongs to an engagement, that engagement is running. */
+    private boolean usable(za.co.handyflow.platform.auditor.domain.model.AuditorAccessGrant g) {
+        if (!g.isUsableAt(java.time.Instant.now())) return false;
+        if (g.getEngagementId() == null) return true;
+        return engagementRepo.findById(g.getEngagementId()).map(e -> e.grantsAccess()).orElse(false);
+    }
+
     private void requireActiveGrant(UUID portalUserId, UUID tenantId) {
         boolean hasAccess = grantRepo.findByTenantId(tenantId).stream()
-                .anyMatch(g -> portalUserId.equals(g.getPortalUserId()) && g.isUsableAt(java.time.Instant.now()));
+                .anyMatch(g -> portalUserId.equals(g.getPortalUserId()) && usable(g));
         if (!hasAccess) {
             throw new HandyFlowException(
                     "You don't have access to this business's records (it may have expired)", HttpStatus.FORBIDDEN, "NO_ACCESS");

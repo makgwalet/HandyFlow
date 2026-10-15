@@ -13,5 +13,6 @@ public record AuditorAccessGrantResponse(
         Instant expiresAt,
         String scopeNote,
         /** ACTIVE grants whose date has passed show as EXPIRED here so the screen cannot mislead. */
-        boolean expired
+        boolean expired,
+        UUID engagementId
 ) {}

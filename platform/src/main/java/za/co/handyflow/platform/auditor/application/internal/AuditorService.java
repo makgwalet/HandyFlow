@@ -27,6 +27,7 @@ import java.util.UUID;
 public class AuditorService {
 
     private final AuditorAccessGrantRepository grantRepo;
+    private final za.co.handyflow.platform.auditor.domain.repository.ExternalAuditEngagementRepository engagementRepo;
     private final EmailService emailService;
     private final za.co.handyflow.platform.audittrail.application.AuditTrailFacade trail;
 
@@ -36,12 +37,26 @@ public class AuditorService {
     @Transactional
     public AuditorAccessGrantResponse inviteAuditor(TenantId tenantId, String email,
                                                     String businessName, UUID invitedBy) {
-        return inviteAuditor(tenantId, email, businessName, invitedBy, null, null);
+        return inviteAuditor(tenantId, email, businessName, invitedBy, null, null, null);
     }
 
     @Transactional
     public AuditorAccessGrantResponse inviteAuditor(TenantId tenantId, String email, String businessName, UUID invitedBy,
                                                     LocalDate expiresOn, String scopeNote) {
+        return inviteAuditor(tenantId, email, businessName, invitedBy, expiresOn, scopeNote, null);
+    }
+
+    @Transactional
+    public AuditorAccessGrantResponse inviteAuditor(TenantId tenantId, String email, String businessName, UUID invitedBy,
+                                                    LocalDate expiresOn, String scopeNote, UUID engagementId) {
+        if (engagementId != null) {
+            var eng = engagementRepo.findByTenantIdAndId(tenantId.getValue(), engagementId)
+                    .orElseThrow(() -> new ResourceNotFoundException("ExternalAuditEngagement", engagementId.toString()));
+            if (!eng.acceptsInvites()) {
+                throw new HandyFlowException("This engagement is " + eng.getStatus().toLowerCase() + "; auditors can no longer be added to it",
+                        HttpStatus.CONFLICT, "ENGAGEMENT_CLOSED");
+            }
+        }
         Instant expiry = expiryFrom(expiresOn);
         boolean alreadyGranted = grantRepo.findByTenantId(tenantId.getValue()).stream()
                 .anyMatch(g -> g.getInviteEmail().equalsIgnoreCase(email) && !"REVOKED".equals(g.getStatus()));
@@ -52,9 +67,10 @@ public class AuditorService {
         }
 
         AuditorAccessGrant grant = AuditorAccessGrant.createInvite(tenantId.getValue(), email, invitedBy, expiry, scopeNote);
+        grant.attachToEngagement(engagementId);
         grantRepo.save(grant);
         trail.record(tenantId, "AUDITOR_INVITED", "AUDITOR_GRANT", grant.getId(), null,
-                java.util.Map.of("email", grant.getInviteEmail(), "expiresAt", String.valueOf(grant.getExpiresAt()), "scope", String.valueOf(grant.getScopeNote())));
+                java.util.Map.of("email", grant.getInviteEmail(), "expiresAt", String.valueOf(grant.getExpiresAt()), "scope", String.valueOf(grant.getScopeNote()), "engagementId", String.valueOf(engagementId)));
 
         emailService.send(email, businessName + " has invited you to review their financial records",
                 EmailTemplates.portalInvite(businessName, "Auditor Access",
@@ -115,6 +131,6 @@ public class AuditorService {
     private AuditorAccessGrantResponse toResponse(AuditorAccessGrant g) {
         return new AuditorAccessGrantResponse(g.getId(), g.getInviteEmail(), g.getStatus(),
                 g.getInvitedAt(), g.getAcceptedAt(), g.getRevokedAt(), g.getExpiresAt(), g.getScopeNote(),
-                g.getExpiresAt() != null && !Instant.now().isBefore(g.getExpiresAt()));
+                g.getExpiresAt() != null && !Instant.now().isBefore(g.getExpiresAt()), g.getEngagementId());
     }
 }

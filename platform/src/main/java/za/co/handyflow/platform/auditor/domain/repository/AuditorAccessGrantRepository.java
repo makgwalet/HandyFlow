@@ -11,5 +11,6 @@ public interface AuditorAccessGrantRepository extends JpaRepository<AuditorAcces
     Optional<AuditorAccessGrant> findByInviteToken(String inviteToken);
     List<AuditorAccessGrant> findByTenantId(UUID tenantId);
     Optional<AuditorAccessGrant> findByTenantIdAndId(UUID tenantId, UUID id);
+    List<AuditorAccessGrant> findByTenantIdAndEngagementId(UUID tenantId, UUID engagementId);
     List<AuditorAccessGrant> findByPortalUserId(UUID portalUserId);
 }
