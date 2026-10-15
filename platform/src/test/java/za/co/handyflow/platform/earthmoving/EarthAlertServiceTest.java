@@ -49,7 +49,7 @@ class EarthAlertServiceTest {
         when(alerts.findLiveByKey(any(), any())).thenReturn(Optional.empty());
         when(rules.findByType(any(), any())).thenReturn(Optional.empty());
         when(users.resolveUser(any(), any())).thenAnswer(i -> Optional.of(new Recipient((UUID) i.getArgument(1), "User", "u@x.co.za", null)));
-        when(admins.resolveTenantAdmins(any())).thenReturn(List.of(new Recipient(adminUser, "Admin", "a@x.co.za", null)));
+        when(admins.resolveTenantAdmins(any(TenantId.class))).thenReturn(List.of(new Recipient(adminUser, "Admin", "a@x.co.za", null)));
     }
 
     private EarthAlertRule rule(String type, Integer escalateAfter, UUID... level1AndLevel2) {

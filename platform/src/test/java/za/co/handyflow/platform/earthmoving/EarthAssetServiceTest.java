@@ -51,7 +51,7 @@ class EarthAssetServiceTest {
                 notifications, admins, alerts, sites, meters);
         when(assets.save(any())).thenAnswer(i -> i.getArgument(0));
         when(assets.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
-        when(admins.resolveTenantAdmins(any())).thenReturn(List.of());
+        when(admins.resolveTenantAdmins(any(TenantId.class))).thenReturn(List.of());
         when(sites.supervisorForAsset(any(), any())).thenReturn(java.util.Optional.empty());
         // A stand-in for the real resolver: typed names pass straight through, no links.
         when(sites.resolveForDeploy(any(), any())).thenAnswer(i -> {
@@ -196,7 +196,7 @@ class EarthAssetServiceTest {
         service.updateStatus(tenant, a.getId(), status("BREAKDOWN", "Hydraulic hose burst"), actor);
         verify(alerts).raise(eq(tenant), eq("BREAKDOWN"), eq("CRITICAL"), eq(a.getId()), any(), any(), any(), any(),
                 eq("BREAKDOWN:" + a.getId()), any());
-        verify(admins, never()).resolveTenantAdmins(any());
+        verify(admins, never()).resolveTenantAdmins(any(TenantId.class));
     }
 
     @Test

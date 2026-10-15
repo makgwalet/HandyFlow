@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import za.co.handyflow.platform.audittrail.application.AuditTrailFacade;
 import za.co.handyflow.platform.crm.CrmFacade;
 import za.co.handyflow.platform.crm.CustomerSummary;
+import za.co.handyflow.platform.crm.domain.model.CustomerStatus;
 import za.co.handyflow.platform.earthmoving.application.internal.*;
 import za.co.handyflow.platform.earthmoving.domain.model.*;
 import za.co.handyflow.platform.earthmoving.domain.repository.EarthDeploymentRepository;
@@ -52,7 +53,7 @@ class EarthSiteServiceTest {
     }
 
     static CustomerSummary customer(UUID id, String name) {
-        return new CustomerSummary(id, name, null, null, null, null, null, "ACTIVE");
+        return new CustomerSummary(id, name, null, null, null, null, null, CustomerStatus.ACTIVE);
     }
     static ProjectSummary project(UUID id, String name) {
         return new ProjectSummary(id, "P-1", name, null, null, null, "ACTIVE");
