@@ -72,3 +72,15 @@ describe("Inspections", () => {
     expect(await screen.findByText(/taken out of service/)).toBeTruthy()
   })
 })
+
+import { inspectionAgo } from "./shared/format"
+
+describe("inspectionAgo", () => {
+  const now = new Date("2026-10-15T12:00:00Z")
+  it("says how long ago in plain words", () => {
+    expect(inspectionAgo(null, now)).toBe("Never inspected")
+    expect(inspectionAgo("2026-10-15T06:00:00Z", now)).toBe("Inspected today")
+    expect(inspectionAgo("2026-10-14T06:00:00Z", now)).toBe("Inspected yesterday")
+    expect(inspectionAgo("2026-10-10T12:00:00Z", now)).toBe("Inspected 5 days ago")
+  })
+})

@@ -162,6 +162,8 @@ export interface Inspection {
   meterReading: number | null; result: string; notes: string | null; items: InspectionItem[]
 }
 
+export interface LatestInspection { assetId: string; performedAt: string; result: string }
+
 // ── Hire charges ─────────────────────────────────────────────────────────
 export interface HireCharge {
   id: string | null; deploymentId: string; assetId: string; machine: string; customerId: string | null; customerName: string | null

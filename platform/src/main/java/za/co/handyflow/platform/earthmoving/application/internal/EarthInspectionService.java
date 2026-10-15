@@ -12,6 +12,7 @@ import za.co.handyflow.platform.earthmoving.domain.repository.EarthInspectionRep
 import za.co.handyflow.platform.earthmoving.dto.CreateIncidentRequest;
 import za.co.handyflow.platform.earthmoving.dto.CreateInspectionRequest;
 import za.co.handyflow.platform.earthmoving.dto.InspectionResponse;
+import za.co.handyflow.platform.earthmoving.dto.LatestInspectionResponse;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -72,6 +73,15 @@ public class EarthInspectionService {
         for (UUID id : found.stream().map(EarthInspection::getAssetId).distinct().toList())
             assets.findActiveById(tenantId, id).ifPresent(a -> names.put(id, label(a)));
         return found.stream().map(i -> toResponse(i, names.getOrDefault(i.getAssetId(), "Unknown machine"), byInspection.getOrDefault(i.getId(), List.of()))).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<LatestInspectionResponse> latest(TenantId tenantId) {
+        access.require(EarthmovingRules.READ, "view inspections");
+        Map<UUID, EarthInspection> byAsset = new LinkedHashMap<>();
+        for (EarthInspection i : inspections.findLatestPerAsset(tenantId)) byAsset.merge(i.getAssetId(), i,
+                (a, b) -> b.getPerformedAt().isAfter(a.getPerformedAt()) ? b : a);
+        return byAsset.values().stream().map(i -> new LatestInspectionResponse(i.getAssetId(), i.getPerformedAt(), i.getResult())).toList();
     }
 
     private UUID raiseIncident(TenantId tenantId, EarthAsset asset, InspectionRules.Answer a, UUID inspector) {

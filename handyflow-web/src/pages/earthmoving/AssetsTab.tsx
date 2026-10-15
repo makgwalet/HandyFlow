@@ -10,11 +10,11 @@ import {
   STATUS_TRANSITIONS, authorityForStatusChange, isRelease, needsReason,
 } from "./shared/constants"
 import { useEarthPerms } from "./shared/useEarthPerms"
-import { fmtCurrency, apiMessage, meterUnitOf, meterWordOf } from "./shared/format"
+import { fmtCurrency, apiMessage, meterUnitOf, meterWordOf, inspectionAgo } from "./shared/format"
 import { Overlay, ModalHead, ModalFoot, Sect, ErrBanner, lbl, inputStyle } from "./shared/Modal"
 import StatusHistoryDialog from "./StatusHistoryDialog"
 import MeterDialog from "./MeterDialog"
-import { useAssets, useCreateAsset, useUpdateAsset, useUpdateAssetStatus, useUpdateAssetHours } from "./shared/hooks"
+import { useLatestInspections, useAssets, useCreateAsset, useUpdateAsset, useUpdateAssetStatus, useUpdateAssetHours } from "./shared/hooks"
 
 const EMPTY_FORM = {
   name: "", fleetNumber: "", assetType: "DOZER", make: "", model: "",
@@ -67,6 +67,7 @@ export default function AssetsTab() {
   const [apiError, setApiError]         = useState("")
 
   const { data: assets = [], isLoading } = useAssets()
+  const { data: latestInspections = [] } = useLatestInspections()
 
   const createAsset = useCreateAsset(() => {
     setShowAdd(false); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("")
@@ -245,6 +246,12 @@ export default function AssetsTab() {
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{Number(asset.currentHours ?? 0).toLocaleString()} {meterUnitOf(asset)}</div>
                       <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{fmtCurrency(asset.dailyRate)}/day</div>
+                      {(() => {
+                        const li = latestInspections.find(x => x.assetId === asset.id)
+                        return <div style={{ fontSize: 11, color: li?.result === "UNSAFE" ? "var(--hf-danger-text)" : "var(--hf-text-faint)" }}>
+                          {inspectionAgo(li?.performedAt)}{li && li.result !== "PASS" ? (li.result === "UNSAFE" ? " · unsafe" : " · defects") : ""}
+                        </div>
+                      })()}
                     </div>
                     <StatusBadge status={asset.status} />
                     <div style={{ display: "flex", gap: 5 }}>

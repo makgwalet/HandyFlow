@@ -15,7 +15,7 @@
 // PUT (backend endpoint is still @PutMapping). Create is POST.
 
 import { apiClient } from "../../../api/client"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, HireCharge, DeploymentOption, DraftInvoiceResult } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, HireCharge, DeploymentOption, DraftInvoiceResult } from "./types"
 
 export function unwrap<T>(r: { data?: { data?: unknown } & Record<string, unknown> }): T {
   const p = (r.data?.data ?? r.data) as { content?: unknown } | undefined
@@ -185,6 +185,11 @@ export const fetchChecklist = async (): Promise<string[]> => unwrap<string[]>(aw
 
 export const fetchInspections = async (assetId: string): Promise<Inspection[]> =>
   unwrap<Inspection[]>(await apiClient.get(`${BASE}/inspections${assetId ? `?assetId=${assetId}` : ""}`))
+
+export const fetchLatestInspections = async (): Promise<LatestInspection[]> => {
+  const r = unwrap<unknown>(await apiClient.get(`${BASE}/inspections/latest`))
+  return Array.isArray(r) ? (r as LatestInspection[]) : []
+}
 
 export const createInspection = async (body: Record<string, unknown>): Promise<Inspection> =>
   unwrap<Inspection>(await apiClient.post(`${BASE}/inspections`, body))

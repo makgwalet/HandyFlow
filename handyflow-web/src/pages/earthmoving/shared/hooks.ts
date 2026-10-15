@@ -1,7 +1,7 @@
 // src/pages/earthmoving/shared/hooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, HireCharge, DeploymentOption, DraftInvoiceResult } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, HireCharge, DeploymentOption, DraftInvoiceResult } from "./types"
 
 // Central query keys — every tab imports these instead of typing the
 // literal string, so a rename is a one-line change instead of a grep.
@@ -367,6 +367,10 @@ export function useChangeMeter(onSuccess?: () => void) {
 
 export function useChecklist() {
   return useQuery<string[]>({ queryKey: ["em-checklist"], queryFn: api.fetchChecklist, staleTime: 300_000 })
+}
+
+export function useLatestInspections(enabled = true) {
+  return useQuery<LatestInspection[]>({ queryKey: [...QK.inspections, "latest"], queryFn: api.fetchLatestInspections, staleTime: 30_000, enabled })
 }
 
 export function useInspections(assetId: string) {

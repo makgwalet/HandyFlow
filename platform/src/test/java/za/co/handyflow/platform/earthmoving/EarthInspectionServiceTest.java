@@ -89,4 +89,16 @@ class EarthInspectionServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.create(tenant, partial, actor));
         verify(inspections, never()).save(any());
     }
+
+    @Test void latestGivesOneRowPerMachineAndNeedsReadPermission() {
+        EarthInspection older = EarthInspection.create(tenant, asset.getId(), actor, null, "PASS", null);
+        EarthInspection newer = EarthInspection.create(tenant, asset.getId(), actor, null, "UNSAFE", null);
+        when(inspections.findLatestPerAsset(tenant)).thenReturn(List.of(older, newer));
+        granted.add("EARTHMOVING_READ");
+        List<LatestInspectionResponse> r = service.latest(tenant);
+        assertEquals(1, r.size());
+        assertEquals(asset.getId(), r.get(0).assetId());
+        granted.clear();
+        assertThrows(HandyFlowException.class, () -> service.latest(tenant));
+    }
 }

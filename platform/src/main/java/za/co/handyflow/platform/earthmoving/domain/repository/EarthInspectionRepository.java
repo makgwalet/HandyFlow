@@ -14,4 +14,9 @@ public interface EarthInspectionRepository extends JpaRepository<EarthInspection
     /** Newest first; assetId null means every machine. */
     @Query("SELECT i FROM EarthInspection i WHERE i.tenantId = :tenantId AND (:assetId IS NULL OR i.assetId = :assetId) ORDER BY i.performedAt DESC")
     List<EarthInspection> findRecent(TenantId tenantId, UUID assetId, Pageable pageable);
+
+    /** The most recent inspection of each machine. */
+    @Query("SELECT i FROM EarthInspection i WHERE i.tenantId = :tenantId AND i.performedAt = "
+            + "(SELECT MAX(j.performedAt) FROM EarthInspection j WHERE j.tenantId = :tenantId AND j.assetId = i.assetId)")
+    List<EarthInspection> findLatestPerAsset(TenantId tenantId);
 }

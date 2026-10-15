@@ -22,6 +22,12 @@ export function apiMessage(e: unknown, fallback: string): string {
 }
 
 /** "hrs" or "km": the unit a machine's meter counts in. Machines from before meter types count hours. */
+/** "Inspected today", "Inspected 3 days ago" or "Never inspected", for a machine's card. */
+export function inspectionAgo(iso: string | null | undefined, now: Date = new Date()): string {
+  if (!iso) return "Never inspected"
+  const days = Math.floor((now.getTime() - new Date(iso).getTime()) / 86_400_000)
+  return days <= 0 ? "Inspected today" : days === 1 ? "Inspected yesterday" : `Inspected ${days} days ago`
+}
 export const meterUnitOf = (a: { meterUnit?: string } | null | undefined) => a?.meterUnit ?? "hrs"
 /** What the meter is called on a form: "Odometer" for kilometres, "Hour meter" otherwise. */
 export const meterNameOf = (a: { meterType?: string } | null | undefined) => (a?.meterType === "KILOMETRES" ? "Odometer" : "Hour meter")

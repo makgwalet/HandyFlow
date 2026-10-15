@@ -11,6 +11,7 @@ import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.earthmoving.application.internal.EarthInspectionService;
 import za.co.handyflow.platform.earthmoving.dto.CreateInspectionRequest;
 import za.co.handyflow.platform.earthmoving.dto.InspectionResponse;
+import za.co.handyflow.platform.earthmoving.dto.LatestInspectionResponse;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.shared.UserContext;
@@ -33,6 +34,14 @@ public class EarthInspectionController {
     public ResponseEntity<ApiResponse<List<String>>> checklist() {
         featureGuard.requireModule("earthmoving");
         return ResponseEntity.ok(ApiResponse.success("Checklist", inspections.checklist()));
+    }
+
+    @GetMapping("/latest")
+    @PreAuthorize("hasAuthority('EARTHMOVING_READ')")
+    @Operation(summary = "The most recent inspection of each machine")
+    public ResponseEntity<ApiResponse<List<LatestInspectionResponse>>> latest() {
+        featureGuard.requireModule("earthmoving");
+        return ResponseEntity.ok(ApiResponse.success("Latest inspections", inspections.latest(TenantContext.getTenantIdAsObject())));
     }
 
     @GetMapping
