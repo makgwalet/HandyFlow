@@ -15,6 +15,7 @@ import { Overlay, ModalHead, ModalFoot, Sect, ErrBanner, lbl, inputStyle } from 
 import StatusHistoryDialog from "./StatusHistoryDialog"
 import MeterDialog from "./MeterDialog"
 import AssetDetail from "./AssetDetail"
+import { searchAssets, sortAssets, pageOf, type SortKey, type SortDir } from "./shared/fleetTable"
 import { useLatestInspections, useAssets, useCreateAsset, useUpdateAsset, useUpdateAssetStatus, useUpdateAssetHours } from "./shared/hooks"
 
 const EMPTY_FORM = {
@@ -60,6 +61,11 @@ export default function AssetsTab() {
   const [expanded, setExpanded]         = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState("ALL")
   const [filterType, setFilterType]     = useState("ALL")
+  const [search, setSearch]             = useState("")
+  const [view, setView]                 = useState<"cards" | "table">("cards")
+  const [sortKey, setSortKey]           = useState<SortKey>("fleetNumber")
+  const [sortDir, setSortDir]           = useState<SortDir>("asc")
+  const [page, setPage]                 = useState(0)
   const [form, setForm]                 = useState(EMPTY_FORM)
   const [newStatus, setNewStatus]       = useState("")
   const [statusNote, setStatusNote]     = useState("")
@@ -110,11 +116,59 @@ export default function AssetsTab() {
     return Object.keys(errs).length === 0
   }
 
-  const filtered = assets.filter(a => {
+  const filtered = sortAssets(searchAssets(assets.filter(a => {
     if (filterStatus !== "ALL" && a.status !== filterStatus) return false
     if (filterType !== "ALL" && a.assetType !== filterType) return false
     return true
-  })
+  }), search), sortKey, sortDir)
+  const paged = pageOf(filtered, page)
+  const pageItems = paged.items
+  const sortBy = (key: SortKey) => { if (key === sortKey) setSortDir(d => (d === "asc" ? "desc" : "asc")); else { setSortKey(key); setSortDir("asc") } setPage(0) }
+
+  const renderTable = () => {
+    const head = (key: SortKey, label: string, right = false) => (
+      <th key={key} aria-sort={sortKey === key ? (sortDir === "asc" ? "ascending" : "descending") : "none"} style={{ textAlign: right ? "right" : "left", padding: "8px 10px", fontSize: 12, color: "var(--hf-text-muted)", fontWeight: 600 }}>
+        <button onClick={() => sortBy(key)} style={{ background: "none", border: "none", cursor: "pointer", font: "inherit", color: "inherit", padding: 0 }}>{label}{sortKey === key ? (sortDir === "asc" ? " ▲" : " ▼") : ""}</button>
+      </th>)
+    const plain = (label: string) => <th key={label} style={{ textAlign: "left", padding: "8px 10px", fontSize: 12, color: "var(--hf-text-muted)", fontWeight: 600 }}>{label}</th>
+    const td: React.CSSProperties = { padding: "8px 10px", fontSize: 13, color: "var(--hf-text)" }
+    return (
+      <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflowX: "auto", background: "var(--hf-surface)" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }} aria-label="Fleet table">
+          <thead><tr>
+            {head("fleetNumber", "Fleet no.")}{head("name", "Machine")}{head("assetType", "Type")}{head("status", "Status")}
+            {plain("Site / client")}{head("currentHours", "Meter", true)}{head("dailyRate", "Daily rate", true)}{plain("Last inspected")}<th />
+          </tr></thead>
+          <tbody>{pageItems.map(a => {
+            const li = latestInspections.find(x => x.assetId === a.id)
+            return (
+              <tr key={a.id} style={{ borderTop: "1px solid var(--hf-border)" }}>
+                <td style={td}>{a.fleetNumber ?? "—"}</td>
+                <td style={td}>{a.name}{a.dueForService ? " ⚠" : ""}</td>
+                <td style={td}>{a.assetType}</td>
+                <td style={td}><StatusBadge status={a.status} /></td>
+                <td style={td}>{[a.currentSite, a.currentClient].filter(Boolean).join(" · ") || "—"}</td>
+                <td style={{ ...td, textAlign: "right" }}>{Number(a.currentHours ?? 0).toLocaleString()} {meterUnitOf(a)}</td>
+                <td style={{ ...td, textAlign: "right" }}>{fmtCurrency(a.dailyRate)}</td>
+                <td style={{ ...td, color: li?.result === "UNSAFE" ? "var(--hf-danger-text)" : "var(--hf-text)" }}>{inspectionAgo(li?.performedAt)}</td>
+                <td style={td}><button onClick={() => setViewing(a)} aria-label={`Open ${a.fleetNumber ?? a.name}`} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: "3px 10px", cursor: "pointer", fontSize: 12, color: "var(--hf-text-secondary)" }}>Open</button></td>
+              </tr>)
+          })}</tbody>
+        </table>
+      </div>)
+  }
+
+  const renderPager = () => paged.pages <= 1 && filtered.length <= pageItems.length ? (
+    <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 10 }}>{filtered.length} machine{filtered.length === 1 ? "" : "s"}</div>
+  ) : (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12, fontSize: 12, color: "var(--hf-text-muted)" }}>
+      <span>Showing {paged.from}–{paged.to} of {filtered.length}</span>
+      <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <button disabled={paged.page === 0} onClick={() => setPage(paged.page - 1)} style={{ padding: "4px 10px", borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", cursor: paged.page === 0 ? "default" : "pointer" }}>Previous</button>
+        <span>Page {paged.page + 1} of {paged.pages}</span>
+        <button disabled={paged.page >= paged.pages - 1} onClick={() => setPage(paged.page + 1)} style={{ padding: "4px 10px", borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", cursor: paged.page >= paged.pages - 1 ? "default" : "pointer" }}>Next</button>
+      </span>
+    </div>)
 
   const stats = [
     { label: "Total fleet", value: assets.length, color: "var(--hf-primary-text)" },
@@ -177,7 +231,7 @@ export default function AssetsTab() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {["ALL", ...STATUSES].map(s => (
-            <button key={s} onClick={() => setFilterStatus(s)}
+            <button key={s} onClick={() => { setFilterStatus(s); setPage(0) }}
               style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterStatus === s ? 600 : 400,
                 background: filterStatus === s ? (s === "ALL" ? "var(--hf-primary)" : STATUS_CFG[s]?.color ?? "var(--hf-primary)") : "var(--hf-surface-sunken)",
                 color: filterStatus === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
@@ -191,9 +245,21 @@ export default function AssetsTab() {
         </button>}
       </div>
 
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+        <input aria-label="Search fleet" placeholder="Search fleet number, name, make, serial, registration, site…" value={search}
+          onChange={e => { setSearch(e.target.value); setPage(0) }} style={{ ...inputStyle(), maxWidth: 380 }} />
+        <span role="group" aria-label="View" style={{ display: "flex", gap: 4 }}>
+          {([["cards", "Cards"], ["table", "Table"]] as const).map(([v, l]) => (
+            <button key={v} aria-pressed={view === v} onClick={() => setView(v)}
+              style={{ padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1px solid var(--hf-border)",
+                background: view === v ? "var(--hf-primary)" : "var(--hf-surface)", color: view === v ? "var(--hf-text-on-solid)" : "var(--hf-text-secondary)" }}>{l}</button>
+          ))}
+        </span>
+      </div>
+
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
         {["ALL", ...ASSET_TYPES].map(t => (
-          <button key={t} onClick={() => setFilterType(t)}
+          <button key={t} onClick={() => { setFilterType(t); setPage(0) }}
             style={{ padding: "4px 10px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: "1px solid",
               borderColor: filterType === t ? "var(--hf-warning)" : "var(--hf-border)",
               background: filterType === t ? "var(--hf-warning-soft)" : "var(--hf-surface)",
@@ -211,8 +277,9 @@ export default function AssetsTab() {
           <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No assets found</div>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {filtered.map(asset => {
+        <>
+        {view === "table" ? renderTable() : (<div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {pageItems.map(asset => {
             const isOpen = expanded === asset.id
             const hoursUsed = (asset.currentHours ?? 0) - (asset.lastServiceHours ?? 0)
             const svcPct = Math.min(100, (hoursUsed / (asset.serviceIntervalHours || 250)) * 100)
@@ -340,7 +407,9 @@ export default function AssetsTab() {
               </div>
             )
           })}
-        </div>
+        </div>)}
+        {renderPager()}
+        </>
       )}
 
       </>)}
