@@ -4,6 +4,7 @@ import { AuditorAccessSection, defaultExpiry } from "./AuditorAccessSection"
 
 const api = vi.hoisted(() => ({ list: vi.fn(), invite: vi.fn(), revoke: vi.fn(), changeExpiry: vi.fn(), engagements: vi.fn(), createEngagement: vi.fn(), engagementAction: vi.fn(), manifest: vi.fn() }))
 vi.mock("../../api/auditor.api", () => ({ auditorApi: api }))
+vi.mock("../../api/auditPack.api", () => ({ auditPackApi: { runs: () => Promise.resolve([]) } }))
 vi.mock("../../api/auditQueries.api", () => ({ businessAuditQueryApi: { list: () => Promise.resolve([]) } }))
 vi.mock("../../api/evidenceRequests.api", () => ({ businessEvidenceRequestApi: { list: () => Promise.resolve([]) } }))
 afterEach(cleanup)
