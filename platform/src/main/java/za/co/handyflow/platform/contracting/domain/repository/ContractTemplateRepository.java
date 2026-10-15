@@ -19,4 +19,7 @@ public interface ContractTemplateRepository extends JpaRepository<ContractTempla
 
     @Query("SELECT COUNT(t) FROM ContractTemplate t WHERE t.tenantId = :#{#tenantId.value} AND t.isSystem = true")
     long countSystemTemplates(TenantId tenantId);
+
+    @Query("SELECT t FROM ContractTemplate t WHERE t.tenantId = :#{#tenantId.value} AND t.contractType = :contractType AND t.deletedAt IS NULL AND t.active = true ORDER BY t.isSystem DESC, t.name")
+    List<ContractTemplate> findActiveByType(TenantId tenantId, String contractType);
 }

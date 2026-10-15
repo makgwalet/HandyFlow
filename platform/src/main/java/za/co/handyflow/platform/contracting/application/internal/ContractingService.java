@@ -199,6 +199,12 @@ public class ContractingService {
         return toContractResponse(c);
     }
 
+    /** Makes sure the tenant has the standard templates. */
+    @Transactional
+    public void seedTemplates(TenantId tenantId) {
+        templateSeeder.seedForTenant(tenantId);
+    }
+
     @Transactional
     public ContractResponse createContract(TenantId tenantId, CreateContractRequest req,
                                            UUID createdByUserId) {

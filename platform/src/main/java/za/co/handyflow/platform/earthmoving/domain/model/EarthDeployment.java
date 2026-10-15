@@ -81,6 +81,10 @@ public class EarthDeployment {
     @Column(name = "returned_at")
     private Instant returnedAt;
 
+    /** The hire contract (held in Contracting) that covers this deployment, if any. */
+    @Column(name = "contract_id")
+    private UUID contractId;
+
     /** Why the deployment ended: RETURNED, BREAKDOWN, or MAINTENANCE. Null while open. */
     @Column(name = "end_reason")
     private String endReason;
@@ -120,6 +124,8 @@ public class EarthDeployment {
     public boolean linkSiteIfEmpty(UUID id) { if (siteId != null || id == null) return false; siteId = id; return true; }
     public boolean linkCustomerIfEmpty(UUID id) { if (customerId != null || id == null) return false; customerId = id; return true; }
     public boolean linkProjectIfEmpty(UUID id) { if (projectId != null || id == null) return false; projectId = id; return true; }
+
+    public void linkContract(UUID contractId) { this.contractId = contractId; }
 
     public boolean isOpen() {
         return returnedAt == null;

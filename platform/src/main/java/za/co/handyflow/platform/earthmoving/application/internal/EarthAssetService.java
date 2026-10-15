@@ -266,6 +266,11 @@ public class EarthAssetService {
         // Warnings never stop a deployment, but deploying despite one is kept on record.
         List<String> warnings = deployChecks.pending(tenantId, asset, java.time.Instant.now());
         EarthSiteService.DeployTarget target = sites.resolveForDeploy(tenantId, req);
+        if (req.contractId() != null) deployChecks.requireContract(tenantId, req.contractId());
+        // A missing or unsigned hire contract is also only a warning, and is kept on record with the others.
+        List<String> allWarnings = new java.util.ArrayList<>(warnings);
+        allWarnings.addAll(deployChecks.contractWarnings(tenantId, asset,
+                new EarthDeployCheckService.HireContext(target.customerId(), target.siteId(), req.startDate(), req.expectedEndDate(), req.contractId())));
         asset.deployTo(target.siteName(), target.clientName());
         assetRepository.save(asset);
 
@@ -274,6 +279,7 @@ public class EarthAssetService {
                 req.contactName(), req.contactPhone(),
                 req.startDate(), req.expectedEndDate(), req.notes()
         ).withLinks(target.siteId(), target.customerId(), target.projectId());
+        deployment.linkContract(req.contractId());
         deploymentRepository.save(deployment);
         statusEvents.save(EarthStatusEvent.of(tenantId, id, previous, AssetStatus.DEPLOYED,
                 "Deployed to " + target.siteName(), actor, asset.getCurrentHours()));
@@ -284,7 +290,7 @@ public class EarthAssetService {
                         "siteId", String.valueOf(target.siteId()),
                         "customerId", String.valueOf(target.customerId()),
                         "projectId", String.valueOf(target.projectId()),
-                        "warningsShown", String.join(" | ", warnings)));
+                        "warningsShown", String.join(" | ", allWarnings)));
 
         log.info("Asset deployed asset={} site={} client={}", id, target.siteName(), target.clientName());
         return toResponse(asset);
@@ -554,7 +560,7 @@ public class EarthAssetService {
                 d.getId(), d.getAssetId(), d.getSiteName(), d.getClientName(),
                 d.getContactName(), d.getContactPhone(),
                 d.getPlannedStartDate(), d.getPlannedEndDate(),
-                d.getDeployedAt(), d.getReturnedAt(), d.getEndReason(), d.getNotes()
+                d.getDeployedAt(), d.getReturnedAt(), d.getEndReason(), d.getNotes(), d.getContractId()
         );
     }
 }

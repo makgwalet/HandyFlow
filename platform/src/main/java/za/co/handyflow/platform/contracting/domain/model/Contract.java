@@ -76,6 +76,11 @@ public class Contract {
     @Column(name = "body_hash")       String    bodyHash;
     @Column(name = "body_locked_at")  Instant   bodyLockedAt;
 
+    /** The business record this contract is for (for example a hire deployment) and the contract it amends. All optional. */
+    @Column(name = "parent_contract_id") UUID parentContractId;
+    @Column(name = "ref_type")        String    refType;
+    @Column(name = "ref_id")          UUID      refId;
+
     // NEW — see class Javadoc. One column per threshold rather than a single
     // "last reminder sent" field, because each threshold must fire exactly
     // once independently (a contract could plausibly need its 30-day AND
@@ -269,5 +274,13 @@ public class Contract {
         this.autoRenew          = autoRenew;
         this.renewalNoticeDays  = renewalNoticeDays;
         this.updatedAt          = Instant.now();
+    }
+
+    /** Records what this contract is for and, for an addendum, the contract it amends. */
+    public void linkReference(String refType, UUID refId, UUID parentContractId) {
+        this.refType = refType;
+        this.refId = refId;
+        this.parentContractId = parentContractId;
+        this.updatedAt = Instant.now();
     }
 }

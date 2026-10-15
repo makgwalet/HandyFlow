@@ -16,5 +16,6 @@ public record DeploymentResponse(
         Instant deployedAt,
         Instant returnedAt,
         String endReason,
-        String notes
+        String notes,
+        UUID contractId
 ) {}

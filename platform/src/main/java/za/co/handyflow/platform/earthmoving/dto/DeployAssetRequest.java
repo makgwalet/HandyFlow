@@ -13,10 +13,17 @@ public record DeployAssetRequest(
         String notes,
         java.util.UUID siteId,
         java.util.UUID customerId,
-        java.util.UUID projectId
+        java.util.UUID projectId,
+        java.util.UUID contractId
 ) {
     public DeployAssetRequest(String siteName, String clientName, String contactName, String contactPhone,
                               LocalDate startDate, LocalDate expectedEndDate, String notes) {
-        this(siteName, clientName, contactName, contactPhone, startDate, expectedEndDate, notes, null, null, null);
+        this(siteName, clientName, contactName, contactPhone, startDate, expectedEndDate, notes, null, null, null, null);
+    }
+
+    public DeployAssetRequest(String siteName, String clientName, String contactName, String contactPhone,
+                              LocalDate startDate, LocalDate expectedEndDate, String notes,
+                              java.util.UUID siteId, java.util.UUID customerId, java.util.UUID projectId) {
+        this(siteName, clientName, contactName, contactPhone, startDate, expectedEndDate, notes, siteId, customerId, projectId, null);
     }
 }

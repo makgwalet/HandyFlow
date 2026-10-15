@@ -23,5 +23,6 @@ public record ContractSummary(
         LocalDate startDate,
         LocalDate endDate,
         BigDecimal valueAmount,
-        boolean autoRenew
+        boolean autoRenew,
+        UUID parentContractId
 ) {}

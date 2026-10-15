@@ -68,4 +68,18 @@ public interface ContractingFacade {
      * purpose inside `contracting` itself).
      */
     List<ContractSummary> listExpiringWithin(TenantId tenantId, int days);
+
+    /**
+     * Another module asks for a DRAFT contract for one of its own records. {@code variables} fill the template's {{placeholders}};
+     * any left out stay for the person to complete before the contract is sent. With a {@code body} no template is used.
+     * The new contract remembers {@code refType}/{@code refId} (and {@code parentContractId} for an addendum). It is not sent.
+     */
+    ContractSummary createDraft(TenantId tenantId, DraftContract draft, UUID createdByUserId);
+
+    /** The contracts made for one record, oldest first. */
+    List<ContractSummary> findByReference(TenantId tenantId, String refType, UUID refId);
+
+    record DraftContract(String title, String contractType, java.util.Map<String, String> variables, String body,
+                         java.math.BigDecimal valueAmount, java.time.LocalDate startDate, java.time.LocalDate endDate, String notes,
+                         String refType, UUID refId, UUID parentContractId) {}
 }
