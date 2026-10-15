@@ -64,6 +64,7 @@ public class EarthAssetService {
     private final EarthSiteService sites;
     private final EarthMeterService meters;
     private final org.springframework.context.ApplicationEventPublisher publisher;
+    private final EarthDeployCheckService deployChecks;
 
     // ── Assets ────────────────────────────────────────────────────────────
 
@@ -262,6 +263,8 @@ public class EarthAssetService {
         EarthmovingRules.checkDeployable(asset.getStatus(), incidentRepository.countOpenCritical(tenantId, id),
                 asset.getOwnershipType(), asset.getHireEndDate(), LocalDate.now());
         AssetStatus previous = asset.getStatus();
+        // Warnings never stop a deployment, but deploying despite one is kept on record.
+        List<String> warnings = deployChecks.pending(tenantId, asset, java.time.Instant.now());
         EarthSiteService.DeployTarget target = sites.resolveForDeploy(tenantId, req);
         asset.deployTo(target.siteName(), target.clientName());
         assetRepository.save(asset);
@@ -280,7 +283,8 @@ public class EarthAssetService {
                         "client", target.clientName() == null ? "" : target.clientName(),
                         "siteId", String.valueOf(target.siteId()),
                         "customerId", String.valueOf(target.customerId()),
-                        "projectId", String.valueOf(target.projectId())));
+                        "projectId", String.valueOf(target.projectId()),
+                        "warningsShown", String.join(" | ", warnings)));
 
         log.info("Asset deployed asset={} site={} client={}", id, target.siteName(), target.clientName());
         return toResponse(asset);

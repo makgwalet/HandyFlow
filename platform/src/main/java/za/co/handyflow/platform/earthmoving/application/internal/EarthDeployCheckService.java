@@ -38,13 +38,20 @@ public class EarthDeployCheckService {
         access.require(EarthmovingRules.READ, "view deployment warnings");
         EarthAsset asset = assets.findActiveById(tenantId, assetId)
                 .orElseThrow(() -> new ResourceNotFoundException("Asset", assetId.toString()));
+        return new DeployWarningsResponse(pending(tenantId, asset, now));
+    }
+
+    /** The warnings for a machine, with no permission check: the deploy itself has already been authorised. */
+    @Transactional(readOnly = true)
+    public List<String> pending(TenantId tenantId, EarthAsset asset, Instant now) {
+        UUID assetId = asset.getId();
         LocalDate today = now.atZone(ZONE).toLocalDate();
         List<String> overdue = plans.findForAsset(tenantId, assetId).stream()
                 .filter(EarthMaintenancePlan::isActive)
                 .filter(p -> p.status(asset.getCurrentHours(), today).state() == WorkOrderRules.PlanState.OVERDUE)
                 .map(EarthMaintenancePlan::getName).toList();
         EarthInspection last = inspections.findRecent(tenantId, assetId, org.springframework.data.domain.PageRequest.of(0, 1)).stream().findFirst().orElse(null);
-        return new DeployWarningsResponse(DeployWarnings.compute(overdue, asset.isDueForService(),
-                last == null ? null : last.getPerformedAt(), last == null ? null : last.getResult(), now));
+        return DeployWarnings.compute(overdue, asset.isDueForService(),
+                last == null ? null : last.getPerformedAt(), last == null ? null : last.getResult(), now);
     }
 }

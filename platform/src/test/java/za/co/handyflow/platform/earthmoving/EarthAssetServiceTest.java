@@ -34,6 +34,7 @@ class EarthAssetServiceTest {
     EarthAlertService alerts = mock(EarthAlertService.class);
     EarthSiteService sites = mock(EarthSiteService.class);
     EarthMeterService meters = mock(EarthMeterService.class);
+    EarthDeployCheckService deployChecks = mock(EarthDeployCheckService.class);
     org.springframework.context.ApplicationEventPublisher publisher = mock(org.springframework.context.ApplicationEventPublisher.class);
     AuditTrailFacade trail = mock(AuditTrailFacade.class);
     NotificationService notifications = mock(NotificationService.class);
@@ -49,7 +50,7 @@ class EarthAssetServiceTest {
     @BeforeEach
     void setUp() {
         service = new EarthAssetService(assets, maintenance, logs, deployments, events, incidents, workOrders, access, trail,
-                notifications, admins, alerts, sites, meters, publisher);
+                notifications, admins, alerts, sites, meters, publisher, deployChecks);
         when(assets.save(any())).thenAnswer(i -> i.getArgument(0));
         when(assets.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
         when(admins.resolveTenantAdmins(any(TenantId.class))).thenReturn(List.of());
@@ -330,6 +331,17 @@ class EarthAssetServiceTest {
         assertEquals("Mine A", a.getCurrentSite());
         verify(deployments).save(any(EarthDeployment.class));
         verify(events).save(any(EarthStatusEvent.class));
+    }
+
+    @Test
+    void deployingDespiteWarningsKeepsThemInTheAuditEntry() {
+        EarthAsset a = machine(AssetStatus.AVAILABLE);
+        granted.add("EARTHMOVING_DEPLOY");
+        when(deployChecks.pending(any(TenantId.class), any(), any())).thenReturn(List.of("Service overdue: 250 hour service.", "No inspection in the last 24 hours."));
+        service.deploy(tenant, a.getId(), new DeployAssetRequest("Mine A", "Anglo", null, null, null, null, null), actor);
+        verify(trail).record(eq(tenant), eq("EARTHMOVING_ASSET_DEPLOYED"), any(), any(), any(),
+                argThat(m -> String.valueOf(m.get("warningsShown")).contains("Service overdue") && String.valueOf(m.get("warningsShown")).contains(" | ")));
+        assertEquals("Mine A", a.getCurrentSite());
     }
 
     @Test
