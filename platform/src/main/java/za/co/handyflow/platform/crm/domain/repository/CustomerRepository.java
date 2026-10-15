@@ -62,6 +62,15 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
                                       @Param("id") UUID id);
 
 
+    @Query("""
+            SELECT c FROM Customer c
+            WHERE c.tenantId = :tenantId
+              AND c.deletedAt IS NULL
+              AND LOWER(TRIM(c.name)) = LOWER(TRIM(:name))
+            ORDER BY c.createdAt ASC
+            """)
+    List<Customer> findActiveByExactName(@Param("tenantId") TenantId tenantId, @Param("name") String name);
+
     /**
      * FIX: backlog 4.3 — backs the funnel/conversion-rate report.
      * CrmReportingService needs every active lead's id and createdAt

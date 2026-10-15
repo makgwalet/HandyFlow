@@ -60,6 +60,7 @@ public class EarthAssetService {
     // never-implemented port. This is what actually turns notifications on.
     private final TenantAdminRecipients tenantAdminRecipients;
     private final EarthAlertService alerts;
+    private final EarthSiteService sites;
 
     // ── Assets ────────────────────────────────────────────────────────────
 
@@ -205,13 +206,16 @@ public class EarthAssetService {
         }
         log.info("Asset status changed asset={} {}->{} actor={}", id, previousStatus, target, actor);
 
+        // Look the site supervisor up BEFORE the deployment closes, so a breakdown is routed to the site it happened at.
+        UUID siteSupervisor = target == AssetStatus.BREAKDOWN ? sites.supervisorForAsset(tenantId, id).orElse(null) : null;
+
         // The deployment closes whenever the machine leaves DEPLOYED, for any reason (see EarthDeployment).
         if (previousStatus == AssetStatus.DEPLOYED && target != AssetStatus.DEPLOYED) {
             closeOpenDeploymentIfAny(tenantId, id, target.name());
         }
 
         if (target == AssetStatus.BREAKDOWN) {
-            notifyBreakdown(tenantId, asset);
+            notifyBreakdown(tenantId, asset, siteSupervisor);
         }
         return toResponse(asset);
     }
@@ -252,23 +256,27 @@ public class EarthAssetService {
         EarthmovingRules.checkDeployable(asset.getStatus(), incidentRepository.countOpenCritical(tenantId, id),
                 asset.getOwnershipType(), asset.getHireEndDate(), LocalDate.now());
         AssetStatus previous = asset.getStatus();
-        asset.deployTo(req.siteName().trim(), req.clientName());
+        EarthSiteService.DeployTarget target = sites.resolveForDeploy(tenantId, req);
+        asset.deployTo(target.siteName(), target.clientName());
         assetRepository.save(asset);
 
         EarthDeployment deployment = EarthDeployment.create(
-                tenantId, id, req.siteName().trim(), req.clientName(),
+                tenantId, id, target.siteName(), target.clientName(),
                 req.contactName(), req.contactPhone(),
                 req.startDate(), req.expectedEndDate(), req.notes()
-        );
+        ).withLinks(target.siteId(), target.customerId(), target.projectId());
         deploymentRepository.save(deployment);
         statusEvents.save(EarthStatusEvent.of(tenantId, id, previous, AssetStatus.DEPLOYED,
-                "Deployed to " + req.siteName().trim(), actor, asset.getCurrentHours()));
+                "Deployed to " + target.siteName(), actor, asset.getCurrentHours()));
         trail.record(tenantId, "EARTHMOVING_ASSET_DEPLOYED", "EARTHMOVING_ASSET", id,
                 Map.of("status", previous.name()),
-                Map.of("status", "DEPLOYED", "site", req.siteName().trim(),
-                        "client", req.clientName() == null ? "" : req.clientName()));
+                Map.of("status", "DEPLOYED", "site", target.siteName(),
+                        "client", target.clientName() == null ? "" : target.clientName(),
+                        "siteId", String.valueOf(target.siteId()),
+                        "customerId", String.valueOf(target.customerId()),
+                        "projectId", String.valueOf(target.projectId())));
 
-        log.info("Asset deployed asset={} site={} client={}", id, req.siteName(), req.clientName());
+        log.info("Asset deployed asset={} site={} client={}", id, target.siteName(), target.clientName());
         return toResponse(asset);
     }
 
@@ -410,11 +418,11 @@ public class EarthAssetService {
     // why these calls are safe to make from inside an @Transactional method
     // (they only actually deliver email/SMS after this transaction commits).
 
-    private void notifyBreakdown(TenantId tenantId, EarthAsset asset) {
+    private void notifyBreakdown(TenantId tenantId, EarthAsset asset, UUID siteSupervisor) {
         alerts.raise(tenantId, "BREAKDOWN", AlertRules.severityFor("BREAKDOWN", "HIGH"), asset.getId(), "ASSET", asset.getId(),
                 "Breakdown reported: " + displayName(asset),
                 displayName(asset) + " was reported as broken down" + (asset.getCurrentSite() != null ? " at " + asset.getCurrentSite() : "") + ".",
-                "BREAKDOWN:" + asset.getId(), null);
+                "BREAKDOWN:" + asset.getId(), siteSupervisor == null ? null : java.util.List.of(siteSupervisor));
     }
 
     private void notifyServiceDue(TenantId tenantId, EarthAsset asset) {

@@ -11,6 +11,7 @@ import IncidentsTab     from "./IncidentsTab"
 import WorkOrdersTab    from "./WorkOrdersTab"
 import PlansTab         from "./PlansTab"
 import AlertsTab        from "./AlertsTab"
+import SitesTab         from "./SitesTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { EARTHMOVING_SECTIONS } from "../../navigation/moduleSections"
 
@@ -22,6 +23,7 @@ export function EarthMovingPage() {
         switch (id) {
           case "dashboard":   return <EarthDashboard onNavigate={goTo} />
           case "assets":      return <AssetsTab />
+          case "sites":       return <SitesTab />
           case "deployments": return <DeploymentsTab />
           case "workorders":  return <WorkOrdersTab />
           case "plans":       return <PlansTab />

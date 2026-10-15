@@ -27,6 +27,12 @@ public interface CrmFacade {
     /** Look up a customer visible to queries. Returns empty if not found or deleted. */
     Optional<CustomerSummary> findCustomerById(TenantId tenantId, UUID customerId);
 
+    /**
+     * Active customers whose name equals the given name, ignoring case and surrounding spaces. Used to match free-text
+     * client names to customer records: more than one result means the name is ambiguous and must not be guessed.
+     */
+    List<CustomerSummary> findCustomersByExactName(TenantId tenantId, String name);
+
     /** Quick existence check without loading the full entity. */
     boolean customerExists(TenantId tenantId, UUID customerId);
 

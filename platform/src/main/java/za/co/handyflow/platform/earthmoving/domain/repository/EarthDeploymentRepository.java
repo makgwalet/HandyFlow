@@ -25,4 +25,20 @@ public interface EarthDeploymentRepository extends JpaRepository<EarthDeployment
     @Query("SELECT d FROM EarthDeployment d WHERE d.tenantId = :tenantId AND d.assetId = :assetId " +
             "AND d.returnedAt IS NULL ORDER BY d.deployedAt DESC")
     Optional<EarthDeployment> findOpenForAsset(TenantId tenantId, UUID assetId);
+
+    /** Deployments still missing a site link, or that name a client but have no customer link. */
+    @Query("SELECT d FROM EarthDeployment d WHERE d.tenantId = :tenantId AND (d.siteId IS NULL OR (d.clientName IS NOT NULL AND d.customerId IS NULL)) ORDER BY d.deployedAt")
+    java.util.List<EarthDeployment> findUnlinked(TenantId tenantId);
+
+    @Query("SELECT COUNT(d) FROM EarthDeployment d WHERE d.tenantId = :tenantId")
+    long countAll(TenantId tenantId);
+
+    @Query("SELECT COUNT(d) FROM EarthDeployment d WHERE d.tenantId = :tenantId AND d.siteId IS NOT NULL")
+    long countWithSite(TenantId tenantId);
+
+    @Query("SELECT COUNT(d) FROM EarthDeployment d WHERE d.tenantId = :tenantId AND d.clientName IS NOT NULL AND TRIM(d.clientName) <> ''")
+    long countWithClientText(TenantId tenantId);
+
+    @Query("SELECT COUNT(d) FROM EarthDeployment d WHERE d.tenantId = :tenantId AND d.customerId IS NOT NULL")
+    long countWithCustomer(TenantId tenantId);
 }

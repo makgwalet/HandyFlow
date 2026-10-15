@@ -62,6 +62,7 @@ public class EarthmovingIncidentService {
     private final EarthStatusEventRepository statusEvents;
     private final EarthWorkOrderService workOrderService;
     private final EarthAlertService alerts;
+    private final EarthSiteService sites;
     private final AuditTrailFacade trail;
 
     @Transactional(readOnly = true)
@@ -107,7 +108,8 @@ public class EarthmovingIncidentService {
             alerts.raise(tenantId, "BREAKDOWN", AlertRules.severityFor("BREAKDOWN", incident.getSeverity()), asset.getId(), "INCIDENT", incident.getId(),
                     "[" + incident.getSeverity() + "] " + incident.getType() + ": " + label,
                     incident.getTitle() + (incident.getSiteName() != null ? " at " + incident.getSiteName() : ""),
-                    "BREAKDOWN:" + asset.getId(), null);
+                    "BREAKDOWN:" + asset.getId(),
+                    sites.supervisorForAsset(tenantId, asset.getId()).map(List::of).orElse(null));
         } else {
             notifyIncidentReported(tenantId, asset, incident);
         }

@@ -68,6 +68,16 @@ public class EarthDeployment {
     @Column(name = "deployed_at", nullable = false)
     private Instant deployedAt;
 
+    /** Links added in E5. The text above stays as the record of what was typed or chosen at the time. */
+    @Column(name = "site_id")
+    private UUID siteId;
+
+    @Column(name = "customer_id")
+    private UUID customerId;
+
+    @Column(name = "project_id")
+    private UUID projectId;
+
     @Column(name = "returned_at")
     private Instant returnedAt;
 
@@ -98,6 +108,18 @@ public class EarthDeployment {
         d.createdAt = Instant.now();
         return d;
     }
+
+    public EarthDeployment withLinks(UUID siteId, UUID customerId, UUID projectId) {
+        this.siteId = siteId;
+        this.customerId = customerId;
+        this.projectId = projectId;
+        return this;
+    }
+
+    /** Fills an empty link; never replaces one that is already set. Returns true if it changed. The text fields are never touched. */
+    public boolean linkSiteIfEmpty(UUID id) { if (siteId != null || id == null) return false; siteId = id; return true; }
+    public boolean linkCustomerIfEmpty(UUID id) { if (customerId != null || id == null) return false; customerId = id; return true; }
+    public boolean linkProjectIfEmpty(UUID id) { if (projectId != null || id == null) return false; projectId = id; return true; }
 
     public boolean isOpen() {
         return returnedAt == null;

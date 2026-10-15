@@ -33,6 +33,7 @@ class EarthAssetServiceTest {
     EarthmovingIncidentRepository incidents = mock(EarthmovingIncidentRepository.class);
     EarthWorkOrderRepository workOrders = mock(EarthWorkOrderRepository.class);
     EarthAlertService alerts = mock(EarthAlertService.class);
+    EarthSiteService sites = mock(EarthSiteService.class);
     AuditTrailFacade trail = mock(AuditTrailFacade.class);
     NotificationService notifications = mock(NotificationService.class);
     TenantAdminRecipients admins = mock(TenantAdminRecipients.class);
@@ -47,10 +48,17 @@ class EarthAssetServiceTest {
     @BeforeEach
     void setUp() {
         service = new EarthAssetService(assets, maintenance, logs, deployments, events, incidents, workOrders, access, trail,
-                notifications, admins, alerts);
+                notifications, admins, alerts, sites);
         when(assets.save(any())).thenAnswer(i -> i.getArgument(0));
         when(assets.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
         when(admins.resolveTenantAdmins(any())).thenReturn(List.of());
+        when(sites.supervisorForAsset(any(), any())).thenReturn(java.util.Optional.empty());
+        // A stand-in for the real resolver: typed names pass straight through, no links.
+        when(sites.resolveForDeploy(any(), any())).thenAnswer(i -> {
+            DeployAssetRequest r = i.getArgument(1);
+            return new EarthSiteService.DeployTarget(r.siteId(), r.siteName() == null ? null : r.siteName().trim(),
+                    r.customerId(), r.clientName(), r.projectId());
+        });
     }
 
     private EarthAsset machine(AssetStatus status) {
@@ -192,6 +200,17 @@ class EarthAssetServiceTest {
     }
 
     @Test
+    void aBreakdownAlsoTellsTheSiteSupervisor() {
+        EarthAsset a = machine(AssetStatus.AVAILABLE);
+        granted.add("EARTHMOVING_WRITE");
+        UUID supervisor = UUID.randomUUID();
+        when(sites.supervisorForAsset(tenant, a.getId())).thenReturn(java.util.Optional.of(supervisor));
+        service.updateStatus(tenant, a.getId(), status("BREAKDOWN", "Hydraulic hose burst"), actor);
+        verify(alerts).raise(eq(tenant), eq("BREAKDOWN"), any(), eq(a.getId()), any(), any(), any(), any(),
+                eq("BREAKDOWN:" + a.getId()), eq(List.of(supervisor)));
+    }
+
+    @Test
     void releaseNeedsAWrittenReason() {
         EarthAsset a = machine(AssetStatus.BREAKDOWN);
         granted.add("EARTHMOVING_RELEASE");
@@ -275,6 +294,35 @@ class EarthAssetServiceTest {
         assertEquals("Mine A", a.getCurrentSite());
         verify(deployments).save(any(EarthDeployment.class));
         verify(events).save(any(EarthStatusEvent.class));
+    }
+
+    @Test
+    void deployRecordsTheResolvedSiteCustomerAndProjectLinks() {
+        EarthAsset a = machine(AssetStatus.AVAILABLE);
+        granted.add("EARTHMOVING_DEPLOY");
+        UUID site = UUID.randomUUID(), customer = UUID.randomUUID(), project = UUID.randomUUID();
+        when(sites.resolveForDeploy(any(), any())).thenReturn(new EarthSiteService.DeployTarget(site, "Mine A", customer, "Anglo American", project));
+        service.deploy(tenant, a.getId(), new DeployAssetRequest("typed", "typed client", null, null, null, null, null, site, customer, project), actor);
+        var captor = org.mockito.ArgumentCaptor.forClass(EarthDeployment.class);
+        verify(deployments).save(captor.capture());
+        assertEquals(site, captor.getValue().getSiteId());
+        assertEquals(customer, captor.getValue().getCustomerId());
+        assertEquals(project, captor.getValue().getProjectId());
+        assertEquals("Mine A", captor.getValue().getSiteName());
+        assertEquals("Anglo American", captor.getValue().getClientName());
+        assertEquals("Mine A", a.getCurrentSite());
+    }
+
+    @Test
+    void aRefusedSiteStopsTheDeploymentBeforeAnythingIsWritten() {
+        EarthAsset a = machine(AssetStatus.AVAILABLE);
+        granted.add("EARTHMOVING_DEPLOY");
+        when(sites.resolveForDeploy(any(), any())).thenThrow(new IllegalArgumentException("That site was not found."));
+        assertThrows(IllegalArgumentException.class, () -> service.deploy(tenant, a.getId(),
+                new DeployAssetRequest(null, null, null, null, null, null, null, UUID.randomUUID(), null, null), actor));
+        verify(deployments, never()).save(any());
+        verify(events, never()).save(any());
+        assertEquals(AssetStatus.AVAILABLE, a.getStatus());
     }
 
     // ── tenants ──────────────────────────────────────────────────────────────

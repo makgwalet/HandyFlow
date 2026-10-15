@@ -127,3 +127,22 @@ export interface AlertRule {
   alertType: string; enabled: boolean; escalateAfterMinutes: number | null
   initialUserIds: string[]; escalationUserIds: string[]; usesAdminFallback: boolean; canBeDisabled: boolean
 }
+
+// ── Sites and links ──────────────────────────────────────────────────────
+export interface Site {
+  id: string; name: string; address: string | null; latitude: number | null; longitude: number | null
+  customerId: string | null; customerName: string | null; projectId: string | null; projectName: string | null
+  supervisorUserId: string | null; notes: string | null; active: boolean
+}
+export interface LinkCandidate { id: string; name: string }
+export interface ReconRow {
+  legacySite: string; legacyClient: string | null; deployments: number
+  siteState: string; siteCandidates: LinkCandidate[]; customerState: string; customerCandidates: LinkCandidate[]
+}
+export interface Reconciliation {
+  totalDeployments: number; withSite: number; withClientText: number; withCustomer: number; groups: number
+  siteMatched: number; siteAmbiguous: number; siteUnmatched: number
+  customerMatched: number; customerAmbiguous: number; customerUnmatched: number; rows: ReconRow[]
+}
+export interface LinkResult { deploymentsLinkedToSite: number; deploymentsLinkedToCustomer: number; deploymentsLinkedToProject: number; groupsStillUnresolved: number }
+export interface PickOption { id: string; name: string }

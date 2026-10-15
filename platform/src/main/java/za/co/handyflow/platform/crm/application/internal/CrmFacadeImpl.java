@@ -79,6 +79,16 @@ class CrmFacadeImpl implements CrmFacade {
 
     @Override
     @Transactional(readOnly = true)
+    public List<CustomerSummary> findCustomersByExactName(TenantId tenantId, String name) {
+        if (name == null || name.isBlank()) return List.of();
+        return customerRepository.findActiveByExactName(tenantId, name).stream()
+                .map(c -> new CustomerSummary(c.getId(), c.getName(), c.getEmail(), c.getPhone(), c.getTaxNumber(),
+                        c.getAddress(), c.getCustomerType(), c.getStatus()))
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public boolean customerExists(TenantId tenantId, UUID customerId) {
         // Delegate to a count-based query — avoids loading the full entity just to check existence.
         return customerRepository.existsActiveById(tenantId, customerId);

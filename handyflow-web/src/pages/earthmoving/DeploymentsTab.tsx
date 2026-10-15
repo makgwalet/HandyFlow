@@ -5,10 +5,10 @@ import { EMOJI } from "./shared/constants"
 import { apiMessage } from "./shared/format"
 import { Overlay, ModalHead, ModalFoot, ErrBanner, lbl, inputStyle } from "./shared/Modal"
 import { useEarthPerms } from "./shared/useEarthPerms"
-import { useAssets, useDeployAsset, useReturnToYard } from "./shared/hooks"
+import { useAssets, useDeployAsset, useReturnToYard, useSites, useCustomerOptions } from "./shared/hooks"
 
 const EMPTY_FORM = {
-  assetId: "", siteName: "", clientName: "", startDate: "", expectedEndDate: "",
+  assetId: "", siteId: "", customerId: "", siteName: "", clientName: "", startDate: "", expectedEndDate: "",
   contactName: "", contactPhone: "", notes: "",
 }
 
@@ -22,6 +22,9 @@ export default function DeploymentsTab() {
   const deployedAssets  = assets.filter(a => ["DEPLOYED", "HIRED_OUT"].includes(a.status))
   const availableAssets = assets.filter(a => a.status === "AVAILABLE")
 
+  const { data: sites = [] } = useSites(false)
+  const { data: customers = [] } = useCustomerOptions(showDeploy)
+  const chosenSite = sites.find(s => s.id === form.siteId)
   const deploy = useDeployAsset(() => { setShowDeploy(false); setForm(EMPTY_FORM); setApiError("") })
   const returnToYard = useReturnToYard()
 
@@ -110,12 +113,20 @@ export default function DeploymentsTab() {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
-                <label style={lbl}>Site Name *</label>
-                <input value={form.siteName} onChange={e => setForm(f => ({ ...f, siteName: e.target.value }))} placeholder="Sandton Excavation Site" style={inputStyle()} />
+                <label htmlFor="dep-site" style={lbl}>Site *</label>
+                <select id="dep-site" value={form.siteId} onChange={e => setForm(f => ({ ...f, siteId: e.target.value }))} style={{ ...inputStyle(), background: "var(--hf-surface)" }}>
+                  <option value="">Type a site name instead…</option>
+                  {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                {!form.siteId && <input aria-label="Site name" value={form.siteName} onChange={e => setForm(f => ({ ...f, siteName: e.target.value }))} placeholder="Sandton Excavation Site" style={{ ...inputStyle(), marginTop: 6 }} />}
               </div>
               <div>
-                <label style={lbl}>Client / Company *</label>
-                <input value={form.clientName} onChange={e => setForm(f => ({ ...f, clientName: e.target.value }))} placeholder="Zeta Construction" style={inputStyle()} />
+                <label htmlFor="dep-customer" style={lbl}>Client / Company</label>
+                <select id="dep-customer" value={form.customerId} onChange={e => setForm(f => ({ ...f, customerId: e.target.value }))} style={{ ...inputStyle(), background: "var(--hf-surface)" }}>
+                  <option value="">{chosenSite?.customerName ? `Site's customer: ${chosenSite.customerName}` : "Type a client instead…"}</option>
+                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                {!form.customerId && !chosenSite?.customerName && <input aria-label="Client name" value={form.clientName} onChange={e => setForm(f => ({ ...f, clientName: e.target.value }))} placeholder="Zeta Construction" style={{ ...inputStyle(), marginTop: 6 }} />}
               </div>
               <div>
                 <label style={lbl}>Start Date</label>
@@ -145,7 +156,8 @@ export default function DeploymentsTab() {
           <ModalFoot
             onCancel={() => setShowDeploy(false)}
             onSubmit={() => deploy.mutate({
-              assetId: form.assetId, siteName: form.siteName, clientName: form.clientName || null,
+              assetId: form.assetId, siteId: form.siteId || null, customerId: form.customerId || null,
+              siteName: form.siteId ? null : form.siteName, clientName: form.clientName || null,
               startDate: form.startDate || null, expectedEndDate: form.expectedEndDate || null,
               contactName: form.contactName || null, contactPhone: form.contactPhone || null,
               notes: form.notes || null,
@@ -154,7 +166,7 @@ export default function DeploymentsTab() {
             })}
             loading={deploy.isPending}
             label="Deploy Equipment"
-            disabled={!form.assetId || !form.siteName.trim()}
+            disabled={!form.assetId || (!form.siteId && !form.siteName.trim())}
           />
         </Overlay>
       )}

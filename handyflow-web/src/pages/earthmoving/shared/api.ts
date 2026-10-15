@@ -15,7 +15,7 @@
 // PUT (backend endpoint is still @PutMapping). Create is POST.
 
 import { apiClient } from "../../../api/client"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption } from "./types"
 
 export function unwrap<T>(r: { data?: { data?: unknown } & Record<string, unknown> }): T {
   const p = (r.data?.data ?? r.data) as { content?: unknown } | undefined
@@ -135,3 +135,35 @@ export const alertAction = (id: string, action: "acknowledge" | "resolve", body?
 export const fetchAlertRules = async (): Promise<AlertRule[]> => unwrap<AlertRule[]>(await apiClient.get(`${BASE}/alerts/rules`))
 
 export const saveAlertRule = (type: string, body: Record<string, unknown>) => apiClient.put(`${BASE}/alerts/rules/${type}`, body)
+
+// ── Sites and links ──────────────────────────────────────────────────────
+
+export const fetchSites = async (includeInactive: boolean): Promise<Site[]> =>
+  unwrap<Site[]>(await apiClient.get(`${BASE}/sites?includeInactive=${includeInactive}`))
+
+export const saveSite = (id: string | null, body: Record<string, unknown>) =>
+  id ? apiClient.put(`${BASE}/sites/${id}`, body) : apiClient.post(`${BASE}/sites`, body)
+
+export const deactivateSite = (id: string) => apiClient.patch(`${BASE}/sites/${id}/deactivate`, {})
+
+export const fetchReconciliation = async (): Promise<Reconciliation> => {
+  const r = await apiClient.get(`${BASE}/sites/reconciliation`)
+  return (r.data?.data ?? r.data) as Reconciliation
+}
+
+export const applyVerifiedLinks = async (): Promise<LinkResult> => {
+  const r = await apiClient.post(`${BASE}/sites/reconciliation/apply-verified`, {})
+  return (r.data?.data ?? r.data) as LinkResult
+}
+
+export const resolveLinks = async (body: Record<string, unknown>): Promise<LinkResult> => {
+  const r = await apiClient.post(`${BASE}/sites/reconciliation/resolve`, body)
+  return (r.data?.data ?? r.data) as LinkResult
+}
+
+/** Customers and projects for the pickers. Names only; the server checks every id again when it is saved. */
+export const fetchCustomerOptions = async (): Promise<PickOption[]> =>
+  (await fetchAllPages<{ id: string; name: string }>("/api/v1/crm/customers", 100, 10)).map(c => ({ id: c.id, name: c.name }))
+
+export const fetchProjectOptions = async (): Promise<PickOption[]> =>
+  (await fetchAllPages<{ id: string; name: string }>("/api/v1/projects", 100, 10)).map(p => ({ id: p.id, name: p.name }))

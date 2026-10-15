@@ -1,7 +1,7 @@
 // src/pages/earthmoving/shared/hooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption } from "./types"
 
 // Central query keys — every tab imports these instead of typing the
 // literal string, so a rename is a one-line change instead of a grep.
@@ -14,6 +14,8 @@ export const QK = {
   plans: ["em-plans"] as const,
   alerts: ["em-alerts"] as const,
   alertRules: ["em-alert-rules"] as const,
+  sites: ["em-sites"] as const,
+  reconciliation: ["em-site-reconciliation"] as const,
 }
 
 // ── Assets ───────────────────────────────────────────────────────────────
@@ -276,4 +278,52 @@ export function useSaveAlertRule(onSuccess?: () => void) {
     mutationFn: ({ type, body }: { type: string; body: Record<string, unknown> }) => api.saveAlertRule(type, body),
     onSuccess: () => { qc.invalidateQueries({ queryKey: QK.alertRules }); onSuccess?.() },
   })
+}
+
+// ── Sites and links ──────────────────────────────────────────────────────
+
+export function useSites(includeInactive = false) {
+  return useQuery<Site[]>({ queryKey: [...QK.sites, includeInactive], queryFn: () => api.fetchSites(includeInactive), staleTime: 30_000 })
+}
+
+export function useSaveSite(onSuccess?: () => void) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string | null; body: Record<string, unknown> }) => api.saveSite(id, body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: QK.sites }); onSuccess?.() },
+  })
+}
+
+export function useDeactivateSite(onSuccess?: () => void) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.deactivateSite(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: QK.sites }); onSuccess?.() },
+  })
+}
+
+export function useCustomerOptions(enabled = true) {
+  return useQuery<PickOption[]>({ queryKey: ["em-customer-options"], queryFn: api.fetchCustomerOptions, staleTime: 60_000, enabled })
+}
+
+export function useProjectOptions(enabled = true) {
+  return useQuery<PickOption[]>({ queryKey: ["em-project-options"], queryFn: api.fetchProjectOptions, staleTime: 60_000, enabled })
+}
+
+export function useReconciliation(enabled: boolean) {
+  return useQuery<Reconciliation>({ queryKey: QK.reconciliation, queryFn: api.fetchReconciliation, enabled })
+}
+
+export function useReconcileActions(onDone?: (message: string) => void) {
+  const qc = useQueryClient()
+  const refresh = () => { qc.invalidateQueries({ queryKey: QK.reconciliation }); qc.invalidateQueries({ queryKey: QK.assets }) }
+  const apply = useMutation({
+    mutationFn: api.applyVerifiedLinks,
+    onSuccess: r => { refresh(); onDone?.(`Linked ${r.deploymentsLinkedToSite} to a site and ${r.deploymentsLinkedToCustomer} to a customer. ${r.groupsStillUnresolved} groups still need a person.`) },
+  })
+  const resolve = useMutation({
+    mutationFn: (body: Record<string, unknown>) => api.resolveLinks(body),
+    onSuccess: r => { refresh(); onDone?.(`Linked ${r.deploymentsLinkedToSite} to a site, ${r.deploymentsLinkedToCustomer} to a customer, ${r.deploymentsLinkedToProject} to a project.`) },
+  })
+  return { apply, resolve }
 }
