@@ -52,7 +52,8 @@ public class AuditInvestigationService {
         UUID t = tenant.getValue();
         int n = (int) cases.countByTenantId(t) + 1;
         while (cases.existsByTenantIdAndNumber(t, AuditInvestigation.numberFor(n))) n++;
-        AuditInvestigation c = guard(() -> AuditInvestigation.open(t, AuditInvestigation.numberFor(n), title, summaryText, actor.userId()));
+        final String number = AuditInvestigation.numberFor(n);   // n changes in the loop above, so the lambda takes a final copy
+        AuditInvestigation c = guard(() -> AuditInvestigation.open(t, number, title, summaryText, actor.userId()));
         cases.save(c);
         members.save(AuditInvestigationMember.of(t, c.getId(), actor.userId(), actor.name(), "LEAD", actor.userId()));
         append(t, c.getId(), actor, "CASE_OPENED", c.getNumber() + ": " + c.getTitle());
