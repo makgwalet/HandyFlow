@@ -45,6 +45,7 @@ public class AuditReportService {
     private final UserRepository users;
     private final UserRecipientResolver recipients;
     private final NotificationService notifications;
+    private final AuditFollowUpService followUps;
 
     // ── reading ─────────────────────────────────────────────────────────────────────────────────────
 
@@ -128,9 +129,11 @@ public class AuditReportService {
         } else {
             List<FindingText> ft = findings.findByEngagement(t, engagementId).stream()
                     .map(f -> new FindingText(f.getTitle(), f.getSeverity(), f.getCriteria(), f.getCondition(), f.getConsequence(), f.getRecommendation(), f.getManagementResponse())).toList();
+            var followUpLines = followUps.reportLines(t, engagementId);
+            String autoText = "FOLLOW_UP".equals(template.id()) && !followUpLines.isEmpty() ? FollowUpSummary.reportText(followUpLines) : ReportTemplates.findingsText(ft);
             int n = 1;
             for (var spec : template.sections())
-                sections.save(AuditReportSection.of(t, r.getId(), n++, spec.title(), spec.autoFindings() ? ReportTemplates.findingsText(ft) : "", spec.autoFindings()));
+                sections.save(AuditReportSection.of(t, r.getId(), n++, spec.title(), spec.autoFindings() ? autoText : "", spec.autoFindings()));
         }
         trail.record(tenant, "AUDIT_REPORT_CREATED", "AUDIT_REPORT", r.getId(), null, Map.of("engagementId", engagementId.toString(), "version", version, "template", template.id()));
         return get(tenant, actor, r.getId());

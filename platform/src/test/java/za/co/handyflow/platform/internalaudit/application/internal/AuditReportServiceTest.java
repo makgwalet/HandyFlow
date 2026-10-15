@@ -35,6 +35,7 @@ class AuditReportServiceTest {
     UserRepository users = mock(UserRepository.class);
     UserRecipientResolver recipients = mock(UserRecipientResolver.class);
     NotificationService notifications = mock(NotificationService.class);
+    AuditFollowUpService followUps = mock(AuditFollowUpService.class);
     AuditReportService service;
 
     UUID tenant = UUID.randomUUID(), eng = UUID.randomUUID(), author = UUID.randomUUID(), reader = UUID.randomUUID(), stranger = UUID.randomUUID();
@@ -43,7 +44,7 @@ class AuditReportServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AuditReportService(reports, sections, items, people, findings, engagements, approvals, trail, users, recipients, notifications);
+        service = new AuditReportService(reports, sections, items, people, findings, engagements, approvals, trail, users, recipients, notifications, followUps);
         tid = TenantId.of(tenant);
         manager = new Actor(author, "Thandi", true);
         readerActor = new Actor(reader, "Chair", false);

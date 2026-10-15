@@ -15,6 +15,7 @@ import { InternalAuditDashboard } from "./InternalAuditDashboard"
 import { CommitteeReport } from "./CommitteeReport"
 import { ReportsSection } from "./ReportsSection"
 import { QualitySection } from "./QualitySection"
+import { FollowUpSection } from "./FollowUpSection"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { INTERNAL_AUDIT_SECTIONS } from "../../navigation/moduleSections"
 import {
@@ -164,6 +165,7 @@ export default function InternalAuditPage() {
         switch (id) {
           case "reports":     return <ReportsSection />
           case "quality":     return <QualitySection />
+          case "follow-ups":  return <FollowUpSection />
           case "committee":   return <CommitteeReport />
           case "dashboard":   return <InternalAuditDashboard />
           case "universe":    return <UniverseSection universe={universe} isLoading={universeLoading} qc={qc} />
