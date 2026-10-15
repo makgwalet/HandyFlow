@@ -15,7 +15,7 @@
 // PUT (backend endpoint is still @PutMapping). Create is POST.
 
 import { apiClient } from "../../../api/client"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef } from "./types"
 
 export function unwrap<T>(r: { data?: { data?: unknown } & Record<string, unknown> }): T {
   const p = (r.data?.data ?? r.data) as { content?: unknown } | undefined
@@ -191,8 +191,14 @@ export const fetchLatestInspections = async (): Promise<LatestInspection[]> => {
   return Array.isArray(r) ? (r as LatestInspection[]) : []
 }
 
-export const fetchDeployWarnings = async (assetId: string): Promise<string[]> => {
-  const r = unwrap<{ warnings?: string[] }>(await apiClient.get(`${BASE}/assets/${assetId}/deploy-warnings`))
+export const fetchDeployWarnings = async (assetId: string, hire?: HireContext): Promise<string[]> => {
+  const q = new URLSearchParams()
+  if (hire?.customerId) q.set("customerId", hire.customerId)
+  if (hire?.siteId) q.set("siteId", hire.siteId)
+  if (hire?.from) q.set("from", hire.from)
+  if (hire?.to) q.set("to", hire.to)
+  const qs = q.toString()
+  const r = unwrap<{ warnings?: string[] }>(await apiClient.get(`${BASE}/assets/${assetId}/deploy-warnings${qs ? `?${qs}` : ""}`))
   return Array.isArray(r?.warnings) ? r.warnings : []
 }
 
@@ -234,3 +240,32 @@ export const reopenHireCharge = (id: string, reason: string) => apiClient.patch(
 
 export const draftInvoiceFromCharges = async (body: Record<string, unknown>): Promise<DraftInvoiceResult> =>
   unwrap<DraftInvoiceResult>(await apiClient.post(`${BASE}/hire-charges/draft-invoice`, body))
+
+// ── Hire contracts and settings ──────────────────────────────────────────
+
+export const fetchDeploymentContract = async (deploymentId: string): Promise<DeploymentContract> =>
+  unwrap<DeploymentContract>(await apiClient.get(`${BASE}/deployments/${deploymentId}/contract`))
+
+export const draftHireContract = async (deploymentId: string): Promise<DeploymentContract> =>
+  unwrap<DeploymentContract>(await apiClient.post(`${BASE}/deployments/${deploymentId}/contract/draft`, {}))
+
+export const linkHireContract = async (deploymentId: string, contractId: string): Promise<DeploymentContract> =>
+  unwrap<DeploymentContract>(await apiClient.put(`${BASE}/deployments/${deploymentId}/contract`, { contractId }))
+
+export const extendHire = async (deploymentId: string, newEndDate: string, reason: string): Promise<DeploymentContract> =>
+  unwrap<DeploymentContract>(await apiClient.post(`${BASE}/deployments/${deploymentId}/contract/extension`, { newEndDate, reason }))
+
+export const fetchSettings = async (): Promise<EarthSettings> => {
+  const r = unwrap<EarthSettings | never[]>(await apiClient.get(`${BASE}/settings`))
+  return Array.isArray(r) ? { contractThreshold: null } : r
+}
+
+export const saveSettings = async (contractThreshold: number | null): Promise<EarthSettings> =>
+  unwrap<EarthSettings>(await apiClient.put(`${BASE}/settings`, { contractThreshold }))
+
+/** Hire agreements in Contracting, for linking an existing one. Needs the Contracting read permission. */
+export const fetchHireContracts = async (): Promise<ContractRef[]> => {
+  const r = unwrap<unknown>(await apiClient.get("/api/v1/contracts?type=EQUIPMENT_HIRE&size=100"))
+  return (Array.isArray(r) ? r : []).map((c: { id: string; contractNumber?: string; title: string; status: string; startDate?: string | null; endDate?: string | null }) =>
+    ({ id: c.id, number: c.contractNumber ?? null, title: c.title, status: c.status, startDate: c.startDate ?? null, endDate: c.endDate ?? null }))
+}

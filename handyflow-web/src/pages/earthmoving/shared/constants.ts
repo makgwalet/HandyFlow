@@ -108,3 +108,8 @@ export const EARTHMOVING_PERMS = {
 } as const
 
 export const INSPECTION_TYPE_LABEL: Record<string, string> = { PRE_USE: "Pre-use", HANDOVER: "Handover to customer", RETURN: "Return from hire" }
+
+export const CONTRACT_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Draft", UNDER_REVIEW: "Under review", SENT: "Sent, not signed", SIGNED: "Signed",
+  EXPIRED: "Expired", TERMINATED: "Terminated", ARCHIVED: "Archived",
+}

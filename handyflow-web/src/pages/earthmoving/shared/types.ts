@@ -189,3 +189,12 @@ export interface HireCharge {
 }
 export interface DeploymentOption { id: string; assetId: string; siteName: string | null; clientName: string | null; deployedAt: string | null; returnedAt: string | null }
 export interface DraftInvoiceResult { invoiceId: string; invoiceNumber: string; subtotal: number; vatTotal: number; total: number; charges: number }
+
+export interface ContractRef { id: string; number: string | null; title: string; status: string; startDate: string | null; endDate: string | null }
+export interface DeploymentContract {
+  deploymentId: string; contract: ContractRef | null; addenda: ContractRef[]
+  expectedValue: number | null; threshold: number | null; expected: boolean; warning: string | null
+}
+export interface EarthSettings { contractThreshold: number | null }
+/** What a deployment is for, so the warnings can say whether a signed contract is expected. */
+export interface HireContext { customerId?: string; siteId?: string; from?: string; to?: string }

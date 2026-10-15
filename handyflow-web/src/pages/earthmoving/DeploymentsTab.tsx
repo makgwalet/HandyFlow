@@ -5,6 +5,8 @@ import { EMOJI } from "./shared/constants"
 import { apiMessage, meterUnitOf } from "./shared/format"
 import { Overlay, ModalHead, ModalFoot, ErrBanner, lbl, inputStyle } from "./shared/Modal"
 import { useEarthPerms } from "./shared/useEarthPerms"
+import { HireContractDialog, ContractSettingsDialog } from "./HireContractDialog"
+import type { Asset } from "./shared/types"
 import { useDeployWarnings, useAssets, useDeployAsset, useReturnToYard, useSites, useCustomerOptions } from "./shared/hooks"
 
 const EMPTY_FORM = {
@@ -27,7 +29,12 @@ export default function DeploymentsTab() {
   const chosenSite = sites.find(s => s.id === form.siteId)
   const deploy = useDeployAsset(() => { setShowDeploy(false); setForm(EMPTY_FORM); setApiError("") })
   const returnToYard = useReturnToYard()
-  const { data: warnings = [] } = useDeployWarnings(showDeploy ? form.assetId : "")
+  const [contractFor, setContractFor] = useState<Asset | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
+  const { data: warnings = [] } = useDeployWarnings(showDeploy ? form.assetId : "", {
+    customerId: form.customerId || undefined, siteId: form.siteId || undefined,
+    from: form.startDate || undefined, to: form.expectedEndDate || undefined,
+  })
 
   return (
     <div>
@@ -45,6 +52,7 @@ export default function DeploymentsTab() {
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
         <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Active Deployments</span>
+        <button onClick={() => setShowSettings(true)} style={{ marginLeft: "auto", marginRight: 12, background: "none", border: "none", color: "var(--hf-primary)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Contract threshold</button>
         {perms.canDeploy && <button onClick={() => { setShowDeploy(true); setApiError("") }}
           style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Deploy Equipment
@@ -78,18 +86,27 @@ export default function DeploymentsTab() {
                     </div>
                   </div>
                 </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setContractFor(a)} aria-label={`Hire contract for ${a.name}`}
+                  style={{ padding: "7px 14px", background: "var(--hf-surface)", color: "var(--hf-text-secondary)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                  Hire contract
+                </button>
                 {perms.canDeploy && <button
                   onClick={() => returnToYard.mutate(a.id, { onError: (e: unknown) => setApiError(apiMessage(e, "Failed to return asset")) })}
                   disabled={returnToYard.isPending}
                   style={{ padding: "7px 14px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                   Return to Yard
                 </button>}
+                </div>
               </div>
             </div>
           ))}
           {apiError && <ErrBanner msg={apiError} />}
         </div>
       )}
+
+      {contractFor && <HireContractDialog asset={contractFor} onClose={() => setContractFor(null)} />}
+      {showSettings && <ContractSettingsDialog onClose={() => setShowSettings(false)} />}
 
       {showDeploy && (
         <Overlay onClose={() => setShowDeploy(false)} width={560}>
@@ -137,12 +154,12 @@ export default function DeploymentsTab() {
                 {!form.customerId && !chosenSite?.customerName && <input aria-label="Client name" value={form.clientName} onChange={e => setForm(f => ({ ...f, clientName: e.target.value }))} placeholder="Zeta Construction" style={{ ...inputStyle(), marginTop: 6 }} />}
               </div>
               <div>
-                <label style={lbl}>Start Date</label>
-                <input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} style={inputStyle()} />
+                <label htmlFor="dep-start" style={lbl}>Start Date</label>
+                <input id="dep-start" type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} style={inputStyle()} />
               </div>
               <div>
-                <label style={lbl}>Expected Return Date</label>
-                <input type="date" value={form.expectedEndDate} onChange={e => setForm(f => ({ ...f, expectedEndDate: e.target.value }))} style={inputStyle()} />
+                <label htmlFor="dep-end" style={lbl}>Expected Return Date</label>
+                <input id="dep-end" type="date" value={form.expectedEndDate} onChange={e => setForm(f => ({ ...f, expectedEndDate: e.target.value }))} style={inputStyle()} />
               </div>
               <div>
                 <label style={lbl}>Site Contact</label>

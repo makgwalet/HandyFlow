@@ -1,7 +1,7 @@
 // src/pages/earthmoving/shared/hooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef } from "./types"
 
 // Central query keys — every tab imports these instead of typing the
 // literal string, so a rename is a one-line change instead of a grep.
@@ -374,8 +374,8 @@ export function useLatestInspections(enabled = true) {
 }
 
 /** Warnings only (overdue service, no recent inspection). They never block a deployment. */
-export function useDeployWarnings(assetId: string) {
-  return useQuery<string[]>({ queryKey: ["em-deploy-warnings", assetId], queryFn: () => api.fetchDeployWarnings(assetId), enabled: !!assetId, staleTime: 0 })
+export function useDeployWarnings(assetId: string, hire?: HireContext) {
+  return useQuery<string[]>({ queryKey: ["em-deploy-warnings", assetId, hire ?? null], queryFn: () => api.fetchDeployWarnings(assetId, hire), enabled: !!assetId, staleTime: 0 })
 }
 
 export function useInspections(assetId: string) {
@@ -452,4 +452,45 @@ export function useDraftInvoice(onDone?: (r: DraftInvoiceResult) => void) {
     mutationFn: (body: Record<string, unknown>) => api.draftInvoiceFromCharges(body),
     onSuccess: r => { qc.invalidateQueries({ queryKey: QK.hireCharges }); onDone?.(r) },
   })
+}
+
+// ── Hire contracts and settings ──────────────────────────────────────────
+
+export function useDeploymentContract(deploymentId: string) {
+  return useQuery<DeploymentContract>({ queryKey: ["em-deployment-contract", deploymentId], queryFn: () => api.fetchDeploymentContract(deploymentId), enabled: !!deploymentId, staleTime: 0 })
+}
+
+/** Each of these returns the refreshed contract panel, so the screen updates from the response. */
+export function useDraftHireContract(deploymentId: string) {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: () => api.draftHireContract(deploymentId), onSuccess: r => qc.setQueryData(["em-deployment-contract", deploymentId], r) })
+}
+
+export function useLinkHireContract(deploymentId: string) {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: (contractId: string) => api.linkHireContract(deploymentId, contractId), onSuccess: r => qc.setQueryData(["em-deployment-contract", deploymentId], r) })
+}
+
+export function useExtendHire(deploymentId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ newEndDate, reason }: { newEndDate: string; reason: string }) => api.extendHire(deploymentId, newEndDate, reason),
+    onSuccess: r => qc.setQueryData(["em-deployment-contract", deploymentId], r),
+  })
+}
+
+export function useEarthSettings(enabled = true) {
+  return useQuery<EarthSettings>({ queryKey: ["em-settings"], queryFn: api.fetchSettings, enabled, staleTime: 30_000 })
+}
+
+export function useSaveSettings(onSuccess?: () => void) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (contractThreshold: number | null) => api.saveSettings(contractThreshold),
+    onSuccess: r => { qc.setQueryData(["em-settings"], r); onSuccess?.() },
+  })
+}
+
+export function useHireContractOptions(enabled: boolean) {
+  return useQuery<ContractRef[]>({ queryKey: ["em-hire-contract-options"], queryFn: api.fetchHireContracts, enabled, retry: false, staleTime: 30_000 })
 }
