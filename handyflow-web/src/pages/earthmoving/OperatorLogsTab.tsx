@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { Plus, Users, CheckCircle2 } from "lucide-react"
 import type { OperatorLog } from "./shared/types"
-import { fmtDate, fmtTime, apiMessage } from "./shared/format"
+import { fmtDate, fmtTime, apiMessage, meterUnitOf, meterNameOf } from "./shared/format"
 import { Overlay, ModalHead, ModalFoot, ErrBanner, lbl, inputStyle } from "./shared/Modal"
 import { useEarthPerms } from "./shared/useEarthPerms"
 import { useAssets, useOperatorLogs, useStartOperatorLog, useCompleteOperatorLog } from "./shared/hooks"
@@ -149,7 +149,7 @@ export default function OperatorLogsTab() {
             onClose={() => setShowAdd(false)} />
 
           <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--hf-sky-soft)", border: "1px solid var(--hf-sky-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-sky-text-strong)" }}>
-            Current meter: <strong>{selectedAssetObj.currentHours.toLocaleString()} hrs</strong>
+            Current meter: <strong>{selectedAssetObj.currentHours.toLocaleString()} {meterUnitOf(selectedAssetObj)}</strong>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -167,7 +167,7 @@ export default function OperatorLogsTab() {
                 <input type="datetime-local" value={form.startedAt} onChange={e => setForm(f => ({ ...f, startedAt: e.target.value }))} style={inputStyle()} />
               </div>
               <div>
-                <label style={lbl}>Starting Hour Reading</label>
+                <label style={lbl}>Starting {meterNameOf(selectedAssetObj)} Reading</label>
                 <input type="number" value={form.startHours} onChange={e => setForm(f => ({ ...f, startHours: e.target.value }))}
                   placeholder={String(selectedAssetObj.currentHours)} style={inputStyle()} />
                 <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 3 }}>Pre-filled from current reading</div>
@@ -205,7 +205,7 @@ export default function OperatorLogsTab() {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
-                <label style={lbl}>Ending Hour Reading</label>
+                <label style={lbl}>Ending {meterNameOf(selectedAssetObj)} Reading</label>
                 <input type="number" value={completeForm.endHours} onChange={e => setCompleteForm(f => ({ ...f, endHours: e.target.value }))} style={inputStyle()} />
               </div>
               <div>

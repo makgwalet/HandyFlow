@@ -23,4 +23,6 @@ export function apiMessage(e: unknown, fallback: string): string {
 
 /** "hrs" or "km": the unit a machine's meter counts in. Machines from before meter types count hours. */
 export const meterUnitOf = (a: { meterUnit?: string } | null | undefined) => a?.meterUnit ?? "hrs"
+/** What the meter is called on a form: "Odometer" for kilometres, "Hour meter" otherwise. */
+export const meterNameOf = (a: { meterType?: string } | null | undefined) => (a?.meterType === "KILOMETRES" ? "Odometer" : "Hour meter")
 export const meterWordOf = (a: { meterType?: string } | null | undefined) => (a?.meterType === "KILOMETRES" ? "kilometres" : "hours")

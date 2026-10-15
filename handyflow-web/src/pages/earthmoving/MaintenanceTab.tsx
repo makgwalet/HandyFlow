@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { Plus, Wrench, AlertTriangle } from "lucide-react"
 import { MAINTENANCE_TYPES, MAINTENANCE_TYPE_CFG } from "./shared/constants"
-import { fmtDate, fmtCurrency2dp, apiMessage } from "./shared/format"
+import { fmtDate, fmtCurrency2dp, apiMessage, meterUnitOf, meterWordOf, meterNameOf } from "./shared/format"
 import { Overlay, ModalHead, ModalFoot, ErrBanner, lbl, inputStyle } from "./shared/Modal"
 import { useEarthPerms } from "./shared/useEarthPerms"
 import { useAssets, useMaintenanceHistory, useCreateMaintenance } from "./shared/hooks"
@@ -72,14 +72,14 @@ export default function MaintenanceTab() {
       {selectedAssetObj && (
         <div style={{ marginBottom: 18, padding: "14px 18px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, display: "flex", gap: 24, flexWrap: "wrap" }}>
           {[
-            { l: "Current Hours", v: `${selectedAssetObj.currentHours.toLocaleString()} hrs` },
-            { l: "Last Service", v: `${selectedAssetObj.lastServiceHours.toLocaleString()} hrs` },
-            { l: "Hours Since Service", v: `${(selectedAssetObj.currentHours - selectedAssetObj.lastServiceHours).toFixed(0)} hrs` },
-            { l: "Service Interval", v: `Every ${selectedAssetObj.serviceIntervalHours} hrs` },
+            { l: `Current ${meterWordOf(selectedAssetObj)}`, v: `${selectedAssetObj.currentHours.toLocaleString()} ${meterUnitOf(selectedAssetObj)}` },
+            { l: "Last Service", v: `${selectedAssetObj.lastServiceHours.toLocaleString()} ${meterUnitOf(selectedAssetObj)}` },
+            { l: `${meterWordOf(selectedAssetObj) === "kilometres" ? "Kilometres" : "Hours"} Since Service`, v: `${(selectedAssetObj.currentHours - selectedAssetObj.lastServiceHours).toFixed(0)} ${meterUnitOf(selectedAssetObj)}` },
+            { l: "Service Interval", v: `Every ${selectedAssetObj.serviceIntervalHours} ${meterUnitOf(selectedAssetObj)}` },
           ].map(item => (
             <div key={item.l}>
               <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 2 }}>{item.l}</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: selectedAssetObj.dueForService && item.l === "Hours Since Service" ? "var(--hf-danger-text)" : "var(--hf-text)" }}>{item.v}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: selectedAssetObj.dueForService && item.l.endsWith("Since Service") ? "var(--hf-danger-text)" : "var(--hf-text)" }}>{item.v}</div>
             </div>
           ))}
           {selectedAssetObj.dueForService && (
@@ -153,7 +153,7 @@ export default function MaintenanceTab() {
               <input type="date" value={form.performedAt} onChange={e => setForm(f => ({ ...f, performedAt: e.target.value }))} style={inputStyle()} />
             </div>
             <div>
-              <label style={lbl}>Hour Meter Reading</label>
+              <label style={lbl}>{meterNameOf(selectedAssetObj)} Reading</label>
               <input type="number" value={form.hoursAtService} onChange={e => setForm(f => ({ ...f, hoursAtService: e.target.value }))}
                 placeholder={selectedAssetObj.currentHours.toString()} style={inputStyle()} />
               <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 3 }}>Pre-filled from current reading</div>

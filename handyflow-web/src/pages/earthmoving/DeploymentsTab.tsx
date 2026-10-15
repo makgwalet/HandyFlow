@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { Plus, MapPin, Clock } from "lucide-react"
 import { EMOJI } from "./shared/constants"
-import { apiMessage } from "./shared/format"
+import { apiMessage, meterUnitOf } from "./shared/format"
 import { Overlay, ModalHead, ModalFoot, ErrBanner, lbl, inputStyle } from "./shared/Modal"
 import { useEarthPerms } from "./shared/useEarthPerms"
 import { useAssets, useDeployAsset, useReturnToYard, useSites, useCustomerOptions } from "./shared/hooks"
@@ -73,7 +73,7 @@ export default function DeploymentsTab() {
                     <div style={{ fontSize: 13, color: "var(--hf-text-muted)", display: "flex", gap: 14, flexWrap: "wrap" }}>
                       {a.currentSite && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><MapPin size={11} style={{ color: 'var(--hf-info-text)' }} /> {a.currentSite}</span>}
                       {a.currentClient && <span>Client: {a.currentClient}</span>}
-                      <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Clock size={11} /> {(a.currentHours ?? 0).toLocaleString()} hrs</span>
+                      <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Clock size={11} /> {(a.currentHours ?? 0).toLocaleString()} {meterUnitOf(a)}</span>
                     </div>
                   </div>
                 </div>
