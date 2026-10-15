@@ -1,7 +1,7 @@
 // src/pages/earthmoving/AssetsTab.tsx
 import { useState } from "react"
 import {
-  Plus, Truck, AlertTriangle, ChevronDown, ChevronUp, X,
+  Plus, Truck, AlertTriangle, ChevronDown, ChevronUp,
   Edit2, Eye, Clock, CheckCircle, AlertCircle, RefreshCw,
 } from "lucide-react"
 import type { Asset } from "./shared/types"
@@ -14,6 +14,7 @@ import { fmtCurrency, apiMessage, meterUnitOf, meterWordOf, inspectionAgo } from
 import { Overlay, ModalHead, ModalFoot, Sect, ErrBanner, lbl, inputStyle } from "./shared/Modal"
 import StatusHistoryDialog from "./StatusHistoryDialog"
 import MeterDialog from "./MeterDialog"
+import AssetDetail from "./AssetDetail"
 import { useLatestInspections, useAssets, useCreateAsset, useUpdateAsset, useUpdateAssetStatus, useUpdateAssetHours } from "./shared/hooks"
 
 const EMPTY_FORM = {
@@ -131,6 +132,14 @@ export default function AssetsTab() {
 
   return (
     <div>
+      {viewing ? (
+        <AssetDetail asset={viewing} actions={{
+          onBack: () => setViewing(null), onEdit: () => openEdit(viewing),
+          onHours: () => { setShowHours(viewing); setNewHours(String(viewing.currentHours ?? 0)) },
+          onStatus: () => { setShowStatus(viewing); setNewStatus(""); setStatusNote("") },
+          onMeter: () => setShowMeter(viewing), onHistory: () => setShowHistory(viewing),
+        }} />
+      ) : (<>
       {/* Stats row */}
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {stats.map(s => (
@@ -333,6 +342,8 @@ export default function AssetsTab() {
           })}
         </div>
       )}
+
+      </>)}
 
       {/* ── Register Asset Modal ────────────────────────────────────────── */}
       {formOpen && (
@@ -627,107 +638,6 @@ export default function AssetsTab() {
         </Overlay>
       )}
 
-      {/* ── View Asset Modal ────────────────────────────────────────────── */}
-      {viewing && (
-        <Overlay onClose={() => setViewing(null)}>
-          <div style={{ background: "linear-gradient(135deg, var(--hf-primary) 0%, var(--hf-primary-hover) 100%)", margin: "-28px -28px 24px", padding: "24px 28px", borderRadius: "16px 16px 0 0" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <div style={{ width: 56, height: 56, borderRadius: 14, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>
-                  {EMOJI[viewing.assetType] ?? "🚧"}
-                </div>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    {viewing.fleetNumber && (
-                      <span style={{ background: "var(--hf-warning)", color: "var(--hf-text-on-solid)", padding: "2px 10px", borderRadius: 6, fontSize: 13, fontWeight: 800 }}>{viewing.fleetNumber}</span>
-                    )}
-                    <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--hf-text-on-solid)" }}>{viewing.name}</h3>
-                  </div>
-                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
-                    {[viewing.make, viewing.model, viewing.year].filter(Boolean).join(" · ")}
-                    {viewing.registration && ` · ${viewing.registration}`}
-                  </div>
-                </div>
-              </div>
-              <button onClick={() => setViewing(null)} aria-label="Close dialog" style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, cursor: "pointer", color: "var(--hf-text-on-solid)", padding: 6, display: "flex" }}><X size={18} /></button>
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
-              <StatusBadge status={viewing.status} />
-              {viewing.ownershipType !== "OWN" && (
-                <span style={{ background: "rgba(255,255,255,0.2)", color: "var(--hf-text-on-solid)", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
-                  {OWN_TYPE_CFG[viewing.ownershipType]?.label}
-                </span>
-              )}
-              {viewing.dueForService && (
-                <span style={{ background: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text)", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: "1px solid var(--hf-warning-border)" }}>⚠ Service Due</span>
-              )}
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
-            {[
-              { l: viewing.meterType === "KILOMETRES" ? "Current Kilometres" : "Current Hours", v: `${Number(viewing.currentHours ?? 0).toLocaleString()} ${meterUnitOf(viewing)}` },
-              { l: "Last Service", v: `${Number(viewing.lastServiceHours ?? 0).toLocaleString()} ${meterUnitOf(viewing)}` },
-              { l: "Serial Number", v: viewing.serialNumber || "—" },
-              { l: "Daily Rate", v: fmtCurrency(viewing.dailyRate) },
-              { l: "Current Site", v: viewing.currentSite || "—" },
-              { l: "Current Client", v: viewing.currentClient || "—" },
-            ].map(item => (
-              <div key={item.l} style={{ padding: "10px 14px", background: "var(--hf-surface-muted)", borderRadius: 8 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>{item.l}</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--hf-text)" }}>{item.v}</div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 6 }}>
-              <span>Service interval progress</span>
-              <span>{(Number(viewing.currentHours ?? 0) - Number(viewing.lastServiceHours ?? 0)).toFixed(0)} / {viewing.serviceIntervalHours || 250} {meterUnitOf(viewing)}</span>
-            </div>
-            <div style={{ height: 8, background: "var(--hf-surface-sunken)", borderRadius: 99, overflow: "hidden" }}>
-              {(() => {
-                const pct = Math.min(100, (Number(viewing.currentHours ?? 0) - Number(viewing.lastServiceHours ?? 0)) / (viewing.serviceIntervalHours || 250) * 100)
-                return <div style={{ height: "100%", width: `${pct}%`, background: pct >= 100 ? "var(--hf-danger)" : pct >= 80 ? "var(--hf-warning)" : "var(--hf-accent)", borderRadius: 99 }} />
-              })()}
-            </div>
-          </div>
-
-          {viewing.ownershipType === "HIRED_IN" && viewing.hireSupplier && (
-            <div style={{ marginBottom: 14, padding: "10px 14px", background: "var(--hf-violet-soft)", border: "1px solid var(--hf-violet-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-violet-text-strong)" }}>
-              <strong>Hired from:</strong> {viewing.hireSupplier}
-              {viewing.hireEndDate && ` · Hire ends ${new Date(viewing.hireEndDate).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}`}
-            </div>
-          )}
-
-          {viewing.notes && (
-            <div style={{ marginBottom: 14, padding: "10px 14px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-warning-text-deep)" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 3, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>Notes</div>
-              {viewing.notes}
-            </div>
-          )}
-
-          <div style={{ display: "flex", gap: 8 }}>
-            {perms.canWrite && <button onClick={() => { setViewing(null); setShowHours(viewing); setNewHours(String(viewing.currentHours ?? 0)) }}
-              style={{ flex: 1, padding: "10px", background: "var(--hf-success-soft)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-              Update Hours
-            </button>}
-            {perms.canWrite && <button onClick={() => openEdit(viewing)}
-              style={{ flex: 1, padding: "10px", background: "var(--hf-surface-muted)", color: "var(--hf-text-secondary)", border: "1px solid var(--hf-border)", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-              Edit Details
-            </button>}
-            {perms.canChangeStatus && <button onClick={() => { setViewing(null); setShowStatus(viewing); setNewStatus(""); setStatusNote("") }}
-              style={{ flex: 1, padding: "10px", background: "var(--hf-warning-soft)", color: "var(--hf-warning-text)", border: "1px solid var(--hf-warning-border)", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-              Change Status
-            </button>}
-            <button onClick={() => { setShowMeter(viewing); setViewing(null) }}
-              style={{ padding: "10px 16px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Meter</button>
-            <button onClick={() => { setShowHistory(viewing); setViewing(null) }}
-              style={{ padding: "10px 16px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>History</button>
-            <button onClick={() => setViewing(null)} style={{ padding: "10px 16px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Close</button>
-          </div>
-        </Overlay>
-      )}
     </div>
   )
 }
