@@ -164,6 +164,13 @@ export interface Inspection {
 
 export interface LatestInspection { assetId: string; performedAt: string; result: string }
 
+// ── Profitability ────────────────────────────────────────────────────────
+export interface ProfitRow {
+  assetId: string | null; machine: string; charges: number; revenue: number; invoiced: number; notInvoiced: number
+  maintenanceCost: number; margin: number; marginPercent: number | null
+}
+export interface Profitability { from: string; to: string; totals: ProfitRow; machines: ProfitRow[] }
+
 // ── Hire charges ─────────────────────────────────────────────────────────
 export interface HireCharge {
   id: string | null; deploymentId: string; assetId: string; machine: string; customerId: string | null; customerName: string | null

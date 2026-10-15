@@ -28,6 +28,10 @@ export function inspectionAgo(iso: string | null | undefined, now: Date = new Da
   const days = Math.floor((now.getTime() - new Date(iso).getTime()) / 86_400_000)
   return days <= 0 ? "Inspected today" : days === 1 ? "Inspected yesterday" : `Inspected ${days} days ago`
 }
+/** A report as CSV text: quotes doubled, so a machine name with a comma or quote stays in one cell. */
+export function toCsv(rows: (string | number | null)[][]): string {
+  return rows.map(r => r.map(v => (v == null ? "" : `"${String(v).replace(/"/g, '""')}"`)).join(",")).join("\r\n")
+}
 export const meterUnitOf = (a: { meterUnit?: string } | null | undefined) => a?.meterUnit ?? "hrs"
 /** What the meter is called on a form: "Odometer" for kilometres, "Hour meter" otherwise. */
 export const meterNameOf = (a: { meterType?: string } | null | undefined) => (a?.meterType === "KILOMETRES" ? "Odometer" : "Hour meter")

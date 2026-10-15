@@ -446,6 +446,9 @@ export const EARTHMOVING_SECTIONS: ModuleSections = {
       { id: 'incidents', label: 'Incidents', icon: AlertTriangle },
       { id: 'alerts', label: 'Alerts', icon: Bell },
     ] },
+    { label: 'Reports', sections: [
+      { id: 'profitability', label: 'Profitability', icon: FileBarChart },
+    ] },
   ],
 }
 

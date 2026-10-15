@@ -24,6 +24,10 @@ public interface EarthHireChargeRepository extends JpaRepository<EarthHireCharge
     List<EarthHireCharge> findForTenant(TenantId tenantId, String status);
 
     /** Live (not voided) charges of this deployment that overlap the period. */
+    /** Charges that count as revenue (not voided) whose period starts inside the dates, both ends included. */
+    @Query("SELECT c FROM EarthHireCharge c WHERE c.tenantId = :tenantId AND c.status <> 'VOIDED' AND c.periodFrom >= :from AND c.periodFrom <= :to")
+    List<EarthHireCharge> findRevenueBetween(TenantId tenantId, LocalDate from, LocalDate to);
+
     @Query("SELECT c FROM EarthHireCharge c WHERE c.tenantId = :tenantId AND c.deploymentId = :deploymentId AND c.status <> 'VOIDED' " +
             "AND c.periodFrom <= :to AND c.periodTo >= :from")
     List<EarthHireCharge> findLiveOverlapping(TenantId tenantId, UUID deploymentId, LocalDate from, LocalDate to);

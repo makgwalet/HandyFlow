@@ -1,7 +1,7 @@
 // src/pages/earthmoving/shared/hooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, HireCharge, DeploymentOption, DraftInvoiceResult } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, Profitability, HireCharge, DeploymentOption, DraftInvoiceResult } from "./types"
 
 // Central query keys — every tab imports these instead of typing the
 // literal string, so a rename is a one-line change instead of a grep.
@@ -392,6 +392,12 @@ export function useCreateInspection(onSuccess?: (i: Inspection) => void) {
       onSuccess?.(i)
     },
   })
+}
+
+// ── Reports ──────────────────────────────────────────────────────────────
+
+export function useProfitability(from: string, to: string, enabled = true) {
+  return useQuery<Profitability>({ queryKey: ["em-profitability", from, to], queryFn: () => api.fetchProfitability(from, to), enabled: enabled && !!from && !!to && from <= to, staleTime: 30_000 })
 }
 
 // ── Hire charges ─────────────────────────────────────────────────────────
