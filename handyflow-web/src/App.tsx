@@ -4,7 +4,7 @@ import { ThemeProvider } from "./theme/ThemeProvider"
 import { LoginPage }                    from "./pages/auth/LoginPage"
 import { RegisterPage }                 from "./pages/auth/RegisterPage"
 import { DashboardPage }                from "./pages/dashboard/DashboardPage"
-import { CustomersPage }                from "./pages/customers/CustomersPage"
+import { CrmPage }                      from "./pages/customers/CrmPage"
 import QuotesListPage                  from "./pages/invoicing/QuotesListPage"
 import InvoicesListPage                from "./pages/invoicing/InvoicesListPage"
 import InvoiceDetailPage               from "./pages/invoicing/InvoiceDetailPage"
@@ -290,7 +290,7 @@ export default function App() {
 
           {/* All module pages — inside AppShell (sidebar + top bar) */}
           <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
-            <Route path="/customers"   element={<CustomersPage />} />
+            <Route path="/customers"   element={<CrmPage />} />
             <Route path="/quotes"      element={<QuotesListPage />} />
             <Route path="/invoices"    element={<InvoicesListPage />} />
             <Route path="/invoices/:id" element={<InvoiceDetailPage />} />

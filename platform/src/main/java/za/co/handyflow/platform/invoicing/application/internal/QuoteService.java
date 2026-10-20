@@ -108,6 +108,14 @@ public class QuoteService {
         );
 
         quoteRepository.save(quote);
+        if (hasCustomer) {
+            // Put it on the customer's timeline. A timeline failure must not fail the quote.
+            try {
+                crmFacade.notifyQuoteLinked(tenantId, request.customerId(), quote.getId(), null);
+            } catch (RuntimeException e) {
+                log.warn("Could not record quote={} on the customer timeline: {}", quoteNumber, e.getMessage());
+            }
+        }
         log.info("Created quote={} tenant={} walkin={}",
                 quoteNumber, tenantId, !hasCustomer);
         return toResponse(quote);
@@ -272,6 +280,14 @@ public class QuoteService {
         invoice.markIssued(dueDate);
         quote.markInvoiced();
         quoteRepository.save(quote);
+
+        if (quote.getCustomerId() != null) {
+            try {
+                crmFacade.notifyInvoiceLinked(tenantId, quote.getCustomerId(), invoice.getId(), null);
+            } catch (RuntimeException e) {
+                log.warn("Could not record invoice={} on the customer timeline: {}", invoice.getId(), e.getMessage());
+            }
+        }
 
         log.info("Converted quote={} to invoice={}", quoteId, invoice.getId());
 

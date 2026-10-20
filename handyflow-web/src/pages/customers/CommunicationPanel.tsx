@@ -201,8 +201,8 @@ function CommRow({ c, onDelete }: { c: Communication; onDelete: () => void }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
           <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--hf-text-secondary)' }}>{label}</span>
           {c.direction === 'OUTBOUND'
-            ? <ArrowUpRight size={11} style={{ color: 'var(--hf-text-faint)' }} titleAccess="Outbound" />
-            : <ArrowDownLeft size={11} style={{ color: 'var(--hf-text-faint)' }} titleAccess="Inbound" />}
+            ? <ArrowUpRight size={11} style={{ color: 'var(--hf-text-faint)' }} aria-label="Outbound" />
+            : <ArrowDownLeft size={11} style={{ color: 'var(--hf-text-faint)' }} aria-label="Inbound" />}
           <span style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{fmtDateTime(c.occurredAt)}</span>
         </div>
         <p style={{ fontSize: 12.5, color: 'var(--hf-text)', margin: 0, lineHeight: 1.4 }}>{c.summary}</p>

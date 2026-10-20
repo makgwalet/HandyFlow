@@ -88,6 +88,13 @@ public class CustomerController {
         return ResponseEntity.ok(ApiResponse.success(customers));
     }
 
+    @GetMapping("/pipeline")
+    @PreAuthorize("hasAuthority('CUSTOMER_READ')")
+    @Operation(summary = "Active leads with their pipeline stage, deal value and owner (pipeline board)")
+    public ResponseEntity<ApiResponse<java.util.List<CustomerResponse>>> getPipeline() {
+        return ResponseEntity.ok(ApiResponse.success(customerService.getPipeline(TenantContext.getTenantIdAsObject())));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('CUSTOMER_READ')")
     @Operation(summary = "Get a single active customer by ID")

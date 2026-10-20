@@ -419,6 +419,12 @@ public class Customer {
                 Map.of("bookingId", bookingId.toString()), null, triggeredBy));
     }
 
+    /** Called by CrmFacade when a quote is raised for this customer. */
+    public void recordQuoteLinked(UUID quoteId, UUID triggeredBy) {
+        addActivity(CustomerActivity.of(this, ActivityType.QUOTE_LINKED,
+                Map.of("quoteId", quoteId.toString()), null, triggeredBy));
+    }
+
     /** Called by CrmFacade when an invoice is linked cross-module. */
     public void recordInvoiceLinked(UUID invoiceId, UUID triggeredBy) {
         addActivity(CustomerActivity.of(this, ActivityType.INVOICE_LINKED,

@@ -95,6 +95,19 @@ public class CustomerService {
         return page.map(this::toResponse);
     }
 
+    /** Most leads the pipeline board loads at once; the board says so when there are more. */
+    public static final int PIPELINE_LIMIT = 500;
+
+    /** Every active lead of the tenant with its stage, newest first, for the pipeline board. */
+    @Transactional(readOnly = true)
+    public List<CustomerResponse> getPipeline(TenantId tenantId) {
+        return customerRepository.findAllActiveLeads(tenantId).stream()
+                .sorted(java.util.Comparator.comparing(Customer::getCreatedAt).reversed())
+                .limit(PIPELINE_LIMIT)
+                .map(this::toResponse)
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public CustomerResponse getCustomer(TenantId tenantId, UUID id) {
         return customerRepository.findActiveById(tenantId, id)
@@ -483,6 +496,7 @@ public class CustomerService {
                 c.getExpectedCloseDate(),
                 c.getCustomerType(),
                 c.getStatus(),
+                c.getPipelineStage(),
                 Set.copyOf(c.getTags()),
                 c.getCreatedAt(),
                 c.getUpdatedAt()

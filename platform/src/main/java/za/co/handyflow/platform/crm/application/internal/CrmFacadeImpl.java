@@ -146,6 +146,17 @@ class CrmFacadeImpl implements CrmFacade {
 
     @Override
     @Transactional
+    public void notifyQuoteLinked(TenantId tenantId, UUID customerId,
+                                  UUID quoteId, UUID triggeredBy) {
+        customerRepository.findActiveById(tenantId, customerId)
+                .ifPresent(customer -> {
+                    customer.recordQuoteLinked(quoteId, triggeredBy);
+                    customerRepository.save(customer);
+                });
+    }
+
+    @Override
+    @Transactional
     public void notifyInvoiceLinked(TenantId tenantId, UUID customerId,
                                     UUID invoiceId, UUID triggeredBy) {
         customerRepository.findActiveById(tenantId, customerId)

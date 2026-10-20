@@ -9,7 +9,7 @@ export function ExportButton() {
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState<string | null>(null)
   const ref                   = useRef<HTMLDivElement>(null)
-  const dismissTimer          = useRef<ReturnType<typeof setTimeout>>()
+  const dismissTimer          = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -36,7 +36,7 @@ export function ExportButton() {
 
       // Check if the server returned an error as JSON inside the blob
       // (some servers send 401/500 as JSON even when responseType is blob)
-      if (res.headers['content-type']?.includes('application/json')) {
+      if (String(res.headers['content-type'] ?? '').includes('application/json')) {
         const text = await (res.data as Blob).text()
         const json = JSON.parse(text)
         throw new Error(json?.message ?? 'Export failed')

@@ -76,6 +76,12 @@ public interface CrmFacade {
                           String summary, java.time.Instant occurredAt, UUID triggeredBy);
 
     /**
+     * Notify CRM that a quote was raised for this customer. Recorded on the customer's
+     * timeline; does nothing if the customer no longer exists. triggeredBy may be null (system).
+     */
+    void notifyQuoteLinked(TenantId tenantId, UUID customerId, UUID quoteId, UUID triggeredBy);
+
+    /**
      * Notify CRM that an invoice was raised for this customer.
      * CRM records this on the customer's activity timeline.
      */

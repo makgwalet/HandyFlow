@@ -1,0 +1,117 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-library/react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import PipelineBoard from "./PipelineBoard"
+import FunnelReport from "./FunnelReport"
+import { barShare, biggestDropOff, closeState, closeText, columns, dealBody, dealProblem, daysText, filterLeads, localToday, NO_FILTER, ownerText, percent, pipelineTotals, stageOf, type Funnel, type PipelineLead } from "./pipeline.logic"
+
+const get = vi.fn(), patch = vi.fn()
+type Args = unknown[]
+let perms = new Set<string>()
+vi.mock("../../api/client", () => ({ apiClient: { get: (...a: Args) => get(...a), patch: (...a: Args) => patch(...a) } }))
+vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.has(p) }))
+vi.mock("../../store/auth.store", () => ({ useAuthStore: (sel: (s: { user: { userId: string } }) => unknown) => sel({ user: { userId: "me" } }) }))
+const ok = (d: unknown) => Promise.resolve({ data: { data: d } })
+const TODAY = "2026-10-20"
+const lead = (id: string, name: string, o: Partial<PipelineLead> = {}): PipelineLead => ({ id, name, email: `${id}@x.co`, phone: null, ownerId: null, dealValue: null, expectedCloseDate: null, pipelineStage: "NEW", ...o })
+const leads: PipelineLead[] = [
+  lead("a", "Acme Mining", { pipelineStage: "QUALIFIED", dealValue: 50000, expectedCloseDate: "2026-10-10", ownerId: "me" }),
+  lead("b", "Bravo Foods", { pipelineStage: "NEW", dealValue: 12000.5, expectedCloseDate: "2026-10-25", ownerId: "other" }),
+  lead("c", "Cape Wines", { pipelineStage: "WON", dealValue: 80000, expectedCloseDate: "2026-09-01" }),
+  lead("d", "Delta Haulage", { pipelineStage: "LOST", dealValue: 9000 }),
+  lead("e", "Echo Retail", { pipelineStage: null }),
+]
+const wrap = (ui: React.ReactElement) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>)
+beforeEach(() => { perms = new Set(["CUSTOMER_READ", "CUSTOMER_UPDATE"]); get.mockReset(); patch.mockReset(); get.mockImplementation(() => ok(leads)); patch.mockResolvedValue({ data: {} }); vi.useRealTimers() })
+afterEach(cleanup)
+
+describe("pipeline rules", () => {
+  it("reads a missing stage as New, and judges overdue only for open leads", () => {
+    expect(stageOf(leads[4])).toBe("NEW")
+    expect(closeState(leads[0], TODAY)).toBe("overdue"); expect(closeState(leads[1], TODAY)).toBe("soon"); expect(closeState(lead("x", "X", { expectedCloseDate: "2027-03-01" }), TODAY)).toBe("later")
+    expect(closeState(leads[2], TODAY)).toBe("none"); expect(closeState(leads[4], TODAY)).toBe("none")
+    expect(closeText(leads[0], TODAY)).toBe("Overdue by 10 days"); expect(closeText(leads[1], TODAY)).toBe("Closes in 5 days"); expect(closeText(lead("y", "Y", { expectedCloseDate: TODAY }), TODAY)).toBe("Closes today")
+    expect(closeText(leads[4], TODAY)).toBe("No close date"); expect(closeText(leads[2], TODAY)).toBe("Close 2026-09-01")
+  })
+  it("uses the local calendar date, not the UTC one", () => {
+    expect(localToday(new Date(2026, 9, 20, 23, 30))).toBe("2026-10-20"); expect(localToday(new Date(2026, 0, 5, 0, 5))).toBe("2026-01-05")
+  })
+  it("groups by stage, soonest close date first, with counts and values", () => {
+    const cols = columns(leads), by = Object.fromEntries(cols.map(c => [c.stage, c]))
+    expect(cols.map(c => c.stage)).toEqual(["NEW", "CONTACTED", "QUALIFIED", "WON", "LOST"]); expect(by.NEW.leads.map(l => l.id)).toEqual(["b", "e"]); expect(by.NEW.value).toBe(12000.5)
+    expect(by.CONTACTED.count).toBe(0); expect(by.WON.value).toBe(80000)
+  })
+  it("totals open, won, lost, overdue and open leads without a value", () => {
+    expect(pipelineTotals(leads, TODAY)).toEqual({ openCount: 3, openValue: 62000.5, wonValue: 80000, lostValue: 9000, overdue: 1, noValue: 1 })
+  })
+  it("filters by text, owner and overdue", () => {
+    const ids = (f: Partial<typeof NO_FILTER>) => filterLeads(leads, { ...NO_FILTER, ...f }, "me", TODAY).map(l => l.id)
+    expect(ids({ search: "  ACME " })).toEqual(["a"]); expect(ids({ search: "b@x" })).toEqual(["b"]); expect(ids({ owner: "mine" })).toEqual(["a"]); expect(ids({ owner: "unassigned" })).toEqual(["c", "d", "e"]); expect(ids({ overdueOnly: true })).toEqual(["a"])
+    expect(filterLeads(leads, { ...NO_FILTER, owner: "mine" }, null, TODAY)).toEqual([]); expect(ownerText(null, "me")).toBe("Unassigned"); expect(ownerText("me", "me")).toBe("You"); expect(ownerText("z", "me")).toBe("Colleague")
+  })
+  it("validates a deal and sends both fields, an empty box clearing it", () => {
+    expect(dealProblem("abc", "")).toMatch(/number/); expect(dealProblem("-5", "")).toMatch(/negative/); expect(dealProblem("1e15", "")).toMatch(/too large/); expect(dealProblem("100", "2026-02-30")).toMatch(/real date/); expect(dealProblem("", "")).toBeNull(); expect(dealProblem("1 500.50", "2026-12-01")).toBeNull()
+    expect(dealBody("1 500.505", "2026-12-01")).toEqual({ dealValue: 1500.51, expectedCloseDate: "2026-12-01" }); expect(dealBody("", "")).toEqual({ dealValue: null, expectedCloseDate: null })
+  })
+})
+
+describe("pipeline board", () => {
+  it("shows leads in their stage columns with totals, and flags the overdue one", async () => {
+    wrap(<PipelineBoard />)
+    const q = await screen.findByLabelText("Qualified column"); expect(within(q).getByLabelText("Acme Mining").textContent).toContain("Overdue by")
+    expect(within(screen.getByLabelText("New column")).getByLabelText("Echo Retail")).toBeTruthy(); expect(screen.getByLabelText("Pipeline totals").textContent).toMatch(/3\s*open leads/); expect(screen.getByLabelText("Pipeline totals").textContent).toContain("past their close date")
+  })
+  it("moves a lead with the stage endpoint", async () => {
+    wrap(<PipelineBoard />); fireEvent.change(await screen.findByLabelText("Move Bravo Foods"), { target: { value: "CONTACTED" } })
+    await waitFor(() => expect(patch).toHaveBeenCalledWith("/api/v1/crm/customers/b/stage", { stage: "CONTACTED" }))
+  })
+  it("assigns to me and unassigns, using the signed-in user's id", async () => {
+    wrap(<PipelineBoard />); fireEvent.click(await screen.findByLabelText("Assign Bravo Foods to me")); await waitFor(() => expect(patch).toHaveBeenCalledWith("/api/v1/crm/customers/b/owner", { ownerId: "me" }))
+    fireEvent.click(screen.getByLabelText("Unassign Acme Mining")); await waitFor(() => expect(patch).toHaveBeenCalledWith("/api/v1/crm/customers/a/owner", { ownerId: null }))
+  })
+  it("edits a deal, blocks a bad value, and saves value and date together", async () => {
+    wrap(<PipelineBoard />); fireEvent.click(await screen.findByLabelText("Edit deal for Bravo Foods"))
+    const form = screen.getByRole("form", { name: "Deal for Bravo Foods" }); fireEvent.change(within(form).getByLabelText("Deal value"), { target: { value: "x" } })
+    expect(within(form).getByText(/must be a number/)).toBeTruthy(); expect((within(form).getByText("Save deal") as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(within(form).getByLabelText("Deal value"), { target: { value: "15000" } }); fireEvent.change(within(form).getByLabelText("Expected close date"), { target: { value: "2026-11-30" } }); fireEvent.click(within(form).getByText("Save deal"))
+    await waitFor(() => expect(patch).toHaveBeenCalledWith("/api/v1/crm/customers/b/deal", { dealValue: 15000, expectedCloseDate: "2026-11-30" }))
+  })
+  it("shows the server's refusal and keeps the board", async () => {
+    patch.mockRejectedValue({ response: { data: { message: "Cannot set a pipeline stage on a non-lead customer" } } })
+    wrap(<PipelineBoard />); fireEvent.change(await screen.findByLabelText("Move Bravo Foods"), { target: { value: "WON" } })
+    expect((await screen.findByRole("alert")).textContent).toMatch(/non-lead/); expect(screen.getByLabelText("Bravo Foods")).toBeTruthy()
+  })
+  it("filters the board and says when nothing matches", async () => {
+    wrap(<PipelineBoard />); fireEvent.change(await screen.findByLabelText("Search leads"), { target: { value: "zzz" } }); expect(screen.getByText(/No leads match/)).toBeTruthy()
+    fireEvent.click(screen.getByText("Clear filters")); fireEvent.change(screen.getByLabelText("Owner filter"), { target: { value: "mine" } }); expect(screen.getByLabelText("Acme Mining")).toBeTruthy(); expect(screen.queryByLabelText("Bravo Foods")).toBeNull()
+  })
+  it("read-only users see the board without move, edit or assign controls", async () => {
+    perms = new Set(["CUSTOMER_READ"]); wrap(<PipelineBoard />); await screen.findByLabelText("Acme Mining")
+    expect(screen.queryByLabelText("Move Acme Mining")).toBeNull(); expect(screen.queryByLabelText("Edit deal for Acme Mining")).toBeNull(); expect(screen.queryByLabelText("Unassign Acme Mining")).toBeNull()
+  })
+  it("explains an empty pipeline and a load failure, and warns when the 500 cap is reached", async () => {
+    get.mockImplementation(() => ok([])); wrap(<PipelineBoard />); expect(await screen.findByText(/No leads yet/)).toBeTruthy(); cleanup()
+    get.mockRejectedValue(new Error("down")); wrap(<PipelineBoard />); expect((await screen.findByRole("alert")).textContent).toMatch(/Couldn't load/); cleanup()
+    get.mockImplementation(() => ok(Array.from({ length: 500 }, (_, i) => lead(`l${i}`, `Lead ${i}`)))); wrap(<PipelineBoard />); expect((await screen.findByRole("status")).textContent).toMatch(/newest 500/)
+  })
+})
+
+const funnel: Funnel = { totalLeads: 10, totalWon: 2, totalLost: 3, totalStillOpen: 5, overallConversionRate: 0.2, stages: [
+  { stage: "NEW", reachedCount: 10, conversionFromPreviousStage: null, avgDaysInStage: 2.34 }, { stage: "CONTACTED", reachedCount: 8, conversionFromPreviousStage: 0.8, avgDaysInStage: 0.4 },
+  { stage: "QUALIFIED", reachedCount: 3, conversionFromPreviousStage: 0.375, avgDaysInStage: null }, { stage: "WON", reachedCount: 2, conversionFromPreviousStage: 0.6667, avgDaysInStage: null }, { stage: "LOST", reachedCount: 3, conversionFromPreviousStage: null, avgDaysInStage: null } ] }
+describe("funnel report", () => {
+  it("formats rates and times, sizes bars against the widest stage and finds the biggest drop", () => {
+    expect(percent(0.2)).toBe("20%"); expect(percent(0.6667)).toBe("66.7%"); expect(percent(null)).toBe("—"); expect(daysText(2.34)).toBe("2.3 days"); expect(daysText(0.4)).toBe("under a day"); expect(daysText(null)).toBe("—")
+    expect(barShare(funnel.stages, funnel.stages[1])).toBe(80); expect(barShare([], funnel.stages[0])).toBe(0)
+    expect(biggestDropOff(funnel.stages)).toEqual({ from: "CONTACTED", to: "QUALIFIED", lost: 5 }); expect(biggestDropOff([{ ...funnel.stages[0], reachedCount: 3 }, { ...funnel.stages[1], reachedCount: 3 }])).toBeNull()
+  })
+  it("shows the totals, the per-stage table and where leads stop", async () => {
+    get.mockImplementation(() => ok(funnel)); wrap(<FunnelReport />)
+    expect((await screen.findByLabelText("Win rate")).textContent).toContain("20%"); expect(screen.getByLabelText("Still open").textContent).toContain("5")
+    expect(within(screen.getByLabelText("Contacted")).getByText("80%")).toBeTruthy(); expect(screen.getByRole("note").textContent).toMatch(/Contacted.*Qualified.*5 leads/)
+  })
+  it("says so when there are no leads and when the report fails", async () => {
+    get.mockImplementation(() => ok({ ...funnel, totalLeads: 0 })); wrap(<FunnelReport />); expect(await screen.findByText(/nothing to report/)).toBeTruthy(); cleanup()
+    get.mockRejectedValue(new Error("x")); wrap(<FunnelReport />); expect((await screen.findByRole("alert")).textContent).toMatch(/Couldn't load/)
+  })
+})

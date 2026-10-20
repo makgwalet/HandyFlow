@@ -2,6 +2,7 @@ package za.co.handyflow.platform.crm.dto;
 
 import za.co.handyflow.platform.crm.domain.model.ActivityType;
 import za.co.handyflow.platform.crm.domain.model.CustomerStatus;
+import za.co.handyflow.platform.crm.domain.model.LeadStage;
 import za.co.handyflow.platform.crm.domain.model.CustomerType;
 
 import java.math.BigDecimal;
@@ -48,6 +49,7 @@ public record CustomerResponse(
         LocalDate expectedCloseDate,
         CustomerType customerType,
         CustomerStatus status,
+        LeadStage pipelineStage,   // null for a converted CUSTOMER
         Set<String> tags,
         Instant createdAt,
         Instant updatedAt

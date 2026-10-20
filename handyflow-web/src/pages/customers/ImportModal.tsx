@@ -250,7 +250,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
             {phase === 'done' ? 'Close' : 'Cancel'}
           </button>
           {(phase === 'idle' || phase === 'error') && (
-            <button className={styles.btnPrimary} onClick={upload} disabled={!file || phase === 'uploading'}>
+            <button className={styles.btnPrimary} onClick={upload} disabled={!file}>
               <Upload size={14} /> Start Import
             </button>
           )}
