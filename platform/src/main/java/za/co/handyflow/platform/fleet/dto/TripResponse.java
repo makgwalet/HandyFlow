@@ -17,5 +17,6 @@ public record TripResponse(
         BigDecimal fuelUsedLitres,
         String status,         // ACTIVE | COMPLETED | CANCELLED
         String notes,
-        Instant createdAt
+        Instant createdAt,
+        UUID driverId          // NEW (chunk 6): linked Driver record, null for free-text-only trips
 ) {}

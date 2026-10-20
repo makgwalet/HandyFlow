@@ -11,5 +11,31 @@ public record VehicleResponse(
         Integer serviceIntervalKm, boolean dueForService,
         boolean licenceExpiringSoon, boolean roadworthyExpiringSoon,
         BigDecimal dailyRate, String notes, Instant createdAt,
-        String assignedDriverName, UUID assignedDriverId
+        String assignedDriverName, UUID assignedDriverId,
+
+        // ── NEW (appended so existing field order is untouched) ───────────
+        String vin,
+        String engineNumber,
+        String variant,
+        String bodyType,
+        String transmission,
+        String driveType,
+        Integer axleCount,
+        Integer gvmKg,
+        Integer tareKg,
+        Integer payloadKg,
+        Integer gcmKg,
+        BigDecimal engineHours,
+        BigDecimal tankCapacityLitres,
+        Integer serviceIntervalDays,
+        LocalDate lastServiceDate,
+        LocalDate acquisitionDate,
+        String acquisitionMethod,
+        BigDecimal purchasePrice,
+        BigDecimal currentBookValue,
+        BigDecimal currentEstimatedValue,
+        LocalDate valuedAt,
+
+        // ── NEW (chunk 5) ─────────────────────────────────────────────────
+        String lifecycleStatus
 ) {}

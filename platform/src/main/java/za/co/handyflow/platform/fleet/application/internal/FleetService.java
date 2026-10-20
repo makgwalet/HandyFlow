@@ -5,11 +5,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.fleet.domain.model.Driver;
 import za.co.handyflow.platform.fleet.domain.model.FuelFillup;
 import za.co.handyflow.platform.fleet.domain.model.Trip;
 import za.co.handyflow.platform.fleet.domain.model.Vehicle;
+import za.co.handyflow.platform.fleet.domain.model.LifecycleEventType;
+import za.co.handyflow.platform.fleet.domain.model.VehicleLifecycleEvent;
+import za.co.handyflow.platform.fleet.domain.model.VehicleLifecycleStatus;
 import za.co.handyflow.platform.fleet.domain.model.VehicleService;
 import za.co.handyflow.platform.fleet.domain.model.VehicleStatus;
 import za.co.handyflow.platform.fleet.domain.repository.*;
@@ -21,6 +24,7 @@ import za.co.handyflow.platform.notifications.application.internal.NotificationS
 import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.shared.UserContext;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -35,6 +39,8 @@ public class FleetService {
     private final VehicleServiceRepository serviceRepository;
     private final TripRepository           tripRepository;
     private final FuelFillupRepository     fuelFillupRepository;
+    private final VehicleLifecycleEventRepository lifecycleEventRepository;
+    private final DriverRepository         driverRepository;
     private final NotificationService      notificationService;
     // Same shared port earthmoving uses — see TenantAdminRecipientsImpl in
     // the identity module. No fleet-specific recipients port; that lesson
@@ -68,17 +74,18 @@ public class FleetService {
 
     @Transactional
     public VehicleResponse createVehicle(TenantId tenantId, CreateVehicleRequest req) {
-        if (vehicleRepository.existsByTenantIdAndRegistrationAndDeletedAtIsNull(
-                tenantId, req.registration().toUpperCase())) {
-            throw new IllegalArgumentException(
-                    "Vehicle with registration " + req.registration() + " already exists");
-        }
+        String registration = req.registration().toUpperCase().trim();
+        String vin          = normaliseIdentifier(req.vin());
+        String engineNumber = normaliseIdentifier(req.engineNumber());
+
+        // Fresh random id: on create there is no "self" to exclude.
+        assertIdentifiersUnique(tenantId, UUID.randomUUID(), registration, vin, engineNumber);
 
         Vehicle vehicle = Vehicle.create(
                 tenantId,
-                req.registration().toUpperCase(),
+                registration,
                 req.make(), req.model(), req.year(),
-                req.colour(), req.vin(),
+                req.colour(), vin,
                 req.vehicleType(), req.fuelType(),
                 req.licenceDiscExpiry(), req.roadworthyExpiry(), req.insuranceExpiry(),
                 req.dailyRate(), req.tankCapacityLitres(),
@@ -87,9 +94,58 @@ public class FleetService {
                 req.assignedDriverName(),
                 req.notes()
         );
+        vehicle.updateIdentity(
+                vin, engineNumber, blankToNull(req.variant()), blankToNull(req.bodyType()),
+                req.transmission(), req.driveType(), req.axleCount(),
+                req.gvmKg(), req.tareKg(), req.payloadKg(), req.gcmKg(),
+                req.acquisitionDate(), req.acquisitionMethod(), req.purchasePrice(),
+                req.currentBookValue(), req.currentEstimatedValue(), req.valuedAt()
+        );
 
         vehicleRepository.save(vehicle);
         log.info("Registered vehicle={} tenant={}", vehicle.getRegistration(), tenantId);
+        return toResponse(vehicle);
+    }
+
+    /**
+     * NEW: edit a vehicle's details and identity. Previously there was no edit
+     * endpoint at all — a typo in the registration or VIN at creation could
+     * never be corrected.
+     */
+    @Transactional
+    public VehicleResponse updateVehicle(TenantId tenantId, UUID id, UpdateVehicleRequest req) {
+        Vehicle vehicle = findActive(tenantId, id);
+
+        String registration = req.registration().toUpperCase().trim();
+        String vin          = normaliseIdentifier(req.vin());
+        String engineNumber = normaliseIdentifier(req.engineNumber());
+        assertIdentifiersUnique(tenantId, id, registration, vin, engineNumber);
+
+        vehicle.updateDetails(
+                registration, req.make(), req.model(), req.year(),
+                req.colour(), req.vehicleType(), req.fuelType(),
+                req.licenceDiscExpiry(), req.roadworthyExpiry(), req.insuranceExpiry(),
+                req.dailyRate(), req.tankCapacityLitres(),
+                req.serviceIntervalKm(), req.serviceIntervalDays(), req.notes()
+        );
+        vehicle.updateIdentity(
+                vin, engineNumber, blankToNull(req.variant()), blankToNull(req.bodyType()),
+                req.transmission(), req.driveType(), req.axleCount(),
+                req.gvmKg(), req.tareKg(), req.payloadKg(), req.gcmKg(),
+                req.acquisitionDate(), req.acquisitionMethod(), req.purchasePrice(),
+                req.currentBookValue(), req.currentEstimatedValue(), req.valuedAt()
+        );
+        vehicleRepository.save(vehicle);
+        log.info("Vehicle updated vehicle={} tenant={}", id, tenantId);
+        return toResponse(vehicle);
+    }
+
+    @Transactional
+    public VehicleResponse updateEngineHours(TenantId tenantId, UUID id, UpdateEngineHoursRequest req) {
+        Vehicle vehicle = findActive(tenantId, id);
+        vehicle.updateEngineHours(req.engineHours());
+        vehicleRepository.save(vehicle);
+        log.info("Engine hours updated vehicle={} hours={}", id, req.engineHours());
         return toResponse(vehicle);
     }
 
@@ -102,9 +158,19 @@ public class FleetService {
         // IllegalStateException) if the transition isn't legal from the
         // vehicle's current state — see VehicleStatus for the full table.
         // The global exception handler maps that to HTTP 409 Conflict.
+        VehicleLifecycleStatus lifecycleBefore = vehicle.getLifecycleStatus();
         vehicle.changeStatusTo(target);
         vehicleRepository.save(vehicle);
         log.info("Vehicle status updated vehicle={} status={}", id, target);
+
+        // Retiring via the operational status also retires the vehicle in its lifecycle
+        // (see Vehicle.changeStatus) — record that in the lifecycle history too.
+        if (vehicle.getLifecycleStatus() != lifecycleBefore) {
+            lifecycleEventRepository.save(VehicleLifecycleEvent.record(tenantId, id,
+                    LifecycleEventType.STATUS_CHANGE, lifecycleBefore, vehicle.getLifecycleStatus(),
+                    java.time.Instant.now(), "Vehicle status set to " + target,
+                    null, UserContext.getCurrentUserId()));
+        }
 
         if (target == VehicleStatus.BREAKDOWN) {
             notifyBreakdown(tenantId, vehicle);
@@ -186,6 +252,37 @@ public class FleetService {
                                   StartTripRequest req) {
         Vehicle vehicle = findActive(tenantId, vehicleId);
 
+        // NEW (chunk 5): a stolen, impounded, sold, written-off... vehicle cannot be put to work.
+        if (!vehicle.getLifecycleStatus().isOperating()) {
+            throw new IllegalStateException("Vehicle lifecycle status is " + vehicle.getLifecycleStatus()
+                    + " — only ACTIVE vehicles can start a trip.");
+        }
+
+        // NEW (chunk 6): optional link to a Driver record. Only trips linked by driverId count
+        // towards that driver's score. When a driver is given we also refuse to dispatch an
+        // inactive driver, or one whose licence (or required PrDP) has already expired.
+        final UUID driverId = req.driverId();
+        String driverName = req.driverName();
+        if (driverId != null) {
+            Driver driver = driverRepository.findActiveById(tenantId, driverId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Driver", driverId.toString()));
+            if (!"ACTIVE".equals(driver.getStatus())) {
+                throw new IllegalArgumentException("Driver " + driver.getFullName() + " is inactive");
+            }
+            java.time.LocalDate today = java.time.LocalDate.now();
+            if (driver.getLicenseExpiry() != null && driver.getLicenseExpiry().isBefore(today)) {
+                throw new IllegalArgumentException("Driver " + driver.getFullName()
+                        + "'s driving licence expired on " + driver.getLicenseExpiry());
+            }
+            if (driver.isPrdpRequired() && driver.getPrdpExpiry() != null && driver.getPrdpExpiry().isBefore(today)) {
+                throw new IllegalArgumentException("Driver " + driver.getFullName()
+                        + "'s PrDP expired on " + driver.getPrdpExpiry());
+            }
+            if (driverName == null || driverName.isBlank()) {
+                driverName = driver.getFullName();
+            }
+        }
+
         tripRepository.findActiveTrip(vehicleId).ifPresent(t -> {
             throw new IllegalStateException(
                     "Vehicle already has an active trip. End the current trip first.");
@@ -201,13 +298,13 @@ public class FleetService {
 
         Trip trip = Trip.create(
                 tenantId, vehicleId,
-                req.guardId(), req.driverName(), req.purpose(),
+                req.guardId(), driverId, driverName, req.purpose(),
                 req.tripType() != null ? req.tripType() : "BUSINESS",
                 req.startLocation(),
                 req.startOdometer(), req.startAt()
         );
         tripRepository.save(trip);
-        log.info("Trip started vehicle={} driver={}", vehicleId, req.driverName());
+        log.info("Trip started vehicle={} driver={}", vehicleId, driverName);
         return toTripResponse(trip);
     }
 
@@ -330,33 +427,40 @@ public class FleetService {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /** Active vehicles that are not retired, as machines run by the hour (ADR-001 W4). */
-    @Transactional(readOnly = true)
-    public List<EquipmentResponse> listEquipment(TenantId tenantId) {
-        return vehicleRepository.findAllActive(tenantId, PageRequest.of(0, 500)).getContent().stream()
-                .filter(v -> v.getStatus() != VehicleStatus.RETIRED)
-                .map(FleetService::toEquipment)
-                .toList();
-    }
-
-    /** Sets the engine-hours meter and the operating rate per hour (service and repairs only). Either may be cleared with null. */
-    @Transactional
-    public EquipmentResponse updateEquipment(TenantId tenantId, UUID id, UpdateEquipmentRequest req) {
-        Vehicle vehicle = findActive(tenantId, id);
-        vehicle.updateEquipment(req.engineHours(), req.operatingRatePerHour());
-        vehicleRepository.save(vehicle);
-        log.info("Vehicle equipment updated vehicle={} engineHours={} ratePerHour={}", id, req.engineHours(), req.operatingRatePerHour());
-        return toEquipment(vehicle);
-    }
-
-    private static EquipmentResponse toEquipment(Vehicle v) {
-        return new EquipmentResponse(v.getId(), v.getRegistration(), v.getMake(), v.getModel(), v.getVehicleType(),
-                v.getStatus() == null ? null : v.getStatus().name(), v.getEngineHours(), v.getOperatingRatePerHour());
-    }
-
     private Vehicle findActive(TenantId tenantId, UUID id) {
         return vehicleRepository.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle", id.toString()));
+    }
+
+    /**
+     * Friendly pre-check; the partial unique indexes in the migration are the
+     * real guarantee against a concurrent duplicate.
+     */
+    private void assertIdentifiersUnique(TenantId tenantId, UUID excludeId,
+                                         String registration, String vin, String engineNumber) {
+        if (vehicleRepository.existsOtherWithRegistration(tenantId, registration, excludeId)) {
+            throw new IllegalArgumentException(
+                    "Vehicle with registration " + registration + " already exists");
+        }
+        if (vin != null && vehicleRepository.existsOtherWithVin(tenantId, vin, excludeId)) {
+            throw new IllegalArgumentException("Vehicle with VIN " + vin + " already exists");
+        }
+        if (engineNumber != null && vehicleRepository.existsOtherWithEngineNumber(tenantId, engineNumber, excludeId)) {
+            throw new IllegalArgumentException("Vehicle with engine number " + engineNumber + " already exists");
+        }
+    }
+
+    /** VIN / engine numbers are case-insensitive identifiers: trim, upper-case, blank → null. */
+    private String normaliseIdentifier(String raw) {
+        if (raw == null) return null;
+        String v = raw.trim().toUpperCase();
+        return v.isEmpty() ? null : v;
+    }
+
+    private String blankToNull(String raw) {
+        if (raw == null) return null;
+        String v = raw.trim();
+        return v.isEmpty() ? null : v;
     }
 
     private VehicleStatus parseStatus(String raw) {
@@ -377,7 +481,19 @@ public class FleetService {
                 v.getCurrentOdometer(), v.getLastServiceKm(), v.getServiceIntervalKm(),
                 v.isDueForService(), v.isLicenceExpiringSoon(), v.isRoadworthyExpiringSoon(),
                 v.getDailyRate(), v.getNotes(), v.getCreatedAt(),
-                v.getAssignedDriverName(), v.getAssignedDriverId()
+                v.getAssignedDriverName(), v.getAssignedDriverId(),
+                // NEW
+                v.getVin(), v.getEngineNumber(), v.getVariant(), v.getBodyType(),
+                v.getTransmission() != null ? v.getTransmission().name() : null,
+                v.getDriveType() != null ? v.getDriveType().name() : null,
+                v.getAxleCount(), v.getGvmKg(), v.getTareKg(), v.getPayloadKg(), v.getGcmKg(),
+                v.getEngineHours(), v.getTankCapacityLitres(),
+                v.getServiceIntervalDays(), v.getLastServiceDate(),
+                v.getPurchaseDate(),
+                v.getAcquisitionMethod() != null ? v.getAcquisitionMethod().name() : null,
+                v.getPurchasePrice(), v.getCurrentBookValue(), v.getCurrentEstimatedValue(),
+                v.getValuedAt(),
+                v.getLifecycleStatus().name()
         );
     }
 
@@ -409,7 +525,7 @@ public class FleetService {
                 t.getStartLocation(), t.getEndLocation(),
                 t.getStartOdometer(), t.getEndOdometer(), t.getDistanceKm(),
                 t.getStartAt(), t.getEndAt(), t.getFuelUsedLitres(),
-                t.getStatus(), t.getNotes(), t.getCreatedAt()
+                t.getStatus(), t.getNotes(), t.getCreatedAt(), t.getDriverId()
         );
     }
 
@@ -422,7 +538,7 @@ public class FleetService {
                 t.getStartLocation(), t.getEndLocation(),
                 t.getStartOdometer(), t.getEndOdometer(), t.getDistanceKm(),
                 t.getStartAt(), t.getEndAt(), t.getFuelUsedLitres(),
-                t.getStatus(), t.getNotes(), t.getCreatedAt()
+                t.getStatus(), t.getNotes(), t.getCreatedAt(), t.getDriverId()
         );
     }
 

@@ -31,6 +31,14 @@ public class Trip {
     @Column(name = "driver_name")
     private String driverName;
 
+    /**
+     * NEW (chunk 6): the real link to a Driver record. Nullable — historical trips and
+     * trips started with only a free-text driverName stay valid; they simply don't count
+     * towards any driver's score. Driver-score metrics key off this field, not the name.
+     */
+    @Column(name = "driver_id")
+    private UUID driverId;
+
     private String purpose;
 
     @Column(name = "trip_type", nullable = false)
@@ -73,8 +81,18 @@ public class Trip {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /** Original signature, kept so existing callers keep compiling — no driver link. */
     public static Trip create(TenantId tenantId, UUID vehicleId,
                               UUID guardId, String driverName,
+                              String purpose, String tripType,
+                              String startLocation,
+                              Integer startOdometer, Instant startAt) {
+        return create(tenantId, vehicleId, guardId, null, driverName, purpose, tripType,
+                startLocation, startOdometer, startAt);
+    }
+
+    public static Trip create(TenantId tenantId, UUID vehicleId,
+                              UUID guardId, UUID driverId, String driverName,
                               String purpose, String tripType,
                               String startLocation,
                               Integer startOdometer, Instant startAt) {
@@ -82,6 +100,7 @@ public class Trip {
         t.tenantId = tenantId;
         t.vehicleId = vehicleId;
         t.guardId = guardId;
+        t.driverId = driverId;
         t.driverName = driverName;
         t.purpose = purpose;
         t.tripType = tripType != null ? tripType : "BUSINESS";

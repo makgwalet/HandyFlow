@@ -80,12 +80,35 @@ public class FleetController {
 
     @PostMapping("/vehicles")
     @PreAuthorize("hasAuthority('FLEET_MANAGE')")
+    @Operation(summary = "Register a vehicle, including identity (VIN, engine number, mass ratings) and acquisition details")
     public ResponseEntity<ApiResponse<VehicleResponse>> createVehicle(
             @Valid @RequestBody CreateVehicleRequest request) {
         featureGuard.requireModule("fleet");
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Vehicle registered",
                         fleetService.createVehicle(TenantContext.getTenantIdAsObject(), request)));
+    }
+
+    @PutMapping("/vehicles/{id}")
+    @PreAuthorize("hasAuthority('FLEET_MANAGE')")
+    @Operation(summary = "Edit a vehicle's details and identity (full replace; status, odometer and driver have their own endpoints)")
+    public ResponseEntity<ApiResponse<VehicleResponse>> updateVehicle(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateVehicleRequest request) {
+        featureGuard.requireModule("fleet");
+        return ResponseEntity.ok(ApiResponse.success("Vehicle updated",
+                fleetService.updateVehicle(TenantContext.getTenantIdAsObject(), id, request)));
+    }
+
+    @PatchMapping("/vehicles/{id}/engine-hours")
+    @PreAuthorize("hasAuthority('FLEET_MANAGE')")
+    @Operation(summary = "Record an engine-hour meter reading (cannot be lower than the current reading)")
+    public ResponseEntity<ApiResponse<VehicleResponse>> updateEngineHours(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateEngineHoursRequest request) {
+        featureGuard.requireModule("fleet");
+        return ResponseEntity.ok(ApiResponse.success("Engine hours updated",
+                fleetService.updateEngineHours(TenantContext.getTenantIdAsObject(), id, request)));
     }
 
     @PatchMapping("/vehicles/{id}/status")
@@ -266,24 +289,5 @@ public class FleetController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Fuel logged",
                         fleetService.logFuel(TenantContext.getTenantIdAsObject(), id, request)));
-    }
-
-    // ---- Equipment costing (ADR-001 W4): the machine's meter and what an hour of use costs to keep running ----
-
-    @GetMapping("/equipment")
-    @PreAuthorize("hasAuthority('FLEET_READ')")
-    @Operation(summary = "Vehicles as machines run by the hour: engine-hours meter and operating rate per hour (service and repairs only)")
-    public ResponseEntity<ApiResponse<List<EquipmentResponse>>> getEquipment() {
-        featureGuard.requireModule("fleet");
-        return ResponseEntity.ok(ApiResponse.success(fleetService.listEquipment(TenantContext.getTenantIdAsObject())));
-    }
-
-    @PatchMapping("/vehicles/{id}/equipment")
-    @PreAuthorize("hasAuthority('FLEET_MANAGE')")
-    @Operation(summary = "Set the engine-hours meter and the operating rate per hour; a null clears it",
-            description = "The rate is service and repairs ONLY: never fuel (allocated from fuel dispatches) and never depreciation.")
-    public ResponseEntity<ApiResponse<EquipmentResponse>> updateEquipment(@PathVariable UUID id, @RequestBody UpdateEquipmentRequest request) {
-        featureGuard.requireModule("fleet");
-        return ResponseEntity.ok(ApiResponse.success("Equipment updated", fleetService.updateEquipment(TenantContext.getTenantIdAsObject(), id, request)));
     }
 }

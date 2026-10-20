@@ -37,7 +37,64 @@ public class Vehicle {
 
     private Integer year;
     private String colour;
+
+    /** VIN / chassis number. Unique per tenant among live (non-deleted) vehicles. */
     private String vin;
+
+    // ── NEW: identity ────────────────────────────────────────────────────
+
+    /** Engine number as stamped on the block / shown on the registration certificate. Unique per tenant. */
+    @Column(name = "engine_number", length = 50)
+    private String engineNumber;
+
+    @Column(length = 100)
+    private String variant;
+
+    @Column(name = "body_type", length = 50)
+    private String bodyType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private Transmission transmission;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "drive_type", length = 20)
+    private DriveType driveType;
+
+    @Column(name = "axle_count")
+    private Integer axleCount;
+
+    /** Gross vehicle mass, kg. */
+    @Column(name = "gvm_kg")
+    private Integer gvmKg;
+
+    /** Unladen mass, kg. */
+    @Column(name = "tare_kg")
+    private Integer tareKg;
+
+    @Column(name = "payload_kg")
+    private Integer payloadKg;
+
+    /** Gross combination mass (vehicle + trailer), kg. */
+    @Column(name = "gcm_kg")
+    private Integer gcmKg;
+
+    @Column(name = "engine_hours", nullable = false, precision = 10, scale = 1)
+    private BigDecimal engineHours = BigDecimal.ZERO;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "acquisition_method", length = 20)
+    private AcquisitionMethod acquisitionMethod;
+
+    @Column(name = "current_book_value", precision = 15, scale = 2)
+    private BigDecimal currentBookValue;
+
+    @Column(name = "current_estimated_value", precision = 15, scale = 2)
+    private BigDecimal currentEstimatedValue;
+
+    /** Date the book / estimated values above were assessed — a value without a date is meaningless. */
+    @Column(name = "valued_at")
+    private LocalDate valuedAt;
 
     @Column(name = "vehicle_type", nullable = false)
     private String vehicleType;
@@ -48,6 +105,14 @@ public class Vehicle {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private VehicleStatus status = VehicleStatus.AVAILABLE;
+
+    /**
+     * NEW (chunk 5): lifecycle of the vehicle as an asset (ACTIVE, STOLEN, SOLD, WRITTEN_OFF, ...),
+     * kept beside — not replacing — the operational {@link #status}. See VehicleLifecycleStatus.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "lifecycle_status", nullable = false, length = 20)
+    private VehicleLifecycleStatus lifecycleStatus = VehicleLifecycleStatus.ACTIVE;
 
     @Column(name = "fuel_type", nullable = false)
     private String fuelType = "DIESEL";
@@ -99,22 +164,12 @@ public class Vehicle {
 
     private String notes;
 
+    /** Doubles as the "acquisition date" in the API. */
     @Column(name = "purchase_date")
     private LocalDate purchaseDate;
 
     @Column(name = "purchase_price", precision = 15, scale = 2)
     private BigDecimal purchasePrice;
-
-    /** Engine-hours meter reading, for machines run by hours (tractors, harvesters). Null until recorded. */
-    @Column(name = "engine_hours", precision = 10, scale = 1)
-    private BigDecimal engineHours;
-
-    /**
-     * What one hour of use costs to keep the machine running: service and repairs ONLY. Not fuel (allocated from fuel dispatches) and not
-     * depreciation, so equipment costing never counts either twice. Null until set; Agriculture will not cost the machine's use without it.
-     */
-    @Column(name = "operating_rate_per_hour", precision = 12, scale = 4)
-    private BigDecimal operatingRatePerHour;
 
     @Column(name = "photo_url")
     private String photoUrl;
@@ -135,6 +190,8 @@ public class Vehicle {
     private Long version;
 
     // ── Factory ───────────────────────────────────────────────────────────
+    // Signature deliberately unchanged so existing callers/tests keep compiling.
+    // The new identity fields are applied afterwards via updateIdentity().
 
     public static Vehicle create(TenantId tenantId,
                                  String registration,
@@ -170,11 +227,131 @@ public class Vehicle {
         v.assignedDriverName = assignedDriverName;
         v.notes = notes;
         v.status = VehicleStatus.AVAILABLE;
+        v.lifecycleStatus = VehicleLifecycleStatus.ACTIVE;
         v.currentOdometer = 0;
         v.lastServiceKm = 0;
+        v.engineHours = BigDecimal.ZERO;
         v.createdAt = Instant.now();
         v.updatedAt = Instant.now();
         return v;
+    }
+
+    // ── Details / identity ───────────────────────────────────────────────
+
+    /** Edits the descriptive and compliance-date fields. Status, odometer and driver have their own paths. */
+    public void updateDetails(String registration, String make, String model, Integer year,
+                              String colour, String vehicleType, String fuelType,
+                              LocalDate licenceDiscExpiry, LocalDate roadworthyExpiry,
+                              LocalDate insuranceExpiry, BigDecimal dailyRate,
+                              BigDecimal tankCapacityLitres, Integer serviceIntervalKm,
+                              Integer serviceIntervalDays, String notes) {
+        this.registration = registration.toUpperCase().trim();
+        this.make = make;
+        this.model = model;
+        this.year = year;
+        this.colour = colour;
+        this.vehicleType = vehicleType;
+        this.fuelType = fuelType != null ? fuelType : this.fuelType;
+        this.licenceDiscExpiry = licenceDiscExpiry;
+        this.roadworthyExpiry = roadworthyExpiry;
+        this.insuranceExpiry = insuranceExpiry;
+        this.dailyRate = dailyRate;
+        this.tankCapacityLitres = tankCapacityLitres;
+        if (serviceIntervalKm != null) this.serviceIntervalKm = serviceIntervalKm;
+        this.serviceIntervalDays = serviceIntervalDays;
+        this.notes = notes;
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * Sets the vehicle identity, mass ratings, acquisition and valuation fields in one go.
+     * Full-replace semantics: a null clears the field (except payload, which is derived).
+     * <p>
+     * Mass rules mirror the DB CHECK constraints so callers get a clean 400 rather
+     * than a constraint-violation 500: tare cannot exceed GVM, and GVM cannot exceed
+     * GCM. When payload isn't supplied it is derived as GVM − tare.
+     */
+    public void updateIdentity(String vin, String engineNumber, String variant, String bodyType,
+                               Transmission transmission, DriveType driveType, Integer axleCount,
+                               Integer gvmKg, Integer tareKg, Integer payloadKg, Integer gcmKg,
+                               LocalDate acquisitionDate, AcquisitionMethod acquisitionMethod,
+                               BigDecimal purchasePrice, BigDecimal currentBookValue,
+                               BigDecimal currentEstimatedValue, LocalDate valuedAt) {
+        if (gvmKg != null && tareKg != null && tareKg > gvmKg) {
+            throw new IllegalArgumentException(
+                    "Tare mass (" + tareKg + " kg) cannot exceed GVM (" + gvmKg + " kg)");
+        }
+        if (gvmKg != null && gcmKg != null && gvmKg > gcmKg) {
+            throw new IllegalArgumentException(
+                    "GVM (" + gvmKg + " kg) cannot exceed gross combination mass (" + gcmKg + " kg)");
+        }
+
+        this.vin = vin;
+        this.engineNumber = engineNumber;
+        this.variant = variant;
+        this.bodyType = bodyType;
+        this.transmission = transmission;
+        this.driveType = driveType;
+        this.axleCount = axleCount;
+        this.gvmKg = gvmKg;
+        this.tareKg = tareKg;
+        this.payloadKg = payloadKg != null ? payloadKg
+                : (gvmKg != null && tareKg != null ? gvmKg - tareKg : null);
+        this.gcmKg = gcmKg;
+        this.purchaseDate = acquisitionDate;
+        this.acquisitionMethod = acquisitionMethod;
+        this.purchasePrice = purchasePrice;
+        this.currentBookValue = currentBookValue;
+        this.currentEstimatedValue = currentEstimatedValue;
+        this.valuedAt = valuedAt;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Same floor guard as {@link #updateOdometer(int)} — hour meters only count up. */
+    public void updateEngineHours(BigDecimal newHours) {
+        if (newHours.compareTo(this.engineHours) < 0) {
+            throw new IllegalArgumentException(
+                    "New engine hours (" + newHours + ") cannot be lower than the current reading ("
+                            + engineHours + "). Hour meters only count up.");
+        }
+        this.engineHours = newHours;
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * NEW (chunk 2): keeps the vehicle's own expiry fields — the ones
+     * FleetNotificationScheduler and the list-view "expiring soon" flags read — in step
+     * with the document vault and insurance profile. Types that don't map to a vehicle
+     * expiry field are ignored. Pass null to clear (e.g. vehicle recorded as uninsured).
+     */
+    public void syncComplianceExpiry(VehicleDocumentType type, LocalDate expiry) {
+        switch (type) {
+            case LICENCE_DISC -> this.licenceDiscExpiry = expiry;
+            case ROADWORTHY   -> this.roadworthyExpiry = expiry;
+            case INSURANCE    -> this.insuranceExpiry = expiry;
+            default           -> { return; }
+        }
+        this.updatedAt = Instant.now();
+    }
+
+    // ── Lifecycle (chunk 5) ──────────────────────────────────────────────
+
+    /**
+     * Moves the vehicle through its asset lifecycle. Illegal moves throw
+     * {@link InvalidLifecycleTransitionException} (HTTP 409). Moving out of the fleet
+     * (sold, transferred, written off, retired, disposed) also sets the operational status
+     * to RETIRED, bypassing the operational transition table on purpose — the asset is gone,
+     * whatever it was doing. Callers must make sure the vehicle is not mid-trip first.
+     */
+    public void changeLifecycleStatus(VehicleLifecycleStatus target) {
+        if (!lifecycleStatus.canTransitionTo(target)) {
+            throw new InvalidLifecycleTransitionException(lifecycleStatus, target);
+        }
+        this.lifecycleStatus = target;
+        if (target.isOutOfFleet()) {
+            this.status = VehicleStatus.RETIRED;
+        }
+        this.updatedAt = Instant.now();
     }
 
     // ── State transitions ────────────────────────────────────────────────
@@ -186,20 +363,12 @@ public class Vehicle {
             throw new InvalidVehicleStatusTransitionException(status, target);
         }
         this.status = target;
-        this.updatedAt = Instant.now();
-    }
-
-    /**
-     * Sets the engine-hours meter and the operating rate per hour (either may be cleared with null). A new method, so nothing that already
-     * creates or updates a vehicle changes.
-     *
-     * @throws IllegalArgumentException when either is negative
-     */
-    public void updateEquipment(BigDecimal engineHours, BigDecimal operatingRatePerHour) {
-        if (engineHours != null && engineHours.signum() < 0) throw new IllegalArgumentException("engine hours cannot be negative");
-        if (operatingRatePerHour != null && operatingRatePerHour.signum() < 0) throw new IllegalArgumentException("operating rate per hour cannot be negative");
-        this.engineHours = engineHours;
-        this.operatingRatePerHour = operatingRatePerHour;
+        // Retiring a vehicle through the operational status keeps the lifecycle consistent.
+        // Other lifecycle states (stolen, sold, written off, ...) are left alone.
+        if (target == VehicleStatus.RETIRED
+                && (lifecycleStatus == VehicleLifecycleStatus.ACTIVE || lifecycleStatus == VehicleLifecycleStatus.ACQUIRED)) {
+            this.lifecycleStatus = VehicleLifecycleStatus.RETIRED;
+        }
         this.updatedAt = Instant.now();
     }
 

@@ -7,6 +7,10 @@ import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.fleet.domain.model.FuelFillup;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,4 +31,25 @@ public interface FuelFillupRepository extends JpaRepository<FuelFillup, UUID> {
      * UNIQUE constraint on source_fuel_dispatch_id would catch it anyway.
      */
     Optional<FuelFillup> findBySourceFuelDispatchId(UUID sourceFuelDispatchId);
+
+    // ── NEW (chunk 7c): fuel analytics inputs ────────────────────────────
+
+    /** One vehicle's fill-ups from {@code since}, oldest first — the order the consumption method needs. */
+    @Query("SELECT f FROM FuelFillup f WHERE f.vehicleId = :vehicleId AND f.filledAt >= :since " +
+            "ORDER BY f.filledAt ASC, f.odometerAtFillup ASC, f.createdAt ASC")
+    List<FuelFillup> findByVehicleSinceOrdered(UUID vehicleId, LocalDate since);
+
+    /** Every fill-up in the tenant in [from, to], oldest first. The tenant id is the raw UUID, as stored on FuelFillup. */
+    @Query("SELECT f FROM FuelFillup f WHERE f.tenantId = :tenantId AND f.filledAt >= :from AND f.filledAt <= :to " +
+            "ORDER BY f.filledAt ASC, f.odometerAtFillup ASC, f.createdAt ASC")
+    List<FuelFillup> findByTenantInRange(UUID tenantId, LocalDate from, LocalDate to);
+
+    /** Fill-ups in the tenant carrying any of these (upper-cased, trimmed) receipt references — for duplicate-receipt checks. */
+    @Query("SELECT f FROM FuelFillup f WHERE f.tenantId = :tenantId AND f.receiptRef IS NOT NULL " +
+            "AND UPPER(TRIM(f.receiptRef)) IN :receiptRefs")
+    List<FuelFillup> findByTenantAndReceiptRefs(UUID tenantId, Collection<String> receiptRefs);
+
+    /** Cross-tenant, for the daily anomaly sweep only: fill-ups recorded since {@code since}. */
+    @Query("SELECT f FROM FuelFillup f WHERE f.createdAt >= :since")
+    List<FuelFillup> findCreatedSince(Instant since);
 }

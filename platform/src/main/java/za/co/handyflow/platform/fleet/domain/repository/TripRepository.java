@@ -10,6 +10,7 @@ import za.co.handyflow.platform.fleet.domain.model.Trip;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,4 +45,29 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
     @Query("SELECT COALESCE(SUM(t.endOdometer - t.startOdometer), 0) FROM Trip t " +
             "WHERE t.vehicleId = :vehicleId AND t.status = 'COMPLETED'")
     int sumDistanceKmByVehicle(UUID vehicleId);
+
+    // ── NEW (chunk 6): driver score inputs ───────────────────────────────
+
+    /** A driver's non-cancelled trips that started in [from, to). */
+    @Query("SELECT t FROM Trip t WHERE t.tenantId = :tenantId AND t.driverId = :driverId " +
+            "AND t.status <> 'CANCELLED' AND t.startAt >= :from AND t.startAt < :to ORDER BY t.startAt")
+    List<Trip> findByDriverInRange(TenantId tenantId, UUID driverId, Instant from, Instant to);
+
+    /** Every non-cancelled trip in the tenant that started in [from, to) — for the fleet-wide leaderboard. */
+    @Query("SELECT t FROM Trip t WHERE t.tenantId = :tenantId AND t.status <> 'CANCELLED' " +
+            "AND t.startAt >= :from AND t.startAt < :to ORDER BY t.startAt")
+    List<Trip> findByTenantInRange(TenantId tenantId, Instant from, Instant to);
+
+    /** Completed trips with fuel data on the given vehicles — the basis for each vehicle's fuel-economy norm. */
+    @Query("SELECT t FROM Trip t WHERE t.tenantId = :tenantId AND t.vehicleId IN :vehicleIds " +
+            "AND t.status = 'COMPLETED' AND t.fuelUsedLitres IS NOT NULL AND t.endOdometer IS NOT NULL " +
+            "AND t.startAt >= :from AND t.startAt < :to")
+    List<Trip> findFuelBaselineTrips(TenantId tenantId, Collection<UUID> vehicleIds, Instant from, Instant to);
+
+    // ── NEW (chunk 7d): who was driving when a telematics event happened ───
+
+    /** Non-cancelled trips on the vehicle that were under way at {@code at}, most recent first. Callers use the first. */
+    @Query("SELECT t FROM Trip t WHERE t.vehicleId = :vehicleId AND t.status <> 'CANCELLED' " +
+            "AND t.startAt <= :at AND (t.endAt IS NULL OR t.endAt >= :at) ORDER BY t.startAt DESC")
+    List<Trip> findTripsAt(UUID vehicleId, Instant at);
 }

@@ -41,4 +41,21 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
     // everything else in this repository.
     @Query("SELECT v FROM Vehicle v WHERE v.deletedAt IS NULL AND v.status <> :excludedStatus")
     List<Vehicle> findAllActiveExcludingStatus(VehicleStatus excludedStatus);
+
+    // ── NEW: uniqueness checks that exclude the vehicle being edited ─────────
+    // On create, callers pass a fresh random UUID as excludeId (matches nothing),
+    // which avoids a nullable-UUID parameter, a known source of "could not
+    // determine data type" errors on PostgreSQL.
+
+    @Query("SELECT COUNT(v) > 0 FROM Vehicle v WHERE v.tenantId = :tenantId AND v.registration = :registration " +
+            "AND v.id <> :excludeId AND v.deletedAt IS NULL")
+    boolean existsOtherWithRegistration(TenantId tenantId, String registration, UUID excludeId);
+
+    @Query("SELECT COUNT(v) > 0 FROM Vehicle v WHERE v.tenantId = :tenantId AND v.vin = :vin " +
+            "AND v.id <> :excludeId AND v.deletedAt IS NULL")
+    boolean existsOtherWithVin(TenantId tenantId, String vin, UUID excludeId);
+
+    @Query("SELECT COUNT(v) > 0 FROM Vehicle v WHERE v.tenantId = :tenantId AND v.engineNumber = :engineNumber " +
+            "AND v.id <> :excludeId AND v.deletedAt IS NULL")
+    boolean existsOtherWithEngineNumber(TenantId tenantId, String engineNumber, UUID excludeId);
 }
