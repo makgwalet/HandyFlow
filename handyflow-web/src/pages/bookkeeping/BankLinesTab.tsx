@@ -49,7 +49,9 @@ function Bank({ clientId }: { clientId: string }) {
   const refresh = () => { for (const k of ["bk-tx", "bk-suggestions", "bk-banks", "bk-work-queue"]) qc.invalidateQueries({ queryKey: [k] }) }
   const fail = (e: any) => { setMessage(null); setError(errorOf(e)) }
 
-  const picked = suggestions.filter(s => !skipped.has(s.transactionId))
+  // Only lines a rule recognised can be categorised in bulk (older servers also returned lines no rule fits).
+  const matched = suggestions.filter(s => !!s.contraAccountId)
+  const picked = matched.filter(s => !skipped.has(s.transactionId))
   const categorise = useMutation({
     mutationFn: async () => {
       let done = 0
@@ -59,7 +61,9 @@ function Bank({ clientId }: { clientId: string }) {
       }
       return done
     },
-    onSuccess: n => { setError(null); setMessage(`${n} ${n === 1 ? "line" : "lines"} categorised.`); setSkipped(new Set()); refresh() }, onError: fail,
+    onSuccess: n => { setError(null); setMessage(`${n} ${n === 1 ? "line" : "lines"} categorised.`); setSkipped(new Set()); refresh() },
+    // An earlier batch may already have been booked, so reload the list or the same lines would be sent again.
+    onError: e => { fail(e); refresh() },
   })
   const doImport = useMutation({
     mutationFn: async (file: File) => (await apiClient.post(`${base}/bank-transactions/import`, { bankAccountId: selected, csvBase64: await readFile(file) })),
@@ -75,12 +79,12 @@ function Bank({ clientId }: { clientId: string }) {
       {message && <div role="status" style={{ ...card, fontSize: 13 }}>{message}</div>}
       {error && <div role="alert" style={{ ...danger, marginBottom: 10 }}>{error}</div>}
 
-      {canManage && suggestions.length > 0 && (
+      {canManage && matched.length > 0 && (
         <div style={card}>
-          <h3 style={{ marginTop: 0 }}>Your rules recognise {suggestions.length} {suggestions.length === 1 ? "line" : "lines"}</h3>
+          <h3 style={{ marginTop: 0 }}>Your rules recognise {matched.length} {matched.length === 1 ? "line" : "lines"}</h3>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead><tr><th /><th style={th}>Date</th><th style={th}>Description</th><th style={{ ...th, ...right }}>Amount</th><th style={th}>Rule</th><th style={th}>Book to</th></tr></thead>
-            <tbody>{suggestions.map(s => (
+            <tbody>{matched.map(s => (
               <tr key={s.transactionId} style={{ borderTop: "1px solid var(--hf-border)" }}>
                 <td style={td}><input type="checkbox" aria-label={`Include ${s.description}`} checked={!skipped.has(s.transactionId)}
                   onChange={() => setSkipped(p => { const n = new Set(p); n.has(s.transactionId) ? n.delete(s.transactionId) : n.add(s.transactionId); return n })} /></td>

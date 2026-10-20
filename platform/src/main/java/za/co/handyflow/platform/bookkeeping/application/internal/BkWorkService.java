@@ -75,7 +75,13 @@ public class BkWorkService {
         return rules(tenantId, clientId);
     }
 
-    /** Uncategorised lines with the account the first matching rule would book them to (null when no rule fits). */
+    /** Most matched lines returned in one go; run again after categorising for the rest. */
+    static final int MAX_SUGGESTIONS = 1000;
+
+    /**
+     * Uncategorised lines that a rule recognises, with the account the first matching rule would book them to. Lines no rule
+     * fits are left out: they cannot be categorised in bulk, and sending them made the whole batch fail with "Every line needs an account".
+     */
     @Transactional(readOnly = true)
     public List<Suggestion> suggestions(TenantId tenantId, UUID clientId, UUID bankAccountId) {
         List<Rule> rules = jdbc.query("""
@@ -88,12 +94,14 @@ public class BkWorkService {
         jdbc.query("""
                 SELECT id, transaction_date, description, reference, amount, transaction_type, bank_account_id FROM bk_bank_transactions
                  WHERE tenant_id = ? AND client_id = ? AND NOT reconciled AND (?::uuid IS NULL OR bank_account_id = ?::uuid)
-                 ORDER BY transaction_date, created_at LIMIT 500""",
+                 ORDER BY transaction_date, created_at""",
                 rs -> {
+                    if (out.size() >= MAX_SUGGESTIONS) return;
                     Line line = new Line(rs.getObject(7, UUID.class), rs.getString(6), rs.getString(3), rs.getString(4), rs.getBigDecimal(5));
                     Rule hit = BkWorkRules.firstMatch(rules, line);
+                    if (hit == null || hit.contraAccountId() == null) return;
                     out.add(new Suggestion(rs.getObject(1, UUID.class), rs.getDate(2).toLocalDate(), rs.getString(3), rs.getBigDecimal(5),
-                            rs.getString(6), hit == null ? null : hit.id(), hit == null ? null : hit.name(), hit == null ? null : hit.contraAccountId()));
+                            rs.getString(6), hit.id(), hit.name(), hit.contraAccountId()));
                 }, tenantId.getValue(), clientId, bankAccountId, bankAccountId);
         return out;
     }

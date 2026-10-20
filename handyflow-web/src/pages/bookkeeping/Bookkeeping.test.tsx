@@ -119,6 +119,25 @@ describe("BankLinesTab", () => {
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/bookkeeping/clients/c1/bank-transactions/categorise", { items: [{ transactionId: "t1", contraAccountId: "a1" }] }))
     await screen.findByText("1 line categorised.")
   })
+  it("never sends a line that no rule recognised", async () => {
+    const plain = { transactionId: "t9", date: "2026-10-04", description: "UNKNOWN PAYEE", amount: 10, type: "DEBIT", ruleId: null, ruleName: null, contraAccountId: null }
+    get.mockImplementation(((orig: any) => (url: string) => url.includes("/suggestions") ? ok([...suggestions, plain]) : orig(url))(get.getMockImplementation()))
+    post.mockResolvedValueOnce({ data: { data: { done: 2 } } })
+    show(<BankLinesTab />)
+    await screen.findByText(/Your rules recognise 2 lines/)
+    fireEvent.click(screen.getByText("Categorise 2 lines"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/bookkeeping/clients/c1/bank-transactions/categorise",
+      { items: [{ transactionId: "t1", contraAccountId: "a1" }, { transactionId: "t3", contraAccountId: "a1" }] }))
+  })
+  it("reloads the list when a batch fails so booked lines are not sent again", async () => {
+    post.mockRejectedValueOnce({ response: { data: { message: "Line 1 of 2 could not be categorised, so none were: period locked" } } })
+    show(<BankLinesTab />)
+    await screen.findByText(/Your rules recognise 2 lines/)
+    const before = get.mock.calls.filter(c => String(c[0]).includes("/suggestions")).length
+    fireEvent.click(screen.getByText("Categorise 2 lines"))
+    await screen.findByRole("alert")
+    await waitFor(() => expect(get.mock.calls.filter(c => String(c[0]).includes("/suggestions")).length).toBeGreaterThan(before))
+  })
   it("books one line to an account", async () => {
     show(<BankLinesTab />)
     await screen.findByText("Book to account")
