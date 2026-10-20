@@ -165,8 +165,7 @@ public class InspectionService {
         }
 
         String contentType = uploads.validate(file, FleetUploadSupport.IMAGE_TYPES, MAX_PHOTO_BYTES);
-        String key = storageKey(tenantId, inspection) + UUID.randomUUID();
-        uploads.store(key, file, contentType);
+        String key = uploads.store(storageKey(tenantId, inspection) + "photos", file, contentType);
 
         InspectionPhoto photo = InspectionPhoto.create(tenantId, inspectionId, resultId,
                 uploads.sanitiseFileName(file.getOriginalFilename()), contentType, file.getSize(),
@@ -192,8 +191,7 @@ public class InspectionService {
             throw new IllegalArgumentException("The signer's name is required");
         }
         String contentType = uploads.validate(file, FleetUploadSupport.SIGNATURE_TYPES, MAX_SIGNATURE_BYTES);
-        String key = storageKey(tenantId, inspection) + "signature-" + UUID.randomUUID();
-        uploads.store(key, file, contentType);
+        String key = uploads.store(storageKey(tenantId, inspection) + "signature", file, contentType);
 
         inspection.attachSignature(key, contentType, signerName.trim());
         inspectionRepository.save(inspection);

@@ -6,17 +6,17 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
-import za.co.handyflow.platform.fleet.application.storage.FleetFileStorage;
+import za.co.handyflow.platform.shared.FileStorageService;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Set;
 
 /**
  * Shared upload handling for Fleet features: type + size + magic-byte validation,
- * display-name sanitising, and storing a file with automatic clean-up if the
- * surrounding transaction rolls back. (VehicleDocumentService from the documents chunk
- * has its own private copy of the same checks and can be moved onto this helper later.)
+ * display-name sanitising, and storing a file (through the shared FileStorageService) with
+ * automatic clean-up if the surrounding transaction rolls back.
  */
 @Slf4j
 @Component
@@ -26,7 +26,7 @@ public class FleetUploadSupport {
     public static final Set<String> IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
     public static final Set<String> SIGNATURE_TYPES = Set.of("image/png", "image/jpeg");
 
-    private final FleetFileStorage storage;
+    private final FileStorageService storage;
 
     /** Returns the normalised content type, or throws IllegalArgumentException. */
     public String validate(MultipartFile file, Set<String> allowedTypes, long maxBytes) {
@@ -53,10 +53,17 @@ public class FleetUploadSupport {
         return contentType;
     }
 
-    /** Stores the file and registers removal of it should the current transaction not commit. */
-    public void store(String key, MultipartFile file, String contentType) {
-        try (InputStream in = file.getInputStream()) {
-            storage.store(key, in, file.getSize(), contentType);
+    /**
+     * Stores the file through the shared {@link FileStorageService} and returns the opaque key to
+     * keep on the owning row. If the surrounding transaction does not commit, the stored bytes are
+     * removed again. {@code pathPrefix} is a logical grouping such as
+     * {@code fleet/<tenantId>/<vehicleId>/inspections/<id>}; it is never built from user input.
+     */
+    public String store(String pathPrefix, MultipartFile file, String contentType) {
+        String prefix = pathPrefix.replaceAll("/+$", "");
+        final String key;
+        try {
+            key = storage.store(prefix, sanitiseFileName(file.getOriginalFilename()), contentType, file.getBytes());
         } catch (IOException e) {
             throw new IllegalStateException("Failed to store uploaded file", e);
         }
@@ -74,13 +81,24 @@ public class FleetUploadSupport {
                 }
             });
         }
+        return key;
     }
 
+    /** Caller must close the stream. */
     public InputStream open(String key) {
         try {
-            return storage.open(key);
+            return new ByteArrayInputStream(storage.retrieve(key));
         } catch (IOException e) {
             throw new IllegalStateException("Stored file could not be read", e);
+        }
+    }
+
+    /** Best-effort removal of a stored file; never throws. */
+    public void deleteQuietly(String key) {
+        try {
+            storage.delete(key);
+        } catch (IOException | RuntimeException e) {
+            log.warn("Could not delete fleet file key={}", key, e);
         }
     }
 
@@ -101,6 +119,8 @@ public class FleetUploadSupport {
             case "image/png" -> (h[0] & 0xFF) == 0x89 && h[1] == 'P' && h[2] == 'N' && h[3] == 'G';
             case "image/webp" -> len >= 12 && h[0] == 'R' && h[1] == 'I' && h[2] == 'F' && h[3] == 'F'
                     && h[8] == 'W' && h[9] == 'E' && h[10] == 'B' && h[11] == 'P';
+            case "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ->
+                    h[0] == 'P' && h[1] == 'K' && h[2] == 3 && h[3] == 4;
             default -> false;
         };
     }

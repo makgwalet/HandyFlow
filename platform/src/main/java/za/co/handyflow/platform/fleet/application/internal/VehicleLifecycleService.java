@@ -321,8 +321,7 @@ public class VehicleLifecycleService {
             throw new IllegalArgumentException("An event can have at most " + MAX_EVIDENCE_PER_EVENT + " evidence files");
         }
         String contentType = uploads.validate(file, EVIDENCE_TYPES, MAX_EVIDENCE_BYTES);
-        String key = "fleet/" + tenantId.getValue() + "/" + vehicleId + "/lifecycle/" + eventId + "/" + UUID.randomUUID();
-        uploads.store(key, file, contentType);
+        String key = uploads.store("fleet/" + tenantId.getValue() + "/" + vehicleId + "/lifecycle/" + eventId, file, contentType);
 
         LifecycleEvidence ev = LifecycleEvidence.create(tenantId, vehicleId, eventId, type,
                 truncate(blankToNull(description), 500), uploads.sanitiseFileName(file.getOriginalFilename()),

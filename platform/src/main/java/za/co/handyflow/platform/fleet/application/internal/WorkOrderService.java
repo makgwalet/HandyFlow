@@ -386,8 +386,7 @@ public class WorkOrderService {
             throw new IllegalArgumentException("A work order can have at most " + MAX_ATTACHMENTS_PER_ORDER + " attachments");
         }
         String contentType = uploads.validate(file, ATTACHMENT_TYPES, MAX_ATTACHMENT_BYTES);
-        String key = "fleet/" + tenantId.getValue() + "/" + wo.getVehicleId() + "/workshop/" + id + "/" + UUID.randomUUID();
-        uploads.store(key, file, contentType);
+        String key = uploads.store("fleet/" + tenantId.getValue() + "/" + wo.getVehicleId() + "/workshop/" + id, file, contentType);
 
         WorkOrderAttachment a = WorkOrderAttachment.create(tenantId, id, type,
                 truncate(blankToNull(description), 500), uploads.sanitiseFileName(file.getOriginalFilename()),

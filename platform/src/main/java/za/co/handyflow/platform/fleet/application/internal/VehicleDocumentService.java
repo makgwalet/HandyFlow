@@ -4,10 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
-import za.co.handyflow.platform.fleet.application.storage.FleetFileStorage;
 import za.co.handyflow.platform.fleet.domain.model.Vehicle;
 import za.co.handyflow.platform.fleet.domain.model.VehicleDocument;
 import za.co.handyflow.platform.fleet.domain.model.VehicleDocumentStatus;
@@ -49,7 +46,7 @@ public class VehicleDocumentService {
 
     private final VehicleRepository vehicleRepository;
     private final VehicleDocumentRepository documentRepository;
-    private final FleetFileStorage storage;
+    private final FleetUploadSupport uploads;
 
     public record DocumentDownload(String fileName, String contentType, long sizeBytes, InputStream stream) {}
 
@@ -70,13 +67,7 @@ public class VehicleDocumentService {
             throw new IllegalArgumentException("An expiry date is required for " + type + " documents");
         }
 
-        String key = "fleet/" + tenantId.getValue() + "/" + vehicleId + "/" + UUID.randomUUID();
-        try (InputStream in = file.getInputStream()) {
-            storage.store(key, in, file.getSize(), contentType);
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to store document file", e);
-        }
-        deleteStoredFileIfTransactionFails(key);
+        String key = uploads.store("fleet/" + tenantId.getValue() + "/" + vehicleId + "/documents", file, contentType);
 
         int version = documentRepository.findMaxVersion(tenantId, vehicleId, type) + 1;
         if (type.isSingleton()) {
@@ -127,12 +118,8 @@ public class VehicleDocumentService {
     @Transactional(readOnly = true)
     public DocumentDownload download(TenantId tenantId, UUID vehicleId, UUID documentId) {
         VehicleDocument doc = findDocument(tenantId, vehicleId, documentId);
-        try {
-            return new DocumentDownload(doc.getFileName(), doc.getContentType(),
-                    doc.getSizeBytes(), storage.open(doc.getStorageKey()));
-        } catch (IOException e) {
-            throw new IllegalStateException("Stored file for document " + documentId + " could not be read", e);
-        }
+        return new DocumentDownload(doc.getFileName(), doc.getContentType(),
+                doc.getSizeBytes(), uploads.open(doc.getStorageKey()));
     }
 
     // ── Delete ───────────────────────────────────────────────────────────
@@ -210,23 +197,6 @@ public class VehicleDocumentService {
         name = name.substring(name.lastIndexOf('/') + 1).replaceAll("[^A-Za-z0-9._ -]", "_").trim();
         if (name.length() > 200) name = name.substring(name.length() - 200);
         return name.isEmpty() ? "document" : name;
-    }
-
-    /** If the surrounding transaction rolls back after the file was stored, remove the orphaned file. */
-    private void deleteStoredFileIfTransactionFails(String key) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) return;
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCompletion(int status) {
-                if (status != STATUS_COMMITTED) {
-                    try {
-                        storage.delete(key);
-                    } catch (IOException e) {
-                        log.warn("Could not clean up orphaned fleet document file key={}", key, e);
-                    }
-                }
-            }
-        });
     }
 
     private String blankToNull(String s) {

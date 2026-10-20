@@ -55,7 +55,7 @@ class MigrationVersionsTest {
         StringBuilder all = new StringBuilder();
         for (Path p : files()) all.append(Files.readString(p)).append('\n');
         String sql = all.toString().toLowerCase(Locale.ROOT);
-        for (String table : List.of("fleet_asset_profiles", "fleet_asset_attachments", "fleet_attachment_assignments", "fleet_asset_meter_readings", "fleet_accidents")) {
+        for (String table : List.of("fleet_asset_profiles", "fleet_asset_attachments", "fleet_attachment_assignments", "fleet_asset_meter_readings", "fleet_accidents", "fleet_accident_counters", "fleet_accident_evidence")) {
             assertTrue(sql.contains("create table if not exists " + table) || sql.contains("create table " + table), "No migration creates " + table);
         }
     }

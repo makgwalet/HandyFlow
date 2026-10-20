@@ -1,0 +1,52 @@
+package za.co.handyflow.platform.fleet.dto;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.UUID;
+
+public record AccidentResponse(
+        UUID id,
+        String referenceNumber,
+        UUID vehicleId,
+        String registration,
+        UUID driverId,
+        String driverName,
+        UUID tripId,
+        Instant occurredAt,
+        String location,
+        String weather,
+        String roadCondition,
+        String otherVehicleRegistration,
+        String otherDriverName,
+        String otherDriverContact,
+        String otherInsurer,
+        String policeCaseNumber,
+        String sapsStation,
+        String policeReference,
+        String description,
+        String witnesses,
+        int injuriesCount,
+        int fatalitiesCount,
+        BigDecimal estimatedDamage,
+        BigDecimal thirdPartyDamage,
+        boolean vehicleDrivable,
+        String status,
+        String resolutionNote,
+        Instant closedAt,
+        String claimStatus,
+        String claimInsurer,
+        String claimNumber,
+        BigDecimal claimExcess,
+        String assessorName,
+        LocalDate assessmentDate,
+        LocalDate claimSubmittedAt,
+        BigDecimal claimSettlementAmount,
+        LocalDate claimSettledAt,
+        String repairer,
+        BigDecimal repairCost,
+        LocalDate returnedToServiceAt,
+        long evidenceCount,
+        Instant createdAt,
+        Instant updatedAt
+) {}

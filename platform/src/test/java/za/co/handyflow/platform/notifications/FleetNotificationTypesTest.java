@@ -38,9 +38,15 @@ class FleetNotificationTypesTest {
     @Test void theWorkshopTyreBatteryFuelAndTelematicsAlertsWarnByAppAndEmail() {
         for (NotificationType t : List.of(NotificationType.INSPECTION_FAILED, NotificationType.WORK_ORDER_APPROVAL_REQUESTED, NotificationType.TYRE_TREAD_LOW,
                 NotificationType.BATTERY_WARRANTY_EXPIRING, NotificationType.FUEL_ANOMALY_DETECTED, NotificationType.TELEMATICS_ALERT,
-                NotificationType.VEHICLE_THEFT_REPORTED)) {
+                NotificationType.ACCIDENT_REPORTED)) {
             assertEquals(NotificationSeverity.WARNING, t.defaultSeverity(), t.name());
             assertEquals(Set.of(NotificationChannel.IN_APP, NotificationChannel.EMAIL), t.defaultChannels(), t.name());
         }
+    }
+
+    @Test void aTheftReportIsCriticalAndReachesPeopleBySms() {
+        assertEquals(NotificationSeverity.CRITICAL, NotificationType.VEHICLE_THEFT_REPORTED.defaultSeverity());
+        assertEquals(Set.of(NotificationChannel.IN_APP, NotificationChannel.EMAIL, NotificationChannel.SMS),
+                NotificationType.VEHICLE_THEFT_REPORTED.defaultChannels());
     }
 }
