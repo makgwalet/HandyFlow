@@ -14,9 +14,7 @@ import org.springframework.test.web.servlet.RequestBuilder;
 import org.springframework.test.web.servlet.ResultActions;
 import za.co.handyflow.platform.WebMvcTestSecuritySupport;
 import za.co.handyflow.platform.billing.FeatureGuard;
-import za.co.handyflow.platform.fleet.application.internal.FleetCostService;
-import za.co.handyflow.platform.fleet.application.internal.FleetLogbookService;
-import za.co.handyflow.platform.fleet.application.internal.FleetService;
+import za.co.handyflow.platform.fleet.application.internal.AssetService;
 import za.co.handyflow.platform.fleet.dto.EquipmentResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
@@ -33,14 +31,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(FleetController.class)
+@WebMvcTest(AssetController.class)
 @Import(WebMvcTestSecuritySupport.class)
-class FleetEquipmentControllerTest {
+class AssetEquipmentControllerTest {
 
     @Autowired MockMvc mvc;
-    @MockitoBean FleetService fleetService;
-    @MockitoBean FleetLogbookService logbookService;
-    @MockitoBean FleetCostService costService;
+    @MockitoBean AssetService assetService;
     @MockitoBean FeatureGuard featureGuard;
 
     final UUID vehicleId = UUID.randomUUID();
@@ -61,7 +57,7 @@ class FleetEquipmentControllerTest {
     @WithMockUser(authorities = "FLEET_READ")
     @DisplayName("GET /equipment lists the machines with their meter and operating rate, and checks the fleet module")
     void lists() throws Exception {
-        when(fleetService.listEquipment(any())).thenReturn(List.of(new EquipmentResponse(vehicleId, "FARM 001 GP", "John Deere", "6120M", "TRACTOR", "AVAILABLE", new BigDecimal("1234.5"), new BigDecimal("85.5"))));
+        when(assetService.listEquipment(any())).thenReturn(List.of(new EquipmentResponse(vehicleId, "FARM 001 GP", "John Deere", "6120M", "TRACTOR", "AVAILABLE", new BigDecimal("1234.5"), new BigDecimal("85.5"))));
 
         call(get("/api/v1/fleet/equipment")).andExpect(status().isOk()).andExpect(jsonPath("$.data[0].operatingRatePerHour").value(85.5));
 
@@ -72,11 +68,11 @@ class FleetEquipmentControllerTest {
     @WithMockUser(authorities = "FLEET_MANAGE")
     @DisplayName("PATCH /vehicles/{id}/equipment saves the numbers")
     void updates() throws Exception {
-        when(fleetService.updateEquipment(any(), eq(vehicleId), any())).thenReturn(new EquipmentResponse(vehicleId, "FARM 001 GP", "John Deere", "6120M", "TRACTOR", "AVAILABLE", new BigDecimal("1234.5"), new BigDecimal("85.5")));
+        when(assetService.updateEquipment(any(), eq(vehicleId), any())).thenReturn(new EquipmentResponse(vehicleId, "FARM 001 GP", "John Deere", "6120M", "TRACTOR", "AVAILABLE", new BigDecimal("1234.5"), new BigDecimal("85.5")));
 
         call(patch("/api/v1/fleet/vehicles/" + vehicleId + "/equipment").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(BODY)).andExpect(status().isOk());
 
-        verify(fleetService).updateEquipment(any(), eq(vehicleId), any());
+        verify(assetService).updateEquipment(any(), eq(vehicleId), any());
     }
 
     @Test
@@ -85,7 +81,7 @@ class FleetEquipmentControllerTest {
     void updateNeedsManage() throws Exception {
         call(patch("/api/v1/fleet/vehicles/" + vehicleId + "/equipment").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(BODY)).andExpect(status().isForbidden());
 
-        verify(fleetService, never()).updateEquipment(any(), any(), any());
+        verify(assetService, never()).updateEquipment(any(), any(), any());
     }
 
     @Test
@@ -94,6 +90,6 @@ class FleetEquipmentControllerTest {
     void listNeedsFleetRead() throws Exception {
         call(get("/api/v1/fleet/equipment")).andExpect(status().isForbidden());
 
-        verify(fleetService, never()).listEquipment(any());
+        verify(assetService, never()).listEquipment(any());
     }
 }

@@ -13,6 +13,7 @@ import za.co.handyflow.platform.fleet.domain.model.AssetMeterReading;
 import za.co.handyflow.platform.fleet.domain.model.AssetProfile;
 import za.co.handyflow.platform.fleet.domain.model.FuelFillup;
 import za.co.handyflow.platform.fleet.domain.model.Vehicle;
+import za.co.handyflow.platform.fleet.domain.model.VehicleStatus;
 import za.co.handyflow.platform.fleet.domain.repository.AssetAttachmentRepository;
 import za.co.handyflow.platform.fleet.domain.repository.AssetMeterReadingRepository;
 import za.co.handyflow.platform.fleet.domain.repository.AssetProfileRepository;
@@ -105,6 +106,58 @@ public class AssetService {
         findVehicle(tenantId, vehicleId);
         return meterRepository.findByVehicle(tenantId, vehicleId, pageable)
                 .map(r -> new MeterReadingResponse(r.getRecordedAt(), r.getEngineHours(), r.getPtoHours(), r.getHydraulicHours()));
+    }
+
+    // ── Simple equipment screen (meter + hourly rate) ────────────────────
+
+    /** Every live, non-retired vehicle as a machine: engine hours and hourly operating rate, by registration. */
+    @Transactional(readOnly = true)
+    public List<EquipmentResponse> listEquipment(TenantId tenantId) {
+        List<Vehicle> vehicles = vehicleRepository.findAllActive(tenantId, PageRequest.of(0, 500)).getContent().stream()
+                .filter(v -> v.getStatus() != VehicleStatus.RETIRED)
+                .sorted(Comparator.comparing(Vehicle::getRegistration, Comparator.nullsLast(String::compareToIgnoreCase)))
+                .toList();
+        if (vehicles.isEmpty()) return List.of();
+        Map<UUID, BigDecimal> rates = new HashMap<>();
+        for (AssetProfile p : profileRepository.findByTenantIdAndVehicleIdIn(tenantId, vehicles.stream().map(Vehicle::getId).toList())) {
+            if (p.getOperatingRatePerHour() != null) rates.put(p.getVehicleId(), p.getOperatingRatePerHour());
+        }
+        return vehicles.stream().map(v -> toEquipment(v, rates.get(v.getId()))).toList();
+    }
+
+    /**
+     * Sets the engine-hour meter and/or the hourly operating rate from the simple equipment screen.
+     * A null engineHours leaves the meter alone (meters only count up, so a lower reading is refused);
+     * a null rate clears the rate. The rate lives on the asset profile, which is created on first use.
+     */
+    @Transactional
+    public EquipmentResponse updateEquipment(TenantId tenantId, UUID vehicleId, UpdateEquipmentRequest req) {
+        Vehicle v = findVehicle(tenantId, vehicleId);
+        if (req.engineHours() != null && req.engineHours().signum() < 0) {
+            throw new IllegalArgumentException("Engine hours cannot be negative");
+        }
+        if (req.operatingRatePerHour() != null && req.operatingRatePerHour().signum() < 0) {
+            throw new IllegalArgumentException("Operating rate per hour cannot be negative");
+        }
+        if (req.engineHours() != null && req.engineHours().compareTo(v.getEngineHours()) != 0) {
+            v.updateEngineHours(req.engineHours());
+            vehicleRepository.save(v);
+        }
+        AssetProfile p = profileRepository.findByTenantIdAndVehicleId(tenantId, vehicleId).orElse(null);
+        if (p == null && req.operatingRatePerHour() != null) {
+            p = AssetProfile.create(tenantId, vehicleId);
+            p.apply(AssetClass.ROAD_VEHICLE, req.operatingRatePerHour(), DEFAULT_TARGET_HOURS, null, null, null, null, null, null);
+            profileRepository.save(p);
+        } else if (p != null) {
+            p.changeOperatingRate(req.operatingRatePerHour());
+            profileRepository.save(p);
+        }
+        return toEquipment(v, p == null ? null : p.getOperatingRatePerHour());
+    }
+
+    private EquipmentResponse toEquipment(Vehicle v, BigDecimal rate) {
+        return new EquipmentResponse(v.getId(), v.getRegistration(), v.getMake(), v.getModel(), v.getVehicleType(),
+                v.getStatus().name(), v.getEngineHours(), rate);
     }
 
     // ── Configure ────────────────────────────────────────────────────────

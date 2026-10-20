@@ -132,6 +132,15 @@ public class AssetProfile {
     }
 
     /** Seeds the service baseline the first time hour-based servicing is configured. */
+    /** Sets only the hourly operating rate (null clears it). Used by the simple equipment screen. */
+    public void changeOperatingRate(BigDecimal rate) {
+        if (rate != null && rate.signum() < 0) {
+            throw new IllegalArgumentException("Operating rate per hour cannot be negative");
+        }
+        this.operatingRatePerHour = rate;
+        touch();
+    }
+
     public void seedLastServiceHours(BigDecimal currentEngineHours) {
         if (serviceIntervalHours != null && lastServiceHours == null) {
             this.lastServiceHours = currentEngineHours;

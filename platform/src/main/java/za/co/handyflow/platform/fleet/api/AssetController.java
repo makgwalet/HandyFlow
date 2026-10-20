@@ -50,6 +50,24 @@ public class AssetController {
                 assetService.list(TenantContext.getTenantIdAsObject(), assetClass, window)));
     }
 
+    @GetMapping("/equipment")
+    @PreAuthorize("hasAuthority('FLEET_READ')")
+    @Operation(summary = "Machines with their engine hours and hourly operating rate (retired vehicles left out)")
+    public ResponseEntity<ApiResponse<List<EquipmentResponse>>> listEquipment() {
+        featureGuard.requireModule("fleet");
+        return ResponseEntity.ok(ApiResponse.success(assetService.listEquipment(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PatchMapping("/vehicles/{vehicleId}/equipment")
+    @PreAuthorize("hasAuthority('FLEET_MANAGE')")
+    @Operation(summary = "Set the engine hours (never lower) and the hourly operating rate (service and repairs only)")
+    public ResponseEntity<ApiResponse<EquipmentResponse>> updateEquipment(
+            @PathVariable UUID vehicleId, @RequestBody UpdateEquipmentRequest request) {
+        featureGuard.requireModule("fleet");
+        return ResponseEntity.ok(ApiResponse.success("Equipment updated",
+                assetService.updateEquipment(TenantContext.getTenantIdAsObject(), vehicleId, request)));
+    }
+
     @GetMapping("/vehicles/{vehicleId}/equipment")
     @PreAuthorize("hasAuthority('FLEET_READ')")
     @Operation(summary = "A vehicle as a fleet asset: hour meters, hour-based service status, cost per engine hour, "

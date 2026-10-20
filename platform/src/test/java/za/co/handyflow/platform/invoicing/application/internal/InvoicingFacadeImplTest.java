@@ -44,11 +44,12 @@ class InvoicingFacadeImplTest {
     @Mock CreditNoteRepository creditNoteRepo;
     @Mock CrmFacade crmFacade;
     @Mock InvoiceNumberGenerator numbers;
+    @Mock VatSettingService vatSettings;
 
     static final TenantId TENANT = TenantId.of(UUID.randomUUID());
     static final Instant ISSUED = Instant.parse("2026-09-18T08:00:00Z");
 
-    private InvoicingFacadeImpl facade() { return new InvoicingFacadeImpl(invoiceRepo, creditNoteRepo, crmFacade, numbers); }
+    private InvoicingFacadeImpl facade() { return new InvoicingFacadeImpl(invoiceRepo, creditNoteRepo, crmFacade, numbers, vatSettings); }
 
     private static void assertNumber(String expected, BigDecimal actual) {
         assertEquals(0, new BigDecimal(expected).compareTo(actual), "expected " + expected + " but was " + actual);
