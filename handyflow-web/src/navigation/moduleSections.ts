@@ -218,6 +218,7 @@ export const FLEET_SECTIONS: ModuleSections = {
         { id: 'trips', label: 'Logbook', icon: Route },
         { id: 'services', label: 'Service History', icon: Wrench },
         { id: 'fuel', label: 'Fuel Log', icon: Fuel },
+        { id: 'inspections', label: 'Inspections', icon: ClipboardList },
         { id: 'accidents', label: 'Accidents', icon: AlertTriangle },
       ],
     },
