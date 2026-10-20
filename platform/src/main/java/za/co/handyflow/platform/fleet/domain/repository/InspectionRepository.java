@@ -4,6 +4,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
 import za.co.handyflow.platform.fleet.domain.model.Inspection;
 import za.co.handyflow.platform.fleet.domain.model.InspectionStatus;
 import za.co.handyflow.platform.shared.TenantId;
@@ -13,34 +14,36 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+// Bean named explicitly: the property module also has an InspectionRepository.
+@Repository("fleetInspectionRepository")
 public interface InspectionRepository extends JpaRepository<Inspection, UUID> {
 
-    @Query("SELECT i FROM Inspection i WHERE i.tenantId = :tenantId AND i.id = :id")
+    @Query("SELECT i FROM FleetInspection i WHERE i.tenantId = :tenantId AND i.id = :id")
     Optional<Inspection> findByTenantAndId(TenantId tenantId, UUID id);
 
-    @Query("SELECT i FROM Inspection i WHERE i.tenantId = :tenantId ORDER BY i.startedAt DESC")
+    @Query("SELECT i FROM FleetInspection i WHERE i.tenantId = :tenantId ORDER BY i.startedAt DESC")
     Page<Inspection> findAllForTenant(TenantId tenantId, Pageable pageable);
 
-    @Query("SELECT i FROM Inspection i WHERE i.tenantId = :tenantId AND i.status = :status ORDER BY i.startedAt DESC")
+    @Query("SELECT i FROM FleetInspection i WHERE i.tenantId = :tenantId AND i.status = :status ORDER BY i.startedAt DESC")
     Page<Inspection> findAllForTenantByStatus(TenantId tenantId, InspectionStatus status, Pageable pageable);
 
-    @Query("SELECT i FROM Inspection i WHERE i.tenantId = :tenantId AND i.vehicleId = :vehicleId ORDER BY i.startedAt DESC")
+    @Query("SELECT i FROM FleetInspection i WHERE i.tenantId = :tenantId AND i.vehicleId = :vehicleId ORDER BY i.startedAt DESC")
     Page<Inspection> findByVehicle(TenantId tenantId, UUID vehicleId, Pageable pageable);
 
     /** When this vehicle last completed an inspection from this template; null if never. */
-    @Query("SELECT MAX(i.completedAt) FROM Inspection i WHERE i.tenantId = :tenantId AND i.vehicleId = :vehicleId " +
+    @Query("SELECT MAX(i.completedAt) FROM FleetInspection i WHERE i.tenantId = :tenantId AND i.vehicleId = :vehicleId " +
             "AND i.templateId = :templateId AND i.status = :status")
     Instant findLastCompletedAt(TenantId tenantId, UUID vehicleId, UUID templateId, InspectionStatus status);
 
     // ── NEW (chunk 6): driver score inputs ───────────────────────────────
 
     /** A driver's completed inspections finished in [from, to). Result rows are not loaded (lazy). */
-    @Query("SELECT i FROM Inspection i WHERE i.tenantId = :tenantId AND i.driverId = :driverId " +
+    @Query("SELECT i FROM FleetInspection i WHERE i.tenantId = :tenantId AND i.driverId = :driverId " +
             "AND i.status = :status AND i.completedAt >= :from AND i.completedAt < :to")
     List<Inspection> findCompletedByDriverInRange(TenantId tenantId, UUID driverId, InspectionStatus status,
                                                   Instant from, Instant to);
 
-    @Query("SELECT i FROM Inspection i WHERE i.tenantId = :tenantId AND i.driverId IS NOT NULL " +
+    @Query("SELECT i FROM FleetInspection i WHERE i.tenantId = :tenantId AND i.driverId IS NOT NULL " +
             "AND i.status = :status AND i.completedAt >= :from AND i.completedAt < :to")
     List<Inspection> findCompletedWithDriverInRange(TenantId tenantId, InspectionStatus status,
                                                     Instant from, Instant to);

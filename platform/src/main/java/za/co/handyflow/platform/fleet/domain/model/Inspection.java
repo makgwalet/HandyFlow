@@ -18,7 +18,8 @@ import java.util.UUID;
  * Template name, type, signature requirement and every question are copied in when the
  * inspection starts, so later template edits never rewrite history.
  */
-@Entity
+// Named explicitly: the property module also has an entity called Inspection, and JPA entity names must be unique.
+@Entity(name = "FleetInspection")
 @Table(name = "fleet_inspections")
 @Getter
 @NoArgsConstructor(access = lombok.AccessLevel.PROTECTED)
