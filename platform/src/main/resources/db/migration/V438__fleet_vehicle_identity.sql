@@ -19,11 +19,17 @@ ALTER TABLE fleet_vehicles
     ADD COLUMN tare_kg                  INTEGER,
     ADD COLUMN payload_kg               INTEGER,
     ADD COLUMN gcm_kg                   INTEGER,
-    ADD COLUMN engine_hours             NUMERIC(10, 1) NOT NULL DEFAULT 0,
     ADD COLUMN acquisition_method       VARCHAR(20),
     ADD COLUMN current_book_value       NUMERIC(15, 2),
     ADD COLUMN current_estimated_value  NUMERIC(15, 2),
     ADD COLUMN valued_at                DATE;
+
+-- engine_hours already exists (V309, nullable). The vehicle record now treats it as always present, so fill the gaps and make it
+-- NOT NULL with a zero default rather than adding it a second time.
+UPDATE fleet_vehicles SET engine_hours = 0 WHERE engine_hours IS NULL;
+ALTER TABLE fleet_vehicles
+    ALTER COLUMN engine_hours SET DEFAULT 0,
+    ALTER COLUMN engine_hours SET NOT NULL;
 
 -- purchase_date and purchase_price already exist on fleet_vehicles and are reused
 -- as "acquisition date" / "purchase price" — no duplicate columns.

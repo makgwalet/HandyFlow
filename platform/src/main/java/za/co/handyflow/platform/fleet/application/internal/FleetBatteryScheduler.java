@@ -24,11 +24,6 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * *** ACTION NEEDED IN YOUR NotificationType.java *** (Fleet section):
- * <pre>{@code
- * BATTERY_WARRANTY_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
- * }</pre>
- * This won't compile until the constant is added.
  * <p>
  * Daily 08:00 SAST: tells tenant admins when an INSTALLED battery's warranty is exactly 60, 30 or
  * 7 days from expiring — the same exact-day idempotency FleetNotificationScheduler uses for

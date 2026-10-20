@@ -178,7 +178,10 @@ public class SecurityConfig {
                                 // Clinic Document Studio (patch 0193, CLINIC-DEC-025): anyone holding an issued document may check
                                 // it is genuine. POST only, exact path, rate limited in RateLimitFilter; it answers with
                                 // authenticity data and never a patient or clinical detail.
-                                "/api/v1/public/clinic/document-verification"
+                                "/api/v1/public/clinic/document-verification",
+                                // Fleet telematics ingest: called by a provider's system with no login. Authenticated by the per-company
+                                // X-Telematics-Key header inside the service (unknown, missing or revoked key gets 401); rate limited in RateLimitFilter.
+                                "/api/v1/fleet/telematics/ingest"
                         ).permitAll()
                         // Everything else requires authentication
                         .anyRequest().authenticated()

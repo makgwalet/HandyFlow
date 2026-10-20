@@ -48,11 +48,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * *** ACTION NEEDED IN YOUR NotificationType.java *** (Fleet section):
- * <pre>{@code
- * TYRE_TREAD_LOW(WARNING, Set.of(IN_APP, EMAIL)),
- * }</pre>
- * This won't compile until the constant is added.
  * <p>
  * Tyre management: register, fit, remove, rotate, measure tread, retread, scrap. A tyre is one
  * record for life; every stay on a vehicle is a {@link TyreFitment}, so lifetime kilometres and

@@ -50,11 +50,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * *** ACTION NEEDED IN YOUR NotificationType.java *** (Fleet section):
- * <pre>{@code
- * VEHICLE_THEFT_REPORTED(WARNING, Set.of(IN_APP, EMAIL)),
- * }</pre>
- * This won't compile until the constant is added.
  * <p>
  * Asset lifecycle workflows: simple moves, theft / missing and recovery, write-off,
  * and sale / transfer / disposal. Every change writes a {@link VehicleLifecycleEvent}

@@ -60,11 +60,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * *** ACTION NEEDED IN YOUR NotificationType.java *** (Fleet section):
- * <pre>{@code
- * TELEMATICS_ALERT(WARNING, Set.of(IN_APP, EMAIL)),
- * }</pre>
- * This won't compile until the constant is added.
  * <p>
  * Receives GPS positions and native device events from any provider, authenticated by a per-tenant
  * API key, and runs the rules over them:

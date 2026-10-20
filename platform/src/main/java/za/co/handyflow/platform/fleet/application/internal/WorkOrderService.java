@@ -55,11 +55,6 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * *** ACTION NEEDED IN YOUR NotificationType.java *** (Fleet section):
- * <pre>{@code
- * WORK_ORDER_APPROVAL_REQUESTED(WARNING, Set.of(IN_APP, EMAIL)),
- * }</pre>
- * This won't compile until the constant is added.
  * <p>
  * The workshop: raise a work order (optionally from a fleet issue or accident), quote, approve,
  * do the work, log actual costs, complete. Beyond the work order's own rules, this service keeps

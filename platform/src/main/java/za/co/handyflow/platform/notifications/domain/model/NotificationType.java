@@ -151,6 +151,15 @@ public enum NotificationType {
     TRIP_RUNNING_LONG(WARNING, Set.of(IN_APP, EMAIL)),
     DRIVER_LICENSE_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
     DRIVER_PRDP_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
+    // Added with the fleet inspections, lifecycle, workshop, tyres and batteries, fuel analytics and telematics work. Severity and channels are the
+    // ones the fleet code asked for. Theft is a candidate for CRITICAL with SMS once the fleet owners have agreed to the SMS cost.
+    INSPECTION_FAILED(WARNING, Set.of(IN_APP, EMAIL)),
+    VEHICLE_THEFT_REPORTED(WARNING, Set.of(IN_APP, EMAIL)),
+    WORK_ORDER_APPROVAL_REQUESTED(WARNING, Set.of(IN_APP, EMAIL)),
+    TYRE_TREAD_LOW(WARNING, Set.of(IN_APP, EMAIL)),
+    BATTERY_WARRANTY_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
+    FUEL_ANOMALY_DETECTED(WARNING, Set.of(IN_APP, EMAIL)),
+    TELEMATICS_ALERT(WARNING, Set.of(IN_APP, EMAIL)),
 
     // ── Fuel ─────────────────────────────────────────────────────────────────
     FUEL_TANK_LOW(WARNING, Set.of(IN_APP, EMAIL)),

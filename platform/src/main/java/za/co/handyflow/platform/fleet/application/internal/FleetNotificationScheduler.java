@@ -29,13 +29,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * *** ACTION NEEDED IN YOUR NotificationType.java *** (Fleet section):
- * <pre>{@code
- * DRIVER_LICENSE_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
- * DRIVER_PRDP_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
- * }</pre>
- * This won't compile until both constants are added — same situation as
- * TRIP_RUNNING_LONG before it.
+ * Daily compliance checks (vehicle documents, driver licences) and the long-running-trip check.
  * <p>
  * Driver compliance mirrors vehicle compliance exactly (same exact-day-match
  * idempotency at 60/30/7 days — see checkComplianceExpiry() for the

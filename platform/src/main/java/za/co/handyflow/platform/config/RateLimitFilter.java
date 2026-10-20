@@ -121,6 +121,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
             // Clinic document verification (patch 0193): public, and the code is the only secret, so guessing is slowed hard.
             // The code has about 80 bits, so this is a second layer, not the main defence.
             new Limit("clinic:document-verification", "/api/v1/public/clinic/document-verification", 30, 10 * 60 * 1_000L),
+
+            // Fleet telematics ingest (public, key authenticated). A provider may send often and in batches of up to 1,000 items, so this is
+            // generous; it is there to slow key guessing and runaway senders, not to meter normal traffic.
+            new Limit("fleet:telematics-ingest", "/api/v1/fleet/telematics/ingest", 300, 60 * 1_000L),
     };
 
     @Override

@@ -23,6 +23,57 @@ CREATE TABLE fleet_vehicle_lifecycle_events (
 CREATE INDEX idx_fleet_lifecycle_events_vehicle
     ON fleet_vehicle_lifecycle_events (tenant_id, vehicle_id, occurred_at DESC);
 
+-- Accidents. The table was missing from the fleet migrations although the vehicle lifecycle, driver scoring and workshop tables below
+-- all point at it, so it is created here, ahead of its first use.
+CREATE TABLE fleet_accidents (
+    id                           UUID PRIMARY KEY,
+    tenant_id                    UUID NOT NULL,
+    reference_number             VARCHAR(30) NOT NULL,
+    vehicle_id                   UUID NOT NULL REFERENCES fleet_vehicles (id),
+    driver_id                    UUID,
+    driver_name                  VARCHAR(255),
+    trip_id                      UUID,
+    occurred_at                  TIMESTAMPTZ NOT NULL,
+    location                     VARCHAR(500),
+    weather                      VARCHAR(20),
+    road_condition               VARCHAR(20),
+    other_vehicle_registration   VARCHAR(30),
+    other_driver_name            VARCHAR(255),
+    other_driver_contact         VARCHAR(255),
+    other_insurer                VARCHAR(255),
+    police_case_number           VARCHAR(100),
+    saps_station                 VARCHAR(255),
+    police_reference             VARCHAR(100),
+    description                  TEXT NOT NULL,
+    witnesses                    TEXT,
+    injuries_count               INTEGER NOT NULL DEFAULT 0,
+    fatalities_count             INTEGER NOT NULL DEFAULT 0,
+    estimated_damage             NUMERIC(15,2),
+    third_party_damage           NUMERIC(15,2),
+    vehicle_drivable             BOOLEAN NOT NULL DEFAULT TRUE,
+    status                       VARCHAR(20) NOT NULL DEFAULT 'REPORTED',
+    resolution_note              TEXT,
+    closed_at                    TIMESTAMPTZ,
+    claim_status                 VARCHAR(20) NOT NULL DEFAULT 'NOT_CLAIMED',
+    claim_insurer                VARCHAR(255),
+    claim_number                 VARCHAR(100),
+    claim_excess                 NUMERIC(15,2),
+    assessor_name                VARCHAR(255),
+    assessment_date              DATE,
+    claim_submitted_at           DATE,
+    claim_settlement_amount      NUMERIC(15,2),
+    claim_settled_at             DATE,
+    repairer                     VARCHAR(255),
+    repair_cost                  NUMERIC(15,2),
+    returned_to_service_at       DATE,
+    reported_by                  UUID,
+    created_at                   TIMESTAMPTZ NOT NULL,
+    updated_at                   TIMESTAMPTZ NOT NULL,
+    version                      BIGINT
+);
+CREATE UNIQUE INDEX uq_fleet_accidents_reference ON fleet_accidents (tenant_id, reference_number);
+CREATE INDEX idx_fleet_accidents_vehicle ON fleet_accidents (tenant_id, vehicle_id, occurred_at DESC);
+
 CREATE TABLE fleet_vehicle_disposals (
     id                         UUID PRIMARY KEY,
     tenant_id                  UUID         NOT NULL,

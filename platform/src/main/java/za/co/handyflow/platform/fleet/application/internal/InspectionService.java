@@ -41,12 +41,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * *** ACTION NEEDED IN YOUR NotificationType.java *** (Fleet section):
- * <pre>{@code
- * INSPECTION_FAILED(WARNING, Set.of(IN_APP, EMAIL)),
- * }</pre>
- * This won't compile until the constant is added — same situation as the other Fleet
- * notification types.
+ * Runs vehicle inspections and raises the failed-inspection notification.
  * <p>
  * Inspection flow: start (questions copied from the template) → save answers → attach
  * photos / signature → complete. Completing validates the rules, locks the inspection,

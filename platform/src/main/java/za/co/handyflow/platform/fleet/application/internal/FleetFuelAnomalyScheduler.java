@@ -26,11 +26,6 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * *** ACTION NEEDED IN YOUR NotificationType.java *** (Fleet section):
- * <pre>{@code
- * FUEL_ANOMALY_DETECTED(WARNING, Set.of(IN_APP, EMAIL)),
- * }</pre>
- * This won't compile until the constant is added.
  * <p>
  * Daily 07:00 SAST: looks at the fill-ups recorded in the last 24 hours and, per vehicle, tells
  * tenant admins about abnormal consumption or theft / data-quality indicators that involve them —
