@@ -17,6 +17,7 @@ import DriverScoresTab from "./DriverScoresTab"
 import TyresBatteriesTab from "./TyresBatteriesTab"
 import FuelAnalyticsTab from "./FuelAnalyticsTab"
 import AlertsTab from "./AlertsTab"
+import LiveMapTab from "./LiveMapTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { FLEET_SECTIONS } from "../../navigation/moduleSections"
 
@@ -38,6 +39,7 @@ export function FleetPage() {
         case "tyres":      return <TyresBatteriesTab />
         case "fuel-analytics": return <FuelAnalyticsTab />
         case "alerts":     return <AlertsTab onNavigate={goTo} />
+        case "live-map":   return <LiveMapTab />
         case "driver-scores": return <DriverScoresTab />
         default:           return null
       }
