@@ -1,6 +1,7 @@
 // Rules for the Fleet list and the dashboards built on it: the two list bars, document counts, searching and sorting.
 // Pure functions; the components fetch and draw.
-import { expiryState } from "./driverScores.logic"
+import { daysToDate, expiryState } from "./driverScores.logic"
+import { isOpenOrder } from "./vehicleTabs.logic"
 import { deviationText, deviationTone, type FuelRow } from "./fuelAnalytics.logic"
 import type { Tone } from "./fleetTones"
 
@@ -55,3 +56,41 @@ export function viewFleet(rows: FleetRow[], search: string, status: string, sort
     .sort((a, b) => (sort === "fuel" ? nullsLast(a.l100, b.l100, -1) : sort === "service" ? nullsLast(a.remainingKm, b.remainingKm, 1)
       : sort === "documents" ? b.docs.expired - a.docs.expired || b.docs.expiring - a.docs.expiring : 0) || a.vehicle.registration.localeCompare(b.vehicle.registration))
 }
+
+// ── Maintenance dashboard ──────────────────────────────────────────────────
+
+export interface BoardOrder { id: string; referenceNumber: string; registration: string; title: string; priority: string; status: string; scheduledFor: string | null; createdAt: string; completedAt: string | null; actualTotal: number | null }
+export interface OrderSummary { open: number; awaitingApproval: number; overdue: number; avgDaysToComplete: number | null }
+/** Work in flight. Overdue = still open and scheduled before today. Average days is created-to-completed over the last 90 days. */
+export function orderSummary(orders: BoardOrder[], today = new Date()): OrderSummary {
+  const open = orders.filter(o => isOpenOrder(o.status))
+  const done = orders.filter(o => o.status === "COMPLETED" && o.completedAt && daysToDate(o.completedAt, today) >= -90)
+  const days = done.map(o => (new Date(o.completedAt as string).getTime() - new Date(o.createdAt).getTime()) / 86400000)
+  return {
+    open: open.length, awaitingApproval: orders.filter(o => o.status === "QUOTED").length,
+    overdue: open.filter(o => o.scheduledFor && daysToDate(o.scheduledFor, today) < 0).length,
+    avgDaysToComplete: days.length ? Math.round((days.reduce((s, d) => s + d, 0) / days.length) * 10) / 10 : null,
+  }
+}
+export const FLIGHT_STATUSES = ["OPEN", "QUOTED", "APPROVED", "IN_PROGRESS", "ON_HOLD"] as const
+export function statusBars(orders: BoardOrder[]): { status: string; count: number; fraction: number }[] {
+  const counts = FLIGHT_STATUSES.map(status => ({ status, count: orders.filter(o => o.status === status).length })), max = Math.max(0, ...counts.map(c => c.count))
+  return counts.map(c => ({ ...c, fraction: max > 0 ? c.count / max : 0 }))
+}
+/** Completed work by the month it was finished, for the last `months` months including this one (oldest first). */
+export function spendByMonth(orders: BoardOrder[], now = new Date(), months = 6): { key: string; label: string; value: number }[] {
+  const slots = Array.from({ length: months }, (_, i) => { const d = new Date(now.getFullYear(), now.getMonth() - (months - 1 - i), 1); return { key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: d.toLocaleDateString("en-ZA", { month: "short" }), value: 0 } })
+  for (const o of orders) { if (o.status !== "COMPLETED" || !o.completedAt) continue; const slot = slots.find(s => s.key === o.completedAt!.slice(0, 7)); if (slot) slot.value += Number(o.actualTotal ?? 0) }
+  return slots
+}
+export const SERVICE_WINDOW_KM = 2000
+/** Vehicles overdue or within 2 000 km of their service, most overdue first. Retired vehicles and those with no interval are left out. */
+export function serviceQueue(vehicles: ListVehicle[], limit = 8): { vehicle: ListVehicle; bar: Bar; remainingKm: number }[] {
+  return vehicles.filter(v => v.status !== "RETIRED" && v.serviceIntervalKm && v.currentOdometer != null)
+    .map(v => ({ vehicle: v, bar: serviceBar(v), remainingKm: (v.serviceIntervalKm as number) - ((v.currentOdometer as number) - (v.lastServiceKm ?? 0)) }))
+    .filter(x => x.remainingKm <= SERVICE_WINDOW_KM).sort((a, b) => a.remainingKm - b.remainingKm).slice(0, limit)
+}
+export interface TyreItem { id: string; registration: string | null; position: string | null; brand: string; size: string; lastTreadDepthMm: number | null; treadStatus: string }
+export interface BatteryItem { id: string; registration: string | null; position: string | null; brand: string; status: string; lastTestResult: string | null; lastVoltage: number | null }
+export const tyreAttention = (tyres: TyreItem[]): TyreItem[] => tyres.filter(t => t.treadStatus === "REPLACE_NOW" || t.treadStatus === "REPLACE_SOON").sort((a, b) => (a.treadStatus === b.treadStatus ? (a.lastTreadDepthMm ?? 99) - (b.lastTreadDepthMm ?? 99) : a.treadStatus === "REPLACE_NOW" ? -1 : 1))
+export const batteryAttention = (bs: BatteryItem[]): BatteryItem[] => bs.filter(b => b.lastTestResult === "FAILED" || b.lastTestResult === "WEAK" || b.status === "FAULTY").sort((a, b) => Number(b.lastTestResult === "FAILED" || b.status === "FAULTY") - Number(a.lastTestResult === "FAILED" || a.status === "FAULTY"))

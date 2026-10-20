@@ -5,6 +5,7 @@
 import FleetDashboard from "./FleetDashboard"
 import VehiclesTab    from "./VehiclesTab"
 import FleetListTab   from "./FleetListTab"
+import MaintenanceBoard from "./MaintenanceBoard"
 import TripsTab       from "./TripsTab"
 import ServicesTab    from "./ServicesTab"
 import FuelTab        from "./FuelTab"
@@ -30,6 +31,7 @@ export function FleetPage() {
         case "dashboard":  return <FleetDashboard onNavigate={goTo} />
         case "vehicles":   return <VehiclesTab />
         case "fleet-list": return <FleetListTab />
+        case "maintenance": return <MaintenanceBoard onNavigate={goTo} />
         case "drivers":    return <DriversTab />
         case "equipment":  return <EquipmentTab />
         case "trips":      return <TripsTab />
