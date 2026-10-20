@@ -227,6 +227,7 @@ export const FLEET_SECTIONS: ModuleSections = {
       ],
     },
     { label: 'Compliance', sections: [{ id: 'compliance', label: 'Compliance', icon: Shield }] },
+    { label: 'Reports', sections: [{ id: 'reports', label: 'Reports', icon: FileBarChart }] },
   ],
 }
 
