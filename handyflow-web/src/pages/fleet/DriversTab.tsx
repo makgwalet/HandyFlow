@@ -3,7 +3,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { ProfileView, SettingsPanel, type ScoreRow } from "./Driver360"
-import { unwrap as unwrapOne, bandText, bandToneFor, scoreText } from "./driverScores.logic"
+import { unwrap as unwrapOne, bandText, bandToneFor, scoreText, sortDrivers, rankMap, SORT_LABEL, type DriverSort } from "./driverScores.logic"
 import {
   Plus, User, X, AlertCircle, AlertTriangle, CheckCircle, Edit2,
   Phone, Mail, IdCard, ShieldCheck, UserX, UserCheck, Gauge,
@@ -53,6 +53,7 @@ export default function DriversTab() {
   const [filterStatus, setFilterStatus] = useState("ACTIVE")
   const [openId, setOpenId]       = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [sort, setSort]           = useState<DriverSort>("name")
   const { data: scoreRows = [] } = useQuery<ScoreRow[]>({ queryKey: ["fleet", "driver-scores"], queryFn: async () => unwrapOne<ScoreRow[]>(await apiClient.get("/api/v1/fleet/driver-scores")) })
   const scoreOf = new Map(scoreRows.map(r => [r.driverId, r]))
   const [form, setForm]           = useState(EMPTY_FORM)
@@ -118,7 +119,8 @@ export default function DriversTab() {
     notes: form.notes || null,
   })
 
-  const filtered = drivers.filter(d => filterStatus === "ALL" || d.status === filterStatus)
+  const filtered = sortDrivers(drivers.filter(d => filterStatus === "ALL" || d.status === filterStatus), sort, scoreOf)
+  const rankOf = sort === "name" ? new Map<string, number>() : rankMap(filtered, scoreOf)
   const stats = [
     { label: "Total drivers", value: drivers.length, color: "var(--hf-primary-text)" },
     { label: "Active", value: drivers.filter(d => d.status === "ACTIVE").length, color: "var(--hf-success-text-strong)" },
@@ -154,6 +156,11 @@ export default function DriversTab() {
             </button>
           ))}
         </div>
+        <label style={{ fontSize: 12.5, color: "var(--hf-text-muted)", display: "flex", alignItems: "center", gap: 6 }}>Sort by
+          <select aria-label="Sort drivers" value={sort} onChange={e => setSort(e.target.value as DriverSort)} style={{ padding: "6px 8px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)" }}>
+            {(Object.keys(SORT_LABEL) as DriverSort[]).map(k => <option key={k} value={k}>{SORT_LABEL[k]}</option>)}
+          </select>
+        </label>
         <button type="button" onClick={() => setShowSettings(s => !s)}
           style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "var(--hf-text)" }}>
           {showSettings ? "Hide score settings" : "Score settings"}
@@ -165,7 +172,6 @@ export default function DriversTab() {
       </div>
 
       {showSettings && <SettingsPanel />}
-      {openId && <ProfileView id={openId} onClose={() => setOpenId(null)} />}
 
       {isLoading ? (
         <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading drivers...</div>
@@ -185,6 +191,7 @@ export default function DriversTab() {
                   </div>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                      {rankOf.has(d.id) && <span aria-label="Rank" style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-primary-text)" }}>#{rankOf.get(d.id)}</span>}
                       <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{d.firstName} {d.lastName}</span>
                       {d.status === "INACTIVE" && <span style={{ fontSize: 10, fontWeight: 700, background: "var(--hf-surface-sunken)", color: "var(--hf-text-muted)", padding: "1px 7px", borderRadius: 20 }}>INACTIVE</span>}
                       {d.prdpRequired && <span style={{ fontSize: 10, fontWeight: 700, background: "var(--hf-violet-soft)", color: "var(--hf-violet-text)", padding: "1px 7px", borderRadius: 20 }}>PrDP {d.prdpCategory}</span>}
@@ -224,7 +231,7 @@ export default function DriversTab() {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
-                  <button type="button" onClick={() => setOpenId(d.id)} title="Driver 360" style={{ background: "var(--hf-violet-soft)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "var(--hf-violet-text)", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}><Gauge size={13} />360 view</button>
+                  <button type="button" onClick={() => setOpenId(openId === d.id ? null : d.id)} aria-expanded={openId === d.id} title="Driver 360" style={{ background: "var(--hf-violet-soft)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "var(--hf-violet-text)", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}><Gauge size={13} />{openId === d.id ? "Hide 360" : "360 view"}</button>
                   <button onClick={() => openEdit(d)} title="Edit" style={{ background: "var(--hf-warning-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-warning-text)" }}><Edit2 size={13} /></button>
                   {d.status === "ACTIVE" ? (
                     <button onClick={() => setStatus.mutate({ id: d.id, active: false })} title="Deactivate" style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><UserX size={13} /></button>
@@ -233,6 +240,7 @@ export default function DriversTab() {
                   )}
                 </div>
               </div>
+              {openId === d.id && <div style={{ marginTop: 14 }}><ProfileView id={d.id} onClose={() => setOpenId(null)} /></div>}
             </div>
           ))}
         </div>

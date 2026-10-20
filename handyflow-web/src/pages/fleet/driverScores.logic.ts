@@ -38,3 +38,27 @@ export const settingsBody = (f: SettingsForm): Settings => Object.fromEntries(Ob
 
 /** A low-coverage score is only a hint, and the screen says so. */
 export const coverageNote = (reliable: boolean, coverage: number) => (reliable ? null : `Indicative only: only ${Math.round(coverage)}% of the score had data.`)
+
+export type DriverSort = "name" | "score-desc" | "score-asc"
+export const SORT_LABEL: Record<DriverSort, string> = { name: "Name", "score-desc": "Best score first", "score-asc": "Lowest score first" }
+interface Scored { overall: number | null; reliable: boolean }
+const group = (s: Scored | undefined) => (!s || s.overall == null ? 2 : s.reliable ? 0 : 1)
+/** Rated drivers first, then indicative scores, then drivers with no data; ties by name. */
+export function sortDrivers<T extends { id: string; firstName: string; lastName: string }>(list: T[], sort: DriverSort, scoreOf: Map<string, Scored>): T[] {
+  const name = (d: T) => `${d.lastName} ${d.firstName}`.toLowerCase()
+  const dir = sort === "score-asc" ? 1 : -1
+  return [...list].sort((a, b) => {
+    if (sort !== "name") {
+      const sa = scoreOf.get(a.id), sb = scoreOf.get(b.id), ga = group(sa), gb = group(sb)
+      if (ga !== gb) return ga - gb
+      if (ga < 2 && sa!.overall !== sb!.overall) return dir * (sa!.overall! - sb!.overall!)
+    }
+    return name(a).localeCompare(name(b))
+  })
+}
+/** 1-based rank among drivers with a reliable score, in the order given. */
+export function rankMap(sorted: { id: string }[], scoreOf: Map<string, Scored>): Map<string, number> {
+  const m = new Map<string, number>(); let n = 0
+  for (const d of sorted) { const s = scoreOf.get(d.id); if (s && s.overall != null && s.reliable) m.set(d.id, ++n) }
+  return m
+}

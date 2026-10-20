@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import DriversTab from "./DriversTab"
-import { bandText, bandToneFor, bandTone, coverageNote, scoreText, settingsBody, settingsProblem, toForm, weightTotal } from "./driverScores.logic"
+import { sortDrivers, rankMap, bandText, bandToneFor, bandTone, coverageNote, scoreText, settingsBody, settingsProblem, toForm, weightTotal } from "./driverScores.logic"
 
 const get = vi.fn(), put = vi.fn()
 type Args = unknown[]
@@ -58,6 +58,16 @@ describe("score rules", () => {
   })
 })
 
+describe("ranking", () => {
+  const ds = [{ id: "a", firstName: "Zed", lastName: "Ames" }, { id: "b", firstName: "Bo", lastName: "Bell" }, { id: "c", firstName: "Cy", lastName: "Cole" }, { id: "d", firstName: "Di", lastName: "Dunn" }, { id: "e", firstName: "Al", lastName: "Eve" }]
+  const sc = new Map([["a", { overall: 70, reliable: true }], ["b", { overall: 90, reliable: true }], ["c", { overall: 95, reliable: false }], ["d", { overall: null, reliable: false }], ["e", { overall: 90, reliable: true }]])
+  const ids = (x: { id: string }[]) => x.map(d => d.id).join("")
+  it("best first puts rated drivers ahead of indicative and no-data ones, ties by name", () => { expect(ids(sortDrivers(ds, "score-desc", sc))).toBe("beacd") })
+  it("lowest first starts with the worst rated driver, unrated still last", () => { expect(ids(sortDrivers(ds, "score-asc", sc))).toBe("abecd") })
+  it("name order ignores scores, and a missing score row counts as no data", () => { expect(ids(sortDrivers(ds, "name", sc))).toBe("abcde"); expect(ids(sortDrivers(ds, "score-desc", new Map()))).toBe("abcde") })
+  it("only reliable scores get a rank", () => { const r = rankMap(sortDrivers(ds, "score-desc", sc), sc); expect([...r.entries()]).toEqual([["b", 1], ["e", 2], ["a", 3]]) })
+})
+
 describe("Drivers with Driver 360", () => {
   it("shows each driver's score on the register and marks low-coverage scores as indicative", async () => {
     show(); await screen.findByText("John Mokoena")
@@ -70,6 +80,17 @@ describe("Drivers with Driver 360", () => {
     expect((await screen.findByLabelText("Overall score")).textContent).toContain("92.3%")
     expect(screen.getByLabelText("PrDP").textContent).toContain("12 days left"); expect(screen.getByLabelText("Fuel efficiency").textContent).toContain("No data")
     expect(screen.getByText(/1 accident /)).toBeTruthy(); expect(screen.getByText(/ACC-2026-00021/)).toBeTruthy(); expect(screen.getByText(/9.5 L\/100 km/)).toBeTruthy()
+  })
+  it("sorts by score with rank badges, and a score the data cannot support gets none", async () => {
+    show(); await screen.findByText("John Mokoena"); expect(screen.queryAllByLabelText("Rank").length).toBe(0)
+    fireEvent.change(screen.getByLabelText("Sort drivers"), { target: { value: "score-desc" } })
+    expect(screen.getAllByLabelText(/^(John Mokoena|Thandi Nkosi|New Starter)$/).map(e => e.getAttribute("aria-label"))).toEqual(["John Mokoena", "Thandi Nkosi", "New Starter"])
+    expect(screen.getByLabelText("John Mokoena").querySelector('[aria-label="Rank"]')?.textContent).toBe("#1"); expect(screen.getByLabelText("Thandi Nkosi").querySelector('[aria-label="Rank"]')).toBeNull()
+  })
+  it("opens the profile under the driver's own card, and closes it again", async () => {
+    show(); await screen.findByText("Thandi Nkosi"); fireEvent.click(within("John Mokoena")); const o = await screen.findByLabelText("Overall score")
+    expect(screen.getByLabelText("John Mokoena").contains(o)).toBe(true); expect(screen.getByLabelText("Thandi Nkosi").contains(o)).toBe(false)
+    fireEvent.click(screen.getByText("Hide 360")); expect(screen.queryByLabelText("Overall score")).toBeNull()
   })
   it("lets an admin change the weights, with the total shown and bad totals blocked", async () => {
     show(); fireEvent.click(await screen.findByText("Score settings")); await screen.findByText("Total 100% of 100%")
