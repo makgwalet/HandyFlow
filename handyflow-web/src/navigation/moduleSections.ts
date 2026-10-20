@@ -438,6 +438,7 @@ export const EARTHMOVING_SECTIONS: ModuleSections = {
       sections: [
         { id: 'inspections', label: 'Inspections', icon: CheckSquare },
         { id: 'checklists', label: 'Checklists', icon: ListChecks },
+        { id: 'documents', label: 'Documents', icon: FileText },
         { id: 'workorders', label: 'Work Orders', icon: ClipboardList },
         { id: 'plans', label: 'Service Plans', icon: CalendarClock },
         { id: 'maintenance', label: 'Maintenance', icon: Wrench },

@@ -1,7 +1,7 @@
 // src/pages/earthmoving/shared/hooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, ActiveChecklist, ChecklistVersion, ChecklistTypeOverview, ChecklistQuestion, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, ActiveChecklist, ChecklistVersion, ChecklistTypeOverview, ChecklistQuestion, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling, EarthDocument, DocumentVersion } from "./types"
 
 // Central query keys — every tab imports these instead of typing the
 // literal string, so a rename is a one-line change instead of a grep.
@@ -607,3 +607,24 @@ export function useSaveAutoBilling(deploymentId: string) {
     onSuccess: r => { qc.setQueryData(["em-auto-billing", deploymentId], r); qc.invalidateQueries({ queryKey: ["em-billing-preview"] }) },
   })
 }
+
+// ── Documents ────────────────────────────────────────────────────────────
+
+const docKeys = ["em-documents"] as const
+export function useDocuments(kind: string, ownerId: string, includeArchived: boolean) {
+  return useQuery<EarthDocument[]>({ queryKey: [...docKeys, kind, ownerId, includeArchived], queryFn: () => api.fetchDocuments(kind, ownerId, includeArchived), enabled: !!ownerId })
+}
+export function useExpiringDocuments(withinDays = 60) {
+  return useQuery<EarthDocument[]>({ queryKey: [...docKeys, "expiring", withinDays], queryFn: () => api.fetchExpiringDocuments(withinDays) })
+}
+export function useDocumentVersions(id: string | null) {
+  return useQuery<DocumentVersion[]>({ queryKey: [...docKeys, "versions", id], queryFn: () => api.fetchDocumentVersions(id as string), enabled: !!id })
+}
+function useDocMutation<V>(fn: (v: V) => Promise<unknown>) {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: fn, onSuccess: () => { qc.invalidateQueries({ queryKey: docKeys }); qc.invalidateQueries({ queryKey: QK.alerts }) } })
+}
+export const useUploadDocument = () => useDocMutation(api.uploadDocument)
+export const useAddDocumentVersion = () => useDocMutation(api.addDocumentVersion)
+export const useUpdateDocument = () => useDocMutation(api.updateDocument)
+export const useArchiveDocument = () => useDocMutation(api.archiveDocument)

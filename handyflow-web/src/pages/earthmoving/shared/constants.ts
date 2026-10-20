@@ -73,7 +73,7 @@ export const SEVERITY_CFG: Record<string, { color: string; bg: string; border: s
 // Mirrors AssetStatus.java's transition table (keep in step). DEPLOYED is never set from the status dialog: use Deploy,
 // which records the site and client.
 export const ALERT_TYPE_LABEL: Record<string, string> = {
-  SERVICE_DUE: "Service due", BREAKDOWN: "Breakdown or accident", WORK_ORDER_OVERDUE: "Overdue work order",
+  SERVICE_DUE: "Service due", BREAKDOWN: "Breakdown or accident", WORK_ORDER_OVERDUE: "Overdue work order", DOCUMENT_EXPIRY: "Document expiring",
 }
 
 export const STATUS_TRANSITIONS: Record<string, string[]> = {
@@ -123,3 +123,13 @@ export const HIRE_RATE_SOURCE_LABEL: Record<string, string> = {
 }
 
 export const ANSWER_TYPE_LABEL: Record<string, string> = { PASS_FAIL: "Pass or fail", NUMERIC: "A number", TEXT: "A note", PHOTO: "A photo" }
+
+export const DOCUMENT_CATEGORY_LABEL: Record<string, string> = {
+  PHOTO: "Photo", MANUAL: "Manual", INSURANCE: "Insurance", WARRANTY: "Warranty", OTHER: "Other", OPERATOR_CERTIFICATE: "Operator certificate",
+}
+export const DOCUMENT_CATEGORIES: Record<"ASSET" | "OPERATOR", string[]> = {
+  ASSET: ["PHOTO", "MANUAL", "INSURANCE", "WARRANTY", "OTHER"], OPERATOR: ["OPERATOR_CERTIFICATE"],
+}
+/** These need an expiry date and an administrator to see or change them. */
+export const SENSITIVE_DOCUMENT_CATEGORIES = ["INSURANCE", "WARRANTY", "OPERATOR_CERTIFICATE"]
+export const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024

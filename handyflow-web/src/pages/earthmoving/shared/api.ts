@@ -15,7 +15,7 @@
 // PUT (backend endpoint is still @PutMapping). Create is POST.
 
 import { apiClient } from "../../../api/client"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, ActiveChecklist, ChecklistVersion, ChecklistTypeOverview, ChecklistQuestion, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, ActiveChecklist, ChecklistVersion, ChecklistTypeOverview, ChecklistQuestion, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling, EarthDocument, DocumentVersion } from "./types"
 
 export function unwrap<T>(r: { data?: { data?: unknown } & Record<string, unknown> }): T {
   const p = (r.data?.data ?? r.data) as { content?: unknown } | undefined
@@ -318,3 +318,47 @@ export const fetchAutoBilling = async (deploymentId: string): Promise<AutoBillin
 
 export const saveAutoBilling = async (deploymentId: string, basis: string | null): Promise<AutoBilling> =>
   unwrap<AutoBilling>(await apiClient.put(`${BASE}/deployments/${deploymentId}/auto-billing`, { basis }))
+
+// ── Documents ────────────────────────────────────────────────────────────
+// kind is ASSET or OPERATOR; the server decides who may see or change which category.
+
+export const fetchDocuments = async (kind: string, ownerId: string, includeArchived: boolean): Promise<EarthDocument[]> => {
+  const r = unwrap<unknown>(await apiClient.get(`${BASE}/documents?ownerKind=${kind}&ownerId=${ownerId}&includeArchived=${includeArchived}`))
+  return Array.isArray(r) ? (r as EarthDocument[]) : []
+}
+export const fetchExpiringDocuments = async (withinDays: number): Promise<EarthDocument[]> => {
+  const r = unwrap<unknown>(await apiClient.get(`${BASE}/documents/expiring?withinDays=${withinDays}`))
+  return Array.isArray(r) ? (r as EarthDocument[]) : []
+}
+export const fetchDocumentVersions = async (id: string): Promise<DocumentVersion[]> => {
+  const r = unwrap<unknown>(await apiClient.get(`${BASE}/documents/${id}/versions`))
+  return Array.isArray(r) ? (r as DocumentVersion[]) : []
+}
+export interface UploadDocument { kind: string; ownerId: string; category: string; title: string; description: string | null; expiresOn: string | null; file: File }
+export const uploadDocument = async (b: UploadDocument): Promise<EarthDocument> => {
+  const f = new FormData()
+  f.append("ownerKind", b.kind); f.append("ownerId", b.ownerId); f.append("category", b.category); f.append("title", b.title)
+  if (b.description) f.append("description", b.description)
+  if (b.expiresOn) f.append("expiresOn", b.expiresOn)
+  f.append("file", b.file)
+  return unwrap<EarthDocument>(await apiClient.post(`${BASE}/documents`, f))
+}
+export const addDocumentVersion = async (b: { id: string; note: string | null; expiresOn: string | null; file: File }): Promise<EarthDocument> => {
+  const f = new FormData()
+  if (b.note) f.append("note", b.note)
+  if (b.expiresOn) f.append("expiresOn", b.expiresOn)
+  f.append("file", b.file)
+  return unwrap<EarthDocument>(await apiClient.post(`${BASE}/documents/${b.id}/versions`, f))
+}
+export const updateDocument = async (b: { id: string; title: string; description: string | null; expiresOn: string | null }): Promise<EarthDocument> =>
+  unwrap<EarthDocument>(await apiClient.patch(`${BASE}/documents/${b.id}`, { title: b.title, description: b.description, expiresOn: b.expiresOn }))
+export const archiveDocument = async (b: { id: string; reason: string }): Promise<EarthDocument> =>
+  unwrap<EarthDocument>(await apiClient.post(`${BASE}/documents/${b.id}/archive`, { reason: b.reason }))
+export const downloadDocument = async (id: string, version: number | null, fileName: string): Promise<void> => {
+  const r = await apiClient.get(`${BASE}/documents/${id}/download${version ? `?version=${version}` : ""}`, { responseType: "blob" })
+  const url = URL.createObjectURL(r.data as Blob)
+  const a = document.createElement("a")
+  a.href = url; a.download = fileName; a.rel = "noopener"
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}

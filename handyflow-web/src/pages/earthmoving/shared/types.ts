@@ -250,3 +250,9 @@ export interface DeploymentContract {
 export interface EarthSettings { contractThreshold: number | null; vatRegistered?: boolean; vatRate?: number }
 /** What a deployment is for, so the warnings can say whether a signed contract is expected. */
 export interface HireContext { customerId?: string; siteId?: string; from?: string; to?: string }
+
+export interface DocumentVersion { id: string; versionNo: number; fileName: string; contentType: string; sizeBytes: number; sha256: string; scanStatus: string; note: string | null; uploadedBy: string | null; uploadedAt: string }
+export interface EarthDocument {
+  id: string; ownerType: string; ownerId: string; category: string; title: string; description: string | null; expiresOn: string | null
+  status: string; archivedReason: string | null; currentVersion: number; current: DocumentVersion | null; createdAt: string; createdBy: string | null
+}
