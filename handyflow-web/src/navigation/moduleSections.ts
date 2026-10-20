@@ -431,6 +431,7 @@ export const EARTHMOVING_SECTIONS: ModuleSections = {
         { id: 'deployments', label: 'Deployments', icon: PinIcon },
         { id: 'hire', label: 'Hire charges', icon: Receipt },
         { id: 'billing', label: 'Monthly billing', icon: CalendarClock },
+        { id: 'tracking', label: 'Tracking', icon: MapPin },
         { id: 'disposals', label: 'Disposals', icon: Archive },
       ],
     },

@@ -263,3 +263,20 @@ export interface Disposal {
   decisionNote: string | null; completedBy: string | null; completedAt: string | null; cancelledBy: string | null; cancelledAt: string | null
   cancelReason: string | null; evidenceCount: number; blockers: string[]
 }
+
+export interface TrackingSource {
+  freshness: "NEVER" | "FRESH" | "STALE" | "OFFLINE"; lastSeen: string | null; positionAt: string | null; latitude: number | null; longitude: number | null
+  meterAt: string | null; meterValue: number | null; meterUnit: string | null; providerCode: string | null
+}
+export interface TrackingStatus {
+  assetId: string; assetName: string; fleetNumber: string | null; meterUnit: string; machineMeter: number | null; activeDevices: number
+  provider: TrackingSource; manual: TrackingSource; providerMeterDifference: number | null
+}
+export interface TelematicsDevice {
+  id: string; assetId: string; assetName: string | null; fleetNumber: string | null; providerCode: string; externalId: string; label: string | null
+  active: boolean; mappedAt: string; unmappedAt: string | null; unmapReason: string | null
+}
+export interface TelematicsReading {
+  id: string; source: "PROVIDER" | "MANUAL"; providerCode: string | null; recordedAt: string; receivedAt: string; latitude: number | null; longitude: number | null
+  meterValue: number | null; meterUnit: string | null; enteredBy: string | null; note: string | null
+}

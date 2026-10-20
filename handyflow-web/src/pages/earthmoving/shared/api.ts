@@ -15,7 +15,7 @@
 // PUT (backend endpoint is still @PutMapping). Create is POST.
 
 import { apiClient } from "../../../api/client"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, ActiveChecklist, ChecklistVersion, ChecklistTypeOverview, ChecklistQuestion, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling, EarthDocument, DocumentVersion, Disposal } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, ActiveChecklist, ChecklistVersion, ChecklistTypeOverview, ChecklistQuestion, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling, EarthDocument, DocumentVersion, Disposal, TrackingStatus, TelematicsDevice, TelematicsReading } from "./types"
 
 export function unwrap<T>(r: { data?: { data?: unknown } & Record<string, unknown> }): T {
   const p = (r.data?.data ?? r.data) as { content?: unknown } | undefined
@@ -375,3 +375,21 @@ export const requestDisposal = async (b: RequestDisposal): Promise<Disposal> => 
 export const decideDisposal = async (b: { id: string; action: "approve" | "reject" | "cancel"; note: string | null }): Promise<Disposal> =>
   unwrap<Disposal>(await apiClient.post(`${BASE}/disposals/${b.id}/${b.action}`, { note: b.note }))
 export const completeDisposal = async (id: string): Promise<Disposal> => unwrap<Disposal>(await apiClient.post(`${BASE}/disposals/${id}/complete`))
+
+// ── Tracking (provider-neutral telematics) ───────────────────────────────
+
+const arr = <T,>(r: unknown): T[] => (Array.isArray(r) ? (r as T[]) : [])
+export const fetchTrackingStatus = async (): Promise<TrackingStatus[]> => arr<TrackingStatus>(unwrap<unknown>(await apiClient.get(`${BASE}/telematics/status`)))
+export const fetchTelematicsDevices = async (includeUnmapped: boolean): Promise<TelematicsDevice[]> =>
+  arr<TelematicsDevice>(unwrap<unknown>(await apiClient.get(`${BASE}/telematics/devices?includeUnmapped=${includeUnmapped}`)))
+export const fetchTelematicsProviders = async (): Promise<string[]> => arr<string>(unwrap<unknown>(await apiClient.get(`${BASE}/telematics/providers`)))
+export const fetchTelematicsReadings = async (assetId: string): Promise<TelematicsReading[]> =>
+  arr<TelematicsReading>(unwrap<unknown>(await apiClient.get(`${BASE}/telematics/assets/${assetId}/readings?limit=50`)))
+export interface MapDevice { assetId: string; providerCode: string; externalId: string; label: string | null }
+export const mapTelematicsDevice = async (b: MapDevice): Promise<TelematicsDevice> => unwrap<TelematicsDevice>(await apiClient.post(`${BASE}/telematics/devices`, b))
+export const unmapTelematicsDevice = async (b: { id: string; reason: string }): Promise<TelematicsDevice> =>
+  unwrap<TelematicsDevice>(await apiClient.post(`${BASE}/telematics/devices/${b.id}/unmap`, { reason: b.reason }))
+export interface ManualReading { assetId: string; latitude: number | null; longitude: number | null; meterValue: number | null; meterUnit: string | null; note: string | null }
+export const recordManualReading = async (b: ManualReading): Promise<TelematicsReading> =>
+  unwrap<TelematicsReading>(await apiClient.post(`${BASE}/telematics/assets/${b.assetId}/readings`,
+    { latitude: b.latitude, longitude: b.longitude, meterValue: b.meterValue, meterUnit: b.meterUnit, note: b.note }))

@@ -1,7 +1,7 @@
 // src/pages/earthmoving/shared/hooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, ActiveChecklist, ChecklistVersion, ChecklistTypeOverview, ChecklistQuestion, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling, EarthDocument, DocumentVersion, Disposal } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, ActiveChecklist, ChecklistVersion, ChecklistTypeOverview, ChecklistQuestion, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling, EarthDocument, DocumentVersion, Disposal, TrackingStatus, TelematicsDevice, TelematicsReading } from "./types"
 
 // Central query keys — every tab imports these instead of typing the
 // literal string, so a rename is a one-line change instead of a grep.
@@ -647,3 +647,20 @@ function useDisposalMutation<V>(fn: (v: V) => Promise<unknown>) {
 export const useRequestDisposal = () => useDisposalMutation(api.requestDisposal)
 export const useDecideDisposal = () => useDisposalMutation(api.decideDisposal)
 export const useCompleteDisposal = () => useDisposalMutation(api.completeDisposal)
+
+// ── Tracking ─────────────────────────────────────────────────────────────
+
+const trackKeys = ["em-tracking"] as const
+export const useTrackingStatus = () => useQuery<TrackingStatus[]>({ queryKey: [...trackKeys, "status"], queryFn: api.fetchTrackingStatus })
+export const useTelematicsDevices = (includeUnmapped: boolean) =>
+  useQuery<TelematicsDevice[]>({ queryKey: [...trackKeys, "devices", includeUnmapped], queryFn: () => api.fetchTelematicsDevices(includeUnmapped) })
+export const useTelematicsProviders = () => useQuery<string[]>({ queryKey: [...trackKeys, "providers"], queryFn: api.fetchTelematicsProviders })
+export const useTelematicsReadings = (assetId: string | null) =>
+  useQuery<TelematicsReading[]>({ queryKey: [...trackKeys, "readings", assetId], queryFn: () => api.fetchTelematicsReadings(assetId as string), enabled: !!assetId })
+function useTrackMutation<V>(fn: (v: V) => Promise<unknown>) {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: fn, onSuccess: () => qc.invalidateQueries({ queryKey: trackKeys }) })
+}
+export const useMapTelematicsDevice = () => useTrackMutation(api.mapTelematicsDevice)
+export const useUnmapTelematicsDevice = () => useTrackMutation(api.unmapTelematicsDevice)
+export const useRecordManualReading = () => useTrackMutation(api.recordManualReading)
