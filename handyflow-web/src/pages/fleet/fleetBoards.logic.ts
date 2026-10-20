@@ -94,3 +94,32 @@ export interface TyreItem { id: string; registration: string | null; position: s
 export interface BatteryItem { id: string; registration: string | null; position: string | null; brand: string; status: string; lastTestResult: string | null; lastVoltage: number | null }
 export const tyreAttention = (tyres: TyreItem[]): TyreItem[] => tyres.filter(t => t.treadStatus === "REPLACE_NOW" || t.treadStatus === "REPLACE_SOON").sort((a, b) => (a.treadStatus === b.treadStatus ? (a.lastTreadDepthMm ?? 99) - (b.lastTreadDepthMm ?? 99) : a.treadStatus === "REPLACE_NOW" ? -1 : 1))
 export const batteryAttention = (bs: BatteryItem[]): BatteryItem[] => bs.filter(b => b.lastTestResult === "FAILED" || b.lastTestResult === "WEAK" || b.status === "FAULTY").sort((a, b) => Number(b.lastTestResult === "FAILED" || b.status === "FAULTY") - Number(a.lastTestResult === "FAILED" || a.status === "FAULTY"))
+
+// ── Fuel & Energy dashboard ────────────────────────────────────────────────
+const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+/** The last `months` calendar months, oldest first; the current month ends today. */
+export function monthRanges(now = new Date(), months = 6): { key: string; label: string; from: string; to: string }[] {
+  return Array.from({ length: months }, (_, i) => {
+    const first = new Date(now.getFullYear(), now.getMonth() - (months - 1 - i), 1), last = new Date(first.getFullYear(), first.getMonth() + 1, 0)
+    return { key: isoDay(first).slice(0, 7), label: first.toLocaleDateString("en-ZA", { month: "short" }), from: isoDay(first), to: isoDay(last > now ? now : last) }
+  })
+}
+/** Fuel cost per km across the fleet, each vehicle weighted by the km it was measured over. */
+export function fleetCostPerKm(rows: FuelRow[]): number | null {
+  const m = rows.filter(r => r.summary.costPerKm != null && r.summary.measuredKm > 0), km = m.reduce((s, r) => s + r.summary.measuredKm, 0)
+  return km > 0 ? m.reduce((s, r) => s + Number(r.summary.costPerKm) * r.summary.measuredKm, 0) / km : null
+}
+export const spendBars = (rows: FuelRow[], limit = 8): { id: string; registration: string; spend: number; fraction: number }[] => {
+  const top = rows.filter(r => Number(r.summary.totalSpend) > 0).sort((a, b) => Number(b.summary.totalSpend) - Number(a.summary.totalSpend)).slice(0, limit), max = top.length ? Number(top[0].summary.totalSpend) : 0
+  return top.map(r => ({ id: r.vehicleId, registration: r.registration, spend: Number(r.summary.totalSpend), fraction: max > 0 ? Number(r.summary.totalSpend) / max : 0 }))
+}
+/** Thirstiest first, scaled to the thirstiest; vehicles with no measured consumption are left out rather than shown as zero. */
+export const thirstiestBars = (rows: FuelRow[], limit = 8): { id: string; registration: string; bar: Bar }[] => {
+  const withData = rows.filter(r => r.summary.litresPer100Km != null).sort((a, b) => (b.summary.litresPer100Km as number) - (a.summary.litresPer100Km as number)), max = withData.length ? (withData[0].summary.litresPer100Km as number) : 0
+  return withData.slice(0, limit).map(r => ({ id: r.vehicleId, registration: r.registration, bar: fuelBar(r.summary.litresPer100Km, r.latestDeviationPercent, max) }))
+}
+export interface StationRow { station: string; fuelType: string; fillups: number; litres: number; totalSpend: number; avgPricePerLitre: number; premiumPercent: number | null }
+export const cheapestStations = (st: StationRow[], limit = 5): StationRow[] => [...st].sort((a, b) => a.avgPricePerLitre - b.avgPricePerLitre || a.station.localeCompare(b.station)).slice(0, limit)
+export interface FuelAlertRow { kind: string; type: string; severity: string; registration: string; date: string; message: string }
+const SEVERITY_RANK: Record<string, number> = { ALERT: 0, WARNING: 1, INFO: 2 }
+export const topFuelAlerts = (a: FuelAlertRow[], limit = 5): FuelAlertRow[] => [...a].sort((x, y) => (SEVERITY_RANK[x.severity] ?? 9) - (SEVERITY_RANK[y.severity] ?? 9) || y.date.localeCompare(x.date)).slice(0, limit)
