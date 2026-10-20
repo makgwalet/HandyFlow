@@ -59,14 +59,14 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (section: s
 
   const expiring30 = vs.filter((v: any) => {
     const dates = [v.licenceDiscExpiry, v.roadworthyExpiry, v.insuranceExpiry].filter(Boolean)
-    return dates.some(d => daysUntil(d) <= 30 && daysUntil(d) >= 0)
+    return dates.some(d => daysUntil(d) <= 30)
   })
 
   const kpis = [
     { label: "Total fleet",    value: vs.length,                                               color: "var(--hf-primary-text)", bg: "var(--hf-info-soft)", icon: Car,           tab: "vehicles" },
     { label: "On trip now",    value: activeTrips.length,                                       color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", icon: Route,         tab: "trips" },
     { label: "Service due",    value: vs.filter((v: any) => v.dueForService).length,            color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", icon: Wrench,        tab: "services" },
-    { label: "Expiring soon",  value: expiring30.length,                                        color: expiring30.length > 0 ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)", bg: expiring30.length > 0 ? "var(--hf-danger-soft)" : "var(--hf-success-soft-strong)", icon: AlertTriangle, tab: "compliance" },
+    { label: "Expired / expiring",  value: expiring30.length,                                        color: expiring30.length > 0 ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)", bg: expiring30.length > 0 ? "var(--hf-danger-soft)" : "var(--hf-success-soft-strong)", icon: AlertTriangle, tab: "compliance" },
   ]
 
   const totalKmThisMonth = ts
@@ -220,7 +220,7 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (section: s
                 { label: "Licence", date: v.licenceDiscExpiry },
                 { label: "Roadworthy", date: v.roadworthyExpiry },
                 { label: "Insurance", date: v.insuranceExpiry },
-              ].filter(x => x.date && daysUntil(x.date) <= 30 && daysUntil(x.date) >= 0)
+              ].filter(x => x.date && daysUntil(x.date) <= 30)
                .sort((a, b) => daysUntil(a.date) - daysUntil(b.date))[0]
 
               return earliest ? (
@@ -231,7 +231,7 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (section: s
                   </div>
                   <div style={{ textAlign: "right" as const }}>
                     <div style={{ fontWeight: 700, color: daysUntil(earliest.date) <= 7 ? "var(--hf-danger-text)" : "var(--hf-warning-text)" }}>
-                      {daysUntil(earliest.date)} days
+                      {daysUntil(earliest.date) < 0 ? `Expired ${-daysUntil(earliest.date)}d ago` : `${daysUntil(earliest.date)} days`}
                     </div>
                     <div style={{ color: "var(--hf-text-faint)" }}>{fmtDate(earliest.date)}</div>
                   </div>

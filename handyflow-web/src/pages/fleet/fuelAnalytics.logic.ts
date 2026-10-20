@@ -43,19 +43,21 @@ const SOURCE_RANK: Record<FleetAlert["source"], number> = { Accident: 0, Fuel: 1
 export interface AlertInputs {
   fuel: { kind: string; type: string; severity: string; registration: string; date: string; message: string }[]
   accidents: { id: string; registration: string; status: string; vehicleDrivable: boolean; referenceNumber: string }[]
-  vehicles: { id: string; registration: string; status: string; dueForService: boolean; licenceExpiringSoon: boolean; roadworthyExpiringSoon: boolean }[]
+  vehicles: { id: string; registration: string; status: string; dueForService: boolean; licenceExpiringSoon: boolean; roadworthyExpiringSoon: boolean; licenceDiscExpiry?: string | null; roadworthyExpiry?: string | null }[]
 }
 const BLOCKING = new Set(["REPORTED", "UNDER_ASSESSMENT", "IN_REPAIR", "WRITTEN_OFF"])
 
 /** One feed from fuel flags, vehicles that cannot be driven, expiring papers and services due; most urgent first (within a level: accidents, fuel, compliance, service). */
-export function buildAlerts(i: AlertInputs): FleetAlert[] {
+export function buildAlerts(i: AlertInputs, now = new Date()): FleetAlert[] {
   const out: FleetAlert[] = []
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
   for (const a of i.accidents) if (!a.vehicleDrivable && BLOCKING.has(a.status))
     out.push({ key: `acc-${a.id}`, severity: "high", source: "Accident", registration: a.registration, message: `Cannot be driven after accident ${a.referenceNumber}; blocked from trips.`, section: "accidents" })
   for (const v of i.vehicles) {
     if (v.status === "RETIRED") continue
-    if (v.licenceExpiringSoon) out.push({ key: `lic-${v.id}`, severity: "medium", source: "Compliance", registration: v.registration, message: "Licence disc expires soon.", section: "compliance" })
-    if (v.roadworthyExpiringSoon) out.push({ key: `rwc-${v.id}`, severity: "medium", source: "Compliance", registration: v.registration, message: "Roadworthy certificate expires soon.", section: "compliance" })
+    const gone = (d?: string | null) => !!d && d < today
+    if (v.licenceExpiringSoon) out.push({ key: `lic-${v.id}`, severity: gone(v.licenceDiscExpiry) ? "high" : "medium", source: "Compliance", registration: v.registration, message: gone(v.licenceDiscExpiry) ? "Licence disc has expired." : "Licence disc expires soon.", section: "compliance" })
+    if (v.roadworthyExpiringSoon) out.push({ key: `rwc-${v.id}`, severity: gone(v.roadworthyExpiry) ? "high" : "medium", source: "Compliance", registration: v.registration, message: gone(v.roadworthyExpiry) ? "Roadworthy certificate has expired." : "Roadworthy certificate expires soon.", section: "compliance" })
     if (v.dueForService) out.push({ key: `svc-${v.id}`, severity: "medium", source: "Service", registration: v.registration, message: "Service is due.", section: "services" })
   }
   i.fuel.forEach((f, n) => out.push({ key: `fuel-${n}`, severity: f.severity === "ALERT" || f.severity === "HIGH" ? "high" : f.severity === "WARNING" || f.severity === "MEDIUM" ? "medium" : "low", source: "Fuel", registration: f.registration, message: f.message, section: "fuel-analytics" }))

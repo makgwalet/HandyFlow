@@ -3,6 +3,10 @@ export const BAND_LABEL: Record<string, string> = { EXCELLENT: "Excellent", GOOD
 export const bandTone = (band: string | null | undefined): "ok" | "warn" | "bad" | "none" =>
   band === "EXCELLENT" || band === "GOOD" ? "ok" : band === "FAIR" ? "warn" : band === "POOR" ? "bad" : "none"
 
+/** A score built on too little data is not a verdict: show "Not rated" instead of a band. */
+export const bandText = (band: string | null | undefined, reliable: boolean) => (!band ? "—" : reliable ? BAND_LABEL[band] : "Not rated")
+export const bandToneFor = (band: string | null | undefined, reliable: boolean) => (reliable ? bandTone(band) : "none")
+
 export const scoreText = (overall: number | null | undefined) => (overall == null ? "No data" : `${overall.toFixed(1)}%`)
 
 export interface Settings {

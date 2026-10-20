@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import DriverScoresTab from "./DriverScoresTab"
-import { bandTone, coverageNote, scoreText, settingsBody, settingsProblem, toForm, weightTotal } from "./driverScores.logic"
+import { bandText, bandToneFor, bandTone, coverageNote, scoreText, settingsBody, settingsProblem, toForm, weightTotal } from "./driverScores.logic"
 
 const get = vi.fn(), put = vi.fn()
 type Args = unknown[]
@@ -36,6 +36,11 @@ describe("score rules", () => {
     expect(scoreText(92.34)).toBe("92.3%"); expect(scoreText(null)).toBe("No data")
     expect(["EXCELLENT", "GOOD", "FAIR", "POOR", null].map(bandTone)).toEqual(["ok", "ok", "warn", "bad", "none"])
     expect(coverageNote(true, 100)).toBeNull(); expect(coverageNote(false, 29.6)).toMatch(/30%/)
+  })
+  it("a thin score is Not rated, never a verdict", () => {
+    expect(bandText("EXCELLENT", false)).toBe("Not rated"); expect(bandText("POOR", false)).toBe("Not rated")
+    expect(bandText("GOOD", true)).toBe("Good"); expect(bandText(null, true)).toBe("—")
+    expect(bandToneFor("POOR", false)).toBe("none"); expect(bandToneFor("POOR", true)).toBe("bad")
   })
   it("settings: weights must total 100 and thresholds must go down", () => {
     const f = toForm(settings)

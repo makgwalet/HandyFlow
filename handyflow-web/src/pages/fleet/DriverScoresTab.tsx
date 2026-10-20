@@ -5,7 +5,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
-import { BAND_LABEL, WEIGHT_FIELDS, bandTone, coverageNote, scoreText, settingsBody, settingsProblem, toForm, weightTotal, type Settings, type SettingsForm } from "./driverScores.logic"
+import { WEIGHT_FIELDS, bandText, bandToneFor, coverageNote, scoreText, settingsBody, settingsProblem, toForm, weightTotal, type Settings, type SettingsForm } from "./driverScores.logic"
 import { COMPLIANCE_LABEL, complianceTone, expiryText } from "./vehicleDetail.logic"
 
 interface Row { driverId: string; driverName: string; overall: number | null; band: string | null; coverage: number; reliable: boolean; tripCount: number }
@@ -41,7 +41,7 @@ function ProfileView({ id, onClose }: { id: string; onClose: () => void }) {
         <tr key={c.key} aria-label={c.label}><td style={{ padding: "2px 10px 2px 0" }}>{c.label}</td>
           <td style={{ color: TONE[complianceTone(c.status)], fontWeight: 700, padding: "2px 10px 2px 0" }}>● {COMPLIANCE_LABEL[c.status] ?? c.status}</td><td style={{ color: "var(--hf-text-muted)" }}>{c.daysRemaining != null ? expiryText(c.daysRemaining) : ""}</td></tr>))}</tbody></table>
       <h4 style={{ margin: "12px 0 4px" }}>Safety &amp; performance score</h4>
-      <div style={{ fontSize: 22, fontWeight: 800, color: TONE[bandTone(score.band)] }} aria-label="Overall score">{scoreText(score.overall)} {score.band && <span style={{ fontSize: 13 }}>{BAND_LABEL[score.band]}</span>}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: TONE[bandToneFor(score.band, score.reliable)] }} aria-label="Overall score">{scoreText(score.overall)} {score.band && <span style={{ fontSize: 13 }}>{bandText(score.band, score.reliable)}</span>}</div>
       {note && <div role="status" style={{ fontSize: 12, color: "var(--hf-warning-text)" }}>{note}</div>}
       <table style={{ width: "100%", fontSize: 12.5, marginTop: 6 }}><tbody>{score.components.map(c => (
         <tr key={c.key} aria-label={c.label} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
@@ -112,7 +112,7 @@ export default function DriverScoresTab() {
             <tr key={r.driverId} aria-label={r.driverName} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
               <td style={{ padding: "9px 10px" }}>{i + 1}</td><td style={{ padding: "9px 10px" }}><strong>{r.driverName}</strong></td>
               <td style={{ padding: "9px 10px", fontWeight: 700 }}>{scoreText(r.overall)}{!r.reliable && r.overall != null && <span title="Low data coverage"> *</span>}</td>
-              <td style={{ padding: "9px 10px", color: TONE[bandTone(r.band)], fontWeight: 700 }}>{r.band ? BAND_LABEL[r.band] : "—"}</td>
+              <td style={{ padding: "9px 10px", color: TONE[bandToneFor(r.band, r.reliable)], fontWeight: 700 }}>{bandText(r.band, r.reliable)}</td>
               <td style={{ padding: "9px 10px" }}>{r.tripCount}</td>
               <td style={{ padding: "9px 10px" }}><button type="button" style={field} onClick={() => setOpenId(r.driverId)}>Profile</button></td>
             </tr>))}</tbody>

@@ -48,6 +48,15 @@ describe("fuel logic", () => {
   })
 })
 
+describe("expired papers", () => {
+  it("are high severity and say expired, not expires soon", () => {
+    const v = (d: string) => ({ id: "v", registration: "ABC", status: "AVAILABLE", dueForService: false, licenceExpiringSoon: true, roadworthyExpiringSoon: false, licenceDiscExpiry: d })
+    const now = new Date(2026, 9, 20)
+    expect(buildAlerts({ fuel: [], accidents: [], vehicles: [v("2026-10-01")] }, now)[0]).toMatchObject({ severity: "high", message: "Licence disc has expired." })
+    expect(buildAlerts({ fuel: [], accidents: [], vehicles: [v("2026-11-05")] }, now)[0]).toMatchObject({ severity: "medium", message: "Licence disc expires soon." })
+  })
+})
+
 describe("FuelAnalyticsTab", () => {
   it("shows fleet totals and each vehicle against its own usual", async () => {
     wrap(<FuelAnalyticsTab />); await screen.findByText("ABC123MP")
