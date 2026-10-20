@@ -13,7 +13,7 @@ import java.util.UUID;
 public final class AlertRules {
     private AlertRules() {}
 
-    public static final Set<String> TYPES = Set.of("SERVICE_DUE", "BREAKDOWN", "WORK_ORDER_OVERDUE", "DOCUMENT_EXPIRY");
+    public static final Set<String> TYPES = Set.of("SERVICE_DUE", "BREAKDOWN", "WORK_ORDER_OVERDUE", "DOCUMENT_EXPIRY", "DISPOSAL_APPROVAL");
     /** A breakdown must reach someone, and must reach the next level within this time if nobody acknowledges it. */
     public static final int BREAKDOWN_MAX_ESCALATION_MINUTES = 60;
     public static final int MAX_ESCALATION_MINUTES = 7 * 24 * 60;

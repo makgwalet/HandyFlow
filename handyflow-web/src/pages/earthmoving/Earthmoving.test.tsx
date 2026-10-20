@@ -68,6 +68,8 @@ describe("status rules in the screen", () => {
     expect(needsReason("DEPLOYED", "AVAILABLE")).toBe(false)
     expect(needsReason("MAINTENANCE", "AVAILABLE")).toBe(true)
     for (const list of Object.values(STATUS_TRANSITIONS)) expect(list).not.toContain("DEPLOYED")
+    // A machine is retired only by completing a disposal request, never from the status dialog.
+    for (const list of Object.values(STATUS_TRANSITIONS)) expect(list).not.toContain("RETIRED")
   })
 })
 

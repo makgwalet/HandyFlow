@@ -9,6 +9,7 @@ import za.co.handyflow.platform.documents.application.DocumentsFacade.FileUpload
 import za.co.handyflow.platform.documents.application.DocumentsFacade.VersionInfo;
 import za.co.handyflow.platform.earthmoving.domain.model.DocumentPolicy;
 import za.co.handyflow.platform.earthmoving.domain.repository.EarthAssetRepository;
+import za.co.handyflow.platform.earthmoving.domain.repository.EarthDisposalRequestRepository;
 import za.co.handyflow.platform.notifications.application.UserRecipientResolver;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
@@ -30,6 +31,7 @@ public class EarthDocumentService {
 
     private final DocumentsFacade documents;
     private final EarthAssetRepository assets;
+    private final EarthDisposalRequestRepository disposals;
     private final UserRecipientResolver users;
     private final EarthAlertService alerts;
     private final EarthmovingAccess access;
@@ -110,8 +112,9 @@ public class EarthDocumentService {
     }
 
     private void checkOwner(TenantId tenantId, String owner, UUID ownerId) {
-        if (ownerId == null) throw new IllegalArgumentException("Say which machine or operator the document belongs to.");
+        if (ownerId == null) throw new IllegalArgumentException("Say which machine, operator or disposal request the document belongs to.");
         if (DocumentPolicy.OWNER_ASSET.equals(owner)) assets.findActiveById(tenantId, ownerId).orElseThrow(() -> new ResourceNotFoundException("Asset", ownerId.toString()));
+        else if (DocumentPolicy.OWNER_DISPOSAL.equals(owner)) disposals.findByTenantAndId(tenantId, ownerId).orElseThrow(() -> new ResourceNotFoundException("Disposal request", ownerId.toString()));
         else if (users.resolveUser(tenantId, ownerId).isEmpty()) throw new ResourceNotFoundException("User", ownerId.toString());
     }
 

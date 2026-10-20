@@ -129,6 +129,16 @@ class EarthAssetServiceTest {
     }
 
     @Test
+    void aMachineCannotBeRetiredByAStatusChangeEvenByAnAdmin() {
+        EarthAsset a = machine(AssetStatus.AVAILABLE);
+        granted.add("EARTHMOVING_ADMIN");
+        var e = assertThrows(IllegalStateException.class, () -> service.updateStatus(tenant, a.getId(), status("RETIRED", "No longer needed"), actor));
+        assertTrue(e.getMessage().contains("Disposals"));
+        assertEquals(AssetStatus.AVAILABLE, a.getStatus());
+        verify(assets, never()).save(any());
+    }
+
+    @Test
     void aStatusChangeThatIsNotAReleaseNeverLooksAtWorkOrders() {
         EarthAsset a = machine(AssetStatus.AVAILABLE);
         granted.addAll(Set.of("EARTHMOVING_MAINTAIN"));

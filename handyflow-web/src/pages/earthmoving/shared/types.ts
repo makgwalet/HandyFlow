@@ -256,3 +256,10 @@ export interface EarthDocument {
   id: string; ownerType: string; ownerId: string; category: string; title: string; description: string | null; expiresOn: string | null
   status: string; archivedReason: string | null; currentVersion: number; current: DocumentVersion | null; createdAt: string; createdBy: string | null
 }
+
+export interface Disposal {
+  id: string; assetId: string; assetName: string | null; fleetNumber: string | null; reason: string; status: string; details: string
+  counterparty: string | null; proceeds: number | null; requestedBy: string; requestedAt: string; decidedBy: string | null; decidedAt: string | null
+  decisionNote: string | null; completedBy: string | null; completedAt: string | null; cancelledBy: string | null; cancelledAt: string | null
+  cancelReason: string | null; evidenceCount: number; blockers: string[]
+}

@@ -1,7 +1,7 @@
 // src/pages/earthmoving/shared/hooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, ActiveChecklist, ChecklistVersion, ChecklistTypeOverview, ChecklistQuestion, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling, EarthDocument, DocumentVersion } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, ActiveChecklist, ChecklistVersion, ChecklistTypeOverview, ChecklistQuestion, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling, EarthDocument, DocumentVersion, Disposal } from "./types"
 
 // Central query keys — every tab imports these instead of typing the
 // literal string, so a rename is a one-line change instead of a grep.
@@ -628,3 +628,22 @@ export const useUploadDocument = () => useDocMutation(api.uploadDocument)
 export const useAddDocumentVersion = () => useDocMutation(api.addDocumentVersion)
 export const useUpdateDocument = () => useDocMutation(api.updateDocument)
 export const useArchiveDocument = () => useDocMutation(api.archiveDocument)
+
+// ── Disposals ────────────────────────────────────────────────────────────
+
+const disposalKeys = ["em-disposals"] as const
+export function useDisposals() {
+  return useQuery<Disposal[]>({ queryKey: disposalKeys, queryFn: () => api.fetchDisposals() })
+}
+function useDisposalMutation<V>(fn: (v: V) => Promise<unknown>) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: disposalKeys }); qc.invalidateQueries({ queryKey: QK.alerts }); qc.invalidateQueries({ queryKey: QK.assets })
+    },
+  })
+}
+export const useRequestDisposal = () => useDisposalMutation(api.requestDisposal)
+export const useDecideDisposal = () => useDisposalMutation(api.decideDisposal)
+export const useCompleteDisposal = () => useDisposalMutation(api.completeDisposal)

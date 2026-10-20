@@ -36,7 +36,8 @@ public final class DocumentPolicy {
         return switch (k) {
             case "ASSET" -> OWNER_ASSET;
             case "OPERATOR" -> OWNER_OPERATOR;
-            default -> throw new IllegalArgumentException("Documents belong to a machine (ASSET) or an operator (OPERATOR).");
+            case "DISPOSAL" -> OWNER_DISPOSAL;
+            default -> throw new IllegalArgumentException("Documents belong to a machine (ASSET), an operator (OPERATOR) or a disposal request (DISPOSAL).");
         };
     }
 

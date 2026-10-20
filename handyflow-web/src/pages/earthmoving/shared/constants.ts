@@ -70,17 +70,18 @@ export const SEVERITY_CFG: Record<string, { color: string; bg: string; border: s
   LOW:      { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)" },
 }
 
+// RETIRED is not listed: a machine is retired only by completing an approved disposal request (Disposals section).
 // Mirrors AssetStatus.java's transition table (keep in step). DEPLOYED is never set from the status dialog: use Deploy,
 // which records the site and client.
 export const ALERT_TYPE_LABEL: Record<string, string> = {
-  SERVICE_DUE: "Service due", BREAKDOWN: "Breakdown or accident", WORK_ORDER_OVERDUE: "Overdue work order", DOCUMENT_EXPIRY: "Document expiring",
+  SERVICE_DUE: "Service due", BREAKDOWN: "Breakdown or accident", WORK_ORDER_OVERDUE: "Overdue work order", DOCUMENT_EXPIRY: "Document expiring", DISPOSAL_APPROVAL: "Disposal waiting for approval",
 }
 
 export const STATUS_TRANSITIONS: Record<string, string[]> = {
-  AVAILABLE:   ["MAINTENANCE", "HIRED_OUT", "RETIRED"],
+  AVAILABLE:   ["MAINTENANCE", "HIRED_OUT"],
   DEPLOYED:    ["AVAILABLE", "BREAKDOWN", "MAINTENANCE"],
-  MAINTENANCE: ["AVAILABLE", "BREAKDOWN", "RETIRED"],
-  BREAKDOWN:   ["AVAILABLE", "MAINTENANCE", "RETIRED"],
+  MAINTENANCE: ["AVAILABLE", "BREAKDOWN"],
+  BREAKDOWN:   ["AVAILABLE", "MAINTENANCE"],
   HIRED_OUT:   ["AVAILABLE", "BREAKDOWN"],
   RETIRED:     [],
 }
@@ -125,7 +126,7 @@ export const HIRE_RATE_SOURCE_LABEL: Record<string, string> = {
 export const ANSWER_TYPE_LABEL: Record<string, string> = { PASS_FAIL: "Pass or fail", NUMERIC: "A number", TEXT: "A note", PHOTO: "A photo" }
 
 export const DOCUMENT_CATEGORY_LABEL: Record<string, string> = {
-  PHOTO: "Photo", MANUAL: "Manual", INSURANCE: "Insurance", WARRANTY: "Warranty", OTHER: "Other", OPERATOR_CERTIFICATE: "Operator certificate",
+  PHOTO: "Photo", MANUAL: "Manual", INSURANCE: "Insurance", WARRANTY: "Warranty", OTHER: "Other", OPERATOR_CERTIFICATE: "Operator certificate", DISPOSAL_EVIDENCE: "Disposal evidence",
 }
 export const DOCUMENT_CATEGORIES: Record<"ASSET" | "OPERATOR", string[]> = {
   ASSET: ["PHOTO", "MANUAL", "INSURANCE", "WARRANTY", "OTHER"], OPERATOR: ["OPERATOR_CERTIFICATE"],
@@ -133,3 +134,8 @@ export const DOCUMENT_CATEGORIES: Record<"ASSET" | "OPERATOR", string[]> = {
 /** These need an expiry date and an administrator to see or change them. */
 export const SENSITIVE_DOCUMENT_CATEGORIES = ["INSURANCE", "WARRANTY", "OPERATOR_CERTIFICATE"]
 export const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
+
+export const DISPOSAL_REASON_LABEL: Record<string, string> = { SOLD: "Sold", SCRAPPED: "Scrapped", WRITTEN_OFF: "Written off", TRANSFERRED: "Transferred" }
+/** Sold and transferred machines go to someone, so the server needs to know who. */
+export const DISPOSAL_NEEDS_COUNTERPARTY = ["SOLD", "TRANSFERRED"]
+export const DISPOSAL_STATUS_LABEL: Record<string, string> = { REQUESTED: "Waiting for approval", APPROVED: "Approved", REJECTED: "Rejected", COMPLETED: "Completed", CANCELLED: "Cancelled" }

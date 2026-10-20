@@ -15,7 +15,7 @@
 // PUT (backend endpoint is still @PutMapping). Create is POST.
 
 import { apiClient } from "../../../api/client"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, ActiveChecklist, ChecklistVersion, ChecklistTypeOverview, ChecklistQuestion, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling, EarthDocument, DocumentVersion } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, ActiveChecklist, ChecklistVersion, ChecklistTypeOverview, ChecklistQuestion, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling, EarthDocument, DocumentVersion, Disposal } from "./types"
 
 export function unwrap<T>(r: { data?: { data?: unknown } & Record<string, unknown> }): T {
   const p = (r.data?.data ?? r.data) as { content?: unknown } | undefined
@@ -362,3 +362,16 @@ export const downloadDocument = async (id: string, version: number | null, fileN
   document.body.appendChild(a); a.click(); a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
+
+// ── Disposals ────────────────────────────────────────────────────────────
+// Evidence is attached through the documents endpoints with kind DISPOSAL.
+
+export const fetchDisposals = async (status?: string): Promise<Disposal[]> => {
+  const r = unwrap<unknown>(await apiClient.get(`${BASE}/disposals${status ? `?status=${status}` : ""}`))
+  return Array.isArray(r) ? (r as Disposal[]) : []
+}
+export interface RequestDisposal { assetId: string; reason: string; details: string; counterparty: string | null; proceeds: number | null }
+export const requestDisposal = async (b: RequestDisposal): Promise<Disposal> => unwrap<Disposal>(await apiClient.post(`${BASE}/disposals`, b))
+export const decideDisposal = async (b: { id: string; action: "approve" | "reject" | "cancel"; note: string | null }): Promise<Disposal> =>
+  unwrap<Disposal>(await apiClient.post(`${BASE}/disposals/${b.id}/${b.action}`, { note: b.note }))
+export const completeDisposal = async (id: string): Promise<Disposal> => unwrap<Disposal>(await apiClient.post(`${BASE}/disposals/${id}/complete`))

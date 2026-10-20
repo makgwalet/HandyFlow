@@ -8,6 +8,7 @@ import za.co.handyflow.platform.documents.application.DocumentsFacade.FileUpload
 import za.co.handyflow.platform.earthmoving.application.internal.*;
 import za.co.handyflow.platform.earthmoving.domain.model.EarthAsset;
 import za.co.handyflow.platform.earthmoving.domain.repository.EarthAssetRepository;
+import za.co.handyflow.platform.earthmoving.domain.repository.EarthDisposalRequestRepository;
 import za.co.handyflow.platform.notifications.application.UserRecipientResolver;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
@@ -26,6 +27,7 @@ import static org.mockito.Mockito.*;
 class EarthDocumentServiceTest {
     DocumentsFacade documents = mock(DocumentsFacade.class);
     EarthAssetRepository assets = mock(EarthAssetRepository.class);
+    EarthDisposalRequestRepository disposals = mock(EarthDisposalRequestRepository.class);
     UserRecipientResolver users = mock(UserRecipientResolver.class);
     EarthAlertService alerts = mock(EarthAlertService.class);
     Set<String> granted = new HashSet<>();
@@ -44,7 +46,7 @@ class EarthDocumentServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new EarthDocumentService(documents, assets, users, alerts, access);
+        service = new EarthDocumentService(documents, assets, disposals, users, alerts, access);
         asset = EarthAsset.create(tenant, "CAT D9", "D9-001", "DOZER", null, null, null, null, null, "OWN", null, null, null, null, null, null);
         when(assets.findActiveById(tenant, asset.getId())).thenReturn(Optional.of(asset));
     }
@@ -126,5 +128,20 @@ class EarthDocumentServiceTest {
         when(documents.archive(tenant, d.id(), "Cancelled policy", actor)).thenReturn(d);
         service.archive(tenant, d.id(), "Cancelled policy", actor);
         verify(alerts, times(3)).resolveByKey(eq(tenant), any(), eq(actor), any());
+    }
+
+    @Test void disposalEvidenceNeedsAnExistingRequestAndOnlyWriteAuthority() {
+        UUID requestId = UUID.randomUUID();
+        granted.add("EARTHMOVING_WRITE");
+        assertThrows(ResourceNotFoundException.class, () -> service.upload(tenant, "DISPOSAL", requestId, "DISPOSAL_EVIDENCE", "Sale agreement", null, null, file, actor));
+        var request = za.co.handyflow.platform.earthmoving.domain.model.EarthDisposalRequest.request(tenant, asset.getId(), "SCRAPPED", "Beyond economic repair", null, null, actor);
+        when(disposals.findByTenantAndId(tenant, requestId)).thenReturn(Optional.of(request));
+        service.upload(tenant, "DISPOSAL", requestId, "DISPOSAL_EVIDENCE", "Scrap certificate", null, null, file, actor);
+        verify(documents).upload(eq(tenant), eq("EARTH_DISPOSAL"), eq(requestId), eq("DISPOSAL_EVIDENCE"), any(), any(), any(), any(), eq(actor));
+    }
+
+    @Test void aDisposalDocumentMustBeEvidence() {
+        granted.add("EARTHMOVING_WRITE");
+        assertThrows(IllegalArgumentException.class, () -> service.upload(tenant, "DISPOSAL", UUID.randomUUID(), "MANUAL", "Manual", null, null, file, actor));
     }
 }

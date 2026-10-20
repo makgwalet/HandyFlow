@@ -149,6 +149,9 @@ public class EarthAssetService {
                     "A machine is deployed with the Deploy action, which records the site and client. Use that instead.");
         }
         access.require(needed, "make this status change");
+        if (target == AssetStatus.RETIRED) {
+            throw new IllegalStateException("A machine is retired by completing an approved disposal request, which records the reason and the evidence. Use Disposals instead.");
+        }
 
         String reason = req.note() == null ? null : req.note().trim();
         if (EarthmovingRules.needsReason(previousStatus, target)) {

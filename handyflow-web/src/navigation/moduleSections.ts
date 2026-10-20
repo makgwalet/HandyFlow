@@ -13,7 +13,7 @@ import {
   AlertTriangle, Bell, CheckCircle2, Coins, Camera, ClipboardList, Clock, Crosshair, DoorOpen, FileBarChart,
   GitBranch, Key, LayoutDashboard, Lock, MapPin, Radio, RefreshCw, Repeat, Route,
   Footprints, QrCode, Gauge, Shield, ShieldCheck, Siren, Tablet, DollarSign, Wheat, Tractor, PawPrint,
-  Droplets, ArrowDownToLine, Fuel, Truck, Users, TrendingUp, Car, Wrench,
+  Droplets, Archive, ArrowDownToLine, Fuel, Truck, Users, TrendingUp, Car, Wrench,
   Calculator, BookOpen, GitBranch as JournalIcon, Landmark, BarChart2, FileText,
   Briefcase, Calendar, FolderOpen, AlertOctagon, CalendarCheck, Settings,
   Building2, GraduationCap, CalendarDays, Award, Scale, Gavel, FileSearch, MapPin as PinIcon, HardHat,
@@ -431,6 +431,7 @@ export const EARTHMOVING_SECTIONS: ModuleSections = {
         { id: 'deployments', label: 'Deployments', icon: PinIcon },
         { id: 'hire', label: 'Hire charges', icon: Receipt },
         { id: 'billing', label: 'Monthly billing', icon: CalendarClock },
+        { id: 'disposals', label: 'Disposals', icon: Archive },
       ],
     },
     {

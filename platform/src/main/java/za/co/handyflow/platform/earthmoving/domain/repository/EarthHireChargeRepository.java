@@ -19,6 +19,10 @@ public interface EarthHireChargeRepository extends JpaRepository<EarthHireCharge
     @Query("SELECT c FROM EarthHireCharge c WHERE c.tenantId = :tenantId AND c.id IN :ids")
     List<EarthHireCharge> findByTenantAndIds(TenantId tenantId, Collection<UUID> ids);
 
+    /** Charges raised for this machine that have not been invoiced or voided. */
+    @Query("SELECT COUNT(c) FROM EarthHireCharge c WHERE c.tenantId = :tenantId AND c.assetId = :assetId AND c.status = 'PENDING'")
+    long countPendingForAsset(TenantId tenantId, UUID assetId);
+
     /** Newest first; a null status means all. */
     @Query("SELECT c FROM EarthHireCharge c WHERE c.tenantId = :tenantId AND (:status IS NULL OR c.status = :status) ORDER BY c.createdAt DESC")
     List<EarthHireCharge> findForTenant(TenantId tenantId, String status);
