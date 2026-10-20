@@ -203,7 +203,7 @@ export const FLEET_SECTIONS: ModuleSections = {
   icon: Car,
   defaultSection: 'dashboard',
   groups: [
-    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }, { id: 'alerts', label: 'Alerts', icon: Bell }] },
     {
       label: 'Fleet',
       sections: [
@@ -219,6 +219,7 @@ export const FLEET_SECTIONS: ModuleSections = {
         { id: 'trips', label: 'Logbook', icon: Route },
         { id: 'services', label: 'Service History', icon: Wrench },
         { id: 'fuel', label: 'Fuel Log', icon: Fuel },
+        { id: 'fuel-analytics', label: 'Fuel Analytics', icon: TrendingUp },
         { id: 'workshop', label: 'Workshop', icon: Wrench },
         { id: 'tyres', label: 'Tyres & Batteries', icon: Gauge },
         { id: 'inspections', label: 'Inspections', icon: ClipboardList },
