@@ -5,6 +5,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
+import WorkOrderAttachments, { type WorkOrderAttachment } from "./WorkOrderAttachments"
 import {
   LINE_LABEL, LINE_TYPES, PRIORITIES, STATUS_LABEL, TYPE_LABEL, canEditLines, completeBody, completeProblem, emptyComplete, emptyLine, emptyOrder, emptyQuote, emptyTech,
   lineBody, lineProblem, orderBody, orderProblem, quoteBody, quoteProblem, stepsFor, techBody, techProblem, varianceText, type StepOption,
@@ -12,7 +13,7 @@ import {
 
 interface Order { id: string; referenceNumber: string; vehicleId: string; registration: string; type: string; title: string; priority: string; status: string; assignedTechnicianName: string | null; quotedAmount: number | null; actualTotal: number | null; scheduledFor: string | null }
 interface Line { id: string; lineType: string; description: string; quantity: number; unitCost: number; lineTotal: number; technicianName: string | null }
-interface Detail { summary: Order; description: string | null; rejectionReason: string | null; holdReason: string | null; lines: Line[]; labourTotal: number; partsTotal: number; subletTotal: number; otherTotal: number; varianceToQuote: number | null; overQuote: boolean; downtimeHours: number | null; downtimeOngoing: boolean }
+interface Detail { summary: Order; description: string | null; rejectionReason: string | null; holdReason: string | null; lines: Line[]; labourTotal: number; partsTotal: number; subletTotal: number; otherTotal: number; varianceToQuote: number | null; overQuote: boolean; downtimeHours: number | null; downtimeOngoing: boolean; attachments?: WorkOrderAttachment[] }
 interface Tech { id: string; name: string; phone: string | null; hourlyRate: number | null; active: boolean }
 interface VehicleOption { id: string; registration: string }
 
@@ -91,6 +92,7 @@ function Runner({ id, onClose }: { id: string; onClose: () => void }) {
           {line.lineType === "LABOUR" && <select aria-label="Technician" style={field} value={line.technicianId} onChange={e => setLine({ ...line, technicianId: e.target.value })}><option value="">Technician…</option>{techs.filter(t => t.active).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>}
           <button type="button" style={{ ...btn, opacity: lineProblem(line) || addLine.isPending ? 0.5 : 1 }} disabled={!!lineProblem(line) || addLine.isPending} onClick={() => addLine.mutate()}>Add cost</button>
         </div>)}
+      <WorkOrderAttachments orderId={id} status={o.status} attachments={data.attachments ?? []} />
       {steps.length > 0 && !step && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>{steps.map(s => <button key={s.step} type="button" style={{ ...btn, background: s.step === "CANCEL" || s.step === "REJECT" ? "var(--hf-danger-text)" : undefined }} onClick={() => { setStep(s); setError(null) }}>{s.label}</button>)}</div>}
       {step && (
         <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, padding: 10, marginTop: 8 }}>

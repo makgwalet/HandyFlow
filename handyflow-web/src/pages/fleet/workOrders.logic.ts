@@ -69,3 +69,28 @@ export interface TechForm { name: string; phone: string; email: string; hourlyRa
 export const emptyTech = (): TechForm => ({ name: "", phone: "", email: "", hourlyRate: "" })
 export function techProblem(f: TechForm) { if (!f.name.trim()) return "Enter the technician's name."; if (bad(f.hourlyRate)) return "The hourly rate must be zero or more."; return null }
 export const techBody = (f: TechForm) => ({ name: f.name.trim(), phone: f.phone.trim() || null, email: f.email.trim() || null, hourlyRate: num(f.hourlyRate), active: true })
+
+// ── Attachments: quotations, invoices, job cards and photos ─────────────────────────────────────────────
+export const ATTACHMENT_TYPES = ["QUOTATION", "INVOICE", "JOB_CARD", "PHOTO", "OTHER"]
+export const ATTACHMENT_LABEL: Record<string, string> = { QUOTATION: "Quotation", INVOICE: "Invoice", JOB_CARD: "Job card", PHOTO: "Photo", OTHER: "Other" }
+export const ATTACHMENT_MAX_BYTES = 15 * 1024 * 1024
+export const ATTACHMENT_MAX_COUNT = 50
+export const ATTACHMENT_MIME = ["application/pdf", "image/jpeg", "image/png", "image/webp", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
+
+export function fileSizeText(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+/** What the server would refuse, caught before the upload: type, file kind, size and the 50-per-order limit. */
+export function attachmentProblem(type: string, file: { name: string; type: string; size: number } | null, existing: number): string | null {
+  if (!type) return "Choose what this file is."
+  if (!file) return "Choose a file."
+  if (existing >= ATTACHMENT_MAX_COUNT) return `A work order can have at most ${ATTACHMENT_MAX_COUNT} attachments.`
+  if (!ATTACHMENT_MIME.includes(file.type)) return "Attach a PDF, an image (JPEG, PNG or WebP) or a Word (.docx) file."
+  if (file.size > ATTACHMENT_MAX_BYTES) return `That file is ${fileSizeText(file.size)}; the limit is 15 MB.`
+  if (file.size === 0) return "That file is empty."
+  return null
+}
+/** The kind of file most likely wanted at this stage, to pre-select the type. */
+export const suggestedAttachmentType = (status: string): string => (status === "OPEN" || status === "QUOTED" ? "QUOTATION" : status === "COMPLETED" ? "INVOICE" : status === "IN_PROGRESS" ? "PHOTO" : "")
