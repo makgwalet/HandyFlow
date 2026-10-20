@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.fleet.domain.model.DrivabilityRules;
 import za.co.handyflow.platform.fleet.domain.model.Driver;
 import za.co.handyflow.platform.fleet.domain.model.FuelFillup;
 import za.co.handyflow.platform.fleet.domain.model.Trip;
@@ -46,6 +47,7 @@ public class FleetService {
     // the identity module. No fleet-specific recipients port; that lesson
     // was already learned building earthmoving's equivalent.
     private final TenantAdminRecipients    tenantAdminRecipients;
+    private final AccidentRepository       accidentRepository;
 
     // ── Vehicles ──────────────────────────────────────────────────────────────
 
@@ -158,6 +160,12 @@ public class FleetService {
         // IllegalStateException) if the transition isn't legal from the
         // vehicle's current state — see VehicleStatus for the full table.
         // The global exception handler maps that to HTTP 409 Conflict.
+        // Going on a trip, or back into service from the workshop, is refused while an accident case says the vehicle cannot be driven.
+        // (Ending a trip is not blocked: a vehicle that crashed mid-trip must be able to come off it.)
+        if (target == VehicleStatus.ON_TRIP || (target == VehicleStatus.AVAILABLE && vehicle.getStatus() != VehicleStatus.ON_TRIP)) {
+            String undrivable = DrivabilityRules.problem(accidentRepository.findUndrivableOpen(tenantId, id));
+            if (undrivable != null) throw new IllegalStateException(undrivable);
+        }
         VehicleLifecycleStatus lifecycleBefore = vehicle.getLifecycleStatus();
         vehicle.changeStatusTo(target);
         vehicleRepository.save(vehicle);
@@ -257,6 +265,10 @@ public class FleetService {
             throw new IllegalStateException("Vehicle lifecycle status is " + vehicle.getLifecycleStatus()
                     + " — only ACTIVE vehicles can start a trip.");
         }
+
+        // A vehicle that cannot be driven after an accident stays off the road until the case is closed or corrected.
+        String undrivable = DrivabilityRules.problem(accidentRepository.findUndrivableOpen(tenantId, vehicleId));
+        if (undrivable != null) throw new IllegalStateException(undrivable);
 
         // NEW (chunk 6): optional link to a Driver record. Only trips linked by driverId count
         // towards that driver's score. When a driver is given we also refuse to dispatch an

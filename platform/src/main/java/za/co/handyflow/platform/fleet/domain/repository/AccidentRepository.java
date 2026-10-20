@@ -37,6 +37,11 @@ public interface AccidentRepository extends JpaRepository<Accident, UUID> {
             "AND a.claimStatus <> :excluded ORDER BY a.occurredAt DESC")
     List<Accident> findClaimsByVehicle(TenantId tenantId, UUID vehicleId, ClaimStatus excluded);
 
+    /** Cases on this vehicle that say it cannot be driven and are not closed (written-off cases included). */
+    @Query("SELECT a FROM Accident a WHERE a.tenantId = :tenantId AND a.vehicleId = :vehicleId AND a.vehicleDrivable = false " +
+            "AND a.status IN ('REPORTED', 'UNDER_ASSESSMENT', 'IN_REPAIR', 'WRITTEN_OFF') ORDER BY a.occurredAt DESC")
+    List<Accident> findUndrivableOpen(TenantId tenantId, UUID vehicleId);
+
     // ── NEW (chunk 6): driver score inputs ───────────────────────────────
 
     @Query("SELECT a FROM Accident a WHERE a.tenantId = :tenantId AND a.driverId = :driverId " +
