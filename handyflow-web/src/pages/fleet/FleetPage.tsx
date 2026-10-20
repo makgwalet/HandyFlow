@@ -18,6 +18,7 @@ import FuelAnalyticsTab from "./FuelAnalyticsTab"
 import AlertsTab from "./AlertsTab"
 import LiveMapTab from "./LiveMapTab"
 import GeofencesTab from "./GeofencesTab"
+import TrackingSetupTab from "./TrackingSetupTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { FLEET_SECTIONS } from "../../navigation/moduleSections"
 
@@ -41,6 +42,7 @@ export function FleetPage() {
         case "alerts":     return <AlertsTab onNavigate={goTo} />
         case "live-map":   return <LiveMapTab />
         case "geofences":  return <GeofencesTab />
+        case "tracking-setup": return <TrackingSetupTab />
         case "driver-scores": return <DriversTab />
         default:           return null
       }
