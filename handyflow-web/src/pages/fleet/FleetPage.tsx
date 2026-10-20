@@ -40,7 +40,7 @@ export function FleetPage() {
         case "tyres":      return <TyresBatteriesTab />
         case "fuel-analytics": return <FuelAnalyticsTab />
         case "alerts":     return <AlertsTab onNavigate={goTo} />
-        case "live-map":   return <LiveMapTab />
+        case "live-map":   return <LiveMapTab onNavigate={goTo} />
         case "geofences":  return <GeofencesTab />
         case "tracking-setup": return <TrackingSetupTab />
         case "driver-scores": return <DriversTab />

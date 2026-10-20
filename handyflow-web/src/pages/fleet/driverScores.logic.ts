@@ -62,3 +62,32 @@ export function rankMap(sorted: { id: string }[], scoreOf: Map<string, Scored>):
   for (const d of sorted) { const s = scoreOf.get(d.id); if (s && s.overall != null && s.reliable) m.set(d.id, ++n) }
   return m
 }
+
+// ── Document expiry, by calendar day ─────────────────────────────────────────
+/** Whole calendar days from today to an ISO date (yyyy-mm-dd); negative once it has passed, 0 on the day itself. One rule for every badge and count. */
+export function daysToDate(iso: string, today = new Date()): number {
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number)
+  return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())) / 86400000)
+}
+export type ExpiryState = "NOT_SET" | "EXPIRED" | "EXPIRING" | "VALID"
+/** Expired is strictly before today; expiring is today up to (not including) 30 days out, the server's window. */
+export function expiryState(iso: string | null | undefined, today = new Date()): ExpiryState {
+  if (!iso) return "NOT_SET"
+  const days = daysToDate(iso, today)
+  return days < 0 ? "EXPIRED" : days < 30 ? "EXPIRING" : "VALID"
+}
+export function expiryWords(iso: string | null | undefined, today = new Date()): string {
+  if (!iso) return "Not set"
+  const d = daysToDate(iso, today)
+  return d < 0 ? `Expired ${-d} ${d === -1 ? "day" : "days"} ago` : d === 0 ? "Expires today" : `${d} ${d === 1 ? "day" : "days"} left`
+}
+interface Credentialed { status: string; licenseExpiry: string | null; prdpRequired: boolean; prdpExpiry: string | null }
+/** Active drivers (the unit is drivers, not documents): any expired document, else any expiring one. A PrDP only counts where it is required. */
+export function driverDocumentCounts(drivers: Credentialed[], today = new Date()): { expired: number; expiring: number } {
+  let expired = 0, expiring = 0
+  for (const d of drivers.filter(x => x.status === "ACTIVE")) {
+    const states = [expiryState(d.licenseExpiry, today), ...(d.prdpRequired ? [expiryState(d.prdpExpiry, today)] : [])]
+    if (states.includes("EXPIRED")) expired++; else if (states.includes("EXPIRING")) expiring++
+  }
+  return { expired, expiring }
+}

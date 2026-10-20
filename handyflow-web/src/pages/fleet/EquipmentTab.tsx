@@ -7,7 +7,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
-import { equipmentChanged, equipmentProblem, parseNonNegative } from "./equipment.logic"
+import { equipmentChanged, equipmentProblem, isMachine, parseNonNegative } from "./equipment.logic"
 
 interface Equipment { id: string; registration: string; make: string | null; model: string | null; vehicleType: string; status: string; engineHours: number | null; operatingRatePerHour: number | null }
 
@@ -20,6 +20,7 @@ const unwrap = (r: { data: unknown }): Equipment[] => {
 const th: React.CSSProperties = { padding: "8px 10px", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, color: "var(--hf-text-faint)", textAlign: "left" }
 const td: React.CSSProperties = { padding: "9px 10px", fontSize: 12.5, verticalAlign: "top" }
 const input: React.CSSProperties = { width: 130, padding: "7px 9px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13 }
+const chip: React.CSSProperties = { padding: "6px 12px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 12.5, cursor: "pointer" }
 const btn: React.CSSProperties = { padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--hf-brand)", color: "var(--hf-on-brand, #fff)", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }
 
 function Row({ v, canEdit }: { v: Equipment; canEdit: boolean }) {
@@ -40,7 +41,7 @@ function Row({ v, canEdit }: { v: Equipment; canEdit: boolean }) {
   }
   return (
     <tr aria-label={v.registration} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
-      <td style={td}><strong>{v.registration}</strong><div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{[v.make, v.model].filter(Boolean).join(" ") || v.vehicleType}</div></td>
+      <td style={td}><strong>{v.registration}</strong><div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{[v.make, v.model].filter(Boolean).join(" ") || v.vehicleType}{!isMachine(v) && <span> · not set up as a machine</span>}</div></td>
       <td style={td}><input aria-label={`Engine hours for ${v.registration}`} type="number" min="0" step="any" style={input} value={hours} disabled={!canEdit} onChange={e => { setHours(e.target.value); setMessage("") }} /></td>
       <td style={td}><input aria-label={`Operating rate per hour for ${v.registration}`} type="number" min="0" step="any" style={input} value={rate} disabled={!canEdit} placeholder="Not set" onChange={e => { setRate(e.target.value); setMessage("") }} />
         {problem && <div role="alert" style={{ fontSize: 11, color: "var(--hf-danger-text)", marginTop: 4, maxWidth: 220 }}>{problem}</div>}</td>
@@ -52,6 +53,7 @@ function Row({ v, canEdit }: { v: Equipment; canEdit: boolean }) {
 
 export default function EquipmentTab() {
   const canEdit = usePermission("FLEET_MANAGE")
+  const [showAll, setShowAll] = useState(false)
   const { data, isLoading, isError, refetch } = useQuery<Equipment[]>({ queryKey: ["fleet", "equipment"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/equipment")) })
 
   return (
@@ -62,15 +64,27 @@ export default function EquipmentTab() {
       </div>
       {isLoading && <p style={{ fontSize: 13 }}>Loading…</p>}
       {isError && <p role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>We couldn't load the equipment. <button type="button" onClick={() => refetch()} style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", color: "inherit", fontWeight: 700 }}>Try again</button></p>}
-      {data && (data.length === 0 ? <p style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No vehicles yet. Add a vehicle first.</p> : (
+      {data && (data.length === 0 ? <p style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No vehicles yet. Add a vehicle first.</p> : (() => {
+        const machines = data.filter(isMachine), rows = showAll ? data : machines
+        return (
         <div style={{ overflowX: "auto" }}>
+          <div role="group" aria-label="Show" style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+            <button type="button" aria-pressed={!showAll} style={{ ...chip, fontWeight: !showAll ? 800 : 500 }} onClick={() => setShowAll(false)}>Machines ({machines.length})</button>
+            <button type="button" aria-pressed={showAll} style={{ ...chip, fontWeight: showAll ? 800 : 500 }} onClick={() => setShowAll(true)}>All vehicles ({data.length})</button>
+          </div>
+          {rows.length === 0 ? (
+            <div role="status" style={{ border: "1px dashed var(--hf-border)", borderRadius: 12, padding: 16, fontSize: 13 }}>
+              <strong>No machines set up yet.</strong>
+              <div style={{ color: "var(--hf-text-muted)", margin: "4px 0 8px" }}>A vehicle counts as a machine once it has engine hours or an operating rate. Road vehicles stay out of this list until then.</div>
+              <button type="button" style={chip} onClick={() => setShowAll(true)}>Show all vehicles to set one up</button>
+            </div>
+          ) : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr><th style={th}>Vehicle</th><th style={th}>Engine hours</th><th style={th}>Operating rate (R per hour)</th><th style={th} /></tr></thead>
-            <tbody>{data.map(v => <Row key={v.id} v={v} canEdit={canEdit} />)}</tbody>
-          </table>
+            <tbody>{rows.map(v => <Row key={v.id} v={v} canEdit={canEdit} />)}</tbody>
+          </table>)}
           {!canEdit && <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", marginTop: 8 }}>You can see these but not change them. Changing a rate needs Fleet manage access.</p>}
-        </div>
-      ))}
+        </div>) })())}
     </div>
   )
 }

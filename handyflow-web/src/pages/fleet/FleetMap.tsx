@@ -5,7 +5,7 @@ import { useEffect } from "react"
 import { MapContainer, TileLayer, CircleMarker, Polyline, Popup, useMap } from "react-leaflet"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
-import { DEFAULT_CENTRE, LIVE_COLOUR, LIVE_LABEL, ageText, hasFix, speedText, type LivePosition } from "./liveMap.logic"
+import { DEFAULT_CENTRE, LIVE_COLOUR, LIVE_LABEL, fixText, hasFix, speedText, type LivePosition } from "./liveMap.logic"
 
 function Fit({ points }: { points: [number, number][] }) {
   const map = useMap()
@@ -25,7 +25,7 @@ export default function FleetMap({ positions, selectedId, track, onSelect }: { p
         <CircleMarker key={p.vehicleId} center={[p.latitude, p.longitude]} radius={p.vehicleId === selectedId ? 12 : 8}
           pathOptions={{ color: LIVE_COLOUR[p.status] ?? "#6b7280", fillColor: LIVE_COLOUR[p.status] ?? "#6b7280", fillOpacity: 0.75, weight: p.vehicleId === selectedId ? 4 : 2 }}
           eventHandlers={{ click: () => onSelect(p.vehicleId) }}>
-          <Popup><strong>{p.registration}</strong><br />{LIVE_LABEL[p.status] ?? p.status} · {speedText(p.speedKph)}<br />{ageText(p.ageMinutes)}</Popup>
+          <Popup><strong>{p.registration}</strong><br />{LIVE_LABEL[p.status] ?? p.status} · {speedText(p.speedKph)}<br />{fixText(p)}</Popup>
         </CircleMarker>))}
     </MapContainer>
   )

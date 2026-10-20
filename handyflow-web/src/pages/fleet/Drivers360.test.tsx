@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import DriversTab from "./DriversTab"
-import { sortDrivers, rankMap, bandText, bandToneFor, bandTone, coverageNote, scoreText, settingsBody, settingsProblem, toForm, weightTotal } from "./driverScores.logic"
+import { daysToDate, driverDocumentCounts, expiryState, expiryWords, sortDrivers, rankMap, bandText, bandToneFor, bandTone, coverageNote, scoreText, settingsBody, settingsProblem, toForm, weightTotal } from "./driverScores.logic"
 
 const get = vi.fn(), put = vi.fn()
 type Args = unknown[]
@@ -58,6 +58,22 @@ describe("score rules", () => {
   })
 })
 
+describe("document expiry", () => {
+  const today = new Date(2026, 9, 20, 22, 40)   // late evening: the day must not roll over
+  const on = (n: number) => { const d = new Date(2026, 9, 20 + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` }
+  it("counts whole calendar days, whatever the time of day", () => {
+    expect([-99, -1, 0, 1, 7, 29, 30].map(n => daysToDate(on(n), today))).toEqual([-99, -1, 0, 1, 7, 29, 30])
+  })
+  it("never calls an expired document expiring", () => {
+    expect([-99, -1, 0, 1, 7, 29, 30].map(n => expiryState(on(n), today))).toEqual(["EXPIRED", "EXPIRED", "EXPIRING", "EXPIRING", "EXPIRING", "EXPIRING", "VALID"]); expect(expiryState(null, today)).toBe("NOT_SET")
+    expect([-99, -1, 0, 1, 7].map(n => expiryWords(on(n), today))).toEqual(["Expired 99 days ago", "Expired 1 day ago", "Expires today", "1 day left", "7 days left"]); expect(expiryWords(null, today)).toBe("Not set")
+  })
+  it("counts active drivers once, expired before expiring, and only requires a PrDP where one is required", () => {
+    const d = (o: object) => ({ status: "ACTIVE", licenseExpiry: on(200), prdpRequired: false, prdpExpiry: null, ...o })
+    expect(driverDocumentCounts([d({ prdpRequired: true, prdpExpiry: on(-99) }), d({ licenseExpiry: on(10), prdpRequired: true, prdpExpiry: on(-5) }), d({ licenseExpiry: on(10) }), d({ prdpExpiry: on(-99) }), d({ status: "INACTIVE", licenseExpiry: on(-1) }), d({})], today)).toEqual({ expired: 2, expiring: 1 })
+  })
+})
+
 describe("ranking", () => {
   const ds = [{ id: "a", firstName: "Zed", lastName: "Ames" }, { id: "b", firstName: "Bo", lastName: "Bell" }, { id: "c", firstName: "Cy", lastName: "Cole" }, { id: "d", firstName: "Di", lastName: "Dunn" }, { id: "e", firstName: "Al", lastName: "Eve" }]
   const sc = new Map([["a", { overall: 70, reliable: true }], ["b", { overall: 90, reliable: true }], ["c", { overall: 95, reliable: false }], ["d", { overall: null, reliable: false }], ["e", { overall: 90, reliable: true }]])
@@ -91,6 +107,13 @@ describe("Drivers with Driver 360", () => {
     show(); await screen.findByText("Thandi Nkosi"); fireEvent.click(within("John Mokoena")); const o = await screen.findByLabelText("Overall score")
     expect(screen.getByLabelText("John Mokoena").contains(o)).toBe(true); expect(screen.getByLabelText("Thandi Nkosi").contains(o)).toBe(false)
     fireEvent.click(screen.getByText("Hide 360")); expect(screen.queryByLabelText("Overall score")).toBeNull()
+  })
+  it("a driver whose PrDP expired is counted as expired, never as expiring", async () => {
+    const day = (n: number) => { const x = new Date(); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}` }
+    get.mockImplementation((url: string) => url.includes("/driver-scores") ? ok(board) : url.includes("/fleet/drivers") ? ok({ content: [{ ...drivers[0], prdpRequired: true, prdpCategory: "G", prdpExpiry: day(-99), prdpExpiringSoon: true }] }) : ok([]))
+    show(); await screen.findByText("John Mokoena")
+    expect(screen.getByLabelText("Active drivers with an expired document").textContent).toMatch(/^1/); expect(screen.getByLabelText("Active drivers with a document expiring in 30 days").textContent).toMatch(/^0/)
+    expect(screen.getByLabelText("John Mokoena").textContent).toContain("Expired 99 days ago"); expect(screen.getByLabelText("John Mokoena").textContent).not.toMatch(/days left/)
   })
   it("lets an admin change the weights, with the total shown and bad totals blocked", async () => {
     show(); fireEvent.click(await screen.findByText("Score settings")); await screen.findByText("Total 100% of 100%")

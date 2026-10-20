@@ -6,7 +6,7 @@ import { Suspense, lazy, useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
-import { EVENT_LABEL, LIVE_COLOUR, LIVE_LABEL, ageText, eventText, liveCounts, speedText, visiblePositions, type LivePosition } from "./liveMap.logic"
+import { EVENT_LABEL, LIVE_COLOUR, LIVE_LABEL, eventText, fixText, liveCounts, speedText, visiblePositions, type LivePosition } from "./liveMap.logic"
 
 const FleetMap = lazy(() => import("./FleetMap"))
 
@@ -17,7 +17,7 @@ const unwrap = <T,>(r: { data: unknown }): T => { const o = r.data as { data?: u
 const list = <T,>(r: { data: unknown }): T[] => { const p = unwrap<T[] | { content?: T[] }>(r); return (Array.isArray(p) ? p : p?.content) ?? [] }
 const field: React.CSSProperties = { padding: "7px 9px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13 }
 
-export default function LiveMapTab() {
+export default function LiveMapTab({ onNavigate }: { onNavigate?: (section: string) => void }) {
   const qc = useQueryClient()
   const canManage = usePermission("FLEET_MANAGE")
   const [status, setStatus] = useState("ALL"), [search, setSearch] = useState(""), [selected, setSelected] = useState<string | null>(null)
@@ -38,7 +38,14 @@ export default function LiveMapTab() {
         <input aria-label="Search vehicles" placeholder="Search vehicle" style={{ ...field, minWidth: 180 }} value={search} onChange={e => setSearch(e.target.value)} />
       </div>
       {live.isError && <div role="alert">Couldn't load vehicle positions.</div>}
-      {!live.isLoading && !live.isError && all.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>No tracked vehicles yet. Add a tracking device to a vehicle to see it here.</p>}
+      {!live.isLoading && !live.isError && all.length === 0 && (
+        <div role="status" aria-label="No tracked vehicles" style={{ border: "1px dashed var(--hf-border)", borderRadius: 12, padding: 18, marginBottom: 14 }}>
+          <strong>No tracked vehicles yet.</strong>
+          <p style={{ margin: "6px 0 10px", color: "var(--hf-text-muted)", fontSize: 13 }}>A vehicle appears here once a tracking device is registered to it and has sent a position.</p>
+          {onNavigate && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" style={{ ...field, cursor: "pointer", fontWeight: 700 }} onClick={() => onNavigate("tracking-setup")}>Register a tracking device</button>
+            <button type="button" style={{ ...field, cursor: "pointer" }} onClick={() => onNavigate("geofences")}>Set up geofences</button></div>}
+        </div>)}
       {all.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 300px", gap: 14 }}>
           <Suspense fallback={<p>Loading map…</p>}><FleetMap positions={shown} selectedId={selected} track={trackPoints} onSelect={setSelected} /></Suspense>
@@ -49,7 +56,7 @@ export default function LiveMapTab() {
                 <button type="button" aria-label={`Show ${p.registration}`} aria-pressed={selected === p.vehicleId} onClick={() => setSelected(s => (s === p.vehicleId ? null : p.vehicleId))}
                   style={{ width: "100%", textAlign: "left", padding: "8px 10px", marginBottom: 6, borderRadius: 8, border: `1px solid ${selected === p.vehicleId ? "var(--hf-brand)" : "var(--hf-border)"}`, background: "var(--hf-surface)", cursor: "pointer" }}>
                   <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 99, background: LIVE_COLOUR[p.status], marginRight: 6 }} /><strong>{p.registration}</strong>
-                  <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{LIVE_LABEL[p.status]} · {speedText(p.speedKph)} · {ageText(p.ageMinutes)}</div>
+                  <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{LIVE_LABEL[p.status]} · {speedText(p.speedKph)} · {fixText(p)}</div>
                 </button>
               </li>))}
           </ul>

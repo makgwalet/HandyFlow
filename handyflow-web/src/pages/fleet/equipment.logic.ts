@@ -26,3 +26,9 @@ export function equipmentChanged(hours: string, rate: string, saved: { engineHou
   if (!h.ok || !r.ok) return true
   return h.value !== saved.engineHours || r.value !== saved.operatingRatePerHour
 }
+
+/**
+ * Whether a vehicle is set up as a machine run by the hour. The server holds 0 hours for every vehicle that has never had a meter,
+ * so "hours above zero or a rate set" is the only sign available that someone has configured it.
+ */
+export const isMachine = (v: { engineHours: number | null; operatingRatePerHour: number | null }): boolean => (v.engineHours ?? 0) > 0 || v.operatingRatePerHour != null

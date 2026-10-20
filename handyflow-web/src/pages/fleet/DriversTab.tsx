@@ -3,7 +3,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { ProfileView, SettingsPanel, type ScoreRow } from "./Driver360"
-import { unwrap as unwrapOne, bandText, bandToneFor, scoreText, sortDrivers, rankMap, SORT_LABEL, type DriverSort } from "./driverScores.logic"
+import { unwrap as unwrapOne, bandText, bandToneFor, scoreText, sortDrivers, daysToDate, expiryState, expiryWords, driverDocumentCounts, rankMap, SORT_LABEL, type DriverSort } from "./driverScores.logic"
 import {
   Plus, User, X, AlertCircle, AlertTriangle, CheckCircle, Edit2,
   Phone, Mail, IdCard, ShieldCheck, UserX, UserCheck, Gauge,
@@ -22,7 +22,6 @@ interface Driver {
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
 const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
-const daysUntil = (d: string | null) => d ? Math.ceil((new Date(d).getTime() - Date.now()) / 86400000) : 999
 
 const LICENSE_CODES = ["A", "A1", "B", "C1", "C", "EB", "EC1", "EC"]
 const PRDP_CATEGORIES = [
@@ -38,11 +37,12 @@ const EMPTY_FORM = {
   notes: "",
 }
 
-function ExpiryBadge({ date, expiringSoon }: { date: string | null; expiringSoon: boolean }) {
-  if (!date) return <span style={{ color: "var(--hf-text-faint)", fontSize: 12 }}>Not set</span>
-  const days = daysUntil(date)
-  if (days < 0) return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "var(--hf-danger-text)" }}><AlertCircle size={11} />Expired {Math.abs(days)}d ago</span>
-  if (expiringSoon) return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: days <= 7 ? "var(--hf-danger-text)" : "var(--hf-warning-text)" }}><AlertTriangle size={11} />{days}d left</span>
+function ExpiryBadge({ date }: { date: string | null }) {
+  const state = expiryState(date)
+  if (state === "NOT_SET") return <span style={{ color: "var(--hf-text-faint)", fontSize: 12 }}>Not set</span>
+  const days = daysToDate(date!), words = expiryWords(date)
+  if (state === "EXPIRED") return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "var(--hf-danger-text)" }}><AlertCircle size={11} />{words}</span>
+  if (state === "EXPIRING") return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: days <= 7 ? "var(--hf-danger-text)" : "var(--hf-warning-text)" }}><AlertTriangle size={11} />{words}</span>
   return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--hf-success-text-strong)" }}><CheckCircle size={11} />Valid</span>
 }
 
@@ -121,11 +121,12 @@ export default function DriversTab() {
 
   const filtered = sortDrivers(drivers.filter(d => filterStatus === "ALL" || d.status === filterStatus), sort, scoreOf)
   const rankOf = sort === "name" ? new Map<string, number>() : rankMap(filtered, scoreOf)
+  const docs = driverDocumentCounts(drivers)
   const stats = [
     { label: "Total drivers", value: drivers.length, color: "var(--hf-primary-text)" },
-    { label: "Active", value: drivers.filter(d => d.status === "ACTIVE").length, color: "var(--hf-success-text-strong)" },
-    { label: "Licence expiring", value: drivers.filter(d => d.licenseExpiringSoon).length, color: "var(--hf-warning-text)" },
-    { label: "PrDP expiring", value: drivers.filter(d => d.prdpRequired && d.prdpExpiringSoon).length, color: "var(--hf-danger-text)" },
+    { label: "Active drivers", value: drivers.filter(d => d.status === "ACTIVE").length, color: "var(--hf-success-text-strong)" },
+    { label: "Active drivers with an expired document", value: docs.expired, color: "var(--hf-danger-text)" },
+    { label: "Active drivers with a document expiring in 30 days", value: docs.expiring, color: "var(--hf-warning-text)" },
   ]
 
   const inp = (k: string): React.CSSProperties => ({
@@ -139,7 +140,7 @@ export default function DriversTab() {
     <div>
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {stats.map(s => (
-          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
+          <div key={s.label} aria-label={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
           </div>
@@ -212,7 +213,7 @@ export default function DriversTab() {
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <span style={{ fontSize: 13, color: "var(--hf-text)" }}>{fmtDate(d.licenseExpiry)}</span>
-                          <ExpiryBadge date={d.licenseExpiry} expiringSoon={d.licenseExpiringSoon} />
+                          <ExpiryBadge date={d.licenseExpiry} />
                         </div>
                       </div>
                       {d.prdpRequired && (
@@ -222,7 +223,7 @@ export default function DriversTab() {
                           </div>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <span style={{ fontSize: 13, color: "var(--hf-text)" }}>{fmtDate(d.prdpExpiry)}</span>
-                            <ExpiryBadge date={d.prdpExpiry} expiringSoon={d.prdpExpiringSoon} />
+                            <ExpiryBadge date={d.prdpExpiry} />
                           </div>
                         </div>
                       )}

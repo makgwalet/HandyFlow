@@ -21,6 +21,8 @@ export function ageText(minutes: number): string {
   if (minutes < 1440) return `${Math.floor(minutes / 60)} h ago`
   const d = Math.floor(minutes / 1440); return `${d} ${d === 1 ? "day" : "days"} ago`
 }
+/** "3 min ago", or "Last known 2 days ago" when the unit has gone quiet: an old fix is never presented as live. */
+export const fixText = (p: { status: string; ageMinutes: number }): string => (p.status === "OFFLINE" ? `Last known ${ageText(p.ageMinutes)}` : ageText(p.ageMinutes))
 export const speedText = (s: number | null) => (s == null ? "—" : `${Math.round(s)} km/h`)
 export const hasFix = (p: { latitude: number; longitude: number }) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude) && !(p.latitude === 0 && p.longitude === 0)
 

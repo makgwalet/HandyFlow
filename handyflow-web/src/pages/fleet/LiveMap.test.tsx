@@ -67,3 +67,20 @@ describe("LiveMapTab", () => {
     show(); expect(await screen.findByText(/No tracked vehicles yet/)).toBeTruthy()
   })
 })
+
+describe("LiveMapTab empty and stale states", () => {
+  const showWith = (onNavigate?: (s: string) => void) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><LiveMapTab onNavigate={onNavigate} /></QueryClientProvider>)
+  it("offers the next step when nothing is tracked", async () => {
+    get.mockImplementation((url: string) => (url.endsWith("/telematics/live") ? ok([]) : ok({ content: [] }))); const go = vi.fn(); showWith(go)
+    const box = await screen.findByLabelText("No tracked vehicles"); expect(box.textContent).toContain("once a tracking device is registered")
+    fireEvent.click(screen.getByText("Register a tracking device")); expect(go).toHaveBeenCalledWith("tracking-setup"); fireEvent.click(screen.getByText("Set up geofences")); expect(go).toHaveBeenCalledWith("geofences")
+  })
+  it("still explains itself where there is nowhere to go", async () => {
+    get.mockImplementation((url: string) => (url.endsWith("/telematics/live") ? ok([]) : ok({ content: [] }))); showWith()
+    expect((await screen.findByLabelText("No tracked vehicles")).textContent).toContain("No tracked vehicles yet."); expect(screen.queryByText("Register a tracking device")).toBeNull()
+  })
+  it("calls an offline position last known, never live", async () => {
+    showWith(); await screen.findByLabelText("Show OFF1")
+    expect(screen.getByLabelText("Show OFF1").textContent).toContain("Last known 2 days ago"); expect(screen.getByLabelText("Show PARK1").textContent).not.toContain("Last known")
+  })
+})
