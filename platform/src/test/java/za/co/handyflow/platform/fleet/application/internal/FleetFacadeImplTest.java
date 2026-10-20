@@ -10,8 +10,10 @@ import org.mockito.quality.Strictness;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import za.co.handyflow.platform.fleet.application.FleetFacade.EquipmentSummary;
+import za.co.handyflow.platform.fleet.domain.model.AssetProfile;
 import za.co.handyflow.platform.fleet.domain.model.Vehicle;
 import za.co.handyflow.platform.fleet.domain.model.VehicleStatus;
+import za.co.handyflow.platform.fleet.domain.repository.AssetProfileRepository;
 import za.co.handyflow.platform.fleet.domain.repository.VehicleRepository;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -31,9 +33,11 @@ import static org.mockito.Mockito.when;
 class FleetFacadeImplTest {
 
     @Mock VehicleRepository vehicleRepository;
+    @Mock AssetProfileRepository profileRepository;
+    private final java.util.Map<UUID, AssetProfile> profiles = new java.util.HashMap<>();
     static final TenantId TENANT = TenantId.of(UUID.randomUUID());
 
-    private FleetFacadeImpl facade() { return new FleetFacadeImpl(vehicleRepository); }
+    private FleetFacadeImpl facade() { return new FleetFacadeImpl(vehicleRepository, profileRepository); }
 
     // Each vehicle is fully stubbed before it goes into a when(...): Mockito cannot stub inside an open stubbing.
     private Vehicle vehicle(UUID id, String registration, VehicleStatus status, String hours, String rate) {
@@ -45,7 +49,13 @@ class FleetFacadeImplTest {
         when(v.getVehicleType()).thenReturn("TRACTOR");
         when(v.getStatus()).thenReturn(status);
         when(v.getEngineHours()).thenReturn(hours == null ? null : new BigDecimal(hours));
-        when(v.getOperatingRatePerHour()).thenReturn(rate == null ? null : new BigDecimal(rate));
+        if (rate != null) {
+            // The hourly rate lives on the asset profile, not on the vehicle.
+            AssetProfile profile = mock(AssetProfile.class);
+            when(profile.getVehicleId()).thenReturn(id);
+            when(profile.getOperatingRatePerHour()).thenReturn(new BigDecimal(rate));
+            profiles.put(id, profile);
+        }
         return v;
     }
 
@@ -55,6 +65,7 @@ class FleetFacadeImplTest {
         UUID id = UUID.randomUUID();
         Vehicle v = vehicle(id, "FARM 001 GP", VehicleStatus.AVAILABLE, "1234.5", "85.5");
         when(vehicleRepository.findActiveById(eq(TENANT), eq(id))).thenReturn(Optional.of(v));
+        when(profileRepository.findByTenantIdAndVehicleId(TENANT, id)).thenReturn(Optional.of(profiles.get(id)));
 
         EquipmentSummary s = facade().findEquipment(TENANT, id).orElseThrow();
 
@@ -94,9 +105,12 @@ class FleetFacadeImplTest {
         Vehicle old = vehicle(UUID.randomUUID(), "OLD-ONE", VehicleStatus.RETIRED, null, "10");
         Page<Vehicle> page = new PageImpl<>(List.of(b, old, a));
         when(vehicleRepository.findAllActive(eq(TENANT), any())).thenReturn(page);
+        when(profileRepository.findByTenantIdAndVehicleIdIn(eq(TENANT), any())).thenReturn(List.copyOf(profiles.values()));
 
         List<EquipmentSummary> list = facade().listEquipment(TENANT);
 
         assertEquals(List.of("A-TRACTOR", "b-harvester"), list.stream().map(EquipmentSummary::registration).toList());
+        assertEquals(0, new BigDecimal("85").compareTo(list.get(0).operatingRatePerHour()));
+        assertEquals(0, new BigDecimal("120").compareTo(list.get(1).operatingRatePerHour()));
     }
 }

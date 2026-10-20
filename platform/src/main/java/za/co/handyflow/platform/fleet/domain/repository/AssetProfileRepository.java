@@ -17,6 +17,8 @@ public interface AssetProfileRepository extends JpaRepository<AssetProfile, UUID
 
     Optional<AssetProfile> findByTenantIdAndVehicleId(TenantId tenantId, UUID vehicleId);
 
+    List<AssetProfile> findByTenantIdAndVehicleIdIn(TenantId tenantId, Collection<UUID> vehicleIds);
+
     /** Trailers currently coupled to this vehicle. */
     @Query("SELECT p FROM AssetProfile p WHERE p.tenantId = :tenantId AND p.coupledToVehicleId = :hostId")
     List<AssetProfile> findCoupledTo(TenantId tenantId, UUID hostId);
