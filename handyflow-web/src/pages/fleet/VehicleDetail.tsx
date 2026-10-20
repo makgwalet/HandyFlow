@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { COMPLIANCE_LABEL, DOCUMENT_TYPE_LABEL, complianceTone, expiryText, identityRows, uploadProblem, type Identity } from "./vehicleDetail.logic"
+import LifecyclePanel from "./LifecyclePanel"
 import { STATUS_LABEL, blocksVehicle } from "./accidents.logic"
 
 interface ComplianceItem { key: string; label: string; status: string; daysRemaining: number | null; detail: string | null }
@@ -20,7 +21,7 @@ const errorOf = (e: unknown) => (e as { response?: { data?: { message?: string }
 const R = (n: number | null | undefined) => (n == null ? "—" : `R ${Number(n).toLocaleString("en-ZA")}`)
 const TONE: Record<string, string> = { ok: "var(--hf-success-text-strong)", warn: "var(--hf-warning-text)", bad: "var(--hf-danger-text)", none: "var(--hf-text-faint)" }
 const field: React.CSSProperties = { padding: "6px 8px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 12.5 }
-const TABS = ["Overview", "Compliance", "Documents", "Insurance", "Accidents"] as const
+const TABS = ["Overview", "Compliance", "Documents", "Insurance", "Accidents", "Lifecycle"] as const
 
 function ComplianceTab({ id }: { id: string }) {
   const { data, isLoading } = useQuery<Compliance>({ queryKey: ["fleet", "compliance", id], queryFn: async () => unwrap<Compliance>(await apiClient.get(`/api/v1/fleet/vehicles/${id}/compliance`)) })
@@ -111,6 +112,7 @@ export default function VehicleDetail({ vehicleId, identity }: { vehicleId: stri
       {tab === "Documents" && <DocumentsTab id={vehicleId} />}
       {tab === "Insurance" && <InsuranceTab id={vehicleId} />}
       {tab === "Accidents" && <AccidentsTab id={vehicleId} />}
+      {tab === "Lifecycle" && <LifecyclePanel vehicleId={vehicleId} />}
     </div>
   )
 }
