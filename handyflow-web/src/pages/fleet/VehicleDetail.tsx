@@ -1,12 +1,13 @@
 // src/pages/fleet/VehicleDetail.tsx
 //
-// Tabs inside the vehicle panel: Overview (identity register), Compliance (traffic lights), Documents (vault), Insurance and Accidents.
+// Tabs inside the vehicle panel: Overview, Location, Maintenance, Fuel & Usage, Compliance, Documents, Insurance, Accidents, Lifecycle and History.
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { COMPLIANCE_LABEL, DOCUMENT_TYPE_LABEL, complianceTone, expiryText, identityRows, uploadProblem, type Identity } from "./vehicleDetail.logic"
 import LifecyclePanel from "./LifecyclePanel"
+import { LocationTab, MaintenanceTab, FuelUsageTab, HistoryTab } from "./VehicleTabs"
 import VehicleEditForm from "./VehicleEditForm"
 import InsuranceForm from "./InsuranceForm"
 import { POLICY_TYPE_LABEL, type InsuranceData } from "./insurance.logic"
@@ -25,7 +26,7 @@ const R = (n: number | null | undefined) => (n == null ? "—" : `R ${Number(n).
 const TONE: Record<string, string> = { ok: "var(--hf-success-text-strong)", warn: "var(--hf-warning-text)", bad: "var(--hf-danger-text)", none: "var(--hf-text-faint)" }
 const field: React.CSSProperties = { padding: "6px 8px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 12.5 }
 const ghostBtn: React.CSSProperties = { padding: "6px 12px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 12.5, cursor: "pointer", marginBottom: 10 }
-const TABS = ["Overview", "Compliance", "Documents", "Insurance", "Accidents", "Lifecycle"] as const
+const TABS = ["Overview", "Location", "Maintenance", "Fuel & Usage", "Compliance", "Documents", "Insurance", "Accidents", "Lifecycle", "History"] as const
 
 function ComplianceTab({ id }: { id: string }) {
   const { data, isLoading } = useQuery<Compliance>({ queryKey: ["fleet", "compliance", id], queryFn: async () => unwrap<Compliance>(await apiClient.get(`/api/v1/fleet/vehicles/${id}/compliance`)) })
@@ -109,7 +110,7 @@ function AccidentsTab({ id }: { id: string }) {
       <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{a.description}</div></li>))}</ul>
 }
 
-export default function VehicleDetail({ vehicleId, identity }: { vehicleId: string; identity: Identity & VehicleFull }) {
+export default function VehicleDetail({ vehicleId, identity }: { vehicleId: string; identity: Identity & VehicleFull & { currentOdometer?: number | null; lastServiceKm?: number | null; serviceIntervalKm?: number | null } }) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview")
   const [editing, setEditing] = useState(false)
   const canManage = usePermission("FLEET_MANAGE")
@@ -123,11 +124,15 @@ export default function VehicleDetail({ vehicleId, identity }: { vehicleId: stri
       {tab === "Overview" && !editing && canManage && <div><button type="button" style={ghostBtn} onClick={() => setEditing(true)}>Edit details</button></div>}
       {tab === "Overview" && !editing && <dl style={{ display: "grid", gridTemplateColumns: "170px 1fr", gap: "5px 12px", fontSize: 13, margin: 0 }}>
         {identityRows(identity).map(r => <div key={r.label} style={{ display: "contents" }}><dt style={{ color: "var(--hf-text-faint)" }}>{r.label}</dt><dd style={{ margin: 0, color: r.missing ? "var(--hf-warning-text)" : undefined }}>{r.value}</dd></div>)}</dl>}
+      {tab === "Location" && <LocationTab id={vehicleId} />}
+      {tab === "Maintenance" && <MaintenanceTab id={vehicleId} facts={identity} />}
+      {tab === "Fuel & Usage" && <FuelUsageTab id={vehicleId} />}
       {tab === "Compliance" && <ComplianceTab id={vehicleId} />}
       {tab === "Documents" && <DocumentsTab id={vehicleId} />}
       {tab === "Insurance" && <InsuranceTab id={vehicleId} />}
       {tab === "Accidents" && <AccidentsTab id={vehicleId} />}
       {tab === "Lifecycle" && <LifecyclePanel vehicleId={vehicleId} />}
+      {tab === "History" && <HistoryTab id={vehicleId} />}
     </div>
   )
 }
