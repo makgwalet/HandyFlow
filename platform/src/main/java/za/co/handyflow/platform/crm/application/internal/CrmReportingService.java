@@ -65,6 +65,31 @@ public class CrmReportingService {
 
     private record StageEntry(LeadStage stage, Instant enteredAt) {}
 
+    /** Lost leads grouped by the reason recorded, biggest group first. Leads lost before reasons existed are grouped under a null reason. */
+    @Transactional(readOnly = true)
+    public List<za.co.handyflow.platform.crm.dto.LostReasonEntry> getLostReasons(TenantId tenantId) {
+        Map<za.co.handyflow.platform.crm.domain.model.LostReason, List<za.co.handyflow.platform.crm.domain.model.Customer>> grouped =
+                new EnumMap<>(za.co.handyflow.platform.crm.domain.model.LostReason.class);
+        List<za.co.handyflow.platform.crm.domain.model.Customer> unknown = new ArrayList<>();
+        for (var c : customerRepository.findAllActiveLeads(tenantId)) {
+            if (c.getPipelineStage() != LeadStage.LOST) continue;
+            if (c.getLostReason() == null) unknown.add(c);
+            else grouped.computeIfAbsent(c.getLostReason(), k -> new ArrayList<>()).add(c);
+        }
+        List<za.co.handyflow.platform.crm.dto.LostReasonEntry> out = new ArrayList<>();
+        grouped.forEach((reason, cs) -> out.add(lostEntry(reason, cs)));
+        if (!unknown.isEmpty()) out.add(lostEntry(null, unknown));
+        out.sort(Comparator.comparingLong(za.co.handyflow.platform.crm.dto.LostReasonEntry::count).reversed());
+        return out;
+    }
+
+    private static za.co.handyflow.platform.crm.dto.LostReasonEntry lostEntry(
+            za.co.handyflow.platform.crm.domain.model.LostReason reason, List<za.co.handyflow.platform.crm.domain.model.Customer> cs) {
+        BigDecimal value = BigDecimal.ZERO;
+        for (var c : cs) if (c.getDealValue() != null) value = value.add(c.getDealValue());
+        return new za.co.handyflow.platform.crm.dto.LostReasonEntry(reason, cs.size(), value);
+    }
+
     @Transactional(readOnly = true)
     public FunnelReportResponse getFunnelReport(TenantId tenantId) {
         var leads = customerRepository.findAllActiveLeads(tenantId);

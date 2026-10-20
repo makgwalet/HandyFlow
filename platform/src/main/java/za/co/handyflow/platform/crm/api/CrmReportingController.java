@@ -27,6 +27,14 @@ public class CrmReportingController {
 
     private final CrmReportingService reportingService;
 
+    @GetMapping("/lost-reasons")
+    @PreAuthorize("hasAuthority('CUSTOMER_READ')")
+    @Operation(summary = "Lost leads grouped by the reason recorded, with count and deal value")
+    public ResponseEntity<ApiResponse<java.util.List<za.co.handyflow.platform.crm.dto.LostReasonEntry>>> getLostReasons() {
+        return ResponseEntity.ok(ApiResponse.success(
+                reportingService.getLostReasons(TenantContext.getTenantIdAsObject())));
+    }
+
     @GetMapping("/funnel")
     @PreAuthorize("hasAuthority('CUSTOMER_READ')")
     @Operation(summary = "Lead funnel report — stage reach counts, stage-to-stage conversion rates, and average time-in-stage")

@@ -418,9 +418,10 @@ public class CustomerService {
     }
 
     @Transactional
-    public StageResponse changeStage(TenantId tenantId, UUID id, LeadStage newStage) {
+    public StageResponse changeStage(TenantId tenantId, UUID id, LeadStage newStage,
+                                     za.co.handyflow.platform.crm.domain.model.LostReason lostReason, String lostNote) {
         var customer = requireActive(tenantId, id);
-        customer.changeStage(newStage, currentUserId());
+        customer.changeStage(newStage, currentUserId(), lostReason, lostNote);
         return toStageResponse(customer);
     }
 
@@ -497,6 +498,8 @@ public class CustomerService {
                 c.getCustomerType(),
                 c.getStatus(),
                 c.getPipelineStage(),
+                c.getLostReason(),
+                c.getLostNote(),
                 Set.copyOf(c.getTags()),
                 c.getCreatedAt(),
                 c.getUpdatedAt()

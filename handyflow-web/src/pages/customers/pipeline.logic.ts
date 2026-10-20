@@ -4,12 +4,33 @@ export type Stage = "NEW" | "CONTACTED" | "QUALIFIED" | "WON" | "LOST"
 export const STAGES: Stage[] = ["NEW", "CONTACTED", "QUALIFIED", "WON", "LOST"]
 export const STAGE_LABEL: Record<Stage, string> = { NEW: "New", CONTACTED: "Contacted", QUALIFIED: "Qualified", WON: "Won", LOST: "Lost" }
 export const OPEN_STAGES: Stage[] = ["NEW", "CONTACTED", "QUALIFIED"]
+export type LostReason = "PRICE" | "COMPETITOR" | "NO_RESPONSE" | "NO_BUDGET" | "NOT_A_FIT" | "TIMING" | "OTHER"
+export const LOST_REASONS: { id: LostReason; label: string }[] = [
+  { id: "PRICE", label: "Price too high" }, { id: "COMPETITOR", label: "Chose a competitor" }, { id: "NO_RESPONSE", label: "Stopped responding" },
+  { id: "NO_BUDGET", label: "No budget" }, { id: "NOT_A_FIT", label: "Not a fit" }, { id: "TIMING", label: "Bad timing" }, { id: "OTHER", label: "Other (note needed)" },
+]
+export const reasonLabel = (r: LostReason | null | undefined) => (r ? LOST_REASONS.find(x => x.id === r)?.label ?? r : "No reason recorded")
+export const MAX_NOTE = 500
+/** Why a lead cannot be marked lost yet, or null. The server checks the same rules. */
+export function lostProblem(reason: LostReason | "", note: string): string | null {
+  if (!reason) return "Choose why the lead was lost."
+  if (reason === "OTHER" && !note.trim()) return "Add a note saying why."
+  if (note.trim().length > MAX_NOTE) return `The note can be at most ${MAX_NOTE} characters.`
+  return null
+}
+/** Stages a lead can be moved to. A won or lost lead is reopened first; it cannot jump straight to the other way of closing. */
+export function allowedMoves(stage: Stage): Stage[] {
+  return STAGES.filter(s => s !== stage && !((stage === "WON" && s === "LOST") || (stage === "LOST" && s === "WON")))
+}
+export const stageBody = (stage: Stage, reason: LostReason | "" = "", note = "") =>
+  stage === "LOST" ? { stage, lostReason: reason, lostNote: note.trim() || null } : { stage }
 /** The server returns at most this many leads; the board says so when it is reached. */
 export const PIPELINE_LIMIT = 500
 
 export interface PipelineLead {
   id: string; name: string; email?: string | null; phone?: string | null; ownerId: string | null
   dealValue: number | null; expectedCloseDate: string | null; pipelineStage: Stage | null; status?: string; createdAt?: string
+  lostReason?: LostReason | null; lostNote?: string | null
 }
 /** A lead with no recorded stage is a new one. */
 export const stageOf = (l: PipelineLead): Stage => l.pipelineStage ?? "NEW"
@@ -104,3 +125,5 @@ export function biggestDropOff(stages: FunnelStage[]): { from: Stage; to: Stage;
   }
   return best
 }
+
+export interface LostReasonRow { reason: LostReason | null; count: number; dealValue: number | null }

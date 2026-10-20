@@ -2,12 +2,13 @@
 // Where leads stop: how many reached each stage, the share that moved on, and how long they stayed. The numbers come from the server.
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { STAGE_LABEL, barShare, biggestDropOff, daysText, percent, type Funnel } from "./pipeline.logic"
+import { STAGE_LABEL, barShare, biggestDropOff, daysText, money, percent, reasonLabel, type Funnel, type LostReasonRow } from "./pipeline.logic"
 
 const unwrap = (r: { data: unknown }): Funnel | null => { const o = r.data as { data?: unknown } | null; return ((o && typeof o === "object" && "data" in o ? o.data : r.data) as Funnel | null) ?? null }
 
 export default function FunnelReport() {
   const { data, isLoading, isError } = useQuery<Funnel | null>({ queryKey: ["crm", "funnel"], queryFn: async () => unwrap(await apiClient.get("/api/v1/crm/reports/funnel")) })
+  const lost = useQuery<LostReasonRow[]>({ queryKey: ["crm", "lost-reasons"], queryFn: async () => { const r = await apiClient.get("/api/v1/crm/reports/lost-reasons"); const o = r.data as { data?: unknown } | null; const p = o && !Array.isArray(o) && typeof o === "object" && "data" in o ? o.data : r.data; return Array.isArray(p) ? (p as LostReasonRow[]) : [] } })
   if (isLoading) return <p>Loading…</p>
   if (isError || !data) return <div role="alert">Couldn't load the funnel report.</div>
   if (data.totalLeads === 0) return <p style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No leads yet, so there is nothing to report. Add leads and move them through the pipeline.</p>
@@ -28,6 +29,12 @@ export default function FunnelReport() {
             <td>{percent(s.conversionFromPreviousStage)}</td><td>{daysText(s.avgDaysInStage)}</td>
           </tr>))}</tbody>
       </table>
+      <h4 style={{ margin: "16px 0 6px" }}>Why leads were lost</h4>
+      {lost.isError ? <div role="alert" style={{ fontSize: 12.5 }}>Couldn't load the lost-deal reasons.</div>
+        : (lost.data ?? []).length === 0 ? <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: 0 }}>No lost leads yet.</p>
+        : <table aria-label="Lost reasons" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead><tr style={{ textAlign: "left", color: "var(--hf-text-muted)" }}><th>Reason</th><th>Leads</th><th>Deal value lost</th></tr></thead>
+          <tbody>{(lost.data ?? []).map((r, i) => <tr key={i} aria-label={reasonLabel(r.reason)} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}><td style={{ padding: "6px 0" }}>{reasonLabel(r.reason)}</td><td>{r.count}</td><td>{money(r.dealValue ?? 0)}</td></tr>)}</tbody></table>}
       <p style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 8 }}>Counts are for leads currently in the pipeline. Won and lost leads stay in the figures.</p>
     </div>
   )

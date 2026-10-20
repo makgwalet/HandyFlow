@@ -9,8 +9,10 @@
 // position (see Customer.changeStage, which enforces this server-side
 // too, not just here).
 
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
+import { LOST_REASONS, allowedMoves, lostProblem, stageBody, type LostReason } from './pipeline.logic'
 
 type Stage = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'WON' | 'LOST'
 
@@ -35,9 +37,11 @@ export function StageSelector({ customerId, customerType }: { customerId: string
     enabled: customerType === 'LEAD',
   })
 
+  const [askLost, setAskLost] = useState(false), [reason, setReason] = useState<LostReason | ''>(''), [note, setNote] = useState(''), [err, setErr] = useState<string | null>(null)
   const changeStage = useMutation({
-    mutationFn: (stage: Stage) => apiClient.patch(`/api/v1/crm/customers/${customerId}/stage`, { stage }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['lead-stage', customerId] }),
+    mutationFn: (v: { stage: Stage; reason?: LostReason | ''; note?: string }) => apiClient.patch(`/api/v1/crm/customers/${customerId}/stage`, stageBody(v.stage, v.reason, v.note)),
+    onSuccess: () => { setAskLost(false); setReason(''); setNote(''); setErr(null); qc.invalidateQueries({ queryKey: ['lead-stage', customerId] }); qc.invalidateQueries({ queryKey: ['crm'] }) },
+    onError: (e: unknown) => setErr((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Could not change the stage. Try again.'),
   })
 
   if (customerType !== 'LEAD') return null
@@ -55,8 +59,9 @@ export function StageSelector({ customerId, customerType }: { customerId: string
         return (
           <button
             key={stage}
-            onClick={() => !active && changeStage.mutate(stage)}
-            disabled={changeStage.isPending}
+            onClick={() => { if (active) return; setErr(null); if (stage === 'LOST') setAskLost(true); else { setAskLost(false); changeStage.mutate({ stage }) } }}
+            disabled={changeStage.isPending || (!!currentStage && !active && !allowedMoves(currentStage).includes(stage))}
+            title={currentStage && !active && !allowedMoves(currentStage).includes(stage) ? 'Reopen the lead first' : undefined}
             style={{
               padding: '4px 11px', borderRadius: 20, fontSize: 12, fontWeight: 600,
               cursor: active ? 'default' : 'pointer', fontFamily: 'inherit',
@@ -69,6 +74,15 @@ export function StageSelector({ customerId, customerType }: { customerId: string
           </button>
         )
       })}
+      {askLost && (
+        <div style={{ flexBasis: '100%', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
+          <select aria-label="Lost reason" value={reason} onChange={e => setReason(e.target.value as LostReason | '')} style={{ padding: '4px 8px', fontSize: 12 }}>
+            <option value="">Why was it lost?</option>{LOST_REASONS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}</select>
+          <input aria-label="Lost note" placeholder="Note" maxLength={500} value={note} onChange={e => setNote(e.target.value)} style={{ padding: '4px 8px', fontSize: 12, minWidth: 180 }} />
+          <button type="button" disabled={!!lostProblem(reason, note) || changeStage.isPending} onClick={() => changeStage.mutate({ stage: 'LOST', reason, note })} style={{ padding: '4px 11px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Mark lost</button>
+          <button type="button" onClick={() => { setAskLost(false); setErr(null) }} style={{ padding: '4px 11px', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+        </div>)}
+      {err && <div role="alert" style={{ flexBasis: '100%', fontSize: 12, color: 'var(--hf-danger-text)' }}>{err}</div>}
     </div>
   )
 }

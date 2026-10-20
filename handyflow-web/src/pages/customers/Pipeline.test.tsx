@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-li
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import PipelineBoard from "./PipelineBoard"
 import FunnelReport from "./FunnelReport"
-import { barShare, biggestDropOff, closeState, closeText, columns, dealBody, dealProblem, daysText, filterLeads, localToday, NO_FILTER, ownerText, percent, pipelineTotals, stageOf, type Funnel, type PipelineLead } from "./pipeline.logic"
+import { allowedMoves, lostProblem, reasonLabel, stageBody, barShare, biggestDropOff, closeState, closeText, columns, dealBody, dealProblem, daysText, filterLeads, localToday, NO_FILTER, ownerText, percent, pipelineTotals, stageOf, type Funnel, type PipelineLead } from "./pipeline.logic"
 
 const get = vi.fn(), patch = vi.fn()
 type Args = unknown[]
@@ -113,5 +113,39 @@ describe("funnel report", () => {
   it("says so when there are no leads and when the report fails", async () => {
     get.mockImplementation(() => ok({ ...funnel, totalLeads: 0 })); wrap(<FunnelReport />); expect(await screen.findByText(/nothing to report/)).toBeTruthy(); cleanup()
     get.mockRejectedValue(new Error("x")); wrap(<FunnelReport />); expect((await screen.findByRole("alert")).textContent).toMatch(/Couldn't load/)
+  })
+})
+
+describe("lost reasons and stage rules", () => {
+  it("offers only legal moves: a closed lead is reopened first", () => {
+    expect(allowedMoves("NEW")).toEqual(["CONTACTED", "QUALIFIED", "WON", "LOST"]); expect(allowedMoves("WON")).toEqual(["NEW", "CONTACTED", "QUALIFIED"]); expect(allowedMoves("LOST")).toEqual(["NEW", "CONTACTED", "QUALIFIED"])
+  })
+  it("needs a reason to lose a lead, and a note for Other", () => {
+    expect(lostProblem("", "")).toMatch(/Choose why/); expect(lostProblem("OTHER", "  ")).toMatch(/note/); expect(lostProblem("PRICE", "")).toBeNull(); expect(lostProblem("OTHER", "x".repeat(501))).toMatch(/500/)
+    expect(stageBody("LOST", "PRICE", " too dear ")).toEqual({ stage: "LOST", lostReason: "PRICE", lostNote: "too dear" }); expect(stageBody("WON", "PRICE", "x")).toEqual({ stage: "WON" }); expect(reasonLabel(null)).toBe("No reason recorded"); expect(reasonLabel("PRICE")).toBe("Price too high")
+  })
+  it("asks why before marking a lead lost, then sends the reason", async () => {
+    wrap(<PipelineBoard />); fireEvent.change(await screen.findByLabelText("Move Bravo Foods"), { target: { value: "LOST" } })
+    expect(patch).not.toHaveBeenCalled(); const form = screen.getByRole("form", { name: "Mark Bravo Foods lost" }); expect((within(form).getByText("Mark lost") as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(within(form).getByLabelText("Lost reason"), { target: { value: "OTHER" } }); expect(within(form).getByText(/Add a note/)).toBeTruthy()
+    fireEvent.change(within(form).getByLabelText("Lost note"), { target: { value: "Went with a cousin" } }); fireEvent.click(within(form).getByText("Mark lost"))
+    await waitFor(() => expect(patch).toHaveBeenCalledWith("/api/v1/crm/customers/b/stage", { stage: "LOST", lostReason: "OTHER", lostNote: "Went with a cousin" }))
+  })
+  it("cancelling leaves the lead where it was", async () => {
+    wrap(<PipelineBoard />); fireEvent.change(await screen.findByLabelText("Move Bravo Foods"), { target: { value: "LOST" } }); fireEvent.click(screen.getByText("Cancel"))
+    expect(screen.queryByRole("form", { name: "Mark Bravo Foods lost" })).toBeNull(); expect(patch).not.toHaveBeenCalled(); expect(screen.getByLabelText("Move Bravo Foods")).toBeTruthy()
+  })
+  it("shows why a lead was lost on its card, and a lost lead cannot be moved straight to won", async () => {
+    get.mockImplementation(() => ok([{ ...leads[3], lostReason: "COMPETITOR", lostNote: "Cheaper quote" }])); wrap(<PipelineBoard />)
+    const card = await screen.findByLabelText("Delta Haulage"); expect(card.textContent).toContain("Lost: Chose a competitor — Cheaper quote")
+    const options = Array.from((within(card).getByLabelText("Move Delta Haulage") as HTMLSelectElement).options).map(o => o.value); expect(options).not.toContain("WON"); expect(options).toContain("NEW")
+  })
+  it("lists the lost reasons in the funnel report, biggest first, with legacy leads called out", async () => {
+    get.mockImplementation((url: string) => ok(url.includes("lost-reasons") ? [{ reason: "PRICE", count: 3, dealValue: 90000 }, { reason: null, count: 1, dealValue: 0 }] : funnel)); wrap(<FunnelReport />)
+    const t = await screen.findByLabelText("Lost reasons"); expect(within(t).getByLabelText("Price too high").textContent).toContain("3"); expect(within(t).getByLabelText("No reason recorded").textContent).toContain("1")
+  })
+  it("tells the person when the lost-reason report fails but still shows the funnel", async () => {
+    get.mockImplementation((url: string) => (url.includes("lost-reasons") ? Promise.reject(new Error("x")) : ok(funnel))); wrap(<FunnelReport />)
+    expect(await screen.findByLabelText("Win rate")).toBeTruthy(); expect((await screen.findByText(/Couldn't load the lost-deal reasons/)).textContent).toBeTruthy()
   })
 })

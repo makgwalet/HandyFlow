@@ -323,6 +323,6 @@ public class CustomerController {
             @Valid @RequestBody UpdateStageRequest request
     ) {
         var tenantId = TenantContext.getTenantIdAsObject();
-        return ResponseEntity.ok(ApiResponse.success(customerService.changeStage(tenantId, id, request.stage())));
+        return ResponseEntity.ok(ApiResponse.success(customerService.changeStage(tenantId, id, request.stage(), request.lostReason(), request.lostNote())));
     }
 }

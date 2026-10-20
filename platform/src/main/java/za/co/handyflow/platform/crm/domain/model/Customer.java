@@ -118,6 +118,14 @@ public class Customer {
     @Column(name = "pipeline_stage", length = 20)
     private LeadStage pipelineStage;
 
+    /** Why the lead was lost. Set only while pipelineStage is LOST. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "lost_reason", length = 30)
+    private LostReason lostReason;
+
+    @Column(name = "lost_note", length = 500)
+    private String lostNote;
+
     /**
      * FIX: backlog 4.2 — "no deal value / expected close date" gap.
      * Nullable, and deliberately not restricted to LEAD-type customers the
@@ -332,15 +340,45 @@ public class Customer {
      * invoice").
      */
     public void changeStage(LeadStage newStage, UUID changedBy) {
+        changeStage(newStage, changedBy, null, null);
+    }
+
+    /**
+     * Rules: a lead that is WON or LOST must be reopened (moved to NEW, CONTACTED or QUALIFIED) before it can be closed
+     * the other way. Moving to LOST needs a reason, and the note is required when the reason is OTHER. Leaving LOST
+     * clears the reason.
+     */
+    public void changeStage(LeadStage newStage, UUID changedBy, LostReason reason, String note) {
         if (this.customerType != CustomerType.LEAD) {
             throw new IllegalStateException("Cannot set a pipeline stage on a non-lead customer");
         }
         if (this.pipelineStage == newStage) return;
-        var payload = Map.of(
-                "from", this.pipelineStage != null ? this.pipelineStage.name() : "NONE",
-                "to", newStage.name()
-        );
+        if ((this.pipelineStage == LeadStage.WON && newStage == LeadStage.LOST)
+                || (this.pipelineStage == LeadStage.LOST && newStage == LeadStage.WON)) {
+            throw new IllegalStateException("Reopen the lead before closing it as " + newStage.name().toLowerCase());
+        }
+        String cleanNote = note == null || note.isBlank() ? null : note.strip();
+        if (newStage == LeadStage.LOST) {
+            if (reason == null) {
+                throw new IllegalArgumentException("Choose why the lead was lost");
+            }
+            if (reason == LostReason.OTHER && cleanNote == null) {
+                throw new IllegalArgumentException("Add a note saying why the lead was lost");
+            }
+            if (cleanNote != null && cleanNote.length() > 500) {
+                throw new IllegalArgumentException("The note can be at most 500 characters");
+            }
+        }
+        var payload = new java.util.LinkedHashMap<String, Object>();
+        payload.put("from", this.pipelineStage != null ? this.pipelineStage.name() : "NONE");
+        payload.put("to", newStage.name());
+        if (newStage == LeadStage.LOST) {
+            payload.put("reason", reason.name());
+            if (cleanNote != null) payload.put("note", cleanNote);
+        }
         this.pipelineStage = newStage;
+        this.lostReason    = newStage == LeadStage.LOST ? reason : null;
+        this.lostNote      = newStage == LeadStage.LOST ? cleanNote : null;
         this.updatedAt     = Instant.now();
         addActivity(CustomerActivity.of(this, ActivityType.STAGE_CHANGED, payload, null, changedBy));
     }
