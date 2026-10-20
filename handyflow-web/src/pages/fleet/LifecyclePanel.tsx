@@ -8,10 +8,11 @@ import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import {
   LIFECYCLE_LABEL, actionsFor, disposalBody, disposalProblem, emptyDisposal, emptyRecovery, emptyTheft, emptyWriteOff, gainLossText,
-  recoveryBody, recoveryProblem, theftBody, theftProblem, writeOffBody, writeOffProblem, type ActionOption,
+  recoveryBody, recoveryProblem, theftBody, theftProblem, writeOffBody, writeOffProblem, writeOffSummary, type ActionOption, type TheftData, type WriteOffData,
 } from "./lifecycle.logic"
+import { EventEvidence, TheftEdit, WriteOffEdit, type Evidence } from "./LifecycleEdits"
 
-interface Event { id: string; eventType: string; fromStatus: string | null; toStatus: string | null; occurredAt: string; reason: string | null; disposal: { gainLoss: number | null; salePrice: number | null; counterpartyName: string | null } | null; theft: { kind: string; policeCaseNumber: string | null; recoveryStatus: string | null } | null }
+interface Event { id: string; eventType: string; fromStatus: string | null; toStatus: string | null; occurredAt: string; reason: string | null; disposal: { gainLoss: number | null; salePrice: number | null; counterpartyName: string | null } | null; theft: TheftData | null; writeOff: WriteOffData | null; evidence: Evidence[] | null }
 interface Lifecycle { lifecycleStatus: string; operationalStatus: string; events: Event[] }
 
 const unwrap = <T,>(r: { data: unknown }): T => { const o = r.data as { data?: unknown }; return (o && typeof o === "object" && "data" in o ? o.data : r.data) as T }
@@ -84,10 +85,15 @@ export default function LifecyclePanel({ vehicleId }: { vehicleId: string }) {
   const qc = useQueryClient()
   const canManage = usePermission("FLEET_MANAGE"), canAdmin = usePermission("FLEET_ADMIN")
   const [chosen, setChosen] = useState<ActionOption | null>(null)
+  const [editing, setEditing] = useState<string | null>(null)
   const { data, isLoading } = useQuery<Lifecycle>({ queryKey: ["fleet", "lifecycle", vehicleId], queryFn: async () => unwrap<Lifecycle>(await apiClient.get(`/api/v1/fleet/vehicles/${vehicleId}/lifecycle`)) })
   if (isLoading || !data) return <p>Loading…</p>
   const options = actionsFor(data.lifecycleStatus).filter(o => (o.adminOnly ? canAdmin : canManage))
-  const done = () => { setChosen(null); for (const k of ["lifecycle", "compliance"]) qc.invalidateQueries({ queryKey: ["fleet", k, vehicleId] }); qc.invalidateQueries({ queryKey: ["fleet-vehicles"] }) }
+  const done = () => { setChosen(null); setEditing(null); for (const k of ["lifecycle", "compliance"]) qc.invalidateQueries({ queryKey: ["fleet", k, vehicleId] }); qc.invalidateQueries({ queryKey: ["fleet-vehicles"] }) }
+  const status = data.lifecycleStatus
+  const openTheftId = status === "STOLEN" || status === "MISSING" ? data.events.find(e => e.eventType === "THEFT_REPORTED" && e.theft && !e.theft.recoveryStatus)?.id : undefined
+  const writeOffId = status === "WRITTEN_OFF" ? data.events.find(e => e.eventType === "WRITE_OFF" && e.writeOff)?.id : undefined
+  const link: React.CSSProperties = { ...field, cursor: "pointer", marginTop: 4 }
   return (
     <div>
       <div style={{ fontSize: 13, marginBottom: 8 }}>Lifecycle: <strong>{LIFECYCLE_LABEL[data.lifecycleStatus] ?? data.lifecycleStatus}</strong> · Operational: <strong>{data.operationalStatus}</strong></div>
@@ -100,7 +106,13 @@ export default function LifecyclePanel({ vehicleId }: { vehicleId: string }) {
           <strong>{EVENT_LABEL[e.eventType] ?? e.eventType}</strong>{e.toStatus ? `: ${e.fromStatus ? `${LIFECYCLE_LABEL[e.fromStatus] ?? e.fromStatus} → ` : ""}${LIFECYCLE_LABEL[e.toStatus] ?? e.toStatus}` : ""} · {new Date(e.occurredAt).toLocaleDateString("en-ZA")}
           {e.reason && <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{e.reason}</div>}
           {e.disposal && <div style={{ fontSize: 12 }}>{e.disposal.counterpartyName ?? ""} {e.disposal.salePrice != null ? `· R ${Number(e.disposal.salePrice).toLocaleString("en-ZA")}` : ""} · {gainLossText(e.disposal.gainLoss)}</div>}
-          {e.theft && <div style={{ fontSize: 12 }}>{e.theft.kind === "MISSING" ? "Missing" : "Stolen"}{e.theft.policeCaseNumber ? ` · SAPS ${e.theft.policeCaseNumber}` : ""}</div>}
+          {e.theft && <div style={{ fontSize: 12 }}>{e.theft.kind === "MISSING" ? "Missing" : "Stolen"}{e.theft.location ? ` · ${e.theft.location}` : ""}{e.theft.policeCaseNumber ? ` · SAPS ${e.theft.policeCaseNumber}${e.theft.sapsStation ? ` (${e.theft.sapsStation})` : ""}` : ""}{e.theft.insurer ? ` · ${e.theft.insurer}${e.theft.claimNumber ? ` claim ${e.theft.claimNumber}` : ""}` : ""}</div>}
+          {e.writeOff && <div style={{ fontSize: 12 }}>{writeOffSummary(e.writeOff)}{e.writeOff.assessorName ? ` · assessor ${e.writeOff.assessorName}` : ""}</div>}
+          {e.theft && e.id === openTheftId && canManage && editing !== e.id && <button type="button" style={link} onClick={() => setEditing(e.id)}>Edit theft report</button>}
+          {e.writeOff && e.id === writeOffId && canAdmin && editing !== e.id && <button type="button" style={link} onClick={() => setEditing(e.id)}>Edit write-off</button>}
+          {editing === e.id && e.theft && <TheftEdit vehicleId={vehicleId} theft={e.theft} onDone={done} />}
+          {editing === e.id && e.writeOff && <WriteOffEdit vehicleId={vehicleId} writeOff={e.writeOff} onDone={done} />}
+          <EventEvidence vehicleId={vehicleId} eventId={e.id} eventType={e.eventType} evidence={e.evidence ?? []} />
         </li>))}</ul>
     </div>
   )

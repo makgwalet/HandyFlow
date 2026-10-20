@@ -74,3 +74,44 @@ export function gainLossText(g: number | null | undefined): string {
   const r = `R ${Math.abs(Math.round(g)).toLocaleString("en-ZA")}`
   return g > 0 ? `Gain ${r}` : g < 0 ? `Loss ${r}` : "No gain or loss"
 }
+
+// ── Editing an open theft report and a write-off, and evidence on any lifecycle event ──────────────────
+export interface TheftData { kind: string; occurredAt: string; location: string | null; policeCaseNumber: string | null; sapsStation: string | null; policeReference: string | null; insurer: string | null; claimNumber: string | null; trackingInfo: string | null; notes: string | null; recoveryStatus: string | null }
+export interface TheftEditForm { location: string; policeCaseNumber: string; sapsStation: string; policeReference: string; insurer: string; claimNumber: string; trackingInfo: string; notes: string }
+const t = (v: string | number | null | undefined) => (v == null ? "" : String(v))
+export const toTheftEdit = (d: TheftData): TheftEditForm => ({ location: t(d.location), policeCaseNumber: t(d.policeCaseNumber), sapsStation: t(d.sapsStation), policeReference: t(d.policeReference), insurer: t(d.insurer), claimNumber: t(d.claimNumber), trackingInfo: t(d.trackingInfo), notes: t(d.notes) })
+/** The server replaces every detail, so blanks are sent as null to clear them. */
+export const theftEditBody = (f: TheftEditForm) => Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.trim() === "" ? null : v.trim()])) as Record<keyof TheftEditForm, string | null>
+/** A claim number with no insurer (or the reverse) is a half-filled claim; a case number needs its station for SAPS follow-up. */
+export function theftEditProblem(f: TheftEditForm): string | null {
+  if (f.claimNumber.trim() && !f.insurer.trim()) return "Name the insurer the claim was lodged with."
+  if (f.policeCaseNumber.trim() && !f.sapsStation.trim()) return "Add the SAPS station that opened the case."
+  return null
+}
+
+export interface WriteOffData { assessmentDate: string | null; assessorName: string | null; decisionDate: string; decisionNote: string | null; preAccidentValue: number | null; salvageValue: number | null; salvageBuyer: string | null; salvageSoldAt: string | null; insuranceSettlementAmount: number | null; insuranceSettledAt: string | null }
+export interface WriteOffEditForm { assessmentDate: string; assessorName: string; decisionDate: string; decisionNote: string; preAccidentValue: string; salvageValue: string; salvageBuyer: string; salvageSoldAt: string; insuranceSettlementAmount: string; insuranceSettledAt: string }
+export const toWriteOffEdit = (w: WriteOffData): WriteOffEditForm => ({ assessmentDate: t(w.assessmentDate), assessorName: t(w.assessorName), decisionDate: t(w.decisionDate), decisionNote: t(w.decisionNote), preAccidentValue: t(w.preAccidentValue), salvageValue: t(w.salvageValue), salvageBuyer: t(w.salvageBuyer), salvageSoldAt: t(w.salvageSoldAt), insuranceSettlementAmount: t(w.insuranceSettlementAmount), insuranceSettledAt: t(w.insuranceSettledAt) })
+const AMOUNTS: [keyof WriteOffEditForm, string][] = [["preAccidentValue", "Pre-accident value"], ["salvageValue", "Salvage value"], ["insuranceSettlementAmount", "Insurance settlement"]]
+export function writeOffEditProblem(f: WriteOffEditForm): string | null {
+  if (!f.decisionDate) return "Say when the write-off was decided."
+  for (const [k, label] of AMOUNTS) if (f[k].trim() !== "" && !(Number(f[k]) >= 0)) return `${label} must be zero or more.`
+  if (f.salvageBuyer.trim() && f.salvageValue.trim() === "") return "Enter the salvage value the buyer paid."
+  if (f.salvageSoldAt && f.salvageValue.trim() === "") return "Enter the salvage value, or clear the salvage sale date."
+  if (f.insuranceSettledAt && f.insuranceSettlementAmount.trim() === "") return "Enter the settlement amount, or clear the settlement date."
+  return null
+}
+export const writeOffEditBody = (f: WriteOffEditForm) => ({
+  assessmentDate: f.assessmentDate || null, assessorName: f.assessorName.trim() || null, decisionDate: f.decisionDate, decisionNote: f.decisionNote.trim() || null,
+  preAccidentValue: num(f.preAccidentValue), salvageValue: num(f.salvageValue), salvageBuyer: f.salvageBuyer.trim() || null, salvageSoldAt: f.salvageSoldAt || null,
+  insuranceSettlementAmount: num(f.insuranceSettlementAmount), insuranceSettledAt: f.insuranceSettledAt || null,
+})
+/** One line on what the write-off recovered: salvage and the insurer's settlement against the pre-accident value. */
+export function writeOffSummary(w: WriteOffData): string {
+  const R = (n: number | null) => (n == null ? "—" : `R ${Math.round(n).toLocaleString("en-ZA")}`)
+  return `Pre-accident ${R(w.preAccidentValue)} · Salvage ${R(w.salvageValue)} · Settlement ${R(w.insuranceSettlementAmount)}`
+}
+
+export const EVIDENCE_TYPES = ["POLICE_REPORT", "SALE_AGREEMENT", "PROOF_OF_PAYMENT", "FINANCE_SETTLEMENT_LETTER", "REGISTRATION_TRANSFER", "ASSESSOR_REPORT", "INSURANCE_SETTLEMENT", "TRACKING_REPORT", "PHOTO", "OTHER"]
+export const EVIDENCE_LABEL: Record<string, string> = { POLICE_REPORT: "Police report", SALE_AGREEMENT: "Sale agreement", PROOF_OF_PAYMENT: "Proof of payment", FINANCE_SETTLEMENT_LETTER: "Finance settlement letter", REGISTRATION_TRANSFER: "Registration transfer", ASSESSOR_REPORT: "Assessor report", INSURANCE_SETTLEMENT: "Insurance settlement", TRACKING_REPORT: "Tracking report", PHOTO: "Photo", OTHER: "Other" }
+export const suggestedEvidenceType = (eventType: string): string => ({ THEFT_REPORTED: "POLICE_REPORT", WRITE_OFF: "ASSESSOR_REPORT", DISPOSAL: "SALE_AGREEMENT", RECOVERED: "PHOTO" } as Record<string, string>)[eventType] ?? ""
