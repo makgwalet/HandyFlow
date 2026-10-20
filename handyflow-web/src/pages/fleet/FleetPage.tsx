@@ -10,6 +10,7 @@ import FuelTab        from "./FuelTab"
 import ComplianceTab  from "./ComplianceTab"
 import DriversTab     from "./DriversTab"
 import EquipmentTab   from "./EquipmentTab"
+import AccidentsTab   from "./AccidentsTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { FLEET_SECTIONS } from "../../navigation/moduleSections"
 
@@ -25,6 +26,7 @@ export function FleetPage() {
         case "services":   return <ServicesTab />
         case "fuel":       return <FuelTab />
         case "compliance": return <ComplianceTab />
+        case "accidents":  return <AccidentsTab />
         default:           return null
       }
     }} />
