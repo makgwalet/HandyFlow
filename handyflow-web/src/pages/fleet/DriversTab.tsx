@@ -2,9 +2,11 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { ProfileView, SettingsPanel, type ScoreRow } from "./Driver360"
+import { unwrap as unwrapOne, bandText, bandToneFor, scoreText } from "./driverScores.logic"
 import {
   Plus, User, X, AlertCircle, AlertTriangle, CheckCircle, Edit2,
-  Phone, Mail, IdCard, ShieldCheck, UserX, UserCheck,
+  Phone, Mail, IdCard, ShieldCheck, UserX, UserCheck, Gauge,
 } from "lucide-react"
 
 interface Driver {
@@ -49,6 +51,10 @@ export default function DriversTab() {
   const [showAdd, setShowAdd]     = useState(false)
   const [editing, setEditing]     = useState<Driver | null>(null)
   const [filterStatus, setFilterStatus] = useState("ACTIVE")
+  const [openId, setOpenId]       = useState<string | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
+  const { data: scoreRows = [] } = useQuery<ScoreRow[]>({ queryKey: ["fleet", "driver-scores"], queryFn: async () => unwrapOne<ScoreRow[]>(await apiClient.get("/api/v1/fleet/driver-scores")) })
+  const scoreOf = new Map(scoreRows.map(r => [r.driverId, r]))
   const [form, setForm]           = useState(EMPTY_FORM)
   const [apiError, setApiError]   = useState("")
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -148,11 +154,18 @@ export default function DriversTab() {
             </button>
           ))}
         </div>
+        <button type="button" onClick={() => setShowSettings(s => !s)}
+          style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "var(--hf-text)" }}>
+          {showSettings ? "Hide score settings" : "Score settings"}
+        </button>
         <button onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("") }}
           style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Register Driver
         </button>
       </div>
+
+      {showSettings && <SettingsPanel />}
+      {openId && <ProfileView id={openId} onClose={() => setOpenId(null)} />}
 
       {isLoading ? (
         <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading drivers...</div>
@@ -164,7 +177,7 @@ export default function DriversTab() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {filtered.map(d => (
-            <div key={d.id} style={{ border: "1px solid var(--hf-border)", borderRadius: 12, padding: "16px 20px", background: "var(--hf-surface)", opacity: d.status === "INACTIVE" ? 0.6 : 1 }}>
+            <div key={d.id} aria-label={`${d.firstName} ${d.lastName}`} style={{ border: "1px solid var(--hf-border)", borderRadius: 12, padding: "16px 20px", background: "var(--hf-surface)", opacity: d.status === "INACTIVE" ? 0.6 : 1 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 14 }}>
                 <div style={{ display: "flex", gap: 14, flex: 1, minWidth: 0 }}>
                   <div style={{ width: 42, height: 42, borderRadius: "50%", background: "var(--hf-info-soft)", border: "2px solid var(--hf-info-border)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 15, color: "var(--hf-info-text)", flexShrink: 0 }}>
@@ -175,6 +188,10 @@ export default function DriversTab() {
                       <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{d.firstName} {d.lastName}</span>
                       {d.status === "INACTIVE" && <span style={{ fontSize: 10, fontWeight: 700, background: "var(--hf-surface-sunken)", color: "var(--hf-text-muted)", padding: "1px 7px", borderRadius: 20 }}>INACTIVE</span>}
                       {d.prdpRequired && <span style={{ fontSize: 10, fontWeight: 700, background: "var(--hf-violet-soft)", color: "var(--hf-violet-text)", padding: "1px 7px", borderRadius: 20 }}>PrDP {d.prdpCategory}</span>}
+                      {(() => { const s = scoreOf.get(d.id); return s && (
+                        <span aria-label="Score" title={s.reliable ? "Safety and performance score" : "Indicative only: less than half of the score had data"} style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)" }}>
+                          {scoreText(s.overall)}{!s.reliable && s.overall != null ? "*" : ""} · <span style={{ color: { ok: "var(--hf-success-text-strong)", warn: "var(--hf-warning-text)", bad: "var(--hf-danger-text)", none: "var(--hf-text-faint)" }[bandToneFor(s.band, s.reliable)] }}>{bandText(s.band, s.reliable)}</span>
+                        </span>) })()}
                     </div>
                     <div style={{ display: "flex", gap: 14, fontSize: 12, color: "var(--hf-text-muted)", flexWrap: "wrap", marginBottom: 8 }}>
                       {d.phone && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Phone size={11} />{d.phone}</span>}
@@ -207,6 +224,7 @@ export default function DriversTab() {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
+                  <button type="button" onClick={() => setOpenId(d.id)} title="Driver 360" style={{ background: "var(--hf-violet-soft)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "var(--hf-violet-text)", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}><Gauge size={13} />360 view</button>
                   <button onClick={() => openEdit(d)} title="Edit" style={{ background: "var(--hf-warning-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-warning-text)" }}><Edit2 size={13} /></button>
                   {d.status === "ACTIVE" ? (
                     <button onClick={() => setStatus.mutate({ id: d.id, active: false })} title="Deactivate" style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><UserX size={13} /></button>
@@ -219,6 +237,7 @@ export default function DriversTab() {
           ))}
         </div>
       )}
+      {scoreRows.some(r => !r.reliable && r.overall != null) && <p style={{ fontSize: 11.5, color: "var(--hf-text-muted)" }}>* Indicative only: less than half of the configured score had data, so it is not rated.</p>}
 
       {(showAdd || editing) && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>

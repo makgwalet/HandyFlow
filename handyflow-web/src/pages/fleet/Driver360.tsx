@@ -1,14 +1,14 @@
-// src/pages/fleet/DriverScoresTab.tsx
+// src/pages/fleet/Driver360.tsx
 //
-// Driver 360: the leaderboard, one driver's profile (compliance, score components, activity, accidents and cost), and the score settings.
+// Driver 360 pieces shown inside the Drivers screen: one driver's profile (compliance, score components, activity, accidents and cost) and the score settings.
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
-import { WEIGHT_FIELDS, bandText, bandToneFor, coverageNote, scoreText, settingsBody, settingsProblem, toForm, weightTotal, type Settings, type SettingsForm } from "./driverScores.logic"
+import { unwrap, WEIGHT_FIELDS, bandText, bandToneFor, coverageNote, scoreText, settingsBody, settingsProblem, toForm, weightTotal, type Settings, type SettingsForm } from "./driverScores.logic"
 import { COMPLIANCE_LABEL, complianceTone, expiryText } from "./vehicleDetail.logic"
 
-interface Row { driverId: string; driverName: string; overall: number | null; band: string | null; coverage: number; reliable: boolean; tripCount: number }
+export interface ScoreRow { driverId: string; driverName: string; overall: number | null; band: string | null; coverage: number; reliable: boolean; tripCount: number }
 interface Component { key: string; label: string; weight: number; effectiveWeight: number; score: number | null; status: string; detail: string }
 interface Profile {
   driver: { firstName: string; lastName: string; licenseCode: string | null; prdpRequired: boolean; status: string }
@@ -19,7 +19,6 @@ interface Profile {
 }
 interface SettingsResponse extends Settings { usingDefaults: boolean }
 
-const unwrap = <T,>(r: { data: unknown }): T => { const o = r.data as { data?: unknown }; return (o && typeof o === "object" && "data" in o ? o.data : r.data) as T }
 const errorOf = (e: unknown) => (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Something went wrong. Try again."
 const R = (n: number | null | undefined) => (n == null ? "—" : `R ${Number(n).toLocaleString("en-ZA")}`)
 const TONE = { ok: "var(--hf-success-text-strong)", warn: "var(--hf-warning-text)", bad: "var(--hf-danger-text)", none: "var(--hf-text-faint)" }
@@ -27,7 +26,7 @@ const field: React.CSSProperties = { padding: "7px 9px", border: "1px solid var(
 const btn: React.CSSProperties = { padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--hf-brand)", color: "var(--hf-on-brand, #fff)", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 14, marginBottom: 12 }
 
-function ProfileView({ id, onClose }: { id: string; onClose: () => void }) {
+export function ProfileView({ id, onClose }: { id: string; onClose: () => void }) {
   const { data } = useQuery<Profile>({ queryKey: ["fleet", "driver-profile", id], queryFn: async () => unwrap<Profile>(await apiClient.get(`/api/v1/fleet/drivers/${id}/profile`)) })
   if (!data) return <p>Loading…</p>
   const { driver, score, activity, accidents } = data
@@ -58,7 +57,7 @@ function ProfileView({ id, onClose }: { id: string; onClose: () => void }) {
   )
 }
 
-function SettingsPanel() {
+export function SettingsPanel() {
   const qc = useQueryClient()
   const canAdmin = usePermission("FLEET_ADMIN")
   const [form, setForm] = useState<SettingsForm | null>(null)
@@ -89,35 +88,6 @@ function SettingsPanel() {
         {saved && <span role="status" style={{ marginLeft: 10, fontSize: 12, color: "var(--hf-success-text-strong)" }}>Saved</span>}
       </div>}
       {error && <div role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)", marginTop: 6 }}>{error}</div>}
-    </div>
-  )
-}
-
-export default function DriverScoresTab() {
-  const [openId, setOpenId] = useState<string | null>(null)
-  const [showSettings, setShowSettings] = useState(false)
-  const { data: rows = [], isLoading, isError } = useQuery<Row[]>({ queryKey: ["fleet", "driver-scores"], queryFn: async () => unwrap<Row[]>(await apiClient.get("/api/v1/fleet/driver-scores")) })
-  return (
-    <div>
-      <div style={{ marginBottom: 12 }}><button type="button" style={field} onClick={() => setShowSettings(s => !s)}>{showSettings ? "Hide score settings" : "Score settings"}</button></div>
-      {showSettings && <SettingsPanel />}
-      {openId && <ProfileView id={openId} onClose={() => setOpenId(null)} />}
-      {isLoading && <p>Loading…</p>}
-      {isError && <div role="alert">Couldn't load driver scores.</div>}
-      {!isLoading && !isError && rows.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>No active drivers yet.</p>}
-      {rows.length > 0 && (
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-          <thead><tr>{["#", "Driver", "Score", "Band", "Trips", ""].map(h => <th key={h} style={{ textAlign: "left", padding: "8px 10px", fontSize: 11, textTransform: "uppercase", color: "var(--hf-text-faint)" }}>{h}</th>)}</tr></thead>
-          <tbody>{rows.map((r, i) => (
-            <tr key={r.driverId} aria-label={r.driverName} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
-              <td style={{ padding: "9px 10px" }}>{i + 1}</td><td style={{ padding: "9px 10px" }}><strong>{r.driverName}</strong></td>
-              <td style={{ padding: "9px 10px", fontWeight: 700 }}>{scoreText(r.overall)}{!r.reliable && r.overall != null && <span title="Low data coverage"> *</span>}</td>
-              <td style={{ padding: "9px 10px", color: TONE[bandToneFor(r.band, r.reliable)], fontWeight: 700 }}>{bandText(r.band, r.reliable)}</td>
-              <td style={{ padding: "9px 10px" }}>{r.tripCount}</td>
-              <td style={{ padding: "9px 10px" }}><button type="button" style={field} onClick={() => setOpenId(r.driverId)}>Profile</button></td>
-            </tr>))}</tbody>
-        </table>)}
-      {rows.some(r => !r.reliable && r.overall != null) && <p style={{ fontSize: 11.5, color: "var(--hf-text-muted)" }}>* Indicative only: less than half of the configured score had data.</p>}
     </div>
   )
 }

@@ -1,4 +1,5 @@
 // Driver 360: score bands, the settings form (weights must total 100, thresholds must descend) and cost/summary wording.
+export const unwrap = <T,>(r: { data: unknown }): T => { const o = r.data as { data?: unknown }; return (o && typeof o === "object" && "data" in o ? o.data : r.data) as T }
 export const BAND_LABEL: Record<string, string> = { EXCELLENT: "Excellent", GOOD: "Good", FAIR: "Fair", POOR: "Poor" }
 export const bandTone = (band: string | null | undefined): "ok" | "warn" | "bad" | "none" =>
   band === "EXCELLENT" || band === "GOOD" ? "ok" : band === "FAIR" ? "warn" : band === "POOR" ? "bad" : "none"

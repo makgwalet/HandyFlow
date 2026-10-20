@@ -13,7 +13,6 @@ import EquipmentTab   from "./EquipmentTab"
 import AccidentsTab   from "./AccidentsTab"
 import InspectionsTab from "./InspectionsTab"
 import WorkOrdersTab  from "./WorkOrdersTab"
-import DriverScoresTab from "./DriverScoresTab"
 import TyresBatteriesTab from "./TyresBatteriesTab"
 import FuelAnalyticsTab from "./FuelAnalyticsTab"
 import AlertsTab from "./AlertsTab"
@@ -40,7 +39,7 @@ export function FleetPage() {
         case "fuel-analytics": return <FuelAnalyticsTab />
         case "alerts":     return <AlertsTab onNavigate={goTo} />
         case "live-map":   return <LiveMapTab />
-        case "driver-scores": return <DriverScoresTab />
+        case "driver-scores": return <DriversTab />
         default:           return null
       }
     }} />
