@@ -238,6 +238,12 @@ public class EarthAssetService {
 
     @Transactional
     public AssetResponse updateHours(TenantId tenantId, UUID id, UpdateHoursRequest req, UUID actor) {
+        return updateHours(tenantId, id, req, actor, "MANUAL");
+    }
+
+    /** Same as above; {@code source} says where the reading came from (MANUAL typed in, FIELD sent from a phone). */
+    @Transactional
+    public AssetResponse updateHours(TenantId tenantId, UUID id, UpdateHoursRequest req, UUID actor, String source) {
         access.require(EarthmovingRules.WRITE, "update an hour meter");
         EarthAsset asset = findActive(tenantId, id);
         boolean wasDue = asset.isDueForService();
@@ -245,7 +251,7 @@ public class EarthAssetService {
 
         asset.updateHours(req.currentHours());
         assetRepository.save(asset);
-        meters.record(tenantId, asset, before, "MANUAL", actor);
+        meters.record(tenantId, asset, before, source, actor);
         trail.record(tenantId, "EARTHMOVING_HOURS_UPDATED", "EARTHMOVING_ASSET", id,
                 Map.of("hours", String.valueOf(before)), Map.of("hours", String.valueOf(req.currentHours())));
         log.info("Hour meter updated asset={} hours={}", id, req.currentHours());

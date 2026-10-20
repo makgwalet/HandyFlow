@@ -1,7 +1,7 @@
 // src/pages/earthmoving/shared/hooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, ActiveChecklist, ChecklistVersion, ChecklistTypeOverview, ChecklistQuestion, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling, EarthDocument, DocumentVersion, Disposal, TrackingStatus, TelematicsDevice, TelematicsReading } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, PickOption, MeterReading, Inspection, LatestInspection, ActiveChecklist, ChecklistVersion, ChecklistTypeOverview, ChecklistQuestion, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling, EarthDocument, DocumentVersion, Disposal, TrackingStatus, TelematicsDevice, TelematicsReading, FieldEntryResult } from "./types"
 
 // Central query keys — every tab imports these instead of typing the
 // literal string, so a rename is a one-line change instead of a grep.
@@ -664,3 +664,13 @@ function useTrackMutation<V>(fn: (v: V) => Promise<unknown>) {
 export const useMapTelematicsDevice = () => useTrackMutation(api.mapTelematicsDevice)
 export const useUnmapTelematicsDevice = () => useTrackMutation(api.unmapTelematicsDevice)
 export const useRecordManualReading = () => useTrackMutation(api.recordManualReading)
+
+// ── Field capture ────────────────────────────────────────────────────────
+
+const fieldKeys = ["em-field"] as const
+export const useFieldConflicts = (enabled: boolean) =>
+  useQuery<FieldEntryResult[]>({ queryKey: [...fieldKeys, "conflicts"], queryFn: api.fetchFieldConflicts, enabled })
+export function useReviewFieldConflict() {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: api.reviewFieldConflict, onSuccess: () => { qc.invalidateQueries({ queryKey: fieldKeys }); qc.invalidateQueries({ queryKey: QK.assets }) } })
+}

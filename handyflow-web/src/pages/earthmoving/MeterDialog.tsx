@@ -11,7 +11,7 @@ import { useMeterReadings, useCorrectReading, useChangeMeter, useAssignableUsers
 import type { Asset, MeterReading } from "./shared/types"
 
 const SOURCE_LABEL: Record<string, string> = {
-  MANUAL: "Entered by hand", SHIFT: "End of shift", SERVICE: "Service record", CORRECTION: "Correction", TYPE_CHANGE: "Meter changed",
+  MANUAL: "Entered by hand", SHIFT: "End of shift", SERVICE: "Service record", CORRECTION: "Correction", TYPE_CHANGE: "Meter changed", FIELD: "Sent from a phone",
 }
 const btn = (primary = false): React.CSSProperties => ({
   padding: "6px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer",

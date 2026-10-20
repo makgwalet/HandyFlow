@@ -1,0 +1,13 @@
+{
+  "name": "HandyFlow Field",
+  "short_name": "HandyFlow",
+  "description": "Record meter readings and machine positions on site, even without signal.",
+  "start_url": "/earthmoving/field",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1f6feb",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

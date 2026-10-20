@@ -18,6 +18,7 @@ import ChecklistsTab    from "./ChecklistsTab"
 import DocumentsTab     from "./DocumentsTab"
 import DisposalsTab     from "./DisposalsTab"
 import TrackingTab      from "./TrackingTab"
+import FieldTab         from "./FieldTab"
 import ProfitabilityTab from "./ProfitabilityTab"
 import InspectionsTab   from "./InspectionsTab"
 import { UtilisationReport, CustomerRevenueReport, DowntimeReport, ComplianceReport } from "./ReportsTab"
@@ -46,6 +47,7 @@ export function EarthMovingPage() {
           case "documents":   return <DocumentsTab />
           case "disposals":   return <DisposalsTab />
           case "tracking":    return <TrackingTab />
+          case "field":       return <FieldTab />
           case "workorders":  return <WorkOrdersTab />
           case "plans":       return <PlansTab />
           case "maintenance": return <MaintenanceTab />

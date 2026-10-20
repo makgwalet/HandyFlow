@@ -280,3 +280,8 @@ export interface TelematicsReading {
   id: string; source: "PROVIDER" | "MANUAL"; providerCode: string | null; recordedAt: string; receivedAt: string; latitude: number | null; longitude: number | null
   meterValue: number | null; meterUnit: string | null; enteredBy: string | null; note: string | null
 }
+
+export interface FieldEntryResult {
+  id: string; submissionId: string; kind: string; assetId: string | null; assetName: string | null; capturedAt: string; receivedAt: string
+  status: "SYNCED" | "REJECTED" | "CONFLICT"; reason: string | null; duplicate: boolean; reviewDecision: string | null; reviewNote: string | null; reviewedAt: string | null
+}

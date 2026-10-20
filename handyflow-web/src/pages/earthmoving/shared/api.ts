@@ -15,7 +15,7 @@
 // PUT (backend endpoint is still @PutMapping). Create is POST.
 
 import { apiClient } from "../../../api/client"
-import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, ActiveChecklist, ChecklistVersion, ChecklistTypeOverview, ChecklistQuestion, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling, EarthDocument, DocumentVersion, Disposal, TrackingStatus, TelematicsDevice, TelematicsReading } from "./types"
+import type { Asset, MaintenanceRecord, OperatorLog, Incident, WorkOrder, MaintenancePlan, PlanScan, StatusEvent, EarthAlert, AlertRule, Site, Reconciliation, LinkResult, PickOption, MeterReading, Inspection, LatestInspection, ActiveChecklist, ChecklistVersion, ChecklistTypeOverview, ChecklistQuestion, Profitability, Utilisation, MachineUtilisation, CustomerRevenue, Downtime, HireCharge, DeploymentOption, DraftInvoiceResult, DeploymentContract, EarthSettings, HireContext, ContractRef, ContractRates, BillingRun, BillingHistory, AutoBilling, EarthDocument, DocumentVersion, Disposal, TrackingStatus, TelematicsDevice, TelematicsReading, FieldEntryResult } from "./types"
 
 export function unwrap<T>(r: { data?: { data?: unknown } & Record<string, unknown> }): T {
   const p = (r.data?.data ?? r.data) as { content?: unknown } | undefined
@@ -393,3 +393,12 @@ export interface ManualReading { assetId: string; latitude: number | null; longi
 export const recordManualReading = async (b: ManualReading): Promise<TelematicsReading> =>
   unwrap<TelematicsReading>(await apiClient.post(`${BASE}/telematics/assets/${b.assetId}/readings`,
     { latitude: b.latitude, longitude: b.longitude, meterValue: b.meterValue, meterUnit: b.meterUnit, note: b.note }))
+
+// ── Field capture (phone) ────────────────────────────────────────────────
+
+export interface FieldEntryBody { submissionId: string; kind: string; assetId: string; capturedAt: string; meterValue: number | null; latitude: number | null; longitude: number | null; note: string | null }
+export const syncFieldEntries = async (entries: FieldEntryBody[]): Promise<FieldEntryResult[]> =>
+  arr<FieldEntryResult>(unwrap<unknown>(await apiClient.post(`${BASE}/field/sync`, { entries })))
+export const fetchFieldConflicts = async (): Promise<FieldEntryResult[]> => arr<FieldEntryResult>(unwrap<unknown>(await apiClient.get(`${BASE}/field/conflicts`)))
+export const reviewFieldConflict = async (b: { id: string; decision: "KEPT_SERVER" | "APPLIED"; note: string | null }): Promise<FieldEntryResult> =>
+  unwrap<FieldEntryResult>(await apiClient.post(`${BASE}/field/conflicts/${b.id}/review`, { decision: b.decision, note: b.note }))

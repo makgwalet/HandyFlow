@@ -16,7 +16,7 @@ public final class MeterRules {
     public static final String HOURS = "HOURS";
     public static final String KILOMETRES = "KILOMETRES";
     public static final List<String> TYPES = List.of(HOURS, KILOMETRES);
-    public static final List<String> SOURCES = List.of("MANUAL", "SHIFT", "SERVICE", "CORRECTION", "TYPE_CHANGE");
+    public static final List<String> SOURCES = List.of("MANUAL", "SHIFT", "SERVICE", "CORRECTION", "TYPE_CHANGE", "FIELD");
 
     /** Blank means hours (the default for every machine that existed before meter types). */
     public static String normalizeType(String type) {
