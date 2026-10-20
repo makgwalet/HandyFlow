@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import VehicleDetail from "./VehicleDetail"
 import {
   Plus, Car, AlertTriangle, ChevronDown, ChevronUp, X,
   Edit2, Eye, AlertCircle, CheckCircle, Wrench, Clock, UserCog,
@@ -16,6 +17,9 @@ interface Vehicle {
   dueForService: boolean; licenceExpiringSoon: boolean; roadworthyExpiringSoon: boolean
   dailyRate: number | null; assignedDriverName: string | null; assignedDriverId: string | null; notes: string | null
   createdAt: string
+  vin?: string | null; engineNumber?: string | null; variant?: string | null; bodyType?: string | null; transmission?: string | null; driveType?: string | null
+  axleCount?: number | null; gvmKg?: number | null; tareKg?: number | null; payloadKg?: number | null; gcmKg?: number | null
+  tankCapacityLitres?: number | null; engineHours?: number | null; lifecycleStatus?: string | null
 }
 
 interface Driver { id: string; firstName: string; lastName: string; status: string }
@@ -482,6 +486,7 @@ export default function VehiclesTab() {
               {(() => { const pct = Math.min(100, ((viewing.currentOdometer ?? 0) - (viewing.lastServiceKm ?? 0)) / (viewing.serviceIntervalKm || 10000) * 100); return <div style={{ height: "100%", width: `${pct}%`, background: pct >= 100 ? "var(--hf-danger)" : pct >= 80 ? "var(--hf-warning)" : "var(--hf-accent)", borderRadius: 99 }} /> })()}
             </div>
           </div>
+          <VehicleDetail vehicleId={viewing.id} identity={viewing} />
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => { setViewing(null); openAssign(viewing) }} style={{ flex: 1, padding: "10px", background: "var(--hf-violet-soft)", color: "var(--hf-violet-text)", border: "1px solid var(--hf-violet-border)", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Assign Driver</button>
             <button onClick={() => { setViewing(null); setShowStatus(viewing); setNewStatus(viewing.status); setStatusNote("") }} style={{ flex: 1, padding: "10px", background: "var(--hf-warning-soft)", color: "var(--hf-warning-text)", border: "1px solid var(--hf-warning-border)", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Change Status</button>
