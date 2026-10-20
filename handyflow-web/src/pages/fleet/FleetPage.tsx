@@ -13,6 +13,7 @@ import EquipmentTab   from "./EquipmentTab"
 import AccidentsTab   from "./AccidentsTab"
 import InspectionsTab from "./InspectionsTab"
 import WorkOrdersTab  from "./WorkOrdersTab"
+import DriverScoresTab from "./DriverScoresTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { FLEET_SECTIONS } from "../../navigation/moduleSections"
 
@@ -31,6 +32,7 @@ export function FleetPage() {
         case "accidents":  return <AccidentsTab />
         case "inspections": return <InspectionsTab />
         case "workshop":   return <WorkOrdersTab />
+        case "driver-scores": return <DriverScoresTab />
         default:           return null
       }
     }} />
