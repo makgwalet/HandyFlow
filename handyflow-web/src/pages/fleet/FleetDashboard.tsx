@@ -1,6 +1,8 @@
 // src/pages/fleet/FleetDashboard.tsx
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { StatusDonut, CostliestVehicles } from "./FleetCharts"
+import { blocksVehicle } from "./accidents.logic"
 import { Car, Route, Wrench, AlertTriangle, CheckCircle, ArrowRight, TrendingUp } from "lucide-react"
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
@@ -43,6 +45,12 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (section: s
     queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/cost-summary")),
   })
 
+  const { data: accidents = [] } = useQuery<{ registration: string; status: string; vehicleDrivable: boolean }[]>({
+    queryKey: ["fleet", "accidents", ""],
+    queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/accidents")),
+  })
+  const offRoad = [...new Set(accidents.filter(blocksVehicle).map(a => a.registration))]
+
   const vs = vehicles as any[]
   const ts = trips as any[]
 
@@ -69,6 +77,11 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (section: s
 
   return (
     <div>
+      {offRoad.length > 0 && (
+        <div role="alert" onClick={() => onNavigate("accidents")} style={{ background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 13, cursor: "pointer" }}>
+          <strong>{offRoad.length} {offRoad.length === 1 ? "vehicle cannot" : "vehicles cannot"} be driven after an accident:</strong> {offRoad.join(", ")}. They are blocked from trips.
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 28 }}>
         {kpis.map(k => (
           <div key={k.label} onClick={() => onNavigate(k.tab)}
@@ -180,6 +193,8 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (section: s
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <StatusDonut vehicles={vs} />
+          <CostliestVehicles rows={costSummary} />
           <div style={{ background: "var(--hf-primary)", borderRadius: 12, padding: 20, color: "var(--hf-text-on-solid)" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginBottom: 14, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>This month</div>
             {[

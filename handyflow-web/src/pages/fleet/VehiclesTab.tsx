@@ -3,6 +3,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import VehicleDetail from "./VehicleDetail"
+import { filterVehicles } from "./fleet.logic"
 import {
   Plus, Car, AlertTriangle, ChevronDown, ChevronUp, X,
   Edit2, Eye, AlertCircle, CheckCircle, Wrench, Clock, UserCog,
@@ -68,6 +69,7 @@ export default function VehiclesTab() {
   const [viewing, setViewing]         = useState<Vehicle | null>(null)
   const [expanded, setExpanded]       = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState("ALL")
+  const [search, setSearch]          = useState("")
   const [form, setForm]               = useState(EMPTY_FORM)
   const [newStatus, setNewStatus]     = useState("")
   const [statusNote, setStatusNote]   = useState("")
@@ -116,7 +118,7 @@ export default function VehiclesTab() {
     return Object.keys(errs).length === 0
   }
 
-  const filtered = (vehicles as Vehicle[]).filter(v => filterStatus === "ALL" || v.status === filterStatus)
+  const filtered = filterVehicles(vehicles as Vehicle[], search, filterStatus)
 
   const stats = [
     { label: "Total",       value: vehicles.length,                                              color: "var(--hf-primary-text)" },
@@ -157,6 +159,8 @@ export default function VehiclesTab() {
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
+        <input aria-label="Search vehicles" placeholder="Search registration, make, driver, VIN, engine no." value={search} onChange={e => setSearch(e.target.value)}
+          style={{ padding: "7px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, minWidth: 260, background: "var(--hf-surface)" }} />
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {["ALL", ...STATUSES].map(s => (
             <button key={s} onClick={() => setFilterStatus(s)}
