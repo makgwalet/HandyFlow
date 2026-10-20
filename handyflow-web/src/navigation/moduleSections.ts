@@ -14,7 +14,7 @@ import {
   GitBranch, Key, LayoutDashboard, Lock, MapPin, Radio, RefreshCw, Repeat, Route,
   Footprints, QrCode, Gauge, Shield, ShieldCheck, Siren, Tablet, DollarSign, Wheat, Tractor, PawPrint,
   Droplets, Archive, Smartphone, ArrowDownToLine, Fuel, Truck, Users, TrendingUp, Car, Wrench,
-  Calculator, BookOpen, GitBranch as JournalIcon, Landmark, BarChart2, FileText,
+  Hexagon, Calculator, BookOpen, GitBranch as JournalIcon, Landmark, BarChart2, FileText,
   Briefcase, Calendar, FolderOpen, AlertOctagon, CalendarCheck, Settings,
   Building2, GraduationCap, CalendarDays, Award, Scale, Gavel, FileSearch, MapPin as PinIcon, HardHat,
   ShoppingCart, Package, CalendarClock, ClipboardCheck, FileCheck,
@@ -203,7 +203,7 @@ export const FLEET_SECTIONS: ModuleSections = {
   icon: Car,
   defaultSection: 'dashboard',
   groups: [
-    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }, { id: 'live-map', label: 'Live Map', icon: MapPin }, { id: 'alerts', label: 'Alerts', icon: Bell }] },
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }, { id: 'live-map', label: 'Live Map', icon: MapPin }, { id: 'geofences', label: 'Geofences', icon: Hexagon }, { id: 'alerts', label: 'Alerts', icon: Bell }] },
     {
       label: 'Fleet',
       sections: [
