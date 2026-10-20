@@ -3,8 +3,11 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Plus, Fuel, X, AlertCircle } from "lucide-react"
+import { errorMessage, unwrapList } from "./apiShape"
 
-const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
+interface VehicleOption { id: string; registration: string; make: string; model: string; currentOdometer: number | null }
+interface FuelLog { id: string; filledAt: string; litres: number; pricePerLitre: number | null; totalCost: number | null; odometerAtFillup: number | null; station: string | null; receiptRef: string | null; fullTank: boolean }
+interface FuelBody { filledAt: string; litres: number; pricePerLitre: number | null; totalCost: number | null; odometerAtFillup: number | null; station: string | null; receiptRef: string | null; fullTank: boolean }
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })
 const fmtR    = (n: number | null | undefined) => n != null ? `R ${Number(n).toFixed(2)}` : "—"
 
@@ -17,19 +20,19 @@ export default function FuelTab() {
   const [form, setForm]                       = useState(EMPTY_FORM)
   const [apiError, setApiError]               = useState("")
 
-  const { data: vehicles = [] } = useQuery<any[]>({
+  const { data: vehicles = [] } = useQuery<VehicleOption[]>({
     queryKey: ["fleet-vehicles"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
+    queryFn: async () => unwrapList<VehicleOption>(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
   })
 
-  const { data: logs = [], isLoading } = useQuery<any[]>({
+  const { data: logs = [], isLoading } = useQuery<FuelLog[]>({
     queryKey: ["fleet-fuel", selectedVehicle],
-    queryFn: async () => selectedVehicle ? unwrap(await apiClient.get(`/api/v1/fleet/vehicles/${selectedVehicle}/fuel?size=100`)) : [],
+    queryFn: async () => selectedVehicle ? unwrapList<FuelLog>(await apiClient.get(`/api/v1/fleet/vehicles/${selectedVehicle}/fuel?size=100`)) : [],
     enabled: !!selectedVehicle,
   })
 
   const logFuel = useMutation({
-    mutationFn: (body: any) => apiClient.post(`/api/v1/fleet/vehicles/${selectedVehicle}/fuel`, body),
+    mutationFn: (body: FuelBody) => apiClient.post(`/api/v1/fleet/vehicles/${selectedVehicle}/fuel`, body),
     // FIX: previously only invalidated fleet-fuel. Confirmed via
     // FleetService.logFuel() that logging a fill-up can also advance the
     // vehicle's currentOdometer (when odometerAtFillup exceeds the stored
@@ -48,16 +51,15 @@ export default function FuelTab() {
       qc.invalidateQueries({ queryKey: ["fleet-cost-summary"] })
       setShowAdd(false); setForm(EMPTY_FORM); setApiError("")
     },
-    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to log fuel"),
+    onError: (e: unknown) => setApiError(errorMessage(e, "Failed to log fuel")),
   })
 
-  const selectedVehicleObj = (vehicles as any[]).find(v => v.id === selectedVehicle)
-  const totalLitres = (logs as any[]).reduce((s, l) => s + Number(l.litres ?? 0), 0)
-  const totalCost   = (logs as any[]).reduce((s, l) => s + Number(l.totalCost ?? 0), 0)
+  const selectedVehicleObj = vehicles.find(v => v.id === selectedVehicle)
+  const totalLitres = logs.reduce((s, l) => s + Number(l.litres ?? 0), 0)
+  const totalCost   = logs.reduce((s, l) => s + Number(l.totalCost ?? 0), 0)
 
   // Auto-compute totalCost or pricePerLitre
   const computedTotal = form.litres && form.pricePerLitre ? (Number(form.litres) * Number(form.pricePerLitre)).toFixed(2) : ""
-  const computedPpl   = form.litres && form.totalCost    ? (Number(form.totalCost) / Number(form.litres)).toFixed(3) : ""
 
   const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, outline: "none" }
   const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
@@ -70,7 +72,7 @@ export default function FuelTab() {
           <select value={selectedVehicle} onChange={e => setSelectedVehicle(e.target.value)}
             style={{ padding: "9px 14px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 14, background: "var(--hf-surface)", minWidth: 300, outline: "none" }}>
             <option value="">Select vehicle...</option>
-            {(vehicles as any[]).map(v => <option key={v.id} value={v.id}>{v.registration} — {v.make} {v.model}</option>)}
+            {vehicles.map(v => <option key={v.id} value={v.id}>{v.registration} — {v.make} {v.model}</option>)}
           </select>
         </div>
         {selectedVehicle && (
@@ -82,7 +84,7 @@ export default function FuelTab() {
       </div>
 
       {/* Summary stats */}
-      {selectedVehicle && (logs as any[]).length > 0 && (
+      {selectedVehicle && logs.length > 0 && (
         <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
           {[
             { label: "Fill-ups",       value: logs.length,                                     color: "var(--hf-primary-text)" },
@@ -106,7 +108,7 @@ export default function FuelTab() {
         </div>
       ) : isLoading ? (
         <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading fuel log...</div>
-      ) : (logs as any[]).length === 0 ? (
+      ) : logs.length === 0 ? (
         <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)", border: "1px dashed var(--hf-border)", borderRadius: 12 }}>
           No fuel records for this vehicle yet.
         </div>
@@ -121,7 +123,7 @@ export default function FuelTab() {
               </tr>
             </thead>
             <tbody>
-              {(logs as any[]).map((log, i) => (
+              {logs.map((log, i) => (
                 <tr key={log.id} style={{ borderBottom: i < logs.length-1 ? "1px solid var(--hf-border-subtle)" : "none", background: "var(--hf-surface)" }}>
                   <td style={{ padding: "12px 16px", fontWeight: 600, color: "var(--hf-text)" }}>{fmtDate(log.filledAt)}</td>
                   <td style={{ padding: "12px 16px", color: "var(--hf-text-tertiary)" }}>{log.odometerAtFillup ? `${Number(log.odometerAtFillup).toLocaleString()} km` : "—"}</td>

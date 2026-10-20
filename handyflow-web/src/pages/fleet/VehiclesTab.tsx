@@ -3,6 +3,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import VehicleDetail from "./VehicleDetail"
+import { errorMessage, fieldErrorsOf, unwrapList } from "./apiShape"
 import { filterVehicles } from "./fleet.logic"
 import {
   Plus, Car, AlertTriangle, ChevronDown, ChevronUp, X,
@@ -48,7 +49,6 @@ const STATUSES      = ["AVAILABLE","ON_TRIP","MAINTENANCE","BREAKDOWN","RETIRED"
 const FUEL_TYPES    = ["PETROL","DIESEL","ELECTRIC","HYBRID","LPG","OTHER"]
 const ICONS: Record<string, string> = { SEDAN:"🚗", SUV:"🚙", BAKKIE:"🛻", TRUCK:"🚛", MINIBUS:"🚐", VAN:"🚌", MOTORCYCLE:"🏍️", OTHER:"🚘" }
 
-const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
 const fmtOdo  = (km: number) => `${Number(km).toLocaleString("en-ZA")} km`
 const fmtR    = (n: number | null | undefined) => n != null ? `R ${Number(n).toLocaleString("en-ZA")}` : "—"
 const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
@@ -80,33 +80,33 @@ export default function VehiclesTab() {
 
   const { data: vehicles = [], isLoading } = useQuery<Vehicle[]>({
     queryKey: ["fleet-vehicles"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
+    queryFn: async () => unwrapList<Vehicle>(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
   })
 
   const { data: drivers = [] } = useQuery<Driver[]>({
     queryKey: ["fleet-drivers"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/drivers?size=200")),
+    queryFn: async () => unwrapList<Driver>(await apiClient.get("/api/v1/fleet/drivers?size=200")),
   })
   const activeDrivers = drivers.filter(d => d.status === "ACTIVE")
 
   const createVehicle = useMutation({
-    mutationFn: (body: any) => apiClient.post("/api/v1/fleet/vehicles", body),
+    mutationFn: (body: Record<string, unknown>) => apiClient.post("/api/v1/fleet/vehicles", body),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["fleet-vehicles"] }); setShowAdd(false); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("") },
-    onError: (e: any) => { const d = e.response?.data; if (d?.errors) setFieldErrors(d.errors); else setApiError(d?.message ?? "Failed to register vehicle") },
+    onError: (e: unknown) => { const fields = fieldErrorsOf(e); if (fields) setFieldErrors(fields); else setApiError(errorMessage(e, "Failed to register vehicle")) },
   })
 
   const updateStatus = useMutation({
     mutationFn: ({ id, status, note }: { id: string; status: string; note: string }) =>
       apiClient.patch(`/api/v1/fleet/vehicles/${id}/status`, { status, note }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["fleet-vehicles"] }); setShowStatus(null); setNewStatus(""); setStatusNote(""); setApiError("") },
-    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to update status"),
+    onError: (e: unknown) => setApiError(errorMessage(e, "Failed to update status")),
   })
 
   const assignDriver = useMutation({
     mutationFn: ({ id, driverId }: { id: string; driverId: string | null }) =>
       apiClient.patch(`/api/v1/fleet/vehicles/${id}/driver`, { driverId }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["fleet-vehicles"] }); setShowAssign(null); setSelectedDriverId(""); setApiError("") },
-    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to update driver assignment"),
+    onError: (e: unknown) => setApiError(errorMessage(e, "Failed to update driver assignment")),
   })
 
   const validate = () => {
@@ -135,18 +135,6 @@ export default function VehiclesTab() {
     border: `1.5px solid ${fieldErrors[k] ? "var(--hf-danger)" : "var(--hf-border)"}`,
     borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   })
-  const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
-    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
-      <AlertCircle size={12} />{fieldErrors[k]}
-    </div>
-  ) : null
-
-  const StatusBadge = ({ status }: { status: string }) => {
-    const cfg = STATUS_CFG[status] ?? STATUS_CFG.AVAILABLE
-    const Icon = cfg.icon
-    return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: cfg.bg, color: cfg.color, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: `1px solid ${cfg.border}` }}><Icon size={10} />{cfg.label}</span>
-  }
-
   const openAssign = (v: Vehicle) => { setShowAssign(v); setSelectedDriverId(v.assignedDriverId ?? ""); setApiError("") }
 
   return (
@@ -189,7 +177,6 @@ export default function VehiclesTab() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {filtered.map(v => {
-            const cfg = STATUS_CFG[v.status] ?? STATUS_CFG.AVAILABLE
             const isOpen = expanded === v.id
             const kmUsed = (v.currentOdometer ?? 0) - (v.lastServiceKm ?? 0)
             const svcPct = Math.min(100, (kmUsed / (v.serviceIntervalKm || 10000)) * 100)
@@ -281,7 +268,7 @@ export default function VehiclesTab() {
       )}
 
       {showAdd && (
-        <Overlay onClose={() => setShowAdd(false)}>
+        <Overlay>
           <MHead title="Register Vehicle" onClose={() => setShowAdd(false)} />
           <Sect title="Vehicle Details">
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -290,22 +277,22 @@ export default function VehiclesTab() {
                 <input autoFocus value={form.registration}
                   onChange={e => { setForm(f => ({ ...f, registration: e.target.value.toUpperCase() })); setFieldErrors(f => omit(f,"registration")) }}
                   placeholder="GP 12 34 JHB" style={inp("registration")} />
-                <FErr k="registration" />
+                <FErr message={fieldErrors.registration} />
               </div>
               <div>
                 <label style={lbl}>Make *</label>
                 <input value={form.make} onChange={e => { setForm(f => ({ ...f, make: e.target.value })); setFieldErrors(f => omit(f,"make")) }} placeholder="Toyota" style={inp("make")} />
-                <FErr k="make" />
+                <FErr message={fieldErrors.make} />
               </div>
               <div>
                 <label style={lbl}>Model *</label>
                 <input value={form.model} onChange={e => { setForm(f => ({ ...f, model: e.target.value })); setFieldErrors(f => omit(f,"model")) }} placeholder="Hilux" style={inp("model")} />
-                <FErr k="model" />
+                <FErr message={fieldErrors.model} />
               </div>
               <div>
                 <label style={lbl}>Year</label>
                 <input type="number" value={form.year} onChange={e => { setForm(f => ({ ...f, year: e.target.value })); setFieldErrors(f => omit(f,"year")) }} placeholder="2022" style={inp("year")} />
-                <FErr k="year" />
+                <FErr message={fieldErrors.year} />
               </div>
               <div>
                 <label style={lbl}>Type</label>
@@ -395,7 +382,7 @@ export default function VehiclesTab() {
       )}
 
       {showStatus && (
-        <Overlay onClose={() => { setShowStatus(null); setApiError("") }}>
+        <Overlay>
           <MHead title={`Update Status — ${showStatus.registration}`} onClose={() => { setShowStatus(null); setApiError("") }} />
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
             {STATUSES.map(s => {
@@ -424,7 +411,7 @@ export default function VehiclesTab() {
 
       {/* ── Assign Driver Modal ───────────────────────────────────────────── */}
       {showAssign && (
-        <Overlay onClose={() => { setShowAssign(null); setApiError("") }}>
+        <Overlay>
           <MHead title={`Assign Driver — ${showAssign.registration}`} onClose={() => { setShowAssign(null); setApiError("") }} />
           <div style={{ marginBottom: 16 }}>
             <label style={lbl}>Driver</label>
@@ -453,7 +440,7 @@ export default function VehiclesTab() {
       )}
 
       {viewing && (
-        <Overlay onClose={() => setViewing(null)}>
+        <Overlay>
           <div style={{ background: "linear-gradient(135deg, var(--hf-primary) 0%, var(--hf-primary-hover) 100%)", margin: "-28px -28px 24px", padding: "24px 28px", borderRadius: "16px 16px 0 0" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -504,7 +491,21 @@ export default function VehiclesTab() {
   )
 }
 
-function Overlay({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+function FErr({ message }: { message?: string }) {
+  return message ? (
+    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
+      <AlertCircle size={12} />{message}
+    </div>
+  ) : null
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const cfg = STATUS_CFG[status] ?? STATUS_CFG.AVAILABLE
+  const Icon = cfg.icon
+  return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: cfg.bg, color: cfg.color, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: `1px solid ${cfg.border}` }}><Icon size={10} />{cfg.label}</span>
+}
+
+function Overlay({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 620, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>

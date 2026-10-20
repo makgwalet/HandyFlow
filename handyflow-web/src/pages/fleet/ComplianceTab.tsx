@@ -2,10 +2,13 @@
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Shield, CheckCircle, AlertTriangle, Clock, AlertCircle } from "lucide-react"
+import { unwrapList } from "./apiShape"
+import { daysToDate } from "./driverScores.logic"
 
-const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
+interface Vehicle { id: string; registration: string; make: string; model: string; year: number | null; vehicleType: string; licenceDiscExpiry: string | null; roadworthyExpiry: string | null; insuranceExpiry: string | null }
 const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
-const daysUntil = (d: string | null) => d ? Math.ceil((new Date(d).getTime() - Date.now()) / 86400000) : 999
+/** Whole calendar days to a date (the one rule every Fleet expiry uses); 999 when there is no date. */
+const daysUntil = (d: string | null) => d ? daysToDate(d) : 999
 
 const ICONS: Record<string, string> = { SEDAN:"🚗", SUV:"🚙", BAKKIE:"🛻", TRUCK:"🚛", MINIBUS:"🚐", VAN:"🚌", MOTORCYCLE:"🏍️", OTHER:"🚘" }
 
@@ -30,13 +33,38 @@ function DocRow({ label, date }: { label: string; date: string | null }) {
   )
 }
 
+function AlertGroup({ title, vList, color }: { title: string; vList: Vehicle[]; color: string }) {
+  if (vList.length === 0) return null
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>{title} ({vList.length})</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {vList.map(v => (
+          <div key={v.id} style={{ border: `1px solid ${color === "var(--hf-danger-text)" ? "var(--hf-danger-border)" : color === "var(--hf-warning-text)" ? "var(--hf-warning-border)" : "var(--hf-border)"}`, borderRadius: 12, padding: "16px 20px", background: "var(--hf-surface)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <div style={{ fontSize: 24 }}>{ICONS[v.vehicleType] ?? "🚘"}</div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{v.registration}</div>
+                <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{v.make} {v.model}{v.year ? ` (${v.year})` : ""}</div>
+              </div>
+            </div>
+            <DocRow label="Licence Disc"   date={v.licenceDiscExpiry} />
+            <DocRow label="Roadworthy"     date={v.roadworthyExpiry} />
+            <DocRow label="Insurance"      date={v.insuranceExpiry} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function ComplianceTab() {
-  const { data: vehicles = [], isLoading } = useQuery<any[]>({
+  const { data: vehicles = [], isLoading } = useQuery<Vehicle[]>({
     queryKey: ["fleet-vehicles"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
+    queryFn: async () => unwrapList<Vehicle>(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
   })
 
-  const vs = vehicles as any[]
+  const vs = vehicles
 
   const expired = vs.filter(v => [v.licenceDiscExpiry, v.roadworthyExpiry, v.insuranceExpiry].some(d => d && daysUntil(d) < 0))
   const critical = vs.filter(v => !expired.includes(v) && [v.licenceDiscExpiry, v.roadworthyExpiry, v.insuranceExpiry].some(d => d && daysUntil(d) <= 7))
@@ -50,31 +78,6 @@ export default function ComplianceTab() {
     { label: "Expiring 30d", value: warning.length,   color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
     { label: "All current",  value: current.length + upcoming.length, color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
   ]
-
-  const AlertGroup = ({ title, vList, color }: { title: string; vList: any[]; color: string }) => {
-    if (vList.length === 0) return null
-    return (
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>{title} ({vList.length})</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {vList.map(v => (
-            <div key={v.id} style={{ border: `1px solid ${color === "var(--hf-danger-text)" ? "var(--hf-danger-border)" : color === "var(--hf-warning-text)" ? "var(--hf-warning-border)" : "var(--hf-border)"}`, borderRadius: 12, padding: "16px 20px", background: "var(--hf-surface)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                <div style={{ fontSize: 24 }}>{ICONS[v.vehicleType] ?? "🚘"}</div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{v.registration}</div>
-                  <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{v.make} {v.model}{v.year ? ` (${v.year})` : ""}</div>
-                </div>
-              </div>
-              <DocRow label="Licence Disc"   date={v.licenceDiscExpiry} />
-              <DocRow label="Roadworthy"     date={v.roadworthyExpiry} />
-              <DocRow label="Insurance"      date={v.insuranceExpiry} />
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div>

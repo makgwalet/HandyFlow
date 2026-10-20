@@ -90,3 +90,25 @@ export function focusPoints(f: GeofenceForm | null, fences: Geofence[]): LatLng[
   if (f?.shape === "CIRCLE" && f.centre) return [f.centre]
   return fences.flatMap(g => (g.shape === "POLYGON" ? (g.polygon ?? []).map(p => [p.latitude, p.longitude] as LatLng) : g.centerLatitude != null && g.centerLongitude != null ? [[g.centerLatitude, g.centerLongitude] as LatLng] : []))
 }
+
+// ── Address search (OpenStreetMap Nominatim) ───────────────────────────────
+export interface Place { name: string; point: LatLng; box: [LatLng, LatLng] | null }
+export const SEARCH_MIN_CHARS = 3
+/** The search request, or null when there is too little to search for. */
+export function searchUrl(query: string): string | null {
+  const q = query.trim()
+  return q.length < SEARCH_MIN_CHARS ? null : `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(q)}`
+}
+/** Turns the service's answer into places, dropping anything without a usable position. Never throws on odd input. */
+export function parsePlaces(raw: unknown): Place[] {
+  if (!Array.isArray(raw)) return []
+  const out: Place[] = []
+  for (const r of raw as Record<string, unknown>[]) {
+    const lat = Number(r?.lat), lon = Number(r?.lon)
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) continue
+    const b = Array.isArray(r.boundingbox) ? r.boundingbox.map(Number) : []
+    const box: Place["box"] = b.length === 4 && b.every(Number.isFinite) ? [[b[0], b[2]], [b[1], b[3]]] : null   // service order: south, north, west, east
+    out.push({ name: String(r.display_name ?? "Unnamed place"), point: [lat, lon], box })
+  }
+  return out
+}

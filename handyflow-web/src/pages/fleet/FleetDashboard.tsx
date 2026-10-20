@@ -3,9 +3,9 @@ import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { StatusDonut, CostliestVehicles } from "./FleetCharts"
 import { blocksVehicle } from "./accidents.logic"
+import { unwrapList } from "./apiShape"
 import { Car, Route, Wrench, AlertTriangle, CheckCircle, ArrowRight, TrendingUp } from "lucide-react"
 
-const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
 const fmtOdo = (km: number) => `${Number(km).toLocaleString("en-ZA")} km`
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })
 const fmtR = (n: number | null | undefined) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
@@ -23,6 +23,14 @@ const VEHICLE_ICONS: Record<string, string> = {
   SEDAN:"🚗", SUV:"🚙", BAKKIE:"🛻", TRUCK:"🚛", MINIBUS:"🚐", VAN:"🚌", MOTORCYCLE:"🏍️", OTHER:"🚘"
 }
 
+interface DashVehicle {
+  id: string; registration: string; make: string; model: string; status: string; vehicleType?: string
+  assignedDriverName?: string | null; currentOdometer?: number | null; lastServiceKm?: number | null; serviceIntervalKm?: number | null
+  dueForService?: boolean; licenceExpiringSoon?: boolean; roadworthyExpiringSoon?: boolean
+  licenceDiscExpiry?: string | null; roadworthyExpiry?: string | null; insuranceExpiry?: string | null
+}
+interface DashTrip { vehicleId: string; status: string; startAt?: string | null; distanceKm?: number | null; driverName?: string | null; purpose?: string | null }
+
 interface CostSummary {
   vehicleId: string; registration: string; make: string; model: string
   totalServiceCost: number; totalFuelCost: number; totalCost: number
@@ -30,48 +38,45 @@ interface CostSummary {
 }
 
 export default function FleetDashboard({ onNavigate }: { onNavigate: (section: string) => void }) {
-  const { data: vehicles = [] } = useQuery({
+  const { data: vs = [] } = useQuery<DashVehicle[]>({
     queryKey: ["fleet-vehicles"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
+    queryFn: async () => unwrapList<DashVehicle>(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
   })
 
-  const { data: trips = [] } = useQuery({
+  const { data: ts = [] } = useQuery<DashTrip[]>({
     queryKey: ["fleet-trips-all"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/trips?size=200")),
+    queryFn: async () => unwrapList<DashTrip>(await apiClient.get("/api/v1/fleet/trips?size=200")),
   })
 
   const { data: costSummary = [] } = useQuery<CostSummary[]>({
     queryKey: ["fleet-cost-summary"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/cost-summary")),
+    queryFn: async () => unwrapList<CostSummary>(await apiClient.get("/api/v1/fleet/cost-summary")),
   })
 
   const { data: accidents = [] } = useQuery<{ registration: string; status: string; vehicleDrivable: boolean }[]>({
     queryKey: ["fleet", "accidents", ""],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/accidents")),
+    queryFn: async () => unwrapList<{ registration: string; status: string; vehicleDrivable: boolean }>(await apiClient.get("/api/v1/fleet/accidents")),
   })
   const offRoad = [...new Set(accidents.filter(blocksVehicle).map(a => a.registration))]
 
-  const vs = vehicles as any[]
-  const ts = trips as any[]
-
   const today = new Date().toISOString().split("T")[0]
-  const activeTrips = ts.filter((t: any) => t.status === "ACTIVE")
+  const activeTrips = ts.filter((t) => t.status === "ACTIVE")
 
-  const expiring30 = vs.filter((v: any) => {
-    const dates = [v.licenceDiscExpiry, v.roadworthyExpiry, v.insuranceExpiry].filter(Boolean)
+  const expiring30 = vs.filter((v) => {
+    const dates = [v.licenceDiscExpiry, v.roadworthyExpiry, v.insuranceExpiry].filter((d): d is string => !!d)
     return dates.some(d => daysUntil(d) <= 30)
   })
 
   const kpis = [
     { label: "Total fleet",    value: vs.length,                                               color: "var(--hf-primary-text)", bg: "var(--hf-info-soft)", icon: Car,           tab: "vehicles" },
     { label: "On trip now",    value: activeTrips.length,                                       color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", icon: Route,         tab: "trips" },
-    { label: "Service due",    value: vs.filter((v: any) => v.dueForService).length,            color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", icon: Wrench,        tab: "services" },
+    { label: "Service due",    value: vs.filter((v) => v.dueForService).length,            color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", icon: Wrench,        tab: "services" },
     { label: "Expired / expiring",  value: expiring30.length,                                        color: expiring30.length > 0 ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)", bg: expiring30.length > 0 ? "var(--hf-danger-soft)" : "var(--hf-success-soft-strong)", icon: AlertTriangle, tab: "compliance" },
   ]
 
   const totalKmThisMonth = ts
-    .filter((t: any) => t.startAt?.startsWith(today.slice(0, 7)))
-    .reduce((s: number, t: any) => s + (t.distanceKm ?? 0), 0)
+    .filter((t) => t.startAt?.startsWith(today.slice(0, 7)))
+    .reduce((s: number, t) => s + (t.distanceKm ?? 0), 0)
 
   const rankedCosts = costSummary.filter(c => c.costPerKm !== null).slice(0, 5)
 
@@ -116,14 +121,14 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (section: s
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {vs.slice(0, 8).map((v: any) => {
+              {vs.slice(0, 8).map((v) => {
                 const cfg = STATUS_CFG[v.status] ?? STATUS_CFG.AVAILABLE
                 const kmUsed = (v.currentOdometer ?? 0) - (v.lastServiceKm ?? 0)
                 const svcPct = Math.min(100, (kmUsed / (v.serviceIntervalKm || 10000)) * 100)
-                const activeTrip = activeTrips.find((t: any) => t.vehicleId === v.id)
+                const activeTrip = activeTrips.find((t) => t.vehicleId === v.id)
                 return (
                   <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", border: `1px solid ${v.status === "BREAKDOWN" ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 10, background: "var(--hf-surface)" }}>
-                    <div style={{ fontSize: 22, width: 36, textAlign: "center" as const, flexShrink: 0 }}>{VEHICLE_ICONS[v.vehicleType] ?? "🚘"}</div>
+                    <div style={{ fontSize: 22, width: 36, textAlign: "center" as const, flexShrink: 0 }}>{VEHICLE_ICONS[v.vehicleType ?? "OTHER"] ?? "🚘"}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
                         <span style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>{v.registration}</span>
@@ -198,7 +203,7 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (section: s
           <div style={{ background: "var(--hf-primary)", borderRadius: 12, padding: 20, color: "var(--hf-text-on-solid)" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginBottom: 14, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>This month</div>
             {[
-              { label: "Trips completed", value: ts.filter((t: any) => t.status === "COMPLETED" && t.startAt?.startsWith(today.slice(0, 7))).length },
+              { label: "Trips completed", value: ts.filter((t) => t.status === "COMPLETED" && t.startAt?.startsWith(today.slice(0, 7))).length },
               { label: "Kilometres driven", value: `${totalKmThisMonth.toLocaleString()} km` },
               { label: "Active now", value: activeTrips.length },
             ].map(s => (
@@ -215,12 +220,12 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (section: s
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--hf-success-text-strong)" }}>
                 <CheckCircle size={14} style={{ color: 'var(--hf-success-text-strong)' }} /> All documents current
               </div>
-            ) : expiring30.slice(0, 4).map((v: any) => {
+            ) : expiring30.slice(0, 4).map((v) => {
               const earliest = [
                 { label: "Licence", date: v.licenceDiscExpiry },
                 { label: "Roadworthy", date: v.roadworthyExpiry },
                 { label: "Insurance", date: v.insuranceExpiry },
-              ].filter(x => x.date && daysUntil(x.date) <= 30)
+              ].filter((x): x is { label: string; date: string } => !!x.date && daysUntil(x.date) <= 30)
                .sort((a, b) => daysUntil(a.date) - daysUntil(b.date))[0]
 
               return earliest ? (

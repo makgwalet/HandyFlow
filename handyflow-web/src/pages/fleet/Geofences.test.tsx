@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import GeofencesTab from "./GeofencesTab"
-import { areaText, circleAreaM2, clearShape, clickMap, emptyGeofence, focusPoints, geofenceBody, geofenceProblem, geofenceSummary, movePoint, polygonAreaM2, removePoint, selfIntersects, switchShape, toGeofenceForm, undoPoint, type Geofence, type GeofenceForm, type LatLng } from "./geofences.logic"
+import { parsePlaces, searchUrl, areaText, circleAreaM2, clearShape, clickMap, emptyGeofence, focusPoints, geofenceBody, geofenceProblem, geofenceSummary, movePoint, polygonAreaM2, removePoint, selfIntersects, switchShape, toGeofenceForm, undoPoint, type Geofence, type GeofenceForm, type LatLng } from "./geofences.logic"
 
 const get = vi.fn(), post = vi.fn(), put = vi.fn(), del = vi.fn()
 type Args = unknown[]
@@ -10,8 +10,9 @@ let perms = new Set<string>()
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: Args) => get(...a), post: (...a: Args) => post(...a), put: (...a: Args) => put(...a), delete: (...a: Args) => del(...a) } }))
 vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.has(p) }))
 // Leaflet needs a real browser; the map is a stub with buttons that act as clicks and drags.
-vi.mock("./GeofenceMap", () => ({ default: ({ draft, onClick, onMove, onRemove }: { draft: GeofenceForm | null; onClick: (p: LatLng) => void; onMove: (i: number, p: LatLng) => void; onRemove: (i: number) => void }) => (
+vi.mock("./GeofenceMap", () => ({ default: ({ draft, goTo, onClick, onMove, onRemove }: { draft: GeofenceForm | null; goTo?: { name: string } | null; onClick: (p: LatLng) => void; onMove: (i: number, p: LatLng) => void; onRemove: (i: number) => void }) => (
   <div data-testid="map">
+    <span data-testid="goto">{goTo ? goTo.name : "none"}</span>
     <span data-testid="draft">{draft ? `${draft.shape}:${draft.polygon.length}:${draft.centre ? draft.centre.join(",") : "none"}` : "none"}</span>
     <button type="button" onClick={() => onClick([-26.0, 28.0])}>click A</button><button type="button" onClick={() => onClick([-26.0, 28.01])}>click B</button>
     <button type="button" onClick={() => onClick([-26.01, 28.01])}>click C</button><button type="button" onClick={() => onClick([-26.01, 28.0])}>click D</button>
@@ -130,5 +131,38 @@ describe("GeofencesTab", () => {
   it("read-only users see the zones but cannot draw, edit or delete", async () => {
     perms = new Set(["FLEET_READ"]); show(); await screen.findByLabelText("Depot")
     expect(screen.queryByText("New circle")).toBeNull(); expect(screen.queryByLabelText("Edit Depot")).toBeNull(); expect(screen.queryByLabelText("Delete Depot")).toBeNull()
+  })
+})
+
+describe("address search", () => {
+  const found = [{ lat: "-26.2041", lon: "28.0473", display_name: "Johannesburg, Gauteng, South Africa", boundingbox: ["-26.3", "-26.1", "27.9", "28.2"] }, { lat: "x", lon: "1", display_name: "Broken" }]
+  let fetchMock: ReturnType<typeof vi.fn>
+  beforeEach(() => { fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock) })
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it("builds the request only for three or more characters, and parses places safely", () => {
+    expect(searchUrl("ab")).toBeNull(); expect(searchUrl("  Sandton ")).toContain("q=Sandton"); expect(searchUrl("Main St & 5th")).toContain("q=Main%20St%20%26%205th")
+    const p = parsePlaces(found); expect(p).toHaveLength(1); expect(p[0].point).toEqual([-26.2041, 28.0473]); expect(p[0].box).toEqual([[-26.3, 27.9], [-26.1, 28.2]])
+    expect(parsePlaces(null)).toEqual([]); expect(parsePlaces([{ lat: "95", lon: "0" }])).toEqual([])
+    expect(parsePlaces([{ lat: "1", lon: "2", display_name: "A", boundingbox: ["1"] }])[0].box).toBeNull()
+  })
+  it("searches, lists results and sends the map to the chosen one without using the API client or drawing anything", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve(found) })
+    show(); fireEvent.change(await screen.findByLabelText("Search address"), { target: { value: "Johannesburg" } }); fireEvent.click(screen.getByText("Search"))
+    fireEvent.click(await screen.findByText(/Johannesburg, Gauteng/))
+    expect(fetchMock.mock.calls[0][0]).toContain("nominatim.openstreetmap.org/search"); expect(screen.getByTestId("goto").textContent).toMatch(/Johannesburg/)
+    expect(screen.queryByRole("list", { name: "Search results" })).toBeNull(); expect(post).not.toHaveBeenCalled(); expect(get).not.toHaveBeenCalledWith(expect.stringContaining("nominatim"))
+  })
+  it("says so when nothing is found, when the input is too short and when the service is down", async () => {
+    show(); const box = await screen.findByLabelText("Search address")
+    fireEvent.change(box, { target: { value: "ab" } }); fireEvent.click(screen.getByText("Search")); expect((await screen.findByRole("alert")).textContent).toMatch(/at least 3/)
+    fetchMock.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) }); fireEvent.change(box, { target: { value: "Nowhereville" } }); fireEvent.click(screen.getByText("Search"))
+    expect(await screen.findByText(/No place found/)).toBeTruthy()
+    fetchMock.mockRejectedValueOnce(new Error("offline")); fireEvent.click(screen.getByText("Search")); expect((await screen.findByRole("alert")).textContent).toMatch(/unavailable/)
+  })
+  it("Enter in the box searches and does not submit the geofence form", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve(found) })
+    show(); fireEvent.click(await screen.findByText("New circle")); fireEvent.change(screen.getByLabelText("Search address"), { target: { value: "Sandton" } })
+    fireEvent.keyDown(screen.getByLabelText("Search address"), { key: "Enter" }); await screen.findByText(/Johannesburg, Gauteng/); expect(post).not.toHaveBeenCalled()
   })
 })

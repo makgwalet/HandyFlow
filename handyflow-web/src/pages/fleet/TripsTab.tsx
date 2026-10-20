@@ -15,6 +15,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Plus, Route, CheckCircle, X, AlertCircle, Briefcase, Home, FileDown, FileSpreadsheet } from "lucide-react"
+import { errorMessage, fieldErrorsOf, unwrapList } from "./apiShape"
 
 interface Vehicle { id: string; registration: string; make: string; model: string; status: string; currentOdometer: number }
 
@@ -38,7 +39,8 @@ const TYPE_CFG: Record<string, { color: string; bg: string; icon: React.ElementT
   PRIVATE:  { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", icon: Home,      label: "Private"  },
 }
 
-const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
+interface StartTripBody { driverName: string | null; purpose: string | null; tripType: string; startLocation: string | null; startOdometer: number; startAt: string }
+interface EndTripBody { endOdometer: number; endLocation: string | null; endAt: string; fuelUsedLitres: number | null; notes: string | null }
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })
 
@@ -79,37 +81,37 @@ export default function TripsTab() {
     queryFn: async () => {
       const params = new URLSearchParams({ size: "200", sort: "startAt,desc" })
       if (filterStatus !== "ALL") params.set("status", filterStatus)
-      return unwrap(await apiClient.get(`/api/v1/fleet/trips?${params}`))
+      return unwrapList<Trip>(await apiClient.get(`/api/v1/fleet/trips?${params}`))
     },
   })
 
   const { data: vehicles = [] } = useQuery<Vehicle[]>({
     queryKey: ["fleet-vehicles"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
+    queryFn: async () => unwrapList<Vehicle>(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
   })
 
   const availableVehicles = (vehicles as Vehicle[]).filter(v => v.status === "AVAILABLE")
 
   const startTrip = useMutation({
-    mutationFn: ({ vehicleId, body }: { vehicleId: string; body: any }) =>
+    mutationFn: ({ vehicleId, body }: { vehicleId: string; body: StartTripBody }) =>
       apiClient.post(`/api/v1/fleet/vehicles/${vehicleId}/trips/start`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["fleet-trips-all"] })
       qc.invalidateQueries({ queryKey: ["fleet-vehicles"] })
       setShowStart(false); setStartForm(EMPTY_START); setFieldErrors({}); setApiError("")
     },
-    onError: (e: any) => { const d = e.response?.data; if (d?.errors) setFieldErrors(d.errors); else setApiError(d?.message ?? "Failed to start trip") },
+    onError: (e: unknown) => { const fields = fieldErrorsOf(e); if (fields) setFieldErrors(fields); else setApiError(errorMessage(e, "Failed to start trip")) },
   })
 
   const endTrip = useMutation({
-    mutationFn: ({ vehicleId, body }: { vehicleId: string; body: any }) =>
+    mutationFn: ({ vehicleId, body }: { vehicleId: string; body: EndTripBody }) =>
       apiClient.post(`/api/v1/fleet/vehicles/${vehicleId}/trips/end`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["fleet-trips-all"] })
       qc.invalidateQueries({ queryKey: ["fleet-vehicles"] })
       setShowEnd(null); setEndOdometer(""); setEndLocation(""); setFuelUsed(""); setEndNotes(""); setApiError("")
     },
-    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to end trip"),
+    onError: (e: unknown) => setApiError(errorMessage(e, "Failed to end trip")),
   })
 
   const validateStart = () => {
@@ -144,8 +146,8 @@ export default function TripsTab() {
       a.click()
       a.remove()
       window.URL.revokeObjectURL(url)
-    } catch (e: any) {
-      setLogbookError(e.response?.status === 404
+    } catch (e: unknown) {
+      setLogbookError((e as { response?: { status?: number } })?.response?.status === 404
         ? "No vehicle found, or nothing to export for that period."
         : "Failed to download logbook. Please try again.")
     } finally {

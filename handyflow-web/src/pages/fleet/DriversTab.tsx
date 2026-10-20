@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { errorMessage, unwrapList } from "./apiShape"
 import { ProfileView, SettingsPanel, type ScoreRow } from "./Driver360"
 import { unwrap as unwrapOne, bandText, bandToneFor, scoreText, sortDrivers, daysToDate, expiryState, expiryWords, driverDocumentCounts, rankMap, SORT_LABEL, type DriverSort } from "./driverScores.logic"
 import {
@@ -20,8 +21,9 @@ interface Driver {
   status: string; notes: string | null; createdAt: string
 }
 
-const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
 const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
+
+type DriverBody = Omit<Driver, "id" | "licenseExpiringSoon" | "prdpExpiringSoon" | "status" | "createdAt">
 
 const LICENSE_CODES = ["A", "A1", "B", "C1", "C", "EB", "EC1", "EC"]
 const PRDP_CATEGORIES = [
@@ -62,19 +64,19 @@ export default function DriversTab() {
 
   const { data: drivers = [], isLoading } = useQuery<Driver[]>({
     queryKey: ["fleet-drivers"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/drivers?size=200")),
+    queryFn: async () => unwrapList<Driver>(await apiClient.get("/api/v1/fleet/drivers?size=200")),
   })
 
   const createDriver = useMutation({
-    mutationFn: (body: any) => apiClient.post("/api/v1/fleet/drivers", body),
+    mutationFn: (body: DriverBody) => apiClient.post("/api/v1/fleet/drivers", body),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["fleet-drivers"] }); closeModal() },
-    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to register driver"),
+    onError: (e: unknown) => setApiError(errorMessage(e, "Failed to register driver")),
   })
 
   const updateDriver = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: any }) => apiClient.put(`/api/v1/fleet/drivers/${id}`, body),
+    mutationFn: ({ id, body }: { id: string; body: DriverBody }) => apiClient.put(`/api/v1/fleet/drivers/${id}`, body),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["fleet-drivers"] }); closeModal() },
-    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to update driver"),
+    onError: (e: unknown) => setApiError(errorMessage(e, "Failed to update driver")),
   })
 
   const setStatus = useMutation({

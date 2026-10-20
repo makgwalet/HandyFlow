@@ -3,10 +3,14 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Plus, Wrench, X, AlertCircle, AlertTriangle } from "lucide-react"
+import { errorMessage, unwrapList } from "./apiShape"
 
-const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
-const fmtDate = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
-const fmtR    = (n: any) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
+interface VehicleOption { id: string; registration: string; make: string; model: string; dueForService: boolean; currentOdometer: number; serviceIntervalKm: number | null }
+interface ServiceRecord { id: string; type: string; description: string | null; serviceDate: string; odometerAtService: number | null; nextServiceKm: number | null; cost: number | null; supplier: string | null; invoiceRef: string | null }
+interface ServiceBody { type: string; description: string; serviceDate: string; odometerAtService: number | null; nextServiceKm: number | null; cost: number | null; supplier: string | null; invoiceRef: string | null }
+
+const fmtDate = (d: string | null | undefined) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
+const fmtR    = (n: number | string | null | undefined) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
 
 const SERVICE_TYPES = ["SERVICE","REPAIR","TYRE","BATTERY","BRAKES","ELECTRICAL","BODYWORK","INSPECTION","OTHER"]
 const TYPE_CFG: Record<string, { color: string; bg: string }> = {
@@ -33,19 +37,19 @@ export default function ServicesTab() {
   const [form, setForm]                       = useState(EMPTY_FORM)
   const [apiError, setApiError]               = useState("")
 
-  const { data: vehicles = [] } = useQuery<any[]>({
+  const { data: vehicles = [] } = useQuery<VehicleOption[]>({
     queryKey: ["fleet-vehicles"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
+    queryFn: async () => unwrapList<VehicleOption>(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
   })
 
-  const { data: services = [], isLoading } = useQuery<any[]>({
+  const { data: services = [], isLoading } = useQuery<ServiceRecord[]>({
     queryKey: ["fleet-services", selectedVehicle],
-    queryFn: async () => selectedVehicle ? unwrap(await apiClient.get(`/api/v1/fleet/vehicles/${selectedVehicle}/services?size=100`)) : [],
+    queryFn: async () => selectedVehicle ? unwrapList<ServiceRecord>(await apiClient.get(`/api/v1/fleet/vehicles/${selectedVehicle}/services?size=100`)) : [],
     enabled: !!selectedVehicle,
   })
 
   const addService = useMutation({
-    mutationFn: (body: any) => apiClient.post(`/api/v1/fleet/vehicles/${selectedVehicle}/services`, body),
+    mutationFn: (body: ServiceBody) => apiClient.post(`/api/v1/fleet/vehicles/${selectedVehicle}/services`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["fleet-services", selectedVehicle] })
       qc.invalidateQueries({ queryKey: ["fleet-vehicles"] })
@@ -56,12 +60,12 @@ export default function ServicesTab() {
       qc.invalidateQueries({ queryKey: ["fleet-cost-summary"] })
       setShowAdd(false); setForm(EMPTY_FORM); setApiError("")
     },
-    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to record service"),
+    onError: (e: unknown) => setApiError(errorMessage(e, "Failed to record service")),
   })
 
-  const selectedVehicleObj = (vehicles as any[]).find(v => v.id === selectedVehicle)
-  const totalCost = (services as any[]).reduce((s, r) => s + Number(r.cost ?? 0), 0)
-  const serviceAlerts = (vehicles as any[]).filter(v => v.dueForService)
+  const selectedVehicleObj = vehicles.find(v => v.id === selectedVehicle)
+  const totalCost = services.reduce((s, r) => s + Number(r.cost ?? 0), 0)
+  const serviceAlerts = vehicles.filter(v => v.dueForService)
 
   const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, outline: "none" }
   const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
@@ -74,7 +78,7 @@ export default function ServicesTab() {
           <AlertTriangle size={17} style={{ color: 'var(--hf-warning-text)', flexShrink: 0 }} />
           <div>
             <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-warning-text)" }}>Service Due — {serviceAlerts.length} vehicle{serviceAlerts.length !== 1 ? "s" : ""}</div>
-            <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>{serviceAlerts.map((v: any) => v.registration).join(", ")}</div>
+            <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>{serviceAlerts.map(v => v.registration).join(", ")}</div>
           </div>
         </div>
       )}
@@ -85,7 +89,7 @@ export default function ServicesTab() {
           <select value={selectedVehicle} onChange={e => setSelectedVehicle(e.target.value)}
             style={{ padding: "9px 14px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 14, background: "var(--hf-surface)", minWidth: 300, outline: "none" }}>
             <option value="">Select vehicle...</option>
-            {(vehicles as any[]).map(v => <option key={v.id} value={v.id}>{v.registration} — {v.make} {v.model}{v.dueForService ? " ⚠ SVC DUE" : ""}</option>)}
+            {vehicles.map(v => <option key={v.id} value={v.id}>{v.registration} — {v.make} {v.model}{v.dueForService ? " ⚠ SVC DUE" : ""}</option>)}
           </select>
         </div>
         {selectedVehicle && (
@@ -97,7 +101,7 @@ export default function ServicesTab() {
       </div>
 
       {/* Vehicle summary */}
-      {selectedVehicleObj && (services as any[]).length > 0 && (
+      {selectedVehicleObj && services.length > 0 && (
         <div style={{ display: "flex", gap: 16, marginBottom: 20, padding: "14px 18px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, flexWrap: "wrap" }}>
           {[
             { l: "Vehicle",      v: `${selectedVehicleObj.registration} — ${selectedVehicleObj.make} ${selectedVehicleObj.model}` },
@@ -120,11 +124,11 @@ export default function ServicesTab() {
         </div>
       ) : isLoading ? (
         <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading...</div>
-      ) : (services as any[]).length === 0 ? (
+      ) : services.length === 0 ? (
         <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)", border: "1px dashed var(--hf-border)", borderRadius: 12 }}>No service records for this vehicle.</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {(services as any[]).map(s => {
+          {services.map(s => {
             const cfg = TYPE_CFG[s.type] ?? TYPE_CFG.OTHER
             return (
               <div key={s.id} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>

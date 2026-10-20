@@ -6,7 +6,7 @@ import { Suspense, lazy, useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
-import { areaText, circleAreaM2, clearShape, clickMap, emptyGeofence, geofenceBody, geofenceProblem, geofenceSummary, movePoint, polygonAreaM2, removePoint, switchShape, toGeofenceForm, undoPoint, type Geofence, type GeofenceForm, type LatLng } from "./geofences.logic"
+import { areaText, circleAreaM2, clearShape, clickMap, emptyGeofence, geofenceBody, geofenceProblem, parsePlaces, searchUrl, geofenceSummary, movePoint, polygonAreaM2, removePoint, switchShape, toGeofenceForm, undoPoint, type Geofence, type GeofenceForm, type LatLng, type Place } from "./geofences.logic"
 
 const GeofenceMap = lazy(() => import("./GeofenceMap"))
 
@@ -29,6 +29,18 @@ export default function GeofencesTab() {
   const toggle = useMutation({ mutationFn: (g: Geofence) => apiClient.put(`/api/v1/fleet/telematics/geofences/${g.id}`, geofenceBody({ ...toGeofenceForm(g), active: !g.active })), onSuccess: refresh, onError: e => setError(errorOf(e)) })
   const remove = useMutation({ mutationFn: (id: string) => apiClient.delete(`/api/v1/fleet/telematics/geofences/${id}`), onSuccess: () => { setConfirmId(null); refresh() }, onError: e => setError(errorOf(e)) })
 
+  const [query, setQuery] = useState(""), [places, setPlaces] = useState<Place[] | null>(null), [searching, setSearching] = useState(false), [searchError, setSearchError] = useState<string | null>(null), [goTo, setGoTo] = useState<Place | null>(null)
+  const search = async () => {
+    const url = searchUrl(query)
+    if (!url) { setSearchError("Type at least 3 characters of an address or place."); setPlaces(null); return }
+    setSearching(true); setSearchError(null)
+    try {
+      const res = await fetch(url, { headers: { Accept: "application/json" } })   // a public map service, not our API: no sign-in token goes with it
+      if (!res.ok) throw new Error(String(res.status))
+      setPlaces(parsePlaces(await res.json()))
+    } catch { setPlaces(null); setSearchError("Address search is unavailable right now. You can still pan and zoom the map.") }
+    finally { setSearching(false) }
+  }
   const change = (f: GeofenceForm) => { setDraft(f); setError(null) }
   const problem = draft ? geofenceProblem(draft) : null
   const area = !draft ? null : draft.shape === "CIRCLE" ? (draft.centre && Number(draft.radiusMeters) > 0 ? circleAreaM2(Number(draft.radiusMeters)) : 0) : polygonAreaM2(draft.polygon)
@@ -69,8 +81,18 @@ export default function GeofencesTab() {
           </div>
           {error && <div role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)", marginTop: 6 }}>{error}</div>}
         </form>)}
+      <div role="search" aria-label="Find an address" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+        <input aria-label="Search address" placeholder="Find an address or place on the map" style={{ ...field, minWidth: 280 }} value={query}
+          onChange={e => { setQuery(e.target.value); setSearchError(null) }} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); void search() } }} />
+        <button type="button" style={ghost} disabled={searching} onClick={() => void search()}>{searching ? "Searching…" : "Search"}</button>
+        {searchError && <span role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)" }}>{searchError}</span>}
+      </div>
+      {places && (places.length === 0
+        ? <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: "0 0 8px" }}>No place found. Try a suburb or town name.</p>
+        : <ul aria-label="Search results" style={{ listStyle: "none", margin: "0 0 8px", padding: 0, fontSize: 12.5, border: "1px solid var(--hf-border)", borderRadius: 8 }}>{places.map((p, i) => (
+          <li key={i}><button type="button" style={{ ...ghost, border: "none", width: "100%", textAlign: "left" }} onClick={() => { setGoTo(p); setPlaces(null) }}>{p.name}</button></li>))}</ul>)}
       <Suspense fallback={<p>Loading map…</p>}>
-        <GeofenceMap fences={fences} draft={draft} onClick={onClick} onMove={(i, p) => draft && change(movePoint(draft, i, p))} onRemove={i => draft && change(removePoint(draft, i))} />
+        <GeofenceMap fences={fences} draft={draft} goTo={goTo} onClick={onClick} onMove={(i, p) => draft && change(movePoint(draft, i, p))} onRemove={i => draft && change(removePoint(draft, i))} />
       </Suspense>
       {!draft && error && <div role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)", marginTop: 6 }}>{error}</div>}
       <h4 style={{ margin: "14px 0 4px" }}>Geofences ({fences.length})</h4>

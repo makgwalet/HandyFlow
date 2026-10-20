@@ -6,7 +6,7 @@ import { MapContainer, TileLayer, Circle, Polygon, Marker, Polyline, Tooltip, us
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { DEFAULT_CENTRE } from "./liveMap.logic"
-import { focusPoints, type Geofence, type GeofenceForm, type LatLng } from "./geofences.logic"
+import { focusPoints, type Geofence, type GeofenceForm, type LatLng, type Place } from "./geofences.logic"
 
 const corner = L.divIcon({ className: "", html: '<div style="width:14px;height:14px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 0 3px rgba(0,0,0,.5)"></div>', iconSize: [14, 14], iconAnchor: [7, 7] })
 const GREY = { color: "#6b7280", weight: 2, fillOpacity: 0.12 }
@@ -24,13 +24,24 @@ function Fit({ points, token }: { points: LatLng[]; token: string }) {
   return null
 }
 
-export default function GeofenceMap({ fences, draft, onClick, onMove, onRemove }: { fences: Geofence[]; draft: GeofenceForm | null; onClick: (p: LatLng) => void; onMove: (i: number, p: LatLng) => void; onRemove: (i: number) => void }) {
+/** Flies to a searched address. Nothing is drawn; the person still clicks to place the fence. */
+function GoTo({ place }: { place: Place | null }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!place) return
+    if (place.box) map.fitBounds(L.latLngBounds(place.box), { maxZoom: 17 }); else map.setView(place.point, 16)
+  }, [place, map])
+  return null
+}
+
+export default function GeofenceMap({ fences, draft, goTo = null, onClick, onMove, onRemove }: { fences: Geofence[]; draft: GeofenceForm | null; goTo?: Place | null; onClick: (p: LatLng) => void; onMove: (i: number, p: LatLng) => void; onRemove: (i: number) => void }) {
   const others = fences.filter(g => g.id !== draft?.id)
   const radius = Number(draft?.radiusMeters)
   return (
     <MapContainer center={DEFAULT_CENTRE} zoom={5} style={{ height: 460, width: "100%", borderRadius: 10, cursor: draft ? "crosshair" : undefined }} scrollWheelZoom>
       <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <Fit points={focusPoints(draft, fences)} token={draft ? `${draft.id ?? "new"}:${draft.shape}` : "list"} />
+      <GoTo place={goTo} />
       {draft && <Clicks onClick={onClick} />}
       {others.map(g => g.shape === "POLYGON"
         ? <Polygon key={g.id} positions={(g.polygon ?? []).map(p => [p.latitude, p.longitude] as LatLng)} pathOptions={g.active ? GREY : { ...GREY, dashArray: "6" }}><Tooltip sticky>{g.name}</Tooltip></Polygon>
