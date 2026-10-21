@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { unwrapList } from "./crmApi"
 import { ENTITY_CHOICES, NO_AUDIT_FILTER, auditParams, auditSentence, filterProblem, pageText, type AuditEntity, type AuditFilter, type AuditPage } from "./audit.logic"
+import { Loading } from "./CrmKit"
 
 const field: React.CSSProperties = { padding: "6px 9px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13 }
 const ghost: React.CSSProperties = { ...field, cursor: "pointer" }
@@ -40,7 +41,7 @@ export default function AuditPanel() {
           <button type="button" style={ghost} onClick={() => { setFilter(NO_AUDIT_FILTER); setPage(0) }}>Clear</button>
         </div>
         {problem && <div role="alert" style={{ color: "var(--hf-danger-text)", marginTop: 6 }}>{problem}</div>}
-        {log.isLoading && <p>Loading…</p>}
+        {log.isLoading && <Loading />}
         {log.isError && <div role="alert" style={{ marginTop: 6 }}>Couldn't load the audit log. You may not have permission to see it.</div>}
         {data && rows.length === 0 && !problem && <p style={{ color: "var(--hf-text-muted)" }}>Nothing matches.</p>}
         <ul style={{ listStyle: "none", margin: "8px 0 0", padding: 0, display: "grid", gap: 6 }}>

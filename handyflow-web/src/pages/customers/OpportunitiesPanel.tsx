@@ -12,6 +12,7 @@ import {
   EMPTY_OPP, LOST_REASONS, NO_OPP_FILTER, OPP_CHANCE, OPP_LABEL, filterOpps, lostProblem, oppBody, oppCloseState, oppCloseText, oppColumns, oppMoves, oppProblem, oppStageBody, oppTotals, toOppForm,
   type OppForm, type OppStage, type Opportunity, type LostReason,
 } from "./opportunities.logic"
+import { Loading, ErrorNote } from "./CrmKit"
 
 const field: React.CSSProperties = { padding: "6px 9px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13 }
 const ghost: React.CSSProperties = { ...field, cursor: "pointer" }
@@ -96,8 +97,8 @@ export default function OpportunitiesPanel({ customerId }: { customerId?: string
           {form.name.length > 0 && problem && <span style={{ color: "var(--hf-danger-text)", fontSize: 12.5 }}>{problem}</span>}
           <div style={{ display: "flex", gap: 6 }}><button type="submit" style={{ ...ghost, fontWeight: 700 }} disabled={!!problem || busy}>{save.isPending ? "Saving…" : "Save opportunity"}</button><button type="button" style={ghost} onClick={() => { setEditing(null); setError(null) }}>Cancel</button></div>
         </form>)}
-      {isLoading && <p>Loading…</p>}
-      {isError && <div role="alert">Couldn't load the opportunities.</div>}
+      {isLoading && <Loading />}
+      {isError && <ErrorNote>Couldn't load the opportunities.</ErrorNote>}
       {!isLoading && !isError && all.length === 0 && <p style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No opportunities yet.{canEdit ? " Choose New opportunity to add the first." : ""}</p>}
       {all.length > 0 && shown.length === 0 && <p style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No opportunities match these filters.</p>}
       {shown.length > 0 && view === "board" && (

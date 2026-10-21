@@ -10,6 +10,7 @@ import {
   addBody, addProblem, addedText, campaignBody, campaignProblem, canPickUser, peopleLocked, progressText, rate, runSummary, stepsBody, stepsLocked, stepsProblem, textLabel, toCampaignForm, toStepForm,
   type Action, type Campaign, type CampaignForm, type CampaignStatus, type JourneyRun, type JourneyStep, type MemberStatus, type Person, type StepForm,
 } from "./campaigns.logic"
+import { Loading, ErrorNote } from "./CrmKit"
 
 const field: React.CSSProperties = { padding: "6px 9px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13 }
 const ghost: React.CSSProperties = { ...field, cursor: "pointer" }
@@ -46,7 +47,7 @@ export default function CampaignsPanel() {
       <section aria-label="Campaigns">
         <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>Campaigns</h3>
         <p style={{ margin: "0 0 8px", color: "var(--hf-text-muted)" }}>A campaign is an outreach to a list of people. Its journey runs every morning for each person: a task, a tag, a new owner or a message to the owner, a set number of days after they were added. A person leaves the journey when they respond, convert, or their lead is won or lost.</p>
-        {list.isLoading && <p>Loading…</p>}{list.isError && <div role="alert">Couldn't load the campaigns.</div>}
+        {list.isLoading && <Loading />}{list.isError && <ErrorNote>Couldn't load the campaigns.</ErrorNote>}
         {list.data && rows.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>No campaigns yet.</p>}
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
           {rows.map(c => (
@@ -122,7 +123,7 @@ function CampaignDetail({ campaign, canEdit, onChanged, onError, onNote }: { cam
       <section aria-label="Journey">
         <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>Journey: {campaign.name}</h3>
         {locked && <p style={{ margin: "0 0 6px", color: "var(--hf-text-muted)" }}>{campaign.status === "ACTIVE" ? "Pause the campaign to change its steps." : "A finished campaign cannot be changed."}</p>}
-        {stepRows.isLoading && <p>Loading…</p>}{stepRows.isError && <div role="alert">Couldn't load the steps.</div>}
+        {stepRows.isLoading && <Loading />}{stepRows.isError && <ErrorNote>Couldn't load the steps.</ErrorNote>}
         {stepRows.data && nSteps === 0 && !steps && <p style={{ color: "var(--hf-text-muted)" }}>No steps yet. Without steps the campaign only keeps a list.</p>}
         {!steps && <ol style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 4 }}>{shown.map(s => <li key={s.position}>{sentence(s)}</li>)}</ol>}
         {canEdit && !locked && !steps && stepRows.data && <button type="button" style={{ ...ghost, marginTop: 8 }} onClick={() => setSteps(shown.map(toStepForm))}>Edit steps</button>}
@@ -146,7 +147,7 @@ function CampaignDetail({ campaign, canEdit, onChanged, onError, onNote }: { cam
 
       <section aria-label="People">
         <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>People</h3>
-        {people.isLoading && <p>Loading…</p>}{people.isError && <div role="alert">Couldn't load the people.</div>}
+        {people.isLoading && <Loading />}{people.isError && <ErrorNote>Couldn't load the people.</ErrorNote>}
         {people.data && people.data.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>Nobody has been added yet.</p>}
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 4 }}>
           {(people.data ?? []).map(p => (
@@ -178,7 +179,7 @@ function CampaignDetail({ campaign, canEdit, onChanged, onError, onNote }: { cam
 
       <section aria-label="Journey log">
         <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>What ran recently</h3>
-        {runs.isLoading && <p>Loading…</p>}{runs.isError && <div role="alert">Couldn't load the log.</div>}
+        {runs.isLoading && <Loading />}{runs.isError && <ErrorNote>Couldn't load the log.</ErrorNote>}
         {runs.data && runs.data.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>No steps have run yet.</p>}
         {runs.data && runs.data.length > 0 && <p style={{ margin: "0 0 6px", color: "var(--hf-text-muted)" }}>{rs.done} done{rs.failed ? `, ${rs.failed} failed` : ""} in the last {runs.data.length}.</p>}
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 4 }}>

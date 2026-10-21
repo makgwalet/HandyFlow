@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { EMPTY_CONTACT, contactBody, contactProblem, initials, sortContacts, toForm, type Contact, type ContactForm } from "./contacts.logic"
+import { ErrorNote } from "./CrmKit"
 
 const inner = (r: { data: unknown }): Contact[] => { const o = r.data as { data?: unknown } | null; const p = o && !Array.isArray(o) && typeof o === "object" && "data" in o ? o.data : r.data; return Array.isArray(p) ? (p as Contact[]) : [] }
 const errorText = (e: unknown) => (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Something went wrong. Try again."
@@ -26,7 +27,7 @@ export function ContactsPanel({ customerId }: { customerId: string }) {
   return (
     <div>
       {isLoading && <p style={{ fontSize: 12 }}>Loading…</p>}
-      {isError && <div role="alert" style={{ fontSize: 12.5 }}>Couldn't load the contacts.</div>}
+      {isError && <ErrorNote>Couldn't load the contacts.</ErrorNote>}
       {error && <div role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)", marginBottom: 8 }}>{error}</div>}
       {!isLoading && !isError && contacts.length === 0 && editing !== "new" && <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)" }}>No contacts yet. Add the people you deal with at this customer. The first one becomes the main contact.</p>}
       {contacts.map(c => editing === c.id

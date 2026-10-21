@@ -7,6 +7,7 @@ import { usePermission } from "../../hooks/usePermission"
 import { responseMessage } from "./apiError"
 import { FIELDS, MAX_CONDITIONS, UNASSIGNED, allFields, countText, describe, fieldDef, needsValue, newCondition, segmentProblem, toRequest, withField, type Condition, type FieldId, type Members, type SegmentRow } from "./segments.logic"
 import type { CustomField } from "./customFields.logic"
+import { Loading, ErrorNote } from "./CrmKit"
 
 interface UserRow { id: string; firstName?: string; lastName?: string; email?: string }
 const inner = (r: { data: unknown }): unknown => { const o = r.data as { data?: unknown } | null; return o && !Array.isArray(o) && typeof o === "object" && "data" in o ? o.data : r.data }
@@ -45,8 +46,8 @@ export default function SegmentsPanel() {
     return <input aria-label={label} style={{ ...field, width: d.input === "text" ? 160 : 110 }} inputMode={d.input === "text" ? "text" : "numeric"} value={c.value} onChange={e => setCondition(i, { ...c, value: e.target.value })} />
   }
 
-  if (segments.isLoading) return <p>Loading…</p>
-  if (segments.isError) return <div role="alert">Couldn't load the segments.</div>
+  if (segments.isLoading) return <Loading />
+  if (segments.isError) return <ErrorNote>Couldn't load the segments.</ErrorNote>
   const rows = segments.data ?? []
   return (
     <div>

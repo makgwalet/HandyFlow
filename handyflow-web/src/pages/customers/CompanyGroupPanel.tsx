@@ -8,6 +8,7 @@ import { money } from "./pipeline.logic"
 import { errorMessage } from "./crmApi"
 import { CompanyPicker } from "./CompanyPicker"
 import type { Hierarchy } from "./opportunities.logic"
+import { ErrorNote } from "./CrmKit"
 
 const field: React.CSSProperties = { padding: "6px 9px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13 }
 const ghost: React.CSSProperties = { ...field, cursor: "pointer" }
@@ -25,7 +26,7 @@ export function CompanyGroupPanel({ customerId }: { customerId: string }) {
     onError: e => setError(errorMessage(e, "Something went wrong. Try again.")),
   })
   if (isLoading) return <p style={{ fontSize: 12 }}>Loading…</p>
-  if (isError || !data) return <div role="alert" style={{ fontSize: 12.5 }}>Couldn't load the company group.</div>
+  if (isError || !data) return <ErrorNote>Couldn't load the company group.</ErrorNote>
   const parent = data.ancestors.length ? data.ancestors[data.ancestors.length - 1] : null
   const r = data.rollup
   return (

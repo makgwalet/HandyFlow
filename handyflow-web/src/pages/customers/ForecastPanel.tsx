@@ -4,13 +4,14 @@ import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { localToday, money, type PipelineLead } from "./pipeline.logic"
 import { CHANCE_TEXT, buildForecast, rowLabel } from "./forecast.logic"
+import { Loading, ErrorNote } from "./CrmKit"
 
 const rows = (r: { data: unknown }): PipelineLead[] => { const o = r.data as { data?: unknown } | null; const p = o && !Array.isArray(o) && typeof o === "object" && "data" in o ? o.data : r.data; return Array.isArray(p) ? (p as PipelineLead[]) : [] }
 
 export default function ForecastPanel() {
   const { data, isLoading, isError } = useQuery<PipelineLead[]>({ queryKey: ["crm", "pipeline"], queryFn: async () => rows(await apiClient.get("/api/v1/crm/customers/pipeline")) })
-  if (isLoading) return <p>Loading…</p>
-  if (isError || !data) return <div role="alert">Couldn't load the pipeline.</div>
+  if (isLoading) return <Loading />
+  if (isError || !data) return <ErrorNote>Couldn't load the pipeline.</ErrorNote>
   const f = buildForecast(data, localToday())
   if (f.deals === 0) return <p style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No open deals, so there is nothing to forecast.</p>
   const tile = (label: string, value: string) => <div aria-label={label} style={{ border: "1px solid var(--hf-border)", borderRadius: 10, padding: "8px 14px", minWidth: 120 }}><div style={{ fontSize: 11.5, color: "var(--hf-text-muted)" }}>{label}</div><div style={{ fontSize: 20, fontWeight: 700 }}>{value}</div></div>

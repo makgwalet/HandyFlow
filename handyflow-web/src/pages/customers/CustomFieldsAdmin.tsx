@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { FIELD_TYPES, definitionProblem, hasOptions, parseOptions, typeLabel, type CustomField, type CustomFieldType } from "./customFields.logic"
+import { Loading, ErrorNote } from "./CrmKit"
 
 const inner = (r: { data: unknown }): unknown => { const o = r.data as { data?: unknown } | null; return o && !Array.isArray(o) && typeof o === "object" && "data" in o ? o.data : r.data }
 const errorText = (e: unknown) => (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Something went wrong. Try again."
@@ -19,8 +20,8 @@ export default function CustomFieldsAdmin() {
   const refresh = () => { setError(null); qc.invalidateQueries({ queryKey: ["crm", "custom-fields"] }) }
   const create = useMutation({ mutationFn: () => apiClient.post("/api/v1/crm/custom-fields", { label: label.trim(), type, required, options: hasOptions(type) ? parseOptions(options) : undefined }), onSuccess: () => { setLabel(""); setType(""); setOptions(""); setRequired(false); refresh() }, onError: e => setError(errorText(e)) })
   const change = useMutation({ mutationFn: (v: { id: string; body: object }) => apiClient.put(`/api/v1/crm/custom-fields/${v.id}`, v.body), onSuccess: () => { setEditing(null); refresh() }, onError: e => setError(errorText(e)) })
-  if (isLoading) return <p>Loading…</p>
-  if (isError || !data) return <div role="alert">Couldn't load the custom fields.</div>
+  if (isLoading) return <Loading />
+  if (isError || !data) return <ErrorNote>Couldn't load the custom fields.</ErrorNote>
   const add = () => { const p = definitionProblem(label, type, options); if (p) { setError(p); return } setError(null); create.mutate() }
   const saveEdit = (f: CustomField) => { const p = definitionProblem(editLabel, f.type, editOptions); if (p) { setError(p); return } setError(null); change.mutate({ id: f.id, body: { label: editLabel.trim(), options: hasOptions(f.type) ? parseOptions(editOptions) : undefined } }) }
   return (

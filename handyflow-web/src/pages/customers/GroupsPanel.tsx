@@ -5,13 +5,14 @@ import { apiClient } from "../../api/client"
 import { localToday, money } from "./pipeline.logic"
 import { fetchAllPages, unwrapList } from "./crmApi"
 import { buildTree, type GroupNode, type Opportunity } from "./opportunities.logic"
+import { Loading, ErrorNote } from "./CrmKit"
 
 export default function GroupsPanel() {
   const today = localToday()
   const nodes = useQuery({ queryKey: ["crm", "hierarchy", "groups"], queryFn: async () => unwrapList<GroupNode>(await apiClient.get("/api/v1/crm/hierarchy/groups")) })
   const opps = useQuery({ queryKey: ["crm", "opportunities", "all"], queryFn: () => fetchAllPages<Opportunity>(u => apiClient.get(u), "/api/v1/crm/opportunities") })
-  if (nodes.isLoading) return <p>Loading…</p>
-  if (nodes.isError) return <div role="alert">Couldn't load the company groups.</div>
+  if (nodes.isLoading) return <Loading />
+  if (nodes.isError) return <ErrorNote>Couldn't load the company groups.</ErrorNote>
   const rows = buildTree(nodes.data ?? [], opps.data?.items ?? [], today)
   if (rows.length === 0) return <p style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No company groups yet. Open a company, choose the Group tab and set its parent company.</p>
   return (

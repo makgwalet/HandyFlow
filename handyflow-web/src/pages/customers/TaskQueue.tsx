@@ -9,6 +9,7 @@ import { useAuthStore } from "../../store/auth.store"
 import { DEFAULT_FILTER, ESCALATE_AFTER_DAYS, OUTCOME_LABEL, PRIORITIES, PRIORITY_LABEL, SECTION_LABEL, SNOOZE_LABEL, assigneeText, dueText, groupTasks, isEscalated, newTaskBody, newTaskProblem, snoozeDate, taskTotals, filterTasks,
   type NewTask, type Outcome, type Priority, type Scope, type Snooze, type Task, type TaskFilter, type TaskList } from "./tasks.logic"
 import { localToday } from "./pipeline.logic"
+import { Loading, ErrorNote } from "./CrmKit"
 
 interface UserRow { id: string; firstName?: string; lastName?: string; email?: string }
 const inner = (r: { data: unknown }): unknown => { const o = r.data as { data?: unknown } | null; return o && !Array.isArray(o) && typeof o === "object" && "data" in o ? o.data : r.data }
@@ -60,8 +61,8 @@ export default function TaskQueue() {
       {adding && canEdit && <NewTaskForm me={me} users={users} today={today} onDone={() => { setAdding(false); refresh() }} />}
       {error && <div role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)", marginBottom: 8 }}>{error}</div>}
       {data?.truncated && <div role="status" style={{ fontSize: 12.5, color: "var(--hf-warning-text)", marginBottom: 8 }}>There are more tasks than this list holds. Finish or reassign some to see the rest.</div>}
-      {isLoading && <p>Loading…</p>}
-      {isError && <div role="alert">Couldn't load the tasks.</div>}
+      {isLoading && <Loading />}
+      {isError && <ErrorNote>Couldn't load the tasks.</ErrorNote>}
       {!isLoading && !isError && all.length === 0 && <p style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>{tab === "open" ? "No open tasks. Schedule a follow-up from a customer, or add a task here." : "Nothing finished in the last 30 days."}</p>}
       {all.length > 0 && shown.length === 0 && <p style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No tasks match these filters.{filter.scope === "mine" && " Switch to everyone's tasks to see the rest."}</p>}
 

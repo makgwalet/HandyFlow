@@ -10,6 +10,7 @@ import {
   EMPTY_WEBHOOK, MAX_KEYS, MAX_WEBHOOKS, WEBHOOK_EVENTS, captureExample, eventLabel, keyProblem, keyStatus, toWebhookForm, toggledEvent, webhookBody, webhookProblem, webhookStatus,
   type CaptureKey, type Webhook, type WebhookDelivery, type WebhookEvent, type WebhookForm,
 } from "./integrations.logic"
+import { Loading, ErrorNote } from "./CrmKit"
 
 const field: React.CSSProperties = { padding: "6px 9px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13 }
 const ghost: React.CSSProperties = { ...field, cursor: "pointer" }
@@ -62,7 +63,7 @@ export default function IntegrationsPanel() {
       <section aria-label="Lead capture keys">
         <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>Send leads in</h3>
         <p style={{ margin: "0 0 8px", color: "var(--hf-text-muted)" }}>A website form or another system can add leads with a key. They are routed, scored and put through your workflows like any other lead. An email already on file is not added twice.</p>
-        {keys.isLoading && <p>Loading…</p>}{keys.isError && <div role="alert">Couldn't load the keys.</div>}
+        {keys.isLoading && <Loading />}{keys.isError && <ErrorNote>Couldn't load the keys.</ErrorNote>}
         {keys.data && keyRows.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>No keys yet.</p>}
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
           {keyRows.map(k => (
@@ -91,7 +92,7 @@ export default function IntegrationsPanel() {
       <section aria-label="Webhooks">
         <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>Tell your systems</h3>
         <p style={{ margin: "0 0 8px", color: "var(--hf-text-muted)" }}>A webhook sends a signed message to an address you choose when something happens. Only https addresses on the public internet are allowed. Each message has an <code>X-HandyFlow-Signature</code> header (sha256 HMAC of the body, using the secret) so you can check it came from us.</p>
-        {hooks.isLoading && <p>Loading…</p>}{hooks.isError && <div role="alert">Couldn't load the webhooks.</div>}
+        {hooks.isLoading && <Loading />}{hooks.isError && <ErrorNote>Couldn't load the webhooks.</ErrorNote>}
         {hooks.data && hookRows.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>No webhooks yet.</p>}
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
           {hookRows.map(w => (
@@ -122,7 +123,7 @@ export default function IntegrationsPanel() {
 
       <section aria-label="Webhook log">
         <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>Recent messages</h3>
-        {log.isLoading && <p>Loading…</p>}{log.isError && <div role="alert">Couldn't load the log.</div>}
+        {log.isLoading && <Loading />}{log.isError && <ErrorNote>Couldn't load the log.</ErrorNote>}
         {log.data && log.data.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>Nothing has been sent yet.</p>}
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 4 }}>
           {(log.data ?? []).map(d => (

@@ -1,0 +1,43 @@
+/* CRM polish layer. Scoped to .crm-scope so it never leaks into other modules.
+   Panels set most colours inline; this adds what inline styles cannot: hover,
+   focus, disabled, transitions, table treatment and the loading skeleton. */
+.crm-scope { font-size: 13.5px; color: var(--hf-text); }
+.crm-scope h4 { font-size: 14px; font-weight: 700; letter-spacing: -0.005em; }
+.crm-scope button, .crm-scope input, .crm-scope select, .crm-scope textarea { font-family: inherit; transition: border-color .15s, box-shadow .15s, background-color .15s, opacity .15s; }
+.crm-scope button:not(:disabled) { cursor: pointer; }
+.crm-scope button:not(:disabled):not([role="tab"]):hover { background-color: var(--hf-surface-sunken) !important; border-color: var(--hf-border-strong, var(--hf-border)) !important; }
+.crm-scope button:disabled { opacity: .5; cursor: not-allowed; }
+.crm-scope button:focus-visible, .crm-scope input:focus-visible, .crm-scope select:focus-visible, .crm-scope textarea:focus-visible, .crm-scope a:focus-visible {
+  outline: 2px solid var(--hf-primary-text); outline-offset: 1px; }
+.crm-scope input:not([type="checkbox"]):not([type="radio"]):focus, .crm-scope select:focus, .crm-scope textarea:focus { border-color: var(--hf-primary-text) !important; box-shadow: 0 0 0 3px var(--hf-info-soft); outline: none; }
+.crm-scope input::placeholder, .crm-scope textarea::placeholder { color: var(--hf-text-faint); }
+
+/* tables: scroll sideways on narrow screens instead of breaking the page */
+.crm-scope table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.crm-scope th { text-align: left; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--hf-text-muted); padding: 8px 10px; border-bottom: 1px solid var(--hf-border); white-space: nowrap; }
+.crm-scope td { padding: 9px 10px; border-bottom: 1px solid var(--hf-border-subtle); vertical-align: middle; }
+.crm-scope tbody tr { transition: background-color .12s; }
+.crm-scope tbody tr:hover { background: var(--hf-surface-sunken); }
+.crm-scope tbody tr:last-child td { border-bottom: none; }
+
+/* shared states */
+.crm-state { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 10px; font-size: 13px; margin: 6px 0; }
+.crm-state--error { background: var(--hf-danger-soft, #fef2f2); color: var(--hf-danger-text); border: 1px solid var(--hf-danger-border, transparent); }
+.crm-state--empty { flex-direction: column; text-align: center; padding: 28px 16px; color: var(--hf-text-muted); border: 1px dashed var(--hf-border); background: transparent; }
+.crm-state--empty strong { color: var(--hf-text); font-size: 14px; }
+.crm-skel { display: grid; gap: 10px; padding: 6px 0; }
+.crm-skel i { display: block; height: 14px; border-radius: 7px; background: linear-gradient(90deg, var(--hf-surface-sunken) 25%, var(--hf-border-subtle) 50%, var(--hf-surface-sunken) 75%); background-size: 200% 100%; animation: crm-shimmer 1.3s infinite linear; }
+.crm-skel i:nth-child(1) { width: 38%; } .crm-skel i:nth-child(2) { width: 100%; } .crm-skel i:nth-child(3) { width: 82%; }
+.crm-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@keyframes crm-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .crm-skel i { animation: none; } .crm-scope * { transition: none !important; } }
+
+/* dashboard tiles */
+.crm-tile { display: flex; gap: 12px; align-items: center; text-align: left; border: 1px solid var(--hf-border); border-radius: 12px; padding: 12px 14px; background: var(--hf-surface); min-width: 150px; flex: 1 1 170px; transition: box-shadow .15s, transform .15s, border-color .15s; }
+.crm-tile:hover { box-shadow: 0 4px 14px rgba(15, 23, 42, .08); transform: translateY(-1px); border-color: var(--hf-primary-border); }
+.crm-tile__icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--hf-info-soft); color: var(--hf-primary-text); flex-shrink: 0; }
+
+@media (max-width: 640px) {
+  .crm-scope { overflow-x: auto; }
+  .crm-scope form { max-width: 100% !important; }
+}

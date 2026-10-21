@@ -9,6 +9,7 @@ import { useAuthStore } from "../../store/auth.store"
 import { localToday, money, type PipelineLead } from "./pipeline.logic"
 import type { Task } from "./tasks.logic"
 import { buildTeam, monthOfDate, monthTitle, ownerName, shiftMonth, targetAmount, targetProblem, withTargets, type TargetRow } from "./team.logic"
+import { Loading, ErrorNote } from "./CrmKit"
 
 interface UserRow { id: string; firstName?: string; lastName?: string; email?: string }
 const inner = (r: { data: unknown }): unknown => { const o = r.data as { data?: unknown } | null; return o && !Array.isArray(o) && typeof o === "object" && "data" in o ? o.data : r.data }
@@ -28,8 +29,8 @@ export default function TeamPanel() {
   const refresh = () => { setError(null); setEditing(null); qc.invalidateQueries({ queryKey: ["crm", "targets"] }) }
   const save = useMutation({ mutationFn: (v: { ownerId: string; amount: number }) => apiClient.put("/api/v1/crm/targets", { ownerId: v.ownerId, period: month, amount: v.amount }), onSuccess: refresh, onError: e => setError(errorText(e)) })
   const clear = useMutation({ mutationFn: (ownerId: string) => apiClient.delete("/api/v1/crm/targets", { params: { ownerId, period: month } }), onSuccess: refresh, onError: e => setError(errorText(e)) })
-  if (leads.isLoading || tasks.isLoading) return <p>Loading…</p>
-  if (leads.isError || tasks.isError || !leads.data || !tasks.data) return <div role="alert">Couldn't load the team figures.</div>
+  if (leads.isLoading || tasks.isLoading) return <Loading />
+  if (leads.isError || tasks.isError || !leads.data || !tasks.data) return <ErrorNote>Couldn't load the team figures.</ErrorNote>
   const names = Object.fromEntries((users.data ?? []).map(u => [u.id, [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Colleague"]))
   const rows = withTargets(buildTeam(leads.data, tasks.data, today), targets.data ?? [])
   if (rows.length === 0) return <p style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No deals or tasks yet.</p>

@@ -2,10 +2,12 @@
 // The CRM landing screen: headline numbers, the funnel, lead sources and what needs attention today.
 // Everything is built from data the other CRM tabs already load; each block links to the tab that has the detail.
 import { useQuery } from "@tanstack/react-query"
+import { CheckSquare, Handshake, Target, Trophy, Users } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { attentionTasks, buildDashboard } from "./dashboard.logic"
 import { STAGE_LABEL, barShare, localToday, money, sourceLabel, type Funnel, type PipelineLead, type SourceRow } from "./pipeline.logic"
 import { dueText, type Task } from "./tasks.logic"
+import { Loading, ErrorNote } from "./CrmKit"
 
 const inner = (r: { data: unknown }): unknown => { const o = r.data as { data?: unknown } | null; return o && !Array.isArray(o) && typeof o === "object" && "data" in o ? o.data : r.data }
 const asList = <T,>(r: { data: unknown }, key?: string): T[] => { const d = inner(r) as Record<string, unknown> | T[] | null; const v = Array.isArray(d) ? d : key ? (d as Record<string, unknown> | null)?.[key] : null; return Array.isArray(v) ? (v as T[]) : [] }
@@ -20,15 +22,22 @@ export default function DashboardPanel({ go }: { go: (tab: string) => void }) {
   const tasks = useQuery<Task[]>({ queryKey: ["crm", "tasks", "dashboard-open"], queryFn: async () => asList<Task>(await apiClient.get("/api/v1/crm/tasks", { params: { done: false } }), "tasks") })
   const funnel = useQuery<Funnel | null>({ queryKey: ["crm", "funnel"], queryFn: async () => (inner(await apiClient.get("/api/v1/crm/reports/funnel")) as Funnel | null) ?? null })
   const sources = useQuery<SourceRow[]>({ queryKey: ["crm", "sources"], queryFn: async () => asList<SourceRow>(await apiClient.get("/api/v1/crm/reports/sources")) })
-  if (leads.isLoading || tasks.isLoading) return <p>Loading…</p>
-  if (leads.isError || tasks.isError || !leads.data || !tasks.data) return <div role="alert">Couldn't load the dashboard.</div>
+  if (leads.isLoading || tasks.isLoading) return <Loading />
+  if (leads.isError || tasks.isError || !leads.data || !tasks.data) return <ErrorNote>Couldn't load the dashboard.</ErrorNote>
   const f = buildDashboard(leads.data, tasks.data, today), attention = attentionTasks(tasks.data, today)
-  const tile = (label: string, value: string, note: string, tab: string, tone?: string) => (
-    <button type="button" key={label} aria-label={`${label}: ${value}`} onClick={() => go(tab)} style={{ ...card, textAlign: "left", cursor: "pointer", minWidth: 150, flex: "1 1 150px" }}>
-      <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: tone }}>{value}</div>
-      <div style={{ fontSize: 11.5, color: "var(--hf-text-muted)" }}>{note}</div>
-    </button>)
+  const ICONS: Record<string, React.ElementType> = { customers: Users, pipeline: Handshake, forecast: Target, funnel: Trophy, tasks: CheckSquare }
+  const tile = (label: string, value: string, note: string, tab: string, tone?: string) => {
+    const Icon = ICONS[tab] ?? Users
+    return (
+      <button type="button" key={label} aria-label={`${label}: ${value}`} onClick={() => go(tab)} className="crm-tile">
+        <span className="crm-tile__icon" aria-hidden><Icon size={18} /></span>
+        <span>
+          <span style={{ display: "block", fontSize: 12, color: "var(--hf-text-muted)" }}>{label}</span>
+          <span style={{ display: "block", fontSize: 22, fontWeight: 800, lineHeight: 1.15, color: tone }}>{value}</span>
+          <span style={{ display: "block", fontSize: 11.5, color: "var(--hf-text-muted)" }}>{note}</span>
+        </span>
+      </button>)
+  }
   const stages = funnel.data?.stages.filter(s => s.stage !== "LOST") ?? [], widest = funnel.data?.stages ?? []
   const maxSource = Math.max(1, ...(sources.data ?? []).map(s => s.leads))
   return (
@@ -51,14 +60,14 @@ export default function DashboardPanel({ go }: { go: (tab: string) => void }) {
         </section>
         <section aria-label="Sales funnel" style={card}>
           <div style={{ display: "flex", justifyContent: "space-between" }}><h4 style={{ margin: "0 0 8px" }}>Sales funnel</h4><button type="button" style={link} onClick={() => go("funnel")}>Full report</button></div>
-          {funnel.isError ? <div role="alert" style={{ fontSize: 12.5 }}>Couldn't load the funnel.</div> : !funnel.data || funnel.data.totalLeads === 0 ? <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: 0 }}>No leads yet.</p> :
+          {funnel.isError ? <ErrorNote>Couldn't load the funnel.</ErrorNote> : !funnel.data || funnel.data.totalLeads === 0 ? <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: 0 }}>No leads yet.</p> :
             stages.map(s => <div key={s.stage} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "3px 0" }}>
               <span style={{ width: 80 }}>{STAGE_LABEL[s.stage]}</span>
               <div role="img" aria-label={`${STAGE_LABEL[s.stage]}: ${s.reachedCount}`} style={{ height: 10, borderRadius: 5, background: "var(--hf-primary-text)", width: `${Math.round(barShare(widest, s) * 0.7)}%`, minWidth: s.reachedCount > 0 ? 4 : 0 }} /><span>{s.reachedCount}</span></div>)}
         </section>
         <section aria-label="Where leads come from" style={card}>
           <h4 style={{ margin: "0 0 8px" }}>Where leads come from</h4>
-          {sources.isError ? <div role="alert" style={{ fontSize: 12.5 }}>Couldn't load the lead sources.</div> : (sources.data ?? []).length === 0 ? <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: 0 }}>No leads yet.</p> :
+          {sources.isError ? <ErrorNote>Couldn't load the lead sources.</ErrorNote> : (sources.data ?? []).length === 0 ? <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: 0 }}>No leads yet.</p> :
             (sources.data ?? []).map((s, i) => <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "3px 0" }}>
               <span style={{ width: 100 }}>{sourceLabel(s.source)}</span>
               <div role="img" aria-label={`${sourceLabel(s.source)}: ${s.leads}`} style={{ height: 10, borderRadius: 5, background: "var(--hf-success-text)", width: `${Math.round((s.leads / maxSource) * 60)}%`, minWidth: 4 }} /><span>{s.leads}</span></div>)}

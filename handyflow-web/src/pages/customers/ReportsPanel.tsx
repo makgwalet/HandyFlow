@@ -6,6 +6,7 @@ import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { errorMessage, unwrapList } from "./crmApi"
 import { EMPTY_REPORT, FREQUENCIES, MAX_SCHEDULES, REPORT_TYPES, lastSentText, recipientText, reportBody, reportProblem, sentToText, toReportForm, toggledId, type Frequency, type ReportForm, type ReportSchedule, type ReportType } from "./reports.logic"
+import { Loading, ErrorNote } from "./CrmKit"
 
 const field: React.CSSProperties = { padding: "6px 9px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13 }
 const ghost: React.CSSProperties = { ...field, cursor: "pointer" }
@@ -40,7 +41,7 @@ export default function ReportsPanel() {
       <section aria-label="Scheduled reports">
         <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>Scheduled reports</h3>
         <p style={{ margin: "0 0 8px", color: "var(--hf-text-muted)" }}>Reports arrive as a notification and an email. Weekly reports go out on Mondays and monthly ones on the 1st, early in the morning. If nobody is chosen, the account's admins get it.</p>
-        {list.isLoading && <p>Loading…</p>}{list.isError && <div role="alert">Couldn't load the scheduled reports.</div>}
+        {list.isLoading && <Loading />}{list.isError && <ErrorNote>Couldn't load the scheduled reports.</ErrorNote>}
         {list.data && rows.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>No reports are scheduled.</p>}
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
           {rows.map(s => (

@@ -7,6 +7,7 @@ import { usePermission } from "../../hooks/usePermission"
 import { errorMessage, unwrapList } from "./crmApi"
 import { ConditionEditor } from "./ConditionEditor"
 import { ACTIONS, EMPTY_WORKFLOW, MAX_WORKFLOWS, TRIGGERS, WORKFLOW_STAGES, canPickUser, needsDays, textLabel, toWorkflowForm, workflowBody, workflowProblem, runSummary, type Action, type Trigger, type Workflow, type WorkflowForm, type WorkflowRun } from "./workflows.logic"
+import { Loading, ErrorNote } from "./CrmKit"
 
 const field: React.CSSProperties = { padding: "6px 9px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13 }
 const ghost: React.CSSProperties = { ...field, cursor: "pointer" }
@@ -39,7 +40,7 @@ export default function WorkflowsPanel() {
       <section aria-label="Workflows">
         <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>Workflow automation</h3>
         <p style={{ margin: "0 0 8px", color: "var(--hf-text-muted)" }}>A workflow does one thing when something happens to a lead. What it does never starts another workflow. If one fails, the change that started it still stands and the failure shows in the log below.</p>
-        {flows.isLoading && <p>Loading…</p>}{flows.isError && <div role="alert">Couldn't load the workflows.</div>}
+        {flows.isLoading && <Loading />}{flows.isError && <ErrorNote>Couldn't load the workflows.</ErrorNote>}
         {flows.data && list.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>No workflows yet.</p>}
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
           {list.map(w => (
@@ -74,7 +75,7 @@ export default function WorkflowsPanel() {
 
       <section aria-label="Workflow log">
         <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>What ran recently</h3>
-        {runs.isLoading && <p>Loading…</p>}{runs.isError && <div role="alert">Couldn't load the log.</div>}
+        {runs.isLoading && <Loading />}{runs.isError && <ErrorNote>Couldn't load the log.</ErrorNote>}
         {runs.data && runs.data.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>Nothing has run yet.</p>}
         {runs.data && runs.data.length > 0 && <p style={{ margin: "0 0 6px", color: "var(--hf-text-muted)" }}>{sum.done} done{sum.failed ? `, ${sum.failed} failed` : ""} in the last {runs.data.length}.</p>}
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 4 }}>

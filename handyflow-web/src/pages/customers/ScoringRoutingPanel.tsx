@@ -10,6 +10,7 @@ import {
   EMPTY_ROUTING, EMPTY_SCORING, movedOrder, routeResultText, routingBody, routingProblem, scoringBody, scoringProblem, toRoutingForm, toScoringForm,
   type RoutingForm, type RoutingRule, type ScoringForm, type ScoringRule,
 } from "./rules.logic"
+import { Loading, ErrorNote } from "./CrmKit"
 
 const field: React.CSSProperties = { padding: "6px 9px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13 }
 const ghost: React.CSSProperties = { ...field, cursor: "pointer" }
@@ -48,7 +49,7 @@ export default function ScoringRoutingPanel() {
       <section aria-label="Scoring rules">
         <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>Lead scoring</h3>
         <p style={{ margin: "0 0 8px", color: "var(--hf-text-muted)" }}>A lead's score is the points of every rule it matches, kept between 0 and 100. 60 and over is hot, 30 and over is warm.</p>
-        {scoring.isLoading && <p>Loading…</p>}{scoring.isError && <div role="alert">Couldn't load the scoring rules.</div>}
+        {scoring.isLoading && <Loading />}{scoring.isError && <ErrorNote>Couldn't load the scoring rules.</ErrorNote>}
         {scoring.data && scoring.data.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>No scoring rules yet.</p>}
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
           {(scoring.data ?? []).map(r => (
@@ -76,7 +77,7 @@ export default function ScoringRoutingPanel() {
       <section aria-label="Routing rules">
         <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>Lead routing</h3>
         <p style={{ margin: "0 0 8px", color: "var(--hf-text-muted)" }}>Rules are tried from the top; the first one a lead fits hands it to its people in turn. New leads from an import or web form are routed automatically. Leads added by a person stay with that person.</p>
-        {routing.isLoading && <p>Loading…</p>}{routing.isError && <div role="alert">Couldn't load the routing rules.</div>}
+        {routing.isLoading && <Loading />}{routing.isError && <ErrorNote>Couldn't load the routing rules.</ErrorNote>}
         {routing.data && rules.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>No routing rules yet.</p>}
         <ol style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 6 }}>
           {rules.map(r => (

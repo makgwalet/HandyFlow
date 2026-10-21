@@ -8,6 +8,7 @@ import { usePermission } from "../../hooks/usePermission"
 import { useAuthStore } from "../../store/auth.store"
 import { BAND_LABEL, BAND_TONE, scoreMap, type LeadScore } from "./rules.logic"
 import { UNDO_REASON_MAX, undoBody, undoReasonProblem, LOST_REASONS, NO_FILTER, PIPELINE_LIMIT, STAGE_LABEL, allowedMoves, canConvert, isConverted, lostProblem, reasonLabel, stageBody, closeState, closeText, columns, dealBody, dealProblem, filterLeads, localToday, money, ownerText, pipelineTotals, type LeadFilter, type LostReason, type OwnerFilter, type PipelineLead, type Stage } from "./pipeline.logic"
+import { Loading, ErrorNote } from "./CrmKit"
 
 const unwrapList = (r: { data: unknown }): PipelineLead[] => { const o = r.data as { data?: unknown } | null; const p = o && !Array.isArray(o) && typeof o === "object" && "data" in o ? o.data : r.data; return Array.isArray(p) ? (p as PipelineLead[]) : [] }
 const errorText = (e: unknown) => (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Something went wrong. Try again."
@@ -52,8 +53,8 @@ export default function PipelineBoard() {
       </div>
       {leads.length >= PIPELINE_LIMIT && <div role="status" style={{ fontSize: 12.5, color: "var(--hf-warning-text)", marginBottom: 8 }}>Showing the newest {PIPELINE_LIMIT} leads. Older leads are not on this board.</div>}
       {error && <div role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)", marginBottom: 8 }}>{error}</div>}
-      {isLoading && <p>Loading…</p>}
-      {isError && <div role="alert">Couldn't load the pipeline.</div>}
+      {isLoading && <Loading />}
+      {isError && <ErrorNote>Couldn't load the pipeline.</ErrorNote>}
       {!isLoading && !isError && leads.length === 0 && <p style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No leads yet. Add a customer as a lead, or import a list, and it will appear here.</p>}
       {leads.length > 0 && shown.length === 0 && <p style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No leads match these filters.</p>}
       {leads.length > 0 && (
