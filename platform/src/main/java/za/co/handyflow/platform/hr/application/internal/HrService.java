@@ -24,7 +24,7 @@ import java.util.*;
 public class HrService {
 
     private final HrEmployeeRepository     employeeRepo;
-    private final HrDisciplinaryRepository  disciplinaryRepo;
+    private final ErCaseService             erCases;
     private final EmployeeNumberGenerator   numberGen;
     // FIX: backlog 3.3 — publishes EmployeeCreatedEvent so contracting can
     // auto-draft a BCEA employment contract. See EmployeeCreatedEvent's own
@@ -257,24 +257,29 @@ public class HrService {
 
     // ── Disciplinary ──────────────────────────────────────────────────────────
 
+    /**
+     * Older entry points to discipline, kept for the Security referral and for callers of the earlier endpoints. They now open and read
+     * employee relations cases ({@link ErCaseService}), so a case opened here follows the same process as any other.
+     */
     @Transactional(readOnly = true)
     public List<DisciplinaryResponse> getDisciplinary(TenantId tenantId, UUID employeeId) {
         findActive(tenantId, employeeId);
-        return disciplinaryRepo.findByEmployee(employeeId)
+        return erCases.disciplinaryCases(tenantId, employeeId)
                 .stream().map(d -> toDisciplinaryResponse(d, tenantId)).toList();
     }
 
+    /**
+     * Opens a disciplinary case with the matter described, as reported by someone: nothing is decided and no hearing is set. The incident
+     * type is now the case title (it used to be a fixed list that the database rejected for most values). A hearing date is ignored,
+     * because a hearing needs a notice with charges, which has its own step.
+     */
     @Transactional
     public DisciplinaryResponse addDisciplinary(TenantId tenantId, UUID employeeId,
                                                 AddDisciplinaryRequest req,
                                                 UUID issuedBy) {
         HrEmployee emp = findActive(tenantId, employeeId);
-        HrDisciplinary d = HrDisciplinary.create(tenantId, employeeId,
-                req.incidentDate(), req.incidentType(), req.description(), issuedBy);
-        if (req.hearingDate() != null) d.setOutcome(null, req.hearingDate());
-        disciplinaryRepo.save(d);
-        log.info("Disciplinary {} added for employee={}", req.incidentType(),
-                emp.getEmployeeNumber());
+        HrErCase d = erCases.openDisciplinary(tenantId, employeeId, req.incidentType(), req.description(), req.incidentDate(), issuedBy);
+        log.info("Disciplinary case {} opened for employee={}", d.getCaseNumber(), emp.getEmployeeNumber());
         return toDisciplinaryResponse(d, tenantId);
     }
 
@@ -337,12 +342,12 @@ public class HrService {
                 e.getEmergencyContactPhone(), e.getCreatedAt());
     }
 
-    private DisciplinaryResponse toDisciplinaryResponse(HrDisciplinary d,
+    private DisciplinaryResponse toDisciplinaryResponse(HrErCase d,
                                                         TenantId tenantId) {
         String empName = employeeRepo.findActiveById(tenantId, d.getEmployeeId())
                 .map(HrEmployee::getFullName).orElse("Unknown");
         return new DisciplinaryResponse(d.getId(), d.getEmployeeId(), empName,
-                d.getIncidentDate(), d.getIncidentType(), d.getDescription(),
+                d.getIncidentDate() != null ? d.getIncidentDate() : d.getReportedOn(), d.getTitle(), d.getDescription(),
                 d.getOutcome(), d.getHearingDate(), d.isAcknowledged(), d.getCreatedAt());
     }
 }

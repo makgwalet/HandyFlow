@@ -40,7 +40,7 @@ class HrServiceEmployeeTest {
         audit = mock(EmployeeAuditService.class);
         numberGen = mock(EmployeeNumberGenerator.class);
         events = mock(ApplicationEventPublisher.class);
-        service = new HrService(repo, mock(HrDisciplinaryRepository.class), numberGen, events, audit, mock(LeaveService.class));
+        service = new HrService(repo, mock(ErCaseService.class), numberGen, events, audit, mock(LeaveService.class));
 
         emp = HrEmployee.create(tenant, "EMP-1", "Jane", "Dlamini", LocalDate.of(2024, 1, 1), "PERMANENT", new BigDecimal("30000"), "MONTHLY");
         emp.setBankAccountNumber("62000011112222");

@@ -308,6 +308,7 @@ public class HrController {
                 hrService.getDisciplinary(TenantContext.getTenantIdAsObject(), id)));
     }
 
+    // Older entry point. Employee relations (ErController) is where cases are run; this opens a case that has been reported, nothing more.
     @PostMapping("/employees/{id}/disciplinary")
     // FIX: was USER_READ — any read user could issue disciplinary records
     @PreAuthorize("hasAnyAuthority('HR_MANAGE','USER_UPDATE')")
@@ -502,17 +503,6 @@ public class HrController {
                 .body(pdf);
     }
 
-
-    @PostMapping("/employees/{id}/disciplinary/{disciplinaryId}/outcome")
-    @PreAuthorize("hasAnyAuthority('HR_MANAGE','USER_UPDATE')")
-    @Operation(summary = "Record the outcome of a disciplinary hearing — verbal/written/final warning or dismissal")
-    public ResponseEntity<ApiResponse<DisciplinaryResponse>> recordDisciplinaryOutcome(
-            @PathVariable UUID id,
-            @PathVariable UUID disciplinaryId,
-            @Valid @RequestBody RecordDisciplinaryOutcomeRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Outcome recorded",
-                hrService.recordDisciplinaryOutcome(TenantContext.getTenantIdAsObject(), id, disciplinaryId, req)));
-    }
 
     @GetMapping("/org-chart")
     @PreAuthorize("hasAnyAuthority('HR_READ','HR_MANAGE','USER_READ')")
