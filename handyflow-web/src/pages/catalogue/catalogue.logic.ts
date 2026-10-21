@@ -526,6 +526,7 @@ export const actionText = (a: string) => ({
   CREATED: "Created", UPDATED: "Edited", PRICE_CHANGED: "Price changed", STATUS_CHANGED: "Status changed", DELETED: "Deleted",
   PRICE_PROPOSED: "Price change proposed", PRICE_APPROVED: "Price change approved", PRICE_REJECTED: "Price change rejected", PRICE_CANCELLED: "Price change cancelled", SETTING_CHANGED: "Setting changed",
   APPROVAL_REQUESTED: "Submitted for approval", ITEM_APPROVED: "Approved", ITEM_REJECTED: "Rejected", APPROVAL_WITHDRAWN: "Request withdrawn",
+  MEDIA_ADDED: "File added", MEDIA_CHANGED: "File changed", MEDIA_REMOVED: "File removed", BUNDLE_CHANGED: "Package parts changed",
 }[a] ?? a)
 
 /** Share of the largest value, 0–100, for the plain bar charts. */
@@ -623,3 +624,50 @@ export const rejectProblem = (note: string): string | null => (note.trim().lengt
 
 export const qualityText = (q: DataQuality) =>
   q.total === 0 ? `Nothing to fix across ${q.scanned} item${q.scanned === 1 ? "" : "s"}.` : `${q.total} thing${q.total === 1 ? "" : "s"} to look at across ${q.scanned} item${q.scanned === 1 ? "" : "s"}.`
+
+
+// ── Media, documents and packages ────────────────────────────────────────────
+export interface MediaFile { id: string; itemId: string; kind: "IMAGE" | "DOCUMENT"; title: string | null; altText: string | null; fileName: string; contentType: string; sizeBytes: number; primary: boolean; sortOrder: number; uploadedAt: string; url: string }
+export interface BundleLine { itemId: string; name: string; sku: string | null; status: string; quantity: number; unitPrice: number | null; lineTotal: number | null }
+export interface BundleView { bundleId: string; name: string; sku: string | null; type: string; price: number | null; components: BundleLine[]; partsTotal: number | null; partsCost: number | null; saving: number | null; unpricedParts: number }
+export interface UsedIn { bundleId: string; name: string; sku: string | null; status: string; quantity: number }
+
+export const MEDIA_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"]
+export const MEDIA_MAX_BYTES: Record<"IMAGE" | "DOCUMENT", number> = { IMAGE: 5 * 1024 * 1024, DOCUMENT: 10 * 1024 * 1024 }
+
+export const fileSizeText = (bytes: number) => (bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`)
+
+/** What is wrong with a file before it is sent, or "" when it can go. The server checks again. */
+export function mediaProblem(file: { name: string; type: string; size: number }): string {
+  if (!MEDIA_TYPES.includes(file.type)) return "Use a JPEG, PNG or WebP picture, or a PDF document."
+  const kind = file.type === "application/pdf" ? "DOCUMENT" : "IMAGE"
+  if (file.size <= 0) return "That file is empty."
+  if (file.size > MEDIA_MAX_BYTES[kind]) return `${kind === "IMAGE" ? "Pictures" : "Documents"} can be up to ${MEDIA_MAX_BYTES[kind] / 1024 / 1024} MB.`
+  return ""
+}
+
+export interface BundleDraftLine { itemId: string; quantity: string }
+
+/** What is wrong with the parts list, or "". */
+export function bundleProblem(lines: BundleDraftLine[], selfId: string): string {
+  if (lines.length === 0) return "Add at least one component."
+  if (lines.length > 30) return "A package can have at most 30 components."
+  const seen = new Set<string>()
+  for (const l of lines) {
+    if (!l.itemId) return "Choose an item for every line."
+    if (l.itemId === selfId) return "A package cannot contain itself."
+    if (seen.has(l.itemId)) return "Each item can appear only once. Raise its quantity instead."
+    seen.add(l.itemId)
+    const q = Number(l.quantity.replace(",", "."))
+    if (!l.quantity.trim() || !Number.isFinite(q) || q <= 0) return "Each quantity must be more than zero."
+    if (q > 9999.999) return "A quantity can be at most 9999.999."
+    if (!/^\d+([.,]\d{1,3})?$/.test(l.quantity.trim())) return "A quantity can have at most 3 decimals."
+  }
+  return ""
+}
+
+export const bundleBody = (lines: BundleDraftLine[]) => ({ components: lines.map(l => ({ itemId: l.itemId, quantity: Number(l.quantity.replace(",", ".")) })) })
+
+export const savingText = (saving: number | null, unpriced: number) =>
+  unpriced > 0 ? `${unpriced} part${unpriced === 1 ? " has" : "s have"} no price, so the saving cannot be worked out.`
+    : saving == null ? "—" : saving > 0 ? `Customers save ${rand(saving)} against buying the parts separately.` : saving < 0 ? `The package costs ${rand(-saving)} more than its parts.` : "The package costs the same as its parts."

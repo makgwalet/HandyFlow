@@ -5,7 +5,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -21,6 +27,8 @@ import za.co.handyflow.platform.catalogue.application.internal.CatalogueImportSe
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueBulkService;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueApprovalService;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueQualityService;
+import za.co.handyflow.platform.catalogue.application.internal.CatalogueMediaService;
+import za.co.handyflow.platform.catalogue.application.internal.CatalogueBundleService;
 import za.co.handyflow.platform.catalogue.domain.model.ItemApprovalStatus;
 import za.co.handyflow.platform.catalogue.domain.model.ImportRules;
 import za.co.handyflow.platform.catalogue.domain.model.PriceChangeStatus;
@@ -76,6 +84,8 @@ public class CatalogueController {
     private final CatalogueBulkService bulkService;
     private final CatalogueApprovalService approvalService;
     private final CatalogueQualityService qualityService;
+    private final CatalogueMediaService mediaService;
+    private final CatalogueBundleService bundleService;
 
     /** What the signed-in user may do, from their authorities. */
     private static Caller caller(Authentication auth) {
@@ -401,6 +411,77 @@ public class CatalogueController {
             @PathVariable UUID id, @PathVariable UUID variantId, @RequestBody UpdateVariantRequest request, Authentication auth) {
         return ResponseEntity.ok(ApiResponse.success("Variant updated", variantService.update(TenantContext.getTenantIdAsObject(), id, variantId, request, caller(auth))));
     }
+
+    // ── Media, documents and packages ────────────────────────────────────────
+
+    @GetMapping("/items/{id}/media")
+    @PreAuthorize(READ)
+    @Operation(summary = "Pictures and documents of an item")
+    public ResponseEntity<ApiResponse<List<MediaResponse>>> media(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(mediaService.list(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping(value = "/items/{id}/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize(WRITE)
+    @Operation(summary = "Add a picture (JPEG, PNG, WebP) or a PDF document to an item")
+    public ResponseEntity<ApiResponse<MediaResponse>> uploadMedia(@PathVariable UUID id, @RequestPart("file") MultipartFile file,
+            @RequestParam(required = false) String title, @RequestParam(required = false) String altText, Authentication auth) throws IOException {
+        var out = mediaService.upload(TenantContext.getTenantIdAsObject(), id, file.getOriginalFilename(), file.getContentType(),
+                file.isEmpty() ? null : file.getBytes(), title, altText, caller(auth));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("File added", out));
+    }
+
+    @PutMapping("/items/{id}/media/{mediaId}")
+    @PreAuthorize(WRITE)
+    @Operation(summary = "Change a file's title or description, or make it the main picture")
+    public ResponseEntity<ApiResponse<MediaResponse>> updateMedia(@PathVariable UUID id, @PathVariable UUID mediaId,
+            @RequestBody MediaUpdateRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success("File updated", mediaService.update(TenantContext.getTenantIdAsObject(), id, mediaId, request, caller(auth))));
+    }
+
+    @DeleteMapping("/items/{id}/media/{mediaId}")
+    @PreAuthorize(WRITE)
+    @Operation(summary = "Remove a file from an item")
+    public ResponseEntity<ApiResponse<Void>> removeMedia(@PathVariable UUID id, @PathVariable UUID mediaId, Authentication auth) {
+        mediaService.remove(TenantContext.getTenantIdAsObject(), id, mediaId, caller(auth));
+        return ResponseEntity.ok(ApiResponse.success("File removed", null));
+    }
+
+    @GetMapping("/items/{id}/media/{mediaId}/file")
+    @PreAuthorize(READ)
+    @Operation(summary = "Download a file")
+    public ResponseEntity<byte[]> mediaFile(@PathVariable UUID id, @PathVariable UUID mediaId) {
+        var dl = mediaService.download(TenantContext.getTenantIdAsObject(), id, mediaId);
+        // Always a download plus nosniff: uploaded content is never shown inline in our own origin.
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(dl.fileName(), StandardCharsets.UTF_8).build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                .contentType(MediaType.parseMediaType(dl.contentType()))
+                .contentLength(dl.sizeBytes())
+                .body(dl.bytes());
+    }
+
+    @GetMapping("/items/{id}/bundle")
+    @PreAuthorize(READ)
+    @Operation(summary = "The parts of a package, and what they are worth")
+    public ResponseEntity<ApiResponse<BundleResponse>> bundle(@PathVariable UUID id, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(bundleService.view(TenantContext.getTenantIdAsObject(), id, caller(auth))));
+    }
+
+    @PutMapping("/items/{id}/bundle")
+    @PreAuthorize(WRITE)
+    @Operation(summary = "Set the parts of a package", description = "The list replaces the current parts. Only items of type Package can have parts.")
+    public ResponseEntity<ApiResponse<BundleResponse>> setBundle(@PathVariable UUID id, @RequestBody BundleRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success("Package saved", bundleService.replace(TenantContext.getTenantIdAsObject(), id, request, caller(auth))));
+    }
+
+    @GetMapping("/items/{id}/used-in")
+    @PreAuthorize(READ)
+    @Operation(summary = "The packages that contain this item")
+    public ResponseEntity<ApiResponse<List<UsedInResponse>>> usedIn(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(bundleService.usedIn(TenantContext.getTenantIdAsObject(), id)));
+    }
+
     // ── Dashboard and Product 360 ────────────────────────────────────────────
 
     @GetMapping("/dashboard")

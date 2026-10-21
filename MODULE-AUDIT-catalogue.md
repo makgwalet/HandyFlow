@@ -242,3 +242,24 @@ Limits to know:
 - The data-quality report is computed when opened over up to a few thousand items; it is not cached or scheduled.
 
 Tests: 10 data-quality rules tests pass standalone. 22 service tests (Mockito: 10 approval, 3 quality, 4 added to the catalogue service, 2 added to the dashboard service) are written but **not run**; the approval entity's own rules are exercised only through those. Front end: 154 catalogue tests pass (15 new), lint and type check clean. The backend was not compiled with Spring here; V482 has not been run against a database.
+
+## 14. Slice 8a status (media, documents, packages): built, not yet run against a database
+
+| Area | What it does |
+|---|---|
+| Media tab | Product 360 has a **Media** tab: pictures (JPEG, PNG, WebP, up to 5 MB, 12 per item) and PDF documents (up to 10 MB, 10 per item). Add, make a picture the main one, remove, download. Needs `CATALOGUE_WRITE` to change; reading needs the usual read permission. |
+| Where the files live | In the shared `FileStorageService` (today the database store, later any object store), under `catalogue/<tenant>/<item>`. The catalogue keeps only the opaque key (`catalogue_item_media`, V483). It does not use the Fleet or Documents modules, because the catalogue may depend only on `shared`. If a tenant-wide Document Service is wanted later, the key can be moved behind it without changing the screens. |
+| Safety | Type, size and the file's first bytes are checked on the server (a renamed program cannot pass as a picture). Names are cleaned and never used as a path. Files are always sent as downloads with `nosniff`, never shown inline in our own origin; the screen fetches pictures with the user's sign-in and shows previews. A file stored by a request that then fails is removed again. Removing a file hides it and keeps the stored bytes (as other modules do). |
+| Main picture | The first picture becomes the main one; there is at most one (a database index). Removing the main picture hands it to the next picture. Only pictures can be main. |
+| Packages | An item of type **Package** gets a **Package** tab: its parts and quantities (up to 30, quantity above zero, 3 decimals), the parts' total, their cost, and the saving against the package price. A package keeps its own price (set the usual way). A package cannot contain itself, another package, an item with variants (choose the variant), an archived or deleted item, or the same item twice. Saving replaces the whole list; if any line is refused nothing changes. Prices and cost are hidden from users without `CATALOGUE_PRICE_READ`. |
+| Used in | Any item shows the packages that contain it (Overview tab). |
+| History | Added, changed and removed files and changes to a package's parts are written to the item's history. |
+
+Limits to know:
+- The catalogue does not reserve or deduct stock for a package's parts; that belongs to the stock and POS modules, which can read the parts from `GET /items/{id}/bundle`. POS and invoicing do not yet explode a package into its parts.
+- Archiving or deleting a part does not stop it (the package keeps pointing at it); check 30 lists such packages. The data-quality report does not yet flag them.
+- No thumbnails are generated: the full picture is fetched and scaled by the browser. Fine for 5 MB limits, not for a large catalogue grid.
+- Pictures are not yet shown in the items list or sent to other modules. A public link to a picture (for a shop front) is part of publishing (8b).
+- A file is held in memory while it is read or written (at most 10 MB).
+
+Tests: 11 rule tests pass standalone (`MediaRulesTest`, `BundleRulesTest`). 14 service tests (Mockito: 8 media, 6 bundle) are written but **not run**. Front end: 166 catalogue tests pass (12 new), lint and type check clean. V483 has not been run against a database; checks 26–30 in `CATALOGUE-MIGRATION-CHECKS.sql` are for it.

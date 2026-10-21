@@ -7,6 +7,8 @@ import { usePermissions } from "../../hooks/usePermission"
 import { ErrorBanner, Modal, StatusBadge } from "./CatalogueKit"
 import { linkBtn, primaryBtn } from "./catalogue.styles"
 import { DecisionModal } from "./ItemApprovalsPanel"
+import MediaTab from "./MediaTab"
+import PackageTab, { UsedInList } from "./PackageTab"
 import PricingModal from "./PricingModal"
 import VariantsModal from "./VariantsModal"
 import {
@@ -20,7 +22,7 @@ const td: React.CSSProperties = { padding: "8px 10px", fontSize: 13, color: "var
 const muted: React.CSSProperties = { fontSize: 13, color: "var(--hf-text-muted)" }
 const banner: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "10px 14px", marginBottom: 14, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border-subtle)", borderRadius: 10, fontSize: 13 }
 
-type Tab = "overview" | "attributes" | "variants" | "pricing" | "history"
+type Tab = "overview" | "attributes" | "media" | "package" | "variants" | "pricing" | "history"
 
 export function CompletenessRing({ score }: { score: number }) {
   const r = 30, c = 2 * Math.PI * r
@@ -49,7 +51,8 @@ export default function Product360({ itemId, onClose, onChanged }: { itemId: str
   const item = o?.item
   const hasVariants = (item?.variantCount ?? 0) > 0
   const tabs: { id: Tab; label: string }[] = [
-    { id: "overview", label: "Overview" }, { id: "attributes", label: "Attributes" },
+    { id: "overview", label: "Overview" }, { id: "attributes", label: "Attributes" }, { id: "media", label: "Media" },
+    ...(item?.itemType === "PACKAGE" ? [{ id: "package" as Tab, label: "Package" }] : []),
     ...(!item?.parentId ? [{ id: "variants" as Tab, label: "Variants" }] : []),
     ...(canSeeCost ? [{ id: "pricing" as Tab, label: "Pricing" }] : []),
     { id: "history", label: "History" },
@@ -109,8 +112,10 @@ export default function Product360({ itemId, onClose, onChanged }: { itemId: str
             ))}
           </div>
 
-          {tab === "overview" && <OverviewTab o={o} />}
+          {tab === "overview" && <><OverviewTab o={o} />{item.itemType !== "PACKAGE" && <UsedInList itemId={itemId} />}</>}
           {tab === "attributes" && <AttributesTab o={o} />}
+          {tab === "media" && <MediaTab itemId={itemId} canWrite={canWrite} />}
+          {tab === "package" && <PackageTab itemId={itemId} canWrite={canWrite} onChanged={changed} />}
           {tab === "variants" && <VariantsTab itemId={itemId} canWrite={canWrite} hasVariants={hasVariants} onManage={() => setDialog("variants")} />}
           {tab === "pricing" && <PricingTab itemId={itemId} hasVariants={hasVariants} canWrite={canWriteCost} onManage={() => setDialog("pricing")} />}
           {tab === "history" && <HistoryTab itemId={itemId} />}

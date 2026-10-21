@@ -138,3 +138,22 @@ WHERE a.status = 'APPROVED' AND i.status = 'DRAFT' AND i.deleted_at IS NULL AND 
 
 -- 25. INFO: tenants that switched item approval on (should be only those who asked; the default is off).
 SELECT tenant_id, price_approval_required, item_approval_required FROM catalogue_settings WHERE item_approval_required;
+
+-- 26. [must be 0 rows] An item with more than one main picture (a unique index should make this impossible).
+SELECT item_id, count(*) FROM catalogue_item_media WHERE is_primary AND deleted_at IS NULL GROUP BY 1 HAVING count(*) > 1;
+
+-- 27. [must be 0 rows] Package parts on an item that is not of type PACKAGE.
+SELECT c.bundle_item_id, i.name, i.item_type FROM catalogue_bundle_components c JOIN catalogue_items i ON i.id = c.bundle_item_id WHERE i.item_type <> 'PACKAGE';
+
+-- 28. [must be 0 rows] A package that contains another package, or an item that has variants.
+SELECT c.bundle_item_id, c.component_item_id FROM catalogue_bundle_components c JOIN catalogue_items p ON p.id = c.component_item_id
+WHERE p.item_type = 'PACKAGE' OR EXISTS (SELECT 1 FROM catalogue_items v WHERE v.parent_id = p.id AND v.deleted_at IS NULL);
+
+-- 29. [must be 0 rows] A package part that belongs to a different tenant than the package.
+SELECT c.id FROM catalogue_bundle_components c JOIN catalogue_items a ON a.id = c.bundle_item_id JOIN catalogue_items b ON b.id = c.component_item_id
+WHERE a.tenant_id <> b.tenant_id OR c.tenant_id <> a.tenant_id;
+
+-- 30. INFO: packages whose parts have been deleted or archived since (they need attention).
+SELECT p.tenant_id, p.name AS package, x.name AS part, x.status, x.deleted_at
+FROM catalogue_bundle_components c JOIN catalogue_items p ON p.id = c.bundle_item_id AND p.deleted_at IS NULL
+JOIN catalogue_items x ON x.id = c.component_item_id WHERE x.deleted_at IS NOT NULL OR x.status = 'ARCHIVED' LIMIT 50;
