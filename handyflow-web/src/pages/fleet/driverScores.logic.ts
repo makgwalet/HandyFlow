@@ -91,3 +91,19 @@ export function driverDocumentCounts(drivers: Credentialed[], today = new Date()
   }
   return { expired, expiring }
 }
+
+// ── Driver profile page ──────────────────────────────────────────────────────
+/** Colour for one score component: green from 80, amber from 60, red below, grey when there is no data. */
+export const componentTone = (score: number | null | undefined): "ok" | "warn" | "bad" | "none" => (score == null ? "none" : score >= 80 ? "ok" : score >= 60 ? "warn" : "bad")
+export const initials = (first: string, last: string) => `${first.trim()[0] ?? ""}${last.trim()[0] ?? ""}`.toUpperCase()
+const MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+const day = (iso: string) => { const [y, m, d] = iso.slice(0, 10).split("-").map(Number); return { y, m: m - 1, d } }
+/** "22 Jul – 20 Oct 2026" (the year once when both ends share it). */
+export function periodText(from: string, to: string): string {
+  const a = day(from), b = day(to)
+  return a.y === b.y ? `${a.d} ${MONTH[a.m]} – ${b.d} ${MONTH[b.m]} ${b.y}` : `${a.d} ${MONTH[a.m]} ${a.y} – ${b.d} ${MONTH[b.m]} ${b.y}`
+}
+/** The vehicles currently assigned to a driver. */
+export const driverVehicles = <V extends { assignedDriverId?: string | null }>(vehicles: V[], driverId: string): V[] => vehicles.filter(v => v.assignedDriverId === driverId)
+/** Share of the ring to fill, 0 to 1; no score fills nothing. */
+export const ringFraction = (overall: number | null | undefined) => (overall == null ? 0 : Math.max(0, Math.min(1, overall / 100)))

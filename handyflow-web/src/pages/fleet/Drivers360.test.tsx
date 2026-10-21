@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import DriversTab from "./DriversTab"
-import { daysToDate, driverDocumentCounts, expiryState, expiryWords, sortDrivers, rankMap, bandText, bandToneFor, bandTone, coverageNote, scoreText, settingsBody, settingsProblem, toForm, weightTotal } from "./driverScores.logic"
+import { componentTone, daysToDate, driverDocumentCounts, driverVehicles, initials, periodText, ringFraction, expiryState, expiryWords, sortDrivers, rankMap, bandText, bandToneFor, bandTone, coverageNote, scoreText, settingsBody, settingsProblem, toForm, weightTotal } from "./driverScores.logic"
 
 const get = vi.fn(), put = vi.fn()
 type Args = unknown[]
@@ -22,7 +22,7 @@ const drivers = [
   { id: "d3", firstName: "New", lastName: "Starter", phone: null, email: null, idNumber: null, licenseNumber: null, licenseCode: "B", licenseExpiry: null, licenseExpiringSoon: false, prdpRequired: false, prdpNumber: null, prdpCategory: null, prdpExpiry: null, prdpExpiringSoon: false, status: "ACTIVE", notes: null, createdAt: "2026-01-01" },
 ]
 const profile = {
-  driver: { firstName: "John", lastName: "Mokoena", licenseCode: "EC", prdpRequired: true, status: "ACTIVE" },
+  driver: { firstName: "John", lastName: "Mokoena", licenseCode: "EC", prdpRequired: true, status: "ACTIVE", phone: "082 123 4567", email: "john@fleet.co.za", idNumber: "8001015009087", licenseNumber: "AB123456", licenseExpiry: "2027-08-01", prdpNumber: "PD-77", prdpCategory: "G", prdpExpiry: "2026-11-01", notes: "Prefers early starts" },
   compliance: [{ key: "LICENCE", label: "Driving licence", status: "VALID", daysRemaining: 300 }, { key: "PRDP", label: "PrDP", status: "EXPIRING_SOON", daysRemaining: 12 }],
   score: { overall: 92.3, band: "EXCELLENT", coverage: 100, reliable: true, periodFrom: "2026-07-22", periodTo: "2026-10-20", components: [{ key: "SAFETY", label: "Safety", weight: 35, effectiveWeight: 35, score: 95, status: "SCORED", detail: "0 harsh events" }, { key: "FUEL", label: "Fuel efficiency", weight: 10, effectiveWeight: 0, score: null, status: "NO_DATA", detail: "No fuel recorded" }] },
   activity: { tripCount: 40, completedTrips: 39, totalKm: 5200, businessKm: 5000, privateKm: 200, fuelLitres: 400, litresPer100Km: 9.5, inspectionsCompleted: 30, inspectionsFailed: 2, vehiclesDriven: ["ABC123MP"] },
@@ -32,7 +32,7 @@ const show = () => render(<QueryClientProvider client={new QueryClient({ default
 
 beforeEach(() => {
   perms = new Set(["FLEET_READ", "FLEET_MANAGE", "FLEET_ADMIN"]); get.mockReset(); put.mockReset(); put.mockResolvedValue({ data: { data: settings } })
-  get.mockImplementation((url: string) => url.includes("/profile") ? ok(profile) : url.includes("/driver-score-settings") ? ok(settings) : url.includes("/driver-scores") ? ok(board) : url.includes("/fleet/drivers") ? ok({ content: drivers }) : ok([]))
+  get.mockImplementation((url: string) => url.includes("/profile") ? ok(profile) : url.includes("/driver-score-settings") ? ok(settings) : url.includes("/driver-scores") ? ok(board) : url.includes("/fleet/drivers") ? ok({ content: drivers }) : url.includes("/fleet/vehicles") ? ok({ content: [{ id: "v1", registration: "ABC123MP", make: "Toyota", model: "Hilux", assignedDriverId: "d1" }, { id: "v2", registration: "XYZ999GP", make: "Isuzu", model: "D-Max", assignedDriverId: null }] }) : ok([]))
 })
 afterEach(cleanup)
 
@@ -74,6 +74,16 @@ describe("document expiry", () => {
   })
 })
 
+describe("profile page rules", () => {
+  it("colours a component by its score", () => { expect([null, 95, 80, 79, 60, 59, 0].map(componentTone)).toEqual(["none", "ok", "ok", "warn", "warn", "bad", "bad"]) })
+  it("makes initials, a period, and a ring fraction", () => {
+    expect(initials(" john", "mokoena")).toBe("JM"); expect(initials("", "x")).toBe("X")
+    expect(periodText("2026-07-22", "2026-10-20")).toBe("22 Jul – 20 Oct 2026"); expect(periodText("2025-12-01", "2026-02-28")).toBe("1 Dec 2025 – 28 Feb 2026")
+    expect([null, -5, 50, 140].map(ringFraction)).toEqual([0, 0, 0.5, 1]); expect(ringFraction(92.3)).toBeCloseTo(0.923, 5)
+  })
+  it("finds a driver's own vehicles only", () => { expect(driverVehicles([{ id: 1, assignedDriverId: "a" }, { id: 2, assignedDriverId: "b" }, { id: 3 }], "a")).toEqual([{ id: 1, assignedDriverId: "a" }]) })
+})
+
 describe("ranking", () => {
   const ds = [{ id: "a", firstName: "Zed", lastName: "Ames" }, { id: "b", firstName: "Bo", lastName: "Bell" }, { id: "c", firstName: "Cy", lastName: "Cole" }, { id: "d", firstName: "Di", lastName: "Dunn" }, { id: "e", firstName: "Al", lastName: "Eve" }]
   const sc = new Map([["a", { overall: 70, reliable: true }], ["b", { overall: 90, reliable: true }], ["c", { overall: 95, reliable: false }], ["d", { overall: null, reliable: false }], ["e", { overall: 90, reliable: true }]])
@@ -95,18 +105,34 @@ describe("Drivers with Driver 360", () => {
     show(); await screen.findByText("John Mokoena"); fireEvent.click(within("John Mokoena"))
     expect((await screen.findByLabelText("Overall score")).textContent).toContain("92.3%")
     expect(screen.getByLabelText("PrDP").textContent).toContain("12 days left"); expect(screen.getByLabelText("Fuel efficiency").textContent).toContain("No data")
-    expect(screen.getByText(/1 accident /)).toBeTruthy(); expect(screen.getByText(/ACC-2026-00021/)).toBeTruthy(); expect(screen.getByText(/9.5 L\/100 km/)).toBeTruthy()
+    expect(screen.getByLabelText("Assigned vehicles").textContent).toContain("ABC123MP · Toyota Hilux"); expect(screen.getByLabelText("Assigned vehicles").textContent).not.toContain("XYZ999GP")
+    const who = screen.getByLabelText("Driver details").textContent ?? ""; expect(who).toContain("082 123 4567"); expect(who).toContain("john@fleet.co.za"); expect(who).toContain("Prefers early starts"); expect(who).toContain("JM")
+  })
+  it("keeps accidents, activity and licence details on their own tabs", async () => {
+    show(); await screen.findByText("John Mokoena"); fireEvent.click(within("John Mokoena")); await screen.findByLabelText("Overall score")
+    fireEvent.click(screen.getByRole("tab", { name: "Incidents" })); expect(screen.getByText(/1 accident /)).toBeTruthy(); expect(screen.getByText(/ACC-2026-00021/)).toBeTruthy()
+    fireEvent.click(screen.getByRole("tab", { name: "Performance" })); expect(screen.getByText("39 of 40")).toBeTruthy(); expect(screen.getAllByText(/9.5 L\/100 km/).length).toBeGreaterThan(0); expect(screen.getByText("0 harsh events")).toBeTruthy()
+    fireEvent.click(screen.getByRole("tab", { name: "Compliance" })); expect(screen.getByText("AB123456")).toBeTruthy(); expect(screen.getByText("PD-77")).toBeTruthy()
+    fireEvent.click(screen.getByRole("tab", { name: "Overview" })); expect(screen.getByLabelText("PrDP")).toBeTruthy()
+  })
+  it("shows the profile as its own page and goes back to the list", async () => {
+    show(); await screen.findByText("Thandi Nkosi"); fireEvent.click(within("John Mokoena")); await screen.findByLabelText("Overall score")
+    expect(screen.queryByText("Thandi Nkosi")).toBeNull(); fireEvent.click(screen.getByText("← Back to drivers"))
+    expect(await screen.findByText("Thandi Nkosi")).toBeTruthy(); expect(screen.queryByLabelText("Overall score")).toBeNull()
+  })
+  it("edits the driver from the profile", async () => {
+    show(); await screen.findByText("John Mokoena"); fireEvent.click(within("John Mokoena")); await screen.findByLabelText("Overall score")
+    fireEvent.click(screen.getByText("Edit driver")); expect(await screen.findByText("Edit Driver")).toBeTruthy()
+  })
+  it("says so when the profile cannot be loaded", async () => {
+    get.mockImplementation((url: string) => url.includes("/profile") ? Promise.reject(new Error("x")) : url.includes("/driver-scores") ? ok(board) : url.includes("/fleet/drivers") ? ok({ content: drivers }) : ok([]))
+    show(); await screen.findByText("John Mokoena"); fireEvent.click(within("John Mokoena")); expect((await screen.findByRole("alert")).textContent).toMatch(/Couldn't load this driver/)
   })
   it("sorts by score with rank badges, and a score the data cannot support gets none", async () => {
     show(); await screen.findByText("John Mokoena"); expect(screen.queryAllByLabelText("Rank").length).toBe(0)
     fireEvent.change(screen.getByLabelText("Sort drivers"), { target: { value: "score-desc" } })
     expect(screen.getAllByLabelText(/^(John Mokoena|Thandi Nkosi|New Starter)$/).map(e => e.getAttribute("aria-label"))).toEqual(["John Mokoena", "Thandi Nkosi", "New Starter"])
     expect(screen.getByLabelText("John Mokoena").querySelector('[aria-label="Rank"]')?.textContent).toBe("#1"); expect(screen.getByLabelText("Thandi Nkosi").querySelector('[aria-label="Rank"]')).toBeNull()
-  })
-  it("opens the profile under the driver's own card, and closes it again", async () => {
-    show(); await screen.findByText("Thandi Nkosi"); fireEvent.click(within("John Mokoena")); const o = await screen.findByLabelText("Overall score")
-    expect(screen.getByLabelText("John Mokoena").contains(o)).toBe(true); expect(screen.getByLabelText("Thandi Nkosi").contains(o)).toBe(false)
-    fireEvent.click(screen.getByText("Hide 360")); expect(screen.queryByLabelText("Overall score")).toBeNull()
   })
   it("a driver whose PrDP expired is counted as expired, never as expiring", async () => {
     const day = (n: number) => { const x = new Date(); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}` }

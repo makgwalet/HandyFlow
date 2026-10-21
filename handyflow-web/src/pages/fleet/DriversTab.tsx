@@ -3,7 +3,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { errorMessage, unwrapList } from "./apiShape"
-import { ProfileView, SettingsPanel, type ScoreRow } from "./Driver360"
+import { ProfileView, SettingsPanel, type AssignedVehicle, type ScoreRow } from "./Driver360"
 import { unwrap as unwrapOne, bandText, bandToneFor, scoreText, sortDrivers, daysToDate, expiryState, expiryWords, driverDocumentCounts, rankMap, SORT_LABEL, type DriverSort } from "./driverScores.logic"
 import {
   Plus, User, X, AlertCircle, AlertTriangle, CheckCircle, Edit2,
@@ -62,6 +62,8 @@ export default function DriversTab() {
   const [apiError, setApiError]   = useState("")
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
+  // Same key and shape as the Vehicles screen's list, so the two share one fetch.
+  const { data: vehicles = [] } = useQuery<AssignedVehicle[]>({ queryKey: ["fleet", "list", "vehicles"], queryFn: async () => unwrapList<AssignedVehicle>(await apiClient.get("/api/v1/fleet/vehicles?size=200")) })
   const { data: drivers = [], isLoading } = useQuery<Driver[]>({
     queryKey: ["fleet-drivers"],
     queryFn: async () => unwrapList<Driver>(await apiClient.get("/api/v1/fleet/drivers?size=200")),
@@ -121,6 +123,7 @@ export default function DriversTab() {
     notes: form.notes || null,
   })
 
+  const opened = openId ? drivers.find(d => d.id === openId) ?? null : null
   const filtered = sortDrivers(drivers.filter(d => filterStatus === "ALL" || d.status === filterStatus), sort, scoreOf)
   const rankOf = sort === "name" ? new Map<string, number>() : rankMap(filtered, scoreOf)
   const docs = driverDocumentCounts(drivers)
@@ -140,6 +143,7 @@ export default function DriversTab() {
 
   return (
     <div>
+      {opened ? <ProfileView id={opened.id} vehicles={vehicles} onClose={() => setOpenId(null)} onEdit={() => openEdit(opened)} /> : <>
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {stats.map(s => (
           <div key={s.label} aria-label={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
@@ -234,7 +238,7 @@ export default function DriversTab() {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
-                  <button type="button" onClick={() => setOpenId(openId === d.id ? null : d.id)} aria-expanded={openId === d.id} title="Driver 360" style={{ background: "var(--hf-violet-soft)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "var(--hf-violet-text)", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}><Gauge size={13} />{openId === d.id ? "Hide 360" : "360 view"}</button>
+                  <button type="button" onClick={() => setOpenId(d.id)} title="Driver 360" style={{ background: "var(--hf-violet-soft)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "var(--hf-violet-text)", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}><Gauge size={13} />360 view</button>
                   <button onClick={() => openEdit(d)} title="Edit" style={{ background: "var(--hf-warning-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-warning-text)" }}><Edit2 size={13} /></button>
                   {d.status === "ACTIVE" ? (
                     <button onClick={() => setStatus.mutate({ id: d.id, active: false })} title="Deactivate" style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><UserX size={13} /></button>
@@ -243,12 +247,13 @@ export default function DriversTab() {
                   )}
                 </div>
               </div>
-              {openId === d.id && <div style={{ marginTop: 14 }}><ProfileView id={d.id} onClose={() => setOpenId(null)} /></div>}
             </div>
           ))}
         </div>
       )}
       {scoreRows.some(r => !r.reliable && r.overall != null) && <p style={{ fontSize: 11.5, color: "var(--hf-text-muted)" }}>* Indicative only: less than half of the configured score had data, so it is not rated.</p>}
+
+      </>}
 
       {(showAdd || editing) && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
