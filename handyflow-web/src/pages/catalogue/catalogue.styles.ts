@@ -1,20 +1,5 @@
-// Shared field styles and the unit list for the catalogue screens.
+// Shared field styles for the catalogue screens.
 import type { CSSProperties } from 'react'
-
-export const UNIT_GROUPS = [
-  { group: 'Time',           options: ['Hour', 'Half Day', 'Day', 'Week', 'Month', 'Year'] },
-  { group: 'Quantity',       options: ['Each', 'Unit', 'Pair', 'Set', 'Box', 'Pallet', 'Dozen'] },
-  { group: 'Weight',         options: ['kg', 'Ton', 'g'] },
-  { group: 'Volume',         options: ['Litre', 'ML', 'm³', 'Gallon'] },
-  { group: 'Distance/Area',  options: ['km', 'm', 'm²', 'Linear metre', 'Square metre'] },
-  { group: 'Transport',      options: ['Per Trip', 'Trip', 'Load', 'Delivery'] },
-  { group: 'Service',        options: ['Job', 'Visit', 'Session', 'Project', 'Contract', 'Per Person', 'Per Event', 'Call-out'] },
-  { group: 'Trade',          options: ['Point', 'Connection', 'Slab', 'Panel', 'Bay'] },
-  { group: 'Hospitality',    options: ['Per Night', 'Per Plate', 'Per Table', 'Per Guest'] },
-  { group: 'Medical',        options: ['Consultation', 'Procedure', 'Script', 'Test'] },
-]
-
-export const ALL_UNITS = UNIT_GROUPS.flatMap(g => g.options)
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 export const inp: CSSProperties = {
@@ -28,3 +13,9 @@ export const sel: CSSProperties = {
   backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', paddingRight: 36, cursor: 'pointer',
 }
 
+
+export const primaryBtn: CSSProperties = { padding: '9px 18px', background: 'var(--hf-primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'var(--hf-text-on-solid)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }
+export const cancelBtn: CSSProperties = { padding: '9px 16px', background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }
+export const linkBtn: CSSProperties = { padding: '4px 10px', background: 'none', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }
+export const th: CSSProperties = { textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--hf-border-subtle)' }
+export const td: CSSProperties = { padding: '11px 14px', fontSize: 13.5, color: 'var(--hf-text)', borderBottom: '1px solid var(--hf-border-subtle)', verticalAlign: 'middle' }

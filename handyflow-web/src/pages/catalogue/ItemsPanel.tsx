@@ -1,15 +1,15 @@
 // src/pages/catalogue/ItemsPanel.tsx — the catalogue list: server-side search, filters, sorting and paging; add/edit, lifecycle changes, history and delete.
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query"
 import { ChevronLeft, ChevronRight, History, Package, Pencil, Plus, Power, Search, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
-import { DeleteModal, ErrorBanner, Field, Modal, StatusBadge, UnitSelect } from "./CatalogueKit"
+import { DeleteModal, ErrorBanner, Field, Modal, StatusBadge } from "./CatalogueKit"
 import { inp, inpErr, sel } from "./catalogue.styles"
 import {
-  EMPTY_FILTERS, EMPTY_ITEM_FORM, ITEM_STATUSES, ITEM_TYPES, STATUS_LABEL, allowedMoves, duplicateField, errorMessage, fieldErrors, hasFilters, itemBody, itemProblems,
+  EMPTY_FILTERS, EMPTY_ITEM_FORM, applicableAttributes, attributeProblems, indented, matchUnit, ITEM_STATUSES, ITEM_TYPES, STATUS_LABEL, allowedMoves, duplicateField, errorMessage, fieldErrors, hasFilters, itemBody, itemProblems,
   listParams, marginText, moveLabel, moveNeedsReason, rand, rangeText, statusProblem, toItemForm, typeLabel,
-  type CatalogueItem, type Category, type Filters, type HistoryLine, type ItemForm, type ItemStatus, type PageOf,
+  type AttributeDef, type CatalogueItem, type Category, type Unit, type Filters, type HistoryLine, type ItemForm, type ItemStatus, type PageOf,
 } from "./catalogue.logic"
 
 const inner = <T,>(r: { data: unknown }): T => { const d = r.data as { data?: T } | null; return (d && typeof d === "object" && "data" in d ? d.data : r.data) as T }
@@ -70,7 +70,7 @@ export default function ItemsPanel() {
         </div>
         <select aria-label="Filter by category" style={{ ...sel, width: "auto", minWidth: 150 }} value={filters.categoryId} onChange={e => set({ categoryId: e.target.value })}>
           <option value="">All categories</option>
-          {(categories.data ?? []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {(categories.data ?? []).map(c => <option key={c.id} value={c.id}>{indented(c)}</option>)}
         </select>
         <select aria-label="Filter by status" style={{ ...sel, width: "auto", minWidth: 130 }} value={filters.status} onChange={e => set({ status: e.target.value as Filters["status"] })}>
           <option value="">All statuses</option>
@@ -163,13 +163,28 @@ function ItemFormModal({ item, categories, canSeeCost, canWriteCost, onClose, on
   item: CatalogueItem | null; categories: Category[]; canSeeCost: boolean; canWriteCost: boolean; onClose: () => void; onSaved: () => void; onStale: () => void
 }) {
   const [form, setForm] = useState<ItemForm>(item ? toItemForm(item) : EMPTY_ITEM_FORM)
+  const units = useQuery<Unit[]>({ queryKey: ["catalogue", "units"], queryFn: async () => inner<Unit[]>(await apiClient.get("/api/v1/catalogue/units")) ?? [] })
+  const defs = useQuery<AttributeDef[]>({ queryKey: ["catalogue", "attributes"], queryFn: async () => inner<AttributeDef[]>(await apiClient.get("/api/v1/catalogue/attributes")) ?? [] })
+  // The list does not carry attribute values, so an edit loads the single item to get them.
+  const full = useQuery<CatalogueItem>({ queryKey: ["catalogue", "item", item?.id], enabled: !!item, queryFn: async () => inner<CatalogueItem>(await apiClient.get(`/api/v1/catalogue/items/${item!.id}`)) })
+  const loadedAttrs = useRef(false)
+  useEffect(() => {
+    const a = full.data?.attributes
+    if (!loadedAttrs.current && Array.isArray(a)) {
+      loadedAttrs.current = true
+      setForm(f => ({ ...f, attributes: { ...Object.fromEntries(a.map(v => [v.definitionId, v.value])), ...f.attributes } }))
+    }
+  }, [full.data])
+  const applicable = applicableAttributes(Array.isArray(defs.data) ? defs.data : [], categories, form.categoryId || null)
+  const unitList = Array.isArray(units.data) ? units.data : []
+  const unitValue = matchUnit(unitList, form.unit)?.code ?? form.unit.trim()
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [general, setGeneral] = useState("")
   const set = <K extends keyof ItemForm>(k: K, v: ItemForm[K]) => setForm(f => ({ ...f, [k]: v }))
 
   const save = useMutation({
     mutationFn: () => {
-      const body = itemBody(form, { canWriteCost, version: item?.version, creating: !item })
+      const body = itemBody({ ...form, unit: unitValue }, { canWriteCost, version: item?.version, creating: !item, attributeIds: applicable.map(d => d.id) })
       return item ? apiClient.put(`/api/v1/catalogue/items/${item.id}`, body) : apiClient.post("/api/v1/catalogue/items", body)
     },
     onSuccess: onSaved,
@@ -183,7 +198,7 @@ function ItemFormModal({ item, categories, canSeeCost, canWriteCost, onClose, on
     },
   })
   const submit = () => {
-    const errs = itemProblems(form, canSeeCost && canWriteCost)
+    const errs = { ...itemProblems(form, canSeeCost && canWriteCost), ...attributeProblems(applicable, form.attributes, item ? item.status !== "DRAFT" : !form.draft) }
     setErrors(errs); setGeneral("")
     if (Object.keys(errs).length === 0) save.mutate()
   }
@@ -203,7 +218,7 @@ function ItemFormModal({ item, categories, canSeeCost, canWriteCost, onClose, on
         <Field label="Category (optional)" id="cat-category">
           <select id="cat-category" style={sel} value={form.categoryId} onChange={e => set("categoryId", e.target.value)}>
             <option value="">— No category —</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {categories.map(c => <option key={c.id} value={c.id}>{indented(c)}</option>)}
           </select>
         </Field>
         <Field label="SKU" error={errors.sku} id="cat-sku">
@@ -215,8 +230,12 @@ function ItemFormModal({ item, categories, canSeeCost, canWriteCost, onClose, on
         <Field label="Brand" error={errors.brand} id="cat-brand">
           <input id="cat-brand" style={s("brand")} value={form.brand} onChange={e => set("brand", e.target.value)} />
         </Field>
-        <Field label="Unit" required error={errors.unit}>
-          <UnitSelect value={form.unit} onChange={v => set("unit", v)} hasError={!!errors.unit} />
+        <Field label="Unit" required error={errors.unit} id="cat-unit">
+          <select id="cat-unit" style={errors.unit ? { ...sel, borderColor: "var(--hf-danger)" } : sel} value={unitValue} onChange={e => set("unit", e.target.value)}>
+            {unitValue === "" && <option value="">Select a unit…</option>}
+            {unitList.filter(u => u.active).map(u => <option key={u.id} value={u.code}>{u.name && u.name !== u.code ? `${u.code} — ${u.name}` : u.code}</option>)}
+            {unitValue !== "" && !unitList.some(u => u.active && u.code === unitValue) && <option value={unitValue}>{unitValue}</option>}
+          </select>
         </Field>
         <Field label="Default price (R)" required error={errors.defaultPrice} id="cat-price">
           <input id="cat-price" style={s("defaultPrice")} value={form.defaultPrice} onChange={e => set("defaultPrice", e.target.value)} placeholder="0.00" inputMode="decimal" />
@@ -241,6 +260,15 @@ function ItemFormModal({ item, categories, canSeeCost, canWriteCost, onClose, on
       <Field label="Description (optional)" id="cat-desc">
         <input id="cat-desc" style={inp} value={form.description} onChange={e => set("description", e.target.value)} placeholder="Brief description" />
       </Field>
+      {applicable.length > 0 && (
+        <fieldset style={{ border: "1px solid var(--hf-border-subtle)", borderRadius: 10, padding: "12px 14px 2px", margin: "0 0 16px" }}>
+          <legend style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-secondary)", padding: "0 6px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Attributes</legend>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {applicable.map(d => <AttributeField key={d.id} def={d} value={form.attributes[d.id] ?? ""} error={errors[`attr:${d.id}`]}
+              onChange={v => setForm(f => ({ ...f, attributes: { ...f.attributes, [d.id]: v } }))} />)}
+          </div>
+        </fieldset>
+      )}
       {!item && (
         <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, marginBottom: 16 }}>
           <input type="checkbox" checked={form.draft} onChange={e => set("draft", e.target.checked)} /> Save as a draft (not available for sale yet)
@@ -252,6 +280,29 @@ function ItemFormModal({ item, categories, canSeeCost, canWriteCost, onClose, on
         <button type="button" style={primary} onClick={submit} disabled={save.isPending}>{save.isPending ? "Saving…" : item ? "Save changes" : "Create item"}</button>
       </div>
     </Modal>
+  )
+}
+
+/** One input for one attribute, chosen by its type. */
+function AttributeField({ def, value, error, onChange }: { def: AttributeDef; value: string; error?: string; onChange: (v: string) => void }) {
+  const id = `attr-${def.id}`, style = error ? inpErr : inp
+  return (
+    <Field label={def.label} required={def.required} error={error} id={id}>
+      {def.type === "LIST" ? (
+        <select id={id} style={sel} value={value} onChange={e => onChange(e.target.value)}>
+          <option value="">—</option>
+          {def.options.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      ) : def.type === "BOOLEAN" ? (
+        <select id={id} style={sel} value={value} onChange={e => onChange(e.target.value)}>
+          <option value="">—</option><option value="true">Yes</option><option value="false">No</option>
+        </select>
+      ) : def.type === "DATE" ? (
+        <input id={id} type="date" style={style} value={value} onChange={e => onChange(e.target.value)} />
+      ) : (
+        <input id={id} style={style} value={value} inputMode={def.type === "NUMBER" ? "decimal" : undefined} onChange={e => onChange(e.target.value)} />
+      )}
+    </Field>
   )
 }
 

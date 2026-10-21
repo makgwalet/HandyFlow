@@ -18,11 +18,24 @@ export const ITEM_TYPES: { id: ItemType; label: string }[] = [
 ]
 export const typeLabel = (t: string) => ITEM_TYPES.find(x => x.id === t)?.label ?? t
 
-export interface Category { id: string; name: string; description: string | null; sortOrder: number; itemCount: number | null }
+export interface Category {
+  id: string; name: string; description: string | null; sortOrder: number; itemCount: number | null
+  parentId: string | null; path: string; depth: number
+}
+export type UnitKind = "COUNT" | "LENGTH" | "AREA" | "VOLUME" | "WEIGHT" | "TIME" | "OTHER"
+export interface Unit { id: string; code: string; name: string; kind: UnitKind; decimals: number; active: boolean; itemCount: number | null }
+export type AttributeType = "TEXT" | "NUMBER" | "BOOLEAN" | "DATE" | "LIST"
+export interface AttributeDef {
+  id: string; categoryId: string | null; categoryPath: string | null; code: string; label: string; type: AttributeType; required: boolean
+  options: string[]; min: number | null; max: number | null; maxLength: number | null; sortOrder: number; active: boolean; valueCount: number | null
+}
+export interface AttributeValue { definitionId: string; code: string; label: string; type: AttributeType; value: string }
 export interface CatalogueItem {
   id: string; name: string; description: string | null; sku: string | null; barcode: string | null; brand: string | null; itemType: ItemType
   status: ItemStatus; statusReason: string | null; statusChangedAt: string | null; unit: string; defaultPrice: number; vatRate: number; vatExempt: boolean
   categoryId: string | null; categoryName: string | null; costPrice: number | null; marginPercent: number | null; version: number; createdAt: string; updatedAt: string
+  /** Attribute values; only present when a single item was loaded. */
+  attributes?: AttributeValue[] | null
 }
 export interface PageOf<T> { content: T[]; totalElements: number; totalPages: number; number: number; size: number }
 export interface HistoryLine { id: string; action: string; detail: string | null; actorId: string | null; at: string }
@@ -52,14 +65,17 @@ export function statusProblem(from: ItemStatus, to: ItemStatus, reason: string):
 export interface ItemForm {
   name: string; description: string; sku: string; barcode: string; brand: string; itemType: ItemType; categoryId: string; unit: string
   defaultPrice: string; costPrice: string; vatRate: string; vatExempt: boolean; draft: boolean
+  /** Attribute values by definition id, as typed. */
+  attributes: Record<string, string>
 }
 export const EMPTY_ITEM_FORM: ItemForm = {
   name: "", description: "", sku: "", barcode: "", brand: "", itemType: "PRODUCT", categoryId: "", unit: "Each",
-  defaultPrice: "", costPrice: "", vatRate: "15", vatExempt: false, draft: false,
+  defaultPrice: "", costPrice: "", vatRate: "15", vatExempt: false, draft: false, attributes: {},
 }
 export const toItemForm = (i: CatalogueItem): ItemForm => ({
   name: i.name, description: i.description ?? "", sku: i.sku ?? "", barcode: i.barcode ?? "", brand: i.brand ?? "", itemType: i.itemType, categoryId: i.categoryId ?? "",
   unit: i.unit, defaultPrice: String(i.defaultPrice), costPrice: i.costPrice == null ? "" : String(i.costPrice), vatRate: String(i.vatRate), vatExempt: i.vatExempt, draft: false,
+  attributes: Object.fromEntries((i.attributes ?? []).map(a => [a.definitionId, a.value])),
 })
 
 const SKU_RE = /^[A-Z0-9][A-Z0-9._/-]*$/, BARCODE_RE = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/, MONEY_RE = /^\d+(\.\d{1,2})?$/
@@ -95,7 +111,7 @@ export function itemProblems(f: ItemForm, showCost: boolean): Record<string, str
 }
 
 /** Request body. Cost is only sent when the user may set it, so an edit never blanks it by accident. */
-export function itemBody(f: ItemForm, opts: { canWriteCost: boolean; version?: number; creating?: boolean }) {
+export function itemBody(f: ItemForm, opts: { canWriteCost: boolean; version?: number; creating?: boolean; attributeIds?: string[] }) {
   return {
     name: f.name.trim(),
     description: f.description.trim() || undefined,
@@ -111,6 +127,8 @@ export function itemBody(f: ItemForm, opts: { canWriteCost: boolean; version?: n
     costPrice: opts.canWriteCost && f.costPrice.trim() ? Number(f.costPrice.trim().replace(/\s/g, "")) : undefined,
     status: opts.creating && f.draft ? "DRAFT" : undefined,
     version: opts.version,
+    // The full set for the attributes that apply (blank clears one); left out when none apply, so stored values are not touched.
+    attributes: opts.attributeIds && opts.attributeIds.length ? Object.fromEntries(opts.attributeIds.map(id => [id, (f.attributes[id] ?? "").trim()])) : undefined,
   }
 }
 
@@ -152,3 +170,136 @@ export function duplicateField(message: string): "name" | "sku" | "barcode" | nu
   if (/barcode/.test(message) && /already uses/.test(message)) return "barcode"
   return null
 }
+
+// ── Category tree ───────────────────────────────────────────────────────────
+/** The category and everything below it. */
+export function subtreeIds(cats: Category[], rootId: string): string[] {
+  const out = [rootId]
+  for (let i = 0; i < out.length; i++) for (const c of cats) if (c.parentId === out[i] && !out.includes(c.id)) out.push(c.id)
+  return out
+}
+/** Ids from the category up to the top (nearest first). */
+export function selfAndAncestorIds(cats: Category[], id: string | null): string[] {
+  const out: string[] = []
+  let cur = id
+  while (cur && !out.includes(cur)) { out.push(cur); cur = cats.find(c => c.id === cur)?.parentId ?? null }
+  return out
+}
+/** Option text that shows the nesting in a plain <select>. */
+export const indented = (c: Category) => `${"\u2003".repeat(Math.max(0, c.depth - 1))}${c.depth > 1 ? "↳ " : ""}${c.name}`
+export const MAX_CATEGORY_DEPTH = 5
+/** Categories a given category may be moved under: not itself, not its own sub-categories, and not so deep that its subtree passes 5 levels. */
+export function parentChoices(cats: Category[], movingId: string | null): Category[] {
+  if (!movingId) return cats.filter(c => c.depth < MAX_CATEGORY_DEPTH)
+  const below = subtreeIds(cats, movingId)
+  const me = cats.find(c => c.id === movingId)
+  const height = below.reduce((h, id) => Math.max(h, (cats.find(c => c.id === id)?.depth ?? 1) - (me?.depth ?? 1) + 1), 1)
+  return cats.filter(c => !below.includes(c.id) && c.depth + height <= MAX_CATEGORY_DEPTH)
+}
+
+// ── Units ───────────────────────────────────────────────────────────────────
+export const UNIT_KINDS: { id: UnitKind; label: string }[] = [
+  { id: "COUNT", label: "Count" }, { id: "LENGTH", label: "Length" }, { id: "AREA", label: "Area" }, { id: "VOLUME", label: "Volume" },
+  { id: "WEIGHT", label: "Weight" }, { id: "TIME", label: "Time" }, { id: "OTHER", label: "Other" },
+]
+export const kindLabel = (k: string) => UNIT_KINDS.find(x => x.id === k)?.label ?? k
+export interface UnitForm { code: string; name: string; kind: UnitKind; decimals: string; active: boolean }
+export const EMPTY_UNIT_FORM: UnitForm = { code: "", name: "", kind: "COUNT", decimals: "0", active: true }
+export const toUnitForm = (u: Unit): UnitForm => ({ code: u.code, name: u.name, kind: u.kind, decimals: String(u.decimals), active: u.active })
+export function unitProblems(f: UnitForm, creating: boolean): Record<string, string> {
+  const e: Record<string, string> = {}
+  const code = f.code.trim()
+  if (creating) { if (!code) e.code = "The unit code is required"; else if (code.length > 50) e.code = "The unit code can be at most 50 characters" }
+  if (f.name.trim().length > 60) e.name = "The unit name can be at most 60 characters"
+  if (!/^[0-4]$/.test(f.decimals.trim())) e.decimals = "Decimals must be between 0 and 4"
+  return e
+}
+export const unitBody = (f: UnitForm) => ({ code: f.code.trim(), name: f.name.trim() || undefined, kind: f.kind, decimals: Number(f.decimals), active: f.active })
+/** The unit to show as selected: the list's own spelling of the code, ignoring case. */
+export const matchUnit = (units: Unit[], code: string): Unit | undefined => units.find(u => u.code.toLowerCase() === code.trim().toLowerCase())
+
+// ── Attributes ─────────────────────────────────────────────────────────────
+export const ATTRIBUTE_TYPES: { id: AttributeType; label: string }[] = [
+  { id: "TEXT", label: "Text" }, { id: "NUMBER", label: "Number" }, { id: "BOOLEAN", label: "Yes / no" }, { id: "DATE", label: "Date" }, { id: "LIST", label: "Pick from a list" },
+]
+export const attributeTypeLabel = (t: string) => ATTRIBUTE_TYPES.find(x => x.id === t)?.label ?? t
+
+/** The active attributes that apply to an item in this category: its own, those of the categories above it, and the global ones. */
+export function applicableAttributes(defs: AttributeDef[], cats: Category[], categoryId: string | null): AttributeDef[] {
+  const chain = selfAndAncestorIds(cats, categoryId || null)
+  return defs.filter(d => d.active && (d.categoryId == null || chain.includes(d.categoryId))).sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label))
+}
+
+/** One value against its definition (mirrors the server). Null when fine or empty; whether empty is allowed is decided separately. */
+export function attributeValueProblem(d: AttributeDef, raw: string): string | null {
+  const v = (raw ?? "").trim()
+  if (!v) return null
+  switch (d.type) {
+    case "TEXT": { const lim = d.maxLength ?? 500; return v.length > lim ? `${d.label}: at most ${lim} characters` : null }
+    case "NUMBER": {
+      const n = Number(v.replace(",", "."))
+      if (!Number.isFinite(n) || !/^-?\d+([.,]\d+)?$/.test(v)) return `${d.label}: "${v}" is not a number`
+      if (d.min != null && n < d.min) return `${d.label}: must be at least ${d.min}`
+      if (d.max != null && n > d.max) return `${d.label}: must be at most ${d.max}`
+      return null
+    }
+    case "BOOLEAN": return /^(true|false|yes|no)$/i.test(v) ? null : `${d.label}: choose yes or no`
+    case "DATE": { const ok = /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v; return ok ? null : `${d.label}: use the date format YYYY-MM-DD` }
+    case "LIST": return d.options.some(o => o.toLowerCase() === v.toLowerCase()) ? null : `${d.label}: "${v}" is not one of the allowed options`
+  }
+}
+/** Problems with the attribute values of an item form, keyed by `attr:<definition id>`. Required ones only count for items that are not drafts. */
+export function attributeProblems(defs: AttributeDef[], values: Record<string, string>, enforceRequired: boolean): Record<string, string> {
+  const e: Record<string, string> = {}
+  for (const d of defs) {
+    const v = (values[d.id] ?? "").trim()
+    if (!v) { if (d.required && enforceRequired) e[`attr:${d.id}`] = `${d.label} is required`; continue }
+    const p = attributeValueProblem(d, v)
+    if (p) e[`attr:${d.id}`] = p.replace(`${d.label}: `, "").replace(/^./, c => c.toUpperCase())
+  }
+  return e
+}
+
+export interface AttributeForm {
+  categoryId: string; code: string; label: string; type: AttributeType; required: boolean; options: string; min: string; max: string; maxLength: string; sortOrder: string; active: boolean
+}
+export const EMPTY_ATTRIBUTE_FORM: AttributeForm = { categoryId: "", code: "", label: "", type: "TEXT", required: false, options: "", min: "", max: "", maxLength: "", sortOrder: "0", active: true }
+export const toAttributeForm = (d: AttributeDef): AttributeForm => ({
+  categoryId: d.categoryId ?? "", code: d.code, label: d.label, type: d.type, required: d.required, options: d.options.join("\n"),
+  min: d.min == null ? "" : String(d.min), max: d.max == null ? "" : String(d.max), maxLength: d.maxLength == null ? "" : String(d.maxLength), sortOrder: String(d.sortOrder), active: d.active,
+})
+const optionList = (raw: string) => raw.split("\n").map(o => o.trim()).filter(Boolean)
+export function attributeFormProblems(f: AttributeForm, creating: boolean): Record<string, string> {
+  const e: Record<string, string> = {}
+  if (creating) {
+    const code = f.code.trim()
+    if (!code) e.code = "The attribute code is required"
+    else if (code.length > 40) e.code = "The attribute code can be at most 40 characters"
+    else if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(code)) e.code = "Start with a letter; use only letters, numbers and underscores"
+  }
+  if (!f.label.trim()) e.label = "The attribute name is required"; else if (f.label.trim().length > 60) e.label = "The attribute name can be at most 60 characters"
+  if (f.type === "LIST") {
+    const opts = optionList(f.options)
+    if (opts.length === 0) e.options = "Add at least one option"
+    else if (new Set(opts.map(o => o.toLowerCase())).size !== opts.length) e.options = "An option is listed twice"
+    else if (opts.length > 50) e.options = "At most 50 options"
+    else if (opts.some(o => o.length > 60)) e.options = "An option can be at most 60 characters"
+  }
+  if (f.type === "NUMBER") {
+    const bad = (x: string) => x.trim() !== "" && !Number.isFinite(Number(x))
+    if (bad(f.min)) e.min = "Enter a number"
+    if (bad(f.max)) e.max = "Enter a number"
+    if (!e.min && !e.max && f.min.trim() !== "" && f.max.trim() !== "" && Number(f.min) > Number(f.max)) e.max = "The maximum cannot be below the minimum"
+  }
+  if (f.type === "TEXT" && f.maxLength.trim() !== "" && !(/^\d+$/.test(f.maxLength.trim()) && Number(f.maxLength) >= 1 && Number(f.maxLength) <= 500)) e.maxLength = "Between 1 and 500"
+  if (!/^-?\d+$/.test(f.sortOrder.trim() || "0")) e.sortOrder = "Enter a whole number"
+  return e
+}
+export const attributeBody = (f: AttributeForm) => ({
+  categoryId: f.categoryId || undefined, code: f.code.trim(), label: f.label.trim(), type: f.type, required: f.required,
+  options: f.type === "LIST" ? optionList(f.options) : undefined,
+  min: f.type === "NUMBER" && f.min.trim() !== "" ? Number(f.min) : undefined,
+  max: f.type === "NUMBER" && f.max.trim() !== "" ? Number(f.max) : undefined,
+  maxLength: f.type === "TEXT" && f.maxLength.trim() !== "" ? Number(f.maxLength) : undefined,
+  sortOrder: Number(f.sortOrder.trim() || "0"), active: f.active,
+})

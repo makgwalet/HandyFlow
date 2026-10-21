@@ -23,7 +23,7 @@ import {
   Megaphone, Warehouse, Handshake, UserCog,
   Database, CalendarRange, MessageSquare, Send, BookOpen as BookIcon,
   UserCheck, Palette, Headphones, Wallet, Receipt, CheckSquare, LayoutGrid, ListChecks, Sprout, FlaskConical,
-  Columns3, Zap, History, Plug, Filter, Copy, SlidersHorizontal, Tags, Target,
+  Columns3, Zap, History, Plug, Filter, Copy, SlidersHorizontal, Tags, Target, Ruler,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -825,6 +825,9 @@ export const CATALOGUE_SECTIONS: ModuleSections = {
   groups: [{ label: 'Overview', sections: [
     { id: 'items', label: 'Products & services', icon: Package },
     { id: 'categories', label: 'Categories', icon: Tags },
+  ] }, { label: 'Setup', sections: [
+    { id: 'units', label: 'Units of measure', icon: Ruler, anyPermission: ['CATALOGUE_ADMIN'] },
+    { id: 'attributes', label: 'Attributes', icon: SlidersHorizontal, anyPermission: ['CATALOGUE_ADMIN'] },
   ] }],
 }
 

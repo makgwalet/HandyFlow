@@ -7,12 +7,13 @@ import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { CATALOGUE_SECTIONS } from "../../navigation/moduleSections"
 
 const ItemsPanel = lazy(() => import("./ItemsPanel")), CategoriesPanel = lazy(() => import("./CategoriesPanel"))
+const UnitsPanel = lazy(() => import("./UnitsPanel")), AttributesPanel = lazy(() => import("./AttributesPanel"))
 
 export function CataloguePage() {
   return (
     <SectionedModulePage config={CATALOGUE_SECTIONS} subtitle="Manage your products and services" render={id => (
       <Suspense fallback={<p>Loading…</p>}>
-        {id === "items" ? <ItemsPanel /> : id === "categories" ? <CategoriesPanel /> : null}
+        {id === "items" ? <ItemsPanel /> : id === "categories" ? <CategoriesPanel /> : id === "units" ? <UnitsPanel /> : id === "attributes" ? <AttributesPanel /> : null}
       </Suspense>
     )} />
   )

@@ -1,11 +1,9 @@
 // src/pages/catalogue/CatalogueKit.tsx — the shared pieces of the catalogue screens: field styles, modal, field wrapper,
-// unit picker, delete confirmation, error banner and category menu.
+// delete confirmation, error banner and category menu.
 import { useState, useRef, useEffect } from 'react'
-import { X, Search, ChevronDown, AlertTriangle, AlertCircle, MoreVertical, Pencil, Trash2 } from 'lucide-react'
+import { X, AlertTriangle, AlertCircle, MoreVertical, Pencil, Trash2 } from 'lucide-react'
 import { STATUS_LABEL, STATUS_TONE, type Category, type ItemStatus } from './catalogue.logic'
-import { UNIT_GROUPS, inp } from './catalogue.styles'
 
-// All units grouped by business type
 // ── Modal wrapper ─────────────────────────────────────────────────────────────
 export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
@@ -32,97 +30,6 @@ export function Field({ label, required, error, id, children }: { label: string;
       {error && (
         <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--hf-danger-text)', marginTop: 4 }}>
           <AlertCircle size={12} style={{ color: 'var(--hf-danger-text)' }} />{error}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Searchable Unit Dropdown ──────────────────────────────────────────────────
-export function UnitSelect({ value, onChange, hasError }: { value: string; onChange: (v: string) => void; hasError: boolean }) {
-  const [open, setOpen]     = useState(false)
-  const [query, setQuery]   = useState('')
-  const ref                 = useRef<HTMLDivElement>(null)
-
-  // Close on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  const filteredGroups = UNIT_GROUPS.map(g => ({
-    ...g,
-    options: g.options.filter(o => o.toLowerCase().includes(query.toLowerCase())),
-  })).filter(g => g.options.length > 0)
-
-  return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      {/* Trigger */}
-      <button
-        type="button"
-        onClick={() => { setOpen(o => !o); setQuery('') }}
-        style={{
-          ...inp,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          cursor: 'pointer', textAlign: 'left',
-          ...(hasError ? { borderColor: 'var(--hf-danger)', background: 'var(--hf-danger-soft)' } : {}),
-        }}>
-        <span style={{ color: value ? 'var(--hf-text)' : 'var(--hf-text-faint)' }}>{value || 'Select unit...'}</span>
-        <ChevronDown size={14} style={{ color: 'var(--hf-text-faint)' }} />
-      </button>
-
-      {/* Dropdown */}
-      {open && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 999,
-          background: 'var(--hf-surface)', border: '1.5px solid var(--hf-border)', borderRadius: 10,
-          boxShadow: '0 8px 30px rgba(0,0,0,0.12)', overflow: 'hidden',
-        }}>
-          {/* Search inside dropdown */}
-          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--hf-border-subtle)' }}>
-            <div style={{ position: 'relative' }}>
-              <Search size={13} style={{ color: 'var(--hf-text-faint)', position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
-              <input
-                autoFocus
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                placeholder="Search units..."
-                style={{ ...inp, paddingLeft: 32, padding: '8px 8px 8px 30px', fontSize: 13 }}
-              />
-            </div>
-          </div>
-
-          {/* Options list */}
-          <div style={{ maxHeight: 240, overflowY: 'auto' }}>
-            {filteredGroups.length === 0 ? (
-              <div style={{ padding: '16px', textAlign: 'center', fontSize: 13, color: 'var(--hf-text-faint)' }}>No units match</div>
-            ) : (
-              filteredGroups.map(group => (
-                <div key={group.group}>
-                  <div style={{ padding: '6px 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', background: 'var(--hf-surface-muted)' }}>
-                    {group.group}
-                  </div>
-                  {group.options.map(unit => (
-                    <div
-                      key={unit}
-                      onClick={() => { onChange(unit); setOpen(false); setQuery('') }}
-                      style={{
-                        padding: '9px 14px', fontSize: 14, cursor: 'pointer',
-                        background: unit === value ? 'var(--hf-info-soft)' : 'var(--hf-surface)',
-                        color: unit === value ? 'var(--hf-info-text)' : 'var(--hf-text)',
-                        fontWeight: unit === value ? 600 : 400,
-                      }}
-                      onMouseEnter={e => { if (unit !== value) (e.currentTarget as HTMLElement).style.background = 'var(--hf-surface-muted)' }}
-                      onMouseLeave={e => { if (unit !== value) (e.currentTarget as HTMLElement).style.background = 'var(--hf-surface)' }}
-                    >
-                      {unit}
-                    </div>
-                  ))}
-                </div>
-              ))
-            )}
-          </div>
         </div>
       )}
     </div>
