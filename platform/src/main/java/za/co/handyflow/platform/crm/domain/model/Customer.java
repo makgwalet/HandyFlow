@@ -118,6 +118,11 @@ public class Customer {
     @Column(name = "pipeline_stage", length = 20)
     private LeadStage pipelineStage;
 
+    /** Where this lead or customer first came from. Optional. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "lead_source", length = 30)
+    private LeadSource leadSource;
+
     /** Why the lead was lost. Set only while pipelineStage is LOST. */
     @Enumerated(EnumType.STRING)
     @Column(name = "lost_reason", length = 30)
@@ -245,6 +250,22 @@ public class Customer {
 
         c.addActivity(CustomerActivity.of(c, ActivityType.CREATED, null, null, createdBy));
         return c;
+    }
+
+    /** Sets the source while the record is being created. Leaves no timeline entry. */
+    public Customer withInitialSource(LeadSource source) {
+        this.leadSource = source;
+        return this;
+    }
+
+    /** Changes the source and records it on the timeline. A null source is ignored (use a value to change it). */
+    public void changeSource(LeadSource newSource, UUID by) {
+        if (newSource == null || newSource == this.leadSource) return;
+        var changes = new HashMap<String, Object>();
+        recordChange(changes, "leadSource", this.leadSource != null ? this.leadSource.name() : null, newSource.name());
+        this.leadSource = newSource;
+        this.updatedAt = Instant.now();
+        addActivity(CustomerActivity.of(this, ActivityType.UPDATED, changes, null, by));
     }
 
     // ══════════════════════════════════════════════════════════════════════

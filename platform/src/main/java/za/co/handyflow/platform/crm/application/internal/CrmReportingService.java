@@ -90,6 +90,14 @@ public class CrmReportingService {
         return new za.co.handyflow.platform.crm.dto.LostReasonEntry(reason, cs.size(), value);
     }
 
+    /** Leads, wins and win rate for each source. Counts every lead, including ones already converted to customers. */
+    @Transactional(readOnly = true)
+    public List<za.co.handyflow.platform.crm.dto.SourceEntry> getSourceReport(TenantId tenantId) {
+        return SourceReport.build(customerRepository.findAllActiveLeads(tenantId).stream()
+                .map(c -> new SourceReport.Lead(c.getLeadSource(), c.getPipelineStage(), c.getDealValue()))
+                .toList());
+    }
+
     @Transactional(readOnly = true)
     public FunnelReportResponse getFunnelReport(TenantId tenantId) {
         var leads = customerRepository.findAllActiveLeads(tenantId);

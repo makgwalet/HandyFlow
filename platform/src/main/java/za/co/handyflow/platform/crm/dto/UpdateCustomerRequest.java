@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import za.co.handyflow.platform.crm.domain.model.CustomerStatus;
 import za.co.handyflow.platform.crm.domain.model.CustomerType;
+import za.co.handyflow.platform.crm.domain.model.LeadSource;
 
 /**
  * UpdateCustomerRequest — validated DTO for customer updates.
@@ -53,6 +54,7 @@ public record UpdateCustomerRequest(
         String notes,
 
         CustomerType customerType,
-        CustomerStatus status
+        CustomerStatus status,
+        LeadSource leadSource   // null leaves the source as it is
 
 ) {}

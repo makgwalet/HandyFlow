@@ -30,6 +30,7 @@ export interface Customer {
   ownerId?:           string | null
   dealValue?:         number | null
   expectedCloseDate?: string | null
+  leadSource?:        LeadSource | null
   pipelineStage?:     'NEW' | 'CONTACTED' | 'QUALIFIED' | 'WON' | 'LOST' | null
   createdAt:    string
   updatedAt:    string
@@ -44,6 +45,8 @@ export interface CustomerActivity {
   createdAt:    string
 }
 
+export type LeadSource = 'WEBSITE' | 'REFERRAL' | 'WALK_IN' | 'PHONE' | 'EMAIL' | 'SOCIAL_MEDIA' | 'ADVERT' | 'EVENT' | 'PARTNER' | 'OTHER'
+
 export interface CreateCustomerRequest {
   name:          string
   email?:        string
@@ -52,6 +55,7 @@ export interface CreateCustomerRequest {
   taxNumber?:    string
   notes?:        string
   customerType?: CustomerType
+  leadSource?:   LeadSource
   tags?:         string[]
 }
 

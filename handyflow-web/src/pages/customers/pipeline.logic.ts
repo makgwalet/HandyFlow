@@ -10,6 +10,12 @@ export const LOST_REASONS: { id: LostReason; label: string }[] = [
   { id: "NO_BUDGET", label: "No budget" }, { id: "NOT_A_FIT", label: "Not a fit" }, { id: "TIMING", label: "Bad timing" }, { id: "OTHER", label: "Other (note needed)" },
 ]
 export const reasonLabel = (r: LostReason | null | undefined) => (r ? LOST_REASONS.find(x => x.id === r)?.label ?? r : "No reason recorded")
+export type LeadSource = "WEBSITE" | "REFERRAL" | "WALK_IN" | "PHONE" | "EMAIL" | "SOCIAL_MEDIA" | "ADVERT" | "EVENT" | "PARTNER" | "OTHER"
+export const LEAD_SOURCES: { id: LeadSource; label: string }[] = [
+  { id: "WEBSITE", label: "Website" }, { id: "REFERRAL", label: "Referral" }, { id: "WALK_IN", label: "Walk-in" }, { id: "PHONE", label: "Phone call" }, { id: "EMAIL", label: "Email" },
+  { id: "SOCIAL_MEDIA", label: "Social media" }, { id: "ADVERT", label: "Advert" }, { id: "EVENT", label: "Event" }, { id: "PARTNER", label: "Partner" }, { id: "OTHER", label: "Other" },
+]
+export const sourceLabel = (s: LeadSource | null | undefined) => (s ? LEAD_SOURCES.find(x => x.id === s)?.label ?? s : "Not recorded")
 export const MAX_NOTE = 500
 /** Why a lead cannot be marked lost yet, or null. The server checks the same rules. */
 export function lostProblem(reason: LostReason | "", note: string): string | null {
@@ -126,6 +132,8 @@ export function biggestDropOff(stages: FunnelStage[]): { from: Stage; to: Stage;
   return best
 }
 
+/** One row of the lead-source report. winRate is a percentage, or null until a lead from that source has been won or lost. */
+export interface SourceRow { source: LeadSource | null; leads: number; won: number; lost: number; open: number; winRate: number | null; wonValue: number | null }
 export interface LostReasonRow { reason: LostReason | null; count: number; dealValue: number | null }
 
 /** A converted customer is no longer a lead: its stage is fixed at Won and it cannot be moved. */

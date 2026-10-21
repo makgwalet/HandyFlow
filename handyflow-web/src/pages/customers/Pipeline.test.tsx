@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-li
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import PipelineBoard from "./PipelineBoard"
 import FunnelReport from "./FunnelReport"
-import { canConvert, isConverted, allowedMoves, lostProblem, reasonLabel, stageBody, barShare, biggestDropOff, closeState, closeText, columns, dealBody, dealProblem, daysText, filterLeads, localToday, NO_FILTER, ownerText, percent, pipelineTotals, stageOf, type Funnel, type PipelineLead } from "./pipeline.logic"
+import { canConvert, LEAD_SOURCES, sourceLabel, isConverted, allowedMoves, lostProblem, reasonLabel, stageBody, barShare, biggestDropOff, closeState, closeText, columns, dealBody, dealProblem, daysText, filterLeads, localToday, NO_FILTER, ownerText, percent, pipelineTotals, stageOf, type Funnel, type PipelineLead } from "./pipeline.logic"
 
 const get = vi.fn(), patch = vi.fn(), post = vi.fn()
 type Args = unknown[]
@@ -144,6 +144,12 @@ describe("lost reasons and stage rules", () => {
     get.mockImplementation((url: string) => ok(url.includes("lost-reasons") ? [{ reason: "PRICE", count: 3, dealValue: 90000 }, { reason: null, count: 1, dealValue: 0 }] : funnel)); wrap(<FunnelReport />)
     const t = await screen.findByLabelText("Lost reasons"); expect(within(t).getByLabelText("Price too high").textContent).toContain("3"); expect(within(t).getByLabelText("No reason recorded").textContent).toContain("1")
   })
+  it("shows which sources win, with the win rate only once leads are decided", async () => {
+    get.mockImplementation((url: string) => ok(url.includes("/sources") ? [{ source: "WEBSITE", leads: 4, won: 2, lost: 1, open: 1, winRate: 66.7, wonValue: 1000 }, { source: "REFERRAL", leads: 1, won: 0, lost: 0, open: 1, winRate: null, wonValue: 0 }, { source: null, leads: 2, won: 0, lost: 0, open: 2, winRate: null, wonValue: null }] : funnel)); wrap(<FunnelReport />)
+    const t = await screen.findByLabelText("Lead sources")
+    expect(within(t).getByLabelText("Source Website").textContent).toContain("66.7%"); expect(within(t).getByLabelText("Source Referral").textContent).toContain("—"); expect(within(t).getByLabelText("Source Not recorded").textContent).toContain("2")
+  })
+  it("names sources in words", () => { expect(sourceLabel("WALK_IN")).toBe("Walk-in"); expect(sourceLabel(null)).toBe("Not recorded"); expect(LEAD_SOURCES.map(x => x.id)).toContain("SOCIAL_MEDIA") })
   it("tells the person when the lost-reason report fails but still shows the funnel", async () => {
     get.mockImplementation((url: string) => (url.includes("lost-reasons") ? Promise.reject(new Error("x")) : ok(funnel))); wrap(<FunnelReport />)
     expect(await screen.findByLabelText("Win rate")).toBeTruthy(); expect((await screen.findByText(/Couldn't load the lost-deal reasons/)).textContent).toBeTruthy()

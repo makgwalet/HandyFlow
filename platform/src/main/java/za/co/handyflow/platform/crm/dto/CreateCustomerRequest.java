@@ -3,6 +3,7 @@ package za.co.handyflow.platform.crm.dto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import za.co.handyflow.platform.crm.domain.model.CustomerType;
+import za.co.handyflow.platform.crm.domain.model.LeadSource;
 
 import java.util.Map;
 import java.util.Set;
@@ -78,6 +79,8 @@ public record CreateCustomerRequest(
         String notes,
 
         CustomerType customerType,
+
+        LeadSource leadSource,
 
         /**
          * Tags applied at creation time.

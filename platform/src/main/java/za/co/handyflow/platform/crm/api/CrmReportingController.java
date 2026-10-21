@@ -27,6 +27,14 @@ public class CrmReportingController {
 
     private final CrmReportingService reportingService;
 
+    @GetMapping("/sources")
+    @PreAuthorize("hasAuthority('CUSTOMER_READ')")
+    @Operation(summary = "Leads, wins and win rate for each lead source")
+    public ResponseEntity<ApiResponse<java.util.List<za.co.handyflow.platform.crm.dto.SourceEntry>>> getSources() {
+        return ResponseEntity.ok(ApiResponse.success(
+                reportingService.getSourceReport(TenantContext.getTenantIdAsObject())));
+    }
+
     @GetMapping("/lost-reasons")
     @PreAuthorize("hasAuthority('CUSTOMER_READ')")
     @Operation(summary = "Lost leads grouped by the reason recorded, with count and deal value")

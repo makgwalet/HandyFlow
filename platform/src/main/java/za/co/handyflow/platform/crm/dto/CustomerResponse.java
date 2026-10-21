@@ -2,6 +2,7 @@ package za.co.handyflow.platform.crm.dto;
 
 import za.co.handyflow.platform.crm.domain.model.ActivityType;
 import za.co.handyflow.platform.crm.domain.model.CustomerStatus;
+import za.co.handyflow.platform.crm.domain.model.LeadSource;
 import za.co.handyflow.platform.crm.domain.model.LeadStage;
 import za.co.handyflow.platform.crm.domain.model.LostReason;
 import za.co.handyflow.platform.crm.domain.model.CustomerType;
@@ -51,6 +52,7 @@ public record CustomerResponse(
         CustomerType customerType,
         CustomerStatus status,
         LeadStage pipelineStage,   // null for a converted CUSTOMER
+        LeadSource leadSource,     // null when not recorded
         LostReason lostReason,     // set only while the stage is LOST
         String lostNote,
         Set<String> tags,

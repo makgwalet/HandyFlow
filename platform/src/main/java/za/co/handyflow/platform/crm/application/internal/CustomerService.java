@@ -207,7 +207,7 @@ public class CustomerService {
                 request.notes(),
                 request.customerType(),
                 currentUserId()
-        );
+        ).withInitialSource(request.leadSource());
 
         // Apply initial tags if provided
         if (request.tags() != null) {
@@ -257,6 +257,7 @@ public class CustomerService {
                 request.notes(),
                 actingUser
         );
+        customer.changeSource(request.leadSource(), actingUser);
 
         // Status change via update (staff can set ACTIVE/INACTIVE/BLOCKED)
         if (request.status() != null && request.status() != customer.getStatus()) {
@@ -510,6 +511,7 @@ public class CustomerService {
                 c.getCustomerType(),
                 c.getStatus(),
                 c.getPipelineStage(),
+                c.getLeadSource(),
                 c.getLostReason(),
                 c.getLostNote(),
                 Set.copyOf(c.getTags()),

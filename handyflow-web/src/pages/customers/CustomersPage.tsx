@@ -1,5 +1,6 @@
 // src/pages/customers/CustomersPage.tsx
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { LEAD_SOURCES, sourceLabel } from "./pipeline.logic"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, Search, Trash2, Eye, Pencil, Mail, Phone, MapPin, Hash,
@@ -80,7 +81,7 @@ const PAGE_SIZE = 10
 const EMPTY_FORM = {
   name: '', email: '', phone: '', taxNumber: '',
   street: '', suburb: '', city: '', province: '', postalCode: '',
-  notes: '', customerType: 'CUSTOMER' as CustomerType,
+  notes: '', customerType: 'CUSTOMER' as CustomerType, leadSource: '',
   status: 'ACTIVE' as CustomerStatus,
 }
 
@@ -437,7 +438,7 @@ export function CustomersPage() {
       street: c.address?.street ?? '', suburb: c.address?.suburb ?? '',
       city: c.address?.city ?? '', province: c.address?.province ?? '',
       postalCode: c.address?.postalCode ?? '',
-      customerType: c.customerType ?? 'CUSTOMER',
+      customerType: c.customerType ?? 'CUSTOMER', leadSource: c.leadSource ?? '',
       status: c.status ?? 'ACTIVE',
     })
     setFieldErrors({}); setGeneralError(''); setModal('edit')
@@ -452,6 +453,7 @@ export function CustomersPage() {
     taxNumber:    frm.taxNumber    || undefined,
     notes:        frm.notes        || undefined,
     customerType: frm.customerType,
+    leadSource:   frm.leadSource || undefined,
     address: {
       street:     frm.street     || undefined,
       suburb:     frm.suburb     || undefined,
@@ -969,6 +971,7 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
               {c.email     && <Detail icon={Mail}     label="Email"      value={c.email} />}
               {c.phone     && <Detail icon={Phone}    label="Phone"      value={c.phone} />}
               {c.taxNumber && <Detail icon={Hash}     label="VAT Number" value={c.taxNumber} />}
+              {c.leadSource && <Detail icon={Hash}    label="Source"     value={sourceLabel(c.leadSource)} />}
               {c.address && Object.values(c.address).some(Boolean) && (
                 <Detail icon={MapPin} label="Address" fullWidth
                   value={[c.address.street, c.address.suburb, c.address.city,
@@ -1119,6 +1122,15 @@ function CustomerFormModal({
               onChange={e => f('customerType', e.target.value)}>
               <option value="CUSTOMER">Customer</option>
               <option value="LEAD">Lead</option>
+            </select>
+          </div>
+
+          <div>
+            <FLabel>Where did they come from?</FLabel>
+            <select className={styles.select} aria-label="Lead source" value={form.leadSource}
+              onChange={e => f('leadSource', e.target.value)}>
+              <option value="">Not recorded</option>
+              {LEAD_SOURCES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
           </div>
 
