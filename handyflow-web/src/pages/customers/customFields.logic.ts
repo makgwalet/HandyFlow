@@ -1,9 +1,22 @@
 // Custom fields an account defines for its customers: labels, checking what is typed, showing stored values. Pure functions.
-export type CustomFieldType = "TEXT" | "NUMBER" | "DATE" | "CHOICE" | "YES_NO"
+export type CustomFieldType = "TEXT" | "NUMBER" | "DATE" | "CHOICE" | "YES_NO" | "MULTI_CHOICE" | "EMAIL" | "URL"
 export interface CustomField { id: string; key: string; label: string; type: CustomFieldType; required: boolean; options: string[]; sortOrder: number; active: boolean }
 export const FIELD_TYPES: { id: CustomFieldType; label: string }[] = [
   { id: "TEXT", label: "Text" }, { id: "NUMBER", label: "Number" }, { id: "DATE", label: "Date" }, { id: "CHOICE", label: "Choice from a list" }, { id: "YES_NO", label: "Yes / No" },
+  { id: "MULTI_CHOICE", label: "Several choices from a list" }, { id: "EMAIL", label: "Email address" }, { id: "URL", label: "Web address" },
 ]
+/** Choice fields are defined with a list of options. */
+export const hasOptions = (t: CustomFieldType | "") => t === "CHOICE" || t === "MULTI_CHOICE"
+export const MULTI_SEPARATOR = "|"
+/** The choices ticked in a several-choices value ("Tyres|Wash"). */
+export const multiValues = (v: string | undefined): string[] => (v ?? "").split(MULTI_SEPARATOR).map(x => x.trim()).filter(Boolean)
+/** Ticks or unticks one option and returns the value to store, in the order of the field's options. */
+export function toggleMulti(f: CustomField, current: string | undefined, option: string, on: boolean): string {
+  const picked = new Set(multiValues(current))
+  if (on) picked.add(option); else picked.delete(option)
+  return f.options.filter(o => picked.has(o)).join(MULTI_SEPARATOR)
+}
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s.]+$/
 export const typeLabel = (t: CustomFieldType) => FIELD_TYPES.find(x => x.id === t)?.label ?? t
 export const MAX_TEXT = 500
 export const MAX_LABEL = 60
@@ -19,7 +32,12 @@ export function definitionProblem(label: string, type: CustomFieldType | "", opt
   if (!label.trim()) return "Give the field a name."
   if (label.trim().length > MAX_LABEL) return `The name can be at most ${MAX_LABEL} characters.`
   if (!type) return "Choose what kind of field this is."
-  if (type === "CHOICE") { const n = parseOptions(optionsText).length; if (n < 2) return "A choice field needs at least two options."; if (n > 30) return "A choice field can have at most 30 options." }
+  if (hasOptions(type)) {
+    const opts = parseOptions(optionsText), n = opts.length
+    if (n < 2) return "A choice field needs at least two options."
+    if (n > 30) return "A choice field can have at most 30 options."
+    if (type === "MULTI_CHOICE" && opts.some(o => o.includes(MULTI_SEPARATOR))) return "Options cannot contain the | character."
+  }
   return null
 }
 const isoDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s)) && new Date(s).toISOString().slice(0, 10) === s
@@ -32,6 +50,9 @@ export function valueProblem(f: CustomField, raw: string): string | null {
   if (f.type === "DATE" && !isoDate(v)) return `${f.label} must be a date like 2026-11-30.`
   if (f.type === "CHOICE" && !f.options.includes(v)) return `${f.label} must be one of the options.`
   if (f.type === "YES_NO" && !["yes", "no"].includes(v.toLowerCase())) return `${f.label} must be yes or no.`
+  if (f.type === "MULTI_CHOICE") { const picked = multiValues(v); if (picked.length === 0) return `${f.label} needs at least one choice.`; if (picked.some(x => !f.options.includes(x))) return `${f.label} must only include the options.` }
+  if (f.type === "EMAIL" && (v.length > 254 || !EMAIL_RE.test(v))) return `${f.label} must be an email address.`
+  if (f.type === "URL" && (v.length > 500 || !/^https?:\/\/\S+$/i.test(v))) return `${f.label} must be a web address starting with http:// or https://.`
   return null
 }
 /** The first problem among the active fields' values, or null. */
@@ -49,6 +70,7 @@ export function valuesBody(fields: CustomField[], values: Record<string, string>
 export function displayValue(f: CustomField, v: string | undefined): string {
   if (v == null || v === "") return "—"
   if (f.type === "YES_NO") return v === "yes" ? "Yes" : v === "no" ? "No" : v
+  if (f.type === "MULTI_CHOICE") return multiValues(v).join(", ")
   return v
 }
 /** Active fields only, in the order the account chose. */

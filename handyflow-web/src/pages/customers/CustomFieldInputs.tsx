@@ -1,5 +1,5 @@
 // src/pages/customers/CustomFieldInputs.tsx — the account's own fields on the customer form.
-import type { CustomField } from "./customFields.logic"
+import { multiValues, toggleMulti, type CustomField } from "./customFields.logic"
 
 const box: React.CSSProperties = { width: "100%", padding: "6px 9px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13 }
 
@@ -11,6 +11,17 @@ export function CustomFieldInputs({ fields, values, onChange }: { fields: Custom
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
         {fields.map(f => {
           const v = values[f.key] ?? "", label = `${f.label}${f.required ? " *" : ""}`
+          if (f.type === "MULTI_CHOICE") {
+            const picked = multiValues(v)
+            return (
+              <fieldset key={f.key} aria-label={f.label} style={{ border: "none", padding: 0, margin: 0, fontSize: 13 }}>
+                <legend style={{ marginBottom: 3 }}>{label}</legend>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  {f.options.map(o => <label key={o} style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    <input type="checkbox" aria-label={`${f.label}: ${o}`} checked={picked.includes(o)} onChange={e => onChange(f.key, toggleMulti(f, v, o, e.target.checked))} />{o}</label>)}
+                </div>
+              </fieldset>)
+          }
           return (
             <label key={f.key} style={{ fontSize: 13 }}>
               <span style={{ display: "block", marginBottom: 3 }}>{label}</span>
@@ -19,7 +30,7 @@ export function CustomFieldInputs({ fields, values, onChange }: { fields: Custom
                     <option value="">{f.required ? "Choose…" : "Not set"}</option>
                     {f.type === "YES_NO" ? <><option value="yes">Yes</option><option value="no">No</option></> : f.options.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
-                : <input aria-label={f.label} style={box} type={f.type === "DATE" ? "date" : "text"} inputMode={f.type === "NUMBER" ? "decimal" : undefined} value={v} onChange={e => onChange(f.key, e.target.value)} />}
+                : <input aria-label={f.label} style={box} type={f.type === "DATE" ? "date" : "text"} inputMode={f.type === "NUMBER" ? "decimal" : f.type === "EMAIL" ? "email" : f.type === "URL" ? "url" : undefined} value={v} onChange={e => onChange(f.key, e.target.value)} />}
             </label>)
         })}
       </div>
