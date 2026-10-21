@@ -7,6 +7,8 @@ import { apiClient } from "../../api/client"
 import type { FuelRow } from "./fuelAnalytics.logic"
 import type { ListVehicle } from "./fleetBoards.logic"
 import { fetchAllPages } from "./apiShape"
+import { Pager, SearchBox } from "./ListControls"
+import { useListView } from "./listKit"
 import {
   REPORTS, PERIOD_LABEL, reportPeriod, costPerKmReport, fuelReport, maintenanceReport, complianceReport, serviceDueReport, driverScoresReport, cellText, toCsv, csvFileName,
   type ReportId, type ReportTable, type PeriodKind, type CostRow, type ReportOrder, type ScoreLine,
@@ -23,7 +25,7 @@ async function build(id: ReportId, period: { from: string; to: string }): Promis
   switch (id) {
     case "cost-per-km": return costPerKmReport(list<CostRow>(await get("/api/v1/fleet/cost-summary")))
     case "fuel": return fuelReport(list<FuelRow>(await get(`/api/v1/fleet/fuel-analytics/vehicles?from=${period.from}&to=${period.to}`)))
-    case "maintenance": return maintenanceReport(list<ReportOrder>(await get("/api/v1/fleet/work-orders?status=COMPLETED&size=500")), period.from, period.to)
+    case "maintenance": return maintenanceReport((await fetchAllPages<ReportOrder>(u => get(u), "/api/v1/fleet/work-orders?status=COMPLETED")).items, period.from, period.to)
     case "compliance": return complianceReport((await fetchAllPages<ListVehicle>(u => get(u), "/api/v1/fleet/vehicles")).items)
     case "service-due": return serviceDueReport((await fetchAllPages<ListVehicle>(u => get(u), "/api/v1/fleet/vehicles")).items)
     case "driver-scores": return driverScoresReport(list<ScoreLine>(await get("/api/v1/fleet/driver-scores")))
@@ -32,6 +34,24 @@ async function build(id: ReportId, period: { from: string; to: string }): Promis
 function download(text: string, fileName: string) {
   const url = URL.createObjectURL(new Blob(["﻿", text], { type: "text/csv;charset=utf-8" })), a = document.createElement("a")
   a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
+}
+
+/** The report's rows with a search box and 25 per page. Keyed by report and period, so a new report starts on page one with an empty search. */
+function ReportRows({ table, title }: { table: ReportTable; title: string }) {
+  const view = useListView(table.rows, r => table.columns.map(c => String(r[c.key] ?? "")).join(" "))
+  return (
+    <div>
+      <div style={{ marginBottom: 10 }}><SearchBox value={view.search} onChange={view.setSearch} label="Search report" placeholder="Search this report" /></div>
+      <div style={{ overflowX: "auto" }}>
+        <table aria-label={title} style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr>{table.columns.map(c => <th key={c.key} style={{ ...th, textAlign: c.kind === "text" ? "left" : "right" }}>{c.label}</th>)}</tr></thead>
+          <tbody>{view.paged.rows.map((r, i) => <tr key={i} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>{table.columns.map(c => <td key={c.key} style={{ ...td, textAlign: c.kind === "text" ? "left" : "right" }}>{cellText(c.kind, r[c.key] ?? null)}</td>)}</tr>)}</tbody>
+          {table.totals && <tfoot><tr aria-label="Totals" style={{ borderTop: "2px solid var(--hf-border)", fontWeight: 800 }}>{table.columns.map(c => <td key={c.key} style={{ ...td, textAlign: c.kind === "text" ? "left" : "right" }}>{table.totals?.[c.key] == null ? "" : cellText(c.kind, table.totals[c.key])}</td>)}</tr></tfoot>}
+        </table>
+      </div>
+      {view.shown.length === 0 && <p role="status" style={{ color: "var(--hf-text-muted)" }}>No rows match.</p>}
+      <Pager paged={view.paged} onPage={view.setPage} />
+    </div>)
 }
 
 export default function ReportsTab() {
@@ -57,13 +77,7 @@ export default function ReportsTab() {
         </div>
         {isError && <p role="alert" style={{ color: "var(--hf-danger-text)" }}>Couldn't build this report. <button type="button" onClick={() => refetch()} style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", color: "inherit" }}>Try again</button></p>}
         {isLoading ? <p>Building the report…</p> : data && (data.rows.length === 0 ? <p style={{ color: "var(--hf-text-muted)" }}>Nothing to report for this {meta.period ? "period" : "report"}.</p> : (
-          <div style={{ overflowX: "auto" }}>
-            <table aria-label={meta.title} style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr>{data.columns.map(c => <th key={c.key} style={{ ...th, textAlign: c.kind === "text" ? "left" : "right" }}>{c.label}</th>)}</tr></thead>
-              <tbody>{data.rows.map((r, i) => <tr key={i} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>{data.columns.map(c => <td key={c.key} style={{ ...td, textAlign: c.kind === "text" ? "left" : "right" }}>{cellText(c.kind, r[c.key] ?? null)}</td>)}</tr>)}</tbody>
-              {data.totals && <tfoot><tr aria-label="Totals" style={{ borderTop: "2px solid var(--hf-border)", fontWeight: 800 }}>{data.columns.map(c => <td key={c.key} style={{ ...td, textAlign: c.kind === "text" ? "left" : "right" }}>{data.totals?.[c.key] == null ? "" : cellText(c.kind, data.totals[c.key])}</td>)}</tr></tfoot>}
-            </table>
-          </div>))}
+          <ReportRows key={`${id}-${period.from}-${period.to}`} table={data} title={meta.title} />))}
       </div>
     </div>)
 }

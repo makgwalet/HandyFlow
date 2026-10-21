@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Plus, Wrench, X, AlertCircle, AlertTriangle } from "lucide-react"
 import { errorMessage, fetchAllPages } from "./apiShape"
+import { Pager, SearchBox } from "./ListControls"
+import { useListView } from "./listKit"
 
 interface VehicleOption { id: string; registration: string; make: string; model: string; dueForService: boolean; currentOdometer: number; serviceIntervalKm: number | null }
 interface ServiceRecord { id: string; type: string; description: string | null; serviceDate: string; odometerAtService: number | null; nextServiceKm: number | null; cost: number | null; supplier: string | null; invoiceRef: string | null }
@@ -66,6 +68,7 @@ export default function ServicesTab() {
   const selectedVehicleObj = vehicles.find(v => v.id === selectedVehicle)
   const totalCost = services.reduce((s, r) => s + Number(r.cost ?? 0), 0)
   const serviceAlerts = vehicles.filter(v => v.dueForService)
+  const view = useListView(services, s => [s.type, s.description, s.supplier, s.invoiceRef, s.serviceDate].filter(Boolean).join(" "))
 
   const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, outline: "none" }
   const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
@@ -127,8 +130,10 @@ export default function ServicesTab() {
       ) : services.length === 0 ? (
         <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)", border: "1px dashed var(--hf-border)", borderRadius: 12 }}>No service records for this vehicle.</div>
       ) : (
+        <>
+        <div style={{ marginBottom: 10 }}><SearchBox value={view.search} onChange={view.setSearch} label="Search service history" placeholder="Search type, supplier, invoice or description" /></div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {services.map(s => {
+          {view.paged.rows.map(s => {
             const cfg = TYPE_CFG[s.type] ?? TYPE_CFG.OTHER
             return (
               <div key={s.id} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -159,6 +164,9 @@ export default function ServicesTab() {
             )
           })}
         </div>
+        {view.shown.length === 0 && <p role="status" style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No service records match.</p>}
+        <Pager paged={view.paged} onPage={view.setPage} />
+        </>
       )}
 
       {/* Record Service Modal */}
