@@ -222,3 +222,45 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - Pay history is the change record from now on. Salaries before this slice cannot be reconstructed.
 - Suspended and on-leave employees are still left out of payroll (only `ACTIVE` is paid) and there is no screen to reach those statuses.
 - `HR_READ` still opens the payslip lists. Whether HR staff should see salaries through payslips is your decision.
+
+## 10. Slice 4 status: leave as a ledger
+
+**What was wrong**
+
+- Leave balances were a single editable row per type and year, seeded once. Nothing recorded why a balance changed, approval could be done by anyone with a read right, rejection needed no reason, requests could overlap, and requests larger than the balance were accepted.
+- Public holidays and half days were not handled, and sick leave had no cycle.
+
+**What changed**
+
+- Balances are now computed from an immutable ledger (`hr_leave_ledger`, blocked from update and delete by a trigger): opening, accrual, carry forward, adjustment, held for a request, hold released, taken, reversed.
+- A request holds its days when made, releases them on rejection or cancellation, and turns them into days taken on approval.
+- BCEA rules live in `LeaveRules`: annual leave earned at one day per 17 days worked (15 days a year on a five-day week), sick leave 30 days per three-year cycle, family responsibility 3 days a year. Weekends and public holidays are not leave days. A half day is one day only.
+- New rights `LEAVE_APPROVE` and `LEAVE_ADJUST`. Approving and rejecting need `LEAVE_APPROVE` or `HR_MANAGE`; a team manager decides only for their own team; nobody decides their own request unless the payroll self-approval setting allows it. Rejection needs a reason.
+- Cancel: a waiting request or approved leave that has not started can be cancelled by the employee's approver; leave that has started needs `LEAVE_ADJUST` and a reason. HR can adjust a balance with a dated, signed, explained entry.
+- Statement endpoint and screen show every movement behind a balance.
+- Payroll checks warn (`UNPAID_LEAVE_NOT_DEDUCTED`) when approved unpaid leave falls in a run.
+- Front end: half day, medical certificate flag (expected for sick leave over two days), cancel, statement, adjustment, a CANCELLED status, and buttons shown only to people who hold the right.
+
+**Decisions I took that you may want to change**
+
+- Unused annual leave carries forward in full. Nothing expires.
+- The ledger starts at the beginning of the year in which V488 runs; older balances are migrated as opening entries with a reconciling adjustment.
+- Self-approval reuses the payroll setting `allow_self_approval`.
+- Study leave is no longer created for everyone; existing entitlements were migrated as opening balances.
+- Backdating: a request cannot start in a closed year or more than 90 days ago; HR uses an adjustment.
+
+**Not verified**
+
+- Maven build and every Mockito test: `LeaveServiceTest`, the changed `HrControllerTest`, `HrServiceEmployeeTest` and `PayrollControlServiceTest`. The JPQL in the new repositories and migration V488 have not been run. Expected values in `LeaveServiceTest` for accrual and carry forward are my reading of the rules, not a run.
+- Run and passing in a standalone harness: `LeaveRulesTest` (17).
+- Front end: 14 tests in `Leave.test.tsx` pass. ESLint reports only `no-explicit-any`, as the file did before (20 before, 29 now, the new ones in the same style). Not looked at in a browser.
+
+**Open items**
+
+- Leave expiry or forfeiture, and a carry-over cap, are not built.
+- Leave payout at termination (final pay) is not built.
+- A five-day week is assumed; part-time pro-rata is not modelled.
+- Payroll warns about unpaid leave but does not deduct it.
+- Employees cannot cancel their own request from the portal yet.
+- Sick leave that crosses a cycle boundary counts against the cycle it starts in.
+- Reading a balance can write an accrual entry; two requests made at the same moment can collide on the unique key and need a retry.

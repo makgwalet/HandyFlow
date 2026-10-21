@@ -8,7 +8,11 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, X, Calendar, ChevronDown, ChevronUp, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react"
+import { Plus, X, Calendar, ChevronDown, ChevronUp, Clock, CheckCircle, XCircle, AlertCircle, Ban, FileText } from "lucide-react"
+import { useAuth } from "../../hooks/useAuth"
+import {
+  adjustmentProblem, canCancel, certificateExpected, kindLabel, leaveRights, reasonProblem, requestProblem, signedDays, todayIso, workingDays,
+} from "./leave.logic"
 
 // FIX: correct ApiResponse<Page<T>> unwrap
 const unwrap     = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
@@ -29,10 +33,20 @@ const STATUS_CFG: Record<string, { color: string; bg: string; icon: React.Elemen
   PENDING:  { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", icon: Clock        },
   APPROVED: { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", icon: CheckCircle  },
   REJECTED: { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", icon: XCircle      },
+  CANCELLED:{ color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)", icon: Ban          },
 }
+const EMPTY_FORM = { employeeId: "", leaveType: "ANNUAL", startDate: "", endDate: "", reason: "", halfDay: false, medicalCertificate: false }
 
 export default function LeaveTab() {
   const qc = useQueryClient()
+  const { user } = useAuth() as { user?: { permissions?: string[] } }
+  const rights = leaveRights(user?.permissions ?? [])
+  const today = todayIso()
+  const [cancelling, setCancelling] = useState<any | null>(null)
+  const [cancelReason, setCancelReason] = useState("")
+  const [statementFor, setStatementFor] = useState<any | null>(null)
+  const [adjusting, setAdjusting] = useState(false)
+  const [adj, setAdj] = useState({ leaveType: "ANNUAL", entryDate: todayIso(), days: "", reason: "" })
   const [statusFilter, setStatus] = useState("ALL")
   const [typeFilter, setType]     = useState("ALL")
   const [showCreate, setShowCreate] = useState(false)
@@ -40,7 +54,7 @@ export default function LeaveTab() {
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState("")
   const [error, setError]           = useState("")
-  const [form, setForm]             = useState({ employeeId: "", leaveType: "ANNUAL", startDate: "", endDate: "", reason: "" })
+  const [form, setForm]             = useState(EMPTY_FORM)
 
   // FIX: unwrap ApiResponse<Page<LeaveRequest>>
   const { data: requests = [], isLoading } = useQuery<any[]>({
@@ -68,13 +82,32 @@ export default function LeaveTab() {
   const submitLeave = useMutation({
     mutationFn: ({ empId, body }: { empId: string; body: any }) =>
       apiClient.post(`/api/v1/hr/employees/${empId}/leave-requests`, body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["leave-requests"] }); setShowCreate(false); setForm({ employeeId: "", leaveType: "ANNUAL", startDate: "", endDate: "", reason: "" }); setError("") },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["leave-requests"] }); setShowCreate(false); setForm(EMPTY_FORM); setError("") },
     onError: (e: any) => setError(e.response?.data?.message ?? "Failed to submit leave"),
+  })
+
+  const { data: statement } = useQuery<any>({
+    queryKey: ["leave-statement", statementFor?.id],
+    queryFn: async () => { const r: any = await apiClient.get(`/api/v1/hr/employees/${statementFor.id}/leave-statement`); return r.data?.data ?? r.data },
+    enabled: !!statementFor,
+  })
+
+  const cancelLeave = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      apiClient.post(`/api/v1/hr/leave-requests/${id}/cancel`, { reason: reason.trim() || null }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["leave-requests"] }); qc.invalidateQueries({ queryKey: ["leave-balances"] }); qc.invalidateQueries({ queryKey: ["leave-statement"] }); setCancelling(null); setCancelReason(""); setError("") },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to cancel"),
+  })
+
+  const adjustLeave = useMutation({
+    mutationFn: (body: any) => apiClient.post(`/api/v1/hr/employees/${statementFor.id}/leave-adjustments`, body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["leave-statement"] }); qc.invalidateQueries({ queryKey: ["leave-balances"] }); setAdjusting(false); setAdj({ leaveType: "ANNUAL", entryDate: todayIso(), days: "", reason: "" }); setError("") },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to record the adjustment"),
   })
 
   const approveLeave = useMutation({
     mutationFn: (id: string) => apiClient.post(`/api/v1/hr/leave-requests/${id}/approve`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["leave-requests"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["leave-requests"] }); qc.invalidateQueries({ queryKey: ["leave-balances"] }) },
     onError: (e: any) => setError(e.response?.data?.message ?? "Failed to approve"),
   })
 
@@ -82,18 +115,14 @@ export default function LeaveTab() {
   const rejectLeave = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) =>
       apiClient.post(`/api/v1/hr/leave-requests/${id}/reject?reason=${encodeURIComponent(reason)}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["leave-requests"] }); setRejectingId(null); setRejectReason("") },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["leave-requests"] }); qc.invalidateQueries({ queryKey: ["leave-balances"] }); setRejectingId(null); setRejectReason("") },
     onError: (e: any) => setError(e.response?.data?.message ?? "Failed to reject"),
   })
 
-  // Working days preview — excludes weekends
-  const workingDays = form.startDate && form.endDate ? (() => {
-    const start = new Date(form.startDate), end = new Date(form.endDate)
-    let count = 0
-    const cur = new Date(start)
-    while (cur <= end) { if (cur.getDay() > 0 && cur.getDay() < 6) count++; cur.setDate(cur.getDate() + 1) }
-    return count
-  })() : 0
+  // Preview only: the server also removes public holidays and has the final say.
+  const workingCount = workingDays(form.startDate, form.endDate, form.halfDay)
+  const formProblem = form.startDate && form.endDate ? requestProblem(form, workingCount) : null
+  const needsCertificate = certificateExpected(form.leaveType, workingCount)
 
   const filtered = (requests as any[]).filter(r => typeFilter === "ALL" || r.leaveType === typeFilter)
   const pending  = (requests as any[]).filter(r => r.status === "PENDING")
@@ -132,6 +161,12 @@ export default function LeaveTab() {
               </div>
               {expandedEmp === emp.id && (
                 <div style={{ padding: "12px 14px", background: "var(--hf-surface-muted)", borderTop: "1px solid var(--hf-border)" }}>
+                  <div style={{ marginBottom: 10 }}>
+                    <button onClick={() => { setStatementFor(emp); setAdjusting(false); setError("") }}
+                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", border: "1px solid var(--hf-border)", borderRadius: 7, background: "var(--hf-surface)", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "var(--hf-text-secondary)" }}>
+                      <FileText size={12} /> Leave statement
+                    </button>
+                  </div>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     {(leaveBalances as any[]).map((b: any) => {
                       const cfg = LEAVE_CFG[b.leaveType]
@@ -156,7 +191,7 @@ export default function LeaveTab() {
       {/* Leave requests */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {["ALL","PENDING","APPROVED","REJECTED"].map(s => (
+          {["ALL","PENDING","APPROVED","REJECTED","CANCELLED"].map(s => (
             <button key={s} onClick={() => setStatus(s)}
               style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: statusFilter === s ? 600 : 400, background: statusFilter === s ? "var(--hf-primary)" : "var(--hf-surface-sunken)", color: statusFilter === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
               {s === "ALL" ? "All statuses" : s}
@@ -203,12 +238,20 @@ export default function LeaveTab() {
                   </div>
                   <div style={{ fontSize: 13, color: "var(--hf-text-tertiary)" }}>
                     {fmtDate(req.startDate)} → {fmtDate(req.endDate)} · <strong>{Number(req.daysRequested).toFixed(1)} working days</strong>
+                    {req.halfDay && " · Half day"}
                     {req.reason && ` · "${req.reason}"`}
                   </div>
+                  {req.certificateExpected && (
+                    <div style={{ fontSize: 12, marginTop: 2, color: req.medicalCertificate ? "var(--hf-success-text-strong)" : "var(--hf-warning-text)" }}>
+                      {req.medicalCertificate ? "Medical certificate provided" : "Medical certificate expected"}
+                    </div>
+                  )}
+                  {req.cancelReason && <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 2 }}>Cancelled: {req.cancelReason}</div>}
                   {req.rejectionReason && <div style={{ fontSize: 12, color: "var(--hf-danger-text)", marginTop: 2 }}>Rejected: {req.rejectionReason}</div>}
                 </div>
-                {req.status === "PENDING" && (
+                {(req.status === "PENDING" && rights.decide || canCancel(req, rights, today)) && (
                   <div style={{ display: "flex", gap: 8, flexShrink: 0, marginLeft: 12 }}>
+                    {req.status === "PENDING" && rights.decide && <>
                     <button onClick={() => approveLeave.mutate(req.id)}
                       style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                       <CheckCircle size={12} /> Approve
@@ -218,6 +261,13 @@ export default function LeaveTab() {
                       style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                       <XCircle size={12} /> Reject
                     </button>
+                    </>}
+                    {canCancel(req, rights, today) && (
+                      <button onClick={() => { setCancelling(req); setCancelReason(""); setError("") }}
+                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-surface)", color: "var(--hf-text-secondary)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        <Ban size={12} /> Cancel leave
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -252,10 +302,20 @@ export default function LeaveTab() {
                 <div><label style={lbl}>Start Date *</label><input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} style={inp} /></div>
                 <div><label style={lbl}>End Date *</label><input type="date" value={form.endDate} min={form.startDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} style={inp} /></div>
               </div>
-              {workingDays > 0 && (
+              {workingCount > 0 && (
                 <div style={{ padding: "9px 12px", background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)", borderRadius: 7, fontSize: 13, color: "var(--hf-info-text)", fontWeight: 600 }}>
-                  {workingDays} working days (weekends excluded)
+                  {workingCount} working day{workingCount === 1 ? "" : "s"} (weekends excluded; the server also removes public holidays)
                 </div>
+              )}
+              {formProblem && <div style={{ fontSize: 12, color: "var(--hf-danger-text)" }}>{formProblem}</div>}
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--hf-text-secondary)" }}>
+                <input type="checkbox" checked={form.halfDay} onChange={e => setForm(f => ({ ...f, halfDay: e.target.checked }))} /> Half day
+              </label>
+              {form.leaveType === "SICK" && (
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--hf-text-secondary)" }}>
+                  <input type="checkbox" checked={form.medicalCertificate} onChange={e => setForm(f => ({ ...f, medicalCertificate: e.target.checked }))} />
+                  Medical certificate provided{needsCertificate ? " (expected for sick leave over two days)" : ""}
+                </label>
               )}
               <div>
                 <label style={lbl}>Reason <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
@@ -265,8 +325,8 @@ export default function LeaveTab() {
             {error && <div style={{ marginTop: 12, padding: "9px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 7 }}><AlertCircle size={13} />{error}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setShowCreate(false)} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
-              <button onClick={() => submitLeave.mutate({ empId: form.employeeId, body: { leaveType: form.leaveType, startDate: form.startDate, endDate: form.endDate, reason: form.reason || null } })}
-                disabled={!form.employeeId || !form.startDate || !form.endDate || submitLeave.isPending}
+              <button onClick={() => submitLeave.mutate({ empId: form.employeeId, body: { leaveType: form.leaveType, startDate: form.startDate, endDate: form.endDate, reason: form.reason || null, halfDay: form.halfDay, medicalCertificate: form.medicalCertificate } })}
+                disabled={!form.employeeId || !form.startDate || !form.endDate || !!formProblem || submitLeave.isPending}
                 style={{ padding: "9px 22px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {submitLeave.isPending ? "Submitting..." : "Submit Request"}
               </button>
@@ -288,14 +348,106 @@ export default function LeaveTab() {
             {error && <div style={{ marginBottom: 12, padding: "9px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button onClick={() => { setRejectingId(null); setRejectReason("") }} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
-              <button onClick={() => rejectLeave.mutate({ id: rejectingId, reason: rejectReason })} disabled={!rejectReason || rejectLeave.isPending}
-                style={{ padding: "9px 22px", background: !rejectReason ? "var(--hf-text-faint)" : "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+              <button onClick={() => rejectLeave.mutate({ id: rejectingId, reason: rejectReason })} disabled={!!reasonProblem(rejectReason, "rejecting the request") || rejectLeave.isPending}
+                style={{ padding: "9px 22px", background: reasonProblem(rejectReason, "x") ? "var(--hf-text-faint)" : "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {rejectLeave.isPending ? "Rejecting..." : "Reject Request"}
               </button>
             </div>
           </div>
         </div>
       )}
+      {/* Cancel modal */}
+      {cancelling && (() => {
+        const started = cancelling.startDate <= today
+        const needReason = cancelling.status === "APPROVED" && started
+        const problem = needReason ? reasonProblem(cancelReason, "cancelling leave that has already started") : null
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1001 }}>
+            <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+              <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Cancel leave</h3>
+              <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--hf-text-tertiary)" }}>
+                {cancelling.employeeName}: {fmtDate(cancelling.startDate)} → {fmtDate(cancelling.endDate)}. The days go back to the balance.
+              </p>
+              <label style={lbl} htmlFor="cancel-reason">Reason {needReason ? "*" : "(optional)"}</label>
+              <textarea id="cancel-reason" value={cancelReason} onChange={e => setCancelReason(e.target.value)} rows={3} style={{ ...inp, resize: "vertical" as const }} />
+              {error && <div style={{ marginTop: 12, padding: "9px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
+                <button onClick={() => { setCancelling(null); setError("") }} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Keep it</button>
+                <button onClick={() => cancelLeave.mutate({ id: cancelling.id, reason: cancelReason })} disabled={!!problem || cancelLeave.isPending}
+                  style={{ padding: "9px 22px", background: problem ? "var(--hf-text-faint)" : "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                  {cancelLeave.isPending ? "Cancelling..." : "Confirm cancel"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Statement modal */}
+      {statementFor && (() => {
+        const adjProblem = adjustmentProblem(adj.days, adj.reason, adj.entryDate, today)
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+            <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 680, maxWidth: "94vw", maxHeight: "86vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Leave statement: {statementFor.fullName}</h3>
+                <button aria-label="Close" onClick={() => { setStatementFor(null); setAdjusting(false); setError("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
+              </div>
+              {!statement ? <div style={{ color: "var(--hf-text-faint)" }}>Loading...</div> : <>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+                  {(statement.balances ?? []).map((b: any) => (
+                    <div key={b.leaveType} style={{ border: "1px solid var(--hf-border)", borderRadius: 8, padding: "8px 12px", minWidth: 100 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, color: LEAVE_CFG[b.leaveType]?.color }}>{LEAVE_CFG[b.leaveType]?.label ?? b.leaveType}</div>
+                      <div style={{ fontSize: 16, fontWeight: 700 }}>{Number(b.availableDays).toFixed(1)}</div>
+                      <div style={{ fontSize: 10, color: "var(--hf-text-faint)" }}>available</div>
+                    </div>
+                  ))}
+                </div>
+                {rights.adjust && !adjusting && (
+                  <button onClick={() => { setAdjusting(true); setError("") }} style={{ marginBottom: 12, padding: "6px 14px", border: "1px solid var(--hf-border)", borderRadius: 7, background: "var(--hf-surface)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Adjust balance</button>
+                )}
+                {rights.adjust && adjusting && (
+                  <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, padding: 14, marginBottom: 14, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div><label style={lbl} htmlFor="adj-type">Leave type</label>
+                      <select id="adj-type" value={adj.leaveType} onChange={e => setAdj(a => ({ ...a, leaveType: e.target.value }))} style={{ ...inp, background: "var(--hf-surface)" }}>
+                        {LEAVE_TYPES.map(t => <option key={t} value={t}>{LEAVE_CFG[t]?.label ?? t}</option>)}
+                      </select></div>
+                    <div><label style={lbl} htmlFor="adj-date">Date</label>
+                      <input id="adj-date" type="date" value={adj.entryDate} max={today} onChange={e => setAdj(a => ({ ...a, entryDate: e.target.value }))} style={inp} /></div>
+                    <div><label style={lbl} htmlFor="adj-days">Days (+ adds, − takes off)</label>
+                      <input id="adj-days" type="number" step="0.5" value={adj.days} onChange={e => setAdj(a => ({ ...a, days: e.target.value }))} style={inp} /></div>
+                    <div><label style={lbl} htmlFor="adj-reason">Reason</label>
+                      <input id="adj-reason" value={adj.reason} onChange={e => setAdj(a => ({ ...a, reason: e.target.value }))} style={inp} /></div>
+                    {adj.days && adjProblem && <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--hf-danger-text)" }}>{adjProblem}</div>}
+                    {error && <div style={{ gridColumn: "1 / -1", fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
+                    <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                      <button onClick={() => setAdjusting(false)} style={{ padding: "7px 16px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", cursor: "pointer" }}>Cancel</button>
+                      <button disabled={!!adjProblem || adjustLeave.isPending}
+                        onClick={() => adjustLeave.mutate({ leaveType: adj.leaveType, entryDate: adj.entryDate, days: Number(adj.days), reason: adj.reason.trim() })}
+                        style={{ padding: "7px 18px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer" }}>Record adjustment</button>
+                    </div>
+                  </div>
+                )}
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead><tr style={{ textAlign: "left", color: "var(--hf-text-faint)" }}><th style={{ padding: "6px 4px" }}>Date</th><th>Type</th><th>Entry</th><th style={{ textAlign: "right" }}>Days</th><th style={{ paddingLeft: 12 }}>Note</th></tr></thead>
+                  <tbody>
+                    {(statement.entries ?? []).map((l: any) => (
+                      <tr key={l.id} style={{ borderTop: "1px solid var(--hf-border)" }}>
+                        <td style={{ padding: "6px 4px" }}>{fmtDate(l.entryDate)}</td>
+                        <td>{LEAVE_CFG[l.leaveType]?.label ?? l.leaveType}</td>
+                        <td>{kindLabel(l.kind)}</td>
+                        <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{signedDays(l.days)}</td>
+                        <td style={{ paddingLeft: 12, color: "var(--hf-text-tertiary)" }}>{l.note}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {(statement.entries ?? []).length === 0 && <div style={{ padding: 16, color: "var(--hf-text-faint)" }}>No movements in {statement.year}.</div>}
+              </>}
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
