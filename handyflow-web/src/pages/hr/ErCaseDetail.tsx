@@ -1,9 +1,12 @@
 // One case, for HR: what it is, what to watch, and the buttons the server says are allowed right now.
 import { useState } from "react"
+import { useAuth } from "../../hooks/useAuth"
+import { letterRights } from "./letters.logic"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { ACTION_LABEL, TYPE_LABEL, fmtDate, words } from "./er.logic"
 import { errorText, plain, primary, unwrap, type Detail } from "./er.shared"
+import CaseLetters from "./CaseLetters"
 import ErActionForm from "./ErActionForms"
 import { Chip, Notice, Section, StatusChip } from "./ErParts"
 import ErSections from "./ErSections"
@@ -12,6 +15,8 @@ const BASE = "/api/v1/hr/employee-relations"
 
 export default function ErCaseDetail({ id, back }: { id: string; back: () => void }) {
   const qc = useQueryClient()
+  const { user } = useAuth() as { user?: { permissions?: string[] } }
+  const letters = letterRights(user?.permissions ?? [])
   const [action, setAction] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
@@ -87,6 +92,8 @@ export default function ErCaseDetail({ id, back }: { id: string; back: () => voi
           )}
         </Section>
       )}
+
+      {letters.read && <CaseLetters caseId={c.id} caseType={c.type} canIssue={letters.issue} />}
 
       <ErSections c={c} />
     </div>

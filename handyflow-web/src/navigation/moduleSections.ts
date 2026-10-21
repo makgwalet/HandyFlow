@@ -24,7 +24,7 @@ import {
   Database, CalendarRange, MessageSquare, Send, BookOpen as BookIcon,
   UserCheck, Palette, Headphones, Wallet, Receipt, CheckSquare, LayoutGrid, ListChecks, Sprout, FlaskConical,
   Columns3, Zap, History, Plug, Filter, Copy, SlidersHorizontal, Tags, Target, Ruler,
-  UserPlus,
+  UserPlus, Mail,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -338,6 +338,7 @@ export const HR_SECTIONS: ModuleSections = {
         { id: 'attendance', label: 'Attendance', icon: Clock },
         { id: 'onboarding', label: 'Onboarding', icon: UserPlus, anyPermission: ['HR_READ', 'HR_MANAGE', 'HR_TEAM_READ', 'HR_ONBOARDING_MANAGE'] },
         { id: 'disciplinary', label: 'Employee relations', icon: AlertOctagon },
+        { id: 'letters', label: 'Letters', icon: Mail },
       ],
     },
     {

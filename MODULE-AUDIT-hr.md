@@ -458,3 +458,35 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - No public holiday calendar for working-day counts.
 - Old warnings with no recorded validity need a person to set it.
 - The Security complaint referral still opens a plain disciplinary case; it does not carry the complaint's evidence across.
+
+## 15. Slice 9 status: Letter & Document Generation Centre
+
+**What was wrong**
+
+- HR wrote letters outside the system. Nothing tied a letter to the employee file or to a disciplinary, grievance or incapacity case, and nobody could show later exactly what an employee was sent.
+
+**What changed**
+
+- Per-tenant letter templates with `{{merge.fields}}`. Eleven standard templates (confirmation, certificate of service, notice of hearing, notice of meeting, suspension, warning, dismissal, grievance outcome, incapacity outcome, appeal outcome, general) are created on first use. HR can edit them, switch them off, write new ones and restore the standard wording.
+- A letter is prepared as a draft that HR can edit, then issued. Issuing generates the PDF, stores it on the employee file and records its SHA-256. A database trigger then refuses any change to the wording, file or employee. A letter can only be voided, with a reason, and the PDF is kept.
+- Gaps are marked `[[Label]]` and block issuing. Fields in the "type in" group are never filled automatically.
+- Salary, ID number, tax number and bank details are never available as merge fields.
+- A letter prepared from a case uses the case's details, and the case timeline records LETTER_ISSUED, LETTER_VOIDED and LETTER_ACKNOWLEDGED. Who sees a case letter follows who may see the case, and nobody can prepare, edit or issue a letter about themselves.
+- The employee sees only issued letters ("My letters"), downloads the PDF, and can confirm receipt.
+- New permissions HR_LETTER_READ, MANAGE and ISSUE (migration V494).
+
+**What is not done, or not what it may seem**
+
+- Confirming receipt is a recorded receipt with the file fingerprint. It is not an advanced electronic signature, and receipt is not agreement.
+- The standard wording is a starting point. A labour adviser must read it before it is relied on.
+- Appeal and CCMA dates in a letter run from the day the employee was told, or from today if that is not recorded yet.
+- The certificate of service has typed-in gaps (address, sectoral standard, remuneration, optional reason).
+- A draft is discarded by voiding it.
+- No email to the employee when a letter is issued, no bulk or mail-merge, no letterhead or logo, and the case screens do not suggest a template.
+- Two people opening the templates screen at the very first moment can race the seeding of the standard templates.
+
+**Not verified**
+
+- The Maven build, real Mockito runs, V494 and the JPQL against PostgreSQL, Hibernate mappings and Spring wiring have not been run.
+- The real iText PDF has never been rendered here. Characters outside the default font's range may not render.
+- Backend logic was checked with a stub harness (22 rules tests, 28 service tests). Front end: 16 tests, ESLint clean.
