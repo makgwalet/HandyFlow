@@ -10,6 +10,7 @@ import { LIVE_LABEL, ageText, hasFix, speedText, eventText, type LivePosition } 
 import { TYPE_LABEL as ORDER_TYPE, STATUS_LABEL as ORDER_STATUS } from "./workOrders.logic"
 import { TREAD_LABEL, treadTone, TEST_TONE, humanise } from "./tyres.logic"
 import { consumptionText, costPerKmText, deviationText, deviationTone, periodRange } from "./fuelAnalytics.logic"
+import { fetchAllPages } from "./apiShape"
 import {
   TRACK_RANGES, trackWindow, trackLine, topSpeed, trackSummary, serviceDue, isOpenOrder, serviceSpend, SEGMENT_LABEL, segmentTone, INDICATOR_LABEL, indicatorTone,
   tripTotals, inRange, HISTORY_KINDS, buildTimeline, filterTimeline, kindCounts, type TrackRange, type Track, type Trip, type HistoryKind,
@@ -41,8 +42,8 @@ interface Accident { id: string; referenceNumber: string; occurredAt: string; de
 interface Inspection { id: string; inspectionType: string; status: string; verdict: string | null; failedCount: number; startedAt: string; completedAt: string | null }
 interface LifecycleEvent { id: string; eventType: string; toStatus: string | null; occurredAt: string; reason: string | null }
 
-const useServices = (id: string) => useQuery<Service[]>({ queryKey: ["fleet", "services", "vehicle", id], queryFn: async () => list<Service>(await apiClient.get(`/api/v1/fleet/vehicles/${id}/services?size=100`)) })
-const useOrders = (id: string) => useQuery<Order[]>({ queryKey: ["fleet", "orders", "vehicle", id], queryFn: async () => list<Order>(await apiClient.get(`/api/v1/fleet/work-orders?vehicleId=${id}&size=100`)) })
+const useServices = (id: string) => useQuery<Service[]>({ queryKey: ["fleet", "services", "vehicle", id], queryFn: async () => (await fetchAllPages<Service>(u => apiClient.get(u), `/api/v1/fleet/vehicles/${id}/services`)).items })
+const useOrders = (id: string) => useQuery<Order[]>({ queryKey: ["fleet", "orders", "vehicle", id], queryFn: async () => (await fetchAllPages<Order>(u => apiClient.get(u), `/api/v1/fleet/work-orders?vehicleId=${id}`)).items })
 
 // ── Location ────────────────────────────────────────────────────────────────
 interface VehicleEvent { id: string; type: string; occurredAt: string; value: number | null; limitValue: number | null; durationSeconds: number | null; geofenceName: string | null; driverName: string | null; acknowledged: boolean }
@@ -148,7 +149,7 @@ export function FuelUsageTab({ id }: { id: string }) {
   const a = useQuery<Analytics>({ queryKey: ["fleet", "fuel-analytics", "vehicle", id, period], queryFn: async () => unwrap<Analytics>(await apiClient.get(`/api/v1/fleet/vehicles/${id}/fuel-analytics?from=${from}&to=${to}`)) })
   const cost = useQuery<CostSummary>({ queryKey: ["fleet", "cost-summary", id], queryFn: async () => unwrap<CostSummary>(await apiClient.get(`/api/v1/fleet/vehicles/${id}/cost-summary`)) })
   const fills = useQuery<Fillup[]>({ queryKey: ["fleet", "fuel", "vehicle", id], queryFn: async () => list<Fillup>(await apiClient.get(`/api/v1/fleet/vehicles/${id}/fuel?size=50`)) })
-  const trips = useQuery<Trip[]>({ queryKey: ["fleet", "trips", "vehicle", id], queryFn: async () => list<Trip>(await apiClient.get(`/api/v1/fleet/vehicles/${id}/trips?size=100`)) })
+  const trips = useQuery<Trip[]>({ queryKey: ["fleet", "trips", "vehicle", id], queryFn: async () => (await fetchAllPages<Trip>(u => apiClient.get(u), `/api/v1/fleet/vehicles/${id}/trips`)).items })
   const s = a.data?.summary, tol = a.data?.settings.tolerancePercent ?? 20
   const periodTrips = tripTotals((trips.data ?? []).filter(t => inRange(t.startAt, from, to)))
   const lastTrips = (trips.data ?? []).slice(0, 8)
@@ -198,7 +199,7 @@ export function HistoryTab({ id }: { id: string }) {
   const services = useServices(id), orders = useOrders(id)
   const lifecycle = useQuery<{ events: LifecycleEvent[] }>({ queryKey: ["fleet", "lifecycle", "history", id], queryFn: async () => unwrap<{ events: LifecycleEvent[] }>(await apiClient.get(`/api/v1/fleet/vehicles/${id}/lifecycle`)) })
   const accidents = useQuery<Accident[]>({ queryKey: ["fleet", "accidents", "vehicle", id], queryFn: async () => list<Accident>(await apiClient.get(`/api/v1/fleet/accidents?vehicleId=${id}`)) })
-  const inspections = useQuery<Inspection[]>({ queryKey: ["fleet", "inspections", "vehicle", id], queryFn: async () => list<Inspection>(await apiClient.get(`/api/v1/fleet/vehicles/${id}/inspections?size=100`)) })
+  const inspections = useQuery<Inspection[]>({ queryKey: ["fleet", "inspections", "vehicle", id], queryFn: async () => (await fetchAllPages<Inspection>(u => apiClient.get(u), `/api/v1/fleet/vehicles/${id}/inspections`)).items })
   const loading = [services, orders, lifecycle, accidents, inspections].some(q => q.isLoading)
   const all = buildTimeline({ lifecycle: lifecycle.data?.events, services: services.data, orders: orders.data, accidents: accidents.data, inspections: inspections.data })
   const shown = filterTimeline(all, kinds)

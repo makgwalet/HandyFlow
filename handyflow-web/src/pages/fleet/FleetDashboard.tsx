@@ -45,7 +45,7 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (section: s
 
   const { data: ts = [] } = useQuery<DashTrip[]>({
     queryKey: ["fleet-trips-all"],
-    queryFn: async () => unwrapList<DashTrip>(await apiClient.get("/api/v1/fleet/trips?size=200")),
+    queryFn: async () => (await fetchAllPages<DashTrip>(u => apiClient.get(u), "/api/v1/fleet/trips")).items,
   })
 
   const { data: costSummary = [] } = useQuery<CostSummary[]>({
