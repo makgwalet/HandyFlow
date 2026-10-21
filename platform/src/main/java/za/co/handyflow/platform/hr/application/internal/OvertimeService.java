@@ -158,6 +158,12 @@ public class OvertimeService {
         return out;
     }
 
+    /** Claims worked up to the end of a period that are still waiting for a decision. */
+    @Transactional(readOnly = true)
+    public int waitingCount(TenantId tenantId, LocalDate periodEnd) {
+        return (int) claimRepo.byStatus(tenantId, List.of(OvertimeRules.PENDING)).stream().filter(c -> !c.getWorkDate().isAfter(periodEnd)).count();
+    }
+
     /** Marks the claims a run has paid, so they cannot be changed or taken twice. */
     @Transactional
     public void markTaken(Collection<HrOvertimeClaim> claims, UUID payRunId) {

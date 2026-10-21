@@ -71,6 +71,9 @@ public class HrPayslip {
 
     public void setMedicalTaxCredit(BigDecimal credit) { this.medicalTaxCredit = credit; }
 
+    /** Approved overtime for the month. Set before the calculations are applied, which add it to the earnings. */
+    public void setOvertimeAmount(BigDecimal amount) { this.overtimeAmount = amount == null ? BigDecimal.ZERO : amount; }
+
     public void applyCalculations(BigDecimal payeAmount, BigDecimal uifEmployee,
                                   BigDecimal uifEmployer, BigDecimal sdlAmount,
                                   BigDecimal taxableIncome, BigDecimal taxBeforeRebate,

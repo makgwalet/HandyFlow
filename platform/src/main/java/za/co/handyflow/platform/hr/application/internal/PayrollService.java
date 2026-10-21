@@ -34,6 +34,7 @@ public class PayrollService {
     private final MedicalSchemeService  medicalSchemeService;
     private final HrPayRunEventRepository eventRepo;
     private final EmployeeChangeService changeService;
+    private final OvertimeService       overtimeService;
 
     // ── Pay runs ──────────────────────────────────────────────────────────────
 
@@ -123,6 +124,16 @@ public class PayrollService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .multiply(BigDecimal.valueOf(12));
 
+        // Approved overtime worked up to the end of the period that no other run has taken. Taken again from scratch on a recalculation.
+        Map<UUID, List<HrOvertimeClaim>> overtime = overtimeService.takeFor(tenantId, run.getId(), run.getPeriodEnd());
+        int waiting = overtimeService.waitingCount(tenantId, run.getPeriodEnd());
+        if (waiting > 0)
+            warnings.add(waiting + " overtime claim(s) worked in this period are still waiting for approval, so they are not in this run. "
+                    + "They will be paid in a later run once approved.");
+        if (!overtime.isEmpty())
+            warnings.add("Overtime for " + overtime.size() + " employee(s) is included. PAYE treats each month's overtime as if it recurred every month "
+                    + "(the periodic method), so it can be higher than the year turns out to need; it is corrected when the year is assessed.");
+
         BigDecimal runGross = BigDecimal.ZERO, runPaye = BigDecimal.ZERO;
         BigDecimal runUif   = BigDecimal.ZERO, runSdl  = BigDecimal.ZERO;
         BigDecimal runNet   = BigDecimal.ZERO;
@@ -132,11 +143,14 @@ public class PayrollService {
             if (m.assumed())
                 warnings.add(emp.getFullName() + " (" + emp.getEmployeeNumber() + "): no medical scheme membership is on record, "
                         + "so the medical credit assumes the employee only. Record the membership to confirm it.");
-            PayrollEngine.PayrollResult result = engine.calculate(emp, rules, annualPayroll, m.count());
+            List<HrOvertimeClaim> claims = overtime.getOrDefault(emp.getId(), List.of());
+            BigDecimal overtimePay = claims.stream().map(HrOvertimeClaim::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+            PayrollEngine.PayrollResult result = engine.calculate(emp, rules, annualPayroll, m.count(), overtimePay);
 
             HrPayslip slip = HrPayslip.create(tenantId, run.getId(), emp.getId(),
                     result.grossSalary(), result.travelAllowance(),
                     result.medicalAid(), result.pension());
+            slip.setOvertimeAmount(overtimePay);
 
             // FIX 1.5: Calculate YTD BEFORE save — slip.getId() is not yet in DB
             BigDecimal ytdGross = payslipRepo.sumYtdGross(emp.getId(), taxYear, slip.getId());
@@ -160,6 +174,7 @@ public class PayrollService {
             slip.setYtdUif(ytdUif.add(result.uifEmployee()));
 
             payslipRepo.save(slip);
+            overtimeService.markTaken(claims, run.getId());
 
             runGross = runGross.add(result.totalEarnings());
             runPaye  = runPaye.add(result.payeAmount());

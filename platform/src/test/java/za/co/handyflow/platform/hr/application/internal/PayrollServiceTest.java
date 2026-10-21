@@ -36,6 +36,7 @@ class PayrollServiceTest {
     private StatutoryRulesService rulesService;
     private MedicalSchemeService medicalSchemeService;
     private HrPayRunEventRepository eventRepo;
+    private OvertimeService overtimeService;
     private PayrollService service;
     private final UUID maker = UUID.randomUUID();
 
@@ -62,8 +63,11 @@ class PayrollServiceTest {
         rulesService = mock(StatutoryRulesService.class);
         medicalSchemeService = mock(MedicalSchemeService.class);
         eventRepo = mock(HrPayRunEventRepository.class);
+        overtimeService = mock(OvertimeService.class);
+        when(overtimeService.takeFor(any(), any(), any())).thenReturn(Map.of());
+        when(overtimeService.waitingCount(any(), any())).thenReturn(0);
         service = new PayrollService(payRunRepo, payslipRepo, emp201Repo, employeeRepo, new PayrollEngine(), numberGen,
-                rulesService, medicalSchemeService, eventRepo, mock(EmployeeChangeService.class));
+                rulesService, medicalSchemeService, eventRepo, mock(EmployeeChangeService.class), overtimeService);
         when(numberGen.next(any(), any())).thenReturn("PR00001");
         when(payRunRepo.save(any())).thenAnswer(i -> i.getArgument(0));
         when(payslipRepo.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -164,6 +168,46 @@ class PayrollServiceTest {
         assertThat(r.totalPaye()).isEqualByComparingTo("4305.78");   // 4 681.78 less R376
         assertThat(r.warnings().size()).isEqualTo(1);
         assertThat(r.warnings().get(0)).contains("EMP-1").contains("no medical scheme membership");
+    }
+
+    @Test
+    void approvedOvertimeIsPaidTaxedAndTakenByTheRun() {
+        HrPayRun run = draftRun(LocalDate.of(2026, 10, 31), 2027);
+        HrEmployee emp = employee("30003.00");
+        when(rulesService.rulesFor(2027)).thenReturn(rules2027());
+        when(employeeRepo.findAllActiveList(any())).thenReturn(List.of(emp));
+        when(medicalSchemeService.membersOn(any(), any(), any())).thenReturn(Map.of(emp.getId(), new MedicalSchemeRules.Members(0, false)));
+        HrOvertimeClaim claim = HrOvertimeClaim.of(tenant.getValue(), emp.getId(), LocalDate.of(2026, 10, 12), "OVERTIME", 600,
+                d("1.5"), d("100.0000"), d("1000.00"), maker);
+        when(overtimeService.takeFor(any(), any(), eq(LocalDate.of(2026, 10, 31)))).thenReturn(Map.of(emp.getId(), List.of(claim)));
+
+        PayRunResponse r = service.processPayRun(tenant, UUID.randomUUID(), maker);
+
+        org.mockito.ArgumentCaptor<HrPayslip> slip = org.mockito.ArgumentCaptor.forClass(HrPayslip.class);
+        verify(payslipRepo).save(slip.capture());
+        assertThat(slip.getValue().getGrossSalary()).isEqualByComparingTo("30003.00");
+        assertThat(slip.getValue().getOvertimeAmount()).isEqualByComparingTo("1000.00");
+        assertThat(slip.getValue().getTotalEarnings()).isEqualByComparingTo("31003.00");
+        // 31 003 x 12 = 372 036; tax 77 121.36 - 17 820 = 59 301.36 / 12 = 4 941.78
+        assertThat(r.totalPaye()).isEqualByComparingTo("4941.78");
+        assertThat(r.totalGross()).isEqualByComparingTo("31003.00");
+        assertThat(r.warnings().stream().anyMatch(w -> w.contains("Overtime for 1 employee"))).isTrue();
+        verify(overtimeService).markTaken(eq(List.of(claim)), eq(run.getId()));
+    }
+
+    @Test
+    void overtimeStillWaitingForApprovalIsReportedAndNotPaid() {
+        draftRun(LocalDate.of(2026, 10, 31), 2027);
+        HrEmployee emp = employee("30003.00");
+        when(rulesService.rulesFor(2027)).thenReturn(rules2027());
+        when(employeeRepo.findAllActiveList(any())).thenReturn(List.of(emp));
+        when(medicalSchemeService.membersOn(any(), any(), any())).thenReturn(Map.of(emp.getId(), new MedicalSchemeRules.Members(0, false)));
+        when(overtimeService.waitingCount(any(), any())).thenReturn(2);
+
+        PayRunResponse r = service.processPayRun(tenant, UUID.randomUUID(), maker);
+
+        assertThat(r.totalGross()).isEqualByComparingTo("30003.00");
+        assertThat(r.warnings().stream().anyMatch(w -> w.contains("2 overtime claim(s)"))).isTrue();
     }
 
     @Test
