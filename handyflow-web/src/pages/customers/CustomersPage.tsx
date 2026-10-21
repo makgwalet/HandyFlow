@@ -18,6 +18,7 @@ import { Customer360Panel }   from './Customer360Panel'
 import { ConsentPanel }       from './ConsentPanel'
 import { StageSelector }      from './StageSelector'
 import { FollowUpPanel }      from './FollowUpPanel'
+import { ContactsPanel }      from './ContactsPanel'
 import { CommunicationPanel } from './CommunicationPanel'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -866,7 +867,7 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
   const trapRef   = useFocusTrap(true)
   const statusCfg = STATUS_CONFIG[c.status]
   const typeCfg   = TYPE_CONFIG[c.customerType]
-  const [activeTab, setActiveTab] = useState<'overview' | 'followups' | 'communications' | 'consent'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'contacts' | 'followups' | 'communications' | 'consent'>('overview')
 
   const downloadProfilePdf = async (id: string, name: string) => {
     try {
@@ -944,6 +945,7 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
         <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--hf-border)', marginBottom: 16 }}>
           {([
             { key: 'overview', label: 'Overview' },
+            { key: 'contacts', label: 'Contacts' },
             { key: 'followups', label: 'Follow-ups' },
             { key: 'communications', label: 'Communications' },
             { key: 'consent', label: 'Consent' },
@@ -1007,6 +1009,7 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
           </>
         )}
 
+        {activeTab === 'contacts' && <ContactsPanel customerId={c.id} />}
         {activeTab === 'followups' && <FollowUpPanel customerId={c.id} />}
         {activeTab === 'communications' && <CommunicationPanel customerId={c.id} />}
         {activeTab === 'consent' && <ConsentPanel customerId={c.id} />}

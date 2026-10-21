@@ -76,6 +76,26 @@ public class Contact {
         return c;
     }
 
+    /** Blank text is stored as null; the email is lower-cased so the per-customer uniqueness check is not case sensitive. */
+    public void update(String firstName, String lastName, String email, String phone, String jobTitle, String notes) {
+        this.firstName = firstName.trim();
+        this.lastName  = lastName.trim();
+        this.email     = blankToNull(email) == null ? null : blankToNull(email).toLowerCase();
+        this.phone     = blankToNull(phone);
+        this.jobTitle  = blankToNull(jobTitle);
+        this.notes     = blankToNull(notes);
+        this.updatedAt = Instant.now();
+    }
+
+    public void markPrimary(boolean primary) {
+        this.primary   = primary;
+        this.updatedAt = Instant.now();
+    }
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
+    }
+
     public String getFullName() {
         return firstName + " " + lastName;
     }
