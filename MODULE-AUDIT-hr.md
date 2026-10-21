@@ -309,3 +309,42 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - Bonus, overtime and back pay in payroll (the engine pays a regular monthly salary only).
 - ETI is not modelled.
 - Certificates for employees who left mid-year show the months they worked but not their reasons for leaving or directive numbers.
+
+## 12. Slice 6 status: onboarding
+
+**What was wrong**
+
+- A new employee had nothing to track what must be in place before payroll or first day: ID, tax number, bank details, written particulars, UIF declaration, login, induction. Recruiter's "convert to employee" creates the employee with no ID, tax or bank details ("completed later in HR") and nothing tracked that later.
+- No place to record probation or when it ends.
+
+**What changed**
+
+- Every new employee gets an onboarding. It is started by a Modulith listener on `EmployeeCreatedEvent`, so it covers employees added by hand and those converted from Recruiter, and a failure there cannot undo or block creating the employee. HR can also start one for any existing employee.
+- Each company has its own task list, made the first time from 19 standard tasks (written particulars under BCEA s29, UIF declaration, POPIA privacy notice, OHSA induction, probation review and so on). Editing the list affects only onboardings started afterwards; tasks already created are copies.
+- Seven tasks are checked against the employee record (ID number, tax number, bank details, salary, manager, login, emergency contact). They tick themselves when the record is valid and cannot be ticked by hand, so a task cannot say done while the data is missing. Other tasks are ticked by a manager or the person assigned, or waived with a reason.
+- Finishing is refused while a required task is open. A finished or cancelled onboarding can no longer be changed. Cancelling needs a reason.
+- Managers with team access only see onboarding for people in their own team.
+- New permission `HR_ONBOARDING_MANAGE` (V490), granted to roles that hold `HR_MANAGE`.
+- Screen: People > Onboarding, with progress per person, tasks grouped by category, due dates and overdue marking, and the actions above.
+
+**Decisions I took that you may want to change**
+
+- Recruiter stays the hiring system; onboarding starts from the employee record. Nothing was added to Recruiter.
+- Probation is 3 months from the start date by default (editable, at most 12).
+- Medical scheme, retirement fund and contract signing are manual ticks because HR does not record them on the employee.
+- Existing employees were not given an onboarding.
+
+**Not verified**
+
+- Maven build and every Mockito test, including `OnboardingServiceTest`. The JPQL in the three new repositories and migration V490 have not been run.
+- Run and passing in a standalone harness: `OnboardingRulesTest` (14).
+- Front end: 11 tests in `Onboarding.test.tsx` pass; ESLint reports nothing in the new files. Not looked at in a browser.
+- If the listener fails, Modulith keeps the event publication for resubmission; I have not seen that happen here.
+
+**Open items (Recruiter, deliberately not built)**
+
+- Requisition approval and offer approval.
+- Candidate data retention and deletion under POPIA.
+- Overdue notifications or a digest to managers. Overdue is only shown on screen.
+- Employees converted from Recruiter start with ID, tax and bank tasks open until HR completes the record.
+- Document uploads (signed contract, ID copy) are ticked, not stored against the task.
