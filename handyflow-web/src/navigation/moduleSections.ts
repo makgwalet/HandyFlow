@@ -23,6 +23,7 @@ import {
   Megaphone, Warehouse, Handshake, UserCog,
   Database, CalendarRange, MessageSquare, Send, BookOpen as BookIcon,
   UserCheck, Palette, Headphones, Wallet, Receipt, CheckSquare, LayoutGrid, ListChecks, Sprout, FlaskConical,
+  Columns3, Zap, History, Plug, Filter, Copy, SlidersHorizontal, Tags, Target,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -952,6 +953,46 @@ export const BOOKKEEPING_SECTIONS: ModuleSections = {
   ],
 }
 
+export const CRM_SECTIONS: ModuleSections = {
+  moduleKey: 'crm',
+  basePath: '/customers',
+  title: 'Customers',
+  icon: Users,
+  defaultSection: 'dashboard',
+  groups: [
+    { label: 'Overview', sections: [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { id: 'tasks', label: 'Tasks', icon: CheckSquare },
+    ] },
+    { label: 'Customers', sections: [
+      { id: 'customers', label: 'Customers', icon: Users },
+      { id: 'groups', label: 'Company groups', icon: Building2 },
+      { id: 'segments', label: 'Segments', icon: Tags },
+      { id: 'duplicates', label: 'Duplicates', icon: Copy },
+    ] },
+    { label: 'Sales', sections: [
+      { id: 'pipeline', label: 'Pipeline', icon: Columns3 },
+      { id: 'opportunities', label: 'Opportunities', icon: Handshake },
+      { id: 'campaigns', label: 'Campaigns', icon: Megaphone },
+    ] },
+    { label: 'Insight', sections: [
+      { id: 'funnel', label: 'Funnel report', icon: Filter },
+      { id: 'forecast', label: 'Forecast', icon: TrendingUp },
+      { id: 'team', label: 'Team', icon: UserCog },
+      { id: 'reports', label: 'Scheduled reports', icon: FileBarChart },
+    ] },
+    { label: 'Automation', sections: [
+      { id: 'rules', label: 'Scoring & routing', icon: Target },
+      { id: 'automation', label: 'Automation', icon: Zap },
+    ] },
+    { label: 'Setup', sections: [
+      { id: 'fields', label: 'Custom fields', icon: SlidersHorizontal },
+      { id: 'integrations', label: 'Integrations', icon: Plug },
+      { id: 'audit', label: 'Audit log', icon: History },
+    ] },
+  ],
+}
+
 const REGISTRY: ModuleSections[] = [
   BOOKKEEPING_SECTIONS,
   SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS, FLEET_SECTIONS, ACCOUNTING_SECTIONS, ACCOUNTANT_SECTIONS,
@@ -961,7 +1002,7 @@ const REGISTRY: ModuleSections[] = [
   DEBT_COLLECTION_SECTIONS, MARKETING_SECTIONS, TRAINING_SECTIONS, WAREHOUSING_SECTIONS, COLLECTIONS_AGENCY_SECTIONS,
   INTERNAL_AUDIT_SECTIONS,
   RECRUITER_SECTIONS, CREATIVE_SECTIONS, CATALOGUE_SECTIONS, COMPLIANCE_SERVICES_SECTIONS, DESK_SECTIONS,
-  EXPENSES_SECTIONS, POS_SECTIONS, PROJECTS_SECTIONS, TASKS_SECTIONS,
+  EXPENSES_SECTIONS, POS_SECTIONS, PROJECTS_SECTIONS, TASKS_SECTIONS, CRM_SECTIONS,
 ]
 
 /** Groups with sections the user may not see removed (and empty groups dropped). */

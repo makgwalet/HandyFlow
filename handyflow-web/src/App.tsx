@@ -290,7 +290,7 @@ export default function App() {
 
           {/* All module pages — inside AppShell (sidebar + top bar) */}
           <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
-            <Route path="/customers"   element={<CrmPage />} />
+            <Route path="/customers/:section?" element={<CrmPage />} />
             <Route path="/quotes"      element={<QuotesListPage />} />
             <Route path="/invoices"    element={<InvoicesListPage />} />
             <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
