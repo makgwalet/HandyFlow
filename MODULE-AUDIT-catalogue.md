@@ -135,4 +135,4 @@ Behaviour changes to know about:
 - Category names are now unique per parent; V476's tenant-wide index is replaced (no existing data can violate the new one).
 - Quantity decimals on a unit are stored and shown but not enforced yet (quotes, POS and purchase orders still accept what they accepted before).
 
-Tests: 19 rules tests run and pass (standalone, Maven unavailable here). 36 service tests (Mockito; units, definitions, applicability, values, tree) and the changed Slice 1 tests are written but **not run**. Front end: 66 catalogue tests pass, lint clean. Backend service, controller, entity and repository code has not been compiled (no Spring jars here); V477 and V478 have not been run against a database.
+Tests: 19 rules tests run and pass (standalone, Maven unavailable here). 45 service tests (Mockito: 19 in the new structure service, 26 in the catalogue service including the Slice 1 ones I changed) are written but **not run**. Front end: 66 catalogue tests pass, lint clean. Backend service, controller, entity and repository code has not been compiled (no Spring jars here); V477 and V478 have not been run against a database.
