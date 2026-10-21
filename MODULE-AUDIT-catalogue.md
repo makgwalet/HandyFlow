@@ -182,3 +182,21 @@ Known limits:
 - Bulk price change across all variants of a parent is not built (each variant is priced on its own; Slice 6 import covers bulk).
 
 Tests: 8 variant rules tests run and pass (standalone). 19 service tests (Mockito: 14 in the new variant service, 5 added to the catalogue service) are written but **not run**. Front end: 113 catalogue tests pass (19 new), lint and type check clean for these files. The backend was not compiled with Spring here (syntax-checked only); V480 has not been run against a database.
+
+## 11. Slice 5 status (dashboard and Product 360): built, not yet run against a database
+
+| Area | What it does |
+|---|---|
+| Dashboard | New first screen of the module (`GET /api/v1/catalogue/dashboard`, `CATALOGUE_READ`). Totals: items (top-level, not archived), products and services, variants, active SKUs (active and sellable, so a parent with variants is not counted), drafts, incomplete records, discontinued (and in the last 30 days). Items over the last 12 months, items per top-level category (with "No category"), the six most recently changed items and the ten latest activity lines. Quick actions: Add item (writers), Review price changes (price users). |
+| Price queue | "Price changes waiting / scheduled" is sent only to users with a price permission; others get nothing and the tile is not drawn. |
+| Product 360 | "Open" on any item (also `?item=ID`). Header: SKU, status, type, category path or "Variant of X", approval state, completeness ring. Tabs: Overview (details and what is outstanding), Attributes, Variants, Pricing (price users only; hidden for items sold through variants), History. Changing variants or prices opens the existing dialogs from the tab. `GET /items/{id}/overview` backs it. |
+| Completeness | Score = share of weighted checks passed (`CompletenessRules`): description 20, category 15, SKU 20, price above zero 20, and for goods (product, consumable) also barcode 15 and brand 10. The dashboard "incomplete records" count uses the same checks in SQL for items still in use (not archived or discontinued, not parents with variants). Required attributes that are empty are listed as outstanding but do not change the score or the dashboard count. |
+| History leak fixed | The item history (and the new activity feed) used to show cost and the price-approval trail to anyone with read access. Without `CATALOGUE_PRICE_READ`, price workflow events now show no detail and cost / minimum price segments are removed (`HistoryRules`). |
+
+Not built, and why it is not on the screens:
+- No tiles for failed imports or sync errors (there is no import or sync yet; Slice 6), and no "drafts awaiting approval" (approval exists for price changes only; item approval is Slice 7).
+- Media, Relationships, Publishing and Audit tabs are not built (Slice 8). History is the audit trail for now.
+- Growth is a plain bar list of totals, not a chart library; the category view is bars, not a donut.
+- Counts are computed on request; they are cheap for normal catalogues but are not cached.
+
+Tests: completeness (7), history redaction (7) and dashboard rules (6) pass standalone. 6 service tests (Mockito) are written but **not run**. Front end: 126 catalogue tests pass (13 new), lint and type check clean. The backend was not compiled with Spring here and the new JPQL queries have not run against a database.

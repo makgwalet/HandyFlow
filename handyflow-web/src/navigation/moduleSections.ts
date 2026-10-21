@@ -821,8 +821,9 @@ export const CATALOGUE_SECTIONS: ModuleSections = {
   basePath: '/catalogue',
   title: 'Catalogue',
   icon: Package,
-  defaultSection: 'items',
+  defaultSection: 'dashboard',
   groups: [{ label: 'Overview', sections: [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'items', label: 'Products & services', icon: Package },
     { id: 'categories', label: 'Categories', icon: Tags },
   ] }, { label: 'Pricing', sections: [

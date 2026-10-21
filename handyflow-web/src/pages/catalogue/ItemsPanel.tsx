@@ -1,16 +1,17 @@
 // src/pages/catalogue/ItemsPanel.tsx — the catalogue list: server-side search, filters, sorting and paging; add/edit, lifecycle changes, history and delete.
 import { useEffect, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query"
-import { ChevronLeft, ChevronRight, Coins, History, Layers, Package, Pencil, Plus, Power, Search, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Coins, History, Layers, LayoutDashboard, Package, Pencil, Plus, Power, Search, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { DeleteModal, ErrorBanner, Field, Modal, StatusBadge } from "./CatalogueKit"
 import { inp, inpErr, sel } from "./catalogue.styles"
 import PricingModal from "./PricingModal"
 import VariantsModal from "./VariantsModal"
+import Product360 from "./Product360"
 import {
   EMPTY_FILTERS, EMPTY_ITEM_FORM, applicableAttributes, attributeProblems, indented, matchUnit, ITEM_STATUSES, ITEM_TYPES, STATUS_LABEL, allowedMoves, duplicateField, errorMessage, fieldErrors, hasFilters, itemBody, itemProblems,
-  listParams, marginText, moveLabel, moveNeedsReason, rand, rangeText, statusProblem, toItemForm, typeLabel,
+  actionText, listParams, marginText, moveLabel, moveNeedsReason, rand, rangeText, statusProblem, toItemForm, typeLabel,
   type AttributeDef, type CatalogueItem, type Category, type Unit, type Filters, type HistoryLine, type ItemForm, type ItemStatus, type PageOf,
 } from "./catalogue.logic"
 
@@ -28,11 +29,12 @@ export default function ItemsPanel() {
 
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
   const [qInput, setQInput] = useState("")
-  const [editing, setEditing] = useState<CatalogueItem | "new" | null>(null)
+  const [editing, setEditing] = useState<CatalogueItem | "new" | null>(() => { try { return canWrite && new URLSearchParams(window.location.search).get("new") ? "new" : null } catch { return null } })
   const [statusFor, setStatusFor] = useState<CatalogueItem | null>(null)
   const [historyFor, setHistoryFor] = useState<CatalogueItem | null>(null)
   const [pricingFor, setPricingFor] = useState<CatalogueItem | null>(null)
   const [variantsFor, setVariantsFor] = useState<CatalogueItem | null>(null)
+  const [openId, setOpenId] = useState<string | null>(() => { try { return new URLSearchParams(window.location.search).get("item") } catch { return null } })
   const [deleting, setDeleting] = useState<CatalogueItem | null>(null)
   const [deleteError, setDeleteError] = useState("")
 
@@ -133,6 +135,7 @@ export default function ItemsPanel() {
                         {canWrite && allowedMoves(i.status, canArchive).length > 0 && <button type="button" style={ghost} aria-label={`Change status of ${i.name}`} onClick={() => setStatusFor(i)}><Power size={12} /> Status</button>}
                         {(canWrite || (i.variantCount ?? 0) > 0) && !i.parentId && i.status !== "ARCHIVED" && <button type="button" style={ghost} aria-label={`Variants of ${i.name}`} onClick={() => setVariantsFor(i)}><Layers size={12} /> Variants</button>}
                         {canSeeCost && i.status !== "ARCHIVED" && (i.variantCount ?? 0) === 0 && <button type="button" style={ghost} aria-label={`Pricing of ${i.name}`} onClick={() => setPricingFor(i)}><Coins size={12} /> Pricing</button>}
+                        <button type="button" style={ghost} aria-label={`Open ${i.name}`} onClick={() => setOpenId(i.id)}><LayoutDashboard size={12} /> Open</button>
                         <button type="button" style={ghost} aria-label={`History of ${i.name}`} onClick={() => setHistoryFor(i)}><History size={12} /></button>
                         {canArchive && <button type="button" style={ghost} aria-label={`Delete ${i.name}`} onClick={() => { setDeleting(i); setDeleteError("") }}><Trash2 size={13} /></button>}
                       </div>
@@ -158,6 +161,7 @@ export default function ItemsPanel() {
       {statusFor && <StatusDialog item={statusFor} canArchive={canArchive} onClose={() => setStatusFor(null)} onDone={() => { refresh(); setStatusFor(null) }} onStale={refresh} />}
       {variantsFor && <VariantsModal item={variantsFor} canWrite={canWrite} canSeeCost={canSeeCost} canWriteCost={canWriteCost} onClose={() => setVariantsFor(null)} onChanged={refresh} />}
       {pricingFor && <PricingModal item={pricingFor} canWrite={canWriteCost} onClose={() => setPricingFor(null)} onChanged={refresh} />}
+      {openId && <Product360 itemId={openId} onClose={() => setOpenId(null)} onChanged={refresh} />}
       {historyFor && <HistoryModal item={historyFor} onClose={() => setHistoryFor(null)} />}
       {deleting && (
         <DeleteModal title="Delete item?" badge={deleting.name} badgeIcon={<Package size={14} />} isPending={del.isPending} error={deleteError}
@@ -377,7 +381,3 @@ function HistoryModal({ item, onClose }: { item: CatalogueItem; onClose: () => v
     </Modal>
   )
 }
-const actionText = (a: string) => ({
-  CREATED: "Created", UPDATED: "Edited", PRICE_CHANGED: "Price changed", STATUS_CHANGED: "Status changed", DELETED: "Deleted",
-  PRICE_PROPOSED: "Price change proposed", PRICE_APPROVED: "Price change approved", PRICE_REJECTED: "Price change rejected", PRICE_CANCELLED: "Price change cancelled", SETTING_CHANGED: "Setting changed",
-}[a] ?? a)

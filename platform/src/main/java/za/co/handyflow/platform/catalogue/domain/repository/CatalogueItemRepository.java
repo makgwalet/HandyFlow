@@ -60,4 +60,42 @@ public interface CatalogueItemRepository extends JpaRepository<CatalogueItem, UU
     /** Live variant counts for a page of items: rows of [parentId, count]. */
     @Query("SELECT i.parentId, COUNT(i) FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL AND i.parentId IN :parentIds GROUP BY i.parentId")
     List<Object[]> variantCounts(TenantId tenantId, java.util.Collection<UUID> parentIds);
+
+    // ── Dashboard ──
+    /** Top-level items by type and status: rows of [type, status, count]. */
+    @Query("SELECT i.itemType, i.status, COUNT(i) FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL AND i.parentId IS NULL GROUP BY i.itemType, i.status")
+    List<Object[]> countsByTypeAndStatus(TenantId tenantId);
+
+    @Query("SELECT COUNT(i) FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL AND i.parentId IS NOT NULL AND i.status <> za.co.handyflow.platform.catalogue.domain.model.CatalogueItemStatus.ARCHIVED")
+    long countLiveVariants(TenantId tenantId);
+
+    /** Items that can be sold right now: active and not a parent whose variants are sold instead. */
+    @Query("SELECT COUNT(i) FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL AND i.status = za.co.handyflow.platform.catalogue.domain.model.CatalogueItemStatus.ACTIVE "
+            + "AND NOT EXISTS (SELECT 1 FROM CatalogueItem v WHERE v.parentId = i.id AND v.deletedAt IS NULL)")
+    long countSellable(TenantId tenantId);
+
+    /** Same checks as CompletenessRules: basic details missing on an item that is still in use. */
+    @Query("SELECT COUNT(i) FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL "
+            + "AND i.status NOT IN (za.co.handyflow.platform.catalogue.domain.model.CatalogueItemStatus.ARCHIVED, za.co.handyflow.platform.catalogue.domain.model.CatalogueItemStatus.DISCONTINUED) "
+            + "AND NOT EXISTS (SELECT 1 FROM CatalogueItem v WHERE v.parentId = i.id AND v.deletedAt IS NULL) "
+            + "AND (i.description IS NULL OR TRIM(i.description) = '' OR i.category IS NULL OR i.sku IS NULL OR i.defaultPrice <= 0 "
+            + "OR (i.itemType IN (za.co.handyflow.platform.catalogue.domain.model.CatalogueItemType.PRODUCT, za.co.handyflow.platform.catalogue.domain.model.CatalogueItemType.CONSUMABLE) AND (i.barcode IS NULL OR i.brand IS NULL)))")
+    long countIncomplete(TenantId tenantId);
+
+    @Query("SELECT COUNT(i) FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL AND i.status = za.co.handyflow.platform.catalogue.domain.model.CatalogueItemStatus.DISCONTINUED AND i.statusChangedAt >= :since")
+    long countDiscontinuedSince(TenantId tenantId, java.time.Instant since);
+
+    /** Items per category (null id = no category), top-level and not archived: rows of [categoryId, count]. */
+    @Query("SELECT c.id, COUNT(i) FROM CatalogueItem i LEFT JOIN i.category c WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL "
+            + "AND i.parentId IS NULL AND i.status <> za.co.handyflow.platform.catalogue.domain.model.CatalogueItemStatus.ARCHIVED GROUP BY c.id")
+    List<Object[]> countsByCategory(TenantId tenantId);
+
+    @Query("SELECT i.createdAt FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL AND i.createdAt >= :since")
+    List<java.time.Instant> createdSince(TenantId tenantId, java.time.Instant since);
+
+    @Query("SELECT COUNT(i) FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL AND i.createdAt < :before")
+    long countCreatedBefore(TenantId tenantId, java.time.Instant before);
+
+    @Query("SELECT i FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL ORDER BY i.updatedAt DESC")
+    List<CatalogueItem> recentlyChanged(TenantId tenantId, org.springframework.data.domain.Pageable pageable);
 }

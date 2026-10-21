@@ -196,6 +196,13 @@ public class CatalogueStructureService {
         return supplied == null ? null : clean;
     }
 
+    /** Labels of the required attributes this item has no value for. */
+    @Transactional(readOnly = true)
+    public List<String> missingRequired(TenantId tenantId, UUID categoryId, UUID itemId) {
+        List<AttrSpec> specs = applicable(tenantId, categoryId).stream().map(CatalogueAttributeDefinition::spec).toList();
+        return StructureRules.missingRequired(specs, stored(tenantId, itemId));
+    }
+
     /** The values currently stored for an item, keyed by definition id. */
     @Transactional(readOnly = true)
     public Map<UUID, String> stored(TenantId tenantId, UUID itemId) {

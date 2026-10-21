@@ -109,9 +109,9 @@ public class CatalogueService {
     }
 
     @Transactional(readOnly = true)
-    public Page<CatalogueHistoryResponse> history(TenantId tenantId, UUID entityId, int page, int size) {
+    public Page<CatalogueHistoryResponse> history(TenantId tenantId, UUID entityId, int page, int size, Caller caller) {
         return auditRepository.history(tenantId, entityId, PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100)))
-                .map(e -> new CatalogueHistoryResponse(e.getId(), e.getAction().name(), e.getDetail(), e.getActorId(), e.getCreatedAt()));
+                .map(e -> new CatalogueHistoryResponse(e.getId(), e.getAction().name(), HistoryRules.redact(e.getAction(), e.getDetail(), caller.canSeePrices()), e.getActorId(), e.getCreatedAt()));
     }
 
     // ── Item writes ───────────────────────────────────────────────────────────

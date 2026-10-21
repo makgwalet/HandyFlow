@@ -13,4 +13,8 @@ public interface CatalogueAuditEventRepository extends JpaRepository<CatalogueAu
 
     @Query("SELECT e FROM CatalogueAuditEvent e WHERE e.tenantId = :tenantId AND e.entityId = :entityId ORDER BY e.createdAt DESC")
     Page<CatalogueAuditEvent> history(TenantId tenantId, UUID entityId, Pageable pageable);
+
+    /** The latest events of the whole tenant, newest first. */
+    @Query("SELECT e FROM CatalogueAuditEvent e WHERE e.tenantId = :tenantId ORDER BY e.createdAt DESC")
+    java.util.List<CatalogueAuditEvent> recent(TenantId tenantId, Pageable pageable);
 }

@@ -493,3 +493,37 @@ export const variantEditBody = (f: VariantEditForm, version: number, canWriteCos
   sku: f.sku.trim() || undefined, barcode: f.barcode.trim() || undefined, defaultPrice: Number(f.price.trim().replace(",", ".")),
   costPrice: canWriteCost && f.cost.trim() ? Number(f.cost.trim().replace(",", ".")) : undefined, version,
 })
+
+
+// ── Dashboard and Product 360 ────────────────────────────────────────────────
+export interface DashboardData {
+  counts: { items: number; products: number; services: number; variants: number; activeSkus: number; drafts: number; suspended: number; discontinued: number; discontinuedRecently: number; incomplete: number }
+  /** Null unless the user deals with prices. */
+  prices: { pending: number; scheduled: number } | null
+  growth: { month: string; total: number }[]
+  byCategory: { name: string; count: number }[]
+  recentItems: { id: string; name: string; sku: string | null; categoryName: string | null; status: ItemStatus; defaultPrice: number; updatedAt: string; parentId: string | null }[]
+  activity: { action: string; detail: string | null; entityType: string; entityId: string; entityName: string | null; at: string }[]
+}
+
+export interface ItemOverview {
+  item: CatalogueItem; categoryPath: string | null; completeness: { score: number; checks: { code: string; label: string; passed: boolean }[] }
+  missingAttributes: string[]; openPriceChanges: number; approvalState: "NONE" | "DRAFT" | "PRICE_CHANGE_PENDING"; parentName: string | null
+}
+
+export const APPROVAL_LABEL: Record<ItemOverview["approvalState"], string> = { NONE: "Nothing waiting", DRAFT: "Draft, not yet active", PRICE_CHANGE_PENDING: "Price change awaiting approval" }
+
+/** Everything still to fix on an item, in plain words: failed checks first, then missing required attributes. */
+export function outstanding(o: ItemOverview): string[] {
+  return [...o.completeness.checks.filter(c => !c.passed).map(c => `${c.label} is missing`), ...o.missingAttributes.map(a => `${a} (required attribute) is missing`)]
+}
+
+export const ringTone = (score: number) => (score >= 80 ? "var(--hf-success-text)" : score >= 50 ? "var(--hf-warning-text)" : "var(--hf-danger-text)")
+
+export const actionText = (a: string) => ({
+  CREATED: "Created", UPDATED: "Edited", PRICE_CHANGED: "Price changed", STATUS_CHANGED: "Status changed", DELETED: "Deleted",
+  PRICE_PROPOSED: "Price change proposed", PRICE_APPROVED: "Price change approved", PRICE_REJECTED: "Price change rejected", PRICE_CANCELLED: "Price change cancelled", SETTING_CHANGED: "Setting changed",
+}[a] ?? a)
+
+/** Share of the largest value, 0–100, for the plain bar charts. */
+export const barPercent = (value: number, max: number) => (max <= 0 ? 0 : Math.max(value > 0 ? 3 : 0, Math.round((value / max) * 100)))

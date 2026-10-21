@@ -16,6 +16,7 @@ import za.co.handyflow.platform.catalogue.application.internal.CatalogueService;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueStructureService;
 import za.co.handyflow.platform.catalogue.application.internal.CataloguePricingService;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueVariantService;
+import za.co.handyflow.platform.catalogue.application.internal.CatalogueDashboardService;
 import za.co.handyflow.platform.catalogue.domain.model.PriceChangeStatus;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueService.Caller;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueService.ItemFilter;
@@ -58,6 +59,7 @@ public class CatalogueController {
     private final CatalogueStructureService structureService;
     private final CataloguePricingService pricingService;
     private final CatalogueVariantService variantService;
+    private final CatalogueDashboardService dashboardService;
 
     /** What the signed-in user may do, from their authorities. */
     private static Caller caller(Authentication auth) {
@@ -112,8 +114,8 @@ public class CatalogueController {
     @PreAuthorize(READ)
     @Operation(summary = "Change history of an item")
     public ResponseEntity<ApiResponse<Page<CatalogueHistoryResponse>>> history(
-            @PathVariable UUID id, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
-        return ResponseEntity.ok(ApiResponse.success(catalogueService.history(TenantContext.getTenantIdAsObject(), id, page, size)));
+            @PathVariable UUID id, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(catalogueService.history(TenantContext.getTenantIdAsObject(), id, page, size, caller(auth))));
     }
 
     @PostMapping("/items")
@@ -376,5 +378,20 @@ public class CatalogueController {
     public ResponseEntity<ApiResponse<CatalogueItemResponse>> updateVariant(
             @PathVariable UUID id, @PathVariable UUID variantId, @RequestBody UpdateVariantRequest request, Authentication auth) {
         return ResponseEntity.ok(ApiResponse.success("Variant updated", variantService.update(TenantContext.getTenantIdAsObject(), id, variantId, request, caller(auth))));
+    }
+    // ── Dashboard and Product 360 ────────────────────────────────────────────
+
+    @GetMapping("/dashboard")
+    @PreAuthorize(READ)
+    @Operation(summary = "Catalogue dashboard", description = "Counts, growth, items per category, recent items and activity. Price queue figures only for price users.")
+    public ResponseEntity<ApiResponse<DashboardResponse>> dashboard(Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(dashboardService.dashboard(TenantContext.getTenantIdAsObject(), caller(auth))));
+    }
+
+    @GetMapping("/items/{id}/overview")
+    @PreAuthorize(READ)
+    @Operation(summary = "Product 360 overview of one item", description = "The item, its completeness score and what is outstanding.")
+    public ResponseEntity<ApiResponse<ItemOverviewResponse>> overview(@PathVariable UUID id, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(dashboardService.overview(TenantContext.getTenantIdAsObject(), id, caller(auth))));
     }
 }
