@@ -1,22 +1,24 @@
 // src/pages/catalogue/Product360.tsx — one item in one place: header, completeness, and tabs for details, attributes, variants, pricing and history.
 // Changing things still happens in the existing dialogs (variants, pricing); this view shows the whole picture and what is outstanding.
 import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { ErrorBanner, Modal, StatusBadge } from "./CatalogueKit"
 import { linkBtn, primaryBtn } from "./catalogue.styles"
+import { DecisionModal } from "./ItemApprovalsPanel"
 import PricingModal from "./PricingModal"
 import VariantsModal from "./VariantsModal"
 import {
   APPROVAL_LABEL, actionText, errorMessage, marginText, outstanding, rand, ringTone, typeLabel,
-  type HistoryLine, type ItemOverview, type ItemPricing, type PageOf, type VariantsView,
+  type HistoryLine, type ItemApproval, type ItemOverview, type ItemPricing, type PageOf, type VariantsView,
 } from "./catalogue.logic"
 
 const inner = <T,>(r: { data: unknown }): T => { const d = r.data as { data?: T } | null; return (d && typeof d === "object" && "data" in d ? d.data : r.data) as T }
 const th: React.CSSProperties = { textAlign: "left", padding: "8px 10px", fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px solid var(--hf-border-subtle)" }
 const td: React.CSSProperties = { padding: "8px 10px", fontSize: 13, color: "var(--hf-text)", borderBottom: "1px solid var(--hf-border-subtle)" }
 const muted: React.CSSProperties = { fontSize: 13, color: "var(--hf-text-muted)" }
+const banner: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "10px 14px", marginBottom: 14, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border-subtle)", borderRadius: 10, fontSize: 13 }
 
 type Tab = "overview" | "attributes" | "variants" | "pricing" | "history"
 
@@ -37,8 +39,11 @@ export default function Product360({ itemId, onClose, onChanged }: { itemId: str
   const canWrite = usePermissions(["SETTINGS_MANAGE", "CATALOGUE_WRITE"])
   const canSeeCost = usePermissions(["CATALOGUE_PRICE_READ"])
   const canWriteCost = usePermissions(["CATALOGUE_PRICE_WRITE"])
+  const canDecide = usePermissions(["CATALOGUE_APPROVE"])
   const [tab, setTab] = useState<Tab>("overview")
   const [dialog, setDialog] = useState<"variants" | "pricing" | null>(null)
+  const [deciding, setDeciding] = useState<{ a: ItemApproval; kind: "approve" | "reject" } | null>(null)
+  const [error, setError] = useState("")
   const ov = useQuery<ItemOverview>({ queryKey: ["catalogue", "overview", itemId], queryFn: async () => inner<ItemOverview>(await apiClient.get(`/api/v1/catalogue/items/${itemId}/overview`)) })
   const o = ov.data
   const item = o?.item
@@ -50,6 +55,15 @@ export default function Product360({ itemId, onClose, onChanged }: { itemId: str
     { id: "history", label: "History" },
   ]
   const changed = () => { ov.refetch(); onChanged() }
+  const submit = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/catalogue/items/${itemId}/approval`, {}),
+    onSuccess: () => { setError(""); changed() }, onError: e => setError(errorMessage(e, "Couldn't submit the item.")),
+  })
+  const pending = useQuery<ItemApproval | null>({
+    queryKey: ["catalogue", "item-approval", itemId, o?.pendingApprovalId ?? null], enabled: !!o?.pendingApprovalId,
+    queryFn: async () => inner<ItemApproval | null>(await apiClient.get(`/api/v1/catalogue/items/${itemId}/approval`)),
+  })
+  const canSubmit = !!o && o.approvalRequired && canWrite && item?.status === "DRAFT" && !item.parentId && !o.pendingApprovalId
 
   return (
     <Modal title={item ? `${item.name}` : "Product"} onClose={onClose} wide>
@@ -72,6 +86,22 @@ export default function Product360({ itemId, onClose, onChanged }: { itemId: str
             </div>
           </div>
 
+          {error && <ErrorBanner message={error} />}
+          {canSubmit && (
+            <div role="region" aria-label="Approval" style={{ ...banner }}>
+              <span>This draft must be approved before it can be sold.</span>
+              <button type="button" style={primaryBtn} disabled={submit.isPending} onClick={() => submit.mutate()}>{submit.isPending ? "Submitting…" : "Submit for approval"}</button>
+            </div>
+          )}
+          {o.pendingApprovalId && (
+            <div role="region" aria-label="Approval" style={{ ...banner }}>
+              <span>Waiting for approval{pending.data?.note ? `: ${pending.data.note}` : "."}</span>
+              {canDecide && pending.data && <span style={{ display: "flex", gap: 6 }}>
+                <button type="button" style={primaryBtn} onClick={() => setDeciding({ a: pending.data as ItemApproval, kind: "approve" })}>Approve</button>
+                <button type="button" style={linkBtn} onClick={() => setDeciding({ a: pending.data as ItemApproval, kind: "reject" })}>Reject</button>
+              </span>}
+            </div>
+          )}
           <div role="tablist" aria-label="Item sections" style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--hf-border-subtle)", marginBottom: 16, overflowX: "auto" }}>
             {tabs.map(t => (
               <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}
@@ -85,6 +115,7 @@ export default function Product360({ itemId, onClose, onChanged }: { itemId: str
           {tab === "pricing" && <PricingTab itemId={itemId} hasVariants={hasVariants} canWrite={canWriteCost} onManage={() => setDialog("pricing")} />}
           {tab === "history" && <HistoryTab itemId={itemId} />}
 
+          {deciding && <DecisionModal approval={deciding.a} kind={deciding.kind} onClose={() => setDeciding(null)} onDone={() => { setDeciding(null); changed() }} />}
           {dialog === "variants" && <VariantsModal item={item} canWrite={canWrite} canSeeCost={canSeeCost} canWriteCost={canWriteCost} onClose={() => setDialog(null)} onChanged={changed} />}
           {dialog === "pricing" && <PricingModal item={item} canWrite={canWriteCost} onClose={() => setDialog(null)} onChanged={changed} />}
         </>

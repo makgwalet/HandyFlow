@@ -54,10 +54,30 @@ public class CataloguePricingService {
         return settingRepository.findById(tenantId.getValue()).map(CatalogueSetting::isPriceApprovalRequired).orElse(true);
     }
 
+    /** Items are approved before going live only when a tenant switched that on; no row means off. */
+    @Transactional(readOnly = true)
+    public boolean itemApprovalRequired(TenantId tenantId) {
+        return settingRepository.findById(tenantId.getValue()).map(CatalogueSetting::isItemApprovalRequired).orElse(false);
+    }
+
     @Transactional(readOnly = true)
     public CatalogueSettingsResponse settings(TenantId tenantId) {
         var s = settingRepository.findById(tenantId.getValue());
-        return new CatalogueSettingsResponse(s.map(CatalogueSetting::isPriceApprovalRequired).orElse(true), s.map(CatalogueSetting::getUpdatedAt).orElse(null));
+        return new CatalogueSettingsResponse(s.map(CatalogueSetting::isPriceApprovalRequired).orElse(true), s.map(CatalogueSetting::isItemApprovalRequired).orElse(false),
+                s.map(CatalogueSetting::getUpdatedAt).orElse(null));
+    }
+
+    @Transactional
+    public CatalogueSettingsResponse setItemApprovalRequired(TenantId tenantId, boolean required, Caller caller) {
+        boolean was = itemApprovalRequired(tenantId);
+        var s = settingRepository.findById(tenantId.getValue()).orElse(null);
+        if (s == null) s = CatalogueSetting.of(tenantId.getValue(), approvalRequired(tenantId), caller.userId());   // keep the price default (new tenants: on)
+        s.setItemApproval(required, caller.userId());
+        settingRepository.save(s);
+        if (was != required)
+            audit(tenantId, "SETTING", tenantId.getValue(), "Item approval", CatalogueAuditAction.SETTING_CHANGED,
+                    "New items " + (required ? "now need approval before they go live" : "no longer need approval"), caller.userId());
+        return new CatalogueSettingsResponse(s.isPriceApprovalRequired(), s.isItemApprovalRequired(), s.getUpdatedAt());
     }
 
     @Transactional
@@ -70,7 +90,7 @@ public class CataloguePricingService {
         if (was != required)
             audit(tenantId, "SETTING", tenantId.getValue(), "Price approval", CatalogueAuditAction.SETTING_CHANGED,
                     "Price changes " + (required ? "now need approval" : "no longer need approval"), caller.userId());
-        return new CatalogueSettingsResponse(required, s.getUpdatedAt());
+        return new CatalogueSettingsResponse(required, s.isItemApprovalRequired(), s.getUpdatedAt());
     }
 
     // ── Price lists ───────────────────────────────────────────────────────────

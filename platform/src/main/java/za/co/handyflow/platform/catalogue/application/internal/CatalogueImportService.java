@@ -63,7 +63,7 @@ public class CatalogueImportService {
     }
 
     private Options options(TenantId tenantId, Caller caller) {
-        return new Options(pricing.approvalRequired(tenantId), caller.canWritePrices(), false);
+        return new Options(pricing.approvalRequired(tenantId), caller.canWritePrices(), !caller.canApproveItems() && pricing.itemApprovalRequired(tenantId));
     }
 
     private Plan plan(TenantId tenantId, Table table, Mode mode, Context ctx, Caller caller) {
@@ -126,7 +126,8 @@ public class CatalogueImportService {
     }
 
     private void create(TenantId tenantId, Parsed row, Context ctx, Caller caller) {
-        CatalogueItemStatus status = row.status() != null ? row.status() : CatalogueItemStatus.ACTIVE;
+        // With item approval on and no right to approve, the item service makes it a draft when no status is given.
+        CatalogueItemStatus status = row.status();
         catalogueService.createItem(tenantId, new CreateItemRequest(row.name(), row.description(), categoryId(row.category(), ctx),
                 row.unit() == null ? "each" : row.unit(), row.price(), row.vatRate(), row.sku(), row.barcode(), row.brand(), row.type(),
                 row.cost(), row.vatExempt(), status, null), caller);

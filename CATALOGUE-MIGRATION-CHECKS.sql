@@ -125,3 +125,16 @@ WHERE created + updated + unchanged + skipped + failed <> total_rows;
 -- 21. INFO: the last imports per tenant.
 SELECT tenant_id, file_name, mode, total_rows, created, updated, skipped, failed, created_at
 FROM catalogue_import_jobs ORDER BY created_at DESC LIMIT 20;
+
+-- 22. [must be 0 rows] A decided approval where the person who asked also decided (the constraint should make this impossible).
+SELECT id, item_id FROM catalogue_item_approvals WHERE status IN ('APPROVED','REJECTED') AND decided_by = requested_by;
+
+-- 23. [must be 0 rows] More than one open approval request for the same item.
+SELECT item_id, count(*) FROM catalogue_item_approvals WHERE status = 'PENDING' GROUP BY 1 HAVING count(*) > 1;
+
+-- 24. [must be 0 rows] An approved request whose item is still a draft (approval activates the item in the same transaction).
+SELECT a.id, i.name FROM catalogue_item_approvals a JOIN catalogue_items i ON i.id = a.item_id
+WHERE a.status = 'APPROVED' AND i.status = 'DRAFT' AND i.deleted_at IS NULL AND i.status_changed_at < a.decided_at;
+
+-- 25. INFO: tenants that switched item approval on (should be only those who asked; the default is off).
+SELECT tenant_id, price_approval_required, item_approval_required FROM catalogue_settings WHERE item_approval_required;

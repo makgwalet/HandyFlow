@@ -25,6 +25,9 @@ public class CatalogueSetting {
     @Column(name = "price_approval_required", nullable = false)
     private boolean priceApprovalRequired;
 
+    @Column(name = "item_approval_required", nullable = false)
+    private boolean itemApprovalRequired;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -38,6 +41,12 @@ public class CatalogueSetting {
         s.updatedAt = Instant.now();
         s.updatedBy = by;
         return s;
+    }
+
+    public void setItemApproval(boolean itemApprovalRequired, UUID by) {
+        this.itemApprovalRequired = itemApprovalRequired;
+        this.updatedAt = Instant.now();
+        this.updatedBy = by;
     }
 
     public void set(boolean priceApprovalRequired, UUID by) {

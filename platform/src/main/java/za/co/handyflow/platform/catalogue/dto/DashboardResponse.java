@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.UUID;
 
 /** Everything the Catalogue dashboard shows. {@code prices} is null for users who may not see or decide prices. */
-public record DashboardResponse(Counts counts, PriceQueue prices, List<MonthPoint> growth, List<CategoryCount> byCategory,
+public record DashboardResponse(Counts counts, PriceQueue prices, Attention attention, List<MonthPoint> growth, List<CategoryCount> byCategory,
                                 List<RecentItem> recentItems, List<ActivityLine> activity) {
 
     /** Items and products/services are top-level and not archived; variants are counted on their own. */
@@ -17,6 +17,9 @@ public record DashboardResponse(Counts counts, PriceQueue prices, List<MonthPoin
                          long discontinued, long discontinuedRecently, long incomplete) {}
 
     public record PriceQueue(long pending, long scheduled) {}
+
+    /** Items waiting for approval, and imports in the last 30 days that left rows out or failed. */
+    public record Attention(long awaitingApproval, long importsWithProblems) {}
 
     public record RecentItem(UUID id, String name, String sku, String categoryName, String status, BigDecimal defaultPrice, Instant updatedAt, UUID parentId) {}
 

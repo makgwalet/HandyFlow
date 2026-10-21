@@ -826,10 +826,12 @@ export const CATALOGUE_SECTIONS: ModuleSections = {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'items', label: 'Products & services', icon: Package },
     { id: 'categories', label: 'Categories', icon: Tags },
+    { id: 'approvals', label: 'Item approvals', icon: CheckCircle2, anyPermission: ['CATALOGUE_APPROVE', 'CATALOGUE_WRITE', 'CATALOGUE_ADMIN', 'SETTINGS_MANAGE'] },
   ] }, { label: 'Pricing', sections: [
     { id: 'pricelists', label: 'Price lists', icon: Coins, anyPermission: ['CATALOGUE_PRICE_READ', 'CATALOGUE_PRICE_WRITE', 'CATALOGUE_PRICE_APPROVE', 'CATALOGUE_ADMIN'] },
     { id: 'priceapprovals', label: 'Price approvals', icon: CheckCircle2, anyPermission: ['CATALOGUE_PRICE_READ', 'CATALOGUE_PRICE_WRITE', 'CATALOGUE_PRICE_APPROVE'] },
   ] }, { label: 'Data', sections: [
+    { id: 'quality', label: 'Data quality', icon: AlertTriangle, anyPermission: ['CATALOGUE_WRITE', 'CATALOGUE_APPROVE', 'CATALOGUE_ADMIN', 'SETTINGS_MANAGE'] },
     { id: 'import', label: 'Import & export', icon: Upload, anyPermission: ['SETTINGS_MANAGE', 'CATALOGUE_IMPORT', 'CATALOGUE_EXPORT'] },
   ] }, { label: 'Setup', sections: [
     { id: 'units', label: 'Units of measure', icon: Ruler, anyPermission: ['CATALOGUE_ADMIN'] },

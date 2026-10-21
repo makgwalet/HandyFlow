@@ -220,3 +220,25 @@ Limits to know:
 - Export of the whole catalogue is allowed to anyone with the export permission; it is logged in the application log, not in the item history.
 
 Tests: 15 import rules tests and 3 bulk rules tests pass standalone. 16 service tests (Mockito) are written but **not run**. Front end: 139 catalogue tests pass (13 new), lint and type check clean. The backend was not compiled with Spring here and V481 and the new queries have not run against a database.
+
+## 13. Slice 7 status (data quality and item approval): built, not yet run against a database
+
+| Area | What it does |
+|---|---|
+| Data quality | Section "Data quality" (`GET /data-quality`). Runs over every item that is not archived and groups what it finds, biggest group first, each with a plain-words suggestion and the items (up to 100 per group; the true count is shown): possible duplicates, active items with no price, price below cost, price below the minimum, no category, no SKU, goods with no barcode, no description, drafts untouched for 30 days. Click an item to open it in Product 360. Parents of variants are not judged on their own price or codes; variants are not compared with each other for duplicates. |
+| Duplicates | Same name once case, accents, spacing and punctuation are removed, or a Jaro-Winkler similarity of 0.94 or more on the name, within items that share their first three letters. Names that differ in a number ("Cement 25 kg", "Cement 50 kg") are never duplicates. Nothing is merged or deleted for you. |
+| Price privacy | "Price below cost" and "below the minimum" are sent only to users with `CATALOGUE_PRICE_READ`. |
+| Item approval setting | `catalogue_settings.item_approval_required`, per tenant, **off for every existing tenant and for new ones** (Decision 1 concerns price approval; this is a separate switch). Changed on the Item approvals screen by `CATALOGUE_ADMIN`; each change is written to history. |
+| Workflow | With the setting on: a person who cannot approve (no `CATALOGUE_APPROVE`) who creates an item gets a draft (asking for "active" explicitly is refused), and a draft cannot be activated directly by them. They press **Submit for approval** on the item page (optional note). A different person with `CATALOGUE_APPROVE` approves (the item becomes active through the ordinary status change, so its checks run; if one fails nothing is saved and the request stays open) or rejects with a reason (the item stays a draft). The person who asked can withdraw. Only one open request per item. Every step is in the item's history. |
+| Separation | The requester can never approve or reject their own request, whatever permissions they hold: enforced in the service and by a database constraint. `CATALOGUE_APPROVE` is granted to nobody by V477 (owner Decision 2); a role must be given it by hand, and the setting has no effect on people who hold it (they may create active items and activate drafts). |
+| Where it shows | Dashboard tiles "Awaiting approval" and "Imports with problems" (these answer the "failed imports" and "drafts awaiting approval" items left out of Slice 5), the Item approvals screen (Waiting / Approved / Rejected), and a banner with Submit, Approve and Reject on Product 360. Import follows the same rule: with the setting on, rows from someone who cannot approve are created as drafts and an explicit "active" is a problem on the row. |
+
+Limits to know:
+- Variants are created active by the variants screen even when the setting is on; they follow the approval of their main item (submit the main item). A variant cannot be submitted on its own.
+- Approval covers going live only. Edits to an active item, price changes (separate workflow), archiving and deleting are not approved by this.
+- No notification is sent to approvers; they see the dashboard tile and the screen. Notifications need the notification module wired in.
+- Bulk "activate" on drafts is refused for people who cannot approve, item by item, with the reason.
+- Duplicate detection is a flag, not a merge. Merging two items (moving their history and references to one) is not built.
+- The data-quality report is computed when opened over up to a few thousand items; it is not cached or scheduled.
+
+Tests: 10 data-quality rules tests pass standalone. 22 service tests (Mockito: 10 approval, 3 quality, 4 added to the catalogue service, 2 added to the dashboard service) are written but **not run**; the approval entity's own rules are exercised only through those. Front end: 154 catalogue tests pass (15 new), lint and type check clean. The backend was not compiled with Spring here; V482 has not been run against a database.

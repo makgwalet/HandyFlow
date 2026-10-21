@@ -19,6 +19,9 @@ import za.co.handyflow.platform.catalogue.application.internal.CatalogueVariantS
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueDashboardService;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueImportService;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueBulkService;
+import za.co.handyflow.platform.catalogue.application.internal.CatalogueApprovalService;
+import za.co.handyflow.platform.catalogue.application.internal.CatalogueQualityService;
+import za.co.handyflow.platform.catalogue.domain.model.ItemApprovalStatus;
 import za.co.handyflow.platform.catalogue.domain.model.ImportRules;
 import za.co.handyflow.platform.catalogue.domain.model.PriceChangeStatus;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueService.Caller;
@@ -55,6 +58,9 @@ public class CatalogueController {
     private static final String IMPORT = "hasAnyAuthority('CATALOGUE_IMPORT','SETTINGS_MANAGE')";
     private static final String EXPORT = "hasAnyAuthority('CATALOGUE_EXPORT','SETTINGS_MANAGE')";
 
+    private static final String APPROVE = "hasAuthority('CATALOGUE_APPROVE')";
+    private static final String APPROVAL_VIEW = "hasAnyAuthority('CATALOGUE_APPROVE','CATALOGUE_WRITE','SETTINGS_MANAGE')";
+
     private static final String ADMIN = "hasAuthority('CATALOGUE_ADMIN')";
     private static final String PRICE_READ = "hasAuthority('CATALOGUE_PRICE_READ')";
     private static final String PRICE_WRITE = "hasAuthority('CATALOGUE_PRICE_WRITE')";
@@ -68,6 +74,8 @@ public class CatalogueController {
     private final CatalogueDashboardService dashboardService;
     private final CatalogueImportService importService;
     private final CatalogueBulkService bulkService;
+    private final CatalogueApprovalService approvalService;
+    private final CatalogueQualityService qualityService;
 
     /** What the signed-in user may do, from their authorities. */
     private static Caller caller(Authentication auth) {
@@ -77,7 +85,8 @@ public class CatalogueController {
                 a.contains("CATALOGUE_PRICE_READ"),
                 a.contains("CATALOGUE_PRICE_WRITE"),
                 admin || a.contains("CATALOGUE_ARCHIVE"),
-                a.contains("CATALOGUE_PRICE_APPROVE"));
+                a.contains("CATALOGUE_PRICE_APPROVE"),
+                a.contains("CATALOGUE_APPROVE"));
     }
 
     /** Read-only "view as" tokens carry no user id; reads still work and writes are not allowed for them anyway. */
@@ -301,10 +310,15 @@ public class CatalogueController {
 
     @PutMapping("/settings")
     @PreAuthorize(ADMIN)
-    @Operation(summary = "Turn price-change approval on or off for this tenant")
-    public ResponseEntity<ApiResponse<CatalogueSettingsResponse>> updateSettings(@Valid @RequestBody CatalogueSettingsRequest request, Authentication auth) {
-        return ResponseEntity.ok(ApiResponse.success("Settings saved",
-                pricingService.setApprovalRequired(TenantContext.getTenantIdAsObject(), request.priceApprovalRequired(), caller(auth))));
+    @Operation(summary = "Turn price-change approval and item approval on or off for this tenant")
+    public ResponseEntity<ApiResponse<CatalogueSettingsResponse>> updateSettings(@RequestBody CatalogueSettingsRequest request, Authentication auth) {
+        if (request.priceApprovalRequired() == null && request.itemApprovalRequired() == null) throw new IllegalArgumentException("Choose a setting to change.");
+        var tenant = TenantContext.getTenantIdAsObject();
+        var caller = caller(auth);
+        CatalogueSettingsResponse out = pricingService.settings(tenant);
+        if (request.priceApprovalRequired() != null) out = pricingService.setApprovalRequired(tenant, request.priceApprovalRequired(), caller);
+        if (request.itemApprovalRequired() != null) out = pricingService.setItemApprovalRequired(tenant, request.itemApprovalRequired(), caller);
+        return ResponseEntity.ok(ApiResponse.success("Settings saved", out));
     }
 
     @GetMapping("/items/{id}/pricing")
@@ -451,5 +465,58 @@ public class CatalogueController {
                 .header("Content-Disposition", "attachment; filename=\"" + fileName + "\"")
                 .header("Content-Type", "text/csv; charset=UTF-8")
                 .body(body);
+    }
+    // ── Data quality and item approval ───────────────────────────────────────
+
+    @GetMapping("/data-quality")
+    @PreAuthorize(READ)
+    @Operation(summary = "Data-quality report", description = "Missing basics, odd prices, unfinished drafts and possible duplicates. Cost-based findings only for price users.")
+    public ResponseEntity<ApiResponse<DataQualityResponse>> dataQuality(Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(qualityService.report(TenantContext.getTenantIdAsObject(), caller(auth))));
+    }
+
+    @PostMapping("/items/{id}/approval")
+    @PreAuthorize(WRITE)
+    @Operation(summary = "Submit a draft item for approval")
+    public ResponseEntity<ApiResponse<ItemApprovalResponse>> submitForApproval(@PathVariable UUID id, @RequestBody(required = false) ApprovalNoteRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success("Submitted for approval",
+                approvalService.submit(TenantContext.getTenantIdAsObject(), id, request == null ? null : request.note(), caller(auth))));
+    }
+
+    @GetMapping("/items/{id}/approval")
+    @PreAuthorize(READ)
+    @Operation(summary = "The latest approval request of an item (empty when there is none)")
+    public ResponseEntity<ApiResponse<ItemApprovalResponse>> itemApproval(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(approvalService.latest(TenantContext.getTenantIdAsObject(), id).orElse(null)));
+    }
+
+    @GetMapping("/approvals")
+    @PreAuthorize(APPROVAL_VIEW)
+    @Operation(summary = "Item approval requests by status (default: waiting)")
+    public ResponseEntity<ApiResponse<java.util.List<ItemApprovalResponse>>> approvals(@RequestParam(required = false) ItemApprovalStatus status) {
+        return ResponseEntity.ok(ApiResponse.success(approvalService.queue(TenantContext.getTenantIdAsObject(), status)));
+    }
+
+    @PostMapping("/approvals/{id}/approve")
+    @PreAuthorize(APPROVE)
+    @Operation(summary = "Approve a request: the draft becomes active. Not the person who asked.")
+    public ResponseEntity<ApiResponse<ItemApprovalResponse>> approveItem(@PathVariable UUID id, @RequestBody(required = false) ApprovalNoteRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success("Approved",
+                approvalService.approve(TenantContext.getTenantIdAsObject(), id, request == null ? null : request.note(), caller(auth))));
+    }
+
+    @PostMapping("/approvals/{id}/reject")
+    @PreAuthorize(APPROVE)
+    @Operation(summary = "Reject a request with a reason: the item stays a draft")
+    public ResponseEntity<ApiResponse<ItemApprovalResponse>> rejectItem(@PathVariable UUID id, @RequestBody(required = false) ApprovalNoteRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success("Rejected",
+                approvalService.reject(TenantContext.getTenantIdAsObject(), id, request == null ? null : request.note(), caller(auth))));
+    }
+
+    @PostMapping("/approvals/{id}/withdraw")
+    @PreAuthorize(WRITE)
+    @Operation(summary = "Take back your own request")
+    public ResponseEntity<ApiResponse<ItemApprovalResponse>> withdrawApproval(@PathVariable UUID id, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success("Withdrawn", approvalService.withdraw(TenantContext.getTenantIdAsObject(), id, caller(auth))));
     }
 }

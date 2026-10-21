@@ -31,6 +31,9 @@ public class CatalogueDashboardService {
     private final CataloguePriceChangeRepository changeRepository;
     private final CatalogueStructureService structure;
     private final CatalogueService catalogueService;
+    private final CatalogueItemApprovalRepository approvalRepository;
+    private final CatalogueImportJobRepository importJobRepository;
+    private final CataloguePricingService pricing;
 
     private Clock clock = Clock.system(CataloguePricingService.ZONE);
 
@@ -84,7 +87,8 @@ public class CatalogueDashboardService {
         var activity = auditRepository.recent(tenantId, PageRequest.of(0, ACTIVITY_LINES)).stream().map(e -> new ActivityLine(
                 e.getAction().name(), HistoryRules.redact(e.getAction(), e.getDetail(), caller.canSeePrices()), e.getEntityType(), e.getEntityId(), e.getEntityName(), e.getCreatedAt())).toList();
 
-        return new DashboardResponse(counts, prices, growth, byCategory, recent, activity);
+        var attention = new Attention(approvalRepository.countPending(tenantId), importJobRepository.countWithProblemsSince(tenantId, now.minus(java.time.Duration.ofDays(RECENT_DAYS))));
+        return new DashboardResponse(counts, prices, attention, growth, byCategory, recent, activity);
     }
 
     @Transactional(readOnly = true)
@@ -106,12 +110,13 @@ public class CatalogueDashboardService {
         boolean mayKnowPrices = caller.canSeePrices() || caller.canWritePrices() || caller.canApprovePrices();
         var open = mayKnowPrices ? changeRepository.openForItem(tenantId, itemId) : List.<CataloguePriceChange>of();
         boolean pending = open.stream().anyMatch(c -> c.getStatus() == PriceChangeStatus.PENDING);
-        String approval = pending ? "PRICE_CHANGE_PENDING" : item.getStatus() == CatalogueItemStatus.DRAFT ? "DRAFT" : "NONE";
+        var itemApproval = approvalRepository.pendingFor(tenantId, itemId);
+        String approval = itemApproval.isPresent() ? "APPROVAL_PENDING" : pending ? "PRICE_CHANGE_PENDING" : item.getStatus() == CatalogueItemStatus.DRAFT ? "DRAFT" : "NONE";
 
         String parentName = item.isVariant() ? itemRepository.findActiveById(tenantId, item.getParentId()).map(CatalogueItem::getName).orElse(null) : null;
         CatalogueItemResponse response = catalogueService.getItem(tenantId, itemId, caller);
         return new ItemOverviewResponse(response, path,
                 new ItemOverviewResponse.Completeness(result.score(), result.checks().stream().map(c -> new ItemOverviewResponse.CheckLine(c.code(), c.label(), c.passed())).toList()),
-                missing, open.size(), approval, parentName);
+                missing, open.size(), approval, parentName, pricing.itemApprovalRequired(tenantId), itemApproval.map(CatalogueItemApproval::getId).orElse(null));
     }
 }

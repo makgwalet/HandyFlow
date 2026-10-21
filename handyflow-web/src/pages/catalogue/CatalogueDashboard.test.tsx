@@ -19,7 +19,7 @@ afterEach(cleanup)
 
 const dash = (over: Partial<DashboardData> = {}): DashboardData => ({
   counts: { items: 16, products: 12, services: 4, variants: 7, activeSkus: 12, drafts: 2, suspended: 0, discontinued: 1, discontinuedRecently: 1, incomplete: 4 },
-  prices: null,
+  prices: null, attention: { awaitingApproval: 0, importsWithProblems: 0 },
   growth: [{ month: "2026-09", total: 10 }, { month: "2026-10", total: 16 }],
   byCategory: [{ name: "Hardware", count: 9 }, { name: "No category", count: 3 }],
   recentItems: [{ id: "i1", name: "Cement 50kg", sku: "CEM", categoryName: "Hardware", status: "ACTIVE", defaultPrice: 100, updatedAt: "2026-10-20T08:00:00Z", parentId: null }],
@@ -31,7 +31,7 @@ const item = (over: Partial<CatalogueItem> = {}): CatalogueItem => ({
   createdAt: "2026-10-01T08:00:00Z", updatedAt: "2026-10-01T08:00:00Z", attributes: [], variantCount: 0, ...over,
 })
 const overview = (over: Partial<ItemOverview> = {}): ItemOverview => ({
-  item: item(), categoryPath: null, openPriceChanges: 0, approvalState: "NONE", parentName: null, missingAttributes: ["Colour"],
+  item: item(), categoryPath: null, openPriceChanges: 0, approvalState: "NONE", parentName: null, missingAttributes: ["Colour"], approvalRequired: false, pendingApprovalId: null,
   completeness: { score: 60, checks: [{ code: "description", label: "Description", passed: true }, { code: "barcode", label: "Barcode", passed: false }] }, ...over,
 })
 

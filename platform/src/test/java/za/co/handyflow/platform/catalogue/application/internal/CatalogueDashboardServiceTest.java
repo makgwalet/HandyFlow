@@ -38,11 +38,14 @@ class CatalogueDashboardServiceTest {
     @Mock CataloguePriceChangeRepository changes;
     @Mock CatalogueStructureService structure;
     @Mock CatalogueService catalogue;
+    @Mock CatalogueItemApprovalRepository approvals;
+    @Mock CatalogueImportJobRepository importJobs;
+    @Mock CataloguePricingService pricing;
     CatalogueDashboardService service;
 
     @BeforeEach
     void setUp() {
-        service = new CatalogueDashboardService(items, categories, audit, changes, structure, catalogue);
+        service = new CatalogueDashboardService(items, categories, audit, changes, structure, catalogue, approvals, importJobs, pricing);
         service.useClock(Clock.fixed(Instant.parse("2026-10-21T10:00:00Z"), ZoneOffset.UTC));
         when(items.countsByTypeAndStatus(TENANT)).thenReturn(List.of(
                 new Object[] {CatalogueItemType.PRODUCT, CatalogueItemStatus.ACTIVE, 10L},
@@ -60,6 +63,9 @@ class CatalogueDashboardServiceTest {
         when(items.recentlyChanged(any(), any())).thenReturn(List.of());
         when(categories.findAllActive(TENANT)).thenReturn(List.of());
         when(audit.recent(any(), any())).thenReturn(List.of());
+        when(approvals.countPending(TENANT)).thenReturn(2L);
+        when(importJobs.countWithProblemsSince(any(), any())).thenReturn(1L);
+        when(approvals.pendingFor(any(), any())).thenReturn(Optional.empty());
         when(changes.countByStatus(TENANT, PriceChangeStatus.PENDING)).thenReturn(3L);
         when(changes.countByStatus(TENANT, PriceChangeStatus.SCHEDULED)).thenReturn(2L);
     }
@@ -75,6 +81,30 @@ class CatalogueDashboardServiceTest {
         assertThat(counts.variants()).isEqualTo(7L);
         assertThat(counts.activeSkus()).isEqualTo(12L);
         assertThat(counts.incomplete()).isEqualTo(4L);
+    }
+
+    @Test
+    void showsWhatIsWaitingForApprovalAndImportsWithProblems() {
+        var a = service.dashboard(TENANT, CLERK).attention();
+        assertThat(a.awaitingApproval()).isEqualTo(2L);
+        assertThat(a.importsWithProblems()).isEqualTo(1L);
+    }
+
+    @Test
+    void overviewShowsAPendingApprovalAndWhetherApprovalIsRequired() {
+        var d = new CatalogueItem.Details("Widget", "A widget", "WID", null, null, CatalogueItemType.PRODUCT, "each",
+                new BigDecimal("10.00"), new BigDecimal("4.00"), new BigDecimal("15.00"), false);
+        var item = CatalogueItem.create(TENANT, null, d, CatalogueItemStatus.DRAFT);
+        var pending = CatalogueItemApproval.request(TENANT, item.getId(), "please", UUID.randomUUID());
+        when(items.findActiveById(TENANT, item.getId())).thenReturn(Optional.of(item));
+        when(structure.missingRequired(any(), any(), any())).thenReturn(List.of());
+        when(changes.openForItem(any(), any())).thenReturn(List.of());
+        when(approvals.pendingFor(TENANT, item.getId())).thenReturn(Optional.of(pending));
+        when(pricing.itemApprovalRequired(TENANT)).thenReturn(true);
+        var o = service.overview(TENANT, item.getId(), CLERK);
+        assertThat(o.approvalState()).isEqualTo("APPROVAL_PENDING");
+        assertThat(o.approvalRequired()).isTrue();
+        assertThat(o.pendingApprovalId()).isEqualTo(pending.getId());
     }
 
     @Test

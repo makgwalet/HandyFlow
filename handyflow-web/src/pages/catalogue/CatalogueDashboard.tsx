@@ -63,6 +63,8 @@ export default function CatalogueDashboard() {
             <Tile label="Drafts" value={d.counts.drafts} hint="Not yet active" />
             <Tile label="Incomplete records" value={d.counts.incomplete} hint="Missing basic details" />
             <Tile label="Discontinued" value={d.counts.discontinued} hint={`${d.counts.discontinuedRecently} in the last 30 days`} />
+            {(d.attention.awaitingApproval > 0 || d.counts.drafts > 0) && <Tile label="Awaiting approval" value={d.attention.awaitingApproval} hint="Drafts submitted to go live" onClick={() => goTo("approvals")} />}
+            {d.attention.importsWithProblems > 0 && <Tile label="Imports with problems" value={d.attention.importsWithProblems} hint="Last 30 days" onClick={() => goTo("import")} />}
             {d.prices && <Tile label="Price changes waiting" value={d.prices.pending} hint={`${d.prices.scheduled} scheduled`} onClick={() => goTo("priceapprovals")} />}
           </section>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>

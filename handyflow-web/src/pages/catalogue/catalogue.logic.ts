@@ -500,6 +500,7 @@ export interface DashboardData {
   counts: { items: number; products: number; services: number; variants: number; activeSkus: number; drafts: number; suspended: number; discontinued: number; discontinuedRecently: number; incomplete: number }
   /** Null unless the user deals with prices. */
   prices: { pending: number; scheduled: number } | null
+  attention: { awaitingApproval: number; importsWithProblems: number }
   growth: { month: string; total: number }[]
   byCategory: { name: string; count: number }[]
   recentItems: { id: string; name: string; sku: string | null; categoryName: string | null; status: ItemStatus; defaultPrice: number; updatedAt: string; parentId: string | null }[]
@@ -508,10 +509,11 @@ export interface DashboardData {
 
 export interface ItemOverview {
   item: CatalogueItem; categoryPath: string | null; completeness: { score: number; checks: { code: string; label: string; passed: boolean }[] }
-  missingAttributes: string[]; openPriceChanges: number; approvalState: "NONE" | "DRAFT" | "PRICE_CHANGE_PENDING"; parentName: string | null
+  missingAttributes: string[]; openPriceChanges: number; approvalState: "NONE" | "DRAFT" | "PRICE_CHANGE_PENDING" | "APPROVAL_PENDING"; parentName: string | null
+  approvalRequired: boolean; pendingApprovalId: string | null
 }
 
-export const APPROVAL_LABEL: Record<ItemOverview["approvalState"], string> = { NONE: "Nothing waiting", DRAFT: "Draft, not yet active", PRICE_CHANGE_PENDING: "Price change awaiting approval" }
+export const APPROVAL_LABEL: Record<ItemOverview["approvalState"], string> = { NONE: "Nothing waiting", DRAFT: "Draft, not yet active", PRICE_CHANGE_PENDING: "Price change awaiting approval", APPROVAL_PENDING: "Waiting for approval to go live" }
 
 /** Everything still to fix on an item, in plain words: failed checks first, then missing required attributes. */
 export function outstanding(o: ItemOverview): string[] {
@@ -523,6 +525,7 @@ export const ringTone = (score: number) => (score >= 80 ? "var(--hf-success-text
 export const actionText = (a: string) => ({
   CREATED: "Created", UPDATED: "Edited", PRICE_CHANGED: "Price changed", STATUS_CHANGED: "Status changed", DELETED: "Deleted",
   PRICE_PROPOSED: "Price change proposed", PRICE_APPROVED: "Price change approved", PRICE_REJECTED: "Price change rejected", PRICE_CANCELLED: "Price change cancelled", SETTING_CHANGED: "Setting changed",
+  APPROVAL_REQUESTED: "Submitted for approval", ITEM_APPROVED: "Approved", ITEM_REJECTED: "Rejected", APPROVAL_WITHDRAWN: "Request withdrawn",
 }[a] ?? a)
 
 /** Share of the largest value, 0–100, for the plain bar charts. */
@@ -600,3 +603,23 @@ export function saveText(fileName: string, text: string): void {
     URL.revokeObjectURL(url)
   } catch { /* no download support, e.g. in tests */ }
 }
+
+
+// ── Data quality and item approval ───────────────────────────────────────────
+export interface QualityFinding { itemId: string; name: string; sku: string | null; detail: string }
+export interface QualityGroup { kind: string; label: string; advice: string; count: number; items: QualityFinding[] }
+export interface DataQuality { scanned: number; total: number; groups: QualityGroup[] }
+
+export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED" | "WITHDRAWN"
+export const APPROVAL_TABS: { id: ApprovalStatus; label: string }[] = [{ id: "PENDING", label: "Waiting" }, { id: "APPROVED", label: "Approved" }, { id: "REJECTED", label: "Rejected" }]
+export interface ItemApproval {
+  id: string; itemId: string; itemName: string | null; sku: string | null; itemStatus: string | null; status: ApprovalStatus
+  requestedBy: string | null; requestedAt: string; note: string | null; decidedBy: string | null; decidedAt: string | null; decisionNote: string | null
+}
+export interface CatalogueSettings { priceApprovalRequired: boolean; itemApprovalRequired: boolean; updatedAt: string | null }
+
+/** Rejecting needs a reason; approving and submitting do not. */
+export const rejectProblem = (note: string): string | null => (note.trim().length < 3 ? "Give a reason of at least 3 characters." : null)
+
+export const qualityText = (q: DataQuality) =>
+  q.total === 0 ? `Nothing to fix across ${q.scanned} item${q.scanned === 1 ? "" : "s"}.` : `${q.total} thing${q.total === 1 ? "" : "s"} to look at across ${q.scanned} item${q.scanned === 1 ? "" : "s"}.`

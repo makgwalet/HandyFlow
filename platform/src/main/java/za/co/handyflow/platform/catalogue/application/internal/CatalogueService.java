@@ -51,9 +51,12 @@ public class CatalogueService {
     private final CataloguePricingService pricing;
 
     /** Who is asking and what they may do. Built by the controller from the signed-in user's authorities. */
-    public record Caller(UUID userId, boolean canSeePrices, boolean canWritePrices, boolean canArchive, boolean canApprovePrices) {
+    public record Caller(UUID userId, boolean canSeePrices, boolean canWritePrices, boolean canArchive, boolean canApprovePrices, boolean canApproveItems) {
+        public Caller(UUID userId, boolean canSeePrices, boolean canWritePrices, boolean canArchive, boolean canApprovePrices) {
+            this(userId, canSeePrices, canWritePrices, canArchive, canApprovePrices, false);
+        }
         public Caller(UUID userId, boolean canSeePrices, boolean canWritePrices, boolean canArchive) {
-            this(userId, canSeePrices, canWritePrices, canArchive, false);
+            this(userId, canSeePrices, canWritePrices, canArchive, false, false);
         }
     }
 
@@ -118,9 +121,13 @@ public class CatalogueService {
 
     @Transactional
     public CatalogueItemResponse createItem(TenantId tenantId, CreateItemRequest r, Caller caller) {
-        CatalogueItemStatus status = r.status() == null ? CatalogueItemStatus.ACTIVE : r.status();
+        // When the tenant approves items before they go live, someone who cannot approve creates drafts.
+        boolean mustBeApproved = !caller.canApproveItems() && pricing.itemApprovalRequired(tenantId);
+        CatalogueItemStatus status = r.status() == null ? (mustBeApproved ? CatalogueItemStatus.DRAFT : CatalogueItemStatus.ACTIVE) : r.status();
         if (status != CatalogueItemStatus.ACTIVE && status != CatalogueItemStatus.DRAFT)
             throw new IllegalArgumentException("A new item can only start as a draft or active.");
+        if (status == CatalogueItemStatus.ACTIVE && mustBeApproved)
+            throw new IllegalArgumentException("New items need approval before they go live. Save it as a draft and submit it for approval.");
         if (r.costPrice() != null && !caller.canWritePrices()) throw new AccessDeniedException("You are not allowed to set the cost price.");
 
         CatalogueCategory category = category(tenantId, r.categoryId());
@@ -178,6 +185,8 @@ public class CatalogueService {
         if (r.status().needsArchivePermission() && !caller.canArchive())
             throw new AccessDeniedException("You are not allowed to discontinue or archive items.");
         var from = item.getStatus();
+        if (from == CatalogueItemStatus.DRAFT && r.status() == CatalogueItemStatus.ACTIVE && !caller.canApproveItems() && pricing.itemApprovalRequired(tenantId))
+            throw new IllegalArgumentException("This draft needs approval before it goes live. Submit it for approval.");
         String reason = CatalogueRules.checkTransition(from, r.status(), r.reason());
         if (r.status() == CatalogueItemStatus.ACTIVE && (item.getUnit() == null || item.getDefaultPrice() == null))
             throw new IllegalArgumentException("The item needs a unit and a price before it can be activated.");

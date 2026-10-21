@@ -442,4 +442,38 @@ class CatalogueServiceTest {
         var page = service.listItems(TENANT, new CatalogueService.ItemFilter(null, null, null, null), 0, 25, "name", false, ADMIN);
         assertThat(page.getContent().get(0).variantCount()).isEqualTo(3L);
     }
+    // ── Item approval ──
+
+    private static final Caller APPROVER = new Caller(UUID.randomUUID(), false, false, false, false, true);
+
+    @Test
+    void whenItemsNeedApprovalANewItemFromSomeoneWhoCannotApproveIsADraft() {
+        when(pricing.itemApprovalRequired(TENANT)).thenReturn(true);
+        assertThat(service.createItem(TENANT, req("Cement", "C-1", "100", null), CLERK).status()).isEqualTo("DRAFT");
+    }
+
+    @Test
+    void whenItemsNeedApprovalAskingForActiveIsRefusedButAnApproverMay() {
+        when(pricing.itemApprovalRequired(TENANT)).thenReturn(true);
+        var active = new CreateItemRequest("A", null, null, "each", BigDecimal.ONE, null, null, null, null, null, null, null, CatalogueItemStatus.ACTIVE, null);
+        assertThatThrownBy(() -> service.createItem(TENANT, active, CLERK)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("need approval");
+        assertThat(service.createItem(TENANT, req("Sand", "S-1", "5", null), APPROVER).status()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void withoutTheSettingNothingChanges() {
+        when(pricing.itemApprovalRequired(TENANT)).thenReturn(false);
+        assertThat(service.createItem(TENANT, req("Cement", "C-1", "100", null), CLERK).status()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void aDraftCannotBeActivatedDirectlyWhenApprovalIsRequired() {
+        var draft = CatalogueItem.create(TENANT, null, new CatalogueItem.Details("Brick", null, "B-1", null, null, CatalogueItemType.PRODUCT, "each",
+                new BigDecimal("5.00"), null, new BigDecimal("15.00"), false), CatalogueItemStatus.DRAFT);
+        when(items.findActiveById(TENANT, draft.getId())).thenReturn(Optional.of(draft));
+        when(pricing.itemApprovalRequired(TENANT)).thenReturn(true);
+        assertThatThrownBy(() -> service.changeStatus(TENANT, draft.getId(), new ItemStatusRequest(CatalogueItemStatus.ACTIVE, null, null), CLERK))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("needs approval");
+        assertThat(service.changeStatus(TENANT, draft.getId(), new ItemStatusRequest(CatalogueItemStatus.ACTIVE, null, null), APPROVER).status()).isEqualTo("ACTIVE");
+    }
 }

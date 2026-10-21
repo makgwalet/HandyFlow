@@ -10,13 +10,14 @@ const ItemsPanel = lazy(() => import("./ItemsPanel")), CategoriesPanel = lazy(()
 const UnitsPanel = lazy(() => import("./UnitsPanel")), AttributesPanel = lazy(() => import("./AttributesPanel"))
 const CatalogueDashboard = lazy(() => import("./CatalogueDashboard"))
 const ImportPanel = lazy(() => import("./ImportPanel"))
+const DataQualityPanel = lazy(() => import("./DataQualityPanel")), ItemApprovalsPanel = lazy(() => import("./ItemApprovalsPanel"))
 const PriceListsPanel = lazy(() => import("./PriceListsPanel")), PriceApprovalsPanel = lazy(() => import("./PriceApprovalsPanel"))
 
 export function CataloguePage() {
   return (
     <SectionedModulePage config={CATALOGUE_SECTIONS} subtitle="Manage your products and services" render={id => (
       <Suspense fallback={<p>Loading…</p>}>
-        {id === "dashboard" ? <CatalogueDashboard /> : id === "items" ? <ItemsPanel /> : id === "categories" ? <CategoriesPanel /> : id === "units" ? <UnitsPanel /> : id === "attributes" ? <AttributesPanel /> : id === "pricelists" ? <PriceListsPanel /> : id === "import" ? <ImportPanel /> : id === "priceapprovals" ? <PriceApprovalsPanel /> : null}
+        {id === "dashboard" ? <CatalogueDashboard /> : id === "items" ? <ItemsPanel /> : id === "categories" ? <CategoriesPanel /> : id === "units" ? <UnitsPanel /> : id === "attributes" ? <AttributesPanel /> : id === "pricelists" ? <PriceListsPanel /> : id === "quality" ? <DataQualityPanel /> : id === "approvals" ? <ItemApprovalsPanel /> : id === "import" ? <ImportPanel /> : id === "priceapprovals" ? <PriceApprovalsPanel /> : null}
       </Suspense>
     )} />
   )
