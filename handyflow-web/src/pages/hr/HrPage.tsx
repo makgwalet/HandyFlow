@@ -7,7 +7,7 @@ import HrDashboard     from "./HrDashboard"
 import EmployeesTab    from "./EmployeesTab"
 import LeaveTab        from "./LeaveTab"
 import PayrollTab      from "./PayrollTab"
-import DisciplinaryTab from "./DisciplinaryTab"
+import EmployeeRelationsTab from "./EmployeeRelationsTab"
 import ComplianceTab   from "./ComplianceTab"
 import PayrollChecksTab from "./PayrollChecksTab"
 import TaxCertificatesTab from "./TaxCertificatesTab"
@@ -30,7 +30,7 @@ export function HrPage() {
           case "tax-certificates": return <TaxCertificatesTab />
           case "onboarding":   return <OnboardingTab />
           case "attendance":   return <AttendanceTab />
-          case "disciplinary": return <DisciplinaryTab />
+          case "disciplinary": return <EmployeeRelationsTab />
           case "compliance":   return <ComplianceTab />
           default:             return null
         }

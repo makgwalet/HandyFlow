@@ -401,3 +401,60 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - Bonus, back pay, final pay and the SARS averaging method are still outstanding in payroll.
 - If a way to cancel a calculated pay run is added, it must release that run's overtime claims (`OvertimeService.takeFor` already does so on recalculation).
 - Employees whose login is not linked to their record cannot clock in; the screen says so.
+
+## 14. Slice 8 status: employee relations (discipline, grievances, incapacity)
+
+**What was wrong**
+
+- The only record was one table of disciplinary entries with a single sanction. There was no process behind it: no notice, charges, hearing, chair, finding, appeal or timeline, and nothing for grievances or incapacity.
+- The screen sent incident types (such as `NOTICE_TO_ATTEND`) that the database check on `incident_type` refused for some values, and the Security complaint referral sent values that check did not allow either. Saving could fail on a valid choice.
+- `HrController` has not compiled since Slice 4. My Slice 4 patch (e7395e93) deleted `HrService.recordDisciplinaryOutcome` while the controller still called it. Patch 0420 removes that endpoint.
+- Nothing stopped a person working a case about themselves, and nothing kept sensitive cases (harassment, ill health) from everyone with general HR access.
+
+**What changed**
+
+- One case table, `hr_er_cases` (the old `hr_disciplinary` table renamed, ids kept), now holds discipline, grievances and incapacity, each with its own route:
+  - Discipline: reported, investigating, notice issued, hearing held, decided, appealed, closed (or withdrawn). Charges are stated in the notice and each gets a finding. A counselling, verbal warning or written warning may be given without a hearing after the employee has responded (the "informal" route). A final written warning or a dismissal needs notice and a hearing.
+  - Grievance: lodged by the employee (or by HR for them), decided by someone who is neither the complainant nor the person complained about, with a "next level" to a different decider.
+  - Incapacity: poor performance or ill health, with the steps the process expects recorded (standard set, support given, time to improve; or nature investigated, medical evidence, alternatives considered), a review period, a meeting, and an outcome.
+- The case timeline (`hr_er_events`) is kept by a database trigger that refuses edits and deletes. Each entry says whether the employee may see it.
+- Warnings carry a validity in months from company policy and are listed as in force or expired. The chair sees the employee's warnings in force when deciding. A warning that came from the old screen, with no recorded validity, is listed separately and not counted as in force.
+- Appeal: the deadline runs from the day the employee was told. An appeal can confirm, replace with a lighter outcome, or overturn. It can never make the outcome harsher. A dismissal records the date the employee was told and the 30-day CCMA referral deadline.
+- Precautionary suspension is recorded on full pay, with reason and dates. It does not change the employee's status, because payroll pays people whose status is ACTIVE.
+- Company policy (`hr_er_policy`, screen: Policy and warnings): hearing notice 48 hours, warnings valid 3, 6 and 12 months, 7 days to appeal, 5 working days to answer a grievance, 28 days minimum review. These are defaults for you to change, not law.
+- Permissions `HR_ER_READ`, `HR_ER_MANAGE`, `HR_ER_DECIDE` (V493), given to roles that hold `HR_MANAGE`; `HR_ER_READ` also to roles that hold `HR_READ`. Cases that are confidential (ill health, harassment, discrimination, victimisation, or flagged by HR) also need `HR_SENSITIVE_READ` unless you own the case; one you may not see answers "not found". Nobody may work a case about themselves.
+- Case numbers `ER-YYYY-NNNN`, from an atomic counter.
+- Employees see their own matters under People > Employee relations > My cases: a grievance they raised always; a matter against them only once they have been given notice or an outcome. Investigation notes and the case officer's working are never sent to them. They can lodge a grievance, confirm they received an outcome (this is not agreement) and appeal.
+- Old records: kept, marked "Imported record"; closed, with the old sanction as the outcome.
+
+**Rules I took from outside the code, and how sure I am**
+
+- The figures that come from law: 30 days to refer a dismissal dispute to the CCMA. Everything else numerical is company policy.
+- The 2025 Code of Good Practice: Dismissal asks for a fair reason and a fair procedure, reasonable notice of a hearing, a chance to respond, and, for poor performance and ill health, the steps built into the incapacity route. I took the content of those expectations from law-firm summaries, not the Code. The sources disagreed on the date it took effect; I did not settle it.
+- The informal route (a written warning without a hearing) is my own decision about what a small business reasonably does. Many policies require a hearing for a written warning; if yours does, say so and I will move it.
+
+**Decisions I took that you may want to change**
+
+- The table was renamed, not just extended, so any query that names `hr_disciplinary` would break. I found none in the Java code; Security keeps a column called `hr_disciplinary_id`, which still holds the same case ids and needed no change.
+- People who hold only `USER_READ` no longer see disciplinary cases.
+- Working days for the grievance response skip weekends, not public holidays (no tenant holiday calendar yet).
+- A dismissal outcome does not terminate the employee. Termination and final pay stay separate steps.
+- Suspension without pay is not offered.
+- An appeal decider may not be the chair of the original hearing.
+
+**Not verified**
+
+- The Maven build, every Mockito test for Slices 1 to 8, and migrations V488 to V493 have not been run. V493 and the JPQL have not run against PostgreSQL; the Hibernate mappings have not been validated by Spring.
+- In a standalone harness: 49 rules tests and 73 service tests pass; a deliberate break of the logic made 3 of 39 sampled tests fail. The harness uses my own small stand-ins for Mockito, Spring and Lombok, so it shows the logic is consistent, not that the wiring works.
+- `HrService` and `HrController` edits were read through but not compiled in that harness. Package-private injection of `ErCaseSupport` and `ErCaseViews` is untested.
+- Front end: 19 tests in `EmployeeRelations.test.tsx` pass (a deliberate break of the notice and decision checks made 2 fail); ESLint reports nothing in the new files; `tsc` reports the same 138 errors as before and none in these files. Not looked at in a browser.
+
+**Open items**
+
+- Letters: the notice of hearing, outcome letters and warning letters should come from the Letter & Document Generation Centre; for now the screen records the facts and the employee sees them on screen.
+- Evidence and attachments are not built.
+- No notifications or reminders (grievance late, hearing tomorrow, appeal window closing).
+- Recording a dismissal does not start termination or final pay.
+- No public holiday calendar for working-day counts.
+- Old warnings with no recorded validity need a person to set it.
+- The Security complaint referral still opens a plain disciplinary case; it does not carry the complaint's evidence across.

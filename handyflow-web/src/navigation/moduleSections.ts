@@ -337,7 +337,7 @@ export const HR_SECTIONS: ModuleSections = {
         { id: 'leave', label: 'Leave', icon: Calendar },
         { id: 'attendance', label: 'Attendance', icon: Clock },
         { id: 'onboarding', label: 'Onboarding', icon: UserPlus, anyPermission: ['HR_READ', 'HR_MANAGE', 'HR_TEAM_READ', 'HR_ONBOARDING_MANAGE'] },
-        { id: 'disciplinary', label: 'Disciplinary', icon: AlertOctagon },
+        { id: 'disciplinary', label: 'Employee relations', icon: AlertOctagon },
       ],
     },
     {
