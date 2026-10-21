@@ -264,3 +264,48 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - Employees cannot cancel their own request from the portal yet.
 - Sick leave that crosses a cycle boundary counts against the cycle it starts in.
 - Reading a balance can write an accrual entry; two requests made at the same moment can collide on the unique key and need a retry.
+
+## 11. Slice 5 status: tax certificates and the EMP501 workpaper
+
+**What was missing**
+
+- No IRP5 or IT3(a), no EMP501 figures and no way to compare the EMP201 returns with what employees were paid. Section 4 already recorded this as PARTIAL.
+
+**What changed**
+
+- Certificates are built per employee for the interim (March to August) or annual (March to February) reconciliation, from payslips of finalised pay runs only. Tax years are named by the year they end in (2027 is 1 March 2026 to 28 February 2027).
+- A certificate is an IRP5 when tax was deducted and an IT3(a) when none was. Each gets a 30-digit number: the employer's 10-digit PAYE reference, the 4-digit year, the period digits (08 or 02) and 14 digits from a sequence. Numbers are never reused, including after cancelling.
+- The reconciliation compares PAYE, UIF and SDL three ways (payslips, certificates, EMP201 returns). Issuing is refused while a run is not finalised, an EMP201 is missing, the three do not agree, the employer's PAYE reference is missing, or an employee has no valid ID number or has tax deducted above the income paid.
+- Issued certificates are locked by database triggers (no update except cancel and release, no delete). A correction cancels the old one and issues the next version with a new number and a reason.
+- Interim certificates cannot be released to employees (SARS: interim is for SARS only). Annual ones are released by an explicit action, then appear in the employee portal.
+- New right `PAYROLL_CERTIFICATE_ISSUE` (administrators only). Viewing and the spreadsheet use `PAYROLL_STATUTORY_EXPORT`. The employer's PAYE, SDL and UIF reference numbers and the retirement fund type are set by `PAYROLL_CONFIGURATION_ADMIN`.
+- Payslips now keep the medical tax credit actually applied (code 4116). Earlier payslips have none recorded and the certificate says so.
+
+**What the certificate does not contain, and why it matters**
+
+- Only these codes are produced: 3601, 3605, 3607, 3701, 3713 (income), 4001/4003/4006 and 4005 (employee contributions), 4102, 4116, 4141, 4142 (tax).
+- Not produced: the totals SARS also requires (3695 to 3699, 3696, 4149), 4582, employer contributions (3810, 3817, 3825, 3828, 4472 to 4475) and all other fringe benefits. SARS's own documents I could read confirm 3696 as non-taxable income and 3699 as taxable gross employment income, but not how they are built, and payroll does not record employer contributions at all. **Where an employer pays towards medical aid or a retirement fund, a certificate from here understates taxable income.**
+- The spreadsheet is a workpaper to complete the submission from in e@syFile. It is not a SARS import file.
+
+**Decisions I took that you may want to change**
+
+- One retirement fund type for the whole company (pension, provident or retirement annuity), because payroll does not record it per employee.
+- Bonuses and overtime would use 3605 and 3607 if payroll ever paid them; today it pays neither, so they are always zero.
+- The travel allowance is reported in full under 3701; how SARS wants the taxable portion shown was not confirmed.
+- Payments to SARS are not recorded in HandyFlow, so the reconciliation cannot compare with what was paid. It says so on screen.
+
+**Not verified**
+
+- Maven build and every Mockito test, including `TaxCertificateServiceTest`. The JPQL (`paidBetween`, `findByPayRuns`, `forPayRuns`, `forReconciliation`, `releasedFor`) and migration V489 have not been run.
+- Run and passing in a standalone harness: `TaxCertificateRulesTest` (18).
+- Front end: 15 tests in `TaxCertificates.test.tsx` pass; ESLint reports nothing in the new files. Not looked at in a browser.
+- Not checked against SARS: the validation rules for the file (field lengths, nature of person, tolerances between EMP201 and certificates). I could not read the Business Requirement Specification (V25.3.0).
+
+**Open items**
+
+- Employer medical aid and retirement fund contributions and the other fringe benefits, so the certificate is complete.
+- The SARS import file for e@syFile, and a certificate PDF in SARS's layout for employees.
+- Recording payments made to SARS against each EMP201.
+- Bonus, overtime and back pay in payroll (the engine pays a regular monthly salary only).
+- ETI is not modelled.
+- Certificates for employees who left mid-year show the months they worked but not their reasons for leaving or directive numbers.

@@ -216,7 +216,7 @@ public class TaxCertificateService {
     private Certificate draftResponse(Prepared p, Draft d) {
         HrEmployee e = d.employee();
         HrTaxCertificate ex = d.existing();
-        return new Certificate(null, p.taxYear(), p.period(), e.getId(), e.getEmployeeNumber(), e.getFullName(), e.getIdNumber(), e.getTaxNumber(),
+        return new Certificate(ex == null ? null : ex.getId(), p.taxYear(), p.period(), e.getId(), e.getEmployeeNumber(), e.getFullName(), e.getIdNumber(), e.getTaxNumber(),
                 ex == null ? null : ex.getCertificateNumber(), d.type(), ex == null ? 1 : ex.getVersion() + ("CHANGED".equals(d.state()) ? 1 : 0), "DRAFT", d.state(),
                 p.window().start(), p.window().end(), d.totals().payslips(), ex == null ? null : ex.getIssuedAt(), null, null, ex == null ? null : ex.getReleasedAt(),
                 d.lines().stream().map(l -> new Line(l.code(), l.description(), l.amount())).toList(),

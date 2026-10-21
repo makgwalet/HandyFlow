@@ -20,7 +20,7 @@ public final class TaxCertificateDtos {
     public record Recon(String tax, BigDecimal payslips, BigDecimal certificates, BigDecimal emp201, BigDecimal difference, boolean balanced) {}
 
     /**
-     * A certificate: either one that would be issued (id null) or one that was. {@code state} for a draft is NEW (nothing issued
+     * A certificate: one that would be issued, or one that was. For a draft, {@code id} is the id of the certificate already issued for the employee, if any. {@code state} for a draft is NEW (nothing issued
      * yet), UNCHANGED (the issued one has the same figures) or CHANGED (the figures differ from the issued one).
      */
     public record Certificate(UUID id, int taxYear, String period, UUID employeeId, String employeeNumber, String employeeName,
