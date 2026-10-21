@@ -1,12 +1,13 @@
 // src/pages/catalogue/ItemsPanel.tsx — the catalogue list: server-side search, filters, sorting and paging; add/edit, lifecycle changes, history and delete.
 import { useEffect, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query"
-import { ChevronLeft, ChevronRight, Coins, History, Package, Pencil, Plus, Power, Search, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Coins, History, Layers, Package, Pencil, Plus, Power, Search, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { DeleteModal, ErrorBanner, Field, Modal, StatusBadge } from "./CatalogueKit"
 import { inp, inpErr, sel } from "./catalogue.styles"
 import PricingModal from "./PricingModal"
+import VariantsModal from "./VariantsModal"
 import {
   EMPTY_FILTERS, EMPTY_ITEM_FORM, applicableAttributes, attributeProblems, indented, matchUnit, ITEM_STATUSES, ITEM_TYPES, STATUS_LABEL, allowedMoves, duplicateField, errorMessage, fieldErrors, hasFilters, itemBody, itemProblems,
   listParams, marginText, moveLabel, moveNeedsReason, rand, rangeText, statusProblem, toItemForm, typeLabel,
@@ -31,6 +32,7 @@ export default function ItemsPanel() {
   const [statusFor, setStatusFor] = useState<CatalogueItem | null>(null)
   const [historyFor, setHistoryFor] = useState<CatalogueItem | null>(null)
   const [pricingFor, setPricingFor] = useState<CatalogueItem | null>(null)
+  const [variantsFor, setVariantsFor] = useState<CatalogueItem | null>(null)
   const [deleting, setDeleting] = useState<CatalogueItem | null>(null)
   const [deleteError, setDeleteError] = useState("")
 
@@ -113,6 +115,8 @@ export default function ItemsPanel() {
                   <tr key={i.id} style={{ borderTop: idx === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
                     <td style={{ padding: "12px 14px", minWidth: 200 }}>
                       <p style={{ fontSize: 14, fontWeight: 600, color: "var(--hf-text)", margin: 0 }}>{i.name}</p>
+                      {(i.variantCount ?? 0) > 0 && <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "2px 0 0" }}>{i.variantCount} {i.variantCount === 1 ? "variant" : "variants"}</p>}
+                      {i.parentId && i.variantLabel && <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "2px 0 0" }}>Variant: {i.variantLabel}</p>}
                       {(i.sku || i.barcode || i.brand) && <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: "2px 0 0" }}>{[i.sku && `SKU ${i.sku}`, i.barcode && `Barcode ${i.barcode}`, i.brand].filter(Boolean).join(" · ")}</p>}
                       {i.description && <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: "2px 0 0" }}>{i.description}</p>}
                     </td>
@@ -127,7 +131,8 @@ export default function ItemsPanel() {
                       <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
                         {canWrite && i.status !== "ARCHIVED" && <button type="button" style={ghost} aria-label={`Edit ${i.name}`} onClick={() => setEditing(i)}><Pencil size={12} /> Edit</button>}
                         {canWrite && allowedMoves(i.status, canArchive).length > 0 && <button type="button" style={ghost} aria-label={`Change status of ${i.name}`} onClick={() => setStatusFor(i)}><Power size={12} /> Status</button>}
-                        {canSeeCost && i.status !== "ARCHIVED" && <button type="button" style={ghost} aria-label={`Pricing of ${i.name}`} onClick={() => setPricingFor(i)}><Coins size={12} /> Pricing</button>}
+                        {(canWrite || (i.variantCount ?? 0) > 0) && !i.parentId && i.status !== "ARCHIVED" && <button type="button" style={ghost} aria-label={`Variants of ${i.name}`} onClick={() => setVariantsFor(i)}><Layers size={12} /> Variants</button>}
+                        {canSeeCost && i.status !== "ARCHIVED" && (i.variantCount ?? 0) === 0 && <button type="button" style={ghost} aria-label={`Pricing of ${i.name}`} onClick={() => setPricingFor(i)}><Coins size={12} /> Pricing</button>}
                         <button type="button" style={ghost} aria-label={`History of ${i.name}`} onClick={() => setHistoryFor(i)}><History size={12} /></button>
                         {canArchive && <button type="button" style={ghost} aria-label={`Delete ${i.name}`} onClick={() => { setDeleting(i); setDeleteError("") }}><Trash2 size={13} /></button>}
                       </div>
@@ -151,6 +156,7 @@ export default function ItemsPanel() {
       {editing && <ItemFormModal item={editing === "new" ? null : editing} categories={categories.data ?? []} canSeeCost={canSeeCost} canWriteCost={canWriteCost}
         onClose={() => setEditing(null)} onSaved={() => { refresh(); setEditing(null) }} onStale={refresh} />}
       {statusFor && <StatusDialog item={statusFor} canArchive={canArchive} onClose={() => setStatusFor(null)} onDone={() => { refresh(); setStatusFor(null) }} onStale={refresh} />}
+      {variantsFor && <VariantsModal item={variantsFor} canWrite={canWrite} canSeeCost={canSeeCost} canWriteCost={canWriteCost} onClose={() => setVariantsFor(null)} onChanged={refresh} />}
       {pricingFor && <PricingModal item={pricingFor} canWrite={canWriteCost} onClose={() => setPricingFor(null)} onChanged={refresh} />}
       {historyFor && <HistoryModal item={historyFor} onClose={() => setHistoryFor(null)} />}
       {deleting && (

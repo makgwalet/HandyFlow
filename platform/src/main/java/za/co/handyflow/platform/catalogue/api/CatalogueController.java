@@ -15,6 +15,7 @@ import za.co.handyflow.platform.catalogue.CatalogueItemSummary;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueService;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueStructureService;
 import za.co.handyflow.platform.catalogue.application.internal.CataloguePricingService;
+import za.co.handyflow.platform.catalogue.application.internal.CatalogueVariantService;
 import za.co.handyflow.platform.catalogue.domain.model.PriceChangeStatus;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueService.Caller;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueService.ItemFilter;
@@ -56,6 +57,7 @@ public class CatalogueController {
     private final CatalogueService catalogueService;
     private final CatalogueStructureService structureService;
     private final CataloguePricingService pricingService;
+    private final CatalogueVariantService variantService;
 
     /** What the signed-in user may do, from their authorities. */
     private static Caller caller(Authentication auth) {
@@ -350,5 +352,29 @@ public class CatalogueController {
     @Operation(summary = "Cancel an open price change", description = "The proposer, or an approver.")
     public ResponseEntity<ApiResponse<PriceChangeResponse>> cancelPrice(@PathVariable UUID id, @RequestBody(required = false) PriceDecisionRequest request, Authentication auth) {
         return ResponseEntity.ok(ApiResponse.success("Price change cancelled", pricingService.cancel(TenantContext.getTenantIdAsObject(), id, request, caller(auth))));
+    }
+    // ── Variants ─────────────────────────────────────────────────────────────
+
+    @GetMapping("/items/{id}/variants")
+    @PreAuthorize(READ)
+    @Operation(summary = "Options and variants of an item")
+    public ResponseEntity<ApiResponse<VariantsResponse>> variants(@PathVariable UUID id, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(variantService.view(TenantContext.getTenantIdAsObject(), id, caller(auth))));
+    }
+
+    @PostMapping("/items/{id}/variants")
+    @PreAuthorize(WRITE)
+    @Operation(summary = "Add variants to an item", description = "Options with their values, and the combinations to create. A variant is an item of its own.")
+    public ResponseEntity<ApiResponse<VariantsResponse>> createVariants(@PathVariable UUID id, @RequestBody CreateVariantsRequest request, Authentication auth) {
+        var out = variantService.create(TenantContext.getTenantIdAsObject(), id, request, caller(auth));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Variants created", out));
+    }
+
+    @PutMapping("/items/{id}/variants/{variantId}")
+    @PreAuthorize(WRITE)
+    @Operation(summary = "Edit a variant's SKU, barcode, price and cost")
+    public ResponseEntity<ApiResponse<CatalogueItemResponse>> updateVariant(
+            @PathVariable UUID id, @PathVariable UUID variantId, @RequestBody UpdateVariantRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success("Variant updated", variantService.update(TenantContext.getTenantIdAsObject(), id, variantId, request, caller(auth))));
     }
 }

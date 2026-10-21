@@ -15,13 +15,15 @@ import java.util.UUID;
 public interface CatalogueItemRepository extends JpaRepository<CatalogueItem, UUID>, JpaSpecificationExecutor<CatalogueItem> {
 
     /** Items that may be picked for new quotes, invoices and sales. */
-    @Query("SELECT i FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL AND i.status = za.co.handyflow.platform.catalogue.domain.model.CatalogueItemStatus.ACTIVE ORDER BY i.name")
+    @Query("SELECT i FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL AND i.status = za.co.handyflow.platform.catalogue.domain.model.CatalogueItemStatus.ACTIVE "
+            + "AND NOT EXISTS (SELECT 1 FROM CatalogueItem v WHERE v.parentId = i.id AND v.deletedAt IS NULL) ORDER BY i.name")
     List<CatalogueItem> findAllSellable(TenantId tenantId);
 
     /** Same, narrowed by what the user typed: matches name, SKU, barcode or brand. */
     @Query("SELECT i FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL AND i.status = za.co.handyflow.platform.catalogue.domain.model.CatalogueItemStatus.ACTIVE "
             + "AND (LOWER(i.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(i.sku) LIKE LOWER(CONCAT('%', :search, '%')) "
-            + "OR LOWER(i.barcode) = LOWER(:search) OR LOWER(i.brand) LIKE LOWER(CONCAT('%', :search, '%'))) ORDER BY i.name")
+            + "OR LOWER(i.barcode) = LOWER(:search) OR LOWER(i.brand) LIKE LOWER(CONCAT('%', :search, '%'))) "
+            + "AND NOT EXISTS (SELECT 1 FROM CatalogueItem v WHERE v.parentId = i.id AND v.deletedAt IS NULL) ORDER BY i.name")
     List<CatalogueItem> searchSellable(TenantId tenantId, String search);
 
     @Query("SELECT i FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.id = :id AND i.deletedAt IS NULL")
@@ -44,6 +46,18 @@ public interface CatalogueItemRepository extends JpaRepository<CatalogueItem, UU
     boolean barcodeTaken(TenantId tenantId, String barcode, UUID excludeId);
 
     /** POS terminal scan: only sellable items match. */
-    @Query("SELECT i FROM CatalogueItem i WHERE i.tenantId = :tenantId AND LOWER(i.barcode) = LOWER(:barcode) AND i.deletedAt IS NULL AND i.status = za.co.handyflow.platform.catalogue.domain.model.CatalogueItemStatus.ACTIVE")
+    @Query("SELECT i FROM CatalogueItem i WHERE i.tenantId = :tenantId AND LOWER(i.barcode) = LOWER(:barcode) AND i.deletedAt IS NULL AND i.status = za.co.handyflow.platform.catalogue.domain.model.CatalogueItemStatus.ACTIVE "
+            + "AND NOT EXISTS (SELECT 1 FROM CatalogueItem v WHERE v.parentId = i.id AND v.deletedAt IS NULL)")
     Optional<CatalogueItem> findSellableByBarcode(TenantId tenantId, String barcode);
+
+    // ── Variants ──
+    @Query("SELECT i FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.parentId = :parentId AND i.deletedAt IS NULL ORDER BY i.variantLabel")
+    List<CatalogueItem> findVariants(TenantId tenantId, UUID parentId);
+
+    @Query("SELECT COUNT(i) FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.parentId = :parentId AND i.deletedAt IS NULL")
+    long countVariants(TenantId tenantId, UUID parentId);
+
+    /** Live variant counts for a page of items: rows of [parentId, count]. */
+    @Query("SELECT i.parentId, COUNT(i) FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL AND i.parentId IN :parentIds GROUP BY i.parentId")
+    List<Object[]> variantCounts(TenantId tenantId, java.util.Collection<UUID> parentIds);
 }

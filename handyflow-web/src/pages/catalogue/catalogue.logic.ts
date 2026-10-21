@@ -36,6 +36,8 @@ export interface CatalogueItem {
   categoryId: string | null; categoryName: string | null; costPrice: number | null; marginPercent: number | null; version: number; createdAt: string; updatedAt: string
   /** Attribute values; only present when a single item was loaded. */
   attributes?: AttributeValue[] | null
+  /** Set on a variant: the item it belongs to and its "Large / Red" label. variantCount is how many variants a parent has. */
+  parentId?: string | null; variantLabel?: string | null; variantCount?: number
 }
 export interface PageOf<T> { content: T[]; totalElements: number; totalPages: number; number: number; size: number }
 export interface HistoryLine { id: string; action: string; detail: string | null; actorId: string | null; at: string }
@@ -381,3 +383,113 @@ export function priceListProblems(f: PriceListForm, creating: boolean): Record<s
   return e
 }
 export const priceListBody = (f: PriceListForm) => ({ code: f.code.trim(), name: f.name.trim(), sortOrder: f.sortOrder.trim() ? Number(f.sortOrder) : undefined, active: f.active })
+
+// ── Variants ─────────────────────────────────────────────────────────────────
+export interface VariantOption { name: string; values: string[] }
+export interface VariantRow { id: string; name: string; label: string; values: string[]; sku: string | null; barcode: string | null; status: ItemStatus; defaultPrice: number; costPrice: number | null; version: number }
+export interface VariantsView { parentId: string; parentName: string; parentSku: string | null; parentPrice: number; options: VariantOption[]; variants: VariantRow[] }
+export const MAX_VARIANT_OPTIONS = 3, MAX_OPTION_VALUES = 20, MAX_VARIANTS_PER_REQUEST = 100, MAX_VARIANTS_PER_ITEM = 200
+
+/** "S, M, L" → ["S","M","L"]; blanks dropped; repeats (ignoring case) dropped. */
+export function parseValues(text: string): string[] {
+  const out: string[] = []
+  for (const part of text.split(/[,;\n]/)) {
+    const v = part.trim()
+    if (v && !out.some(o => o.toLowerCase() === v.toLowerCase())) out.push(v)
+  }
+  return out
+}
+
+/** One value per option, every combination, first option changing slowest. */
+export function combinations(valuesPerOption: string[][]): string[][] {
+  return valuesPerOption.reduce<string[][]>((acc, values) => acc.flatMap(prefix => values.map(v => [...prefix, v])), [[]])
+}
+
+export const comboKey = (values: string[]) => values.map(v => v.trim().toLowerCase()).join("|")
+export const comboLabel = (values: string[]) => values.join(" / ")
+
+/** Parent SKU plus three letters of each value: CEM-50 + Large + Red = CEM-50-LAR-RED. */
+export function suggestVariantSku(parentSku: string | null | undefined, values: string[]): string {
+  if (!parentSku || !parentSku.trim()) return ""
+  const parts = values.map(v => { const p = v.toUpperCase().replace(/[^A-Z0-9]/g, ""); return (p || "X").slice(0, 3) })
+  return [parentSku.trim().toUpperCase(), ...parts].join("-").slice(0, 50)
+}
+
+export interface OptionDraft { name: string; values: string }
+export interface MatrixRow { key: string; values: string[]; include: boolean; sku: string; barcode: string; price: string }
+
+/** Checks the option drafts before a matrix is built. Returns a message or null. */
+export function optionProblem(opts: OptionDraft[], lockedNames?: string[]): string | null {
+  if (opts.length === 0) return "Add at least one option, for example Size."
+  if (opts.length > MAX_VARIANT_OPTIONS) return `An item can have at most ${MAX_VARIANT_OPTIONS} options.`
+  const names = opts.map(o => o.name.trim().toLowerCase())
+  if (names.some(n => !n)) return "Each option needs a name, for example Size or Colour."
+  if (new Set(names).size !== names.length) return "Two options have the same name."
+  if (lockedNames && lockedNames.length > 0 && (lockedNames.length !== names.length || lockedNames.some((n, i) => n.toLowerCase() !== names[i])))
+    return `This item already has the options ${lockedNames.join(", ")}. Use the same options.`
+  for (const o of opts) {
+    const vs = parseValues(o.values)
+    if (vs.length === 0) return `The option '${o.name.trim()}' needs at least one value.`
+    if (vs.length > MAX_OPTION_VALUES) return `The option '${o.name.trim()}' can have at most ${MAX_OPTION_VALUES} values.`
+    if (vs.some(v => /[|=]/.test(v))) return "A value cannot contain | or =."
+    if (vs.some(v => v.length > 50)) return "A value can be at most 50 characters."
+  }
+  const total = opts.reduce((n, o) => n * parseValues(o.values).length, 1)
+  if (total > MAX_VARIANTS_PER_REQUEST) return `That makes ${total} variants. Use fewer values (at most ${MAX_VARIANTS_PER_REQUEST} at a time).`
+  return null
+}
+
+/** The rows of the matrix for the options, leaving out combinations that already exist. */
+export function buildMatrix(opts: OptionDraft[], parentSku: string | null, parentPrice: number, existing: VariantRow[]): MatrixRow[] {
+  const have = new Set(existing.map(v => comboKey(v.values)))
+  return combinations(opts.map(o => parseValues(o.values))).filter(v => !have.has(comboKey(v))).map(values => (
+    { key: comboKey(values), values, include: true, sku: suggestVariantSku(parentSku, values), barcode: "", price: String(parentPrice) }))
+}
+
+/** Problems per matrix row (keyed by row key + field) for the rows that are ticked. */
+export function matrixProblems(rows: MatrixRow[]): Record<string, string> {
+  const e: Record<string, string> = {}
+  const picked = rows.filter(r => r.include)
+  if (picked.length === 0) { e.general = "Tick at least one variant to create."; return e }
+  const skus = new Map<string, string>(), codes = new Map<string, string>()
+  for (const r of picked) {
+    const sku = r.sku.trim().toUpperCase(), code = r.barcode.trim().toLowerCase()
+    if (sku) {
+      if (!SKU_RE.test(sku)) e[`${r.key}:sku`] = "Letters, numbers and . _ / - only."
+      else if (sku.length > 50) e[`${r.key}:sku`] = "At most 50 characters."
+      else if (skus.has(sku)) e[`${r.key}:sku`] = "Same SKU as another row."
+      skus.set(sku, r.key)
+    }
+    if (code) {
+      if (!BARCODE_RE.test(r.barcode.trim())) e[`${r.key}:barcode`] = "Letters, numbers and . _ / - only."
+      else if (codes.has(code)) e[`${r.key}:barcode`] = "Same barcode as another row."
+      codes.set(code, r.key)
+    }
+    const p = r.price.trim().replace(",", ".")
+    if (!p) e[`${r.key}:price`] = "Required."
+    else if (!/^\d+(\.\d{1,2})?$/.test(p)) e[`${r.key}:price`] = "Like 120 or 120.50."
+  }
+  return e
+}
+
+export const variantsBody = (opts: OptionDraft[], rows: MatrixRow[]) => ({
+  options: opts.map(o => ({ name: o.name.trim(), values: parseValues(o.values) })),
+  variants: rows.filter(r => r.include).map(r => ({
+    values: r.values, sku: r.sku.trim() || undefined, barcode: r.barcode.trim() || undefined, defaultPrice: Number(r.price.trim().replace(",", ".")),
+  })),
+})
+
+export interface VariantEditForm { sku: string; barcode: string; price: string; cost: string }
+export const toVariantEditForm = (v: VariantRow): VariantEditForm => ({ sku: v.sku ?? "", barcode: v.barcode ?? "", price: String(v.defaultPrice), cost: v.costPrice == null ? "" : String(v.costPrice) })
+export function variantEditProblems(f: VariantEditForm, showCost: boolean): Record<string, string> {
+  const e: Record<string, string> = {}
+  if (f.sku.trim() && !SKU_RE.test(f.sku.trim().toUpperCase())) e.sku = "The SKU can only use letters, numbers and . _ / - (no spaces)"
+  if (f.barcode.trim() && !BARCODE_RE.test(f.barcode.trim())) e.barcode = "The barcode can only use letters, numbers and . _ / - (no spaces)"
+  if (!/^\d+(\.\d{1,2})?$/.test(f.price.trim().replace(",", "."))) e.price = "Price must be a number with at most 2 decimals"
+  if (showCost && f.cost.trim() && !/^\d+(\.\d{1,2})?$/.test(f.cost.trim().replace(",", "."))) e.cost = "Cost must be a number with at most 2 decimals"
+  return e
+}
+export const variantEditBody = (f: VariantEditForm, version: number, canWriteCost: boolean) => ({
+  sku: f.sku.trim() || undefined, barcode: f.barcode.trim() || undefined, defaultPrice: Number(f.price.trim().replace(",", ".")),
+  costPrice: canWriteCost && f.cost.trim() ? Number(f.cost.trim().replace(",", ".")) : undefined, version,
+})

@@ -99,3 +99,21 @@ JOIN roles r ON r.id = rp.role_id
 JOIN permissions p ON p.id = rp.permission_id
 WHERE p.name IN ('CATALOGUE_PRICE_READ','CATALOGUE_PRICE_WRITE','CATALOGUE_PRICE_APPROVE')
 ORDER BY r.tenant_id, r.name, p.name;
+
+-- ── Slice 4 (V480): variants ──────────────────────────────────────────────────
+
+-- 16. [must be 0 rows] A variant whose parent is in another tenant, is itself a variant, or has been deleted while the variant is live.
+SELECT v.id FROM catalogue_items v JOIN catalogue_items p ON p.id = v.parent_id
+WHERE v.deleted_at IS NULL AND (p.tenant_id <> v.tenant_id OR p.parent_id IS NOT NULL OR p.deleted_at IS NOT NULL);
+
+-- 17. [must be 0 rows] Two live variants of one parent with the same combination (the unique index should make this impossible).
+SELECT parent_id, variant_key, count(*) FROM catalogue_items
+WHERE parent_id IS NOT NULL AND deleted_at IS NULL GROUP BY 1, 2 HAVING count(*) > 1;
+
+-- 18. [must be 0 rows] A variant option that points at another tenant's item.
+SELECT o.id FROM catalogue_variant_options o JOIN catalogue_items i ON i.id = o.parent_item_id WHERE i.tenant_id <> o.tenant_id;
+
+-- 19. INFO: parents and how many live variants each has.
+SELECT p.tenant_id, p.name, count(*) AS variants
+FROM catalogue_items p JOIN catalogue_items v ON v.parent_id = p.id AND v.deleted_at IS NULL
+WHERE p.deleted_at IS NULL GROUP BY p.tenant_id, p.id, p.name ORDER BY variants DESC LIMIT 50;

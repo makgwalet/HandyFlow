@@ -80,6 +80,8 @@ public class CatalogueService {
             var ps = new ArrayList<Predicate>();
             ps.add(cb.equal(root.get("tenantId"), tenantId));
             ps.add(cb.isNull(root.get("deletedAt")));
+            // Variants are reached through their parent; a search looks at them too, so a variant's SKU or barcode still finds it.
+            if (f.q() == null || f.q().isBlank()) ps.add(cb.isNull(root.get("parentId")));
             if (f.q() != null && !f.q().isBlank()) {
                 String like = "%" + f.q().trim().toLowerCase(Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
                 ps.add(cb.or(
@@ -93,12 +95,17 @@ public class CatalogueService {
             if (f.type() != null) ps.add(cb.equal(root.get("itemType"), f.type()));
             return cb.and(ps.toArray(new Predicate[0]));
         };
-        return itemRepository.findAll(spec, pageable).map(i -> toResponse(i, caller));
+        Page<CatalogueItem> found = itemRepository.findAll(spec, pageable);
+        Map<UUID, Long> counts = new HashMap<>();
+        if (!found.isEmpty()) itemRepository.variantCounts(tenantId, found.getContent().stream().map(CatalogueItem::getId).toList())
+                .forEach(row -> counts.put((UUID) row[0], (Long) row[1]));
+        return found.map(i -> toResponse(i, caller).withVariantCount(counts.getOrDefault(i.getId(), 0L)));
     }
 
     @Transactional(readOnly = true)
     public CatalogueItemResponse getItem(TenantId tenantId, UUID itemId, Caller caller) {
-        return toResponse(load(tenantId, itemId), caller).withAttributes(structure.valuesFor(tenantId, itemId));
+        return toResponse(load(tenantId, itemId), caller).withAttributes(structure.valuesFor(tenantId, itemId))
+                .withVariantCount(itemRepository.countVariants(tenantId, itemId));
     }
 
     @Transactional(readOnly = true)
@@ -154,6 +161,7 @@ public class CatalogueService {
         String change = CatalogueRules.describeChanges(before, after);
         String attributeChange = structure.store(tenantId, item.getId(), attributes);
         if (priceEdited) pricing.recordDirectChange(tenantId, item, oldPrice, item.getDefaultPrice(), caller);
+        if (!item.isVariant()) propagateToVariants(tenantId, item, details, category, caller);
         if (!change.isEmpty()) {
             itemRepository.save(item);
             audit(tenantId, item, CatalogueRules.priceChanged(before, after) ? CatalogueAuditAction.PRICE_CHANGED : CatalogueAuditAction.UPDATED, change, caller);
@@ -175,19 +183,65 @@ public class CatalogueService {
             throw new IllegalArgumentException("The item needs a unit and a price before it can be activated.");
         if (r.status() == CatalogueItemStatus.ACTIVE)
             structure.check(tenantId, item.getCategory() == null ? null : item.getCategory().getId(), null, true, structure.stored(tenantId, item.getId()));
+        if (r.status() == CatalogueItemStatus.ACTIVE && item.isVariant()) {
+            var parent = load(tenantId, item.getParentId());
+            if (parent.getStatus() != CatalogueItemStatus.ACTIVE) throw new IllegalArgumentException("Activate the main item '" + parent.getName() + "' first.");
+        }
         item.changeStatus(r.status(), reason);
         itemRepository.save(item);
         audit(tenantId, item, CatalogueAuditAction.STATUS_CHANGED,
                 CatalogueRules.label(from) + " -> " + CatalogueRules.label(r.status()) + (reason != null ? ": " + reason : ""), caller);
+        if (!item.isVariant() && r.status() != CatalogueItemStatus.ACTIVE) cascadeStatus(tenantId, item, r.status(), reason, caller);
         return toResponse(item, caller);
     }
 
     @Transactional
     public void softDeleteItem(TenantId tenantId, UUID itemId, Caller caller) {
         CatalogueItem item = load(tenantId, itemId);
+        var variants = itemRepository.findVariants(tenantId, itemId);
         item.softDelete(caller.userId());
         itemRepository.save(item);
-        audit(tenantId, item, CatalogueAuditAction.DELETED, "Deleted", caller);
+        audit(tenantId, item, CatalogueAuditAction.DELETED, variants.isEmpty() ? "Deleted" : "Deleted with its " + variants.size() + (variants.size() == 1 ? " variant" : " variants"), caller);
+        for (var v : variants) {
+            v.softDelete(caller.userId());
+            itemRepository.save(v);
+            audit(tenantId, v, CatalogueAuditAction.DELETED, "Deleted with " + item.getName(), caller);
+        }
+    }
+
+    // ── Variants follow their parent ──────────────────────────────────────────
+
+    /** A parent's name, category, unit, brand, type and VAT are the variants' too; their SKU, barcode, price and cost stay their own. */
+    private void propagateToVariants(TenantId tenantId, CatalogueItem parent, CatalogueItem.Details d, CatalogueCategory category, Caller caller) {
+        for (var v : itemRepository.findVariants(tenantId, parent.getId())) {
+            String name = VariantRules.variantName(d.name(), java.util.Arrays.asList(v.getVariantValues().split("\\|")));
+            if (!name.equals(v.getName()) && itemRepository.nameTaken(tenantId, name, v.getId()))
+                throw new ConflictException("An item named '" + name + "' already exists, so the variants cannot be renamed.");
+            var vd = new CatalogueItem.Details(name, d.description(), v.getSku(), v.getBarcode(), d.brand(), d.type(), d.unit(),
+                    v.getDefaultPrice(), v.getCostPrice(), d.vatRate(), d.vatExempt());
+            var before = v.snapshot();
+            v.update(category, vd);
+            String change = CatalogueRules.describeChanges(before, v.snapshot());
+            if (!change.isEmpty()) {
+                itemRepository.save(v);
+                audit(tenantId, v, CatalogueAuditAction.UPDATED, "Followed " + parent.getName() + ": " + change, caller);
+            }
+        }
+    }
+
+    /** Suspending, discontinuing or archiving a parent does the same to its variants where that move is allowed. */
+    private void cascadeStatus(TenantId tenantId, CatalogueItem parent, CatalogueItemStatus to, String reason, Caller caller) {
+        for (var v : itemRepository.findVariants(tenantId, parent.getId())) {
+            try {
+                String r = CatalogueRules.checkTransition(v.getStatus(), to, reason);
+                var from = v.getStatus();
+                v.changeStatus(to, r);
+                itemRepository.save(v);
+                audit(tenantId, v, CatalogueAuditAction.STATUS_CHANGED, CatalogueRules.label(from) + " -> " + CatalogueRules.label(to) + " with " + parent.getName(), caller);
+            } catch (IllegalArgumentException skipped) {
+                // This variant cannot make that move (already there, or not allowed from its status); it is left as it is.
+            }
+        }
     }
 
     // ── Categories ────────────────────────────────────────────────────────────
@@ -394,6 +448,6 @@ public class CatalogueService {
                 i.getDefaultPrice(), i.getVatRate(), i.isVatExempt(),
                 i.getCategory() != null ? i.getCategory().getId() : null,
                 i.getCategory() != null ? i.getCategory().getName() : null,
-                cost, margin, i.getVersion(), i.getCreatedAt(), i.getUpdatedAt());
+                cost, margin, i.getVersion(), i.getCreatedAt(), i.getUpdatedAt(), null, i.getParentId(), i.getVariantLabel(), 0L);
     }
 }

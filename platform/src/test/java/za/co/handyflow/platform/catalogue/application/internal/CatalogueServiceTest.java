@@ -378,4 +378,68 @@ class CatalogueServiceTest {
         verify(pricing, never()).requireDirectEditAllowed(any());
         verify(pricing, never()).recordDirectChange(any(), any(), any(), any(), any());
     }
+
+    @Test
+    void renamingAParentRenamesItsVariantsButKeepsTheirOwnSkuAndPrice() {
+        var item = existing("Tee shirt", "TEE", "100.00");
+        var v = existing("Tee shirt — S / Red", "TEE-S-RED", "90.00");
+        v.asVariant(item.getId(), "size=s|colour=red", "S / Red", "S|Red");
+        when(items.findActiveById(TENANT, item.getId())).thenReturn(Optional.of(item));
+        when(items.findVariants(TENANT, item.getId())).thenReturn(java.util.List.of(v));
+        service.updateItem(TENANT, item.getId(), req("Tee", "TEE", "100", null), ADMIN);
+        assertThat(v.getName()).isEqualTo("Tee — S / Red");
+        assertThat(v.getSku()).isEqualTo("TEE-S-RED");
+        assertThat(v.getDefaultPrice()).isEqualByComparingTo("90.00");
+    }
+
+    @Test
+    void aVariantCannotBeActivatedWhileItsParentIsNotActive() {
+        var parent = existing("Tee shirt", "TEE", "100.00");
+        parent.changeStatus(CatalogueItemStatus.SUSPENDED, "stock");
+        var v = CatalogueItem.create(TENANT, null, new CatalogueItem.Details("Tee — S", null, "T-S", null, null, CatalogueItemType.PRODUCT, "each",
+                new BigDecimal("10.00"), null, new BigDecimal("15.00"), false), CatalogueItemStatus.DRAFT);
+        v.asVariant(parent.getId(), "size=s", "S", "S");
+        when(items.findActiveById(TENANT, parent.getId())).thenReturn(Optional.of(parent));
+        when(items.findActiveById(TENANT, v.getId())).thenReturn(Optional.of(v));
+        assertThatThrownBy(() -> service.changeStatus(TENANT, v.getId(), new ItemStatusRequest(CatalogueItemStatus.ACTIVE, null, null), ADMIN))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Activate the main item 'Tee shirt' first.");
+    }
+
+    @Test
+    void suspendingAParentSuspendsItsActiveVariantsAndSkipsThoseThatCannotMove() {
+        var parent = existing("Tee shirt", "TEE", "100.00");
+        var active = existing("Tee — S", "T-S", "10.00");
+        active.asVariant(parent.getId(), "size=s", "S", "S");
+        var draft = CatalogueItem.create(TENANT, null, new CatalogueItem.Details("Tee — M", null, "T-M", null, null, CatalogueItemType.PRODUCT, "each",
+                new BigDecimal("10.00"), null, new BigDecimal("15.00"), false), CatalogueItemStatus.DRAFT);
+        draft.asVariant(parent.getId(), "size=m", "M", "M");
+        when(items.findActiveById(TENANT, parent.getId())).thenReturn(Optional.of(parent));
+        when(items.findVariants(TENANT, parent.getId())).thenReturn(java.util.List.of(active, draft));
+        service.changeStatus(TENANT, parent.getId(), new ItemStatusRequest(CatalogueItemStatus.SUSPENDED, "out of stock", null), ADMIN);
+        assertThat(parent.getStatus()).isEqualTo(CatalogueItemStatus.SUSPENDED);
+        assertThat(active.getStatus()).isEqualTo(CatalogueItemStatus.SUSPENDED);
+        assertThat(draft.getStatus()).isEqualTo(CatalogueItemStatus.DRAFT);
+    }
+
+    @Test
+    void deletingAParentDeletesItsVariants() {
+        var parent = existing("Tee shirt", "TEE", "100.00");
+        var v = existing("Tee — S", "T-S", "10.00");
+        v.asVariant(parent.getId(), "size=s", "S", "S");
+        when(items.findActiveById(TENANT, parent.getId())).thenReturn(Optional.of(parent));
+        when(items.findVariants(TENANT, parent.getId())).thenReturn(java.util.List.of(v));
+        service.softDeleteItem(TENANT, parent.getId(), ADMIN);
+        assertThat(parent.isDeleted()).isTrue();
+        assertThat(v.isDeleted()).isTrue();
+    }
+
+    @Test
+    void theListCarriesTheVariantCountOfEachParent() {
+        var parent = existing("Tee shirt", "TEE", "100.00");
+        when(items.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of(parent)));
+        when(items.variantCounts(eq(TENANT), any())).thenReturn(java.util.List.<Object[]>of(new Object[]{parent.getId(), 3L}));
+        var page = service.listItems(TENANT, new CatalogueService.ItemFilter(null, null, null, null), 0, 25, "name", false, ADMIN);
+        assertThat(page.getContent().get(0).variantCount()).isEqualTo(3L);
+    }
 }

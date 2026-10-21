@@ -70,6 +70,18 @@ public class CatalogueItem {
     @Column(name = "min_price", precision = 15, scale = 2)
     private BigDecimal minPrice;
 
+    @Column(name = "parent_id", updatable = false)
+    private UUID parentId;
+
+    @Column(name = "variant_key", length = 400)
+    private String variantKey;
+
+    @Column(name = "variant_label", length = 300)
+    private String variantLabel;
+
+    @Column(name = "variant_values", length = 1100)
+    private String variantValues;
+
     @Column(name = "vat_rate", nullable = false,
             precision = 5, scale = 2)
     private BigDecimal vatRate;
@@ -127,6 +139,16 @@ public class CatalogueItem {
         this.vatExempt = d.vatExempt();
         this.vatRate = d.vatExempt() ? new BigDecimal("0.00") : d.vatRate();
     }
+
+    /** Makes a new item a variant of the parent. Only called while creating the variant. */
+    public void asVariant(UUID parentId, String key, String label, String values) {
+        this.parentId = parentId;
+        this.variantKey = key;
+        this.variantLabel = label;
+        this.variantValues = values;
+    }
+
+    public boolean isVariant() { return parentId != null; }
 
     /** The floor under every price of this item; null means none. */
     public void changeMinPrice(BigDecimal minPrice) {

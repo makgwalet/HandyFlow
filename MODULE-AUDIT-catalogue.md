@@ -161,3 +161,24 @@ Known limits:
 - Quotes, invoices and POS still read only the default price. Choosing another list when invoicing is not built.
 
 Tests: 11 pricing rules tests run and pass (standalone). 37 service tests (Mockito: 34 in the new pricing service, 3 added to the catalogue service) are written but **not run**. Front end: 94 catalogue tests pass (28 new), lint and type check clean for these files. The backend was not compiled with Spring here (only syntax-checked); V479 has not been run against a database.
+
+## 10. Slice 4 status (variants): built, not yet run against a database
+
+| Item | Status |
+|---|---|
+| Model | A variant **is a catalogue item** (own id, SKU, barcode, price, cost, status, history) with `parent_id` set, named "Parent — Large / Red". Quotes, invoices, POS and Supply Chain therefore sell variants with no change, scanning a variant's barcode finds that variant, and Slice 3 price lists, minimum price and approval apply to each variant as they do to any item. One level only (a variant cannot have variants). |
+| Parent | A parent that has live variants is not offered in pickers, POS scan or the facade's search (worked out from its variants, not stored). Its own price is only the default for new variants. Existing documents that reference the parent keep working (lookup by id is unchanged). |
+| Options | Up to 3 options per parent (Size, Colour...), up to 20 values each, up to 100 variants created at once and 200 per parent. Values are remembered per option (`catalogue_variant_options`). Once variants exist, later additions must use the same options (values can be added). |
+| Matrix | Screen: name the options and list values; the combinations are shown with a suggested SKU (parent SKU plus three letters of each value) and the parent's price; tick the ones to create, edit SKU, barcode and price, create. Combinations that already exist are left out. A combination is unique per parent ignoring case (database index plus service check). |
+| Following the parent | Renaming the parent renames its variants; its category, unit, brand, type and VAT are copied to them. Their SKU, barcode, price and cost stay their own. Suspending, discontinuing or archiving a parent does the same to its variants where that move is allowed (a draft variant is left alone). Deleting a parent deletes its variants. A variant cannot be activated while its parent is not active. |
+| Editing a variant | SKU, barcode, price, cost through the parent's Variants dialog; this calls the ordinary item update, so duplicate checks, version check, price history and the "prices change through approval" rule all apply. Deleting a variant is the normal item delete; when the last one goes the parent is a normal item again. |
+| Lists | The catalogue list shows top-level items with "N variants"; a search also finds variants (so a variant's SKU or barcode finds it), shown with their label. |
+
+Known limits:
+- Attribute values (Slice 2) are held on the parent only; variants do not carry their own, and required-attribute checks are not applied to variants.
+- Converting an existing item into a parent removes it from pickers from then on; if it was being sold directly, sell one of its variants instead (create a variant for the current form of the product).
+- Option names and values cannot be renamed or removed once variants exist; delete the variants and recreate them.
+- The stock and POS screens show the variant's full name ("Tee shirt — S / Red"); they do not show the option breakdown.
+- Bulk price change across all variants of a parent is not built (each variant is priced on its own; Slice 6 import covers bulk).
+
+Tests: 8 variant rules tests run and pass (standalone). 19 service tests (Mockito: 14 in the new variant service, 5 added to the catalogue service) are written but **not run**. Front end: 113 catalogue tests pass (19 new), lint and type check clean for these files. The backend was not compiled with Spring here (syntax-checked only); V480 has not been run against a database.
