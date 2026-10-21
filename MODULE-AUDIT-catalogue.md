@@ -302,3 +302,9 @@ Limits to know:
 - Suggestion quality depends on how consistently names are written; poor names give no suggestions rather than wrong ones, but wrong ones are possible. Always review before applying.
 
 Tests: 16 rule tests pass standalone (`ReportRulesTest` 6, `EnrichmentRulesTest` 10). 23 service tests (Mockito: 14 report, 9 enrichment) are written but **not run**. Front end: 192 catalogue tests pass (14 new), lint and type check clean. The new JPQL (`publishedItemIds`, `itemLinesSince`, `appliedSince`, `allForTenant`) has not run against a database.
+
+## 17. Polish pass: dialogs and checks against the modernization checklist
+
+- **Dialogs (all Catalogue dialogs share one component):** Escape closes; a press on the dark backdrop closes; Tab and Shift+Tab stay inside; focus goes to the first field (not Close) and returns to the button that opened it; the page behind no longer scrolls; the dialog is named by its title; padding shrinks on a phone. 5 tests added (`CatalogueKit.test.tsx`).
+- **Checked, no change needed:** every one of the 76 catalogue endpoints is used by a screen; every input has a label; every wide table sits in a horizontal scroll box; the production build (`vite build`) succeeds; type check, lint and 197 catalogue tests pass.
+- **Not done:** a browser and phone-size look at the screens, a dark-mode pass, and a screen-reader pass. Backend unchanged: Maven, the Mockito tests and migrations V479–V484 still have not been run, so the module is **not** closed under the checklist's step 6.

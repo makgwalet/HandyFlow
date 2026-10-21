@@ -1,19 +1,52 @@
 // src/pages/catalogue/CatalogueKit.tsx — the shared pieces of the catalogue screens: field styles, modal, field wrapper,
 // delete confirmation, error banner and category menu.
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useId } from 'react'
 import { X, AlertTriangle, AlertCircle, MoreVertical, Pencil, Trash2 } from 'lucide-react'
 import { STATUS_LABEL, STATUS_TONE, type Category, type ItemStatus } from './catalogue.logic'
 
 // ── Modal wrapper ─────────────────────────────────────────────────────────────
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/** A dialog that behaves like one: Escape closes it, Tab stays inside, focus moves in and goes back, the page behind does not scroll. */
 export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
+  const box = useRef<HTMLDivElement>(null)
+  const closeRef = useRef(onClose)
+  useEffect(() => { closeRef.current = onClose })
+  const titleId = useId()
+
+  useEffect(() => {
+    const before = document.activeElement as HTMLElement | null
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const root = box.current
+    // first field if there is one, otherwise the dialog itself (never the close button, so Enter cannot dismiss by accident)
+    const first = root?.querySelector<HTMLElement>('[data-modal-body]')?.querySelector<HTMLElement>(FOCUSABLE)
+    ;(first ?? root)?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); closeRef.current(); return }
+      if (e.key !== 'Tab' || !root) return
+      const items = Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE))
+      if (items.length === 0) { e.preventDefault(); root.focus(); return }
+      const firstEl = items[0], lastEl = items[items.length - 1]
+      if (e.shiftKey && (document.activeElement === firstEl || document.activeElement === root)) { e.preventDefault(); lastEl.focus() }
+      else if (!e.shiftKey && document.activeElement === lastEl) { e.preventDefault(); firstEl.focus() }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = overflow
+      if (before && document.contains(before)) before.focus()
+    }
+  }, [])
+
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, backdropFilter: 'blur(2px)' }}>
-      <div role="dialog" aria-modal="true" aria-label={title} style={{ background: 'var(--hf-surface)', borderRadius: 16, width: '100%', maxWidth: wide ? 880 : 500, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', overflow: 'hidden', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+    <div onMouseDown={e => { if (e.target === e.currentTarget) onClose() }} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(8px, 3vw, 24px)', backdropFilter: 'blur(2px)' }}>
+      <div ref={box} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId} style={{ background: 'var(--hf-surface)', borderRadius: 16, width: '100%', maxWidth: wide ? 880 : 500, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', overflow: 'hidden', maxHeight: '92vh', display: 'flex', flexDirection: 'column', outline: 'none' }}>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--hf-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--hf-text)' }}>{title}</h3>
+          <h3 id={titleId} style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--hf-text)' }}>{title}</h3>
           <button type="button" aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', padding: 4, display: 'flex' }}><X size={18} /></button>
         </div>
-        <div style={{ padding: 24, overflowY: 'auto' }}>{children}</div>
+        <div data-modal-body style={{ padding: 'clamp(16px, 4vw, 24px)', overflowY: 'auto' }}>{children}</div>
       </div>
     </div>
   )
