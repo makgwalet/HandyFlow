@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.catalogue.CatalogueItemSummary;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueService;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueStructureService;
+import za.co.handyflow.platform.catalogue.application.internal.CataloguePricingService;
+import za.co.handyflow.platform.catalogue.domain.model.PriceChangeStatus;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueService.Caller;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueService.ItemFilter;
 import za.co.handyflow.platform.catalogue.domain.model.CatalogueItemStatus;
@@ -46,9 +48,14 @@ public class CatalogueController {
     private static final String ARCHIVE = "hasAnyAuthority('CATALOGUE_ARCHIVE','SETTINGS_MANAGE')";
 
     private static final String ADMIN = "hasAuthority('CATALOGUE_ADMIN')";
+    private static final String PRICE_READ = "hasAuthority('CATALOGUE_PRICE_READ')";
+    private static final String PRICE_WRITE = "hasAuthority('CATALOGUE_PRICE_WRITE')";
+    private static final String PRICE_DECIDE = "hasAuthority('CATALOGUE_PRICE_APPROVE')";
+    private static final String PRICE_QUEUE = "hasAnyAuthority('CATALOGUE_PRICE_APPROVE','CATALOGUE_PRICE_READ','CATALOGUE_PRICE_WRITE')";
 
     private final CatalogueService catalogueService;
     private final CatalogueStructureService structureService;
+    private final CataloguePricingService pricingService;
 
     /** What the signed-in user may do, from their authorities. */
     private static Caller caller(Authentication auth) {
@@ -57,7 +64,8 @@ public class CatalogueController {
         return new Caller(currentUserOrNull(),
                 a.contains("CATALOGUE_PRICE_READ"),
                 a.contains("CATALOGUE_PRICE_WRITE"),
-                admin || a.contains("CATALOGUE_ARCHIVE"));
+                admin || a.contains("CATALOGUE_ARCHIVE"),
+                a.contains("CATALOGUE_PRICE_APPROVE"));
     }
 
     /** Read-only "view as" tokens carry no user id; reads still work and writes are not allowed for them anyway. */
@@ -238,5 +246,109 @@ public class CatalogueController {
     public ResponseEntity<ApiResponse<Void>> deleteAttribute(@PathVariable UUID id, Authentication auth) {
         structureService.deleteDefinition(TenantContext.getTenantIdAsObject(), id, caller(auth));
         return ResponseEntity.ok(ApiResponse.success("Attribute deleted", null));
+    }
+    // ── Pricing ──────────────────────────────────────────────────────────────
+
+    @GetMapping("/price-lists")
+    @PreAuthorize(READ)
+    @Operation(summary = "Price lists", description = "The default (Retail) list is created the first time this is called.")
+    public ResponseEntity<ApiResponse<List<CataloguePriceListResponse>>> getPriceLists() {
+        return ResponseEntity.ok(ApiResponse.success(pricingService.lists(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/price-lists")
+    @PreAuthorize(ADMIN)
+    @Operation(summary = "Add a price list")
+    public ResponseEntity<ApiResponse<CataloguePriceListResponse>> createPriceList(@Valid @RequestBody CataloguePriceListRequest request, Authentication auth) {
+        var l = pricingService.createList(TenantContext.getTenantIdAsObject(), request, caller(auth));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Price list created", l));
+    }
+
+    @PutMapping("/price-lists/{id}")
+    @PreAuthorize(ADMIN)
+    @Operation(summary = "Edit a price list", description = "Name, order and on/off. The code cannot change.")
+    public ResponseEntity<ApiResponse<CataloguePriceListResponse>> updatePriceList(
+            @PathVariable UUID id, @Valid @RequestBody CataloguePriceListRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success("Price list updated", pricingService.updateList(TenantContext.getTenantIdAsObject(), id, request, caller(auth))));
+    }
+
+    @DeleteMapping("/price-lists/{id}")
+    @PreAuthorize(ADMIN)
+    @Operation(summary = "Delete a price list with no price history")
+    public ResponseEntity<ApiResponse<Void>> deletePriceList(@PathVariable UUID id, Authentication auth) {
+        pricingService.deleteList(TenantContext.getTenantIdAsObject(), id, caller(auth));
+        return ResponseEntity.ok(ApiResponse.success("Price list deleted", null));
+    }
+
+    @GetMapping("/settings")
+    @PreAuthorize(READ)
+    @Operation(summary = "Catalogue settings of this tenant")
+    public ResponseEntity<ApiResponse<CatalogueSettingsResponse>> getSettings() {
+        return ResponseEntity.ok(ApiResponse.success(pricingService.settings(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PutMapping("/settings")
+    @PreAuthorize(ADMIN)
+    @Operation(summary = "Turn price-change approval on or off for this tenant")
+    public ResponseEntity<ApiResponse<CatalogueSettingsResponse>> updateSettings(@Valid @RequestBody CatalogueSettingsRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success("Settings saved",
+                pricingService.setApprovalRequired(TenantContext.getTenantIdAsObject(), request.priceApprovalRequired(), caller(auth))));
+    }
+
+    @GetMapping("/items/{id}/pricing")
+    @PreAuthorize(PRICE_READ)
+    @Operation(summary = "Prices of one item on every list, with cost, margin and open changes")
+    public ResponseEntity<ApiResponse<ItemPricingResponse>> itemPricing(@PathVariable UUID id, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(pricingService.pricing(TenantContext.getTenantIdAsObject(), id, caller(auth))));
+    }
+
+    @GetMapping("/items/{id}/price-changes")
+    @PreAuthorize(PRICE_READ)
+    @Operation(summary = "Price history of one item")
+    public ResponseEntity<ApiResponse<List<PriceChangeResponse>>> priceHistory(@PathVariable UUID id, @RequestParam(defaultValue = "50") int size, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(pricingService.itemHistory(TenantContext.getTenantIdAsObject(), id, size, caller(auth))));
+    }
+
+    @PostMapping("/items/{id}/price-changes")
+    @PreAuthorize(PRICE_WRITE)
+    @Operation(summary = "Propose a price change", description = "Waits for approval when the tenant requires it; otherwise applied or scheduled at once.")
+    public ResponseEntity<ApiResponse<PriceChangeResponse>> proposePrice(@PathVariable UUID id, @Valid @RequestBody PriceChangeRequest request, Authentication auth) {
+        var c = pricingService.propose(TenantContext.getTenantIdAsObject(), id, request, caller(auth));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Price change recorded", c));
+    }
+
+    @PutMapping("/items/{id}/min-price")
+    @PreAuthorize(PRICE_WRITE)
+    @Operation(summary = "Set or clear the minimum price of an item")
+    public ResponseEntity<ApiResponse<ItemPricingResponse>> minPrice(@PathVariable UUID id, @RequestBody MinPriceRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success("Minimum price saved", pricingService.setMinPrice(TenantContext.getTenantIdAsObject(), id, request, caller(auth))));
+    }
+
+    @GetMapping("/price-changes")
+    @PreAuthorize(PRICE_QUEUE)
+    @Operation(summary = "Price changes by status", description = "PENDING is the approval queue, SCHEDULED the changes waiting for their date.")
+    public ResponseEntity<ApiResponse<List<PriceChangeResponse>>> priceQueue(@RequestParam(defaultValue = "PENDING") PriceChangeStatus status, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(pricingService.queue(TenantContext.getTenantIdAsObject(), status, caller(auth))));
+    }
+
+    @PostMapping("/price-changes/{id}/approve")
+    @PreAuthorize(PRICE_DECIDE)
+    @Operation(summary = "Approve a price change", description = "Never the person who proposed it.")
+    public ResponseEntity<ApiResponse<PriceChangeResponse>> approvePrice(@PathVariable UUID id, @RequestBody(required = false) PriceDecisionRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success("Price change approved", pricingService.approve(TenantContext.getTenantIdAsObject(), id, request, caller(auth))));
+    }
+
+    @PostMapping("/price-changes/{id}/reject")
+    @PreAuthorize(PRICE_DECIDE)
+    @Operation(summary = "Reject a price change", description = "A note is required. Never the person who proposed it.")
+    public ResponseEntity<ApiResponse<PriceChangeResponse>> rejectPrice(@PathVariable UUID id, @RequestBody(required = false) PriceDecisionRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success("Price change rejected", pricingService.reject(TenantContext.getTenantIdAsObject(), id, request, caller(auth))));
+    }
+
+    @PostMapping("/price-changes/{id}/cancel")
+    @PreAuthorize(PRICE_QUEUE)
+    @Operation(summary = "Cancel an open price change", description = "The proposer, or an approver.")
+    public ResponseEntity<ApiResponse<PriceChangeResponse>> cancelPrice(@PathVariable UUID id, @RequestBody(required = false) PriceDecisionRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success("Price change cancelled", pricingService.cancel(TenantContext.getTenantIdAsObject(), id, request, caller(auth))));
     }
 }

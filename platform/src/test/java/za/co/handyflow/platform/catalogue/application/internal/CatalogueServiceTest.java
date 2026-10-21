@@ -45,11 +45,12 @@ class CatalogueServiceTest {
     @Mock CatalogueCategoryRepository categories;
     @Mock CatalogueAuditEventRepository audit;
     @Mock CatalogueStructureService structure;
+    @Mock CataloguePricingService pricing;
     CatalogueService service;
 
     @BeforeEach
     void setUp() {
-        service = new CatalogueService(items, categories, audit, new VatRateProvider(new BigDecimal("15.00")), structure);
+        service = new CatalogueService(items, categories, audit, new VatRateProvider(new BigDecimal("15.00")), structure, pricing);
         lenient().when(structure.resolveUnit(any(), anyString(), any())).thenAnswer(i -> ((String) i.getArgument(1)).trim());
         lenient().when(items.nameTaken(any(), anyString(), any())).thenReturn(false);
         lenient().when(items.skuTaken(any(), anyString(), any())).thenReturn(false);
@@ -346,5 +347,35 @@ class CatalogueServiceTest {
         assertThatThrownBy(() -> service.createItem(TENANT, r, ADMIN)).isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("The unit 'bag' is not set up. Choose a unit from the list.");
         verify(items, never()).save(any());
+    }
+
+    @Test
+    void aPriceEditedOnTheFormIsRecordedInThePriceHistory() {
+        var item = existing("Cement", "C-1", "100.00");
+        when(items.findActiveById(TENANT, item.getId())).thenReturn(Optional.of(item));
+        service.updateItem(TENANT, item.getId(), req("Cement", "C-1", "120", null), ADMIN);
+        verify(pricing).requireDirectEditAllowed(TENANT);
+        verify(pricing).recordDirectChange(eq(TENANT), eq(item), eq(new BigDecimal("100.00")), eq(new BigDecimal("120.00")), eq(ADMIN));
+    }
+
+    @Test
+    void whenApprovalIsRequiredAPriceCannotBeEditedOnTheForm() {
+        var item = existing("Cement", "C-1", "100.00");
+        when(items.findActiveById(TENANT, item.getId())).thenReturn(Optional.of(item));
+        org.mockito.Mockito.doThrow(new IllegalArgumentException("Prices on this account change through a price change request, which needs approval. Use Change price on the item."))
+                .when(pricing).requireDirectEditAllowed(TENANT);
+        assertThatThrownBy(() -> service.updateItem(TENANT, item.getId(), req("Cement", "C-1", "120", null), ADMIN))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Use Change price");
+        assertThat(item.getDefaultPrice()).isEqualByComparingTo("100.00");
+        verify(items, never()).save(any());
+    }
+
+    @Test
+    void editingOtherFieldsNeverTouchesThePriceRules() {
+        var item = existing("Cement", "C-1", "100.00");
+        when(items.findActiveById(TENANT, item.getId())).thenReturn(Optional.of(item));
+        service.updateItem(TENANT, item.getId(), req("Cement 50kg", "C-1", "100", null), ADMIN);
+        verify(pricing, never()).requireDirectEditAllowed(any());
+        verify(pricing, never()).recordDirectChange(any(), any(), any(), any(), any());
     }
 }

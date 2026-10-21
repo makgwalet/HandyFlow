@@ -136,3 +136,28 @@ Behaviour changes to know about:
 - Quantity decimals on a unit are stored and shown but not enforced yet (quotes, POS and purchase orders still accept what they accepted before).
 
 Tests: 19 rules tests run and pass (standalone, Maven unavailable here). 45 service tests (Mockito: 19 in the new structure service, 26 in the catalogue service including the Slice 1 ones I changed) are written but **not run**. Front end: 66 catalogue tests pass, lint clean. Backend service, controller, entity and repository code has not been compiled (no Spring jars here); V477 and V478 have not been run against a database.
+
+## 9. Slice 3 status (pricing): built, not yet run against a database
+
+| Item | Status |
+|---|---|
+| Price lists | `catalogue_price_lists` per tenant. The default list (Retail) is the item's `default_price`, so Invoicing, POS and Supply Chain read exactly what they read before. Other lists (Wholesale, Trade, ...) hold their price as the latest applied change. Code is fixed once created; lists are switched off, or deleted only while they have no price history. |
+| Effective dates | A price change has an effective date (today or later, at most two years ahead). A change dated today is in force at once; a later one is SCHEDULED and a nightly job (00:05 South African time, catches up missed nights) puts it into force. |
+| Minimum price | Optional floor per item (`min_price`). No list can be priced below it, checked when proposing, again when approving, and again when a scheduled change is applied (a change that has fallen below a raised minimum is cancelled with a note, not applied). |
+| Cost and margin | Shown in the pricing screen only with CATALOGUE_PRICE_READ. Margin is on price, one decimal. VAT-inclusive price shown per list. |
+| Price history | Every price change is a row in `catalogue_price_changes` (old, new, effective date, reason, who proposed, who decided, status) and also a line in the item's history. A price edited on the item form (allowed only when approval is off) also leaves a row. Invoices keep their own price snapshot; nothing here rewrites a past invoice. |
+| Owner decision 1: approval setting | `catalogue_settings.price_approval_required`, **per tenant**, not a global setting. Existing tenants were given `false` by V479 (current behaviour kept). A tenant with no row, which is every tenant created from now on, is treated as `true`. Changed on the Price lists screen by CATALOGUE_ADMIN; each change is written to history. When on: a price change waits as PENDING; the proposer cannot approve or reject their own change (enforced in the service, returns 403, whatever permissions they hold); approving needs CATALOGUE_PRICE_APPROVE; a rejection needs a reason; the price field on the item form is read-only (prices change through Pricing). When off: a change is applied or scheduled at once. Permissions, validation, minimum price, history and date rules apply in both modes. |
+| Permissions | View prices/cost/margin: CATALOGUE_PRICE_READ. Propose, set minimum: CATALOGUE_PRICE_WRITE. Approve/reject: CATALOGUE_PRICE_APPROVE. Price lists and the setting: CATALOGUE_ADMIN. V479 grants none of the price permissions (decision 2); see the grant example in the delivery note. |
+
+Deliberate deviation to know about: the approval step is built inside the Catalogue (a status on the price change, permission-gated, proposer is never the approver) and **not** on the platform's generic approvals engine. That engine's module may depend only on `shared` and has no price-change type, so using it would have needed a cross-module dependency the architecture rules forbid; the Catalogue's own workflow stays inside its module boundary. If you later want approvals from several modules in one inbox, this is the place to connect them.
+
+Known limits:
+- Thresholds (only approve above X%, above a rand value, or by margin impact) are not built; the data needed (old price, new price, cost) is already on each change. Today the rule is all-or-nothing per tenant.
+- Only one change may wait for approval per item and list; a second proposal is refused until the first is decided or withdrawn.
+- A change cannot be approved after its date has passed; it must be rejected and proposed again.
+- The nightly job applies all due changes in one transaction; one failure leaves them all for the next night and is logged.
+- A tenant's first open of the price lists creates the default list; two simultaneous first opens could fail once.
+- New tenants default to approval required, so a new tenant with one user needs a second user, or an administrator switching the setting off, before a price can change.
+- Quotes, invoices and POS still read only the default price. Choosing another list when invoicing is not built.
+
+Tests: 11 pricing rules tests run and pass (standalone). 37 service tests (Mockito: 34 in the new pricing service, 3 added to the catalogue service) are written but **not run**. Front end: 94 catalogue tests pass (28 new), lint and type check clean for these files. The backend was not compiled with Spring here (only syntax-checked); V479 has not been run against a database.

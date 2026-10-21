@@ -69,3 +69,33 @@ ORDER BY r.tenant_id, p.name;
 
 -- 9. INFO: units created for each tenant by the backfill.
 SELECT tenant_id, count(*) AS units FROM catalogue_units WHERE deleted_at IS NULL GROUP BY tenant_id ORDER BY tenant_id;
+
+-- ── Slice 3 (V479): pricing ───────────────────────────────────────────────────
+
+-- 10. [must be 0 rows] A tenant that has catalogue items but no default price list.
+SELECT DISTINCT i.tenant_id FROM catalogue_items i
+WHERE NOT EXISTS (SELECT 1 FROM catalogue_price_lists l WHERE l.tenant_id = i.tenant_id AND l.is_default AND l.deleted_at IS NULL);
+
+-- 11. [must be 0 rows] A tenant without a catalogue_settings row that existed before V479 (they must keep "no approval").
+--     Tenants created after V479 legitimately have no row and are treated as "approval required".
+SELECT t.id FROM tenants t
+WHERE NOT EXISTS (SELECT 1 FROM catalogue_settings s WHERE s.tenant_id = t.id) AND t.created_at < (SELECT installed_on FROM flyway_schema_history WHERE version = '479');
+
+-- 12. [must be 0 rows] A price change that points at another tenant's item or list.
+SELECT c.id FROM catalogue_price_changes c JOIN catalogue_items i ON i.id = c.item_id WHERE i.tenant_id <> c.tenant_id
+UNION ALL
+SELECT c.id FROM catalogue_price_changes c JOIN catalogue_price_lists l ON l.id = c.price_list_id WHERE l.tenant_id <> c.tenant_id;
+
+-- 13. [must be 0 rows] A scheduled change whose date has passed more than a day ago (the nightly job should have applied it).
+SELECT id, item_id, effective_from FROM catalogue_price_changes WHERE status = 'SCHEDULED' AND effective_from < current_date - 1;
+
+-- 14. INFO: price approval setting per tenant (existing tenants should show false).
+SELECT tenant_id, price_approval_required, updated_at FROM catalogue_settings ORDER BY tenant_id;
+
+-- 15. INFO: who holds the pricing permissions. None are granted automatically (owner decision 2): grant them on purpose.
+SELECT r.tenant_id, r.name AS role, p.name AS permission
+FROM role_permissions rp
+JOIN roles r ON r.id = rp.role_id
+JOIN permissions p ON p.id = rp.permission_id
+WHERE p.name IN ('CATALOGUE_PRICE_READ','CATALOGUE_PRICE_WRITE','CATALOGUE_PRICE_APPROVE')
+ORDER BY r.tenant_id, r.name, p.name;

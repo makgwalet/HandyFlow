@@ -825,6 +825,9 @@ export const CATALOGUE_SECTIONS: ModuleSections = {
   groups: [{ label: 'Overview', sections: [
     { id: 'items', label: 'Products & services', icon: Package },
     { id: 'categories', label: 'Categories', icon: Tags },
+  ] }, { label: 'Pricing', sections: [
+    { id: 'pricelists', label: 'Price lists', icon: Coins, anyPermission: ['CATALOGUE_PRICE_READ', 'CATALOGUE_PRICE_WRITE', 'CATALOGUE_PRICE_APPROVE', 'CATALOGUE_ADMIN'] },
+    { id: 'priceapprovals', label: 'Price approvals', icon: CheckCircle2, anyPermission: ['CATALOGUE_PRICE_READ', 'CATALOGUE_PRICE_WRITE', 'CATALOGUE_PRICE_APPROVE'] },
   ] }, { label: 'Setup', sections: [
     { id: 'units', label: 'Units of measure', icon: Ruler, anyPermission: ['CATALOGUE_ADMIN'] },
     { id: 'attributes', label: 'Attributes', icon: SlidersHorizontal, anyPermission: ['CATALOGUE_ADMIN'] },

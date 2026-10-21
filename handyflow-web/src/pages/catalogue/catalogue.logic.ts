@@ -303,3 +303,81 @@ export const attributeBody = (f: AttributeForm) => ({
   maxLength: f.type === "TEXT" && f.maxLength.trim() !== "" ? Number(f.maxLength) : undefined,
   sortOrder: Number(f.sortOrder.trim() || "0"), active: f.active,
 })
+
+// ── Pricing ──────────────────────────────────────────────────────────────────
+export type PriceChangeStatus = "PENDING" | "SCHEDULED" | "APPLIED" | "REJECTED" | "CANCELLED"
+export interface PriceList { id: string; code: string; name: string; defaultList: boolean; active: boolean; sortOrder: number }
+export interface PriceChange {
+  id: string; itemId: string; itemName: string | null; priceListId: string; priceListName: string | null
+  oldPrice: number | null; newPrice: number; changePercent: number | null; effectiveFrom: string; reason: string | null
+  status: PriceChangeStatus; proposedByMe: boolean; proposedAt: string; decidedAt: string | null; decisionNote: string | null; appliedAt: string | null
+}
+export interface ListPrice { priceListId: string; code: string; name: string; defaultList: boolean; price: number | null; priceInclVat: number | null; marginPercent: number | null; open: PriceChange[] }
+export interface ItemPricing {
+  itemId: string; itemName: string; unit: string; minPrice: number | null; costPrice: number | null; vatRate: number; vatExempt: boolean
+  approvalRequired: boolean; lists: ListPrice[]
+}
+
+export const PRICE_STATUS_LABEL: Record<PriceChangeStatus, string> = { PENDING: "Waiting for approval", SCHEDULED: "Scheduled", APPLIED: "In force", REJECTED: "Rejected", CANCELLED: "Cancelled" }
+
+/** "R 100.00 → R 120.00 (+20%)" for a change; "R 120.00" when there was no earlier price. */
+export function changeText(c: Pick<PriceChange, "oldPrice" | "newPrice" | "changePercent">): string {
+  const pct = c.changePercent == null ? "" : ` (${c.changePercent > 0 ? "+" : ""}${c.changePercent}%)`
+  return c.oldPrice == null ? rand(c.newPrice) : `${rand(c.oldPrice)} → ${rand(c.newPrice)}${pct}`
+}
+
+export const todayIso = (now: Date = new Date()) => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+
+export interface PriceForm { priceListId: string; newPrice: string; effectiveFrom: string; reason: string }
+export const EMPTY_PRICE_FORM: PriceForm = { priceListId: "", newPrice: "", effectiveFrom: "", reason: "" }
+
+/** Checks a proposal before it is sent. The server repeats every rule. */
+export function priceProblems(f: PriceForm, ctx: { minPrice: number | null; current: number | null; approvalRequired: boolean; today?: string }): Record<string, string> {
+  const e: Record<string, string> = {}
+  const raw = f.newPrice.trim().replace(",", ".")
+  if (!f.priceListId) e.priceListId = "Choose a price list."
+  if (!raw) e.newPrice = "Enter the new price."
+  else if (!/^\d+(\.\d{1,2})?$/.test(raw)) e.newPrice = "Enter an amount like 120 or 120.50."
+  else {
+    const n = Number(raw)
+    if (ctx.minPrice != null && n < ctx.minPrice) e.newPrice = `The price cannot be below the minimum price of ${rand(ctx.minPrice)}.`
+    else if (ctx.current != null && n === ctx.current && (!f.effectiveFrom || f.effectiveFrom <= (ctx.today ?? todayIso()))) e.newPrice = "That is already the price."
+  }
+  if (f.effectiveFrom && f.effectiveFrom < (ctx.today ?? todayIso())) e.effectiveFrom = "The effective date cannot be in the past."
+  if (ctx.approvalRequired && f.reason.trim().length < 3) e.reason = "Say why the price is changing (at least 3 characters)."
+  if (f.reason.trim().length > 255) e.reason = "The reason can be at most 255 characters."
+  return e
+}
+
+export const priceBody = (f: PriceForm) => ({
+  priceListId: f.priceListId, newPrice: Number(f.newPrice.trim().replace(",", ".")),
+  effectiveFrom: f.effectiveFrom || undefined, reason: f.reason.trim() || undefined,
+})
+
+/** The minimum price field: empty clears it. */
+export function minPriceProblem(raw: string, current: number | null): string | null {
+  const s = raw.trim().replace(",", ".")
+  if (!s) return null
+  if (!/^\d+(\.\d{1,2})?$/.test(s)) return "Enter an amount like 80 or 80.50."
+  if (current != null && Number(s) > current) return `The current price (${rand(current)}) is already below that. Change the price first.`
+  return null
+}
+export const minPriceBody = (raw: string) => ({ minPrice: raw.trim() ? Number(raw.trim().replace(",", ".")) : null })
+
+export interface PriceListForm { code: string; name: string; sortOrder: string; active: boolean }
+export const EMPTY_PRICE_LIST_FORM: PriceListForm = { code: "", name: "", sortOrder: "10", active: true }
+export const toPriceListForm = (l: PriceList): PriceListForm => ({ code: l.code, name: l.name, sortOrder: String(l.sortOrder), active: l.active })
+export function priceListProblems(f: PriceListForm, creating: boolean): Record<string, string> {
+  const e: Record<string, string> = {}
+  if (creating) {
+    const c = f.code.trim()
+    if (!c) e.code = "The code is required."
+    else if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(c)) e.code = "Start with a letter; use only letters, numbers and underscores."
+    else if (c.length > 30) e.code = "The code can be at most 30 characters."
+  }
+  if (!f.name.trim()) e.name = "The name is required."
+  else if (f.name.trim().length > 60) e.name = "The name can be at most 60 characters."
+  if (f.sortOrder.trim() && !/^-?\d+$/.test(f.sortOrder.trim())) e.sortOrder = "Whole number."
+  return e
+}
+export const priceListBody = (f: PriceListForm) => ({ code: f.code.trim(), name: f.name.trim(), sortOrder: f.sortOrder.trim() ? Number(f.sortOrder) : undefined, active: f.active })

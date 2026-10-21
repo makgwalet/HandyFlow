@@ -67,6 +67,9 @@ public class CatalogueItem {
     @Column(name = "cost_price", precision = 15, scale = 2)
     private BigDecimal costPrice;
 
+    @Column(name = "min_price", precision = 15, scale = 2)
+    private BigDecimal minPrice;
+
     @Column(name = "vat_rate", nullable = false,
             precision = 5, scale = 2)
     private BigDecimal vatRate;
@@ -123,6 +126,18 @@ public class CatalogueItem {
         this.costPrice = d.costPrice();
         this.vatExempt = d.vatExempt();
         this.vatRate = d.vatExempt() ? new BigDecimal("0.00") : d.vatRate();
+    }
+
+    /** The floor under every price of this item; null means none. */
+    public void changeMinPrice(BigDecimal minPrice) {
+        this.minPrice = minPrice;
+        this.updatedAt = Instant.now();
+    }
+
+    /** The Retail price that Invoicing, POS and Supply Chain read. Only the pricing workflow calls this. */
+    public void changeDefaultPrice(BigDecimal price) {
+        this.defaultPrice = price;
+        this.updatedAt = Instant.now();
     }
 
     /** Moves the item through its lifecycle. The caller has already checked the move with CatalogueRules. */

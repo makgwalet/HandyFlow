@@ -8,12 +8,13 @@ import { CATALOGUE_SECTIONS } from "../../navigation/moduleSections"
 
 const ItemsPanel = lazy(() => import("./ItemsPanel")), CategoriesPanel = lazy(() => import("./CategoriesPanel"))
 const UnitsPanel = lazy(() => import("./UnitsPanel")), AttributesPanel = lazy(() => import("./AttributesPanel"))
+const PriceListsPanel = lazy(() => import("./PriceListsPanel")), PriceApprovalsPanel = lazy(() => import("./PriceApprovalsPanel"))
 
 export function CataloguePage() {
   return (
     <SectionedModulePage config={CATALOGUE_SECTIONS} subtitle="Manage your products and services" render={id => (
       <Suspense fallback={<p>Loading…</p>}>
-        {id === "items" ? <ItemsPanel /> : id === "categories" ? <CategoriesPanel /> : id === "units" ? <UnitsPanel /> : id === "attributes" ? <AttributesPanel /> : null}
+        {id === "items" ? <ItemsPanel /> : id === "categories" ? <CategoriesPanel /> : id === "units" ? <UnitsPanel /> : id === "attributes" ? <AttributesPanel /> : id === "pricelists" ? <PriceListsPanel /> : id === "priceapprovals" ? <PriceApprovalsPanel /> : null}
       </Suspense>
     )} />
   )

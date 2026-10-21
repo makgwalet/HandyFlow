@@ -48,9 +48,14 @@ public class CatalogueService {
     private final CatalogueAuditEventRepository auditRepository;
     private final VatRateProvider vatRateProvider;
     private final CatalogueStructureService structure;
+    private final CataloguePricingService pricing;
 
     /** Who is asking and what they may do. Built by the controller from the signed-in user's authorities. */
-    public record Caller(UUID userId, boolean canSeePrices, boolean canWritePrices, boolean canArchive) {}
+    public record Caller(UUID userId, boolean canSeePrices, boolean canWritePrices, boolean canArchive, boolean canApprovePrices) {
+        public Caller(UUID userId, boolean canSeePrices, boolean canWritePrices, boolean canArchive) {
+            this(userId, canSeePrices, canWritePrices, canArchive, false);
+        }
+    }
 
     /** The filters of the catalogue list. All optional. */
     public record ItemFilter(String q, UUID categoryId, CatalogueItemStatus status, CatalogueItemType type) {}
@@ -139,12 +144,16 @@ public class CatalogueService {
         checkDuplicates(tenantId, details, item.getId());
         var attributes = structure.check(tenantId, category == null ? null : category.getId(), r.attributes(),
                 item.getStatus() != CatalogueItemStatus.DRAFT, structure.stored(tenantId, item.getId()));
+        BigDecimal oldPrice = item.getDefaultPrice();
+        boolean priceEdited = differs(details.defaultPrice(), oldPrice);
+        if (priceEdited) pricing.requireDirectEditAllowed(tenantId);
 
         var before = item.snapshot();
         item.update(category, details);
         var after = item.snapshot();
         String change = CatalogueRules.describeChanges(before, after);
         String attributeChange = structure.store(tenantId, item.getId(), attributes);
+        if (priceEdited) pricing.recordDirectChange(tenantId, item, oldPrice, item.getDefaultPrice(), caller);
         if (!change.isEmpty()) {
             itemRepository.save(item);
             audit(tenantId, item, CatalogueRules.priceChanged(before, after) ? CatalogueAuditAction.PRICE_CHANGED : CatalogueAuditAction.UPDATED, change, caller);

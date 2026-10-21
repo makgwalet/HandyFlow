@@ -1,11 +1,12 @@
 // src/pages/catalogue/ItemsPanel.tsx — the catalogue list: server-side search, filters, sorting and paging; add/edit, lifecycle changes, history and delete.
 import { useEffect, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query"
-import { ChevronLeft, ChevronRight, History, Package, Pencil, Plus, Power, Search, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Coins, History, Package, Pencil, Plus, Power, Search, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { DeleteModal, ErrorBanner, Field, Modal, StatusBadge } from "./CatalogueKit"
 import { inp, inpErr, sel } from "./catalogue.styles"
+import PricingModal from "./PricingModal"
 import {
   EMPTY_FILTERS, EMPTY_ITEM_FORM, applicableAttributes, attributeProblems, indented, matchUnit, ITEM_STATUSES, ITEM_TYPES, STATUS_LABEL, allowedMoves, duplicateField, errorMessage, fieldErrors, hasFilters, itemBody, itemProblems,
   listParams, marginText, moveLabel, moveNeedsReason, rand, rangeText, statusProblem, toItemForm, typeLabel,
@@ -29,6 +30,7 @@ export default function ItemsPanel() {
   const [editing, setEditing] = useState<CatalogueItem | "new" | null>(null)
   const [statusFor, setStatusFor] = useState<CatalogueItem | null>(null)
   const [historyFor, setHistoryFor] = useState<CatalogueItem | null>(null)
+  const [pricingFor, setPricingFor] = useState<CatalogueItem | null>(null)
   const [deleting, setDeleting] = useState<CatalogueItem | null>(null)
   const [deleteError, setDeleteError] = useState("")
 
@@ -125,6 +127,7 @@ export default function ItemsPanel() {
                       <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
                         {canWrite && i.status !== "ARCHIVED" && <button type="button" style={ghost} aria-label={`Edit ${i.name}`} onClick={() => setEditing(i)}><Pencil size={12} /> Edit</button>}
                         {canWrite && allowedMoves(i.status, canArchive).length > 0 && <button type="button" style={ghost} aria-label={`Change status of ${i.name}`} onClick={() => setStatusFor(i)}><Power size={12} /> Status</button>}
+                        {canSeeCost && i.status !== "ARCHIVED" && <button type="button" style={ghost} aria-label={`Pricing of ${i.name}`} onClick={() => setPricingFor(i)}><Coins size={12} /> Pricing</button>}
                         <button type="button" style={ghost} aria-label={`History of ${i.name}`} onClick={() => setHistoryFor(i)}><History size={12} /></button>
                         {canArchive && <button type="button" style={ghost} aria-label={`Delete ${i.name}`} onClick={() => { setDeleting(i); setDeleteError("") }}><Trash2 size={13} /></button>}
                       </div>
@@ -148,6 +151,7 @@ export default function ItemsPanel() {
       {editing && <ItemFormModal item={editing === "new" ? null : editing} categories={categories.data ?? []} canSeeCost={canSeeCost} canWriteCost={canWriteCost}
         onClose={() => setEditing(null)} onSaved={() => { refresh(); setEditing(null) }} onStale={refresh} />}
       {statusFor && <StatusDialog item={statusFor} canArchive={canArchive} onClose={() => setStatusFor(null)} onDone={() => { refresh(); setStatusFor(null) }} onStale={refresh} />}
+      {pricingFor && <PricingModal item={pricingFor} canWrite={canWriteCost} onClose={() => setPricingFor(null)} onChanged={refresh} />}
       {historyFor && <HistoryModal item={historyFor} onClose={() => setHistoryFor(null)} />}
       {deleting && (
         <DeleteModal title="Delete item?" badge={deleting.name} badgeIcon={<Package size={14} />} isPending={del.isPending} error={deleteError}
@@ -167,6 +171,9 @@ function ItemFormModal({ item, categories, canSeeCost, canWriteCost, onClose, on
   const defs = useQuery<AttributeDef[]>({ queryKey: ["catalogue", "attributes"], queryFn: async () => inner<AttributeDef[]>(await apiClient.get("/api/v1/catalogue/attributes")) ?? [] })
   // The list does not carry attribute values, so an edit loads the single item to get them.
   const full = useQuery<CatalogueItem>({ queryKey: ["catalogue", "item", item?.id], enabled: !!item, queryFn: async () => inner<CatalogueItem>(await apiClient.get(`/api/v1/catalogue/items/${item!.id}`)) })
+  const settings = useQuery<{ priceApprovalRequired: boolean }>({ queryKey: ["catalogue", "settings"], queryFn: async () => inner<{ priceApprovalRequired: boolean }>(await apiClient.get("/api/v1/catalogue/settings")) })
+  // When price changes need approval, an existing item's price changes through Pricing, not through this form.
+  const priceLocked = !!item && settings.data?.priceApprovalRequired === true
   const loadedAttrs = useRef(false)
   useEffect(() => {
     const a = full.data?.attributes
@@ -238,7 +245,9 @@ function ItemFormModal({ item, categories, canSeeCost, canWriteCost, onClose, on
           </select>
         </Field>
         <Field label="Default price (R)" required error={errors.defaultPrice} id="cat-price">
-          <input id="cat-price" style={s("defaultPrice")} value={form.defaultPrice} onChange={e => set("defaultPrice", e.target.value)} placeholder="0.00" inputMode="decimal" />
+          <input id="cat-price" style={s("defaultPrice")} value={form.defaultPrice} onChange={e => set("defaultPrice", e.target.value)} placeholder="0.00" inputMode="decimal"
+            readOnly={priceLocked} title={priceLocked ? "Price changes need approval. Use Pricing on the item." : undefined} />
+          {priceLocked && <span style={{ display: "block", fontSize: 12, color: "var(--hf-text-muted)", marginTop: 4 }}>Price changes need approval. Use Pricing on the item.</span>}
         </Field>
         {canSeeCost && (
           <Field label="Cost price (R)" error={errors.costPrice} id="cat-cost">
@@ -362,4 +371,7 @@ function HistoryModal({ item, onClose }: { item: CatalogueItem; onClose: () => v
     </Modal>
   )
 }
-const actionText = (a: string) => ({ CREATED: "Created", UPDATED: "Edited", PRICE_CHANGED: "Price changed", STATUS_CHANGED: "Status changed", DELETED: "Deleted" }[a] ?? a)
+const actionText = (a: string) => ({
+  CREATED: "Created", UPDATED: "Edited", PRICE_CHANGED: "Price changed", STATUS_CHANGED: "Status changed", DELETED: "Deleted",
+  PRICE_PROPOSED: "Price change proposed", PRICE_APPROVED: "Price change approved", PRICE_REJECTED: "Price change rejected", PRICE_CANCELLED: "Price change cancelled", SETTING_CHANGED: "Setting changed",
+}[a] ?? a)
