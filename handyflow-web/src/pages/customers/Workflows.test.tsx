@@ -1,0 +1,126 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { render, screen, cleanup, within, fireEvent, waitFor } from "@testing-library/react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import WorkflowsPanel from "./WorkflowsPanel"
+import { EMPTY_WORKFLOW, runSummary, textLabel, toWorkflowForm, workflowBody, workflowProblem, type Workflow, type WorkflowRun } from "./workflows.logic"
+
+const get = vi.fn(), post = vi.fn(), put = vi.fn(), del = vi.fn()
+let perms = new Set<string>()
+vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a), put: (...a: unknown[]) => put(...a), delete: (...a: unknown[]) => del(...a) } }))
+vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.has(p) }))
+const wrap = (ui: React.ReactElement) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>)
+const ok = (d: unknown) => Promise.resolve({ data: { data: d } })
+beforeEach(() => { perms = new Set(["CUSTOMER_READ", "CUSTOMER_UPDATE"]); for (const m of [get, post, put, del]) m.mockReset(); for (const m of [post, put, del]) m.mockResolvedValue({ data: { data: {} } }) })
+afterEach(cleanup)
+
+const wf = (over: Partial<Workflow> = {}): Workflow => ({ id: "w1", name: "Proposal task", trigger: "STAGE_CHANGED", triggerStage: "QUALIFIED", condField: null, condOp: null, condValue: null, action: "CREATE_TASK", actionText: "Send proposal", actionDays: 2, actionUser: null, active: true, description: "When a lead moves to qualified, add a task \"Send proposal\" due in 2 days", ...over })
+const run = (over: Partial<WorkflowRun> = {}): WorkflowRun => ({ id: "r1", workflowId: "w1", workflowName: "Proposal task", customerId: "c1", customerName: "Acme", outcome: "DONE", detail: "Task added, due 2026-10-23", ranAt: "2026-10-21T10:00:00Z", ...over })
+const users = { content: [{ id: "u1", firstName: "Olive", lastName: "Other" }, { id: "u2", firstName: "Sam", lastName: "Seller" }] }
+const serve = (w: Workflow[], r: WorkflowRun[]) => get.mockImplementation((url: string) => ok(url.endsWith("/runs") ? r : url.includes("workflows") ? w : users))
+
+describe("workflow logic", () => {
+  const f = { ...EMPTY_WORKFLOW, name: "Tag big", trigger: "LEAD_CREATED" as const, action: "ADD_TAG" as const, text: "big" }
+  it("checks the form step by step", () => {
+    expect(workflowProblem(EMPTY_WORKFLOW)).toBe("Name the workflow.")
+    expect(workflowProblem({ ...EMPTY_WORKFLOW, name: "x" })).toBe("Choose what starts the workflow.")
+    expect(workflowProblem({ ...EMPTY_WORKFLOW, name: "x", trigger: "LEAD_CREATED" })).toBe("Choose what the workflow does.")
+    expect(workflowProblem(f)).toBeNull()
+    expect(workflowProblem({ ...f, text: " " })).toBe("Name the tag.")
+    expect(workflowProblem({ ...f, text: "x".repeat(51) })).toBe("The tag can be at most 50 characters.")
+    expect(workflowProblem({ ...f, condition: { field: "SOURCE", op: "EQ", value: "" } })).toBe("Give the value to compare with.")
+    expect(workflowProblem({ ...f, action: "CREATE_TASK", text: "" })).toBe("Say what the task is.")
+    expect(workflowProblem({ ...f, action: "CREATE_TASK", text: "Call", days: "366" })).toBe("Due in days must be a whole number from 0 to 365.")
+    expect(workflowProblem({ ...f, action: "CREATE_TASK", text: "Call", days: "1.5" })).toBe("Due in days must be a whole number from 0 to 365.")
+    expect(workflowProblem({ ...f, action: "CREATE_TASK", text: "Call", days: "0" })).toBeNull()
+    expect(workflowProblem({ ...f, action: "ASSIGN_OWNER" })).toBe("Choose who becomes the owner.")
+    expect(workflowProblem({ ...f, action: "ASSIGN_OWNER", user: "u1" })).toBeNull()
+    expect(workflowProblem({ ...f, action: "NOTIFY_OWNER", text: "" })).toBe("Write the message.")
+  })
+  it("sends only what the action uses", () => {
+    expect(workflowBody(f)).toEqual({ name: "Tag big", trigger: "LEAD_CREATED", triggerStage: null, condField: null, condOp: null, condValue: null, action: "ADD_TAG", actionText: "big", actionDays: null, actionUser: null, active: true })
+    expect(workflowBody({ ...f, trigger: "STAGE_CHANGED", triggerStage: "WON", action: "CREATE_TASK", text: " Call ", days: " 3 ", user: "u2" }))
+      .toMatchObject({ triggerStage: "WON", actionText: "Call", actionDays: 3, actionUser: "u2" })
+    expect(workflowBody({ ...f, triggerStage: "WON" }).triggerStage).toBeNull()
+    expect(workflowBody({ ...f, action: "ASSIGN_OWNER", text: "left over", user: "u1" })).toMatchObject({ actionText: null, actionUser: "u1" })
+    expect(workflowBody({ ...f, condition: { field: "DEAL_VALUE", op: "GTE", value: "50 000" } })).toMatchObject({ condField: "DEAL_VALUE", condOp: "GTE", condValue: "50000" })
+  })
+  it("round-trips a saved workflow into the form and labels the text box", () => {
+    const form = toWorkflowForm(wf({ condField: "SOURCE", condOp: "EQ", condValue: "WEBSITE" }))
+    expect(form).toMatchObject({ trigger: "STAGE_CHANGED", triggerStage: "QUALIFIED", condition: { field: "SOURCE", value: "WEBSITE" }, text: "Send proposal", days: "2" })
+    expect(textLabel("ASSIGN_OWNER")).toBeNull(); expect(textLabel("ADD_TAG")).toBe("Tag")
+  })
+  it("counts the log", () => { expect(runSummary([run(), run({ id: "r2", outcome: "FAILED" }), run({ id: "r3" })])).toEqual({ done: 2, failed: 1 }) })
+})
+
+describe("WorkflowsPanel", () => {
+  it("lists workflows as sentences and shows the log", async () => {
+    serve([wf(), wf({ id: "w2", name: "Quiet one", active: false })], [run(), run({ id: "r2", outcome: "FAILED", detail: "Nobody could be found to tell" })])
+    wrap(<WorkflowsPanel />)
+    const row = await screen.findByLabelText("Proposal task")
+    expect(within(row).getByText(/When a lead moves to qualified/)).toBeTruthy()
+    expect(within(screen.getByLabelText("Quiet one")).getByText("(off)")).toBeTruthy()
+    expect(await screen.findAllByLabelText(/Run of Proposal task for Acme/)).toHaveLength(2)
+    expect(screen.getByText(/Failed: Nobody could be found to tell/)).toBeTruthy(); expect(screen.getByText(/1 done, 1 failed in the last 2/)).toBeTruthy()
+  })
+  it("says so when there is nothing", async () => {
+    serve([], [])
+    wrap(<WorkflowsPanel />)
+    expect(await screen.findByText("No workflows yet.")).toBeTruthy(); expect(await screen.findByText("Nothing has run yet.")).toBeTruthy()
+  })
+  it("adds a workflow", async () => {
+    serve([], [])
+    wrap(<WorkflowsPanel />)
+    fireEvent.click(await screen.findByText("Add workflow"))
+    const save = screen.getByText("Save workflow") as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText("Workflow name"), { target: { value: "Welcome task" } })
+    fireEvent.change(screen.getByLabelText("Trigger"), { target: { value: "LEAD_CREATED" } })
+    fireEvent.change(screen.getByLabelText("Action"), { target: { value: "CREATE_TASK" } })
+    expect(save.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText("What is the task?"), { target: { value: "Call the lead" } })
+    expect(save.disabled).toBe(false)
+    fireEvent.click(save)
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/crm/workflows", expect.objectContaining({ name: "Welcome task", trigger: "LEAD_CREATED", action: "CREATE_TASK", actionText: "Call the lead", actionDays: 2, condField: null })))
+  })
+  it("shows the stage choice only for stage changes", async () => {
+    serve([], [])
+    wrap(<WorkflowsPanel />)
+    fireEvent.click(await screen.findByText("Add workflow"))
+    expect(screen.queryByLabelText("Trigger stage")).toBeNull()
+    fireEvent.change(screen.getByLabelText("Trigger"), { target: { value: "STAGE_CHANGED" } })
+    expect(screen.getByLabelText("Trigger stage")).toBeTruthy()
+    fireEvent.change(screen.getByLabelText("Trigger"), { target: { value: "OPPORTUNITY_WON" } })
+    expect(screen.queryByLabelText("Trigger stage")).toBeNull()
+  })
+  it("edits, turns off and deletes", async () => {
+    serve([wf()], [])
+    wrap(<WorkflowsPanel />)
+    fireEvent.click(await screen.findByLabelText("Turn off Proposal task"))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/crm/workflows/w1", expect.objectContaining({ active: false, triggerStage: "QUALIFIED", actionText: "Send proposal", actionDays: 2 })))
+    fireEvent.click(screen.getByLabelText("Edit Proposal task"))
+    fireEvent.change(screen.getByLabelText("Due in days"), { target: { value: "5" } })
+    fireEvent.click(screen.getByText("Save workflow"))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/crm/workflows/w1", expect.objectContaining({ actionDays: 5 })))
+    fireEvent.click(screen.getByLabelText("Delete Proposal task"))
+    await waitFor(() => expect(del).toHaveBeenCalledWith("/api/v1/crm/workflows/w1"))
+  })
+  it("uses a person's real name in the sentence and offers people for the owner action", async () => {
+    serve([wf({ id: "w3", name: "Hand over", trigger: "OPPORTUNITY_WON", triggerStage: null, action: "ASSIGN_OWNER", actionText: null, actionDays: null, actionUser: "u2", description: "When an opportunity is won, make someone the owner" })], [])
+    wrap(<WorkflowsPanel />)
+    expect(await within(await screen.findByLabelText("Hand over")).findByText("When an opportunity is won, make Sam Seller the owner")).toBeTruthy()
+    fireEvent.click(screen.getByLabelText("Edit Hand over"))
+    expect((screen.getByLabelText("Person") as HTMLSelectElement).value).toBe("u2")
+    expect(screen.queryByLabelText("Tag")).toBeNull()
+  })
+  it("hides the editing controls without permission and shows a server refusal", async () => {
+    perms = new Set(["CUSTOMER_READ"]); serve([wf()], [])
+    wrap(<WorkflowsPanel />)
+    await screen.findByLabelText("Proposal task")
+    expect(screen.queryByText("Add workflow")).toBeNull(); expect(screen.queryByLabelText("Delete Proposal task")).toBeNull()
+    cleanup(); perms = new Set(["CUSTOMER_READ", "CUSTOMER_UPDATE"]); serve([wf()], [])
+    put.mockRejectedValue({ response: { data: { message: "At most 30 workflows" } } })
+    wrap(<WorkflowsPanel />)
+    fireEvent.click(await screen.findByLabelText("Turn off Proposal task"))
+    expect((await screen.findByRole("alert")).textContent).toContain("At most 30 workflows")
+  })
+})
