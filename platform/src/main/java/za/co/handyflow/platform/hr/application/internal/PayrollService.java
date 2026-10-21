@@ -33,6 +33,7 @@ public class PayrollService {
     private final StatutoryRulesService rulesService;
     private final MedicalSchemeService  medicalSchemeService;
     private final HrPayRunEventRepository eventRepo;
+    private final EmployeeChangeService changeService;
 
     // ── Pay runs ──────────────────────────────────────────────────────────────
 
@@ -102,6 +103,9 @@ public class PayrollService {
 
         run.markProcessing();
         payRunRepo.save(run);
+
+        // Approved pay and bank changes dated up to the end of the period take effect before anything is calculated.
+        changeService.applyDue(tenantId, run.getPeriodEnd());
 
         List<HrEmployee> employees = employeeRepo.findAllActiveList(tenantId);
         if (employees.isEmpty())

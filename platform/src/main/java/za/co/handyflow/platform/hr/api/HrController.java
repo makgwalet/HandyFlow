@@ -12,6 +12,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.hr.application.internal.*;
@@ -48,57 +49,168 @@ public class HrController {
     private final MedicalSchemeService   medicalSchemeService;
     private final PayrollImpactService   payrollImpactService;
     private final PayrollControlService  payrollControlService;
+    private final EmployeeViewService   employeeViewService;
+    private final EmployeeChangeService employeeChangeService;
+    private final EmployeeAuditService  employeeAuditService;
 
     // ── Employees ─────────────────────────────────────────────────────────────
 
     @GetMapping("/employees")
-    @PreAuthorize("hasAnyAuthority('HR_READ','HR_MANAGE','PAYROLL_RUN','PAYROLL_PREPARE','PAYROLL_APPROVE','USER_READ')")
-    @Operation(summary = "List employees with optional status and search filters")
-    public ResponseEntity<ApiResponse<Page<EmployeeResponse>>> getEmployees(
+    @PreAuthorize("hasAnyAuthority('HR_READ','HR_MANAGE','HR_TEAM_READ','PAYROLL_RUN','PAYROLL_PREPARE','PAYROLL_APPROVE','USER_READ')")
+    @Operation(summary = "List employees. Personal data and pay are left out unless the caller holds the permission")
+    public ResponseEntity<ApiResponse<Page<EmployeeViewResponse>>> getEmployees(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
-            @PageableDefault(size = 50) Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.success(
-                hrService.getEmployees(TenantContext.getTenantIdAsObject(), status, search, pageable)));
+            @PageableDefault(size = 50) Pageable pageable,
+            Authentication authentication, Principal principal) {
+        return ResponseEntity.ok(ApiResponse.success(employeeViewService.list(
+                TenantContext.getTenantIdAsObject(), status, search, pageable, HrAccess.held(authentication), resolveUserId(principal))));
     }
 
     @GetMapping("/employees/{id}")
-    @PreAuthorize("hasAnyAuthority('HR_READ','HR_MANAGE','USER_READ')")
-    public ResponseEntity<ApiResponse<EmployeeResponse>> getEmployee(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.success(
-                hrService.getEmployee(TenantContext.getTenantIdAsObject(), id)));
+    @PreAuthorize("hasAnyAuthority('HR_READ','HR_MANAGE','HR_TEAM_READ','USER_READ')")
+    public ResponseEntity<ApiResponse<EmployeeViewResponse>> getEmployee(
+            @PathVariable UUID id, Authentication authentication, Principal principal) {
+        return ResponseEntity.ok(ApiResponse.success(employeeViewService.get(
+                TenantContext.getTenantIdAsObject(), id, HrAccess.held(authentication), resolveUserId(principal))));
     }
 
     @PostMapping("/employees")
     // FIX: was USER_READ — anyone could create employees
     @PreAuthorize("hasAnyAuthority('HR_MANAGE','USER_UPDATE')")
     @Operation(summary = "Register a new employee — seeds BCEA leave balances automatically")
-    public ResponseEntity<ApiResponse<EmployeeResponse>> createEmployee(
-            @Valid @RequestBody CreateEmployeeRequest req) {
+    public ResponseEntity<ApiResponse<EmployeeViewResponse>> createEmployee(
+            @Valid @RequestBody CreateEmployeeRequest req, Authentication authentication, Principal principal) {
+        EmployeeResponse created = hrService.createEmployee(TenantContext.getTenantIdAsObject(), req);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Employee registered",
-                hrService.createEmployee(TenantContext.getTenantIdAsObject(), req)));
+                employeeViewService.get(TenantContext.getTenantIdAsObject(), created.id(), HrAccess.held(authentication), resolveUserId(principal))));
     }
 
     @PutMapping("/employees/{id}")
     @PreAuthorize("hasAnyAuthority('HR_MANAGE','USER_UPDATE')")
-    @Operation(summary = "Update employee details — salary, department, contact info")
-    public ResponseEntity<ApiResponse<EmployeeResponse>> updateEmployee(
-            @PathVariable UUID id,
-            @Valid @RequestBody CreateEmployeeRequest req) {
+    @Operation(summary = "Update contact and job details. Pay and bank details change through a request that someone else approves")
+    public ResponseEntity<ApiResponse<EmployeeViewResponse>> updateEmployee(
+            @PathVariable UUID id, @RequestBody UpdateEmployeeRequest req, Authentication authentication, Principal principal) {
+        var held = HrAccess.held(authentication);
+        UUID actor = resolveUserId(principal);
+        hrService.updateDetails(TenantContext.getTenantIdAsObject(), id, req, HrAccess.sensitive(held), actor);
         return ResponseEntity.ok(ApiResponse.success("Employee updated",
-                hrService.updateEmployee(TenantContext.getTenantIdAsObject(), id, req)));
+                employeeViewService.get(TenantContext.getTenantIdAsObject(), id, held, actor)));
     }
 
     @PostMapping("/employees/{id}/terminate")
     // FIX: was USER_READ — anyone could terminate employees
     @PreAuthorize("hasAnyAuthority('HR_MANAGE','USER_UPDATE')")
-    @Operation(summary = "Terminate an employee — sets end date and status to TERMINATED")
-    public ResponseEntity<ApiResponse<EmployeeResponse>> terminateEmployee(
+    @Operation(summary = "Terminate an employee — last day worked and a reason are required")
+    public ResponseEntity<ApiResponse<EmployeeViewResponse>> terminateEmployee(
             @PathVariable UUID id,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(required = false) String reason) {
+            @RequestParam String reason, Authentication authentication, Principal principal) {
+        UUID actor = resolveUserId(principal);
+        hrService.terminateEmployee(TenantContext.getTenantIdAsObject(), id, endDate, reason, actor);
         return ResponseEntity.ok(ApiResponse.success("Employee terminated",
-                hrService.terminateEmployee(TenantContext.getTenantIdAsObject(), id, endDate)));
+                employeeViewService.get(TenantContext.getTenantIdAsObject(), id, HrAccess.held(authentication), actor)));
+    }
+
+    @PutMapping("/employees/{id}/manager")
+    @PreAuthorize("hasAnyAuthority('HR_MANAGE','USER_UPDATE')")
+    @Operation(summary = "Set or remove the manager of an employee. A person cannot report to themselves or to their own team")
+    public ResponseEntity<ApiResponse<EmployeeViewResponse>> setManager(
+            @PathVariable UUID id, @RequestBody SetManagerRequest req, Authentication authentication, Principal principal) {
+        UUID actor = resolveUserId(principal);
+        hrService.setManager(TenantContext.getTenantIdAsObject(), id, req.managerId(), actor);
+        return ResponseEntity.ok(ApiResponse.success("Manager updated",
+                employeeViewService.get(TenantContext.getTenantIdAsObject(), id, HrAccess.held(authentication), actor)));
+    }
+
+    @PutMapping("/employees/{id}/user-link")
+    @PreAuthorize("hasAnyAuthority('HR_MANAGE','USER_UPDATE')")
+    @Operation(summary = "Link an employee to a staff login, so a manager sees their own team")
+    public ResponseEntity<ApiResponse<EmployeeViewResponse>> linkUser(
+            @PathVariable UUID id, @RequestBody LinkUserRequest req, Authentication authentication, Principal principal) {
+        UUID actor = resolveUserId(principal);
+        hrService.linkUser(TenantContext.getTenantIdAsObject(), id, req.userId(), actor);
+        return ResponseEntity.ok(ApiResponse.success("Login link updated",
+                employeeViewService.get(TenantContext.getTenantIdAsObject(), id, HrAccess.held(authentication), actor)));
+    }
+
+    @GetMapping("/employees/{id}/audit")
+    @PreAuthorize("hasAnyAuthority('HR_MANAGE','HR_SENSITIVE_READ','HR_COMPENSATION_APPROVE')")
+    @Operation(summary = "What was done to an employee record, and who looked at personal data or pay")
+    public ResponseEntity<ApiResponse<List<EmployeeAuditResponse>>> employeeAudit(@PathVariable UUID id) {
+        hrService.getEmployee(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok(ApiResponse.success(employeeAuditService.history(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    // ── Pay and bank changes ──────────────────────────────────────────────────
+
+    @PostMapping("/employees/{id}/changes/compensation")
+    @PreAuthorize("hasAuthority('HR_COMPENSATION_MANAGE')")
+    @Operation(summary = "Ask for a change to salary, allowances or pay frequency. It takes effect once someone else approves it")
+    public ResponseEntity<ApiResponse<EmployeeChangeResponse>> requestCompensation(
+            @PathVariable UUID id, @RequestBody CompensationChangeRequest req, Principal principal) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Change requested",
+                employeeChangeService.requestCompensation(TenantContext.getTenantIdAsObject(), id, req, resolveUserId(principal))));
+    }
+
+    @PostMapping("/employees/{id}/changes/bank")
+    @PreAuthorize("hasAuthority('HR_COMPENSATION_MANAGE')")
+    @Operation(summary = "Ask for a change to bank details. It takes effect once someone else approves it")
+    public ResponseEntity<ApiResponse<EmployeeChangeResponse>> requestBank(
+            @PathVariable UUID id, @RequestBody BankChangeRequest req, Principal principal) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Change requested",
+                employeeChangeService.requestBank(TenantContext.getTenantIdAsObject(), id, req, resolveUserId(principal))));
+    }
+
+    @GetMapping("/employees/{id}/changes")
+    @PreAuthorize("hasAnyAuthority('HR_COMPENSATION_READ','HR_COMPENSATION_MANAGE','HR_COMPENSATION_APPROVE')")
+    public ResponseEntity<ApiResponse<List<EmployeeChangeResponse>>> employeeChanges(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(employeeChangeService.forEmployee(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @GetMapping("/employee-changes/pending")
+    @PreAuthorize("hasAnyAuthority('HR_COMPENSATION_READ','HR_COMPENSATION_MANAGE','HR_COMPENSATION_APPROVE')")
+    @Operation(summary = "Pay and bank changes waiting for a decision")
+    public ResponseEntity<ApiResponse<List<EmployeeChangeResponse>>> pendingChanges() {
+        return ResponseEntity.ok(ApiResponse.success(employeeChangeService.pending(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/employee-changes/{changeId}/approve")
+    @PreAuthorize("hasAuthority('HR_COMPENSATION_APPROVE')")
+    public ResponseEntity<ApiResponse<EmployeeChangeResponse>> approveChange(
+            @PathVariable UUID changeId, @RequestBody(required = false) ChangeDecisionRequest req, Principal principal) {
+        return ResponseEntity.ok(ApiResponse.success("Change approved", employeeChangeService.approve(
+                TenantContext.getTenantIdAsObject(), changeId, req == null ? null : req.note(), resolveUserId(principal))));
+    }
+
+    @PostMapping("/employee-changes/{changeId}/reject")
+    @PreAuthorize("hasAuthority('HR_COMPENSATION_APPROVE')")
+    public ResponseEntity<ApiResponse<EmployeeChangeResponse>> rejectChange(
+            @PathVariable UUID changeId, @RequestBody(required = false) ChangeDecisionRequest req, Principal principal) {
+        return ResponseEntity.ok(ApiResponse.success("Change rejected", employeeChangeService.reject(
+                TenantContext.getTenantIdAsObject(), changeId, req == null ? null : req.note(), resolveUserId(principal))));
+    }
+
+    @PostMapping("/employee-changes/{changeId}/cancel")
+    @PreAuthorize("hasAuthority('HR_COMPENSATION_MANAGE')")
+    public ResponseEntity<ApiResponse<EmployeeChangeResponse>> cancelChange(@PathVariable UUID changeId, Principal principal) {
+        return ResponseEntity.ok(ApiResponse.success("Change cancelled", employeeChangeService.cancel(
+                TenantContext.getTenantIdAsObject(), changeId, resolveUserId(principal))));
+    }
+
+    @GetMapping("/employees/access-review")
+    @PreAuthorize("hasAnyAuthority('HR_MANAGE','USER_UPDATE')")
+    @Operation(summary = "What the employee-security migration gave each role, and which roles lost sight of personal data or pay")
+    public ResponseEntity<ApiResponse<EmployeeAccessReviewResponse>> employeeAccessReview() {
+        List<EmployeeAccessReviewResponse.Role> roles = jdbc.query("""
+                SELECT role_id, role_name, users_in_role, legacy_held, granted, needs_review, note
+                FROM hr_employee_access_review WHERE tenant_id = ? ORDER BY needs_review DESC, role_name""",
+                (rs, i) -> new EmployeeAccessReviewResponse.Role((UUID) rs.getObject("role_id"), rs.getString("role_name"),
+                        rs.getInt("users_in_role"), rs.getString("legacy_held"), rs.getString("granted"),
+                        rs.getBoolean("needs_review"), rs.getString("note")),
+                TenantContext.getTenantIdAsObject().getValue());
+        return ResponseEntity.ok(ApiResponse.success(new EmployeeAccessReviewResponse(
+                (int) roles.stream().filter(EmployeeAccessReviewResponse.Role::needsReview).count(), roles)));
     }
 
     // ── Leave ─────────────────────────────────────────────────────────────────

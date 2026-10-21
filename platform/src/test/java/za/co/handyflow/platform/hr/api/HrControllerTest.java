@@ -12,7 +12,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import za.co.handyflow.platform.WebMvcTestSecuritySupport;
 import za.co.handyflow.platform.hr.application.internal.Emp201PdfGenerator;
+import za.co.handyflow.platform.hr.application.internal.EmployeeAuditService;
+import za.co.handyflow.platform.hr.application.internal.EmployeeChangeService;
+import za.co.handyflow.platform.hr.application.internal.EmployeeViewService;
 import za.co.handyflow.platform.hr.application.internal.MedicalSchemeService;
+import za.co.handyflow.platform.hr.application.internal.PayrollControlService;
 import za.co.handyflow.platform.hr.application.internal.PayrollImpactService;
 import za.co.handyflow.platform.hr.application.internal.StatutoryRulesService;
 import za.co.handyflow.platform.hr.application.internal.HrService;
@@ -75,6 +79,9 @@ class HrControllerTest {
     @MockitoBean MedicalSchemeService   medicalSchemeService;
     @MockitoBean PayrollImpactService   payrollImpactService;
     @MockitoBean PayrollControlService  payrollControlService;
+    @MockitoBean EmployeeViewService    employeeViewService;
+    @MockitoBean EmployeeChangeService  employeeChangeService;
+    @MockitoBean EmployeeAuditService   employeeAuditService;
     @MockitoBean PayslipPdfGenerator    payslipPdfGenerator;
     @MockitoBean HrPayslipRepository    payslipRepo;
     @MockitoBean HrEmployeeRepository   employeeRepo;
@@ -104,6 +111,17 @@ class HrControllerTest {
                 new BigDecimal("30000"), "MONTHLY",
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
                 null, null, Instant.now());
+    }
+
+    EmployeeViewResponse viewResponse(UUID id, String status) {
+        return new EmployeeViewResponse(id, "EMP001", "Jane", "Dlamini", "Jane Dlamini", null, null, "PERMANENT", "Developer",
+                "Engineering", LocalDate.of(2026, 1, 1), null, status, null, null, null, false, false,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+    }
+
+    EmployeeChangeResponse changeResponse(UUID id) {
+        return new EmployeeChangeResponse(id, UUID.randomUUID(), "Jane Dlamini", "COMPENSATION", java.util.List.of(),
+                LocalDate.of(2026, 11, 1), "Annual increase", "PENDING", null, Instant.now(), null, null, null, false, null);
     }
 
     LeaveRequestResponse leaveResponse(UUID id) {
@@ -152,6 +170,7 @@ class HrControllerTest {
     void createEmployeeWithHrManageReturns201() throws Exception {
         var id = UUID.randomUUID();
         when(hrService.createEmployee(any(), any())).thenReturn(employeeResponse(id));
+        when(employeeViewService.get(any(), eq(id), any(), any())).thenReturn(viewResponse(id, "ACTIVE"));
 
         var body = Map.of(
                 "firstName", "Jane", "lastName", "Dlamini",
@@ -170,6 +189,7 @@ class HrControllerTest {
     void createEmployeeWithUserUpdateReturns201() throws Exception {
         var id = UUID.randomUUID();
         when(hrService.createEmployee(any(), any())).thenReturn(employeeResponse(id));
+        when(employeeViewService.get(any(), eq(id), any(), any())).thenReturn(viewResponse(id, "ACTIVE"));
 
         var body = Map.of(
                 "firstName", "Jane", "lastName", "Dlamini",
@@ -193,10 +213,11 @@ class HrControllerTest {
 
         mvc.perform(post(BASE + "/employees/" + id + "/terminate")
                         .param("endDate", "2026-08-20")
+                        .param("reason", "Resigned")
                         .with(csrf()))
                 .andExpect(status().isForbidden());
 
-        verify(hrService, never()).terminateEmployee(any(), any(), any());
+        verify(hrService, never()).terminateEmployee(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -204,21 +225,119 @@ class HrControllerTest {
     @DisplayName("POST /employees/{id}/terminate with HR_MANAGE returns 200")
     void terminateEmployeeWithHrManageReturns200() throws Exception {
         var id = UUID.randomUUID();
-        var terminated = new EmployeeResponse(id, "EMP001", "Jane", "Dlamini", "Jane Dlamini",
-                null, null, null, null, null, null, null,
-                "PERMANENT", "Developer", "Engineering",
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 8, 20), "TERMINATED",
-                new BigDecimal("30000"), "MONTHLY",
-                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                null, null, Instant.now());
-        when(hrService.terminateEmployee(any(), eq(id), eq(LocalDate.of(2026, 8, 20))))
-                .thenReturn(terminated);
+        when(employeeViewService.get(any(), eq(id), any(), any())).thenReturn(viewResponse(id, "TERMINATED"));
+
+        mvc.perform(post(BASE + "/employees/" + id + "/terminate")
+                        .param("endDate", "2026-08-20")
+                        .param("reason", "Resigned")
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("TERMINATED"));
+
+        verify(hrService).terminateEmployee(any(), eq(id), eq(LocalDate.of(2026, 8, 20)), eq("Resigned"), any());
+    }
+
+    @Test
+    @WithMockUser(authorities = "HR_MANAGE")
+    @DisplayName("POST /employees/{id}/terminate without a reason is refused before anything is changed")
+    void terminateWithoutReasonReturns400() throws Exception {
+        var id = UUID.randomUUID();
 
         mvc.perform(post(BASE + "/employees/" + id + "/terminate")
                         .param("endDate", "2026-08-20")
                         .with(csrf()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("TERMINATED"));
+                .andExpect(status().is4xxClientError());
+
+        verify(hrService, never()).terminateEmployee(any(), any(), any(), any(), any());
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Slice 3: who sees what, and who changes pay
+    // ══════════════════════════════════════════════════════════════════════
+
+    @Test
+    @WithMockUser(authorities = "HR_TEAM_READ")
+    @DisplayName("GET /employees with HR_TEAM_READ is allowed, and the view service is told what the caller holds")
+    void listWithTeamReadIsAllowed() throws Exception {
+        when(employeeViewService.list(any(), any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of()));
+
+        mvc.perform(get(BASE + "/employees")).andExpect(status().isOk());
+
+        verify(employeeViewService).list(any(), any(), any(), any(), argThat(held -> held.contains("HR_TEAM_READ")), any());
+    }
+
+    @Test
+    @WithMockUser(authorities = "PAYROLL_INVOICE_READ")
+    @DisplayName("GET /employees/{id} without any HR permission returns 403")
+    void getEmployeeWithoutHrPermissionReturns403() throws Exception {
+        mvc.perform(get(BASE + "/employees/" + UUID.randomUUID())).andExpect(status().isForbidden());
+        verifyNoInteractions(employeeViewService);
+    }
+
+    @Test
+    @WithMockUser(authorities = "HR_MANAGE")
+    @DisplayName("Asking for a pay change needs HR_COMPENSATION_MANAGE; HR_MANAGE alone is refused")
+    void requestPayChangeNeedsCompensationManage() throws Exception {
+        mvc.perform(post(BASE + "/employees/" + UUID.randomUUID() + "/changes/compensation").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"grossSalary\":35000,\"effectiveFrom\":\"2026-11-01\",\"reason\":\"Annual increase\"}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(employeeChangeService);
+    }
+
+    @Test
+    @WithMockUser(username = USER_ID, authorities = "HR_COMPENSATION_MANAGE")
+    @DisplayName("Asking for a pay change passes the real user id as the requester")
+    void requestPayChangePassesRequester() throws Exception {
+        var emp = UUID.randomUUID();
+        when(employeeChangeService.requestCompensation(any(), eq(emp), any(), any())).thenReturn(changeResponse(UUID.randomUUID()));
+
+        mvc.perform(post(BASE + "/employees/" + emp + "/changes/compensation").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"grossSalary\":35000,\"effectiveFrom\":\"2026-11-01\",\"reason\":\"Annual increase\"}"))
+                .andExpect(status().isCreated());
+
+        verify(employeeChangeService).requestCompensation(any(), eq(emp), any(), eq(UUID.fromString(USER_ID)));
+    }
+
+    @Test
+    @WithMockUser(authorities = {"HR_MANAGE", "HR_COMPENSATION_MANAGE"})
+    @DisplayName("Deciding on a pay change needs HR_COMPENSATION_APPROVE; managing is not enough")
+    void approvePayChangeNeedsApprove() throws Exception {
+        mvc.perform(post(BASE + "/employee-changes/" + UUID.randomUUID() + "/approve").with(csrf()))
+                .andExpect(status().isForbidden());
+        verify(employeeChangeService, never()).approve(any(), any(), any(), any());
+    }
+
+    @Test
+    @WithMockUser(username = USER_ID, authorities = "HR_COMPENSATION_APPROVE")
+    @DisplayName("Approving passes the real user id as the decider")
+    void approvePayChangePassesDecider() throws Exception {
+        var change = UUID.randomUUID();
+        when(employeeChangeService.approve(any(), eq(change), any(), any())).thenReturn(changeResponse(change));
+
+        mvc.perform(post(BASE + "/employee-changes/" + change + "/approve").with(csrf())).andExpect(status().isOk());
+
+        verify(employeeChangeService).approve(any(), eq(change), any(), eq(UUID.fromString(USER_ID)));
+    }
+
+    @Test
+    @WithMockUser(authorities = "HR_READ")
+    @DisplayName("Setting a manager needs HR_MANAGE")
+    void setManagerNeedsManage() throws Exception {
+        mvc.perform(put(BASE + "/employees/" + UUID.randomUUID() + "/manager").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isForbidden());
+        verify(hrService, never()).setManager(any(), any(), any(), any());
+    }
+
+    @Test
+    @WithMockUser(authorities = "HR_READ")
+    @DisplayName("The employee audit trail is not open to everyone who can read the staff list")
+    void auditNeedsMoreThanRead() throws Exception {
+        mvc.perform(get(BASE + "/employees/" + UUID.randomUUID() + "/audit")).andExpect(status().isForbidden());
+        verifyNoInteractions(employeeAuditService);
     }
 
     // ══════════════════════════════════════════════════════════════════════

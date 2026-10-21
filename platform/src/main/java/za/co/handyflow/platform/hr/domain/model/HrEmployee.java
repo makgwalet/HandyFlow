@@ -62,6 +62,11 @@ public class HrEmployee {
     @Column(name = "emergency_contact_phone")    String emergencyContactPhone;
     @Column(name = "emergency_contact_relation") String emergencyContactRelation;
 
+    @Column(name = "user_id")            UUID userId;
+    @Column(name = "termination_reason") String terminationReason;
+    @Column(name = "terminated_by")      UUID terminatedBy;
+    @Column(name = "terminated_at")      Instant terminatedAt;
+
     String notes;
     @Column(name = "created_at") Instant createdAt;
     @Column(name = "updated_at") Instant updatedAt;
@@ -100,6 +105,14 @@ public class HrEmployee {
         this.updatedAt = Instant.now();
     }
 
+    /** Terminate, keeping why and who recorded it. */
+    public void terminate(LocalDate endDate, String reason, UUID actor) {
+        terminate(endDate);
+        this.terminationReason = reason == null ? null : reason.trim();
+        this.terminatedBy = actor;
+        this.terminatedAt = Instant.now();
+    }
+
     public void suspend() {
         this.status    = "SUSPENDED";
         this.updatedAt = Instant.now();
@@ -131,6 +144,7 @@ public class HrEmployee {
     public void setRace(String race)                        { this.race = race; }
     public void setEmail(String email)                      { this.email = email; }
     public void setPhone(String phone)                      { this.phone = phone; }
+    public void setEmploymentType(String v)                 { this.employmentType = v; }
     public void setJobTitle(String jobTitle)                { this.jobTitle = jobTitle; }
     public void setDepartment(String department)            { this.department = department; }
     public void setBankName(String bankName)                { this.bankName = bankName; }
@@ -144,4 +158,25 @@ public class HrEmployee {
     public void setEmergencyContactName(String v)                 { this.emergencyContactName = v; }
     public void setEmergencyContactPhone(String v)                { this.emergencyContactPhone = v; }
     public void setNotes(String notes)                            { this.notes = notes; }
+    public void setEmergencyContactRelation(String v)             { this.emergencyContactRelation = v; }
+    public void setManagerId(UUID managerId)                      { this.managerId = managerId; this.updatedAt = Instant.now(); }
+    public void setUserId(UUID userId)                            { this.userId = userId; this.updatedAt = Instant.now(); }
+
+    /** Applies an approved change of pay. Values come from the change request, already checked. */
+    public void applyCompensation(BigDecimal gross, BigDecimal travel, BigDecimal medical, BigDecimal pension, String frequency) {
+        this.grossSalary = gross;
+        this.travelAllowance = travel == null ? BigDecimal.ZERO : travel;
+        this.medicalAidContribution = medical == null ? BigDecimal.ZERO : medical;
+        this.pensionContribution = pension == null ? BigDecimal.ZERO : pension;
+        if (frequency != null && !frequency.isBlank()) this.payFrequency = frequency;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Applies an approved change of bank details. */
+    public void applyBank(String bankName, String account, String branch) {
+        this.bankName = bankName;
+        this.bankAccountNumber = account;
+        this.bankBranchCode = branch;
+        this.updatedAt = Instant.now();
+    }
 }

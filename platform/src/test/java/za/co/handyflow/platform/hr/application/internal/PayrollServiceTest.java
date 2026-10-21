@@ -63,7 +63,7 @@ class PayrollServiceTest {
         medicalSchemeService = mock(MedicalSchemeService.class);
         eventRepo = mock(HrPayRunEventRepository.class);
         service = new PayrollService(payRunRepo, payslipRepo, emp201Repo, employeeRepo, new PayrollEngine(), numberGen,
-                rulesService, medicalSchemeService, eventRepo);
+                rulesService, medicalSchemeService, eventRepo, mock(EmployeeChangeService.class));
         when(numberGen.next(any(), any())).thenReturn("PR00001");
         when(payRunRepo.save(any())).thenAnswer(i -> i.getArgument(0));
         when(payslipRepo.save(any())).thenAnswer(i -> i.getArgument(0));

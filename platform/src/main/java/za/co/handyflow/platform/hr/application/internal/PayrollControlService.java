@@ -33,6 +33,7 @@ public class PayrollControlService {
     private final HrEmployeeRepository employeeRepo;
     private final HrPayRunEventRepository eventRepo;
     private final HrPayrollSettingsRepository settingsRepo;
+    private final HrEmployeeChangeRepository changeRepo;
     private final MedicalSchemeService medicalSchemeService;
     private final JdbcTemplate jdbc;
 
@@ -85,7 +86,19 @@ public class PayrollControlService {
                 prevNames.put(s.getEmployeeId(), e != null ? e.getFullName() + " (" + e.getEmployeeNumber() + ")" : s.getEmployeeId().toString());
             }
         }
-        return new Checked(PayrollExceptionRules.check(lines, prevNet, prevNames), comparedWith);
+        List<Item> items = new ArrayList<>(PayrollExceptionRules.check(lines, prevNet, prevNames));
+        // Pay or bank details that changed after this run was calculated mean the figures are out of date.
+        if (run.getProcessedAt() != null && !slips.isEmpty()) {
+            Set<UUID> changed = new LinkedHashSet<>();
+            for (HrEmployeeChange c : changeRepo.appliedSince(tenantId, people.keySet(), run.getProcessedAt())) changed.add(c.getEmployeeId());
+            for (UUID id : changed) {
+                HrEmployee e = people.get(id);
+                items.add(new Item(PayrollExceptionRules.Severity.WARNING, "PAY_CHANGED_AFTER_CALCULATION",
+                        e != null ? e.getFullName() + " (" + e.getEmployeeNumber() + ")" : id.toString(),
+                        "Pay or bank details changed after this run was calculated. Send the run back and calculate it again if the change should apply."));
+            }
+        }
+        return new Checked(items, comparedWith);
     }
 
     private Map<UUID, HrEmployee> peopleOf(TenantId tenantId, Collection<UUID> ids) {

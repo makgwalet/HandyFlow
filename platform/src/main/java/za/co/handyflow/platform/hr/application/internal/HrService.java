@@ -21,8 +21,7 @@ import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -40,6 +39,7 @@ public class HrService {
     // auto-draft a BCEA employment contract. See EmployeeCreatedEvent's own
     // Javadoc for the full reasoning.
     private final ApplicationEventPublisher eventPublisher;
+    private final EmployeeAuditService audit;
 
     // ── Employees ─────────────────────────────────────────────────────────────
 
@@ -59,6 +59,7 @@ public class HrService {
 
     @Transactional
     public EmployeeResponse createEmployee(TenantId tenantId, CreateEmployeeRequest req) {
+        validateNew(tenantId, req);
         String number = numberGen.next(tenantId);
         HrEmployee emp = HrEmployee.create(
                 tenantId, number,
@@ -91,6 +92,7 @@ public class HrService {
 
         employeeRepo.save(emp);
         seedLeaveBalances(tenantId, emp.getId(), LocalDate.now().getYear());
+        audit.record(tenantId, emp.getId(), "CREATED", null, null);
         log.info("Created employee={} {} tenant={}", number, emp.getFullName(), tenantId);
 
         // FIX: backlog 3.3 — this was the one missing piece. The
@@ -109,39 +111,132 @@ public class HrService {
         return toEmployeeResponse(emp);
     }
 
+    /**
+     * Kept for callers that pass a full {@link CreateEmployeeRequest} (HrFacade). It no longer touches pay or bank details:
+     * those change only through {@link EmployeeChangeService}. Personal data is not changed here either.
+     */
     @Transactional
-    public EmployeeResponse updateEmployee(TenantId tenantId, UUID id,
-                                           CreateEmployeeRequest req) {
+    public EmployeeResponse updateEmployee(TenantId tenantId, UUID id, CreateEmployeeRequest req) {
+        return updateDetails(tenantId, id, new UpdateEmployeeRequest(req.email(), req.phone(), req.employmentType(), req.jobTitle(),
+                req.department(), req.emergencyContactName(), req.emergencyContactPhone(), req.notes(),
+                null, null, null, null, null), false, null);
+    }
+
+    /** Edits working details. Personal data is applied only when {@code sensitiveAllowed}. A null field is left alone. */
+    @Transactional
+    public EmployeeResponse updateDetails(TenantId tenantId, UUID id, UpdateEmployeeRequest req, boolean sensitiveAllowed, UUID actor) {
         HrEmployee emp = findActive(tenantId, id);
-        emp.setEmail(req.email());
-        emp.setPhone(req.phone());
-        emp.setJobTitle(req.jobTitle());
-        emp.setDepartment(req.department());
-        emp.setGrossSalary(req.grossSalary());
-        emp.setPayFrequency(req.payFrequency());
-        emp.setTravelAllowance(req.travelAllowance() != null ? req.travelAllowance() : BigDecimal.ZERO);
-        emp.setMedicalAidContribution(req.medicalAidContribution() != null ? req.medicalAidContribution() : BigDecimal.ZERO);
-        emp.setPensionContribution(req.pensionContribution() != null ? req.pensionContribution() : BigDecimal.ZERO);
-        emp.setBankName(req.bankName());
-        emp.setBankAccountNumber(req.bankAccountNumber());
-        emp.setBankBranchCode(req.bankBranchCode());
-        emp.setEmergencyContactName(req.emergencyContactName());
-        emp.setEmergencyContactPhone(req.emergencyContactPhone());
-        emp.setNotes(req.notes());
+        LocalDate today = LocalDate.now();
+        List<String> changed = new ArrayList<>();
+
+        fail(EmployeeRules.emailProblem(req.email()));
+        fail(EmployeeRules.phoneProblem(req.phone()));
+        fail(EmployeeRules.phoneProblem(req.emergencyContactPhone()));
+        if (req.email() != null)                 { emp.setEmail(blankToNull(req.email()));          changed.add("email"); }
+        if (req.phone() != null)                 { emp.setPhone(blankToNull(req.phone()));          changed.add("phone"); }
+        if (req.employmentType() != null)        { emp.setEmploymentType(req.employmentType());     changed.add("employment type"); }
+        if (req.jobTitle() != null)              { emp.setJobTitle(blankToNull(req.jobTitle()));    changed.add("job title"); }
+        if (req.department() != null)            { emp.setDepartment(blankToNull(req.department())); changed.add("department"); }
+        if (req.notes() != null)                 { emp.setNotes(req.notes());                       changed.add("notes"); }
+
+        if (sensitiveAllowed) {
+            String idNumber = req.idNumber() != null ? EmployeeRules.normaliseId(req.idNumber()) : emp.getIdNumber();
+            LocalDate dob = req.dateOfBirth() != null ? req.dateOfBirth() : emp.getDateOfBirth();
+            if (req.idNumber() != null) {
+                fail(EmployeeRules.idProblem(idNumber, today));
+                if (idNumber != null && !idNumber.isBlank() && employeeRepo.countByIdNumber(tenantId, idNumber, id) > 0) {
+                    throw new IllegalStateException("Another employee already has this ID number.");
+                }
+                emp.setIdNumber(blankToNull(idNumber));
+                changed.add("ID number");
+            }
+            if (req.idNumber() != null || req.dateOfBirth() != null) {
+                fail(EmployeeRules.dobProblem(idNumber, dob, emp.getStartDate(), today));
+                if (req.dateOfBirth() != null) { emp.setDateOfBirth(req.dateOfBirth()); changed.add("date of birth"); }
+            }
+            if (req.taxNumber() != null) {
+                fail(EmployeeRules.taxNumberProblem(req.taxNumber()));
+                emp.setTaxNumber(blankToNull(req.taxNumber()));
+                changed.add("tax number");
+            }
+            if (req.gender() != null)                { emp.setGender(blankToNull(req.gender()));    changed.add("gender"); }
+            if (req.race() != null)                  { emp.setRace(blankToNull(req.race()));        changed.add("race"); }
+            if (req.emergencyContactName() != null)  { emp.setEmergencyContactName(blankToNull(req.emergencyContactName())); changed.add("emergency contact"); }
+            if (req.emergencyContactPhone() != null) { emp.setEmergencyContactPhone(blankToNull(req.emergencyContactPhone())); changed.add("emergency contact"); }
+        }
         employeeRepo.save(emp);
+        if (!changed.isEmpty()) audit.record(tenantId, id, "UPDATED", String.join(", ", new LinkedHashSet<>(changed)), actor);
         log.info("Updated employee={}", emp.getEmployeeNumber());
         return toEmployeeResponse(emp);
     }
 
+    /** Terminate with the last day worked and a reason. The portal access of the person is left as it is. */
     @Transactional
-    public EmployeeResponse terminateEmployee(TenantId tenantId, UUID id,
-                                              LocalDate endDate) {
+    public EmployeeResponse terminateEmployee(TenantId tenantId, UUID id, LocalDate endDate, String reason, UUID actor) {
         HrEmployee emp = findActive(tenantId, id);
-        emp.terminate(endDate);
+        fail(EmployeeRules.terminationProblem(emp.getStatus(), emp.getStartDate(), endDate, reason, LocalDate.now()));
+        emp.terminate(endDate, reason, actor);
         employeeRepo.save(emp);
+        audit.record(tenantId, id, "TERMINATED", "last day " + endDate, actor);
         log.info("Terminated employee={}", emp.getEmployeeNumber());
         return toEmployeeResponse(emp);
     }
+
+    @Transactional
+    public EmployeeResponse setManager(TenantId tenantId, UUID id, UUID managerId, UUID actor) {
+        HrEmployee emp = findActive(tenantId, id);
+        Map<UUID, UUID> managerOf = new HashMap<>();
+        Map<UUID, HrEmployee> byId = new HashMap<>();
+        for (HrEmployee e : employeeRepo.findNotTerminated(tenantId)) {
+            byId.put(e.getId(), e);
+            if (e.getManagerId() != null) managerOf.put(e.getId(), e.getManagerId());
+        }
+        HrEmployee manager = managerId == null ? null : byId.get(managerId);
+        if (managerId != null && manager == null) throw new IllegalArgumentException("The manager must be a current employee.");
+        fail(OrgRules.managerProblem(id, managerId, managerOf));
+        emp.setManagerId(managerId);
+        employeeRepo.save(emp);
+        audit.record(tenantId, id, "MANAGER_CHANGED", manager == null ? "removed" : manager.getFullName(), actor);
+        return toEmployeeResponse(emp);
+    }
+
+    @Transactional
+    public EmployeeResponse linkUser(TenantId tenantId, UUID id, UUID userId, UUID actor) {
+        HrEmployee emp = findActive(tenantId, id);
+        if (userId != null) {
+            Optional<HrEmployee> other = employeeRepo.findByUserId(tenantId, userId);
+            if (other.isPresent() && !other.get().getId().equals(id)) {
+                throw new IllegalStateException("That login is already linked to " + other.get().getFullName() + ".");
+            }
+        }
+        emp.setUserId(userId);
+        employeeRepo.save(emp);
+        audit.record(tenantId, id, userId == null ? "LOGIN_UNLINKED" : "LOGIN_LINKED", null, actor);
+        return toEmployeeResponse(emp);
+    }
+
+    private void validateNew(TenantId tenantId, CreateEmployeeRequest req) {
+        LocalDate today = LocalDate.now();
+        String id = EmployeeRules.normaliseId(req.idNumber());
+        fail(EmployeeRules.idProblem(id, today));
+        fail(EmployeeRules.dobProblem(id, req.dateOfBirth(), req.startDate(), today));
+        fail(EmployeeRules.taxNumberProblem(req.taxNumber()));
+        fail(EmployeeRules.emailProblem(req.email()));
+        fail(EmployeeRules.phoneProblem(req.phone()));
+        fail(EmployeeRules.phoneProblem(req.emergencyContactPhone()));
+        fail(EmployeeRules.bankProblem(req.bankName(), req.bankAccountNumber(), req.bankBranchCode()));
+        fail(EmployeeChangeRules.compensationProblem(req.grossSalary(), req.travelAllowance(), req.medicalAidContribution(),
+                req.pensionContribution(), req.payFrequency()));
+        if (id != null && !id.isBlank() && employeeRepo.countByIdNumber(tenantId, id, null) > 0) {
+            throw new IllegalStateException("An employee with this ID number already exists.");
+        }
+    }
+
+    private static void fail(String problem) {
+        if (problem != null) throw new IllegalArgumentException(problem);
+    }
+
+    private static String blankToNull(String s) { return s == null || s.isBlank() ? null : s.trim(); }
 
     // ── Leave balances ────────────────────────────────────────────────────────
 

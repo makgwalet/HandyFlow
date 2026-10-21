@@ -35,4 +35,15 @@ public interface HrEmployeeRepository extends JpaRepository<HrEmployee, UUID> {
 
     @Query("SELECT COUNT(e) FROM HrEmployee e WHERE e.tenantId = :#{#tenantId.value} AND e.deletedAt IS NULL")
     long countByTenant(TenantId tenantId);
+
+    /** Other live employees with the same ID number. Used to refuse duplicates. */
+    @Query("SELECT COUNT(e) FROM HrEmployee e WHERE e.tenantId = :#{#tenantId.value} AND e.deletedAt IS NULL AND e.idNumber = :idNumber AND (:excludeId IS NULL OR e.id <> :excludeId)")
+    long countByIdNumber(TenantId tenantId, String idNumber, UUID excludeId);
+
+    @Query("SELECT e FROM HrEmployee e WHERE e.tenantId = :#{#tenantId.value} AND e.userId = :userId AND e.deletedAt IS NULL")
+    Optional<HrEmployee> findByUserId(TenantId tenantId, UUID userId);
+
+    /** Everyone not yet terminated, for building the reporting lines. */
+    @Query("SELECT e FROM HrEmployee e WHERE e.tenantId = :#{#tenantId.value} AND e.status <> 'TERMINATED' AND e.deletedAt IS NULL")
+    List<HrEmployee> findNotTerminated(TenantId tenantId);
 }
