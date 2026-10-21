@@ -6,6 +6,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { unwrap, WEIGHT_FIELDS, bandText, bandToneFor, componentTone, coverageNote, driverVehicles, initials, periodText, ringFraction, scoreText, settingsBody, settingsProblem, toForm, weightTotal, type Settings, type SettingsForm } from "./driverScores.logic"
+import PhotoBox from "./PhotoBox"
+import DriverDocuments from "./DriverDocuments"
 import { COMPLIANCE_LABEL, complianceTone, expiryText } from "./vehicleDetail.logic"
 
 export interface ScoreRow { driverId: string; driverName: string; overall: number | null; band: string | null; coverage: number; reliable: boolean; tripCount: number }
@@ -26,8 +28,8 @@ const field: React.CSSProperties = { padding: "7px 9px", border: "1px solid var(
 const btn: React.CSSProperties = { padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--hf-brand)", color: "var(--hf-on-brand, #fff)", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 14, marginBottom: 12 }
 
-type TabId = "overview" | "compliance" | "performance" | "incidents"
-const TABS: { id: TabId; label: string }[] = [{ id: "overview", label: "Overview" }, { id: "compliance", label: "Compliance" }, { id: "performance", label: "Performance" }, { id: "incidents", label: "Incidents" }]
+type TabId = "overview" | "compliance" | "documents" | "medical" | "performance" | "incidents"
+const TABS: { id: TabId; label: string }[] = [{ id: "overview", label: "Overview" }, { id: "compliance", label: "Compliance" }, { id: "documents", label: "Documents" }, { id: "medical", label: "Medical & training" }, { id: "performance", label: "Performance" }, { id: "incidents", label: "Incidents" }]
 export interface AssignedVehicle { id: string; registration: string; make?: string | null; model?: string | null; assignedDriverId?: string | null }
 const date = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—")
 const km = (n: number) => `${n.toLocaleString("en-ZA")} km`
@@ -44,6 +46,7 @@ function Ring({ overall, tone }: { overall: number | null; tone: keyof typeof TO
 /** One driver's page: who they are, the score and what it is made of, then compliance, performance and incidents on tabs. */
 export function ProfileView({ id, onClose, onEdit, vehicles = [] }: { id: string; onClose: () => void; onEdit?: () => void; vehicles?: AssignedVehicle[] }) {
   const [tab, setTab] = useState<TabId>("overview")
+  const canManage = usePermission("FLEET_MANAGE")
   const { data, isError } = useQuery<Profile>({ queryKey: ["fleet", "driver-profile", id], queryFn: async () => unwrap<Profile>(await apiClient.get(`/api/v1/fleet/drivers/${id}/profile`)) })
   const back = <button type="button" style={{ ...field, cursor: "pointer", marginBottom: 12 }} onClick={onClose}>← Back to drivers</button>
   if (isError) return <div>{back}<div role="alert" style={{ color: "var(--hf-danger-text)" }}>Couldn't load this driver.</div></div>
@@ -59,7 +62,7 @@ export function ProfileView({ id, onClose, onEdit, vehicles = [] }: { id: string
       {back}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12, marginBottom: 12 }}>
         <section aria-label="Driver details" style={{ ...card, marginBottom: 0, display: "flex", gap: 14, alignItems: "flex-start" }}>
-          <div aria-hidden="true" style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--hf-info-soft)", border: "2px solid var(--hf-info-border)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 22, color: "var(--hf-info-text)", flexShrink: 0 }}>{initials(driver.firstName, driver.lastName)}</div>
+          <PhotoBox base={`/api/v1/fleet/drivers/${id}`} canEdit={canManage} name={`${driver.firstName} ${driver.lastName}`} fallback={<div aria-hidden="true" style={{ fontWeight: 800, fontSize: 28, color: "var(--hf-info-text)" }}>{initials(driver.firstName, driver.lastName)}</div>} />
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <h3 style={{ margin: 0 }}>{driver.firstName} {driver.lastName}</h3>
@@ -131,6 +134,8 @@ export function ProfileView({ id, onClose, onEdit, vehicles = [] }: { id: string
                   <dl style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, margin: 0 }}>{kv("Number", driver.prdpNumber ?? "—")}{kv("Category", driver.prdpCategory ?? "—")}{kv("Expires", date(driver.prdpExpiry))}
                     {data.compliance.filter(c => c.key === "PRDP").map(c => kv("Status", `${COMPLIANCE_LABEL[c.status] ?? c.status}${c.daysRemaining != null ? ` · ${expiryText(c.daysRemaining)}` : ""}`, "prdp-status"))}</dl>)}</div>
             </div>)}
+          {tab === "documents" && <DriverDocuments driverId={id} group="documents" />}
+          {tab === "medical" && <DriverDocuments driverId={id} group="medical" />}
           {tab === "performance" && (
             <div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8, marginBottom: 12 }}>

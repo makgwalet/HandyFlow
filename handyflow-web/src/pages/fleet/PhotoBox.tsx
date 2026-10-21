@@ -13,7 +13,7 @@ const rowsOf = (r: { data: unknown }): DocRow[] => { const o = r.data as { data?
 const toDataUrl = (b: Blob) => new Promise<string>((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => no(r.error); r.readAsDataURL(b) })
 const errorOf = (e: unknown) => (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "We couldn't save the picture. Try again."
 
-export default function PhotoBox({ base, canEdit, name, size = 88 }: { base: string; canEdit: boolean; name: string; size?: number }) {
+export default function PhotoBox({ base, canEdit, name, size = 88, fallback }: { base: string; canEdit: boolean; name: string; size?: number; fallback?: React.ReactNode }) {
   const qc = useQueryClient(), input = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
   const key = ["fleet", "photo", base]
@@ -39,7 +39,7 @@ export default function PhotoBox({ base, canEdit, name, size = 88 }: { base: str
   return (
     <div style={{ width: size, flex: "none" }}>
       <div style={{ width: size, height: size, borderRadius: 14, overflow: "hidden", background: "var(--hf-surface-sunken)", border: "1px solid var(--hf-border)", display: "grid", placeItems: "center", color: "var(--hf-text-faint)" }}>
-        {src ? <img src={src} alt={`Photo of ${name}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={Math.round(size / 3)} aria-label="No photo yet" role="img" />}
+        {src ? <img src={src} alt={`Photo of ${name}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : fallback ?? <Camera size={Math.round(size / 3)} aria-label="No photo yet" role="img" />}
       </div>
       {canEdit && <>
         <input ref={input} type="file" accept={PHOTO_TYPES.join(",")} aria-label={`Photo file for ${name}`} hidden onChange={e => { choose(e.target.files?.[0]); e.target.value = "" }} />

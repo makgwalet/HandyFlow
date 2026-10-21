@@ -109,6 +109,14 @@ describe("Drivers with Driver 360", () => {
     expect(screen.getByLabelText("Assigned vehicles").textContent).toContain("ABC123MP · Toyota Hilux"); expect(screen.getByLabelText("Assigned vehicles").textContent).not.toContain("XYZ999GP")
     const who = screen.getByLabelText("Driver details").textContent ?? ""; expect(who).toContain("082 123 4567"); expect(who).toContain("john@fleet.co.za"); expect(who).toContain("Prefers early starts"); expect(who).toContain("JM")
   })
+  it("shows the driver's photo box and opens the documents and medical tabs", async () => {
+    const docs = [{ id: "m1", type: "MEDICAL_CERTIFICATE", title: null, documentNumber: null, issueDate: null, expiryDate: "2026-11-10", version: 1, fileName: "med.pdf", expired: false, daysToExpiry: 20 }]
+    get.mockImplementation((url: string) => url.includes("/drivers/d1/documents") ? ok(url.includes("type=PHOTO") ? [] : docs) : url.includes("/profile") ? ok(profile) : url.includes("/driver-scores") ? ok(board) : url.includes("/fleet/drivers") ? ok({ content: drivers }) : ok([]))
+    show(); await screen.findByText("John Mokoena"); fireEvent.click(within("John Mokoena")); await screen.findByLabelText("Overall score")
+    expect(screen.getByRole("button", { name: "Add photo" })).toBeTruthy()
+    fireEvent.click(screen.getByRole("tab", { name: "Medical & training" })); expect((await screen.findByLabelText("Medical certificate")).textContent).toContain("20 days left")
+    fireEvent.click(screen.getByRole("tab", { name: "Documents" })); expect((await screen.findByRole("status")).textContent).toContain("No documents on file yet")
+  })
   it("keeps accidents, activity and licence details on their own tabs", async () => {
     show(); await screen.findByText("John Mokoena"); fireEvent.click(within("John Mokoena")); await screen.findByLabelText("Overall score")
     fireEvent.click(screen.getByRole("tab", { name: "Incidents" })); expect(screen.getByText(/1 accident /)).toBeTruthy(); expect(screen.getByText(/ACC-2026-00021/)).toBeTruthy()
