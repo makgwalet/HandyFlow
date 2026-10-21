@@ -73,6 +73,7 @@ public class CustomerService {
     private final NotificationService           notificationService;
     private final UserRecipientResolver         userRecipientResolver;
     private final CustomFieldService            customFieldService;
+    private final LeadRoutingService            routingService;
 
     // ══════════════════════════════════════════════════════════════════════
     // READ operations
@@ -226,6 +227,7 @@ public class CustomerService {
         // notifyNewLead() now routes to the owner first (see its own
         // Javadoc), tenant admins only as a fallback.
         if (customer.getCustomerType() == CustomerType.LEAD) {
+            routingService.routeNewLead(tenantId, customer);   // only acts when nobody owns the lead (import, web form)
             notifyNewLead(tenantId, customer);
         }
 
