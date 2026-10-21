@@ -22,6 +22,8 @@ import za.co.handyflow.platform.hr.application.internal.StatutoryRulesService;
 import za.co.handyflow.platform.hr.application.internal.HrService;
 import za.co.handyflow.platform.hr.application.internal.PayrollService;
 import za.co.handyflow.platform.hr.application.internal.PayslipPdfGenerator;
+import za.co.handyflow.platform.hr.domain.model.HrEmp201;
+import za.co.handyflow.platform.hr.domain.model.HrPayRun;
 import za.co.handyflow.platform.hr.domain.repository.*;
 import za.co.handyflow.platform.hr.dto.*;
 
