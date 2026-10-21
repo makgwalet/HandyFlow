@@ -1,10 +1,10 @@
 // src/pages/customers/CrmPage.tsx — the CRM home: customer register, sales pipeline board and funnel report.
 import { Suspense, lazy, useState } from "react"
 import { CustomersPage } from "./CustomersPage"
-const PipelineBoard = lazy(() => import("./PipelineBoard")), TaskQueue = lazy(() => import("./TaskQueue")), FunnelReport = lazy(() => import("./FunnelReport")), DuplicatesPanel = lazy(() => import("./DuplicatesPanel")), ForecastPanel = lazy(() => import("./ForecastPanel")), TeamPanel = lazy(() => import("./TeamPanel")), CustomFieldsAdmin = lazy(() => import("./CustomFieldsAdmin")), DashboardPanel = lazy(() => import("./DashboardPanel")), SegmentsPanel = lazy(() => import("./SegmentsPanel")), OpportunitiesPanel = lazy(() => import("./OpportunitiesPanel")), GroupsPanel = lazy(() => import("./GroupsPanel"))
+const PipelineBoard = lazy(() => import("./PipelineBoard")), TaskQueue = lazy(() => import("./TaskQueue")), FunnelReport = lazy(() => import("./FunnelReport")), DuplicatesPanel = lazy(() => import("./DuplicatesPanel")), ForecastPanel = lazy(() => import("./ForecastPanel")), TeamPanel = lazy(() => import("./TeamPanel")), CustomFieldsAdmin = lazy(() => import("./CustomFieldsAdmin")), DashboardPanel = lazy(() => import("./DashboardPanel")), SegmentsPanel = lazy(() => import("./SegmentsPanel")), OpportunitiesPanel = lazy(() => import("./OpportunitiesPanel")), GroupsPanel = lazy(() => import("./GroupsPanel")), ScoringRoutingPanel = lazy(() => import("./ScoringRoutingPanel"))
 
-type Tab = "dashboard" | "customers" | "pipeline" | "opportunities" | "groups" | "tasks" | "funnel" | "forecast" | "team" | "segments" | "duplicates" | "fields"
-const TABS: { id: Tab; label: string }[] = [{ id: "dashboard", label: "Dashboard" }, { id: "customers", label: "Customers" }, { id: "pipeline", label: "Pipeline" }, { id: "opportunities", label: "Opportunities" }, { id: "groups", label: "Company groups" }, { id: "tasks", label: "Tasks" }, { id: "funnel", label: "Funnel report" }, { id: "forecast", label: "Forecast" }, { id: "team", label: "Team" }, { id: "segments", label: "Segments" }, { id: "duplicates", label: "Duplicates" }, { id: "fields", label: "Fields" }]
+type Tab = "dashboard" | "customers" | "pipeline" | "opportunities" | "groups" | "rules" | "tasks" | "funnel" | "forecast" | "team" | "segments" | "duplicates" | "fields"
+const TABS: { id: Tab; label: string }[] = [{ id: "dashboard", label: "Dashboard" }, { id: "customers", label: "Customers" }, { id: "pipeline", label: "Pipeline" }, { id: "opportunities", label: "Opportunities" }, { id: "groups", label: "Company groups" }, { id: "rules", label: "Scoring & routing" }, { id: "tasks", label: "Tasks" }, { id: "funnel", label: "Funnel report" }, { id: "forecast", label: "Forecast" }, { id: "team", label: "Team" }, { id: "segments", label: "Segments" }, { id: "duplicates", label: "Duplicates" }, { id: "fields", label: "Fields" }]
 
 export function CrmPage() {
   const [tab, setTab] = useState<Tab>("dashboard")
@@ -15,7 +15,7 @@ export function CrmPage() {
           style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: tab === t.id ? "var(--hf-info-soft)" : "transparent", color: tab === t.id ? "var(--hf-primary-text)" : "var(--hf-text-muted)" }}>{t.label}</button>)}
       </div>
       <Suspense fallback={<p>Loading…</p>}>
-        {tab === "dashboard" ? <DashboardPanel go={t => setTab(t as Tab)} /> : tab === "customers" ? <CustomersPage /> : tab === "pipeline" ? <PipelineBoard /> : tab === "opportunities" ? <OpportunitiesPanel /> : tab === "groups" ? <GroupsPanel /> : tab === "tasks" ? <TaskQueue /> : tab === "forecast" ? <ForecastPanel /> : tab === "team" ? <TeamPanel /> : tab === "segments" ? <SegmentsPanel /> : tab === "fields" ? <CustomFieldsAdmin /> : tab === "duplicates" ? <DuplicatesPanel /> : <FunnelReport />}
+        {tab === "dashboard" ? <DashboardPanel go={t => setTab(t as Tab)} /> : tab === "customers" ? <CustomersPage /> : tab === "pipeline" ? <PipelineBoard /> : tab === "opportunities" ? <OpportunitiesPanel /> : tab === "groups" ? <GroupsPanel /> : tab === "rules" ? <ScoringRoutingPanel /> : tab === "tasks" ? <TaskQueue /> : tab === "forecast" ? <ForecastPanel /> : tab === "team" ? <TeamPanel /> : tab === "segments" ? <SegmentsPanel /> : tab === "fields" ? <CustomFieldsAdmin /> : tab === "duplicates" ? <DuplicatesPanel /> : <FunnelReport />}
       </Suspense>
     </div>
   )

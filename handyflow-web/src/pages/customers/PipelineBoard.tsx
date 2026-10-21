@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { useAuthStore } from "../../store/auth.store"
+import { BAND_LABEL, BAND_TONE, scoreMap, type LeadScore } from "./rules.logic"
 import { LOST_REASONS, NO_FILTER, PIPELINE_LIMIT, STAGE_LABEL, allowedMoves, canConvert, isConverted, lostProblem, reasonLabel, stageBody, closeState, closeText, columns, dealBody, dealProblem, filterLeads, localToday, money, ownerText, pipelineTotals, type LeadFilter, type LostReason, type OwnerFilter, type PipelineLead, type Stage } from "./pipeline.logic"
 
 const unwrapList = (r: { data: unknown }): PipelineLead[] => { const o = r.data as { data?: unknown } | null; const p = o && !Array.isArray(o) && typeof o === "object" && "data" in o ? o.data : r.data; return Array.isArray(p) ? (p as PipelineLead[]) : [] }
@@ -19,6 +20,8 @@ export default function PipelineBoard() {
   const [filter, setFilter] = useState<LeadFilter>(NO_FILTER), [error, setError] = useState<string | null>(null), [editing, setEditing] = useState<string | null>(null), [losing, setLosing] = useState<string | null>(null), [converting, setConverting] = useState<string | null>(null)
   const today = localToday()
   const { data: leads = [], isLoading, isError } = useQuery<PipelineLead[]>({ queryKey: ["crm", "pipeline"], queryFn: async () => unwrapList(await apiClient.get("/api/v1/crm/customers/pipeline")) })
+  const scores = useQuery<LeadScore[]>({ queryKey: ["crm", "scores"], retry: false, queryFn: async () => unwrapList(await apiClient.get("/api/v1/crm/scoring/scores")) as unknown as LeadScore[] })
+  const scoreOf = scoreMap(scores.data ?? [])
   const done = () => { setError(null); qc.invalidateQueries({ queryKey: ["crm", "pipeline"] }); qc.invalidateQueries({ queryKey: ["crm", "funnel"] }) }
   const move = useMutation({ mutationFn: (v: { id: string; stage: Stage; reason?: LostReason | ""; note?: string }) => apiClient.patch(`/api/v1/crm/customers/${v.id}/stage`, stageBody(v.stage, v.reason, v.note)), onSuccess: () => { setLosing(null); done() }, onError: e => setError(errorText(e)) })
   const convert = useMutation({ mutationFn: (id: string) => apiClient.post(`/api/v1/crm/customers/${id}/convert`), onSuccess: () => { setConverting(null); done(); qc.invalidateQueries({ queryKey: ["customers"] }) }, onError: e => setError(errorText(e)) })
@@ -60,7 +63,7 @@ export default function PipelineBoard() {
                 const state = closeState(l, today), isEditing = editing === l.id
                 return (
                   <article key={l.id} aria-label={l.name} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: 9, marginBottom: 8, fontSize: 12.5 }}>
-                    <strong style={{ fontSize: 13 }}>{l.name}</strong>{isConverted(l) && <span style={{ marginLeft: 6, fontSize: 11, color: "var(--hf-success-text)" }}>Customer</span>}
+                    <strong style={{ fontSize: 13 }}>{l.name}</strong>{scoreOf.get(l.id) && <span title={scoreOf.get(l.id)!.reasons.join(", ") || "No scoring rule matched"} aria-label={`Score for ${l.name}`} style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: BAND_TONE[scoreOf.get(l.id)!.band] }}>{BAND_LABEL[scoreOf.get(l.id)!.band]} {scoreOf.get(l.id)!.score}</span>}{isConverted(l) && <span style={{ marginLeft: 6, fontSize: 11, color: "var(--hf-success-text)" }}>Customer</span>}
                     <div style={{ color: "var(--hf-text-muted)" }}>{[l.email, l.phone].filter(Boolean).join(" · ") || "No contact details"}</div>
                     <div style={{ marginTop: 4 }}>{money(l.dealValue)} · <span style={{ color: TONE[state] }}>{closeText(l, today)}</span></div>
                     <div style={{ color: "var(--hf-text-muted)" }}>Owner: {ownerText(l.ownerId, me)}</div>
