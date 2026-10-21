@@ -12,6 +12,7 @@ import za.co.handyflow.platform.crm.domain.repository.CustomerRepository;
 import za.co.handyflow.platform.crm.dto.TaskListResponse;
 import za.co.handyflow.platform.crm.dto.TaskResponse;
 import za.co.handyflow.platform.crm.dto.UpdateTaskRequest;
+import za.co.handyflow.platform.notifications.application.UserRecipientResolver;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -41,6 +42,7 @@ public class CrmTaskService {
 
     private final CustomerFollowUpRepository followUpRepository;
     private final CustomerRepository customerRepository;
+    private final UserRecipientResolver userResolver;
 
     @Transactional(readOnly = true)
     public TaskListResponse list(TenantId tenantId, boolean done) {
@@ -78,7 +80,12 @@ public class CrmTaskService {
             }
             task.moveDueDate(req.dueDate());
         }
-        if (req.assignedTo() != null) task.reassign(req.assignedTo());
+        if (req.assignedTo() != null) {
+            if (userResolver.resolveUser(tenantId, req.assignedTo()).isEmpty()) {
+                throw new IllegalArgumentException("That person is not a user of this account");
+            }
+            task.reassign(req.assignedTo());
+        }
         if (req.priority() != null) task.changePriority(req.priority());
         followUpRepository.save(task);
         log.info("[CRM] Task updated id={} tenant={}", id, tenantId);

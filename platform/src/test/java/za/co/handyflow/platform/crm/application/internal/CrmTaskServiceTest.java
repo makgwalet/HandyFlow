@@ -10,6 +10,8 @@ import za.co.handyflow.platform.crm.domain.model.CustomerFollowUp;
 import za.co.handyflow.platform.crm.domain.repository.CustomerFollowUpRepository;
 import za.co.handyflow.platform.crm.domain.repository.CustomerRepository;
 import za.co.handyflow.platform.crm.dto.UpdateTaskRequest;
+import za.co.handyflow.platform.notifications.application.Recipient;
+import za.co.handyflow.platform.notifications.application.UserRecipientResolver;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.LocalDate;
@@ -30,11 +32,12 @@ class CrmTaskServiceTest {
 
     @Mock private CustomerFollowUpRepository followUps;
     @Mock private CustomerRepository customers;
+    @Mock private UserRecipientResolver users;
 
     private final TenantId tenant = TenantId.generate();
     private final UUID user = UUID.randomUUID();
 
-    private CrmTaskService service() { return new CrmTaskService(followUps, customers); }
+    private CrmTaskService service() { return new CrmTaskService(followUps, customers, users); }
 
     private Customer customer(UUID id, String name, TenantId owner, boolean deleted) {
         Customer c = mock(Customer.class);
@@ -89,10 +92,20 @@ class CrmTaskServiceTest {
         var t = task(cid, LocalDate.now());
         when(followUps.findByIdAndTenant(any(), any())).thenReturn(Optional.of(t));
         when(customers.findAllById(any())).thenReturn(List.of(customer(cid, "Acme", tenant, false)));
+        when(users.resolveUser(tenant, other)).thenReturn(Optional.of(new Recipient(other, "Olive Other", null, null)));
         var out = service().update(tenant, UUID.randomUUID(), new UpdateTaskRequest(other, LocalDate.now().plusDays(7), CustomerFollowUp.Priority.HIGH));
         assertThat(out.dueDate()).isEqualTo(LocalDate.now().plusDays(7));
         assertThat(out.assignedTo()).isEqualTo(other);
         assertThat(out.priority()).isEqualTo("HIGH");
+    }
+
+    @Test @DisplayName("a task cannot be given to someone outside this account")
+    void reassignToStranger() {
+        UUID stranger = UUID.randomUUID();
+        when(followUps.findByIdAndTenant(any(), any())).thenReturn(Optional.of(task(UUID.randomUUID(), LocalDate.now())));
+        when(users.resolveUser(tenant, stranger)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service().update(tenant, UUID.randomUUID(), new UpdateTaskRequest(stranger, null, null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("not a user");
     }
 
     @Test @DisplayName("a past due date is refused, and a finished task cannot be changed")

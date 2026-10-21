@@ -393,6 +393,9 @@ public class CustomerService {
     @Transactional
     public CustomerResponse assignOwner(TenantId tenantId, UUID id, UUID newOwnerId) {
         var customer = requireActive(tenantId, id);
+        if (newOwnerId != null && userRecipientResolver.resolveUser(tenantId, newOwnerId).isEmpty()) {
+            throw new IllegalArgumentException("That person is not a user of this account");
+        }
         customer.assignOwner(newOwnerId, currentUserId());
         customerRepository.save(customer);
         log.info("[CRM] Customer owner changed id={} tenant={} newOwner={} by={}",
