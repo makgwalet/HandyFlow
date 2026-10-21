@@ -135,6 +135,17 @@ export const thirstiestBars = (rows: FuelRow[], limit = 8): { id: string; regist
   return withData.slice(0, limit).map(r => ({ id: r.vehicleId, registration: r.registration, bar: fuelBar(r.summary.litresPer100Km, r.latestDeviationPercent, max) }))
 }
 export interface StationRow { station: string; fuelType: string; fillups: number; litres: number; totalSpend: number; avgPricePerLitre: number; premiumPercent: number | null }
+export interface StationShare { label: string; spend: number; fraction: number; percent: number }
+/** Each station's share of fuel spend (all its fuel types together), biggest first. Stations past `limit` are folded into "Other". */
+export function stationShares(st: StationRow[], limit = 4): StationShare[] {
+  const bySt = new Map<string, number>()
+  for (const s of st) bySt.set(s.station, (bySt.get(s.station) ?? 0) + Number(s.totalSpend))
+  const sorted = [...bySt.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])), total = sorted.reduce((s, [, v]) => s + v, 0)
+  if (total <= 0) return []
+  const top = sorted.slice(0, limit), rest = sorted.slice(limit).reduce((s, [, v]) => s + v, 0)
+  const all: [string, number][] = rest > 0 ? [...top, ["Other", rest]] : top
+  return all.map(([label, spend]) => ({ label, spend, fraction: spend / total, percent: Math.round((spend / total) * 100) }))
+}
 export const cheapestStations = (st: StationRow[], limit = 5): StationRow[] => [...st].sort((a, b) => a.avgPricePerLitre - b.avgPricePerLitre || a.station.localeCompare(b.station)).slice(0, limit)
 export interface FuelAlertRow { kind: string; type: string; severity: string; registration: string; date: string; message: string }
 const SEVERITY_RANK: Record<string, number> = { ALERT: 0, WARNING: 1, INFO: 2 }

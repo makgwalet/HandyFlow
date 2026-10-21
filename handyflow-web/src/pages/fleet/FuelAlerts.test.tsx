@@ -59,12 +59,12 @@ describe("expired papers", () => {
 
 describe("FuelAnalyticsTab", () => {
   it("shows fleet totals and each vehicle against its own usual", async () => {
-    wrap(<FuelAnalyticsTab />); await screen.findByText("ABC123MP")
+    wrap(<FuelAnalyticsTab />); await screen.findByRole("row", { name: "ABC123MP" })
     expect(screen.getByLabelText("Fleet consumption").textContent).toBe("12.5 L/100 km"); expect(screen.getByLabelText("Flags").textContent).toBe("2")
-    expect(screen.getByLabelText("ABC123MP").textContent).toContain("35% thirstier than usual"); expect(screen.getByLabelText("XYZ999GP").textContent).toContain("8% lighter than usual")
+    expect(screen.getByRole("row", { name: "ABC123MP" }).textContent).toContain("35% thirstier than usual"); expect(screen.getByRole("row", { name: "XYZ999GP" }).textContent).toContain("8% lighter than usual")
   })
   it("asks for the chosen period", async () => {
-    wrap(<FuelAnalyticsTab />); await screen.findByText("ABC123MP"); fireEvent.change(screen.getByLabelText("Period"), { target: { value: "90" } })
+    wrap(<FuelAnalyticsTab />); await screen.findByRole("row", { name: "ABC123MP" }); fireEvent.change(screen.getByLabelText("Period"), { target: { value: "90" } })
     await waitFor(() => expect(get.mock.calls.some(c => String(c[0]).includes("/fuel-analytics/vehicles") && String(c[0]).includes("from="))).toBe(true))
   })
   it("lists alerts with the not-proof reminder", async () => {

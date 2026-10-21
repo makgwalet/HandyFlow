@@ -39,3 +39,20 @@ export function Columns({ items, format, label }: { items: { key: string; label:
         </div>))}
     </div>)
 }
+
+const SERIES_COLOURS = ["var(--hf-brand)", "var(--hf-success-text-strong)", "var(--hf-warning-text)", "var(--hf-violet-text)", "var(--hf-text-faint)"]
+/** A ring split into shares, with the total in the middle and a legend that gives each share as text, so colour is never the only signal. */
+export function Donut({ slices, centre, label }: { slices: { label: string; fraction: number; percent: number }[]; centre: string; label: string }) {
+  const ends = slices.reduce<number[]>((acc, s) => [...acc, (acc.at(-1) ?? 0) + s.fraction * 100], [])
+  const stops = slices.map((_, i) => `${SERIES_COLOURS[i % SERIES_COLOURS.length]} ${i === 0 ? 0 : ends[i - 1]}% ${ends[i]}%`).join(", ")
+  return (
+    <div role="img" aria-label={label} style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+      <div style={{ position: "relative", width: 120, height: 120, borderRadius: "50%", background: `conic-gradient(${stops})`, flex: "none" }}>
+        <div style={{ position: "absolute", inset: 22, borderRadius: "50%", background: "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, textAlign: "center" }}>{centre}</div>
+      </div>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: 12.5 }}>{slices.map((s, i) => (
+        <li key={s.label} aria-label={`${s.label}: ${s.percent}%`} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: 2, background: SERIES_COLOURS[i % SERIES_COLOURS.length] }} />{s.label}<strong style={{ marginLeft: "auto", paddingLeft: 12 }}>{s.percent}%</strong>
+        </li>))}</ul>
+    </div>)
+}

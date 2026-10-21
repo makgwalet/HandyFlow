@@ -36,3 +36,18 @@ describe("fuel analytics at scale", () => {
     fireEvent.change(screen.getByLabelText("Search vehicles"), { target: { value: "fuel031" } }); expect(screen.getByLabelText("Showing").textContent).toBe("Showing 1–1 of 1")
   })
 })
+
+describe("fuel analytics dashboard", () => {
+  const station = (name: string, type: string, spend: number) => ({ station: name, fuelType: type, fillups: 3, litres: 100, totalSpend: spend, avgPricePerLitre: 21, premiumPercent: null })
+  it("shows the trend, station shares and top consumers, and a vehicle filter narrows the tiles", async () => {
+    const rows = [fuelRow(1), { ...fuelRow(2), summary: { ...fuelRow(2).summary, totalSpend: 1000, totalLitres: 50, litresPer100Km: 14 } }]
+    get.mockImplementation((url: string) => url.includes("/fuel-analytics/vehicles") ? ok(rows)
+      : url.includes("/fuel-analytics/stations") ? ok([station("Engen", "DIESEL", 6000), station("Engen", "PETROL", 2000), station("Shell", "DIESEL", 2000)]) : ok([]))
+    wrap(<FuelAnalyticsTab />)
+    expect(await screen.findByLabelText("Engen: 80%")).toBeTruthy(); expect(screen.getByLabelText("Shell: 20%")).toBeTruthy()
+    expect(screen.getByLabelText("Fuel cost trend")).toBeTruthy(); expect(screen.getByLabelText("Top consumers").textContent).toContain("FUEL002")
+    await waitFor(() => expect(screen.getByLabelText("Total spend").textContent).toMatch(/5\s000/))
+    fireEvent.change(screen.getByLabelText("Vehicle"), { target: { value: "v2" } })
+    expect(screen.getByLabelText("Total spend").textContent).toMatch(/1\s000/); expect(screen.queryByRole("row", { name: "FUEL001" })).toBeNull()
+  })
+})
