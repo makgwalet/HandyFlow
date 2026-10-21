@@ -121,22 +121,7 @@ public class WorkflowService {
         String detail;
         boolean done = true;
         try {
-            detail = switch (w.getAction()) {
-                case CREATE_TASK -> {
-                    UUID who = w.getActionUser() != null ? w.getActionUser() : lead.getOwnerId();
-                    LocalDate due = WorkflowRules.dueDate(LocalDate.now(ZONE), w.getActionDays());
-                    followUpRepository.save(CustomerFollowUp.create(tenantId, lead.getId(), due, w.getActionText(), who, null));
-                    yield "Task added, due " + due;
-                }
-                case ADD_TAG -> { lead.addTag(w.getActionText(), null); customerRepository.save(lead); yield "Tagged " + w.getActionText().toLowerCase(); }
-                case ASSIGN_OWNER -> {
-                    if (userResolver.resolveUser(tenantId, w.getActionUser()).isEmpty()) throw new IllegalStateException("The new owner is no longer a user of this account");
-                    lead.assignOwner(w.getActionUser(), null);
-                    customerRepository.save(lead);
-                    yield "Owner changed";
-                }
-                case NOTIFY_OWNER -> yield notifyOwner(tenantId, w, lead);
-            };
+            detail = perform(tenantId, w.getAction(), w.getActionText(), w.getActionDays(), w.getActionUser(), lead);
         } catch (Exception e) {
             done = false;
             detail = e.getMessage();
@@ -145,12 +130,35 @@ public class WorkflowService {
         runRepository.save(WorkflowRun.of(tenantId, w.getId(), lead.getId(), done, detail));
     }
 
-    private String notifyOwner(TenantId tenantId, Workflow w, Customer lead) {
+    /**
+     * Does one action to a lead and says what it did; throws with a readable message when it cannot. Shared by workflows and journeys.
+     * The caller decides what a failure means.
+     */
+    String perform(TenantId tenantId, WorkflowAction action, String text, Integer days, UUID user, Customer lead) {
+        return switch (action) {
+            case CREATE_TASK -> {
+                UUID who = user != null ? user : lead.getOwnerId();
+                LocalDate due = WorkflowRules.dueDate(LocalDate.now(ZONE), days == null ? 0 : days);
+                followUpRepository.save(CustomerFollowUp.create(tenantId, lead.getId(), due, text, who, null));
+                yield "Task added, due " + due;
+            }
+            case ADD_TAG -> { lead.addTag(text, null); customerRepository.save(lead); yield "Tagged " + text.toLowerCase(); }
+            case ASSIGN_OWNER -> {
+                if (userResolver.resolveUser(tenantId, user).isEmpty()) throw new IllegalStateException("The new owner is no longer a user of this account");
+                lead.assignOwner(user, null);
+                customerRepository.save(lead);
+                yield "Owner changed";
+            }
+            case NOTIFY_OWNER -> notifyOwner(tenantId, text, lead);
+        };
+    }
+
+    private String notifyOwner(TenantId tenantId, String text, Customer lead) {
         List<Recipient> to = lead.getOwnerId() == null ? List.of() : userResolver.resolveUser(tenantId, lead.getOwnerId()).map(List::of).orElse(List.of());
         if (to.isEmpty()) to = tenantAdminRecipients.resolveTenantAdmins(tenantId);
         if (to.isEmpty()) throw new IllegalStateException("Nobody could be found to tell");
         notificationService.send(NotificationRequest.builder()
-                .tenantId(tenantId).type(NotificationType.CRM_WORKFLOW_MESSAGE).title(lead.getName()).message(w.getActionText())
+                .tenantId(tenantId).type(NotificationType.CRM_WORKFLOW_MESSAGE).title(lead.getName()).message(text)
                 .actionUrl("/crm").sourceModule("crm").sourceEntityId(lead.getId().toString()).recipients(to).build());
         return "Message sent";
     }

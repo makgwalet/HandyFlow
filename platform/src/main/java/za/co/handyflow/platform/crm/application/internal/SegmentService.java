@@ -82,6 +82,14 @@ public class SegmentService {
         return members(conditionsOf(find(tenantId, id)), customers.findAllActiveForExport(tenantId), Instant.now());
     }
 
+    /** Every customer a segment matches, not just the sample that {@link #members} shows. */
+    @Transactional(readOnly = true)
+    public List<UUID> memberIds(TenantId tenantId, UUID id) {
+        List<Condition> conditions = conditionsOf(find(tenantId, id));
+        Instant now = Instant.now();
+        return customers.findAllActiveForExport(tenantId).stream().filter(c -> SegmentRules.matches(conditions, subject(c), now)).map(Customer::getId).toList();
+    }
+
     private Segment find(TenantId tenantId, UUID id) {
         return repository.findByIdAndTenant(tenantId, id).orElseThrow(() -> new ResourceNotFoundException("Segment", id.toString()));
     }
