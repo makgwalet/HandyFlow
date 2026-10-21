@@ -28,8 +28,9 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Catalogue endpoints. SETTINGS_MANAGE still works everywhere it did before, so existing roles keep their
- * access; the CATALOGUE_* permissions let a role be given just what it needs.
+ * Catalogue endpoints. SETTINGS_MANAGE still opens reading, editing and archiving, so existing roles keep their
+ * access. It does NOT open prices: cost visibility and changes need CATALOGUE_PRICE_READ / CATALOGUE_PRICE_WRITE,
+ * which are assigned explicitly (owner decision: managing settings is separate from commercial control).
  */
 @RestController
 @RequestMapping("/api/v1/catalogue")
@@ -45,13 +46,13 @@ public class CatalogueController {
 
     private final CatalogueService catalogueService;
 
-    /** What the signed-in user may do, from their authorities. SETTINGS_MANAGE counts as everything. */
+    /** What the signed-in user may do, from their authorities. */
     private static Caller caller(Authentication auth) {
         Set<String> a = auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(Collectors.toSet());
         boolean admin = a.contains("SETTINGS_MANAGE");
         return new Caller(currentUserOrNull(),
-                admin || a.contains("CATALOGUE_PRICE_READ"),
-                admin || a.contains("CATALOGUE_PRICE_WRITE"),
+                a.contains("CATALOGUE_PRICE_READ"),
+                a.contains("CATALOGUE_PRICE_WRITE"),
                 admin || a.contains("CATALOGUE_ARCHIVE"));
     }
 

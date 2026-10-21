@@ -115,6 +115,17 @@ describe("items panel", () => {
     expect(row.getByText("33.3%")).toBeTruthy()
     expect(lastSearch()).toEqual({ page: 0, size: 25, sort: "name", desc: false })
   })
+  it("settings access alone opens editing but not prices", async () => {
+    perms = new Set(["SETTINGS_MANAGE"])
+    serve()
+    wrap(<ItemsPanel />)
+    await screen.findByText("Cement 50kg")
+    expect(screen.queryByText("Margin")).toBeNull()
+    expect(screen.getByRole("button", { name: /Add item/ })).toBeTruthy()
+    expect(screen.getByRole("button", { name: /Delete Cement/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: /Edit Cement/ }))
+    expect(within(await screen.findByRole("dialog")).queryByLabelText(/Cost price/)).toBeNull()
+  })
   it("hides cost and write actions from a read-only user", async () => {
     perms = new Set()
     serve()

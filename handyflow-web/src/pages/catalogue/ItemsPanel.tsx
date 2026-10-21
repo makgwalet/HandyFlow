@@ -21,8 +21,8 @@ export default function ItemsPanel() {
   const qc = useQueryClient()
   const canWrite = usePermissions(["SETTINGS_MANAGE", "CATALOGUE_WRITE"])
   const canArchive = usePermissions(["SETTINGS_MANAGE", "CATALOGUE_ARCHIVE"])
-  const canSeeCost = usePermissions(["SETTINGS_MANAGE", "CATALOGUE_PRICE_READ"])
-  const canWriteCost = usePermissions(["SETTINGS_MANAGE", "CATALOGUE_PRICE_WRITE"])
+  const canSeeCost = usePermissions(["CATALOGUE_PRICE_READ"])
+  const canWriteCost = usePermissions(["CATALOGUE_PRICE_WRITE"])
 
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
   const [qInput, setQInput] = useState("")
