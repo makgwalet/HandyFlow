@@ -33,9 +33,9 @@ import za.co.handyflow.platform.crm.domain.model.AuditAction;
 import za.co.handyflow.platform.crm.domain.model.AuditEntity;
 import za.co.handyflow.platform.crm.domain.model.Customer;
 import za.co.handyflow.platform.crm.domain.model.Webhook;
-import za.co.handyflow.platform.crm.domain.model.WebhookDelivery;
+import za.co.handyflow.platform.crm.domain.model.CrmWebhookDelivery;
 import za.co.handyflow.platform.crm.domain.model.WebhookEvent;
-import za.co.handyflow.platform.crm.domain.repository.WebhookDeliveryRepository;
+import za.co.handyflow.platform.crm.domain.repository.CrmWebhookDeliveryRepository;
 import za.co.handyflow.platform.crm.domain.repository.WebhookRepository;
 import za.co.handyflow.platform.crm.dto.CreatedWebhookResponse;
 import za.co.handyflow.platform.crm.dto.WebhookDeliveryResponse;
@@ -50,13 +50,13 @@ import za.co.handyflow.platform.shared.TenantId;
  * addresses that point inside a network are refused both when saved and again when sent. After 10 failures in a row a webhook is suspended.
  */
 @Slf4j
-@Service
+@Service("crmWebhookService")
 public class WebhookService {
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final Duration TIMEOUT = Duration.ofSeconds(5);
 
     private final WebhookRepository webhookRepository;
-    private final WebhookDeliveryRepository deliveryRepository;
+    private final CrmWebhookDeliveryRepository deliveryRepository;
     private final CrmAuditService audit;
     private final ObjectMapper mapper;
     private final TransactionTemplate tx;
@@ -67,7 +67,7 @@ public class WebhookService {
         return t;
     }, new ThreadPoolExecutor.AbortPolicy());
 
-    public WebhookService(WebhookRepository webhookRepository, WebhookDeliveryRepository deliveryRepository, CrmAuditService audit, ObjectMapper mapper, PlatformTransactionManager txManager) {
+    public WebhookService(WebhookRepository webhookRepository, CrmWebhookDeliveryRepository deliveryRepository, CrmAuditService audit, ObjectMapper mapper, PlatformTransactionManager txManager) {
         this.webhookRepository = webhookRepository;
         this.deliveryRepository = deliveryRepository;
         this.audit = audit;
@@ -126,7 +126,7 @@ public class WebhookService {
     public WebhookDeliveryResponse test(TenantId tenantId, UUID id) {
         Webhook w = tx.execute(s -> require(tenantId, id));
         String body = body(WebhookEvent.PING, Map.of("message", "This is a test from HandyFlow."));
-        WebhookDelivery d = send(w, WebhookEvent.PING, body);
+        CrmWebhookDelivery d = send(w, WebhookEvent.PING, body);
         record(w.getId(), tenantId, d, true);
         return new WebhookDeliveryResponse(d.getId(), w.getId(), w.getName(), d.getEvent(), d.getOutcome(), d.getStatusCode(), d.getDetail(), d.getSentAt());
     }
@@ -157,7 +157,7 @@ public class WebhookService {
         try {
             pool.execute(() -> {
                 try {
-                    WebhookDelivery d = send(w, event, body);
+                    CrmWebhookDelivery d = send(w, event, body);
                     record(w.getId(), tenantId, d, false);
                 } catch (Exception e) {
                     log.warn("[CRM] Webhook {} delivery could not be recorded tenant={}: {}", w.getId(), tenantId, e.getMessage());
@@ -169,12 +169,12 @@ public class WebhookService {
     }
 
     /** Makes the call. Never throws: every problem becomes a failed delivery with a readable detail. */
-    private WebhookDelivery send(Webhook w, WebhookEvent event, String body) {
+    private CrmWebhookDelivery send(Webhook w, WebhookEvent event, String body) {
         try {
             WebhookRules.checkUrl(w.getUrl());
             URI uri = URI.create(w.getUrl());
             for (InetAddress a : InetAddress.getAllByName(uri.getHost())) {
-                if (WebhookRules.isBlocked(a)) return WebhookDelivery.of(w.getTenantId(), w.getId(), event, false, null, "The address points inside a private network, so it was not called");
+                if (WebhookRules.isBlocked(a)) return CrmWebhookDelivery.of(w.getTenantId(), w.getId(), event, false, null, "The address points inside a private network, so it was not called");
             }
             HttpRequest req = HttpRequest.newBuilder(uri).timeout(TIMEOUT)
                     .header("Content-Type", "application/json").header("User-Agent", "HandyFlow-Webhooks/1")
@@ -182,19 +182,19 @@ public class WebhookService {
                     .header("X-HandyFlow-Signature", WebhookRules.sign(w.getSecret(), body))
                     .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build();
             int code = http.send(req, HttpResponse.BodyHandlers.discarding()).statusCode();
-            return WebhookDelivery.of(w.getTenantId(), w.getId(), event, code >= 200 && code < 300, code, WebhookRules.statusText(code));
+            return CrmWebhookDelivery.of(w.getTenantId(), w.getId(), event, code >= 200 && code < 300, code, WebhookRules.statusText(code));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return WebhookDelivery.of(w.getTenantId(), w.getId(), event, false, null, "Interrupted");
+            return CrmWebhookDelivery.of(w.getTenantId(), w.getId(), event, false, null, "Interrupted");
         } catch (java.net.http.HttpTimeoutException e) {
-            return WebhookDelivery.of(w.getTenantId(), w.getId(), event, false, null, "The receiver did not answer within 5 seconds");
+            return CrmWebhookDelivery.of(w.getTenantId(), w.getId(), event, false, null, "The receiver did not answer within 5 seconds");
         } catch (Exception e) {
-            return WebhookDelivery.of(w.getTenantId(), w.getId(), event, false, null, "Could not reach the address: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
+            return CrmWebhookDelivery.of(w.getTenantId(), w.getId(), event, false, null, "Could not reach the address: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
         }
     }
 
     /** Saves the attempt, updates the webhook's failure count (a test does not count against it) and trims old log lines. */
-    private void record(UUID webhookId, TenantId tenantId, WebhookDelivery d, boolean isTest) {
+    private void record(UUID webhookId, TenantId tenantId, CrmWebhookDelivery d, boolean isTest) {
         tx.executeWithoutResult(s -> {
             deliveryRepository.save(d);
             deliveryRepository.deleteOlderThan(webhookId, Instant.now().minus(Duration.ofDays(30)));

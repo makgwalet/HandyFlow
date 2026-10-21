@@ -8,14 +8,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import za.co.handyflow.platform.crm.domain.model.WebhookDelivery;
+import za.co.handyflow.platform.crm.domain.model.CrmWebhookDelivery;
 import za.co.handyflow.platform.shared.TenantId;
 
-public interface WebhookDeliveryRepository extends JpaRepository<WebhookDelivery, UUID> {
-    @Query("SELECT d FROM WebhookDelivery d WHERE d.tenantId = :tenantId ORDER BY d.sentAt DESC, d.id")
-    List<WebhookDelivery> findRecent(@Param("tenantId") TenantId tenantId, Pageable pageable);
+public interface CrmWebhookDeliveryRepository extends JpaRepository<CrmWebhookDelivery, UUID> {
+    @Query("SELECT d FROM CrmWebhookDelivery d WHERE d.tenantId = :tenantId ORDER BY d.sentAt DESC, d.id")
+    List<CrmWebhookDelivery> findRecent(@Param("tenantId") TenantId tenantId, Pageable pageable);
 
     @Modifying
-    @Query("DELETE FROM WebhookDelivery d WHERE d.webhookId = :webhookId AND d.sentAt < :cutoff")
+    @Query("DELETE FROM CrmWebhookDelivery d WHERE d.webhookId = :webhookId AND d.sentAt < :cutoff")
     int deleteOlderThan(@Param("webhookId") UUID webhookId, @Param("cutoff") Instant cutoff);
 }

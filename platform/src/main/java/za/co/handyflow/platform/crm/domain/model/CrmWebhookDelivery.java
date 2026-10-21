@@ -13,7 +13,7 @@ import za.co.handyflow.platform.shared.TenantId;
 @Table(name = "crm_webhook_deliveries")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class WebhookDelivery {
+public class CrmWebhookDelivery {
     @Id
     private UUID id = UUID.randomUUID();
 
@@ -40,8 +40,8 @@ public class WebhookDelivery {
     @Column(name = "sent_at", nullable = false)
     private Instant sentAt;
 
-    public static WebhookDelivery of(TenantId tenantId, UUID webhookId, WebhookEvent event, boolean ok, Integer statusCode, String detail) {
-        var d = new WebhookDelivery();
+    public static CrmWebhookDelivery of(TenantId tenantId, UUID webhookId, WebhookEvent event, boolean ok, Integer statusCode, String detail) {
+        var d = new CrmWebhookDelivery();
         d.tenantId = tenantId;
         d.webhookId = webhookId;
         d.event = event;

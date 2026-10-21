@@ -13,7 +13,7 @@ import za.co.handyflow.platform.shared.TenantId;
 @Table(name = "crm_audit_events")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class AuditEvent {
+public class CrmAuditEvent {
     @Id
     private UUID id = UUID.randomUUID();
 
@@ -44,8 +44,8 @@ public class AuditEvent {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    public static AuditEvent of(TenantId tenantId, AuditEntity type, UUID entityId, String name, AuditAction action, String detail, UUID actorId) {
-        var e = new AuditEvent();
+    public static CrmAuditEvent of(TenantId tenantId, AuditEntity type, UUID entityId, String name, AuditAction action, String detail, UUID actorId) {
+        var e = new CrmAuditEvent();
         e.tenantId = tenantId;
         e.entityType = type;
         e.entityId = entityId;

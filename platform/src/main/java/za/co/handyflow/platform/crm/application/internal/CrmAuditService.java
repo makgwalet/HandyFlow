@@ -17,8 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.crm.domain.model.AuditAction;
 import za.co.handyflow.platform.crm.domain.model.AuditEntity;
-import za.co.handyflow.platform.crm.domain.model.AuditEvent;
-import za.co.handyflow.platform.crm.domain.repository.AuditEventRepository;
+import za.co.handyflow.platform.crm.domain.model.CrmAuditEvent;
+import za.co.handyflow.platform.crm.domain.repository.CrmAuditEventRepository;
 import za.co.handyflow.platform.crm.dto.AuditEventResponse;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -32,11 +32,11 @@ import za.co.handyflow.platform.shared.TenantId;
 public class CrmAuditService {
     private static final ZoneId ZONE = ZoneId.of("Africa/Johannesburg");
 
-    private final AuditEventRepository repository;
+    private final CrmAuditEventRepository repository;
 
     public void record(TenantId tenantId, AuditEntity type, UUID entityId, String entityName, AuditAction action, String detail) {
         try {
-            repository.save(AuditEvent.of(tenantId, type, entityId, AuditRules.clean(entityName, AuditRules.NAME_MAX), action, AuditRules.clean(detail, AuditRules.DETAIL_MAX), currentUserId()));
+            repository.save(CrmAuditEvent.of(tenantId, type, entityId, AuditRules.clean(entityName, AuditRules.NAME_MAX), action, AuditRules.clean(detail, AuditRules.DETAIL_MAX), currentUserId()));
         } catch (Exception e) {
             log.warn("[CRM] Audit line not written ({} {} {}) tenant={}: {}", action, type, entityId, tenantId, e.getMessage());
         }
@@ -45,7 +45,7 @@ public class CrmAuditService {
     @Transactional(readOnly = true)
     public Page<AuditEventResponse> search(TenantId tenantId, AuditEntity type, UUID actorId, LocalDate from, LocalDate to, Integer page, Integer size) {
         AuditRules.checkRange(from, to);
-        Specification<AuditEvent> spec = (root, q, cb) -> {
+        Specification<CrmAuditEvent> spec = (root, q, cb) -> {
             var ps = new ArrayList<Predicate>();
             ps.add(cb.equal(root.get("tenantId"), tenantId));
             if (type != null) ps.add(cb.equal(root.get("entityType"), type));
