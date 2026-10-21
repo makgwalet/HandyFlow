@@ -25,3 +25,34 @@ export function buildTeam(leads: PipelineLead[], tasks: Task[], today: string): 
 }
 export const ownerName = (owner: string, me: string | null, names: Record<string, string>) =>
   owner === UNASSIGNED ? "Unassigned" : owner === me ? "You" : names[owner] ?? "Colleague"
+
+// ── Monthly targets ─────────────────────────────────────────────────────────
+export interface TargetRow { ownerId: string; target: number | null; achieved: number; wonDeals: number; percent: number | null }
+/** The month ("YYYY-MM") a local date falls in. */
+export const monthOfDate = (iso: string) => iso.slice(0, 7)
+/** Moves a "YYYY-MM" month by whole months. */
+export function shiftMonth(month: string, by: number): string {
+  const [y, m] = month.split("-").map(Number), n = y * 12 + (m - 1) + by
+  return `${Math.floor(n / 12)}-${String((n % 12) + 1).padStart(2, "0")}`
+}
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+export const monthTitle = (month: string) => { const [y, m] = month.split("-").map(Number); return `${MONTHS[m - 1]} ${y}` }
+/** Why a typed target cannot be saved, or null. The server checks the same limits. */
+export function targetProblem(text: string): string | null {
+  const t = text.trim().replace(/\s/g, "")
+  if (!t) return "Enter a target amount."
+  const n = Number(t)
+  if (!Number.isFinite(n)) return "The target must be a number."
+  if (n <= 0) return "The target must be more than zero."
+  if (n > 9_999_999_999_999.99) return "That target is too large."
+  return null
+}
+export const targetAmount = (text: string) => Number(text.trim().replace(/\s/g, ""))
+/** A team row with that month's target and wins attached. Owners who only appear in the targets list get a row too. */
+export interface TeamTargetRow extends TeamRow { target: number | null; achieved: number; wonDeals: number; percent: number | null }
+export function withTargets(rows: TeamRow[], targets: TargetRow[]): TeamTargetRow[] {
+  const by = new Map(targets.map(t => [t.ownerId, t])), seen = new Set<string>(), out: TeamTargetRow[] = []
+  for (const r of rows) { const t = by.get(r.owner); seen.add(r.owner); out.push({ ...r, target: t?.target ?? null, achieved: t?.achieved ?? 0, wonDeals: t?.wonDeals ?? 0, percent: t?.percent ?? null }) }
+  for (const t of targets) if (!seen.has(t.ownerId)) out.push({ ...blank(t.ownerId), target: t.target, achieved: t.achieved, wonDeals: t.wonDeals, percent: t.percent })
+  return out
+}
