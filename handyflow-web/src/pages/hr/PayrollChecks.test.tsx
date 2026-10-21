@@ -25,6 +25,12 @@ const run = (over: Record<string, unknown> = {}) => ({
   recordedPaye: 1000, recalculatedPaye: 900, payeDifference: -100, verdict: "CONFIRMED_DIFFERENCE", action: "Review before any correction.", lines: null, ...over,
 })
 
+const SETTINGS = { allowSelfApproval: false, legacyAccessEnds: "2026-12-31", legacyAccessOpen: false }
+/** Wraps a handler so the payroll settings request that the checks screen also makes gets a sensible answer. */
+const serve = (handler: (url: string, cfg?: { params?: { runId?: string } }) => Promise<unknown>) =>
+  get.mockImplementation((url: string, cfg?: { params?: { runId?: string } }) =>
+    url.endsWith("/payroll/settings") ? Promise.resolve({ data: { data: SETTINGS } }) : handler(url, cfg))
+
 beforeEach(() => { get.mockReset(); post.mockReset() })
 afterEach(() => cleanup())
 
@@ -51,7 +57,7 @@ describe("payroll checks logic", () => {
 
 describe("PayrollChecksTab", () => {
   it("shows the rules and the impact, and flags a mislabelled run", async () => {
-    get.mockImplementation((url: string) => Promise.resolve({ data: { data: url.includes("tax-years") ? [year(), year({ taxYear: 2028, label: "2027/28", usable: false, status: "DRAFT", problems: ["No tax brackets are loaded."] })] : { generatedAt: "x", runs: [run()], runsWithDifferences: 1, notes: ["Nothing is changed."] } } }))
+    serve((url: string) => Promise.resolve({ data: { data: url.includes("tax-years") ? [year(), year({ taxYear: 2028, label: "2027/28", usable: false, status: "DRAFT", problems: ["No tax brackets are loaded."] })] : { generatedAt: "x", runs: [run()], runsWithDifferences: 1, notes: ["Nothing is changed."] } } }))
     wrap(<PayrollChecksTab />)
     expect(await screen.findByText("Approved, in use")).toBeTruthy()
     expect(screen.getByText("Cannot be used")).toBeTruthy()
@@ -62,7 +68,7 @@ describe("PayrollChecksTab", () => {
   })
 
   it("loads the payslips of a run only when asked", async () => {
-    get.mockImplementation((url: string, cfg?: { params?: { runId?: string } }) => Promise.resolve({ data: { data: url.includes("tax-years") ? [] : cfg?.params?.runId
+    serve((url: string, cfg?: { params?: { runId?: string } }) => Promise.resolve({ data: { data: url.includes("tax-years") ? [] : cfg?.params?.runId
       ? { generatedAt: "x", runsWithDifferences: 1, notes: [], runs: [run({ lines: [{ payslipId: "p1", employeeId: "e1", employeeName: "Thandi Nkosi", employeeNumber: "E001", verdict: "CONFIRMED_DIFFERENCE", recordedPaye: 500, recalculatedPaye: 450, payeDifference: -50, uifDifference: 0, sdlDifference: 0, medicalMembers: 1, medicalAssumed: true, reasons: ["Medical membership is assumed."] }] })] }
       : { generatedAt: "x", runs: [run()], runsWithDifferences: 1, notes: [] } } }))
     wrap(<PayrollChecksTab />)
@@ -72,7 +78,7 @@ describe("PayrollChecksTab", () => {
   })
 
   it("says so when there are no tax years or the report fails", async () => {
-    get.mockImplementation((url: string) => url.includes("tax-years") ? Promise.resolve({ data: { data: [] } }) : Promise.reject({ response: { data: { message: "Boom" } } }))
+    serve((url: string) => url.includes("tax-years") ? Promise.resolve({ data: { data: [] } }) : Promise.reject({ response: { data: { message: "Boom" } } }))
     wrap(<PayrollChecksTab />)
     expect(await screen.findByText(/payroll cannot run/)).toBeTruthy()
     expect(await screen.findByText("Boom")).toBeTruthy()

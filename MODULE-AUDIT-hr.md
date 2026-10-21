@@ -128,3 +128,44 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - Not looked at in a browser.
 
 **Please run:** `mvn clean test -pl platform`, start the app so Flyway applies V485 and Hibernate validates the new entities, then open HR > Payroll checks and read the impact report before processing any new run.
+
+## 8. Slice 2 status: payroll controls
+
+**What was wrong before**
+
+- A pay run went from DRAFT straight to COMPLETED in one click. Nobody else looked at it, and there was no lock.
+- Anyone holding `USER_UPDATE` (a general "edit users" permission) could create and calculate pay runs.
+- The employee self-service portal showed payslips the moment a run was calculated, before anyone had checked them.
+- Calculating a run twice produced two EMP201 drafts.
+- The EMP201 PDF could be downloaded for a run nobody had approved.
+
+**What changed**
+
+- **Steps.** DRAFT, then PREPARED (calculated, waiting), APPROVED, FINALISED (locked). A prepared or approved run can be sent back to draft with a reason. A finalised run cannot be calculated again. Runs made before this slice keep the old status COMPLETED: employees can still see them, they can still be approved and finalised, and they cannot be calculated again.
+- **Separation of duties.** The person who calculated a run cannot approve or finalise it. A business with a single payroll person can switch that off in HR > Payroll checks; every approval or finalisation of one's own run is then written in the run's history. It is off by default.
+- **Review before approval.** Errors block approval (no payslips, net pay zero or negative). Warnings do not (medical credit assumed, no bank account on record, net pay moved more than 10% from the previous approved run, a person new on the run or missing from it).
+- **History.** Every step is stored with who, when and the note, and is never edited (`hr_pay_run_events`).
+- **Employees** see payslips only from finalised runs (and legacy COMPLETED ones). **EMP201** export waits for finalisation. A recalculation replaces the EMP201 draft; one that has moved on blocks the recalculation.
+- **Permissions (decision 4).** New: `PAYROLL_PREPARE`, `PAYROLL_APPROVE`, `PAYROLL_FINALISE`, `PAYROLL_BANK_FILE_GENERATE`, `PAYROLL_STATUTORY_EXPORT`, `PAYROLL_CONFIGURATION_ADMIN`.
+  - Roles holding `PAYROLL_RUN` are given read, prepare and statutory export. They are not given approve or finalise.
+  - Roles holding only `USER_UPDATE` are given nothing. They are listed in `hr_payroll_access_review` as needing a decision.
+  - The `ADMIN` role is given approve, finalise and configuration so payroll is never left without an approver. This is a choice I made, not one you gave me; take it off the role if you want someone else to approve.
+  - `PAYROLL_BANK_FILE_GENERATE` is granted to nobody; there is no bank file yet.
+- **Legacy fallback with an end date.** `PAYROLL_RUN` and `USER_UPDATE` still read and calculate until **31 December 2026** (`PayrollAccess.LEGACY_ACCESS_ENDS`), then stop with no further release. They never approve or finalise. The date is a constant I picked; change it if you want a different window.
+- **`USER_READ` no longer opens payroll.** It used to show pay runs, payslips and EMP201 to nearly every user. I removed it at once rather than carrying it to the end date. A role that only had `USER_READ` and was used by a bookkeeper to view payroll needs `PAYROLL_READ`.
+- **Screens.** Pay run list shows the new statuses, totals once calculated, the steps a person may take, what a run is waiting for, the review and the history. HR > Payroll checks has the approval setting and, for configuration admins, the access review.
+
+**Not verified**
+
+- Maven build, `PayrollControlServiceTest`, the changed `PayrollServiceTest`, `PayrollImpactServiceTest`, `HrControllerTest` (including the 14 new tests and the `@PreAuthorize` expressions that call `PayrollAccess`), the new JPQL (`previousIssued`), and migration V486 have not been run.
+- Run and passing in a standalone harness: `PayRunWorkflowRulesTest` (12), `PayrollExceptionRulesTest` (7), `PayrollAccessTest` (7). The harness caught a rounding bug in the variance check, fixed.
+- V486 checks worth a look when you run it: the status constraint is dropped by its default name `hr_pay_runs_status_check`; if your database named it differently the drop does nothing and the new statuses will be refused.
+- Front end: type-check, 46 tests in `pages/hr` and `navigation`, and the build. Not looked at in a browser.
+
+**Open items**
+
+- `HR_READ` still opens payslip lists and PDFs, as before. Whether HR staff should see salaries is a decision for you.
+- There is no bank file, no payment record and no "paid" state yet, so finalised does not mean paid.
+- Corrections to a finalised run (an approved adjustment or reversal) are not built. Today a finalised run is simply locked.
+- The payroll bureau product has its own pay run, calculator and permissions and was not touched.
+- Maker/checker for changing an employee's salary or bank details belongs with Slice 3 (employee master and security).

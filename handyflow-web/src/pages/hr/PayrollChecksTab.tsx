@@ -3,9 +3,10 @@
 // Read-only checks for payroll: the statutory rules each tax year uses, and what a recalculation under those rules
 // would change in payslips already issued. Nothing on this screen changes payroll data.
 import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AlertCircle, CheckCircle2 } from "lucide-react"
 import { apiClient } from "../../api/client"
+import { useAuth } from "../../hooks/useAuth"
 import {
   impactSummary, rand, signedRand, taxYearName, VERDICT_STYLE, VERDICT_TEXT,
   type Impact, type ImpactRun, type TaxYear,
@@ -197,9 +198,93 @@ function RunRows({ run, open, onToggle }: { run: ImpactRun; open: boolean; onTog
   )
 }
 
+interface AccessReview { legacyAccessEnds: string; rolesNeedingReview: number; roles: { roleId: string; roleName: string; usersInRole: number; held: string; granted: string; needsReview: boolean; note: string }[] }
+interface PayrollSettings { allowSelfApproval: boolean; legacyAccessEnds: string; legacyAccessOpen: boolean }
+
+/** Who can do what in payroll: the self-approval choice and what the permissions migration did to each role. */
+export function PayrollControlsPanel() {
+  const qc = useQueryClient()
+  const { user } = useAuth()
+  const canConfigure = (user?.permissions ?? []).includes("PAYROLL_CONFIGURATION_ADMIN")
+  const [error, setError] = useState("")
+  const settings = useQuery<PayrollSettings>({
+    queryKey: ["hr-payroll-settings"],
+    queryFn: async () => unwrap<PayrollSettings>(await apiClient.get("/api/v1/hr/payroll/settings")),
+  })
+  const review = useQuery<AccessReview>({
+    queryKey: ["hr-payroll-access-review"],
+    queryFn: async () => unwrap<AccessReview>(await apiClient.get("/api/v1/hr/payroll/access-review")),
+    enabled: canConfigure,
+  })
+  const save = useMutation({
+    mutationFn: (allow: boolean) => apiClient.put("/api/v1/hr/payroll/settings", { allowSelfApproval: allow }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["hr-payroll-settings"] }); setError("") },
+    onError: e => setError(errorText(e, "The setting could not be saved.")),
+  })
+  return (
+    <section style={card} aria-labelledby="hr-controls-h">
+      <div style={head}>
+        <h3 id="hr-controls-h" style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "var(--hf-text)" }}>Payroll approval and access</h3>
+        <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--hf-text-muted)" }}>
+          A pay run is calculated by one person and approved and finalised by another. Employees see their payslips once it is finalised.
+        </p>
+      </div>
+      {settings.isLoading ? <div style={{ padding: 24, color: "var(--hf-text-faint)" }}>Loading…</div>
+        : settings.isError ? <Problem message={errorText(settings.error, "The payroll settings could not be loaded.")} />
+        : settings.data && (
+          <div style={{ padding: "12px 18px", fontSize: 13, color: "var(--hf-text)" }}>
+            <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: canConfigure ? "pointer" : "default" }}>
+              <input type="checkbox" checked={settings.data.allowSelfApproval} disabled={!canConfigure || save.isPending}
+                onChange={e => save.mutate(e.target.checked)} style={{ marginTop: 3 }} />
+              <span>
+                <strong>One person may calculate and approve</strong>
+                <span style={{ display: "block", fontSize: 12, color: "var(--hf-text-muted)" }}>
+                  For a business with a single payroll person. Off by default. When on, every time someone approves or finalises their own run, the run's history says so.
+                  {!canConfigure && " Only someone with payroll configuration access can change this."}
+                </span>
+              </span>
+            </label>
+            {error && <div role="alert" style={{ marginTop: 8, color: "var(--hf-danger-text)" }}>{error}</div>}
+            {settings.data.legacyAccessOpen && (
+              <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-warning-text)" }}>
+                The old permissions (Process pay runs and Update users) still calculate pay runs until {fmtDate(settings.data.legacyAccessEnds)}. After that date only the payroll permissions work.
+              </div>
+            )}
+          </div>
+        )}
+      {canConfigure && (
+        review.isLoading ? <div style={{ padding: "0 18px 18px", color: "var(--hf-text-faint)" }}>Loading the access review…</div>
+        : review.isError ? <Problem message={errorText(review.error, "The access review could not be loaded.")} />
+        : review.data && (
+          <div style={{ overflowX: "auto", borderTop: "1px solid var(--hf-border-subtle)" }}>
+            <div style={{ padding: "10px 18px", fontSize: 12, fontWeight: 600, color: review.data.rolesNeedingReview ? "var(--hf-warning-text)" : "var(--hf-text-muted)" }}>
+              {review.data.rolesNeedingReview === 0 ? "Every role that had payroll access was mapped." : `${review.data.rolesNeedingReview} ${review.data.rolesNeedingReview === 1 ? "role needs" : "roles need"} a decision.`}
+            </div>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr><th style={th}>Role</th><th style={th}>People</th><th style={th}>Held</th><th style={th}>Given</th><th style={th}>What to do</th></tr></thead>
+              <tbody>
+                {review.data.roles.map(r => (
+                  <tr key={r.roleId}>
+                    <td style={td}><strong>{r.roleName}</strong>{r.needsReview && <div><Pill text="Needs a decision" color="var(--hf-warning-text)" bg="var(--hf-warning-soft)" /></div>}</td>
+                    <td style={td}>{r.usersInRole}</td>
+                    <td style={{ ...td, fontSize: 12 }}>{r.held}</td>
+                    <td style={{ ...td, fontSize: 12 }}>{r.granted || "Nothing new"}</td>
+                    <td style={{ ...td, fontSize: 12, color: "var(--hf-text-secondary)", maxWidth: 360 }}>{r.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      )}
+    </section>
+  )
+}
+
 export default function PayrollChecksTab() {
   return (
     <div>
+      <PayrollControlsPanel />
       <StatutoryRulesPanel />
       <ImpactReportPanel />
     </div>

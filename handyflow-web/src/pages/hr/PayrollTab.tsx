@@ -9,7 +9,11 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, X, Play, ChevronDown, ChevronUp, Download, DollarSign, AlertTriangle, AlertCircle } from "lucide-react"
+import { Plus, X, ChevronDown, ChevronUp, Download, DollarSign, AlertCircle } from "lucide-react"
+import { useAuth } from "../../hooks/useAuth"
+import { RunActions, RunReview } from "./PayRunControls"
+import { hasTotals, rightsFrom, STATUS_STYLE, STATUS_TEXT } from "./payrollControls.logic"
+import { taxYearName } from "./payrollChecks.logic"
 
 // FIX: correct ApiResponse<Page<T>> unwrap
 const unwrap     = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
@@ -17,20 +21,22 @@ const unwrapList = (r: any): any[] => { const d = r.data?.data ?? r.data; return
 const fmtR    = (n: any) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
 const fmtDate = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
 
-// FIX: status values match what the backend actually returns
-const STATUS_CFG: Record<string, { color: string; bg: string; label: string }> = {
-  DRAFT:      { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", label: "Draft"      },
-  PROCESSING: { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", label: "Processing" },
-  COMPLETED:  { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", label: "Completed"  },
-  CANCELLED:  { color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)", label: "Cancelled"  },
-}
-
 export default function PayrollTab() {
   const qc = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
   const [expanded, setExpanded]     = useState<string | null>(null)
   const [error, setError]           = useState("")
   const [warnings, setWarnings] = useState<string[]>([])
+  const { user } = useAuth()
+
+  // The business's choice about one person calculating and approving, and whether the old permissions still work.
+  const settings = useQuery<{ allowSelfApproval: boolean; legacyAccessOpen: boolean }>({
+    queryKey: ["hr-payroll-settings"],
+    queryFn: async () => (await apiClient.get("/api/v1/hr/payroll/settings")).data?.data,
+    retry: false,
+  })
+  const allowSelf = settings.data?.allowSelfApproval ?? false
+  const rights = rightsFrom(user?.permissions ?? [], settings.data?.legacyAccessOpen ?? false)
 
   const today = new Date()
   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split("T")[0]
@@ -56,16 +62,6 @@ export default function PayrollTab() {
     onError: (e: any) => setError(e.response?.data?.message ?? "Failed to create pay run"),
   })
 
-  const processPayRun = useMutation({
-    mutationFn: (id: string) => apiClient.post(`/api/v1/hr/pay-runs/${id}/process`),
-    onSuccess: (res, id) => {
-      qc.invalidateQueries({ queryKey: ["pay-runs"] }); qc.invalidateQueries({ queryKey: ["payslips", id] })
-      const w = (res.data?.data ?? res.data)?.warnings
-      setWarnings(Array.isArray(w) ? w : []); setError("")
-    },
-    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to process pay run"),
-  })
-
   // FIX: no window.__AUTH_TOKEN__ — apiClient handles auth headers automatically
   const downloadPayslip = async (id: string, empNumber: string, runNumber: string) => {
     try {
@@ -83,14 +79,19 @@ export default function PayrollTab() {
 
   return (
     <div>
+      {error && !showCreate && (
+        <div role="alert" style={{ marginBottom: 14, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 7 }}>
+          <AlertCircle size={14} />{error}
+        </div>
+      )}
       {warnings.length > 0 && (
         <div role="status" style={{ marginBottom: 14, padding: "10px 14px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-warning-text)" }}>
-          <strong>The run was processed, with {warnings.length === 1 ? "one point" : `${warnings.length} points`} to check:</strong>
+          <strong>The run was calculated and now waits for approval. {warnings.length === 1 ? "One point" : `${warnings.length} points`} to check:</strong>
           <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>{warnings.map(w => <li key={w}>{w}</li>)}</ul>
         </div>
       )}
       <div style={{ marginBottom: 18, padding: "10px 14px", background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-info-text)" }}>
-        <strong>SA tax year:</strong> March to February, taken from the pay date. Processing uses the approved rules for that year (see Payroll checks) and stops if they are missing. The medical credit comes from the employee's recorded medical scheme membership.
+        <strong>SA tax year:</strong> March to February, taken from the pay date. A run is calculated, then approved by a second person, then finalised and locked. Employees see their payslips only after it is finalised. Calculation uses the approved rules for the year (see Payroll checks) and stops if they are missing.
       </div>
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
@@ -111,10 +112,10 @@ export default function PayrollTab() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {sorted.map((run: any, idx: number) => {
-            const cfg    = STATUS_CFG[run.status] ?? STATUS_CFG.DRAFT
+            const cfg    = { ...(STATUS_STYLE[run.status] ?? STATUS_STYLE.DRAFT), label: STATUS_TEXT[run.status] ?? run.status }
             const isOpen = expanded === run.id
             const prev   = sorted[idx + 1]
-            const netVar = (prev?.status === "COMPLETED" && run.status === "COMPLETED" && run.totalNet && prev.totalNet)
+            const netVar = (prev && hasTotals(prev.status) && hasTotals(run.status) && run.totalNet && prev.totalNet)
               ? Number(run.totalNet) - Number(prev.totalNet) : null
 
             return (
@@ -125,13 +126,13 @@ export default function PayrollTab() {
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
                       <span style={{ fontWeight: 800, fontSize: 16, color: "var(--hf-text)" }}>{run.payRunNumber}</span>
                       <span style={{ background: cfg.bg, color: cfg.color, padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{cfg.label}</span>
-                      <span style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>Tax Year {run.taxYear}/{Number(run.taxYear)+1}</span>
+                      <span style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>Tax year {taxYearName(Number(run.taxYear))}</span>
                     </div>
                     <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>
                       {fmtDate(run.periodStart)} → {fmtDate(run.periodEnd)} · Pay date: {fmtDate(run.payDate)}
                       {run.employeeCount > 0 && ` · ${run.employeeCount} employees`}
                     </div>
-                    {run.status === "COMPLETED" && (
+                    {hasTotals(run.status) && (
                       <div style={{ display: "flex", gap: 14, marginTop: 10, flexWrap: "wrap" }}>
                         {[
                           { l: "Gross",   v: fmtR(run.totalGross), c: "var(--hf-text)" },
@@ -157,13 +158,7 @@ export default function PayrollTab() {
                     )}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, marginLeft: 14 }}>
-                    {run.status === "DRAFT" && (
-                      <button onClick={e => { e.stopPropagation(); processPayRun.mutate(run.id) }} disabled={processPayRun.isPending}
-                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                        <Play size={12} />{processPayRun.isPending ? "Processing..." : "Process"}
-                      </button>
-                    )}
-                    {run.status !== "DRAFT" && (
+                    {hasTotals(run.status) && (
                       <div style={{ textAlign: "right" as const }}>
                         <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-success-text-strong)" }}>{fmtR(run.totalNet)}</div>
                         <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>net pay</div>
@@ -173,16 +168,12 @@ export default function PayrollTab() {
                   </div>
                 </div>
 
-                {run.status === "DRAFT" && (
-                  <div style={{ padding: "8px 20px 12px", background: "var(--hf-warning-soft)", borderTop: "1px solid var(--hf-warning-border)" }}>
-                    <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)", display: "flex", alignItems: "center", gap: 6 }}>
-                      <AlertTriangle size={12} /> Click Process to calculate PAYE, UIF, and SDL for all active employees.
-                    </div>
-                  </div>
-                )}
+                <RunActions run={run} rights={rights} userId={user?.userId} allowSelf={allowSelf}
+                  onCalculated={setWarnings} onError={setError} />
 
                 {isOpen && (
                   <div style={{ borderTop: "1px solid var(--hf-border)", padding: "14px 20px", background: "var(--hf-surface-muted)" }}>
+                    <RunReview run={run} userId={user?.userId} />
                     {(payslips as any[]).length > 0 ? (
                       <div>
                         <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>Payslips ({payslips.length} employees)</div>

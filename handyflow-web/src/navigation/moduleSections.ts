@@ -341,7 +341,7 @@ export const HR_SECTIONS: ModuleSections = {
       label: 'Payroll & compliance',
       sections: [
         { id: 'payroll', label: 'Payroll', icon: DollarSign },
-        { id: 'payroll-checks', label: 'Payroll checks', icon: ShieldCheck, anyPermission: ['PAYROLL_READ', 'PAYROLL_RUN'] },
+        { id: 'payroll-checks', label: 'Payroll checks', icon: ShieldCheck, anyPermission: ['PAYROLL_READ', 'PAYROLL_RUN', 'PAYROLL_PREPARE', 'PAYROLL_APPROVE', 'PAYROLL_FINALISE', 'PAYROLL_CONFIGURATION_ADMIN'] },
         { id: 'compliance', label: 'Compliance', icon: FileText },
       ],
     },
