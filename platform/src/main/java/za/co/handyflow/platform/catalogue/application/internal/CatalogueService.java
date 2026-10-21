@@ -1,170 +1,307 @@
 package za.co.handyflow.platform.catalogue.application.internal;
 
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.catalogue.CatalogueItemSummary;
-import za.co.handyflow.platform.catalogue.domain.model.CatalogueCategory;
-import za.co.handyflow.platform.catalogue.domain.model.CatalogueItem;
+import za.co.handyflow.platform.catalogue.domain.model.*;
+import za.co.handyflow.platform.catalogue.domain.repository.CatalogueAuditEventRepository;
 import za.co.handyflow.platform.catalogue.domain.repository.CatalogueCategoryRepository;
 import za.co.handyflow.platform.catalogue.domain.repository.CatalogueItemRepository;
-import za.co.handyflow.platform.catalogue.dto.CategoryResponse;
-import za.co.handyflow.platform.catalogue.dto.CreateCategoryRequest;
-import za.co.handyflow.platform.catalogue.dto.CreateItemRequest;
+import za.co.handyflow.platform.catalogue.dto.*;
+import za.co.handyflow.platform.shared.ConflictException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.shared.VatRateProvider;
 
 import java.math.BigDecimal;
-import java.util.List;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Locale;
 import java.util.UUID;
 
+/**
+ * Catalogue items and categories. Rules that need no database live in {@link CatalogueRules}.
+ * Every read and write is scoped to the tenant, and every change leaves a line in the history.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class CatalogueService {
 
+    /** Matches no real row; used as "exclude nothing" in duplicate checks. */
+    private static final UUID NO_ID = new UUID(0L, 0L);
+
     private final CatalogueItemRepository itemRepository;
     private final CatalogueCategoryRepository categoryRepository;
-    // FIX (VAT consolidation pass): replaces the two separate hardcoded
-    // new BigDecimal("15.00") fallbacks that used to live independently
-    // in createItem() and updateItem() below (confirmed duplicated
-    // within this one file, not just across the codebase) — see
-    // VatRateProvider's own Javadoc for the fuller "scattered in 4+
-    // places" finding this closes.
+    private final CatalogueAuditEventRepository auditRepository;
     private final VatRateProvider vatRateProvider;
 
+    /** Who is asking and what they may do. Built by the controller from the signed-in user's authorities. */
+    public record Caller(UUID userId, boolean canSeePrices, boolean canWritePrices, boolean canArchive) {}
+
+    /** The filters of the catalogue list. All optional. */
+    public record ItemFilter(String q, UUID categoryId, CatalogueItemStatus status, CatalogueItemType type) {}
+
+    // ── Reads ─────────────────────────────────────────────────────────────────
+
+    /** Pickers (quotes, POS, supply chain): sellable items only. */
     @Transactional(readOnly = true)
-    public List<CatalogueItemSummary> searchItems(TenantId tenantId, String query) {
+    public java.util.List<CatalogueItemSummary> searchItems(TenantId tenantId, String query) {
         var items = (query == null || query.isBlank())
-                ? itemRepository.findAllActive(tenantId)
-                : itemRepository.searchByName(tenantId, query);
-        return items.stream().map(this::toSummary).toList();
+                ? itemRepository.findAllSellable(tenantId)
+                : itemRepository.searchSellable(tenantId, query.trim());
+        return items.stream().map(CatalogueFacadeImpl::toSummary).toList();
     }
 
-    @Transactional
-    public CatalogueItemSummary createItem(TenantId tenantId,
-                                           CreateItemRequest request) {
-        if (itemRepository.existsByTenantIdAndNameAndDeletedAtIsNull(
-                tenantId, request.name())) {
-            throw new IllegalArgumentException(
-                    "An item named '" + request.name() + "' already exists"
-            );
-        }
-
-        CatalogueCategory category = null;
-        if (request.categoryId() != null) {
-            category = categoryRepository
-                    .findActiveById(tenantId, request.categoryId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Category", request.categoryId().toString()
-                    ));
-        }
-
-        BigDecimal vatRate = request.vatRate() != null
-                ? request.vatRate()
-                : vatRateProvider.ratePercent();
-
-        CatalogueItem item = CatalogueItem.create(
-                tenantId, category, request.name(), request.description(),
-                request.unit(), request.defaultPrice(), vatRate
-        );
-
-        itemRepository.save(item);
-        log.info("Created catalogue item={} tenant={}", item.getName(), tenantId);
-        return toSummary(item);
-    }
-
-    @Transactional
-    public void softDeleteItem(TenantId tenantId, UUID itemId) {
-        CatalogueItem item = itemRepository
-                .findActiveById(tenantId, itemId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "CatalogueItem", itemId.toString()
-                ));
-        // WHY null for deletedBy here?
-        // We'll wire the current userId from SecurityContext in a later step
-        // when we add a CurrentUserService. For now null is acceptable.
-        item.softDelete(null);
-        itemRepository.save(item);
+    /** The catalogue list: every live item, paged, filtered and sorted on the server. */
+    @Transactional(readOnly = true)
+    public Page<CatalogueItemResponse> listItems(TenantId tenantId, ItemFilter f, int page, int size, String sort, boolean desc, Caller caller) {
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 200), sortFor(sort, desc));
+        Specification<CatalogueItem> spec = (root, query, cb) -> {
+            var ps = new ArrayList<Predicate>();
+            ps.add(cb.equal(root.get("tenantId"), tenantId));
+            ps.add(cb.isNull(root.get("deletedAt")));
+            if (f.q() != null && !f.q().isBlank()) {
+                String like = "%" + f.q().trim().toLowerCase(Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+                ps.add(cb.or(
+                        cb.like(cb.lower(root.<String>get("name")), like, '\\'),
+                        cb.like(cb.lower(root.<String>get("sku")), like, '\\'),
+                        cb.like(cb.lower(root.<String>get("barcode")), like, '\\'),
+                        cb.like(cb.lower(root.<String>get("brand")), like, '\\')));
+            }
+            if (f.categoryId() != null) ps.add(cb.equal(root.get("category").get("id"), f.categoryId()));
+            if (f.status() != null) ps.add(cb.equal(root.get("status"), f.status()));
+            if (f.type() != null) ps.add(cb.equal(root.get("itemType"), f.type()));
+            return cb.and(ps.toArray(new Predicate[0]));
+        };
+        return itemRepository.findAll(spec, pageable).map(i -> toResponse(i, caller));
     }
 
     @Transactional(readOnly = true)
-    public List<CategoryResponse> getCategories(TenantId tenantId) {
-        return categoryRepository.findAllActive(tenantId)
-                .stream()
-                .map(c -> new CategoryResponse(
-                        c.getId(), c.getName(),
-                        c.getDescription(), c.getSortOrder()
-                ))
+    public CatalogueItemResponse getItem(TenantId tenantId, UUID itemId, Caller caller) {
+        return toResponse(load(tenantId, itemId), caller);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<CatalogueHistoryResponse> history(TenantId tenantId, UUID entityId, int page, int size) {
+        return auditRepository.history(tenantId, entityId, PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100)))
+                .map(e -> new CatalogueHistoryResponse(e.getId(), e.getAction().name(), e.getDetail(), e.getActorId(), e.getCreatedAt()));
+    }
+
+    // ── Item writes ───────────────────────────────────────────────────────────
+
+    @Transactional
+    public CatalogueItemResponse createItem(TenantId tenantId, CreateItemRequest r, Caller caller) {
+        CatalogueItemStatus status = r.status() == null ? CatalogueItemStatus.ACTIVE : r.status();
+        if (status != CatalogueItemStatus.ACTIVE && status != CatalogueItemStatus.DRAFT)
+            throw new IllegalArgumentException("A new item can only start as a draft or active.");
+        if (r.costPrice() != null && !caller.canWritePrices()) throw new AccessDeniedException("You are not allowed to set the cost price.");
+
+        CatalogueCategory category = category(tenantId, r.categoryId());
+        var details = details(r, null, caller);
+        checkDuplicates(tenantId, details, null);
+
+        CatalogueItem item = CatalogueItem.create(tenantId, category, details, status);
+        itemRepository.save(item);
+        audit(tenantId, item, CatalogueAuditAction.CREATED, "Created as " + CatalogueRules.label(status)
+                + (item.getSku() != null ? " (SKU " + item.getSku() + ")" : ""), caller);
+        log.info("Created catalogue item={} tenant={}", item.getName(), tenantId);
+        return toResponse(item, caller);
+    }
+
+    @Transactional
+    public CatalogueItemResponse updateItem(TenantId tenantId, UUID itemId, CreateItemRequest r, Caller caller) {
+        CatalogueItem item = load(tenantId, itemId);
+        checkVersion(item, r.version());
+        if (item.getStatus() == CatalogueItemStatus.ARCHIVED) throw new IllegalArgumentException("An archived item cannot be edited. Restore it to a draft first.");
+        if (r.costPrice() != null && !caller.canWritePrices() && differs(r.costPrice(), item.getCostPrice()))
+            throw new AccessDeniedException("You are not allowed to change the cost price.");
+
+        CatalogueCategory category = category(tenantId, r.categoryId());
+        var details = details(r, item, caller);
+        checkDuplicates(tenantId, details, item.getId());
+
+        var before = item.snapshot();
+        item.update(category, details);
+        var after = item.snapshot();
+        String change = CatalogueRules.describeChanges(before, after);
+        if (!change.isEmpty()) {
+            itemRepository.save(item);
+            audit(tenantId, item, CatalogueRules.priceChanged(before, after) ? CatalogueAuditAction.PRICE_CHANGED : CatalogueAuditAction.UPDATED, change, caller);
+        }
+        log.info("Updated catalogue item={} tenant={}", itemId, tenantId);
+        return toResponse(item, caller);
+    }
+
+    @Transactional
+    public CatalogueItemResponse changeStatus(TenantId tenantId, UUID itemId, ItemStatusRequest r, Caller caller) {
+        CatalogueItem item = load(tenantId, itemId);
+        checkVersion(item, r.version());
+        if (r.status().needsArchivePermission() && !caller.canArchive())
+            throw new AccessDeniedException("You are not allowed to discontinue or archive items.");
+        var from = item.getStatus();
+        String reason = CatalogueRules.checkTransition(from, r.status(), r.reason());
+        if (r.status() == CatalogueItemStatus.ACTIVE && (item.getUnit() == null || item.getDefaultPrice() == null))
+            throw new IllegalArgumentException("The item needs a unit and a price before it can be activated.");
+        item.changeStatus(r.status(), reason);
+        itemRepository.save(item);
+        audit(tenantId, item, CatalogueAuditAction.STATUS_CHANGED,
+                CatalogueRules.label(from) + " -> " + CatalogueRules.label(r.status()) + (reason != null ? ": " + reason : ""), caller);
+        return toResponse(item, caller);
+    }
+
+    @Transactional
+    public void softDeleteItem(TenantId tenantId, UUID itemId, Caller caller) {
+        CatalogueItem item = load(tenantId, itemId);
+        item.softDelete(caller.userId());
+        itemRepository.save(item);
+        audit(tenantId, item, CatalogueAuditAction.DELETED, "Deleted", caller);
+    }
+
+    // ── Categories ────────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public java.util.List<CategoryResponse> getCategories(TenantId tenantId) {
+        return categoryRepository.findAllActive(tenantId).stream()
+                .map(c -> new CategoryResponse(c.getId(), c.getName(), c.getDescription(), c.getSortOrder(),
+                        itemRepository.countLiveInCategory(tenantId, c)))
                 .toList();
     }
 
     @Transactional
-    public CategoryResponse createCategory(TenantId tenantId,
-                                           CreateCategoryRequest request) {
-        CatalogueCategory cat = CatalogueCategory.create(
-                tenantId, request.name(), request.description()
-        );
+    public CategoryResponse createCategory(TenantId tenantId, CreateCategoryRequest r, Caller caller) {
+        String name = categoryName(r.name());
+        if (categoryRepository.nameTaken(tenantId, name, NO_ID)) throw new ConflictException("A category named '" + name + "' already exists.");
+        CatalogueCategory cat = CatalogueCategory.create(tenantId, name, r.description());
         categoryRepository.save(cat);
-        return new CategoryResponse(
-                cat.getId(), cat.getName(),
-                cat.getDescription(), cat.getSortOrder()
-        );
+        audit(tenantId, "CATEGORY", cat.getId(), cat.getName(), CatalogueAuditAction.CREATED, "Created", caller);
+        return new CategoryResponse(cat.getId(), cat.getName(), cat.getDescription(), cat.getSortOrder(), 0L);
     }
 
     @Transactional
-    public CatalogueItemSummary updateItem(TenantId tenantId, UUID itemId, CreateItemRequest request) {
-        CatalogueItem item = itemRepository.findActiveById(tenantId, itemId)
+    public CategoryResponse updateCategory(TenantId tenantId, UUID categoryId, CreateCategoryRequest r, Caller caller) {
+        CatalogueCategory cat = categoryRepository.findActiveById(tenantId, categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Category", categoryId.toString()));
+        String name = categoryName(r.name());
+        if (categoryRepository.nameTaken(tenantId, name, cat.getId())) throw new ConflictException("A category named '" + name + "' already exists.");
+        String old = cat.getName();
+        cat.update(name, r.description());
+        categoryRepository.save(cat);
+        audit(tenantId, "CATEGORY", cat.getId(), cat.getName(), CatalogueAuditAction.UPDATED, old.equals(name) ? "Updated" : "name: " + old + " -> " + name, caller);
+        return new CategoryResponse(cat.getId(), cat.getName(), cat.getDescription(), cat.getSortOrder(), itemRepository.countLiveInCategory(tenantId, cat));
+    }
+
+    /** A category with items in it is not deleted: that used to remove every item silently. */
+    @Transactional
+    public void deleteCategory(TenantId tenantId, UUID categoryId, Caller caller) {
+        CatalogueCategory cat = categoryRepository.findActiveById(tenantId, categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Category", categoryId.toString()));
+        long n = itemRepository.countLiveInCategory(tenantId, cat);
+        if (n > 0) throw new ConflictException("This category still has " + n + (n == 1 ? " item" : " items") + ". Move or delete them first.");
+        cat.softDelete(caller.userId());
+        categoryRepository.save(cat);
+        audit(tenantId, "CATEGORY", cat.getId(), cat.getName(), CatalogueAuditAction.DELETED, "Deleted", caller);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private CatalogueItem load(TenantId tenantId, UUID itemId) {
+        return itemRepository.findActiveById(tenantId, itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("CatalogueItem", itemId.toString()));
-
-        CatalogueCategory category = null;
-        if (request.categoryId() != null) {
-            category = categoryRepository.findActiveById(tenantId, request.categoryId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Category", request.categoryId().toString()));
-        }
-
-        BigDecimal vatRate = request.vatRate() != null ? request.vatRate() : vatRateProvider.ratePercent();
-
-        item.update(request.name(), request.description(), category,
-                request.unit(), request.defaultPrice(), vatRate);
-        itemRepository.save(item);
-        log.info("Updated catalogue item={} tenant={}", itemId, tenantId);
-        return toSummary(item);
     }
 
-    @Transactional
-    public CategoryResponse updateCategory(TenantId tenantId, UUID categoryId, CreateCategoryRequest request) {
-        CatalogueCategory cat = categoryRepository.findActiveById(tenantId, categoryId)
-                .orElseThrow(() -> new ResourceNotFoundException("Category", categoryId.toString()));
-        cat.update(request.name(), request.description());
-        categoryRepository.save(cat);
-        log.info("Updated category={} tenant={}", categoryId, tenantId);
-        return new CategoryResponse(cat.getId(), cat.getName(), cat.getDescription(), cat.getSortOrder());
+    private CatalogueCategory category(TenantId tenantId, UUID id) {
+        if (id == null) return null;
+        return categoryRepository.findActiveById(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category", id.toString()));
     }
 
-    @Transactional
-    public void deleteCategory(TenantId tenantId, UUID categoryId) {
-        CatalogueCategory cat = categoryRepository.findActiveById(tenantId, categoryId)
-                .orElseThrow(() -> new ResourceNotFoundException("Category", categoryId.toString()));
-
-        // Soft delete all items in this category first
-        List<CatalogueItem> items = itemRepository.findAllByCategory(tenantId, cat);
-        items.forEach(item -> item.softDelete(null));
-        itemRepository.saveAll(items);
-
-        // Then soft delete the category itself
-        cat.softDelete(null);
-        categoryRepository.save(cat);
-        log.info("Deleted category={} with {} items tenant={}", categoryId, items.size(), tenantId);
+    private static String categoryName(String raw) {
+        String s = raw == null ? "" : raw.trim();
+        if (s.isEmpty()) throw new IllegalArgumentException("Category name is required.");
+        if (s.length() > 100) throw new IllegalArgumentException("The category name can be at most 100 characters.");
+        return s;
     }
 
-    private CatalogueItemSummary toSummary(CatalogueItem item) {
-        return new CatalogueItemSummary(
-                item.getId(), item.getName(), item.getDescription(),
-                item.getUnit(), item.getDefaultPrice(), item.getVatRate(),
-                item.getCategory() != null ? item.getCategory().getName() : null
-        );
+    private static void checkVersion(CatalogueItem item, Long sent) {
+        if (sent != null && !sent.equals(item.getVersion()))
+            throw new ConflictException("This item was changed by someone else. Reload it and try again.");
+    }
+
+    /** Cleans and checks the request. When the caller may not write prices, the existing cost is kept. */
+    private CatalogueItem.Details details(CreateItemRequest r, CatalogueItem existing, Caller caller) {
+        boolean exempt = Boolean.TRUE.equals(r.vatExempt());
+        BigDecimal vat = r.vatRate() != null ? r.vatRate() : vatRateProvider.ratePercent();
+        BigDecimal cost = caller.canWritePrices() ? CatalogueRules.checkMoney("The cost price", r.costPrice())
+                : existing != null ? existing.getCostPrice() : null;
+        String unit = r.unit() == null ? "" : r.unit().trim();
+        if (unit.isEmpty()) throw new IllegalArgumentException("Unit is required.");
+        return new CatalogueItem.Details(
+                CatalogueRules.normalizeName(r.name()),
+                r.description() == null || r.description().isBlank() ? null : r.description().trim(),
+                CatalogueRules.normalizeSku(r.sku()),
+                CatalogueRules.normalizeBarcode(r.barcode()),
+                CatalogueRules.normalizeBrand(r.brand()),
+                r.itemType() == null ? CatalogueItemType.PRODUCT : r.itemType(),
+                unit,
+                CatalogueRules.checkMoney("The price", r.defaultPrice()),
+                cost,
+                CatalogueRules.effectiveVat(exempt, vat.setScale(2, RoundingMode.HALF_UP)),
+                exempt);
+    }
+
+    private void checkDuplicates(TenantId tenantId, CatalogueItem.Details d, UUID selfId) {
+        UUID exclude = selfId == null ? NO_ID : selfId;
+        if (itemRepository.nameTaken(tenantId, d.name(), exclude)) throw new ConflictException("An item named '" + d.name() + "' already exists.");
+        if (d.sku() != null && itemRepository.skuTaken(tenantId, d.sku(), exclude)) throw new ConflictException("Another item already uses the SKU '" + d.sku() + "'.");
+        if (d.barcode() != null && itemRepository.barcodeTaken(tenantId, d.barcode(), exclude)) throw new ConflictException("Another item already uses the barcode '" + d.barcode() + "'.");
+    }
+
+    private void audit(TenantId tenantId, CatalogueItem item, CatalogueAuditAction action, String detail, Caller caller) {
+        audit(tenantId, "ITEM", item.getId(), item.getName(), action, detail, caller);
+    }
+
+    private void audit(TenantId tenantId, String type, UUID id, String name, CatalogueAuditAction action, String detail, Caller caller) {
+        auditRepository.save(CatalogueAuditEvent.of(tenantId, type, id, name, action, detail, caller.userId()));
+    }
+
+    private static boolean differs(BigDecimal a, BigDecimal b) {
+        return a == null || b == null ? a != b : a.compareTo(b) != 0;
+    }
+
+    private static Sort sortFor(String sort, boolean desc) {
+        String field = switch (sort == null ? "" : sort) {
+            case "sku" -> "sku";
+            case "price" -> "defaultPrice";
+            case "status" -> "status";
+            case "type" -> "itemType";
+            case "updated" -> "updatedAt";
+            default -> "name";
+        };
+        Sort s = desc ? Sort.by(field).descending() : Sort.by(field).ascending();
+        return "name".equals(field) ? s : s.and(Sort.by("name").ascending());
+    }
+
+    static CatalogueItemResponse toResponse(CatalogueItem i, Caller caller) {
+        BigDecimal cost = caller.canSeePrices() ? i.getCostPrice() : null;
+        BigDecimal margin = null;
+        if (cost != null && i.getDefaultPrice() != null && i.getDefaultPrice().signum() > 0)
+            margin = i.getDefaultPrice().subtract(cost).multiply(BigDecimal.valueOf(100)).divide(i.getDefaultPrice(), 1, RoundingMode.HALF_UP);
+        if (!caller.canSeePrices()) margin = null;
+        return new CatalogueItemResponse(i.getId(), i.getName(), i.getDescription(), i.getSku(), i.getBarcode(), i.getBrand(),
+                i.getItemType().name(), i.getStatus().name(), i.getStatusReason(), i.getStatusChangedAt(), i.getUnit(),
+                i.getDefaultPrice(), i.getVatRate(), i.isVatExempt(),
+                i.getCategory() != null ? i.getCategory().getId() : null,
+                i.getCategory() != null ? i.getCategory().getName() : null,
+                cost, margin, i.getVersion(), i.getCreatedAt(), i.getUpdatedAt());
     }
 }

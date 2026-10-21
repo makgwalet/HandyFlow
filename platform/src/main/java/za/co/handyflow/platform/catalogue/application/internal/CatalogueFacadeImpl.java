@@ -18,38 +18,35 @@ import java.util.UUID;
 public class CatalogueFacadeImpl implements CatalogueFacade {
     private final CatalogueItemRepository itemRepository;
 
+    /** New selections only see sellable (ACTIVE) items. */
     @Override
     @Transactional(readOnly = true)
     public List<CatalogueItemSummary> searchItems(TenantId tenantId, String query) {
         List<CatalogueItem> items = (query == null || query.isBlank())
-                ? itemRepository.findAllActive(tenantId)
-                : itemRepository.searchByName(tenantId, query);
-        return items.stream().map(this::toSummary).toList();
+                ? itemRepository.findAllSellable(tenantId)
+                : itemRepository.searchSellable(tenantId, query.trim());
+        return items.stream().map(CatalogueFacadeImpl::toSummary).toList();
     }
 
+    /** By id: any live item, in any status, so documents that already use it keep reading it. */
     @Override
     @Transactional(readOnly = true)
     public Optional<CatalogueItemSummary> findItemById(TenantId tenantId, UUID itemId) {
-        return itemRepository.findActiveById(tenantId, itemId)
-                .map(this::toSummary);
+        return itemRepository.findActiveById(tenantId, itemId).map(CatalogueFacadeImpl::toSummary);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<CatalogueItemSummary> findItemByBarcode(TenantId tenantId, String barcode) {
-        return itemRepository.findByTenantIdAndBarcode(tenantId.getValue(), barcode)
-                .map(this::toSummary);
+        if (barcode == null || barcode.isBlank()) return Optional.empty();
+        return itemRepository.findSellableByBarcode(tenantId, barcode.trim()).map(CatalogueFacadeImpl::toSummary);
     }
 
-    private CatalogueItemSummary toSummary(CatalogueItem item) {
+    static CatalogueItemSummary toSummary(CatalogueItem item) {
         return new CatalogueItemSummary(
-                item.getId(),
-                item.getName(),
-                item.getDescription(),
-                item.getUnit(),
-                item.getDefaultPrice(),
-                item.getVatRate(),
-                item.getCategory() != null ? item.getCategory().getName() : null
-        );
+                item.getId(), item.getName(), item.getDescription(), item.getUnit(),
+                item.getDefaultPrice(), item.getVatRate(),
+                item.getCategory() != null ? item.getCategory().getName() : null,
+                item.getSku(), item.getBarcode(), item.getItemType().name(), item.getStatus().name(), item.isVatExempt());
     }
 }

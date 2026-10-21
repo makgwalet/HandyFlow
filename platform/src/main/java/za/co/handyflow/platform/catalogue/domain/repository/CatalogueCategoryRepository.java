@@ -16,4 +16,7 @@ public interface CatalogueCategoryRepository extends JpaRepository<CatalogueCate
 
     @Query("SELECT c FROM CatalogueCategory c WHERE c.tenantId = :tenantId AND c.id = :id AND c.deletedAt IS NULL")
     Optional<CatalogueCategory> findActiveById(TenantId tenantId, UUID id);
+
+    @Query("SELECT COUNT(c) > 0 FROM CatalogueCategory c WHERE c.tenantId = :tenantId AND c.deletedAt IS NULL AND LOWER(c.name) = LOWER(:name) AND c.id <> :excludeId")
+    boolean nameTaken(TenantId tenantId, String name, UUID excludeId);
 }

@@ -15,6 +15,11 @@ import java.util.UUID;
 @NoArgsConstructor(access = lombok.AccessLevel.PROTECTED)
 public class CatalogueItem {
 
+    /** Everything an edit can change on an item, so create and update take the same shape. */
+    public record Details(String name, String description, String sku, String barcode, String brand,
+                          CatalogueItemType type, String unit, BigDecimal defaultPrice, BigDecimal costPrice,
+                          BigDecimal vatRate, boolean vatExempt) {}
+
     @Id
     private UUID id = UUID.randomUUID();
 
@@ -32,6 +37,26 @@ public class CatalogueItem {
 
     private String description;
 
+    private String sku;
+
+    private String barcode;
+
+    private String brand;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "item_type", nullable = false, length = 20)
+    private CatalogueItemType itemType = CatalogueItemType.PRODUCT;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private CatalogueItemStatus status = CatalogueItemStatus.ACTIVE;
+
+    @Column(name = "status_reason")
+    private String statusReason;
+
+    @Column(name = "status_changed_at")
+    private Instant statusChangedAt;
+
     @Column(nullable = false)
     private String unit;
 
@@ -39,9 +64,15 @@ public class CatalogueItem {
             precision = 15, scale = 2)
     private BigDecimal defaultPrice;
 
+    @Column(name = "cost_price", precision = 15, scale = 2)
+    private BigDecimal costPrice;
+
     @Column(name = "vat_rate", nullable = false,
             precision = 5, scale = 2)
     private BigDecimal vatRate;
+
+    @Column(name = "vat_exempt", nullable = false)
+    private boolean vatExempt;
 
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
@@ -61,72 +92,64 @@ public class CatalogueItem {
     @Version
     private Long version;
 
-    public static CatalogueItem create(TenantId tenantId,
-                                       CatalogueCategory category,
-                                       String name,
-                                       String description,
-                                       String unit,
-                                       BigDecimal defaultPrice,
-                                       BigDecimal vatRate) {
+    /** New items start ACTIVE unless a draft is asked for. The service resolves the VAT rate before calling. */
+    public static CatalogueItem create(TenantId tenantId, CatalogueCategory category, Details d, CatalogueItemStatus status) {
         CatalogueItem item = new CatalogueItem();
         item.tenantId = tenantId;
         item.category = category;
-        item.name = name.trim();
-        item.description = description;
-        item.unit = unit;
-        item.defaultPrice = defaultPrice;
-        // FIX (VAT consolidation pass): CatalogueService.createItem() —
-        // this factory's only real caller, confirmed by search — now
-        // always resolves a concrete default via VatRateProvider before
-        // calling here, so this fallback is no longer reachable through
-        // the actual application flow. Left in place, not deleted or
-        // wired to VatRateProvider itself: a domain entity's static
-        // factory shouldn't reach into Spring-managed config (matches
-        // this codebase's own convention of keeping entities free of
-        // framework dependencies), and this remains a reasonable,
-        // harmless defensive default for any future direct caller that
-        // doesn't resolve one first.
-        item.vatRate = vatRate != null ? vatRate : new BigDecimal("15.00");
-        item.active = true;
+        item.apply(d);
+        item.status = status == null ? CatalogueItemStatus.ACTIVE : status;
+        item.active = item.status.sellable();
         item.createdAt = Instant.now();
-        item.updatedAt = Instant.now();
+        item.updatedAt = item.createdAt;
         return item;
-
     }
 
-    public void update(String name, String description, String unit,
-                       BigDecimal defaultPrice, BigDecimal vatRate,
-                       CatalogueCategory category) {
-        this.name = name.trim();
-        this.description = description;
-        this.unit = unit;
-        this.defaultPrice = defaultPrice;
-        this.vatRate = vatRate;
+    public void update(CatalogueCategory category, Details d) {
         this.category = category;
+        apply(d);
         this.updatedAt = Instant.now();
+    }
+
+    private void apply(Details d) {
+        this.name = d.name();
+        this.description = d.description();
+        this.sku = d.sku();
+        this.barcode = d.barcode();
+        this.brand = d.brand();
+        this.itemType = d.type() == null ? CatalogueItemType.PRODUCT : d.type();
+        this.unit = d.unit();
+        this.defaultPrice = d.defaultPrice();
+        this.costPrice = d.costPrice();
+        this.vatExempt = d.vatExempt();
+        this.vatRate = d.vatExempt() ? new BigDecimal("0.00") : d.vatRate();
+    }
+
+    /** Moves the item through its lifecycle. The caller has already checked the move with CatalogueRules. */
+    public void changeStatus(CatalogueItemStatus to, String reason) {
+        this.status = to;
+        this.statusReason = reason;
+        this.statusChangedAt = Instant.now();
+        this.active = to.sellable();
+        this.updatedAt = this.statusChangedAt;
     }
 
     public void softDelete(UUID deletedByUserId) {
         this.deletedAt = Instant.now();
         this.deletedBy = deletedByUserId;
+        this.status = CatalogueItemStatus.ARCHIVED;
+        this.statusChangedAt = this.deletedAt;
         this.active = false;
-        this.updatedAt = Instant.now();
-    }
-
-    public void update(String name, String description, CatalogueCategory category,
-                       String unit, BigDecimal defaultPrice, BigDecimal vatRate) {
-        this.name = name;
-        this.description = description;
-        this.category = category;
-        this.unit = unit;
-        this.defaultPrice = defaultPrice;
-        this.vatRate = vatRate;
+        this.updatedAt = this.deletedAt;
     }
 
     public boolean isDeleted() { return deletedAt != null; }
 
+    public CatalogueRules.Snapshot snapshot() {
+        return new CatalogueRules.Snapshot(name, description, sku, barcode, brand, itemType.name(), unit,
+                category == null ? null : category.getName(), defaultPrice, costPrice, vatRate, vatExempt);
+    }
+
     @PreUpdate
     void onUpdate() { this.updatedAt = Instant.now(); }
-
-
 }

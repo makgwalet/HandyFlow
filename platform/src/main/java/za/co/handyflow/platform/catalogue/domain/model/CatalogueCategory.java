@@ -77,7 +77,8 @@ public class CatalogueCategory {
     @PreUpdate
     void onUpdate() { this.updatedAt = Instant.now(); }
     public void update(String name, String description) {
-        this.name = name;
+        this.name = name.trim();
         this.description = description;
+        this.updatedAt = Instant.now();
     }
 }
