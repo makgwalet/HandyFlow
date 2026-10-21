@@ -25,6 +25,8 @@ import { StageSelector }      from './StageSelector'
 import { FollowUpPanel }      from './FollowUpPanel'
 import { ContactsPanel }      from './ContactsPanel'
 import { CommunicationPanel } from './CommunicationPanel'
+import OpportunitiesPanel from './OpportunitiesPanel'
+import { CompanyGroupPanel } from './CompanyGroupPanel'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Predefined tag catalogue
@@ -895,7 +897,7 @@ function ViewModal({ customer: c, customFields, onClose, onEdit, onTimeline, onA
   const trapRef   = useFocusTrap(true)
   const statusCfg = STATUS_CONFIG[c.status]
   const typeCfg   = TYPE_CONFIG[c.customerType]
-  const [activeTab, setActiveTab] = useState<'overview' | 'contacts' | 'followups' | 'communications' | 'consent'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'contacts' | 'opportunities' | 'group' | 'followups' | 'communications' | 'consent'>('overview')
 
   const downloadProfilePdf = async (id: string, name: string) => {
     try {
@@ -974,6 +976,8 @@ function ViewModal({ customer: c, customFields, onClose, onEdit, onTimeline, onA
           {([
             { key: 'overview', label: 'Overview' },
             { key: 'contacts', label: 'Contacts' },
+            { key: 'opportunities', label: 'Opportunities' },
+            { key: 'group', label: 'Group' },
             { key: 'followups', label: 'Follow-ups' },
             { key: 'communications', label: 'Communications' },
             { key: 'consent', label: 'Consent' },
@@ -1040,6 +1044,8 @@ function ViewModal({ customer: c, customFields, onClose, onEdit, onTimeline, onA
         )}
 
         {activeTab === 'contacts' && <ContactsPanel customerId={c.id} />}
+        {activeTab === 'opportunities' && <OpportunitiesPanel customerId={c.id} />}
+        {activeTab === 'group' && <CompanyGroupPanel customerId={c.id} />}
         {activeTab === 'followups' && <FollowUpPanel customerId={c.id} />}
         {activeTab === 'communications' && <CommunicationPanel customerId={c.id} />}
         {activeTab === 'consent' && <ConsentPanel customerId={c.id} />}
