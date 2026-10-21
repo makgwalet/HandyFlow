@@ -41,6 +41,11 @@ describe("TeamPanel", () => {
     get.mockImplementation((url: string) => Promise.resolve({ data: { data: url.includes("identity") ? { content: [{ id: "other", firstName: "Olive", lastName: "Other" }] } : url.includes("/targets") ? targetRows : url.includes("/tasks") ? { tasks, truncated: false } : leads } })); mk()
     const t = await screen.findByLabelText("Team performance"); expect(within(t).getByLabelText("You").textContent).toContain("66.7%"); expect(await within(t).findByLabelText("Olive Other")).toBeTruthy(); expect(within(t).getByLabelText("Unassigned")).toBeTruthy()
   })
+  it("does not break when the task queue has already cached its own list shape", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } }); qc.setQueryData(["crm", "pipeline"], leads); qc.setQueryData(["crm", "tasks", "open"], { tasks, truncated: false })
+    get.mockImplementation((url: string) => Promise.resolve({ data: { data: url.includes("identity") ? { content: [] } : url.includes("/targets") ? [] : url.includes("/tasks") ? { tasks, truncated: false } : leads } }))
+    render(<QueryClientProvider client={qc}><TeamPanel /></QueryClientProvider>); expect(await screen.findByLabelText("Team performance")).toBeTruthy()
+  })
   it("still works when the user list cannot be loaded", async () => {
     get.mockImplementation((url: string) => (url.includes("identity") ? Promise.reject(new Error("no")) : Promise.resolve({ data: { data: url.includes("/targets") ? [] : url.includes("/tasks") ? { tasks, truncated: false } : leads } }))); mk()
     expect(await screen.findByLabelText("Colleague")).toBeTruthy()

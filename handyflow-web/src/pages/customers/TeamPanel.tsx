@@ -21,7 +21,8 @@ export default function TeamPanel() {
   const qc = useQueryClient(), canEdit = usePermission("CUSTOMER_UPDATE"), me = useAuthStore(s => s.user?.userId ?? null), today = localToday()
   const [month, setMonth] = useState(monthOfDate(today)), [editing, setEditing] = useState<string | null>(null), [text, setText] = useState(""), [error, setError] = useState<string | null>(null)
   const leads = useQuery<PipelineLead[]>({ queryKey: ["crm", "pipeline"], queryFn: async () => list<PipelineLead>(await apiClient.get("/api/v1/crm/customers/pipeline")) })
-  const tasks = useQuery<Task[]>({ queryKey: ["crm", "tasks", "open"], queryFn: async () => list<Task>(await apiClient.get("/api/v1/crm/tasks", { params: { done: false } }), "tasks") })
+  // Own key: the task queue caches the same URL as { tasks, truncated } under ["crm", "tasks", "open"], and sharing it crashed this tab.
+  const tasks = useQuery<Task[]>({ queryKey: ["crm", "tasks", "team-open"], queryFn: async () => list<Task>(await apiClient.get("/api/v1/crm/tasks", { params: { done: false } }), "tasks") })
   const targets = useQuery<TargetRow[]>({ queryKey: ["crm", "targets", month], retry: false, queryFn: async () => list<TargetRow>(await apiClient.get("/api/v1/crm/targets", { params: { period: month } })) })
   const users = useQuery<UserRow[]>({ queryKey: ["crm", "task-users"], retry: false, queryFn: async () => { const d = inner(await apiClient.get("/api/v1/identity/users", { params: { size: 200 } })) as { content?: UserRow[] } | UserRow[] | null; return Array.isArray(d) ? d : d?.content ?? [] } })
   const refresh = () => { setError(null); setEditing(null); qc.invalidateQueries({ queryKey: ["crm", "targets"] }) }
