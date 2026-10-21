@@ -75,6 +75,10 @@ public enum NotificationType {
     // a daily digest to managers, not an emergency.
     CRM_TASK_ESCALATED(WARNING, Set.of(IN_APP, EMAIL)),
 
+    // A message written into a CRM workflow, and the scheduled CRM report digests.
+    CRM_WORKFLOW_MESSAGE(INFO, Set.of(IN_APP, EMAIL)),
+    CRM_REPORT_DIGEST(INFO, Set.of(IN_APP, EMAIL)),
+
     // ── Existing ─────────────────────────────────────────────────────────────
     INCIDENT_REPORTED(WARNING, Set.of(IN_APP, EMAIL)),
 

@@ -74,6 +74,7 @@ public class CustomerService {
     private final UserRecipientResolver         userRecipientResolver;
     private final CustomFieldService            customFieldService;
     private final LeadRoutingService            routingService;
+    private final WorkflowService               workflowService;
 
     // ══════════════════════════════════════════════════════════════════════
     // READ operations
@@ -229,6 +230,7 @@ public class CustomerService {
         if (customer.getCustomerType() == CustomerType.LEAD) {
             routingService.routeNewLead(tenantId, customer);   // only acts when nobody owns the lead (import, web form)
             notifyNewLead(tenantId, customer);
+            workflowService.fire(tenantId, za.co.handyflow.platform.crm.domain.model.WorkflowTrigger.LEAD_CREATED, customer, null);
         }
 
         return toResponse(customer);
@@ -451,7 +453,9 @@ public class CustomerService {
     public StageResponse changeStage(TenantId tenantId, UUID id, LeadStage newStage,
                                      za.co.handyflow.platform.crm.domain.model.LostReason lostReason, String lostNote) {
         var customer = requireActive(tenantId, id);
+        var before = customer.getPipelineStage();
         customer.changeStage(newStage, currentUserId(), lostReason, lostNote);
+        if (before != newStage) workflowService.fire(tenantId, za.co.handyflow.platform.crm.domain.model.WorkflowTrigger.STAGE_CHANGED, customer, newStage);
         return toStageResponse(customer);
     }
 
