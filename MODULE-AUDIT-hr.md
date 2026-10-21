@@ -169,3 +169,56 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - Corrections to a finalised run (an approved adjustment or reversal) are not built. Today a finalised run is simply locked.
 - The payroll bureau product has its own pay run, calculator and permissions and was not touched.
 - Maker/checker for changing an employee's salary or bank details belongs with Slice 3 (employee master and security).
+
+## 9. Slice 3 status: employee master and security
+
+**What was wrong**
+
+- Editing an employee overwrote salary, allowances and bank details in place, by anyone with `HR_MANAGE` or `USER_UPDATE`, with no trace.
+- Anyone who could read the staff list saw ID numbers, salaries and tax numbers.
+- The termination reason was accepted and thrown away. A future "last day" took the person off payroll before final pay.
+- Managers could never be set, so the org chart was always flat. No staff login was linked to an employee.
+- No server-side check of ID numbers (the screen had one), duplicates, bank accounts, email or phone.
+
+**What changed (V487 and the HR code)**
+
+- **Three levels of view.** Working details (name, job, contact, manager) for anyone who can read employees. Personal data (ID, tax number, date of birth, gender, race, emergency contact) needs `HR_SENSITIVE_READ`. Pay (salary, allowances, masked bank account) needs `HR_COMPENSATION_READ`. Redaction happens in a new view service; `HrService.getEmployee` and `EmployeeResponse`, used by 17 other modules, are unchanged.
+- **Pay and bank changes are requests.** `HR_COMPENSATION_MANAGE` asks (new values, effective date, reason). Someone else with `HR_COMPENSATION_APPROVE` decides, unless the business turned on self-approval in the payroll settings (then it is recorded as self-approved). One open request per employee and kind. The employee row changes only when the change is approved and its date has come; payroll applies due changes just before it calculates. A calculated run that predates an applied change gets a warning in its review.
+- **Editing no longer touches pay or bank.** The old full update path (also used by `HrFacade`) now changes working details only.
+- **Manager scope.** `HR_TEAM_READ` shows a manager their own team (the people below them in the reporting line), working details only. It needs the employee linked to their login. It is granted to nobody by the migration.
+- **Checks on the way in.** SA ID (13 digits, valid date, Luhn), date of birth against the ID, minimum age 15, tax number (10 digits), email, phone, bank account (4 to 17 digits) and branch (6 digits), duplicate ID number.
+- **Termination** needs a last day that has come (not before the start) and a reason of at most 200 characters, and records who did it and when.
+- **Reporting lines.** Set or remove a manager; a person cannot report to themselves or to their own team. Link or unlink a staff login; one login to one employee.
+- **Audit.** Per employee: created, edited (field names only), terminated, manager and login changes, every pay or bank request and decision, and views of personal data or pay (at most one per person per hour). Values are never stored in the trail.
+- **Screens.** Employees tab hides what the person may not see, says "Restricted" instead of showing a blank, and offers only the buttons they may use. New: request pay change, request bank change, pay and bank changes waiting (with approve, reject, cancel), history, manager and login, termination with reason.
+
+**Permissions migration (V487)**
+
+- `HR_MANAGE` holders get `HR_SENSITIVE_READ`, `HR_COMPENSATION_READ` and `HR_COMPENSATION_MANAGE`. They are not given approve.
+- Payroll roles (`PAYROLL_RUN`, `PAYROLL_PREPARE`, `PAYROLL_APPROVE`) get `HR_COMPENSATION_READ` so the pay run screens keep working.
+- The `ADMIN` role gets `HR_COMPENSATION_APPROVE` so there is always an approver. My choice, as with payroll approval; remove it if someone else should decide.
+- Roles with only `HR_READ` (or `USER_READ`) lose sight of ID numbers and salaries. They are listed in `hr_employee_access_review`, and in `GET /hr/employees/access-review`, with `needs_review` set.
+
+**Decisions I took that you may want to change**
+
+- A termination cannot be recorded for a future last day. The cost is that notice periods cannot be diarised here; the benefit is that nobody drops off payroll before their final pay.
+- Portal access of a terminated employee is left as it is, so they can still reach payslips and IRP5s. If you want it revoked at termination, say so.
+- The audit trail records views of personal data and pay. That is a privacy choice (POPIA accountability); the trail is readable only by `HR_MANAGE`, `HR_SENSITIVE_READ` and `HR_COMPENSATION_APPROVE`.
+- Creating an employee still takes pay and bank details directly (the starting figures), validated. Only changes after creation need approval.
+
+**Not verified**
+
+- Maven build and every Mockito test: `EmployeeChangeServiceTest`, `EmployeeViewServiceTest`, `HrServiceEmployeeTest`, the changed `HrControllerTest`, `PayrollServiceTest` and `PayrollControlServiceTest`. The JPQL (`countByIdNumber`, `findByUserId`, `findNotTerminated`, `due`, `appliedSince`, `countSince`), the `jsonb` mapping on `HrEmployeeChange`, and migration V487 have not been run.
+- Run and passing in a standalone harness: `EmployeeRulesTest` (11), `EmployeeChangeRulesTest` (12), `OrgRulesTest` (7), `HrAccessTest` (6).
+- Front end: 22 new tests in `Employees.test.tsx` pass; ESLint reports nothing new in the changed files (the 18 it reports in `EmployeesTab.tsx` were there before). Not looked at in a browser.
+- **Correction to section 8.** The type-check I reported for Slice 2 ran `tsc -p .`, which checks nothing in this repository (the root `tsconfig.json` has `"files": []`). The real check is `tsc -p tsconfig.app.json`. Run properly now, it shows no errors in the Slice 1, 2 or 3 files, and many existing errors elsewhere in the repository.
+- Also found and fixed in this slice: `HrControllerTest` from Slice 2 was missing the import of `PayrollControlService`, so it would not have compiled.
+
+**Open items**
+
+- Other modules that return `EmployeeResponse` through their own endpoints (agriculture, training, expenses, legal practice, recruiter, security guard link and others) still expose ID number, tax number and salary to whoever can call those endpoints. Each needs its own look.
+- Organisation units, positions and cost centres are not modelled; "department" is still free text from a fixed list.
+- Final pay on termination (leave payout, notice pay, pro-rata) is not built.
+- Pay history is the change record from now on. Salaries before this slice cannot be reconstructed.
+- Suspended and on-leave employees are still left out of payroll (only `ACTIVE` is paid) and there is no screen to reach those statuses.
+- `HR_READ` still opens the payslip lists. Whether HR staff should see salaries through payslips is your decision.

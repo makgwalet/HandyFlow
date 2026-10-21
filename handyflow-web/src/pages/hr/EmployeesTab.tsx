@@ -10,7 +10,10 @@ import { useState } from "react"
 import MedicalSchemeModal from "./MedicalSchemeModal"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, X, Search, Users, ChevronRight, AlertTriangle, AlertCircle, Edit2, UserX, CheckCircle } from "lucide-react"
+import { useAuth } from "../../hooks/useAuth"
+import { employeeRights, terminationProblem, today } from "./employees.logic"
+import { ApprovalsModal, HistoryModal, ReportingModal, RequestChangeModal } from "./EmployeeChanges"
+import { Plus, X, Search, Users, AlertTriangle, AlertCircle, Edit2, UserX } from "lucide-react"
 
 interface Employee {
   id: string; employeeNumber: string; firstName: string; lastName: string; fullName: string
@@ -18,9 +21,13 @@ interface Employee {
   gender: string | null; race: string | null; email: string | null; phone: string | null
   employmentType: string; jobTitle: string | null; department: string | null
   startDate: string; endDate: string | null; status: string
-  grossSalary: number; payFrequency: string
-  medicalAidContribution: number; pensionContribution: number; travelAllowance: number
-  emergencyContactName: string | null; emergencyContactPhone: string | null; notes: string | null
+  // Personal data and pay are null when the caller may not see them; these flags say which it is.
+  canSeeSensitive: boolean; canSeeCompensation: boolean
+  grossSalary: number | null; payFrequency: string | null
+  medicalAidContribution: number | null; pensionContribution: number | null; travelAllowance: number | null
+  bankName: string | null; bankAccountMasked: string | null; bankBranchCode: string | null
+  emergencyContactName: string | null; emergencyContactPhone: string | null; notes?: string | null
+  managerId: string | null; managerName: string | null; userId: string | null; terminationReason: string | null
 }
 
 // Correct ApiResponse unwrap — handles both wrapped and bare responses
@@ -83,6 +90,13 @@ export default function EmployeesTab() {
   const [terminating, setTerminating] = useState<Employee | null>(null)
   const [medicalFor, setMedicalFor] = useState<Employee | null>(null)
   const [endDate, setEndDate]       = useState("")
+  const [reason, setReason]         = useState("")
+  const { user } = useAuth() as { user?: { permissions?: string[] } }
+  const rights = employeeRights(user?.permissions ?? [])
+  const [changeFor, setChangeFor]   = useState<{ kind: "pay" | "bank"; emp: Employee } | null>(null)
+  const [historyFor, setHistoryFor] = useState<Employee | null>(null)
+  const [reportingFor, setReportingFor] = useState<Employee | null>(null)
+  const [showApprovals, setShowApprovals] = useState(false)
   const [form, setForm]             = useState(EMPTY_FORM)
   const [error, setError]           = useState("")
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -99,6 +113,12 @@ export default function EmployeesTab() {
     },
   })
 
+  const showPay = rights.compensation
+  const { data: waiting = [] } = useQuery<unknown[]>({
+    queryKey: ["hr-employee-changes", "pending"], enabled: showPay,
+    queryFn: async () => unwrapList(await apiClient.get("/api/v1/hr/employee-changes/pending")),
+  })
+
   const createEmployee = useMutation({
     mutationFn: (body: any) => apiClient.post("/api/v1/hr/employees", body),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["hr-employees"] }); setShowCreate(false); setForm(EMPTY_FORM); setError(""); setIdState({ valid: null, msg: "" }) },
@@ -112,9 +132,9 @@ export default function EmployeesTab() {
   })
 
   const terminateEmployee = useMutation({
-    mutationFn: ({ id, date }: { id: string; date: string }) =>
-      apiClient.post(`/api/v1/hr/employees/${id}/terminate?endDate=${date}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["hr-employees"] }); setTerminating(null); setSelected(null); setEndDate(""); setError("") },
+    mutationFn: ({ id, date, why }: { id: string; date: string; why: string }) =>
+      apiClient.post(`/api/v1/hr/employees/${id}/terminate?endDate=${date}&reason=${encodeURIComponent(why.trim())}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["hr-employees"] }); setTerminating(null); setSelected(null); setEndDate(""); setReason(""); setError("") },
     onError: (e: any) => setError(e.response?.data?.message ?? "Failed to terminate employee"),
   })
 
@@ -158,6 +178,17 @@ export default function EmployeesTab() {
     notes: f.notes || null,
   })
 
+  // Editing sends working details only. Pay and bank details change through a request that someone else approves.
+  const toEditBody = (f: typeof EMPTY_FORM, withPersonal: boolean) => ({
+    email: f.email || "", phone: f.phone || "", employmentType: f.employmentType,
+    jobTitle: f.jobTitle || "", department: f.department || "",
+    ...(withPersonal ? {
+      idNumber: f.idNumber || "", taxNumber: f.taxNumber || "", dateOfBirth: f.dateOfBirth || null,
+      gender: f.gender || "", race: f.race || "",
+      emergencyContactName: f.emergencyContactName || "", emergencyContactPhone: f.emergencyContactPhone || "",
+    } : {}),
+  })
+
   const openEdit = (emp: Employee) => {
     setEditing(emp)
     setForm({
@@ -166,7 +197,7 @@ export default function EmployeesTab() {
       race: emp.race ?? "", email: emp.email ?? "", phone: emp.phone ?? "",
       startDate: emp.startDate, employmentType: emp.employmentType,
       jobTitle: emp.jobTitle ?? "", department: emp.department ?? "",
-      grossSalary: String(emp.grossSalary), payFrequency: emp.payFrequency,
+      grossSalary: String(emp.grossSalary ?? ""), payFrequency: emp.payFrequency ?? "MONTHLY",
       bankName: "", bankAccountNumber: "", bankBranchCode: "",
       medicalAidContribution: String(emp.medicalAidContribution ?? 0),
       pensionContribution:    String(emp.pensionContribution ?? 0),
@@ -204,12 +235,15 @@ export default function EmployeesTab() {
     ? <div style={{ fontSize: 12, color: "var(--hf-danger-text)", marginTop: 3, display: "flex", alignItems: "center", gap: 3 }}><AlertCircle size={11} />{fieldErrors[k]}</div>
     : null
 
+  const isEdit = !!editing
+  const personal = !isEdit || rights.sensitive
   const EmployeeForm = () => (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <Sect title="Personal Details">
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <div><label style={lbl}>First Name *</label><input autoFocus value={form.firstName} onChange={e => { setForm(f => ({ ...f, firstName: e.target.value })); setFieldErrors(f => omit(f,"firstName")) }} style={inp("firstName")} /><FErr k="firstName" /></div>
-          <div><label style={lbl}>Last Name *</label><input value={form.lastName} onChange={e => { setForm(f => ({ ...f, lastName: e.target.value })); setFieldErrors(f => omit(f,"lastName")) }} style={inp("lastName")} /><FErr k="lastName" /></div>
+          <div><label style={lbl}>First Name *</label><input autoFocus={!isEdit} readOnly={isEdit} value={form.firstName} onChange={e => { setForm(f => ({ ...f, firstName: e.target.value })); setFieldErrors(f => omit(f,"firstName")) }} style={inp("firstName")} /><FErr k="firstName" /></div>
+          <div><label style={lbl}>Last Name *</label><input readOnly={isEdit} value={form.lastName} onChange={e => { setForm(f => ({ ...f, lastName: e.target.value })); setFieldErrors(f => omit(f,"lastName")) }} style={inp("lastName")} /><FErr k="lastName" /></div>
+          {personal && <>
           <div>
             <label style={lbl}>SA ID Number</label>
             <input value={form.idNumber} onChange={e => handleIdChange(e.target.value)} placeholder="13 digits"
@@ -236,6 +270,7 @@ export default function EmployeesTab() {
             </select>
             <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 2 }}>Required for Employment Equity</div>
           </div>
+          </>}
           <div><label style={lbl}>Email</label><input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="employee@co.za" style={inp("email")} /></div>
           <div><label style={lbl}>Phone</label><input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+27 82 555 1234" style={inp("phone")} /></div>
         </div>
@@ -250,6 +285,12 @@ export default function EmployeesTab() {
         </div>
       </Sect>
 
+      {isEdit && (
+        <div style={{ padding: "10px 14px", background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-info-text)" }}>
+          Salary, allowances and bank details are not edited here. Use "Request pay change" or "Request bank change" on the employee, so a second person approves them.
+        </div>
+      )}
+      {!isEdit && <>
       <Sect title="Payroll & Deductions">
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <div>
@@ -291,6 +332,9 @@ export default function EmployeesTab() {
         </div>
       </Sect>
 
+      </>}
+
+      {personal && (
       <Sect title="Emergency Contact">
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <div><label style={lbl}>Name</label><input value={form.emergencyContactName} onChange={e => setForm(f => ({ ...f, emergencyContactName: e.target.value }))} placeholder="Maria Dlamini" style={inp("emergencyContactName")} /></div>
@@ -298,7 +342,9 @@ export default function EmployeesTab() {
         </div>
       </Sect>
 
-      <div><label style={lbl}>Notes</label><textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Probation period, special arrangements..." style={{ ...inp("notes"), resize: "vertical" as const }} /></div>
+      )}
+
+      {!isEdit && <div><label style={lbl}>Notes</label><textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Probation period, special arrangements..." style={{ ...inp("notes"), resize: "vertical" as const }} /></div>}
     </div>
   )
 
@@ -329,10 +375,18 @@ export default function EmployeesTab() {
               style={{ paddingLeft: 32, padding: "8px 12px 8px 32px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none", width: 220 }} />
           </div>
         </div>
-        <button onClick={() => { setShowCreate(true); setForm(EMPTY_FORM); setFieldErrors({}); setError(""); setIdState({ valid: null, msg: "" }) }}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        {showPay && (
+          <button onClick={() => setShowApprovals(true)}
+            style={{ padding: "9px 14px", background: (waiting as unknown[]).length ? "var(--hf-warning-soft)" : "var(--hf-surface)", color: (waiting as unknown[]).length ? "var(--hf-warning-text)" : "var(--hf-text-secondary)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            Pay & bank changes{(waiting as unknown[]).length ? ` (${(waiting as unknown[]).length} waiting)` : ""}
+          </button>
+        )}
+        {rights.manage && <button onClick={() => { setShowCreate(true); setForm(EMPTY_FORM); setFieldErrors({}); setError(""); setIdState({ valid: null, msg: "" }) }}
           style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Add Employee
-        </button>
+        </button>}
+        </div>
       </div>
 
       {isLoading ? (
@@ -347,7 +401,7 @@ export default function EmployeesTab() {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "var(--hf-surface-muted)" }}>
-                {["Employee","Job Title","Department","Type","Gross Salary","Status",""].map(h => (
+                {["Employee","Job Title","Department","Type",...(showPay ? ["Gross Salary"] : []),"Status",""].map(h => (
                   <th key={h} style={{ padding: "10px 16px", textAlign: "left" as const, fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", letterSpacing: "0.05em", borderBottom: "1px solid var(--hf-border)" }}>{h}</th>
                 ))}
               </tr>
@@ -371,14 +425,14 @@ export default function EmployeesTab() {
                     <td style={{ padding: "12px 16px", fontSize: 13, color: "var(--hf-text-tertiary)", borderBottom: "1px solid var(--hf-border-subtle)" }}>{emp.jobTitle || "—"}</td>
                     <td style={{ padding: "12px 16px", fontSize: 13, color: "var(--hf-text-tertiary)", borderBottom: "1px solid var(--hf-border-subtle)" }}>{emp.department || "—"}</td>
                     <td style={{ padding: "12px 16px", fontSize: 12, color: "var(--hf-text-muted)", borderBottom: "1px solid var(--hf-border-subtle)" }}>{emp.employmentType}</td>
-                    <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "var(--hf-text)", borderBottom: "1px solid var(--hf-border-subtle)" }}>{fmtR(emp.grossSalary)}</td>
+                    {showPay && <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "var(--hf-text)", borderBottom: "1px solid var(--hf-border-subtle)" }}>{fmtR(emp.grossSalary)}</td>}
                     <td style={{ padding: "12px 16px", borderBottom: "1px solid var(--hf-border-subtle)" }}>
                       <span style={{ background: cfg.bg, color: cfg.color, padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{cfg.label}</span>
                     </td>
                     <td style={{ padding: "12px 16px", borderBottom: "1px solid var(--hf-border-subtle)" }}>
                       <div style={{ display: "flex", gap: 5 }}>
-                        <button onClick={e => { e.stopPropagation(); openEdit(emp) }} style={{ background: "var(--hf-info-soft)", border: "none", borderRadius: 6, padding: "5px 7px", cursor: "pointer", color: "var(--hf-info-text)" }}><Edit2 size={12} /></button>
-                        {emp.status === "ACTIVE" && <button onClick={e => { e.stopPropagation(); setTerminating(emp); setEndDate(""); setError("") }} style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "5px 7px", cursor: "pointer", color: "var(--hf-danger-text)" }}><UserX size={12} /></button>}
+                        {rights.manage && <button aria-label={`Edit ${emp.fullName}`} onClick={e => { e.stopPropagation(); openEdit(emp) }} style={{ background: "var(--hf-info-soft)", border: "none", borderRadius: 6, padding: "5px 7px", cursor: "pointer", color: "var(--hf-info-text)" }}><Edit2 size={12} /></button>}
+                        {rights.manage && emp.status === "ACTIVE" && <button aria-label={`Terminate ${emp.fullName}`} onClick={e => { e.stopPropagation(); setTerminating(emp); setEndDate(""); setReason(""); setError("") }} style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "5px 7px", cursor: "pointer", color: "var(--hf-danger-text)" }}><UserX size={12} /></button>}
                       </div>
                     </td>
                   </tr>
@@ -408,17 +462,26 @@ export default function EmployeesTab() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
               {[
                 { l: "Employment Type", v: selected.employmentType },
-                { l: "Gross Salary",    v: fmtR(selected.grossSalary) },
                 { l: "Start Date",      v: fmtDate(selected.startDate) },
-                { l: "Pay Frequency",   v: selected.payFrequency },
                 { l: "Email",           v: selected.email || "—" },
                 { l: "Phone",           v: selected.phone || "—" },
-                { l: "SA ID",           v: selected.idNumber || "—" },
-                { l: "Tax Number",      v: selected.taxNumber || "—" },
-                { l: "Travel Allow.",   v: fmtR(selected.travelAllowance) },
-                { l: "Medical Aid",     v: fmtR(selected.medicalAidContribution) },
-                { l: "Pension",         v: fmtR(selected.pensionContribution) },
-                { l: "Emergency",       v: selected.emergencyContactName ? `${selected.emergencyContactName} · ${selected.emergencyContactPhone}` : "—" },
+                { l: "Reports to",      v: selected.managerName || "—" },
+                { l: "Staff login",     v: selected.userId ? "Linked" : "Not linked" },
+                ...(selected.status === "TERMINATED" ? [{ l: "Last day", v: fmtDate(selected.endDate) }, { l: "Reason", v: selected.terminationReason || (selected.canSeeSensitive ? "—" : "Restricted") }] : []),
+                ...(selected.canSeeSensitive ? [
+                  { l: "SA ID",           v: selected.idNumber || "—" },
+                  { l: "Tax Number",      v: selected.taxNumber || "—" },
+                  { l: "Date of birth",   v: fmtDate(selected.dateOfBirth) },
+                  { l: "Emergency",       v: selected.emergencyContactName ? `${selected.emergencyContactName} · ${selected.emergencyContactPhone}` : "—" },
+                ] : [{ l: "Personal data", v: "Restricted" }]),
+                ...(selected.canSeeCompensation ? [
+                  { l: "Gross Salary",    v: fmtR(selected.grossSalary) },
+                  { l: "Pay Frequency",   v: selected.payFrequency ?? "—" },
+                  { l: "Travel Allow.",   v: fmtR(selected.travelAllowance) },
+                  { l: "Medical Aid",     v: fmtR(selected.medicalAidContribution) },
+                  { l: "Pension",         v: fmtR(selected.pensionContribution) },
+                  { l: "Bank",            v: selected.bankName ? `${selected.bankName} ${selected.bankAccountMasked ?? ""}` : "—" },
+                ] : [{ l: "Pay", v: "Restricted" }]),
               ].map(item => (
                 <div key={item.l} style={{ padding: "9px 12px", background: "var(--hf-surface-muted)", borderRadius: 7 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 2 }}>{item.l}</div>
@@ -427,13 +490,17 @@ export default function EmployeesTab() {
               ))}
             </div>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button onClick={() => openEdit(selected)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1px solid var(--hf-info-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}><Edit2 size={13} /> Edit</button>
+              {rights.manage && <button onClick={() => openEdit(selected)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1px solid var(--hf-info-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}><Edit2 size={13} /> Edit</button>}
+              {rights.askPay && selected.status !== "TERMINATED" && <button onClick={() => { setChangeFor({ kind: "pay", emp: selected }); setSelected(null) }} style={secondaryBtn}>Request pay change</button>}
+              {rights.askPay && selected.status !== "TERMINATED" && <button onClick={() => { setChangeFor({ kind: "bank", emp: selected }); setSelected(null) }} style={secondaryBtn}>Request bank change</button>}
+              {rights.manage && <button onClick={() => { setReportingFor(selected); setSelected(null) }} style={secondaryBtn}>Manager & login</button>}
+              {(rights.audit || rights.compensation) && <button onClick={() => { setHistoryFor(selected); setSelected(null) }} style={secondaryBtn}>History</button>}
               <button onClick={() => { setMedicalFor(selected); setSelected(null) }}
                 style={{ padding: "8px 14px", background: "var(--hf-surface)", color: "var(--hf-text-secondary)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                 Medical scheme
               </button>
-              {selected.status === "ACTIVE" && (
-                <button onClick={() => { setTerminating(selected); setEndDate(""); setError(""); setSelected(null) }}
+              {rights.manage && selected.status === "ACTIVE" && (
+                <button onClick={() => { setTerminating(selected); setEndDate(""); setReason(""); setError(""); setSelected(null) }}
                   style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                   <AlertTriangle size={13} /> Terminate
                 </button>
@@ -460,11 +527,16 @@ export default function EmployeesTab() {
           <MHead title={`Edit — ${editing.fullName}`} onClose={() => setEditing(null)} />
           <EmployeeForm />
           {error && <ErrBanner msg={error} />}
-          <MFoot onCancel={() => setEditing(null)} onSubmit={() => { if (validate()) updateEmployee.mutate({ id: editing.id, body: toBody(form) }) }} loading={updateEmployee.isPending} label="Save Changes" />
+          <MFoot onCancel={() => setEditing(null)} onSubmit={() => { setError(""); updateEmployee.mutate({ id: editing.id, body: toEditBody(form, rights.sensitive) }) }} loading={updateEmployee.isPending} label="Save Changes" />
         </Overlay>
       )}
 
       {medicalFor && <MedicalSchemeModal employee={medicalFor} onClose={() => setMedicalFor(null)} />}
+      {changeFor && <RequestChangeModal kind={changeFor.kind} employee={{ ...changeFor.emp, grossSalary: changeFor.emp.grossSalary }} onClose={() => setChangeFor(null)} />}
+      {showApprovals && <ApprovalsModal canDecide={rights.decidePay} onClose={() => setShowApprovals(false)} />}
+      {historyFor && <HistoryModal employee={historyFor} showChanges={rights.compensation} showAudit={rights.audit} onClose={() => setHistoryFor(null)} />}
+      {reportingFor && <ReportingModal employee={reportingFor} managerId={reportingFor.managerId} userId={reportingFor.userId}
+        candidates={(employees as Employee[]).filter(e => e.status !== "TERMINATED")} onClose={() => setReportingFor(null)} />}
 
       {/* Terminate modal */}
       {terminating && (
@@ -479,13 +551,18 @@ export default function EmployeesTab() {
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Last Working Day *</label>
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ ...inp("_"), width: "100%" }} />
+              <input type="date" max={today()} value={endDate} onChange={e => setEndDate(e.target.value)} style={{ ...inp("_"), width: "100%" }} />
+              <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 2 }}>Record the termination on or after the last day, so final pay is not missed.</div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl}>Reason *</label>
+              <input value={reason} maxLength={200} onChange={e => setReason(e.target.value)} placeholder="Resigned, dismissed, contract ended..." style={{ ...inp("_"), width: "100%" }} />
             </div>
             {error && <ErrBanner msg={error} />}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button onClick={() => { setTerminating(null); setError("") }} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
-              <button onClick={() => terminateEmployee.mutate({ id: terminating.id, date: endDate })} disabled={!endDate || terminateEmployee.isPending}
-                style={{ padding: "9px 22px", background: !endDate ? "var(--hf-text-faint)" : "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+              <button onClick={() => { const p = terminationProblem(endDate, reason, terminating.startDate); if (p) { setError(p); return } setError(""); terminateEmployee.mutate({ id: terminating.id, date: endDate, why: reason }) }} disabled={!endDate || !reason.trim() || terminateEmployee.isPending}
+                style={{ padding: "9px 22px", background: !endDate || !reason.trim() ? "var(--hf-text-faint)" : "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {terminateEmployee.isPending ? "Processing..." : "Terminate"}
               </button>
             </div>
@@ -495,6 +572,8 @@ export default function EmployeesTab() {
     </div>
   )
 }
+
+const secondaryBtn: React.CSSProperties = { padding: "8px 14px", background: "var(--hf-surface)", color: "var(--hf-text-secondary)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }
 
 function Overlay({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
