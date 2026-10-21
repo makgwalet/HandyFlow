@@ -117,7 +117,7 @@ export default function VehicleDetail({ vehicleId, identity }: { vehicleId: stri
   const canManage = usePermission("FLEET_MANAGE")
   return (
     <div style={{ marginBottom: 16 }}>
-      <VehicleSummary vehicle={identity as never} />
+      <VehicleSummary vehicleId={vehicleId} name={(identity as { registration?: string }).registration ?? "this vehicle"} vehicle={identity as never} />
       <div role="tablist" style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--hf-border)", marginBottom: 10, flexWrap: "wrap" }}>
         {TABS.map(t => <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
           style={{ padding: "6px 12px", border: "none", background: "none", cursor: "pointer", fontSize: 13, fontWeight: tab === t ? 800 : 500, borderBottom: tab === t ? "2px solid var(--hf-brand)" : "2px solid transparent", color: "var(--hf-text)" }}>{t}</button>)}

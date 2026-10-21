@@ -23,6 +23,8 @@ public enum VehicleDocumentType {
     PURCHASE_AGREEMENT(true, false),
     FINANCE_AGREEMENT(true, false),
     TRACKING_CERTIFICATE(true, false),
+    /** The picture shown at the top of the vehicle; uploading a new one replaces it (the old one stays as history). Images only. */
+    PHOTO(true, false),
     SERVICE_RECORD(false, false),
     WARRANTY(false, false),
     INSPECTION(false, false),

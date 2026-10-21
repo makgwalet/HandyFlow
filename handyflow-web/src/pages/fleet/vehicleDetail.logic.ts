@@ -15,7 +15,7 @@ export function expiryText(days: number | null | undefined): string {
 
 export const DOCUMENT_TYPE_LABEL: Record<string, string> = {
   LICENCE_DISC: "Licence disc", ROADWORTHY: "Roadworthy certificate", INSURANCE: "Insurance", REGISTRATION_CERTIFICATE: "Registration certificate",
-  PURCHASE_AGREEMENT: "Purchase agreement", FINANCE_AGREEMENT: "Finance agreement", TRACKING_CERTIFICATE: "Tracking certificate",
+  PURCHASE_AGREEMENT: "Purchase agreement", FINANCE_AGREEMENT: "Finance agreement", TRACKING_CERTIFICATE: "Tracking certificate", PHOTO: "Photo",
   SERVICE_RECORD: "Service record", WARRANTY: "Warranty", INSPECTION: "Inspection", ACCIDENT: "Accident", OTHER: "Other",
 }
 /** Types whose expiry date is required by the server (it updates the vehicle's own expiry). */

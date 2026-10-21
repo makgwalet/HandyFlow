@@ -60,6 +60,9 @@ public class VehicleDocumentService {
         Vehicle vehicle = findVehicle(tenantId, vehicleId);
 
         String contentType = validateFile(file);
+        if (type == VehicleDocumentType.PHOTO && !contentType.startsWith("image/")) {
+            throw new IllegalArgumentException("A vehicle photo must be a JPEG, PNG or WebP image");
+        }
         if (issueDate != null && expiryDate != null && expiryDate.isBefore(issueDate)) {
             throw new IllegalArgumentException("Expiry date cannot be before the issue date");
         }

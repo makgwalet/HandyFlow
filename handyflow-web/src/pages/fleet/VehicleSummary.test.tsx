@@ -1,8 +1,12 @@
-import { describe, it, expect, afterEach } from "vitest"
+import { describe, it, expect, afterEach, vi } from "vitest"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen, cleanup } from "@testing-library/react"
 import VehicleSummary from "./VehicleSummary"
 import { vehicleSummary } from "./vehicleSummary.logic"
 
+const get = vi.fn()
+vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: vi.fn() } }))
+vi.mock("../../hooks/usePermission", () => ({ usePermission: () => false }))
 afterEach(cleanup)
 const today = new Date(2026, 9, 21)
 const base = { currentOdometer: 48000, lastServiceKm: 40000, serviceIntervalKm: 10000, licenceDiscExpiry: "2026-12-31", roadworthyExpiry: "2026-10-30", insuranceExpiry: "2026-10-01" }
@@ -19,7 +23,8 @@ describe("vehicle summary", () => {
     expect(none.nextServiceKm).toBeNull(); expect(none.docs.every(d => d.text === "Not set" && d.tone === "none")).toBe(true)
   })
   it("shows the service meter, odometer and documents", () => {
-    render(<VehicleSummary vehicle={{ ...base, insuranceExpiry: null }} />)
+    get.mockResolvedValue({ data: { data: [] } })
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><VehicleSummary vehicleId="v1" name="ABC123MP" vehicle={{ ...base, insuranceExpiry: null }} /></QueryClientProvider>)
     expect(screen.getByLabelText(/^Service:/)).toBeTruthy(); expect(screen.getByText(/Odometer 48.000 km/)).toBeTruthy()
     expect(screen.getByLabelText("Insurance: Not set")).toBeTruthy()
   })
