@@ -5,6 +5,7 @@ import za.co.handyflow.platform.catalogue.domain.model.CatalogueItemStatus;
 import za.co.handyflow.platform.catalogue.domain.model.CatalogueItemType;
 
 import java.math.BigDecimal;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -42,5 +43,18 @@ public record CreateItemRequest(
         /** Only used on create: DRAFT or ACTIVE (default ACTIVE). */
         CatalogueItemStatus status,
         /** Only used on edit. */
-        Long version
-) {}
+        Long version,
+        /**
+         * Attribute values keyed by definition id. Null leaves the stored values alone; a map replaces them all
+         * (an empty or blank value clears that attribute).
+         */
+        Map<UUID, String> attributes
+) {
+    /** The shape before attributes existed, so older callers keep compiling. */
+    public CreateItemRequest(String name, String description, UUID categoryId, String unit, BigDecimal defaultPrice,
+                             BigDecimal vatRate, String sku, String barcode, String brand, CatalogueItemType itemType,
+                             BigDecimal costPrice, Boolean vatExempt, CatalogueItemStatus status, Long version) {
+        this(name, description, categoryId, unit, defaultPrice, vatRate, sku, barcode, brand, itemType, costPrice,
+                vatExempt, status, version, null);
+    }
+}

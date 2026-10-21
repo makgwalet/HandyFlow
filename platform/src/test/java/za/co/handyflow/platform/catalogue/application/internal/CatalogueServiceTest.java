@@ -44,11 +44,13 @@ class CatalogueServiceTest {
     @Mock CatalogueItemRepository items;
     @Mock CatalogueCategoryRepository categories;
     @Mock CatalogueAuditEventRepository audit;
+    @Mock CatalogueStructureService structure;
     CatalogueService service;
 
     @BeforeEach
     void setUp() {
-        service = new CatalogueService(items, categories, audit, new VatRateProvider(new BigDecimal("15.00")));
+        service = new CatalogueService(items, categories, audit, new VatRateProvider(new BigDecimal("15.00")), structure);
+        lenient().when(structure.resolveUnit(any(), anyString(), any())).thenAnswer(i -> ((String) i.getArgument(1)).trim());
         lenient().when(items.nameTaken(any(), anyString(), any())).thenReturn(false);
         lenient().when(items.skuTaken(any(), anyString(), any())).thenReturn(false);
         lenient().when(items.barcodeTaken(any(), anyString(), any())).thenReturn(false);
@@ -221,9 +223,9 @@ class CatalogueServiceTest {
 
     @Test
     void duplicateCategoryNamesAreConflicts() {
-        when(categories.nameTaken(eq(TENANT), eq("Tools"), any())).thenReturn(true);
+        when(categories.nameTaken(eq(TENANT), eq("Tools"), any(), any())).thenReturn(true);
         assertThatThrownBy(() -> service.createCategory(TENANT, new CreateCategoryRequest("Tools", null), ADMIN))
-                .isInstanceOf(ConflictException.class).hasMessage("A category named 'Tools' already exists.");
+                .isInstanceOf(ConflictException.class).hasMessage("A category named 'Tools' already exists at the top level.");
     }
 
     @Test
@@ -232,5 +234,117 @@ class CatalogueServiceTest {
         var out = service.createItem(TENANT, r, ADMIN);
         assertThat(out.vatExempt()).isTrue();
         assertThat(out.vatRate()).isEqualByComparingTo("0");
+    }
+
+    // ── Slice 2: tree, attributes ─────────────────────────────────────────────
+
+    private CatalogueCategory cat(String name, CatalogueCategory parent) {
+        return CatalogueCategory.create(TENANT, name, null, parent == null ? null : parent.getId());
+    }
+
+    @Test
+    void aCategoryCannotBeMovedInsideItsOwnSubCategory() {
+        var root = cat("Building", null);
+        var child = cat("Cement", root);
+        when(categories.findAllActive(TENANT)).thenReturn(java.util.List.of(root, child));
+        when(categories.findActiveById(TENANT, root.getId())).thenReturn(Optional.of(root));
+        assertThatThrownBy(() -> service.updateCategory(TENANT, root.getId(), new CreateCategoryRequest("Building", null, child.getId()), ADMIN))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("A category cannot be moved inside itself or one of its own sub-categories.");
+        assertThat(root.getParentId()).isNull();
+    }
+
+    @Test
+    void movingACategoryChangesItsParentAndIsRecorded() {
+        var a = cat("Building", null);
+        var b = cat("Tools", null);
+        when(categories.findAllActive(TENANT)).thenReturn(java.util.List.of(a, b));
+        when(categories.findActiveById(TENANT, b.getId())).thenReturn(Optional.of(b));
+        var out = service.updateCategory(TENANT, b.getId(), new CreateCategoryRequest("Tools", null, a.getId()), ADMIN);
+        assertThat(b.getParentId()).isEqualTo(a.getId());
+        assertThat(out.path()).isEqualTo("Building › Tools");
+        assertThat(out.depth()).isEqualTo(2);
+        var ev = ArgumentCaptor.forClass(CatalogueAuditEvent.class);
+        verify(audit).save(ev.capture());
+        assertThat(ev.getValue().getDetail()).isEqualTo("moved: top level -> Building");
+    }
+
+    @Test
+    void aCategoryUnderAnUnknownParentIsNotFound() {
+        when(categories.findAllActive(TENANT)).thenReturn(java.util.List.of());
+        assertThatThrownBy(() -> service.createCategory(TENANT, new CreateCategoryRequest("Tools", null, UUID.randomUUID()), ADMIN))
+                .isInstanceOf(za.co.handyflow.platform.shared.ResourceNotFoundException.class);
+    }
+
+    @Test
+    void aSiblingWithTheSameNameIsAConflictButOtherParentsAreFine() {
+        var root = cat("Building", null);
+        when(categories.findAllActive(TENANT)).thenReturn(java.util.List.of(root));
+        when(categories.nameTaken(eq(TENANT), eq("Other"), eq(root.getId()), any())).thenReturn(true);
+        assertThatThrownBy(() -> service.createCategory(TENANT, new CreateCategoryRequest("Other", null, root.getId()), ADMIN))
+                .isInstanceOf(ConflictException.class).hasMessage("A category named 'Other' already exists in that category.");
+        assertThat(service.createCategory(TENANT, new CreateCategoryRequest("Other", null, null), ADMIN).parentId()).isNull();
+    }
+
+    @Test
+    void aCategoryWithSubCategoriesOrAttributesIsNotDeleted() {
+        var root = cat("Building", null);
+        var child = cat("Cement", root);
+        when(categories.findAllActive(TENANT)).thenReturn(java.util.List.of(root, child));
+        when(categories.findActiveById(TENANT, root.getId())).thenReturn(Optional.of(root));
+        assertThatThrownBy(() -> service.deleteCategory(TENANT, root.getId(), ADMIN))
+                .isInstanceOf(ConflictException.class).hasMessage("This category still has 1 sub-category. Move or delete them first.");
+
+        when(categories.findAllActive(TENANT)).thenReturn(java.util.List.of(root));
+        when(structure.countDefinitionsFor(TENANT, root.getId())).thenReturn(2L);
+        assertThatThrownBy(() -> service.deleteCategory(TENANT, root.getId(), ADMIN))
+                .isInstanceOf(ConflictException.class).hasMessage("This category still has 2 attributes. Delete or re-home them first.");
+        assertThat(root.isDeleted()).isFalse();
+    }
+
+    @Test
+    void anAttributeProblemStopsTheItemFromBeingSaved() {
+        when(structure.check(any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean(), any()))
+                .thenThrow(new IllegalArgumentException("Fill in the required attribute: Colour."));
+        assertThatThrownBy(() -> service.createItem(TENANT, req("Paint", null, "10", null), ADMIN))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Fill in the required attribute: Colour.");
+        verify(items, never()).save(any());
+        verify(structure, never()).store(any(), any(), any());
+    }
+
+    @Test
+    void aDraftDoesNotNeedItsRequiredAttributesButAnActiveItemDoes() {
+        var draft = new CreateItemRequest("Paint", null, null, "each", BigDecimal.TEN, null, null, null, null, null, null, null, CatalogueItemStatus.DRAFT, null);
+        service.createItem(TENANT, draft, ADMIN);
+        verify(structure).check(eq(TENANT), any(), any(), eq(false), any());
+        service.createItem(TENANT, req("Paint 2", null, "10", null), ADMIN);
+        verify(structure).check(eq(TENANT), any(), any(), eq(true), any());
+    }
+
+    @Test
+    void activatingAnItemChecksItsRequiredAttributes() {
+        var item = existing("Cement", "C-1", "100.00");
+        item.changeStatus(CatalogueItemStatus.DRAFT, null);
+        when(items.findActiveById(TENANT, item.getId())).thenReturn(Optional.of(item));
+        when(structure.check(any(), any(), any(), eq(true), any()))
+                .thenThrow(new IllegalArgumentException("Fill in the required attribute: Grade."));
+        assertThatThrownBy(() -> service.changeStatus(TENANT, item.getId(), new ItemStatusRequest(CatalogueItemStatus.ACTIVE, null, null), ADMIN))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Fill in the required attribute: Grade.");
+    }
+
+    @Test
+    void theUnitIsTheTenantsOwnSpellingFromTheUnitList() {
+        when(structure.resolveUnit(eq(TENANT), eq("EACH"), any())).thenReturn("each");
+        var r = new CreateItemRequest("Bolt", null, null, "EACH", BigDecimal.ONE, null, null, null, null, null, null, null, null, null);
+        assertThat(service.createItem(TENANT, r, ADMIN).unit()).isEqualTo("each");
+    }
+
+    @Test
+    void anUnknownUnitStopsTheSave() {
+        when(structure.resolveUnit(any(), eq("bag"), any())).thenThrow(new IllegalArgumentException("The unit 'bag' is not set up. Choose a unit from the list."));
+        var r = new CreateItemRequest("Sand", null, null, "bag", BigDecimal.ONE, null, null, null, null, null, null, null, null, null);
+        assertThatThrownBy(() -> service.createItem(TENANT, r, ADMIN)).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("The unit 'bag' is not set up. Choose a unit from the list.");
+        verify(items, never()).save(any());
     }
 }

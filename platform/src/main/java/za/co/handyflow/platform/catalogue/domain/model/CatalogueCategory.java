@@ -28,6 +28,9 @@ public class CatalogueCategory {
 
     private String description;
 
+    @Column(name = "parent_id")
+    private UUID parentId;
+
     @Column(name = "sort_order")
     private Integer sortOrder = 0;
 
@@ -50,7 +53,12 @@ public class CatalogueCategory {
     public static CatalogueCategory create(TenantId tenantId,
                                            String name,
                                            String description) {
+        return create(tenantId, name, description, null);
+    }
+
+    public static CatalogueCategory create(TenantId tenantId, String name, String description, UUID parentId) {
         CatalogueCategory cat = new CatalogueCategory();
+        cat.parentId = parentId;
         cat.tenantId = tenantId;
         cat.name = name.trim();
         cat.description = description;
@@ -61,6 +69,12 @@ public class CatalogueCategory {
 
     public void rename(String newName) {
         this.name = newName.trim();
+        this.updatedAt = Instant.now();
+    }
+
+    /** Move under another category (null = top level). The service has already checked for loops and depth. */
+    public void moveTo(UUID newParentId) {
+        this.parentId = newParentId;
         this.updatedAt = Instant.now();
     }
 

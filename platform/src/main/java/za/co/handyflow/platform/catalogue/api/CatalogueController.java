@@ -13,6 +13,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.catalogue.CatalogueItemSummary;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueService;
+import za.co.handyflow.platform.catalogue.application.internal.CatalogueStructureService;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueService.Caller;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueService.ItemFilter;
 import za.co.handyflow.platform.catalogue.domain.model.CatalogueItemStatus;
@@ -44,7 +45,10 @@ public class CatalogueController {
     private static final String WRITE = "hasAnyAuthority('CATALOGUE_WRITE','SETTINGS_MANAGE')";
     private static final String ARCHIVE = "hasAnyAuthority('CATALOGUE_ARCHIVE','SETTINGS_MANAGE')";
 
+    private static final String ADMIN = "hasAuthority('CATALOGUE_ADMIN')";
+
     private final CatalogueService catalogueService;
+    private final CatalogueStructureService structureService;
 
     /** What the signed-in user may do, from their authorities. */
     private static Caller caller(Authentication auth) {
@@ -168,5 +172,71 @@ public class CatalogueController {
     public ResponseEntity<ApiResponse<Void>> deleteCategory(@PathVariable UUID id, Authentication auth) {
         catalogueService.deleteCategory(TenantContext.getTenantIdAsObject(), id, caller(auth));
         return ResponseEntity.ok(ApiResponse.success("Category deleted", null));
+    }
+
+    // ── Units of measure ─────────────────────────────────────────────────────
+
+    @GetMapping("/units")
+    @PreAuthorize(PICK)
+    @Operation(summary = "Units of measure", description = "A tenant with none yet gets the standard set.")
+    public ResponseEntity<ApiResponse<List<CatalogueUnitResponse>>> getUnits() {
+        return ResponseEntity.ok(ApiResponse.success(structureService.listUnits(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/units")
+    @PreAuthorize(ADMIN)
+    @Operation(summary = "Add a unit of measure")
+    public ResponseEntity<ApiResponse<CatalogueUnitResponse>> createUnit(@Valid @RequestBody CatalogueUnitRequest request, Authentication auth) {
+        var unit = structureService.createUnit(TenantContext.getTenantIdAsObject(), request, caller(auth));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Unit created", unit));
+    }
+
+    @PutMapping("/units/{id}")
+    @PreAuthorize(ADMIN)
+    @Operation(summary = "Edit a unit", description = "Name, kind, decimals and on/off. The code cannot change.")
+    public ResponseEntity<ApiResponse<CatalogueUnitResponse>> updateUnit(
+            @PathVariable UUID id, @Valid @RequestBody CatalogueUnitRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success("Unit updated", structureService.updateUnit(TenantContext.getTenantIdAsObject(), id, request, caller(auth))));
+    }
+
+    @DeleteMapping("/units/{id}")
+    @PreAuthorize(ADMIN)
+    @Operation(summary = "Delete an unused unit", description = "Refused while items use it; switch it off instead.")
+    public ResponseEntity<ApiResponse<Void>> deleteUnit(@PathVariable UUID id, Authentication auth) {
+        structureService.deleteUnit(TenantContext.getTenantIdAsObject(), id, caller(auth));
+        return ResponseEntity.ok(ApiResponse.success("Unit deleted", null));
+    }
+
+    // ── Attribute definitions ────────────────────────────────────────────────
+
+    @GetMapping("/attributes")
+    @PreAuthorize(READ)
+    @Operation(summary = "Attribute definitions", description = "All of them; an item gets those of its category, the categories above it, and the global ones.")
+    public ResponseEntity<ApiResponse<List<CatalogueAttributeResponse>>> getAttributes() {
+        return ResponseEntity.ok(ApiResponse.success(structureService.listDefinitions(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/attributes")
+    @PreAuthorize(ADMIN)
+    @Operation(summary = "Add an attribute definition")
+    public ResponseEntity<ApiResponse<CatalogueAttributeResponse>> createAttribute(@Valid @RequestBody CatalogueAttributeRequest request, Authentication auth) {
+        var d = structureService.createDefinition(TenantContext.getTenantIdAsObject(), request, caller(auth));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Attribute created", d));
+    }
+
+    @PutMapping("/attributes/{id}")
+    @PreAuthorize(ADMIN)
+    @Operation(summary = "Edit an attribute definition", description = "Code, type and category are fixed once created.")
+    public ResponseEntity<ApiResponse<CatalogueAttributeResponse>> updateAttribute(
+            @PathVariable UUID id, @Valid @RequestBody CatalogueAttributeRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success("Attribute updated", structureService.updateDefinition(TenantContext.getTenantIdAsObject(), id, request, caller(auth))));
+    }
+
+    @DeleteMapping("/attributes/{id}")
+    @PreAuthorize(ADMIN)
+    @Operation(summary = "Delete an attribute that has no values", description = "Refused while items hold a value; switch it off instead.")
+    public ResponseEntity<ApiResponse<Void>> deleteAttribute(@PathVariable UUID id, Authentication auth) {
+        structureService.deleteDefinition(TenantContext.getTenantIdAsObject(), id, caller(auth));
+        return ResponseEntity.ok(ApiResponse.success("Attribute deleted", null));
     }
 }

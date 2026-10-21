@@ -69,10 +69,26 @@ Screens: roadmap lists 6; **1** exists (a basic version of item list). Reports: 
 8. **Slice 8: Media, documents, bundles, publishing, reports (P1).**
 9. P2 items only after the above are in use.
 
-## 5. Decisions needed from the owner (none block Slice 1)
+## 5. Owner decisions (2026-10-21)
 
-- Should approval (maker-checker) be **on by default** for price changes, or opt-in per tenant? Slice 3 depends on it.
-- Existing roles: add the new CATALOGUE_* permissions to roles that currently have SETTINGS_MANAGE automatically (recommended), or leave to manual assignment?
+**Decision 1: price-change maker-checker is configurable per tenant.**
+Setting `CATALOGUE_PRICE_APPROVAL_REQUIRED` (true/false), stored per tenant, not as a global application setting. Existing tenants default to **false** (today's behaviour is kept); new tenants default to **true**; an authorised tenant administrator can change it. When it is on, the person who proposed a change cannot approve it. Permissions, validation, audit history and effective-date rules always apply. Later: thresholds by percentage change, monetary value or margin impact. **Built in Slice 3** (it needs the price-change workflow), on the existing approvals engine rather than a second mechanism. Changing the setting needs CATALOGUE_ADMIN, which is separate from CATALOGUE_PRICE_APPROVE (managing settings is not approving prices).
+
+**Decision 2: controlled automatic migration of Catalogue permissions** (V477, done).
+
+| Existing authority | Receives | Not implied |
+|---|---|---|
+| SETTINGS_MANAGE | CATALOGUE_READ, WRITE, ARCHIVE, IMPORT, EXPORT, PUBLISH | APPROVE, PRICE_APPROVE, ADMIN, PRICE_READ, PRICE_WRITE |
+| Role named `ADMIN` (per tenant) | CATALOGUE_ADMIN | |
+| (no pricing-administration permission exists) | nobody gets PRICE_READ / PRICE_WRITE automatically | |
+| (no catalogue approval authority exists) | nobody gets APPROVE / PRICE_APPROVE automatically | |
+
+How this was read, so it can be corrected:
+- **Pricing administration:** none exists in the system, so PRICE_READ and PRICE_WRITE are assigned by hand. V476 had granted both to every SETTINGS_MANAGE role; V477 removes exactly those grants. Effect for existing users: they stop seeing cost price and margin until a role is given CATALOGUE_PRICE_READ. This is the one visible behaviour change.
+- **Approval authority:** the only generic one is `APPROVALS_MANAGE`, which configures approval rules; it does not mean "may approve a price". Granting approval to rule-configurers would blur the separation the owner asked for, so APPROVE / PRICE_APPROVE start empty. V477 carries the one-line SQL to grant them to a chosen role.
+- **Tenant administration:** the role named `ADMIN` (the same convention V41 and V246 use). A tenant whose administrators use a differently named role gets no CATALOGUE_ADMIN until it is assigned, which means they cannot manage units or attributes yet.
+- Migration is additive apart from the price withdrawal above; manual grants and memberships are untouched; it can run twice. `CATALOGUE-MIGRATION-CHECKS.sql` verifies the result per tenant (run it once Flyway has applied V476 to V478).
+- Future Catalogue permissions are not granted by implication: each new permission is added in its own slice with its own mapping row in this table.
 
 ## 6. Not verified yet
 
@@ -102,3 +118,21 @@ Behaviour changes to know about:
 - SKU is stored upper-case; name, SKU and barcode uniqueness ignore case.
 
 Tests: 10 rules tests run and pass (standalone, Maven unavailable here); 17 service tests (Mockito) and 31 front-end tests written; the front-end tests pass, the service tests have **not been run**. The service, controller and repository code could not be compiled here (no Spring jars): the first `mvn` build will show any slip.
+
+## 8. Slice 2 status (units, category tree, attributes): built, not yet run against a database
+
+| Item | Status |
+|---|---|
+| D7 unit is free text | Fixed. `catalogue_units` per tenant (code, name, kind, decimals, on/off). Items must use a unit from the list; the code stays as text on the item so POS, Supply Chain and Invoicing keep working unchanged. The unit list is filled from the units the tenant's items already use (spellings merged, most common wins) plus a standard set of 12; other tenants get the standard set on first open. A unit in use cannot be deleted, only switched off; an item may keep a unit that was switched off later. |
+| Category tree | `parent_id`, up to 5 levels, no loops (a category cannot move under itself or its own sub-categories), names unique among siblings only. Filtering by a category includes everything below it. Deleting a category is refused while it has items, sub-categories or attributes. |
+| Attribute definitions | Types text, number (min/max), yes/no, date, pick-from-a-list. Per category (inherited by sub-categories) or for every item. Code and type are fixed after creation. Required attributes are enforced for any item that is not a draft, including when a draft is activated. An attribute with values is switched off, not deleted. |
+| Item form | Unit is a list from the tenant's units; the attribute fields that apply to the chosen category appear and are checked in the browser and again on the server. |
+| Permissions | Units and attributes are managed with CATALOGUE_ADMIN; anyone who can read the catalogue can read them. The two Setup screens appear in the sidebar only for CATALOGUE_ADMIN. |
+
+Behaviour changes to know about:
+- Creating or editing an item with a unit that is not in the tenant's list is refused with a message. The standard set is created automatically, so "each", "hour", "kg" and so on work straight away.
+- Existing items' unit text is rewritten to the canonical spelling (e.g. "EACH" and " each" become "each").
+- Category names are now unique per parent; V476's tenant-wide index is replaced (no existing data can violate the new one).
+- Quantity decimals on a unit are stored and shown but not enforced yet (quotes, POS and purchase orders still accept what they accepted before).
+
+Tests: 19 rules tests run and pass (standalone, Maven unavailable here). 36 service tests (Mockito; units, definitions, applicability, values, tree) and the changed Slice 1 tests are written but **not run**. Front end: 66 catalogue tests pass, lint clean. Backend service, controller, entity and repository code has not been compiled (no Spring jars here); V477 and V478 have not been run against a database.

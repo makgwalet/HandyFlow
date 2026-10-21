@@ -25,7 +25,10 @@ import za.co.handyflow.platform.shared.VatRateProvider;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -44,6 +47,7 @@ public class CatalogueService {
     private final CatalogueCategoryRepository categoryRepository;
     private final CatalogueAuditEventRepository auditRepository;
     private final VatRateProvider vatRateProvider;
+    private final CatalogueStructureService structure;
 
     /** Who is asking and what they may do. Built by the controller from the signed-in user's authorities. */
     public record Caller(UUID userId, boolean canSeePrices, boolean canWritePrices, boolean canArchive) {}
@@ -66,6 +70,7 @@ public class CatalogueService {
     @Transactional(readOnly = true)
     public Page<CatalogueItemResponse> listItems(TenantId tenantId, ItemFilter f, int page, int size, String sort, boolean desc, Caller caller) {
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 200), sortFor(sort, desc));
+        List<UUID> categoryIds = f.categoryId() == null ? null : StructureRules.subtree(f.categoryId(), parentMap(tenantId));
         Specification<CatalogueItem> spec = (root, query, cb) -> {
             var ps = new ArrayList<Predicate>();
             ps.add(cb.equal(root.get("tenantId"), tenantId));
@@ -78,7 +83,7 @@ public class CatalogueService {
                         cb.like(cb.lower(root.<String>get("barcode")), like, '\\'),
                         cb.like(cb.lower(root.<String>get("brand")), like, '\\')));
             }
-            if (f.categoryId() != null) ps.add(cb.equal(root.get("category").get("id"), f.categoryId()));
+            if (categoryIds != null) ps.add(root.get("category").get("id").in(categoryIds));
             if (f.status() != null) ps.add(cb.equal(root.get("status"), f.status()));
             if (f.type() != null) ps.add(cb.equal(root.get("itemType"), f.type()));
             return cb.and(ps.toArray(new Predicate[0]));
@@ -88,7 +93,7 @@ public class CatalogueService {
 
     @Transactional(readOnly = true)
     public CatalogueItemResponse getItem(TenantId tenantId, UUID itemId, Caller caller) {
-        return toResponse(load(tenantId, itemId), caller);
+        return toResponse(load(tenantId, itemId), caller).withAttributes(structure.valuesFor(tenantId, itemId));
     }
 
     @Transactional(readOnly = true)
@@ -107,15 +112,18 @@ public class CatalogueService {
         if (r.costPrice() != null && !caller.canWritePrices()) throw new AccessDeniedException("You are not allowed to set the cost price.");
 
         CatalogueCategory category = category(tenantId, r.categoryId());
-        var details = details(r, null, caller);
+        var details = details(tenantId, r, null, caller);
         checkDuplicates(tenantId, details, null);
+        var attributes = structure.check(tenantId, category == null ? null : category.getId(), r.attributes(),
+                status != CatalogueItemStatus.DRAFT, null);
 
         CatalogueItem item = CatalogueItem.create(tenantId, category, details, status);
         itemRepository.save(item);
+        structure.store(tenantId, item.getId(), attributes);
         audit(tenantId, item, CatalogueAuditAction.CREATED, "Created as " + CatalogueRules.label(status)
                 + (item.getSku() != null ? " (SKU " + item.getSku() + ")" : ""), caller);
         log.info("Created catalogue item={} tenant={}", item.getName(), tenantId);
-        return toResponse(item, caller);
+        return toResponse(item, caller).withAttributes(structure.valuesFor(tenantId, item.getId()));
     }
 
     @Transactional
@@ -127,19 +135,23 @@ public class CatalogueService {
             throw new AccessDeniedException("You are not allowed to change the cost price.");
 
         CatalogueCategory category = category(tenantId, r.categoryId());
-        var details = details(r, item, caller);
+        var details = details(tenantId, r, item, caller);
         checkDuplicates(tenantId, details, item.getId());
+        var attributes = structure.check(tenantId, category == null ? null : category.getId(), r.attributes(),
+                item.getStatus() != CatalogueItemStatus.DRAFT, structure.stored(tenantId, item.getId()));
 
         var before = item.snapshot();
         item.update(category, details);
         var after = item.snapshot();
         String change = CatalogueRules.describeChanges(before, after);
+        String attributeChange = structure.store(tenantId, item.getId(), attributes);
         if (!change.isEmpty()) {
             itemRepository.save(item);
             audit(tenantId, item, CatalogueRules.priceChanged(before, after) ? CatalogueAuditAction.PRICE_CHANGED : CatalogueAuditAction.UPDATED, change, caller);
         }
+        if (!attributeChange.isEmpty()) audit(tenantId, item, CatalogueAuditAction.UPDATED, "attributes: " + attributeChange, caller);
         log.info("Updated catalogue item={} tenant={}", itemId, tenantId);
-        return toResponse(item, caller);
+        return toResponse(item, caller).withAttributes(structure.valuesFor(tenantId, item.getId()));
     }
 
     @Transactional
@@ -152,6 +164,8 @@ public class CatalogueService {
         String reason = CatalogueRules.checkTransition(from, r.status(), r.reason());
         if (r.status() == CatalogueItemStatus.ACTIVE && (item.getUnit() == null || item.getDefaultPrice() == null))
             throw new IllegalArgumentException("The item needs a unit and a price before it can be activated.");
+        if (r.status() == CatalogueItemStatus.ACTIVE)
+            structure.check(tenantId, item.getCategory() == null ? null : item.getCategory().getId(), null, true, structure.stored(tenantId, item.getId()));
         item.changeStatus(r.status(), reason);
         itemRepository.save(item);
         audit(tenantId, item, CatalogueAuditAction.STATUS_CHANGED,
@@ -169,22 +183,29 @@ public class CatalogueService {
 
     // ── Categories ────────────────────────────────────────────────────────────
 
+    /** Every live category with its place in the tree. itemCount is the items directly in it. */
     @Transactional(readOnly = true)
-    public java.util.List<CategoryResponse> getCategories(TenantId tenantId) {
-        return categoryRepository.findAllActive(tenantId).stream()
-                .map(c -> new CategoryResponse(c.getId(), c.getName(), c.getDescription(), c.getSortOrder(),
-                        itemRepository.countLiveInCategory(tenantId, c)))
+    public List<CategoryResponse> getCategories(TenantId tenantId) {
+        var all = categoryRepository.findAllActive(tenantId);
+        Map<UUID, UUID> parents = new HashMap<>();
+        Map<UUID, String> names = new HashMap<>();
+        all.forEach(c -> { parents.put(c.getId(), c.getParentId()); names.put(c.getId(), c.getName()); });
+        return all.stream()
+                .map(c -> response(c, parents, names, itemRepository.countLiveInCategory(tenantId, c)))
+                .sorted(java.util.Comparator.comparing(CategoryResponse::path, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
 
     @Transactional
     public CategoryResponse createCategory(TenantId tenantId, CreateCategoryRequest r, Caller caller) {
         String name = categoryName(r.name());
-        if (categoryRepository.nameTaken(tenantId, name, NO_ID)) throw new ConflictException("A category named '" + name + "' already exists.");
-        CatalogueCategory cat = CatalogueCategory.create(tenantId, name, r.description());
+        var parents = parentMap(tenantId);
+        UUID parentId = checkedParent(tenantId, r.parentId(), null, 1, parents);
+        if (categoryRepository.nameTaken(tenantId, name, parentId, NO_ID)) throw new ConflictException(duplicateCategoryMessage(name, parentId));
+        CatalogueCategory cat = CatalogueCategory.create(tenantId, name, r.description(), parentId);
         categoryRepository.save(cat);
-        audit(tenantId, "CATEGORY", cat.getId(), cat.getName(), CatalogueAuditAction.CREATED, "Created", caller);
-        return new CategoryResponse(cat.getId(), cat.getName(), cat.getDescription(), cat.getSortOrder(), 0L);
+        audit(tenantId, "CATEGORY", cat.getId(), cat.getName(), CatalogueAuditAction.CREATED, parentId == null ? "Created" : "Created under " + pathOf(tenantId, parentId), caller);
+        return categoryResponse(tenantId, cat, 0L);
     }
 
     @Transactional
@@ -192,24 +213,86 @@ public class CatalogueService {
         CatalogueCategory cat = categoryRepository.findActiveById(tenantId, categoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", categoryId.toString()));
         String name = categoryName(r.name());
-        if (categoryRepository.nameTaken(tenantId, name, cat.getId())) throw new ConflictException("A category named '" + name + "' already exists.");
+        var parents = parentMap(tenantId);
+        UUID parentId = checkedParent(tenantId, r.parentId(), cat.getId(), subtreeHeight(cat.getId(), parents), parents);
+        if (categoryRepository.nameTaken(tenantId, name, parentId, cat.getId())) throw new ConflictException(duplicateCategoryMessage(name, parentId));
         String old = cat.getName();
+        boolean moved = !java.util.Objects.equals(parentId, cat.getParentId());
+        String from = moved ? pathOf(tenantId, cat.getParentId()) : null;
         cat.update(name, r.description());
+        if (moved) cat.moveTo(parentId);
         categoryRepository.save(cat);
-        audit(tenantId, "CATEGORY", cat.getId(), cat.getName(), CatalogueAuditAction.UPDATED, old.equals(name) ? "Updated" : "name: " + old + " -> " + name, caller);
-        return new CategoryResponse(cat.getId(), cat.getName(), cat.getDescription(), cat.getSortOrder(), itemRepository.countLiveInCategory(tenantId, cat));
+        var parts = new ArrayList<String>();
+        if (!old.equals(name)) parts.add("name: " + old + " -> " + name);
+        if (moved) parts.add("moved: " + (from.isEmpty() ? "top level" : from) + " -> " + (parentId == null ? "top level" : pathOf(tenantId, parentId)));
+        audit(tenantId, "CATEGORY", cat.getId(), cat.getName(), CatalogueAuditAction.UPDATED, parts.isEmpty() ? "Updated" : String.join("; ", parts), caller);
+        return categoryResponse(tenantId, cat, itemRepository.countLiveInCategory(tenantId, cat));
     }
 
-    /** A category with items in it is not deleted: that used to remove every item silently. */
+    /** A category that still holds items, sub-categories or attributes is not deleted: that used to remove items silently. */
     @Transactional
     public void deleteCategory(TenantId tenantId, UUID categoryId, Caller caller) {
         CatalogueCategory cat = categoryRepository.findActiveById(tenantId, categoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", categoryId.toString()));
         long n = itemRepository.countLiveInCategory(tenantId, cat);
         if (n > 0) throw new ConflictException("This category still has " + n + (n == 1 ? " item" : " items") + ". Move or delete them first.");
+        long kids = parentMap(tenantId).values().stream().filter(categoryId::equals).count();
+        if (kids > 0) throw new ConflictException("This category still has " + kids + (kids == 1 ? " sub-category" : " sub-categories") + ". Move or delete them first.");
+        long attrs = structure.countDefinitionsFor(tenantId, categoryId);
+        if (attrs > 0) throw new ConflictException("This category still has " + attrs + (attrs == 1 ? " attribute" : " attributes") + ". Delete or re-home them first.");
         cat.softDelete(caller.userId());
         categoryRepository.save(cat);
         audit(tenantId, "CATEGORY", cat.getId(), cat.getName(), CatalogueAuditAction.DELETED, "Deleted", caller);
+    }
+
+    // ── Category tree helpers ─────────────────────────────────────────────────
+
+    private Map<UUID, UUID> parentMap(TenantId tenantId) {
+        Map<UUID, UUID> parents = new HashMap<>();
+        categoryRepository.findAllActive(tenantId).forEach(c -> parents.put(c.getId(), c.getParentId()));
+        return parents;
+    }
+
+    /** Checks the chosen parent exists and the placement is allowed; returns the parent id (null = top level). */
+    private UUID checkedParent(TenantId tenantId, UUID parentId, UUID self, int height, Map<UUID, UUID> parents) {
+        if (parentId == null) return null;
+        if (!parents.containsKey(parentId)) throw new ResourceNotFoundException("Category", parentId.toString());
+        StructureRules.checkPlacement(self, parentId, height, parents::get);
+        return parentId;
+    }
+
+    /** Levels in the subtree under (and including) this category. */
+    private static int subtreeHeight(UUID id, Map<UUID, UUID> parents) {
+        int base = StructureRules.depthOf(id, parents::get), best = 1;
+        for (UUID d : StructureRules.subtree(id, parents)) best = Math.max(best, StructureRules.depthOf(d, parents::get) - base + 1);
+        return best;
+    }
+
+    private String pathOf(TenantId tenantId, UUID id) {
+        if (id == null) return "";
+        Map<UUID, UUID> parents = new HashMap<>();
+        Map<UUID, String> names = new HashMap<>();
+        categoryRepository.findAllActive(tenantId).forEach(c -> { parents.put(c.getId(), c.getParentId()); names.put(c.getId(), c.getName()); });
+        return StructureRules.pathOf(id, parents::get, names::get);
+    }
+
+    private CategoryResponse categoryResponse(TenantId tenantId, CatalogueCategory cat, long count) {
+        Map<UUID, UUID> parents = new HashMap<>();
+        Map<UUID, String> names = new HashMap<>();
+        categoryRepository.findAllActive(tenantId).forEach(c -> { parents.put(c.getId(), c.getParentId()); names.put(c.getId(), c.getName()); });
+        parents.put(cat.getId(), cat.getParentId());
+        names.put(cat.getId(), cat.getName());
+        return response(cat, parents, names, count);
+    }
+
+    private static CategoryResponse response(CatalogueCategory c, Map<UUID, UUID> parents, Map<UUID, String> names, long count) {
+        return new CategoryResponse(c.getId(), c.getName(), c.getDescription(), c.getSortOrder(), count, c.getParentId(),
+                StructureRules.pathOf(c.getId(), parents::get, names::get), StructureRules.depthOf(c.getId(), parents::get));
+    }
+
+    private String duplicateCategoryMessage(String name, UUID parentId) {
+        return parentId == null ? "A category named '" + name + "' already exists at the top level."
+                : "A category named '" + name + "' already exists in that category.";
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -238,13 +321,13 @@ public class CatalogueService {
     }
 
     /** Cleans and checks the request. When the caller may not write prices, the existing cost is kept. */
-    private CatalogueItem.Details details(CreateItemRequest r, CatalogueItem existing, Caller caller) {
+    private CatalogueItem.Details details(TenantId tenantId, CreateItemRequest r, CatalogueItem existing, Caller caller) {
         boolean exempt = Boolean.TRUE.equals(r.vatExempt());
         BigDecimal vat = r.vatRate() != null ? r.vatRate() : vatRateProvider.ratePercent();
         BigDecimal cost = caller.canWritePrices() ? CatalogueRules.checkMoney("The cost price", r.costPrice())
                 : existing != null ? existing.getCostPrice() : null;
-        String unit = r.unit() == null ? "" : r.unit().trim();
-        if (unit.isEmpty()) throw new IllegalArgumentException("Unit is required.");
+        if (r.unit() == null || r.unit().isBlank()) throw new IllegalArgumentException("Unit is required.");
+        String unit = structure.resolveUnit(tenantId, r.unit(), existing == null ? null : existing.getUnit());
         return new CatalogueItem.Details(
                 CatalogueRules.normalizeName(r.name()),
                 r.description() == null || r.description().isBlank() ? null : r.description().trim(),

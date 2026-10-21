@@ -40,3 +40,9 @@ WHERE rp.permission_id = pp.id AND pp.name IN ('CATALOGUE_PRICE_READ','CATALOGUE
   AND sm_rp.role_id = rp.role_id AND sm_rp.permission_id = sm.id AND sm.name = 'SETTINGS_MANAGE';
 
 -- CATALOGUE_APPROVE and CATALOGUE_PRICE_APPROVE are deliberately granted to no role here.
+-- The only generic approval permission, APPROVALS_MANAGE, configures approval rules; it does not mean "may approve a
+-- price change", and the owner asked that managing settings stay separate from approving commercial changes.
+-- To give a role approval authority on purpose:
+--   INSERT INTO role_permissions (role_id, permission_id)
+--   SELECT r.id, p.id FROM roles r JOIN permissions p ON p.name IN ('CATALOGUE_APPROVE','CATALOGUE_PRICE_APPROVE')
+--   WHERE r.tenant_id = '<tenant>' AND r.name = '<role>' ON CONFLICT DO NOTHING;
