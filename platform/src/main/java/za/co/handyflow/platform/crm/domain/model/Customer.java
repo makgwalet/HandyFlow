@@ -136,6 +136,10 @@ public class Customer {
     @Column(name = "lost_note", length = 500)
     private String lostNote;
 
+    /** The company this one sits under (head office -> branch); null for a top-level company. */
+    @Column(name = "parent_customer_id")
+    private UUID parentCustomerId;
+
     /**
      * FIX: backlog 4.2 — "no deal value / expected close date" gap.
      * Nullable, and deliberately not restricted to LEAD-type customers the
@@ -552,6 +556,13 @@ public class Customer {
     public void recordMarketingConsentChanged(boolean optedIn, UUID triggeredBy) {
         ActivityType type = optedIn ? ActivityType.MARKETING_OPTED_IN : ActivityType.MARKETING_OPTED_OUT;
         addActivity(CustomerActivity.of(this, type, Map.of("optedIn", optedIn), null, triggeredBy));
+    }
+
+    /** The caller has already checked the move with HierarchyRules. */
+    public void changeParent(UUID newParentId) {
+        if (Objects.equals(this.parentCustomerId, newParentId)) return;
+        this.parentCustomerId = newParentId;
+        this.updatedAt = Instant.now();
     }
 
     public boolean isDeleted() {

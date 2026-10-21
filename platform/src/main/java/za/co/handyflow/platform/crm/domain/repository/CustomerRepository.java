@@ -411,4 +411,25 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
             WHERE c.deleted_at IS NULL
             """, nativeQuery = true)
     List<UUID> findDistinctActiveTenantIds();
+
+    // ── Company hierarchy ────────────────────────────────────────────────────
+
+    /** Every active company that has a parent, as (id, parentId) pairs. */
+    @Query("""
+            SELECT c.id, c.parentCustomerId FROM Customer c
+            WHERE c.tenantId = :tenantId AND c.deletedAt IS NULL AND c.parentCustomerId IS NOT NULL
+            """)
+    List<Object[]> findParentLinks(@Param("tenantId") TenantId tenantId);
+
+    @Query("""
+            SELECT c FROM Customer c
+            WHERE c.tenantId = :tenantId AND c.deletedAt IS NULL AND c.id IN :ids
+            """)
+    List<Customer> findActiveByIds(@Param("tenantId") TenantId tenantId, @Param("ids") java.util.Collection<UUID> ids);
+
+    @Query("""
+            SELECT COUNT(c) FROM Customer c
+            WHERE c.tenantId = :tenantId AND c.deletedAt IS NULL AND c.parentCustomerId = :parentId
+            """)
+    long countActiveBranches(@Param("tenantId") TenantId tenantId, @Param("parentId") UUID parentId);
 }

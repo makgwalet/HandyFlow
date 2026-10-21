@@ -311,6 +311,16 @@ public class CustomerService {
             );
         }
 
+        // Guard 1b: branches
+        long branches = customerRepository.countActiveBranches(tenantId, id);
+        if (branches > 0) {
+            throw new ConflictException(
+                    "Cannot delete '" + customer.getName() + "' — " + branches +
+                            " branch" + (branches == 1 ? "" : "es") +
+                            " sit under it. Move them to another company or make them top-level first."
+            );
+        }
+
         // Guard 2: unpaid invoices
         long unpaidInvoices = customerRepository.countUnpaidInvoices(tenantId, id);
         if (unpaidInvoices > 0) {
