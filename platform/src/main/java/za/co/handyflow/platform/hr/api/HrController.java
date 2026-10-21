@@ -44,6 +44,9 @@ public class HrController {
     private final Emp201PdfGenerator     emp201PdfGenerator;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private final HrEmployeePortalAuthService hrEmployeePortalAuthService;
+    private final StatutoryRulesService  statutoryRulesService;
+    private final MedicalSchemeService   medicalSchemeService;
+    private final PayrollImpactService   payrollImpactService;
 
     // ── Employees ─────────────────────────────────────────────────────────────
 
@@ -312,6 +315,42 @@ public class HrController {
     public ResponseEntity<ApiResponse<List<OrgChartNodeResponse>>> getOrgChart() {
         return ResponseEntity.ok(ApiResponse.success(
                 hrService.getOrgChart(TenantContext.getTenantIdAsObject())));
+    }
+
+    // ── Statutory rules, medical scheme, impact report ────────────────────────
+    // These use PAYROLL_* / HR_MANAGE only. The general USER_READ / USER_UPDATE authorities are deliberately not accepted.
+
+    @GetMapping("/statutory/tax-years")
+    @PreAuthorize("hasAnyAuthority('PAYROLL_READ','PAYROLL_RUN')")
+    @Operation(summary = "Statutory tax years with their rules, source and approval state")
+    public ResponseEntity<ApiResponse<List<TaxYearResponse>>> getTaxYears() {
+        return ResponseEntity.ok(ApiResponse.success(statutoryRulesService.list()));
+    }
+
+    @GetMapping("/payroll/impact-report")
+    @PreAuthorize("hasAnyAuthority('PAYROLL_READ','PAYROLL_RUN')")
+    @Operation(summary = "Read-only comparison of recorded payslips with a recalculation under the approved rules")
+    public ResponseEntity<ApiResponse<PayrollImpactResponse>> getImpactReport(
+            @RequestParam(required = false) UUID runId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                payrollImpactService.report(TenantContext.getTenantIdAsObject(), runId)));
+    }
+
+    @GetMapping("/employees/{id}/medical-scheme")
+    @PreAuthorize("hasAnyAuthority('HR_MANAGE','PAYROLL_READ','PAYROLL_RUN')")
+    @Operation(summary = "An employee's medical scheme membership history")
+    public ResponseEntity<ApiResponse<List<MedicalSchemeResponse>>> getMedicalScheme(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                medicalSchemeService.list(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/employees/{id}/medical-scheme")
+    @PreAuthorize("hasAnyAuthority('HR_MANAGE','PAYROLL_RUN')")
+    @Operation(summary = "Record a new stretch of medical scheme membership; the open one is closed the day before")
+    public ResponseEntity<ApiResponse<MedicalSchemeResponse>> addMedicalScheme(
+            @PathVariable UUID id, @Valid @RequestBody MedicalSchemeRequest req, Principal principal) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Membership recorded",
+                medicalSchemeService.add(TenantContext.getTenantIdAsObject(), id, req, resolveUserId(principal))));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

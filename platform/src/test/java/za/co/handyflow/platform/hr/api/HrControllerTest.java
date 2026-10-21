@@ -12,6 +12,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import za.co.handyflow.platform.WebMvcTestSecuritySupport;
 import za.co.handyflow.platform.hr.application.internal.Emp201PdfGenerator;
+import za.co.handyflow.platform.hr.application.internal.MedicalSchemeService;
+import za.co.handyflow.platform.hr.application.internal.PayrollImpactService;
+import za.co.handyflow.platform.hr.application.internal.StatutoryRulesService;
 import za.co.handyflow.platform.hr.application.internal.HrService;
 import za.co.handyflow.platform.hr.application.internal.PayrollService;
 import za.co.handyflow.platform.hr.application.internal.PayslipPdfGenerator;
@@ -68,6 +71,9 @@ class HrControllerTest {
 
     @MockitoBean HrService              hrService;
     @MockitoBean PayrollService         payrollService;
+    @MockitoBean StatutoryRulesService  statutoryRulesService;
+    @MockitoBean MedicalSchemeService   medicalSchemeService;
+    @MockitoBean PayrollImpactService   payrollImpactService;
     @MockitoBean PayslipPdfGenerator    payslipPdfGenerator;
     @MockitoBean HrPayslipRepository    payslipRepo;
     @MockitoBean HrEmployeeRepository   employeeRepo;
@@ -115,7 +121,7 @@ class HrControllerTest {
         return new PayRunResponse(id, "PR00001",
                 LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), LocalDate.of(2026, 8, 25),
                 2026, "DRAFT", BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                BigDecimal.ZERO, BigDecimal.ZERO, 0, null, null, Instant.now());
+                BigDecimal.ZERO, BigDecimal.ZERO, 0, null, null, Instant.now(), java.util.List.of());
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -381,5 +387,82 @@ class HrControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(body)))
                 .andExpect(status().isForbidden());
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Slice 1: statutory rules, medical scheme and impact report.
+    // These endpoints accept PAYROLL_* / HR_MANAGE only; the broad USER_* authorities are rejected on purpose.
+    // ══════════════════════════════════════════════════════════════════════
+
+    @Test
+    @WithMockUser(authorities = {"USER_READ", "USER_UPDATE"})
+    @DisplayName("GET /statutory/tax-years with only USER_* returns 403")
+    void taxYearsRefuseBroadUserAuthorities() throws Exception {
+        mvc.perform(get(BASE + "/statutory/tax-years")).andExpect(status().isForbidden());
+        verifyNoInteractions(statutoryRulesService);
+    }
+
+    @Test
+    @WithMockUser(authorities = "PAYROLL_READ")
+    @DisplayName("GET /statutory/tax-years with PAYROLL_READ returns 200")
+    void taxYearsWithPayrollReadReturns200() throws Exception {
+        when(statutoryRulesService.list()).thenReturn(java.util.List.of());
+        mvc.perform(get(BASE + "/statutory/tax-years")).andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(authorities = {"USER_READ", "USER_UPDATE", "HR_READ"})
+    @DisplayName("GET /payroll/impact-report without a payroll authority returns 403")
+    void impactReportRefusesNonPayrollUsers() throws Exception {
+        mvc.perform(get(BASE + "/payroll/impact-report")).andExpect(status().isForbidden());
+        verifyNoInteractions(payrollImpactService);
+    }
+
+    @Test
+    @WithMockUser(authorities = "PAYROLL_READ")
+    @DisplayName("GET /payroll/impact-report passes the run id through")
+    void impactReportPassesRunId() throws Exception {
+        UUID runId = UUID.randomUUID();
+        when(payrollImpactService.report(any(), eq(runId)))
+                .thenReturn(new PayrollImpactResponse(Instant.now(), java.util.List.of(), 0, java.util.List.of()));
+        mvc.perform(get(BASE + "/payroll/impact-report").param("runId", runId.toString())).andExpect(status().isOk());
+        verify(payrollImpactService).report(any(), eq(runId));
+    }
+
+    @Test
+    @WithMockUser(authorities = "USER_UPDATE")
+    @DisplayName("POST /employees/{id}/medical-scheme with only USER_UPDATE returns 403")
+    void medicalSchemeWriteRefusesUserUpdate() throws Exception {
+        var body = Map.of("schemeName", "Discovery", "dependants", 1, "effectiveFrom", "2026-03-01");
+        mvc.perform(post(BASE + "/employees/" + UUID.randomUUID() + "/medical-scheme").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(medicalSchemeService);
+    }
+
+    @Test
+    @WithMockUser(username = USER_ID, authorities = "HR_MANAGE")
+    @DisplayName("POST /employees/{id}/medical-scheme with HR_MANAGE returns 201 and records who did it")
+    void medicalSchemeWriteRecordsTheUser() throws Exception {
+        UUID empId = UUID.randomUUID();
+        var body = Map.of("schemeName", "Discovery", "dependants", 1, "effectiveFrom", "2026-03-01");
+        when(medicalSchemeService.add(any(), eq(empId), any(), eq(UUID.fromString(USER_ID))))
+                .thenReturn(new MedicalSchemeResponse(UUID.randomUUID(), empId, "Discovery", null, 1, 2,
+                        LocalDate.of(2026, 3, 1), null, true, null, Instant.now()));
+        mvc.perform(post(BASE + "/employees/" + empId + "/medical-scheme").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
+                .andExpect(status().isCreated());
+        verify(medicalSchemeService).add(any(), eq(empId), any(), eq(UUID.fromString(USER_ID)));
+    }
+
+    @Test
+    @WithMockUser(authorities = "HR_MANAGE")
+    @DisplayName("POST /employees/{id}/medical-scheme without a scheme name returns 400")
+    void medicalSchemeNeedsAName() throws Exception {
+        var body = Map.of("dependants", 1, "effectiveFrom", "2026-03-01");
+        mvc.perform(post(BASE + "/employees/" + UUID.randomUUID() + "/medical-scheme").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(medicalSchemeService);
     }
 }

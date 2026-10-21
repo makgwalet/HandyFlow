@@ -7,6 +7,7 @@
 // 5. Status SUSPENDED added
 // 6. Rejection reason on terminate
 import { useState } from "react"
+import MedicalSchemeModal from "./MedicalSchemeModal"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Plus, X, Search, Users, ChevronRight, AlertTriangle, AlertCircle, Edit2, UserX, CheckCircle } from "lucide-react"
@@ -80,6 +81,7 @@ export default function EmployeesTab() {
   const [editing, setEditing]       = useState<Employee | null>(null)
   const [selected, setSelected]     = useState<Employee | null>(null)
   const [terminating, setTerminating] = useState<Employee | null>(null)
+  const [medicalFor, setMedicalFor] = useState<Employee | null>(null)
   const [endDate, setEndDate]       = useState("")
   const [form, setForm]             = useState(EMPTY_FORM)
   const [error, setError]           = useState("")
@@ -426,6 +428,10 @@ export default function EmployeesTab() {
             </div>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <button onClick={() => openEdit(selected)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1px solid var(--hf-info-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}><Edit2 size={13} /> Edit</button>
+              <button onClick={() => { setMedicalFor(selected); setSelected(null) }}
+                style={{ padding: "8px 14px", background: "var(--hf-surface)", color: "var(--hf-text-secondary)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                Medical scheme
+              </button>
               {selected.status === "ACTIVE" && (
                 <button onClick={() => { setTerminating(selected); setEndDate(""); setError(""); setSelected(null) }}
                   style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
@@ -457,6 +463,8 @@ export default function EmployeesTab() {
           <MFoot onCancel={() => setEditing(null)} onSubmit={() => { if (validate()) updateEmployee.mutate({ id: editing.id, body: toBody(form) }) }} loading={updateEmployee.isPending} label="Save Changes" />
         </Overlay>
       )}
+
+      {medicalFor && <MedicalSchemeModal employee={medicalFor} onClose={() => setMedicalFor(null)} />}
 
       {/* Terminate modal */}
       {terminating && (

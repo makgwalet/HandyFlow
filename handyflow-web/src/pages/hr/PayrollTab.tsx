@@ -30,6 +30,7 @@ export default function PayrollTab() {
   const [showCreate, setShowCreate] = useState(false)
   const [expanded, setExpanded]     = useState<string | null>(null)
   const [error, setError]           = useState("")
+  const [warnings, setWarnings] = useState<string[]>([])
 
   const today = new Date()
   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split("T")[0]
@@ -57,7 +58,11 @@ export default function PayrollTab() {
 
   const processPayRun = useMutation({
     mutationFn: (id: string) => apiClient.post(`/api/v1/hr/pay-runs/${id}/process`),
-    onSuccess: (_, id) => { qc.invalidateQueries({ queryKey: ["pay-runs"] }); qc.invalidateQueries({ queryKey: ["payslips", id] }) },
+    onSuccess: (res, id) => {
+      qc.invalidateQueries({ queryKey: ["pay-runs"] }); qc.invalidateQueries({ queryKey: ["payslips", id] })
+      const w = (res.data?.data ?? res.data)?.warnings
+      setWarnings(Array.isArray(w) ? w : []); setError("")
+    },
     onError: (e: any) => setError(e.response?.data?.message ?? "Failed to process pay run"),
   })
 
@@ -78,8 +83,14 @@ export default function PayrollTab() {
 
   return (
     <div>
+      {warnings.length > 0 && (
+        <div role="status" style={{ marginBottom: 14, padding: "10px 14px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-warning-text)" }}>
+          <strong>The run was processed, with {warnings.length === 1 ? "one point" : `${warnings.length} points`} to check:</strong>
+          <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>{warnings.map(w => <li key={w}>{w}</li>)}</ul>
+        </div>
+      )}
       <div style={{ marginBottom: 18, padding: "10px 14px", background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-info-text)" }}>
-        <strong>SA Tax Year:</strong> March to February. Processing calculates PAYE (with MTC), UIF (1% capped at R17,712/month), and SDL (1% if payroll &gt; R500,000/year). Travel allowance: 80% taxable.
+        <strong>SA tax year:</strong> March to February, taken from the pay date. Processing uses the approved rules for that year (see Payroll checks) and stops if they are missing. The medical credit comes from the employee's recorded medical scheme membership.
       </div>
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>

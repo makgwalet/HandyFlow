@@ -87,3 +87,44 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 3. **Medical tax credit.** Do we add the dependants count to the employee record now?
 4. **Permissions.** Taking `USER_UPDATE` out of payroll processing will stop people who rely on it today. OK to switch to `PAYROLL_*` with a controlled migration like the Catalogue one?
 5. **Scope of "HR".** Recruitment and training packages already exist for agency and training-provider products. Do you want the HR module to reuse them or have its own employer-side versions?
+
+## 6. Decisions taken (2026-10-21)
+
+1. SARS figures are fetched from SARS and stored as versioned rules with a source note and an approval state.
+2. An impact report comes before any change to issued payslips. Issued payslips and paid runs are never overwritten; corrections go through an approved adjustment or reversal.
+3. Medical scheme membership is modelled with dates and dependants. The credit comes from the people covered, not from children or household dependants.
+4. `USER_UPDATE` is replaced on payroll by `PAYROLL_*` permissions through a controlled migration (Slice 2, with an inventory and an unmapped-assignments report first).
+5. Recruitment and training reuse shared technical services but get HR-owned employer-side workflows, decoupled from the agency and training-provider products.
+
+## 7. Slice 1 status: payroll correctness
+
+**Built (not yet run by me against Maven or a database, see "Not verified")**
+
+- **Tax year from the pay date.** A tax year is named by the year it ends (2027 is 1 March 2026 to 28 February 2027). The old code labelled March to December with the calendar year, so the label was wrong for most runs.
+- **Rules in the database, not in code.** `hr_statutory_tax_years` (V485) holds UIF ceiling and rates, SDL, retirement cap, travel percentage and medical credits per year, with status, source note and approval. Brackets and rebates for 2027 were added next to the existing 2026 ones.
+- **No silent zero.** A pay run for a year with missing, incomplete or unapproved rules is refused with a plain message (409). Before, a missing table gave R0 PAYE, UIF and SDL.
+- **Medical credit only for people covered.** The credit follows `hr_medical_scheme_memberships` (employee plus dependants, with dates). With no membership on record and a medical aid deduction, the run uses an employee-only credit and says so in the run warnings. With neither, there is no credit.
+- **Age at the end of the tax year**, not the current calendar year.
+- **Impact report** (`GET /payroll/impact-report`, read-only). Recalculates each processed run under the approved rules and classifies every payslip and run as NO_DIFFERENCE, POTENTIAL_DIFFERENCE, CONFIRMED_DIFFERENCE or REVIEW_REQUIRED. It changes nothing.
+- **Screens.** HR > Payroll checks (rules by tax year; impact report with payslip detail), Medical scheme button on the employee card, and pay run warnings shown after processing.
+- **Permissions.** The new endpoints use `PAYROLL_READ` / `PAYROLL_RUN` / `HR_MANAGE` and do not accept `USER_*`.
+
+**Sources (read 2026-10-21):** SARS rates of tax for individuals; SARS medical tax credit rates; SARS UIF page (ceiling R17 712 a month); SARS employer guide for employees' tax 2026 and 2027; SARS monthly deduction tables.
+2025/26 figures match the existing seed. 2026/27: brackets from R245 100, primary rebate R17 820, medical credit R376 / R376 (R752 with one dependant) / R254, retirement cap R430 000.
+
+**Needs your decision or action**
+
+- **Sign-off.** V485 loads both tax years as APPROVED so payroll keeps working after deploy. `approved_by` is empty and the approval note says the owner sign-off is still to be recorded. Someone accountable should check the figures against SARS and record that. There is no screen for approving a tax year yet.
+- **Parity test removed.** `PayrollEngineParityTest` asserted that the HR engine equals the payroll bureau engine. That is no longer true by design, so the test was deleted.
+- **Payroll bureau still has the old formula.** `payrollbureau` uses the shared `SarsPayrollCalculator`, which still gives the medical credit to everyone, uses the current calendar year for age, and has hard-coded constants. It needs its own review and impact report. I have not touched it.
+
+**Not covered by Slice 1:** the `PAYROLL_*` permissions migration (Slice 2), overtime, bonus, pro-rata and final pay, a tax-year approval screen, ETI, retirement-fund carry-forward, and whether a run was paid or exported (not tracked, so the impact report cannot say).
+
+**Not verified**
+
+- Maven build, all Mockito tests (`PayrollServiceTest`, `StatutoryRulesServiceTest`, `MedicalSchemeServiceTest`, `PayrollImpactServiceTest`, the new `HrControllerTest` cases), the JPQL queries and migration V485 have not been run.
+- Run in a standalone harness and passing: `SarsPayeCalculatorTest` (14, including 18 SARS table rows for 2026 and 2027), `MedicalSchemeRulesTest` (9), `PayrollImpactRulesTest` (8).
+- Front end: `tsc`, `eslint` on the new files, 24 tests in `pages/hr` and `navigation`, and `vite build` pass.
+- Not looked at in a browser.
+
+**Please run:** `mvn clean test -pl platform`, start the app so Flyway applies V485 and Hibernate validates the new entities, then open HR > Payroll checks and read the impact report before processing any new run.

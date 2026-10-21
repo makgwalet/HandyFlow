@@ -3,6 +3,7 @@ package za.co.handyflow.platform.hr.dto;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 public record PayRunResponse(
@@ -21,5 +22,7 @@ public record PayRunResponse(
         int employeeCount,
         String notes,
         Instant processedAt,
-        Instant createdAt
+        Instant createdAt,
+        /** Things a person should look at after processing, such as a medical credit that rested on a guess. */
+        List<String> warnings
 ) {}

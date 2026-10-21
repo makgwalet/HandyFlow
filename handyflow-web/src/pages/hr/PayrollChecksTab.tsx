@@ -1,0 +1,207 @@
+// src/pages/hr/PayrollChecksTab.tsx
+//
+// Read-only checks for payroll: the statutory rules each tax year uses, and what a recalculation under those rules
+// would change in payslips already issued. Nothing on this screen changes payroll data.
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { AlertCircle, CheckCircle2 } from "lucide-react"
+import { apiClient } from "../../api/client"
+import {
+  impactSummary, rand, signedRand, taxYearName, VERDICT_STYLE, VERDICT_TEXT,
+  type Impact, type ImpactRun, type TaxYear,
+} from "./payrollChecks.logic"
+
+type Wrapped = { data?: { data?: unknown } }
+type ApiErr = { response?: { data?: { message?: string } } }
+const unwrap = <T,>(r: Wrapped): T => (r.data?.data ?? r.data) as T
+const errorText = (e: unknown, fallback: string) => (e as ApiErr)?.response?.data?.message ?? fallback
+const fmtDate = (d: string | null | undefined) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
+
+const card: React.CSSProperties = { border: "1px solid var(--hf-border)", borderRadius: 12, background: "var(--hf-surface)", marginBottom: 20, overflow: "hidden" }
+const head: React.CSSProperties = { padding: "14px 18px", borderBottom: "1px solid var(--hf-border-subtle)" }
+const th: React.CSSProperties = { textAlign: "left", padding: "9px 12px", fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }
+const td: React.CSSProperties = { padding: "10px 12px", fontSize: 13, color: "var(--hf-text)", borderTop: "1px solid var(--hf-border-subtle)", verticalAlign: "top" }
+
+function Pill({ text, color, bg }: { text: string; color: string; bg: string }) {
+  return <span style={{ background: bg, color, padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>{text}</span>
+}
+
+function Problem({ message }: { message: string }) {
+  return (
+    <div role="alert" style={{ display: "flex", gap: 8, alignItems: "center", padding: "12px 18px", color: "var(--hf-danger-text)", fontSize: 13 }}>
+      <AlertCircle size={15} /> {message}
+    </div>
+  )
+}
+
+export function StatutoryRulesPanel() {
+  const q = useQuery<TaxYear[]>({
+    queryKey: ["hr-tax-years"],
+    queryFn: async () => unwrap<TaxYear[]>(await apiClient.get("/api/v1/hr/statutory/tax-years")),
+  })
+  return (
+    <section style={card} aria-labelledby="hr-rules-h">
+      <div style={head}>
+        <h3 id="hr-rules-h" style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "var(--hf-text)" }}>Statutory rules by tax year</h3>
+        <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--hf-text-muted)" }}>
+          Payroll uses the rules of the tax year the pay date falls in, and will not run a period whose year is missing or unapproved.
+          A tax year is named by the year it ends, as SARS names it: 2027 is 1 March 2026 to 28 February 2027. This list is read-only.
+        </p>
+      </div>
+      {q.isLoading ? <div style={{ padding: 24, color: "var(--hf-text-faint)" }}>Loading tax years…</div>
+        : q.isError ? <Problem message={errorText(q.error, "The tax years could not be loaded.")} />
+        : (q.data ?? []).length === 0 ? <div style={{ padding: 24, color: "var(--hf-text-faint)" }}>No tax years are set up, so payroll cannot run.</div>
+        : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr>
+                <th style={th}>Tax year</th><th style={th}>Period</th><th style={th}>State</th><th style={th}>Primary rebate</th>
+                <th style={th}>Medical credit a month</th><th style={th}>UIF ceiling</th><th style={th}>Retirement cap</th><th style={th}>Source</th>
+              </tr></thead>
+              <tbody>
+                {(q.data ?? []).map(y => (
+                  <tr key={y.taxYear}>
+                    <td style={td}><strong>{taxYearName(y.taxYear)}</strong><div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>SARS: {y.taxYear}</div></td>
+                    <td style={td}>{fmtDate(y.effectiveFrom)} – {fmtDate(y.effectiveTo)}</td>
+                    <td style={td}>
+                      {y.usable
+                        ? <Pill text="Approved, in use" color="var(--hf-success-text-strong)" bg="var(--hf-success-soft-strong)" />
+                        : <Pill text="Cannot be used" color="var(--hf-danger-text)" bg="var(--hf-danger-soft)" />}
+                      {y.problems.map(p => <div key={p} style={{ fontSize: 11, color: "var(--hf-danger-text)", marginTop: 4 }}>{p}</div>)}
+                      {y.usable && y.approvalNote && <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 4, maxWidth: 260 }}>{y.approvalNote}</div>}
+                    </td>
+                    <td style={td}>{rand(y.primaryRebate)}</td>
+                    <td style={td}>{rand(y.mtcTaxpayer)} / {rand(y.mtcFirstDependant)} / {rand(y.mtcAdditional)}
+                      <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>member / first dependant / each more</div></td>
+                    <td style={td}>{rand(y.uifMonthlyCeiling)}</td>
+                    <td style={td}>{rand(y.retirementCapAmount)}<div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>or {(y.retirementCapPct * 100).toFixed(1)}% of income</div></td>
+                    <td style={td}><details><summary style={{ cursor: "pointer", fontSize: 12 }}>Where it came from</summary>
+                      <div style={{ fontSize: 11, color: "var(--hf-text-muted)", maxWidth: 320, marginTop: 4 }}>{y.sourceNote}</div></details></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+    </section>
+  )
+}
+
+function RunDetail({ runId }: { runId: string }) {
+  const q = useQuery<Impact>({
+    queryKey: ["hr-impact", runId],
+    queryFn: async () => unwrap<Impact>(await apiClient.get("/api/v1/hr/payroll/impact-report", { params: { runId } })),
+  })
+  if (q.isLoading) return <div style={{ padding: 16, color: "var(--hf-text-faint)" }}>Loading payslips…</div>
+  if (q.isError) return <Problem message={errorText(q.error, "The payslips could not be compared.")} />
+  const run = q.data?.runs[0]
+  if (!run) return <div style={{ padding: 16, color: "var(--hf-text-faint)" }}>This run has no payslips to compare.</div>
+  return (
+    <div style={{ padding: "12px 16px", background: "var(--hf-surface-muted)" }}>
+      <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--hf-text-secondary)" }}>{run.action}</p>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr><th style={th}>Employee</th><th style={th}>Result</th><th style={th}>PAYE paid</th><th style={th}>PAYE recalculated</th><th style={th}>Difference</th><th style={th}>Why</th></tr></thead>
+          <tbody>
+            {(run.lines ?? []).map(l => (
+              <tr key={l.payslipId}>
+                <td style={td}>{l.employeeName}<div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{l.employeeNumber}</div></td>
+                <td style={td}><Pill text={VERDICT_TEXT[l.verdict]} {...VERDICT_STYLE[l.verdict]} /></td>
+                <td style={td}>{rand(l.recordedPaye)}</td>
+                <td style={td}>{rand(l.recalculatedPaye)}</td>
+                <td style={td}>{signedRand(l.payeDifference)}</td>
+                <td style={{ ...td, fontSize: 12, color: "var(--hf-text-secondary)" }}>{l.reasons.length ? l.reasons.map(r => <div key={r}>{r}</div>) : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+export function ImpactReportPanel() {
+  const [open, setOpen] = useState<string | null>(null)
+  const q = useQuery<Impact>({
+    queryKey: ["hr-impact"],
+    queryFn: async () => unwrap<Impact>(await apiClient.get("/api/v1/hr/payroll/impact-report")),
+  })
+  return (
+    <section style={card} aria-labelledby="hr-impact-h">
+      <div style={head}>
+        <h3 id="hr-impact-h" style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "var(--hf-text)" }}>Payslips already issued: what would change</h3>
+        <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--hf-text-muted)" }}>
+          Each processed run is recalculated under the approved rules and compared with what was paid. This report changes nothing.
+          Any correction has to go through an approved adjustment, not through this screen.
+        </p>
+      </div>
+      {q.isLoading ? <div style={{ padding: 24, color: "var(--hf-text-faint)" }}>Comparing pay runs…</div>
+        : q.isError ? <Problem message={errorText(q.error, "The report could not be produced.")} />
+        : q.data && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 18px", fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>
+              {q.data.runsWithDifferences === 0 ? <CheckCircle2 size={15} color="var(--hf-success-text-strong)" /> : <AlertCircle size={15} color="var(--hf-warning-text)" />}
+              {impactSummary(q.data)}
+            </div>
+            {q.data.runs.length > 0 && (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead><tr>
+                    <th style={th}>Run</th><th style={th}>Pay date</th><th style={th}>Tax year</th><th style={th}>Status</th><th style={th}>Payslips</th>
+                    <th style={th}>PAYE paid</th><th style={th}>PAYE recalculated</th><th style={th}>Difference</th><th style={th}>Result</th><th style={th}><span className="sr-only" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden" }}>Details</span></th>
+                  </tr></thead>
+                  <tbody>
+                    {q.data.runs.map((r: ImpactRun) => (
+                      <RunRows key={r.runId} run={r} open={open === r.runId} onToggle={() => setOpen(open === r.runId ? null : r.runId)} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <ul style={{ margin: 0, padding: "12px 18px 16px 34px", fontSize: 12, color: "var(--hf-text-muted)" }}>
+              {q.data.notes.map(n => <li key={n}>{n}</li>)}
+            </ul>
+          </>
+        )}
+    </section>
+  )
+}
+
+function RunRows({ run, open, onToggle }: { run: ImpactRun; open: boolean; onToggle: () => void }) {
+  const mislabelled = run.recordedTaxYear != null && run.recordedTaxYear !== run.correctTaxYear
+  return (
+    <>
+      <tr>
+        <td style={td}><strong>{run.runNumber}</strong></td>
+        <td style={td}>{fmtDate(run.payDate)}</td>
+        <td style={td}>{taxYearName(run.correctTaxYear)}
+          {mislabelled && <div style={{ fontSize: 11, color: "var(--hf-warning-text)" }}>was labelled {taxYearName(run.recordedTaxYear as number)}</div>}</td>
+        <td style={td}>{run.status}{run.emp201Status && <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>EMP201: {run.emp201Status}</div>}</td>
+        <td style={td}>{run.payslips}</td>
+        <td style={td}>{rand(run.recordedPaye)}</td>
+        <td style={td}>{rand(run.recalculatedPaye)}</td>
+        <td style={td}>{signedRand(run.payeDifference)}</td>
+        <td style={td}><Pill text={VERDICT_TEXT[run.verdict]} {...VERDICT_STYLE[run.verdict]} />
+          <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>
+            {run.confirmedDifference} confirmed · {run.potentialDifference} possible · {run.reviewRequired} to review
+          </div></td>
+        <td style={td}>
+          <button type="button" onClick={onToggle} aria-expanded={open} aria-label={`${open ? "Hide" : "Show"} payslips of ${run.runNumber}`}
+            style={{ padding: "5px 10px", border: "1px solid var(--hf-border)", borderRadius: 7, background: "var(--hf-surface)", cursor: "pointer", fontSize: 12, color: "var(--hf-text-secondary)" }}>
+            {open ? "Hide" : "Payslips"}
+          </button>
+        </td>
+      </tr>
+      {open && <tr><td colSpan={10} style={{ padding: 0, borderTop: "1px solid var(--hf-border-subtle)" }}><RunDetail runId={run.runId} /></td></tr>}
+    </>
+  )
+}
+
+export default function PayrollChecksTab() {
+  return (
+    <div>
+      <StatutoryRulesPanel />
+      <ImpactReportPanel />
+    </div>
+  )
+}

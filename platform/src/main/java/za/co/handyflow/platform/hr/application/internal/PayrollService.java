@@ -10,11 +10,13 @@ import za.co.handyflow.platform.hr.domain.model.*;
 import za.co.handyflow.platform.hr.domain.repository.*;
 import za.co.handyflow.platform.hr.dto.*;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
+import za.co.handyflow.platform.shared.StatutoryYearRules;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -28,22 +30,29 @@ public class PayrollService {
     private final HrEmployeeRepository  employeeRepo;
     private final PayrollEngine         engine;
     private final PayRunNumberGenerator numberGen;
+    private final StatutoryRulesService rulesService;
+    private final MedicalSchemeService  medicalSchemeService;
 
     // ── Pay runs ──────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public Page<PayRunResponse> getPayRuns(TenantId tenantId, Pageable pageable) {
         return payRunRepo.findAllByTenant(tenantId, pageable)
-                .map(this::toPayRunResponse);
+                .map(r -> toPayRunResponse(r, List.of()));
     }
 
     @Transactional
     public PayRunResponse createPayRun(TenantId tenantId, CreatePayRunRequest req) {
-        // WHY determine tax year? SA tax year runs Mar–Feb.
-        // March 2026 is tax year 2026. February 2026 is tax year 2025.
-        int taxYear = req.periodStart().getMonthValue() >= 3
-                ? req.periodStart().getYear()
-                : req.periodStart().getYear() - 1;
+        if (req.periodEnd().isBefore(req.periodStart()))
+            throw new IllegalArgumentException("The period cannot end before it starts.");
+        if (req.payDate().isBefore(req.periodStart()))
+            throw new IllegalArgumentException("The pay date cannot be before the period starts.");
+
+        // The tax year is named by the year it ends, as SARS names it, and is taken from the pay date:
+        // 1 March 2026 to 28 February 2027 is tax year 2027. A run is refused up front when that year has no
+        // approved rules, rather than producing payslips with no tax.
+        int taxYear = StatutoryYearRules.taxYearOf(req.payDate());
+        rulesService.rulesFor(taxYear);
 
         String number = numberGen.next(tenantId, req.periodStart());
         HrPayRun run = HrPayRun.create(tenantId, number,
@@ -58,7 +67,7 @@ public class PayrollService {
         payRunRepo.save(run);
         log.info("Created pay run={} period={} to {}", number,
                 req.periodStart(), req.periodEnd());
-        return toPayRunResponse(run);
+        return toPayRunResponse(run, List.of());
     }
 
     @Transactional
@@ -68,6 +77,12 @@ public class PayrollService {
 
         if (!"DRAFT".equals(run.getStatus()))
             throw new IllegalStateException("Only DRAFT pay runs can be processed. Current status: " + run.getStatus());
+
+        // The tax year comes from the pay date, not from the label the run was created with: runs made before
+        // this fix can carry a wrong label. The rules are loaded once, and a missing year stops the run before
+        // anything is deleted or written.
+        int taxYear = StatutoryYearRules.taxYearOf(run.getPayDate());
+        StatutoryYearRules rules = rulesService.rulesFor(taxYear);
 
         // FIX 1.4: Idempotency — delete any existing payslips before re-processing
         // Prevents duplicate payslips if processing was retried after a partial failure
@@ -85,6 +100,13 @@ public class PayrollService {
         if (employees.isEmpty())
             throw new IllegalStateException("No active employees found for this tenant");
 
+        List<String> warnings = new java.util.ArrayList<>();
+        if (taxYear != run.getTaxYear())
+            warnings.add("This run was labelled tax year " + run.getTaxYear() + " but its pay date falls in " + taxYear
+                    + ". It was calculated under " + taxYear + ".");
+
+        Map<UUID, MedicalSchemeRules.Members> members = medicalSchemeService.membersOn(tenantId, employees, run.getPayDate());
+
         BigDecimal annualPayroll = employees.stream()
                 .map(HrEmployee::getGrossSalary)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
@@ -95,21 +117,25 @@ public class PayrollService {
         BigDecimal runNet   = BigDecimal.ZERO;
 
         for (HrEmployee emp : employees) {
-            PayrollEngine.PayrollResult result = engine.calculate(emp, run.getTaxYear(), annualPayroll);
+            MedicalSchemeRules.Members m = members.get(emp.getId());
+            if (m.assumed())
+                warnings.add(emp.getFullName() + " (" + emp.getEmployeeNumber() + "): no medical scheme membership is on record, "
+                        + "so the medical credit assumes the employee only. Record the membership to confirm it.");
+            PayrollEngine.PayrollResult result = engine.calculate(emp, rules, annualPayroll, m.count());
 
             HrPayslip slip = HrPayslip.create(tenantId, run.getId(), emp.getId(),
                     result.grossSalary(), result.travelAllowance(),
                     result.medicalAid(), result.pension());
 
             // FIX 1.5: Calculate YTD BEFORE save — slip.getId() is not yet in DB
-            BigDecimal ytdGross = payslipRepo.sumYtdGross(emp.getId(), run.getTaxYear(), slip.getId());
-            BigDecimal ytdPaye  = payslipRepo.sumYtdPaye(emp.getId(), run.getTaxYear(), slip.getId());
-            BigDecimal ytdUif   = payslipRepo.sumYtdUif(emp.getId(), run.getTaxYear(), slip.getId());
+            BigDecimal ytdGross = payslipRepo.sumYtdGross(emp.getId(), taxYear, slip.getId());
+            BigDecimal ytdPaye  = payslipRepo.sumYtdPaye(emp.getId(), taxYear, slip.getId());
+            BigDecimal ytdUif   = payslipRepo.sumYtdUif(emp.getId(), taxYear, slip.getId());
 
             slip.applyCalculations(
                     result.payeAmount(), result.uifEmployee(), result.uifEmployer(),
                     result.sdlAmount(), result.taxableIncome(), result.taxBeforeRebate(),
-                    result.primaryRebate(), run.getTaxYear());
+                    result.primaryRebate(), taxYear);
 
             // FIX 1.2: Replace reflection with direct setters on HrPayslip
             slip.setYtdGross(ytdGross.add(result.totalEarnings()));
@@ -132,9 +158,9 @@ public class PayrollService {
                 run.getPeriodStart(), run.getPeriodEnd(), runPaye, runUif, runSdl);
         emp201Repo.save(emp201);
 
-        log.info("Processed pay run={} employees={} gross={} paye={} uif={} sdl={} net={}",
-                run.getPayRunNumber(), employees.size(), runGross, runPaye, runUif, runSdl, runNet);
-        return toPayRunResponse(run);
+        log.info("Processed pay run={} taxYear={} employees={} gross={} paye={} uif={} sdl={} net={} warnings={}",
+                run.getPayRunNumber(), taxYear, employees.size(), runGross, runPaye, runUif, runSdl, runNet, warnings.size());
+        return toPayRunResponse(run, warnings);
     }
 
     // ── Payslips ──────────────────────────────────────────────────────────────
@@ -165,12 +191,12 @@ public class PayrollService {
 
     // ── Mappers ───────────────────────────────────────────────────────────────
 
-    private PayRunResponse toPayRunResponse(HrPayRun r) {
+    private PayRunResponse toPayRunResponse(HrPayRun r, List<String> warnings) {
         return new PayRunResponse(r.getId(), r.getPayRunNumber(),
                 r.getPeriodStart(), r.getPeriodEnd(), r.getPayDate(),
                 r.getTaxYear(), r.getStatus(), r.getTotalGross(), r.getTotalPaye(),
                 r.getTotalUif(), r.getTotalSdl(), r.getTotalNet(),
-                r.getEmployeeCount(), r.getNotes(), r.getProcessedAt(), r.getCreatedAt());
+                r.getEmployeeCount(), r.getNotes(), r.getProcessedAt(), r.getCreatedAt(), warnings);
     }
 
     private PayslipResponse toPayslipResponse(HrPayslip s, TenantId tenantId) {
