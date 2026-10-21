@@ -1,5 +1,7 @@
 // src/pages/customers/CustomersPage.tsx
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { responseMessage } from './apiError'
+import type { LucideIcon } from 'lucide-react'
 import { LEAD_SOURCES, sourceLabel } from "./pipeline.logic"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -89,7 +91,7 @@ const EMPTY_FORM = {
 // Display config maps
 // ─────────────────────────────────────────────────────────────────────────────
 
-const STATUS_CONFIG: Record<CustomerStatus, { label: string; className: string; Icon: React.FC<any> }> = {
+const STATUS_CONFIG: Record<CustomerStatus, { label: string; className: string; Icon: LucideIcon }> = {
   ACTIVE:   { label: 'Active',   className: styles.badgeActive,   Icon: CheckCircle2 },
   INACTIVE: { label: 'Inactive', className: styles.badgeInactive, Icon: TrendingDown },
   BLOCKED:  { label: 'Blocked',  className: styles.badgeBlocked,  Icon: Ban          },
@@ -176,10 +178,10 @@ const formatDateTime = (iso: string) =>
   })
 
 function parseApiError(e: unknown): { fieldMap: Record<string, string>; general: string } {
-  const data = (e as any)?.response?.data
+  const data = (e as { response?: { data?: { errors?: unknown; message?: string } } } | null)?.response?.data
   if (data?.errors && Array.isArray(data.errors)) {
     const fieldMap: Record<string, string> = {}
-    data.errors.forEach((err: any) => { fieldMap[err.field] = err.message })
+    for (const err of data.errors as { field: string; message: string }[]) fieldMap[err.field] = err.message
     return { fieldMap, general: '' }
   }
   return { fieldMap: {}, general: data?.message ?? 'Something went wrong. Please try again.' }
@@ -190,7 +192,7 @@ function validateForm(f: typeof EMPTY_FORM): Record<string, string> {
   if (!f.name.trim()) errs.name = 'Company name is required'
   if (f.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email))
     errs.email = 'Enter a valid email address'
-  if (f.phone && !/^(\+|0)[\d\s\-]{7,}$/.test(f.phone))
+  if (f.phone && !/^(\+|0)[\d\s-]{7,}$/.test(f.phone))
     errs.phone = 'Phone must start with + or 0'
   if (f.taxNumber && !/^\d{10}$/.test(f.taxNumber))
     errs.taxNumber = 'SA VAT number must be exactly 10 digits'
@@ -316,7 +318,9 @@ export function CustomersPage() {
   const [noteText, setNoteText]         = useState('')
   const [showImport, setShowImport]     = useState(false)
 
-  useEffect(() => { setPage(0) }, [debouncedSearch])
+  // Back to the first page when the search text changes (adjusting state while rendering, not in an effect).
+  const [searchSeen, setSearchSeen] = useState(debouncedSearch)
+  if (searchSeen !== debouncedSearch) { setSearchSeen(debouncedSearch); setPage(0) }
 
   const closeModal = useCallback(() => {
     setModal('none'); setForm(EMPTY_FORM)
@@ -908,8 +912,8 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
       link.href = url; link.download = filename
       document.body.appendChild(link); link.click()
       document.body.removeChild(link); URL.revokeObjectURL(url)
-    } catch (e: any) {
-      setPopiaError(e?.response?.data?.message ?? 'Failed to generate POPIA export')
+    } catch (e) {
+      setPopiaError(responseMessage(e) ?? 'Failed to generate POPIA export')
     }
   }
 
@@ -1322,7 +1326,7 @@ function TimelineModal({ customer, activities, isLoading, noteText, onNoteChange
             </p>
           ) : activities.map((a, i) => (
             <div key={a.id} className={styles.timelineItem}>
-              <div className={`${styles.timelineDot} ${(styles as any)[`dot_${a.activityType}`] ?? ''}`} />
+              <div className={`${styles.timelineDot} ${(styles as Record<string, string>)[`dot_${a.activityType}`] ?? ''}`} />
               {i < activities.length - 1 && <div className={styles.timelineLine} />}
               <div className={styles.timelineContent}>
                 <div className={styles.timelineLabel}>
@@ -1331,7 +1335,7 @@ function TimelineModal({ customer, activities, isLoading, noteText, onNoteChange
                 {a.note && <p className={styles.timelineNote}>{a.note}</p>}
                 {a.payload && a.activityType === 'STATUS_CHANGED' && (
                   <p className={styles.timelineDetail}>
-                    {String((a.payload as any).from)} → {String((a.payload as any).to)}
+                    {String((a.payload as { from?: unknown }).from)} → {String((a.payload as { to?: unknown }).to)}
                   </p>
                 )}
                 <time className={styles.timelineTime}>{formatDateTime(a.createdAt)}</time>
@@ -1357,7 +1361,7 @@ function Overlay({ children, onClose }: { children: React.ReactNode; onClose: ()
 }
 
 function Detail({ icon: Icon, label, value, fullWidth = false }: {
-  icon: React.FC<any>; label: string; value: string; fullWidth?: boolean
+  icon: LucideIcon; label: string; value: string; fullWidth?: boolean
 }) {
   return (
     <div className={`${styles.detailCard} ${fullWidth ? styles.detailCardFull : ''}`}>

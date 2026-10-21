@@ -4,6 +4,7 @@
 // FollowUpPanel, same collapsible-section convention.
 
 import { useState } from 'react'
+import { responseMessage } from './apiError'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { MessageSquare, Plus, Trash2, AlertCircle, Phone, Mail, Users, MessageCircle, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
 import { apiClient } from '../../api/client'
@@ -67,7 +68,7 @@ export function CommunicationPanel({ customerId }: { customerId: string }) {
     onSuccess: () => {
       invalidate(); setShowAdd(false); setSummary(''); setOccurredAt(nowForInput()); setFormError('')
     },
-    onError: (e: any) => setFormError(e?.response?.data?.message ?? 'Failed to log communication'),
+    onError: (e: unknown) => setFormError(responseMessage(e) ?? 'Failed to log communication'),
   })
 
   const deleteMutation = useMutation({

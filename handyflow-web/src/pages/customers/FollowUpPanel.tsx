@@ -12,6 +12,7 @@
 // collapsible.
 
 import { useState } from 'react'
+import { responseMessage } from './apiError'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { CalendarClock, Check, X, RotateCcw, Trash2, Plus, AlertCircle, AlertTriangle, PhoneMissed, CalendarPlus } from 'lucide-react'
 import { apiClient } from '../../api/client'
@@ -74,7 +75,7 @@ export function FollowUpPanel({ customerId }: { customerId: string }) {
     mutationFn: () =>
       apiClient.post(`/api/v1/crm/customers/${customerId}/followups`, { dueDate, note }),
     onSuccess: () => { invalidate(); setShowAdd(false); setDueDate(''); setNote(''); setFormError('') },
-    onError: (e: any) => setFormError(e?.response?.data?.message ?? 'Failed to schedule follow-up'),
+    onError: (e: unknown) => setFormError(responseMessage(e) ?? 'Failed to schedule follow-up'),
   })
 
   const completeMutation = useMutation({

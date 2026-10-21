@@ -1,5 +1,6 @@
 // src/pages/customers/ExportButton.tsx
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { errorMessage } from './apiError'
 import { Download, ChevronDown, AlertCircle, X } from 'lucide-react'
 import { apiClient } from '../../api/client'
 import styles from './CustomersPage.module.css'
@@ -49,10 +50,8 @@ export function ExportButton() {
       link.click()
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
-    } catch (e: any) {
-      const msg = e?.response?.data?.message
-             ?? e?.message
-             ?? 'Export failed. Check your connection and try again.'
+    } catch (e) {
+      const msg = errorMessage(e) ?? 'Export failed. Check your connection and try again.'
       showError(msg)
     } finally {
       setLoading(false)

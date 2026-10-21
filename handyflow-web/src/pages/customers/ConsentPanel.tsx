@@ -4,6 +4,7 @@
 // Shows the active consent record, allows recording and withdrawing consent.
 
 import { useState } from 'react'
+import { responseMessage } from './apiError'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Shield, ShieldOff, ShieldCheck, AlertCircle } from 'lucide-react'
 import { apiClient } from '../../api/client'
@@ -76,14 +77,14 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
     mutationFn: (body: object) =>
       apiClient.post(`/api/v1/crm/customers/${customerId}/consent`, body),
     onSuccess: () => { invalidate(); setShowRecord(false); setFormError('') },
-    onError: (e: any) => setFormError(e?.response?.data?.message ?? 'Failed to record consent'),
+    onError: (e: unknown) => setFormError(responseMessage(e) ?? 'Failed to record consent'),
   })
 
   const withdrawMutation = useMutation({
     mutationFn: (reason: string) =>
       apiClient.delete(`/api/v1/crm/customers/${customerId}/consent`, { data: { reason } }),
     onSuccess: () => { invalidate(); setShowWithdraw(false); setWithdrawReason('') },
-    onError: (e: any) => setFormError(e?.response?.data?.message ?? 'Failed to withdraw consent'),
+    onError: (e: unknown) => setFormError(responseMessage(e) ?? 'Failed to withdraw consent'),
   })
 
   // FIX: "no retention-review action button" — CustomerRetentionScheduler
@@ -97,7 +98,7 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
     mutationFn: () =>
       apiClient.post(`/api/v1/crm/customers/consent/${consent?.id}/review`),
     onSuccess: () => invalidate(),
-    onError: (e: any) => setFormError(e?.response?.data?.message ?? 'Failed to record review'),
+    onError: (e: unknown) => setFormError(responseMessage(e) ?? 'Failed to record review'),
   })
 
   const consent = data

@@ -2,6 +2,7 @@
 //
 // USAGE in CustomersPage header:
 //   import { ImportModal } from './ImportModal'
+import { errorMessage } from './apiError'
 //   const [showImport, setShowImport] = useState(false)
 //
 //   <button className={styles.btnOutline} onClick={() => setShowImport(true)}>
@@ -101,9 +102,9 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
       setPhase('done')
       qc.invalidateQueries({ queryKey: ['customers'] })
 
-    } catch (e: any) {
+    } catch (e) {
       setPhase('error')
-      setErrorMsg(e.response?.data?.message ?? e.message ?? 'Upload failed. Please try again.')
+      setErrorMsg(errorMessage(e) ?? 'Upload failed. Please try again.')
     }
   }
 
