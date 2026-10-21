@@ -200,3 +200,23 @@ Not built, and why it is not on the screens:
 - Counts are computed on request; they are cheap for normal catalogues but are not cached.
 
 Tests: completeness (7), history redaction (7) and dashboard rules (6) pass standalone. 6 service tests (Mockito) are written but **not run**. Front end: 126 catalogue tests pass (13 new), lint and type check clean. The backend was not compiled with Spring here and the new JPQL queries have not run against a database.
+
+## 12. Slice 6 status (import, export, bulk change): built, not yet run against a database
+
+| Area | What it does |
+|---|---|
+| Import | Section "Import & export" (needs `CATALOGUE_IMPORT` or `SETTINGS_MANAGE`). The browser reads a CSV (comma, semicolon or tab; quotes and a byte-order mark are handled; header names such as "Item Code", "Selling Price", "VAT %" are recognised) and sends its text. **Check file** returns a dry run, row by row: new, update, no change, or a problem with the reason. **Import** applies the same plan. Up to 2,000 rows and 2 MB per file. |
+| Matching | By SKU (case does not matter). Empty cells on an existing item leave it as it is. Modes: add new only, update existing only, or both. A file that repeats a SKU, name or barcode, or clashes with an existing item, is flagged on the row. Categories are matched by full path ("Building > Cement") or by name when only one category has it; unknown categories are a problem (nothing is created silently). |
+| Rules kept | Each row is saved through the ordinary create / update (duplicate checks, version check, required attributes, history), one row at a time, so a row that fails when saved is reported and the rest still go in. **Price changes to existing items are refused when price approval is on**; new items may carry a price. Cost is accepted only from users with `CATALOGUE_PRICE_WRITE`. Variants: name, category, unit, brand, type and VAT columns are ignored (they follow the main item). The status column is used for new items only. |
+| Problems | The import will not run while rows have problems unless "leave out" is ticked; left-out rows and rows that failed on saving are listed with their reason. Every applied import is recorded (`catalogue_import_jobs`, V481; dry runs are not). |
+| Export / template | `GET /export` (needs `CATALOGUE_EXPORT` or `SETTINGS_MANAGE`): all items that are not archived, same columns as the template, so an export can be edited and imported back. Cost is left blank for users without `CATALOGUE_PRICE_READ`. Text starting with `= + @ -` is written with a leading apostrophe so spreadsheets do not run it as a formula, and read back without it. |
+| Bulk change | Tick items in the list, **Change selected**: status (with a reason where one is needed), category, or prices by a percentage (-90 to +500, rounded to the cent, from a date, with a reason). Up to 200 items. **Check first** shows what would happen to each item; **Apply** then makes the change item by item through the normal rules. Price changes go through the price workflow, so with approval on each one waits for an approver; the minimum price is enforced. Items sold through variants are refused for price (select the variants). |
+
+Limits to know:
+- The dry run checks the rules it can see (duplicates, permissions, status moves, minimum price). A few checks only run when saving, such as required attributes for activation, so a row can pass the check and still fail when applied; that is reported as "could not be saved".
+- No attributes, variants or price-list columns in the file yet; per-list prices and variant creation are not imported.
+- The file is held in memory and processed in one request; large catalogues should be split (2,000 rows).
+- There is no undo for an applied import beyond editing the items again; the item history shows every change.
+- Export of the whole catalogue is allowed to anyone with the export permission; it is logged in the application log, not in the item history.
+
+Tests: 15 import rules tests and 3 bulk rules tests pass standalone. 16 service tests (Mockito) are written but **not run**. Front end: 139 catalogue tests pass (13 new), lint and type check clean. The backend was not compiled with Spring here and V481 and the new queries have not run against a database.

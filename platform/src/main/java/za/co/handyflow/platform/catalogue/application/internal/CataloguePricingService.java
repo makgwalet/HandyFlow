@@ -326,6 +326,10 @@ public class CataloguePricingService {
                 PricingRules.describe(list.getName(), change.getOldPrice(), change.getNewPrice(), change.getEffectiveFrom()), actor);
     }
 
+    /** The id of the default (Retail) list, created if the tenant has none yet. */
+    @Transactional
+    public UUID defaultListId(TenantId tenantId) { return ensureDefaultList(tenantId).getId(); }
+
     private CataloguePriceList ensureDefaultList(TenantId tenantId) {
         return listRepository.findDefault(tenantId).orElseGet(() -> listRepository.save(CataloguePriceList.create(tenantId, "RETAIL", "Retail", true, 0)));
     }

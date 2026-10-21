@@ -17,6 +17,9 @@ import za.co.handyflow.platform.catalogue.application.internal.CatalogueStructur
 import za.co.handyflow.platform.catalogue.application.internal.CataloguePricingService;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueVariantService;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueDashboardService;
+import za.co.handyflow.platform.catalogue.application.internal.CatalogueImportService;
+import za.co.handyflow.platform.catalogue.application.internal.CatalogueBulkService;
+import za.co.handyflow.platform.catalogue.domain.model.ImportRules;
 import za.co.handyflow.platform.catalogue.domain.model.PriceChangeStatus;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueService.Caller;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueService.ItemFilter;
@@ -49,6 +52,9 @@ public class CatalogueController {
     private static final String WRITE = "hasAnyAuthority('CATALOGUE_WRITE','SETTINGS_MANAGE')";
     private static final String ARCHIVE = "hasAnyAuthority('CATALOGUE_ARCHIVE','SETTINGS_MANAGE')";
 
+    private static final String IMPORT = "hasAnyAuthority('CATALOGUE_IMPORT','SETTINGS_MANAGE')";
+    private static final String EXPORT = "hasAnyAuthority('CATALOGUE_EXPORT','SETTINGS_MANAGE')";
+
     private static final String ADMIN = "hasAuthority('CATALOGUE_ADMIN')";
     private static final String PRICE_READ = "hasAuthority('CATALOGUE_PRICE_READ')";
     private static final String PRICE_WRITE = "hasAuthority('CATALOGUE_PRICE_WRITE')";
@@ -60,6 +66,8 @@ public class CatalogueController {
     private final CataloguePricingService pricingService;
     private final CatalogueVariantService variantService;
     private final CatalogueDashboardService dashboardService;
+    private final CatalogueImportService importService;
+    private final CatalogueBulkService bulkService;
 
     /** What the signed-in user may do, from their authorities. */
     private static Caller caller(Authentication auth) {
@@ -393,5 +401,55 @@ public class CatalogueController {
     @Operation(summary = "Product 360 overview of one item", description = "The item, its completeness score and what is outstanding.")
     public ResponseEntity<ApiResponse<ItemOverviewResponse>> overview(@PathVariable UUID id, Authentication auth) {
         return ResponseEntity.ok(ApiResponse.success(dashboardService.overview(TenantContext.getTenantIdAsObject(), id, caller(auth))));
+    }
+    // ── Import, export and bulk change ───────────────────────────────────────
+
+    @GetMapping(value = "/import/template", produces = "text/csv")
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_IMPORT','CATALOGUE_EXPORT','SETTINGS_MANAGE')")
+    @Operation(summary = "A CSV file with the columns the import reads, and one example row")
+    public ResponseEntity<String> importTemplate() {
+        return csv(ImportRules.template(), "catalogue-import-template.csv");
+    }
+
+    @PostMapping("/import/preview")
+    @PreAuthorize(IMPORT)
+    @Operation(summary = "Dry run of an import: what each row would do, nothing is saved")
+    public ResponseEntity<ApiResponse<ImportPreviewResponse>> importPreview(@Valid @RequestBody ImportRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(importService.preview(TenantContext.getTenantIdAsObject(), request, caller(auth))));
+    }
+
+    @PostMapping("/import")
+    @PreAuthorize(IMPORT)
+    @Operation(summary = "Apply an import", description = "Refused while rows have problems unless skipErrors is set.")
+    public ResponseEntity<ApiResponse<ImportResultResponse>> importApply(@Valid @RequestBody ImportRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(importService.run(TenantContext.getTenantIdAsObject(), request, caller(auth))));
+    }
+
+    @GetMapping("/import/jobs")
+    @PreAuthorize(IMPORT)
+    @Operation(summary = "Recent imports")
+    public ResponseEntity<ApiResponse<java.util.List<ImportJobResponse>>> importJobs() {
+        return ResponseEntity.ok(ApiResponse.success(importService.jobs(TenantContext.getTenantIdAsObject())));
+    }
+
+    @GetMapping(value = "/export", produces = "text/csv")
+    @PreAuthorize(EXPORT)
+    @Operation(summary = "Export the catalogue as CSV", description = "Cost is included only for users who may see prices.")
+    public ResponseEntity<String> export(Authentication auth) {
+        return csv(importService.export(TenantContext.getTenantIdAsObject(), caller(auth)), "catalogue.csv");
+    }
+
+    @PostMapping("/items/bulk")
+    @PreAuthorize(WRITE)
+    @Operation(summary = "Change many items at once (status, category, or prices by a percentage); supports a dry run")
+    public ResponseEntity<ApiResponse<BulkResponse>> bulk(@Valid @RequestBody BulkRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(bulkService.run(TenantContext.getTenantIdAsObject(), request, caller(auth))));
+    }
+
+    private static ResponseEntity<String> csv(String body, String fileName) {
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"" + fileName + "\"")
+                .header("Content-Type", "text/csv; charset=UTF-8")
+                .body(body);
     }
 }

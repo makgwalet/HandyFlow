@@ -98,4 +98,15 @@ public interface CatalogueItemRepository extends JpaRepository<CatalogueItem, UU
 
     @Query("SELECT i FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL ORDER BY i.updatedAt DESC")
     List<CatalogueItem> recentlyChanged(TenantId tenantId, org.springframework.data.domain.Pageable pageable);
+
+    // ── Import, export, bulk, data quality ──
+    /** Every live item with its category loaded, for building an import plan or an export. */
+    @Query("SELECT i FROM CatalogueItem i LEFT JOIN FETCH i.category WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL ORDER BY i.name")
+    List<CatalogueItem> allLive(TenantId tenantId);
+
+    @Query("SELECT DISTINCT i.parentId FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL AND i.parentId IS NOT NULL")
+    List<UUID> parentIdsWithVariants(TenantId tenantId);
+
+    @Query("SELECT i FROM CatalogueItem i LEFT JOIN FETCH i.category WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL AND i.id IN :ids")
+    List<CatalogueItem> findLiveByIds(TenantId tenantId, java.util.Collection<UUID> ids);
 }

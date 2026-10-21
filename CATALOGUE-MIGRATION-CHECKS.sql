@@ -117,3 +117,11 @@ SELECT o.id FROM catalogue_variant_options o JOIN catalogue_items i ON i.id = o.
 SELECT p.tenant_id, p.name, count(*) AS variants
 FROM catalogue_items p JOIN catalogue_items v ON v.parent_id = p.id AND v.deleted_at IS NULL
 WHERE p.deleted_at IS NULL GROUP BY p.tenant_id, p.id, p.name ORDER BY variants DESC LIMIT 50;
+
+-- 20. [must be 0 rows] An import record whose counts do not add up (created + updated + unchanged + skipped + failed should equal total_rows).
+SELECT id, total_rows, created, updated, unchanged, skipped, failed FROM catalogue_import_jobs
+WHERE created + updated + unchanged + skipped + failed <> total_rows;
+
+-- 21. INFO: the last imports per tenant.
+SELECT tenant_id, file_name, mode, total_rows, created, updated, skipped, failed, created_at
+FROM catalogue_import_jobs ORDER BY created_at DESC LIMIT 20;

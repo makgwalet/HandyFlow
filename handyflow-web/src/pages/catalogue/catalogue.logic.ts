@@ -527,3 +527,76 @@ export const actionText = (a: string) => ({
 
 /** Share of the largest value, 0–100, for the plain bar charts. */
 export const barPercent = (value: number, max: number) => (max <= 0 ? 0 : Math.max(value > 0 ? 3 : 0, Math.round((value / max) * 100)))
+
+
+// ── Import, export and bulk change ───────────────────────────────────────────
+export type ImportMode = "CREATE_ONLY" | "UPDATE_ONLY" | "CREATE_OR_UPDATE"
+export const IMPORT_MODES: { id: ImportMode; label: string; hint: string }[] = [
+  { id: "CREATE_OR_UPDATE", label: "Add new items and update existing ones", hint: "Items are matched by SKU. Empty cells leave an existing item as it is." },
+  { id: "CREATE_ONLY", label: "Add new items only", hint: "A row whose SKU already exists is a problem." },
+  { id: "UPDATE_ONLY", label: "Update existing items only", hint: "A row whose SKU does not exist is a problem." },
+]
+export type RowAction = "CREATE" | "UPDATE" | "UNCHANGED" | "ERROR"
+export const ROW_ACTION_LABEL: Record<RowAction, string> = { CREATE: "New", UPDATE: "Update", UNCHANGED: "No change", ERROR: "Problem" }
+export interface ImportRow { line: number; key: string; action: RowAction; changes: string[]; errors: string[]; notes: string[] }
+export interface ImportPreview { mode: ImportMode; total: number; create: number; update: number; unchanged: number; errors: number; fileProblems: string[]; unknownColumns: string[]; rows: ImportRow[]; truncated: boolean }
+export interface ImportResult { jobId: string; total: number; created: number; updated: number; unchanged: number; skipped: number; failed: number; problems: string[] }
+export interface ImportJob { id: string; fileName: string | null; mode: ImportMode; totalRows: number; created: number; updated: number; unchanged: number; skipped: number; failed: number; createdAt: string }
+
+export const MAX_IMPORT_CHARS = 2_000_000
+
+/** How many rows an import would write, given whether rows with problems are left out. Null when it cannot go ahead. */
+export function importCount(p: ImportPreview | null, skipErrors: boolean): number | null {
+  if (!p || p.fileProblems.length > 0) return null
+  if (p.errors > 0 && !skipErrors) return null
+  const n = p.create + p.update
+  return n > 0 ? n : null
+}
+
+export const importSummaryText = (p: ImportPreview) =>
+  p.fileProblems.length > 0 ? p.fileProblems[0] : `${p.total} row${p.total === 1 ? "" : "s"}: ${p.create} new, ${p.update} to update, ${p.unchanged} unchanged, ${p.errors} with problems.`
+
+export const resultText = (r: ImportResult) =>
+  `${r.created} added, ${r.updated} updated, ${r.unchanged} unchanged` + (r.skipped ? `, ${r.skipped} left out` : "") + (r.failed ? `, ${r.failed} could not be saved` : "") + "."
+
+export type BulkAction = "STATUS" | "CATEGORY" | "PRICE_PERCENT"
+export interface BulkForm { action: BulkAction; status: ItemStatus; reason: string; categoryId: string; percent: string; effectiveFrom: string }
+export const EMPTY_BULK_FORM: BulkForm = { action: "STATUS", status: "SUSPENDED", reason: "", categoryId: "", percent: "", effectiveFrom: "" }
+export interface BulkRow { id: string; name: string; sku: string | null; outcome: "OK" | "UNCHANGED" | "REFUSED"; message: string }
+export interface BulkResult { dryRun: boolean; ok: number; unchanged: number; refused: number; rows: BulkRow[] }
+export const MAX_BULK_ITEMS = 200
+
+export function bulkProblem(f: BulkForm): string | null {
+  if (f.action === "STATUS") return moveNeedsReason(f.status) && f.reason.trim().length < 3 ? "Give a reason of at least 3 characters." : null
+  if (f.action === "CATEGORY") return f.categoryId ? null : "Choose a category."
+  const p = Number(f.percent.replace(",", "."))
+  if (!f.percent.trim() || Number.isNaN(p)) return "Enter the percentage, for example 5 or -10."
+  if (p === 0) return "A change of 0% changes nothing."
+  if (p < -90 || p > 500) return "The percentage must be between -90 and 500."
+  return null
+}
+
+export function bulkBody(ids: string[], f: BulkForm, dryRun: boolean) {
+  return {
+    ids, action: f.action, dryRun,
+    status: f.action === "STATUS" ? f.status : undefined,
+    reason: f.reason.trim() || undefined,
+    categoryId: f.action === "CATEGORY" ? f.categoryId : undefined,
+    percent: f.action === "PRICE_PERCENT" ? Number(f.percent.replace(",", ".")) : undefined,
+    effectiveFrom: f.action === "PRICE_PERCENT" && f.effectiveFrom ? f.effectiveFrom : undefined,
+  }
+}
+
+export const bulkSummary = (r: BulkResult) =>
+  `${r.dryRun ? "Would change" : "Changed"} ${r.ok}` + (r.unchanged ? `, ${r.unchanged} already as asked` : "") + (r.refused ? `, ${r.refused} refused` : "") + "."
+
+/** Hands text to the browser as a file download. Does nothing where downloads are not possible. */
+export function saveText(fileName: string, text: string): void {
+  try {
+    const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }))
+    const a = document.createElement("a")
+    a.href = url; a.download = fileName
+    document.body.appendChild(a); a.click(); a.remove()
+    URL.revokeObjectURL(url)
+  } catch { /* no download support, e.g. in tests */ }
+}

@@ -9,6 +9,7 @@ import { inp, inpErr, sel } from "./catalogue.styles"
 import PricingModal from "./PricingModal"
 import VariantsModal from "./VariantsModal"
 import Product360 from "./Product360"
+import BulkModal from "./BulkModal"
 import {
   EMPTY_FILTERS, EMPTY_ITEM_FORM, applicableAttributes, attributeProblems, indented, matchUnit, ITEM_STATUSES, ITEM_TYPES, STATUS_LABEL, allowedMoves, duplicateField, errorMessage, fieldErrors, hasFilters, itemBody, itemProblems,
   actionText, listParams, marginText, moveLabel, moveNeedsReason, rand, rangeText, statusProblem, toItemForm, typeLabel,
@@ -35,6 +36,8 @@ export default function ItemsPanel() {
   const [pricingFor, setPricingFor] = useState<CatalogueItem | null>(null)
   const [variantsFor, setVariantsFor] = useState<CatalogueItem | null>(null)
   const [openId, setOpenId] = useState<string | null>(() => { try { return new URLSearchParams(window.location.search).get("item") } catch { return null } })
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [bulk, setBulk] = useState(false)
   const [deleting, setDeleting] = useState<CatalogueItem | null>(null)
   const [deleteError, setDeleteError] = useState("")
 
@@ -102,12 +105,22 @@ export default function ItemsPanel() {
         </div>
       )}
 
+      {picked.size > 0 && (
+        <div role="region" aria-label="Selected items" style={{ display: "flex", gap: 10, alignItems: "center", padding: "8px 14px", marginBottom: 10, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border-subtle)", borderRadius: 10, fontSize: 13 }}>
+          <strong>{picked.size} selected</strong>
+          <button type="button" style={ghost} onClick={() => setBulk(true)}>Change selected…</button>
+          <button type="button" style={ghost} onClick={() => setPicked(new Set())}>Clear selection</button>
+        </div>
+      )}
+
       {page && page.totalElements > 0 && (
         <div style={{ border: "1px solid var(--hf-primary-border)", borderRadius: 14, overflow: "hidden", opacity: list.isFetching ? 0.7 : 1 }}>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "var(--hf-surface-muted)" }}>
+                  {canWrite && <th style={{ ...th, width: 34 }}><input type="checkbox" aria-label="Select all items on this page" checked={page.content.length > 0 && page.content.every(i => picked.has(i.id))}
+                    onChange={e => setPicked(prev => { const n = new Set(prev); page.content.forEach(i => e.target.checked ? n.add(i.id) : n.delete(i.id)); return n })} /></th>}
                   {sortTh("name", "Item")}<th style={th}>Type</th><th style={th}>Category</th><th style={th}>Unit</th>
                   {sortTh("price", "Price")}{canSeeCost && <th style={th}>Margin</th>}<th style={th}>VAT</th>{sortTh("status", "Status")}<th style={th}><span className="sr-only" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden" }}>Actions</span></th>
                 </tr>
@@ -115,6 +128,7 @@ export default function ItemsPanel() {
               <tbody>
                 {page.content.map((i, idx) => (
                   <tr key={i.id} style={{ borderTop: idx === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
+                    {canWrite && <td style={{ padding: "12px 0 12px 14px" }}><input type="checkbox" aria-label={`Select ${i.name}`} checked={picked.has(i.id)} onChange={e => setPicked(prev => { const n = new Set(prev); if (e.target.checked) n.add(i.id); else n.delete(i.id); return n })} /></td>}
                     <td style={{ padding: "12px 14px", minWidth: 200 }}>
                       <p style={{ fontSize: 14, fontWeight: 600, color: "var(--hf-text)", margin: 0 }}>{i.name}</p>
                       {(i.variantCount ?? 0) > 0 && <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "2px 0 0" }}>{i.variantCount} {i.variantCount === 1 ? "variant" : "variants"}</p>}
@@ -161,6 +175,7 @@ export default function ItemsPanel() {
       {statusFor && <StatusDialog item={statusFor} canArchive={canArchive} onClose={() => setStatusFor(null)} onDone={() => { refresh(); setStatusFor(null) }} onStale={refresh} />}
       {variantsFor && <VariantsModal item={variantsFor} canWrite={canWrite} canSeeCost={canSeeCost} canWriteCost={canWriteCost} onClose={() => setVariantsFor(null)} onChanged={refresh} />}
       {pricingFor && <PricingModal item={pricingFor} canWrite={canWriteCost} onClose={() => setPricingFor(null)} onChanged={refresh} />}
+      {bulk && <BulkModal ids={[...picked]} categories={categories.data ?? []} canArchive={canArchive} canPrice={canWriteCost} onClose={() => setBulk(false)} onDone={() => { setPicked(new Set()); refresh() }} />}
       {openId && <Product360 itemId={openId} onClose={() => setOpenId(null)} onChanged={refresh} />}
       {historyFor && <HistoryModal item={historyFor} onClose={() => setHistoryFor(null)} />}
       {deleting && (
