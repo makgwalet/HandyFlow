@@ -6,6 +6,7 @@ export type ActivityType =
   | 'CREATED' | 'UPDATED' | 'DELETED' | 'RESTORED'
   | 'STATUS_CHANGED' | 'TAG_ADDED' | 'TAG_REMOVED'
   | 'NOTE_ADDED' | 'BOOKING_LINKED' | 'INVOICE_LINKED' | 'QUOTE_LINKED'
+  | 'STAGE_CHANGED' | 'OWNER_CHANGED' | 'DEAL_UPDATED' | 'LEAD_CONVERTED'
 
 export interface Address {
   street?:     string

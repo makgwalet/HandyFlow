@@ -52,6 +52,8 @@ public enum ActivityType {
      */
     DEAL_UPDATED,
 
+    /** A won lead was converted to a customer (same record, no copy). Payload carries the stage it was converted from. */
+    LEAD_CONVERTED,
     // ── Notes ─────────────────────────────────────────────────────────────
     NOTE_ADDED,
 

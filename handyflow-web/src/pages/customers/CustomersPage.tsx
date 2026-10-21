@@ -110,6 +110,10 @@ const ACTIVITY_LABELS: Record<string, string> = {
   BOOKING_LINKED: 'Booking linked',
   INVOICE_LINKED: 'Invoice linked',
   QUOTE_LINKED:   'Quote linked',
+  STAGE_CHANGED:  'Pipeline stage changed',
+  OWNER_CHANGED:  'Owner changed',
+  DEAL_UPDATED:   'Deal updated',
+  LEAD_CONVERTED: 'Converted to customer',
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -315,6 +315,14 @@ public class CustomerController {
         return ResponseEntity.ok(ApiResponse.success(customerService.getStage(tenantId, id)));
     }
 
+    @PostMapping("/{id}/convert")
+    @PreAuthorize("hasAuthority('CUSTOMER_UPDATE')")
+    @Operation(summary = "Convert a won lead into a customer (same record)")
+    public ResponseEntity<ApiResponse<CustomerResponse>> convertToCustomer(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                customerService.convertToCustomer(TenantContext.getTenantIdAsObject(), id)));
+    }
+
     @PatchMapping("/{id}/stage")
     @PreAuthorize("hasAuthority('CUSTOMER_UPDATE')")
     @Operation(summary = "Change a lead's pipeline stage — only valid for LEAD-type customers")

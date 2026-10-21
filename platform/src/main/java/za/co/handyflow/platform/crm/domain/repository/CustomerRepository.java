@@ -93,7 +93,8 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
             SELECT c FROM Customer c
             WHERE c.tenantId = :tenantId
               AND c.deletedAt IS NULL
-              AND c.customerType = za.co.handyflow.platform.crm.domain.model.CustomerType.LEAD
+              AND (c.customerType = za.co.handyflow.platform.crm.domain.model.CustomerType.LEAD
+                   OR c.pipelineStage IS NOT NULL)
             """)
     List<Customer> findAllActiveLeads(@Param("tenantId") TenantId tenantId);
 

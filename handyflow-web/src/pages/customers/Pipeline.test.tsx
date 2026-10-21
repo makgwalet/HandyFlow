@@ -3,12 +3,12 @@ import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-li
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import PipelineBoard from "./PipelineBoard"
 import FunnelReport from "./FunnelReport"
-import { allowedMoves, lostProblem, reasonLabel, stageBody, barShare, biggestDropOff, closeState, closeText, columns, dealBody, dealProblem, daysText, filterLeads, localToday, NO_FILTER, ownerText, percent, pipelineTotals, stageOf, type Funnel, type PipelineLead } from "./pipeline.logic"
+import { canConvert, isConverted, allowedMoves, lostProblem, reasonLabel, stageBody, barShare, biggestDropOff, closeState, closeText, columns, dealBody, dealProblem, daysText, filterLeads, localToday, NO_FILTER, ownerText, percent, pipelineTotals, stageOf, type Funnel, type PipelineLead } from "./pipeline.logic"
 
-const get = vi.fn(), patch = vi.fn()
+const get = vi.fn(), patch = vi.fn(), post = vi.fn()
 type Args = unknown[]
 let perms = new Set<string>()
-vi.mock("../../api/client", () => ({ apiClient: { get: (...a: Args) => get(...a), patch: (...a: Args) => patch(...a) } }))
+vi.mock("../../api/client", () => ({ apiClient: { get: (...a: Args) => get(...a), patch: (...a: Args) => patch(...a), post: (...a: Args) => post(...a) } }))
 vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.has(p) }))
 vi.mock("../../store/auth.store", () => ({ useAuthStore: (sel: (s: { user: { userId: string } }) => unknown) => sel({ user: { userId: "me" } }) }))
 const ok = (d: unknown) => Promise.resolve({ data: { data: d } })
@@ -22,7 +22,7 @@ const leads: PipelineLead[] = [
   lead("e", "Echo Retail", { pipelineStage: null }),
 ]
 const wrap = (ui: React.ReactElement) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>)
-beforeEach(() => { perms = new Set(["CUSTOMER_READ", "CUSTOMER_UPDATE"]); get.mockReset(); patch.mockReset(); get.mockImplementation(() => ok(leads)); patch.mockResolvedValue({ data: {} }); vi.useRealTimers() })
+beforeEach(() => { perms = new Set(["CUSTOMER_READ", "CUSTOMER_UPDATE"]); get.mockReset(); patch.mockReset(); post.mockReset(); post.mockResolvedValue({ data: {} }); get.mockImplementation(() => ok(leads)); patch.mockResolvedValue({ data: {} }); vi.useRealTimers() })
 afterEach(cleanup)
 
 describe("pipeline rules", () => {
@@ -147,5 +147,30 @@ describe("lost reasons and stage rules", () => {
   it("tells the person when the lost-reason report fails but still shows the funnel", async () => {
     get.mockImplementation((url: string) => (url.includes("lost-reasons") ? Promise.reject(new Error("x")) : ok(funnel))); wrap(<FunnelReport />)
     expect(await screen.findByLabelText("Win rate")).toBeTruthy(); expect((await screen.findByText(/Couldn't load the lost-deal reasons/)).textContent).toBeTruthy()
+  })
+})
+
+describe("converting a won lead", () => {
+  const won = { ...leads[2], customerType: "LEAD" as const }
+  it("only a won lead that is still a lead can be converted", () => {
+    expect(canConvert(won)).toBe(true); expect(canConvert({ ...won, customerType: "CUSTOMER" })).toBe(false); expect(canConvert(leads[0])).toBe(false); expect(isConverted({ ...won, customerType: "CUSTOMER" })).toBe(true)
+  })
+  it("asks to confirm, then converts through the server", async () => {
+    get.mockImplementation(() => ok([won])); wrap(<PipelineBoard />)
+    fireEvent.click(await screen.findByLabelText("Convert Cape Wines to customer")); expect(post).not.toHaveBeenCalled(); expect(screen.getByText(/cannot be undone/)).toBeTruthy()
+    fireEvent.click(screen.getByLabelText("Confirm convert Cape Wines")); await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/crm/customers/c/convert"))
+  })
+  it("cancelling does nothing, and an open lead has no convert button", async () => {
+    wrap(<PipelineBoard />); fireEvent.click(await screen.findByLabelText("Convert Cape Wines to customer")); fireEvent.click(screen.getByText("Cancel")); expect(post).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText("Convert Acme Mining to customer")).toBeNull()
+  })
+  it("a converted customer stays in the Won column, marked, with no move or convert controls", async () => {
+    get.mockImplementation(() => ok([{ ...won, customerType: "CUSTOMER" }])); wrap(<PipelineBoard />)
+    const card = await screen.findByLabelText("Cape Wines"); expect(card.textContent).toContain("Customer"); expect(within(screen.getByLabelText("Won column")).getByLabelText("Cape Wines")).toBeTruthy()
+    expect(screen.queryByLabelText("Move Cape Wines")).toBeNull(); expect(screen.queryByLabelText("Convert Cape Wines to customer")).toBeNull()
+  })
+  it("shows the server's refusal", async () => {
+    post.mockRejectedValue({ response: { data: { message: "Only a won lead can be converted to a customer" } } }); get.mockImplementation(() => ok([won])); wrap(<PipelineBoard />)
+    fireEvent.click(await screen.findByLabelText("Convert Cape Wines to customer")); fireEvent.click(screen.getByLabelText("Confirm convert Cape Wines")); expect((await screen.findByRole("alert")).textContent).toMatch(/won lead/)
   })
 })

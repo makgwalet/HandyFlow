@@ -30,7 +30,7 @@ export const PIPELINE_LIMIT = 500
 export interface PipelineLead {
   id: string; name: string; email?: string | null; phone?: string | null; ownerId: string | null
   dealValue: number | null; expectedCloseDate: string | null; pipelineStage: Stage | null; status?: string; createdAt?: string
-  lostReason?: LostReason | null; lostNote?: string | null
+  lostReason?: LostReason | null; lostNote?: string | null; customerType?: "LEAD" | "CUSTOMER"
 }
 /** A lead with no recorded stage is a new one. */
 export const stageOf = (l: PipelineLead): Stage => l.pipelineStage ?? "NEW"
@@ -127,3 +127,8 @@ export function biggestDropOff(stages: FunnelStage[]): { from: Stage; to: Stage;
 }
 
 export interface LostReasonRow { reason: LostReason | null; count: number; dealValue: number | null }
+
+/** A converted customer is no longer a lead: its stage is fixed at Won and it cannot be moved. */
+export const isConverted = (l: PipelineLead) => l.customerType === "CUSTOMER"
+/** Only a won lead that is still a lead can be converted. */
+export const canConvert = (l: PipelineLead) => !isConverted(l) && stageOf(l) === "WON"

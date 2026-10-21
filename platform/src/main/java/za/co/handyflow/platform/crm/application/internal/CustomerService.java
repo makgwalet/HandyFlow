@@ -418,6 +418,15 @@ public class CustomerService {
     }
 
     @Transactional
+    public CustomerResponse convertToCustomer(TenantId tenantId, UUID id) {
+        var customer = requireActive(tenantId, id);
+        customer.convertToCustomer(currentUserId());
+        customerRepository.save(customer);
+        log.info("[CRM] Lead converted to customer id={} tenant={} by={}", id, tenantId, currentUserId());
+        return toResponse(customer);
+    }
+
+    @Transactional
     public StageResponse changeStage(TenantId tenantId, UUID id, LeadStage newStage,
                                      za.co.handyflow.platform.crm.domain.model.LostReason lostReason, String lostNote) {
         var customer = requireActive(tenantId, id);

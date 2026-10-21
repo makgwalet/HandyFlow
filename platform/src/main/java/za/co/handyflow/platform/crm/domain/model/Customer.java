@@ -384,6 +384,23 @@ public class Customer {
     }
 
     /**
+     * Converts a won lead into a customer. It is the same record, so there is no second customer identity and the
+     * timeline, deal value and pipeline history stay with it. The pipeline stage is kept (WON) so reports still count the win.
+     */
+    public void convertToCustomer(UUID changedBy) {
+        if (this.customerType != CustomerType.LEAD) {
+            throw new IllegalStateException("This record is already a customer");
+        }
+        if (this.pipelineStage != LeadStage.WON) {
+            throw new IllegalStateException("Only a won lead can be converted to a customer");
+        }
+        this.customerType = CustomerType.CUSTOMER;
+        this.updatedAt    = Instant.now();
+        addActivity(CustomerActivity.of(this, ActivityType.LEAD_CONVERTED,
+                Map.of("from", CustomerType.LEAD.name(), "to", CustomerType.CUSTOMER.name()), null, changedBy));
+    }
+
+    /**
      * FIX: backlog 4.1 — "no lead ownership/assignment" gap. Applies to any
      * customer (not restricted to LEAD type the way changeStage() is) —
      * unlike a pipeline stage, "who's the account owner" is a meaningful

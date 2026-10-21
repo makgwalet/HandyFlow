@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { useAuthStore } from "../../store/auth.store"
-import { LOST_REASONS, NO_FILTER, PIPELINE_LIMIT, STAGE_LABEL, allowedMoves, lostProblem, reasonLabel, stageBody, closeState, closeText, columns, dealBody, dealProblem, filterLeads, localToday, money, ownerText, pipelineTotals, type LeadFilter, type LostReason, type OwnerFilter, type PipelineLead, type Stage } from "./pipeline.logic"
+import { LOST_REASONS, NO_FILTER, PIPELINE_LIMIT, STAGE_LABEL, allowedMoves, canConvert, isConverted, lostProblem, reasonLabel, stageBody, closeState, closeText, columns, dealBody, dealProblem, filterLeads, localToday, money, ownerText, pipelineTotals, type LeadFilter, type LostReason, type OwnerFilter, type PipelineLead, type Stage } from "./pipeline.logic"
 
 const unwrapList = (r: { data: unknown }): PipelineLead[] => { const o = r.data as { data?: unknown } | null; const p = o && !Array.isArray(o) && typeof o === "object" && "data" in o ? o.data : r.data; return Array.isArray(p) ? (p as PipelineLead[]) : [] }
 const errorText = (e: unknown) => (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Something went wrong. Try again."
@@ -16,16 +16,17 @@ const TONE = { overdue: "var(--hf-danger-text)", soon: "var(--hf-warning-text)",
 
 export default function PipelineBoard() {
   const qc = useQueryClient(), canEdit = usePermission("CUSTOMER_UPDATE"), me = useAuthStore(s => s.user?.userId ?? null)
-  const [filter, setFilter] = useState<LeadFilter>(NO_FILTER), [error, setError] = useState<string | null>(null), [editing, setEditing] = useState<string | null>(null), [losing, setLosing] = useState<string | null>(null)
+  const [filter, setFilter] = useState<LeadFilter>(NO_FILTER), [error, setError] = useState<string | null>(null), [editing, setEditing] = useState<string | null>(null), [losing, setLosing] = useState<string | null>(null), [converting, setConverting] = useState<string | null>(null)
   const today = localToday()
   const { data: leads = [], isLoading, isError } = useQuery<PipelineLead[]>({ queryKey: ["crm", "pipeline"], queryFn: async () => unwrapList(await apiClient.get("/api/v1/crm/customers/pipeline")) })
   const done = () => { setError(null); qc.invalidateQueries({ queryKey: ["crm", "pipeline"] }); qc.invalidateQueries({ queryKey: ["crm", "funnel"] }) }
   const move = useMutation({ mutationFn: (v: { id: string; stage: Stage; reason?: LostReason | ""; note?: string }) => apiClient.patch(`/api/v1/crm/customers/${v.id}/stage`, stageBody(v.stage, v.reason, v.note)), onSuccess: () => { setLosing(null); done() }, onError: e => setError(errorText(e)) })
+  const convert = useMutation({ mutationFn: (id: string) => apiClient.post(`/api/v1/crm/customers/${id}/convert`), onSuccess: () => { setConverting(null); done(); qc.invalidateQueries({ queryKey: ["customers"] }) }, onError: e => setError(errorText(e)) })
   const owner = useMutation({ mutationFn: (v: { id: string; ownerId: string | null }) => apiClient.patch(`/api/v1/crm/customers/${v.id}/owner`, { ownerId: v.ownerId }), onSuccess: done, onError: e => setError(errorText(e)) })
   const deal = useMutation({ mutationFn: (v: { id: string; value: string; date: string }) => apiClient.patch(`/api/v1/crm/customers/${v.id}/deal`, dealBody(v.value, v.date)), onSuccess: () => { setEditing(null); done() }, onError: e => setError(errorText(e)) })
 
   const shown = filterLeads(leads, filter, me, today), cols = columns(shown), totals = pipelineTotals(leads, today)
-  const busy = move.isPending || owner.isPending || deal.isPending
+  const busy = move.isPending || owner.isPending || deal.isPending || convert.isPending
 
   return (
     <div>
@@ -59,12 +60,12 @@ export default function PipelineBoard() {
                 const state = closeState(l, today), isEditing = editing === l.id
                 return (
                   <article key={l.id} aria-label={l.name} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: 9, marginBottom: 8, fontSize: 12.5 }}>
-                    <strong style={{ fontSize: 13 }}>{l.name}</strong>
+                    <strong style={{ fontSize: 13 }}>{l.name}</strong>{isConverted(l) && <span style={{ marginLeft: 6, fontSize: 11, color: "var(--hf-success-text)" }}>Customer</span>}
                     <div style={{ color: "var(--hf-text-muted)" }}>{[l.email, l.phone].filter(Boolean).join(" · ") || "No contact details"}</div>
                     <div style={{ marginTop: 4 }}>{money(l.dealValue)} · <span style={{ color: TONE[state] }}>{closeText(l, today)}</span></div>
                     <div style={{ color: "var(--hf-text-muted)" }}>Owner: {ownerText(l.ownerId, me)}</div>
                     {l.pipelineStage === "LOST" && <div style={{ color: "var(--hf-danger-text)" }}>Lost: {reasonLabel(l.lostReason)}{l.lostNote ? ` — ${l.lostNote}` : ""}</div>}
-                    {canEdit && !isEditing && losing !== l.id && (
+                    {canEdit && !isEditing && losing !== l.id && !isConverted(l) && (
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
                         <select aria-label={`Move ${l.name}`} style={{ ...field, padding: "3px 6px", fontSize: 12 }} value="" disabled={busy} onChange={e => { const to = e.target.value as Stage; if (!to) return; if (to === "LOST") { setLosing(l.id); setEditing(null); setError(null) } else move.mutate({ id: l.id, stage: to }) }}>
                           <option value="">Move to…</option>{allowedMoves(l.pipelineStage ?? "NEW").map(s => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}</select>
@@ -73,6 +74,10 @@ export default function PipelineBoard() {
                           ? <button type="button" style={{ ...ghost, padding: "3px 8px", fontSize: 12 }} disabled={busy} aria-label={`Unassign ${l.name}`} onClick={() => owner.mutate({ id: l.id, ownerId: null })}>Unassign</button>
                           : <button type="button" style={{ ...ghost, padding: "3px 8px", fontSize: 12 }} disabled={busy || !me} aria-label={`Assign ${l.name} to me`} onClick={() => owner.mutate({ id: l.id, ownerId: me })}>Assign to me</button>}
                       </div>)}
+                    {canEdit && canConvert(l) && !isEditing && losing !== l.id && (converting === l.id
+                      ? <div style={{ marginTop: 6 }}><div>Make {l.name} a customer? This cannot be undone here.</div>
+                          <div style={{ display: "flex", gap: 6, marginTop: 4 }}><button type="button" style={{ ...ghost, fontWeight: 700 }} disabled={busy} aria-label={`Confirm convert ${l.name}`} onClick={() => convert.mutate(l.id)}>Confirm</button><button type="button" style={ghost} onClick={() => setConverting(null)}>Cancel</button></div></div>
+                      : <button type="button" style={{ ...ghost, padding: "3px 8px", fontSize: 12, marginTop: 6 }} aria-label={`Convert ${l.name} to customer`} onClick={() => { setConverting(l.id); setError(null) }}>Convert to customer</button>)}
                     {canEdit && losing === l.id && <LostForm lead={l} saving={move.isPending} onCancel={() => { setLosing(null); setError(null) }} onSave={(reason, note) => move.mutate({ id: l.id, stage: "LOST", reason, note })} />}
                     {canEdit && isEditing && <DealForm lead={l} saving={deal.isPending} onCancel={() => { setEditing(null); setError(null) }} onSave={(value, date) => deal.mutate({ id: l.id, value, date })} />}
                   </article>)

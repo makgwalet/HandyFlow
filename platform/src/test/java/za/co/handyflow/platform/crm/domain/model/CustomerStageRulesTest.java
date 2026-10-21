@@ -72,6 +72,19 @@ class CustomerStageRulesTest {
         assertThat(last.getPayload()).containsEntry("to", "LOST").containsEntry("reason", "COMPETITOR");
     }
 
+    @Test @DisplayName("only a won lead converts, once, keeping the win on record")
+    void conversion() {
+        var c = lead();
+        assertThatThrownBy(() -> c.convertToCustomer(USER)).isInstanceOf(IllegalStateException.class).hasMessageContaining("won");
+        c.changeStage(LeadStage.WON, USER);
+        c.convertToCustomer(USER);
+        assertThat(c.getCustomerType()).isEqualTo(CustomerType.CUSTOMER);
+        assertThat(c.getPipelineStage()).isEqualTo(LeadStage.WON);
+        assertThat(c.getActivities().get(c.getActivities().size() - 1).getActivityType()).isEqualTo(ActivityType.LEAD_CONVERTED);
+        assertThatThrownBy(() -> c.convertToCustomer(USER)).isInstanceOf(IllegalStateException.class).hasMessageContaining("already");
+        assertThatThrownBy(() -> c.changeStage(LeadStage.NEW, USER)).isInstanceOf(IllegalStateException.class);
+    }
+
     @Test @DisplayName("a converted customer has no pipeline stage")
     void customerHasNoStage() {
         var c = Customer.create(TenantId.generate(), "Bravo", null, null, null, null, null, CustomerType.CUSTOMER, USER);
