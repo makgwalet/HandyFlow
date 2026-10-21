@@ -93,6 +93,10 @@ public class CustomerFollowUp {
     @Column(name = "reminder_sent_at")
     private Instant reminderSentAt;
 
+    /** When managers were told this task is badly late. Null until then. */
+    @Column(name = "escalation_sent_at")
+    private Instant escalationSentAt;
+
     @Column(name = "created_by")
     private UUID createdBy;
 
@@ -137,6 +141,7 @@ public class CustomerFollowUp {
 
     /** Undo a mistaken complete — a genuinely common action ("oops, wrong one"), not an edge case to skip. */
     public void reopen() {
+        this.escalationSentAt = null;
         this.completedAt = null;
         this.completedBy = null;
         this.outcome     = null;
@@ -157,9 +162,15 @@ public class CustomerFollowUp {
 
     /** Moves the due date in place (snooze). A reminder is due again for the new date. */
     public void moveDueDate(LocalDate date) {
-        this.dueDate        = date;
-        this.reminderSentAt = null;
+        this.dueDate          = date;
+        this.reminderSentAt   = null;
+        this.escalationSentAt = null;
         this.updatedAt      = Instant.now();
+    }
+
+    public void markEscalated() {
+        this.escalationSentAt = Instant.now();
+        this.updatedAt        = Instant.now();
     }
 
     public void markReminderSent() {

@@ -55,6 +55,20 @@ public interface CustomerFollowUpRepository extends JpaRepository<CustomerFollow
             @Param("date")     LocalDate date
     );
 
+    /** Unfinished tasks due on or before the cutoff whose managers have not yet been told. */
+    @Query("""
+            SELECT f FROM CustomerFollowUp f
+            WHERE f.tenantId         = :tenantId
+              AND f.completedAt      IS NULL
+              AND f.dueDate          <= :cutoff
+              AND f.escalationSentAt IS NULL
+            ORDER BY f.dueDate ASC
+            """)
+    List<CustomerFollowUp> findForEscalation(
+            @Param("tenantId") TenantId tenantId,
+            @Param("cutoff")   LocalDate cutoff
+    );
+
     /** Every unfinished task of the tenant, soonest first. Pass a Pageable to cap the size. */
     @Query("""
             SELECT f FROM CustomerFollowUp f

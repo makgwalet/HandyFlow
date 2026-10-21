@@ -71,6 +71,10 @@ public enum NotificationType {
     // routine, positive event, not something requiring urgent attention.
     NEW_LEAD_ASSIGNED(INFO, Set.of(IN_APP, EMAIL)),
 
+    // Tasks left undone for days. WARNING: a customer is waiting on someone, but it is
+    // a daily digest to managers, not an emergency.
+    CRM_TASK_ESCALATED(WARNING, Set.of(IN_APP, EMAIL)),
+
     // ── Existing ─────────────────────────────────────────────────────────────
     INCIDENT_REPORTED(WARNING, Set.of(IN_APP, EMAIL)),
 

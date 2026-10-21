@@ -49,7 +49,7 @@ export default function TaskQueue() {
           <span style={{ color: totals.overdue ? "var(--hf-danger-text)" : undefined }}><strong>{totals.overdue}</strong> overdue</span>
           <span><strong>{totals.today}</strong> due today</span>
           <span><strong>{totals.week}</strong> in the next 7 days</span>
-          {totals.escalated > 0 && <span style={{ color: "var(--hf-danger-text)" }}><strong>{totals.escalated}</strong> late by {ESCALATE_AFTER_DAYS}+ days</span>}
+          {totals.escalated > 0 && <span title="Account admins are told about these each morning" style={{ color: "var(--hf-danger-text)" }}><strong>{totals.escalated}</strong> late by {ESCALATE_AFTER_DAYS}+ days</span>}
         </div>)}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
         <select aria-label="Whose tasks" style={field} value={filter.scope} onChange={e => setFilter({ ...filter, scope: e.target.value as Scope })}><option value="mine">My tasks</option><option value="all">Everyone's tasks</option></select>
