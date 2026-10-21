@@ -86,6 +86,9 @@ public class Driver {
 
     private String notes;
 
+    @Column(length = 100)
+    private String department;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -138,6 +141,12 @@ public class Driver {
     /** Always false if a PrDP isn't required for this driver — nothing to expire. */
     public boolean isPrdpExpiringSoon() {
         return prdpRequired && prdpExpiry != null && prdpExpiry.isBefore(LocalDate.now().plusDays(30));
+    }
+
+    /** Blank clears it. Kept apart from create/update so existing callers are unaffected. */
+    public void setDepartment(String department) {
+        String t = department == null ? "" : department.trim();
+        this.department = t.isEmpty() ? null : t;
     }
 
     public void update(String firstName, String lastName, String phone, String email, String idNumber,

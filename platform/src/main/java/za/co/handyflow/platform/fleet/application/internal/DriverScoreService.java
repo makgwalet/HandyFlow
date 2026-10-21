@@ -269,6 +269,6 @@ public class DriverScoreService {
                 d.getId(), d.getFirstName(), d.getLastName(), d.getPhone(), d.getEmail(), d.getIdNumber(),
                 d.getLicenseNumber(), d.getLicenseCode(), d.getLicenseExpiry(), d.isLicenseExpiringSoon(),
                 d.isPrdpRequired(), d.getPrdpNumber(), d.getPrdpCategory(), d.getPrdpExpiry(), d.isPrdpExpiringSoon(),
-                d.getStatus(), d.getNotes(), d.getCreatedAt());
+                d.getStatus(), d.getNotes(), d.getCreatedAt(), d.getDepartment());
     }
 }

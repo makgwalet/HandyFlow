@@ -16,7 +16,7 @@ export const DOC_FILE_TYPES = ["application/pdf", "image/jpeg", "image/png", "im
 
 export interface DriverDoc {
   id: string; type: string; title: string | null; documentNumber: string | null; issueDate: string | null; expiryDate: string | null
-  version: number; fileName: string; expired: boolean; daysToExpiry: number | null
+  version: number; fileName: string; expired: boolean; daysToExpiry: number | null; uploadedAt?: string; status?: string
 }
 export interface UploadForm { type: string; title: string; issueDate: string; expiryDate: string }
 

@@ -1,6 +1,7 @@
 package za.co.handyflow.platform.fleet.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 
 public record CreateDriverRequest(
@@ -16,5 +17,6 @@ public record CreateDriverRequest(
         String prdpNumber,
         String prdpCategory,        // G, P, D
         LocalDate prdpExpiry,
-        String notes
+        String notes,
+        @Size(max = 100) String department   // optional: Operations, Logistics, ...
 ) {}

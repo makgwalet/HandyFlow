@@ -114,14 +114,14 @@ describe("Drivers with Driver 360", () => {
     get.mockImplementation((url: string) => url.includes("/drivers/d1/documents") ? ok(url.includes("type=PHOTO") ? [] : docs) : url.includes("/profile") ? ok(profile) : url.includes("/driver-scores") ? ok(board) : url.includes("/fleet/drivers") ? ok({ content: drivers }) : ok([]))
     show(); await screen.findByText("John Mokoena"); fireEvent.click(within("John Mokoena")); await screen.findByLabelText("Overall score")
     expect(screen.getByRole("button", { name: "Add photo" })).toBeTruthy()
-    fireEvent.click(screen.getByRole("tab", { name: "Medical & training" })); expect((await screen.findByLabelText("Medical certificate")).textContent).toContain("20 days left")
+    fireEvent.click(screen.getByRole("tab", { name: "Training & Certifications" })); expect((await screen.findByLabelText("Medical certificate")).textContent).toContain("20 days left")
     fireEvent.click(screen.getByRole("tab", { name: "Documents" })); expect((await screen.findByRole("status")).textContent).toContain("No documents on file yet")
   })
   it("keeps accidents, activity and licence details on their own tabs", async () => {
     show(); await screen.findByText("John Mokoena"); fireEvent.click(within("John Mokoena")); await screen.findByLabelText("Overall score")
     fireEvent.click(screen.getByRole("tab", { name: "Incidents" })); expect(screen.getByText(/1 accident /)).toBeTruthy(); expect(screen.getByText(/ACC-2026-00021/)).toBeTruthy()
     fireEvent.click(screen.getByRole("tab", { name: "Performance" })); expect(screen.getByText("39 of 40")).toBeTruthy(); expect(screen.getAllByText(/9.5 L\/100 km/).length).toBeGreaterThan(0); expect(screen.getByText("0 harsh events")).toBeTruthy()
-    fireEvent.click(screen.getByRole("tab", { name: "Compliance" })); expect(screen.getByText("AB123456")).toBeTruthy(); expect(screen.getByText("PD-77")).toBeTruthy()
+    fireEvent.click(screen.getByRole("tab", { name: "Licence & PrDP" })); expect(screen.getByText("AB123456")).toBeTruthy(); expect(screen.getByText("PD-77")).toBeTruthy()
     fireEvent.click(screen.getByRole("tab", { name: "Overview" })); expect(screen.getByLabelText("PrDP")).toBeTruthy()
   })
   it("shows the profile as its own page and goes back to the list", async () => {
@@ -132,6 +132,15 @@ describe("Drivers with Driver 360", () => {
   it("edits the driver from the profile", async () => {
     show(); await screen.findByText("John Mokoena"); fireEvent.click(within("John Mokoena")); await screen.findByLabelText("Overall score")
     fireEvent.click(screen.getByText("Edit driver")); expect(await screen.findByText("Edit Driver")).toBeTruthy()
+  })
+  it("shows the department and saves it from the edit form", async () => {
+    get.mockImplementation((url: string) => url.includes("/profile") ? ok({ ...profile, driver: { ...profile.driver, department: "Operations" } }) : url.includes("/driver-score-settings") ? ok(settings) : url.includes("/driver-scores") ? ok(board) : url.includes("/fleet/drivers") ? ok({ content: drivers }) : ok([]))
+    put.mockResolvedValue({ data: { data: {} } })
+    show(); await screen.findByText("John Mokoena"); fireEvent.click(within("John Mokoena")); await screen.findByLabelText("Overall score")
+    expect(screen.getByLabelText("Department").textContent).toBe("Department: Operations")
+    fireEvent.click(screen.getByText("Edit driver")); fireEvent.change(await screen.findByRole("textbox", { name: "Department" }), { target: { value: " Logistics " } })
+    fireEvent.click(screen.getByText("Save Changes"))
+    await waitFor(() => expect(put).toHaveBeenCalledWith(expect.stringMatching(/\/api\/v1\/fleet\/drivers\//), expect.objectContaining({ department: "Logistics" })))
   })
   it("says so when the profile cannot be loaded", async () => {
     get.mockImplementation((url: string) => url.includes("/profile") ? Promise.reject(new Error("x")) : url.includes("/driver-scores") ? ok(board) : url.includes("/fleet/drivers") ? ok({ content: drivers }) : ok([]))

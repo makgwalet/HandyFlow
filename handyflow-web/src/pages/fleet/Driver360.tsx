@@ -8,12 +8,13 @@ import { usePermission } from "../../hooks/usePermission"
 import { unwrap, WEIGHT_FIELDS, bandText, bandToneFor, componentTone, coverageNote, driverVehicles, initials, periodText, ringFraction, scoreText, settingsBody, settingsProblem, toForm, weightTotal, type Settings, type SettingsForm } from "./driverScores.logic"
 import PhotoBox from "./PhotoBox"
 import DriverDocuments from "./DriverDocuments"
+import DriverHistory, { RecentActivity } from "./DriverHistory"
 import { COMPLIANCE_LABEL, complianceTone, expiryText } from "./vehicleDetail.logic"
 
 export interface ScoreRow { driverId: string; driverName: string; overall: number | null; band: string | null; coverage: number; reliable: boolean; tripCount: number }
 interface Component { key: string; label: string; weight: number; effectiveWeight: number; score: number | null; status: string; detail: string }
 interface Profile {
-  driver: { firstName: string; lastName: string; licenseCode: string | null; prdpRequired: boolean; status: string; phone?: string | null; email?: string | null; idNumber?: string | null; licenseNumber?: string | null; licenseExpiry?: string | null; prdpNumber?: string | null; prdpCategory?: string | null; prdpExpiry?: string | null; notes?: string | null }
+  driver: { createdAt?: string | null; department?: string | null; firstName: string; lastName: string; licenseCode: string | null; prdpRequired: boolean; status: string; phone?: string | null; email?: string | null; idNumber?: string | null; licenseNumber?: string | null; licenseExpiry?: string | null; prdpNumber?: string | null; prdpCategory?: string | null; prdpExpiry?: string | null; notes?: string | null }
   compliance: { key: string; label: string; status: string; daysRemaining: number | null }[]
   score: { overall: number | null; band: string | null; coverage: number; reliable: boolean; periodFrom: string; periodTo: string; components: Component[] }
   activity: { tripCount: number; completedTrips: number; totalKm: number; businessKm: number; privateKm: number; fuelLitres: number | null; litresPer100Km: number | null; inspectionsCompleted: number; inspectionsFailed: number; vehiclesDriven: string[] }
@@ -28,8 +29,8 @@ const field: React.CSSProperties = { padding: "7px 9px", border: "1px solid var(
 const btn: React.CSSProperties = { padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--hf-brand)", color: "var(--hf-on-brand, #fff)", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 14, marginBottom: 12 }
 
-type TabId = "overview" | "compliance" | "documents" | "medical" | "performance" | "incidents"
-const TABS: { id: TabId; label: string }[] = [{ id: "overview", label: "Overview" }, { id: "compliance", label: "Compliance" }, { id: "documents", label: "Documents" }, { id: "medical", label: "Medical & training" }, { id: "performance", label: "Performance" }, { id: "incidents", label: "Incidents" }]
+type TabId = "overview" | "compliance" | "documents" | "medical" | "performance" | "incidents" | "history"
+const TABS: { id: TabId; label: string }[] = [{ id: "overview", label: "Overview" }, { id: "compliance", label: "Licence & PrDP" }, { id: "medical", label: "Training & Certifications" }, { id: "documents", label: "Documents" }, { id: "performance", label: "Performance" }, { id: "incidents", label: "Incidents" }, { id: "history", label: "History" }]
 export interface AssignedVehicle { id: string; registration: string; make?: string | null; model?: string | null; assignedDriverId?: string | null }
 const date = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—")
 const km = (n: number) => `${n.toLocaleString("en-ZA")} km`
@@ -70,6 +71,7 @@ export function ProfileView({ id, onClose, onEdit, vehicles = [] }: { id: string
               {driver.prdpRequired && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 20, background: "var(--hf-violet-soft)", color: "var(--hf-violet-text)" }}>PrDP {driver.prdpCategory ?? "required"}</span>}
             </div>
             <div style={line}>
+              {driver.department && <span aria-label="Department">Department: {driver.department}</span>}
               {driver.idNumber && <span>ID {driver.idNumber}</span>}
               {driver.phone && <a href={`tel:${driver.phone}`} style={{ color: "inherit" }}>{driver.phone}</a>}
               {driver.email && <a href={`mailto:${driver.email}`} style={{ color: "inherit" }}>{driver.email}</a>}
@@ -123,6 +125,7 @@ export function ProfileView({ id, onClose, onEdit, vehicles = [] }: { id: string
                 </div>
                 {activity.vehiclesDriven.length > 0 && <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 8 }}>Vehicles driven: {activity.vehiclesDriven.join(", ")}</div>}
               </div>
+              <RecentActivity driverId={id} createdAt={driver.createdAt} accidents={accidents.accidents} />
             </div>)}
           {tab === "compliance" && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18 }}>
@@ -134,6 +137,7 @@ export function ProfileView({ id, onClose, onEdit, vehicles = [] }: { id: string
                   <dl style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, margin: 0 }}>{kv("Number", driver.prdpNumber ?? "—")}{kv("Category", driver.prdpCategory ?? "—")}{kv("Expires", date(driver.prdpExpiry))}
                     {data.compliance.filter(c => c.key === "PRDP").map(c => kv("Status", `${COMPLIANCE_LABEL[c.status] ?? c.status}${c.daysRemaining != null ? ` · ${expiryText(c.daysRemaining)}` : ""}`, "prdp-status"))}</dl>)}</div>
             </div>)}
+          {tab === "history" && <DriverHistory driverId={id} createdAt={driver.createdAt} accidents={accidents.accidents} />}
           {tab === "documents" && <DriverDocuments driverId={id} group="documents" />}
           {tab === "medical" && <DriverDocuments driverId={id} group="medical" />}
           {tab === "performance" && (

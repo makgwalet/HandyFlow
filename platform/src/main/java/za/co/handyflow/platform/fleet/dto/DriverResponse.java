@@ -22,5 +22,6 @@ public record DriverResponse(
         boolean prdpExpiringSoon,
         String status,
         String notes,
-        Instant createdAt
+        Instant createdAt,
+        String department
 ) {}

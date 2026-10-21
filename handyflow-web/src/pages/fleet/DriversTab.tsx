@@ -18,7 +18,7 @@ interface Driver {
   licenseExpiry: string | null; licenseExpiringSoon: boolean
   prdpRequired: boolean; prdpNumber: string | null; prdpCategory: string | null
   prdpExpiry: string | null; prdpExpiringSoon: boolean
-  status: string; notes: string | null; createdAt: string
+  status: string; notes: string | null; createdAt: string; department?: string | null
 }
 
 const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
@@ -36,7 +36,7 @@ const EMPTY_FORM = {
   firstName: "", lastName: "", phone: "", email: "", idNumber: "",
   licenseNumber: "", licenseCode: "B", licenseExpiry: "",
   prdpRequired: false, prdpNumber: "", prdpCategory: "G", prdpExpiry: "",
-  notes: "",
+  notes: "", department: "",
 }
 
 const DRIVERS_KEY = ["fleet", "drivers", "all"]
@@ -105,7 +105,7 @@ export default function DriversTab() {
       idNumber: d.idNumber ?? "", licenseNumber: d.licenseNumber ?? "", licenseCode: d.licenseCode ?? "B",
       licenseExpiry: d.licenseExpiry ?? "", prdpRequired: d.prdpRequired,
       prdpNumber: d.prdpNumber ?? "", prdpCategory: d.prdpCategory ?? "G", prdpExpiry: d.prdpExpiry ?? "",
-      notes: d.notes ?? "",
+      notes: d.notes ?? "", department: d.department ?? "",
     })
     setApiError(""); setFieldErrors({})
   }
@@ -128,6 +128,7 @@ export default function DriversTab() {
     prdpCategory: form.prdpRequired ? form.prdpCategory : null,
     prdpExpiry: form.prdpRequired ? (form.prdpExpiry || null) : null,
     notes: form.notes || null,
+    department: form.department.trim() || null,
   })
 
   const opened = openId ? drivers.find(d => d.id === openId) ?? null : null
@@ -345,6 +346,10 @@ export default function DriversTab() {
               </div>
             )}
 
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl} htmlFor="driver-department">Department</label>
+              <input id="driver-department" value={form.department} maxLength={100} onChange={e => setForm(f => ({ ...f, department: e.target.value }))} style={inp("department")} placeholder="Operations, Logistics…" />
+            </div>
             <div>
               <label style={lbl}>Notes</label>
               <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} style={{ ...inp("notes"), resize: "vertical" as const }} placeholder="Any additional notes..." />

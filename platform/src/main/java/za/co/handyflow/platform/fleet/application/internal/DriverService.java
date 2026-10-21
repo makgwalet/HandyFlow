@@ -43,6 +43,7 @@ public class DriverService {
                 req.prdpRequired(), req.prdpNumber(), req.prdpCategory(), req.prdpExpiry(),
                 req.notes()
         );
+        driver.setDepartment(req.department());
         driverRepository.save(driver);
         log.info("Driver registered id={} name={} tenant={}", driver.getId(), driver.getFullName(), tenantId);
         return toResponse(driver);
@@ -57,6 +58,7 @@ public class DriverService {
                 req.prdpRequired(), req.prdpNumber(), req.prdpCategory(), req.prdpExpiry(),
                 req.notes()
         );
+        driver.setDepartment(req.department());
         driverRepository.save(driver);
         return toResponse(driver);
     }
@@ -90,7 +92,7 @@ public class DriverService {
                 d.getId(), d.getFirstName(), d.getLastName(), d.getPhone(), d.getEmail(), d.getIdNumber(),
                 d.getLicenseNumber(), d.getLicenseCode(), d.getLicenseExpiry(), d.isLicenseExpiringSoon(),
                 d.isPrdpRequired(), d.getPrdpNumber(), d.getPrdpCategory(), d.getPrdpExpiry(), d.isPrdpExpiringSoon(),
-                d.getStatus(), d.getNotes(), d.getCreatedAt()
+                d.getStatus(), d.getNotes(), d.getCreatedAt(), d.getDepartment()
         );
     }
 }
