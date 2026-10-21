@@ -43,6 +43,8 @@ public class CustomerFollowUp {
      */
     public enum Outcome { COMPLETED, NO_RESPONSE, RESCHEDULED }
 
+    public enum Priority { LOW, NORMAL, HIGH }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -84,6 +86,10 @@ public class CustomerFollowUp {
     private UUID rescheduledFromId;
 
     /** Edge-trigger guard — see CustomerFollowUpReminderScheduler for why this exists. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "priority", nullable = false, length = 10)
+    private Priority priority = Priority.NORMAL;
+
     @Column(name = "reminder_sent_at")
     private Instant reminderSentAt;
 
@@ -135,6 +141,25 @@ public class CustomerFollowUp {
         this.completedBy = null;
         this.outcome     = null;
         this.updatedAt   = Instant.now();
+    }
+
+    public void changePriority(Priority priority) {
+        this.priority  = priority != null ? priority : Priority.NORMAL;
+        this.updatedAt = Instant.now();
+    }
+
+    /** The new owner gets their own reminder, so the "reminder sent" mark is cleared. */
+    public void reassign(UUID userId) {
+        this.assignedTo     = userId;
+        this.reminderSentAt = null;
+        this.updatedAt      = Instant.now();
+    }
+
+    /** Moves the due date in place (snooze). A reminder is due again for the new date. */
+    public void moveDueDate(LocalDate date) {
+        this.dueDate        = date;
+        this.reminderSentAt = null;
+        this.updatedAt      = Instant.now();
     }
 
     public void markReminderSent() {

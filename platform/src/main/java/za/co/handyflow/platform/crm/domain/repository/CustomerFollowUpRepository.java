@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.crm.domain.repository;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -53,4 +54,25 @@ public interface CustomerFollowUpRepository extends JpaRepository<CustomerFollow
             @Param("tenantId") TenantId tenantId,
             @Param("date")     LocalDate date
     );
+
+    /** Every unfinished task of the tenant, soonest first. Pass a Pageable to cap the size. */
+    @Query("""
+            SELECT f FROM CustomerFollowUp f
+            WHERE f.tenantId = :tenantId
+              AND f.completedAt IS NULL
+            ORDER BY f.dueDate ASC, f.createdAt ASC
+            """)
+    List<CustomerFollowUp> findOpen(@Param("tenantId") TenantId tenantId, Pageable pageable);
+
+    /** Tasks finished since the given moment, most recent first. */
+    @Query("""
+            SELECT f FROM CustomerFollowUp f
+            WHERE f.tenantId = :tenantId
+              AND f.completedAt IS NOT NULL
+              AND f.completedAt >= :since
+            ORDER BY f.completedAt DESC
+            """)
+    List<CustomerFollowUp> findCompletedSince(@Param("tenantId") TenantId tenantId,
+                                              @Param("since") java.time.Instant since,
+                                              Pageable pageable);
 }

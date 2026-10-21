@@ -53,7 +53,7 @@ export function FollowUpPanel({ customerId }: { customerId: string }) {
   const [completingId, setCompletingId]     = useState<string | null>(null)
   const [rescheduleDate, setRescheduleDate] = useState('')
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['followups', customerId] })
+  const invalidate = () => { qc.invalidateQueries({ queryKey: ['followups', customerId] }); qc.invalidateQueries({ queryKey: ['crm', 'tasks'] }) }
 
   const { data, isLoading } = useQuery<FollowUp[]>({
     queryKey: ['followups', customerId],

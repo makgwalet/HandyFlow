@@ -32,6 +32,7 @@ public class CustomerFollowUpService {
         }
         var followUp = CustomerFollowUp.create(
                 tenantId, customerId, req.dueDate(), req.note(), req.assignedTo(), createdBy);
+        followUp.changePriority(req.priority());
         followUpRepository.save(followUp);
         log.info("[CRM] Follow-up created customer={} due={} assignedTo={} tenant={}",
                 customerId, req.dueDate(), followUp.getAssignedTo(), tenantId);
