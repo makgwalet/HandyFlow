@@ -29,6 +29,11 @@ public final class CustomFieldRules {
     public static final int MAX_OPTION_LENGTH = 60;
     public static final int MAX_KEY = 40;
     public static final int MAX_FIELDS = 30;
+    public static final int MAX_EMAIL = 254;
+    public static final int MAX_URL = 500;
+    /** Between the values of a multiple-choice field. */
+    public static final String SEPARATOR = "|";
+    private static final java.util.regex.Pattern EMAIL_PATTERN = java.util.regex.Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s.]+$");
 
     private CustomFieldRules() {}
 
@@ -37,11 +42,12 @@ public final class CustomFieldRules {
         if (label == null || label.isBlank()) return "Give the field a name";
         if (label.strip().length() > MAX_LABEL) return "The field name can be at most " + MAX_LABEL + " characters";
         if (type == null) return "Choose what kind of field this is";
-        if (type == CustomFieldType.CHOICE) {
+        if (type.hasOptions()) {
             List<String> clean = cleanOptions(options);
             if (clean.size() < 2) return "A choice field needs at least two options";
             if (clean.size() > MAX_OPTIONS) return "A choice field can have at most " + MAX_OPTIONS + " options";
             if (clean.stream().anyMatch(o -> o.length() > MAX_OPTION_LENGTH)) return "Each option can be at most " + MAX_OPTION_LENGTH + " characters";
+            if (type == CustomFieldType.MULTI_CHOICE && clean.stream().anyMatch(o -> o.contains(SEPARATOR))) return "Options cannot contain the | character";
         }
         return null;
     }
@@ -128,7 +134,33 @@ public final class CustomFieldRules {
                 if (l.equals("no") || l.equals("false")) return "no";
                 throw new IllegalArgumentException(d.label() + " must be yes or no");
             }
-            default -> throw new IllegalStateException("Unhandled field type " + d.type());
+            case MULTI_CHOICE -> {
+                Set<String> picked = new LinkedHashSet<>();
+                for (String part : v.split("\\" + SEPARATOR)) {
+                    String t = part.strip();
+                    if (t.isEmpty()) continue;
+                    String match = d.options().stream().filter(o -> o.equals(t)).findFirst()
+                            .orElseThrow(() -> new IllegalArgumentException(d.label() + " can only include: " + String.join(", ", d.options())));
+                    picked.add(match);
+                }
+                if (picked.isEmpty()) throw new IllegalArgumentException(d.label() + " needs at least one choice");
+                // Stored in the order of the options, so the same choices always look the same.
+                return d.options().stream().filter(picked::contains).collect(java.util.stream.Collectors.joining(SEPARATOR));
+            }
+            case EMAIL -> {
+                String e = v.toLowerCase(Locale.ROOT);
+                if (e.length() > MAX_EMAIL || !EMAIL_PATTERN.matcher(e).matches()) throw new IllegalArgumentException(d.label() + " must be an email address");
+                return e;
+            }
+            case URL -> {
+                if (v.length() > MAX_URL) throw new IllegalArgumentException(d.label() + " can be at most " + MAX_URL + " characters");
+                String l = v.toLowerCase(Locale.ROOT);
+                if ((!l.startsWith("http://") && !l.startsWith("https://")) || l.matches(".*\\s.*") || l.length() <= (l.startsWith("https") ? 8 : 7)) {
+                    throw new IllegalArgumentException(d.label() + " must be a web address starting with http:// or https://");
+                }
+                return v;
+            }
         }
+        throw new IllegalStateException("Unhandled field type " + d.type());
     }
 }

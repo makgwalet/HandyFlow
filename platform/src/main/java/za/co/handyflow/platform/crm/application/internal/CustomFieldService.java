@@ -54,7 +54,7 @@ public class CustomFieldService {
     @Transactional
     public CustomFieldResponse update(TenantId tenantId, UUID id, CustomFieldRequest req) {
         var field = repository.findByIdAndTenant(tenantId, id).orElseThrow(() -> new ResourceNotFoundException("CustomField", id.toString()));
-        List<String> options = field.getType() == CustomFieldType.CHOICE
+        List<String> options = field.getType().hasOptions()
                 ? CustomFieldRules.cleanOptions(req.options() != null ? req.options() : field.getOptions()) : List.of();
         String label = req.label() != null ? req.label() : field.getLabel();
         String problem = CustomFieldRules.definitionProblem(label, field.getType(), options);

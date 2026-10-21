@@ -63,18 +63,18 @@ public class CustomField {
         f.label = label.strip();
         f.type = type;
         f.required = required;
-        f.options = type == CustomFieldType.CHOICE ? List.copyOf(options) : null;
+        f.options = type.hasOptions() ? List.copyOf(options) : null;
         f.sortOrder = sortOrder;
         f.createdAt = Instant.now();
         f.updatedAt = f.createdAt;
         return f;
     }
 
-    /** The type and key cannot change. Options can only be changed on a choice field. */
+    /** The type and key cannot change. Options can only be changed on a field that has them. */
     public void update(String label, boolean required, List<String> options, int sortOrder, boolean active) {
         this.label = label.strip();
         this.required = required;
-        if (type == CustomFieldType.CHOICE) this.options = List.copyOf(options);
+        if (type.hasOptions()) this.options = List.copyOf(options);
         this.sortOrder = sortOrder;
         this.active = active;
         this.updatedAt = Instant.now();

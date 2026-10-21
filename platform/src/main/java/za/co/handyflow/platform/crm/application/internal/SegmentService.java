@@ -6,8 +6,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.crm.application.internal.SegmentRules.Condition;
 import za.co.handyflow.platform.crm.application.internal.SegmentRules.Subject;
+import za.co.handyflow.platform.crm.domain.model.CustomField;
+import za.co.handyflow.platform.crm.domain.model.CustomFieldType;
 import za.co.handyflow.platform.crm.domain.model.Customer;
 import za.co.handyflow.platform.crm.domain.model.Segment;
+import za.co.handyflow.platform.crm.domain.repository.CustomFieldRepository;
 import za.co.handyflow.platform.crm.domain.repository.CustomerRepository;
 import za.co.handyflow.platform.crm.domain.repository.SegmentRepository;
 import za.co.handyflow.platform.crm.dto.SegmentConditionDto;
@@ -34,33 +37,35 @@ public class SegmentService {
 
     private final SegmentRepository repository;
     private final CustomerRepository customers;
+    private final CustomFieldRepository customFields;
 
     @Transactional(readOnly = true)
     public List<SegmentResponse> list(TenantId tenantId) {
         var everyone = customers.findAllActiveForExport(tenantId);
         Instant now = Instant.now();
+        var types = typesOf(tenantId);
         return repository.findAllForTenant(tenantId).stream()
-                .map(s -> toResponse(s, count(conditionsOf(s), everyone, now))).toList();
+                .map(s -> toResponse(s, count(conditionsOf(s), everyone, now, types))).toList();
     }
 
     @Transactional
     public SegmentResponse create(TenantId tenantId, UUID userId, SegmentRequest req) {
-        var conditions = checked(req);
+        var conditions = checked(tenantId, req);
         if (repository.findAllForTenant(tenantId).size() >= SegmentRules.MAX_SEGMENTS) {
             throw new IllegalArgumentException("An account can have at most " + SegmentRules.MAX_SEGMENTS + " segments.");
         }
         var segment = repository.save(Segment.create(tenantId, req.name(), toStored(conditions), userId));
         log.info("[CRM] Segment created id={} tenant={}", segment.getId(), tenantId);
-        return toResponse(segment, count(conditions, customers.findAllActiveForExport(tenantId), Instant.now()));
+        return toResponse(segment, count(conditions, customers.findAllActiveForExport(tenantId), Instant.now(), typesOf(tenantId)));
     }
 
     @Transactional
     public SegmentResponse update(TenantId tenantId, UUID id, SegmentRequest req) {
         var segment = find(tenantId, id);
-        var conditions = checked(req);
+        var conditions = checked(tenantId, req);
         segment.update(req.name(), toStored(conditions));
         repository.save(segment);
-        return toResponse(segment, count(conditions, customers.findAllActiveForExport(tenantId), Instant.now()));
+        return toResponse(segment, count(conditions, customers.findAllActiveForExport(tenantId), Instant.now(), typesOf(tenantId)));
     }
 
     @Transactional
@@ -72,14 +77,15 @@ public class SegmentService {
     @Transactional(readOnly = true)
     public SegmentMembersResponse preview(TenantId tenantId, SegmentRequest req) {
         List<Condition> conditions = SegmentRules.clean(fromDtos(req.conditions()));
-        String problem = SegmentRules.problem(conditions);
+        var fields = customFields.findActiveForTenant(tenantId);
+        String problem = SegmentRules.problem(conditions, typesOf(fields), optionsOf(fields));
         if (problem != null) throw new IllegalArgumentException(problem);
-        return members(conditions, customers.findAllActiveForExport(tenantId), Instant.now());
+        return members(conditions, customers.findAllActiveForExport(tenantId), Instant.now(), typesOf(fields));
     }
 
     @Transactional(readOnly = true)
     public SegmentMembersResponse members(TenantId tenantId, UUID id) {
-        return members(conditionsOf(find(tenantId, id)), customers.findAllActiveForExport(tenantId), Instant.now());
+        return members(conditionsOf(find(tenantId, id)), customers.findAllActiveForExport(tenantId), Instant.now(), typesOf(tenantId));
     }
 
     /** Every customer a segment matches, not just the sample that {@link #members} shows. */
@@ -87,20 +93,36 @@ public class SegmentService {
     public List<UUID> memberIds(TenantId tenantId, UUID id) {
         List<Condition> conditions = conditionsOf(find(tenantId, id));
         Instant now = Instant.now();
-        return customers.findAllActiveForExport(tenantId).stream().filter(c -> SegmentRules.matches(conditions, subject(c), now)).map(Customer::getId).toList();
+        var types = typesOf(tenantId);
+        return customers.findAllActiveForExport(tenantId).stream().filter(c -> SegmentRules.matches(conditions, subject(c), now, types)).map(Customer::getId).toList();
     }
 
     private Segment find(TenantId tenantId, UUID id) {
         return repository.findByIdAndTenant(tenantId, id).orElseThrow(() -> new ResourceNotFoundException("Segment", id.toString()));
     }
 
-    private List<Condition> checked(SegmentRequest req) {
+    private Map<String, CustomFieldType> typesOf(TenantId tenantId) { return typesOf(customFields.findActiveForTenant(tenantId)); }
+
+    private static Map<String, CustomFieldType> typesOf(List<CustomField> fields) {
+        Map<String, CustomFieldType> out = new HashMap<>();
+        fields.forEach(f -> out.put(f.getKey(), f.getType()));
+        return out;
+    }
+
+    private static Map<String, List<String>> optionsOf(List<CustomField> fields) {
+        Map<String, List<String>> out = new HashMap<>();
+        fields.forEach(f -> out.put(f.getKey(), f.getOptions() == null ? List.of() : f.getOptions()));
+        return out;
+    }
+
+    private List<Condition> checked(TenantId tenantId, SegmentRequest req) {
         String name = req.name() == null ? "" : req.name().strip();
         if (name.isEmpty() || name.length() > SegmentRules.MAX_NAME) {
             throw new IllegalArgumentException("A segment name must be 1 to " + SegmentRules.MAX_NAME + " characters.");
         }
         List<Condition> conditions = SegmentRules.clean(fromDtos(req.conditions()));
-        String problem = SegmentRules.problem(conditions);
+        var fields = customFields.findActiveForTenant(tenantId);
+        String problem = SegmentRules.problem(conditions, typesOf(fields), optionsOf(fields));
         if (problem != null) throw new IllegalArgumentException(problem);
         return conditions;
     }
@@ -126,20 +148,21 @@ public class SegmentService {
     private static Subject subject(Customer c) {
         return new Subject(c.getCustomerType(), c.getStatus(), c.getLeadSource(), c.getPipelineStage(), c.getOwnerId(),
                 c.getTags() == null ? java.util.Set.of() : new LinkedHashSet<>(c.getTags()), c.getDealValue(), c.getCreatedAt(), c.getUpdatedAt(),
-                c.getEmail() != null && !c.getEmail().isBlank(), c.getPhone() != null && !c.getPhone().isBlank());
+                c.getEmail() != null && !c.getEmail().isBlank(), c.getPhone() != null && !c.getPhone().isBlank(),
+                c.getCustomValues() == null ? Map.of() : c.getCustomValues());
     }
 
-    private static int count(List<Condition> conditions, List<Customer> everyone, Instant now) {
+    private static int count(List<Condition> conditions, List<Customer> everyone, Instant now, Map<String, CustomFieldType> types) {
         int n = 0;
-        for (Customer c : everyone) if (SegmentRules.matches(conditions, subject(c), now)) n++;
+        for (Customer c : everyone) if (SegmentRules.matches(conditions, subject(c), now, types)) n++;
         return n;
     }
 
-    private static SegmentMembersResponse members(List<Condition> conditions, List<Customer> everyone, Instant now) {
+    private static SegmentMembersResponse members(List<Condition> conditions, List<Customer> everyone, Instant now, Map<String, CustomFieldType> types) {
         var rows = new java.util.ArrayList<SegmentMembersResponse.Member>();
         int total = 0;
         for (Customer c : everyone) {
-            if (!SegmentRules.matches(conditions, subject(c), now)) continue;
+            if (!SegmentRules.matches(conditions, subject(c), now, types)) continue;
             total++;
             if (rows.size() < MEMBER_LIMIT) rows.add(new SegmentMembersResponse.Member(c.getId(), c.getName(), c.getEmail(), c.getPhone(),
                     c.getCustomerType() == null ? null : c.getCustomerType().name(), c.getStatus() == null ? null : c.getStatus().name()));
