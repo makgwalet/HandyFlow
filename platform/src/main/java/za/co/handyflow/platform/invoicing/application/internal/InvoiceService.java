@@ -203,6 +203,14 @@ public class InvoiceService {
         invoice.recalculateTotals();
 
         invoiceRepo.save(invoice);
+        if (req.customerId() != null) {
+            // On the customer's timeline. A timeline failure must not fail the invoice.
+            try {
+                crmFacade.notifyInvoiceLinked(tenantId, req.customerId(), invoice.getId(), null);
+            } catch (RuntimeException e) {
+                log.warn("Could not record invoice={} on the customer timeline: {}", invoiceNumber, e.getMessage());
+            }
+        }
         log.info("Created retainer invoice={} committed={}hrs rate={}/hr",
                 invoiceNumber, req.committedHours(), req.ratePerHour());
         return queryService.getInvoice(tenantId, invoice.getId());

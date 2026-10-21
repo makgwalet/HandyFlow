@@ -314,6 +314,14 @@ public class RecurringScheduleService {
         // through the tenant's payment terms; this path needed the same fix.
         LocalDate dueDate = paymentTermsResolver.resolveDueDate(tenantId, LocalDate.now());
         invoice.markIssued(dueDate);
+        if (schedule.getCustomerId() != null) {
+            // On the customer's timeline. A timeline failure must not fail the invoice.
+            try {
+                crmFacade.notifyInvoiceLinked(tenantId, schedule.getCustomerId(), invoice.getId(), null);
+            } catch (RuntimeException e) {
+                log.warn("Could not record invoice={} on the customer timeline: {}", invoiceNumber, e.getMessage());
+            }
+        }
 
         // Update schedule state
         schedule.accumulateHours(billed);

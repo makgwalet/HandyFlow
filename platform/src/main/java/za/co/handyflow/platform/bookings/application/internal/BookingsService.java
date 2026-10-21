@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.bookings.domain.model.*;
 import za.co.handyflow.platform.bookings.domain.repository.*;
 import za.co.handyflow.platform.bookings.dto.*;
+import za.co.handyflow.platform.crm.CrmFacade;
 import za.co.handyflow.platform.shared.ConflictException;
 import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.EmailTemplates;
@@ -74,6 +75,7 @@ public class BookingsService {
     private final BookingConfirmationPdfService  confirmationPdfService;
     private final BookingServiceStaffRepository  serviceStaffRepo;
     private final JdbcTemplate                  jdbc;
+    private final CrmFacade                     crmFacade;
 
     // ── Services ──────────────────────────────────────────────────────────────
 
@@ -368,6 +370,15 @@ public class BookingsService {
 
         log.info("Created booking={} client={} date={} service={}",
                 number, req.clientName(), req.bookingDate(), service.getName());
+
+        if (req.customerId() != null) {
+            // On the customer's timeline. A timeline failure must not fail the booking.
+            try {
+                crmFacade.notifyBookingLinked(tenantId, req.customerId(), booking.getId(), null);
+            } catch (RuntimeException e) {
+                log.warn("Could not record booking={} on the customer timeline: {}", number, e.getMessage());
+            }
+        }
 
         // Send confirmation email to client (async — failure does not roll back booking)
         if (req.clientEmail() != null && !req.clientEmail().isBlank()) {

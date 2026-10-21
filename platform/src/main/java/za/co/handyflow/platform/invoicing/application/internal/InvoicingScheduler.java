@@ -208,6 +208,14 @@ class InvoicingScheduler {
         invoiceRepository.save(invoice);
         LocalDate dueDate = paymentTermsResolver.resolveDueDate(tenantId, LocalDate.now());
         invoice.markIssued(dueDate);
+        if (schedule.getCustomerId() != null) {
+            // On the customer's timeline. A timeline failure must not fail the invoice.
+            try {
+                crmFacade.notifyInvoiceLinked(tenantId, schedule.getCustomerId(), invoice.getId(), null);
+            } catch (RuntimeException e) {
+                log.warn("Could not record invoice={} on the customer timeline: {}", invoiceNumber, e.getMessage());
+            }
+        }
 
         schedule.markRan(Instant.now());
         scheduleRepository.save(schedule);

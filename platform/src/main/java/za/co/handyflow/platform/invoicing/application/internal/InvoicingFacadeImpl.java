@@ -37,6 +37,7 @@ import java.util.UUID;
  */
 @Service
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 class InvoicingFacadeImpl implements InvoicingFacade {
 
     private final InvoiceRepository invoiceRepo;
@@ -155,6 +156,14 @@ class InvoicingFacadeImpl implements InvoicingFacade {
         }
         invoice.recalculateTotals();
         invoiceRepo.save(invoice);
+        if (request.customerId() != null) {
+            // On the customer's timeline. A timeline failure must not fail the invoice.
+            try {
+                crmFacade.notifyInvoiceLinked(tenantId, request.customerId(), invoice.getId(), null);
+            } catch (RuntimeException e) {
+                log.warn("Could not record invoice={} on the customer timeline: {}", invoice.getInvoiceNumber(), e.getMessage());
+            }
+        }
         return new DraftInvoiceResult(invoice.getId(), invoice.getInvoiceNumber(), invoice.getSubtotal(), invoice.getVatTotal(), invoice.getTotal());
     }
 
