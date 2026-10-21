@@ -10,7 +10,7 @@ import {
 import { apiClient } from '../../api/client'
 import type {
   Customer, CustomerActivity, CreateCustomerRequest, UpdateCustomerRequest,
-  SpringPage, CustomerType, CustomerStatus,
+  SpringPage, CustomerType, CustomerStatus, LeadSource,
 } from '../../types/crm.types'
 import styles from './CustomersPage.module.css'
 import { ExportButton }       from './ExportButton'
@@ -453,7 +453,7 @@ export function CustomersPage() {
     taxNumber:    frm.taxNumber    || undefined,
     notes:        frm.notes        || undefined,
     customerType: frm.customerType,
-    leadSource:   frm.leadSource || undefined,
+    leadSource:   (frm.leadSource || undefined) as LeadSource | undefined,
     address: {
       street:     frm.street     || undefined,
       suburb:     frm.suburb     || undefined,
