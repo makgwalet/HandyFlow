@@ -54,6 +54,8 @@ public enum ActivityType {
 
     /** A won lead was converted to a customer (same record, no copy). Payload carries the stage it was converted from. */
     LEAD_CONVERTED,
+    /** A conversion was undone and the record is a lead again. Payload carries who and the reason, if one was given. */
+    LEAD_CONVERSION_UNDONE,
     // ── Notes ─────────────────────────────────────────────────────────────
     NOTE_ADDED,
 

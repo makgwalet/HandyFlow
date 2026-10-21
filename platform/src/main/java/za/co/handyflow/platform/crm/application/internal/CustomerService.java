@@ -444,6 +444,23 @@ public class CustomerService {
         return toResponse(customer);
     }
 
+    /** Turns a converted customer back into a lead. Refused while it has active bookings or unpaid invoices. */
+    @Transactional
+    public CustomerResponse undoConversion(TenantId tenantId, UUID id, String reason) {
+        var customer = requireActive(tenantId, id);
+        String why = ConversionRules.cleanReason(reason);
+        try {
+            ConversionRules.checkUndo(customer.getCustomerType(), customerRepository.countActiveBookings(tenantId, id), customerRepository.countUnpaidInvoices(tenantId, id));
+        } catch (IllegalStateException e) {
+            throw new ConflictException("Cannot undo the conversion of '" + customer.getName() + "': " + e.getMessage());
+        }
+        customer.undoConversion(currentUserId(), why);
+        customerRepository.save(customer);
+        log.info("[CRM] Conversion undone id={} tenant={} by={}", id, tenantId, currentUserId());
+        audit.record(tenantId, AuditEntity.CUSTOMER, id, customer.getName(), AuditAction.CONVERSION_UNDONE, why);
+        return toResponse(customer);
+    }
+
     @Transactional
     public CustomerResponse convertToCustomer(TenantId tenantId, UUID id) {
         var customer = requireActive(tenantId, id);

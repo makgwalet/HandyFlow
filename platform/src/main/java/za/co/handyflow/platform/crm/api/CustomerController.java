@@ -339,6 +339,15 @@ public class CustomerController {
                 customerService.convertToCustomer(TenantContext.getTenantIdAsObject(), id)));
     }
 
+    @PostMapping("/{id}/undo-convert")
+    @PreAuthorize("hasAuthority('CUSTOMER_UPDATE')")
+    @Operation(summary = "Undo a conversion: the customer becomes a lead again (refused while it has active bookings or unpaid invoices)")
+    public ResponseEntity<ApiResponse<CustomerResponse>> undoConversion(@PathVariable UUID id,
+            @RequestBody(required = false) za.co.handyflow.platform.crm.dto.UndoConversionRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                customerService.undoConversion(TenantContext.getTenantIdAsObject(), id, request == null ? null : request.reason())));
+    }
+
     @PatchMapping("/{id}/stage")
     @PreAuthorize("hasAuthority('CUSTOMER_UPDATE')")
     @Operation(summary = "Change a lead's pipeline stage — only valid for LEAD-type customers")

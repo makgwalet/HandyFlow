@@ -451,6 +451,23 @@ public class Customer {
     }
 
     /**
+     * Undoes a conversion: the record is a lead again, still at the Won stage, with its timeline and deal intact.
+     * The service decides whether this is allowed (bookings and invoices); this only changes the record.
+     */
+    public void undoConversion(UUID changedBy, String reason) {
+        if (this.customerType != CustomerType.CUSTOMER) {
+            throw new IllegalStateException("This record is already a lead");
+        }
+        this.customerType = CustomerType.LEAD;
+        this.updatedAt    = Instant.now();
+        var payload = new java.util.LinkedHashMap<String, String>();
+        payload.put("from", CustomerType.CUSTOMER.name());
+        payload.put("to", CustomerType.LEAD.name());
+        if (reason != null) payload.put("reason", reason);
+        addActivity(CustomerActivity.of(this, ActivityType.LEAD_CONVERSION_UNDONE, payload, null, changedBy));
+    }
+
+    /**
      * FIX: backlog 4.1 — "no lead ownership/assignment" gap. Applies to any
      * customer (not restricted to LEAD type the way changeStage() is) —
      * unlike a pipeline stage, "who's the account owner" is a meaningful
