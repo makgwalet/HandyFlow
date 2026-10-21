@@ -109,4 +109,20 @@ public interface CatalogueItemRepository extends JpaRepository<CatalogueItem, UU
 
     @Query("SELECT i FROM CatalogueItem i LEFT JOIN FETCH i.category WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL AND i.id IN :ids")
     List<CatalogueItem> findLiveByIds(TenantId tenantId, java.util.Collection<UUID> ids);
+
+    // ── Channels ──
+    /** Active, live items published to a channel; the channel's catalogue feed. */
+    @Query("SELECT i FROM CatalogueItem i LEFT JOIN FETCH i.category WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL AND i.parentId IS NULL "
+            + "AND i.status = za.co.handyflow.platform.catalogue.domain.model.CatalogueItemStatus.ACTIVE "
+            + "AND i.id IN (SELECT x.itemId FROM CatalogueItemChannel x WHERE x.tenantId = :tenantId AND x.channelId = :channelId) ORDER BY i.name, i.id")
+    List<CatalogueItem> publishedTo(TenantId tenantId, UUID channelId, org.springframework.data.domain.Pageable page);
+
+    @Query("SELECT COUNT(i) FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL AND i.parentId IS NULL "
+            + "AND i.status = za.co.handyflow.platform.catalogue.domain.model.CatalogueItemStatus.ACTIVE "
+            + "AND i.id IN (SELECT x.itemId FROM CatalogueItemChannel x WHERE x.tenantId = :tenantId AND x.channelId = :channelId)")
+    long countPublishedTo(TenantId tenantId, UUID channelId);
+
+    /** Live variants of several parents at once. */
+    @Query("SELECT i FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL AND i.parentId IN :parentIds ORDER BY i.variantLabel")
+    List<CatalogueItem> variantsOf(TenantId tenantId, java.util.Collection<UUID> parentIds);
 }

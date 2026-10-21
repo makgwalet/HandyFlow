@@ -15,7 +15,7 @@ import {
   Footprints, QrCode, Gauge, Shield, ShieldCheck, Siren, Tablet, DollarSign, Wheat, Tractor, PawPrint,
   Droplets, Archive, Smartphone, ArrowDownToLine, Fuel, Truck, Users, TrendingUp, Car, Wrench,
   Hexagon, Calculator, BookOpen, GitBranch as JournalIcon, Landmark, BarChart2, FileText,
-  Upload, Briefcase, Calendar, FolderOpen, AlertOctagon, CalendarCheck, Settings,
+  Upload, Store, Briefcase, Calendar, FolderOpen, AlertOctagon, CalendarCheck, Settings,
   Building2, GraduationCap, CalendarDays, Award, Scale, Gavel, FileSearch, MapPin as PinIcon, HardHat,
   ShoppingCart, Package, CalendarClock, ClipboardCheck, FileCheck,
   PartyPopper, FilePlus, LayoutTemplate, CreditCard,
@@ -830,6 +830,8 @@ export const CATALOGUE_SECTIONS: ModuleSections = {
   ] }, { label: 'Pricing', sections: [
     { id: 'pricelists', label: 'Price lists', icon: Coins, anyPermission: ['CATALOGUE_PRICE_READ', 'CATALOGUE_PRICE_WRITE', 'CATALOGUE_PRICE_APPROVE', 'CATALOGUE_ADMIN'] },
     { id: 'priceapprovals', label: 'Price approvals', icon: CheckCircle2, anyPermission: ['CATALOGUE_PRICE_READ', 'CATALOGUE_PRICE_WRITE', 'CATALOGUE_PRICE_APPROVE'] },
+  ] }, { label: 'Sales', sections: [
+    { id: 'channels', label: 'Channels', icon: Store, anyPermission: ['CATALOGUE_PUBLISH', 'CATALOGUE_ADMIN', 'SETTINGS_MANAGE'] },
   ] }, { label: 'Data', sections: [
     { id: 'quality', label: 'Data quality', icon: AlertTriangle, anyPermission: ['CATALOGUE_WRITE', 'CATALOGUE_APPROVE', 'CATALOGUE_ADMIN', 'SETTINGS_MANAGE'] },
     { id: 'import', label: 'Import & export', icon: Upload, anyPermission: ['SETTINGS_MANAGE', 'CATALOGUE_IMPORT', 'CATALOGUE_EXPORT'] },

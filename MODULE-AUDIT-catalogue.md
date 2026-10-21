@@ -263,3 +263,23 @@ Limits to know:
 - A file is held in memory while it is read or written (at most 10 MB).
 
 Tests: 11 rule tests pass standalone (`MediaRulesTest`, `BundleRulesTest`). 14 service tests (Mockito: 8 media, 6 bundle) are written but **not run**. Front end: 166 catalogue tests pass (12 new), lint and type check clean. V483 has not been run against a database; checks 26–30 in `CATALOGUE-MIGRATION-CHECKS.sql` are for it.
+
+## 15. Slice 8b status (channels, publishing, change feed, events): built, not yet run against a database
+
+| Area | What it does |
+|---|---|
+| Channels | Section **Channels** (Sales). A channel has a code (fixed, used in addresses), a name, a kind (till, online shop, marketplace, printed list, other), an optional price list it sells from (default list if none) and an on/off switch. Up to 20 per tenant. A channel with items published to it cannot be deleted; switch it off. Seeing the list needs catalogue read; changing anything needs `CATALOGUE_PUBLISH` (V477 gives it to `SETTINGS_MANAGE`; nobody else gets it automatically). |
+| Publishing | From the channel ("Items") or from an item's new **Channels** tab. Items are checked first (a "Check" button does a dry run) and the ones that pass are published; the others come back with plain reasons, up to 200 at a time. Rules: the item must be active and priced **on the channel's price list**; an online shop or marketplace also needs a description, a picture and a SKU; a till needs a SKU or barcode; a variant is never published alone (publish the main item, its active variants go with it). Publishing and taking off are written to the item's history. |
+| Feed | `GET /channels/{code}/feed`: active items published to the channel with their active variants, priced from the channel's list (with VAT-inclusive price), category, brand, unit, a path to the picture list and `updatedAt`. **Cost, margin and minimum price are never included.** Needs `CATALOGUE_PUBLISH`. Items archived or deleted after publishing drop out of the feed on their own (check 35 lists them). |
+| Change feed (delta API) | `GET /sync/changes?since=<cursor>&limit=<n>`. The history now carries a running change number (`seq`, V484). Start with `since=0` for everything; keep the returned `cursor` and send it back; repeat while `hasMore`. Each item appears once with its latest state (`UPSERT`) or as `DELETE`. Price is left out for callers without `CATALOGUE_PRICE_READ`. Anything that wrote an item history line (create, edit, price change, status, publish, media, package parts, variant, approval) shows up here, including the scheduled price changes. |
+| Events | Saving an item history line publishes `CatalogueItemChanged(tenantId, itemId, action, occurredOn)` (a Spring Modulith `DomainEvent`, in the catalogue's public package). It carries no prices; a listener reads the item through `CatalogueFacade`. Nothing listens yet. |
+
+Limits to know:
+- Change numbers are given when the line is written, not when the transaction commits, so a save that is still open for more than a few seconds can commit with a number below one already handed out. The feed holds lines back for 5 seconds, which covers normal saves; **a long import may be missed**. A consumer should repeat a full pass (`since=0`) now and then. A tenant-wide `seq` order is not strict across the old rows (they were numbered by V484 in the order the database found them).
+- The feed and the change feed are for people with a sign-in. There are no API keys, per-channel tokens or webhooks, so an outside system needs a service user with these permissions. Nothing pushes to Shopify, a marketplace or the POS: POS and invoicing still read the catalogue through the existing facade, not from a channel.
+- Stock is not part of the feed; quantities belong to the stock module.
+- Channel changes (create, edit, delete) are in the history under the channel, not shown on the Product 360 screen.
+- Bulk publish is by search and pick, up to 200 per press; there is no "publish a whole category" yet.
+- The Product 360 Channels tab checks a single item at a time; its "ready" state uses the same rules as the channel screen.
+
+Tests: 8 rule tests pass standalone (`ChannelRulesTest`). 23 service and entity tests (Mockito: 14 channel, 7 change feed; 2 for the event on the history line) are written but **not run**. Front end: 178 catalogue tests pass (12 new), lint and type check clean. V484 has not been run against a database (check 31 first: it numbers existing history lines); checks 31–35 are for it.

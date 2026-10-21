@@ -44,6 +44,18 @@ public class CatalogueAuditEvent {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /** Running change number, given by the database. Used by the change feed. */
+    @Column(name = "seq", insertable = false, updatable = false)
+    private Long seq;
+
+    /** Published by Spring Data when the line is saved, so other modules can react to item changes without the catalogue calling them. */
+    @org.springframework.data.domain.DomainEvents
+    java.util.Collection<Object> domainEvents() {
+        return "ITEM".equals(entityType)
+                ? java.util.List.of(new za.co.handyflow.platform.catalogue.CatalogueItemChanged(tenantId, entityId, action.name(), createdAt))
+                : java.util.List.of();
+    }
+
     public static CatalogueAuditEvent of(TenantId tenantId, String entityType, UUID entityId, String entityName,
                                          CatalogueAuditAction action, String detail, UUID actorId) {
         var e = new CatalogueAuditEvent();

@@ -50,4 +50,9 @@ public interface CataloguePriceChangeRepository extends JpaRepository<CatalogueP
 
     @Query("SELECT COUNT(c) FROM CataloguePriceChange c WHERE c.tenantId = :tenantId AND c.priceListId = :listId")
     long countForList(TenantId tenantId, UUID listId);
+
+    /** Applied changes of several items on one list, latest first: the first one per item is that item's price on the list. */
+    @Query("SELECT c FROM CataloguePriceChange c WHERE c.tenantId = :tenantId AND c.priceListId = :listId AND c.itemId IN :itemIds AND c.status = "
+            + "za.co.handyflow.platform.catalogue.domain.model.PriceChangeStatus.APPLIED ORDER BY c.effectiveFrom DESC, c.appliedAt DESC")
+    List<CataloguePriceChange> appliedOnList(TenantId tenantId, UUID listId, java.util.Collection<UUID> itemIds);
 }

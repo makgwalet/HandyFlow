@@ -157,3 +157,20 @@ WHERE a.tenant_id <> b.tenant_id OR c.tenant_id <> a.tenant_id;
 SELECT p.tenant_id, p.name AS package, x.name AS part, x.status, x.deleted_at
 FROM catalogue_bundle_components c JOIN catalogue_items p ON p.id = c.bundle_item_id AND p.deleted_at IS NULL
 JOIN catalogue_items x ON x.id = c.component_item_id WHERE x.deleted_at IS NOT NULL OR x.status = 'ARCHIVED' LIMIT 50;
+
+-- 31. [must be 0 rows] Every history line has a change number (V484 numbers the old lines and the database numbers new ones).
+SELECT id FROM catalogue_audit_events WHERE seq IS NULL;
+
+-- 32. [must be 0 rows] A publication whose item, channel and tenant do not agree.
+SELECT x.id FROM catalogue_item_channels x JOIN catalogue_items i ON i.id = x.item_id JOIN catalogue_channels c ON c.id = x.channel_id
+WHERE i.tenant_id <> x.tenant_id OR c.tenant_id <> x.tenant_id;
+
+-- 33. [must be 0 rows] A channel that sells from a price list that has been deleted.
+SELECT c.id, c.code FROM catalogue_channels c JOIN catalogue_price_lists l ON l.id = c.price_list_id WHERE l.deleted_at IS NOT NULL;
+
+-- 34. [must be 0 rows] A variant published on its own (variants go with their main item).
+SELECT x.id, i.name FROM catalogue_item_channels x JOIN catalogue_items i ON i.id = x.item_id WHERE i.parent_id IS NOT NULL;
+
+-- 35. INFO: published items that are no longer live (archived or deleted); they drop out of the feeds and can be taken off.
+SELECT c.tenant_id, c.code, i.name, i.status, i.deleted_at FROM catalogue_item_channels x JOIN catalogue_channels c ON c.id = x.channel_id
+JOIN catalogue_items i ON i.id = x.item_id WHERE i.deleted_at IS NOT NULL OR i.status <> 'ACTIVE' LIMIT 50;

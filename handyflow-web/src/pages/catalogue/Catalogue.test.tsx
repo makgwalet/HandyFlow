@@ -208,8 +208,8 @@ describe("catalogue structure logic", () => {
   it("shows the setup screens only to catalogue administrators", () => {
     const names = (perms: string[]) => visibleGroups(CATALOGUE_SECTIONS, perms).flatMap(g => g.sections.map(s => s.id))
     expect(names([])).toEqual(["dashboard", "items", "categories"])
-    expect(names(["SETTINGS_MANAGE"])).toEqual(["dashboard", "items", "categories", "approvals", "quality", "import"])
-    expect(names(["CATALOGUE_ADMIN"])).toEqual(["dashboard", "items", "categories", "approvals", "pricelists", "quality", "units", "attributes"])
+    expect(names(["SETTINGS_MANAGE"])).toEqual(["dashboard", "items", "categories", "approvals", "channels", "quality", "import"])
+    expect(names(["CATALOGUE_ADMIN"])).toEqual(["dashboard", "items", "categories", "approvals", "pricelists", "channels", "quality", "units", "attributes"])
   })
 })
 

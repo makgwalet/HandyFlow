@@ -29,6 +29,8 @@ import za.co.handyflow.platform.catalogue.application.internal.CatalogueApproval
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueQualityService;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueMediaService;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueBundleService;
+import za.co.handyflow.platform.catalogue.application.internal.CatalogueChannelService;
+import za.co.handyflow.platform.catalogue.application.internal.CatalogueSyncService;
 import za.co.handyflow.platform.catalogue.domain.model.ItemApprovalStatus;
 import za.co.handyflow.platform.catalogue.domain.model.ImportRules;
 import za.co.handyflow.platform.catalogue.domain.model.PriceChangeStatus;
@@ -66,6 +68,7 @@ public class CatalogueController {
     private static final String IMPORT = "hasAnyAuthority('CATALOGUE_IMPORT','SETTINGS_MANAGE')";
     private static final String EXPORT = "hasAnyAuthority('CATALOGUE_EXPORT','SETTINGS_MANAGE')";
 
+    private static final String PUBLISH = "hasAnyAuthority('CATALOGUE_PUBLISH','SETTINGS_MANAGE')";
     private static final String APPROVE = "hasAuthority('CATALOGUE_APPROVE')";
     private static final String APPROVAL_VIEW = "hasAnyAuthority('CATALOGUE_APPROVE','CATALOGUE_WRITE','SETTINGS_MANAGE')";
 
@@ -86,6 +89,8 @@ public class CatalogueController {
     private final CatalogueQualityService qualityService;
     private final CatalogueMediaService mediaService;
     private final CatalogueBundleService bundleService;
+    private final CatalogueChannelService channelService;
+    private final CatalogueSyncService syncService;
 
     /** What the signed-in user may do, from their authorities. */
     private static Caller caller(Authentication auth) {
@@ -480,6 +485,80 @@ public class CatalogueController {
     @Operation(summary = "The packages that contain this item")
     public ResponseEntity<ApiResponse<List<UsedInResponse>>> usedIn(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(bundleService.usedIn(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+
+    // ── Channels, publishing and the change feed ─────────────────────────────
+
+    @GetMapping("/channels")
+    @PreAuthorize(READ)
+    @Operation(summary = "Sales channels and how many items are published to each")
+    public ResponseEntity<ApiResponse<List<ChannelResponse>>> channels() {
+        return ResponseEntity.ok(ApiResponse.success(channelService.channels(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/channels")
+    @PreAuthorize(PUBLISH)
+    @Operation(summary = "Add a sales channel")
+    public ResponseEntity<ApiResponse<ChannelResponse>> createChannel(@RequestBody ChannelRequest request, Authentication auth) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Channel created", channelService.create(TenantContext.getTenantIdAsObject(), request, caller(auth))));
+    }
+
+    @PutMapping("/channels/{id}")
+    @PreAuthorize(PUBLISH)
+    @Operation(summary = "Change a channel's name, kind, price list or on/off state")
+    public ResponseEntity<ApiResponse<ChannelResponse>> updateChannel(@PathVariable UUID id, @RequestBody ChannelRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success("Channel updated", channelService.update(TenantContext.getTenantIdAsObject(), id, request, caller(auth))));
+    }
+
+    @DeleteMapping("/channels/{id}")
+    @PreAuthorize(PUBLISH)
+    @Operation(summary = "Delete a channel that has nothing published to it")
+    public ResponseEntity<ApiResponse<Void>> deleteChannel(@PathVariable UUID id, Authentication auth) {
+        channelService.delete(TenantContext.getTenantIdAsObject(), id, caller(auth));
+        return ResponseEntity.ok(ApiResponse.success("Channel deleted", null));
+    }
+
+    @PostMapping("/channels/{id}/publish")
+    @PreAuthorize(PUBLISH)
+    @Operation(summary = "Publish items to a channel", description = "Items that pass the channel's rules are published; the others come back with reasons. dryRun checks only.")
+    public ResponseEntity<ApiResponse<PublishResponse>> publish(@PathVariable UUID id, @RequestBody PublishRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(channelService.publish(TenantContext.getTenantIdAsObject(), id, request, caller(auth))));
+    }
+
+    @PostMapping("/channels/{id}/unpublish")
+    @PreAuthorize(PUBLISH)
+    @Operation(summary = "Take items off a channel")
+    public ResponseEntity<ApiResponse<PublishResponse>> unpublish(@PathVariable UUID id, @RequestBody PublishRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(channelService.unpublish(TenantContext.getTenantIdAsObject(), id, request, caller(auth))));
+    }
+
+    @GetMapping("/channels/{id}/items")
+    @PreAuthorize(READ)
+    @Operation(summary = "Items published to a channel, whatever their status now")
+    public ResponseEntity<ApiResponse<List<ChannelItemResponse>>> channelItems(@PathVariable UUID id, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "100") int size) {
+        return ResponseEntity.ok(ApiResponse.success(channelService.published(TenantContext.getTenantIdAsObject(), id, page, size)));
+    }
+
+    @GetMapping("/items/{id}/channels")
+    @PreAuthorize(READ)
+    @Operation(summary = "Where an item is published, and what stops it elsewhere")
+    public ResponseEntity<ApiResponse<List<ItemChannelResponse>>> itemChannels(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(channelService.forItem(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @GetMapping("/channels/{code}/feed")
+    @PreAuthorize(PUBLISH)
+    @Operation(summary = "A channel's catalogue", description = "Active items published to the channel, with variants, priced from the channel's price list. Cost is never included.")
+    public ResponseEntity<ApiResponse<FeedResponse>> feed(@PathVariable String code, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "100") int size) {
+        return ResponseEntity.ok(ApiResponse.success(channelService.feed(TenantContext.getTenantIdAsObject(), code, page, size)));
+    }
+
+    @GetMapping("/sync/changes")
+    @PreAuthorize(READ)
+    @Operation(summary = "What changed since a cursor", description = "Start with since=0. Keep the returned cursor and send it back; repeat while hasMore is true.")
+    public ResponseEntity<ApiResponse<ChangesResponse>> changes(@RequestParam(required = false) Long since, @RequestParam(required = false) Integer limit, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(syncService.changes(TenantContext.getTenantIdAsObject(), since, limit, caller(auth))));
     }
 
     // ── Dashboard and Product 360 ────────────────────────────────────────────

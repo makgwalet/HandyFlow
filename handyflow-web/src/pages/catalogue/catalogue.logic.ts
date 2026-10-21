@@ -527,6 +527,7 @@ export const actionText = (a: string) => ({
   PRICE_PROPOSED: "Price change proposed", PRICE_APPROVED: "Price change approved", PRICE_REJECTED: "Price change rejected", PRICE_CANCELLED: "Price change cancelled", SETTING_CHANGED: "Setting changed",
   APPROVAL_REQUESTED: "Submitted for approval", ITEM_APPROVED: "Approved", ITEM_REJECTED: "Rejected", APPROVAL_WITHDRAWN: "Request withdrawn",
   MEDIA_ADDED: "File added", MEDIA_CHANGED: "File changed", MEDIA_REMOVED: "File removed", BUNDLE_CHANGED: "Package parts changed",
+  PUBLISHED: "Published", UNPUBLISHED: "Taken off a channel", CHANNEL_CHANGED: "Channel changed",
 }[a] ?? a)
 
 /** Share of the largest value, 0–100, for the plain bar charts. */
@@ -671,3 +672,42 @@ export const bundleBody = (lines: BundleDraftLine[]) => ({ components: lines.map
 export const savingText = (saving: number | null, unpriced: number) =>
   unpriced > 0 ? `${unpriced} part${unpriced === 1 ? " has" : "s have"} no price, so the saving cannot be worked out.`
     : saving == null ? "—" : saving > 0 ? `Customers save ${rand(saving)} against buying the parts separately.` : saving < 0 ? `The package costs ${rand(-saving)} more than its parts.` : "The package costs the same as its parts."
+
+
+// ── Channels and publishing ──────────────────────────────────────────────────
+export type ChannelKind = "POS" | "WEB" | "MARKETPLACE" | "PRINT" | "OTHER"
+export const CHANNEL_KINDS: { id: ChannelKind; label: string }[] = [
+  { id: "POS", label: "Till (point of sale)" }, { id: "WEB", label: "Online shop" }, { id: "MARKETPLACE", label: "Marketplace" }, { id: "PRINT", label: "Printed price list" }, { id: "OTHER", label: "Other" },
+]
+export const channelKindLabel = (k: string) => CHANNEL_KINDS.find(x => x.id === k)?.label ?? k
+export interface Channel { id: string; code: string; name: string; kind: ChannelKind; priceListId: string | null; priceListName: string | null; active: boolean; publishedCount: number }
+export interface ChannelItem { itemId: string; name: string | null; sku: string | null; status: string; publishedAt: string }
+export interface PublishRow { itemId: string; name: string | null; sku: string | null; outcome: string; problems: string[] }
+export interface PublishResult { channelId: string; dryRun: boolean; done: number; unchanged: number; blocked: number; rows: PublishRow[] }
+export interface ItemChannel { channelId: string; code: string; name: string; kind: ChannelKind; channelActive: boolean; published: boolean; publishedAt: string | null; problems: string[] }
+
+export interface ChannelForm { code: string; name: string; kind: ChannelKind; priceListId: string; active: boolean }
+export const EMPTY_CHANNEL_FORM: ChannelForm = { code: "", name: "", kind: "WEB", priceListId: "", active: true }
+export const toChannelForm = (c: Channel): ChannelForm => ({ code: c.code, name: c.name, kind: c.kind, priceListId: c.priceListId ?? "", active: c.active })
+
+export function channelProblems(f: ChannelForm, isNew: boolean): Record<string, string> {
+  const e: Record<string, string> = {}
+  if (isNew && !/^[a-z0-9][a-z0-9-]{1,29}$/.test(f.code.trim().toLowerCase())) e.code = "2 to 30 letters, digits or hyphens, e.g. web-shop"
+  if (!f.name.trim()) e.name = "Required"
+  else if (f.name.trim().length > 80) e.name = "At most 80 characters"
+  return e
+}
+export const channelBody = (f: ChannelForm) => ({ code: f.code.trim().toLowerCase(), name: f.name.trim(), kind: f.kind, priceListId: f.priceListId || null, active: f.active })
+
+export const OUTCOME_LABEL: Record<string, string> = {
+  PUBLISHED: "Published", WOULD_PUBLISH: "Can be published", ALREADY: "Already there", BLOCKED: "Cannot be published",
+  UNPUBLISHED: "Taken off", WOULD_UNPUBLISH: "Would be taken off", NOT_PUBLISHED: "Was not published",
+}
+export function publishText(r: PublishResult, verb: "publish" | "unpublish" = "publish"): string {
+  const parts: string[] = []
+  const w = verb === "publish" ? (r.dryRun ? "can be published" : "published") : (r.dryRun ? "would be taken off" : "taken off")
+  parts.push(`${r.done} ${w}`)
+  if (r.unchanged > 0) parts.push(verb === "publish" ? `${r.unchanged} already there` : `${r.unchanged} were not published`)
+  if (r.blocked > 0) parts.push(`${r.blocked} cannot be published`)
+  return parts.join(", ") + "."
+}

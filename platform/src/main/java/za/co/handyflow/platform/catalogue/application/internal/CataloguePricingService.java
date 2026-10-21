@@ -360,6 +360,25 @@ public class CataloguePricingService {
     }
 
     /** The default list reads the item's price; other lists read their latest applied change. */
+    /**
+     * The price of each item on one list, for a channel's feed. A null or default list means the item's own selling price;
+     * any other list has a price only where a change has been applied to it. Items with no price are left out of the map.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, BigDecimal> pricesOnList(TenantId tenantId, UUID listId, Collection<CatalogueItem> items) {
+        Map<UUID, BigDecimal> out = new HashMap<>();
+        if (items.isEmpty()) return out;
+        var list = listId == null ? null : listRepository.findLiveById(tenantId, listId).orElse(null);
+        if (list == null || list.isDefaultList()) {
+            for (var i : items) if (i.getDefaultPrice() != null) out.put(i.getId(), i.getDefaultPrice());
+            return out;
+        }
+        for (var c : changeRepository.appliedOnList(tenantId, list.getId(), items.stream().map(CatalogueItem::getId).toList())) {
+            out.putIfAbsent(c.getItemId(), c.getNewPrice());   // latest first, so the first one seen wins
+        }
+        return out;
+    }
+
     private Map<UUID, BigDecimal> currentPrices(TenantId tenantId, CatalogueItem item, List<CataloguePriceList> lists) {
         Map<UUID, BigDecimal> out = new HashMap<>();
         var applied = changeRepository.appliedForItem(tenantId, item.getId());
