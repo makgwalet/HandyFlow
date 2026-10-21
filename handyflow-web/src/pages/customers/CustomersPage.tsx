@@ -122,6 +122,7 @@ const ACTIVITY_LABELS: Record<string, string> = {
   OWNER_CHANGED:  'Owner changed',
   DEAL_UPDATED:   'Deal updated',
   LEAD_CONVERTED: 'Converted to customer',
+  LEAD_CONVERSION_UNDONE: 'Conversion undone',
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

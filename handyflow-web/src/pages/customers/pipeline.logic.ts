@@ -136,6 +136,11 @@ export function biggestDropOff(stages: FunnelStage[]): { from: Stage; to: Stage;
 export interface SourceRow { source: LeadSource | null; leads: number; won: number; lost: number; open: number; winRate: number | null; wonValue: number | null }
 export interface LostReasonRow { reason: LostReason | null; count: number; dealValue: number | null }
 
+export const UNDO_REASON_MAX = 500
+export const undoReasonProblem = (reason: string): string | null => (reason.trim().length > UNDO_REASON_MAX ? `The reason can be at most ${UNDO_REASON_MAX} characters.` : null)
+/** The reason is optional; an empty box sends nothing. */
+export const undoBody = (reason: string) => ({ reason: reason.trim() || null })
+
 /** A converted customer is no longer a lead: its stage is fixed at Won and it cannot be moved. */
 export const isConverted = (l: PipelineLead) => l.customerType === "CUSTOMER"
 /** Only a won lead that is still a lead can be converted. */

@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-li
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import PipelineBoard from "./PipelineBoard"
 import FunnelReport from "./FunnelReport"
-import { canConvert, LEAD_SOURCES, sourceLabel, isConverted, allowedMoves, lostProblem, reasonLabel, stageBody, barShare, biggestDropOff, closeState, closeText, columns, dealBody, dealProblem, daysText, filterLeads, localToday, NO_FILTER, ownerText, percent, pipelineTotals, stageOf, type Funnel, type PipelineLead } from "./pipeline.logic"
+import { undoBody, undoReasonProblem, canConvert, LEAD_SOURCES, sourceLabel, isConverted, allowedMoves, lostProblem, reasonLabel, stageBody, barShare, biggestDropOff, closeState, closeText, columns, dealBody, dealProblem, daysText, filterLeads, localToday, NO_FILTER, ownerText, percent, pipelineTotals, stageOf, type Funnel, type PipelineLead } from "./pipeline.logic"
 
 const get = vi.fn(), patch = vi.fn(), post = vi.fn()
 type Args = unknown[]
@@ -163,7 +163,7 @@ describe("converting a won lead", () => {
   })
   it("asks to confirm, then converts through the server", async () => {
     get.mockImplementation(() => ok([won])); wrap(<PipelineBoard />)
-    fireEvent.click(await screen.findByLabelText("Convert Cape Wines to customer")); expect(post).not.toHaveBeenCalled(); expect(screen.getByText(/cannot be undone/)).toBeTruthy()
+    fireEvent.click(await screen.findByLabelText("Convert Cape Wines to customer")); expect(post).not.toHaveBeenCalled(); expect(screen.getByText(/You can undo this later/)).toBeTruthy()
     fireEvent.click(screen.getByLabelText("Confirm convert Cape Wines")); await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/crm/customers/c/convert"))
   })
   it("cancelling does nothing, and an open lead has no convert button", async () => {
@@ -178,5 +178,34 @@ describe("converting a won lead", () => {
   it("shows the server's refusal", async () => {
     post.mockRejectedValue({ response: { data: { message: "Only a won lead can be converted to a customer" } } }); get.mockImplementation(() => ok([won])); wrap(<PipelineBoard />)
     fireEvent.click(await screen.findByLabelText("Convert Cape Wines to customer")); fireEvent.click(screen.getByLabelText("Confirm convert Cape Wines")); expect((await screen.findByRole("alert")).textContent).toMatch(/won lead/)
+  })
+})
+
+describe("undoing a conversion", () => {
+  const customer = { ...leads[2], customerType: "CUSTOMER" as const }
+  it("checks and builds the reason", () => {
+    expect(undoReasonProblem("x".repeat(500))).toBeNull(); expect(undoReasonProblem("x".repeat(501))).toBe("The reason can be at most 500 characters.")
+    expect(undoBody("  Converted by mistake ")).toEqual({ reason: "Converted by mistake" }); expect(undoBody("   ")).toEqual({ reason: null })
+  })
+  it("asks for an optional reason, then undoes through the server", async () => {
+    get.mockImplementation(() => ok([customer])); wrap(<PipelineBoard />)
+    fireEvent.click(await screen.findByLabelText("Undo conversion of Cape Wines")); expect(post).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText("Reason (optional)"), { target: { value: "Converted by mistake" } })
+    fireEvent.click(screen.getByLabelText("Confirm undo Cape Wines"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/crm/customers/c/undo-convert", { reason: "Converted by mistake" }))
+  })
+  it("works without a reason, and cancelling does nothing", async () => {
+    get.mockImplementation(() => ok([customer])); wrap(<PipelineBoard />)
+    fireEvent.click(await screen.findByLabelText("Undo conversion of Cape Wines")); fireEvent.click(screen.getByText("Cancel")); expect(post).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByLabelText("Undo conversion of Cape Wines")); fireEvent.click(screen.getByLabelText("Confirm undo Cape Wines"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/crm/customers/c/undo-convert", { reason: null }))
+  })
+  it("a lead that was never converted has no undo, and the server's refusal is shown", async () => {
+    get.mockImplementation(() => ok([{ ...customer, customerType: "LEAD" }])); wrap(<PipelineBoard />)
+    await screen.findByLabelText("Cape Wines"); expect(screen.queryByLabelText("Undo conversion of Cape Wines")).toBeNull(); cleanup()
+    post.mockRejectedValue({ response: { data: { message: "Cannot undo the conversion of 'Cape Wines': 1 active booking exists. Cancel or complete it first." } } })
+    get.mockImplementation(() => ok([customer])); wrap(<PipelineBoard />)
+    fireEvent.click(await screen.findByLabelText("Undo conversion of Cape Wines")); fireEvent.click(screen.getByLabelText("Confirm undo Cape Wines"))
+    expect((await screen.findByRole("alert")).textContent).toMatch(/1 active booking exists/)
   })
 })
