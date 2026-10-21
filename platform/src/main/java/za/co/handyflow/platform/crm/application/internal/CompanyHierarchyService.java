@@ -1,5 +1,7 @@
 package za.co.handyflow.platform.crm.application.internal;
 
+import za.co.handyflow.platform.crm.domain.model.AuditAction;
+import za.co.handyflow.platform.crm.domain.model.AuditEntity;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -30,6 +32,7 @@ public class CompanyHierarchyService {
 
     private final CustomerRepository customerRepository;
     private final OpportunityRepository opportunityRepository;
+    private final CrmAuditService audit;
 
     @Transactional(readOnly = true)
     public HierarchyResponse hierarchy(TenantId tenantId, UUID id) {
@@ -76,6 +79,7 @@ public class CompanyHierarchyService {
         c.changeParent(parentId);
         customerRepository.save(c);
         log.info("[CRM] Company {} parent set to {} tenant={}", id, parentId, tenantId);
+        audit.record(tenantId, AuditEntity.COMPANY_GROUP, id, c.getName(), AuditAction.PARENT_CHANGED, parentId == null ? "Made top-level" : "Moved under " + customerRepository.findActiveById(tenantId, parentId).map(Customer::getName).orElse("another company"));
         return hierarchy(tenantId, id);
     }
 

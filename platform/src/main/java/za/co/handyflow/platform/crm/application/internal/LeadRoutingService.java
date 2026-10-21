@@ -1,5 +1,7 @@
 package za.co.handyflow.platform.crm.application.internal;
 
+import za.co.handyflow.platform.crm.domain.model.AuditAction;
+import za.co.handyflow.platform.crm.domain.model.AuditEntity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -31,6 +33,7 @@ public class LeadRoutingService {
     private final RoutingRuleRepository ruleRepository;
     private final CustomerRepository customerRepository;
     private final UserRecipientResolver userResolver;
+    private final CrmAuditService audit;
 
     @Transactional(readOnly = true)
     public List<RoutingRuleResponse> rules(TenantId tenantId) {
@@ -44,7 +47,9 @@ public class LeadRoutingService {
         if (existing.size() >= MAX_RULES) throw new IllegalArgumentException("At most " + MAX_RULES + " routing rules");
         int next = existing.stream().mapToInt(RoutingRule::getPosition).max().orElse(0) + 1;
         var rule = RoutingRule.create(tenantId, next, req.name(), req.field(), req.op(), req.value(), LeadRouting.joinIds(req.assigneeIds()), req.active() == null || req.active());
-        return toResponse(ruleRepository.save(rule));
+        var saved = ruleRepository.save(rule);
+        audit.record(tenantId, AuditEntity.ROUTING_RULE, saved.getId(), saved.getName(), AuditAction.CREATED, null);
+        return toResponse(saved);
     }
 
     @Transactional
@@ -52,6 +57,7 @@ public class LeadRoutingService {
         var rule = require(tenantId, id);
         check(tenantId, req);
         rule.change(req.name(), req.field(), req.op(), req.value(), LeadRouting.joinIds(req.assigneeIds()), req.active() == null || req.active());
+        audit.record(tenantId, AuditEntity.ROUTING_RULE, id, rule.getName(), AuditAction.UPDATED, rule.isActive() ? null : "Turned off");
         return toResponse(ruleRepository.save(rule));
     }
 
@@ -60,6 +66,7 @@ public class LeadRoutingService {
         var rule = require(tenantId, id);
         rule.softDelete();
         ruleRepository.save(rule);
+        audit.record(tenantId, AuditEntity.ROUTING_RULE, id, rule.getName(), AuditAction.DELETED, null);
     }
 
     /** Sets the order rules are tried in. The ids must be exactly the account's rules. */
@@ -71,6 +78,7 @@ public class LeadRoutingService {
         }
         for (RoutingRule r : rules) r.moveTo(ids.indexOf(r.getId()) + 1);
         ruleRepository.saveAll(rules);
+        audit.record(tenantId, AuditEntity.ROUTING_RULE, null, "Routing order", AuditAction.REORDERED, null);
         return ruleRepository.findAllActive(tenantId).stream().map(LeadRoutingService::toResponse).toList();
     }
 
@@ -83,7 +91,10 @@ public class LeadRoutingService {
             if (c.getOwnerId() != null || c.getCustomerType() != CustomerType.LEAD || isClosed(c)) continue;
             if (assign(tenantId, c, rules)) routed++; else left++;
         }
-        if (routed > 0) log.info("[CRM] Routed {} unassigned leads tenant={}", routed, tenantId);
+        if (routed > 0) {
+            log.info("[CRM] Routed {} unassigned leads tenant={}", routed, tenantId);
+            audit.record(tenantId, AuditEntity.ROUTING_RULE, null, "Route unassigned leads", AuditAction.RUN, routed + (routed == 1 ? " lead was given an owner" : " leads were given an owner"));
+        }
         return new RouteRunResponse(routed, left);
     }
 

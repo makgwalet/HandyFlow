@@ -1,5 +1,7 @@
 package za.co.handyflow.platform.crm.application.internal;
 
+import za.co.handyflow.platform.crm.domain.model.AuditAction;
+import za.co.handyflow.platform.crm.domain.model.AuditEntity;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.HashMap;
@@ -38,6 +40,7 @@ public class OpportunityService {
     private final CustomerRepository customerRepository;
     private final UserRecipientResolver userResolver;
     private final WorkflowService workflowService;
+    private final CrmAuditService audit;
 
     /** customerId narrows to one company; openOnly leaves out won and lost. */
     @Transactional(readOnly = true)
@@ -67,6 +70,7 @@ public class OpportunityService {
                 req.expectedCloseDate(), owner, OpportunityRules.cleanNote(req.notes(), 4000, "The notes"), by);
         opportunityRepository.save(o);
         log.info("[CRM] Opportunity created id={} customer={} tenant={}", o.getId(), customer.getId(), tenantId);
+        audit.record(tenantId, AuditEntity.OPPORTUNITY, o.getId(), o.getName(), AuditAction.CREATED, customer.getName());
         return toResponse(o, customer.getName());
     }
 
@@ -77,6 +81,7 @@ public class OpportunityService {
         o.changeDetails(OpportunityRules.cleanName(req.name()), OpportunityRules.cleanAmount(req.amount()), req.expectedCloseDate(), owner,
                 OpportunityRules.cleanNote(req.notes(), 4000, "The notes"));
         opportunityRepository.save(o);
+        audit.record(tenantId, AuditEntity.OPPORTUNITY, o.getId(), o.getName(), AuditAction.UPDATED, null);
         return toResponse(o, names(tenantId, List.of(o.getCustomerId())).get(o.getCustomerId()));
     }
 
@@ -88,6 +93,7 @@ public class OpportunityService {
         o.moveTo(req.stage(), req.lostReason(), note);
         opportunityRepository.save(o);
         log.info("[CRM] Opportunity {} moved to {} tenant={}", id, req.stage(), tenantId);
+        audit.record(tenantId, AuditEntity.OPPORTUNITY, id, o.getName(), AuditAction.STAGE_CHANGED, "Moved to " + req.stage().name().toLowerCase());
         if (req.stage() == za.co.handyflow.platform.crm.domain.model.OpportunityStage.WON) {
             customerRepository.findActiveById(tenantId, o.getCustomerId())
                     .ifPresent(c -> workflowService.fire(tenantId, za.co.handyflow.platform.crm.domain.model.WorkflowTrigger.OPPORTUNITY_WON, c, null));
@@ -100,6 +106,7 @@ public class OpportunityService {
         Opportunity o = require(tenantId, id);
         o.softDelete();
         opportunityRepository.save(o);
+        audit.record(tenantId, AuditEntity.OPPORTUNITY, id, o.getName(), AuditAction.DELETED, null);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────

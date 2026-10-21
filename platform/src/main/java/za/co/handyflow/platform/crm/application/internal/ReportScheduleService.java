@@ -1,5 +1,7 @@
 package za.co.handyflow.platform.crm.application.internal;
 
+import za.co.handyflow.platform.crm.domain.model.AuditAction;
+import za.co.handyflow.platform.crm.domain.model.AuditEntity;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -42,6 +44,7 @@ public class ReportScheduleService {
     private final UserRecipientResolver userResolver;
     private final TenantAdminRecipients tenantAdminRecipients;
     private final NotificationService notificationService;
+    private final CrmAuditService audit;
 
     @Transactional(readOnly = true)
     public List<ReportScheduleResponse> list(TenantId tenantId) {
@@ -52,7 +55,9 @@ public class ReportScheduleService {
     public ReportScheduleResponse create(TenantId tenantId, ReportScheduleRequest req) {
         var ids = validate(tenantId, req);
         if (scheduleRepository.findAllActive(tenantId).size() >= ReportRules.MAX_SCHEDULES) throw new IllegalArgumentException("At most " + ReportRules.MAX_SCHEDULES + " scheduled reports");
-        return toResponse(scheduleRepository.save(ReportSchedule.create(tenantId, req.name(), req.reportType(), req.frequency(), LeadRouting.joinIds(ids), req.active() == null || req.active())));
+        var saved = scheduleRepository.save(ReportSchedule.create(tenantId, req.name(), req.reportType(), req.frequency(), LeadRouting.joinIds(ids), req.active() == null || req.active()));
+        audit.record(tenantId, AuditEntity.REPORT_SCHEDULE, saved.getId(), saved.getName(), AuditAction.CREATED, ReportRules.describe(saved.getReportType(), saved.getFrequency()));
+        return toResponse(saved);
     }
 
     @Transactional
@@ -60,6 +65,7 @@ public class ReportScheduleService {
         var s = require(tenantId, id);
         var ids = validate(tenantId, req);
         s.change(req.name(), req.reportType(), req.frequency(), LeadRouting.joinIds(ids), req.active() == null || req.active());
+        audit.record(tenantId, AuditEntity.REPORT_SCHEDULE, id, s.getName(), AuditAction.UPDATED, s.isActive() ? null : "Turned off");
         return toResponse(scheduleRepository.save(s));
     }
 
@@ -68,6 +74,7 @@ public class ReportScheduleService {
         var s = require(tenantId, id);
         s.softDelete();
         scheduleRepository.save(s);
+        audit.record(tenantId, AuditEntity.REPORT_SCHEDULE, id, s.getName(), AuditAction.DELETED, null);
     }
 
     @Transactional(readOnly = true)
@@ -78,9 +85,12 @@ public class ReportScheduleService {
     }
 
     /** Sends the report now. Does not count as the scheduled send, so the next scheduled day still goes out. */
-    @Transactional(readOnly = true)
+    @Transactional
     public ReportSendResponse sendNow(TenantId tenantId, UUID id) {
-        return new ReportSendResponse(deliver(tenantId, require(tenantId, id)));
+        var s = require(tenantId, id);
+        int n = deliver(tenantId, s);
+        audit.record(tenantId, AuditEntity.REPORT_SCHEDULE, id, s.getName(), AuditAction.SENT, "Sent now to " + n + (n == 1 ? " person" : " people"));
+        return new ReportSendResponse(n);
     }
 
     /** Sends every active report that is due today. Returns how many went out. Never throws. */

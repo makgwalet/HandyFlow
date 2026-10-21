@@ -1,5 +1,7 @@
 package za.co.handyflow.platform.crm.application.internal;
 
+import za.co.handyflow.platform.crm.domain.model.AuditAction;
+import za.co.handyflow.platform.crm.domain.model.AuditEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -75,6 +77,7 @@ public class CustomerService {
     private final CustomFieldService            customFieldService;
     private final LeadRoutingService            routingService;
     private final WorkflowService               workflowService;
+    private final CrmAuditService               audit;
 
     // ══════════════════════════════════════════════════════════════════════
     // READ operations
@@ -338,6 +341,7 @@ public class CustomerService {
         customer.softDelete(actingUser);
         customerRepository.save(customer);
         log.info("[CRM] Customer soft-deleted id={} tenant={} by={}", id, tenantId, actingUser);
+        audit.record(tenantId, AuditEntity.CUSTOMER, id, customer.getName(), AuditAction.DELETED, null);
     }
 
     /**
@@ -446,6 +450,7 @@ public class CustomerService {
         customer.convertToCustomer(currentUserId());
         customerRepository.save(customer);
         log.info("[CRM] Lead converted to customer id={} tenant={} by={}", id, tenantId, currentUserId());
+        audit.record(tenantId, AuditEntity.CUSTOMER, id, customer.getName(), AuditAction.CONVERTED, "Lead became a customer");
         return toResponse(customer);
     }
 

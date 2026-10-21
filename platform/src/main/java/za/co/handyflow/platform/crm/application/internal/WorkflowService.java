@@ -1,5 +1,7 @@
 package za.co.handyflow.platform.crm.application.internal;
 
+import za.co.handyflow.platform.crm.domain.model.AuditAction;
+import za.co.handyflow.platform.crm.domain.model.AuditEntity;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.HashMap;
@@ -52,6 +54,7 @@ public class WorkflowService {
     private final UserRecipientResolver userResolver;
     private final TenantAdminRecipients tenantAdminRecipients;
     private final NotificationService notificationService;
+    private final CrmAuditService audit;
 
     @Transactional(readOnly = true)
     public List<WorkflowResponse> list(TenantId tenantId) {
@@ -63,7 +66,9 @@ public class WorkflowService {
         validate(tenantId, req);
         if (workflowRepository.findAllActive(tenantId).size() >= WorkflowRules.MAX_WORKFLOWS) throw new IllegalArgumentException("At most " + WorkflowRules.MAX_WORKFLOWS + " workflows");
         var w = Workflow.create(tenantId, req.name(), req.trigger(), req.triggerStage(), req.condField(), req.condOp(), req.condValue(), req.action(), req.actionText(), req.actionDays(), req.actionUser(), req.active() == null || req.active());
-        return toResponse(workflowRepository.save(w));
+        var saved = workflowRepository.save(w);
+        audit.record(tenantId, AuditEntity.WORKFLOW, saved.getId(), saved.getName(), AuditAction.CREATED, WorkflowRules.describe(toRule(saved), null));
+        return toResponse(saved);
     }
 
     @Transactional
@@ -71,6 +76,7 @@ public class WorkflowService {
         var w = require(tenantId, id);
         validate(tenantId, req);
         w.change(req.name(), req.trigger(), req.triggerStage(), req.condField(), req.condOp(), req.condValue(), req.action(), req.actionText(), req.actionDays(), req.actionUser(), req.active() == null || req.active());
+        audit.record(tenantId, AuditEntity.WORKFLOW, id, w.getName(), AuditAction.UPDATED, w.isActive() ? null : "Turned off");
         return toResponse(workflowRepository.save(w));
     }
 
@@ -79,6 +85,7 @@ public class WorkflowService {
         var w = require(tenantId, id);
         w.softDelete();
         workflowRepository.save(w);
+        audit.record(tenantId, AuditEntity.WORKFLOW, id, w.getName(), AuditAction.DELETED, null);
     }
 
     @Transactional(readOnly = true)

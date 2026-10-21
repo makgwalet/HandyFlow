@@ -23,6 +23,7 @@ public class LeadScoringService {
 
     private final ScoringRuleRepository ruleRepository;
     private final CustomerRepository customerRepository;
+    private final CrmAuditService audit;
 
     @Transactional(readOnly = true)
     public List<ScoringRuleResponse> rules(TenantId tenantId) {
@@ -35,7 +36,9 @@ public class LeadScoringService {
         LeadScoring.checkRule(req.name(), c, req.points());
         if (ruleRepository.findAllActive(tenantId).size() >= MAX_RULES) throw new IllegalArgumentException("At most " + MAX_RULES + " scoring rules");
         var rule = ScoringRule.create(tenantId, req.name(), req.field(), req.op(), req.value(), req.points(), req.active() == null || req.active());
-        return toResponse(ruleRepository.save(rule));
+        var saved = ruleRepository.save(rule);
+        audit.record(tenantId, za.co.handyflow.platform.crm.domain.model.AuditEntity.SCORING_RULE, saved.getId(), saved.getName(), za.co.handyflow.platform.crm.domain.model.AuditAction.CREATED, "%d points".formatted(saved.getPoints()));
+        return toResponse(saved);
     }
 
     @Transactional
@@ -43,6 +46,7 @@ public class LeadScoringService {
         var rule = require(tenantId, id);
         LeadScoring.checkRule(req.name(), new Condition(req.field(), req.op(), req.value()), req.points());
         rule.change(req.name(), req.field(), req.op(), req.value(), req.points(), req.active() == null || req.active());
+        audit.record(tenantId, za.co.handyflow.platform.crm.domain.model.AuditEntity.SCORING_RULE, id, rule.getName(), za.co.handyflow.platform.crm.domain.model.AuditAction.UPDATED, rule.isActive() ? null : "Turned off");
         return toResponse(ruleRepository.save(rule));
     }
 
@@ -51,6 +55,7 @@ public class LeadScoringService {
         var rule = require(tenantId, id);
         rule.softDelete();
         ruleRepository.save(rule);
+        audit.record(tenantId, za.co.handyflow.platform.crm.domain.model.AuditEntity.SCORING_RULE, id, rule.getName(), za.co.handyflow.platform.crm.domain.model.AuditAction.DELETED, null);
     }
 
     /** The score, band and reasons of every active lead. */
