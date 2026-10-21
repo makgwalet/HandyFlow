@@ -31,6 +31,8 @@ import za.co.handyflow.platform.catalogue.application.internal.CatalogueMediaSer
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueBundleService;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueChannelService;
 import za.co.handyflow.platform.catalogue.application.internal.CatalogueSyncService;
+import za.co.handyflow.platform.catalogue.application.internal.CatalogueReportService;
+import za.co.handyflow.platform.catalogue.application.internal.CatalogueEnrichmentService;
 import za.co.handyflow.platform.catalogue.domain.model.ItemApprovalStatus;
 import za.co.handyflow.platform.catalogue.domain.model.ImportRules;
 import za.co.handyflow.platform.catalogue.domain.model.PriceChangeStatus;
@@ -91,6 +93,8 @@ public class CatalogueController {
     private final CatalogueBundleService bundleService;
     private final CatalogueChannelService channelService;
     private final CatalogueSyncService syncService;
+    private final CatalogueReportService reportService;
+    private final CatalogueEnrichmentService enrichmentService;
 
     /** What the signed-in user may do, from their authorities. */
     private static Caller caller(Authentication auth) {
@@ -559,6 +563,55 @@ public class CatalogueController {
     @Operation(summary = "What changed since a cursor", description = "Start with since=0. Keep the returned cursor and send it back; repeat while hasMore is true.")
     public ResponseEntity<ApiResponse<ChangesResponse>> changes(@RequestParam(required = false) Long since, @RequestParam(required = false) Integer limit, Authentication auth) {
         return ResponseEntity.ok(ApiResponse.success(syncService.changes(TenantContext.getTenantIdAsObject(), since, limit, caller(auth))));
+    }
+
+
+    // ── Reports and suggestions ──────────────────────────────────────────────
+
+    @GetMapping("/reports")
+    @PreAuthorize(READ)
+    @Operation(summary = "The catalogue reports, and which of them the caller may run")
+    public ResponseEntity<ApiResponse<List<ReportDefResponse>>> reports(Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(reportService.reports(caller(auth))));
+    }
+
+    @GetMapping("/reports/{code}")
+    @PreAuthorize(READ)
+    @Operation(summary = "Run a report", description = "listId for PRICE_LIST, marginLimit for LOW_MARGIN, days for PRICE_CHANGES and RECENT_CHANGES. Reports with costs need price access.")
+    public ResponseEntity<ApiResponse<ReportResponse>> report(@PathVariable String code, @RequestParam(required = false) UUID listId,
+            @RequestParam(required = false) Integer marginLimit, @RequestParam(required = false) Integer days, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(reportService.run(TenantContext.getTenantIdAsObject(), code, new CatalogueReportService.Params(listId, marginLimit, days), caller(auth))));
+    }
+
+    @GetMapping(value = "/reports/{code}/export", produces = "text/csv")
+    @PreAuthorize(EXPORT)
+    @Operation(summary = "A report as CSV")
+    public ResponseEntity<String> exportReport(@PathVariable String code, @RequestParam(required = false) UUID listId,
+            @RequestParam(required = false) Integer marginLimit, @RequestParam(required = false) Integer days, Authentication auth) {
+        String body = reportService.csv(TenantContext.getTenantIdAsObject(), code, new CatalogueReportService.Params(listId, marginLimit, days), caller(auth));
+        return csv(body, "catalogue-" + code.trim().toLowerCase().replace('_', '-') + ".csv");
+    }
+
+    @GetMapping("/enrichment")
+    @PreAuthorize(WRITE)
+    @Operation(summary = "Items with suggestions for a missing category, brand or SKU",
+            description = "Worked out from your own catalogue by fixed rules. Nothing is changed until a suggestion is applied.")
+    public ResponseEntity<ApiResponse<EnrichmentResponse>> enrichment(Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(enrichmentService.overview(TenantContext.getTenantIdAsObject(), caller(auth))));
+    }
+
+    @GetMapping("/items/{id}/enrichment")
+    @PreAuthorize(READ)
+    @Operation(summary = "Suggestions for one item")
+    public ResponseEntity<ApiResponse<EnrichmentResponse.Entry>> itemEnrichment(@PathVariable UUID id, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success(enrichmentService.forItem(TenantContext.getTenantIdAsObject(), id, caller(auth))));
+    }
+
+    @PostMapping("/items/{id}/enrichment/apply")
+    @PreAuthorize(WRITE)
+    @Operation(summary = "Apply a suggestion", description = "Fills a category, brand or SKU that is still empty, through the ordinary item edit.")
+    public ResponseEntity<ApiResponse<CatalogueItemResponse>> applySuggestion(@PathVariable UUID id, @RequestBody ApplySuggestionRequest request, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.success("Suggestion applied", enrichmentService.apply(TenantContext.getTenantIdAsObject(), id, request, caller(auth))));
     }
 
     // ── Dashboard and Product 360 ────────────────────────────────────────────

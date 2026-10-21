@@ -711,3 +711,50 @@ export function publishText(r: PublishResult, verb: "publish" | "unpublish" = "p
   if (r.blocked > 0) parts.push(`${r.blocked} cannot be published`)
   return parts.join(", ") + "."
 }
+
+
+// ── Reports and suggestions ──────────────────────────────────────────────────
+export interface ReportDef { code: string; group: string; title: string; description: string; needsPrices: boolean; available: boolean }
+export interface ReportColumn { key: string; label: string; numeric: boolean }
+export interface Report { code: string; title: string; description: string; columns: ReportColumn[]; rows: string[][]; total: number; truncated: boolean; generatedAt: string; note: string | null }
+export interface ReportOptions { listId: string; marginLimit: string; days: string }
+export const EMPTY_REPORT_OPTIONS: ReportOptions = { listId: "", marginLimit: "", days: "" }
+
+/** Which settings a report takes, and the default shown to the user. */
+export const REPORT_SETTINGS: Record<string, { listId?: boolean; marginLimit?: string; days?: string }> = {
+  PRICE_LIST: { listId: true }, LOW_MARGIN: { marginLimit: "20" }, PRICE_CHANGES: { days: "90" }, RECENT_CHANGES: { days: "30" },
+}
+
+/** What is wrong with the report settings, or "". */
+export function reportProblem(code: string, o: ReportOptions): string {
+  const spec = REPORT_SETTINGS[code]
+  if (!spec) return ""
+  if (spec.marginLimit !== undefined && o.marginLimit.trim() !== "") {
+    const n = Number(o.marginLimit)
+    if (!Number.isInteger(n) || n < 0 || n > 99) return "The margin limit must be a whole number from 0 to 99."
+  }
+  if (spec.days !== undefined && o.days.trim() !== "") {
+    const n = Number(o.days)
+    if (!Number.isInteger(n) || n < 1 || n > 730) return "Days must be a whole number from 1 to 730."
+  }
+  return ""
+}
+
+/** Only the settings the report takes, and only the ones filled in. */
+export function reportParams(code: string, o: ReportOptions): Record<string, string | number> {
+  const spec = REPORT_SETTINGS[code] ?? {}
+  const p: Record<string, string | number> = {}
+  if (spec.listId && o.listId) p.listId = o.listId
+  if (spec.marginLimit !== undefined && o.marginLimit.trim()) p.marginLimit = Number(o.marginLimit)
+  if (spec.days !== undefined && o.days.trim()) p.days = Number(o.days)
+  return p
+}
+
+export interface Suggestion { kind: "CATEGORY" | "BRAND" | "SKU" | "PRICE"; value: string; label: string; confidence: number; reason: string; applicable: boolean }
+export interface SuggestionEntry { itemId: string; name: string; sku: string | null; suggestions: Suggestion[] }
+export interface Enrichment { scanned: number; itemsWithSuggestions: number; truncated: boolean; items: SuggestionEntry[] }
+export const SUGGESTION_KIND: Record<string, string> = { CATEGORY: "Category", BRAND: "Brand", SKU: "SKU", PRICE: "Price hint" }
+export const confidenceText = (c: number) => (c >= 85 ? "Very likely" : c >= 70 ? "Likely" : "Possible")
+export const enrichmentText = (e: Enrichment) =>
+  e.itemsWithSuggestions === 0 ? `Nothing to suggest across ${e.scanned} item${e.scanned === 1 ? "" : "s"}.`
+    : `${e.itemsWithSuggestions} item${e.itemsWithSuggestions === 1 ? "" : "s"} with suggestions across ${e.scanned} item${e.scanned === 1 ? "" : "s"}.`

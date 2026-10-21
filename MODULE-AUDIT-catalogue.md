@@ -283,3 +283,22 @@ Limits to know:
 - The Product 360 Channels tab checks a single item at a time; its "ready" state uses the same rules as the channel screen.
 
 Tests: 8 rule tests pass standalone (`ChannelRulesTest`). 23 service and entity tests (Mockito: 14 channel, 7 change feed; 2 for the event on the history line) are written but **not run**. Front end: 178 catalogue tests pass (12 new), lint and type check clean. V484 has not been run against a database (check 31 first: it numbers existing history lines); checks 31–35 are for it.
+
+## 16. Slice 8c and P2 status (reports, suggestions): built, not yet run against a database
+
+No migration: 8c only reads. The next free migration is still V485.
+
+| Area | What it does |
+|---|---|
+| Reports | Section **Reports** (Data). 12 reports in groups (pricing, gaps, publishing, activity), each with a short description, plain settings (price list, margin limit, last N days) and a table on screen. **The roadmap lists no reports, so the 12 were chosen by me**; confirm or change the list. Seeing them needs catalogue read; reports that show cost, margin or price changes are switched off and refused (403) for callers without `CATALOGUE_PRICE_READ`. CSV download needs `CATALOGUE_EXPORT` and uses the same safe CSV writer as the item export. |
+| Suggestions (P2) | Section **Suggestions** (Data) and a panel on Product 360 Overview. Suggests a category, a brand, a SKU in the tenant's own pattern, and a price hint. **These are fixed rules, not machine learning and not an outside AI service**: items are compared by the words in their names (sizes and filler words ignored), and a suggestion is made only when enough similar items agree. Every suggestion shows its reason and a confidence. |
+| Applying | Category, brand and SKU can be applied with one press, only to an **empty** field, through the normal edit path (so history, validation and approval rules apply). Price hints are shown for information only and cannot be applied here. Variants are refused. Needs `CATALOGUE_WRITE`. Price hints only for callers who may see prices. |
+
+Limits to know:
+- Reports are computed in memory over the tenant's live items and stop at 5,000 rows (the screen says when it was cut). Fine for a small or mid catalogue, not for a very large one.
+- There is no sales data in the catalogue, so slow-mover, best-seller or demand reports are **not possible** here; they belong with the sales and stock modules.
+- Price hints need at least 3 priced items in the category and only suggest the category's usual margin. They are a prompt, not advice.
+- The overview scans and shows at most 100 items with suggestions. No scheduling, notifications or saved reports.
+- Suggestion quality depends on how consistently names are written; poor names give no suggestions rather than wrong ones, but wrong ones are possible. Always review before applying.
+
+Tests: 16 rule tests pass standalone (`ReportRulesTest` 6, `EnrichmentRulesTest` 10). 23 service tests (Mockito: 14 report, 9 enrichment) are written but **not run**. Front end: 192 catalogue tests pass (14 new), lint and type check clean. The new JPQL (`publishedItemIds`, `itemLinesSince`, `appliedSince`, `allForTenant`) has not run against a database.

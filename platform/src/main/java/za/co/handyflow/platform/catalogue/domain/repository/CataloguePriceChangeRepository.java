@@ -55,4 +55,9 @@ public interface CataloguePriceChangeRepository extends JpaRepository<CatalogueP
     @Query("SELECT c FROM CataloguePriceChange c WHERE c.tenantId = :tenantId AND c.priceListId = :listId AND c.itemId IN :itemIds AND c.status = "
             + "za.co.handyflow.platform.catalogue.domain.model.PriceChangeStatus.APPLIED ORDER BY c.effectiveFrom DESC, c.appliedAt DESC")
     List<CataloguePriceChange> appliedOnList(TenantId tenantId, UUID listId, java.util.Collection<UUID> itemIds);
+
+    /** Applied price changes that took effect on or after a day, newest first. */
+    @Query("SELECT c FROM CataloguePriceChange c WHERE c.tenantId = :tenantId AND c.effectiveFrom >= :from AND c.status = "
+            + "za.co.handyflow.platform.catalogue.domain.model.PriceChangeStatus.APPLIED ORDER BY c.effectiveFrom DESC, c.appliedAt DESC")
+    List<CataloguePriceChange> appliedSince(TenantId tenantId, LocalDate from, Pageable page);
 }

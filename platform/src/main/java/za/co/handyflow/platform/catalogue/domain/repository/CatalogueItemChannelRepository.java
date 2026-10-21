@@ -27,4 +27,8 @@ public interface CatalogueItemChannelRepository extends JpaRepository<CatalogueI
 
     @Query("SELECT x FROM CatalogueItemChannel x WHERE x.tenantId = :tenantId AND x.channelId = :channelId ORDER BY x.publishedAt DESC, x.id")
     List<CatalogueItemChannel> pageOnChannel(TenantId tenantId, UUID channelId, org.springframework.data.domain.Pageable page);
+
+    /** Every item published to at least one channel. */
+    @Query("SELECT DISTINCT x.itemId FROM CatalogueItemChannel x WHERE x.tenantId = :tenantId")
+    List<UUID> publishedItemIds(TenantId tenantId);
 }

@@ -21,4 +21,8 @@ public interface CatalogueAuditEventRepository extends JpaRepository<CatalogueAu
     /** Item history lines after a change number, oldest first, settled for a few seconds so a still-open save is not skipped. */
     @Query("SELECT e FROM CatalogueAuditEvent e WHERE e.tenantId = :tenantId AND e.entityType = 'ITEM' AND e.seq > :since AND e.createdAt <= :settledBefore ORDER BY e.seq")
     List<CatalogueAuditEvent> itemChangesAfter(TenantId tenantId, long since, java.time.Instant settledBefore, org.springframework.data.domain.Pageable page);
+
+    /** Item history lines since a moment, newest first (for the "recently changed" report). */
+    @Query("SELECT e FROM CatalogueAuditEvent e WHERE e.tenantId = :tenantId AND e.entityType = 'ITEM' AND e.createdAt >= :since ORDER BY e.createdAt DESC")
+    List<CatalogueAuditEvent> itemLinesSince(TenantId tenantId, java.time.Instant since, org.springframework.data.domain.Pageable page);
 }

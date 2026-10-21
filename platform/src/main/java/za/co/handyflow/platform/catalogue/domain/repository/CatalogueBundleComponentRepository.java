@@ -21,4 +21,7 @@ public interface CatalogueBundleComponentRepository extends JpaRepository<Catalo
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM CatalogueBundleComponent c WHERE c.tenantId = :tenantId AND c.bundleItemId = :bundleId")
     void deleteForBundle(TenantId tenantId, UUID bundleId);
+
+    @Query("SELECT c FROM CatalogueBundleComponent c WHERE c.tenantId = :tenantId ORDER BY c.bundleItemId, c.sortOrder")
+    List<CatalogueBundleComponent> allForTenant(TenantId tenantId);
 }

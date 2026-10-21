@@ -15,7 +15,7 @@ import {
   Footprints, QrCode, Gauge, Shield, ShieldCheck, Siren, Tablet, DollarSign, Wheat, Tractor, PawPrint,
   Droplets, Archive, Smartphone, ArrowDownToLine, Fuel, Truck, Users, TrendingUp, Car, Wrench,
   Hexagon, Calculator, BookOpen, GitBranch as JournalIcon, Landmark, BarChart2, FileText,
-  Upload, Store, Briefcase, Calendar, FolderOpen, AlertOctagon, CalendarCheck, Settings,
+  Upload, Store, Sparkles, Briefcase, Calendar, FolderOpen, AlertOctagon, CalendarCheck, Settings,
   Building2, GraduationCap, CalendarDays, Award, Scale, Gavel, FileSearch, MapPin as PinIcon, HardHat,
   ShoppingCart, Package, CalendarClock, ClipboardCheck, FileCheck,
   PartyPopper, FilePlus, LayoutTemplate, CreditCard,
@@ -834,6 +834,8 @@ export const CATALOGUE_SECTIONS: ModuleSections = {
     { id: 'channels', label: 'Channels', icon: Store, anyPermission: ['CATALOGUE_PUBLISH', 'CATALOGUE_ADMIN', 'SETTINGS_MANAGE'] },
   ] }, { label: 'Data', sections: [
     { id: 'quality', label: 'Data quality', icon: AlertTriangle, anyPermission: ['CATALOGUE_WRITE', 'CATALOGUE_APPROVE', 'CATALOGUE_ADMIN', 'SETTINGS_MANAGE'] },
+    { id: 'suggestions', label: 'Suggestions', icon: Sparkles, anyPermission: ['CATALOGUE_WRITE', 'CATALOGUE_ADMIN', 'SETTINGS_MANAGE'] },
+    { id: 'reports', label: 'Reports', icon: BarChart2, anyPermission: ['CATALOGUE_WRITE', 'CATALOGUE_EXPORT', 'CATALOGUE_PRICE_READ', 'CATALOGUE_ADMIN', 'SETTINGS_MANAGE'] },
     { id: 'import', label: 'Import & export', icon: Upload, anyPermission: ['SETTINGS_MANAGE', 'CATALOGUE_IMPORT', 'CATALOGUE_EXPORT'] },
   ] }, { label: 'Setup', sections: [
     { id: 'units', label: 'Units of measure', icon: Ruler, anyPermission: ['CATALOGUE_ADMIN'] },

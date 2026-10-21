@@ -10,6 +10,7 @@ import { DecisionModal } from "./ItemApprovalsPanel"
 import ChannelsTab from "./ChannelsTab"
 import MediaTab from "./MediaTab"
 import PackageTab, { UsedInList } from "./PackageTab"
+import { ItemSuggestions } from "./SuggestionsPanel"
 import PricingModal from "./PricingModal"
 import VariantsModal from "./VariantsModal"
 import {
@@ -114,7 +115,7 @@ export default function Product360({ itemId, onClose, onChanged }: { itemId: str
             ))}
           </div>
 
-          {tab === "overview" && <><OverviewTab o={o} />{item.itemType !== "PACKAGE" && <UsedInList itemId={itemId} />}</>}
+          {tab === "overview" && <><OverviewTab o={o} />{item.itemType !== "PACKAGE" && <UsedInList itemId={itemId} />}{!item.parentId && item.status !== "ARCHIVED" && <ItemSuggestions itemId={itemId} canWrite={canWrite} onApplied={changed} />}</>}
           {tab === "attributes" && <AttributesTab o={o} />}
           {tab === "media" && <MediaTab itemId={itemId} canWrite={canWrite} />}
           {tab === "channels" && <ChannelsTab itemId={itemId} canPublish={canPublish} />}
