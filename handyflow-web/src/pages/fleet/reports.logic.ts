@@ -11,14 +11,18 @@ export type Cell = string | number | null
 export interface ReportTable { columns: Column[]; rows: Record<string, Cell>[]; totals?: Record<string, Cell> }
 
 export type ReportId = "cost-per-km" | "fuel" | "maintenance" | "compliance" | "service-due" | "driver-scores"
-export const REPORTS: { id: ReportId; title: string; description: string; period: boolean }[] = [
-  { id: "cost-per-km", title: "Cost per km", description: "Service and fuel cost over distance driven, for every vehicle, whole life.", period: false },
-  { id: "fuel", title: "Fuel efficiency", description: "Litres, spend and consumption per vehicle for the period.", period: true },
-  { id: "maintenance", title: "Maintenance cost", description: "Completed work orders in the period, quoted against actual.", period: true },
-  { id: "compliance", title: "Compliance expiry", description: "Licence disc, roadworthy and insurance dates, most urgent first.", period: false },
-  { id: "service-due", title: "Service due", description: "Distance to the next service, most overdue first.", period: false },
-  { id: "driver-scores", title: "Driver scores", description: "Rated drivers first; thin data is shown as not rated.", period: false },
+export type ReportCategory = "operational" | "compliance" | "financial" | "safety"
+export const CATEGORIES: { id: ReportCategory; label: string }[] = [{ id: "operational", label: "Operational" }, { id: "compliance", label: "Compliance" }, { id: "financial", label: "Financial" }, { id: "safety", label: "Safety" }]
+export const REPORTS: { id: ReportId; title: string; description: string; period: boolean; category: ReportCategory }[] = [
+  { id: "cost-per-km", title: "Cost per km", description: "Service and fuel cost over distance driven, for every vehicle, whole life.", period: false, category: "financial" },
+  { id: "fuel", title: "Fuel efficiency", description: "Litres, spend and consumption per vehicle for the period.", period: true, category: "operational" },
+  { id: "maintenance", title: "Maintenance cost", description: "Completed work orders in the period, quoted against actual.", period: true, category: "financial" },
+  { id: "compliance", title: "Compliance expiry", description: "Licence disc, roadworthy and insurance dates, most urgent first.", period: false, category: "compliance" },
+  { id: "service-due", title: "Service due", description: "Distance to the next service, most overdue first.", period: false, category: "operational" },
+  { id: "driver-scores", title: "Driver scores", description: "Rated drivers first; thin data is shown as not rated.", period: false, category: "safety" },
 ]
+/** The reports on show: all of them, or one category's. */
+export const reportsIn = (category: ReportCategory | "all") => (category === "all" ? REPORTS : REPORTS.filter(r => r.category === category))
 export type PeriodKind = "month" | "30" | "90" | "year"
 export const PERIOD_LABEL: Record<PeriodKind, string> = { month: "This month", "30": "Last 30 days", "90": "Last 90 days", year: "This year" }
 export function reportPeriod(kind: PeriodKind, today = new Date()): { from: string; to: string } {

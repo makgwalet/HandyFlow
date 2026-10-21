@@ -51,3 +51,15 @@ describe("fuel analytics dashboard", () => {
     expect(screen.getByLabelText("Total spend").textContent).toMatch(/1\s000/); expect(screen.queryByRole("row", { name: "FUEL001" })).toBeNull()
   })
 })
+
+describe("report categories", () => {
+  it("shows every report under All and only that category's reports under a tab", async () => {
+    get.mockImplementation(() => ok([]))
+    wrap(<ReportsTab />)
+    const cards = () => [...screen.getByLabelText("Reports").querySelectorAll("strong")].map(s => s.textContent)
+    await screen.findByLabelText("Row count"); expect(cards()).toHaveLength(6)
+    fireEvent.click(screen.getByRole("tab", { name: "Financial" })); expect(cards().sort()).toEqual(["Cost per km", "Maintenance cost"])
+    fireEvent.click(screen.getByRole("tab", { name: "Safety" })); expect(cards()).toEqual(["Driver scores"])
+    fireEvent.click(screen.getByRole("button", { name: /Driver scores/ })); expect(screen.getByRole("button", { name: /Driver scores/ }).getAttribute("aria-pressed")).toBe("true")
+  })
+})

@@ -45,4 +45,10 @@ describe("equipment", () => {
     expect(screen.getByLabelText("TRK07")).toBeTruthy(); expect(screen.getByLabelText("Showing").textContent).toBe("Showing 1–1 of 1")
     fireEvent.change(screen.getByLabelText("Search equipment"), { target: { value: "zzz" } }); expect(screen.getByText("No equipment matches.")).toBeTruthy()
   })
+  it("shows each machine's type and status and filters by status", async () => {
+    get.mockImplementation(() => ok([{ ...row("TRACTOR1", 4200, 310, "OTHER"), status: "MAINTENANCE" }, row("TRACTOR2", 100, 200, "OTHER")])); show()
+    expect((await screen.findByLabelText("TRACTOR1")).textContent).toContain("Maintenance"); expect(screen.getByLabelText("TRACTOR2").textContent).toContain("Available")
+    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "MAINTENANCE" } })
+    expect(screen.getByLabelText("TRACTOR1")).toBeTruthy(); expect(screen.queryByLabelText("TRACTOR2")).toBeNull()
+  })
 })

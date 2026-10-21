@@ -9,6 +9,7 @@ import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { SearchBox, Pager } from "./ListControls"
 import { useListView } from "./listKit"
+import { STATUS_CFG } from "./vehicleStatus"
 import { equipmentChanged, equipmentProblem, isMachine, parseNonNegative } from "./equipment.logic"
 
 interface Equipment { id: string; registration: string; make: string | null; model: string | null; vehicleType: string; status: string; engineHours: number | null; operatingRatePerHour: number | null }
@@ -22,6 +23,7 @@ const unwrap = (r: { data: unknown }): Equipment[] => {
 const th: React.CSSProperties = { padding: "8px 10px", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, color: "var(--hf-text-faint)", textAlign: "left" }
 const td: React.CSSProperties = { padding: "9px 10px", fontSize: 12.5, verticalAlign: "top" }
 const input: React.CSSProperties = { width: 130, padding: "7px 9px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13 }
+const input2: React.CSSProperties = { padding: "7px 9px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13 }
 const chip: React.CSSProperties = { padding: "6px 12px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 12.5, cursor: "pointer" }
 const btn: React.CSSProperties = { padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--hf-brand)", color: "var(--hf-on-brand, #fff)", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }
 
@@ -44,6 +46,8 @@ function Row({ v, canEdit }: { v: Equipment; canEdit: boolean }) {
   return (
     <tr aria-label={v.registration} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
       <td style={td}><strong>{v.registration}</strong><div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{[v.make, v.model].filter(Boolean).join(" ") || v.vehicleType}{!isMachine(v) && <span> · not set up as a machine</span>}</div></td>
+      <td style={td}>{(v.vehicleType ?? "").replace(/_/g, " ").toLowerCase().replace(/^./, c => c.toUpperCase()) || "—"}</td>
+      <td style={td}><span style={{ color: STATUS_CFG[v.status]?.color, fontWeight: 700 }}>{STATUS_CFG[v.status]?.label ?? v.status}</span></td>
       <td style={td}><input aria-label={`Engine hours for ${v.registration}`} type="number" min="0" step="any" style={input} value={hours} disabled={!canEdit} onChange={e => { setHours(e.target.value); setMessage("") }} /></td>
       <td style={td}><input aria-label={`Operating rate per hour for ${v.registration}`} type="number" min="0" step="any" style={input} value={rate} disabled={!canEdit} placeholder="Not set" onChange={e => { setRate(e.target.value); setMessage("") }} />
         {problem && <div role="alert" style={{ fontSize: 11, color: "var(--hf-danger-text)", marginTop: 4, maxWidth: 220 }}>{problem}</div>}</td>
@@ -57,7 +61,8 @@ export default function EquipmentTab() {
   const canEdit = usePermission("FLEET_MANAGE")
   const [showAll, setShowAll] = useState(false)
   const { data, isLoading, isError, refetch } = useQuery<Equipment[]>({ queryKey: ["fleet", "equipment"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/equipment")) })
-  const pool = (data ?? []).filter(v => showAll || isMachine(v))
+  const [status, setStatus] = useState("")
+  const pool = (data ?? []).filter(v => (showAll || isMachine(v)) && (!status || v.status === status))
   const view = useListView(pool, v => [v.registration, v.make, v.model, v.vehicleType].filter(Boolean).join(" "))
 
   return (
@@ -76,6 +81,7 @@ export default function EquipmentTab() {
             <button type="button" aria-pressed={!showAll} style={{ ...chip, fontWeight: !showAll ? 800 : 500 }} onClick={() => setShowAll(false)}>Machines ({machines.length})</button>
             <button type="button" aria-pressed={showAll} style={{ ...chip, fontWeight: showAll ? 800 : 500 }} onClick={() => setShowAll(true)}>All vehicles ({data.length})</button>
           </div>
+          {(data ?? []).length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}><select aria-label="Status" style={input2} value={status} onChange={e => { setStatus(e.target.value); view.setPage(0) }}><option value="">All statuses</option>{Object.entries(STATUS_CFG).map(([k, c]) => <option key={k} value={k}>{c.label}</option>)}</select></div>}
           {rows.length > 0 && <div style={{ marginBottom: 10 }}><SearchBox value={view.search} onChange={view.setSearch} label="Search equipment" placeholder="Search registration, make or model" /></div>}
           {rows.length === 0 ? (
             <div role="status" style={{ border: "1px dashed var(--hf-border)", borderRadius: 12, padding: 16, fontSize: 13 }}>
@@ -85,7 +91,7 @@ export default function EquipmentTab() {
             </div>
           ) : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr><th style={th}>Vehicle</th><th style={th}>Engine hours</th><th style={th}>Operating rate (R per hour)</th><th style={th} /></tr></thead>
+            <thead><tr><th style={th}>Vehicle</th><th style={th}>Type</th><th style={th}>Status</th><th style={th}>Engine hours</th><th style={th}>Operating rate (R per hour)</th><th style={th} /></tr></thead>
             <tbody>{view.paged.rows.map(v => <Row key={v.id} v={v} canEdit={canEdit} />)}</tbody>
           </table>)}
           {rows.length > 0 && view.shown.length === 0 && <p role="status" style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No equipment matches.</p>}

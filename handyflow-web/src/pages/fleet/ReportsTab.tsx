@@ -10,8 +10,8 @@ import { fetchAllPages } from "./apiShape"
 import { Pager, SearchBox } from "./ListControls"
 import { useListView } from "./listKit"
 import {
-  REPORTS, PERIOD_LABEL, reportPeriod, costPerKmReport, fuelReport, maintenanceReport, complianceReport, serviceDueReport, driverScoresReport, cellText, toCsv, csvFileName,
-  type ReportId, type ReportTable, type PeriodKind, type CostRow, type ReportOrder, type ScoreLine,
+  REPORTS, CATEGORIES, reportsIn, PERIOD_LABEL, reportPeriod, costPerKmReport, fuelReport, maintenanceReport, complianceReport, serviceDueReport, driverScoresReport, cellText, toCsv, csvFileName,
+  type ReportId, type ReportCategory, type ReportTable, type PeriodKind, type CostRow, type ReportOrder, type ScoreLine,
 } from "./reports.logic"
 
 const unwrap = <T,>(r: { data: unknown }): T => { const o = r.data as { data?: unknown }; return (o && typeof o === "object" && "data" in o ? o.data : r.data) as T }
@@ -55,16 +55,22 @@ function ReportRows({ table, title }: { table: ReportTable; title: string }) {
 }
 
 export default function ReportsTab() {
-  const [id, setId] = useState<ReportId>("cost-per-km"), [kind, setKind] = useState<PeriodKind>("30")
+  const [id, setId] = useState<ReportId>("cost-per-km"), [kind, setKind] = useState<PeriodKind>("30"), [category, setCategory] = useState<ReportCategory | "all">("all")
   const meta = REPORTS.find(r => r.id === id) as (typeof REPORTS)[number], period = reportPeriod(kind)
   const { data, isLoading, isError, refetch } = useQuery<ReportTable>({ queryKey: ["fleet", "report", id, meta.period ? period.from : "", meta.period ? period.to : ""], queryFn: () => build(id, period) })
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "230px minmax(0,1fr)", gap: 16 }}>
-      <nav aria-label="Reports" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {REPORTS.map(r => (
+    <div>
+      <div role="tablist" aria-label="Report categories" style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+        {([{ id: "all", label: "All" }, ...CATEGORIES] as { id: ReportCategory | "all"; label: string }[]).map(c => (
+          <button key={c.id} type="button" role="tab" aria-selected={category === c.id} onClick={() => setCategory(c.id)}
+            style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: category === c.id ? "var(--hf-info-soft)" : "transparent", color: category === c.id ? "var(--hf-primary-text)" : "var(--hf-text-muted)" }}>{c.label}</button>))}
+      </div>
+      <nav aria-label="Reports" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10, marginBottom: 16 }}>
+        {reportsIn(category).map(r => (
           <button key={r.id} type="button" aria-pressed={r.id === id} onClick={() => setId(r.id)}
-            style={{ textAlign: "left", padding: "9px 12px", borderRadius: 10, border: `1px solid ${r.id === id ? "var(--hf-brand)" : "var(--hf-border)"}`, background: r.id === id ? "var(--hf-surface-muted)" : "var(--hf-surface)", color: "var(--hf-text)", cursor: "pointer" }}>
-            <strong style={{ fontSize: 13 }}>{r.title}</strong><div style={{ fontSize: 11.5, color: "var(--hf-text-muted)" }}>{r.description}</div></button>))}
+            style={{ textAlign: "left", padding: "10px 12px", borderRadius: 10, border: `1px solid ${r.id === id ? "var(--hf-brand)" : "var(--hf-border)"}`, background: r.id === id ? "var(--hf-surface-muted)" : "var(--hf-surface)", color: "var(--hf-text)", cursor: "pointer", display: "flex", flexDirection: "column", gap: 4 }}>
+            <strong style={{ fontSize: 13 }}>{r.title}</strong><span style={{ fontSize: 11.5, color: "var(--hf-text-muted)", flex: 1 }}>{r.description}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-primary-text)" }}>{r.id === id ? "Showing" : "Run report"}</span></button>))}
       </nav>
       <div style={{ minWidth: 0 }}>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
