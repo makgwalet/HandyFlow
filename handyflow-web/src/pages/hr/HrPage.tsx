@@ -12,6 +12,7 @@ import ComplianceTab   from "./ComplianceTab"
 import PayrollChecksTab from "./PayrollChecksTab"
 import TaxCertificatesTab from "./TaxCertificatesTab"
 import OnboardingTab from "./OnboardingTab"
+import AttendanceTab from "./AttendanceTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { HR_SECTIONS } from "../../navigation/moduleSections"
 
@@ -28,6 +29,7 @@ export function HrPage() {
           case "payroll-checks": return <PayrollChecksTab />
           case "tax-certificates": return <TaxCertificatesTab />
           case "onboarding":   return <OnboardingTab />
+          case "attendance":   return <AttendanceTab />
           case "disciplinary": return <DisciplinaryTab />
           case "compliance":   return <ComplianceTab />
           default:             return null

@@ -348,3 +348,56 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - Overdue notifications or a digest to managers. Overdue is only shown on screen.
 - Employees converted from Recruiter start with ID, tax and bank tasks open until HR completes the record.
 - Document uploads (signed contract, ID copy) are ticked, not stored against the task.
+
+## 13. Slice 7 status: attendance and overtime
+
+**What was wrong**
+
+- HR had no attendance at all (the Security module has guard shifts, nothing for general staff), so lateness, absence and hours worked were not recorded anywhere.
+- Payroll paid a regular monthly salary only. Overtime, which the Basic Conditions of Employment Act (BCEA) requires to be paid at 1.5 times (2 times for a Sunday not ordinarily worked), had no source and no place on the payslip.
+
+**What changed**
+
+- Employees clock in and out (their login is linked to their employee record). HR, or the manager of a person, adds, corrects or voids an entry with a reason. Nothing is deleted; every change is kept in a log that the database refuses to edit. Nobody corrects their own time unless they hold HR attendance management. A person cannot be clocked in twice.
+- Work schedules (days, start, end, unpaid break) per company, with a default; an employee works the default unless assigned another. A company with none gets a Monday to Friday 08:00 to 17:00 week with an hour's break the first time one is needed.
+- A day is read against the schedule, public holidays and approved leave: present, late (more than 5 minutes), absent, on leave, public holiday, rest day, no clock-out, or still to come. Hours beyond the schedule on a working day, and all hours on an unscheduled day, are overtime.
+- BCEA limits are flagged, not enforced: more than 45 ordinary hours or 10 overtime hours in a week, more than 12 hours in a day, less than 12 hours' rest.
+- Overtime claims are made from the record (one per employee per day, safe to ask for again). Rate = monthly salary x 12 / 52 / ordinary weekly hours (s 35), times 1.5, or 2 for a Sunday not ordinarily worked. The rate and amount are fixed when the claim is made. Someone other than the employee approves or rejects; approving locks that day's entries until the claim is rejected.
+- A pay run takes approved overtime worked up to the end of its period that no other run has taken, adds it to the month's remuneration before PAYE, UIF (up to the ceiling) and SDL, shows it on the payslip (code 3607 on the tax certificate), and marks the claims as taken so they cannot change or be paid twice. Recalculating releases and re-takes them. The run lists how many claims are still waiting.
+- Permissions `HR_ATTENDANCE_MANAGE` and `HR_OVERTIME_APPROVE` (V491, V492), given to roles that hold `HR_MANAGE`. Screen: People > Attendance (My time, Register, Overtime, Schedules).
+
+**Rules I took from outside the code, and how sure I am**
+
+- BCEA limits and rates (ss 9, 10, 14, 15, 16, 35) and the earnings threshold (R261,748.45 from 1 April 2025; R269,600.90 from 1 May 2026) come from law-firm summaries (Cliffe Dekker Hofmeyr, 20 April 2026; Bowmans; DLA Piper; Timesheet.io and PayTools for the section detail). I did not read the Act or the Gazette notice. The threshold values are versioned in `WorkingTimeRules` with their source; a date before 1 April 2025 is refused rather than guessed.
+- Above the threshold the Act's hours and overtime provisions do not apply, so no claim is made for those employees; their overtime is whatever their contract says. The test uses basic monthly salary x 12; whether the Act's "earnings" include allowances was not checked.
+- PAYE on overtime: I add the month's overtime to the month and annualise it, which is the periodic method the rest of the engine uses. This taxes the overtime as if it recurred every month, so PAYE can be higher than the year needs until the year is assessed. SARS also allows an averaging method for fluctuating pay; I could not confirm from a SARS source which one it expects and did not implement averaging. The run says this on screen.
+- UIF and SDL on overtime: I treated overtime as remuneration for both. Not confirmed against the UIF and SDL Acts.
+
+**Decisions I took that you may want to change**
+
+- A schedule is the employee's ordinary hours; no shifts across midnight.
+- One punch pair in a day has the schedule's break taken off when it is longer than 5 hours; several pairs are taken to have the breaks between them.
+- Work on an unscheduled Saturday is overtime at 1.5 from the first minute, even for someone whose contract is under 45 hours.
+- Public holiday work is recorded and flagged, but the pay due under s 18 is not calculated or claimed. I could not confirm the exact wording of s 18, so HR decides it.
+- Sunday as an ordinary working day: the Sunday rate for the ordinary hours (s 16) is flagged, not paid; only hours beyond the schedule are claimed, at 1.5.
+- Night-work allowances and transport (s 17), the 36-hour weekly rest, and the one-hour meal interval are not checked.
+- Overtime is not capped or refused when it breaks the weekly limit; it is flagged.
+- Approval is by `HR_MANAGE` or `HR_OVERTIME_APPROVE` only; team managers can claim and correct for their team but not approve.
+- Half-day leave is shown as such and the shortfall is not counted against the employee.
+
+**Not verified**
+
+- Maven build and every Mockito test, including `AttendanceServiceTest`, `OvertimeServiceTest` and the two new tests in `PayrollServiceTest`. The JPQL in the new repositories and migrations V491 and V492 have not been run.
+- Run and passing in a standalone harness: `AttendanceRulesTest` (22) and `OvertimeRulesTest` (9). The PAYE figure used in the payroll test (R4,941.78 on R31,003) was reproduced by running `SarsPayeCalculator` here.
+- Front end: 14 tests in `Attendance.test.tsx` pass; ESLint reports nothing in the new files. Not looked at in a browser.
+- Time zone: entries are read in South African time (no daylight saving). A tenant outside South Africa would be wrong.
+
+**Open items**
+
+- No device or file import (biometric clocks, CSV); no geofence or IP check on clock-in; no kiosk mode.
+- No notifications for missed clock-outs, absence, or claims waiting for approval.
+- Unpaid leave and unauthorised absence still do not reduce pay (already listed for payroll).
+- Time off in lieu instead of overtime pay, and agreed overtime (s 10(1)) as a recorded agreement, are not modelled.
+- Bonus, back pay, final pay and the SARS averaging method are still outstanding in payroll.
+- If a way to cancel a calculated pay run is added, it must release that run's overtime claims (`OvertimeService.takeFor` already does so on recalculation).
+- Employees whose login is not linked to their record cannot clock in; the screen says so.
