@@ -22,4 +22,7 @@ public interface HrEmp201Repository extends JpaRepository<HrEmp201, UUID> {
 
     @Query("SELECT e FROM HrEmp201 e WHERE e.tenantId = :#{#tenantId.value} AND e.payRunId = :payRunId")
     List<HrEmp201> forPayRun(TenantId tenantId, UUID payRunId);
+
+    @Query("SELECT e FROM HrEmp201 e WHERE e.tenantId = :#{#tenantId.value} AND e.payRunId IN :runIds")
+    List<HrEmp201> forPayRuns(TenantId tenantId, java.util.Collection<UUID> runIds);
 }

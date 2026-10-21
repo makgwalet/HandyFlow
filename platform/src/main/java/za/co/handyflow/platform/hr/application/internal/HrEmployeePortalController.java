@@ -89,6 +89,14 @@ public class HrEmployeePortalController {
                 portalDataService.getMyPayslips(getPortalUserId(), employeeId)));
     }
 
+    @GetMapping("/employees/{employeeId}/tax-certificates")
+    @PreAuthorize("hasAuthority('PORTAL_USER')")
+    @Operation(summary = "View my annual tax certificates (IRP5 / IT3(a)) once released")
+    public ResponseEntity<ApiResponse<List<za.co.handyflow.platform.hr.dto.TaxCertificateDtos.Certificate>>> getMyTaxCertificates(@PathVariable UUID employeeId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                portalDataService.getMyTaxCertificates(getPortalUserId(), employeeId)));
+    }
+
     @GetMapping("/employees/{employeeId}/leave-balances")
     @PreAuthorize("hasAuthority('PORTAL_USER')")
     @Operation(summary = "View my own leave balances")

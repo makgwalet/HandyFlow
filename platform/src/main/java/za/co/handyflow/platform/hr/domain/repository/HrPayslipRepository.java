@@ -43,4 +43,7 @@ public interface HrPayslipRepository extends JpaRepository<HrPayslip, UUID> {
     AND p.id != :excludePayslipId
     """)
     java.math.BigDecimal sumYtdUif(UUID employeeId, int taxYear, UUID excludePayslipId);
+
+    @Query("SELECT p FROM HrPayslip p WHERE p.payRunId IN :runIds ORDER BY p.createdAt")
+    List<HrPayslip> findByPayRuns(java.util.Collection<UUID> runIds);
 }

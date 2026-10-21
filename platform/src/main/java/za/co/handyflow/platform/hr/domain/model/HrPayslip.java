@@ -41,6 +41,8 @@ public class HrPayslip {
     @Column(name = "tax_before_rebate") BigDecimal taxBeforeRebate;
     @Column(name = "primary_rebate")    BigDecimal primaryRebate;
     @Column(name = "tax_year")          Integer taxYear;
+    /** The medical tax credit actually taken off the month's PAYE. Null on payslips made before it was recorded. */
+    @Column(name = "medical_tax_credit") BigDecimal medicalTaxCredit;
     @Column(name = "created_at")        Instant createdAt;
 
     public static HrPayslip create(TenantId tenantId, UUID payRunId,
@@ -66,6 +68,8 @@ public class HrPayslip {
         p.createdAt       = Instant.now();
         return p;
     }
+
+    public void setMedicalTaxCredit(BigDecimal credit) { this.medicalTaxCredit = credit; }
 
     public void applyCalculations(BigDecimal payeAmount, BigDecimal uifEmployee,
                                   BigDecimal uifEmployer, BigDecimal sdlAmount,

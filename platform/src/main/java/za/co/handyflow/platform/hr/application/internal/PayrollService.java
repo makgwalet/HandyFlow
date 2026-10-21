@@ -148,6 +148,12 @@ public class PayrollService {
                     result.sdlAmount(), result.taxableIncome(), result.taxBeforeRebate(),
                     result.primaryRebate(), taxYear);
 
+            // The credit taken off this month's PAYE, kept for the tax certificate (code 4116). It cannot exceed the
+            // tax that is left after the rebates.
+            BigDecimal taxAfterRebates = result.taxBeforeRebate().subtract(result.totalRebates()).max(BigDecimal.ZERO);
+            slip.setMedicalTaxCredit(result.medicalTaxCredit().min(taxAfterRebates)
+                    .divide(BigDecimal.valueOf(12), 2, java.math.RoundingMode.HALF_UP));
+
             // FIX 1.2: Replace reflection with direct setters on HrPayslip
             slip.setYtdGross(ytdGross.add(result.totalEarnings()));
             slip.setYtdPaye(ytdPaye.add(result.payeAmount()));

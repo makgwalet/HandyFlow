@@ -61,6 +61,7 @@ public class HrEmployeePortalDataService {
     private final HrService hrService;
     private final PayrollService payrollService;
     private final HrLeaveRequestRepository leaveRepo;
+    private final TaxCertificateService taxCertificateService;
 
     @Transactional(readOnly = true)
     public EmployeeResponse getMyProfile(UUID portalUserId, UUID employeeId) {
@@ -72,6 +73,13 @@ public class HrEmployeePortalDataService {
     public List<PayslipResponse> getMyPayslips(UUID portalUserId, UUID employeeId) {
         HrEmployeePortalAccessGrant grant = requireAccess(portalUserId, employeeId);
         return payrollService.getEmployeePayslips(TenantId.of(grant.getTenantId()), employeeId, true);
+    }
+
+    /** Annual tax certificates the employer has released. Interim ones are for SARS only and are never shown. */
+    @Transactional(readOnly = true)
+    public List<za.co.handyflow.platform.hr.dto.TaxCertificateDtos.Certificate> getMyTaxCertificates(UUID portalUserId, UUID employeeId) {
+        HrEmployeePortalAccessGrant grant = requireAccess(portalUserId, employeeId);
+        return taxCertificateService.releasedFor(TenantId.of(grant.getTenantId()), employeeId);
     }
 
     // Not read-only: reading a balance first posts any leave earned since the last visit.
