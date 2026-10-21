@@ -78,6 +78,7 @@ public class CustomerService {
     private final LeadRoutingService            routingService;
     private final WorkflowService               workflowService;
     private final CrmAuditService               audit;
+    private final WebhookService                webhookService;
 
     // ══════════════════════════════════════════════════════════════════════
     // READ operations
@@ -234,6 +235,7 @@ public class CustomerService {
             routingService.routeNewLead(tenantId, customer);   // only acts when nobody owns the lead (import, web form)
             notifyNewLead(tenantId, customer);
             workflowService.fire(tenantId, za.co.handyflow.platform.crm.domain.model.WorkflowTrigger.LEAD_CREATED, customer, null);
+            webhookService.publish(tenantId, za.co.handyflow.platform.crm.domain.model.WebhookEvent.LEAD_CREATED, customer);
         }
 
         return toResponse(customer);
@@ -468,6 +470,7 @@ public class CustomerService {
         customerRepository.save(customer);
         log.info("[CRM] Lead converted to customer id={} tenant={} by={}", id, tenantId, currentUserId());
         audit.record(tenantId, AuditEntity.CUSTOMER, id, customer.getName(), AuditAction.CONVERTED, "Lead became a customer");
+        webhookService.publish(tenantId, za.co.handyflow.platform.crm.domain.model.WebhookEvent.LEAD_CONVERTED, customer);
         return toResponse(customer);
     }
 
@@ -477,7 +480,10 @@ public class CustomerService {
         var customer = requireActive(tenantId, id);
         var before = customer.getPipelineStage();
         customer.changeStage(newStage, currentUserId(), lostReason, lostNote);
-        if (before != newStage) workflowService.fire(tenantId, za.co.handyflow.platform.crm.domain.model.WorkflowTrigger.STAGE_CHANGED, customer, newStage);
+        if (before != newStage) {
+            workflowService.fire(tenantId, za.co.handyflow.platform.crm.domain.model.WorkflowTrigger.STAGE_CHANGED, customer, newStage);
+            webhookService.publish(tenantId, za.co.handyflow.platform.crm.domain.model.WebhookEvent.STAGE_CHANGED, customer);
+        }
         return toStageResponse(customer);
     }
 

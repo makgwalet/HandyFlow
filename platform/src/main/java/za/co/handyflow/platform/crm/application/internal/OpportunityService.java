@@ -41,6 +41,7 @@ public class OpportunityService {
     private final UserRecipientResolver userResolver;
     private final WorkflowService workflowService;
     private final CrmAuditService audit;
+    private final WebhookService webhookService;
 
     /** customerId narrows to one company; openOnly leaves out won and lost. */
     @Transactional(readOnly = true)
@@ -96,7 +97,10 @@ public class OpportunityService {
         audit.record(tenantId, AuditEntity.OPPORTUNITY, id, o.getName(), AuditAction.STAGE_CHANGED, "Moved to " + req.stage().name().toLowerCase());
         if (req.stage() == za.co.handyflow.platform.crm.domain.model.OpportunityStage.WON) {
             customerRepository.findActiveById(tenantId, o.getCustomerId())
-                    .ifPresent(c -> workflowService.fire(tenantId, za.co.handyflow.platform.crm.domain.model.WorkflowTrigger.OPPORTUNITY_WON, c, null));
+                    .ifPresent(c -> {
+                        workflowService.fire(tenantId, za.co.handyflow.platform.crm.domain.model.WorkflowTrigger.OPPORTUNITY_WON, c, null);
+                        webhookService.publish(tenantId, za.co.handyflow.platform.crm.domain.model.WebhookEvent.OPPORTUNITY_WON, c);
+                    });
         }
         return toResponse(o, names(tenantId, List.of(o.getCustomerId())).get(o.getCustomerId()));
     }
