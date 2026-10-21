@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { StatusDonut, CostliestVehicles } from "./FleetCharts"
 import { blocksVehicle } from "./accidents.logic"
-import { unwrapList } from "./apiShape"
+import { unwrapList, fetchAllPages } from "./apiShape"
 import { Car, Route, Wrench, AlertTriangle, CheckCircle, ArrowRight, TrendingUp } from "lucide-react"
 
 const fmtOdo = (km: number) => `${Number(km).toLocaleString("en-ZA")} km`
@@ -40,7 +40,7 @@ interface CostSummary {
 export default function FleetDashboard({ onNavigate }: { onNavigate: (section: string) => void }) {
   const { data: vs = [] } = useQuery<DashVehicle[]>({
     queryKey: ["fleet-vehicles"],
-    queryFn: async () => unwrapList<DashVehicle>(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
+    queryFn: async () => (await fetchAllPages<DashVehicle>(u => apiClient.get(u), "/api/v1/fleet/vehicles")).items,
   })
 
   const { data: ts = [] } = useQuery<DashTrip[]>({

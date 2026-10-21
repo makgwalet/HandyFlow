@@ -5,6 +5,9 @@ import { Fragment, useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
+import { fetchAllPages } from "./apiShape"
+import { Pager, SearchBox } from "./ListControls"
+import { useListView } from "./listKit"
 import {
   BATTERY_REMOVE_REASONS, BATTERY_STATUS_LABEL, TEST_TONE, TREAD_LABEL, TYRE_REMOVE_REASONS, TYRE_STATUS_LABEL, batteryActions, batteryBody, batteryProblem, emptyBattery, emptyTyre,
   fitProblem, humanise, normalisePosition, removeProblem, retreadProblem, treadProblem, treadTone, tyreActions, tyreBody, tyreProblem, voltageProblem,
@@ -14,7 +17,6 @@ interface Tyre { id: string; serialNumber: string; brand: string; size: string; 
 interface Battery { id: string; serialNumber: string; brand: string; nominalVoltage: number; capacityAh: number | null; status: string; registration: string | null; position: string | null; warrantyExpiry: string | null; inWarranty: boolean; lastVoltage: number | null; lastTestResult: string | null; daysInService: number }
 interface VehicleOption { id: string; registration: string }
 
-const list = <T,>(r: { data: unknown }): T[] => { const o = r.data as { data?: unknown }; const p = (o && typeof o === "object" && "data" in o ? o.data : r.data) as T[] | { content?: T[] }; return (Array.isArray(p) ? p : p?.content) ?? [] }
 const errorOf = (e: unknown) => (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Something went wrong. Try again."
 const TONE = { ok: "var(--hf-success-text-strong)", warn: "var(--hf-warning-text)", bad: "var(--hf-danger-text)", none: "var(--hf-text-faint)" }
 const field: React.CSSProperties = { padding: "7px 9px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13 }
@@ -28,7 +30,7 @@ function ActionForm({ kind, id, action, onDone, onCancel }: { kind: "tyres" | "b
   const [vehicleId, setVehicleId] = useState(""), [position, setPosition] = useState(""), [value, setValue] = useState(""), [outcome, setOutcome] = useState("IN_STOCK")
   const [reason, setReason] = useState(kind === "tyres" ? "WORN" : "REPLACED"), [scrapReason, setScrapReason] = useState(""), [cost, setCost] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const { data: vehicles = [] } = useQuery<VehicleOption[]>({ queryKey: ["fleet", "vehicle-options"], queryFn: async () => list<VehicleOption>(await apiClient.get("/api/v1/fleet/vehicles?size=200")) })
+  const { data: vehicles = [] } = useQuery<VehicleOption[]>({ queryKey: ["fleet", "vehicle-options"], queryFn: async () => (await fetchAllPages<VehicleOption>(u => apiClient.get(u), "/api/v1/fleet/vehicles")).items })
   const base = `/api/v1/fleet/${kind}/${id}`
   const needsVehicle = action === "FIT" || action === "INSTALL"
   const problem = needsVehicle ? fitProblem(vehicleId, position, kind === "tyres")
@@ -100,23 +102,26 @@ function Panel({ kind }: { kind: "tyres" | "batteries" }) {
   const qc = useQueryClient()
   const canManage = usePermission("FLEET_MANAGE")
   const [status, setStatus] = useState(""), [registering, setRegistering] = useState(false), [active, setActive] = useState<{ id: string; action: string } | null>(null)
-  const { data = [], isLoading, isError } = useQuery<(Tyre | Battery)[]>({ queryKey: ["fleet", kind, status], queryFn: async () => list<Tyre | Battery>(await apiClient.get(`/api/v1/fleet/${kind}${status ? `?status=${status}` : ""}`)) })
+  const { data = [], isLoading, isError } = useQuery<(Tyre | Battery)[]>({ queryKey: ["fleet", kind, status], queryFn: async () => (await fetchAllPages<Tyre | Battery>(u => apiClient.get(u), `/api/v1/fleet/${kind}${status ? `?status=${status}` : ""}`)).items })
+  const view = useListView(data, r => [r.serialNumber, r.brand, (r as Tyre).size, r.registration, r.position].filter(Boolean).join(" "))
   const labels = kind === "tyres" ? TYRE_STATUS_LABEL : BATTERY_STATUS_LABEL
   const done = () => { setActive(null); setRegistering(false); qc.invalidateQueries({ queryKey: ["fleet", kind] }) }
   return (
     <div>
       <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-        <select aria-label="Filter by status" style={field} value={status} onChange={e => setStatus(e.target.value)}><option value="">All</option>{Object.entries(labels).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+        <SearchBox label={`Search ${kind}`} placeholder="Search serial, brand, size or vehicle" value={view.search} onChange={view.setSearch} />
+        <select aria-label="Filter by status" style={field} value={status} onChange={e => { setStatus(e.target.value); view.setPage(0) }}><option value="">All</option>{Object.entries(labels).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
         {canManage && <button type="button" style={btn} onClick={() => setRegistering(r => !r)}>{registering ? "Cancel" : kind === "tyres" ? "Register a tyre" : "Register a battery"}</button>}
       </div>
       {registering && <RegisterForm kind={kind} onDone={done} />}
       {isLoading && <p>Loading…</p>}
       {isError && <div role="alert">Couldn't load {kind}.</div>}
       {!isLoading && !isError && data.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>No {kind} yet.</p>}
-      {data.length > 0 && (
+      {data.length > 0 && view.shown.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>No {kind} match.</p>}
+      {view.shown.length > 0 && (
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead><tr>{(kind === "tyres" ? ["Serial", "Brand / size", "Status", "Where", "Tread", "Km", ""] : ["Serial", "Brand", "Status", "Where", "Last test", "Warranty", ""]).map(h => <th key={h} style={th}>{h}</th>)}</tr></thead>
-          <tbody>{data.map(row => {
+          <tbody>{view.paged.rows.map(row => {
             const tyre = kind === "tyres" ? (row as Tyre) : null, bat = kind === "batteries" ? (row as Battery) : null
             const actions = kind === "tyres" ? tyreActions(row.status) : batteryActions(row.status)
             return (
@@ -136,6 +141,7 @@ function Panel({ kind }: { kind: "tyres" | "batteries" }) {
               </Fragment>)
           })}</tbody>
         </table>)}
+      <Pager paged={view.paged} onPage={view.setPage} />
     </div>
   )
 }

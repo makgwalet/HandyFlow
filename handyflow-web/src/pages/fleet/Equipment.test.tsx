@@ -36,4 +36,13 @@ describe("equipment", () => {
     fireEvent.click(await screen.findByText("Show all vehicles to set one up")); fireEvent.change(screen.getByLabelText("Engine hours for HILUX1"), { target: { value: "120" } }); fireEvent.click(screen.getByLabelText("Save HILUX1"))
     await vi.waitFor(() => expect(patch).toHaveBeenCalledWith("/api/v1/fleet/vehicles/HILUX1/equipment", { engineHours: 120, operatingRatePerHour: null }))
   })
+  it("searches the list and shows 25 machines at a time", async () => {
+    get.mockImplementation(() => ok(Array.from({ length: 30 }, (_, i) => row(`TRK${String(i).padStart(2, "0")}`, 100 + i, 50)))); show()
+    expect(await screen.findByLabelText("TRK00")).toBeTruthy(); expect(screen.queryByLabelText("TRK25")).toBeNull()
+    expect(screen.getByLabelText("Showing").textContent).toBe("Showing 1–25 of 30")
+    fireEvent.click(screen.getByRole("button", { name: "Next" })); expect(screen.getByLabelText("TRK25")).toBeTruthy(); expect(screen.getByLabelText("Showing").textContent).toBe("Showing 26–30 of 30")
+    fireEvent.change(screen.getByLabelText("Search equipment"), { target: { value: "trk07" } })
+    expect(screen.getByLabelText("TRK07")).toBeTruthy(); expect(screen.getByLabelText("Showing").textContent).toBe("Showing 1–1 of 1")
+    fireEvent.change(screen.getByLabelText("Search equipment"), { target: { value: "zzz" } }); expect(screen.getByText("No equipment matches.")).toBeTruthy()
+  })
 })

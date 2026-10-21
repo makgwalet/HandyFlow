@@ -9,6 +9,7 @@ import { TONE_COLOUR, type Tone } from "./fleetTones"
 import { STATUS_LABEL as ORDER_STATUS } from "./workOrders.logic"
 import { TREAD_LABEL } from "./tyres.logic"
 import { orderSummary, serviceQueue, spendByMonth, statusBars, tyreAttention, batteryAttention, type BoardOrder, type ListVehicle, type TyreItem, type BatteryItem } from "./fleetBoards.logic"
+import { fetchAllPages } from "./apiShape"
 
 const unwrap = <T,>(r: { data: unknown }): T => { const o = r.data as { data?: unknown }; return (o && typeof o === "object" && "data" in o ? o.data : r.data) as T }
 const list = <T,>(r: { data: unknown }): T[] => { const p = unwrap<T[] | { content?: T[] } | null>(r); return (Array.isArray(p) ? p : p?.content) ?? [] }
@@ -24,8 +25,8 @@ function Tile({ label, value, tone, to, go }: { label: string; value: string; to
 }
 
 export default function MaintenanceBoard({ onNavigate }: { onNavigate?: (section: string) => void }) {
-  const vehicles = useQuery<ListVehicle[]>({ queryKey: ["fleet", "list", "vehicles"], queryFn: async () => list<ListVehicle>(await apiClient.get("/api/v1/fleet/vehicles?size=200")) })
-  const orders = useQuery<BoardOrder[]>({ queryKey: ["fleet", "board", "orders"], queryFn: async () => list<BoardOrder>(await apiClient.get("/api/v1/fleet/work-orders?size=200")) })
+  const vehicles = useQuery<ListVehicle[]>({ queryKey: ["fleet", "list", "vehicles"], queryFn: async () => (await fetchAllPages<ListVehicle>(u => apiClient.get(u), "/api/v1/fleet/vehicles")).items })
+  const orders = useQuery<BoardOrder[]>({ queryKey: ["fleet", "board", "orders"], queryFn: async () => (await fetchAllPages<BoardOrder>(u => apiClient.get(u), "/api/v1/fleet/work-orders")).items })
   const tyres = useQuery<TyreItem[]>({ queryKey: ["fleet", "board", "tyres"], queryFn: async () => list<TyreItem>(await apiClient.get("/api/v1/fleet/tyres?status=FITTED")) })
   const batteries = useQuery<BatteryItem[]>({ queryKey: ["fleet", "board", "batteries"], queryFn: async () => list<BatteryItem>(await apiClient.get("/api/v1/fleet/batteries?status=INSTALLED")) })
   const o = orders.data ?? [], sum = orderSummary(o), queue = serviceQueue(vehicles.data ?? []), months = spendByMonth(o)

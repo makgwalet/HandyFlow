@@ -5,6 +5,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
+import { fetchAllPages } from "./apiShape"
 import {
   DEVICE_STATE_LABEL, INGEST_HEADER, INGEST_PATH, PROVIDERS, SETTING_FIELDS, agoText, deviceBody, deviceProblem, deviceState, emptyDevice, keyNameProblem, keyStatusText,
   settingsBody, settingsProblem, speedLimitWarning, toDeviceForm, toSettingsForm, untracked, type Device, type DeviceForm, type IngestKey, type SettingsForm, type TrackingSettings,
@@ -21,7 +22,7 @@ const btn: React.CSSProperties = { ...field, cursor: "pointer", fontWeight: 700,
 const ghost: React.CSSProperties = { ...field, cursor: "pointer" }
 const card: React.CSSProperties = { border: "1px solid var(--hf-border)", borderRadius: 10, padding: 12, marginBottom: 12 }
 const STATE_TONE = { off: "var(--hf-text-faint)", never: "var(--hf-warning-text)", ok: "var(--hf-success-text-strong)", silent: "var(--hf-danger-text)" }
-const useVehicles = () => useQuery<VehicleOption[]>({ queryKey: ["fleet", "vehicle-options"], queryFn: async () => list<VehicleOption>(await apiClient.get("/api/v1/fleet/vehicles?size=200")) })
+const useVehicles = () => useQuery<VehicleOption[]>({ queryKey: ["fleet", "vehicle-options"], queryFn: async () => (await fetchAllPages<VehicleOption>(u => apiClient.get(u), "/api/v1/fleet/vehicles")).items })
 const useSettings = () => useQuery<TrackingSettings>({ queryKey: ["fleet", "telematics-settings"], queryFn: async () => unwrap<TrackingSettings>(await apiClient.get("/api/v1/fleet/telematics/settings")) })
 
 function Devices() {

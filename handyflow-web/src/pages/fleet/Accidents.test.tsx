@@ -83,3 +83,19 @@ describe("AccidentsTab", () => {
     expect(screen.queryByLabelText("Move ACC-2026-00021 to")).toBeNull()
   })
 })
+
+describe("accident list at scale", () => {
+  it("reads every page, searches, and shows 25 at a time", async () => {
+    const all = Array.from({ length: 30 }, (_, i) => acc({ id: `a${i}`, referenceNumber: `ACC-${String(i).padStart(3, "0")}`, registration: `REG${i}`, status: "CLOSED", vehicleDrivable: true }))
+    get.mockImplementation((url: string) => {
+      if (url.includes("/vehicles")) return ok({ content: [{ id: "v1", registration: "ABC123MP" }] })
+      const page = Number(/page=(\d+)/.exec(url)?.[1] ?? 0)
+      return ok({ content: all.slice(page * 20, page * 20 + 20), totalPages: 2 })
+    })
+    show()
+    await waitFor(() => expect(screen.getByLabelText("Showing").textContent).toBe("Showing 1–25 of 30"))
+    fireEvent.change(screen.getByLabelText("Search accidents"), { target: { value: "acc-029" } })
+    expect(screen.getByLabelText("Showing").textContent).toBe("Showing 1–1 of 1")
+  })
+})
+

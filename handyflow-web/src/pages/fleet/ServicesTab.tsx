@@ -3,7 +3,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Plus, Wrench, X, AlertCircle, AlertTriangle } from "lucide-react"
-import { errorMessage, unwrapList } from "./apiShape"
+import { errorMessage, fetchAllPages } from "./apiShape"
 
 interface VehicleOption { id: string; registration: string; make: string; model: string; dueForService: boolean; currentOdometer: number; serviceIntervalKm: number | null }
 interface ServiceRecord { id: string; type: string; description: string | null; serviceDate: string; odometerAtService: number | null; nextServiceKm: number | null; cost: number | null; supplier: string | null; invoiceRef: string | null }
@@ -39,12 +39,12 @@ export default function ServicesTab() {
 
   const { data: vehicles = [] } = useQuery<VehicleOption[]>({
     queryKey: ["fleet-vehicles"],
-    queryFn: async () => unwrapList<VehicleOption>(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
+    queryFn: async () => (await fetchAllPages<VehicleOption>(u => apiClient.get(u), "/api/v1/fleet/vehicles")).items,
   })
 
   const { data: services = [], isLoading } = useQuery<ServiceRecord[]>({
     queryKey: ["fleet-services", selectedVehicle],
-    queryFn: async () => selectedVehicle ? unwrapList<ServiceRecord>(await apiClient.get(`/api/v1/fleet/vehicles/${selectedVehicle}/services?size=100`)) : [],
+    queryFn: async () => selectedVehicle ? (await fetchAllPages<ServiceRecord>(u => apiClient.get(u), `/api/v1/fleet/vehicles/${selectedVehicle}/services`)).items : [],
     enabled: !!selectedVehicle,
   })
 

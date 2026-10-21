@@ -7,6 +7,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { OUTCOME_LABEL, answeredCount, bySection, completionProblems, failedCount, startBody, startProblem, type Detail, type Outcome, type Result } from "./inspections.logic"
+import { fetchAllPages } from "./apiShape"
+import { Pager, SearchBox } from "./ListControls"
+import { useListView } from "./listKit"
 
 interface Summary { id: string; registration: string; templateName: string; inspectorName: string | null; status: string; verdict: string | null; failedCount: number; startedAt: string }
 interface Full extends Detail { summary: Summary; signerName: string | null }
@@ -108,7 +111,7 @@ function StartForm({ onStarted }: { onStarted: (id: string) => void }) {
   const [f, setF] = useState({ vehicleId: "", templateId: "", odometer: "", inspectorName: "" })
   const [error, setError] = useState<string | null>(null)
   const set = (k: keyof typeof f, v: string) => { setF(p => ({ ...p, [k]: v })); setError(null) }
-  const { data: vehicles = [] } = useQuery<VehicleOption[]>({ queryKey: ["fleet", "vehicle-options"], queryFn: async () => list<VehicleOption>(await apiClient.get("/api/v1/fleet/vehicles?size=200")) })
+  const { data: vehicles = [] } = useQuery<VehicleOption[]>({ queryKey: ["fleet", "vehicle-options"], queryFn: async () => (await fetchAllPages<VehicleOption>(u => apiClient.get(u), "/api/v1/fleet/vehicles")).items })
   const { data: templates = [] } = useQuery<Template[]>({ queryKey: ["fleet", "inspection-templates"], queryFn: async () => list<Template>(await apiClient.get("/api/v1/fleet/inspection-templates")) })
   const qc = useQueryClient()
   const starter = useMutation({
@@ -147,12 +150,14 @@ export default function InspectionsTab() {
   const qc = useQueryClient()
   const { data: rows = [], isLoading, isError } = useQuery<Summary[]>({
     queryKey: ["fleet", "inspections", status],
-    queryFn: async () => list<Summary>(await apiClient.get(`/api/v1/fleet/inspections${status ? `?status=${status}` : ""}`)),
+    queryFn: async () => (await fetchAllPages<Summary>(u => apiClient.get(u), `/api/v1/fleet/inspections${status ? `?status=${status}` : ""}`)).items,
   })
+  const view = useListView(rows, i => [i.registration, i.templateName, i.inspectorName].filter(Boolean).join(" "))
   return (
     <div>
       <div style={{ display: "flex", gap: 10, marginBottom: 12, alignItems: "center" }}>
-        <select aria-label="Filter by status" style={field} value={status} onChange={e => setStatus(e.target.value)}>
+        <SearchBox label="Search inspections" placeholder="Search vehicle, inspection or inspector" value={view.search} onChange={view.setSearch} />
+        <select aria-label="Filter by status" style={field} value={status} onChange={e => { setStatus(e.target.value); view.setPage(0) }}>
           <option value="">All inspections</option><option value="IN_PROGRESS">In progress</option><option value="COMPLETED">Completed</option><option value="CANCELLED">Cancelled</option></select>
         {canManage && <button type="button" style={btn} onClick={() => setStarting(s => !s)}>{starting ? "Cancel" : "Start an inspection"}</button>}
       </div>
@@ -161,10 +166,11 @@ export default function InspectionsTab() {
       {isLoading && <p>Loading…</p>}
       {isError && <div role="alert">Couldn't load inspections.</div>}
       {!isLoading && !isError && rows.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>No inspections yet.</p>}
-      {rows.length > 0 && (
+      {rows.length > 0 && view.shown.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>No inspections match.</p>}
+      {view.shown.length > 0 && (
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
           <thead><tr>{["Vehicle", "Inspection", "Started", "Inspector", "Status", "Result", ""].map(h => <th key={h} style={{ textAlign: "left", padding: "8px 10px", fontSize: 11, textTransform: "uppercase", color: "var(--hf-text-faint)" }}>{h}</th>)}</tr></thead>
-          <tbody>{rows.map(i => (
+          <tbody>{view.paged.rows.map(i => (
             <tr key={i.id} aria-label={`${i.registration} ${i.templateName}`} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
               <td style={{ padding: "9px 10px" }}><strong>{i.registration}</strong></td><td style={{ padding: "9px 10px" }}>{i.templateName}</td>
               <td style={{ padding: "9px 10px" }}>{new Date(i.startedAt).toLocaleDateString("en-ZA")}</td><td style={{ padding: "9px 10px" }}>{i.inspectorName ?? "—"}</td>
@@ -173,6 +179,7 @@ export default function InspectionsTab() {
               <td style={{ padding: "9px 10px" }}><button type="button" style={field} onClick={() => setOpenId(i.id)}>{i.status === "IN_PROGRESS" && canManage ? "Continue" : "View"}</button></td>
             </tr>))}</tbody>
         </table>)}
+      <Pager paged={view.paged} onPage={view.setPage} />
     </div>
   )
 }

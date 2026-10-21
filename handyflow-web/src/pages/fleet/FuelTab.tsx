@@ -3,7 +3,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Plus, Fuel, X, AlertCircle } from "lucide-react"
-import { errorMessage, unwrapList } from "./apiShape"
+import { errorMessage, fetchAllPages } from "./apiShape"
 
 interface VehicleOption { id: string; registration: string; make: string; model: string; currentOdometer: number | null }
 interface FuelLog { id: string; filledAt: string; litres: number; pricePerLitre: number | null; totalCost: number | null; odometerAtFillup: number | null; station: string | null; receiptRef: string | null; fullTank: boolean }
@@ -22,12 +22,12 @@ export default function FuelTab() {
 
   const { data: vehicles = [] } = useQuery<VehicleOption[]>({
     queryKey: ["fleet-vehicles"],
-    queryFn: async () => unwrapList<VehicleOption>(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
+    queryFn: async () => (await fetchAllPages<VehicleOption>(u => apiClient.get(u), "/api/v1/fleet/vehicles")).items,
   })
 
   const { data: logs = [], isLoading } = useQuery<FuelLog[]>({
     queryKey: ["fleet-fuel", selectedVehicle],
-    queryFn: async () => selectedVehicle ? unwrapList<FuelLog>(await apiClient.get(`/api/v1/fleet/vehicles/${selectedVehicle}/fuel?size=100`)) : [],
+    queryFn: async () => selectedVehicle ? (await fetchAllPages<FuelLog>(u => apiClient.get(u), `/api/v1/fleet/vehicles/${selectedVehicle}/fuel`)).items : [],
     enabled: !!selectedVehicle,
   })
 

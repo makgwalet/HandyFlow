@@ -7,6 +7,8 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
+import { SearchBox, Pager } from "./ListControls"
+import { useListView } from "./listKit"
 import { equipmentChanged, equipmentProblem, isMachine, parseNonNegative } from "./equipment.logic"
 
 interface Equipment { id: string; registration: string; make: string | null; model: string | null; vehicleType: string; status: string; engineHours: number | null; operatingRatePerHour: number | null }
@@ -55,6 +57,8 @@ export default function EquipmentTab() {
   const canEdit = usePermission("FLEET_MANAGE")
   const [showAll, setShowAll] = useState(false)
   const { data, isLoading, isError, refetch } = useQuery<Equipment[]>({ queryKey: ["fleet", "equipment"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/equipment")) })
+  const pool = (data ?? []).filter(v => showAll || isMachine(v))
+  const view = useListView(pool, v => [v.registration, v.make, v.model, v.vehicleType].filter(Boolean).join(" "))
 
   return (
     <div>
@@ -65,13 +69,14 @@ export default function EquipmentTab() {
       {isLoading && <p style={{ fontSize: 13 }}>Loading…</p>}
       {isError && <p role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>We couldn't load the equipment. <button type="button" onClick={() => refetch()} style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", color: "inherit", fontWeight: 700 }}>Try again</button></p>}
       {data && (data.length === 0 ? <p style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No vehicles yet. Add a vehicle first.</p> : (() => {
-        const machines = data.filter(isMachine), rows = showAll ? data : machines
+        const machines = data.filter(isMachine), rows = pool
         return (
         <div style={{ overflowX: "auto" }}>
           <div role="group" aria-label="Show" style={{ display: "flex", gap: 6, marginBottom: 10 }}>
             <button type="button" aria-pressed={!showAll} style={{ ...chip, fontWeight: !showAll ? 800 : 500 }} onClick={() => setShowAll(false)}>Machines ({machines.length})</button>
             <button type="button" aria-pressed={showAll} style={{ ...chip, fontWeight: showAll ? 800 : 500 }} onClick={() => setShowAll(true)}>All vehicles ({data.length})</button>
           </div>
+          {rows.length > 0 && <div style={{ marginBottom: 10 }}><SearchBox value={view.search} onChange={view.setSearch} label="Search equipment" placeholder="Search registration, make or model" /></div>}
           {rows.length === 0 ? (
             <div role="status" style={{ border: "1px dashed var(--hf-border)", borderRadius: 12, padding: 16, fontSize: 13 }}>
               <strong>No machines set up yet.</strong>
@@ -81,8 +86,10 @@ export default function EquipmentTab() {
           ) : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr><th style={th}>Vehicle</th><th style={th}>Engine hours</th><th style={th}>Operating rate (R per hour)</th><th style={th} /></tr></thead>
-            <tbody>{rows.map(v => <Row key={v.id} v={v} canEdit={canEdit} />)}</tbody>
+            <tbody>{view.paged.rows.map(v => <Row key={v.id} v={v} canEdit={canEdit} />)}</tbody>
           </table>)}
+          {rows.length > 0 && view.shown.length === 0 && <p role="status" style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No equipment matches.</p>}
+          {rows.length > 0 && <Pager paged={view.paged} onPage={view.setPage} />}
           {!canEdit && <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", marginTop: 8 }}>You can see these but not change them. Changing a rate needs Fleet manage access.</p>}
         </div>) })())}
     </div>

@@ -15,7 +15,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Plus, Route, CheckCircle, X, AlertCircle, Briefcase, Home, FileDown, FileSpreadsheet } from "lucide-react"
-import { errorMessage, fieldErrorsOf, unwrapList } from "./apiShape"
+import { errorMessage, fieldErrorsOf, unwrapList, fetchAllPages } from "./apiShape"
 
 interface Vehicle { id: string; registration: string; make: string; model: string; status: string; currentOdometer: number }
 
@@ -87,7 +87,7 @@ export default function TripsTab() {
 
   const { data: vehicles = [] } = useQuery<Vehicle[]>({
     queryKey: ["fleet-vehicles"],
-    queryFn: async () => unwrapList<Vehicle>(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
+    queryFn: async () => (await fetchAllPages<Vehicle>(u => apiClient.get(u), "/api/v1/fleet/vehicles")).items,
   })
 
   const availableVehicles = (vehicles as Vehicle[]).filter(v => v.status === "AVAILABLE")

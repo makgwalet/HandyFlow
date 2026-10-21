@@ -129,10 +129,4 @@ export function filterDrivers<T extends Searchable & Documented & { status: stri
     return words.every(w => hay.includes(w))
   })
 }
-export const DRIVER_PAGE_SIZE = 25
-export interface Paged<T> { rows: T[]; page: number; pages: number; from: number; to: number; total: number }
-/** One page of a list. The page number is clamped, so a page that no longer exists (after a filter) shows the last real one. */
-export function paginate<T>(items: T[], page: number, size = DRIVER_PAGE_SIZE): Paged<T> {
-  const pages = Math.max(1, Math.ceil(items.length / size)), at = Math.max(0, Math.min(page, pages - 1)), start = at * size
-  return { rows: items.slice(start, start + size), page: at, pages, from: items.length === 0 ? 0 : start + 1, to: Math.min(items.length, start + size), total: items.length }
-}
+export { DRIVER_PAGE_SIZE, paginate, type Paged } from "./listKit"

@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import type { FuelRow } from "./fuelAnalytics.logic"
 import type { ListVehicle } from "./fleetBoards.logic"
+import { fetchAllPages } from "./apiShape"
 import {
   REPORTS, PERIOD_LABEL, reportPeriod, costPerKmReport, fuelReport, maintenanceReport, complianceReport, serviceDueReport, driverScoresReport, cellText, toCsv, csvFileName,
   type ReportId, type ReportTable, type PeriodKind, type CostRow, type ReportOrder, type ScoreLine,
@@ -23,8 +24,8 @@ async function build(id: ReportId, period: { from: string; to: string }): Promis
     case "cost-per-km": return costPerKmReport(list<CostRow>(await get("/api/v1/fleet/cost-summary")))
     case "fuel": return fuelReport(list<FuelRow>(await get(`/api/v1/fleet/fuel-analytics/vehicles?from=${period.from}&to=${period.to}`)))
     case "maintenance": return maintenanceReport(list<ReportOrder>(await get("/api/v1/fleet/work-orders?status=COMPLETED&size=500")), period.from, period.to)
-    case "compliance": return complianceReport(list<ListVehicle>(await get("/api/v1/fleet/vehicles?size=200")))
-    case "service-due": return serviceDueReport(list<ListVehicle>(await get("/api/v1/fleet/vehicles?size=200")))
+    case "compliance": return complianceReport((await fetchAllPages<ListVehicle>(u => get(u), "/api/v1/fleet/vehicles")).items)
+    case "service-due": return serviceDueReport((await fetchAllPages<ListVehicle>(u => get(u), "/api/v1/fleet/vehicles")).items)
     case "driver-scores": return driverScoresReport(list<ScoreLine>(await get("/api/v1/fleet/driver-scores")))
   }
 }

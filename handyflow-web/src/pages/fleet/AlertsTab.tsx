@@ -4,6 +4,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { buildAlerts, periodRange, type AlertInputs, type Severity } from "./fuelAnalytics.logic"
+import { fetchAllPages } from "./apiShape"
 
 const list = <T,>(r: { data: unknown }): T[] => { const o = r.data as { data?: unknown }; const p = (o && typeof o === "object" && "data" in o ? o.data : r.data) as T[] | { content?: T[] }; return (Array.isArray(p) ? p : p?.content) ?? [] }
 const COLOUR: Record<Severity, string> = { high: "var(--hf-danger-text)", medium: "var(--hf-warning-text)", low: "var(--hf-text-faint)" }
@@ -13,7 +14,7 @@ export default function AlertsTab({ onNavigate }: { onNavigate: (section: string
   const { from, to } = periodRange("30")
   const fuel = useQuery({ queryKey: ["fleet", "alerts-fuel"], queryFn: async () => list<AlertInputs["fuel"][number]>(await apiClient.get(`/api/v1/fleet/fuel-analytics/alerts?from=${from}&to=${to}`)) })
   const accidents = useQuery({ queryKey: ["fleet", "accidents", ""], queryFn: async () => list<AlertInputs["accidents"][number]>(await apiClient.get("/api/v1/fleet/accidents")) })
-  const vehicles = useQuery({ queryKey: ["fleet-vehicles"], queryFn: async () => list<AlertInputs["vehicles"][number]>(await apiClient.get("/api/v1/fleet/vehicles?size=200")) })
+  const vehicles = useQuery({ queryKey: ["fleet-vehicles"], queryFn: async () => (await fetchAllPages<AlertInputs["vehicles"][number]>(u => apiClient.get(u), "/api/v1/fleet/vehicles")).items })
   const alerts = buildAlerts({ fuel: fuel.data ?? [], accidents: accidents.data ?? [], vehicles: vehicles.data ?? [] })
   const loading = fuel.isLoading || accidents.isLoading || vehicles.isLoading
   return (

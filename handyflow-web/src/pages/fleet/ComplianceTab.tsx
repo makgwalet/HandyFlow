@@ -2,7 +2,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Shield, CheckCircle, AlertTriangle, Clock, AlertCircle } from "lucide-react"
-import { unwrapList } from "./apiShape"
+import { fetchAllPages } from "./apiShape"
 import { daysToDate } from "./driverScores.logic"
 
 interface Vehicle { id: string; registration: string; make: string; model: string; year: number | null; vehicleType: string; licenceDiscExpiry: string | null; roadworthyExpiry: string | null; insuranceExpiry: string | null }
@@ -61,7 +61,7 @@ function AlertGroup({ title, vList, color }: { title: string; vList: Vehicle[]; 
 export default function ComplianceTab() {
   const { data: vehicles = [], isLoading } = useQuery<Vehicle[]>({
     queryKey: ["fleet-vehicles"],
-    queryFn: async () => unwrapList<Vehicle>(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
+    queryFn: async () => (await fetchAllPages<Vehicle>(u => apiClient.get(u), "/api/v1/fleet/vehicles")).items,
   })
 
   const vs = vehicles

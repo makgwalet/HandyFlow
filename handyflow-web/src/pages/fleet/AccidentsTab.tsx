@@ -7,6 +7,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { NEXT_STATUSES, STATUS_LABEL, ACCIDENT_STATUSES, blocksVehicle, emptyReport, reportBody, reportProblem } from "./accidents.logic"
+import { fetchAllPages } from "./apiShape"
+import { Pager, SearchBox } from "./ListControls"
+import { useListView } from "./listKit"
 
 interface Accident {
   id: string; referenceNumber: string; vehicleId: string; registration: string; driverName: string | null; occurredAt: string; location: string | null
@@ -15,11 +18,6 @@ interface Accident {
 }
 interface VehicleOption { id: string; registration: string }
 
-const rowsOf = <T,>(r: { data: unknown }): T[] => {
-  const outer = r.data as { data?: unknown } | null
-  const p = (outer && typeof outer === "object" && !Array.isArray(outer) && "data" in outer ? outer.data : r.data) as T[] | { content?: T[] } | null
-  return (Array.isArray(p) ? p : p?.content) ?? []
-}
 const errorOf = (e: unknown) => (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Something went wrong. Try again."
 const th: React.CSSProperties = { padding: "8px 10px", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, color: "var(--hf-text-faint)", textAlign: "left" }
 const td: React.CSSProperties = { padding: "9px 10px", fontSize: 12.5, verticalAlign: "top" }
@@ -88,15 +86,17 @@ export default function AccidentsTab() {
   const [showForm, setShowForm] = useState(false)
   const { data: accidents = [], isLoading, isError, refetch } = useQuery<Accident[]>({
     queryKey: ["fleet", "accidents", status],
-    queryFn: async () => rowsOf<Accident>(await apiClient.get(`/api/v1/fleet/accidents${status ? `?status=${status}` : ""}`)),
+    queryFn: async () => (await fetchAllPages<Accident>(u => apiClient.get(u), `/api/v1/fleet/accidents${status ? `?status=${status}` : ""}`)).items,
   })
-  const { data: vehicles = [] } = useQuery<VehicleOption[]>({ queryKey: ["fleet", "vehicle-options"], enabled: canManage, queryFn: async () => rowsOf<VehicleOption>(await apiClient.get("/api/v1/fleet/vehicles?size=200")) })
+  const view = useListView(accidents, a => [a.referenceNumber, a.claimNumber, a.registration, a.driverName, a.location, a.description].filter(Boolean).join(" "))
+  const { data: vehicles = [] } = useQuery<VehicleOption[]>({ queryKey: ["fleet", "vehicle-options"], enabled: canManage, queryFn: async () => (await fetchAllPages<VehicleOption>(u => apiClient.get(u), "/api/v1/fleet/vehicles")).items })
   const offRoad = accidents.filter(blocksVehicle)
 
   return (
     <div>
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
-        <select aria-label="Filter by status" style={field} value={status} onChange={e => setStatus(e.target.value)}>
+        <SearchBox label="Search accidents" placeholder="Search case, vehicle, driver or place" value={view.search} onChange={view.setSearch} />
+        <select aria-label="Filter by status" style={field} value={status} onChange={e => { setStatus(e.target.value); view.setPage(0) }}>
           <option value="">All cases</option>{ACCIDENT_STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
         </select>
         {canManage && <button type="button" style={btn} onClick={() => setShowForm(s => !s)}>{showForm ? "Cancel" : "Report an accident"}</button>}
@@ -110,10 +110,11 @@ export default function AccidentsTab() {
       {isLoading && <p>Loading…</p>}
       {isError && <div role="alert">Couldn't load accidents. <button type="button" onClick={() => refetch()}>Try again</button></div>}
       {!isLoading && !isError && accidents.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>No accidents on record.</p>}
-      {accidents.length > 0 && (
+      {accidents.length > 0 && view.shown.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>No accidents match.</p>}
+      {view.shown.length > 0 && (
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead><tr><th style={th}>Case</th><th style={th}>Vehicle</th><th style={th}>When</th><th style={th}>What happened</th><th style={th}>Status</th><th style={th}>Drivable</th><th style={th}>Evidence</th>{canManage && <th style={th} />}</tr></thead>
-          <tbody>{accidents.map(a => (
+          <tbody>{view.paged.rows.map(a => (
             <tr key={a.id} aria-label={a.referenceNumber} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
               <td style={td}><strong>{a.referenceNumber}</strong>{a.claimNumber && <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>Claim {a.claimNumber}</div>}</td>
               <td style={td}>{a.registration}<div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{a.driverName}</div></td>
@@ -126,6 +127,7 @@ export default function AccidentsTab() {
             </tr>))}</tbody>
         </table>
       )}
+      <Pager paged={view.paged} onPage={view.setPage} />
     </div>
   )
 }

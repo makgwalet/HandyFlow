@@ -6,6 +6,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import WorkOrderAttachments, { type WorkOrderAttachment } from "./WorkOrderAttachments"
+import { fetchAllPages } from "./apiShape"
+import { Pager, SearchBox } from "./ListControls"
+import { useListView } from "./listKit"
 import {
   LINE_LABEL, LINE_TYPES, PRIORITIES, STATUS_LABEL, TYPE_LABEL, canEditLines, completeBody, completeProblem, emptyComplete, emptyLine, emptyOrder, emptyQuote, emptyTech,
   lineBody, lineProblem, orderBody, orderProblem, quoteBody, quoteProblem, stepsFor, techBody, techProblem, varianceText, type StepOption,
@@ -125,7 +128,7 @@ function NewOrder({ onCreated }: { onCreated: (id: string) => void }) {
   const [f, setF] = useState(emptyOrder())
   const [error, setError] = useState<string | null>(null)
   const set = (k: keyof typeof f, v: string) => { setF(p => ({ ...p, [k]: v })); setError(null) }
-  const { data: vehicles = [] } = useQuery<VehicleOption[]>({ queryKey: ["fleet", "vehicle-options"], queryFn: async () => list<VehicleOption>(await apiClient.get("/api/v1/fleet/vehicles?size=200")) })
+  const { data: vehicles = [] } = useQuery<VehicleOption[]>({ queryKey: ["fleet", "vehicle-options"], queryFn: async () => (await fetchAllPages<VehicleOption>(u => apiClient.get(u), "/api/v1/fleet/vehicles")).items })
   const { data: techs = [] } = useTechnicians()
   const create = useMutation({ mutationFn: () => apiClient.post("/api/v1/fleet/work-orders", orderBody(f)), onSuccess: r => onCreated(unwrap<Detail>(r).summary.id), onError: e => setError(errorOf(e)) })
   const problem = orderProblem(f)
@@ -178,11 +181,13 @@ export default function WorkOrdersTab() {
   const [status, setStatus] = useState("")
   const [openId, setOpenId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false), [showTechs, setShowTechs] = useState(false)
-  const { data: rows = [], isLoading, isError } = useQuery<Order[]>({ queryKey: ["fleet", "work-orders", status], queryFn: async () => list<Order>(await apiClient.get(`/api/v1/fleet/work-orders${status ? `?status=${status}` : ""}`)) })
+  const { data: rows = [], isLoading, isError } = useQuery<Order[]>({ queryKey: ["fleet", "work-orders", status], queryFn: async () => (await fetchAllPages<Order>(u => apiClient.get(u), `/api/v1/fleet/work-orders${status ? `?status=${status}` : ""}`)).items })
+  const view = useListView(rows, o => [o.referenceNumber, o.registration, o.title, o.assignedTechnicianName, TYPE_LABEL[o.type], STATUS_LABEL[o.status]].filter(Boolean).join(" "))
   return (
     <div>
       <div style={{ display: "flex", gap: 10, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <select aria-label="Filter by status" style={field} value={status} onChange={e => setStatus(e.target.value)}><option value="">All work orders</option>{Object.entries(STATUS_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+        <SearchBox label="Search work orders" placeholder="Search order, vehicle, work or technician" value={view.search} onChange={view.setSearch} />
+        <select aria-label="Filter by status" style={field} value={status} onChange={e => { setStatus(e.target.value); view.setPage(0) }}><option value="">All work orders</option>{Object.entries(STATUS_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
         {canManage && <button type="button" style={btn} onClick={() => setCreating(c => !c)}>{creating ? "Cancel" : "New work order"}</button>}
         <button type="button" style={field} onClick={() => setShowTechs(s => !s)}>{showTechs ? "Hide technicians" : "Technicians"}</button>
       </div>
@@ -192,10 +197,11 @@ export default function WorkOrdersTab() {
       {isLoading && <p>Loading…</p>}
       {isError && <div role="alert">Couldn't load work orders.</div>}
       {!isLoading && !isError && rows.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>No work orders yet.</p>}
-      {rows.length > 0 && (
+      {rows.length > 0 && view.shown.length === 0 && <p style={{ color: "var(--hf-text-muted)" }}>No work orders match.</p>}
+      {view.shown.length > 0 && (
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
           <thead><tr>{["Order", "Vehicle", "Work", "Priority", "Status", "Quoted", "Actual", ""].map(h => <th key={h} style={{ textAlign: "left", padding: "8px 10px", fontSize: 11, textTransform: "uppercase", color: "var(--hf-text-faint)" }}>{h}</th>)}</tr></thead>
-          <tbody>{rows.map(o => (
+          <tbody>{view.paged.rows.map(o => (
             <tr key={o.id} aria-label={o.referenceNumber} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
               <td style={{ padding: "9px 10px" }}><strong>{o.referenceNumber}</strong></td><td style={{ padding: "9px 10px" }}>{o.registration}</td>
               <td style={{ padding: "9px 10px" }}>{o.title}<div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{TYPE_LABEL[o.type]}{o.assignedTechnicianName ? ` · ${o.assignedTechnicianName}` : ""}</div></td>
@@ -204,6 +210,7 @@ export default function WorkOrdersTab() {
               <td style={{ padding: "9px 10px" }}><button type="button" style={field} onClick={() => setOpenId(o.id)}>Open</button></td>
             </tr>))}</tbody>
         </table>)}
+      <Pager paged={view.paged} onPage={view.setPage} />
     </div>
   )
 }
