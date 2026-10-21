@@ -20,6 +20,7 @@ beforeEach(() => {
   get.mockReset()
   get.mockImplementation((url: string) => url.includes("/accidents") ? ok({ content: [{ registration: "KLM555NW", status: "IN_REPAIR", vehicleDrivable: false }, { registration: "ABC123MP", status: "CLOSED", vehicleDrivable: false }] })
     : url.includes("/cost-summary") ? ok([{ vehicleId: "1", registration: "ABC123MP", make: "", model: "", totalServiceCost: 0, totalFuelCost: 0, totalCost: 5000, totalKm: 100, costPerKm: 50 }])
+    : url.includes("/fuel-analytics") ? ok([])
     : url.includes("/vehicles") ? ok({ content: fleet }) : ok({ content: [] }))
 })
 afterEach(cleanup)
@@ -67,7 +68,7 @@ describe("screens", () => {
   it("fleet list search narrows the table", async () => {
     wrap(<VehiclesTab />)
     await screen.findByText("XYZ999GP")
-    fireEvent.change(screen.getByLabelText("Search vehicles"), { target: { value: "isuzu" } })
+    fireEvent.change(screen.getByLabelText("Search fleet"), { target: { value: "isuzu" } })
     expect(screen.queryByText("ABC123MP")).toBeNull(); expect(screen.getByText("XYZ999GP")).toBeTruthy()
   })
 })

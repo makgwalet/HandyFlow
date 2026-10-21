@@ -53,7 +53,7 @@ describe("MaintenanceBoard", () => {
     const go = vi.fn(); wrap(go); await screen.findByLabelText("BBB2")
     expect(screen.getByLabelText("Open work orders").textContent).toMatch(/^5/); expect(screen.getByRole("button", { name: "Awaiting approval" }).textContent).toMatch(/^1/); expect(screen.getByLabelText("Past scheduled date").textContent).toMatch(/^1/)
     expect(screen.getByLabelText("Services overdue").textContent).toMatch(/^1/); expect(screen.getByLabelText("Average days to complete (90 days)").textContent).toMatch(/^3/)
-    fireEvent.click(screen.getByLabelText("Open work orders")); expect(go).toHaveBeenCalledWith("workshop"); fireEvent.click(screen.getByLabelText("Services overdue")); expect(go).toHaveBeenCalledWith("fleet-list")
+    fireEvent.click(screen.getByLabelText("Open work orders")); expect(go).toHaveBeenCalledWith("workshop"); fireEvent.click(screen.getByLabelText("Services overdue")); expect(go).toHaveBeenCalledWith("vehicles")
   })
   it("lists the service queue, workshop bars, spend columns, tyres and batteries", async () => {
     wrap(); const q = await screen.findByLabelText("BBB2"); expect(within(q).getByLabelText(/^Service: Overdue by 2.000 km/)).toBeTruthy(); expect(within(screen.getByLabelText("CCC3")).getByLabelText(/^Service: 500 km to go/)).toBeTruthy()

@@ -207,7 +207,6 @@ export const FLEET_SECTIONS: ModuleSections = {
     {
       label: 'Fleet',
       sections: [
-        { id: 'fleet-list', label: 'Fleet List', icon: ListChecks },
         { id: 'vehicles', label: 'Vehicles', icon: Car },
         { id: 'drivers', label: 'Drivers', icon: Users },
         { id: 'equipment', label: 'Equipment', icon: Tractor },

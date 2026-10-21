@@ -9,6 +9,9 @@ export interface ListVehicle {
   id: string; registration: string; make: string | null; model: string | null; year: number | null; status: string
   assignedDriverName: string | null; currentOdometer: number | null; lastServiceKm: number | null; serviceIntervalKm: number | null
   licenceDiscExpiry: string | null; roadworthyExpiry: string | null; insuranceExpiry: string | null
+  // Present on the real list; the screen shows them when it has them.
+  assignedDriverId?: string | null; vehicleType?: string | null; colour?: string | null; fuelType?: string | null; dailyRate?: number | null
+  notes?: string | null; vin?: string | null; engineNumber?: string | null; dueForService?: boolean
 }
 export interface Bar { fraction: number; tone: Tone; text: string }
 const km = (n: number) => `${Math.abs(Math.round(n)).toLocaleString("en-ZA")} km`
@@ -45,12 +48,25 @@ export function fleetRows(vehicles: ListVehicle[], fuel: FuelRow[], today = new 
   })
 }
 
+/** The headline counts above the table. */
+export interface FleetTile { id: "total" | "available" | "on-trip" | "service" | "breakdown"; label: string; value: number; tone: "ok" | "warn" | "bad" | "none" }
+export function fleetTiles(vehicles: ListVehicle[]): FleetTile[] {
+  const n = (f: (v: ListVehicle) => boolean) => vehicles.filter(f).length
+  return [
+    { id: "total", label: "Total vehicles", value: vehicles.length, tone: "none" },
+    { id: "available", label: "Available", value: n(v => v.status === "AVAILABLE"), tone: "ok" },
+    { id: "on-trip", label: "On trip", value: n(v => v.status === "ON_TRIP"), tone: "none" },
+    { id: "service", label: "Service due", value: n(v => v.dueForService === true), tone: "warn" },
+    { id: "breakdown", label: "Breakdown", value: n(v => v.status === "BREAKDOWN"), tone: "bad" },
+  ]
+}
+
 export type FleetSort = "registration" | "fuel" | "service" | "documents"
 export const SORT_OPTIONS: { id: FleetSort; label: string }[] = [{ id: "registration", label: "Registration" }, { id: "fuel", label: "Thirstiest first" }, { id: "service", label: "Service most due" }, { id: "documents", label: "Documents most urgent" }]
-/** Search over registration, make, model and driver (every word must match); status filter; then the chosen order, ties by registration. */
+/** Search over registration, make, model, driver, VIN and engine number (every word must match); status filter; then the chosen order, ties by registration. */
 export function viewFleet(rows: FleetRow[], search: string, status: string, sort: FleetSort): FleetRow[] {
   const words = search.toLowerCase().split(/\s+/).filter(Boolean)
-  const hay = (r: FleetRow) => `${r.vehicle.registration} ${r.vehicle.make ?? ""} ${r.vehicle.model ?? ""} ${r.vehicle.assignedDriverName ?? ""}`.toLowerCase()
+  const hay = (r: FleetRow) => `${r.vehicle.registration} ${r.vehicle.make ?? ""} ${r.vehicle.model ?? ""} ${r.vehicle.assignedDriverName ?? ""} ${r.vehicle.vin ?? ""} ${r.vehicle.engineNumber ?? ""}`.toLowerCase()
   const nullsLast = (a: number | null, b: number | null, dir: 1 | -1) => (a == null && b == null ? 0 : a == null ? 1 : b == null ? -1 : dir * (a - b))
   return rows.filter(r => (status === "ALL" || r.vehicle.status === status) && words.every(w => hay(r).includes(w)))
     .sort((a, b) => (sort === "fuel" ? nullsLast(a.l100, b.l100, -1) : sort === "service" ? nullsLast(a.remainingKm, b.remainingKm, 1)

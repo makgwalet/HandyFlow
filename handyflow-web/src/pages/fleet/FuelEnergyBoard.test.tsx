@@ -54,7 +54,7 @@ describe("FuelEnergyBoard", () => {
   it("asks for the chosen period and links through to the detail screens", async () => {
     const go = vi.fn(); wrap(go); await screen.findByLabelText("Warning CCC3"); fireEvent.change(screen.getByLabelText("Period"), { target: { value: "90" } })
     await waitFor(() => expect(get.mock.calls.map(c => String(c[0])).filter(u => u.includes("/fuel-analytics/alerts")).length).toBe(2))
-    fireEvent.click(screen.getByText("Fuel log")); expect(go).toHaveBeenCalledWith("fuel"); fireEvent.click(screen.getByText("Fleet list")); expect(go).toHaveBeenCalledWith("fleet-list")
+    fireEvent.click(screen.getByText("Fuel log")); expect(go).toHaveBeenCalledWith("fuel"); fireEvent.click(screen.getByText("Vehicles")); expect(go).toHaveBeenCalledWith("vehicles")
   })
   it("says so when there is no fuel in the period, or the figures fail", async () => {
     get.mockImplementation((url: string) => (url.includes("/fuel-analytics/vehicles") ? ok([]) : ok([]))); wrap()

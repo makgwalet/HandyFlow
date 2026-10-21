@@ -4,7 +4,6 @@
 // (see navigation/moduleSections.ts and components/shell/SectionedModulePage).
 import FleetDashboard from "./FleetDashboard"
 import VehiclesTab    from "./VehiclesTab"
-import FleetListTab   from "./FleetListTab"
 import MaintenanceBoard from "./MaintenanceBoard"
 import FuelEnergyBoard from "./FuelEnergyBoard"
 import ReportsTab from "./ReportsTab"
@@ -32,7 +31,7 @@ export function FleetPage() {
       switch (id) {
         case "dashboard":  return <FleetDashboard onNavigate={goTo} />
         case "vehicles":   return <VehiclesTab />
-        case "fleet-list": return <FleetListTab />
+        case "fleet-list": return <VehiclesTab />   // the old Fleet List address, kept so saved links still open the one Vehicles screen
         case "maintenance": return <MaintenanceBoard onNavigate={goTo} />
         case "fuel-energy": return <FuelEnergyBoard onNavigate={goTo} />
         case "reports":    return <ReportsTab />

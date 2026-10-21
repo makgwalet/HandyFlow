@@ -48,7 +48,7 @@ export default function FuelEnergyBoard({ onNavigate }: { onNavigate?: (section:
         <div style={card}><Head title="Litres, last 6 months" to="fuel" label="Fuel log" go={onNavigate} />{trendLoading ? <p>Loading…</p> : <Columns label="Litres by month" items={trendItems(x => x.litres)} format={L} />}</div>
         <div style={card}><Head title="Biggest spenders" to="fuel-analytics" label="All vehicles" go={onNavigate} />
           {board.isLoading ? <p>Loading…</p> : spendBars(rows).length === 0 ? <p style={muted}>No fuel recorded in this period.</p> : spendBars(rows).map(b => <BarRow key={b.id} name={b.registration} fraction={b.fraction} valueText={R(b.spend)} />)}</div>
-        <div style={card}><Head title="Thirstiest vehicles" to="fleet-list" label="Fleet list" go={onNavigate} />
+        <div style={card}><Head title="Thirstiest vehicles" to="vehicles" label="Vehicles" go={onNavigate} />
           {board.isLoading ? <p>Loading…</p> : thirstiestBars(rows).length === 0 ? <p style={muted}>No consumption could be measured yet. It needs two full-tank fills.</p> : thirstiestBars(rows).map(b => (
             <div key={b.id} aria-label={b.registration} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8 }}><strong style={{ fontSize: 12.5 }}>{b.registration}</strong><Meter label="Fuel" {...b.bar} /></div>))}</div>
         <div style={card}><Head title="Fuel warnings" to="fuel-analytics" label="See all" go={onNavigate} />

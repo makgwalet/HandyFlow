@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, fireEvent, cleanup, within } from "@testing-library/react"
+import { render, screen, fireEvent, cleanup, within, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import FleetListTab from "./FleetListTab"
-import { documentBadge, fleetRows, fuelBar, serviceBar, viewFleet, type ListVehicle } from "./fleetBoards.logic"
+import VehiclesTab from "./VehiclesTab"
+import { documentBadge, fleetRows, fleetTiles, fuelBar, serviceBar, viewFleet, type ListVehicle } from "./fleetBoards.logic"
 import type { FuelRow } from "./fuelAnalytics.logic"
 
-const get = vi.fn()
+const get = vi.fn(), patch = vi.fn(), post = vi.fn()
 type Args = unknown[]
-vi.mock("../../api/client", () => ({ apiClient: { get: (...a: Args) => get(...a) } }))
+vi.mock("../../api/client", () => ({ apiClient: { get: (...a: Args) => get(...a), patch: (...a: Args) => patch(...a), post: (...a: Args) => post(...a) } }))
 vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true }))
 vi.mock("./VehicleDetail", () => ({ default: ({ vehicleId }: { vehicleId: string }) => <div data-testid="detail">detail of {vehicleId}</div> }))
 const ok = (d: unknown) => Promise.resolve({ data: { data: d } })
@@ -22,8 +22,8 @@ const vehicles = [
   v({ id: "d", registration: "DDD4", licenceDiscExpiry: null, roadworthyExpiry: null, insuranceExpiry: null, currentOdometer: 48000 }),
 ]
 const fuelRows = [fuel("a", 10, 5), fuel("b", 20, 30), fuel("d", null, null)]
-const wrap = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><FleetListTab /></QueryClientProvider>)
-beforeEach(() => { get.mockReset(); get.mockImplementation((url: string) => (url.includes("/fuel-analytics/vehicles") ? ok(fuelRows) : url.includes("/vehicles") ? ok({ content: vehicles }) : ok([]))) })
+const wrap = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><VehiclesTab /></QueryClientProvider>)
+beforeEach(() => { patch.mockReset(); post.mockReset(); patch.mockResolvedValue({ data: {} }); post.mockResolvedValue({ data: {} }); get.mockReset(); get.mockImplementation((url: string) => (url.includes("/fuel-analytics/vehicles") ? ok(fuelRows) : url.includes("/vehicles") ? ok({ content: vehicles }) : ok([]))) })
 afterEach(cleanup)
 
 describe("fleet list rules", () => {
@@ -51,7 +51,7 @@ describe("fleet list rules", () => {
   })
 })
 
-describe("FleetListTab", () => {
+describe("VehiclesTab", () => {
   it("shows a fuel bar and a service bar for every vehicle", async () => {
     wrap(); const row = await screen.findByLabelText("BBB2")
     expect(within(row).getByLabelText(/^Fuel: 20.0 L\/100 km · 30% thirstier/)).toBeTruthy(); expect(within(row).getByLabelText(/^Service: Overdue by 2.000 km/)).toBeTruthy(); expect(row.textContent).toContain("1 expired")
@@ -71,5 +71,39 @@ describe("FleetListTab", () => {
   it("keeps the list when fuel figures fail, and says so", async () => {
     get.mockImplementation((url: string) => (url.includes("/fuel-analytics/vehicles") ? Promise.reject(new Error("x")) : url.includes("/vehicles") ? ok({ content: vehicles }) : ok([])))
     wrap(); expect(await screen.findByLabelText("AAA1")).toBeTruthy(); expect((await screen.findAllByRole("alert"))[0].textContent).toMatch(/Fuel figures couldn't be loaded/); expect(within(screen.getByLabelText("BBB2")).getByLabelText(/^Fuel: No fuel data/)).toBeTruthy()
+  })
+  it("counts the fleet above the table", async () => {
+    wrap(); await screen.findByLabelText("AAA1")
+    expect(within(screen.getByLabelText("Total vehicles")).getByText("4")).toBeTruthy(); expect(within(screen.getByLabelText("Available")).getByText("3")).toBeTruthy()
+    expect(within(screen.getByLabelText("Breakdown")).getByText("0")).toBeTruthy()
+  })
+  it("finds a vehicle by VIN or engine number", async () => {
+    get.mockImplementation((url: string) => (url.includes("/fuel-analytics/vehicles") ? ok([]) : url.includes("/vehicles") ? ok({ content: [{ ...vehicles[0], vin: "AHTKZ3CD6H123456", engineNumber: "1GD-FTV-7890123" }, vehicles[1]] }) : ok([])))
+    wrap(); await screen.findByLabelText("AAA1"); fireEvent.change(screen.getByLabelText("Search fleet"), { target: { value: "1gd-ftv" } })
+    expect(screen.getByLabelText("AAA1")).toBeTruthy(); expect(screen.queryByLabelText("BBB2")).toBeNull()
+    fireEvent.change(screen.getByLabelText("Search fleet"), { target: { value: "ahtkz3" } }); expect(screen.getByLabelText("AAA1")).toBeTruthy()
+  })
+  it("shows the extra facts and notes of a vehicle when its row is opened", async () => {
+    get.mockImplementation((url: string) => (url.includes("/fuel-analytics/vehicles") ? ok([]) : url.includes("/vehicles") ? ok({ content: [{ ...vehicles[0], colour: "White", dailyRate: 850, notes: "Dent on the left door" }] }) : ok([])))
+    wrap(); fireEvent.click(await screen.findByLabelText("AAA1"))
+    const facts = await screen.findByLabelText("AAA1 details"); expect(facts.textContent).toMatch(/White/); expect(facts.textContent).toMatch(/R 850/); expect(screen.getByText("Dent on the left door")).toBeTruthy()
+  })
+  it("registers a vehicle from the same screen", async () => {
+    wrap(); await screen.findByLabelText("AAA1"); fireEvent.click(screen.getByText("Register vehicle"))
+    fireEvent.click(await screen.findByRole("button", { name: "Register Vehicle" })); expect(await screen.findByText("Registration is required")).toBeTruthy(); expect(post).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByPlaceholderText("GP 12 34 JHB"), { target: { value: "gp 99 jhb" } }); fireEvent.change(screen.getByPlaceholderText("Toyota"), { target: { value: "Ford" } }); fireEvent.change(screen.getByPlaceholderText("Hilux"), { target: { value: "Ranger" } })
+    fireEvent.click(screen.getByRole("button", { name: "Register Vehicle" })); await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fleet/vehicles", expect.objectContaining({ registration: "GP 99 JHB", make: "Ford", model: "Ranger" })))
+  })
+  it("changes status and assigns a driver without opening the row", async () => {
+    get.mockImplementation((url: string) => (url.includes("/fuel-analytics/vehicles") ? ok([]) : url.includes("/drivers") ? ok({ content: [{ id: "d1", firstName: "Sipho", lastName: "Dlamini", status: "ACTIVE" }] }) : url.includes("/vehicles") ? ok({ content: vehicles }) : ok([])))
+    wrap(); await screen.findByLabelText("AAA1")
+    fireEvent.click(screen.getByLabelText("Change status of BBB2")); expect(screen.queryByTestId("detail")).toBeNull()
+    fireEvent.click(await screen.findByText("Unserviceable — requires attention")); fireEvent.click(screen.getByRole("button", { name: "Update Status" }))
+    await waitFor(() => expect(patch).toHaveBeenCalledWith("/api/v1/fleet/vehicles/b/status", { status: "BREAKDOWN", note: "" }))
+    fireEvent.click(screen.getByLabelText("Assign driver to AAA1")); fireEvent.change(await screen.findByDisplayValue("Unassigned"), { target: { value: "d1" } }); fireEvent.click(screen.getByRole("button", { name: "Save Assignment" }))
+    await waitFor(() => expect(patch).toHaveBeenCalledWith("/api/v1/fleet/vehicles/a/driver", { driverId: "d1" }))
+  })
+  it("counts tiles from the list's own flags", () => {
+    expect(fleetTiles([{ ...vehicles[0], dueForService: true }, { ...vehicles[1], status: "BREAKDOWN" }]).map(t => [t.id, t.value])).toEqual([["total", 2], ["available", 1], ["on-trip", 0], ["service", 1], ["breakdown", 1]])
   })
 })

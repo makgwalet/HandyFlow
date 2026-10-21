@@ -38,11 +38,11 @@ export default function MaintenanceBoard({ onNavigate }: { onNavigate?: (section
         <Tile label="Open work orders" value={String(sum.open)} tone={sum.open ? "warn" : "ok"} to="workshop" go={onNavigate} />
         <Tile label="Awaiting approval" value={String(sum.awaitingApproval)} tone={sum.awaitingApproval ? "warn" : "ok"} to="workshop" go={onNavigate} />
         <Tile label="Past scheduled date" value={String(sum.overdue)} tone={sum.overdue ? "bad" : "ok"} to="workshop" go={onNavigate} />
-        <Tile label="Services overdue" value={String(overdueServices)} tone={overdueServices ? "bad" : "ok"} to="fleet-list" go={onNavigate} />
+        <Tile label="Services overdue" value={String(overdueServices)} tone={overdueServices ? "bad" : "ok"} to="vehicles" go={onNavigate} />
         <Tile label="Average days to complete (90 days)" value={sum.avgDaysToComplete == null ? "—" : String(sum.avgDaysToComplete)} to="workshop" go={onNavigate} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 12 }}>
-        <div style={card}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><strong style={{ fontSize: 13 }}>Service queue</strong><button type="button" style={link} onClick={() => onNavigate?.("fleet-list")}>Fleet list</button></div>
+        <div style={card}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><strong style={{ fontSize: 13 }}>Service queue</strong><button type="button" style={link} onClick={() => onNavigate?.("vehicles")}>Vehicles</button></div>
           {vehicles.isLoading ? <p>Loading…</p> : queue.length === 0 ? <p style={muted}>No vehicle is overdue or within 2 000 km of its service.</p> : queue.map(q => (
             <div key={q.vehicle.id} aria-label={q.vehicle.registration} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8 }}>
               <span style={{ fontSize: 12.5 }}><strong>{q.vehicle.registration}</strong><div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{[q.vehicle.make, q.vehicle.model].filter(Boolean).join(" ")}</div></span>
