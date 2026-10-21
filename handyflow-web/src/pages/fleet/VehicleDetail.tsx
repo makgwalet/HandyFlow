@@ -5,8 +5,9 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
-import { COMPLIANCE_LABEL, DOCUMENT_TYPE_LABEL, complianceTone, expiryText, identityRows, uploadProblem, type Identity } from "./vehicleDetail.logic"
+import { COMPLIANCE_LABEL, DOCUMENT_TYPE_LABEL, complianceTone, expiryText, uploadProblem, type Identity } from "./vehicleDetail.logic"
 import VehicleSummary from "./VehicleSummary"
+import VehicleOverview from "./VehicleOverview"
 import LifecyclePanel from "./LifecyclePanel"
 import { LocationTab, MaintenanceTab, FuelUsageTab, HistoryTab } from "./VehicleTabs"
 import VehicleEditForm from "./VehicleEditForm"
@@ -124,8 +125,7 @@ export default function VehicleDetail({ vehicleId, identity }: { vehicleId: stri
       </div>
       {tab === "Overview" && editing && <VehicleEditForm vehicleId={vehicleId} vehicle={identity} onDone={() => setEditing(false)} />}
       {tab === "Overview" && !editing && canManage && <div><button type="button" style={ghostBtn} onClick={() => setEditing(true)}>Edit details</button></div>}
-      {tab === "Overview" && !editing && <dl style={{ display: "grid", gridTemplateColumns: "170px 1fr", gap: "5px 12px", fontSize: 13, margin: 0 }}>
-        {identityRows(identity).map(r => <div key={r.label} style={{ display: "contents" }}><dt style={{ color: "var(--hf-text-faint)" }}>{r.label}</dt><dd style={{ margin: 0, color: r.missing ? "var(--hf-warning-text)" : undefined }}>{r.value}</dd></div>)}</dl>}
+      {tab === "Overview" && !editing && <VehicleOverview vehicleId={vehicleId} vehicle={identity as never} />}
       {tab === "Location" && <LocationTab id={vehicleId} />}
       {tab === "Maintenance" && <MaintenanceTab id={vehicleId} facts={identity} />}
       {tab === "Fuel & Usage" && <FuelUsageTab id={vehicleId} />}

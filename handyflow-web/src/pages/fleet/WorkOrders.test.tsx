@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import WorkOrdersTab from "./WorkOrdersTab"
-import { canEditLines, completeProblem, emptyComplete, emptyLine, emptyOrder, emptyQuote, lineProblem, orderBody, orderProblem, quoteProblem, stepsFor, techProblem, emptyTech, varianceText } from "./workOrders.logic"
+import { vehicleFromQuery, canEditLines, completeProblem, emptyComplete, emptyLine, emptyOrder, emptyQuote, lineProblem, orderBody, orderProblem, quoteProblem, stepsFor, techProblem, emptyTech, varianceText } from "./workOrders.logic"
 
 const get = vi.fn(), post = vi.fn(), put = vi.fn(), del = vi.fn()
 type Args = unknown[]
@@ -92,5 +92,11 @@ describe("WorkOrdersTab", () => {
   it("read-only users can look but not change", async () => {
     perms = new Set(["FLEET_READ"]); show(); expect(screen.queryByText("New work order")).toBeNull()
     fireEvent.click(await screen.findByRole("button", { name: "Open" })); await screen.findByText("Oil filter"); expect(screen.queryByText("Add cost")).toBeNull(); expect(screen.queryByText("Start work")).toBeNull()
+  })
+})
+
+describe("work order link from a vehicle", () => {
+  it("reads the vehicle from the address", () => {
+    expect(vehicleFromQuery("?vehicleId=abc-1")).toBe("abc-1"); expect(vehicleFromQuery("?x=1")).toBe(""); expect(vehicleFromQuery("")).toBe(""); expect(vehicleFromQuery("?vehicleId=%20v2%20")).toBe("v2")
   })
 })

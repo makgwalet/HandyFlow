@@ -10,7 +10,7 @@ import { fetchAllPages } from "./apiShape"
 import { Pager, SearchBox } from "./ListControls"
 import { useListView } from "./listKit"
 import {
-  LINE_LABEL, LINE_TYPES, PRIORITIES, STATUS_LABEL, TYPE_LABEL, canEditLines, completeBody, completeProblem, emptyComplete, emptyLine, emptyOrder, emptyQuote, emptyTech,
+  LINE_LABEL, LINE_TYPES, PRIORITIES, STATUS_LABEL, TYPE_LABEL, canEditLines, completeBody, completeProblem, emptyComplete, emptyLine, emptyOrder, emptyQuote, vehicleFromQuery, emptyTech,
   lineBody, lineProblem, orderBody, orderProblem, quoteBody, quoteProblem, stepsFor, techBody, techProblem, varianceText, type StepOption,
 } from "./workOrders.logic"
 
@@ -124,8 +124,8 @@ function Runner({ id, onClose }: { id: string; onClose: () => void }) {
   )
 }
 
-function NewOrder({ onCreated }: { onCreated: (id: string) => void }) {
-  const [f, setF] = useState(emptyOrder())
+function NewOrder({ onCreated, vehicleId = "" }: { onCreated: (id: string) => void; vehicleId?: string }) {
+  const [f, setF] = useState(() => ({ ...emptyOrder(), vehicleId }))
   const [error, setError] = useState<string | null>(null)
   const set = (k: keyof typeof f, v: string) => { setF(p => ({ ...p, [k]: v })); setError(null) }
   const { data: vehicles = [] } = useQuery<VehicleOption[]>({ queryKey: ["fleet", "vehicle-options"], queryFn: async () => (await fetchAllPages<VehicleOption>(u => apiClient.get(u), "/api/v1/fleet/vehicles")).items })
@@ -180,7 +180,9 @@ export default function WorkOrdersTab() {
   const qc = useQueryClient()
   const [status, setStatus] = useState("")
   const [openId, setOpenId] = useState<string | null>(null)
-  const [creating, setCreating] = useState(false), [showTechs, setShowTechs] = useState(false)
+  // A link from a vehicle ("Create work order") arrives as ?vehicleId=…, and opens the form with that vehicle chosen.
+  const [preset] = useState(() => vehicleFromQuery(window.location.search))
+  const [creating, setCreating] = useState(() => preset !== "" && canManage), [showTechs, setShowTechs] = useState(false)
   const { data: rows = [], isLoading, isError } = useQuery<Order[]>({ queryKey: ["fleet", "work-orders", status], queryFn: async () => (await fetchAllPages<Order>(u => apiClient.get(u), `/api/v1/fleet/work-orders${status ? `?status=${status}` : ""}`)).items })
   const view = useListView(rows, o => [o.referenceNumber, o.registration, o.title, o.assignedTechnicianName, TYPE_LABEL[o.type], STATUS_LABEL[o.status]].filter(Boolean).join(" "))
   return (
@@ -192,7 +194,7 @@ export default function WorkOrdersTab() {
         <button type="button" style={field} onClick={() => setShowTechs(s => !s)}>{showTechs ? "Hide technicians" : "Technicians"}</button>
       </div>
       {showTechs && <Technicians />}
-      {creating && <NewOrder onCreated={id => { setCreating(false); setOpenId(id); qc.invalidateQueries({ queryKey: ["fleet", "work-orders"] }) }} />}
+      {creating && <NewOrder vehicleId={preset} onCreated={id => { setCreating(false); setOpenId(id); qc.invalidateQueries({ queryKey: ["fleet", "work-orders"] }) }} />}
       {openId && <Runner id={openId} onClose={() => setOpenId(null)} />}
       {isLoading && <p>Loading…</p>}
       {isError && <div role="alert">Couldn't load work orders.</div>}

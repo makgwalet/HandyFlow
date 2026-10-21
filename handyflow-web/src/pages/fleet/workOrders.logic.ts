@@ -28,6 +28,8 @@ const num = (v: string) => (v.trim() === "" ? null : Number(v))
 
 export interface NewOrderForm { vehicleId: string; type: string; title: string; priority: string; technicianId: string; supplier: string; scheduledFor: string }
 export const emptyOrder = (): NewOrderForm => ({ vehicleId: "", type: "SERVICE", title: "", priority: "NORMAL", technicianId: "", supplier: "", scheduledFor: "" })
+/** The vehicle named in a link such as ?vehicleId=abc, or "" when there is none. */
+export const vehicleFromQuery = (search: string): string => new URLSearchParams(search).get("vehicleId")?.trim() ?? ""
 export function orderProblem(f: NewOrderForm) { if (!f.vehicleId) return "Choose the vehicle."; if (!f.title.trim()) return "Say what the work is."; return null }
 export const orderBody = (f: NewOrderForm) => ({ vehicleId: f.vehicleId, type: f.type, title: f.title.trim(), priority: f.priority, technicianId: f.technicianId || null, supplier: f.supplier.trim() || null, scheduledFor: f.scheduledFor || null })
 

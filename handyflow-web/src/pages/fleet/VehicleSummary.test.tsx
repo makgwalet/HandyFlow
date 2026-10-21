@@ -6,7 +6,8 @@ import { vehicleSummary } from "./vehicleSummary.logic"
 
 const get = vi.fn()
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: vi.fn() } }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: () => false }))
+let manage = false
+vi.mock("../../hooks/usePermission", () => ({ usePermission: () => manage }))
 afterEach(cleanup)
 const today = new Date(2026, 9, 21)
 const base = { currentOdometer: 48000, lastServiceKm: 40000, serviceIntervalKm: 10000, licenceDiscExpiry: "2026-12-31", roadworthyExpiry: "2026-10-30", insuranceExpiry: "2026-10-01" }
@@ -25,7 +26,22 @@ describe("vehicle summary", () => {
   it("shows the service meter, odometer and documents", () => {
     get.mockResolvedValue({ data: { data: [] } })
     render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><VehicleSummary vehicleId="v1" name="ABC123MP" vehicle={{ ...base, insuranceExpiry: null }} /></QueryClientProvider>)
-    expect(screen.getByLabelText(/^Service:/)).toBeTruthy(); expect(screen.getByText(/Odometer 48.000 km/)).toBeTruthy()
+    expect(screen.getByLabelText(/^Service:/)).toBeTruthy(); expect(screen.getByLabelText("Service due summary").textContent).toMatch(/Odometer48\s000 km/)
     expect(screen.getByLabelText("Insurance: Not set")).toBeTruthy()
+  })
+  it("shows the service due lines and the insurer, and offers a work order only to managers", async () => {
+    get.mockImplementation((url: string) => Promise.resolve({ data: { data: url.includes("/insurance") ? { insurer: "Santam", policyNumber: "ST123" } : [] } }))
+    const view = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><VehicleSummary vehicleId="v1" name="ABC123MP" vehicle={base} /></QueryClientProvider>)
+    manage = true; view()
+    const due = screen.getByLabelText("Service due summary").textContent ?? ""
+    expect(due).toMatch(/Next service50\s000 km/); expect(due).toMatch(/Due in2\s000 km/); expect(due).toMatch(/Last service40\s000 km/)
+    expect((await screen.findByLabelText("Insurance policy")).textContent).toBe("Santam · Policy ST123")
+    expect(screen.getByRole("link", { name: "Create work order" }).getAttribute("href")).toBe("/fleet/workshop?vehicleId=v1")
+    cleanup(); manage = false; view(); expect(screen.queryByRole("link", { name: "Create work order" })).toBeNull()
+  })
+  it("says overdue when the service has been missed", () => {
+    get.mockResolvedValue({ data: { data: [] } })
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><VehicleSummary vehicleId="v1" name="ABC123MP" vehicle={{ ...base, currentOdometer: 52000 }} /></QueryClientProvider>)
+    expect(screen.getByLabelText("Service due summary").textContent).toMatch(/Overdue by2\s000 km/)
   })
 })
