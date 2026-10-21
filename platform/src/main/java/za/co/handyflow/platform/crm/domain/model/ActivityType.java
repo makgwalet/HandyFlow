@@ -56,6 +56,8 @@ public enum ActivityType {
     LEAD_CONVERTED,
     /** A conversion was undone and the record is a lead again. Payload carries who and the reason, if one was given. */
     LEAD_CONVERSION_UNDONE,
+    /** Another record was merged into this one. Payload carries the merged record's id and name and the fields that were filled in. */
+    MERGED,
     // ── Notes ─────────────────────────────────────────────────────────────
     NOTE_ADDED,
 

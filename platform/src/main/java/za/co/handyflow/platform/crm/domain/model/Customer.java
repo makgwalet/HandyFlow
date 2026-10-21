@@ -575,6 +575,16 @@ public class Customer {
         addActivity(CustomerActivity.of(this, type, Map.of("optedIn", optedIn), null, triggeredBy));
     }
 
+    /** Notes that another record was folded into this one. The fields were already changed through the usual methods. */
+    public void recordMerge(UUID mergedId, String mergedName, java.util.List<String> filledFields, UUID by) {
+        var payload = new HashMap<String, Object>();
+        payload.put("mergedId", mergedId.toString());
+        payload.put("mergedName", mergedName);
+        payload.put("filled", java.util.List.copyOf(filledFields));
+        this.updatedAt = Instant.now();
+        addActivity(CustomerActivity.of(this, ActivityType.MERGED, payload, null, by));
+    }
+
     /** The caller has already checked the move with HierarchyRules. */
     public void changeParent(UUID newParentId) {
         if (Objects.equals(this.parentCustomerId, newParentId)) return;
