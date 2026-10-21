@@ -14,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.crm.application.internal.Customer360Service;
+import za.co.handyflow.platform.crm.application.internal.CustomerDuplicateService;
 import za.co.handyflow.platform.crm.application.internal.CustomerService;
 import za.co.handyflow.platform.crm.domain.repository.Customer360Repository.Customer360Summary;
 import za.co.handyflow.platform.crm.dto.*;
@@ -55,6 +56,7 @@ public class CustomerController {
 
     private final CustomerService   customerService;
     private final Customer360Service customer360Service;
+    private final CustomerDuplicateService duplicateService;
     private final FeatureGuard      featureGuard;
 
     /**
@@ -86,6 +88,20 @@ public class CustomerController {
         var tenantId  = TenantContext.getTenantIdAsObject();
         var customers = customerService.getCustomers(tenantId, search, mine, pageable);
         return ResponseEntity.ok(ApiResponse.success(customers));
+    }
+
+    @GetMapping("/duplicates")
+    @PreAuthorize("hasAuthority('CUSTOMER_READ')")
+    @Operation(summary = "Groups of customers that look like the same business entered more than once")
+    public ResponseEntity<ApiResponse<DuplicatesResponse>> findDuplicates() {
+        return ResponseEntity.ok(ApiResponse.success(duplicateService.find(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/duplicates/dismiss")
+    @PreAuthorize("hasAuthority('CUSTOMER_UPDATE')")
+    @Operation(summary = "Mark these customers as not duplicates of each other")
+    public ResponseEntity<ApiResponse<Integer>> dismissDuplicates(@Valid @RequestBody DismissDuplicatesRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(duplicateService.dismiss(TenantContext.getTenantIdAsObject(), request.customerIds())));
     }
 
     @GetMapping("/pipeline")
