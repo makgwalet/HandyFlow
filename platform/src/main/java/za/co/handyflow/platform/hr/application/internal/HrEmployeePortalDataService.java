@@ -71,7 +71,7 @@ public class HrEmployeePortalDataService {
     @Transactional(readOnly = true)
     public List<PayslipResponse> getMyPayslips(UUID portalUserId, UUID employeeId) {
         HrEmployeePortalAccessGrant grant = requireAccess(portalUserId, employeeId);
-        return payrollService.getEmployeePayslips(TenantId.of(grant.getTenantId()), employeeId);
+        return payrollService.getEmployeePayslips(TenantId.of(grant.getTenantId()), employeeId, true);
     }
 
     @Transactional(readOnly = true)

@@ -32,6 +32,7 @@ public class PayrollService {
     private final PayRunNumberGenerator numberGen;
     private final StatutoryRulesService rulesService;
     private final MedicalSchemeService  medicalSchemeService;
+    private final HrPayRunEventRepository eventRepo;
 
     // ── Pay runs ──────────────────────────────────────────────────────────────
 
@@ -71,12 +72,12 @@ public class PayrollService {
     }
 
     @Transactional
-    public PayRunResponse processPayRun(TenantId tenantId, UUID payRunId) {
+    public PayRunResponse processPayRun(TenantId tenantId, UUID payRunId, UUID actor) {
         HrPayRun run = payRunRepo.findByTenantAndId(tenantId, payRunId)
                 .orElseThrow(() -> new ResourceNotFoundException("PayRun", payRunId.toString()));
 
-        if (!"DRAFT".equals(run.getStatus()))
-            throw new IllegalStateException("Only DRAFT pay runs can be processed. Current status: " + run.getStatus());
+        PayRunWorkflowRules.checkCanPrepare(run.getStatus());
+        String before = run.getStatus();
 
         // The tax year comes from the pay date, not from the label the run was created with: runs made before
         // this fix can carry a wrong label. The rules are loaded once, and a missing year stops the run before
@@ -92,6 +93,12 @@ public class PayrollService {
                     existing.size(), run.getPayRunNumber());
             payslipRepo.deleteAll(existing);
         }
+
+        // A recalculation replaces the EMP201 draft too. One that has already moved on is not touched.
+        List<HrEmp201> oldEmp201 = emp201Repo.forPayRun(tenantId, run.getId());
+        if (oldEmp201.stream().anyMatch(e -> !"DRAFT".equals(e.getStatus())))
+            throw new IllegalStateException("The EMP201 of this run has already been submitted, so the run cannot be recalculated.");
+        emp201Repo.deleteAll(oldEmp201);
 
         run.markProcessing();
         payRunRepo.save(run);
@@ -151,8 +158,10 @@ public class PayrollService {
             runNet   = runNet.add(result.netPay());
         }
 
-        run.complete(runGross, runPaye, runUif, runSdl, runNet, employees.size());
+        run.prepared(runGross, runPaye, runUif, runSdl, runNet, employees.size(), actor);
         payRunRepo.save(run);
+        eventRepo.save(HrPayRunEvent.of(tenantId.getValue(), run.getId(), "CALCULATED", before, run.getStatus(), actor,
+                employees.size() + " payslips" + (warnings.isEmpty() ? "" : ", " + warnings.size() + " warnings")));
 
         HrEmp201 emp201 = HrEmp201.create(tenantId, run.getId(),
                 run.getPeriodStart(), run.getPeriodEnd(), runPaye, runUif, runSdl);
@@ -175,10 +184,25 @@ public class PayrollService {
 
     @Transactional(readOnly = true)
     public List<PayslipResponse> getEmployeePayslips(TenantId tenantId, UUID employeeId) {
+        return getEmployeePayslips(tenantId, employeeId, false);
+    }
+
+    /**
+     * @param issuedOnly true for what an employee may see: payslips of finalised runs, and of runs issued before approval
+     *                   existed. Payslips still being checked are not shown to the employee.
+     */
+    @Transactional(readOnly = true)
+    public List<PayslipResponse> getEmployeePayslips(TenantId tenantId, UUID employeeId, boolean issuedOnly) {
         employeeRepo.findActiveById(tenantId, employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee", employeeId.toString()));
-        return payslipRepo.findByEmployee(employeeId)
-                .stream().map(s -> toPayslipResponse(s, tenantId)).toList();
+        List<HrPayslip> slips = payslipRepo.findByEmployee(employeeId);
+        if (issuedOnly && !slips.isEmpty()) {
+            Map<UUID, String> status = new java.util.HashMap<>();
+            payRunRepo.findAllById(slips.stream().map(HrPayslip::getPayRunId).distinct().toList())
+                    .forEach(r -> status.put(r.getId(), r.getStatus()));
+            slips = slips.stream().filter(sl -> PayRunWorkflowRules.isIssued(status.get(sl.getPayRunId()))).toList();
+        }
+        return slips.stream().map(sl -> toPayslipResponse(sl, tenantId)).toList();
     }
 
     // ── EMP201 ────────────────────────────────────────────────────────────────
@@ -196,7 +220,8 @@ public class PayrollService {
                 r.getPeriodStart(), r.getPeriodEnd(), r.getPayDate(),
                 r.getTaxYear(), r.getStatus(), r.getTotalGross(), r.getTotalPaye(),
                 r.getTotalUif(), r.getTotalSdl(), r.getTotalNet(),
-                r.getEmployeeCount(), r.getNotes(), r.getProcessedAt(), r.getCreatedAt(), warnings);
+                r.getEmployeeCount(), r.getNotes(), r.getProcessedAt(), r.getCreatedAt(),
+                r.getPreparedBy(), r.getPreparedAt(), r.getApprovedBy(), r.getApprovedAt(), r.getFinalisedBy(), r.getFinalisedAt(), warnings);
     }
 
     private PayslipResponse toPayslipResponse(HrPayslip s, TenantId tenantId) {

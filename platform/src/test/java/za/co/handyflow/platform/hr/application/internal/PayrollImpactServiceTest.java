@@ -54,10 +54,13 @@ class PayrollImpactServiceTest {
         when(emp201s.forPayRun(any(), any())).thenReturn(List.of());
     }
 
-    private HrPayRun run(int labelledYear) {
+    private HrPayRun run(int labelledYear) { return run(labelledYear, true); }
+
+    private HrPayRun run(int labelledYear, boolean finalise) {
         HrPayRun run = HrPayRun.create(tenant, "PR00001", LocalDate.of(2026, 10, 1), PAY_DATE, PAY_DATE, labelledYear);
         run.markProcessing();
-        run.complete(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 1);
+        run.prepared(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 1, null);
+        if (finalise) { run.approve(UUID.randomUUID()); run.finalise(UUID.randomUUID()); }
         when(payRuns.findAllByTenant(any(), any())).thenReturn(new PageImpl<>(List.of(run)));
         when(payRuns.findByTenantAndId(any(), any())).thenReturn(Optional.of(run));
         return run;
@@ -130,6 +133,12 @@ class PayrollImpactServiceTest {
         HrPayRun run = run(2027);
         when(payslips.findByPayRun(run.getId())).thenReturn(List.of());
         assertThat(service.report(tenant, null).runs()).isEmpty();
+    }
+
+    @Test
+    void aRunNotYetFinalisedSaysItCanSimplyBeCalculatedAgain() {
+        HrPayRun run = run(2026, false); HrEmployee emp = employee("0"); slip(run, emp, "0", "4305.78");
+        assertThat(service.report(tenant, null).runs().get(0).action()).contains("not been finalised").contains("calculate it again");
     }
 
     @Test

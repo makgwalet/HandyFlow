@@ -21,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /** Pay run creation and processing: the tax year comes from the pay date, missing rules stop the run, nothing is guessed. */
@@ -33,7 +35,9 @@ class PayrollServiceTest {
     private PayRunNumberGenerator numberGen;
     private StatutoryRulesService rulesService;
     private MedicalSchemeService medicalSchemeService;
+    private HrPayRunEventRepository eventRepo;
     private PayrollService service;
+    private final UUID maker = UUID.randomUUID();
 
     private final TenantId tenant = TenantId.of(UUID.randomUUID());
 
@@ -57,8 +61,9 @@ class PayrollServiceTest {
         numberGen = mock(PayRunNumberGenerator.class);
         rulesService = mock(StatutoryRulesService.class);
         medicalSchemeService = mock(MedicalSchemeService.class);
+        eventRepo = mock(HrPayRunEventRepository.class);
         service = new PayrollService(payRunRepo, payslipRepo, emp201Repo, employeeRepo, new PayrollEngine(), numberGen,
-                rulesService, medicalSchemeService);
+                rulesService, medicalSchemeService, eventRepo);
         when(numberGen.next(any(), any())).thenReturn("PR00001");
         when(payRunRepo.save(any())).thenAnswer(i -> i.getArgument(0));
         when(payslipRepo.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -125,7 +130,7 @@ class PayrollServiceTest {
     void processingStopsBeforeTouchingAnythingWhenTheRulesAreMissing() {
         draftRun(LocalDate.of(2026, 10, 31), 2027);
         when(rulesService.rulesFor(2027)).thenThrow(new IllegalStateException("There are no approved statutory rules for tax year 2027"));
-        assertThatThrownBy(() -> service.processPayRun(tenant, UUID.randomUUID())).hasMessageContaining("no approved statutory rules");
+        assertThatThrownBy(() -> service.processPayRun(tenant, UUID.randomUUID(), maker)).hasMessageContaining("no approved statutory rules");
         verify(payslipRepo, never()).deleteAll(any());
         verify(payslipRepo, never()).save(any());
         verify(payRunRepo, never()).save(any());
@@ -139,7 +144,7 @@ class PayrollServiceTest {
         when(employeeRepo.findAllActiveList(any())).thenReturn(List.of(emp));
         when(medicalSchemeService.membersOn(any(), any(), any())).thenReturn(Map.of(emp.getId(), new MedicalSchemeRules.Members(0, false)));
 
-        PayRunResponse r = service.processPayRun(tenant, UUID.randomUUID());
+        PayRunResponse r = service.processPayRun(tenant, UUID.randomUUID(), maker);
 
         // 30 003 x 12 = 360 036; tax 74 001.36 - 17 820 = 56 181.36 / 12 = 4 681.78, with no medical credit
         assertThat(r.totalPaye()).isEqualByComparingTo("4681.78");
@@ -154,7 +159,7 @@ class PayrollServiceTest {
         when(employeeRepo.findAllActiveList(any())).thenReturn(List.of(emp));
         when(medicalSchemeService.membersOn(any(), any(), any())).thenReturn(Map.of(emp.getId(), new MedicalSchemeRules.Members(1, true)));
 
-        PayRunResponse r = service.processPayRun(tenant, UUID.randomUUID());
+        PayRunResponse r = service.processPayRun(tenant, UUID.randomUUID(), maker);
 
         assertThat(r.totalPaye()).isEqualByComparingTo("4305.78");   // 4 681.78 less R376
         assertThat(r.warnings().size()).isEqualTo(1);
@@ -169,7 +174,7 @@ class PayrollServiceTest {
         when(employeeRepo.findAllActiveList(any())).thenReturn(List.of(emp));
         when(medicalSchemeService.membersOn(any(), any(), any())).thenReturn(Map.of(emp.getId(), new MedicalSchemeRules.Members(0, false)));
 
-        PayRunResponse r = service.processPayRun(tenant, UUID.randomUUID());
+        PayRunResponse r = service.processPayRun(tenant, UUID.randomUUID(), maker);
 
         assertThat(r.warnings().get(0)).contains("labelled tax year 2026").contains("2027");
         verify(rulesService).rulesFor(2027);
@@ -179,7 +184,80 @@ class PayrollServiceTest {
     void onlyDraftRunsCanBeProcessed() {
         HrPayRun run = draftRun(LocalDate.of(2026, 10, 31), 2027);
         run.markProcessing();
-        assertThatThrownBy(() -> service.processPayRun(tenant, UUID.randomUUID())).hasMessageContaining("Only DRAFT");
+        assertThatThrownBy(() -> service.processPayRun(tenant, UUID.randomUUID(), maker)).hasMessageContaining("can only be calculated");
         verifyNoInteractions(rulesService);
+    }
+
+    // ── Workflow and what employees see ─────────────────────────────────────────
+
+    @Test
+    void aCalculatedRunWaitsForApprovalAndRemembersWhoCalculatedIt() {
+        HrPayRun run = draftRun(LocalDate.of(2026, 10, 31), 2027);
+        HrEmployee emp = employee("30003.00");
+        when(rulesService.rulesFor(2027)).thenReturn(rules2027());
+        when(employeeRepo.findAllActiveList(any())).thenReturn(List.of(emp));
+        when(medicalSchemeService.membersOn(any(), any(), any())).thenReturn(Map.of(emp.getId(), new MedicalSchemeRules.Members(0, false)));
+
+        PayRunResponse r = service.processPayRun(tenant, UUID.randomUUID(), maker);
+
+        assertThat(r.status()).isEqualTo("PREPARED");
+        assertThat(r.preparedBy()).isEqualTo(maker);
+        assertThat(r.approvedBy()).isNull();
+        assertThat(run.getStatus()).isEqualTo("PREPARED");
+        verify(eventRepo).save(argThat((HrPayRunEvent e) -> e.getAction().equals("CALCULATED") && maker.equals(e.getActorId())
+                && e.getFromStatus().equals("DRAFT") && e.getToStatus().equals("PREPARED")));
+    }
+
+    @Test
+    void anApprovedRunCannotBeRecalculatedAndItsPayslipsStay() {
+        HrPayRun run = draftRun(LocalDate.of(2026, 10, 31), 2027);
+        run.prepared(BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, 1, maker);
+        run.approve(UUID.randomUUID());
+        assertThatThrownBy(() -> service.processPayRun(tenant, UUID.randomUUID(), maker)).hasMessageContaining("can only be calculated");
+        verify(payslipRepo, never()).deleteAll(any());
+        verifyNoInteractions(rulesService);
+    }
+
+    @Test
+    void aFinalisedRunIsLocked() {
+        HrPayRun run = draftRun(LocalDate.of(2026, 10, 31), 2027);
+        run.prepared(BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, 1, maker);
+        run.approve(UUID.randomUUID());
+        run.finalise(UUID.randomUUID());
+        assertThatThrownBy(() -> service.processPayRun(tenant, UUID.randomUUID(), maker)).hasMessageContaining("locked");
+    }
+
+    @Test
+    void aRunWhoseEmp201WasSubmittedIsNotRecalculated() {
+        draftRun(LocalDate.of(2026, 10, 31), 2027);
+        when(rulesService.rulesFor(2027)).thenReturn(rules2027());
+        HrEmp201 submitted = mock(HrEmp201.class);
+        when(submitted.getStatus()).thenReturn("SUBMITTED");
+        when(emp201Repo.forPayRun(any(), any())).thenReturn(List.of(submitted));
+        assertThatThrownBy(() -> service.processPayRun(tenant, UUID.randomUUID(), maker)).hasMessageContaining("already been submitted");
+        verify(payslipRepo, never()).save(any());
+        verify(emp201Repo, never()).deleteAll(any());
+    }
+
+    @Test
+    void anEmployeeSeesOnlyPayslipsOfIssuedRuns() {
+        UUID empId = UUID.randomUUID();
+        HrEmployee emp = employee("30003.00");
+        when(employeeRepo.findActiveById(any(), eq(empId))).thenReturn(Optional.of(emp));
+        HrPayRun prepared = HrPayRun.create(tenant, "PR00001", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), LocalDate.of(2026, 9, 25), 2027);
+        prepared.prepared(BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, 1, maker);
+        HrPayRun finalised = HrPayRun.create(tenant, "PR00002", LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), LocalDate.of(2026, 8, 25), 2027);
+        finalised.prepared(BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, 1, maker);
+        finalised.approve(UUID.randomUUID());
+        finalised.finalise(UUID.randomUUID());
+        HrPayslip hidden = mock(HrPayslip.class), shown = mock(HrPayslip.class);
+        when(hidden.getPayRunId()).thenReturn(prepared.getId());
+        when(shown.getPayRunId()).thenReturn(finalised.getId());
+        when(payslipRepo.findByEmployee(empId)).thenReturn(List.of(hidden, shown));
+        when(payRunRepo.findAllById(any())).thenReturn(List.of(prepared, finalised));
+        when(payRunRepo.findById(any())).thenReturn(Optional.of(finalised));
+
+        assertThat(service.getEmployeePayslips(tenant, empId, true).size()).isEqualTo(1);
+        assertThat(service.getEmployeePayslips(tenant, empId, false).size()).isEqualTo(2);
     }
 }

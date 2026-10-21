@@ -74,6 +74,7 @@ class HrControllerTest {
     @MockitoBean StatutoryRulesService  statutoryRulesService;
     @MockitoBean MedicalSchemeService   medicalSchemeService;
     @MockitoBean PayrollImpactService   payrollImpactService;
+    @MockitoBean PayrollControlService  payrollControlService;
     @MockitoBean PayslipPdfGenerator    payslipPdfGenerator;
     @MockitoBean HrPayslipRepository    payslipRepo;
     @MockitoBean HrEmployeeRepository   employeeRepo;
@@ -121,7 +122,8 @@ class HrControllerTest {
         return new PayRunResponse(id, "PR00001",
                 LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), LocalDate.of(2026, 8, 25),
                 2026, "DRAFT", BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                BigDecimal.ZERO, BigDecimal.ZERO, 0, null, null, Instant.now(), java.util.List.of());
+                BigDecimal.ZERO, BigDecimal.ZERO, 0, null, null, Instant.now(),
+                null, null, null, null, null, null, java.util.List.of());
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -331,8 +333,8 @@ class HrControllerTest {
     }
 
     @Test
-    @WithMockUser(authorities = "PAYROLL_RUN")
-    @DisplayName("POST /pay-runs with PAYROLL_RUN returns 201")
+    @WithMockUser(authorities = "PAYROLL_PREPARE")
+    @DisplayName("POST /pay-runs with PAYROLL_PREPARE returns 201")
     void createPayRunWithPayrollRunReturns201() throws Exception {
         var id = UUID.randomUUID();
         when(payrollService.createPayRun(any(), any())).thenReturn(payRunResponse(id));
@@ -358,15 +360,15 @@ class HrControllerTest {
         mvc.perform(post(BASE + "/pay-runs/" + id + "/process").with(csrf()))
                 .andExpect(status().isForbidden());
 
-        verify(payrollService, never()).processPayRun(any(), any());
+        verify(payrollService, never()).processPayRun(any(), any(), any());
     }
 
     @Test
-    @WithMockUser(authorities = "PAYROLL_RUN")
-    @DisplayName("POST /pay-runs/{id}/process with PAYROLL_RUN returns 200")
-    void processPayRunWithPayrollRunReturns200() throws Exception {
+    @WithMockUser(username = USER_ID, authorities = "PAYROLL_PREPARE")
+    @DisplayName("POST /pay-runs/{id}/process with PAYROLL_PREPARE returns 200 and records who calculated it")
+    void processPayRunWithPayrollPrepareReturns200() throws Exception {
         var id = UUID.randomUUID();
-        when(payrollService.processPayRun(any(), eq(id))).thenReturn(payRunResponse(id));
+        when(payrollService.processPayRun(any(), eq(id), eq(UUID.fromString(USER_ID)))).thenReturn(payRunResponse(id));
 
         mvc.perform(post(BASE + "/pay-runs/" + id + "/process").with(csrf()))
                 .andExpect(status().isOk());
@@ -395,8 +397,8 @@ class HrControllerTest {
     // ══════════════════════════════════════════════════════════════════════
 
     @Test
-    @WithMockUser(authorities = {"USER_READ", "USER_UPDATE"})
-    @DisplayName("GET /statutory/tax-years with only USER_* returns 403")
+    @WithMockUser(authorities = {"USER_READ", "HR_READ"})
+    @DisplayName("GET /statutory/tax-years with only USER_READ and HR_READ returns 403")
     void taxYearsRefuseBroadUserAuthorities() throws Exception {
         mvc.perform(get(BASE + "/statutory/tax-years")).andExpect(status().isForbidden());
         verifyNoInteractions(statutoryRulesService);
@@ -411,7 +413,7 @@ class HrControllerTest {
     }
 
     @Test
-    @WithMockUser(authorities = {"USER_READ", "USER_UPDATE", "HR_READ"})
+    @WithMockUser(authorities = {"USER_READ", "HR_READ"})
     @DisplayName("GET /payroll/impact-report without a payroll authority returns 403")
     void impactReportRefusesNonPayrollUsers() throws Exception {
         mvc.perform(get(BASE + "/payroll/impact-report")).andExpect(status().isForbidden());
@@ -430,9 +432,9 @@ class HrControllerTest {
     }
 
     @Test
-    @WithMockUser(authorities = "USER_UPDATE")
-    @DisplayName("POST /employees/{id}/medical-scheme with only USER_UPDATE returns 403")
-    void medicalSchemeWriteRefusesUserUpdate() throws Exception {
+    @WithMockUser(authorities = "USER_READ")
+    @DisplayName("POST /employees/{id}/medical-scheme with only USER_READ returns 403")
+    void medicalSchemeWriteRefusesUserRead() throws Exception {
         var body = Map.of("schemeName", "Discovery", "dependants", 1, "effectiveFrom", "2026-03-01");
         mvc.perform(post(BASE + "/employees/" + UUID.randomUUID() + "/medical-scheme").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
@@ -464,5 +466,157 @@ class HrControllerTest {
                         .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(medicalSchemeService);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Slice 2 — approving, sending back, finalising, review, settings
+    // ══════════════════════════════════════════════════════════════════════
+
+    @Test
+    @WithMockUser(authorities = {"PAYROLL_PREPARE", "PAYROLL_READ", "PAYROLL_STATUTORY_EXPORT"})
+    @DisplayName("Preparing and reading do not allow approving or finalising")
+    void preparerCannotApproveOrFinalise() throws Exception {
+        UUID id = UUID.randomUUID();
+        mvc.perform(post(BASE + "/pay-runs/" + id + "/approve").with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(post(BASE + "/pay-runs/" + id + "/send-back").with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(post(BASE + "/pay-runs/" + id + "/finalise").with(csrf())).andExpect(status().isForbidden());
+        verifyNoInteractions(payrollControlService);
+    }
+
+    @Test
+    @WithMockUser(authorities = {"USER_UPDATE", "PAYROLL_RUN", "HR_MANAGE"})
+    @DisplayName("The old permissions never approve or finalise, whatever the date")
+    void legacyPermissionsCannotApprove() throws Exception {
+        UUID id = UUID.randomUUID();
+        mvc.perform(post(BASE + "/pay-runs/" + id + "/approve").with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(post(BASE + "/pay-runs/" + id + "/finalise").with(csrf())).andExpect(status().isForbidden());
+        verifyNoInteractions(payrollControlService);
+    }
+
+    @Test
+    @WithMockUser(username = USER_ID, authorities = "PAYROLL_APPROVE")
+    @DisplayName("POST /pay-runs/{id}/approve passes the user and the note on")
+    void approveRecordsTheUserAndNote() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(payrollControlService.approve(any(), eq(id), eq(UUID.fromString(USER_ID)), eq("Checked against timesheets")))
+                .thenReturn(payRunResponse(id));
+        mvc.perform(post(BASE + "/pay-runs/" + id + "/approve").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"Checked against timesheets\"}"))
+                .andExpect(status().isOk());
+        verify(payrollControlService).approve(any(), eq(id), eq(UUID.fromString(USER_ID)), eq("Checked against timesheets"));
+    }
+
+    @Test
+    @WithMockUser(username = USER_ID, authorities = "PAYROLL_APPROVE")
+    @DisplayName("POST /pay-runs/{id}/approve works without a body")
+    void approveWithoutBody() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(payrollControlService.approve(any(), eq(id), any(), isNull())).thenReturn(payRunResponse(id));
+        mvc.perform(post(BASE + "/pay-runs/" + id + "/approve").with(csrf())).andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(username = USER_ID, authorities = "PAYROLL_APPROVE")
+    @DisplayName("POST /pay-runs/{id}/send-back passes the reason on")
+    void sendBackPassesTheReason() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(payrollControlService.sendBack(any(), eq(id), any(), eq("Overtime missing")))
+                .thenReturn(payRunResponse(id));
+        mvc.perform(post(BASE + "/pay-runs/" + id + "/send-back").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"Overtime missing\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(username = USER_ID, authorities = "PAYROLL_FINALISE")
+    @DisplayName("POST /pay-runs/{id}/finalise with PAYROLL_FINALISE returns 200")
+    void finaliseWithPermission() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(payrollControlService.finalise(any(), eq(id), eq(UUID.fromString(USER_ID)), isNull())).thenReturn(payRunResponse(id));
+        mvc.perform(post(BASE + "/pay-runs/" + id + "/finalise").with(csrf())).andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(authorities = "PAYROLL_APPROVE")
+    @DisplayName("A note longer than 500 characters returns 400")
+    void tooLongANote() throws Exception {
+        UUID id = UUID.randomUUID();
+        mvc.perform(post(BASE + "/pay-runs/" + id + "/approve").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"" + "x".repeat(501) + "\"}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(payrollControlService);
+    }
+
+    @Test
+    @WithMockUser(authorities = "PAYROLL_APPROVE")
+    @DisplayName("GET /pay-runs/{id}/review and /history are open to an approver")
+    void approverSeesReviewAndHistory() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(payrollControlService.review(any(), eq(id))).thenReturn(
+                new PayRunReviewResponse(id, "PR00001", "PREPARED", null, false, 0, 0, java.util.List.of()));
+        when(payrollControlService.events(any(), eq(id))).thenReturn(java.util.List.of());
+        mvc.perform(get(BASE + "/pay-runs/" + id + "/review")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.blocking").value(false));
+        mvc.perform(get(BASE + "/pay-runs/" + id + "/history")).andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(authorities = {"USER_READ", "HR_READ"})
+    @DisplayName("Review and history are refused to people without a payroll permission")
+    void reviewRefusedWithoutPayroll() throws Exception {
+        UUID id = UUID.randomUUID();
+        mvc.perform(get(BASE + "/pay-runs/" + id + "/review")).andExpect(status().isForbidden());
+        mvc.perform(get(BASE + "/pay-runs/" + id + "/history")).andExpect(status().isForbidden());
+        verifyNoInteractions(payrollControlService);
+    }
+
+    @Test
+    @WithMockUser(authorities = "PAYROLL_APPROVE")
+    @DisplayName("Changing payroll settings and reading the access review need PAYROLL_CONFIGURATION_ADMIN")
+    void settingsAndAccessReviewNeedConfigurationAdmin() throws Exception {
+        mvc.perform(put(BASE + "/payroll/settings").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"allowSelfApproval\":true}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get(BASE + "/payroll/access-review")).andExpect(status().isForbidden());
+        verifyNoInteractions(payrollControlService);
+    }
+
+    @Test
+    @WithMockUser(username = USER_ID, authorities = "PAYROLL_CONFIGURATION_ADMIN")
+    @DisplayName("PUT /payroll/settings records who changed it, and needs an answer")
+    void settingsAreSavedByAConfigurationAdmin() throws Exception {
+        when(payrollControlService.updateSettings(any(), eq(true), eq(UUID.fromString(USER_ID))))
+                .thenReturn(new PayrollSettingsResponse(true, Instant.now(), LocalDate.of(2026, 12, 31), true));
+        mvc.perform(put(BASE + "/payroll/settings").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"allowSelfApproval\":true}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.allowSelfApproval").value(true));
+        mvc.perform(put(BASE + "/payroll/settings").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(authorities = "PAYROLL_CONFIGURATION_ADMIN")
+    @DisplayName("GET /payroll/access-review returns the migration report")
+    void accessReviewIsShown() throws Exception {
+        when(payrollControlService.accessReview(any()))
+                .thenReturn(new PayrollAccessReviewResponse(LocalDate.of(2026, 12, 31), 0, java.util.List.of()));
+        mvc.perform(get(BASE + "/payroll/access-review")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.rolesNeedingReview").value(0));
+    }
+
+    @Test
+    @WithMockUser(authorities = "PAYROLL_STATUTORY_EXPORT")
+    @DisplayName("EMP201 PDF of a run that is not finalised is refused with 409")
+    void emp201PdfWaitsForFinalisation() throws Exception {
+        UUID id = UUID.randomUUID(), runId = UUID.randomUUID();
+        HrEmp201 e = mock(HrEmp201.class);
+        when(e.getPayRunId()).thenReturn(runId);
+        HrPayRun run = mock(HrPayRun.class);
+        when(run.getStatus()).thenReturn("PREPARED");
+        when(emp201Repo.findByTenantAndId(any(), eq(id))).thenReturn(java.util.Optional.of(e));
+        when(payRunRepo.findByTenantAndId(any(), eq(runId))).thenReturn(java.util.Optional.of(run));
+        mvc.perform(get(BASE + "/emp201/" + id + "/pdf")).andExpect(status().isConflict());
+        verifyNoInteractions(emp201PdfGenerator);
     }
 }

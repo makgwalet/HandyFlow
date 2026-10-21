@@ -47,11 +47,12 @@ public class HrController {
     private final StatutoryRulesService  statutoryRulesService;
     private final MedicalSchemeService   medicalSchemeService;
     private final PayrollImpactService   payrollImpactService;
+    private final PayrollControlService  payrollControlService;
 
     // ── Employees ─────────────────────────────────────────────────────────────
 
     @GetMapping("/employees")
-    @PreAuthorize("hasAnyAuthority('HR_READ','HR_MANAGE','PAYROLL_RUN','USER_READ')")
+    @PreAuthorize("hasAnyAuthority('HR_READ','HR_MANAGE','PAYROLL_RUN','PAYROLL_PREPARE','PAYROLL_APPROVE','USER_READ')")
     @Operation(summary = "List employees with optional status and search filters")
     public ResponseEntity<ApiResponse<Page<EmployeeResponse>>> getEmployees(
             @RequestParam(required = false) String status,
@@ -183,7 +184,7 @@ public class HrController {
     // ── Pay runs ──────────────────────────────────────────────────────────────
 
     @GetMapping("/pay-runs")
-    @PreAuthorize("hasAnyAuthority('PAYROLL_READ','PAYROLL_RUN','USER_READ')")
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canRead(authentication)")
     public ResponseEntity<ApiResponse<Page<PayRunResponse>>> getPayRuns(
             @PageableDefault(size = 24) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -191,8 +192,7 @@ public class HrController {
     }
 
     @PostMapping("/pay-runs")
-    // FIX: was USER_READ — any read user could create pay runs
-    @PreAuthorize("hasAnyAuthority('PAYROLL_RUN','USER_UPDATE')")
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canPrepare(authentication)")
     @Operation(summary = "Create a new pay run draft for a pay period")
     public ResponseEntity<ApiResponse<PayRunResponse>> createPayRun(
             @Valid @RequestBody CreatePayRunRequest req) {
@@ -201,16 +201,78 @@ public class HrController {
     }
 
     @PostMapping("/pay-runs/{id}/process")
-    // FIX: was USER_READ — any read user could trigger payroll processing
-    @PreAuthorize("hasAnyAuthority('PAYROLL_RUN','USER_UPDATE')")
-    @Operation(summary = "Process pay run — calculates PAYE, UIF, SDL for all active employees")
-    public ResponseEntity<ApiResponse<PayRunResponse>> processPayRun(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.success("Pay run processed",
-                payrollService.processPayRun(TenantContext.getTenantIdAsObject(), id)));
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canPrepare(authentication)")
+    @Operation(summary = "Calculate a pay run. It then waits for a second person to approve it.")
+    public ResponseEntity<ApiResponse<PayRunResponse>> processPayRun(@PathVariable UUID id, Principal principal) {
+        return ResponseEntity.ok(ApiResponse.success("Pay run calculated",
+                payrollService.processPayRun(TenantContext.getTenantIdAsObject(), id, resolveUserId(principal))));
+    }
+
+    @GetMapping("/pay-runs/{id}/review")
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canReview(authentication)")
+    @Operation(summary = "What to check before approving a pay run: errors that block approval and warnings")
+    public ResponseEntity<ApiResponse<PayRunReviewResponse>> reviewPayRun(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(payrollControlService.review(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/pay-runs/{id}/approve")
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canApprove(authentication)")
+    @Operation(summary = "Approve a calculated pay run. The person who calculated it cannot, unless the business allows it.")
+    public ResponseEntity<ApiResponse<PayRunResponse>> approvePayRun(
+            @PathVariable UUID id, @Valid @RequestBody(required = false) PayRunActionRequest req, Principal principal) {
+        return ResponseEntity.ok(ApiResponse.success("Pay run approved",
+                payrollControlService.approve(TenantContext.getTenantIdAsObject(), id, resolveUserId(principal), req == null ? null : req.note())));
+    }
+
+    @PostMapping("/pay-runs/{id}/send-back")
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canApprove(authentication)")
+    @Operation(summary = "Send a calculated or approved pay run back to draft, with a reason")
+    public ResponseEntity<ApiResponse<PayRunResponse>> sendBackPayRun(
+            @PathVariable UUID id, @Valid @RequestBody(required = false) PayRunActionRequest req, Principal principal) {
+        return ResponseEntity.ok(ApiResponse.success("Pay run sent back",
+                payrollControlService.sendBack(TenantContext.getTenantIdAsObject(), id, resolveUserId(principal), req == null ? null : req.note())));
+    }
+
+    @PostMapping("/pay-runs/{id}/finalise")
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canFinalise(authentication)")
+    @Operation(summary = "Finalise and lock an approved pay run. Payslips are then shown to employees.")
+    public ResponseEntity<ApiResponse<PayRunResponse>> finalisePayRun(
+            @PathVariable UUID id, @Valid @RequestBody(required = false) PayRunActionRequest req, Principal principal) {
+        return ResponseEntity.ok(ApiResponse.success("Pay run finalised",
+                payrollControlService.finalise(TenantContext.getTenantIdAsObject(), id, resolveUserId(principal), req == null ? null : req.note())));
+    }
+
+    @GetMapping("/pay-runs/{id}/history")
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canReview(authentication)")
+    @Operation(summary = "Who calculated, approved, sent back and finalised a pay run, and when")
+    public ResponseEntity<ApiResponse<List<PayRunEventResponse>>> payRunHistory(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(payrollControlService.events(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @GetMapping("/payroll/settings")
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canReview(authentication)")
+    public ResponseEntity<ApiResponse<PayrollSettingsResponse>> payrollSettings() {
+        return ResponseEntity.ok(ApiResponse.success(payrollControlService.settings(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PutMapping("/payroll/settings")
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canConfigure(authentication)")
+    @Operation(summary = "Choose whether one person may calculate and approve the same pay run")
+    public ResponseEntity<ApiResponse<PayrollSettingsResponse>> updatePayrollSettings(
+            @Valid @RequestBody PayrollSettingsRequest req, Principal principal) {
+        return ResponseEntity.ok(ApiResponse.success("Payroll settings saved",
+                payrollControlService.updateSettings(TenantContext.getTenantIdAsObject(), req.allowSelfApproval(), resolveUserId(principal))));
+    }
+
+    @GetMapping("/payroll/access-review")
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canConfigure(authentication)")
+    @Operation(summary = "What the payroll permissions migration gave each role, and which roles need a decision")
+    public ResponseEntity<ApiResponse<PayrollAccessReviewResponse>> payrollAccessReview() {
+        return ResponseEntity.ok(ApiResponse.success(payrollControlService.accessReview(TenantContext.getTenantIdAsObject())));
     }
 
     @GetMapping("/pay-runs/{id}/payslips")
-    @PreAuthorize("hasAnyAuthority('PAYROLL_READ','PAYROLL_RUN','USER_READ')")
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canRead(authentication)")
     public ResponseEntity<ApiResponse<List<PayslipResponse>>> getPayRunPayslips(
             @PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -218,7 +280,7 @@ public class HrController {
     }
 
     @GetMapping("/employees/{id}/payslips")
-    @PreAuthorize("hasAnyAuthority('PAYROLL_READ','HR_READ','USER_READ')")
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canRead(authentication) or hasAuthority('HR_READ')")
     public ResponseEntity<ApiResponse<List<PayslipResponse>>> getEmployeePayslips(
             @PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -228,7 +290,7 @@ public class HrController {
     // ── SARS compliance ───────────────────────────────────────────────────────
 
     @GetMapping("/emp201")
-    @PreAuthorize("hasAnyAuthority('PAYROLL_READ','PAYROLL_RUN','USER_READ')")
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canRead(authentication)")
     @Operation(summary = "List EMP201 monthly employer declarations")
     public ResponseEntity<ApiResponse<List<Emp201Response>>> getEmp201s() {
         return ResponseEntity.ok(ApiResponse.success(
@@ -238,7 +300,7 @@ public class HrController {
     // ── PDF downloads ─────────────────────────────────────────────────────────
 
     @GetMapping("/payslips/{id}/pdf")
-    @PreAuthorize("hasAnyAuthority('PAYROLL_READ','PAYROLL_RUN','HR_READ','USER_READ')")
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canRead(authentication) or hasAuthority('HR_READ')")
     @Operation(summary = "Download payslip as PDF")
     public ResponseEntity<byte[]> downloadPayslip(@PathVariable UUID id) {
         var tenantId = TenantContext.getTenantIdAsObject();
@@ -274,7 +336,7 @@ public class HrController {
     }
 
     @GetMapping("/emp201/{id}/pdf")
-    @PreAuthorize("hasAnyAuthority('PAYROLL_READ','PAYROLL_RUN','USER_READ')")
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canExport(authentication)")
     @Operation(summary = "Download EMP201 monthly declaration as PDF")
     public ResponseEntity<byte[]> downloadEmp201(@PathVariable UUID id) {
         var tenantId = TenantContext.getTenantIdAsObject();
@@ -283,6 +345,8 @@ public class HrController {
         HrPayRun payRun = emp201.getPayRunId() != null
                 ? payRunRepo.findByTenantAndId(tenantId, emp201.getPayRunId()).orElse(null)
                 : null;
+        if (payRun != null && !PayRunWorkflowRules.isIssued(payRun.getStatus()))
+            throw new IllegalStateException("The EMP201 can be exported once its pay run has been finalised.");
         int employeeCount = emp201.getPayRunId() != null
                 ? emp201Repo.countByPayRunId(emp201.getPayRunId()) : 0;
 
@@ -321,14 +385,14 @@ public class HrController {
     // These use PAYROLL_* / HR_MANAGE only. The general USER_READ / USER_UPDATE authorities are deliberately not accepted.
 
     @GetMapping("/statutory/tax-years")
-    @PreAuthorize("hasAnyAuthority('PAYROLL_READ','PAYROLL_RUN')")
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canRead(authentication)")
     @Operation(summary = "Statutory tax years with their rules, source and approval state")
     public ResponseEntity<ApiResponse<List<TaxYearResponse>>> getTaxYears() {
         return ResponseEntity.ok(ApiResponse.success(statutoryRulesService.list()));
     }
 
     @GetMapping("/payroll/impact-report")
-    @PreAuthorize("hasAnyAuthority('PAYROLL_READ','PAYROLL_RUN')")
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canRead(authentication)")
     @Operation(summary = "Read-only comparison of recorded payslips with a recalculation under the approved rules")
     public ResponseEntity<ApiResponse<PayrollImpactResponse>> getImpactReport(
             @RequestParam(required = false) UUID runId) {
@@ -337,7 +401,7 @@ public class HrController {
     }
 
     @GetMapping("/employees/{id}/medical-scheme")
-    @PreAuthorize("hasAnyAuthority('HR_MANAGE','PAYROLL_READ','PAYROLL_RUN')")
+    @PreAuthorize("hasAuthority('HR_MANAGE') or T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canRead(authentication)")
     @Operation(summary = "An employee's medical scheme membership history")
     public ResponseEntity<ApiResponse<List<MedicalSchemeResponse>>> getMedicalScheme(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -345,7 +409,7 @@ public class HrController {
     }
 
     @PostMapping("/employees/{id}/medical-scheme")
-    @PreAuthorize("hasAnyAuthority('HR_MANAGE','PAYROLL_RUN')")
+    @PreAuthorize("hasAuthority('HR_MANAGE') or T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canPrepare(authentication)")
     @Operation(summary = "Record a new stretch of medical scheme membership; the open one is closed the day before")
     public ResponseEntity<ApiResponse<MedicalSchemeResponse>> addMedicalScheme(
             @PathVariable UUID id, @Valid @RequestBody MedicalSchemeRequest req, Principal principal) {

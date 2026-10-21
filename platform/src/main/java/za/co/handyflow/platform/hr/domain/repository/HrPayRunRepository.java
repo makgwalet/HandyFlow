@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.hr.domain.model.HrPayRun;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,4 +22,10 @@ public interface HrPayRunRepository extends JpaRepository<HrPayRun, UUID> {
 
     @Query("SELECT COUNT(r) FROM HrPayRun r WHERE r.tenantId = :#{#tenantId.value}")
     long countByTenant(TenantId tenantId);
+
+    /** The most recent earlier run that was approved, finalised or issued before approval existed. Used to compare. */
+    @Query("""
+            SELECT r FROM HrPayRun r WHERE r.tenantId = :#{#tenantId.value} AND r.periodStart < :before
+              AND r.status IN ('APPROVED', 'FINALISED', 'COMPLETED') ORDER BY r.periodStart DESC""")
+    List<HrPayRun> previousIssued(TenantId tenantId, LocalDate before, Pageable page);
 }

@@ -32,6 +32,12 @@ public class HrPayRun {
     @Column(name = "employee_count") int employeeCount;
     String notes;
     @Column(name = "processed_at")   Instant processedAt;
+    @Column(name = "prepared_by")    UUID preparedBy;
+    @Column(name = "prepared_at")    Instant preparedAt;
+    @Column(name = "approved_by")    UUID approvedBy;
+    @Column(name = "approved_at")    Instant approvedAt;
+    @Column(name = "finalised_by")   UUID finalisedBy;
+    @Column(name = "finalised_at")   Instant finalisedAt;
     @Column(name = "created_at")     Instant createdAt;
     @Column(name = "updated_at")     Instant updatedAt;
 
@@ -63,10 +69,11 @@ public class HrPayRun {
         this.updatedAt = Instant.now();
     }
 
-    public void complete(BigDecimal totalGross, BigDecimal totalPaye,
+    /** The calculation is done. The run now waits for a second person; nobody but staff sees its payslips yet. */
+    public void prepared(BigDecimal totalGross, BigDecimal totalPaye,
                          BigDecimal totalUif, BigDecimal totalSdl,
-                         BigDecimal totalNet, int employeeCount) {
-        this.status        = "COMPLETED";
+                         BigDecimal totalNet, int employeeCount, UUID actor) {
+        this.status        = PayRunWorkflowRules.PREPARED;
         this.totalGross    = totalGross;
         this.totalPaye     = totalPaye;
         this.totalUif      = totalUif;
@@ -74,7 +81,33 @@ public class HrPayRun {
         this.totalNet      = totalNet;
         this.employeeCount = employeeCount;
         this.processedAt   = Instant.now();
+        this.preparedBy    = actor;
+        this.preparedAt    = this.processedAt;
+        this.approvedBy    = null;
+        this.approvedAt    = null;
         this.updatedAt     = Instant.now();
+    }
+
+    public void approve(UUID actor) {
+        this.status     = PayRunWorkflowRules.APPROVED;
+        this.approvedBy = actor;
+        this.approvedAt = Instant.now();
+        this.updatedAt  = Instant.now();
+    }
+
+    /** Back to a draft so it can be corrected and calculated again. Earlier approval is cleared. */
+    public void sendBack() {
+        this.status     = PayRunWorkflowRules.DRAFT;
+        this.approvedBy = null;
+        this.approvedAt = null;
+        this.updatedAt  = Instant.now();
+    }
+
+    public void finalise(UUID actor) {
+        this.status      = PayRunWorkflowRules.FINALISED;
+        this.finalisedBy = actor;
+        this.finalisedAt = Instant.now();
+        this.updatedAt   = Instant.now();
     }
 
     public void cancel() {

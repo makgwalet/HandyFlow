@@ -133,6 +133,8 @@ public class PayrollImpactService {
         if (v == Verdict.NO_DIFFERENCE) return "No action needed.";
         if ("DRAFT".equals(run.getStatus()))
             return "This run is still a draft. Process it again once the rules are in place; nothing has been issued.";
+        if ("PREPARED".equals(run.getStatus()) || "APPROVED".equals(run.getStatus()))
+            return "This run has not been finalised, so employees have not seen these payslips. Send it back and calculate it again under the approved rules.";
         String emp201 = emp201Status == null ? "" : " and a review of the EMP201 (status " + emp201Status + ")";
         return "This run is already processed. A correction through an approved adjustment, a payslip reissue" + emp201
                 + " may be needed. Nothing has been changed.";

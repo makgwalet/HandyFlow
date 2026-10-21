@@ -23,6 +23,12 @@ public record PayRunResponse(
         String notes,
         Instant processedAt,
         Instant createdAt,
+        UUID preparedBy,
+        Instant preparedAt,
+        UUID approvedBy,
+        Instant approvedAt,
+        UUID finalisedBy,
+        Instant finalisedAt,
         /** Things a person should look at after processing, such as a medical credit that rested on a guess. */
         List<String> warnings
 ) {}
