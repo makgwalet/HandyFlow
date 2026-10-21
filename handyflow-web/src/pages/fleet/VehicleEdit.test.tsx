@@ -79,19 +79,19 @@ describe("Vehicle edit screen", () => {
     perms = new Set(["FLEET_READ"]); show(); expect(screen.queryByText("Edit details")).toBeNull()
   })
   it("edits the insurance profile", async () => {
-    show(); fireEvent.click(screen.getByText("Insurance")); fireEvent.click(await screen.findByText("Edit insurance"))
+    show(); fireEvent.click(screen.getByRole("tab", { name: "Insurance" })); fireEvent.click(await screen.findByText("Edit insurance"))
     fireEvent.change(await screen.findByLabelText("Policy expiry"), { target: { value: "2027-12-31" } }); fireEvent.change(screen.getByLabelText("Premium (R)"), { target: { value: "1500" } })
     fireEvent.click(screen.getByText("Save insurance"))
     await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fleet/vehicles/v1/insurance", expect.objectContaining({ insured: true, insurer: "Santam", policyExpiry: "2027-12-31", premium: 1500, trackingProvider: "Netstar" })))
   })
   it("records insurance for a vehicle with none, and the read view shows the new fields", async () => {
     get.mockImplementation((url: string) => url.endsWith("/insurance") ? ok(null) : ok([]))
-    show(); fireEvent.click(screen.getByText("Insurance")); expect(await screen.findByText("No insurance recorded for this vehicle.")).toBeTruthy()
+    show(); fireEvent.click(screen.getByRole("tab", { name: "Insurance" })); expect(await screen.findByText("No insurance recorded for this vehicle.")).toBeTruthy()
     fireEvent.click(screen.getByText("Record insurance")); fireEvent.click(await screen.findByLabelText("Vehicle is insured"))
     expect(screen.queryByLabelText("Insurer")).toBeNull(); expect((screen.getByText("Save insurance") as HTMLButtonElement).disabled).toBe(false)
   })
   it("shows broker, windscreen and tracking device on the read view", async () => {
-    show(); fireEvent.click(screen.getByText("Insurance"))
+    show(); fireEvent.click(screen.getByRole("tab", { name: "Insurance" }))
     expect(await screen.findByText("Alexander Forbes")).toBeTruthy(); expect(screen.getByText("Covered")).toBeTruthy(); expect(screen.getByText(/Netstar · N-1/)).toBeTruthy()
   })
 })

@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { COMPLIANCE_LABEL, DOCUMENT_TYPE_LABEL, complianceTone, expiryText, identityRows, uploadProblem, type Identity } from "./vehicleDetail.logic"
+import VehicleSummary from "./VehicleSummary"
 import LifecyclePanel from "./LifecyclePanel"
 import { LocationTab, MaintenanceTab, FuelUsageTab, HistoryTab } from "./VehicleTabs"
 import VehicleEditForm from "./VehicleEditForm"
@@ -116,6 +117,7 @@ export default function VehicleDetail({ vehicleId, identity }: { vehicleId: stri
   const canManage = usePermission("FLEET_MANAGE")
   return (
     <div style={{ marginBottom: 16 }}>
+      <VehicleSummary vehicle={identity as never} />
       <div role="tablist" style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--hf-border)", marginBottom: 10, flexWrap: "wrap" }}>
         {TABS.map(t => <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
           style={{ padding: "6px 12px", border: "none", background: "none", cursor: "pointer", fontSize: 13, fontWeight: tab === t ? 800 : 500, borderBottom: tab === t ? "2px solid var(--hf-brand)" : "2px solid transparent", color: "var(--hf-text)" }}>{t}</button>)}
