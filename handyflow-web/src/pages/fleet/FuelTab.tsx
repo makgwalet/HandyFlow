@@ -2,8 +2,11 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, Fuel, X, AlertCircle } from "lucide-react"
+import { Plus, X, AlertCircle } from "lucide-react"
 import { errorMessage, fetchAllPages } from "./apiShape"
+import FleetFuelLog from "./FleetFuelLog"
+import { Pager, SearchBox } from "./ListControls"
+import { useListView } from "./listKit"
 
 interface VehicleOption { id: string; registration: string; make: string; model: string; currentOdometer: number | null }
 interface FuelLog { id: string; filledAt: string; litres: number; pricePerLitre: number | null; totalCost: number | null; odometerAtFillup: number | null; station: string | null; receiptRef: string | null; fullTank: boolean }
@@ -16,6 +19,7 @@ const EMPTY_FORM = { filledAt: new Date().toISOString().split("T")[0], litres: "
 export default function FuelTab() {
   const qc = useQueryClient()
   const [selectedVehicle, setSelectedVehicle] = useState("")
+  const [modalVehicle, setModalVehicle]       = useState("")   // the vehicle chosen inside the form when no vehicle is selected on the page
   const [showAdd, setShowAdd]                 = useState(false)
   const [form, setForm]                       = useState(EMPTY_FORM)
   const [apiError, setApiError]               = useState("")
@@ -31,8 +35,10 @@ export default function FuelTab() {
     enabled: !!selectedVehicle,
   })
 
+  const targetId = selectedVehicle || modalVehicle
+
   const logFuel = useMutation({
-    mutationFn: (body: FuelBody) => apiClient.post(`/api/v1/fleet/vehicles/${selectedVehicle}/fuel`, body),
+    mutationFn: (body: FuelBody) => apiClient.post(`/api/v1/fleet/vehicles/${targetId}/fuel`, body),
     // FIX: previously only invalidated fleet-fuel. Confirmed via
     // FleetService.logFuel() that logging a fill-up can also advance the
     // vehicle's currentOdometer (when odometerAtFillup exceeds the stored
@@ -43,7 +49,8 @@ export default function FuelTab() {
     // all show a stale odometer/status until something unrelated happened
     // to refetch them.
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["fleet-fuel", selectedVehicle] })
+      qc.invalidateQueries({ queryKey: ["fleet-fuel", targetId] })
+      qc.invalidateQueries({ queryKey: ["fleet", "fuel-log"] })
       qc.invalidateQueries({ queryKey: ["fleet-vehicles"] })
       // Fuel cost feeds directly into FleetCostService.summarize()'s
       // totalFuelCost/costPerKm — FleetDashboard.tsx's cost-per-km table
@@ -54,7 +61,8 @@ export default function FuelTab() {
     onError: (e: unknown) => setApiError(errorMessage(e, "Failed to log fuel")),
   })
 
-  const selectedVehicleObj = vehicles.find(v => v.id === selectedVehicle)
+  const selectedVehicleObj = vehicles.find(v => v.id === targetId)
+  const view = useListView(logs, l => [l.station, l.receiptRef, l.filledAt].filter(Boolean).join(" "))
   const totalLitres = logs.reduce((s, l) => s + Number(l.litres ?? 0), 0)
   const totalCost   = logs.reduce((s, l) => s + Number(l.totalCost ?? 0), 0)
 
@@ -71,16 +79,14 @@ export default function FuelTab() {
           <label style={{ fontSize: 14, fontWeight: 500, color: "var(--hf-text-secondary)" }}>Vehicle:</label>
           <select value={selectedVehicle} onChange={e => setSelectedVehicle(e.target.value)}
             style={{ padding: "9px 14px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 14, background: "var(--hf-surface)", minWidth: 300, outline: "none" }}>
-            <option value="">Select vehicle...</option>
+            <option value="">All vehicles</option>
             {vehicles.map(v => <option key={v.id} value={v.id}>{v.registration} — {v.make} {v.model}</option>)}
           </select>
         </div>
-        {selectedVehicle && (
-          <button onClick={() => { setShowAdd(true); setApiError(""); setForm({ ...EMPTY_FORM, odometerAtFillup: String(selectedVehicleObj?.currentOdometer ?? "") }) }}
+                  <button onClick={() => { setShowAdd(true); setApiError(""); setModalVehicle(""); setForm({ ...EMPTY_FORM, odometerAtFillup: String(vehicles.find(v => v.id === selectedVehicle)?.currentOdometer ?? "") }) }}
             style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             <Plus size={15} /> Log Fill-Up
           </button>
-        )}
       </div>
 
       {/* Summary stats */}
@@ -101,11 +107,7 @@ export default function FuelTab() {
       )}
 
       {!selectedVehicle ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
-          <Fuel size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>Select a vehicle to view its fuel log</div>
-          <div style={{ fontSize: 13, marginTop: 4 }}>Fuel fill-ups are tracked separately from trips for accurate cost-per-km reporting.</div>
-        </div>
+        <FleetFuelLog />
       ) : isLoading ? (
         <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading fuel log...</div>
       ) : logs.length === 0 ? (
@@ -113,6 +115,8 @@ export default function FuelTab() {
           No fuel records for this vehicle yet.
         </div>
       ) : (
+        <>
+        <div style={{ marginBottom: 10 }}><SearchBox value={view.search} onChange={view.setSearch} label="Search fill-ups" placeholder="Search station, receipt or date" /></div>
         <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
@@ -123,8 +127,8 @@ export default function FuelTab() {
               </tr>
             </thead>
             <tbody>
-              {logs.map((log, i) => (
-                <tr key={log.id} style={{ borderBottom: i < logs.length-1 ? "1px solid var(--hf-border-subtle)" : "none", background: "var(--hf-surface)" }}>
+              {view.paged.rows.map((log, i) => (
+                <tr key={log.id} style={{ borderBottom: i < view.paged.rows.length-1 ? "1px solid var(--hf-border-subtle)" : "none", background: "var(--hf-surface)" }}>
                   <td style={{ padding: "12px 16px", fontWeight: 600, color: "var(--hf-text)" }}>{fmtDate(log.filledAt)}</td>
                   <td style={{ padding: "12px 16px", color: "var(--hf-text-tertiary)" }}>{log.odometerAtFillup ? `${Number(log.odometerAtFillup).toLocaleString()} km` : "—"}</td>
                   <td style={{ padding: "12px 16px", fontWeight: 600, color: "var(--hf-accent-text)" }}>{Number(log.litres).toFixed(1)} L</td>
@@ -140,20 +144,30 @@ export default function FuelTab() {
             </tbody>
           </table>
         </div>
+        {view.shown.length === 0 && <p role="status" style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No fill-ups match.</p>}
+        <Pager paged={view.paged} onPage={view.setPage} />
+        </>
       )}
 
       {/* Log Fill-Up Modal */}
-      {showAdd && selectedVehicleObj && (
+      {showAdd && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
           <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 520, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
               <div>
                 <h3 style={{ margin: "0 0 3px", fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Log Fuel Fill-Up</h3>
-                <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>{selectedVehicleObj.registration} — {selectedVehicleObj.make} {selectedVehicleObj.model}</div>
+                <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>{selectedVehicleObj ? `${selectedVehicleObj.registration} — ${selectedVehicleObj.make} ${selectedVehicleObj.model}` : "Choose the vehicle"}</div>
               </div>
               <button onClick={() => setShowAdd(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
 
+            {!selectedVehicle && <div style={{ marginBottom: 14 }}>
+              <label style={lbl} htmlFor="fuel-vehicle">Vehicle *</label>
+              <select id="fuel-vehicle" value={modalVehicle} onChange={e => { setModalVehicle(e.target.value); setForm(f => ({ ...f, odometerAtFillup: String(vehicles.find(v => v.id === e.target.value)?.currentOdometer ?? "") })) }} style={inp}>
+                <option value="">Choose a vehicle…</option>
+                {vehicles.map(v => <option key={v.id} value={v.id}>{v.registration} — {v.make} {v.model}</option>)}
+              </select>
+            </div>}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
                 <label style={lbl}>Date *</label>
@@ -161,7 +175,7 @@ export default function FuelTab() {
               </div>
               <div>
                 <label style={lbl}>Odometer at Fill-Up (km)</label>
-                <input type="number" value={form.odometerAtFillup} onChange={e => setForm(f => ({ ...f, odometerAtFillup: e.target.value }))} placeholder={String(selectedVehicleObj.currentOdometer)} style={inp} />
+                <input type="number" value={form.odometerAtFillup} onChange={e => setForm(f => ({ ...f, odometerAtFillup: e.target.value }))} placeholder={String(selectedVehicleObj?.currentOdometer ?? "")} style={inp} />
               </div>
               <div>
                 <label style={lbl}>Litres Filled *</label>
@@ -196,7 +210,7 @@ export default function FuelTab() {
               <button onClick={() => setShowAdd(false)} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
               <button
                 onClick={() => logFuel.mutate({ filledAt: form.filledAt, litres: Number(form.litres), pricePerLitre: form.pricePerLitre ? Number(form.pricePerLitre) : null, totalCost: form.totalCost ? Number(form.totalCost) : (form.litres && form.pricePerLitre ? Number(form.litres) * Number(form.pricePerLitre) : null), odometerAtFillup: form.odometerAtFillup ? Number(form.odometerAtFillup) : null, station: form.station || null, receiptRef: form.receiptRef || null, fullTank: form.fullTank })}
-                disabled={!form.litres || !form.filledAt || logFuel.isPending}
+                disabled={!targetId || !form.litres || !form.filledAt || logFuel.isPending}
                 style={{ padding: "9px 22px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {logFuel.isPending ? "Saving..." : "Log Fill-Up"}
               </button>

@@ -5,6 +5,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.fleet.domain.model.FuelFillup;
+import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -52,4 +53,24 @@ public interface FuelFillupRepository extends JpaRepository<FuelFillup, UUID> {
     /** Cross-tenant, for the daily anomaly sweep only: fill-ups recorded since {@code since}. */
     @Query("SELECT f FROM FuelFillup f WHERE f.createdAt >= :since")
     List<FuelFillup> findCreatedSince(Instant since);
+
+    // ── Fleet-wide fuel log: every fill-up in the tenant, filtered and paged ──────────────
+    // No null parameters (Postgres cannot type them): "all vehicles" is a flag, and an empty search is the pattern '%'.
+
+    @Query("SELECT f FROM FuelFillup f WHERE f.tenantId = :tenantUuid AND f.filledAt >= :from AND f.filledAt <= :to " +
+            "AND (:allVehicles = true OR f.vehicleId = :vehicleId) " +
+            "AND (LOWER(COALESCE(f.station, '')) LIKE :pattern OR LOWER(COALESCE(f.receiptRef, '')) LIKE :pattern " +
+            "OR f.vehicleId IN (SELECT v.id FROM Vehicle v WHERE v.tenantId = :tenantId AND LOWER(v.registration) LIKE :pattern)) " +
+            "ORDER BY f.filledAt DESC, f.createdAt DESC")
+    Page<FuelFillup> searchLog(UUID tenantUuid, TenantId tenantId, LocalDate from, LocalDate to,
+                               boolean allVehicles, UUID vehicleId, String pattern, Pageable pageable);
+
+    /** One row of [count, litres, spend] over the same filter as {@link #searchLog}. */
+    @Query("SELECT COUNT(f), COALESCE(SUM(f.litres), 0), COALESCE(SUM(f.totalCost), 0) FROM FuelFillup f " +
+            "WHERE f.tenantId = :tenantUuid AND f.filledAt >= :from AND f.filledAt <= :to " +
+            "AND (:allVehicles = true OR f.vehicleId = :vehicleId) " +
+            "AND (LOWER(COALESCE(f.station, '')) LIKE :pattern OR LOWER(COALESCE(f.receiptRef, '')) LIKE :pattern " +
+            "OR f.vehicleId IN (SELECT v.id FROM Vehicle v WHERE v.tenantId = :tenantId AND LOWER(v.registration) LIKE :pattern))")
+    List<Object[]> totalsFor(UUID tenantUuid, TenantId tenantId, LocalDate from, LocalDate to,
+                             boolean allVehicles, UUID vehicleId, String pattern);
 }
