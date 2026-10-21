@@ -58,7 +58,8 @@ export function SectionedModulePage({ config, render, action, subtitle, detail, 
         icon={section.icon}
         breadcrumbs={[
           { label: config.title, to: `${base}/${config.defaultSection}` },
-          { label: group.label },
+          // A group named like the module (Fleet > Fleet) would only repeat it.
+          ...(group.label === config.title ? [] : [{ label: group.label }]),
           detail ? { label: section.label, to: `${base}/${section.id}` } : { label: section.label },
           ...(detail ? [{ label: detail.label }] : []),
         ]}
