@@ -82,6 +82,9 @@ public record CreateCustomerRequest(
 
         LeadSource leadSource,
 
+        /** Values for the account's custom fields, by field key. */
+        Map<String, String> customFields,
+
         /**
          * Tags applied at creation time.
          * Max 20 tags, each max 50 chars.

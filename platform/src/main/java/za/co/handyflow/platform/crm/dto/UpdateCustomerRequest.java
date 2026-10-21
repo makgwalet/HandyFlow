@@ -6,6 +6,8 @@ import za.co.handyflow.platform.crm.domain.model.CustomerStatus;
 import za.co.handyflow.platform.crm.domain.model.CustomerType;
 import za.co.handyflow.platform.crm.domain.model.LeadSource;
 
+import java.util.Map;
+
 /**
  * UpdateCustomerRequest — validated DTO for customer updates.
  *
@@ -55,6 +57,7 @@ public record UpdateCustomerRequest(
 
         CustomerType customerType,
         CustomerStatus status,
-        LeadSource leadSource   // null leaves the source as it is
+        LeadSource leadSource,   // null leaves the source as it is
+        Map<String, String> customFields   // null leaves the custom fields as they are; otherwise replaces the values of the active fields
 
 ) {}

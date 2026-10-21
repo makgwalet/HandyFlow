@@ -53,6 +53,7 @@ public record CustomerResponse(
         CustomerStatus status,
         LeadStage pipelineStage,   // null for a converted CUSTOMER
         LeadSource leadSource,     // null when not recorded
+        Map<String, String> customFields,   // never null
         LostReason lostReason,     // set only while the stage is LOST
         String lostNote,
         Set<String> tags,

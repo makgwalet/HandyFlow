@@ -72,6 +72,7 @@ public class CustomerService {
     private final TenantAdminRecipients         tenantAdminRecipients;
     private final NotificationService           notificationService;
     private final UserRecipientResolver         userRecipientResolver;
+    private final CustomFieldService            customFieldService;
 
     // ══════════════════════════════════════════════════════════════════════
     // READ operations
@@ -207,7 +208,8 @@ public class CustomerService {
                 request.notes(),
                 request.customerType(),
                 currentUserId()
-        ).withInitialSource(request.leadSource());
+        ).withInitialSource(request.leadSource())
+                .withInitialCustomValues(customFieldService.clean(tenantId, request.customFields(), null));
 
         // Apply initial tags if provided
         if (request.tags() != null) {
@@ -258,6 +260,9 @@ public class CustomerService {
                 actingUser
         );
         customer.changeSource(request.leadSource(), actingUser);
+        if (request.customFields() != null) {
+            customer.changeCustomValues(customFieldService.clean(tenantId, request.customFields(), customer.getCustomValues()), actingUser);
+        }
 
         // Status change via update (staff can set ACTIVE/INACTIVE/BLOCKED)
         if (request.status() != null && request.status() != customer.getStatus()) {
@@ -512,6 +517,7 @@ public class CustomerService {
                 c.getStatus(),
                 c.getPipelineStage(),
                 c.getLeadSource(),
+                c.getCustomValues() == null ? Map.of() : c.getCustomValues(),
                 c.getLostReason(),
                 c.getLostNote(),
                 Set.copyOf(c.getTags()),

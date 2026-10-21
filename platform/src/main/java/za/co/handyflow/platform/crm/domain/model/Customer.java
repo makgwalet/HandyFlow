@@ -118,6 +118,11 @@ public class Customer {
     @Column(name = "pipeline_stage", length = 20)
     private LeadStage pipelineStage;
 
+    /** Values for the account's own custom fields, by field key. Null until one is filled in. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "custom_values", columnDefinition = "jsonb")
+    private Map<String, String> customValues;
+
     /** Where this lead or customer first came from. Optional. */
     @Enumerated(EnumType.STRING)
     @Column(name = "lead_source", length = 30)
@@ -250,6 +255,26 @@ public class Customer {
 
         c.addActivity(CustomerActivity.of(c, ActivityType.CREATED, null, null, createdBy));
         return c;
+    }
+
+    /** Sets the custom field values while the record is being created. Leaves no timeline entry. */
+    public Customer withInitialCustomValues(Map<String, String> values) {
+        this.customValues = values == null || values.isEmpty() ? null : Map.copyOf(values);
+        return this;
+    }
+
+    /** Replaces the custom field values and records which fields changed on the timeline. Values are expected to be checked already. */
+    public void changeCustomValues(Map<String, String> values, UUID by) {
+        Map<String, String> next = values == null ? Map.of() : values, prev = this.customValues == null ? Map.of() : this.customValues;
+        var changes = new HashMap<String, Object>();
+        var keys = new TreeSet<String>();
+        keys.addAll(prev.keySet());
+        keys.addAll(next.keySet());
+        for (String k : keys) recordChange(changes, "custom." + k, prev.get(k), next.get(k));
+        if (changes.isEmpty()) return;
+        this.customValues = next.isEmpty() ? null : Map.copyOf(next);
+        this.updatedAt = Instant.now();
+        addActivity(CustomerActivity.of(this, ActivityType.UPDATED, changes, null, by));
     }
 
     /** Sets the source while the record is being created. Leaves no timeline entry. */

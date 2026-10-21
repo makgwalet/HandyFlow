@@ -3,6 +3,8 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { responseMessage } from './apiError'
 import type { LucideIcon } from 'lucide-react'
 import { LEAD_SOURCES, sourceLabel } from "./pipeline.logic"
+import { CustomFieldInputs } from "./CustomFieldInputs"
+import { activeFields, displayValue, firstValueProblem, valuesBody, type CustomField } from "./customFields.logic"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, Search, Trash2, Eye, Pencil, Mail, Phone, MapPin, Hash,
@@ -318,12 +320,21 @@ export function CustomersPage() {
   const [noteText, setNoteText]         = useState('')
   const [showImport, setShowImport]     = useState(false)
 
+  // The account's own extra fields, shown on the form and the overview. If they cannot be loaded the form still works
+  // and leaves the stored values alone (see buildPayload).
+  const [customValues, setCustomValues] = useState<Record<string, string>>({})
+  const { data: customFieldDefs = [] } = useQuery<CustomField[]>({
+    queryKey: ['crm', 'custom-fields', 'active'], retry: false, staleTime: 60_000,
+    queryFn: async () => { const r = await apiClient.get('/api/v1/crm/custom-fields'); const o = r.data as { data?: unknown } | null; const d = o && !Array.isArray(o) && typeof o === 'object' && 'data' in o ? o.data : r.data; return Array.isArray(d) ? (d as CustomField[]) : [] },
+  })
+  const fieldsInUse = activeFields(customFieldDefs)
+
   // Back to the first page when the search text changes (adjusting state while rendering, not in an effect).
   const [searchSeen, setSearchSeen] = useState(debouncedSearch)
   if (searchSeen !== debouncedSearch) { setSearchSeen(debouncedSearch); setPage(0) }
 
   const closeModal = useCallback(() => {
-    setModal('none'); setForm(EMPTY_FORM)
+    setModal('none'); setForm(EMPTY_FORM); setCustomValues({})
     setFieldErrors({}); setGeneralError(''); setNoteText('')
   }, [])
 
@@ -431,7 +442,7 @@ export function CustomersPage() {
   // ── Form helpers ───────────────────────────────────────────────────────────
 
   const openAdd = () => {
-    setForm(EMPTY_FORM); setFieldErrors({}); setGeneralError(''); setModal('add')
+    setForm(EMPTY_FORM); setCustomValues({}); setFieldErrors({}); setGeneralError(''); setModal('add')
   }
 
   const openEdit = (c: Customer) => {
@@ -445,6 +456,7 @@ export function CustomersPage() {
       customerType: c.customerType ?? 'CUSTOMER', leadSource: c.leadSource ?? '',
       status: c.status ?? 'ACTIVE',
     })
+    setCustomValues({ ...(c.customFields ?? {}) })
     setFieldErrors({}); setGeneralError(''); setModal('edit')
   }
 
@@ -458,6 +470,8 @@ export function CustomersPage() {
     notes:        frm.notes        || undefined,
     customerType: frm.customerType,
     leadSource:   (frm.leadSource || undefined) as LeadSource | undefined,
+    // Only sent when the fields loaded: an empty list would otherwise wipe the stored values.
+    customFields: fieldsInUse.length > 0 ? valuesBody(fieldsInUse, customValues) : undefined,
     address: {
       street:     frm.street     || undefined,
       suburb:     frm.suburb     || undefined,
@@ -470,6 +484,8 @@ export function CustomersPage() {
   const submitCreate = () => {
     const errs = validateForm(form)
     if (Object.keys(errs).length) { setFieldErrors(errs); return }
+    const problem = firstValueProblem(fieldsInUse, customValues)
+    if (problem) { setGeneralError(problem); return }
     createMutation.mutate(buildPayload(form))
   }
 
@@ -477,6 +493,8 @@ export function CustomersPage() {
     if (!selectedCustomer) return
     const errs = validateForm(form)
     if (Object.keys(errs).length) { setFieldErrors(errs); return }
+    const problem = firstValueProblem(fieldsInUse, customValues)
+    if (problem) { setGeneralError(problem); return }
     updateMutation.mutate({
       id: selectedCustomer.id,
       body: { ...buildPayload(form), status: form.status as CustomerStatus },
@@ -662,6 +680,7 @@ export function CustomersPage() {
       {modal === 'view' && selectedCustomer && (
         <ViewModal
           customer={selectedCustomer}
+          customFields={fieldsInUse}
           onClose={closeModal}
           onEdit={() => openEdit(selectedCustomer)}
           onTimeline={() => { setModal('timeline') }}
@@ -681,6 +700,9 @@ export function CustomersPage() {
           onSubmit={modal === 'add' ? submitCreate : submitEdit}
           onClose={closeModal}
           f={f}
+          customFields={fieldsInUse}
+          customValues={customValues}
+          onCustomChange={(k, v) => setCustomValues(p => ({ ...p, [k]: v }))}
         />
       )}
 
@@ -866,8 +888,8 @@ function DeletedView({ customers, restoring, onRestore }: {
 // ViewModal
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemoveTag }: {
-  customer:   Customer; onClose: () => void; onEdit: () => void
+function ViewModal({ customer: c, customFields, onClose, onEdit, onTimeline, onAddTag, onRemoveTag }: {
+  customer:   Customer; customFields: CustomField[]; onClose: () => void; onEdit: () => void
   onTimeline: () => void; onAddTag: (tag: string) => void; onRemoveTag: (tag: string) => void
 }) {
   const trapRef   = useFocusTrap(true)
@@ -976,6 +998,7 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
               {c.phone     && <Detail icon={Phone}    label="Phone"      value={c.phone} />}
               {c.taxNumber && <Detail icon={Hash}     label="VAT Number" value={c.taxNumber} />}
               {c.leadSource && <Detail icon={Hash}    label="Source"     value={sourceLabel(c.leadSource)} />}
+              {customFields.filter(cf => c.customFields?.[cf.key]).map(cf => <Detail key={cf.key} icon={Hash} label={cf.label} value={displayValue(cf, c.customFields?.[cf.key])} />)}
               {c.address && Object.values(c.address).some(Boolean) && (
                 <Detail icon={MapPin} label="Address" fullWidth
                   value={[c.address.street, c.address.suburb, c.address.city,
@@ -1089,7 +1112,7 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
 // ─────────────────────────────────────────────────────────────────────────────
 
 function CustomerFormModal({
-  mode, customer, form, fieldErrors, generalError, isPending, onSubmit, onClose, f,
+  mode, customer, form, fieldErrors, generalError, isPending, onSubmit, onClose, f, customFields, customValues, onCustomChange,
 }: {
   mode:         'add' | 'edit'
   customer?:    Customer
@@ -1100,6 +1123,9 @@ function CustomerFormModal({
   onSubmit:     () => void
   onClose:      () => void
   f:            (k: string, v: string) => void
+  customFields:   CustomField[]
+  customValues:   Record<string, string>
+  onCustomChange: (key: string, value: string) => void
 }) {
   const trapRef = useFocusTrap(true)
   const title   = mode === 'add' ? 'Add Customer' : `Edit — ${customer?.name}`
@@ -1179,6 +1205,12 @@ function CustomerFormModal({
               onChange={e => f('notes', e.target.value)}
               placeholder="Key account, prefers invoice on the 25th…" rows={2} />
           </div>
+
+          {customFields.length > 0 && (
+            <div className={styles.formFieldFull}>
+              <CustomFieldInputs fields={customFields} values={customValues} onChange={onCustomChange} />
+            </div>
+          )}
 
           <div className={styles.formFieldFull}>
             <div className={styles.sectionDivider}>Address</div>

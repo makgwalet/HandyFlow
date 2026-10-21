@@ -31,6 +31,7 @@ export interface Customer {
   dealValue?:         number | null
   expectedCloseDate?: string | null
   leadSource?:        LeadSource | null
+  customFields?:      Record<string, string>
   pipelineStage?:     'NEW' | 'CONTACTED' | 'QUALIFIED' | 'WON' | 'LOST' | null
   createdAt:    string
   updatedAt:    string
@@ -56,6 +57,7 @@ export interface CreateCustomerRequest {
   notes?:        string
   customerType?: CustomerType
   leadSource?:   LeadSource
+  customFields?: Record<string, string>
   tags?:         string[]
 }
 
@@ -67,6 +69,8 @@ export interface UpdateCustomerRequest {
   taxNumber?:    string
   notes?:        string
   customerType?: CustomerType
+  leadSource?:   LeadSource
+  customFields?: Record<string, string>
   status?:       CustomerStatus
 }
 
