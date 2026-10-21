@@ -822,7 +822,10 @@ export const CATALOGUE_SECTIONS: ModuleSections = {
   title: 'Catalogue',
   icon: Package,
   defaultSection: 'items',
-  groups: [{ label: 'Overview', sections: [{ id: 'items', label: 'Products & services', icon: Package }] }],
+  groups: [{ label: 'Overview', sections: [
+    { id: 'items', label: 'Products & services', icon: Package },
+    { id: 'categories', label: 'Categories', icon: Tags },
+  ] }],
 }
 
 export const COMPLIANCE_SERVICES_SECTIONS: ModuleSections = {

@@ -77,3 +77,28 @@ Screens: roadmap lists 6; **1** exists (a basic version of item list). Reports: 
 ## 6. Not verified yet
 
 Nothing in this audit was run against a database; findings D2 and D3 come from reading the migration against the service code, and should be confirmed by the Slice 1 tests.
+
+## 7. Slice 1 status (identity and integrity): built, not yet run against a database
+
+| Finding | Status |
+|---|---|
+| D1 sku / barcode / vat_exempt not on the entity | Fixed: mapped, editable, searchable; POS barcode scan now matches sellable items only. |
+| D2 / D3 deleted names block re-use; rename can hit the database error | Fixed: V476 swaps the table constraints for partial unique indexes (live rows only); create **and** update check name, SKU and barcode and answer 409 with the field's own message. |
+| D4 category delete removes its items | Fixed: refused with a count while the category has items. |
+| D5 `deletedBy` always null | Fixed for items and categories. |
+| D6 two `update(...)` overloads, one skipping `updatedAt` | Fixed: one `update`, one `apply`. |
+| D7 unit free text | Not yet (Slice 2). |
+| D8 only SETTINGS_MANAGE | Partly: CATALOGUE_READ / WRITE / ARCHIVE / PRICE_READ / PRICE_WRITE added; SETTINGS_MANAGE still works everywhere. Approve / import / export / publish / admin come with their slices. |
+| D9 no audit trail or price history | Audit events for create, edit, price change, status change, delete, with old and new values; History button on each item. Full price lists and effective dates are Slice 3. |
+| D10 categories need INVOICE_CREATE | Fixed: POS and catalogue readers can load them. |
+| D11 conflicting `vat_exempt` comments | Fixed: exempt is now a real flag that forces a 0% rate. |
+| Extra: `ConflictException` returned HTTP 500 (no handler) | Fixed in `GlobalExceptionHandler` (409). This affects 10 other files that throw it. |
+
+New: item type, lifecycle status (draft / active / suspended / discontinued / archived) with reasons, brand, cost price and margin (shown only with CATALOGUE_PRICE_READ), edit conflict detection (version), server-side paged search by name, SKU, barcode or brand with category / status / type filters and sorting, a Categories screen with item counts.
+
+Behaviour changes to know about:
+- `GET /catalogue/items` (used by quotes, recurring schedules, POS, supply chain pickers) now returns **active items only**. Suspended, discontinued, draft and archived items disappear from pickers, by design. Existing quotes and invoices still read them by id.
+- Deleting a category no longer deletes its items.
+- SKU is stored upper-case; name, SKU and barcode uniqueness ignore case.
+
+Tests: 10 rules tests run and pass (standalone, Maven unavailable here); 17 service tests (Mockito) and 31 front-end tests written; the front-end tests pass, the service tests have **not been run**. The service, controller and repository code could not be compiled here (no Spring jars): the first `mvn` build will show any slip.
