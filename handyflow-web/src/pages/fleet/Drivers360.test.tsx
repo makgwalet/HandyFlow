@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import DriversTab from "./DriversTab"
-import { componentTone, daysToDate, driverDocumentCounts, driverVehicles, initials, periodText, ringFraction, expiryState, expiryWords, sortDrivers, rankMap, bandText, bandToneFor, bandTone, coverageNote, scoreText, settingsBody, settingsProblem, toForm, weightTotal } from "./driverScores.logic"
+import { fetchAllPages } from "./apiShape"
+import { componentTone, documentState, filterDrivers, paginate, daysToDate, driverDocumentCounts, driverVehicles, initials, periodText, ringFraction, expiryState, expiryWords, sortDrivers, rankMap, bandText, bandToneFor, bandTone, coverageNote, scoreText, settingsBody, settingsProblem, toForm, weightTotal } from "./driverScores.logic"
 
 const get = vi.fn(), put = vi.fn()
 type Args = unknown[]
@@ -156,3 +157,57 @@ describe("Drivers with Driver 360", () => {
 })
 
 function within(name: string) { return Array.from(screen.getByLabelText(name).querySelectorAll("button")).find(b => b.textContent === "360 view") as HTMLElement }
+
+describe("a long driver register", () => {
+  const on = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` }
+  const mk = (i: number, o: object = {}) => ({ ...drivers[0], id: `x${i}`, firstName: `Driver${String(i).padStart(3, "0")}`, lastName: "Test", phone: `0821000${String(i).padStart(3, "0")}`, licenseNumber: `LIC${i}`, licenseExpiry: on(300), status: "ACTIVE", ...o })
+  const many = Array.from({ length: 60 }, (_, i) => mk(i + 1))
+  const serve = (list: unknown[], pages = 1) => get.mockImplementation((url: string) => {
+    if (url.includes("/fleet/drivers")) { const page = Number(/page=(\d+)/.exec(url)?.[1] ?? 0), size = Number(/size=(\d+)/.exec(url)?.[1] ?? 200); return ok({ content: list.slice(page * size, (page + 1) * size), totalPages: pages }) }
+    return url.includes("/driver-scores") ? ok([]) : ok([])
+  })
+  it("rules: documents, search and paging", () => {
+    const base = { ...drivers[0], prdpRequired: false, prdpExpiry: null }
+    expect([on(-1), on(5), on(40)].map(e => documentState({ ...base, licenseExpiry: e }))).toEqual(["EXPIRED", "EXPIRING", "OK"])
+    expect(documentState({ ...base, licenseExpiry: on(300), prdpRequired: true, prdpExpiry: on(-3) })).toBe("EXPIRED"); expect(documentState({ ...base, licenseExpiry: on(300), prdpExpiry: on(-3) })).toBe("OK")
+    const list = [mk(1), mk(2, { licenseExpiry: on(-5) }), mk(3, { status: "INACTIVE" })]
+    expect(filterDrivers(list, { search: "driver002", status: "ALL", docs: "ALL" }).map(d => d.id)).toEqual(["x2"]); expect(filterDrivers(list, { search: "test 0821000003", status: "ALL", docs: "ALL" }).map(d => d.id)).toEqual(["x3"])
+    expect(filterDrivers(list, { search: "", status: "ACTIVE", docs: "ALL" }).length).toBe(2); expect(filterDrivers(list, { search: "", status: "ALL", docs: "EXPIRED" }).map(d => d.id)).toEqual(["x2"])
+    expect(paginate(many, 0)).toMatchObject({ pages: 3, from: 1, to: 25, total: 60 }); expect(paginate(many, 2)).toMatchObject({ from: 51, to: 60 }); expect(paginate(many, 9).page).toBe(2); expect(paginate([], 0)).toMatchObject({ pages: 1, from: 0, to: 0, rows: [] })
+  })
+  it("reads every page of a paged list, and says when it stopped early", async () => {
+    const pages = [[1, 2], [3, 4], [5]]
+    const g = (u: string) => Promise.resolve({ data: { data: { content: pages[Number(/page=(\d+)/.exec(u)![1])] ?? [], totalPages: 3 } } })
+    expect(await fetchAllPages<number>(g, "/x?y=1", 2)).toEqual({ items: [1, 2, 3, 4, 5], truncated: false })
+    expect(await fetchAllPages<number>(g, "/x", 2, 2)).toEqual({ items: [1, 2, 3, 4], truncated: true })
+    expect(await fetchAllPages<number>(() => Promise.resolve({ data: { data: [7, 8] } }), "/x")).toEqual({ items: [7, 8], truncated: false })
+  })
+  it("shows 25 at a time and moves between pages", async () => {
+    serve(many); show(); await screen.findByText("Driver001 Test")
+    expect(screen.getByLabelText("Showing").textContent).toBe("Showing 1–25 of 60"); expect(screen.queryByText("Driver026 Test")).toBeNull()
+    fireEvent.click(screen.getByText("Next")); expect(await screen.findByText("Driver026 Test")).toBeTruthy(); expect(screen.getByLabelText("Showing").textContent).toBe("Showing 26–50 of 60")
+    fireEvent.click(screen.getByText("Next")); expect(screen.getByLabelText("Showing").textContent).toBe("Showing 51–60 of 60"); expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(true)
+  })
+  it("searches the whole register and goes back to the first page", async () => {
+    serve(many); show(); await screen.findByText("Driver001 Test"); fireEvent.click(screen.getByText("Next")); await screen.findByText("Driver026 Test")
+    fireEvent.change(screen.getByLabelText("Search drivers"), { target: { value: "driver057" } })
+    expect(await screen.findByText("Driver057 Test")).toBeTruthy(); expect(screen.getByLabelText("Showing").textContent).toBe("Showing 1–1 of 1"); expect(screen.queryByText("Next")).toBeNull()
+    fireEvent.change(screen.getByLabelText("Search drivers"), { target: { value: "nobody" } }); expect(await screen.findByText("No drivers match")).toBeTruthy()
+  })
+  it("reads past the first 200 drivers", async () => {
+    const lots = Array.from({ length: 230 }, (_, i) => mk(i + 1)); serve(lots, 2); show()
+    await screen.findByText("Driver001 Test"); expect(screen.getByLabelText("Showing").textContent).toBe("Showing 1–25 of 230"); expect(screen.getByLabelText("Total drivers").textContent).toMatch(/^230/)
+  })
+  it("clicking the expired tile lists just those drivers, and clicking it again clears it", async () => {
+    serve([mk(1), mk(2, { licenseExpiry: on(-5) }), mk(3, { licenseExpiry: on(5) })]); show(); await screen.findByText("Driver001 Test")
+    fireEvent.click(screen.getByLabelText("Active drivers with an expired document")); expect(screen.getByLabelText("Showing").textContent).toBe("Showing 1–1 of 1"); expect(screen.getByText("Driver002 Test")).toBeTruthy(); expect(screen.queryByText("Driver001 Test")).toBeNull()
+    fireEvent.click(screen.getByLabelText("Active drivers with an expired document")); expect(screen.getByLabelText("Showing").textContent).toBe("Showing 1–3 of 3")
+    fireEvent.change(screen.getByLabelText("Documents"), { target: { value: "EXPIRING" } }); expect(screen.getByText("Driver003 Test")).toBeTruthy(); expect(screen.queryByText("Driver002 Test")).toBeNull()
+  })
+  it("keeps a driver's rank among all drivers when the list is searched", async () => {
+    serve([mk(1), mk(2)]); get.mockImplementation((url: string) => url.includes("/driver-scores") ? ok([{ driverId: "x1", driverName: "a", overall: 70, band: "FAIR", coverage: 100, reliable: true, tripCount: 9 }, { driverId: "x2", driverName: "b", overall: 90, band: "EXCELLENT", coverage: 100, reliable: true, tripCount: 9 }]) : url.includes("/fleet/drivers") ? ok({ content: [mk(1), mk(2)] }) : ok([]))
+    show(); await screen.findByText("Driver001 Test"); fireEvent.change(screen.getByLabelText("Sort drivers"), { target: { value: "score-desc" } })
+    fireEvent.change(screen.getByLabelText("Search drivers"), { target: { value: "driver001" } })
+    expect(screen.getByLabelText("Driver001 Test").querySelector('[aria-label="Rank"]')?.textContent).toBe("#2")
+  })
+})

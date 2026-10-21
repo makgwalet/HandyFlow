@@ -5,7 +5,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { errorMessage, fieldErrorsOf, unwrapList } from "./apiShape"
+import { errorMessage, fetchAllPages, fieldErrorsOf } from "./apiShape"
 import { X, AlertCircle, CheckCircle } from "lucide-react"
 import { STATUS_CFG } from "./vehicleStatus"
 
@@ -219,7 +219,7 @@ export function StatusModal({ vehicle, onClose }: { vehicle: ActionVehicle; onCl
 export function AssignDriverModal({ vehicle, onClose }: { vehicle: ActionVehicle; onClose: () => void }) {
   const qc = useQueryClient()
   const [selectedDriverId, setSelectedDriverId] = useState(vehicle.assignedDriverId ?? ""), [apiError, setApiError] = useState("")
-  const { data: drivers = [] } = useQuery<Driver[]>({ queryKey: ["fleet-drivers"], queryFn: async () => unwrapList<Driver>(await apiClient.get("/api/v1/fleet/drivers?size=200")) })
+  const { data: drivers = [] } = useQuery<Driver[]>({ queryKey: ["fleet-drivers"], queryFn: async () => (await fetchAllPages<Driver>(u => apiClient.get(u), "/api/v1/fleet/drivers")).items })
   const activeDrivers = drivers.filter(d => d.status === "ACTIVE")
   const assignDriver = useMutation({
     mutationFn: ({ id, driverId }: { id: string; driverId: string | null }) => apiClient.patch(`/api/v1/fleet/vehicles/${id}/driver`, { driverId }),

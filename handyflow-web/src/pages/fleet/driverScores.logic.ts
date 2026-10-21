@@ -107,3 +107,32 @@ export function periodText(from: string, to: string): string {
 export const driverVehicles = <V extends { assignedDriverId?: string | null }>(vehicles: V[], driverId: string): V[] => vehicles.filter(v => v.assignedDriverId === driverId)
 /** Share of the ring to fill, 0 to 1; no score fills nothing. */
 export const ringFraction = (overall: number | null | undefined) => (overall == null ? 0 : Math.max(0, Math.min(1, overall / 100)))
+
+// ── The driver register: searching, filtering by documents, and paging ───────
+export type DocFilter = "ALL" | "EXPIRED" | "EXPIRING"
+export const DOC_FILTER_LABEL: Record<DocFilter, string> = { ALL: "Any documents", EXPIRED: "Expired documents", EXPIRING: "Expiring in 30 days" }
+interface Searchable { firstName: string; lastName: string; phone: string | null; email: string | null; idNumber: string | null; licenseNumber: string | null }
+interface Documented { licenseExpiry: string | null; prdpRequired: boolean; prdpExpiry: string | null }
+/** The worst state of a driver's documents, by the same rule as the counts above the list. */
+export function documentState(d: Documented, today = new Date()): "EXPIRED" | "EXPIRING" | "OK" {
+  const states = [expiryState(d.licenseExpiry, today), ...(d.prdpRequired ? [expiryState(d.prdpExpiry, today)] : [])]
+  return states.includes("EXPIRED") ? "EXPIRED" : states.includes("EXPIRING") ? "EXPIRING" : "OK"
+}
+export interface DriverView { search: string; status: string; docs: DocFilter }
+/** Every word of the search must appear in the name, phone, email, ID or licence number. */
+export function filterDrivers<T extends Searchable & Documented & { status: string }>(list: T[], v: DriverView, today = new Date()): T[] {
+  const words = v.search.toLowerCase().split(/\s+/).filter(Boolean)
+  return list.filter(d => {
+    if (v.status !== "ALL" && d.status !== v.status) return false
+    if (v.docs !== "ALL" && documentState(d, today) !== v.docs) return false
+    const hay = [d.firstName, d.lastName, d.phone, d.email, d.idNumber, d.licenseNumber].filter(Boolean).join(" ").toLowerCase()
+    return words.every(w => hay.includes(w))
+  })
+}
+export const DRIVER_PAGE_SIZE = 25
+export interface Paged<T> { rows: T[]; page: number; pages: number; from: number; to: number; total: number }
+/** One page of a list. The page number is clamped, so a page that no longer exists (after a filter) shows the last real one. */
+export function paginate<T>(items: T[], page: number, size = DRIVER_PAGE_SIZE): Paged<T> {
+  const pages = Math.max(1, Math.ceil(items.length / size)), at = Math.max(0, Math.min(page, pages - 1)), start = at * size
+  return { rows: items.slice(start, start + size), page: at, pages, from: items.length === 0 ? 0 : start + 1, to: Math.min(items.length, start + size), total: items.length }
+}

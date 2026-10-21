@@ -10,6 +10,7 @@ import { apiClient } from "../../api/client"
 import VehicleDetail from "./VehicleDetail"
 import { Meter } from "./FleetBars"
 import { TONE_COLOUR } from "./fleetTones"
+import { fetchAllPages } from "./apiShape"
 import { periodRange, type FuelRow } from "./fuelAnalytics.logic"
 import { fleetRows, fleetTiles, viewFleet, SORT_OPTIONS, type FleetSort, type ListVehicle } from "./fleetBoards.logic"
 import { AssignDriverModal, RegisterVehicleModal, StatusBadge, StatusModal } from "./VehicleActions"
@@ -27,7 +28,7 @@ export default function VehiclesTab() {
   const [search, setSearch] = useState(""), [status, setStatus] = useState("ALL"), [sort, setSort] = useState<FleetSort>("registration"), [openId, setOpenId] = useState<string | null>(null)
   const [registering, setRegistering] = useState(false), [changing, setChanging] = useState<ListVehicle | null>(null), [assigning, setAssigning] = useState<ListVehicle | null>(null)
   const { from, to } = periodRange("30")
-  const vehicles = useQuery<ListVehicle[]>({ queryKey: ["fleet", "list", "vehicles"], queryFn: async () => list<ListVehicle>(await apiClient.get("/api/v1/fleet/vehicles?size=200")) })
+  const vehicles = useQuery<ListVehicle[]>({ queryKey: ["fleet", "list", "vehicles"], queryFn: async () => (await fetchAllPages<ListVehicle>(u => apiClient.get(u), "/api/v1/fleet/vehicles")).items })
   const fuel = useQuery<FuelRow[]>({ queryKey: ["fleet", "list", "fuel", from, to], queryFn: async () => list<FuelRow>(await apiClient.get(`/api/v1/fleet/fuel-analytics/vehicles?from=${from}&to=${to}`)) })
   const rows = viewFleet(fleetRows(vehicles.data ?? [], fuel.data ?? []), search, status, sort)
   return (
