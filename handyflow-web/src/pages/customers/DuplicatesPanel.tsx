@@ -1,10 +1,12 @@
 // src/pages/customers/DuplicatesPanel.tsx
-// Customers that look like the same business entered more than once. Nothing is merged: the person can say "not a duplicate"
+// Customers that look like the same business entered more than once. The person can merge two records into one, say "not a duplicate"
 // (the pair is remembered) or delete the extra record (it can be restored).
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
+import MergeDialog from "./MergeDialog"
+import { sameRecord } from "./merge.logic"
 import { groupKey, oldestFirst, summaryText, differingFields, type Duplicates, type DupGroup } from "./duplicates.logic"
 
 const inner = (r: { data: unknown }): unknown => { const o = r.data as { data?: unknown } | null; return o && !Array.isArray(o) && typeof o === "object" && "data" in o ? o.data : r.data }
@@ -15,6 +17,7 @@ const btn: React.CSSProperties = { padding: "4px 10px", border: "1px solid var(-
 export default function DuplicatesPanel() {
   const qc = useQueryClient(), canEdit = usePermission("CUSTOMER_UPDATE"), canDelete = usePermission("CUSTOMER_DELETE")
   const [error, setError] = useState<string | null>(null), [confirm, setConfirm] = useState<string | null>(null)
+  const [pick, setPick] = useState<Record<string, { keep: string; merge: string }>>({}), [merging, setMerging] = useState<string | null>(null)
   const { data, isLoading, isError } = useQuery<Duplicates>({ queryKey: ["crm", "duplicates"], queryFn: async () => asDuplicates(await apiClient.get("/api/v1/crm/customers/duplicates")) })
   const refresh = () => { setError(null); setConfirm(null); qc.invalidateQueries({ queryKey: ["crm", "duplicates"] }) }
   const dismiss = useMutation({ mutationFn: (g: DupGroup) => apiClient.post("/api/v1/crm/customers/duplicates/dismiss", { customerIds: g.customers.map(c => c.id) }), onSuccess: refresh, onError: e => setError(errorText(e)) })
@@ -30,6 +33,7 @@ export default function DuplicatesPanel() {
       {error && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 13 }}>{error}</p>}
       {data.groups.map(g => {
         const key = groupKey(g), members = oldestFirst(g), differ = differingFields(g)
+        const sel = pick[key] ?? { keep: members[0].id, merge: members[1]?.id ?? "" }
         return (
           <section key={key} aria-label={`Possible duplicates: ${members.map(m => m.name).join(", ")}`} style={{ border: "1px solid var(--hf-border-subtle)", borderRadius: 10, padding: 12, marginBottom: 10 }}>
             <p style={{ margin: "0 0 8px", fontSize: 12, color: "var(--hf-text-muted)" }}>{g.reasons.join(" · ")}</p>
@@ -49,7 +53,18 @@ export default function DuplicatesPanel() {
                     : <button type="button" style={btn} disabled={busy} aria-label={`Delete ${m.name}`} onClick={() => setConfirm(m.id)}>Delete (restorable)</button>)}
                 </div>))}
             </div>
-            {canEdit && <div style={{ marginTop: 10 }}><button type="button" style={btn} disabled={busy} onClick={() => dismiss.mutate(g)}>Not a duplicate</button></div>}
+            {canEdit && <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <button type="button" style={btn} disabled={busy} onClick={() => dismiss.mutate(g)}>Not a duplicate</button>
+              {merging !== key && <button type="button" style={btn} disabled={busy} onClick={() => { setPick({ ...pick, [key]: sel }); setMerging(key) }}>Merge…</button>}
+            </div>}
+            {canEdit && merging === key && (
+              <div style={{ marginTop: 10, fontSize: 13 }}>
+                <label>Keep <select aria-label="Record to keep" style={btn} value={sel.keep} onChange={e => setPick({ ...pick, [key]: { ...sel, keep: e.target.value } })}>{members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>{" "}
+                <label>Merge in <select aria-label="Record to merge in" style={btn} value={sel.merge} onChange={e => setPick({ ...pick, [key]: { ...sel, merge: e.target.value } })}>{members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
+                {sameRecord(sel.keep, sel.merge)
+                  ? <p role="alert" style={{ color: "var(--hf-danger-text)" }}>Choose two different records.</p>
+                  : <MergeDialog keepId={sel.keep} mergeId={sel.merge} onSwap={() => setPick({ ...pick, [key]: { keep: sel.merge, merge: sel.keep } })} onClose={() => setMerging(null)} onDone={() => { setMerging(null); refresh() }} />}
+              </div>)}
           </section>)
       })}
     </div>

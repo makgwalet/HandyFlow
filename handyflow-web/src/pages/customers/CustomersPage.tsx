@@ -123,6 +123,7 @@ const ACTIVITY_LABELS: Record<string, string> = {
   DEAL_UPDATED:   'Deal updated',
   LEAD_CONVERTED: 'Converted to customer',
   LEAD_CONVERSION_UNDONE: 'Conversion undone',
+  MERGED: 'Another record merged in',
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
