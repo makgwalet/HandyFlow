@@ -7,8 +7,6 @@ import za.co.handyflow.platform.hr.domain.model.HrEmployee;
 import za.co.handyflow.platform.hr.domain.repository.*;
 import za.co.handyflow.platform.hr.dto.CreateEmployeeRequest;
 import za.co.handyflow.platform.hr.dto.UpdateEmployeeRequest;
-import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
-import za.co.handyflow.platform.notifications.application.internal.NotificationService;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
@@ -42,8 +40,7 @@ class HrServiceEmployeeTest {
         audit = mock(EmployeeAuditService.class);
         numberGen = mock(EmployeeNumberGenerator.class);
         events = mock(ApplicationEventPublisher.class);
-        service = new HrService(repo, mock(HrLeaveBalanceRepository.class), mock(HrLeaveRequestRepository.class),
-                mock(HrDisciplinaryRepository.class), numberGen, mock(NotificationService.class), mock(TenantAdminRecipients.class), events, audit);
+        service = new HrService(repo, mock(HrDisciplinaryRepository.class), numberGen, events, audit, mock(LeaveService.class));
 
         emp = HrEmployee.create(tenant, "EMP-1", "Jane", "Dlamini", LocalDate.of(2024, 1, 1), "PERMANENT", new BigDecimal("30000"), "MONTHLY");
         emp.setBankAccountNumber("62000011112222");

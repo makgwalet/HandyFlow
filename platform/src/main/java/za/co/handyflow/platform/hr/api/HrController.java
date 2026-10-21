@@ -52,6 +52,7 @@ public class HrController {
     private final EmployeeViewService   employeeViewService;
     private final EmployeeChangeService employeeChangeService;
     private final EmployeeAuditService  employeeAuditService;
+    private final LeaveService          leaveService;
 
     // ── Employees ─────────────────────────────────────────────────────────────
 
@@ -225,8 +226,17 @@ public class HrController {
                 hrService.getLeaveBalances(TenantContext.getTenantIdAsObject(), id, leaveYear)));
     }
 
+    @GetMapping("/employees/{id}/leave-statement")
+    @PreAuthorize("hasAnyAuthority('HR_READ','HR_MANAGE','LEAVE_APPROVE','LEAVE_ADJUST')")
+    @Operation(summary = "Leave balances for a year and every movement behind them")
+    public ResponseEntity<ApiResponse<LeaveStatementResponse>> leaveStatement(
+            @PathVariable UUID id, @RequestParam(defaultValue = "0") int year) {
+        int leaveYear = year == 0 ? LocalDate.now().getYear() : year;
+        return ResponseEntity.ok(ApiResponse.success(leaveService.statement(TenantContext.getTenantIdAsObject(), id, leaveYear)));
+    }
+
     @GetMapping("/leave-requests")
-    @PreAuthorize("hasAnyAuthority('HR_READ','HR_MANAGE','USER_READ')")
+    @PreAuthorize("hasAnyAuthority('HR_READ','HR_MANAGE','USER_READ','LEAVE_APPROVE')")
     @Operation(summary = "List all leave requests, optionally filter by status")
     public ResponseEntity<ApiResponse<Page<LeaveRequestResponse>>> getLeaveRequests(
             @RequestParam(required = false) String status,
@@ -237,7 +247,7 @@ public class HrController {
 
     @PostMapping("/employees/{id}/leave-requests")
     // FIX: was USER_READ
-    @PreAuthorize("hasAnyAuthority('HR_MANAGE','USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('HR_MANAGE','USER_UPDATE','LEAVE_APPROVE')")
     @Operation(summary = "Submit a leave request for an employee")
     public ResponseEntity<ApiResponse<LeaveRequestResponse>> submitLeaveRequest(
             @PathVariable UUID id,
@@ -248,25 +258,44 @@ public class HrController {
 
     @PostMapping("/leave-requests/{id}/approve")
     // FIX: was USER_READ — anyone could approve leave
-    @PreAuthorize("hasAnyAuthority('HR_MANAGE','USER_UPDATE')")
-    @Operation(summary = "Approve a leave request — deducts from employee's balance")
+    @PreAuthorize("hasAnyAuthority('LEAVE_APPROVE','HR_MANAGE')")
+    @Operation(summary = "Approve a leave request. The days held for it become days taken")
     public ResponseEntity<ApiResponse<LeaveRequestResponse>> approveLeave(
-            @PathVariable UUID id, Principal principal) {
+            @PathVariable UUID id, Principal principal, Authentication authentication) {
         // FIX: was passing null as approverId — approval audit trail was broken
         UUID approverId = resolveUserId(principal);
         return ResponseEntity.ok(ApiResponse.success("Leave approved",
-                hrService.approveLeaveRequest(TenantContext.getTenantIdAsObject(), id, approverId)));
+                leaveService.approve(TenantContext.getTenantIdAsObject(), id, approverId, HrAccess.held(authentication))));
     }
 
     @PostMapping("/leave-requests/{id}/reject")
-    @PreAuthorize("hasAnyAuthority('HR_MANAGE','USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('LEAVE_APPROVE','HR_MANAGE')")
     public ResponseEntity<ApiResponse<LeaveRequestResponse>> rejectLeave(
             @PathVariable UUID id,
             @RequestParam(required = false) String reason,
-            Principal principal) {
+            Principal principal, Authentication authentication) {
         UUID approverId = resolveUserId(principal);
         return ResponseEntity.ok(ApiResponse.success("Leave rejected",
-                hrService.rejectLeaveRequest(TenantContext.getTenantIdAsObject(), id, approverId, reason)));
+                leaveService.reject(TenantContext.getTenantIdAsObject(), id, approverId, reason, HrAccess.held(authentication))));
+    }
+
+    @PostMapping("/leave-requests/{id}/cancel")
+    @PreAuthorize("hasAnyAuthority('LEAVE_APPROVE','HR_MANAGE','LEAVE_ADJUST')")
+    @Operation(summary = "Cancel a waiting request, or approved leave (leave that has started needs LEAVE_ADJUST)")
+    public ResponseEntity<ApiResponse<LeaveRequestResponse>> cancelLeave(
+            @PathVariable UUID id, @RequestBody(required = false) LeaveCancelRequest req,
+            Principal principal, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.success("Leave cancelled", leaveService.cancel(
+                TenantContext.getTenantIdAsObject(), id, resolveUserId(principal), req == null ? null : req.reason(), HrAccess.held(authentication))));
+    }
+
+    @PostMapping("/employees/{id}/leave-adjustments")
+    @PreAuthorize("hasAuthority('LEAVE_ADJUST')")
+    @Operation(summary = "Add days to or take days off a leave balance, with a reason")
+    public ResponseEntity<ApiResponse<LeaveStatementResponse.Entry>> adjustLeave(
+            @PathVariable UUID id, @RequestBody LeaveAdjustmentRequest req, Principal principal) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Adjustment recorded",
+                leaveService.adjust(TenantContext.getTenantIdAsObject(), id, req, resolveUserId(principal))));
     }
 
     // ── Disciplinary ──────────────────────────────────────────────────────────

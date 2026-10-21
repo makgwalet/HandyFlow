@@ -8,5 +8,11 @@ public record SubmitLeaveRequest(
         @NotBlank String leaveType,
         @NotNull  LocalDate startDate,
         @NotNull  LocalDate endDate,
-        String reason
-) {}
+        String reason,
+        Boolean halfDay,
+        Boolean medicalCertificate
+) {
+    public SubmitLeaveRequest(String leaveType, LocalDate startDate, LocalDate endDate, String reason) {
+        this(leaveType, startDate, endDate, reason, null, null);
+    }
+}

@@ -34,6 +34,7 @@ public class PayrollControlService {
     private final HrPayRunEventRepository eventRepo;
     private final HrPayrollSettingsRepository settingsRepo;
     private final HrEmployeeChangeRepository changeRepo;
+    private final HrLeaveRequestRepository leaveRepo;
     private final MedicalSchemeService medicalSchemeService;
     private final JdbcTemplate jdbc;
 
@@ -97,6 +98,15 @@ public class PayrollControlService {
                         e != null ? e.getFullName() + " (" + e.getEmployeeNumber() + ")" : id.toString(),
                         "Pay or bank details changed after this run was calculated. Send the run back and calculate it again if the change should apply."));
             }
+        }
+        // Approved unpaid leave is not deducted by the calculation yet.
+        Set<UUID> unpaid = new LinkedHashSet<>();
+        for (HrLeaveRequest r : leaveRepo.approvedUnpaidIn(tenantId, run.getPeriodStart(), run.getPeriodEnd())) unpaid.add(r.getEmployeeId());
+        for (UUID id : unpaid) {
+            HrEmployee e = people.get(id);
+            if (e == null) continue;
+            items.add(new Item(PayrollExceptionRules.Severity.WARNING, "UNPAID_LEAVE_NOT_DEDUCTED", e.getFullName() + " (" + e.getEmployeeNumber() + ")",
+                    "Approved unpaid leave falls in this period. Payroll does not deduct unpaid leave yet, so check the pay by hand."));
         }
         return new Checked(items, comparedWith);
     }

@@ -62,7 +62,8 @@ public class EmployeeViewService {
         return view(e, names(tenantId), effective);
     }
 
-    private Set<UUID> teamOf(TenantId tenantId, UUID actorUserId) {
+    /** The people who report, directly or through others, to the employee linked to this login. */
+    public Set<UUID> teamOf(TenantId tenantId, UUID actorUserId) {
         if (actorUserId == null) return Set.of();
         Optional<HrEmployee> me = employeeRepo.findByUserId(tenantId, actorUserId);
         if (me.isEmpty()) return Set.of();

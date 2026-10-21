@@ -15,6 +15,7 @@ import za.co.handyflow.platform.hr.application.internal.Emp201PdfGenerator;
 import za.co.handyflow.platform.hr.application.internal.EmployeeAuditService;
 import za.co.handyflow.platform.hr.application.internal.EmployeeChangeService;
 import za.co.handyflow.platform.hr.application.internal.EmployeeViewService;
+import za.co.handyflow.platform.hr.application.internal.LeaveService;
 import za.co.handyflow.platform.hr.application.internal.MedicalSchemeService;
 import za.co.handyflow.platform.hr.application.internal.PayrollControlService;
 import za.co.handyflow.platform.hr.application.internal.PayrollImpactService;
@@ -84,6 +85,7 @@ class HrControllerTest {
     @MockitoBean EmployeeViewService    employeeViewService;
     @MockitoBean EmployeeChangeService  employeeChangeService;
     @MockitoBean EmployeeAuditService   employeeAuditService;
+    @MockitoBean LeaveService           leaveService;
     @MockitoBean PayslipPdfGenerator    payslipPdfGenerator;
     @MockitoBean HrPayslipRepository    payslipRepo;
     @MockitoBean HrEmployeeRepository   employeeRepo;
@@ -334,6 +336,56 @@ class HrControllerTest {
         verify(hrService, never()).setManager(any(), any(), any(), any());
     }
 
+    // ── Slice 4: leave ───────────────────────────────────────────────────────
+
+    @Test
+    @WithMockUser(authorities = "HR_READ")
+    @DisplayName("Reading leave does not allow adjusting a balance")
+    void adjustLeaveNeedsLeaveAdjust() throws Exception {
+        mvc.perform(post(BASE + "/employees/" + UUID.randomUUID() + "/leave-adjustments").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"leaveType\":\"ANNUAL\",\"days\":2,\"reason\":\"Correction\"}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(leaveService);
+    }
+
+    @Test
+    @WithMockUser(username = USER_ID, authorities = "LEAVE_ADJUST")
+    @DisplayName("An adjustment records the real user id")
+    void adjustLeaveRecordsUser() throws Exception {
+        var emp = UUID.randomUUID();
+        when(leaveService.adjust(any(), eq(emp), any(), any())).thenReturn(null);
+
+        mvc.perform(post(BASE + "/employees/" + emp + "/leave-adjustments").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"leaveType\":\"ANNUAL\",\"days\":2,\"reason\":\"Correction\"}"))
+                .andExpect(status().isCreated());
+
+        verify(leaveService).adjust(any(), eq(emp), any(), eq(UUID.fromString(USER_ID)));
+    }
+
+    @Test
+    @WithMockUser(authorities = "USER_READ")
+    @DisplayName("Cancelling leave needs more than USER_READ")
+    void cancelLeaveNeedsApprover() throws Exception {
+        mvc.perform(post(BASE + "/leave-requests/" + UUID.randomUUID() + "/cancel").with(csrf()))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(leaveService);
+    }
+
+    @Test
+    @WithMockUser(username = USER_ID, authorities = "LEAVE_APPROVE")
+    @DisplayName("LEAVE_APPROVE alone can reject, and the real user id is recorded")
+    void rejectLeaveWithLeaveApprove() throws Exception {
+        var id = UUID.randomUUID();
+        when(leaveService.reject(any(), eq(id), any(), any(), any())).thenReturn(leaveResponse(id));
+
+        mvc.perform(post(BASE + "/leave-requests/" + id + "/reject").param("reason", "Busy period").with(csrf()))
+                .andExpect(status().isOk());
+
+        verify(leaveService).reject(any(), eq(id), eq(UUID.fromString(USER_ID)), eq("Busy period"), any());
+    }
+
     @Test
     @WithMockUser(authorities = "HR_READ")
     @DisplayName("The employee audit trail is not open to everyone who can read the staff list")
@@ -356,7 +408,7 @@ class HrControllerTest {
         mvc.perform(post(BASE + "/leave-requests/" + id + "/approve").with(csrf()))
                 .andExpect(status().isForbidden());
 
-        verify(hrService, never()).approveLeaveRequest(any(), any(), any());
+        verify(leaveService, never()).approve(any(), any(), any(), any());
     }
 
     @Test
@@ -364,14 +416,14 @@ class HrControllerTest {
     @DisplayName("REGRESSION: POST /leave-requests/{id}/approve records the real approver id, not null")
     void approveLeaveRecordsRealApproverId() throws Exception {
         var id = UUID.randomUUID();
-        when(hrService.approveLeaveRequest(any(), eq(id), any()))
+        when(leaveService.approve(any(), eq(id), any(), any()))
                 .thenReturn(leaveResponse(id));
 
         mvc.perform(post(BASE + "/leave-requests/" + id + "/approve").with(csrf()))
                 .andExpect(status().isOk());
 
         var approverIdCaptor = org.mockito.ArgumentCaptor.forClass(UUID.class);
-        verify(hrService).approveLeaveRequest(any(), eq(id), approverIdCaptor.capture());
+        verify(leaveService).approve(any(), eq(id), approverIdCaptor.capture(), any());
 
         // The original bug hard-coded this argument to null, silently
         // breaking the approval audit trail. This is the assertion that

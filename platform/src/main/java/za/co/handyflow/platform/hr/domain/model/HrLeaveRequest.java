@@ -28,6 +28,12 @@ public class HrLeaveRequest {
     @Column(name = "approved_by")     UUID approvedBy;
     @Column(name = "approved_at")     Instant approvedAt;
     @Column(name = "rejection_reason") String rejectionReason;
+    @Column(name = "half_day")            boolean halfDay;
+    @Column(name = "medical_certificate") boolean medicalCertificate;
+    @Column(name = "cancelled_by")        UUID cancelledBy;
+    @Column(name = "cancelled_at")        Instant cancelledAt;
+    @Column(name = "cancel_reason")       String cancelReason;
+    @Version long version;
     @Column(name = "created_at")      Instant createdAt;
     @Column(name = "updated_at")      Instant updatedAt;
 
@@ -69,4 +75,14 @@ public class HrLeaveRequest {
         this.status    = "CANCELLED";
         this.updatedAt = Instant.now();
     }
+
+    public void cancel(UUID by, String why) {
+        cancel();
+        this.cancelledBy = by;
+        this.cancelledAt = Instant.now();
+        this.cancelReason = why == null || why.isBlank() ? null : why.trim();
+    }
+
+    public void setHalfDay(boolean halfDay)                   { this.halfDay = halfDay; }
+    public void setMedicalCertificate(boolean certificate)    { this.medicalCertificate = certificate; }
 }

@@ -49,7 +49,7 @@ class PayrollControlServiceTest {
         eventRepo = mock(HrPayRunEventRepository.class);
         settingsRepo = mock(HrPayrollSettingsRepository.class);
         medical = mock(MedicalSchemeService.class);
-        service = new PayrollControlService(payRunRepo, payslipRepo, employeeRepo, eventRepo, settingsRepo, mock(HrEmployeeChangeRepository.class), medical, mock(JdbcTemplate.class));
+        service = new PayrollControlService(payRunRepo, payslipRepo, employeeRepo, eventRepo, settingsRepo, mock(HrEmployeeChangeRepository.class), mock(HrLeaveRequestRepository.class), medical, mock(JdbcTemplate.class));
 
         run = HrPayRun.create(tenant, "PR00002", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), LocalDate.of(2026, 10, 25), 2027);
         run.prepared(BigDecimal.TEN, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.TEN, 1, maker);

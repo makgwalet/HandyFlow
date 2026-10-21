@@ -74,7 +74,8 @@ public class HrEmployeePortalDataService {
         return payrollService.getEmployeePayslips(TenantId.of(grant.getTenantId()), employeeId, true);
     }
 
-    @Transactional(readOnly = true)
+    // Not read-only: reading a balance first posts any leave earned since the last visit.
+    @Transactional
     public List<LeaveBalanceResponse> getMyLeaveBalances(UUID portalUserId, UUID employeeId, int year) {
         HrEmployeePortalAccessGrant grant = requireAccess(portalUserId, employeeId);
         int leaveYear = year == 0 ? LocalDate.now().getYear() : year;
@@ -95,7 +96,7 @@ public class HrEmployeePortalDataService {
                         r.getId(), r.getEmployeeId(), emp.fullName(),
                         r.getLeaveType(), r.getStartDate(), r.getEndDate(),
                         r.getDaysRequested(), r.getReason(), r.getStatus(),
-                        r.getRejectionReason(), r.getCreatedAt()));
+                        r.getRejectionReason(), r.getCreatedAt(), r.isHalfDay(), r.isMedicalCertificate(), false));
     }
 
     @Transactional
