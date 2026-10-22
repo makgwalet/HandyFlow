@@ -375,6 +375,15 @@ public class HrController {
                 payrollControlService.sendBack(TenantContext.getTenantIdAsObject(), id, resolveUserId(principal), req == null ? null : req.note())));
     }
 
+    @PostMapping("/pay-runs/{id}/cancel")
+    @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canPrepare(authentication)")
+    @Operation(summary = "Cancel a draft pay run that will not be paid, with a reason. Its overtime claims are released.")
+    public ResponseEntity<ApiResponse<PayRunResponse>> cancelPayRun(
+            @PathVariable UUID id, @Valid @RequestBody(required = false) PayRunActionRequest req, Principal principal) {
+        return ResponseEntity.ok(ApiResponse.success("Pay run cancelled",
+                payrollControlService.cancel(TenantContext.getTenantIdAsObject(), id, resolveUserId(principal), req == null ? null : req.note())));
+    }
+
     @PostMapping("/pay-runs/{id}/finalise")
     @PreAuthorize("T(za.co.handyflow.platform.hr.application.internal.PayrollAccess).canFinalise(authentication)")
     @Operation(summary = "Finalise and lock an approved pay run. Payslips are then shown to employees.")

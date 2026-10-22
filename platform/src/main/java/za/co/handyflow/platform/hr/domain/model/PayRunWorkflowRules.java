@@ -68,9 +68,11 @@ public final class PayRunWorkflowRules {
         return same;
     }
 
-    public static void checkCanCancel(String status) {
+    public static void checkCanCancel(String status, String reason) {
         if (!DRAFT.equals(status))
-            throw new IllegalStateException(describe(status, "can only be cancelled while it is a draft"));
+            throw new IllegalStateException(describe(status, "can only be cancelled while it is a draft. Send it back first if it is waiting for approval"));
+        if (reason == null || reason.isBlank())
+            throw new IllegalArgumentException("Give a reason for cancelling the run.");
     }
 
     private static void requireActor(UUID actor) {

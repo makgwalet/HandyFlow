@@ -35,6 +35,7 @@ public class PayrollControlService {
     private final HrPayrollSettingsRepository settingsRepo;
     private final HrEmployeeChangeRepository changeRepo;
     private final MedicalSchemeService medicalSchemeService;
+    private final OvertimeService overtimeService;
     private final JdbcTemplate jdbc;
 
     // ── Review ────────────────────────────────────────────────────────────────
@@ -139,6 +140,22 @@ public class PayrollControlService {
         return toResponse(run);
     }
 
+    /** Cancels a draft run that will not be paid. Its overtime goes back so the next run can pay it. */
+    @Transactional
+    public PayRunResponse cancel(TenantId tenantId, UUID runId, UUID actor, String reason) {
+        HrPayRun run = load(tenantId, runId);
+        String from = run.getStatus();
+        PayRunWorkflowRules.checkCanCancel(from, reason);
+        requireActor(actor);
+        run.cancel();
+        payRunRepo.save(run);
+        int released = overtimeService.releaseFor(tenantId, runId);
+        eventRepo.save(HrPayRunEvent.of(tenantId.getValue(), runId, "CANCELLED", from, run.getStatus(), actor,
+                reason.trim() + (released > 0 ? " (" + released + " overtime claim(s) released)" : "")));
+        log.info("Pay run {} cancelled by {}, {} overtime claim(s) released", run.getPayRunNumber(), actor, released);
+        return toResponse(run);
+    }
+
     @Transactional
     public PayRunResponse finalise(TenantId tenantId, UUID runId, UUID actor, String note) {
         HrPayRun run = load(tenantId, runId);
@@ -198,6 +215,10 @@ public class PayrollControlService {
     private HrPayRun load(TenantId tenantId, UUID runId) {
         return payRunRepo.findByTenantAndId(tenantId, runId)
                 .orElseThrow(() -> new ResourceNotFoundException("PayRun", runId.toString()));
+    }
+
+    private static void requireActor(UUID actor) {
+        if (actor == null) throw new org.springframework.security.access.AccessDeniedException("Your user could not be identified, so this step cannot be recorded.");
     }
 
     private static String nz(String s) { return s == null ? "" : s; }

@@ -19,7 +19,7 @@ const when = (d: string) => new Date(d).toLocaleString("en-ZA", { day: "numeric"
 
 export interface RunLite { id: string; payRunNumber: string; status: string; preparedBy: string | null }
 
-const PATH: Record<Exclude<Step["key"], "calculate">, string> = { approve: "approve", sendBack: "send-back", finalise: "finalise" }
+const PATH: Record<Exclude<Step["key"], "calculate">, string> = { approve: "approve", sendBack: "send-back", finalise: "finalise", cancel: "cancel" }
 
 export function RunActions({ run, rights, userId, allowSelf, onCalculated, onError }: {
   run: RunLite; rights: Rights; userId: string | undefined; allowSelf: boolean
@@ -64,9 +64,9 @@ export function RunActions({ run, rights, userId, allowSelf, onCalculated, onErr
             title={s.reason ?? undefined}
             onClick={e => { e.stopPropagation(); if (s.key === "calculate") calculate.mutate(); else { setAsking(s); setNote("") } }}
             style={{ padding: "7px 14px", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: s.enabled ? "pointer" : "not-allowed",
-              border: s.key === "sendBack" ? "1px solid var(--hf-border)" : "none",
-              background: !s.enabled ? "var(--hf-surface-muted)" : s.key === "sendBack" ? "var(--hf-surface)" : "var(--hf-primary)",
-              color: !s.enabled ? "var(--hf-text-faint)" : s.key === "sendBack" ? "var(--hf-text-secondary)" : "var(--hf-text-on-solid)" }}>
+              border: (s.key === "sendBack" || s.key === "cancel") ? "1px solid var(--hf-border)" : "none",
+              background: !s.enabled ? "var(--hf-surface-muted)" : (s.key === "sendBack" || s.key === "cancel") ? "var(--hf-surface)" : "var(--hf-primary)",
+              color: !s.enabled ? "var(--hf-text-faint)" : s.key === "cancel" ? "var(--hf-danger-text)" : s.key === "sendBack" ? "var(--hf-text-secondary)" : "var(--hf-text-on-solid)" }}>
             {s.key === "calculate" && calculate.isPending ? "Calculating…" : s.label}
           </button>
         ))}
@@ -77,7 +77,7 @@ export function RunActions({ run, rights, userId, allowSelf, onCalculated, onErr
       {asking && (
         <form onClick={e => e.stopPropagation()} onSubmit={e => { e.preventDefault(); if (!problem) act.mutate(asking) }} style={{ marginTop: 10 }}>
           <label htmlFor={`note-${run.id}`} style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }}>
-            {asking.needsNote ? "Reason for sending it back *" : `Note for the record (optional) — ${asking.label}`}
+            {asking.needsNote ? (asking.key === "cancel" ? "Reason for cancelling *" : "Reason for sending it back *") : `Note for the record (optional) — ${asking.label}`}
           </label>
           <input id={`note-${run.id}`} value={note} onChange={e => setNote(e.target.value)} maxLength={500} autoFocus
             style={{ width: "100%", padding: "8px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box", background: "var(--hf-surface)", color: "var(--hf-text)" }} />

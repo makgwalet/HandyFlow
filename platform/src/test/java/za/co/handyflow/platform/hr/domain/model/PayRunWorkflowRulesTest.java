@@ -95,9 +95,12 @@ class PayRunWorkflowRulesTest {
     }
 
     @Test
-    void onlyDraftsAreCancelled() {
-        checkCanCancel(DRAFT);
-        assertThrows(IllegalStateException.class, () -> checkCanCancel(PREPARED));
-        assertThrows(IllegalStateException.class, () -> checkCanCancel(FINALISED));
+    void onlyDraftsAreCancelledAndWithAReason() {
+        checkCanCancel(DRAFT, "Wrong period");
+        assertThrows(IllegalStateException.class, () -> checkCanCancel(PREPARED, "Wrong period"));
+        assertThrows(IllegalStateException.class, () -> checkCanCancel(APPROVED, "Wrong period"));
+        assertThrows(IllegalStateException.class, () -> checkCanCancel(FINALISED, "Wrong period"));
+        assertThrows(IllegalArgumentException.class, () -> checkCanCancel(DRAFT, "  "));
+        assertThrows(IllegalArgumentException.class, () -> checkCanCancel(DRAFT, null));
     }
 }

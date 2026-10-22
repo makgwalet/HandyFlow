@@ -635,3 +635,25 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - Maven, real Mockito, Spring wiring and PostgreSQL have not run. `V498`, the retention SQL, the JPQL `notChangedSince` and the derived query `findByApplicantIdIn` have never been executed.
 - In the stub harness: 12 rules tests and 14 service tests pass, and three deliberate breaks (skipping the submitter check, the open-application check and the tenant check) were each caught.
 - Front end: 11 new tests pass, with the 15 existing navigation and recruiter tests; lint shows no new errors (RecruiterPage.tsx has 26 older ones). I have not looked at the screens in a browser.
+
+## 21. Slice 15a: cancelling a pay run releases its overtime
+
+**What was wrong.** The rule and the entity method for cancelling a pay run existed, but nothing called them: there was no endpoint and no button, so a draft run that would never be paid could not be cancelled. A run sent back to draft also kept its overtime claims locked to it.
+
+**What changed**
+
+- `POST /api/v1/hr/pay-runs/{id}/cancel` (needs the payroll prepare permission). It works on a draft run only, needs a reason, and writes a CANCELLED entry to the run's history that also says how many overtime claims were released. A run waiting for approval or approved must be sent back first.
+- `OvertimeService.releaseFor` gives back every claim the run had taken, so the next run can pay them and the attendance days unlock.
+- A "Cancel this run" button on draft runs asks for the reason; the history and the run's status line say "Cancelled".
+
+**Still not done**
+
+- The payslips of a cancelled run are kept (reports and certificates already skip cancelled runs); they are not deleted.
+- Cancelling does not undo other things a calculation consumed (for example nothing else is linked today, but any future link would need releasing here).
+- A finalised run cannot be cancelled or corrected; corrections to finalised runs are still on the backlog.
+
+**Not verified**
+
+- Maven and real Mockito have not run. The three new `PayrollControlServiceTest` tests and the changed constructor are unexecuted; `OvertimeService.releaseFor` is untested on its own.
+- In the stub harness only the rules test (`PayRunWorkflowRulesTest`, 12 pass) could run; the service classes do not compile against my stand-ins.
+- Front end: 195 HR tests pass and lint is clean. Not seen in a browser.

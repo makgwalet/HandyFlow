@@ -158,6 +158,14 @@ public class OvertimeService {
         return out;
     }
 
+    /** Gives back every claim a run had taken, for a run that will never be paid. They can be taken by the next run. Returns how many. */
+    @Transactional
+    public int releaseFor(TenantId tenantId, UUID payRunId) {
+        List<HrOvertimeClaim> taken = claimRepo.takenBy(tenantId, payRunId);
+        for (HrOvertimeClaim c : taken) { c.linkTo(null); claimRepo.save(c); }
+        return taken.size();
+    }
+
     /** Claims worked up to the end of a period that are still waiting for a decision. */
     @Transactional(readOnly = true)
     public int waitingCount(TenantId tenantId, LocalDate periodEnd) {

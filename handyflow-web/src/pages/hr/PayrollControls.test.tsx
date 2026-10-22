@@ -41,7 +41,7 @@ describe("rightsFrom", () => {
 
 describe("stepsFor", () => {
   it("offers Calculate on a draft and Calculate again while waiting for approval", () => {
-    expect(stepsFor(run("DRAFT"), everything, "u-me", false).map(s => s.label)).toEqual(["Calculate"])
+    expect(stepsFor(run("DRAFT"), everything, "u-me", false).map(s => s.label)).toEqual(["Calculate", "Cancel this run"])
     expect(stepsFor(run("PREPARED"), everything, "u-me", false).map(s => s.label)).toEqual(["Calculate again", "Approve", "Send back"])
   })
   it("blocks approving your own run unless the business allows it, and says why", () => {
@@ -68,7 +68,7 @@ describe("wording", () => {
   it("says what a run is waiting for", () => {
     expect(waitingFor("PREPARED")).toMatch(/Employees cannot see/)
     expect(waitingFor("FINALISED")).toMatch(/locked/)
-    expect(waitingFor("CANCELLED")).toBeNull()
+    expect(waitingFor("CANCELLED")).toMatch(/Cancelled/)
   })
   it("knows which runs have totals and which employees can see", () => {
     expect(hasTotals("DRAFT")).toBe(false); expect(hasTotals("PREPARED")).toBe(true)
@@ -126,6 +126,29 @@ describe("RunActions", () => {
     post.mockRejectedValueOnce({ response: { data: { message: "There are no approved statutory rules for tax year 2028" } } })
     fireEvent.click(screen.getByRole("button", { name: "Calculate" }))
     await waitFor(() => expect(onError).toHaveBeenCalledWith("There are no approved statutory rules for tax year 2028"))
+  })
+
+  it("cancels a draft only with a reason, and sends it", async () => {
+    post.mockResolvedValueOnce({ data: { data: {} } })
+    wrap(<RunActions run={run("DRAFT", null)} {...props} />)
+    fireEvent.click(screen.getByRole("button", { name: "Cancel this run" }))
+    fireEvent.change(screen.getByLabelText(/Reason for cancelling/), { target: { value: "  " } })
+    fireEvent.change(screen.getByLabelText(/Reason for cancelling/), { target: { value: "x" } })
+    fireEvent.change(screen.getByLabelText(/Reason for cancelling/), { target: { value: "Wrong period" } })
+    fireEvent.click(screen.getByRole("button", { name: /Confirm: Cancel this run/ }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/hr/pay-runs/r1/cancel", { note: "Wrong period" }))
+  })
+
+  it("will not confirm a cancel without a reason", () => {
+    wrap(<RunActions run={run("DRAFT", null)} {...props} />)
+    fireEvent.click(screen.getByRole("button", { name: "Cancel this run" }))
+    expect((screen.getByRole("button", { name: /Confirm: Cancel this run/ }) as HTMLButtonElement).disabled).toBe(true)
+    expect(noteProblem({ needsNote: true, key: "cancel" }, " ")).toMatch(/cancelling/)
+  })
+
+  it("does not offer cancel to someone who cannot prepare, or on a calculated run", () => {
+    expect(stepsFor(run("DRAFT"), rightsFrom(["PAYROLL_APPROVE"], false), "u-me", false).map(s => s.key)).toEqual([])
+    expect(stepsFor(run("PREPARED"), everything, "u-me", false).map(s => s.key)).not.toContain("cancel")
   })
 
   it("only says what a run is waiting for when the person has no step to take", () => {

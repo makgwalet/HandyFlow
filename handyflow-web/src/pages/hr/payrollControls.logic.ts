@@ -42,7 +42,7 @@ export function rightsFrom(perms: readonly string[], legacyOpen: boolean): Right
   }
 }
 
-export type StepKey = "calculate" | "approve" | "sendBack" | "finalise"
+export type StepKey = "calculate" | "approve" | "sendBack" | "finalise" | "cancel"
 export interface Step { key: StepKey; label: string; enabled: boolean; reason: string | null; needsNote: boolean }
 
 const OWN_WORK = "You calculated this run, so another person has to do this step."
@@ -51,6 +51,7 @@ export function stepsFor(run: { status: string; preparedBy: string | null }, rig
   const own = !!userId && run.preparedBy === userId && !allowSelf
   const out: Step[] = []
   if (run.status === "DRAFT" && rights.prepare) out.push({ key: "calculate", label: "Calculate", enabled: true, reason: null, needsNote: false })
+  if (run.status === "DRAFT" && rights.prepare) out.push({ key: "cancel", label: "Cancel this run", enabled: true, reason: null, needsNote: true })
   if (run.status === "PREPARED" && rights.prepare) out.push({ key: "calculate", label: "Calculate again", enabled: true, reason: null, needsNote: false })
   if ((run.status === "PREPARED" || run.status === "COMPLETED") && rights.approve)
     out.push({ key: "approve", label: "Approve", enabled: !own, reason: own ? OWN_WORK : null, needsNote: false })
@@ -65,6 +66,7 @@ export function stepsFor(run: { status: string; preparedBy: string | null }, rig
 export function waitingFor(status: string): string | null {
   switch (status) {
     case "DRAFT": return "Waiting to be calculated."
+    case "CANCELLED": return "Cancelled. Its overtime was released for the next run."
     case "PREPARED": return "Waiting for an approver. Employees cannot see these payslips yet."
     case "APPROVED": return "Approved. Waiting to be finalised. Employees cannot see these payslips yet."
     case "FINALISED": return "Finalised and locked. Employees can see their payslips."
@@ -80,6 +82,7 @@ const EVENT_TEXT: Record<string, string> = {
   APPROVED: "Approved",
   APPROVED_OWN_RUN: "Approved by the person who calculated it",
   SENT_BACK: "Sent back",
+  CANCELLED: "Cancelled",
   FINALISED: "Finalised and locked",
   FINALISED_OWN_RUN: "Finalised by the person who calculated it",
 }
@@ -91,8 +94,8 @@ export function eventText(e: Pick<RunEvent, "action" | "actorId">, userId: strin
 }
 
 /** Sending back needs a reason; every note is at most 500 characters. */
-export function noteProblem(step: Pick<Step, "needsNote">, note: string): string {
-  if (step.needsNote && !note.trim()) return "Give a reason for sending the run back."
+export function noteProblem(step: Pick<Step, "needsNote"> & { key?: StepKey }, note: string): string {
+  if (step.needsNote && !note.trim()) return step.key === "cancel" ? "Give a reason for cancelling the run." : "Give a reason for sending the run back."
   if (note.length > 500) return "The note can be at most 500 characters."
   return ""
 }

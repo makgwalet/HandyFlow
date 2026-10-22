@@ -34,6 +34,7 @@ class PayrollControlServiceTest {
     private HrPayRunEventRepository eventRepo;
     private HrPayrollSettingsRepository settingsRepo;
     private MedicalSchemeService medical;
+    private HrOvertimeClaimRepository claimRepo;
     private PayrollControlService service;
 
     private final TenantId tenant = TenantId.of(UUID.randomUUID());
@@ -49,7 +50,9 @@ class PayrollControlServiceTest {
         eventRepo = mock(HrPayRunEventRepository.class);
         settingsRepo = mock(HrPayrollSettingsRepository.class);
         medical = mock(MedicalSchemeService.class);
-        service = new PayrollControlService(payRunRepo, payslipRepo, employeeRepo, eventRepo, settingsRepo, mock(HrEmployeeChangeRepository.class), medical, mock(JdbcTemplate.class));
+        claimRepo = mock(HrOvertimeClaimRepository.class);
+        service = new PayrollControlService(payRunRepo, payslipRepo, employeeRepo, eventRepo, settingsRepo, mock(HrEmployeeChangeRepository.class), medical,
+                new OvertimeService(claimRepo, employeeRepo, mock(AttendanceService.class), mock(EmployeeViewService.class)), mock(JdbcTemplate.class));
 
         run = HrPayRun.create(tenant, "PR00002", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), LocalDate.of(2026, 10, 25), 2027);
         run.prepared(BigDecimal.TEN, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.TEN, 1, maker);
@@ -165,5 +168,45 @@ class PayrollControlServiceTest {
     @Test
     void aRunOfAnotherTenantIsNotFound() {
         assertThatThrownBy(() -> service.approve(tenant, UUID.randomUUID(), checker, null)).hasMessageContaining("PayRun");
+    }
+
+    private HrOvertimeClaim claimTakenBy(UUID runId) {
+        HrOvertimeClaim c = HrOvertimeClaim.of(tenant.getValue(), UUID.randomUUID(), LocalDate.of(2026, 10, 10), "WEEKDAY", 120, new BigDecimal("1.5"),
+                new BigDecimal("100.00"), new BigDecimal("300.00"), UUID.randomUUID());
+        c.linkTo(runId);
+        return c;
+    }
+
+    @Test
+    void cancellingADraftReleasesItsOvertimeAndRecordsWhy() {
+        run.sendBack();
+        HrOvertimeClaim a = claimTakenBy(run.getId()), b = claimTakenBy(run.getId());
+        when(claimRepo.takenBy(any(), eq(run.getId()))).thenReturn(List.of(a, b));
+        PayRunResponse r = service.cancel(tenant, run.getId(), checker, " Wrong period ");
+        assertThat(r.status()).isEqualTo("CANCELLED");
+        assertThat(a.getPayRunId()).isNull();
+        assertThat(b.getPayRunId()).isNull();
+        verify(claimRepo, times(2)).save(any());
+        verify(eventRepo).save(argThat((HrPayRunEvent e) -> e.getAction().equals("CANCELLED") && checker.equals(e.getActorId())
+                && e.getNote().startsWith("Wrong period") && e.getNote().contains("2 overtime claim(s) released")));
+    }
+
+    @Test
+    void aRunWaitingForApprovalCannotBeCancelledAndKeepsItsOvertime() {
+        HrOvertimeClaim a = claimTakenBy(run.getId());
+        when(claimRepo.takenBy(any(), eq(run.getId()))).thenReturn(List.of(a));
+        assertThatThrownBy(() -> service.cancel(tenant, run.getId(), checker, "Wrong period")).isInstanceOf(IllegalStateException.class);
+        assertThat(run.getStatus()).isEqualTo("PREPARED");
+        assertThat(a.getPayRunId()).isEqualTo(run.getId());
+        verify(eventRepo, never()).save(any());
+    }
+
+    @Test
+    void cancellingNeedsAReasonAndAKnownUser() {
+        run.sendBack();
+        assertThatThrownBy(() -> service.cancel(tenant, run.getId(), checker, " ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.cancel(tenant, run.getId(), null, "Wrong period")).isInstanceOf(AccessDeniedException.class);
+        assertThat(run.getStatus()).isEqualTo("DRAFT");
+        verify(payRunRepo, never()).save(any());
     }
 }
