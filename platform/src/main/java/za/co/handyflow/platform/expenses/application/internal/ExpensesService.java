@@ -18,7 +18,7 @@ import za.co.handyflow.platform.expenses.domain.model.ExpenseClaim;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.expenses.domain.repository.ExpenseClaimRepository;
 import za.co.handyflow.platform.expenses.dto.*;
-import za.co.handyflow.platform.hr.dto.EmployeeResponse;
+import za.co.handyflow.platform.hr.EmployeeSummary;
 import za.co.handyflow.platform.notifications.application.NotificationRequest;
 import za.co.handyflow.platform.notifications.application.Recipient;
 import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
@@ -102,7 +102,7 @@ public class ExpensesService {
 
     private String employeeEmail(TenantId tenantId, UUID employeeId) {
         if (employeeId == null) return null;
-        try { return hrFacade.findEmployeeById(tenantId, employeeId).map(EmployeeResponse::email).orElse(null); }
+        try { return hrFacade.findEmployeeById(tenantId, employeeId).map(EmployeeSummary::email).orElse(null); }
         catch (RuntimeException e) { return null; }
     }
 
@@ -447,7 +447,7 @@ public class ExpensesService {
     private void notifyEmployee(TenantId tenantId, ExpenseClaim claim, NotificationType type,
                                 String title, String message) {
         if (claim.getEmployeeId() == null) return;
-               Optional<EmployeeResponse> employee = hrFacade.findEmployeeById(tenantId, claim.getEmployeeId());
+               Optional<EmployeeSummary> employee = hrFacade.findEmployeeById(tenantId, claim.getEmployeeId());
                 if (employee.isEmpty() || employee.get().email() == null || employee.get().email().isBlank()) return;
                 Recipient recipient = Recipient.external(
                                 employee.get().fullName(), employee.get().email(), employee.get().phone());

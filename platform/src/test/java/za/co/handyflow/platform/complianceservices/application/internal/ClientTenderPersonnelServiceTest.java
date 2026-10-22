@@ -11,7 +11,7 @@ import za.co.handyflow.platform.complianceservices.domain.repository.ClientTende
 import za.co.handyflow.platform.complianceservices.domain.repository.ClientTenderRepository;
 import za.co.handyflow.platform.complianceservices.dto.AddClientTenderPersonnelRequest;
 import za.co.handyflow.platform.hr.application.HrFacade;
-import za.co.handyflow.platform.hr.dto.EmployeeResponse;
+import za.co.handyflow.platform.hr.EmployeeSummary;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
@@ -45,10 +45,8 @@ class ClientTenderPersonnelServiceTest {
     private static final TenantId TENANT = TenantId.generate();
     private static final UUID USER = UUID.randomUUID();
 
-    private static EmployeeResponse employee(UUID id, String fullName, String employeeNumber) {
-        return new EmployeeResponse(id, employeeNumber, "Jane", "Doe", fullName, null, null, null,
-                null, null, "jane@example.com", null, "PERMANENT", "Project Manager", null,
-                null, null, "ACTIVE", null, null, null, null, null, null, null, null);
+    private static EmployeeSummary employee(UUID id, String fullName, String employeeNumber) {
+        return new EmployeeSummary(id, employeeNumber, "Jane", "Doe", fullName, "jane@example.com", null, "Project Manager", null, "ACTIVE");
     }
 
     private ClientTender sampleTender(UUID clientId) {

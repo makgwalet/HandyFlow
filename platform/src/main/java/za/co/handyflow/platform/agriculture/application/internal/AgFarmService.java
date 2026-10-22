@@ -13,7 +13,7 @@ import za.co.handyflow.platform.agriculture.dto.CreateFarmRequest;
 import za.co.handyflow.platform.agriculture.dto.FarmResponse;
 import za.co.handyflow.platform.agriculture.dto.UpdateFarmRequest;
 import za.co.handyflow.platform.hr.application.HrFacade;
-import za.co.handyflow.platform.hr.dto.EmployeeResponse;
+import za.co.handyflow.platform.hr.EmployeeSummary;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -71,7 +71,7 @@ public class AgFarmService {
             farm.clearManager();
             return toResponse(farm);
         }
-        EmployeeResponse employee = hrFacade.findEmployeeById(tenantId, req.managerId())
+        EmployeeSummary employee = hrFacade.findEmployeeById(tenantId, req.managerId())
                 .orElseThrow(() -> new IllegalArgumentException("Employee not found: " + req.managerId()));
         farm.assignManager(employee.id(), employee.fullName());
         return toResponse(farm);

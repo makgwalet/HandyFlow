@@ -11,7 +11,7 @@ import za.co.handyflow.platform.compliancetender.domain.repository.TenderReposit
 import za.co.handyflow.platform.compliancetender.dto.AddTenderPersonnelRequest;
 import za.co.handyflow.platform.compliancetender.dto.TenderPersonnelResponse;
 import za.co.handyflow.platform.hr.application.HrFacade;
-import za.co.handyflow.platform.hr.dto.EmployeeResponse;
+import za.co.handyflow.platform.hr.EmployeeSummary;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
@@ -61,7 +61,7 @@ public class TenderPersonnelService {
             return toResponse(external, null);
         }
 
-        EmployeeResponse employee = hrFacade.findEmployeeById(tenantId, req.employeeId())
+        EmployeeSummary employee = hrFacade.findEmployeeById(tenantId, req.employeeId())
                 .orElseThrow(() -> new HandyFlowException(
                         "No HR employee found with id " + req.employeeId() + " — add them in HR first",
                         HttpStatus.BAD_REQUEST, "EMPLOYEE_NOT_FOUND"));
@@ -91,7 +91,7 @@ public class TenderPersonnelService {
         log.info("Tender personnel removed id={} tenant={}", id, tenantId);
     }
 
-    private TenderPersonnelResponse toResponse(TenderPersonnel p, EmployeeResponse employee) {
+    private TenderPersonnelResponse toResponse(TenderPersonnel p, EmployeeSummary employee) {
         if (p.isExternal()) {
             return new TenderPersonnelResponse(p.getId(), p.getTenderId(), null, p.getRole(), true, p.getExternalName(), null,
                     p.getCreatedAt(), p.getPersonType(), p.getExternalOrganisation());

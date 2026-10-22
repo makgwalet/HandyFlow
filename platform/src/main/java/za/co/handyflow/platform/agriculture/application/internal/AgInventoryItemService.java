@@ -12,7 +12,7 @@ import za.co.handyflow.platform.agriculture.domain.repository.AgInventoryItemRep
 import za.co.handyflow.platform.agriculture.domain.repository.AgStockMovementRepository;
 import za.co.handyflow.platform.agriculture.dto.*;
 import za.co.handyflow.platform.hr.application.HrFacade;
-import za.co.handyflow.platform.hr.dto.EmployeeResponse;
+import za.co.handyflow.platform.hr.EmployeeSummary;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.supplychain.application.SupplierFacade;
@@ -149,7 +149,7 @@ public class AgInventoryItemService {
 
     private String resolveEmployeeName(TenantId tenantId, UUID employeeId) {
         if (employeeId == null) return null;
-        Optional<EmployeeResponse> employee = hrFacade.findEmployeeById(tenantId, employeeId);
+        Optional<EmployeeSummary> employee = hrFacade.findEmployeeById(tenantId, employeeId);
         if (employee.isEmpty()) {
             throw new IllegalArgumentException("Employee not found: " + employeeId);
         }

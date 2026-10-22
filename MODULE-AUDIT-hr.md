@@ -657,3 +657,24 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - Maven and real Mockito have not run. The three new `PayrollControlServiceTest` tests and the changed constructor are unexecuted; `OvertimeService.releaseFor` is untested on its own.
 - In the stub harness only the rules test (`PayRunWorkflowRulesTest`, 12 pass) could run; the service classes do not compile against my stand-ins.
 - Front end: 195 HR tests pass and lint is clean. Not seen in a browser.
+
+## 22. Slice 15b: other modules no longer receive a whole employee record
+
+**What was wrong.** `HrFacade` gave every other module the full `EmployeeResponse`: ID number, tax number, date of birth, race, salary, allowances and the emergency contact. Agriculture, training, expenses, legal practice, tenders, security and the recruiter only ever used a name, number, email, phone, job title, department or status; the one real need for pay was farm labour costing.
+
+**What changed**
+
+- `EmployeeSummary` (id, number, names, email, phone, job title, department, status) is now what `findEmployeeById`, `searchEmployees`, `createEmployee` and `updateEmployee` return to other modules.
+- `EmployeePay` (gross salary and pay frequency) comes from a separate `findEmployeePay`, used only by farm labour costing, which already checks that the user may use salary-based rates before asking.
+- 16 services and 6 tests were switched over. `EmployeeSummaryTest` fails if a field for ID number, tax number, birth date, race or pay is ever added to the summary.
+
+**Still not done**
+
+- `findEmployeePay` does not check permissions itself; the caller must. Today only `AgLabourCostService` calls it, after its `hrRatesAllowed` check.
+- HR's own screens and the payroll bureau (its own `PayEmployee` records) were not part of this.
+- Other places may still hold full employee data in their own tables (for example tender personnel copies of names); not reviewed.
+
+**Not verified**
+
+- Maven has not run. The change touches 16 services and 6 tests that I could only check by reading; a missed use of a removed accessor would be a compile error. I searched for every removed accessor (`idNumber`, `taxNumber`, `grossSalary` and the rest) and found only the labour-cost one, now moved.
+- `HrFacadeTest` (3 tests, real Mockito) was written but not run. `EmployeeSummaryTest` runs in my harness (2 pass; adding an `idNumber` field makes both fail).

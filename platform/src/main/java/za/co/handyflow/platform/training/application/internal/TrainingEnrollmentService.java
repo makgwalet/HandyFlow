@@ -7,7 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.hr.application.HrFacade;
-import za.co.handyflow.platform.hr.dto.EmployeeResponse;
+import za.co.handyflow.platform.hr.EmployeeSummary;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
@@ -46,7 +46,7 @@ public class TrainingEnrollmentService {
             throw new IllegalStateException("Session " + sessionId + " is " + session.getStatus() + " and no longer accepts enrollments");
         }
 
-        EmployeeResponse employee = hrFacade.findEmployeeById(tenantId, employeeId)
+        EmployeeSummary employee = hrFacade.findEmployeeById(tenantId, employeeId)
                 .orElseThrow(() -> new HandyFlowException(
                         "Employee " + employeeId + " was not found in HR", HttpStatus.BAD_REQUEST, "EMPLOYEE_NOT_FOUND"));
 

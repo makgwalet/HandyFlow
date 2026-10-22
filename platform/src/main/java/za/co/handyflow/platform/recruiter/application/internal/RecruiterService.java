@@ -21,7 +21,7 @@ import za.co.handyflow.platform.shared.*;
 // ApplicationModules verification test is in the build, swap this import.
 import za.co.handyflow.platform.hr.application.internal.HrService;
 import za.co.handyflow.platform.hr.dto.CreateEmployeeRequest;
-import za.co.handyflow.platform.hr.dto.EmployeeResponse;
+import za.co.handyflow.platform.hr.EmployeeSummary;
 // Notification module — this one IS meant for cross-module use despite
 // living partly in .internal: NotificationService's own Javadoc documents
 // itself as "the single entry point every other module uses", and
@@ -656,14 +656,7 @@ public class RecruiterService {
                 null, null,                                     // emergency contact — completed later in HR
                 "Converted from recruiter application " + applicationId
         );
-        EmployeeResponse created = hrFacade.createEmployee(tenantId, hrReq);
-        // UNVERIFIED: created.id() / created.employeeNumber() are inferred from
-        // HrService.toEmployeeResponse()'s constructor call order
-        // (new EmployeeResponse(e.getId(), e.getEmployeeNumber(), ...)), not
-        // from EmployeeResponse.java itself, which wasn't provided. If the
-        // record's component names differ from these, this line won't
-        // compile — that's intentional, so it fails loudly at compile time
-        // rather than silently. Confirm against the real file before merging.
+        EmployeeSummary created = hrFacade.createEmployee(tenantId, hrReq);
         UUID employeeId = created.id();
 
         app.linkToEmployee(employeeId);

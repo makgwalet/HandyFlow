@@ -19,7 +19,7 @@ import za.co.handyflow.platform.agriculture.dto.LabourDtos.LabourCandidate;
 import za.co.handyflow.platform.agriculture.dto.LabourDtos.LabourItem;
 import za.co.handyflow.platform.agriculture.dto.LabourDtos.LabourOverview;
 import za.co.handyflow.platform.hr.application.HrFacade;
-import za.co.handyflow.platform.hr.dto.EmployeeResponse;
+import za.co.handyflow.platform.hr.EmployeePay;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -105,10 +105,7 @@ class AgLabourCostServiceTest {
     }
 
     private void employeeInHr(UUID id, String salary, String frequency) {
-        EmployeeResponse e = mock(EmployeeResponse.class);
-        when(e.grossSalary()).thenReturn(salary == null ? null : bd(salary));
-        when(e.payFrequency()).thenReturn(frequency);
-        when(hrFacade.findEmployeeById(eq(TENANT), eq(id))).thenReturn(Optional.of(e));
+        when(hrFacade.findEmployeePay(eq(TENANT), eq(id))).thenReturn(Optional.of(new EmployeePay(salary == null ? null : bd(salary), frequency)));
     }
 
     private void uncosted(List<AgInputApplication> inputs, List<AgHarvestRecord> harvests) {
@@ -204,7 +201,7 @@ class AgLabourCostServiceTest {
         farmExists(); settings("45", "0");
         AgInputApplication a = input(inputId, workerId, "Thandi M.", "6");
         uncosted(List.of(a), List.of());
-        when(hrFacade.findEmployeeById(eq(TENANT), eq(workerId))).thenReturn(Optional.empty());
+        when(hrFacade.findEmployeePay(eq(TENANT), eq(workerId))).thenReturn(Optional.empty());
 
         assertTrue(service().overview(TENANT, farmId, true).candidates().get(0).rateNote().contains("not found in HR"));
     }
@@ -219,7 +216,7 @@ class AgLabourCostServiceTest {
 
         service().overview(TENANT, farmId, true);
 
-        verify(hrFacade, times(1)).findEmployeeById(eq(TENANT), eq(workerId));
+        verify(hrFacade, times(1)).findEmployeePay(eq(TENANT), eq(workerId));
     }
 
     @Test

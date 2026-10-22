@@ -7,6 +7,8 @@ import org.springframework.data.domain.PageRequest;
 import za.co.handyflow.platform.hr.dto.AddDisciplinaryRequest;
 import za.co.handyflow.platform.hr.dto.CreateEmployeeRequest;
 import za.co.handyflow.platform.hr.dto.DisciplinaryResponse;
+import za.co.handyflow.platform.hr.EmployeePay;
+import za.co.handyflow.platform.hr.EmployeeSummary;
 import za.co.handyflow.platform.hr.dto.EmployeeResponse;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
@@ -60,8 +62,8 @@ public class HrFacade {
      * business rule; it's the same HrService.createEmployee() the HR
      * module's own controller calls.
      */
-    public EmployeeResponse createEmployee(TenantId tenantId, CreateEmployeeRequest req) {
-        return hrService.createEmployee(tenantId, req);
+    public EmployeeSummary createEmployee(TenantId tenantId, CreateEmployeeRequest req) {
+        return EmployeeSummary.from(hrService.createEmployee(tenantId, req));
     }
 
     /**
@@ -70,8 +72,8 @@ public class HrFacade {
      * (you can't update a record you don't have the id for), not a case that
      * should be silently absorbed the way findEmployeeById's miss is.
      */
-    public EmployeeResponse updateEmployee(TenantId tenantId, UUID employeeId, CreateEmployeeRequest req) {
-        return hrService.updateEmployee(tenantId, employeeId, req);
+    public EmployeeSummary updateEmployee(TenantId tenantId, UUID employeeId, CreateEmployeeRequest req) {
+        return EmployeeSummary.from(hrService.updateEmployee(tenantId, employeeId, req));
     }
 
     /**
@@ -79,9 +81,22 @@ public class HrFacade {
      * not found — see class Javadoc for why this differs from HR's own
      * internal getEmployee().
      */
-    public Optional<EmployeeResponse> findEmployeeById(TenantId tenantId, UUID employeeId) {
+    public Optional<EmployeeSummary> findEmployeeById(TenantId tenantId, UUID employeeId) {
         try {
-            return Optional.of(hrService.getEmployee(tenantId, employeeId));
+            return Optional.of(EmployeeSummary.from(hrService.getEmployee(tenantId, employeeId)));
+        } catch (ResourceNotFoundException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * The pay of an employee, for labour costing only. Callers must already have checked that the person asking may see
+     * salaries; this call does not.
+     */
+    public Optional<EmployeePay> findEmployeePay(TenantId tenantId, UUID employeeId) {
+        try {
+            EmployeeResponse e = hrService.getEmployee(tenantId, employeeId);
+            return Optional.of(new EmployeePay(e.grossSalary(), e.payFrequency()));
         } catch (ResourceNotFoundException e) {
             return Optional.empty();
         }
@@ -97,8 +112,9 @@ public class HrFacade {
     }
 
     /** Employees matching a name, number or ID search, for pickers in other modules (at most `limit`, newest first as HR orders them). */
-    public List<EmployeeResponse> searchEmployees(TenantId tenantId, String search, int limit) {
-        return hrService.getEmployees(tenantId, null, search, PageRequest.of(0, Math.max(1, Math.min(limit, 50)))).getContent();
+    public List<EmployeeSummary> searchEmployees(TenantId tenantId, String search, int limit) {
+        return hrService.getEmployees(tenantId, null, search, PageRequest.of(0, Math.max(1, Math.min(limit, 50)))).getContent().stream()
+                .map(EmployeeSummary::from).toList();
     }
 
     /** Opens a disciplinary case for an employee, exactly as HR's own endpoint does. */

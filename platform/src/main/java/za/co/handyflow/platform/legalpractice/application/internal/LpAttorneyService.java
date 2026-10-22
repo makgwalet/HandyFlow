@@ -7,7 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.hr.application.HrFacade;
-import za.co.handyflow.platform.hr.dto.EmployeeResponse;
+import za.co.handyflow.platform.hr.EmployeeSummary;
 import za.co.handyflow.platform.legalpractice.domain.model.LpAttorney;
 import za.co.handyflow.platform.legalpractice.domain.repository.LpAttorneyRepository;
 import za.co.handyflow.platform.legalpractice.dto.CreateLpAttorneyRequest;
@@ -97,7 +97,7 @@ public class LpAttorneyService {
         String employeeName = null;
         String employeeEmail = null;
         if (a.getEmployeeId() != null) {
-            Optional<EmployeeResponse> emp = hrFacade.findEmployeeById(tenantId, a.getEmployeeId());
+            Optional<EmployeeSummary> emp = hrFacade.findEmployeeById(tenantId, a.getEmployeeId());
             if (emp.isPresent()) {
                 employeeName = emp.get().fullName();
                 employeeEmail = emp.get().email();

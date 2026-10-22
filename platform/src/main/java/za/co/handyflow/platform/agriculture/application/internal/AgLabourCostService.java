@@ -23,7 +23,7 @@ import za.co.handyflow.platform.agriculture.dto.LabourDtos.LabourCandidate;
 import za.co.handyflow.platform.agriculture.dto.LabourDtos.LabourItem;
 import za.co.handyflow.platform.agriculture.dto.LabourDtos.LabourOverview;
 import za.co.handyflow.platform.hr.application.HrFacade;
-import za.co.handyflow.platform.hr.dto.EmployeeResponse;
+import za.co.handyflow.platform.hr.EmployeePay;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -84,7 +84,7 @@ public class AgLabourCostService {
         for (AgHarvestRecord h : harvestRepository.findUncostedLabourForFarm(tenantId, farmId, PageRequest.of(0, CANDIDATE_LIMIT))) work.add(toWork(h));
         work.sort(Comparator.comparing(Work::date).reversed());
 
-        Map<UUID, Optional<EmployeeResponse>> employees = new HashMap<>();
+        Map<UUID, Optional<EmployeePay>> employees = new HashMap<>();
         List<LabourCandidate> out = new ArrayList<>();
         for (Work w : work) {
             RateInfo rate = hrRate(tenantId, w, hrRatesAllowed, settings.hoursPerWeek(), employees);
@@ -107,7 +107,7 @@ public class AgLabourCostService {
 
         record Pending(Work work, BigDecimal baseRate, String rateSource, BigDecimal loadedRate, BigDecimal amount) {}
         Set<String> seen = new HashSet<>();
-        Map<UUID, Optional<EmployeeResponse>> employees = new HashMap<>();
+        Map<UUID, Optional<EmployeePay>> employees = new HashMap<>();
         List<Pending> pending = new ArrayList<>();
         for (LabourItem item : req.items()) {
             if (!seen.add(item.sourceType() + ":" + item.sourceId())) throw new IllegalArgumentException("the same piece of work is listed twice");
@@ -162,10 +162,10 @@ public class AgLabourCostService {
         return w;
     }
 
-    private RateInfo hrRate(TenantId tenantId, Work w, boolean hrRatesAllowed, BigDecimal hoursPerWeek, Map<UUID, Optional<EmployeeResponse>> employees) {
+    private RateInfo hrRate(TenantId tenantId, Work w, boolean hrRatesAllowed, BigDecimal hoursPerWeek, Map<UUID, Optional<EmployeePay>> employees) {
         if (w.workerId() == null) return new RateInfo(null, "NONE", "no HR employee is linked to this work" + (w.workerName() != null ? " (" + w.workerName() + ")" : ""));
         if (!hrRatesAllowed) return new RateInfo(null, "NONE", "HR access is needed to use a salary-based rate");
-        Optional<EmployeeResponse> employee = employees.computeIfAbsent(w.workerId(), id -> hrFacade.findEmployeeById(tenantId, id));
+        Optional<EmployeePay> employee = employees.computeIfAbsent(w.workerId(), id -> hrFacade.findEmployeePay(tenantId, id));
         if (employee.isEmpty()) return new RateInfo(null, "NONE", "the linked employee was not found in HR");
         BigDecimal rate = AgLabourRules.hourlyRate(employee.get().grossSalary(), employee.get().payFrequency(), hoursPerWeek);
         if (rate == null) return new RateInfo(null, "NONE", "the employee has no usable salary or a pay frequency this cannot convert");

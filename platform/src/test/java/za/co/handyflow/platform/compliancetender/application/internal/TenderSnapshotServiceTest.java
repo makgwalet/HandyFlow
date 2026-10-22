@@ -15,7 +15,7 @@ import za.co.handyflow.platform.compliancetender.domain.repository.TenderReposit
 import za.co.handyflow.platform.compliancetender.domain.repository.TenderRequirementRepository;
 import za.co.handyflow.platform.compliancetender.domain.repository.TenderSubmissionSnapshotRepository;
 import za.co.handyflow.platform.hr.application.HrFacade;
-import za.co.handyflow.platform.hr.dto.EmployeeResponse;
+import za.co.handyflow.platform.hr.EmployeeSummary;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.List;
@@ -63,10 +63,8 @@ class TenderSnapshotServiceTest {
     private static final TenantId TENANT = TenantId.generate();
     private static final UUID USER = UUID.randomUUID();
 
-    private static EmployeeResponse employee(UUID id, String fullName) {
-        return new EmployeeResponse(id, "EMP-001", "Thabo", "Mokoena", fullName, null, null, null,
-                null, null, null, null, "PERMANENT", "Project Manager", null, null, null, "ACTIVE",
-                null, null, null, null, null, null, null, null);
+    private static EmployeeSummary employee(UUID id, String fullName) {
+        return new EmployeeSummary(id, "EMP-001", "Thabo", "Mokoena", fullName, null, null, "Project Manager", null, "ACTIVE");
     }
 
     @Test

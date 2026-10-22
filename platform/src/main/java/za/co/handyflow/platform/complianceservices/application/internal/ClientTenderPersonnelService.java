@@ -11,7 +11,7 @@ import za.co.handyflow.platform.complianceservices.domain.repository.ClientTende
 import za.co.handyflow.platform.complianceservices.dto.AddClientTenderPersonnelRequest;
 import za.co.handyflow.platform.complianceservices.dto.ClientTenderPersonnelResponse;
 import za.co.handyflow.platform.hr.application.HrFacade;
-import za.co.handyflow.platform.hr.dto.EmployeeResponse;
+import za.co.handyflow.platform.hr.EmployeeSummary;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
@@ -43,7 +43,7 @@ public class ClientTenderPersonnelService {
         tenderRepository.findByIdForTenant(tenantId, clientTenderId)
                 .orElseThrow(() -> new ResourceNotFoundException("ClientTender", clientTenderId.toString()));
 
-        EmployeeResponse employee = hrFacade.findEmployeeById(tenantId, req.employeeId())
+        EmployeeSummary employee = hrFacade.findEmployeeById(tenantId, req.employeeId())
                 .orElseThrow(() -> new HandyFlowException(
                         "No HR employee found with id " + req.employeeId() + " — add them in HR first",
                         HttpStatus.BAD_REQUEST, "EMPLOYEE_NOT_FOUND"));
@@ -78,7 +78,7 @@ public class ClientTenderPersonnelService {
         log.info("Client tender personnel removed id={} tenant={}", id, tenantId);
     }
 
-    private ClientTenderPersonnelResponse toResponse(ClientTenderPersonnel p, EmployeeResponse employee) {
+    private ClientTenderPersonnelResponse toResponse(ClientTenderPersonnel p, EmployeeSummary employee) {
         return new ClientTenderPersonnelResponse(p.getId(), p.getClientTenderId(), p.getEmployeeId(), p.getRole(),
                 employee != null, employee != null ? employee.fullName() : null,
                 employee != null ? employee.employeeNumber() : null, p.getCreatedAt());

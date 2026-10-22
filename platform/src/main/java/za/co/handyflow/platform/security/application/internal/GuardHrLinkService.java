@@ -7,7 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.hr.application.HrFacade;
-import za.co.handyflow.platform.hr.dto.EmployeeResponse;
+import za.co.handyflow.platform.hr.EmployeeSummary;
 import za.co.handyflow.platform.security.domain.model.Guard;
 import za.co.handyflow.platform.security.domain.repository.GuardRepository;
 import za.co.handyflow.platform.security.dto.GuardHrLinkDtos.EmployeeOption;
@@ -53,7 +53,7 @@ public class GuardHrLinkService {
     @Transactional
     public HrLink link(TenantId tenantId, UUID guardId, UUID employeeId) {
         Guard g = guard(tenantId, guardId);
-        EmployeeResponse e = hrFacade.findEmployeeById(tenantId, employeeId)
+        EmployeeSummary e = hrFacade.findEmployeeById(tenantId, employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee", employeeId.toString()));
         guardRepository.findByEmployee(tenantId, employeeId).ifPresent(other -> {
             if (!other.getId().equals(guardId))
@@ -77,7 +77,7 @@ public class GuardHrLinkService {
         return guardRepository.findActiveById(tenantId, guardId).orElseThrow(() -> new ResourceNotFoundException("Guard", guardId.toString()));
     }
 
-    private static HrLink toLink(EmployeeResponse e) {
+    private static HrLink toLink(EmployeeSummary e) {
         return new HrLink(true, false, e.id(), e.employeeNumber(), e.fullName(), e.jobTitle(), e.department(), e.status());
     }
 }

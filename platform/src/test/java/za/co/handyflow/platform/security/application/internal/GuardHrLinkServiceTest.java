@@ -3,7 +3,7 @@ package za.co.handyflow.platform.security.application.internal;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import za.co.handyflow.platform.hr.application.HrFacade;
-import za.co.handyflow.platform.hr.dto.EmployeeResponse;
+import za.co.handyflow.platform.hr.EmployeeSummary;
 import za.co.handyflow.platform.security.domain.model.Guard;
 import za.co.handyflow.platform.security.domain.repository.GuardRepository;
 import za.co.handyflow.platform.shared.HandyFlowException;
@@ -36,14 +36,8 @@ class GuardHrLinkServiceTest {
         return g;
     }
 
-    private EmployeeResponse employee(UUID id) {
-        EmployeeResponse e = mock(EmployeeResponse.class);
-        when(e.id()).thenReturn(id);
-        when(e.employeeNumber()).thenReturn("EMP-0007");
-        when(e.fullName()).thenReturn("Gerhard Botha");
-        when(e.jobTitle()).thenReturn("Security officer");
-        when(e.status()).thenReturn("ACTIVE");
-        return e;
+    private EmployeeSummary employee(UUID id) {
+        return new EmployeeSummary(id, "EMP-0007", null, null, "Gerhard Botha", null, null, "Security officer", null, "ACTIVE");
     }
 
     @Test @DisplayName("An unlinked guard reports no link")

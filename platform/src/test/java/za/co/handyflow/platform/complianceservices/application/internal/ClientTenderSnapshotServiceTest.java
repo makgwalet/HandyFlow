@@ -15,7 +15,7 @@ import za.co.handyflow.platform.complianceservices.domain.repository.ClientTende
 import za.co.handyflow.platform.complianceservices.domain.repository.ClientTenderRequirementRepository;
 import za.co.handyflow.platform.complianceservices.domain.repository.ClientTenderSubmissionSnapshotRepository;
 import za.co.handyflow.platform.hr.application.HrFacade;
-import za.co.handyflow.platform.hr.dto.EmployeeResponse;
+import za.co.handyflow.platform.hr.EmployeeSummary;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.List;
@@ -177,9 +177,7 @@ class ClientTenderSnapshotServiceTest {
         when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
         when(personnelRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(personnel));
         when(hrFacade.findEmployeeById(TENANT, employeeId)).thenReturn(Optional.of(
-                new EmployeeResponse(employeeId, "EMP-001", "Thabo", "Mokoena", "Thabo Mokoena", null, null, null,
-                        null, null, null, null, "PERMANENT", "Project Manager", null, null, null, "ACTIVE",
-                        null, null, null, null, null, null, null, null)));
+                new EmployeeSummary(employeeId, "EMP-001", "Thabo", "Mokoena", "Thabo Mokoena", null, null, "Project Manager", null, "ACTIVE")));
         when(snapshotRepository.countByTender(TENANT, tenderId)).thenReturn(0L);
 
         var response = service().captureSnapshot(TENANT, tenderId, USER);
