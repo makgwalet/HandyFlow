@@ -783,3 +783,30 @@ I read the four training services, the entities and the session screen. The modu
 - Maven, Spring and the database have not run. `TrainingEnrollmentService` and `TrainingSessionService` gained constructor arguments; the new `findByTenantAndIdForUpdate` (pessimistic lock) query has never run against PostgreSQL. `TrainingBookingServicesTest` (9, real Mockito) is unexecuted.
 - In my harness `TrainingRulesTest` (7) passes, and a deliberate break (letting a no-show be passed) is caught.
 - Front end: 3 new tests pass; `TrainingSessionDetail.tsx` has 3 lint `any` errors (4 before, none added).
+
+## 27. Slice 17c: leave carry-over policy (expiry) and what is paid out
+
+**What was there.** Annual leave carried into every new year without limit, including a negative balance. On the day employment ends the system already works out annual leave owing (BCEA section 40), pays it at the daily rate in the final pay, and pays nothing for a negative balance. That payout was reviewed and left alone.
+
+**What changed**
+
+- **A company policy on carrying leave over.** A company can set the most annual leave carried into a new year. Until it does, nothing changes. A limit needs three things: the number of days, the year it starts from (next year at the earliest, because earlier rollovers are already in the ledger and the ledger cannot be changed), and the written agreement that allows it, named. Leave can only be forfeited by agreement (BCEA section 20(7)), so a limit cannot be saved without naming one. Only a user with HR manage can change it.
+- **When the year rolls over,** days above the limit are posted as a forfeited entry dated the last day of the closing year (kind `EXPIRY`, with the limit and the agreement in the note), then the limit is carried forward. The closing year's statement and balance show where the days went; the entry is posted once per employee per year.
+- **At-risk list.** HR can see who would lose days at the coming rollover if they took no more (balance now plus what is still to be earned this year, over the limit), so people can be told while they can still take the leave.
+- **Screen.** A panel at the top of the Leave tab shows the policy, a form to change it (with the same checks as the server), and the at-risk list. The statement labels the new entry "Forfeited under company policy".
+- Migration V500 adds the policy table and allows the `EXPIRY` kind in the ledger.
+
+**Still not done**
+
+- Carried-over days do not expire on their own after a set number of months (for example, use by 30 June). Only the cap at rollover exists. That needs days to be tracked by the year they were earned.
+- Nobody is told that days are at risk: no email to the employee or manager, no reminder before year end. The list is for HR to act on.
+- No cash-out of annual leave during employment. Leave is paid out only when employment ends.
+- A negative balance (leave taken in advance) is still not taken off the final pay, and is carried forward as before.
+- Sick, family responsibility and study leave have no carry-over rules; they work as before.
+- Leave cancelled after the rollover, which would have restored days that were already forfeited, has not been looked at.
+
+**Not verified**
+
+- Maven, Spring and the database have not run. `LeaveService` gained a constructor argument (the policy repository); `LeaveServiceTest` was updated to match and has 8 new cases, all unexecuted. V500 and the dropped-and-recreated ledger constraint (assumed to be named `hr_leave_ledger_kind_check`, the name PostgreSQL gives an unnamed column check) have never run.
+- In my harness `LeavePolicyRulesTest` (7) passes, and ignoring the limit when working out the forfeited days is caught by 2 of them.
+- Front end: 7 new tests pass, and the 14 existing leave tests and all 224 tests in the HR, training, careers and recruiter folders pass. New files are lint-clean; `LeaveTab.tsx` has the same 29 lint errors as before.

@@ -70,7 +70,7 @@ export function canCancel(row: LeaveRow, rights: LeaveRights, today: string): bo
 
 export const KIND_LABEL: Record<string, string> = {
   OPENING: "Opening balance", ACCRUAL: "Earned", CARRY_FORWARD: "Carried forward", ADJUSTMENT: "Adjustment",
-  RESERVED: "Held for request", RELEASED: "Hold released", TAKEN: "Taken", REVERSAL: "Reversed",
+  RESERVED: "Held for request", RELEASED: "Hold released", TAKEN: "Taken", REVERSAL: "Reversed", EXPIRY: "Forfeited under company policy",
 }
 
 export const kindLabel = (k: string) => KIND_LABEL[k] ?? k
@@ -82,3 +82,25 @@ export function signedDays(n: number | string): string {
 }
 
 export const todayIso = () => iso(new Date())
+
+/** Whether to offer the carry-over policy form. The server decides again. */
+export const canSetPolicy = (permissions: string[]) => permissions.includes("HR_MANAGE")
+
+export const MAX_CAP = 100
+
+/** Null when the policy may be sent. An empty cap means "no limit". Messages match the server's. */
+export function policyProblem(cap: string, effectiveYear: string, agreement: string, thisYear: number): string | null {
+  if (cap.trim() === "") return null
+  const n = Number(cap)
+  if (!Number.isFinite(n)) return "Enter the most days that may be carried over."
+  if (n < 0) return "The most that can be carried over cannot be negative."
+  if (n > MAX_CAP) return `The most that can be carried over cannot be more than ${MAX_CAP} days.`
+  if (!/^\d+(\.\d{1,2})?$/.test(cap.trim())) return "Use at most two decimals for the days."
+  const y = Number(effectiveYear)
+  if (!Number.isInteger(y)) return "Say from which year the limit applies."
+  if (y <= thisYear) return `The limit can only start from next year (${thisYear + 1}) or later.`
+  if (y > thisYear + 5) return "That is too far ahead."
+  if (!agreement.trim()) return "Leave can only be forfeited by written agreement. Say which agreement or policy document allows it."
+  if (agreement.trim().length > 200) return "The agreement reference is too long (200 characters at most)."
+  return null
+}

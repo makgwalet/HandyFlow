@@ -226,6 +226,27 @@ public class HrController {
                 hrService.getLeaveBalances(TenantContext.getTenantIdAsObject(), id, leaveYear)));
     }
 
+    @GetMapping("/leave-policy")
+    @PreAuthorize("hasAnyAuthority('HR_READ','HR_MANAGE','LEAVE_APPROVE','LEAVE_ADJUST')")
+    @Operation(summary = "The company's limit on carrying annual leave into a new year, if it has one")
+    public ResponseEntity<ApiResponse<LeavePolicyDtos.PolicyView>> leavePolicy() {
+        return ResponseEntity.ok(ApiResponse.success(leaveService.policy(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PutMapping("/leave-policy")
+    @PreAuthorize("hasAuthority('HR_MANAGE')")
+    @Operation(summary = "Set or remove the limit on carrying annual leave into a new year. Starts from next year at the earliest; the agreement that allows forfeiting leave must be named")
+    public ResponseEntity<ApiResponse<LeavePolicyDtos.PolicyView>> updateLeavePolicy(@RequestBody LeavePolicyDtos.PolicyRequest req, Principal principal) {
+        return ResponseEntity.ok(ApiResponse.success("Leave policy saved", leaveService.updatePolicy(TenantContext.getTenantIdAsObject(), req, resolveUserId(principal))));
+    }
+
+    @GetMapping("/leave-policy/at-risk")
+    @PreAuthorize("hasAnyAuthority('HR_READ','HR_MANAGE','LEAVE_ADJUST')")
+    @Operation(summary = "Employees who would lose annual leave at the next rollover if they took no more")
+    public ResponseEntity<ApiResponse<LeavePolicyDtos.AtRiskReport>> leaveAtRisk() {
+        return ResponseEntity.ok(ApiResponse.success(leaveService.atRisk(TenantContext.getTenantIdAsObject())));
+    }
+
     @GetMapping("/employees/{id}/leave-statement")
     @PreAuthorize("hasAnyAuthority('HR_READ','HR_MANAGE','LEAVE_APPROVE','LEAVE_ADJUST')")
     @Operation(summary = "Leave balances for a year and every movement behind them")

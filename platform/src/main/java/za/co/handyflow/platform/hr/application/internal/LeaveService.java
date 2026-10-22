@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.hr.domain.model.*;
 import za.co.handyflow.platform.hr.domain.repository.*;
 import za.co.handyflow.platform.hr.dto.*;
+import za.co.handyflow.platform.hr.dto.LeavePolicyDtos.*;
 import za.co.handyflow.platform.notifications.application.NotificationRequest;
 import za.co.handyflow.platform.notifications.application.Recipient;
 import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
@@ -22,6 +23,7 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 
 /**
@@ -36,6 +38,7 @@ import java.util.*;
 public class LeaveService {
 
     private static final BigDecimal EPS = new BigDecimal("0.005");
+    private static final ZoneId ZONE = ZoneId.of("Africa/Johannesburg");
 
     private final HrLeaveLedgerRepository ledgerRepo;
     private final HrLeaveRequestRepository requestRepo;
@@ -46,6 +49,7 @@ public class LeaveService {
     private final EmployeeViewService viewService;
     private final NotificationService notificationService;
     private final TenantAdminRecipients tenantAdminRecipients;
+    private final HrLeavePolicyRepository policyRepo;
 
     // ── Reading ─────────────────────────────────────────────────────────────────────────────────
 
@@ -207,6 +211,50 @@ public class LeaveService {
                 null, l.getCreatedBy(), l.getCreatedAt());
     }
 
+    // ── Carry-over policy ───────────────────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public PolicyView policy(TenantId tenantId) {
+        return policyRepo.findById(tenantId.getValue()).map(LeaveService::view)
+                .orElseGet(() -> new PolicyView(null, null, null, null));
+    }
+
+    /** Sets or removes the limit on carrying annual leave into a new year. Only rollovers that have not happened yet are affected. */
+    @Transactional
+    public PolicyView updatePolicy(TenantId tenantId, PolicyRequest req, UUID actor) {
+        if (actor == null) throw new AccessDeniedException("Your user could not be identified, so this step cannot be recorded.");
+        fail(LeavePolicyRules.policyProblem(req.carryOverCapDays(), req.effectiveYear(), req.agreementRef(), LocalDate.now(ZONE).getYear()));
+        HrLeavePolicy p = policyRepo.findById(tenantId.getValue()).orElseGet(() -> HrLeavePolicy.none(tenantId.getValue()));
+        p.set(req.carryOverCapDays() == null ? null : req.carryOverCapDays().setScale(2, RoundingMode.HALF_UP), req.effectiveYear(), req.agreementRef(), actor);
+        policyRepo.save(p);
+        return view(p);
+    }
+
+    /** Who would lose annual leave at the coming rollover if they took no more. Empty when there is no limit that will apply. */
+    @Transactional
+    public AtRiskReport atRisk(TenantId tenantId) {
+        LocalDate today = LocalDate.now(ZONE);
+        int next = today.getYear() + 1;
+        HrLeavePolicy policy = policyRepo.findById(tenantId.getValue()).orElse(null);
+        BigDecimal cap = policy == null ? null : LeavePolicyRules.capFor(policy.getCarryOverCapDays(), policy.getEffectiveYear(), next);
+        if (cap == null) return new AtRiskReport(null, next, List.of());
+        List<AtRisk> out = new ArrayList<>();
+        for (HrEmployee emp : employeeRepo.findNotTerminated(tenantId)) {
+            ensureAccrued(tenantId, emp, today);
+            BigDecimal available = totalsAt(tenantId, emp, LeaveRules.ANNUAL, today).available();
+            BigDecimal ahead = LeaveRules.annualEarned(emp.getStartDate(), ledgerStart(tenantId), today.getYear(), LocalDate.of(today.getYear(), 12, 31))
+                    .subtract(LeaveRules.annualEarned(emp.getStartDate(), ledgerStart(tenantId), today.getYear(), today)).max(BigDecimal.ZERO);
+            BigDecimal lose = LeavePolicyRules.atRisk(available, ahead, cap);
+            if (lose.signum() > 0) out.add(new AtRisk(emp.getId(), emp.getFullName(), available, available.add(ahead), lose));
+        }
+        out.sort(Comparator.comparing(AtRisk::wouldLose).reversed());
+        return new AtRiskReport(cap, next, out);
+    }
+
+    private static PolicyView view(HrLeavePolicy p) {
+        return new PolicyView(p.getCarryOverCapDays(), p.getEffectiveYear(), p.getAgreementRef(), p.getUpdatedAt());
+    }
+
     // ── Accrual ─────────────────────────────────────────────────────────────────────────────────
 
     /**
@@ -256,12 +304,24 @@ public class LeaveService {
                 "Earned under the BCEA", null);
     }
 
-    /** Whatever annual leave was left at the end of the year moves into the next, including a negative balance. */
+    /**
+     * Whatever annual leave was left at the end of the year moves into the next, including a negative balance. When the company has a
+     * limit that applies to this rollover, days above it are forfeited first: an entry dated the last day of the year that is closing,
+     * so that year's statement shows where they went, and only the limit is carried.
+     */
     private void carryForward(TenantId tenantId, UUID employeeId, int year) {
         String key = "carry:" + year;
         if (ledgerRepo.countKey(tenantId, employeeId, LeaveRules.ANNUAL, LeaveRules.CARRY_FORWARD, key) > 0) return;
         BigDecimal closing = ledgerRepo.window(tenantId, employeeId, LeaveRules.ANNUAL, LocalDate.of(year - 1, 1, 1), LocalDate.of(year - 1, 12, 31)).stream()
                 .filter(l -> !isReservation(l.getKind())).map(HrLeaveLedger::getDays).reduce(BigDecimal.ZERO, BigDecimal::add);
+        HrLeavePolicy policy = policyRepo.findById(tenantId.getValue()).orElse(null);
+        BigDecimal cap = policy == null ? null : LeavePolicyRules.capFor(policy.getCarryOverCapDays(), policy.getEffectiveYear(), year);
+        BigDecimal lost = LeavePolicyRules.forfeited(closing, cap);
+        if (lost.signum() > 0) {
+            post(tenantId, employeeId, LeaveRules.ANNUAL, LocalDate.of(year - 1, 12, 31), LeaveRules.EXPIRY, lost.negate(), null, "expire:" + (year - 1),
+                    LeavePolicyRules.forfeitNote(cap, policy.getAgreementRef(), year - 1), null);
+            closing = closing.subtract(lost);
+        }
         if (closing.abs().compareTo(EPS) <= 0) return;
         post(tenantId, employeeId, LeaveRules.ANNUAL, LocalDate.of(year, 1, 1), LeaveRules.CARRY_FORWARD, closing, null, key,
                 "Carried forward from " + (year - 1), null);
@@ -277,7 +337,7 @@ public class LeaveService {
         BigDecimal entitled = BigDecimal.ZERO, taken = BigDecimal.ZERO, pending = BigDecimal.ZERO;
         for (HrLeaveLedger l : entries) {
             switch (l.getKind()) {
-                case LeaveRules.OPENING, LeaveRules.ACCRUAL, LeaveRules.CARRY_FORWARD, LeaveRules.ADJUSTMENT -> entitled = entitled.add(l.getDays());
+                case LeaveRules.OPENING, LeaveRules.ACCRUAL, LeaveRules.CARRY_FORWARD, LeaveRules.ADJUSTMENT, LeaveRules.EXPIRY -> entitled = entitled.add(l.getDays());
                 case LeaveRules.TAKEN, LeaveRules.REVERSAL -> taken = taken.subtract(l.getDays());
                 case LeaveRules.RESERVED, LeaveRules.RELEASED -> pending = pending.subtract(l.getDays());
                 default -> { }

@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Plus, X, Calendar, ChevronDown, ChevronUp, Clock, CheckCircle, XCircle, AlertCircle, Ban, FileText } from "lucide-react"
 import { useAuth } from "../../hooks/useAuth"
+import LeavePolicy from "./LeavePolicy"
 import {
   adjustmentProblem, canCancel, certificateExpected, kindLabel, leaveRights, reasonProblem, requestProblem, signedDays, todayIso, workingDays,
 } from "./leave.logic"
@@ -132,6 +133,7 @@ export default function LeaveTab() {
 
   return (
     <div>
+      <LeavePolicy permissions={user?.permissions ?? []} />
       {pending.length > 0 && (
         <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
           <Clock size={16} style={{ color: 'var(--hf-warning-text)', flexShrink: 0 }} />

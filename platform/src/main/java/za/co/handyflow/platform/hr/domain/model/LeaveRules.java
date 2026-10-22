@@ -24,7 +24,8 @@ public final class LeaveRules {
     public static final Set<String> CAPPED = Set.of(ANNUAL, SICK, FAMILY, STUDY);
 
     public static final String OPENING = "OPENING", ACCRUAL = "ACCRUAL", CARRY_FORWARD = "CARRY_FORWARD", ADJUSTMENT = "ADJUSTMENT",
-            RESERVED = "RESERVED", RELEASED = "RELEASED", TAKEN = "TAKEN", REVERSAL = "REVERSAL";
+            RESERVED = "RESERVED", RELEASED = "RELEASED", TAKEN = "TAKEN", REVERSAL = "REVERSAL",
+            EXPIRY = "EXPIRY";
 
     public static final BigDecimal ANNUAL_PER_YEAR = new BigDecimal("15");
     public static final BigDecimal SICK_PER_CYCLE = new BigDecimal("30");

@@ -40,6 +40,7 @@ class LeaveServiceTest {
     PublicHolidayRepository holidays;
     EmployeeViewService viewService;
     LeaveService service;
+    HrLeavePolicyRepository policyRepo;
     HrEmployee emp;
 
     @BeforeEach
@@ -47,12 +48,14 @@ class LeaveServiceTest {
         ledgerRepo = mock(HrLeaveLedgerRepository.class);
         requestRepo = mock(HrLeaveRequestRepository.class);
         settingsRepo = mock(HrLeaveSettingsRepository.class);
+        policyRepo = mock(HrLeavePolicyRepository.class);
+        when(policyRepo.findById(any())).thenReturn(Optional.empty());
         employeeRepo = mock(HrEmployeeRepository.class);
         payrollSettings = mock(HrPayrollSettingsRepository.class);
         holidays = mock(PublicHolidayRepository.class);
         viewService = mock(EmployeeViewService.class);
         service = new LeaveService(ledgerRepo, requestRepo, settingsRepo, employeeRepo, payrollSettings, holidays, viewService,
-                mock(NotificationService.class), mock(TenantAdminRecipients.class));
+                mock(NotificationService.class), mock(TenantAdminRecipients.class), policyRepo);
 
         emp = HrEmployee.create(tenant, "EMP-1", "Jane", "Dlamini", today.minusYears(3), "PERMANENT", new BigDecimal("30000"), "MONTHLY");
         when(employeeRepo.findActiveById(any(), eq(emp.getId()))).thenReturn(Optional.of(emp));
@@ -355,5 +358,88 @@ class LeaveServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> service.adjust(tenant, emp.getId(), new LeaveAdjustmentRequest("ANNUAL", today, BigDecimal.ZERO, "Why"), approver))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    // ── Carry-over policy ───────────────────────────────────────────────────────────────────────
+
+    private void capOf(String days, int fromYear) {
+        HrLeavePolicy policy = HrLeavePolicy.none(tenant.getValue());
+        policy.set(new BigDecimal(days), fromYear, "Leave policy 2026, signed by staff", approver);
+        when(policyRepo.findById(any())).thenReturn(Optional.of(policy));
+    }
+
+    @Test
+    void withoutAPolicyEverythingIsCarriedAsBefore() {
+        balance("ANNUAL");
+
+        assertThat(count("EXPIRY")).isZero();
+        HrLeaveLedger carry = ledger.stream().filter(l -> l.getKind().equals("CARRY_FORWARD")).findFirst().orElseThrow();
+        assertThat(carry.getDays().compareTo(new BigDecimal("15"))).isGreaterThanOrEqualTo(0);
+    }
+
+    @Test
+    void aCapForfeitsTheExcessWhenTheYearRollsOverAndCarriesOnlyTheCap() {
+        capOf("5", today.getYear());
+        balance("ANNUAL");
+
+        HrLeaveLedger lost = ledger.stream().filter(l -> l.getKind().equals("EXPIRY")).findFirst().orElseThrow();
+        assertThat(lost.getEntryDate()).isEqualTo(LocalDate.of(today.getYear() - 1, 12, 31));
+        assertThat(lost.getDays().signum()).isEqualTo(-1);
+        assertThat(lost.getNote()).contains("5-day limit");
+        HrLeaveLedger carry = ledger.stream().filter(l -> l.getKind().equals("CARRY_FORWARD")).findFirst().orElseThrow();
+        assertThat(carry.getDays().compareTo(new BigDecimal("5"))).isZero();
+    }
+
+    @Test
+    void aCapThatStartsLaterDoesNotTouchTheRolloverThatHasHappened() {
+        capOf("5", today.getYear() + 1);
+        balance("ANNUAL");
+
+        assertThat(count("EXPIRY")).isZero();
+    }
+
+    @Test
+    void forfeitingIsPostedOnceEvenIfTheBalanceIsReadAgain() {
+        capOf("5", today.getYear());
+        balance("ANNUAL");
+        long first = count("EXPIRY");
+        balance("ANNUAL");
+
+        assertThat(first).isEqualTo(1);
+        assertThat(count("EXPIRY")).isEqualTo(1);
+    }
+
+    @Test
+    void forfeitedDaysShowInLastYearsBalance() {
+        capOf("5", today.getYear());
+        balance("ANNUAL");
+        LeaveBalanceResponse lastYear = service.balances(tenant, emp.getId(), today.getYear() - 1).stream()
+                .filter(b -> b.leaveType().equals("ANNUAL")).findFirst().orElseThrow();
+
+        assertThat(lastYear.availableDays().compareTo(new BigDecimal("5"))).isLessThanOrEqualTo(0);
+    }
+
+    @Test
+    void thePolicyCannotBeSavedWithoutTheAgreementOrForThisYear() {
+        assertThatThrownBy(() -> service.updatePolicy(tenant, new LeavePolicyDtos.PolicyRequest(new BigDecimal("5"), today.getYear() + 1, " "), approver))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("written agreement");
+        assertThatThrownBy(() -> service.updatePolicy(tenant, new LeavePolicyDtos.PolicyRequest(new BigDecimal("5"), today.getYear(), "Policy 1"), approver))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("next year");
+        assertThatThrownBy(() -> service.updatePolicy(tenant, new LeavePolicyDtos.PolicyRequest(new BigDecimal("5"), today.getYear() + 1, "Policy 1"), null))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(policyRepo, never()).save(any());
+    }
+
+    @Test
+    void aValidPolicyIsSavedAndCanBeRemoved() {
+        service.updatePolicy(tenant, new LeavePolicyDtos.PolicyRequest(new BigDecimal("5"), LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg")).getYear() + 1, "Policy 1"), approver);
+        verify(policyRepo).save(argThat(p -> p.getCarryOverCapDays().compareTo(new BigDecimal("5")) == 0 && "Policy 1".equals(p.getAgreementRef())));
+        service.updatePolicy(tenant, new LeavePolicyDtos.PolicyRequest(null, null, null), approver);
+        verify(policyRepo, times(2)).save(any());
+    }
+
+    @Test
+    void theAtRiskListIsEmptyWhenNoLimitAppliesYet() {
+        assertThat(service.atRisk(tenant).employees()).isEmpty();
     }
 }
