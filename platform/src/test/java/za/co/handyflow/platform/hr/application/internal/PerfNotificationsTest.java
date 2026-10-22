@@ -115,7 +115,7 @@ class PerfNotificationsTest {
     // ── Daily reminders ─────────────────────────────────────────────────────────────────────────
 
     private PerfReminderService reminders(TenantAdminRecipients admins) {
-        return new PerfReminderService(h.cycleRepo, h.reviewRepo, h.employees, h.notifier, admins);
+        return new PerfReminderService(h.cycleRepo, h.reviewRepo, h.employees, h.notifier, admins, h.planRepo, h.checkinRepo);
     }
 
     @Test
@@ -166,5 +166,114 @@ class PerfNotificationsTest {
         when(h.cycleRepo.allOpen()).thenReturn(List.of(cycle));
         when(h.reviewRepo.forCycles(any())).thenReturn(List.of(done));
         assertThat(reminders(mock(TenantAdminRecipients.class)).remindAll(today)).isZero();
+    }
+
+    // ── Goals ───────────────────────────────────────────────────────────────────────────────────
+
+    private GoalRequest goal(UUID employee) {
+        return new GoalRequest(employee, null, "Cut invoice errors", "Fewer invoices sent back", "Under 2 a month", today.plusDays(60));
+    }
+
+    @Test
+    void aProposedGoalAsksTheManagerToApproveIt() {
+        email(boss, "boss@example.com");
+        h.goals.create(TENANT, goal(null), annUser, NONE);
+        NotificationRequest n = sent().stream().filter(x -> x.type() == NotificationType.PERF_GOAL_PROPOSED).findFirst().orElseThrow();
+        assertThat(emails(n)).containsExactly("boss@example.com");
+        assertThat(n.title()).contains("Ann Adams");
+        assertThat(n.message()).contains("Cut invoice errors");
+    }
+
+    @Test
+    void anApprovedGoalTellsTheEmployee() {
+        email(boss, "boss@example.com");
+        email(ann, "ann@example.com");
+        GoalView g = h.goals.create(TENANT, goal(null), annUser, NONE);
+        h.goals.approve(TENANT, g.id(), bossUser, NONE);
+        NotificationRequest n = sent().stream().filter(x -> x.type() == NotificationType.PERF_GOAL_DECIDED).findFirst().orElseThrow();
+        assertThat(emails(n)).containsExactly("ann@example.com");
+        assertThat(n.message()).contains("was approved");
+    }
+
+    @Test
+    void aGoalSetByTheManagerTellsTheEmployeeAndDoesNotAskForApproval() {
+        email(boss, "boss@example.com");
+        email(ann, "ann@example.com");
+        h.goals.create(TENANT, goal(ann), bossUser, NONE);
+        assertThat(sent().stream().filter(x -> x.type() == NotificationType.PERF_GOAL_PROPOSED)).isEmpty();
+        NotificationRequest n = sent().stream().filter(x -> x.type() == NotificationType.PERF_GOAL_DECIDED).findFirst().orElseThrow();
+        assertThat(emails(n)).containsExactly("ann@example.com");
+        assertThat(n.message()).contains("was set for you");
+    }
+
+    @Test
+    void aGoalIsStillSavedWhenTheMessageCannotBeSent() {
+        email(boss, "boss@example.com");
+        doThrow(new IllegalStateException("mail down")).when(h.notificationService).send(any());
+        GoalView g = h.goals.create(TENANT, goal(null), annUser, NONE);
+        assertThat(g).isNotNull();
+        assertThat(h.goalStore).hasSize(1);
+    }
+
+    // ── Plan reminders ──────────────────────────────────────────────────────────────────────────
+
+    private HrPerfPlan activePlan(LocalDate told, LocalDate end) {
+        HrPerfPlan p = HrPerfPlan.draft(TENANT.getValue(), ann, boss, null, null, "Invoice accuracy", "Repeated invoice errors.", "Fewer than two a month.",
+                "Weekly coaching.", told, end, hrUser);
+        p.start(told);
+        return p;
+    }
+
+    @Test
+    void aPlanWithNoCheckInForTwoWeeksIsChasedWithoutTheDetails() {
+        email(boss, "boss@example.com");
+        HrPerfPlan plan = activePlan(today.minusDays(15), today.plusDays(30));
+        when(h.planRepo.allActive()).thenReturn(List.of(plan));
+        assertThat(reminders(mock(TenantAdminRecipients.class)).remindPlans(today)).isEqualTo(1);
+        NotificationRequest n = sent().stream().filter(x -> x.type() == NotificationType.PERF_PLAN_CHECKIN_DUE).findFirst().orElseThrow();
+        assertThat(emails(n)).containsExactly("boss@example.com");
+        assertThat(n.title()).contains("Ann Adams");
+        assertThat(n.message()).contains("none has been recorded").doesNotContain("errors").doesNotContain("coaching");
+    }
+
+    @Test
+    void aRecentCheckInOrAYoungPlanIsLeftAlone() {
+        email(boss, "boss@example.com");
+        HrPerfPlan young = activePlan(today.minusDays(10), today.plusDays(30));
+        when(h.planRepo.allActive()).thenReturn(List.of(young));
+        assertThat(reminders(mock(TenantAdminRecipients.class)).remindPlans(today)).isZero();
+
+        HrPerfPlan old = activePlan(today.minusDays(40), today.plusDays(30));
+        h.checkinStore.add(HrPerfCheckin.of(TENANT.getValue(), old.getId(), today.minusDays(5), "ON_TRACK", "Going well", boss));
+        when(h.planRepo.allActive()).thenReturn(List.of(old));
+        assertThat(reminders(mock(TenantAdminRecipients.class)).remindPlans(today)).isZero();
+    }
+
+    @Test
+    void aPlanStillRunningAfterItsEndDateIsFlaggedToItsOwner() {
+        email(boss, "boss@example.com");
+        HrPerfPlan plan = activePlan(today.minusDays(60), today.minusDays(1));
+        h.checkinStore.add(HrPerfCheckin.of(TENANT.getValue(), plan.getId(), today.minusDays(2), "AT_RISK", "Slipping", boss));
+        when(h.planRepo.allActive()).thenReturn(List.of(plan));
+        reminders(mock(TenantAdminRecipients.class)).remindPlans(today);
+        NotificationRequest n = sent().stream().filter(x -> x.type() == NotificationType.PERF_PLAN_ENDED).findFirst().orElseThrow();
+        assertThat(emails(n)).containsExactly("boss@example.com");
+        assertThat(n.message()).contains("1 day ago").doesNotContain("Slipping");
+    }
+
+    @Test
+    void aPlanWhoseOwnerHasLeftGoesToTheAdministratorsAndATerminatedEmployeeIsSkipped() {
+        email(boss, "boss@example.com");
+        h.terminate(boss);
+        HrPerfPlan plan = activePlan(today.minusDays(15), today.plusDays(30));
+        when(h.planRepo.allActive()).thenReturn(List.of(plan));
+        TenantAdminRecipients admins = mock(TenantAdminRecipients.class);
+        when(admins.resolveTenantAdmins(TENANT)).thenReturn(List.of(Recipient.external("Admin", "admin@example.com", null)));
+        reminders(admins).remindPlans(today);
+        assertThat(sent().stream().anyMatch(n -> emails(n).contains("admin@example.com"))).isTrue();
+
+        reset(h.notificationService);
+        h.terminate(ann);
+        assertThat(reminders(admins).remindPlans(today)).isZero();
     }
 }

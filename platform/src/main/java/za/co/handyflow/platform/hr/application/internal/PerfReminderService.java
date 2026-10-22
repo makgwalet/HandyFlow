@@ -5,11 +5,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.hr.domain.model.HrEmployee;
+import za.co.handyflow.platform.hr.domain.model.HrPerfCheckin;
+import za.co.handyflow.platform.hr.domain.model.HrPerfPlan;
 import za.co.handyflow.platform.hr.domain.model.HrPerfCycle;
 import za.co.handyflow.platform.hr.domain.model.HrPerfReview;
 import za.co.handyflow.platform.hr.domain.model.PerfReminderRules;
 import za.co.handyflow.platform.hr.domain.repository.HrEmployeeRepository;
+import za.co.handyflow.platform.hr.domain.repository.HrPerfCheckinRepository;
 import za.co.handyflow.platform.hr.domain.repository.HrPerfCycleRepository;
+import za.co.handyflow.platform.hr.domain.repository.HrPerfPlanRepository;
 import za.co.handyflow.platform.hr.domain.repository.HrPerfReviewRepository;
 import za.co.handyflow.platform.notifications.application.Recipient;
 import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
@@ -36,6 +40,8 @@ public class PerfReminderService {
     private final HrEmployeeRepository employeeRepo;
     private final PerfNotifier notifier;
     private final TenantAdminRecipients adminRecipients;
+    private final HrPerfPlanRepository planRepo;
+    private final HrPerfCheckinRepository checkinRepo;
 
     /** Sends today's reminders for every company. Returns how many messages went out. */
     @Transactional(readOnly = true)
@@ -53,6 +59,49 @@ public class PerfReminderService {
             }
         }
         log.info("Performance reminders: {} message(s) for {} open cycle(s)", sent, open.size());
+        return sent;
+    }
+
+    /**
+     * Reminders for running improvement plans: a check-in is due when none has been recorded for two weeks, and a plan still running after its
+     * end date has to be closed. They go to the plan's owner, or to the administrators when the owner has left. Returns how many went out.
+     */
+    @Transactional(readOnly = true)
+    public int remindPlans(LocalDate today) {
+        int sent = 0;
+        for (HrPerfPlan p : planRepo.allActive()) {
+            try {
+                sent += remindPlan(p, today);
+            } catch (RuntimeException e) {
+                log.error("Plan reminder failed for plan {}: {}", p.getId(), e.getMessage());
+            }
+        }
+        log.info("Plan reminders: {} message(s)", sent);
+        return sent;
+    }
+
+    private int remindPlan(HrPerfPlan plan, LocalDate today) {
+        TenantId tenant = TenantId.of(plan.getTenantId());
+        LocalDate last = checkinRepo.forPlan(plan.getId()).stream().map(HrPerfCheckin::getOnDate).max(Comparator.naturalOrder()).orElse(null);
+        boolean checkin = PerfReminderRules.checkinReminderToday(plan.getStatus(), plan.getCommunicatedOn(), plan.getStartDate(), last, today);
+        boolean ended = PerfReminderRules.endedReminderToday(plan.getStatus(), plan.getEndDate(), today);
+        if (!checkin && !ended) return 0;
+        Optional<HrEmployee> employee = employeeRepo.findActiveById(tenant, plan.getEmployeeId()).filter(x -> !"TERMINATED".equals(x.getStatus()));
+        if (employee.isEmpty()) return 0;
+        String name = employee.get().getFullName();
+        List<Recipient> to = plan.getOwnerId() == null ? adminRecipients.resolveTenantAdmins(tenant) : reviewer(tenant, plan.getOwnerId(), adminRecipients);
+        if (to.isEmpty()) return 0;
+        int sent = 0;
+        if (checkin) {
+            notifier.send(tenant, NotificationType.PERF_PLAN_CHECKIN_DUE, PerfReminderRules.checkinTitle(name),
+                    PerfReminderRules.checkinMessage(name, last, today), plan.getId(), "/hr/performance", to);
+            sent++;
+        }
+        if (ended) {
+            notifier.send(tenant, NotificationType.PERF_PLAN_ENDED, PerfReminderRules.planEndedTitle(name),
+                    PerfReminderRules.planEndedMessage(name, plan.getEndDate(), today), plan.getId(), "/hr/performance", to);
+            sent++;
+        }
         return sent;
     }
 

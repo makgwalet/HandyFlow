@@ -44,4 +44,35 @@ class PerfReminderRulesTest {
         assertThat(selfLateMessage("Mid-year", TODAY.minusDays(1), TODAY)).contains("1 day ago");
         assertThat(releasedMessage("Mid-year")).doesNotContain("rating of");
     }
+
+    @Test
+    void aPlanIsChasedFortnightlyFromTheLastCheckInOrFromTheDayTheEmployeeWasTold() {
+        LocalDate told = TODAY.minusDays(15);
+        assertThat(checkinReminderToday(PerfRules.PLAN_ACTIVE, told, told, null, TODAY)).isTrue();             // 14 days + 1
+        assertThat(checkinReminderToday(PerfRules.PLAN_ACTIVE, told, told, null, TODAY.minusDays(1))).isFalse(); // exactly 14
+        assertThat(checkinReminderToday(PerfRules.PLAN_ACTIVE, told, told, TODAY.minusDays(3), TODAY)).isFalse();
+        assertThat(checkinReminderToday(PerfRules.PLAN_ACTIVE, told, told, TODAY.minusDays(15), TODAY)).isTrue();
+        assertThat(checkinReminderToday(PerfRules.PLAN_ACTIVE, told, told, TODAY.minusDays(21), TODAY)).isTrue();  // weekly after
+        assertThat(checkinReminderToday(PerfRules.PLAN_ACTIVE, told, told, TODAY.minusDays(16), TODAY)).isFalse();
+    }
+
+    @Test
+    void onlyARunningPlanIsChased() {
+        LocalDate told = TODAY.minusDays(15);
+        for (String status : new String[]{PerfRules.PLAN_DRAFT, PerfRules.MET, PerfRules.NOT_MET, PerfRules.PLAN_CANCELLED}) {
+            assertThat(checkinReminderToday(status, told, told, null, TODAY)).isFalse();
+            assertThat(endedReminderToday(status, TODAY.minusDays(1), TODAY)).isFalse();
+        }
+        assertThat(endedReminderToday(PerfRules.PLAN_ACTIVE, TODAY.minusDays(1), TODAY)).isTrue();
+        assertThat(endedReminderToday(PerfRules.PLAN_ACTIVE, TODAY, TODAY)).isFalse();
+    }
+
+    @Test
+    void planAndGoalWordsKeepTheDetailsOut() {
+        assertThat(checkinMessage("Ann Adams", null, TODAY)).contains("none has been recorded").contains("Ann Adams");
+        assertThat(checkinMessage("Ann Adams", TODAY.minusDays(16), TODAY)).contains("16 days ago");
+        assertThat(planEndedMessage("Ann Adams", TODAY.minusDays(1), TODAY)).contains("1 day ago");
+        assertThat(goalProposedMessage("Ann", "x".repeat(200)).length()).isLessThan(200);
+        assertThat(goalSetMessage("Cut errors", TODAY)).contains("Cut errors").contains(TODAY.toString());
+    }
 }

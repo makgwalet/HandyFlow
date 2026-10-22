@@ -20,6 +20,10 @@ public interface HrPerfPlanRepository extends JpaRepository<HrPerfPlan, UUID> {
     @Query("SELECT p FROM HrPerfPlan p WHERE p.tenantId = :#{#tenantId.value} AND p.employeeId = :employeeId ORDER BY p.createdAt DESC")
     List<HrPerfPlan> forEmployee(TenantId tenantId, UUID employeeId);
 
+    /** Every running plan in every company, for the daily reminders. */
+    @Query("SELECT p FROM HrPerfPlan p WHERE p.status = 'ACTIVE'")
+    List<HrPerfPlan> allActive();
+
     @Query("SELECT p FROM HrPerfPlan p WHERE p.tenantId = :#{#tenantId.value} AND p.caseId = :caseId ORDER BY p.createdAt DESC")
     List<HrPerfPlan> forCase(TenantId tenantId, UUID caseId);
 }

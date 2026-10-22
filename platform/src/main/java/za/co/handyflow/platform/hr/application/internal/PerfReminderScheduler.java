@@ -30,5 +30,10 @@ public class PerfReminderScheduler {
         } catch (RuntimeException e) {
             log.error("Performance reminders failed: {}", e.getMessage());
         }
+        try {
+            service.remindPlans(LocalDate.now(SAST));
+        } catch (RuntimeException e) {
+            log.error("Plan reminders failed: {}", e.getMessage());
+        }
     }
 }

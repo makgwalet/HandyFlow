@@ -839,3 +839,29 @@ I read the four training services, the entities and the session screen. The modu
 - In my harness the pure tests pass: `SarsPayeCalculatorBenefitsTest` (6), `BenefitRulesTest` (6) and `TaxCertificateBenefitCodesTest` (5). Hand-worked figures match: R30 000 salary with R3 000 employer medical adds R886.25 a month PAYE. Dropping the employer retirement amount from the deduction is caught by 2 tests.
 - **Tax treatment needs a payroll specialist's check before use:** the certificate codes come from a vendor list, not from SARS; whether UIF and SDL apply to these benefits is unconfirmed (they are left unchanged); the retirement cap base including fringe benefits is assumed; the medical tax credit is not limited by the contributions.
 - Front end: 12 new tests pass, and all 220 tests in the HR folder pass. New files are lint-clean; `EmployeesTab.tsx` reports 16 lint errors, none on the lines I added.
+
+## 29. Slice 18b: performance goal and improvement plan notifications
+
+**What was there.** Review steps already told people it was their turn (section on cycles and reminders). Goals and improvement plans told nobody anything: a manager only found a proposed goal by opening the screen, and a plan could run for months without a check-in or run past its end date unnoticed.
+
+**What changed**
+
+- **Goals.** When an employee proposes a goal, their manager is told (the title is in the message, as the manager is about to approve it). When a manager approves it, the employee is told. When a manager or HR sets a goal for someone, that employee is told; no approval is asked. An employee with no manager, or a manager with no email, is skipped without error.
+- **Plan check-ins.** Every morning, a running plan with no check-in for 14 days (counted from the last check-in, or from the day the employee was told) gets a reminder to the plan's owner: the day after the 14 days, then every seventh day.
+- **Plans past their end date.** A plan still running after its end date is flagged to its owner the day after, then weekly, so it is closed, extended or cancelled.
+- **Owner gone.** When the plan has no owner, or the owner has left or has no email, the company administrators are told instead. Nothing is sent about an employee who has left.
+- **Privacy.** The plan messages carry the employee's name and say a check-in is due; they never carry the shortfall, the standard, the support or any check-in note. Nothing about a plan goes to the employee. Sending is best effort: a failure is logged and never stops the goal or plan step. The reminders respect the existing switch `app.notifications.enabled` and run in the same 07:45 South African time job.
+- Four new notification types: goal proposed, goal decided, plan check-in due, plan ended. No migration; no screen change.
+
+**Still not done**
+
+- No reminder to a manager about a proposed goal left unapproved, or to an employee about a goal that is past its due date.
+- The 14-day check-in interval is fixed; it is not set per plan or per company.
+- Employees are not told when a plan starts, a check-in is recorded or a plan is closed (HR tells the employee in person; the plan records the date).
+- A goal cancelled or closed notifies nobody.
+- Each daily run sends again on its cadence day; it does not remember what it sent, so a run repeated on the same day would repeat the message.
+
+**Not verified**
+
+- Maven, Spring and the database have not run. `PerfGoalService` gained a constructor argument and `PerfReminderService` gained two; `PerfHarness` and `PerfNotificationsTest` were updated to match and have 9 new cases (real Mockito), unexecuted. The new `allActive` query has not run against PostgreSQL.
+- In my harness `PerfReminderRulesTest` (7, 3 new) passes, and removing the weekly repeat from the check-in rule is caught.

@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import za.co.handyflow.platform.hr.domain.model.HrEmployee;
 import za.co.handyflow.platform.hr.domain.model.HrPerfCycle;
+import za.co.handyflow.platform.hr.domain.model.HrPerfGoal;
 import za.co.handyflow.platform.hr.domain.model.HrPerfReview;
 import za.co.handyflow.platform.hr.domain.model.PerfReminderRules;
 import za.co.handyflow.platform.hr.domain.repository.HrEmployeeRepository;
@@ -59,6 +60,26 @@ class PerfNotifier {
                     send(tenant, NotificationType.PERF_FEEDBACK_REQUESTED, PerfReminderRules.feedbackTitle(subject.getFullName()),
                             PerfReminderRules.feedbackMessage(subject.getFullName(), cycle.getName()), review.getId(), "/hr/performance", contactOf(p)));
         }
+    }
+
+    /** An employee proposed a goal: their manager is asked to approve it. */
+    void goalProposed(TenantId tenant, HrPerfGoal goal, HrEmployee subject) {
+        if (subject.getManagerId() == null) return;
+        employeeRepo.findActiveById(tenant, subject.getManagerId()).ifPresent(manager ->
+                send(tenant, NotificationType.PERF_GOAL_PROPOSED, PerfReminderRules.goalProposedTitle(subject.getFullName()),
+                        PerfReminderRules.goalProposedMessage(subject.getFullName(), goal.getTitle()), goal.getId(), "/hr/performance", contactOf(manager)));
+    }
+
+    /** A manager approved the employee's goal. */
+    void goalApproved(TenantId tenant, HrPerfGoal goal, HrEmployee subject) {
+        send(tenant, NotificationType.PERF_GOAL_DECIDED, PerfReminderRules.goalApprovedTitle(),
+                PerfReminderRules.goalApprovedMessage(goal.getTitle()), goal.getId(), "/hr/performance", contactOf(subject));
+    }
+
+    /** A manager or HR set a goal for the employee. */
+    void goalSet(TenantId tenant, HrPerfGoal goal, HrEmployee subject) {
+        send(tenant, NotificationType.PERF_GOAL_DECIDED, PerfReminderRules.goalSetTitle(),
+                PerfReminderRules.goalSetMessage(goal.getTitle(), goal.getDueDate()), goal.getId(), "/hr/performance", contactOf(subject));
     }
 
     static Recipient contactOf(HrEmployee e) {

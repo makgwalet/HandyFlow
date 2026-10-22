@@ -197,6 +197,10 @@ public enum NotificationType {
     PERF_RESULT_RELEASED(INFO, Set.of(IN_APP, EMAIL)),
     PERF_FEEDBACK_REQUESTED(INFO, Set.of(IN_APP, EMAIL)),
     PERF_REVIEWS_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
+    PERF_GOAL_PROPOSED(INFO, Set.of(IN_APP, EMAIL)),
+    PERF_GOAL_DECIDED(INFO, Set.of(IN_APP, EMAIL)),
+    PERF_PLAN_CHECKIN_DUE(WARNING, Set.of(IN_APP, EMAIL)),
+    PERF_PLAN_ENDED(WARNING, Set.of(IN_APP, EMAIL)),
 
     // An HR letter was issued to the employee. The message never says what the letter is about: letters can concern discipline
     // or health, and an email is not a private place.

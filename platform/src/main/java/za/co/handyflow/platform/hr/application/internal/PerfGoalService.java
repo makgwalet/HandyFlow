@@ -27,6 +27,7 @@ public class PerfGoalService {
     private final HrPerfCycleRepository cycleRepo;
     private final HrEmployeeRepository employeeRepo;
     private final PerfSupport support;
+    private final PerfNotifier notifier;
 
     // ── Reading ───────────────────────────────────────────────────────────────────────────────────
 
@@ -86,6 +87,8 @@ public class PerfGoalService {
                 PerfRules.initialGoalStatus(w.subject()), userId);
         goalRepo.save(g);
         support.event(tenantId, HrPerfEvent.GOAL, g.getId(), w.subject() ? "PROPOSED" : "SET", null, userId);
+        if (w.subject()) notifier.goalProposed(tenantId, g, subject);
+        else notifier.goalSet(tenantId, g, subject);
         return views(tenantId, List.of(g), me, held, true).get(0);
     }
 
@@ -109,6 +112,7 @@ public class PerfGoalService {
         g.approve(userId);
         goalRepo.save(g);
         support.event(tenantId, HrPerfEvent.GOAL, g.getId(), "APPROVED", null, userId);
+        notifier.goalApproved(tenantId, g, f.subject());
         return views(tenantId, List.of(g), f.me(), held, true).get(0);
     }
 

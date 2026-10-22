@@ -50,7 +50,7 @@ final class PerfHarness {
     final NotificationService notificationService = mock(NotificationService.class);
     final PerfNotifier notifier = new PerfNotifier(notificationService, employees);
     final PerfSupport support = new PerfSupport(employees, cycleRepo, reviewRepo, eventRepo);
-    final PerfGoalService goals = new PerfGoalService(goalRepo, cycleRepo, employees, support);
+    final PerfGoalService goals = new PerfGoalService(goalRepo, cycleRepo, employees, support, notifier);
     final PerfFeedbackService feedback = new PerfFeedbackService(feedbackRepo, reviewRepo, cycleRepo, support, notifier);
     final PerfReviewViews views = new PerfReviewViews(cycleRepo, support, goals, feedback);
     final PerfCycleService cycles = new PerfCycleService(cycleRepo, reviewRepo, employees, support, views, notifier);
