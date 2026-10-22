@@ -46,6 +46,12 @@ public class RecApplication {
     @Column(name = "offered_start_date")       private LocalDate offeredStartDate;
     @Column(name = "offer_benefits")           private String    offerBenefits;
     @Column(name = "offer_letter_sent_at")     private Instant   offerLetterSentAt;
+    @Column(name = "offer_approval_status", nullable = false) private String offerApprovalStatus = "NOT_SUBMITTED";
+    @Column(name = "offer_submitted_by")       private UUID      offerSubmittedBy;
+    @Column(name = "offer_submitted_at")       private Instant   offerSubmittedAt;
+    @Column(name = "offer_approved_by")        private UUID      offerApprovedBy;
+    @Column(name = "offer_approved_at")        private Instant   offerApprovedAt;
+    @Column(name = "offer_approval_note")      private String    offerApprovalNote;
 
     // Referral tracking. referrerName is candidate-supplied free text at
     // apply time (a public applicant has no way to know internal user
@@ -117,11 +123,33 @@ public class RecApplication {
 
     public void recordOfferTerms(BigDecimal offeredSalary, String offeredSalaryFrequency,
                                  LocalDate offeredStartDate, String offerBenefits) {
+        // Different terms from the ones that were sent for approval, or approved, are a different offer.
+        if (RecruiterApprovalRules.offerChanged(this.offeredSalary, this.offeredSalaryFrequency, this.offeredStartDate, this.offerBenefits,
+                offeredSalary, offeredSalaryFrequency, offeredStartDate, offerBenefits) && offerLetterSentAt == null) withdrawOfferApproval();
         this.offeredSalary          = offeredSalary;
         this.offeredSalaryFrequency = offeredSalaryFrequency;
         this.offeredStartDate       = offeredStartDate;
         this.offerBenefits          = offerBenefits;
         touch();
+    }
+
+    public void submitOfferForApproval(UUID by) {
+        this.offerApprovalStatus = RecruiterApprovalRules.SUBMITTED;
+        this.offerSubmittedBy = by; this.offerSubmittedAt = Instant.now();
+        this.offerApprovedBy = null; this.offerApprovedAt = null; this.offerApprovalNote = null;
+        touch();
+    }
+
+    public void decideOfferApproval(boolean approve, UUID by, String note) {
+        this.offerApprovalStatus = approve ? RecruiterApprovalRules.APPROVED : RecruiterApprovalRules.REJECTED;
+        this.offerApprovedBy = by; this.offerApprovedAt = Instant.now();
+        this.offerApprovalNote = note == null || note.isBlank() ? null : note.trim();
+        touch();
+    }
+
+    public void withdrawOfferApproval() {
+        this.offerApprovalStatus = RecruiterApprovalRules.NOT_SUBMITTED;
+        this.offerSubmittedBy = null; this.offerSubmittedAt = null; this.offerApprovedBy = null; this.offerApprovedAt = null; this.offerApprovalNote = null;
     }
 
     public void markOfferLetterSent() {

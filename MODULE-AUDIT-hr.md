@@ -605,3 +605,33 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 
 - Maven, real Mockito and PostgreSQL have not run. The new `ErTerminationService`, `ErCaseService.setWarningValidity`, `ErCaseViews.responseDue` and the controller endpoints (`/end-employment`, `/warning-validity`) have compiled only against my stand-in classes. Spring wiring of `ErTerminationService` and the new `PublicHolidayRepository` dependency of `ErCaseViews` is untested.
 - In the stub harness: 6 rules tests and 8 service tests pass (the service tests use hand-made stand-ins for the audit and view classes); two deliberate breaks, skipping the appeal check and the permission check, were each caught. Front end: 3 new tests (22 in the file), ESLint clean.
+
+## 20. Slice 14: recruiter approvals and POPIA retention
+
+**What changed**
+
+- **Job approval.** A company can require that a job is approved before it is published. A draft job is sent for approval (`RECRUITER_ADMIN`), and someone else with `RECRUITER_ADMIN` approves it or refuses it with a note. Publishing is refused until it is approved. A draft changed after it was sent or approved loses the approval; a job already published can still be edited without it.
+- **Offer approval.** A company can require that an offer is approved before the letter is emailed. Sending for approval needs `RECRUITER_MANAGE`, deciding needs `RECRUITER_ADMIN`, and the person who sent it cannot decide it. Changing the offer terms withdraws the approval, unless the letter has already gone out.
+- **Both are off by default** (per company, in `rec_settings`), so nothing that works today is blocked. Jobs already published and offers already sent are marked approved by the migration.
+- **Retention of unsuccessful applicants' details.** The company chooses how long to keep them (3 to 60 months, default 12) counted from the latest activity. A person with `RECRUITER_ADMIN` sees who is past that, chooses, confirms, and the system removes the name, email, phone, links, CV file and the free-text notes about them. The applications, stages and scores stay without the person so reports still add up. Every removal is logged in `rec_retention_log`. Anyone with an open application, or hired, is refused again at removal time.
+- **Screens.** An approval panel on draft jobs and on offers; a new "Approvals & privacy" section with the settings and the removal list; a publish refusal is now shown instead of silently failing.
+- Migration `V498`.
+
+**Decisions to know about**
+
+- POPIA does not name a number of months for job applicants, so the period is the company's choice and the screen says so.
+- Removal is manual and cannot be undone. There is no scheduler.
+
+**Still not done**
+
+- Notifications to approvers, and any approval history beyond the latest decision.
+- Downloading the offer-letter PDF is not blocked before approval; only sending is.
+- A consent statement on the careers page.
+- The removal list loads all applicants past the cutoff and their applications into memory (fine for thousands, not hundreds of thousands).
+- Turning a recruiter hire into an employee with ID, tax and bank details.
+
+**Not verified**
+
+- Maven, real Mockito, Spring wiring and PostgreSQL have not run. `V498`, the retention SQL, the JPQL `notChangedSince` and the derived query `findByApplicantIdIn` have never been executed.
+- In the stub harness: 12 rules tests and 14 service tests pass, and three deliberate breaks (skipping the submitter check, the open-application check and the tenant check) were each caught.
+- Front end: 11 new tests pass, with the 15 existing navigation and recruiter tests; lint shows no new errors (RecruiterPage.tsx has 26 older ones). I have not looked at the screens in a browser.

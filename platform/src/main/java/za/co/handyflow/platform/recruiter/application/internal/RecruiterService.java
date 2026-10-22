@@ -58,6 +58,7 @@ public class RecruiterService {
     private final RecInterviewPanelistRepository    panelistRepo;
     private final RecJobInterviewRoundRepository    roundRepo;
     private final CvStorage                          cvStorage;
+    private final RecruiterApprovalService           approvalService;
 
     private static final Map<String, String> STAGE_LABELS = Map.of(
             "APPLIED",    "Application Received",
@@ -120,6 +121,8 @@ public class RecruiterService {
     @Transactional
     public JobResponse updateJob(TenantId tenantId, UUID id, CreateJobRequest req) {
         RecJob job = findJob(tenantId, id);
+        // A draft changed after it was sent for approval, or approved, is a different job: the approval no longer covers it.
+        if (RecruiterApprovalRules.editWithdrawsApproval(job.getStatus(), job.getApprovalStatus())) job.withdrawApproval();
         job.update(req.title(), req.department(), req.location(),
                 req.jobType(), req.experienceLevel(), req.description(),
                 req.requirements(), req.benefits(),
@@ -132,7 +135,7 @@ public class RecruiterService {
     public JobResponse updateJobStatus(TenantId tenantId, UUID id, String action) {
         RecJob job = findJob(tenantId, id);
         switch (action.toUpperCase()) {
-            case "PUBLISH" -> job.publish();
+            case "PUBLISH" -> { approvalService.requirePublishable(tenantId, job); job.publish(); }
             case "PAUSE"   -> job.pause();
             case "CLOSE"   -> job.close();
             case "FILL"    -> job.markFilled();
@@ -685,6 +688,7 @@ public class RecruiterService {
                 .orElseThrow(() -> new ResourceNotFoundException("Application", applicationId.toString()));
         RecApplicant applicant = applicantRepo.findById(app.getApplicantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Applicant", app.getApplicantId().toString()));
+        approvalService.requireOfferSendable(tenantId, app);
         if (applicant.getEmail() == null) {
             throw new HandyFlowException("Applicant has no email on file",
                     HttpStatus.BAD_REQUEST, "NO_EMAIL");

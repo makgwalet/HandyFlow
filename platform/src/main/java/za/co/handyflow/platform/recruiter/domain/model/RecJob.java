@@ -42,6 +42,12 @@ public class RecJob {
     @Column(name = "created_at")       private Instant createdAt;
     @Column(name = "updated_at")       private Instant updatedAt;
     @Column(name = "deleted_at")       private Instant deletedAt;
+    @Column(name = "approval_status", nullable = false) private String approvalStatus = "NOT_SUBMITTED";
+    @Column(name = "submitted_by")     private UUID    submittedBy;
+    @Column(name = "submitted_at")     private Instant submittedAt;
+    @Column(name = "approved_by")      private UUID    approvedBy;
+    @Column(name = "approved_at")      private Instant approvedAt;
+    @Column(name = "approval_note")    private String  approvalNote;
 
     public static RecJob create(TenantId tenantId, String title, String department,
                                  String location, String jobType, String experienceLevel,
@@ -74,6 +80,27 @@ public class RecJob {
     public void pause()    { this.status = "PAUSED"; touch(); }
     public void close()    { this.status = "CLOSED"; touch(); }
     public void markFilled() { this.status = "FILLED"; touch(); }
+
+    public void submitForApproval(UUID by) {
+        this.approvalStatus = RecruiterApprovalRules.SUBMITTED;
+        this.submittedBy = by; this.submittedAt = Instant.now();
+        this.approvedBy = null; this.approvedAt = null; this.approvalNote = null;
+        touch();
+    }
+
+    public void decideApproval(boolean approve, UUID by, String note) {
+        this.approvalStatus = approve ? RecruiterApprovalRules.APPROVED : RecruiterApprovalRules.REJECTED;
+        this.approvedBy = by; this.approvedAt = Instant.now();
+        this.approvalNote = note == null || note.isBlank() ? null : note.trim();
+        touch();
+    }
+
+    /** The job was changed after it was sent for approval or approved, so the approval no longer covers what is published. */
+    public void withdrawApproval() {
+        this.approvalStatus = RecruiterApprovalRules.NOT_SUBMITTED;
+        this.submittedBy = null; this.submittedAt = null; this.approvedBy = null; this.approvedAt = null; this.approvalNote = null;
+        touch();
+    }
 
     public void incrementApplicationCount() { this.applicationCount++; touch(); }
 

@@ -32,6 +32,7 @@ public class RecApplicant {
     @Column(name = "portal_token",  unique = true) private String portalToken;
     @Column(name = "created_at")    private Instant createdAt;
     @Column(name = "updated_at")    private Instant updatedAt;
+    @Column(name = "anonymised_at") private Instant anonymisedAt;
 
     public static RecApplicant create(TenantId tenantId, String firstName, String lastName,
                                        String email, String phone, String location,
@@ -69,6 +70,20 @@ public class RecApplicant {
         if (portfolioUrl != null) this.portfolioUrl = portfolioUrl;
         this.updatedAt = Instant.now();
     }
+
+    /** Removes everything that identifies the person. The row stays, so counts and history of applications still add up. */
+    public void anonymise() {
+        this.firstName = "Removed";
+        this.lastName = "applicant";
+        this.email = "removed-" + id + "@removed.invalid";
+        this.phone = null; this.location = null; this.linkedinUrl = null; this.portfolioUrl = null;
+        this.cvUrl = null; this.cvName = null;
+        this.portalToken = UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
+        this.anonymisedAt = Instant.now();
+        this.updatedAt = this.anonymisedAt;
+    }
+
+    public boolean isAnonymised() { return anonymisedAt != null; }
 
     public String getFullName() { return firstName + " " + lastName; }
 }

@@ -35,6 +35,8 @@ public interface RecApplicationRepository extends JpaRepository<RecApplication, 
 
     List<RecApplication> findByApplicantId(UUID applicantId);
 
+    List<RecApplication> findByApplicantIdIn(java.util.Collection<UUID> applicantIds);
+
     @Query("""
         SELECT COUNT(a) FROM RecApplication a
         WHERE a.tenantId = :tenantId AND a.stage = :stage

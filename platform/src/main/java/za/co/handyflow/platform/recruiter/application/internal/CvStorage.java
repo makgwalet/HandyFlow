@@ -44,4 +44,10 @@ public interface CvStorage {
      * (see RecruiterService.getCvBytes()'s legacy-base64 fallback).
      */
     byte[] retrieve(String reference);
+
+    /**
+     * Deletes the file a reference points to. Nothing happens for a reference that is not this provider's or whose file is already gone, so
+     * removing an applicant's details can be repeated safely.
+     */
+    void delete(String reference);
 }

@@ -10,7 +10,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.recruiter.application.internal.RecruiterPdfGenerator;
+import za.co.handyflow.platform.recruiter.application.internal.RecruiterApprovalService;
+import za.co.handyflow.platform.recruiter.application.internal.RecruiterRetentionService;
 import za.co.handyflow.platform.recruiter.application.internal.RecruiterService;
+import za.co.handyflow.platform.recruiter.dto.RecruiterApprovalDtos.*;
 import za.co.handyflow.platform.recruiter.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -39,6 +42,8 @@ public class RecruiterController {
 
     private final RecruiterService recruiterService;
     private final RecruiterPdfGenerator recruiterPdfGenerator;
+    private final RecruiterApprovalService approvalService;
+    private final RecruiterRetentionService retentionService;
 
     // ── Summary ───────────────────────────────────────────────────────────────
 
@@ -347,5 +352,80 @@ public class RecruiterController {
             @PathVariable String token, @PathVariable UUID applicationId) {
         recruiterService.withdrawApplication(token, applicationId);
         return ResponseEntity.ok(ApiResponse.success("Application withdrawn", null));
+    }
+
+    // ── Settings, approvals and applicant data retention ───────────────────────────────────────────
+
+    @GetMapping("/settings")
+    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    @Operation(summary = "Whether jobs and offers need approval, and how long unsuccessful applicants' details are kept")
+    public ResponseEntity<ApiResponse<SettingsView>> settings() {
+        return ResponseEntity.ok(ApiResponse.success(approvalService.settingsView(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PutMapping("/settings")
+    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    public ResponseEntity<ApiResponse<SettingsView>> updateSettings(@RequestBody SettingsRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Settings saved",
+                approvalService.updateSettings(TenantContext.getTenantIdAsObject(), req, TenantContext.getCurrentUserId())));
+    }
+
+    @GetMapping("/jobs/{id}/approval")
+    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    public ResponseEntity<ApiResponse<ApprovalView>> jobApproval(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(approvalService.jobApproval(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/jobs/{id}/approval/submit")
+    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @Operation(summary = "Send a draft job for approval")
+    public ResponseEntity<ApiResponse<ApprovalView>> submitJob(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Sent for approval",
+                approvalService.submitJob(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/jobs/{id}/approval/decision")
+    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @Operation(summary = "Approve or not approve a job. Not the person who sent it")
+    public ResponseEntity<ApiResponse<ApprovalView>> decideJob(@PathVariable UUID id, @RequestBody DecisionRequest req) {
+        return ResponseEntity.ok(ApiResponse.success(
+                approvalService.decideJob(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
+    }
+
+    @GetMapping("/applications/{id}/offer-approval")
+    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    public ResponseEntity<ApiResponse<ApprovalView>> offerApproval(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(approvalService.offerApproval(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/applications/{id}/offer-approval/submit")
+    @PreAuthorize("hasAuthority('RECRUITER_MANAGE')")
+    @Operation(summary = "Send the offer terms for approval before the letter is sent")
+    public ResponseEntity<ApiResponse<ApprovalView>> submitOffer(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Sent for approval",
+                approvalService.submitOffer(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/applications/{id}/offer-approval/decision")
+    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @Operation(summary = "Approve or not approve an offer. Not the person who sent it")
+    public ResponseEntity<ApiResponse<ApprovalView>> decideOffer(@PathVariable UUID id, @RequestBody DecisionRequest req) {
+        return ResponseEntity.ok(ApiResponse.success(
+                approvalService.decideOffer(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
+    }
+
+    @GetMapping("/retention")
+    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @Operation(summary = "Unsuccessful applicants whose retention period has ended")
+    public ResponseEntity<ApiResponse<List<RemovalCandidate>>> retentionDue() {
+        return ResponseEntity.ok(ApiResponse.success(retentionService.due(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/retention/remove")
+    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @Operation(summary = "Remove the personal details and CV of the applicants chosen. Cannot be undone")
+    public ResponseEntity<ApiResponse<RemovalResult>> retentionRemove(@RequestBody RemovalRequest req) {
+        return ResponseEntity.ok(ApiResponse.success(
+                retentionService.remove(TenantContext.getTenantIdAsObject(), req.applicantIds(), TenantContext.getCurrentUserId())));
     }
 }

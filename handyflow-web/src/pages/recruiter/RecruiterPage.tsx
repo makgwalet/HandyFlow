@@ -12,6 +12,8 @@ import {
 import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
 import { RECRUITER_SECTIONS } from '../../navigation/moduleSections'
 import { useParams } from 'react-router-dom'
+import ApprovalPanel from './RecApproval'
+import RecPrivacy from './RecPrivacy'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Job {
@@ -601,6 +603,8 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
               </>
             )}
           </div>
+
+          {app?.stage === 'OFFER' && app?.offeredSalary != null && !app?.offerLetterSentAt && <ApprovalPanel kind="offer" id={app.id} />}
 
           {/* Tabs */}
           <div style={{ display: 'flex' }}>
@@ -1301,6 +1305,7 @@ export function RecruiterPage() {
   const [selectedApp,   setSelectedApp]   = useState<Application | null>(null)
   const [showDeleteJob, setShowDeleteJob] = useState<Job | null>(null)
   const [showPublish,   setShowPublish]   = useState<Job | null>(null)
+  const [jobError,      setJobError]      = useState<string | null>(null)
   const [compareIds,    setCompareIds]    = useState<string[]>([])
   const [showCompare,   setShowCompare]   = useState(false)
 
@@ -1341,7 +1346,8 @@ export function RecruiterPage() {
   const doJobAction = useMutation({
     mutationFn: ({ id, action }: { id: string; action: string }) =>
       apiClient.post(`/api/v1/recruiter/jobs/${id}/action/${action}`),
-    onSuccess: () => { invalidate(); setShowPublish(null) },
+    onSuccess: () => { invalidate(); setShowPublish(null); setJobError(null) },
+    onError: (e: { response?: { data?: { message?: string } } }) => { setShowPublish(null); setJobError(e?.response?.data?.message || 'That could not be done.') },
   })
 
   const deleteJob = useMutation({
@@ -1422,6 +1428,7 @@ export function RecruiterPage() {
           case 'pipeline':
           case 'applications': return (
             <>
+              {jobError && <div role="alert" style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', fontSize: 13 }}>{jobError}</div>}
               {/* Toolbar */}
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 18 }}>
                 <div style={{ position: 'relative' as const }}>
@@ -1504,6 +1511,7 @@ export function RecruiterPage() {
                               </a>
                             )}
                           </div>
+                          {job.status === 'DRAFT' && <ApprovalPanel kind="job" id={job.id} />}
                         </div>
                         <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                           {job.status === 'DRAFT' && (
@@ -1641,6 +1649,7 @@ export function RecruiterPage() {
               )}
             </>
           )
+          case 'settings': return <RecPrivacy />
           default: return null
         }
       }}>

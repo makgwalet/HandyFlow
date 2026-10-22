@@ -79,4 +79,16 @@ public class LocalCvStorage implements CvStorage {
                     HttpStatus.INTERNAL_SERVER_ERROR, "CV_READ_FAILED");
         }
     }
+
+    @Override
+    public void delete(String reference) {
+        if (reference == null || !reference.startsWith(PREFIX)) return;
+        try {
+            Files.deleteIfExists(storageDir.resolve(reference.substring(PREFIX.length())));
+        } catch (IOException e) {
+            log.error("Failed to delete CV from local storage, reference={}: {}", reference, e.getMessage());
+            throw new HandyFlowException("Stored CV could not be deleted",
+                    HttpStatus.INTERNAL_SERVER_ERROR, "CV_DELETE_FAILED");
+        }
+    }
 }

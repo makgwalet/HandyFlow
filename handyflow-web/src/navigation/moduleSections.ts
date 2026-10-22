@@ -812,6 +812,12 @@ export const RECRUITER_SECTIONS: ModuleSections = {
         { id: 'applications', label: 'Applications', icon: Users },
       ],
     },
+    {
+      label: 'Settings',
+      sections: [
+        { id: 'settings', label: 'Approvals & privacy', icon: ShieldCheck },
+      ],
+    },
   ],
 }
 
