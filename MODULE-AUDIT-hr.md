@@ -490,3 +490,37 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - The Maven build, real Mockito runs, V494 and the JPQL against PostgreSQL, Hibernate mappings and Spring wiring have not been run.
 - The real iText PDF has never been rendered here. Characters outside the default font's range may not render.
 - Backend logic was checked with a stub harness (22 rules tests, 28 service tests). Front end: 16 tests, ESLint clean.
+
+## 16. Slice 10 status: performance (reviews, goals, 360 feedback, improvement plans)
+
+**What was wrong**
+
+- Performance was handled outside the system. There was no record of what an employee was rated, who said what, or what support and time a struggling employee was given before a poor-performance case went further.
+
+**What changed**
+
+- **Review cycles** (draft, open, closed). Launching makes a review for every employee who worked in the period. The reviewer is the employee's manager if that manager is still serving; otherwise none is set and HR must choose one (the cycle screen warns). A cycle cannot be closed while reviews are still being worked on.
+- **Reviews**: the employee writes a self-review; the manager rates 1 to 5 once it is in or the self-review due date has passed. Ratings 1, 2 and 5 need comments of at least 20 characters. HR may change the final rating (with a reason) and then releases the result. The employee sees the manager's side, the final rating and the 360 summary only after release. A released review is fixed by a database trigger. The employee can reply once; acknowledging means read, not agreed.
+- **360 feedback**: the reviewer or HR asks up to 15 colleagues. The summary appears only once 3 people have replied, with no names or dates and comments in alphabetical order. The reviewer sees who was asked and who replied, not what each wrote. Only HR sees what each person wrote. The subject and the reviewer cannot be asked. A provider can decline.
+- **Goals**: the employee proposes, the manager approves; a manager or HR may also set a goal directly. Progress is logged as events. The manager closes a goal as achieved, partly achieved or not achieved (a note is needed unless achieved).
+- **Improvement plans**: HR creates and starts a plan. Starting records the date the employee was told, and the employee cannot see the plan before that. After that the shortfall, standard and support are frozen by a database trigger; the end date can be made later, never earlier. The support person or HR records check-ins. "Not met" needs the end date reached and at least one check-in. A plan can be linked to a poor-performance incapacity case about the same employee; the case screen shows it, and a confidential case hides its plan from people who cannot see the case. A plan shorter than the ER policy minimum is flagged.
+- Nobody is treated as manager, reviewer or HR on their own record. Events and check-ins cannot be edited or deleted (trigger).
+- New permissions HR_PERF_READ and HR_PERF_MANAGE (migration V495), given to HR_MANAGE holders. Managers and employees need no permission for their own and their team's records; this follows the manager recorded on the employee.
+
+**What is not done, or not what it may seem**
+
+- 360 anonymity is a threshold of 3 replies, not true anonymity: HR can see who wrote what, and in a small team 3 replies can still point to someone.
+- A self-review can only be submitted; there is no draft saving.
+- A plan is created and started by HR only. Check-ins are by the support person or HR.
+- Linking a plan to a case does not add steps or timeline entries to the case, and ending a plan does not advance the case.
+- No notifications, reminders or email for due dates, requests or releases.
+- No competency framework, rating-distribution or calibration report, and no goal cascading.
+- Employees cannot suggest their own 360 providers.
+- If a manager has left, the review has no reviewer until HR assigns one.
+- Reviews are made for everyone not terminated who worked in the period, including probationers.
+
+**Not verified**
+
+- The Maven build, real Mockito runs, V495 and the JPQL against PostgreSQL, Hibernate mappings and Spring wiring have not been run. The new `@DeleteMapping` and the `ApiResponse.success` call with a null body have not been compiled.
+- List screens may issue extra queries per row (capped at 300 plans, 1000 rows); not measured.
+- Backend logic was checked with a stub harness (31 rules tests, 41 service tests; 8 deliberate breaks of the visibility and release rules were each caught). Front end: 24 tests, ESLint clean on the new files.

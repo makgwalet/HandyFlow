@@ -6,6 +6,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { ACTION_LABEL, TYPE_LABEL, fmtDate, words } from "./er.logic"
 import { errorText, plain, primary, unwrap, type Detail } from "./er.shared"
+import CasePlans from "./CasePlans"
+import { perfRights } from "./perf.logic"
 import CaseLetters from "./CaseLetters"
 import ErActionForm from "./ErActionForms"
 import { Chip, Notice, Section, StatusChip } from "./ErParts"
@@ -17,6 +19,7 @@ export default function ErCaseDetail({ id, back }: { id: string; back: () => voi
   const qc = useQueryClient()
   const { user } = useAuth() as { user?: { permissions?: string[] } }
   const letters = letterRights(user?.permissions ?? [])
+  const perf = perfRights(user?.permissions ?? [])
   const [action, setAction] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
@@ -92,6 +95,8 @@ export default function ErCaseDetail({ id, back }: { id: string; back: () => voi
           )}
         </Section>
       )}
+
+      {perf.read && <CasePlans caseId={c.id} caseType={c.type} category={c.category} employeeId={c.employee.id} canManage={perf.manage} />}
 
       {letters.read && <CaseLetters caseId={c.id} caseType={c.type} canIssue={letters.issue} />}
 

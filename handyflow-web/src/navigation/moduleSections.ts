@@ -339,6 +339,7 @@ export const HR_SECTIONS: ModuleSections = {
         { id: 'onboarding', label: 'Onboarding', icon: UserPlus, anyPermission: ['HR_READ', 'HR_MANAGE', 'HR_TEAM_READ', 'HR_ONBOARDING_MANAGE'] },
         { id: 'disciplinary', label: 'Employee relations', icon: AlertOctagon },
         { id: 'letters', label: 'Letters', icon: Mail },
+        { id: 'performance', label: 'Performance', icon: Target },
       ],
     },
     {
