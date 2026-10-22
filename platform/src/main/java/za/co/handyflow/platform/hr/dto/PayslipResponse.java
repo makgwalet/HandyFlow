@@ -28,5 +28,13 @@ public record PayslipResponse(
         BigDecimal ytdPaye,
         BigDecimal taxableIncome,
         int taxYear,
-        Instant createdAt
+        Instant createdAt,
+        Integer daysInPeriod,
+        BigDecimal daysPaid,
+        BigDecimal prorationAmount,
+        BigDecimal unpaidLeaveDays,
+        BigDecimal unpaidLeaveAmount,
+        BigDecimal leavePayoutDays,
+        BigDecimal leavePayoutAmount,
+        boolean finalPay
 ) {}

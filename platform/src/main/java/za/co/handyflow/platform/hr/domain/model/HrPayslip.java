@@ -3,6 +3,8 @@ package za.co.handyflow.platform.hr.domain.model;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
@@ -43,6 +45,18 @@ public class HrPayslip {
     @Column(name = "tax_year")          Integer taxYear;
     /** The medical tax credit actually taken off the month's PAYE. Null on payslips made before it was recorded. */
     @Column(name = "medical_tax_credit") BigDecimal medicalTaxCredit;
+    /** Working days in the pay period and the days paid. Empty on payslips made before part-period pay existed, which were paid in full. */
+    @Column(name = "days_in_period") @JdbcTypeCode(SqlTypes.SMALLINT) Integer daysInPeriod;
+    @Column(name = "days_paid")            BigDecimal daysPaid;
+    /** Salary not paid because the employee joined or left part way through the period. Already taken off the gross salary. */
+    @Column(name = "proration_amount")     BigDecimal prorationAmount    = BigDecimal.ZERO;
+    @Column(name = "unpaid_leave_days")    BigDecimal unpaidLeaveDays    = BigDecimal.ZERO;
+    /** Salary not paid for approved unpaid leave. Already taken off the gross salary. */
+    @Column(name = "unpaid_leave_amount")  BigDecimal unpaidLeaveAmount  = BigDecimal.ZERO;
+    @Column(name = "leave_payout_days")    BigDecimal leavePayoutDays    = BigDecimal.ZERO;
+    /** Annual leave paid out on the last pay. Part of the total earnings. */
+    @Column(name = "leave_payout_amount")  BigDecimal leavePayoutAmount  = BigDecimal.ZERO;
+    @Column(name = "final_pay")            boolean finalPay;
     @Column(name = "created_at")        Instant createdAt;
 
     public static HrPayslip create(TenantId tenantId, UUID payRunId,
@@ -69,6 +83,23 @@ public class HrPayslip {
         return p;
     }
 
+    /** What the gross salary was worked out from. Set before the calculations are applied. */
+    public void setPeriodPay(int daysInPeriod, BigDecimal daysPaid, BigDecimal prorationAmount, BigDecimal unpaidLeaveDays, BigDecimal unpaidLeaveAmount) {
+        this.daysInPeriod = daysInPeriod;
+        this.daysPaid = daysPaid;
+        this.prorationAmount = prorationAmount;
+        this.unpaidLeaveDays = unpaidLeaveDays;
+        this.unpaidLeaveAmount = unpaidLeaveAmount;
+    }
+
+    /** Annual leave paid out on the last pay. Set before the calculations are applied, which add it to the earnings. */
+    public void setLeavePayout(BigDecimal days, BigDecimal amount) {
+        this.leavePayoutDays = days == null ? BigDecimal.ZERO : days;
+        this.leavePayoutAmount = amount == null ? BigDecimal.ZERO : amount;
+    }
+
+    public void markFinalPay() { this.finalPay = true; }
+
     public void setMedicalTaxCredit(BigDecimal credit) { this.medicalTaxCredit = credit; }
 
     /** Approved overtime for the month. Set before the calculations are applied, which add it to the earnings. */
@@ -89,7 +120,7 @@ public class HrPayslip {
 
         this.totalEarnings = grossSalary
                 .add(overtimeAmount).add(bonusAmount)
-                .add(travelAllowance).add(otherEarnings);
+                .add(travelAllowance).add(otherEarnings).add(leavePayoutAmount);
 
         this.totalDeductions = payeAmount
                 .add(uifEmployee).add(medicalAid)

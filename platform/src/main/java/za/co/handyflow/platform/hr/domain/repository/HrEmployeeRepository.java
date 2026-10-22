@@ -30,6 +30,24 @@ public interface HrEmployeeRepository extends JpaRepository<HrEmployee, UUID> {
     @Query("SELECT e FROM HrEmployee e WHERE e.tenantId = :#{#tenantId.value} AND e.status = 'ACTIVE' AND e.deletedAt IS NULL ORDER BY e.lastName")
     List<HrEmployee> findAllActiveList(TenantId tenantId);
 
+    /**
+     * Terminated employees a pay run for a period still has to deal with:
+     * <ul>
+     *   <li>leaving after the end of the period (terminated on record, still working): paid as normal;</li>
+     *   <li>leaving within the period, or recorded late (not before {@code earliest}): their last pay, unless a pay run other than this one
+     *       that was not cancelled already covers the days up to the day they left.</li>
+     * </ul>
+     */
+    @Query("""
+            SELECT e FROM HrEmployee e WHERE e.tenantId = :#{#tenantId.value} AND e.status = 'TERMINATED' AND e.deletedAt IS NULL
+              AND e.endDate IS NOT NULL AND e.startDate <= :periodEnd
+              AND (e.endDate > :periodEnd
+                   OR (e.endDate >= :earliest AND NOT EXISTS (
+                         SELECT 1 FROM HrPayslip p, HrPayRun r WHERE p.employeeId = e.id AND r.id = p.payRunId
+                           AND r.id <> :runId AND r.status <> 'CANCELLED' AND r.periodEnd >= e.endDate)))
+            ORDER BY e.lastName""")
+    List<HrEmployee> terminatedForPay(TenantId tenantId, java.time.LocalDate periodEnd, java.time.LocalDate earliest, java.util.UUID runId);
+
     @Query("SELECT e FROM HrEmployee e WHERE e.tenantId = :#{#tenantId.value} AND e.id = :id AND e.deletedAt IS NULL")
     Optional<HrEmployee> findActiveById(TenantId tenantId, UUID id);
 

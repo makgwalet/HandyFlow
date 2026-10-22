@@ -35,6 +35,9 @@ public class PayrollService {
     private final HrPayRunEventRepository eventRepo;
     private final EmployeeChangeService changeService;
     private final OvertimeService       overtimeService;
+    private final za.co.handyflow.platform.shared.PublicHolidayRepository holidayRepo;
+    private final HrLeaveRequestRepository leaveRepo;
+    private final LeaveService          leaveService;
 
     // ── Pay runs ──────────────────────────────────────────────────────────────
 
@@ -108,9 +111,22 @@ public class PayrollService {
         // Approved pay and bank changes dated up to the end of the period take effect before anything is calculated.
         changeService.applyDue(tenantId, run.getPeriodEnd());
 
-        List<HrEmployee> employees = employeeRepo.findAllActiveList(tenantId);
+        List<HrEmployee> active = employeeRepo.findAllActiveList(tenantId);
+        // Leavers are paid up to the day they left, and a person who joins part way through the period is paid from their start date.
+        List<HrEmployee> employees = new java.util.ArrayList<>();
+        java.util.Set<UUID> seen = new java.util.HashSet<>();
+        for (HrEmployee e : active) if (seen.add(e.getId())) employees.add(e);
+        for (HrEmployee e : employeeRepo.terminatedForPay(tenantId, run.getPeriodEnd(), PayPeriodRules.earliestLateLeaver(run.getPeriodStart()), run.getId()))
+            if (seen.add(e.getId())) employees.add(e);
+        employees.removeIf(e -> e.getStartDate() != null && e.getStartDate().isAfter(run.getPeriodEnd()));
         if (employees.isEmpty())
             throw new IllegalStateException("No active employees found for this tenant");
+
+        java.util.Set<LocalDate> holidays = new java.util.HashSet<>(holidayRepo.datesBetween(run.getPeriodStart(), run.getPeriodEnd()));
+        Map<UUID, BigDecimal> unpaidDays = new java.util.HashMap<>();
+        for (HrLeaveRequest r : leaveRepo.approvedUnpaidIn(tenantId, run.getPeriodStart(), run.getPeriodEnd()))
+            unpaidDays.merge(r.getEmployeeId(), PayPeriodRules.unpaidDaysIn(r.getStartDate(), r.getEndDate(), r.isHalfDay(),
+                    run.getPeriodStart(), run.getPeriodEnd(), holidays), BigDecimal::add);
 
         List<String> warnings = new java.util.ArrayList<>();
         if (taxYear != run.getTaxYear())
@@ -145,12 +161,36 @@ public class PayrollService {
                         + "so the medical credit assumes the employee only. Record the membership to confirm it.");
             List<HrOvertimeClaim> claims = overtime.getOrDefault(emp.getId(), List.of());
             BigDecimal overtimePay = claims.stream().map(HrOvertimeClaim::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
-            PayrollEngine.PayrollResult result = engine.calculate(emp, rules, annualPayroll, m.count(), overtimePay);
+
+            // Pay for the period: the days employed less unpaid leave, and on a last pay the annual leave owing.
+            String who = emp.getFullName() + " (" + emp.getEmployeeNumber() + ")";
+            PayPeriodRules.Pay pay = PayPeriodRules.pay(emp.getGrossSalary(), run.getPeriodStart(), run.getPeriodEnd(), holidays,
+                    emp.getStartDate(), "TERMINATED".equals(emp.getStatus()) ? emp.getEndDate() : null,
+                    unpaidDays.getOrDefault(emp.getId(), BigDecimal.ZERO));
+            boolean finalPay = PayPeriodRules.isFinal(emp.getStatus(), emp.getEndDate(), run.getPeriodEnd());
+            BigDecimal payoutDays = BigDecimal.ZERO, payout = BigDecimal.ZERO;
+            if (finalPay) {
+                payoutDays = leaveService.annualLeaveOwing(tenantId, emp, emp.getEndDate());
+                payout = PayPeriodRules.leavePayout(emp.getGrossSalary(), payoutDays);
+                warnings.add(who + ": last pay (left " + emp.getEndDate() + ")"
+                        + (payout.signum() > 0 ? ", including " + payoutDays + " day(s) of annual leave paid out at " + payout + "." : ", no annual leave owing.")
+                        + " Notice pay, bonus and any leave taken in advance are not handled; check them by hand.");
+            }
+            if (pay.partPeriod() && !finalPay)
+                warnings.add(who + ": paid " + pay.daysPaid() + " of " + pay.workingDays() + " working days"
+                        + (pay.proration().signum() > 0 ? " (joined or left part way through)" : "") + ".");
+            if (pay.unpaidDays().signum() > 0)
+                warnings.add(who + ": " + pay.unpaidDays() + " day(s) of unpaid leave deducted (" + pay.unpaidAmount() + ").");
+            BigDecimal travel = PayPeriodRules.share(emp.getTravelAllowance(), pay);
+            PayrollEngine.PayrollResult result = engine.calculate(emp, rules, annualPayroll, m.count(), overtimePay,
+                    new PayrollEngine.Period(pay.paid(), travel, emp.getPensionContribution(), payout));
 
             HrPayslip slip = HrPayslip.create(tenantId, run.getId(), emp.getId(),
                     result.grossSalary(), result.travelAllowance(),
                     result.medicalAid(), result.pension());
             slip.setOvertimeAmount(overtimePay);
+            slip.setPeriodPay(pay.workingDays(), pay.daysPaid(), pay.proration(), pay.unpaidDays(), pay.unpaidAmount());
+            if (finalPay) { slip.setLeavePayout(payoutDays, payout); slip.markFinalPay(); }
 
             // FIX 1.5: Calculate YTD BEFORE save — slip.getId() is not yet in DB
             BigDecimal ytdGross = payslipRepo.sumYtdGross(emp.getId(), taxYear, slip.getId());
@@ -263,7 +303,8 @@ public class PayrollService {
                 s.getTotalDeductions(), s.getUifEmployer(), s.getSdlAmount(),
                 s.getNetPay(), s.getYtdGross(), s.getYtdPaye(),
                 s.getTaxableIncome(), s.getTaxYear() != null ? s.getTaxYear() : 0,
-                s.getCreatedAt());
+                s.getCreatedAt(), s.getDaysInPeriod(), s.getDaysPaid(), s.getProrationAmount(), s.getUnpaidLeaveDays(), s.getUnpaidLeaveAmount(),
+                s.getLeavePayoutDays(), s.getLeavePayoutAmount(), s.isFinalPay());
     }
 
     private Emp201Response toEmp201Response(HrEmp201 e) {

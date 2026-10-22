@@ -152,13 +152,15 @@ public class PayslipPdfGenerator {
         // Left: Earnings
         Cell earningsCell = new Cell().setBorder(null).setPaddingRight(8);
         earningsCell.add(sectionTitle("Earnings"));
-        earningsCell.add(buildAmountTable(new String[][]{
-                { "Basic salary",     fmt(p.getGrossSalary())    },
-                { "Travel allowance", fmt(p.getTravelAllowance())},
-                { "Overtime",         fmt(p.getOvertimeAmount()) },
-                { "Bonus",            fmt(p.getBonusAmount())    },
-                { "Other earnings",   fmt(p.getOtherEarnings())  },
-        }, "Total earnings", fmt(p.getTotalEarnings()), BRAND_TEAL));
+        java.util.List<String[]> rows = new java.util.ArrayList<>();
+        rows.add(new String[]{ basicLabel(p), fmt(p.getGrossSalary()) });
+        rows.add(new String[]{ "Travel allowance", fmt(p.getTravelAllowance()) });
+        rows.add(new String[]{ "Overtime",         fmt(p.getOvertimeAmount()) });
+        if (p.getLeavePayoutAmount() != null && p.getLeavePayoutAmount().signum() > 0)
+            rows.add(new String[]{ "Annual leave paid out (" + p.getLeavePayoutDays().stripTrailingZeros().toPlainString() + " days)", fmt(p.getLeavePayoutAmount()) });
+        rows.add(new String[]{ "Bonus",            fmt(p.getBonusAmount()) });
+        rows.add(new String[]{ "Other earnings",   fmt(p.getOtherEarnings()) });
+        earningsCell.add(buildAmountTable(rows.toArray(new String[0][]), "Total earnings", fmt(p.getTotalEarnings()), BRAND_TEAL));
         two.addCell(earningsCell);
 
         // Right: Deductions
@@ -174,6 +176,17 @@ public class PayslipPdfGenerator {
         two.addCell(deductionsCell);
 
         doc.add(two);
+    }
+
+    /** "Basic salary", or what part of the period it covers when the employee joined, left or took unpaid leave. */
+    private static String basicLabel(HrPayslip p) {
+        if (p.getDaysInPeriod() == null || p.getDaysPaid() == null || p.getDaysInPeriod() == 0) return "Basic salary";
+        boolean part = p.getDaysPaid().compareTo(java.math.BigDecimal.valueOf(p.getDaysInPeriod())) != 0;
+        if (!part) return "Basic salary";
+        String label = "Basic salary (" + p.getDaysPaid().stripTrailingZeros().toPlainString() + " of " + p.getDaysInPeriod() + " days";
+        if (p.getUnpaidLeaveDays() != null && p.getUnpaidLeaveDays().signum() > 0)
+            label += ", incl. " + p.getUnpaidLeaveDays().stripTrailingZeros().toPlainString() + " unpaid";
+        return label + ")";
     }
 
     private Table buildAmountTable(String[][] rows, String totalLabel,

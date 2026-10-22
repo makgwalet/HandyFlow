@@ -35,19 +35,34 @@ public class PayrollEngine {
      * for fluctuating pay is not implemented.
      */
     public PayrollResult calculate(HrEmployee employee, StatutoryYearRules rules, BigDecimal annualPayroll, int medicalMembers, BigDecimal overtime) {
+        return calculate(employee, rules, annualPayroll, medicalMembers, overtime,
+                new Period(employee.getGrossSalary(), employee.getTravelAllowance(), employee.getPensionContribution(), BigDecimal.ZERO));
+    }
+
+    /** What is paid for the period when it is not a full month: the salary, travel allowance and pension for the days paid, and any leave paid out. */
+    public record Period(BigDecimal basic, BigDecimal travel, BigDecimal pension, BigDecimal leavePayout) {}
+
+    /**
+     * For a part period, or a last pay that includes annual leave paid out. The basic salary is what is payable for the days paid; the leave
+     * payout is remuneration like the salary, so PAYE, UIF and SDL see it, and it is reported separately. The periodic method annualises the
+     * month, so a payout in the last month is taxed as if it recurred and a part month as if the person were paid that little all year;
+     * the difference is settled when the employee's year is assessed.
+     */
+    public PayrollResult calculate(HrEmployee employee, StatutoryYearRules rules, BigDecimal annualPayroll, int medicalMembers, BigDecimal overtime, Period period) {
         BigDecimal ot = overtime == null ? BigDecimal.ZERO : overtime;
+        BigDecimal payout = period.leavePayout() == null ? BigDecimal.ZERO : period.leavePayout();
         SarsPayrollResult r = SarsPayeCalculator.calculate(new SarsPayeCalculator.Inputs(
-                employee.getGrossSalary().add(ot), employee.getTravelAllowance(), employee.getPensionContribution(),
+                period.basic().add(ot).add(payout), period.travel(), period.pension(),
                 employee.getMedicalAidContribution(), employee.getDateOfBirth(), medicalMembers, annualPayroll), rules);
 
         log.debug("Payroll employee={} year={} taxable={} paye={} uif={} sdl={} medicalMembers={}",
                 employee.getId(), rules.taxYear(), r.taxableIncome(), r.payeAmount(), r.uifEmployee(), r.sdlAmount(), medicalMembers);
 
         return new PayrollResult(
-                r.grossSalary().subtract(ot), r.travelAllowance(), r.medicalAid(), r.pension(),
+                r.grossSalary().subtract(ot).subtract(payout), r.travelAllowance(), r.medicalAid(), r.pension(),
                 r.payeAmount(), r.uifEmployee(), r.uifEmployer(), r.sdlAmount(),
                 r.taxableIncome(), r.taxBeforeRebate(), r.primaryRebate(),
-                r.secondaryRebate(), r.tertiaryRebate(), r.medicalTaxCredit(), r.taxYear(), ot);
+                r.secondaryRebate(), r.tertiaryRebate(), r.medicalTaxCredit(), r.taxYear(), ot, payout);
     }
 
     public record PayrollResult(
@@ -66,18 +81,28 @@ public class PayrollEngine {
             BigDecimal tertiaryRebate,
             BigDecimal medicalTaxCredit,
             int taxYear,
-            BigDecimal overtime
+            BigDecimal overtime,
+            BigDecimal leavePayout
     ) {
+        /** Without annual leave paid out. */
+        public PayrollResult(BigDecimal grossSalary, BigDecimal travelAllowance, BigDecimal medicalAid, BigDecimal pension,
+                             BigDecimal payeAmount, BigDecimal uifEmployee, BigDecimal uifEmployer, BigDecimal sdlAmount,
+                             BigDecimal taxableIncome, BigDecimal taxBeforeRebate, BigDecimal primaryRebate,
+                             BigDecimal secondaryRebate, BigDecimal tertiaryRebate, BigDecimal medicalTaxCredit, int taxYear, BigDecimal overtime) {
+            this(grossSalary, travelAllowance, medicalAid, pension, payeAmount, uifEmployee, uifEmployer, sdlAmount, taxableIncome,
+                    taxBeforeRebate, primaryRebate, secondaryRebate, tertiaryRebate, medicalTaxCredit, taxYear, overtime, BigDecimal.ZERO);
+        }
+
         /** Without overtime. */
         public PayrollResult(BigDecimal grossSalary, BigDecimal travelAllowance, BigDecimal medicalAid, BigDecimal pension,
                              BigDecimal payeAmount, BigDecimal uifEmployee, BigDecimal uifEmployer, BigDecimal sdlAmount,
                              BigDecimal taxableIncome, BigDecimal taxBeforeRebate, BigDecimal primaryRebate,
                              BigDecimal secondaryRebate, BigDecimal tertiaryRebate, BigDecimal medicalTaxCredit, int taxYear) {
             this(grossSalary, travelAllowance, medicalAid, pension, payeAmount, uifEmployee, uifEmployer, sdlAmount, taxableIncome,
-                    taxBeforeRebate, primaryRebate, secondaryRebate, tertiaryRebate, medicalTaxCredit, taxYear, BigDecimal.ZERO);
+                    taxBeforeRebate, primaryRebate, secondaryRebate, tertiaryRebate, medicalTaxCredit, taxYear, BigDecimal.ZERO, BigDecimal.ZERO);
         }
 
-        public BigDecimal totalEarnings() { return grossSalary.add(overtime).add(travelAllowance); }
+        public BigDecimal totalEarnings() { return grossSalary.add(overtime).add(travelAllowance).add(leavePayout); }
 
         public BigDecimal totalDeductions() {
             // the medical credit is already inside payeAmount

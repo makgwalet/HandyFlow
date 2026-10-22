@@ -82,6 +82,31 @@ public final class LeaveRules {
         return earned.min(ANNUAL_PER_YEAR);
     }
 
+    /** One line of the leave ledger, as far as working out what is owing needs it. Days taken are negative, as in the ledger. */
+    public record Line(String kind, BigDecimal days) {}
+
+    /**
+     * Annual leave still owing at the end of employment, to be paid out (BCEA section 40). Lines are the ledger entries of the year of the
+     * leaving date, dated up to the leaving date. What was earned is the larger of what the ledger shows and what the rule says was earned by
+     * that date, so an accrual posted later than the leaving date (the ledger is topped up whenever someone opens it) is not missed and one
+     * posted for days after it is not counted. Reservations are ignored: they are leave asked for, not leave taken. A negative balance, leave
+     * taken in advance, pays nothing; it is not taken off the pay here.
+     */
+    public static BigDecimal annualOwing(List<Line> lines, BigDecimal earnedToLeavingDate) {
+        BigDecimal accrued = BigDecimal.ZERO, other = BigDecimal.ZERO, taken = BigDecimal.ZERO;
+        for (Line l : lines) {
+            switch (l.kind()) {
+                case ACCRUAL, OPENING -> accrued = accrued.add(l.days());
+                case CARRY_FORWARD, ADJUSTMENT -> other = other.add(l.days());
+                case TAKEN, REVERSAL -> taken = taken.subtract(l.days());
+                default -> { }
+            }
+        }
+        BigDecimal earned = accrued.max(earnedToLeavingDate == null ? BigDecimal.ZERO : earnedToLeavingDate);
+        BigDecimal owing = earned.add(other).subtract(taken);
+        return owing.signum() <= 0 ? BigDecimal.ZERO : owing.setScale(2, RoundingMode.DOWN);
+    }
+
     /** Family responsibility leave: 3 days a year once four months of service are complete. */
     public static BigDecimal familyEarned(LocalDate employmentStart, int year, LocalDate asOf) {
         LocalDate eligible = employmentStart.plusMonths(4);

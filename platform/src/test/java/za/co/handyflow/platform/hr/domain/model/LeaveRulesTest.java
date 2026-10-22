@@ -136,4 +136,32 @@ class LeaveRulesTest {
         assertThat(LeaveRules.isKnown("MATERNITY")).isTrue();
         assertThat(LeaveRules.isKnown(null)).isFalse();
     }
+
+    // ── Annual leave owing on leaving ──────────────────────────────────────────
+
+    private static LeaveRules.Line line(String kind, String days) { return new LeaveRules.Line(kind, new BigDecimal(days)); }
+
+    @Test
+    void owingIsWhatWasEarnedPlusCarriedLessTaken() {
+        List<LeaveRules.Line> lines = List.of(line("OPENING", "5"), line("ACCRUAL", "10"), line("CARRY_FORWARD", "2"), line("TAKEN", "-4"));
+        assertThat(LeaveRules.annualOwing(lines, new BigDecimal("15")).compareTo(new BigDecimal("13"))).isEqualTo(0);
+    }
+
+    @Test
+    void leaveEarnedUpToTheLeavingDateCountsEvenWhenNotYetPosted() {
+        List<LeaveRules.Line> lines = List.of(line("ACCRUAL", "8"), line("TAKEN", "-3"));
+        assertThat(LeaveRules.annualOwing(lines, new BigDecimal("12.5")).compareTo(new BigDecimal("9.5"))).isEqualTo(0);
+    }
+
+    @Test
+    void reservationsAreNotLeaveTakenAndReversalsGiveDaysBack() {
+        List<LeaveRules.Line> lines = List.of(line("ACCRUAL", "10"), line("RESERVED", "-5"), line("TAKEN", "-4"), line("REVERSAL", "2"));
+        assertThat(LeaveRules.annualOwing(lines, BigDecimal.ZERO).compareTo(new BigDecimal("8"))).isEqualTo(0);
+    }
+
+    @Test
+    void leaveTakenInAdvancePaysNothingAndDaysAreCutNotRounded() {
+        assertThat(LeaveRules.annualOwing(List.of(line("ACCRUAL", "3"), line("TAKEN", "-5")), BigDecimal.ZERO).signum()).isEqualTo(0);
+        assertThat(LeaveRules.annualOwing(List.of(line("ACCRUAL", "1.239")), null).compareTo(new BigDecimal("1.23"))).isEqualTo(0);
+    }
 }

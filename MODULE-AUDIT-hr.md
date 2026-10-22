@@ -560,3 +560,27 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - Spring wiring has not been run: `AttendanceService` now implements a small `AttendanceRegister` interface so the reports can use it, and `ReportService` is injected with that interface.
 - Performance of the queries on a large tenant has not been measured. The workforce report reads every current employee row into memory.
 - Backend logic was checked with a stub harness: 14 rules tests and 16 service tests (the service tests use canned rows, so they check the arithmetic and access rules, not the SQL); five deliberate breaks of the privacy rules were each caught. Front end: 19 tests, ESLint clean.
+
+## 18. Payroll: pay for the period (final pay, joiners, unpaid leave)
+
+**What changed.** A pay run used to pay every ACTIVE employee a full month. Now each payslip is for the days actually employed in the period:
+
+- A joiner is paid from their start date and a leaver up to their leaving date: salary ÷ working days in the period × days employed.
+- Approved UNPAID leave is deducted at the same daily rate (a half day counts 0.5). The "unpaid leave not deducted" run-check warning was removed, because it is now deducted.
+- A TERMINATED employee with a leaving date in the period (or recorded late, up to 3 months back, and not already covered by another run) gets a **final pay**: prorated salary plus their annual leave owing, paid at monthly × 12 ÷ 260 per day. Previously every TERMINATED employee was dropped from runs, so leavers were never paid their last month. A terminated employee whose leaving date is still ahead is paid as normal.
+- Travel allowance follows the days paid. The payslip stores days in period, days paid, proration, unpaid days and amount, leave payout days and amount, and a final-pay flag (V497). The PDF shows "Basic salary (12 of 22 days, incl. 2 unpaid)" and the leave paid out; the pay run list shows the same as notes under each name.
+- Annual leave owing = max(posted accrual, accrual earned to the leaving date) + carry-forward + adjustments − taken. Reservations are ignored. Nothing is paid for a negative balance.
+- The tax certificate reports leave paid out with the basic salary (code 3601).
+
+**Known limits**
+
+- Working days are Monday–Friday less public holidays. Six-day weeks and shift patterns are not handled; the rate for leave payout assumes 260 days a year.
+- Only the UNPAID leave type is deducted. Other leave that a policy treats as unpaid (for example some maternity) is not.
+- Pension and medical contributions are not prorated.
+- PAYE uses the periodic method on the month's pay, so a part month is taxed as if the person earned that little all year and a payout is taxed as if it recurred. The difference is settled on assessment.
+- Leave taken in advance (a negative balance) is not recovered from the final pay. Approved leave dated after the leaving date is not cancelled.
+- Notice pay, bonus and back pay are not handled; the final-pay warning on the run says so.
+- Whether SARS wants leave pay under code 3601 or a separate code is **not checked against the current IRP5 guide**. Confirm before issuing certificates for a leaver.
+- A leaver recorded more than 3 months late is not picked up by a run.
+
+**Not verified.** Maven and real Mockito have not run: `PayrollServiceTest` (five new tests), `TaxCertificateServiceTest` and the changed `PayrollControlServiceTest` constructor were written but not executed. The `terminatedForPay` JPQL (a correlated NOT EXISTS across two entities) and V497 have not been run against PostgreSQL. `PayPeriodRules` (11 tests) and `LeaveRules.annualOwing` (4 new tests) ran in the stub harness, and two deliberate breaks of `PayPeriodRules` were caught. Front end: 4 tests; ESLint on `PayrollTab.tsx` still reports its existing `any` uses.

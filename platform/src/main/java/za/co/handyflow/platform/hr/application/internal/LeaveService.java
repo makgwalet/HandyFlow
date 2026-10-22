@@ -233,6 +233,19 @@ public class LeaveService {
         accrue(tenantId, id, LeaveRules.SICK, cycle.from(), cycle.to(), LeaveRules.sickEarned(start, asOf), asOf);
     }
 
+    /**
+     * Annual leave still owing on the day employment ended, in days. Brings the ledger up to that day first (posting nothing if it is already
+     * there), then works the balance out from entries dated up to it. See {@link LeaveRules#annualOwing}.
+     */
+    @Transactional
+    public BigDecimal annualLeaveOwing(TenantId tenantId, HrEmployee emp, LocalDate leavingDate) {
+        ensureAccrued(tenantId, emp, leavingDate);
+        List<LeaveRules.Line> lines = ledgerRepo.window(tenantId, emp.getId(), LeaveRules.ANNUAL, LocalDate.of(leavingDate.getYear(), 1, 1), leavingDate)
+                .stream().map(l -> new LeaveRules.Line(l.getKind(), l.getDays())).toList();
+        BigDecimal earned = LeaveRules.annualEarned(emp.getStartDate(), ledgerStart(tenantId), leavingDate.getYear(), leavingDate);
+        return LeaveRules.annualOwing(lines, earned);
+    }
+
     private void accrue(TenantId tenantId, UUID employeeId, String type, LocalDate from, LocalDate to, BigDecimal earned, LocalDate on) {
         BigDecimal posted = ledgerRepo.window(tenantId, employeeId, type, from, to).stream()
                 .filter(l -> LeaveRules.ACCRUAL.equals(l.getKind()) || LeaveRules.OPENING.equals(l.getKind()))

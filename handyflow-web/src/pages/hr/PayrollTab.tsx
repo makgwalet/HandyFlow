@@ -6,6 +6,7 @@
 // 4. window.__AUTH_TOKEN__ removed — apiClient handles auth automatically
 // 5. Payslip query now properly scoped to expanded pay run ID
 // 6. Variance vs prior month added
+import { payslipNotes } from "./payslipNotes"
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -192,6 +193,9 @@ export default function PayrollTab() {
                                   <td style={{ padding: "10px 12px" }}>
                                     <div style={{ fontWeight: 600 }}>{slip.employeeName}</div>
                                     <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{slip.employeeNumber}</div>
+                                    {payslipNotes(slip).map(n => (
+                                      <div key={n} style={{ fontSize: 11, color: "var(--hf-warning-text)" }}>{n}</div>
+                                    ))}
                                   </td>
                                   <td style={{ padding: "10px 12px", color: "var(--hf-accent-text)", fontWeight: 600 }}>{fmtR(slip.grossSalary)}</td>
                                   <td style={{ padding: "10px 12px", color: "var(--hf-danger-text)" }}>{fmtR(slip.payeAmount)}</td>

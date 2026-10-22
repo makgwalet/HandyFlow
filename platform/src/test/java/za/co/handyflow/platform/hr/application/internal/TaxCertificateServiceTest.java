@@ -111,6 +111,19 @@ class TaxCertificateServiceTest {
     }
 
     @Test
+    void annualLeavePaidOutOnTheLastPayIsReportedWithTheBasicSalary() {
+        HrPayslip last = HrPayslip.create(tenant, run.getId(), emp.getId(), new BigDecimal("30000"), BigDecimal.ZERO, new BigDecimal("1000"), new BigDecimal("1500"));
+        last.setLeavePayout(new BigDecimal("5"), new BigDecimal("5769.23"));
+        last.applyCalculations(new BigDecimal("3000.00"), new BigDecimal("300.00"), new BigDecimal("300.00"), new BigDecimal("300.00"),
+                new BigDecimal("330000"), new BigDecimal("90000"), new BigDecimal("17235"), YEAR);
+        when(payslipRepo.findByPayRuns(any())).thenReturn(List.of(last));
+
+        Certificate c = service.reconciliation(tenant, YEAR, INTERIM).certificates().get(0);
+
+        assertThat(c.lines().stream().filter(l -> l.code().equals("3601")).findFirst().orElseThrow().amount()).isEqualByComparingTo("35769.23");
+    }
+
+    @Test
     void aRunThatIsNotFinalisedStopsTheCertificates() {
         ReflectionTestUtils.setField(run, "status", "APPROVED");
 

@@ -37,6 +37,9 @@ class PayrollServiceTest {
     private MedicalSchemeService medicalSchemeService;
     private HrPayRunEventRepository eventRepo;
     private OvertimeService overtimeService;
+    private za.co.handyflow.platform.shared.PublicHolidayRepository holidayRepo;
+    private HrLeaveRequestRepository leaveRepo;
+    private LeaveService leaveService;
     private PayrollService service;
     private final UUID maker = UUID.randomUUID();
 
@@ -64,10 +67,17 @@ class PayrollServiceTest {
         medicalSchemeService = mock(MedicalSchemeService.class);
         eventRepo = mock(HrPayRunEventRepository.class);
         overtimeService = mock(OvertimeService.class);
+        holidayRepo = mock(za.co.handyflow.platform.shared.PublicHolidayRepository.class);
+        leaveRepo = mock(HrLeaveRequestRepository.class);
+        leaveService = mock(LeaveService.class);
+        when(holidayRepo.datesBetween(any(), any())).thenReturn(List.of());
+        when(leaveRepo.approvedUnpaidIn(any(), any(), any())).thenReturn(List.of());
+        when(employeeRepo.terminatedForPay(any(), any(), any(), any())).thenReturn(List.of());
         when(overtimeService.takeFor(any(), any(), any())).thenReturn(Map.of());
         when(overtimeService.waitingCount(any(), any())).thenReturn(0);
         service = new PayrollService(payRunRepo, payslipRepo, emp201Repo, employeeRepo, new PayrollEngine(), numberGen,
-                rulesService, medicalSchemeService, eventRepo, mock(EmployeeChangeService.class), overtimeService);
+                rulesService, medicalSchemeService, eventRepo, mock(EmployeeChangeService.class), overtimeService,
+                holidayRepo, leaveRepo, leaveService);
         when(numberGen.next(any(), any())).thenReturn("PR00001");
         when(payRunRepo.save(any())).thenAnswer(i -> i.getArgument(0));
         when(payslipRepo.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -230,6 +240,112 @@ class PayrollServiceTest {
         run.markProcessing();
         assertThatThrownBy(() -> service.processPayRun(tenant, UUID.randomUUID(), maker)).hasMessageContaining("can only be calculated");
         verifyNoInteractions(rulesService);
+    }
+
+    // ── Pay for the period ─────────────────────────────────────────────────────
+
+    private HrEmployee employeeFrom(String salary, LocalDate start) {
+        HrEmployee e = HrEmployee.create(tenant, "EMP-1", "Jane", "Dlamini", start, "PERMANENT", d(salary), "MONTHLY");
+        e.setDateOfBirth(LocalDate.of(1990, 6, 1));
+        return e;
+    }
+
+    private org.mockito.ArgumentCaptor<HrPayslip> savedSlip() {
+        org.mockito.ArgumentCaptor<HrPayslip> slip = org.mockito.ArgumentCaptor.forClass(HrPayslip.class);
+        verify(payslipRepo).save(slip.capture());
+        return slip;
+    }
+
+    @Test
+    void aJoinerIsPaidFromTheirStartDate() {
+        draftRun(LocalDate.of(2026, 10, 31), 2027);      // October 2026 has 22 working days
+        HrEmployee emp = employeeFrom("22000.00", LocalDate.of(2026, 10, 15));   // 12 of them are after the 15th
+        when(rulesService.rulesFor(2027)).thenReturn(rules2027());
+        when(employeeRepo.findAllActiveList(any())).thenReturn(List.of(emp));
+        when(medicalSchemeService.membersOn(any(), any(), any())).thenReturn(Map.of(emp.getId(), new MedicalSchemeRules.Members(0, false)));
+
+        PayRunResponse r = service.processPayRun(tenant, UUID.randomUUID(), maker);
+
+        HrPayslip slip = savedSlip().getValue();
+        assertThat(slip.getGrossSalary()).isEqualByComparingTo("12000.00");
+        assertThat(slip.getProrationAmount()).isEqualByComparingTo("10000.00");
+        assertThat(slip.getDaysPaid()).isEqualByComparingTo("12");
+        assertThat(slip.getDaysInPeriod()).isEqualTo(22);
+        assertThat(r.totalGross()).isEqualByComparingTo("12000.00");
+        assertThat(r.warnings().stream().anyMatch(w -> w.contains("12 of 22 working days"))).isTrue();
+    }
+
+    @Test
+    void approvedUnpaidLeaveIsDeductedAtTheDailyRateOfThePeriod() {
+        draftRun(LocalDate.of(2026, 10, 31), 2027);
+        HrEmployee emp = employeeFrom("22000.00", LocalDate.of(2024, 1, 1));
+        when(rulesService.rulesFor(2027)).thenReturn(rules2027());
+        when(employeeRepo.findAllActiveList(any())).thenReturn(List.of(emp));
+        when(medicalSchemeService.membersOn(any(), any(), any())).thenReturn(Map.of(emp.getId(), new MedicalSchemeRules.Members(0, false)));
+        HrLeaveRequest leave = mock(HrLeaveRequest.class);
+        when(leave.getEmployeeId()).thenReturn(emp.getId());
+        when(leave.getStartDate()).thenReturn(LocalDate.of(2026, 10, 12));
+        when(leave.getEndDate()).thenReturn(LocalDate.of(2026, 10, 16));
+        when(leaveRepo.approvedUnpaidIn(any(), any(), any())).thenReturn(List.of(leave));
+
+        PayRunResponse r = service.processPayRun(tenant, UUID.randomUUID(), maker);
+
+        HrPayslip slip = savedSlip().getValue();
+        assertThat(slip.getUnpaidLeaveDays()).isEqualByComparingTo("5");
+        assertThat(slip.getUnpaidLeaveAmount()).isEqualByComparingTo("5000.00");
+        assertThat(slip.getGrossSalary()).isEqualByComparingTo("17000.00");
+        assertThat(r.warnings().stream().anyMatch(w -> w.contains("5 day(s) of unpaid leave deducted"))).isTrue();
+    }
+
+    @Test
+    void aLeaversLastPayIsProratedAndIncludesTheirAnnualLeave() {
+        draftRun(LocalDate.of(2026, 10, 31), 2027);
+        HrEmployee emp = employeeFrom("22000.00", LocalDate.of(2024, 1, 1));
+        emp.terminate(LocalDate.of(2026, 10, 15));        // 11 working days to the 15th inclusive: 1,2,5-9,12-15
+        when(rulesService.rulesFor(2027)).thenReturn(rules2027());
+        when(employeeRepo.findAllActiveList(any())).thenReturn(List.of());
+        when(employeeRepo.terminatedForPay(any(), any(), any(), any())).thenReturn(List.of(emp));
+        when(medicalSchemeService.membersOn(any(), any(), any())).thenReturn(Map.of(emp.getId(), new MedicalSchemeRules.Members(0, false)));
+        when(leaveService.annualLeaveOwing(any(), eq(emp), eq(LocalDate.of(2026, 10, 15)))).thenReturn(d("10.50"));
+
+        PayRunResponse r = service.processPayRun(tenant, UUID.randomUUID(), maker);
+
+        HrPayslip last = savedSlip().getValue();
+        assertThat(last.isFinalPay()).isTrue();
+        // 22 000 / 22 = 1 000 a day, 11 days employed: 11 000. Daily rate for leave: 22 000 x 12 / 260 = 1 015.38; x 10.5 = 10 661.49
+        assertThat(last.getGrossSalary()).isEqualByComparingTo("11000.00");
+        assertThat(last.getLeavePayoutDays()).isEqualByComparingTo("10.50");
+        assertThat(last.getLeavePayoutAmount()).isEqualByComparingTo("10661.49");
+        assertThat(last.getTotalEarnings()).isEqualByComparingTo("21661.49");
+        assertThat(r.warnings().stream().anyMatch(w -> w.contains("last pay") && w.contains("10.50 day(s) of annual leave"))).isTrue();
+    }
+
+    @Test
+    void aLeaverWhoseEndDateIsStillAheadIsPaidInFullAndGetsNoPayout() {
+        draftRun(LocalDate.of(2026, 10, 31), 2027);
+        HrEmployee emp = employeeFrom("22000.00", LocalDate.of(2024, 1, 1));
+        emp.terminate(LocalDate.of(2026, 11, 20));
+        when(rulesService.rulesFor(2027)).thenReturn(rules2027());
+        when(employeeRepo.findAllActiveList(any())).thenReturn(List.of());
+        when(employeeRepo.terminatedForPay(any(), any(), any(), any())).thenReturn(List.of(emp));
+        when(medicalSchemeService.membersOn(any(), any(), any())).thenReturn(Map.of(emp.getId(), new MedicalSchemeRules.Members(0, false)));
+
+        service.processPayRun(tenant, UUID.randomUUID(), maker);
+
+        HrPayslip slip = savedSlip().getValue();
+        assertThat(slip.getGrossSalary()).isEqualByComparingTo("22000.00");
+        assertThat(slip.isFinalPay()).isFalse();
+        verifyNoInteractions(leaveService);
+    }
+
+    @Test
+    void anEmployeeWhoStartsAfterThePeriodIsNotPaid() {
+        draftRun(LocalDate.of(2026, 10, 31), 2027);
+        HrEmployee later = employeeFrom("22000.00", LocalDate.of(2026, 11, 3));
+        when(rulesService.rulesFor(2027)).thenReturn(rules2027());
+        when(employeeRepo.findAllActiveList(any())).thenReturn(List.of(later));
+        assertThatThrownBy(() -> service.processPayRun(tenant, UUID.randomUUID(), maker)).hasMessageContaining("No active employees");
+        verify(payslipRepo, never()).save(any());
     }
 
     // ── Workflow and what employees see ─────────────────────────────────────────
