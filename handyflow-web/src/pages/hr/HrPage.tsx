@@ -10,6 +10,7 @@ import PayrollTab      from "./PayrollTab"
 import EmployeeRelationsTab from "./EmployeeRelationsTab"
 import LettersTab from "./LettersTab"
 import PerformanceTab from "./PerformanceTab"
+import ReportsTab from "./ReportsTab"
 import ComplianceTab   from "./ComplianceTab"
 import PayrollChecksTab from "./PayrollChecksTab"
 import TaxCertificatesTab from "./TaxCertificatesTab"
@@ -35,6 +36,7 @@ export function HrPage() {
           case "disciplinary": return <EmployeeRelationsTab />
           case "letters":      return <LettersTab />
           case "performance":  return <PerformanceTab />
+          case "hr-reports":   return <ReportsTab />
           case "compliance":   return <ComplianceTab />
           default:             return null
         }

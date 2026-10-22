@@ -524,3 +524,39 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - The Maven build, real Mockito runs, V495 and the JPQL against PostgreSQL, Hibernate mappings and Spring wiring have not been run. The new `@DeleteMapping` and the `ApiResponse.success` call with a null body have not been compiled.
 - List screens may issue extra queries per row (capped at 300 plans, 1000 rows); not measured.
 - Backend logic was checked with a stub harness (31 rules tests, 41 service tests; 8 deliberate breaks of the visibility and release rules were each caught). Front end: 24 tests, ESLint clean on the new files.
+
+## 17. Slice 11 status: HR reports
+
+**What was wrong**
+
+- HR had no reports. Headcount, turnover, leave, overtime, payroll cost and case figures were worked out by hand from screens and exports, and the figures differed between people.
+
+**What changed**
+
+- Four read-only reports for a period of up to 366 days, built from the records the other HR modules already keep, with a spreadsheet (CSV) download of each:
+  - **Workforce**: headcount at the start and end, joiners, leavers, turnover for the period and for a year, and breakdowns by department, employment type, length of service, age and reason for leaving. Gender, race and disability are added for people who may see sensitive records.
+  - **Time and leave**: approved leave by type, leave waiting for a decision (and how much has waited over 14 days), sick leave, attendance (present, late, absent, hours, the five people with most absence) and approved overtime by kind and by department.
+  - **Payroll cost**: pay runs in the period, totals of gross, PAYE, UIF, SDL, net and employer cost from finalised and completed runs only, cost by department, and the EMP201 returns with overdue ones marked.
+  - **Compliance and employee relations**: employees with no ID number, tax number, bank account, emergency contact or manager; leave waiting over 14 days; improvement plans past their end date; and, for people with an employee relations right, cases opened and closed, average days to close, cases open over 90 days, overdue hearings, warnings about to expire, and outcomes.
+- **Who sees what.** Opening the reports needs the new permission HR_REPORT_READ (V496, given to roles that hold HR_MANAGE). Beyond that: gender, race and disability need HR_SENSITIVE_READ; payroll needs a compensation right and is refused without one; overtime amounts need a compensation right; employee relations needs an employee relations right; confidential cases are left out unless the person may see sensitive records (and the report says how many were left out); the attendance figures come through the existing register, so its access rules apply; names in the data checks appear only for people who see every employee.
+- **Small groups.** In the gender, race and disability counts any group under 5 people is hidden. If only one group would be hidden, the next smallest is hidden too, because the headcount is shown and the hidden number could otherwise be worked out. The spreadsheet follows the same rules.
+- A spreadsheet cell that starts with =, +, - or @ is written with a leading apostrophe so it cannot run as a formula.
+
+**What is not done, or not what it may seem**
+
+- No saved, scheduled or emailed reports, no charts, and no comparison with an earlier period.
+- No cost-per-hire, time-to-fill or training reports, no pay equity or EEA-style workforce profile, and no sectoral or occupational-level breakdown.
+- Leave is counted in the period its first day falls in, using the days requested; a leave that crosses the end of the period is not split.
+- Departments are each employee's current department, not the one they had at the time. A person who has changed department appears under the new one in past periods.
+- Employer cost is earnings plus the employer's UIF and SDL. Employer medical and retirement contributions and fringe benefits are not recorded, so are not in it.
+- Turnover for a year is the period's rate scaled to 365 days. It is not reliable over a short period (the report says so under 90 days).
+- Headcount counts people with a start date on or before the day and no end date before it. A person whose end date was not recorded when they left still counts.
+- Attendance is limited to 62 days by the existing register; a longer period shows the other figures with a note.
+- Pay runs are chosen by pay date and EMP201 returns by the end of their period. A pay run in a different period from its EMP201 can look out of step.
+
+**Not verified**
+
+- The Maven build, real Mockito runs, V496, and all the report SQL against PostgreSQL have not been run. The SQL was written against the column names in the entities and earlier migrations and has never been executed; `COUNT(*) FILTER`, `AVG(closed_on - reported_on)` and the `GROUP BY` forms are the likeliest places for a mistake.
+- Spring wiring has not been run: `AttendanceService` now implements a small `AttendanceRegister` interface so the reports can use it, and `ReportService` is injected with that interface.
+- Performance of the queries on a large tenant has not been measured. The workforce report reads every current employee row into memory.
+- Backend logic was checked with a stub harness: 14 rules tests and 16 service tests (the service tests use canned rows, so they check the arithmetic and access rules, not the SQL); five deliberate breaks of the privacy rules were each caught. Front end: 19 tests, ESLint clean.
