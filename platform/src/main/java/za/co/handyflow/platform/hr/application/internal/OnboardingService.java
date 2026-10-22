@@ -136,7 +136,7 @@ public class OnboardingService {
                 OnboardingRules.overdue(eff, t.getDueDate(), today), t.getNote(), t.getResolvedAt());
     }
 
-    private static OnboardingRules.Facts facts(HrEmployee e, LocalDate today) {
+    static OnboardingRules.Facts facts(HrEmployee e, LocalDate today) {
         return OnboardingRules.facts(e.getIdNumber(), e.getTaxNumber(), e.getBankName(), e.getBankAccountNumber(), e.getBankBranchCode(),
                 e.getGrossSalary(), e.getManagerId(), e.getUserId(), e.getEmergencyContactName(), e.getEmergencyContactPhone(), today);
     }

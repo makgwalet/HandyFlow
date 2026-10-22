@@ -22,4 +22,7 @@ public interface HrPerfReviewRepository extends JpaRepository<HrPerfReview, UUID
 
     @Query("SELECT r FROM HrPerfReview r WHERE r.tenantId = :#{#tenantId.value} AND r.reviewerId = :reviewerId ORDER BY r.createdAt DESC")
     List<HrPerfReview> forReviewer(TenantId tenantId, UUID reviewerId);
+
+    @Query("SELECT r FROM HrPerfReview r WHERE r.cycleId IN :cycleIds")
+    List<HrPerfReview> forCycles(java.util.Collection<UUID> cycleIds);
 }

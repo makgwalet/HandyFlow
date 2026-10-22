@@ -678,3 +678,29 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 
 - Maven has not run. The change touches 16 services and 6 tests that I could only check by reading; a missed use of a removed accessor would be a compile error. I searched for every removed accessor (`idNumber`, `taxNumber`, `grossSalary` and the rest) and found only the labour-cost one, now moved.
 - `HrFacadeTest` (3 tests, real Mockito) was written but not run. `EmployeeSummaryTest` runs in my harness (2 pass; adding an `idNumber` field makes both fail).
+
+## 23. Slice 16a: onboarding and performance notifications
+
+**What changed**
+
+- **Onboarding.** Every morning at 07:30 (South African time) the system looks at every onboarding still under way. A task that is past its due date, still open (a checked task counts as done once the employee record satisfies it) and for an employee who still works here is mentioned the day after it falls due, and then every seventh day if it is required. Optional tasks are mentioned once. A task with an assignee goes to that person; the rest go to the new employee's manager, or to the company's administrators when there is no manager with an email address. One message per onboarding and recipient lists the first five tasks and how many more.
+- **Performance, when it becomes someone's turn.** Opening a cycle (or adding someone to it) asks each employee for their self-review. Submitting the self-review tells the reviewer. Releasing a result tells the employee. Asking for 360 feedback tells each person asked.
+- **Performance, when a date has passed (07:45 daily).** An employee who has not written their self-review is reminded the day after the date and then weekly. A reviewer gets one message per cycle saying how many reviews are waiting for their rating; the administrators are told about reviews that have no reviewer.
+- These messages say whose turn it is and nothing else: no ratings, no comments, nothing from the self-review.
+- A notification that cannot be sent is logged and never stops the review step that caused it.
+- Shared by both: `ReminderCadence` (the day after, then weekly). Switch off with `app.notifications.enabled=false`, as for the other schedulers.
+
+**Still not done**
+
+- Nobody can switch these messages off per company or per type; people can only use their own notification preferences.
+- Goals and improvement plans send nothing yet (a goal proposed for approval, a plan check-in that is late).
+- Only people with an email address on their employee record are reached; there is no fallback to their login's email.
+- Reminders are not repeated for an employee who was told once and has since changed manager.
+- Nothing is recorded to show that a reminder was sent, apart from the notification itself.
+
+**Not verified**
+
+- Maven, real Mockito, Spring wiring and the JPQL (`allInProgress`, `allOpen`, `forCycles`) have not run. The two services and the performance notifier have only been read and compiled against nothing; `OnboardingReminderServiceTest` (8) and `PerfNotificationsTest` (9) are unexecuted.
+- In the stub harness: `OnboardingReminderRulesTest` (6) and `PerfReminderRulesTest` (4) pass. Deliberate breaks (reminding optional tasks weekly; chasing a reviewer after they have rated) were caught.
+- The existing `PerfHarness` was changed to pass the new notifier; I have not re-run the 41 existing performance service tests.
+- `ONBOARDING_TASKS_OVERDUE` and the five `PERF_*` types were added to the notification catalogue; I found no database constraint on that column but could not run a migration check.

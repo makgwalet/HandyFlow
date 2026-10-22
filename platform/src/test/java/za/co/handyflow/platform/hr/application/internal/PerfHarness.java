@@ -3,6 +3,7 @@ package za.co.handyflow.platform.hr.application.internal;
 import org.springframework.jdbc.core.JdbcTemplate;
 import za.co.handyflow.platform.hr.domain.model.*;
 import za.co.handyflow.platform.hr.domain.repository.*;
+import za.co.handyflow.platform.notifications.application.internal.NotificationService;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.LocalDate;
@@ -46,12 +47,14 @@ final class PerfHarness {
 
     final ErPolicyService policy = new ErPolicyService(policyRepo);
     final ErCaseSupport caseSupport = new ErCaseSupport(cases, steps, caseEvents, employees, jdbc);
+    final NotificationService notificationService = mock(NotificationService.class);
+    final PerfNotifier notifier = new PerfNotifier(notificationService, employees);
     final PerfSupport support = new PerfSupport(employees, cycleRepo, reviewRepo, eventRepo);
     final PerfGoalService goals = new PerfGoalService(goalRepo, cycleRepo, employees, support);
-    final PerfFeedbackService feedback = new PerfFeedbackService(feedbackRepo, reviewRepo, cycleRepo, support);
+    final PerfFeedbackService feedback = new PerfFeedbackService(feedbackRepo, reviewRepo, cycleRepo, support, notifier);
     final PerfReviewViews views = new PerfReviewViews(cycleRepo, support, goals, feedback);
-    final PerfCycleService cycles = new PerfCycleService(cycleRepo, reviewRepo, employees, support, views);
-    final PerfReviewService reviews = new PerfReviewService(reviewRepo, employees, support, views);
+    final PerfCycleService cycles = new PerfCycleService(cycleRepo, reviewRepo, employees, support, views, notifier);
+    final PerfReviewService reviews = new PerfReviewService(reviewRepo, employees, support, views, notifier);
     final PerfPlanService plans = new PerfPlanService(planRepo, checkinRepo, cases, caseSupport, policy, support);
 
     PerfHarness() {

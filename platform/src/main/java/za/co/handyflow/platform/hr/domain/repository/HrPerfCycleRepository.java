@@ -16,4 +16,8 @@ public interface HrPerfCycleRepository extends JpaRepository<HrPerfCycle, UUID> 
 
     @Query("SELECT c FROM HrPerfCycle c WHERE c.tenantId = :#{#tenantId.value} ORDER BY c.periodStart DESC, c.createdAt DESC")
     List<HrPerfCycle> forTenant(TenantId tenantId);
+
+    /** Cycles under way for every company, for the daily reminders. */
+    @Query("SELECT c FROM HrPerfCycle c WHERE c.status = 'OPEN'")
+    List<HrPerfCycle> allOpen();
 }

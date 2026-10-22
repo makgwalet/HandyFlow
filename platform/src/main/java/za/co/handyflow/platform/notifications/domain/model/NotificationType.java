@@ -186,6 +186,18 @@ public enum NotificationType {
     LEAVE_REQUEST_APPROVED(INFO, Set.of(IN_APP, EMAIL)),
     LEAVE_REQUEST_REJECTED(WARNING, Set.of(IN_APP, EMAIL)),
 
+    // Onboarding tasks of a new employee that are past their due date. WARNING, not CRITICAL: a missed task is paperwork that
+    // is late, and the reminder repeats weekly for required tasks rather than daily.
+    ONBOARDING_TASKS_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
+
+    // Performance reviews. INFO for the ordinary hand-overs (your turn, a result is ready); WARNING when a due date has passed.
+    // None of them carries a rating or any comment: the message only says whose turn it is.
+    PERF_SELF_REVIEW_DUE(INFO, Set.of(IN_APP, EMAIL)),
+    PERF_READY_FOR_MANAGER(INFO, Set.of(IN_APP, EMAIL)),
+    PERF_RESULT_RELEASED(INFO, Set.of(IN_APP, EMAIL)),
+    PERF_FEEDBACK_REQUESTED(INFO, Set.of(IN_APP, EMAIL)),
+    PERF_REVIEWS_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
+
     // ── Invoicing ────────────────────────────────────────────────────────────
     QUOTE_SENT(INFO, Set.of(IN_APP)),
     QUOTE_ACCEPTED(INFO, Set.of(IN_APP, EMAIL)),

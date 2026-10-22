@@ -24,6 +24,7 @@ public class PerfReviewService {
     private final HrEmployeeRepository employeeRepo;
     private final PerfSupport support;
     private final PerfReviewViews views;
+    private final PerfNotifier notifier;
 
     /** Where the signed-in person sits: their employee record, how many people report to them, and what they hold. */
     @Transactional(readOnly = true)
@@ -67,6 +68,7 @@ public class PerfReviewService {
         r.submitSelf(req.rating(), req.comment());
         reviewRepo.save(r);
         support.event(tenantId, HrPerfEvent.REVIEW, r.getId(), "SELF_SUBMITTED", null, userId);
+        notifier.readyForReviewer(tenantId, x.cycle(), r, x.subject());
         return views.detail(tenantId, x, held);
     }
 
@@ -118,6 +120,7 @@ public class PerfReviewService {
         r.share(userId);
         reviewRepo.save(r);
         support.event(tenantId, HrPerfEvent.REVIEW, r.getId(), "SHARED", null, userId);
+        notifier.resultReleased(tenantId, x.cycle(), r, x.subject());
         return views.detail(tenantId, x, held);
     }
 

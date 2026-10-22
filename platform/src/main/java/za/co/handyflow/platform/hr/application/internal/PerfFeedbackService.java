@@ -25,6 +25,7 @@ public class PerfFeedbackService {
     private final HrPerfReviewRepository reviewRepo;
     private final HrPerfCycleRepository cycleRepo;
     private final PerfSupport support;
+    private final PerfNotifier notifier;
 
     /** Asks people for feedback. Everyone in the list is checked before anyone is asked. */
     @Transactional
@@ -50,6 +51,7 @@ public class PerfFeedbackService {
         }
         for (HrPerfFeedback f : fresh) feedbackRepo.save(f);
         support.event(tenantId, HrPerfEvent.REVIEW, r.getId(), "FEEDBACK_REQUESTED", fresh.size() + (fresh.size() == 1 ? " person asked" : " people asked"), userId);
+        notifier.feedbackAsked(tenantId, x.cycle(), x.subject(), r, fresh.stream().map(HrPerfFeedback::getProviderId).toList());
         return requests(r.getId(), true, PerfRules.sight(x.sightWho(), r.getStatus()).feedbackNames());
     }
 

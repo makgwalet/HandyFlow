@@ -26,6 +26,7 @@ public class PerfCycleService {
     private final HrEmployeeRepository employeeRepo;
     private final PerfSupport support;
     private final PerfReviewViews views;
+    private final PerfNotifier notifier;
 
     @Transactional(readOnly = true)
     public List<CycleRow> cycles(TenantId tenantId, Set<String> held) {
@@ -87,6 +88,7 @@ public class PerfCycleService {
         cycleRepo.save(c);
         for (HrPerfReview r : made) reviewRepo.save(r);
         support.event(tenantId, HrPerfEvent.CYCLE, c.getId(), "OPENED", made.size() + (made.size() == 1 ? " review made" : " reviews made"), userId);
+        notifier.selfReviewAsked(tenantId, c, made);
         return detail(tenantId, c, held, userId);
     }
 
@@ -104,6 +106,7 @@ public class PerfCycleService {
         HrPerfReview r = newReview(tenantId, c, e, byId);
         reviewRepo.save(r);
         support.event(tenantId, HrPerfEvent.CYCLE, c.getId(), "REVIEW_ADDED", e.getFullName(), userId);
+        notifier.selfReviewAsked(tenantId, c, List.of(r));
         return detail(tenantId, c, held, userId);
     }
 

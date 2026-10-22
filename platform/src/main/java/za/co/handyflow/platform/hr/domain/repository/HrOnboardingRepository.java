@@ -21,4 +21,8 @@ public interface HrOnboardingRepository extends JpaRepository<HrOnboarding, UUID
 
     @Query("SELECT o FROM HrOnboarding o WHERE o.tenantId = :#{#tenantId.value} AND o.employeeId = :employeeId")
     Optional<HrOnboarding> findByEmployee(TenantId tenantId, UUID employeeId);
+
+    /** Onboardings still under way, for every company: the daily reminder looks at all of them. */
+    @Query("SELECT o FROM HrOnboarding o WHERE o.status = 'IN_PROGRESS'")
+    List<HrOnboarding> allInProgress();
 }
