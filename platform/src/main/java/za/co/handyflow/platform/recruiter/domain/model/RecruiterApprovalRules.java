@@ -69,6 +69,36 @@ public final class RecruiterApprovalRules {
         return "This company needs an offer to be approved before the letter is sent. Send it for approval first.";
     }
 
+    /** Null when the offer letter PDF may be downloaded. Same test as sending: an unapproved offer is not shown as a finished letter. */
+    public static String offerPdfProblem(boolean approvalRequired, String approvalStatus) {
+        if (!approvalRequired || APPROVED.equals(approvalStatus)) return null;
+        if (SUBMITTED.equals(approvalStatus)) return "This offer is waiting for approval, so the letter cannot be downloaded yet.";
+        if (REJECTED.equals(approvalStatus)) return "This offer was not approved. Change the terms and send it for approval again.";
+        return "This company needs an offer to be approved before the letter is produced. Send it for approval first.";
+    }
+
+    public static String requestedTitle(boolean job) { return job ? "A job is waiting for your approval" : "An offer is waiting for your approval"; }
+
+    /** Names the role only. Never the candidate, the salary or the submitter's note. */
+    public static String requestedMessage(boolean job, String jobTitle, String submitter) {
+        String who = submitter == null || submitter.isBlank() ? "A colleague" : submitter.trim();
+        return who + (job ? " has asked you to approve the job \"" + clean(jobTitle) + "\" before it is published."
+                : " has asked you to approve an offer for the \"" + clean(jobTitle) + "\" role before the letter is sent.");
+    }
+
+    public static String decidedTitle(boolean job, boolean approved) {
+        return (job ? "Your job was " : "Your offer was ") + (approved ? "approved" : "not approved");
+    }
+
+    public static String decidedMessage(boolean job, boolean approved, String jobTitle, String decidedBy) {
+        String who = decidedBy == null || decidedBy.isBlank() ? "An approver" : decidedBy.trim();
+        String what = job ? "the job \"" + clean(jobTitle) + "\"" : "the offer for the \"" + clean(jobTitle) + "\" role";
+        return who + (approved ? " approved " + what + ". You can " + (job ? "publish it now." : "send the letter now.")
+                : " did not approve " + what + ". Open it to read why.");
+    }
+
+    private static String clean(String t) { return t == null || t.isBlank() ? "(untitled)" : t.trim(); }
+
     /** Whether the offered terms differ from the ones that were approved, in which case the approval no longer stands. */
     public static boolean offerChanged(BigDecimal oldSalary, String oldFrequency, java.time.LocalDate oldStart, String oldBenefits,
                                        BigDecimal newSalary, String newFrequency, java.time.LocalDate newStart, String newBenefits) {

@@ -59,6 +59,10 @@ const labelStyle: CSSProperties = {
   display: 'block', fontSize: 13, fontWeight: 500, color: ink, marginBottom: 6,
 }
 
+// Must match RecruiterConsentRules.STATEMENT on the server; the server records which version the applicant agreed to.
+const CONSENT_STATEMENT =
+  "I agree that this company may keep my application, CV and contact details to consider me for this and similar roles, and that they will be removed after the company's retention period. I can ask to see, correct or delete them at any time."
+
 const MAX_CV_BYTES = 5 * 1024 * 1024 // 5MB — reasonable client-side guard; cv storage is
 // base64-in-DB on the backend (a known, separately-flagged gap, not something to fix here),
 // so keeping uploads modest matters more than usual.
@@ -77,6 +81,7 @@ export function JobApplyPage() {
   const [cvFile, setCvFile] = useState<File | null>(null)
   const [cvError, setCvError] = useState('')
   const [formError, setFormError] = useState('')
+  const [consent, setConsent] = useState(false)
 
   const { data: job, isLoading, isError, error } = useQuery<JobDetail>({
     queryKey: ['public-job', tenantSlug, jobSlug],
@@ -117,6 +122,7 @@ export function JobApplyPage() {
           linkedinUrl: linkedinUrl || null, portfolioUrl: portfolioUrl || null,
           cvBase64, cvFileName: cvFile?.name || null,
           source: 'CAREERS_PAGE',
+          consent,
         })
       return r.data?.data ?? r.data
     },
@@ -135,6 +141,10 @@ export function JobApplyPage() {
     setFormError('')
     if (!firstName.trim() || !lastName.trim() || !email.trim()) {
       setFormError('Please fill in your first name, last name, and email.')
+      return
+    }
+    if (!consent) {
+      setFormError('Please agree to the use of your details before you apply.')
       return
     }
     apply.mutate()
@@ -305,6 +315,11 @@ export function JobApplyPage() {
                 )}
                 {cvError && <div style={{ fontSize: 12, color: danger, marginTop: 6 }}>{cvError}</div>}
               </div>
+
+              <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, color: muted, lineHeight: 1.5, marginBottom: 18 }}>
+                <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} style={{ marginTop: 3 }} />
+                <span>{CONSENT_STATEMENT}</span>
+              </label>
 
               {formError && (
                 <div style={{ background: dangerSoft, color: danger, fontSize: 13, padding: '10px 14px', borderRadius: 8, marginBottom: 18 }}>

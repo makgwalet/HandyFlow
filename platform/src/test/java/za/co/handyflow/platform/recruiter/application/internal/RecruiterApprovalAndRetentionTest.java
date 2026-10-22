@@ -31,7 +31,8 @@ class RecruiterApprovalAndRetentionTest {
     private final RecSettingsRepository settingsRepo = mock(RecSettingsRepository.class);
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
     private final CvStorage cv = mock(CvStorage.class);
-    private final RecruiterApprovalService approvals = new RecruiterApprovalService(jobs, applications, settingsRepo, jdbc);
+    private final RecruiterApprovalNotifier notifier = mock(RecruiterApprovalNotifier.class);
+    private final RecruiterApprovalService approvals = new RecruiterApprovalService(jobs, applications, settingsRepo, jdbc, notifier);
     private final RecruiterRetentionService retention = new RecruiterRetentionService(applicants, applications, approvals, cv, jdbc);
 
     private final List<String> sqls = new java.util.ArrayList<>();
@@ -291,5 +292,44 @@ class RecruiterApprovalAndRetentionTest {
     @Test
     void choosingNobodyIsAnError() {
         assertThatThrownBy(() -> retention.remove(tenant, List.of(), maker, NOW)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    // ── Notifications and the offer PDF ───────────────────────────────────────────────────────────
+
+    @Test
+    void sendingAJobForApprovalAsksTheApprovers_andTheOutcomeGoesBackToTheSubmitter() {
+        settings(true, false, 12);
+        RecJob job = draftJob();
+        approvals.submitJob(tenant, job.getId(), maker);
+        verify(notifier).requested(tenant, true, job.getId(), "Clerk", maker);
+        approvals.decideJob(tenant, job.getId(), new DecisionRequest(true, "Fine"), checker);
+        verify(notifier).decided(tenant, true, job.getId(), "Clerk", maker, checker, true);
+    }
+
+    @Test
+    void aRefusedApprovalIsNotAnnounced() {
+        settings(true, false, 12);
+        RecJob job = draftJob();
+        approvals.submitJob(tenant, job.getId(), maker);
+        assertThatThrownBy(() -> approvals.decideJob(tenant, job.getId(), new DecisionRequest(true, null), maker)).hasMessageContaining("yourself");
+        verify(notifier, never()).decided(any(), anyBoolean(), any(), any(), any(), any(), anyBoolean());
+    }
+
+    @Test
+    void anOfferThatNeedsApprovalCannotBeDownloadedUntilApproved() {
+        settings(false, true, 12);
+        RecApplication a = offerApplication(UUID.randomUUID());
+        assertThatThrownBy(() -> approvals.requireOfferPdf(tenant, a.getId())).hasMessageContaining("Send it for approval");
+        approvals.submitOffer(tenant, a.getId(), maker);
+        assertThatThrownBy(() -> approvals.requireOfferPdf(tenant, a.getId())).hasMessageContaining("waiting for approval");
+        approvals.decideOffer(tenant, a.getId(), new DecisionRequest(true, null), checker);
+        approvals.requireOfferPdf(tenant, a.getId());
+    }
+
+    @Test
+    void theOfferPdfIsNotBlockedWhenTheCompanyDoesNotUseApproval() {
+        settings(false, false, 12);
+        RecApplication a = offerApplication(UUID.randomUUID());
+        approvals.requireOfferPdf(tenant, a.getId());
     }
 }

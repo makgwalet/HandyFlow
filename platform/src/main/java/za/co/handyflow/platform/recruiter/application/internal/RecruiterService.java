@@ -245,6 +245,8 @@ public class RecruiterService {
             throw new HandyFlowException("This position is no longer accepting applications",
                     HttpStatus.BAD_REQUEST, "JOB_CLOSED");
         }
+        String consentProblem = RecruiterConsentRules.problem(req.consent());
+        if (consentProblem != null) throw new HandyFlowException(consentProblem, HttpStatus.BAD_REQUEST, "CONSENT_REQUIRED");
 
         // Store the CV via CvStorage (local disk for now, dev phase — see
         // CvStorage's own Javadoc) rather than the raw base64 string.
@@ -273,6 +275,7 @@ public class RecruiterService {
 
         RecApplication application = RecApplication.create(tenantId, jobId,
                 applicant.getId(), req.source(), req.referrerName());
+        application.recordConsent(RecruiterConsentRules.VERSION);
         applicationRepo.save(application);
 
         // Update job application count

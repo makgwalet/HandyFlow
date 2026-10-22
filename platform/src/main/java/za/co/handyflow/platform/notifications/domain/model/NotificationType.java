@@ -202,6 +202,11 @@ public enum NotificationType {
     // or health, and an email is not a private place.
     LETTER_ISSUED(INFO, Set.of(IN_APP, EMAIL)),
 
+    // Recruiter approvals: someone is asked to approve a job or an offer, and the person who asked is told the outcome.
+    // The message names the role, never the candidate or the salary.
+    REC_APPROVAL_REQUESTED(INFO, Set.of(IN_APP, EMAIL)),
+    REC_APPROVAL_DECIDED(INFO, Set.of(IN_APP, EMAIL)),
+
     // ── Invoicing ────────────────────────────────────────────────────────────
     QUOTE_SENT(INFO, Set.of(IN_APP)),
     QUOTE_ACCEPTED(INFO, Set.of(IN_APP, EMAIL)),

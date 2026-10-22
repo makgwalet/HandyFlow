@@ -29,6 +29,7 @@ public class RecruiterApprovalService {
     private final RecApplicationRepository applicationRepo;
     private final RecSettingsRepository settingsRepo;
     private final JdbcTemplate jdbc;
+    private final RecruiterApprovalNotifier notifier;
 
     // ── Settings ──────────────────────────────────────────────────────────────────────────────────
 
@@ -69,6 +70,7 @@ public class RecruiterApprovalService {
         job.submitForApproval(by);
         jobRepo.save(job);
         log.info("Job={} sent for approval by user={}", jobId, by);
+        notifier.requested(tenantId, true, jobId, job.getTitle(), by);
         return jobView(tenantId, job, by);
     }
 
@@ -80,6 +82,7 @@ public class RecruiterApprovalService {
         job.decideApproval(approve, by, req.note());
         jobRepo.save(job);
         log.info("Job={} {} by user={}", jobId, approve ? "approved" : "not approved", by);
+        notifier.decided(tenantId, true, jobId, job.getTitle(), job.getSubmittedBy(), by, approve);
         return jobView(tenantId, job, by);
     }
 
@@ -102,6 +105,7 @@ public class RecruiterApprovalService {
         app.submitOfferForApproval(by);
         applicationRepo.save(app);
         log.info("Offer for application={} sent for approval by user={}", applicationId, by);
+        notifier.requested(tenantId, false, applicationId, jobTitle(tenantId, app), by);
         return offerView(tenantId, app, by);
     }
 
@@ -113,12 +117,24 @@ public class RecruiterApprovalService {
         app.decideOfferApproval(approve, by, req.note());
         applicationRepo.save(app);
         log.info("Offer for application={} {} by user={}", applicationId, approve ? "approved" : "not approved", by);
+        notifier.decided(tenantId, false, applicationId, jobTitle(tenantId, app), app.getOfferSubmittedBy(), by, approve);
         return offerView(tenantId, app, by);
     }
 
     /** Called when someone sends an offer letter: refused when the company needs approval and the offer does not have it. */
     void requireOfferSendable(TenantId tenantId, RecApplication app) {
         fail(RecruiterApprovalRules.sendOfferProblem(settings(tenantId).isRequireOfferApproval(), app.getOfferApprovalStatus()));
+    }
+
+    /** Called when someone downloads the offer letter PDF: refused for an offer that still needs approval. */
+    @Transactional(readOnly = true)
+    public void requireOfferPdf(TenantId tenantId, UUID applicationId) {
+        RecApplication app = application(tenantId, applicationId);
+        fail(RecruiterApprovalRules.offerPdfProblem(settings(tenantId).isRequireOfferApproval(), app.getOfferApprovalStatus()));
+    }
+
+    private String jobTitle(TenantId tenantId, RecApplication app) {
+        return jobRepo.findByIdAndTenantId(app.getJobId(), tenantId).map(RecJob::getTitle).orElse(null);
     }
 
     // ── Views ─────────────────────────────────────────────────────────────────────────────────────

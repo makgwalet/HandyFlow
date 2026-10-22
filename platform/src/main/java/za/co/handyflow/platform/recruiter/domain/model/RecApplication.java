@@ -40,6 +40,9 @@ public class RecApplication {
     // Null until then; null offeredSalary is how the service layer detects
     // "no offer terms recorded yet" before allowing an offer letter to be
     // generated.
+    @Column(name = "consent_given_at")         private Instant   consentGivenAt;
+    @Column(name = "consent_statement_ver")    private String    consentStatementVer;
+
     @Column(name = "offered_salary", precision = 12, scale = 2)
     private BigDecimal offeredSalary;
     @Column(name = "offered_salary_frequency") private String    offeredSalaryFrequency;
@@ -80,6 +83,12 @@ public class RecApplication {
         a.createdAt       = Instant.now();
         a.updatedAt       = Instant.now();
         return a;
+    }
+
+    /** The applicant agreed to the wording of the given version. */
+    public void recordConsent(String statementVersion) {
+        this.consentGivenAt = Instant.now();
+        this.consentStatementVer = statementVersion;
     }
 
     // ── Pipeline progression ──────────────────────────────────────────────────

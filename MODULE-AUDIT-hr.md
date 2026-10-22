@@ -729,3 +729,25 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - `LetterBulkAndNoticeTest` (10) is written and unexecuted.
 - In my stub harness: `LetterheadRulesTest` (4) and `LetterBulkRulesTest` (4) pass; leaving out the PNG byte check was caught by a test. `LetterHarness` was changed to pass the notification service and the existing letter service tests were not re-run.
 - Front end: 6 new tests in `LetterBulk.test.tsx` and the 16 existing letter tests pass; lint and type-check are clean on the changed files. The screen has not been opened in a browser against a real server.
+
+## 25. Slice 17a: recruiter approvals told, offer PDF held back, applicant consent
+
+**What changed**
+
+- **Approvers are told.** When a job or an offer is sent for approval, the company's administrators (everyone except the person who asked, since nobody may approve their own request) get an in-app and email message. When it is decided, the person who asked is told approved or not approved. The messages name the role and who asked; never the candidate, the salary or the approver's note.
+- **Offer PDF held back.** Downloading the offer letter PDF is refused for a company that requires offer approval until the offer is approved, with the same reasons as sending. Companies that do not use approval are unaffected.
+- **Applicant consent.** The careers apply form has a required tick-box with a short statement (the company keeps the application and CV to consider the person, removes them after the retention period, and the person can ask to see, correct or delete them). The server refuses an application without it and records when, and which version of the wording, was agreed (`consent_given_at`, `consent_statement_ver`, migration V499). Applications made before this change have no record and stay blank.
+
+**Still not done**
+
+- Approvers are the tenant administrators. There is no "approver" permission, so a company cannot name particular people.
+- The consent statement does not show the company's actual retention months (the public job endpoint does not return the setting) and does not link to a privacy notice.
+- Other public entry points that create applications, if any exist besides the careers page, were not looked for beyond `submitApplicationBySlug`.
+- Converting a hire into an employee with ID, tax and bank details is not done; the existing "place as employee" step is unchanged.
+- No reminder to an approver who has not acted.
+
+**Not verified**
+
+- Maven, Spring and the database have not run. `RecruiterApprovalService` gained a constructor argument (the notifier); the existing test was changed to match and has not run. `RecruiterApprovalNotifierTest` (4) and four new cases in `RecruiterApprovalAndRetentionTest` are unexecuted. V499 is unrun.
+- In my harness `RecruiterApprovalMessagesTest` (4: message wording, offer-PDF rule, consent rule) passes.
+- Front end: 2 new tests for the apply form pass (refuses without agreement; sends `consent: true`); 11 existing recruiter approval tests pass. `JobApplyPage.tsx` has 3 pre-existing lint `any` errors, none added.

@@ -248,6 +248,7 @@ public class RecruiterController {
     @PreAuthorize("hasAuthority('RECRUITER_READ')")
     @Operation(summary = "Download the offer letter PDF — application must have offer terms recorded (move to OFFER with salary details first)")
     public ResponseEntity<byte[]> downloadOfferLetter(@PathVariable UUID id) {
+        approvalService.requireOfferPdf(TenantContext.getTenantIdAsObject(), id);
         byte[] pdf = recruiterPdfGenerator.generateOfferLetter(TenantContext.getTenantIdAsObject(), id);
         return ResponseEntity.ok()
                 .header("Content-Type", "application/pdf")
