@@ -98,7 +98,8 @@ public class PayrollImpactService {
                     covers.getOrDefault(emp.getId(), List.of()), run.getPayDate(), s.getMedicalAid());
             SarsPayrollResult again = SarsPayeCalculator.calculate(new SarsPayeCalculator.Inputs(
                     s.getGrossSalary(), s.getTravelAllowance(), s.getPension(), s.getMedicalAid(),
-                    emp.getDateOfBirth(), members.count(), annualPayroll), rules.get());
+                    emp.getDateOfBirth(), members.count(), annualPayroll,
+                    s.getEmployerMedical(), s.getEmployerRetirement(), s.getOtherFringe()), rules.get());
             Facts f = new Facts(false, false, ignored, members.assumed(),
                     again.payeAmount().subtract(nvl(s.getPayeAmount())),
                     again.uifEmployee().subtract(nvl(s.getUifEmployee())),

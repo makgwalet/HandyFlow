@@ -184,7 +184,7 @@ public class TaxCertificateService {
                 sum(l, HrPayslip::getOtherEarnings), sum(l, HrPayslip::getTravelAllowance), sum(l, HrPayslip::getPension),
                 sum(l, HrPayslip::getMedicalAid), sum(l, HrPayslip::getPayeAmount), sum(l, HrPayslip::getUifEmployee),
                 sum(l, HrPayslip::getUifEmployer), sum(l, HrPayslip::getSdlAmount), sum(l, HrPayslip::getMedicalTaxCredit),
-                l.size(), withoutCredit);
+                l.size(), withoutCredit, sum(l, HrPayslip::getEmployerMedical), sum(l, HrPayslip::getEmployerRetirement), sum(l, HrPayslip::getOtherFringe));
     }
 
     private static boolean sameLines(List<TaxCertificateRules.Line> lines, List<HrTaxCertificateLine> stored) {

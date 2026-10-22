@@ -57,6 +57,10 @@ public class HrPayslip {
     /** Annual leave paid out on the last pay. Part of the total earnings. */
     @Column(name = "leave_payout_amount")  BigDecimal leavePayoutAmount  = BigDecimal.ZERO;
     @Column(name = "final_pay")            boolean finalPay;
+    /** Taxable benefits for the month that were not paid in cash. They raise the income PAYE is worked out on; they are not in the earnings. */
+    @Column(name = "employer_medical")     BigDecimal employerMedical    = BigDecimal.ZERO;
+    @Column(name = "employer_retirement")  BigDecimal employerRetirement = BigDecimal.ZERO;
+    @Column(name = "other_fringe")         BigDecimal otherFringe        = BigDecimal.ZERO;
     @Column(name = "created_at")        Instant createdAt;
 
     public static HrPayslip create(TenantId tenantId, UUID payRunId,
@@ -99,6 +103,13 @@ public class HrPayslip {
     }
 
     public void markFinalPay() { this.finalPay = true; }
+
+    /** What the employer paid towards medical aid and a retirement fund this month, and other taxable benefits. Set before the calculations are applied. */
+    public void setBenefits(BigDecimal employerMedical, BigDecimal employerRetirement, BigDecimal otherFringe) {
+        this.employerMedical = employerMedical == null ? BigDecimal.ZERO : employerMedical;
+        this.employerRetirement = employerRetirement == null ? BigDecimal.ZERO : employerRetirement;
+        this.otherFringe = otherFringe == null ? BigDecimal.ZERO : otherFringe;
+    }
 
     public void setMedicalTaxCredit(BigDecimal credit) { this.medicalTaxCredit = credit; }
 

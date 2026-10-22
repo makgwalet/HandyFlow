@@ -40,7 +40,12 @@ public class PayrollEngine {
     }
 
     /** What is paid for the period when it is not a full month: the salary, travel allowance and pension for the days paid, and any leave paid out. */
-    public record Period(BigDecimal basic, BigDecimal travel, BigDecimal pension, BigDecimal leavePayout) {}
+    public record Period(BigDecimal basic, BigDecimal travel, BigDecimal pension, BigDecimal leavePayout,
+                         BigDecimal employerMedical, BigDecimal employerRetirement, BigDecimal otherFringe) {
+        public Period(BigDecimal basic, BigDecimal travel, BigDecimal pension, BigDecimal leavePayout) {
+            this(basic, travel, pension, leavePayout, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        }
+    }
 
     /**
      * For a part period, or a last pay that includes annual leave paid out. The basic salary is what is payable for the days paid; the leave
@@ -53,7 +58,8 @@ public class PayrollEngine {
         BigDecimal payout = period.leavePayout() == null ? BigDecimal.ZERO : period.leavePayout();
         SarsPayrollResult r = SarsPayeCalculator.calculate(new SarsPayeCalculator.Inputs(
                 period.basic().add(ot).add(payout), period.travel(), period.pension(),
-                employee.getMedicalAidContribution(), employee.getDateOfBirth(), medicalMembers, annualPayroll), rules);
+                employee.getMedicalAidContribution(), employee.getDateOfBirth(), medicalMembers, annualPayroll,
+                period.employerMedical(), period.employerRetirement(), period.otherFringe()), rules);
 
         log.debug("Payroll employee={} year={} taxable={} paye={} uif={} sdl={} medicalMembers={}",
                 employee.getId(), rules.taxYear(), r.taxableIncome(), r.payeAmount(), r.uifEmployee(), r.sdlAmount(), medicalMembers);

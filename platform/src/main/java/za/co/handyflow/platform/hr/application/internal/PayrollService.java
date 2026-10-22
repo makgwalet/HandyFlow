@@ -38,6 +38,7 @@ public class PayrollService {
     private final za.co.handyflow.platform.shared.PublicHolidayRepository holidayRepo;
     private final HrLeaveRequestRepository leaveRepo;
     private final LeaveService          leaveService;
+    private final BenefitService        benefitService;
 
     // ── Pay runs ──────────────────────────────────────────────────────────────
 
@@ -134,6 +135,8 @@ public class PayrollService {
                     + ". It was calculated under " + taxYear + ".");
 
         Map<UUID, MedicalSchemeRules.Members> members = medicalSchemeService.membersOn(tenantId, employees, run.getPayDate());
+        // Taxable benefits in force on the last day of the period. They are not prorated for part months or unpaid leave.
+        Map<UUID, BenefitRules.Monthly> benefits = benefitService.forRun(tenantId, run.getPeriodEnd());
 
         BigDecimal annualPayroll = employees.stream()
                 .map(HrEmployee::getGrossSalary)
@@ -182,13 +185,19 @@ public class PayrollService {
             if (pay.unpaidDays().signum() > 0)
                 warnings.add(who + ": " + pay.unpaidDays() + " day(s) of unpaid leave deducted (" + pay.unpaidAmount() + ").");
             BigDecimal travel = PayPeriodRules.share(emp.getTravelAllowance(), pay);
+            BenefitRules.Monthly benefit = benefits.getOrDefault(emp.getId(), BenefitRules.Monthly.none());
+            if (!benefit.isEmpty())
+                warnings.add(who + ": taxable benefits of " + benefit.medical().add(benefit.retirement()).add(benefit.other())
+                        + " a month (not paid in cash) are included in the income PAYE is worked out on.");
             PayrollEngine.PayrollResult result = engine.calculate(emp, rules, annualPayroll, m.count(), overtimePay,
-                    new PayrollEngine.Period(pay.paid(), travel, emp.getPensionContribution(), payout));
+                    new PayrollEngine.Period(pay.paid(), travel, emp.getPensionContribution(), payout,
+                            benefit.medical(), benefit.retirement(), benefit.other()));
 
             HrPayslip slip = HrPayslip.create(tenantId, run.getId(), emp.getId(),
                     result.grossSalary(), result.travelAllowance(),
                     result.medicalAid(), result.pension());
             slip.setOvertimeAmount(overtimePay);
+            slip.setBenefits(benefit.medical(), benefit.retirement(), benefit.other());
             slip.setPeriodPay(pay.workingDays(), pay.daysPaid(), pay.proration(), pay.unpaidDays(), pay.unpaidAmount());
             if (finalPay) { slip.setLeavePayout(payoutDays, payout); slip.markFinalPay(); }
 
@@ -304,7 +313,8 @@ public class PayrollService {
                 s.getNetPay(), s.getYtdGross(), s.getYtdPaye(),
                 s.getTaxableIncome(), s.getTaxYear() != null ? s.getTaxYear() : 0,
                 s.getCreatedAt(), s.getDaysInPeriod(), s.getDaysPaid(), s.getProrationAmount(), s.getUnpaidLeaveDays(), s.getUnpaidLeaveAmount(),
-                s.getLeavePayoutDays(), s.getLeavePayoutAmount(), s.isFinalPay());
+                s.getLeavePayoutDays(), s.getLeavePayoutAmount(), s.isFinalPay(),
+                s.getEmployerMedical(), s.getEmployerRetirement(), s.getOtherFringe());
     }
 
     private Emp201Response toEmp201Response(HrEmp201 e) {

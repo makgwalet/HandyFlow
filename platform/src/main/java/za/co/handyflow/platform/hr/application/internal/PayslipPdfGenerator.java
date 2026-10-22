@@ -176,7 +176,17 @@ public class PayslipPdfGenerator {
         two.addCell(deductionsCell);
 
         doc.add(two);
+
+        java.util.List<String> benefits = new java.util.ArrayList<>();
+        if (positive(p.getEmployerMedical())) benefits.add("Employer medical aid contribution " + fmt(p.getEmployerMedical()));
+        if (positive(p.getEmployerRetirement())) benefits.add("Employer retirement fund contribution " + fmt(p.getEmployerRetirement()));
+        if (positive(p.getOtherFringe())) benefits.add("Other taxable benefits " + fmt(p.getOtherFringe()));
+        if (!benefits.isEmpty())
+            doc.add(new Paragraph("Taxable benefits this month, not paid in cash but included in the income your tax is worked out on: "
+                    + String.join("; ", benefits) + ".").setFontSize(8).setMarginTop(8));
     }
+
+    private static boolean positive(java.math.BigDecimal v) { return v != null && v.signum() > 0; }
 
     /** "Basic salary", or what part of the period it covers when the employee joined, left or took unpaid leave. */
     private static String basicLabel(HrPayslip p) {

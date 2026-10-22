@@ -33,7 +33,7 @@ public final class TaxCertificateRules {
     public static final List<String> NOT_PRODUCED = List.of(
             "3695 to 3699 (gross employment income totals), 3696 (non-taxable income) and 4149 (statutory total): the exact definitions and the way they relate to the other codes could not be confirmed from SARS documents.",
             "4582 and the taxable portion of the travel allowance: how SARS wants it reported could not be confirmed.",
-            "Employer contributions (3810, 3817, 3825, 3828, 4472 to 4475) and every other fringe benefit: payroll does not record them yet, so a certificate understates taxable income where the employer pays towards medical aid or a retirement fund.");
+            "Employer contributions and other fringe benefits are reported under 3801, 3810, 3817, 3825, 3828 and 4472 to 4475, taken from a payroll vendor's code list rather than from SARS itself, and only what payroll recorded. Payslips made before benefits were recorded carry none, and the totals codes (3695 to 3699) are not produced, so check a certificate for an employee with benefits against SARS's own code list before submitting it.");
 
     private TaxCertificateRules() {}
 
@@ -61,7 +61,15 @@ public final class TaxCertificateRules {
     /** What one employee was paid and charged over the window, summed from payslips of finalised runs. */
     public record Totals(BigDecimal basic, BigDecimal overtime, BigDecimal bonus, BigDecimal otherEarnings, BigDecimal travel,
                          BigDecimal pension, BigDecimal medicalAid, BigDecimal paye, BigDecimal uifEmployee, BigDecimal uifEmployer,
-                         BigDecimal sdl, BigDecimal medicalCredit, int payslips, int payslipsWithoutCredit) {
+                         BigDecimal sdl, BigDecimal medicalCredit, int payslips, int payslipsWithoutCredit,
+                         BigDecimal employerMedical, BigDecimal employerRetirement, BigDecimal otherFringe) {
+        /** Without taxable benefits, as before payroll recorded them. */
+        public Totals(BigDecimal basic, BigDecimal overtime, BigDecimal bonus, BigDecimal otherEarnings, BigDecimal travel,
+                      BigDecimal pension, BigDecimal medicalAid, BigDecimal paye, BigDecimal uifEmployee, BigDecimal uifEmployer,
+                      BigDecimal sdl, BigDecimal medicalCredit, int payslips, int payslipsWithoutCredit) {
+            this(basic, overtime, bonus, otherEarnings, travel, pension, medicalAid, paye, uifEmployee, uifEmployer, sdl, medicalCredit,
+                    payslips, payslipsWithoutCredit, ZERO, ZERO, ZERO);
+        }
         public static Totals empty() {
             return new Totals(ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, 0, 0);
         }
@@ -86,6 +94,24 @@ public final class TaxCertificateRules {
         add(out, "3701", "Travel allowance", t.travel());
         add(out, "3713", "Other taxable allowances", t.otherEarnings());
         String fund = retirementFund == null ? PENSION : retirementFund;
+        // Taxable benefits: the employer's contribution shows as a fringe benefit and again in the 44xx code beside it.
+        add(out, "3801", "General fringe benefits", t.otherFringe());
+        add(out, "3810", "Medical scheme: employer contribution (taxable benefit)", t.employerMedical());
+        add(out, "4474", "Employer's medical aid contributions", t.employerMedical());
+        switch (fund) {
+            case PROVIDENT -> {
+                add(out, "3825", "Employer provident fund contributions (taxable benefit)", t.employerRetirement());
+                add(out, "4473", "Employer's provident fund contributions", t.employerRetirement());
+            }
+            case RETIREMENT_ANNUITY -> {
+                add(out, "3828", "Employer retirement annuity contributions (taxable benefit)", t.employerRetirement());
+                add(out, "4475", "Employer's retirement annuity contributions", t.employerRetirement());
+            }
+            default -> {
+                add(out, "3817", "Employer pension fund contributions (taxable benefit)", t.employerRetirement());
+                add(out, "4472", "Employer's pension fund contributions", t.employerRetirement());
+            }
+        }
         switch (fund) {
             case PROVIDENT -> add(out, "4003", "Provident fund contributions (employee)", t.pension());
             case RETIREMENT_ANNUITY -> add(out, "4006", "Retirement annuity contributions (employee)", t.pension());

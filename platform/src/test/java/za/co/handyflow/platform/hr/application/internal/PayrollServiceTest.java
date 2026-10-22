@@ -37,6 +37,7 @@ class PayrollServiceTest {
     private MedicalSchemeService medicalSchemeService;
     private HrPayRunEventRepository eventRepo;
     private OvertimeService overtimeService;
+    private BenefitService benefitService;
     private za.co.handyflow.platform.shared.PublicHolidayRepository holidayRepo;
     private HrLeaveRequestRepository leaveRepo;
     private LeaveService leaveService;
@@ -67,17 +68,19 @@ class PayrollServiceTest {
         medicalSchemeService = mock(MedicalSchemeService.class);
         eventRepo = mock(HrPayRunEventRepository.class);
         overtimeService = mock(OvertimeService.class);
+        benefitService = mock(BenefitService.class);
         holidayRepo = mock(za.co.handyflow.platform.shared.PublicHolidayRepository.class);
         leaveRepo = mock(HrLeaveRequestRepository.class);
         leaveService = mock(LeaveService.class);
         when(holidayRepo.datesBetween(any(), any())).thenReturn(List.of());
         when(leaveRepo.approvedUnpaidIn(any(), any(), any())).thenReturn(List.of());
         when(employeeRepo.terminatedForPay(any(), any(), any(), any())).thenReturn(List.of());
+        when(benefitService.forRun(any(), any())).thenReturn(Map.of());
         when(overtimeService.takeFor(any(), any(), any())).thenReturn(Map.of());
         when(overtimeService.waitingCount(any(), any())).thenReturn(0);
         service = new PayrollService(payRunRepo, payslipRepo, emp201Repo, employeeRepo, new PayrollEngine(), numberGen,
                 rulesService, medicalSchemeService, eventRepo, mock(EmployeeChangeService.class), overtimeService,
-                holidayRepo, leaveRepo, leaveService);
+                holidayRepo, leaveRepo, leaveService, benefitService);
         when(numberGen.next(any(), any())).thenReturn("PR00001");
         when(payRunRepo.save(any())).thenAnswer(i -> i.getArgument(0));
         when(payslipRepo.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -163,6 +166,26 @@ class PayrollServiceTest {
         // 30 003 x 12 = 360 036; tax 74 001.36 - 17 820 = 56 181.36 / 12 = 4 681.78, with no medical credit
         assertThat(r.totalPaye()).isEqualByComparingTo("4681.78");
         assertThat(r.warnings()).isEmpty();
+    }
+
+    @Test
+    void anEmployerMedicalContributionRaisesTheTaxButNotThePay() {
+        draftRun(LocalDate.of(2026, 10, 31), 2027);
+        HrEmployee emp = employee("30003.00");
+        when(rulesService.rulesFor(2027)).thenReturn(rules2027());
+        when(employeeRepo.findAllActiveList(any())).thenReturn(List.of(emp));
+        when(medicalSchemeService.membersOn(any(), any(), any())).thenReturn(Map.of(emp.getId(), new MedicalSchemeRules.Members(0, false)));
+        when(benefitService.forRun(any(), any())).thenReturn(Map.of(emp.getId(), new BenefitRules.Monthly(d("3000"), BigDecimal.ZERO, BigDecimal.ZERO)));
+
+        PayRunResponse r = service.processPayRun(tenant, UUID.randomUUID(), maker);
+
+        // 360 036 + 36 000 = 396 036; tax 79 998 + 31% x 12 936 = 84 008.16 - 17 820 = 66 188.16 / 12 = 5 515.68
+        assertThat(r.totalPaye()).isEqualByComparingTo("5515.68");
+        assertThat(r.totalGross()).isEqualByComparingTo("30003.00");
+        assertThat(r.warnings()).anyMatch(w -> w.contains("taxable benefits of 3000"));
+        HrPayslip slip = savedSlip().getValue();
+        assertThat(slip.getEmployerMedical()).isEqualByComparingTo("3000");
+        assertThat(slip.getEmployerRetirement()).isEqualByComparingTo("0");
     }
 
     @Test

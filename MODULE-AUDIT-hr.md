@@ -810,3 +810,32 @@ I read the four training services, the entities and the session screen. The modu
 - Maven, Spring and the database have not run. `LeaveService` gained a constructor argument (the policy repository); `LeaveServiceTest` was updated to match and has 8 new cases, all unexecuted. V500 and the dropped-and-recreated ledger constraint (assumed to be named `hr_leave_ledger_kind_check`, the name PostgreSQL gives an unnamed column check) have never run.
 - In my harness `LeavePolicyRulesTest` (7) passes, and ignoring the limit when working out the forfeited days is caught by 2 of them.
 - Front end: 7 new tests pass, and the 14 existing leave tests and all 224 tests in the HR, training, careers and recruiter folders pass. New files are lint-clean; `LeaveTab.tsx` has the same 29 lint errors as before.
+
+## 28. Slice 18a: employer medical and retirement contributions and other fringe benefits in payroll
+
+**What was there.** Payroll taxed cash pay only. An employer's contribution to a medical scheme or retirement fund, or a benefit such as a company car, never reached the PAYE calculation, the payslip or the tax certificate, so tax was understated for anyone who had one.
+
+**What changed**
+
+- **Benefit lines per employee.** HR can record three kinds of monthly benefit: employer medical contribution, employer retirement contribution, and other taxable benefit (which needs a description, such as the company car). Each line has a start date, an optional last day, and a reason. Medical and retirement lines for one employee cannot overlap; other benefits can run side by side. A line cannot start before the employee did. Lines are never deleted; a line is ended on a chosen last day, and the person who added or ended it is kept.
+- **Payroll uses them.** For a pay run, the lines in force on the last day of the period are added up. The three amounts are added to the income tax is worked out on (twelve times a month), and the employer's retirement contribution also counts toward the retirement deduction, still limited to the yearly cap. They do not change the cash pay, and the run shows a warning with the monthly total of taxable benefits.
+- **Payslip and certificate.** The payslip stores the three amounts (older payslips show zero), the payslip PDF shows a short line when there are any, and the tax certificate now produces codes 3801 (other taxable benefits), 3810/4474 (employer medical) and 3817/4472, 3825/4473 or 3828/4475 (employer pension, provident or retirement annuity, by the fund type).
+- **Who can do it.** Anyone who can review payroll can read the lines; adding and ending needs the prepare right (the old payroll permissions still count until 31 December 2026). A known user is required so the trail is not blank.
+- **Screen.** "Employer benefits" on the employee card opens a list with an add form (same checks as the server) and an End action. Without prepare rights it is read-only.
+- Migration V501 adds the benefits table and the three payslip columns.
+
+**Still not done**
+
+- No part-month proration and no adjustment for unpaid leave. A line counts for a period only if it is in force on the period's last day, so a benefit ending mid-month is not counted for that month, and a leaver's final pay does not count it.
+- No second approver on a benefit change; the trail is the person and the reason.
+- Other fringe benefits (car, loans, housing) are entered by HR as a monthly amount; nothing is calculated from their rules.
+- Certificate totals codes 3695 to 3699 are still not produced.
+- The payslip screen in the web app does not yet show the three new amounts (the PDF does).
+- Cancelled pay runs still keep their payslips (unchanged).
+
+**Not verified**
+
+- Maven, Spring and PostgreSQL have not run. V501 is unrun. The `PayrollService` constructor gained `BenefitService`; `PayrollServiceTest` was updated and has one new case (employer medical raises the tax, not the pay), unexecuted, as are `BenefitServiceTest`, the payslip PDF change and the `TaxCertificateService` totals change.
+- In my harness the pure tests pass: `SarsPayeCalculatorBenefitsTest` (6), `BenefitRulesTest` (6) and `TaxCertificateBenefitCodesTest` (5). Hand-worked figures match: R30 000 salary with R3 000 employer medical adds R886.25 a month PAYE. Dropping the employer retirement amount from the deduction is caught by 2 tests.
+- **Tax treatment needs a payroll specialist's check before use:** the certificate codes come from a vendor list, not from SARS; whether UIF and SDL apply to these benefits is unconfirmed (they are left unchanged); the retirement cap base including fringe benefits is assumed; the medical tax credit is not limited by the contributions.
+- Front end: 12 new tests pass, and all 220 tests in the HR folder pass. New files are lint-clean; `EmployeesTab.tsx` reports 16 lint errors, none on the lines I added.

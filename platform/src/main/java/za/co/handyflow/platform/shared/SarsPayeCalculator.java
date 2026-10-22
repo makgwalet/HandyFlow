@@ -24,7 +24,15 @@ public final class SarsPayeCalculator {
      */
     public record Inputs(BigDecimal monthlySalary, BigDecimal travelAllowance, BigDecimal pensionContribution,
                          BigDecimal medicalAidContribution, LocalDate dateOfBirth, int medicalMembers,
-                         BigDecimal annualPayroll) {}
+                         BigDecimal annualPayroll,
+                         BigDecimal employerMedical, BigDecimal employerRetirement, BigDecimal otherFringe) {
+        /** Without employer benefits, as before they existed. */
+        public Inputs(BigDecimal monthlySalary, BigDecimal travelAllowance, BigDecimal pensionContribution,
+                      BigDecimal medicalAidContribution, LocalDate dateOfBirth, int medicalMembers, BigDecimal annualPayroll) {
+            this(monthlySalary, travelAllowance, pensionContribution, medicalAidContribution, dateOfBirth, medicalMembers, annualPayroll,
+                    BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        }
+    }
 
     public static SarsPayrollResult calculate(Inputs in, StatutoryYearRules r) {
         BigDecimal salary = in.monthlySalary();
@@ -32,13 +40,22 @@ public final class SarsPayeCalculator {
         BigDecimal pension = nvl(in.pensionContribution());
         BigDecimal medicalAid = nvl(in.medicalAidContribution());
 
+        BigDecimal employerMedical = nvl(in.employerMedical());
+        BigDecimal employerRetirement = nvl(in.employerRetirement());
+        BigDecimal otherFringe = nvl(in.otherFringe());
+
         BigDecimal annualGross = salary.multiply(TWELVE);
         BigDecimal annualTravel = travel.multiply(r.travelTaxablePct()).multiply(TWELVE);
-        BigDecimal annualPension = pension.multiply(TWELVE);
+        // Employer contributions to a medical scheme or a retirement fund, and other fringe benefits, are taxable benefits: they add to
+        // the income tax is worked out on. What the employer pays into a retirement fund counts as the employee's own contribution for
+        // the deduction, so it shares the cap with the employee's contribution.
+        BigDecimal annualFringe = employerMedical.add(employerRetirement).add(otherFringe).multiply(TWELVE);
+        BigDecimal annualPension = pension.add(employerRetirement).multiply(TWELVE);
+        BigDecimal remuneration = annualGross.add(annualTravel).add(annualFringe);
 
-        BigDecimal cap = annualGross.add(annualTravel).multiply(r.retirementCapPct()).min(r.retirementCapAmount());
+        BigDecimal cap = remuneration.multiply(r.retirementCapPct()).min(r.retirementCapAmount());
         BigDecimal pensionDeduction = annualPension.min(cap);
-        BigDecimal taxable = annualGross.add(annualTravel).subtract(pensionDeduction).max(BigDecimal.ZERO);
+        BigDecimal taxable = remuneration.subtract(pensionDeduction).max(BigDecimal.ZERO);
 
         BigDecimal taxBefore = tax(taxable, r);
 
