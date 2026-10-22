@@ -26,6 +26,11 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
     @Query("SELECT s FROM TrainingSession s WHERE s.tenantId = :#{#tenantId.value} AND s.id = :id")
     Optional<TrainingSession> findByTenantAndId(TenantId tenantId, UUID id);
 
+    /** The same session, locked until the transaction ends. Used where a count is checked and then acted on. */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM TrainingSession s WHERE s.tenantId = :#{#tenantId.value} AND s.id = :id")
+    Optional<TrainingSession> findByTenantAndIdForUpdate(TenantId tenantId, UUID id);
+
     @Query("""
         SELECT s FROM TrainingSession s
         WHERE s.tenantId = :#{#tenantId.value}

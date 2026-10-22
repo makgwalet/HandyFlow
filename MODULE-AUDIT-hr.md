@@ -751,3 +751,35 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - Maven, Spring and the database have not run. `RecruiterApprovalService` gained a constructor argument (the notifier); the existing test was changed to match and has not run. `RecruiterApprovalNotifierTest` (4) and four new cases in `RecruiterApprovalAndRetentionTest` are unexecuted. V499 is unrun.
 - In my harness `RecruiterApprovalMessagesTest` (4: message wording, offer-PDF rule, consent rule) passes.
 - Front end: 2 new tests for the apply form pass (refuses without agreement; sends `consent: true`); 11 existing recruiter approval tests pass. `JobApplyPage.tsx` has 3 pre-existing lint `any` errors, none added.
+
+## 26. Slice 17b: training bookings (the `training` module)
+
+I read the four training services, the entities and the session screen. The module is about 1,100 lines of backend with no service tests. These were the real problems and what was done about them.
+
+**What changed**
+
+- **Who can be booked.** A terminated or suspended employee can no longer be put on a session. A session must be scheduled or in progress.
+- **The last place.** Two people booking at the same moment could both take the last place (the count was read and then acted on with no lock). The session row is now locked for the booking. Capacity can no longer be lowered below the people already on the session.
+- **Results.** A no-show or cancelled booking could be marked as passed through the API (the screen hid the button, the server did not refuse). Now only enrolled or attended people can be given a result, only once the session has started, and a score must be between 0 and 100.
+- **Attendance.** Attendance cannot be recorded for a cancelled session or one that has not yet reached its start date. A session that was never "started" in the system still works once its start date has come.
+- **Cancelling a session** now cancels the bookings of people still waiting (with the reason) and tells them. People who already attended keep their record.
+- **Completing a session** is refused while anyone is still shown as enrolled; attendance has to be recorded first.
+- **Employees are told** (email and in-app) when they are booked, and when a session they are on is moved or cancelled. The message names the course and date only.
+- **The daily training sweep** now runs on South African time and respects `app.notifications.enabled` like the other schedulers.
+- **Screen.** The session screen showed nothing when a step was refused, and used a browser `alert` for certificates. It now shows the server's reason above the roster and clears it when the next step works.
+
+**Still not done**
+
+- Employees cannot see their own bookings or certificates (no self-service screen); certificate expiry warnings go to administrators, not to the certificate holder or their manager.
+- No link from a certificate to compliance (for example, a role that needs a valid first-aid certificate) and no required-training matrix per job title.
+- The session sweep repeats every day for three days before a session; it does not remember what it already sent.
+- Cancelling a session still asks for the reason with a browser prompt.
+- No waiting list when a session is full; no approval by a manager before booking.
+- Booking a person who is already booked on an overlapping session is not checked.
+- The certificate number sequence and PDF generation were not reviewed.
+
+**Not verified**
+
+- Maven, Spring and the database have not run. `TrainingEnrollmentService` and `TrainingSessionService` gained constructor arguments; the new `findByTenantAndIdForUpdate` (pessimistic lock) query has never run against PostgreSQL. `TrainingBookingServicesTest` (9, real Mockito) is unexecuted.
+- In my harness `TrainingRulesTest` (7) passes, and a deliberate break (letting a no-show be passed) is caught.
+- Front end: 3 new tests pass; `TrainingSessionDetail.tsx` has 3 lint `any` errors (4 before, none added).

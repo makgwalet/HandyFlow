@@ -278,6 +278,9 @@ public enum NotificationType {
     TRAINING_SESSION_UPCOMING(INFO, Set.of(IN_APP, EMAIL)),
     TRAINING_CERTIFICATE_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
     TRAINING_CERTIFICATE_EXPIRED(CRITICAL, Set.of(IN_APP, EMAIL)),
+    // Told to the employee: they were put on a session, or a session they were on was moved or cancelled.
+    TRAINING_ENROLLED(INFO, Set.of(IN_APP, EMAIL)),
+    TRAINING_SESSION_CHANGED(WARNING, Set.of(IN_APP, EMAIL)),
 
     // ── Warehousing ──────────────────────────────────────────────────────────
     WAREHOUSING_INBOUND_SHIPMENT_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),

@@ -12,12 +12,15 @@ import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.training.domain.model.TrainingEnrollment;
+import za.co.handyflow.platform.training.domain.model.TrainingRules;
 import za.co.handyflow.platform.training.domain.model.TrainingSession;
 import za.co.handyflow.platform.training.domain.repository.TrainingEnrollmentRepository;
 import za.co.handyflow.platform.training.domain.repository.TrainingSessionRepository;
 
 import java.math.BigDecimal;
 import org.springframework.http.HttpStatus;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.UUID;
 
 /**
@@ -37,18 +40,20 @@ public class TrainingEnrollmentService {
     private final TrainingEnrollmentRepository enrollmentRepository;
     private final TrainingSessionRepository sessionRepository;
     private final HrFacade hrFacade;
+    private final TrainingNotifier notifier;
+    private static final ZoneId ZONE = ZoneId.of("Africa/Johannesburg");
 
     @Transactional
     public TrainingEnrollment enroll(TenantId tenantId, UUID sessionId, UUID employeeId, String notes) {
-        TrainingSession session = sessionRepository.findByTenantAndId(tenantId, sessionId)
+        // The session row is locked so two people enrolling at once cannot both take the last place.
+        TrainingSession session = sessionRepository.findByTenantAndIdForUpdate(tenantId, sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("TrainingSession", sessionId.toString()));
-        if (!session.acceptsEnrollment()) {
-            throw new IllegalStateException("Session " + sessionId + " is " + session.getStatus() + " and no longer accepts enrollments");
-        }
 
         EmployeeSummary employee = hrFacade.findEmployeeById(tenantId, employeeId)
                 .orElseThrow(() -> new HandyFlowException(
                         "Employee " + employeeId + " was not found in HR", HttpStatus.BAD_REQUEST, "EMPLOYEE_NOT_FOUND"));
+        String problem = TrainingRules.enrollProblem(employee.status(), session.getStatus());
+        if (problem != null) throw new IllegalStateException(problem);
 
         enrollmentRepository.findActiveEnrollment(tenantId, sessionId, employeeId).ifPresent(existing -> {
             throw new IllegalStateException("Employee " + employeeId + " is already enrolled in this session");
@@ -61,12 +66,15 @@ public class TrainingEnrollmentService {
 
         TrainingEnrollment enrollment = TrainingEnrollment.create(tenantId, sessionId, employeeId,
                 employee.fullName(), employee.employeeNumber(), notes);
-        return enrollmentRepository.save(enrollment);
+        TrainingEnrollment saved = enrollmentRepository.save(enrollment);
+        notifier.enrolled(tenantId, session, saved, employee);
+        return saved;
     }
 
     @Transactional
     public TrainingEnrollment markAttended(TenantId tenantId, UUID id) {
         TrainingEnrollment enrollment = get(tenantId, id);
+        requireAttendance(tenantId, enrollment);
         enrollment.markAttended();
         return enrollmentRepository.save(enrollment);
     }
@@ -74,6 +82,7 @@ public class TrainingEnrollmentService {
     @Transactional
     public TrainingEnrollment markNoShow(TenantId tenantId, UUID id) {
         TrainingEnrollment enrollment = get(tenantId, id);
+        requireAttendance(tenantId, enrollment);
         enrollment.markNoShow();
         return enrollmentRepository.save(enrollment);
     }
@@ -88,8 +97,22 @@ public class TrainingEnrollmentService {
     @Transactional
     public TrainingEnrollment complete(TenantId tenantId, UUID id, BigDecimal score, boolean passed) {
         TrainingEnrollment enrollment = get(tenantId, id);
+        TrainingSession session = sessionOf(tenantId, enrollment);
+        String problem = TrainingRules.resultProblem(enrollment.getStatus(), session.getStatus(), session.getStartDate(), LocalDate.now(ZONE), score);
+        if (problem != null) throw new IllegalStateException(problem);
         enrollment.complete(score, passed);
         return enrollmentRepository.save(enrollment);
+    }
+
+    private void requireAttendance(TenantId tenantId, TrainingEnrollment enrollment) {
+        TrainingSession session = sessionOf(tenantId, enrollment);
+        String problem = TrainingRules.attendanceProblem(enrollment.getStatus(), session.getStatus(), session.getStartDate(), LocalDate.now(ZONE));
+        if (problem != null) throw new IllegalStateException(problem);
+    }
+
+    private TrainingSession sessionOf(TenantId tenantId, TrainingEnrollment enrollment) {
+        return sessionRepository.findByTenantAndId(tenantId, enrollment.getSessionId())
+                .orElseThrow(() -> new ResourceNotFoundException("TrainingSession", enrollment.getSessionId().toString()));
     }
 
     public TrainingEnrollment get(TenantId tenantId, UUID id) {

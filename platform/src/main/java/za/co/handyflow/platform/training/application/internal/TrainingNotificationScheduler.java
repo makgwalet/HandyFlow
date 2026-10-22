@@ -56,9 +56,13 @@ public class TrainingNotificationScheduler {
     private final NotificationService notificationService;
     private final TenantAdminRecipients tenantAdminRecipients;
 
-    @Scheduled(cron = "0 15 8 * * *")
+    @org.springframework.beans.factory.annotation.Value("${app.notifications.enabled:true}")
+    private boolean enabled = true;
+
+    @Scheduled(cron = "0 15 8 * * *", zone = "Africa/Johannesburg")
     @Transactional
     public void sweep() {
+        if (!enabled) return;
         sweepUpcomingSessions();
         sweepExpiringCertificates();
     }

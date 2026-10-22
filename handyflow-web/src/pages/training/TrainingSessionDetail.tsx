@@ -17,6 +17,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, Play, CheckCircle2, XCircle, Pencil, Download, Upload, UserPlus, Award, Check, X as XIcon } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { TRAINING_ACCENT, TRAINING_ACCENT_TEXT } from "./constants"
+import { apiMessage } from "./training.logic"
 import EmployeePicker, { type EmployeeOption } from "./EmployeePicker"
 import type { CourseResponse } from "./TrainingCoursesTab"
 
@@ -166,6 +167,9 @@ export default function TrainingSessionDetail({ sessionId, onBack }: { sessionId
   const [showEdit, setShowEdit] = useState(false)
   const [showEnroll, setShowEnroll] = useState(false)
   const [completing, setCompleting] = useState<EnrollmentResponse | null>(null)
+  // The reason the last step was refused, shown above the roster until the next step works.
+  const [problem, setProblem] = useState<string | null>(null)
+  const refused = (fallback: string) => (err: unknown) => setProblem(apiMessage(err, fallback))
 
   const { data: session, isLoading } = useQuery<SessionResponse>({
     queryKey: ["training-session", sessionId],
@@ -194,26 +198,30 @@ export default function TrainingSessionDetail({ sessionId, onBack }: { sessionId
       }
       return apiClient.post(`/api/v1/training/sessions/${sessionId}/${action}`)
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["training-session", sessionId] }); qc.invalidateQueries({ queryKey: ["training-sessions"] }) },
+    onSuccess: () => { setProblem(null); qc.invalidateQueries({ queryKey: ["training-session", sessionId] }); qc.invalidateQueries({ queryKey: ["training-sessions"] }); qc.invalidateQueries({ queryKey: ["training-enrollments", sessionId] }) },
+    onError: refused("The session could not be updated."),
   })
 
   const markAttended = useMutation({
     mutationFn: async (id: string) => apiClient.post(`/api/v1/training/enrollments/${id}/attended`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["training-enrollments", sessionId] }),
+    onSuccess: () => { setProblem(null); qc.invalidateQueries({ queryKey: ["training-enrollments", sessionId] }) },
+    onError: refused("Attendance could not be recorded."),
   })
   const markNoShow = useMutation({
     mutationFn: async (id: string) => apiClient.post(`/api/v1/training/enrollments/${id}/no-show`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["training-enrollments", sessionId] }),
+    onSuccess: () => { setProblem(null); qc.invalidateQueries({ queryKey: ["training-enrollments", sessionId] }) },
+    onError: refused("Attendance could not be recorded."),
   })
   const cancelEnrollment = useMutation({
     mutationFn: async (id: string) => apiClient.post(`/api/v1/training/enrollments/${id}/cancel`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["training-enrollments", sessionId] }),
+    onSuccess: () => { setProblem(null); qc.invalidateQueries({ queryKey: ["training-enrollments", sessionId] }) },
+    onError: refused("The booking could not be cancelled."),
   })
   // ADMIN-only server-side (TRAINING_ADMIN) — same "backend @PreAuthorize is the real gate" note as elsewhere.
   const issueCertificate = useMutation({
     mutationFn: async (enrollmentId: string) => apiClient.post(`/api/v1/training/enrollments/${enrollmentId}/certificate`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["training-enrollments", sessionId] }),
-    onError: (err: any) => alert(err?.response?.data?.message ?? "Could not issue certificate"),
+    onError: refused("The certificate could not be issued."),
   })
 
   const uploadEvidence = useMutation({
@@ -268,6 +276,8 @@ export default function TrainingSessionDetail({ sessionId, onBack }: { sessionId
           <button onClick={downloadRegister} style={btnStyle}><Download size={13} /> Attendance PDF</button>
         </div>
       </div>
+
+      {problem && <p role="alert" style={{ background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", fontSize: 13, padding: "10px 14px", borderRadius: 8, margin: "0 0 12px" }}>{problem}</p>}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "20px 0 10px" }}>
         <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Enrolled employees ({enrollments.length})</p>
