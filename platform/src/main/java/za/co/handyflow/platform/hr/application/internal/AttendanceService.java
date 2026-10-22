@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class AttendanceService {
+public class AttendanceService implements AttendanceRegister {
 
     private static final int MAX_DAYS = 62;
 
@@ -162,6 +162,7 @@ public class AttendanceService {
         return timesheetOf(tenantId, emp, from, to, canCorrect(tenantId, emp, held, actor));
     }
 
+    @Override
     @Transactional
     public List<RegisterRow> register(TenantId tenantId, LocalDate from, LocalDate to, Set<String> held, UUID actor) {
         checkRange(from, to);
