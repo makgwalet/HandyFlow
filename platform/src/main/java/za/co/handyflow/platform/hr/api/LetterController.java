@@ -86,6 +86,21 @@ public class LetterController {
                 .body(ApiResponse.success("Draft prepared", letters.prepare(tenant(), req, user(auth), HrAccess.held(auth))));
     }
 
+    @PostMapping("/bulk/prepare")
+    @PreAuthorize(ISSUE)
+    @Operation(summary = "Make one general or employment template for many employees, each as its own draft")
+    public ResponseEntity<ApiResponse<BulkPrepared>> prepareBulk(@RequestBody BulkPrepareRequest req, Authentication auth) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Drafts prepared", letters.prepareBulk(tenant(), req, user(auth), HrAccess.held(auth))));
+    }
+
+    @PostMapping("/bulk/issue")
+    @PreAuthorize(ISSUE)
+    @Operation(summary = "Issue many drafts. Drafts with gaps are reported and left as drafts")
+    public ResponseEntity<ApiResponse<BulkIssued>> issueBulk(@RequestBody BulkIssueRequest req, Authentication auth) {
+        return ok(letters.issueBulk(tenant(), req, user(auth), HrAccess.held(auth)));
+    }
+
     @PutMapping("/{id}/draft")
     @PreAuthorize(ISSUE)
     public ResponseEntity<ApiResponse<Detail>> updateDraft(@PathVariable UUID id, @RequestBody DraftRequest req, Authentication auth) {

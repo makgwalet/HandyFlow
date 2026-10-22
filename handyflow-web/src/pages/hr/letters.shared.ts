@@ -36,3 +36,8 @@ export async function downloadLetter(path: string, fileName: string): Promise<st
     return "The PDF could not be downloaded. Please try again."
   }
 }
+
+export interface BulkItem { employeeId: string; employeeName: string; letterId: string | null; number: string | null; gaps: string[]; problem: string | null }
+export interface BulkPrepared { items: BulkItem[]; made: number; refused: number }
+export interface BulkIssueItem { letterId: string; number: string | null; employeeName: string | null; problem: string | null }
+export interface BulkIssued { items: BulkIssueItem[]; issued: number; refused: number }

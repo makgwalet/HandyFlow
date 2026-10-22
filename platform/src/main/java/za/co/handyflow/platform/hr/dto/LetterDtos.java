@@ -37,4 +37,18 @@ public final class LetterDtos {
     public record VoidRequest(String reason) {}
 
     public record TemplateRequest(String name, String category, String subject, String body, Boolean requiresAck, Boolean active) {}
+
+    /** One template made for many employees at once. */
+    public record BulkPrepareRequest(UUID templateId, List<UUID> employeeIds) {}
+
+    /** What happened for one employee: a draft was made (with any gaps still to fill in) or it was refused with a reason. */
+    public record BulkItem(UUID employeeId, String employeeName, UUID letterId, String number, List<String> gaps, String problem) {}
+
+    public record BulkPrepared(List<BulkItem> items, int made, int refused) {}
+
+    public record BulkIssueRequest(List<UUID> letterIds) {}
+
+    public record BulkIssueItem(UUID letterId, String number, String employeeName, String problem) {}
+
+    public record BulkIssued(List<BulkIssueItem> items, int issued, int refused) {}
 }

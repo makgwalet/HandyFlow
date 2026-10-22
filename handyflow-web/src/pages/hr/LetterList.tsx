@@ -8,12 +8,14 @@ import { STATUS_LABEL } from "./letters.logic"
 import { card, errorText, input, plain, primary, td, th, unwrap, type LetterDetail, type LetterRow, type Templates } from "./letters.shared"
 import { Field, Notice, PersonSelect } from "./ErParts"
 import { LetterStatus } from "./LetterParts"
+import LetterBulk from "./LetterBulk"
 
 const BASE = "/api/v1/hr/letters"
 
 export default function LetterList({ canIssue, open }: { canIssue: boolean; open: (id: string) => void }) {
   const [status, setStatus] = useState("")
   const [preparing, setPreparing] = useState(false)
+  const [bulk, setBulk] = useState(false)
   const q = useQuery<LetterRow[]>({
     queryKey: ["letters", status],
     queryFn: async () => unwrap<LetterRow[]>(await apiClient.get(`${BASE}${status ? `?status=${status}` : ""}`)) ?? [],
@@ -29,8 +31,10 @@ export default function LetterList({ canIssue, open }: { canIssue: boolean; open
           </select>
         </div>
         <div style={{ flex: 1 }} />
+        {canIssue && <button onClick={() => setBulk(b => !b)} style={plain}>{bulk ? "Close bulk letters" : "Letters for many people"}</button>}
         {canIssue && <button onClick={() => setPreparing(p => !p)} style={primary}>{preparing ? "Close form" : "Prepare a letter"}</button>}
       </div>
+      {bulk && <LetterBulk cancel={() => setBulk(false)} />}
       {preparing && <PrepareLetter done={id => { setPreparing(false); open(id) }} cancel={() => setPreparing(false)} />}
       {q.isError && <Notice kind="error">{errorText(q.error, "The letters could not be loaded.")}</Notice>}
       <div style={card}>

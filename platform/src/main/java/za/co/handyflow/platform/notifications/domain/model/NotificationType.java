@@ -198,6 +198,10 @@ public enum NotificationType {
     PERF_FEEDBACK_REQUESTED(INFO, Set.of(IN_APP, EMAIL)),
     PERF_REVIEWS_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
 
+    // An HR letter was issued to the employee. The message never says what the letter is about: letters can concern discipline
+    // or health, and an email is not a private place.
+    LETTER_ISSUED(INFO, Set.of(IN_APP, EMAIL)),
+
     // ── Invoicing ────────────────────────────────────────────────────────────
     QUOTE_SENT(INFO, Set.of(IN_APP)),
     QUOTE_ACCEPTED(INFO, Set.of(IN_APP, EMAIL)),

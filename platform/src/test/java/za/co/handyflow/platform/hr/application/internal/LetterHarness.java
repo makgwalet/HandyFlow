@@ -73,6 +73,8 @@ final class LetterHarness {
     final HrErPolicyRepository policyRepo = mock(HrErPolicyRepository.class);
     final JdbcTemplate jdbc = mock(JdbcTemplate.class);
     final MemoryFiles files = new MemoryFiles();
+    final za.co.handyflow.platform.notifications.application.internal.NotificationService notifications =
+            mock(za.co.handyflow.platform.notifications.application.internal.NotificationService.class);
 
     final List<HrLetterTemplate> savedTemplates = new ArrayList<>();
     final List<HrLetter> savedLetters = new ArrayList<>();
@@ -83,7 +85,7 @@ final class LetterHarness {
     final ErCaseSupport support = new ErCaseSupport(cases, steps, caseEvents, employees, jdbc);
     final LetterContext context = new LetterContext(employees, charges, policy, jdbc);
     final LetterPdfGenerator pdf = new LetterPdfGenerator();
-    final LetterService service = new LetterService(templateRepo, letterRepo, letterEvents, employees, cases, support, context, pdf, files, jdbc);
+    final LetterService service = new LetterService(templateRepo, letterRepo, letterEvents, employees, cases, support, context, pdf, files, jdbc, notifications);
 
     private int number = 6;
 

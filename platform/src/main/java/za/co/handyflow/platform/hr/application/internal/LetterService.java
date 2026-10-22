@@ -8,6 +8,11 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.hr.domain.model.*;
 import za.co.handyflow.platform.hr.domain.repository.*;
 import za.co.handyflow.platform.hr.dto.LetterDtos.*;
+import lombok.extern.slf4j.Slf4j;
+import za.co.handyflow.platform.notifications.application.NotificationRequest;
+import za.co.handyflow.platform.notifications.application.Recipient;
+import za.co.handyflow.platform.notifications.application.internal.NotificationService;
+import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.shared.FileStorageService;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
@@ -23,6 +28,7 @@ import java.util.*;
  * acknowledgement. What a letter says is the template's wording and the facts on the record; this service only fills it in, keeps it, and
  * makes sure the right people can see it.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LetterService {
@@ -37,6 +43,7 @@ public class LetterService {
     private final LetterPdfGenerator pdfGenerator;
     private final FileStorageService files;
     private final JdbcTemplate jdbc;
+    private final NotificationService notifications;
 
     /** A file ready to send. */
     public record Pdf(String fileName, byte[] bytes) {}
@@ -124,6 +131,12 @@ public class LetterService {
             refuseSelf(tenantId, emp.getId(), userId);
         }
 
+        HrLetter l = makeDraft(tenantId, t, emp, c, userId);
+        return detail(tenantId, l, held, userId);
+    }
+
+    /** Fills a template in for one employee (and maybe a case) and keeps it as a draft. */
+    private HrLetter makeDraft(TenantId tenantId, HrLetterTemplate t, HrEmployee emp, HrErCase c, UUID userId) {
         LocalDate today = support.today();
         Map<String, String> values = context.build(tenantId, emp, c, today);
         LetterRules.Rendered subject = LetterRules.render(t.getSubject(), values);
@@ -133,7 +146,7 @@ public class LetterService {
         HrLetter l = HrLetter.draft(tenantId.getValue(), nextNumber(tenantId), t, emp.getId(), c == null ? null : c.getId(), subjectText, body.text(), userId);
         letterRepo.save(l);
         event(l, "PREPARED", "From \"" + t.getName() + "\" (revision " + t.getRevision() + ")", userId);
-        return detail(tenantId, l, held, userId);
+        return l;
     }
 
     @Transactional
@@ -153,10 +166,15 @@ public class LetterService {
     public Detail issue(TenantId tenantId, UUID id, UUID userId, Set<String> held) {
         requireIssue(held);
         HrLetter l = findToAct(tenantId, id, held, userId);
+        issueOne(tenantId, l, userId);
+        return detail(tenantId, l, held, userId);
+    }
+
+    private void issueOne(TenantId tenantId, HrLetter l, UUID userId) {
         fail(LetterRules.issueProblem(l.getStatus(), l.getSubject(), l.getBody()));
         LocalDate today = support.today();
         String fileName = l.getNumber() + ".pdf";
-        byte[] bytes = pdfGenerator.generate(context.companyName(tenantId), l.getNumber(), today, l.getSubject(), l.getBody());
+        byte[] bytes = pdfGenerator.generate(context.letterhead(tenantId), l.getNumber(), today, l.getSubject(), l.getBody());
         String key;
         try {
             key = files.store("hr/letters/" + tenantId.getValue() + "/" + l.getEmployeeId(), fileName, "application/pdf", bytes);
@@ -167,7 +185,32 @@ public class LetterService {
         letterRepo.save(l);
         event(l, "ISSUED", l.isRequiresAck() ? "Confirmation of receipt requested" : null, userId);
         caseEvent(tenantId, l, "LETTER_ISSUED", l.getSubject() + " (" + l.getNumber() + ")", true, userId);
-        return detail(tenantId, l, held, userId);
+        tellEmployee(tenantId, l);
+    }
+
+    /**
+     * Tells the employee a letter is waiting. The message gives the reference and nothing of what the letter says, because it may
+     * concern discipline or health and an email is not a private place. Best effort: a failure here never undoes the issue.
+     */
+    private void tellEmployee(TenantId tenantId, HrLetter l) {
+        try {
+            HrEmployee emp = employeeRepo.findActiveById(tenantId, l.getEmployeeId()).orElse(null);
+            if (emp == null || emp.getEmail() == null || emp.getEmail().isBlank()) return;
+            Recipient to = emp.getUserId() != null ? Recipient.user(emp.getUserId(), emp.getFullName(), emp.getEmail(), emp.getPhone())
+                    : Recipient.external(emp.getFullName(), emp.getEmail(), emp.getPhone());
+            notifications.send(NotificationRequest.builder()
+                    .tenantId(tenantId)
+                    .type(NotificationType.LETTER_ISSUED)
+                    .title("A letter from HR is waiting for you")
+                    .message(LetterRules.issuedMessage(l.getNumber(), l.isRequiresAck()))
+                    .actionUrl("/hr/my-letters")
+                    .sourceModule("hr")
+                    .sourceEntityId(l.getId().toString())
+                    .recipient(to)
+                    .build());
+        } catch (RuntimeException e) {
+            log.warn("Letter {} was issued but the employee could not be notified: {}", l.getNumber(), e.getMessage());
+        }
     }
 
     @Transactional
@@ -181,6 +224,63 @@ public class LetterService {
         event(l, "VOIDED", req.reason().trim(), userId);
         caseEvent(tenantId, l, "LETTER_VOIDED", l.getNumber() + ": " + req.reason().trim(), wasIssued, userId);
         return detail(tenantId, l, held, userId);
+    }
+
+    // ── Many at once ──────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Makes the same general or employment template for many employees, each as its own draft. Nothing is issued: HR reads the
+     * drafts and issues them. An employee who cannot be done (HR's own user, someone who left) is reported and the rest go ahead.
+     */
+    @Transactional
+    public BulkPrepared prepareBulk(TenantId tenantId, BulkPrepareRequest req, UUID userId, Set<String> held) {
+        requireIssue(held);
+        if (req.templateId() == null) throw new IllegalArgumentException("Choose the template.");
+        List<UUID> ids = req.employeeIds() == null ? List.of() : req.employeeIds().stream().filter(Objects::nonNull).distinct().toList();
+        HrLetterTemplate t = template(tenantId, req.templateId());
+        if (!t.isActive()) throw new IllegalStateException("That template is switched off.");
+        fail(LetterRules.bulkProblem(t.getCategory(), t.getSubject(), t.getBody(), ids.size()));
+        List<BulkItem> out = new ArrayList<>();
+        int made = 0;
+        for (UUID employeeId : ids) {
+            String name = null;
+            try {
+                HrEmployee emp = support.employee(tenantId, employeeId);
+                name = emp.getFullName();
+                refuseSelf(tenantId, emp.getId(), userId);
+                if ("TERMINATED".equals(emp.getStatus())) throw new IllegalStateException(name + " no longer works here.");
+                HrLetter l = makeDraft(tenantId, t, emp, null, userId);
+                out.add(new BulkItem(employeeId, name, l.getId(), l.getNumber(), LetterRules.gaps(l.getSubject(), l.getBody()), null));
+                made++;
+            } catch (IllegalArgumentException | IllegalStateException | AccessDeniedException | ResourceNotFoundException e) {
+                out.add(new BulkItem(employeeId, name, null, null, List.of(), e.getMessage()));
+            }
+        }
+        return new BulkPrepared(out, made, out.size() - made);
+    }
+
+    /** Issues many drafts. A draft with gaps, one that is not a draft any more, or one about HR's own user is reported and the rest go ahead. */
+    @Transactional
+    public BulkIssued issueBulk(TenantId tenantId, BulkIssueRequest req, UUID userId, Set<String> held) {
+        requireIssue(held);
+        List<UUID> ids = req.letterIds() == null ? List.of() : req.letterIds().stream().filter(Objects::nonNull).distinct().toList();
+        fail(LetterRules.bulkIssueProblem(ids.size()));
+        List<BulkIssueItem> out = new ArrayList<>();
+        int issued = 0;
+        for (UUID id : ids) {
+            String number = null, name = null;
+            try {
+                HrLetter l = findToAct(tenantId, id, held, userId);
+                number = l.getNumber();
+                name = support.nameOf(tenantId, l.getEmployeeId());
+                issueOne(tenantId, l, userId);
+                out.add(new BulkIssueItem(id, number, name, null));
+                issued++;
+            } catch (IllegalArgumentException | IllegalStateException | AccessDeniedException | ResourceNotFoundException e) {
+                out.add(new BulkIssueItem(id, number, name, e.getMessage()));
+            }
+        }
+        return new BulkIssued(out, issued, out.size() - issued);
     }
 
     // ── Reading, for HR ───────────────────────────────────────────────────────────────────────────

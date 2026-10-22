@@ -94,3 +94,27 @@ export function voidProblem(reason: string): string | null {
   if (r.length > 500) return "The reason is too long (500 characters at most)."
   return null
 }
+
+export const BULK_MAX = 200
+export const BULK_ISSUE_MAX = 100
+const CASE_GROUPS = ["Case", "Hearing", "Outcome", "Suspension"]
+
+/** Null when the template can be made for many people at once. The server decides again; this only saves a trip. */
+export function bulkTemplateProblem(t: { category: string; fields: string[] }, fields: { key: string; group: string }[]): string | null {
+  if (t.category !== "EMPLOYMENT" && t.category !== "GENERAL") return "Letters about a case are made from the case, not in bulk."
+  const bad = fields.find(f => t.fields.includes(f.key) && CASE_GROUPS.includes(f.group))
+  return bad ? "This template uses case details, so it cannot be made for many people at once." : null
+}
+
+/** Null when the request may be sent. */
+export function bulkPrepareProblem(templateOk: boolean, people: number): string | null {
+  if (!templateOk) return "Choose a template that can be used for many people."
+  if (people < 1) return "Choose at least one employee."
+  if (people > BULK_MAX) return `Choose at most ${BULK_MAX} employees at a time.`
+  return null
+}
+
+/** Drafts with no gaps and no refusal are ready to issue. */
+export function readyToIssue(items: { letterId: string | null; gaps: string[]; problem: string | null }[]): string[] {
+  return items.filter(i => i.letterId && !i.problem && i.gaps.length === 0).map(i => i.letterId as string)
+}

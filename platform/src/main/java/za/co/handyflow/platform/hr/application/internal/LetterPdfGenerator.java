@@ -14,7 +14,10 @@ import com.itextpdf.layout.borders.SolidBorder;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.properties.TextAlignment;
 import org.springframework.stereotype.Component;
+import com.itextpdf.io.image.ImageDataFactory;
+import com.itextpdf.layout.element.Image;
 import za.co.handyflow.platform.hr.domain.model.LetterRules;
+import za.co.handyflow.platform.hr.domain.model.LetterheadRules.Letterhead;
 
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
@@ -27,15 +30,30 @@ public class LetterPdfGenerator {
     private static final DeviceRgb GREY = new DeviceRgb(100, 116, 139);
     private static final DeviceRgb TEXT = new DeviceRgb(15, 23, 42);
 
+    /** A letter with only the company's name at the top. */
     public byte[] generate(String companyName, String number, LocalDate issuedOn, String subject, String body) {
+        return generate(Letterhead.plain(companyName), number, issuedOn, subject, body);
+    }
+
+    public byte[] generate(Letterhead head, String number, LocalDate issuedOn, String subject, String body) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PdfDocument pdf = new PdfDocument(new PdfWriter(out));
-            pdf.addEventHandler(PdfDocumentEvent.END_PAGE, new Footer(companyName + " · " + number));
+            pdf.addEventHandler(PdfDocumentEvent.END_PAGE, new Footer(head.name() + " · " + number));
             Document doc = new Document(pdf, PageSize.A4);
             doc.setMargins(60, 60, 70, 60);
 
-            doc.add(new Paragraph(companyName).setFontSize(18).setBold().setFontColor(NAVY).setMarginBottom(2));
-            doc.add(new Paragraph("Ref " + number + " · " + LetterRules.longDate(issuedOn)).setFontSize(9).setFontColor(GREY).setMarginBottom(6));
+            if (head.hasLogo()) {
+                try {
+                    Image logo = new Image(ImageDataFactory.create(head.logo()));
+                    logo.scaleToFit(140, 56).setMarginBottom(6);
+                    doc.add(logo);
+                } catch (Exception ignored) {
+                    // a logo that cannot be read is left out; the letter still goes ahead
+                }
+            }
+            doc.add(new Paragraph(head.name()).setFontSize(18).setBold().setFontColor(NAVY).setMarginBottom(2));
+            for (String line : head.lines()) doc.add(new Paragraph(line).setFontSize(9).setFontColor(GREY).setMarginBottom(0));
+            doc.add(new Paragraph("Ref " + number + " · " + LetterRules.longDate(issuedOn)).setFontSize(9).setFontColor(GREY).setMarginTop(6).setMarginBottom(6));
             doc.add(new Paragraph().setBorderBottom(new SolidBorder(NAVY, 1.5f)).setMarginTop(4).setMarginBottom(12));
             doc.add(new Paragraph(subject).setFontSize(13).setBold().setFontColor(TEXT).setMarginBottom(12));
 

@@ -177,6 +177,44 @@ public final class LetterRules {
         return null;
     }
 
+    /** What the employee is told when a letter is issued. The reference only, never the subject or the wording. */
+    public static String issuedMessage(String number, boolean requiresAck) {
+        return "HR has issued you a letter (reference " + number + "). Sign in to the employee portal to read it"
+                + (requiresAck ? " and confirm that you received it." : ".");
+    }
+
+    // ── Bulk ─────────────────────────────────────────────────────────────────────────────────────────
+
+    public static final int BULK_MAX = 200;
+    public static final int BULK_ISSUE_MAX = 100;
+    private static final Set<String> CASE_GROUPS = Set.of("Case", "Hearing", "Outcome", "Suspension");
+
+    /**
+     * Null when a template can be made for many people at once. A template that talks about a case, a hearing or an outcome belongs to
+     * one case and has to be made from it, so it cannot be merged for a list of employees.
+     */
+    public static String bulkProblem(String category, String subject, String body, int people) {
+        if (people < 1) return "Choose at least one employee.";
+        if (people > BULK_MAX) return "At most " + BULK_MAX + " letters can be made at once.";
+        if (!"EMPLOYMENT".equals(category) && !"GENERAL".equals(category))
+            return "Only general and employment templates can be made for many people at once. Letters about a case are made from the case.";
+        Set<String> keys = new LinkedHashSet<>(fieldsIn(subject));
+        keys.addAll(fieldsIn(body));
+        for (String k : keys) {
+            Field f = BY_KEY.get(k);
+            if (f != null && CASE_GROUPS.contains(f.group()))
+                return "This template uses \"" + f.label() + "\", which belongs to a case, so it cannot be made for many people at once.";
+        }
+        return null;
+    }
+
+    /** Null when this many drafts may be issued in one go. */
+    public static String bulkIssueProblem(int count) {
+        if (count < 1) return "Choose at least one letter.";
+        if (count > BULK_ISSUE_MAX) return "At most " + BULK_ISSUE_MAX + " letters can be issued at once.";
+        return null;
+    }
+
     public static String voidProblem(String status, String reason) {
         if (VOID.equals(status)) return "This letter is already void.";
         if (reason == null || reason.trim().length() < 3) return "Give the reason for voiding the letter.";

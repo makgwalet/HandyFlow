@@ -38,6 +38,27 @@ class LetterContext {
         return "The Company";
     }
 
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /** The top of a letter from the company's settings. Anything missing or unreadable is left out; the name is always there. */
+    LetterheadRules.Letterhead letterhead(TenantId tenantId) {
+        String name = companyName(tenantId);
+        try {
+            Map<String, Object> row = jdbc.queryForMap(
+                    "SELECT phone, email, address::text AS address, vat_number, logo_url FROM tenants WHERE id = ?", tenantId.getValue());
+            Map<String, String> address = null;
+            Object raw = row.get("address");
+            if (raw != null && !raw.toString().isBlank()) {
+                address = JSON.readValue(raw.toString(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {});
+            }
+            return LetterheadRules.of(name, address, text(row.get("phone")), text(row.get("email")), text(row.get("vat_number")), text(row.get("logo_url")));
+        } catch (Exception e) {
+            return LetterheadRules.Letterhead.plain(name);
+        }
+    }
+
+    private static String text(Object o) { return o == null ? null : o.toString(); }
+
     Map<String, String> build(TenantId tenantId, HrEmployee emp, HrErCase c, LocalDate today) {
         Map<String, String> v = new HashMap<>();
         put(v, "company.name", companyName(tenantId));

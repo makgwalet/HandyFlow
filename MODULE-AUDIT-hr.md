@@ -704,3 +704,28 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - In the stub harness: `OnboardingReminderRulesTest` (6) and `PerfReminderRulesTest` (4) pass. Deliberate breaks (reminding optional tasks weekly; chasing a reviewer after they have rated) were caught.
 - The existing `PerfHarness` was changed to pass the new notifier; I have not re-run the 41 existing performance service tests.
 - `ONBOARDING_TASKS_OVERDUE` and the five `PERF_*` types were added to the notification catalogue; I found no database constraint on that column but could not run a migration check.
+
+## 24. Slice 16b: letters (email on issue, letters for many people, letterhead)
+
+**What changed**
+
+- **The employee is told.** Issuing a letter sends the employee a notification (email and in-app) saying a letter from HR is waiting, with the reference number and a link to "My letters". It never carries the subject or the wording, so nothing private sits in an inbox. An employee with a login is reached through the login; one without is reached by the email on the employee record. If the send fails it is logged and the letter is still issued.
+- **Letterhead.** A newly issued letter's PDF now carries the company's logo, name, address, phone, email and VAT number, taken from the company record. If any of that is missing or unreadable the PDF falls back to the plain company name. The logo must be PNG or JPEG, at most 512 KB, and is checked by its first bytes; anything else is left out without stopping the letter.
+- **Letters for many people.** "Letters for many people" on the letters list: choose a general or employment template and up to 200 employees; one draft is made per person. A person whose draft cannot be made (for example a template field their record cannot fill) is listed with the reason and the others carry on. Drafts with gaps still to fill are listed as such and left for one-by-one finishing. "Issue the complete drafts" then issues up to 100 at a time; each is checked again by the server and refused individually with a reason if it is no longer fit to issue.
+- **Limits that are deliberate.** Templates about a case (discipline, grievance, incapacity) and any template that uses a Case, Hearing, Outcome or Suspension field cannot be used in bulk; those letters are made from the case. Making drafts and issuing them are two steps so someone looks before anything goes out.
+
+**Still not done**
+
+- The email does not contain the letter or attach the PDF; the employee signs in to read it.
+- No reminder for a letter that has not been acknowledged.
+- No per-company switch for the new notification.
+- Letters issued before this change keep their old PDF (they are fingerprinted and must not change).
+- A bad logo is dropped silently; there is no screen telling HR the logo was not used.
+- Bulk issue stores each PDF before the database commit; if the commit rolls back an unreferenced file can remain in storage.
+
+**Not verified**
+
+- Maven, Spring and the database have not run. The `LetterService` constructor change (a new `NotificationService` argument), the tenant query for the letterhead (it assumes `phone`, `email`, `address`, `vat_number` and `logo_url` columns on `tenants`) and the iText image drawing are uncompiled and unexecuted. I have not looked at a generated PDF or a logo.
+- `LetterBulkAndNoticeTest` (10) is written and unexecuted.
+- In my stub harness: `LetterheadRulesTest` (4) and `LetterBulkRulesTest` (4) pass; leaving out the PNG byte check was caught by a test. `LetterHarness` was changed to pass the notification service and the existing letter service tests were not re-run.
+- Front end: 6 new tests in `LetterBulk.test.tsx` and the 16 existing letter tests pass; lint and type-check are clean on the changed files. The screen has not been opened in a browser against a real server.
