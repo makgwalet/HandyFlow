@@ -9,6 +9,7 @@ import { errorText, plain, primary, unwrap, type Detail } from "./er.shared"
 import CasePlans from "./CasePlans"
 import { perfRights } from "./perf.logic"
 import CaseLetters from "./CaseLetters"
+import CaseEvidence from "./CaseEvidence"
 import ErActionForm from "./ErActionForms"
 import { Chip, Notice, Section, StatusChip } from "./ErParts"
 import ErSections from "./ErSections"
@@ -101,6 +102,8 @@ export default function ErCaseDetail({ id, back }: { id: string; back: () => voi
       {perf.read && <CasePlans caseId={c.id} caseType={c.type} category={c.category} employeeId={c.employee.id} canManage={perf.manage} />}
 
       {letters.read && <CaseLetters caseId={c.id} caseType={c.type} canIssue={letters.issue} />}
+
+      {rights.read && <CaseEvidence caseId={c.id} canManage={rights.manage} open={c.status !== "CLOSED" && c.status !== "WITHDRAWN"} />}
 
       <ErSections c={c} />
     </div>

@@ -62,7 +62,7 @@ public interface EvidenceRepository extends JpaRepository<Evidence, UUID> {
                e.fileSizeBytes as fileSizeBytes, e.evidenceType as evidenceType,
                e.status as status, e.uploadedByName as uploadedByName, e.createdAt as createdAt
         FROM Evidence e
-        WHERE e.tenantId = :tenantId AND e.status = 'ACTIVE'
+        WHERE e.tenantId = :tenantId AND e.status = 'ACTIVE' AND e.sourceModule NOT LIKE 'restricted-%'
         ORDER BY e.createdAt DESC
     """)
     List<EvidenceSummaryProjection> findAllActiveForTenant(@Param("tenantId") UUID tenantId);

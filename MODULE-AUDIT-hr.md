@@ -865,3 +865,31 @@ I read the four training services, the entities and the session screen. The modu
 
 - Maven, Spring and the database have not run. `PerfGoalService` gained a constructor argument and `PerfReminderService` gained two; `PerfHarness` and `PerfNotificationsTest` were updated to match and have 9 new cases (real Mockito), unexecuted. The new `allActive` query has not run against PostgreSQL.
 - In my harness `PerfReminderRulesTest` (7, 3 new) passes, and removing the weekly repeat from the check-in rule is caught.
+
+## 30. Slice 18c: employee relations evidence files
+
+**What was there.** A case held its text, steps and timeline, but no files. Statements, emails, photographs and recordings were kept outside the system. The company already has a shared evidence store, but using it as it was would have been unsafe for this: its general screens list and open any file in a company by id, and the external auditor portal can be given any item in it.
+
+**What changed**
+
+- **Restricted evidence (evidence module).** A file whose source module starts with `restricted-` can only be attached, listed, opened or removed through the owning module's own methods. The general upload and list return nothing for it, the general download and detach do not find it, the company-wide listing used for auditors leaves it out (so it cannot be shared with an auditor), and opening it needs the exact entity it is attached to. The general audit trail records a restricted file without its name, since a name can name a person.
+- **Files on a case.** Anyone who may manage cases can add a file, say what kind it is (statement, document, email, photograph, recording, other), and take it off with a reason; anyone who may read cases can see the list and open a file. Nobody can open or add files on a case about themselves, and a confidential case's files are as hidden as the case. A closed or withdrawn case takes no new files and keeps none removed. A case holds up to 50 files of up to 15 MB.
+- **What is accepted.** PDF, PNG, JPG, DOCX, XLSX, TXT, MP3, M4A and WAV. The type is decided from the file's extension, never taken from the browser, and the first bytes must fit the extension, so a web page or script renamed to `.pdf` is refused. Names lose any folder part and odd characters. Downloads are sent as attachments with sniffing turned off and are not cached.
+- **Timeline.** Adding and removing a file is noted on the case timeline (kind and file name; the reason for a removal), hidden from the employee. Removing a file hides it; the stored file is never deleted.
+- **Screen.** An "Evidence files" section on the case: the list with kind, size and who added it, download, an upload form that checks the file before sending, and a removal form that asks for the reason. Without manage rights, or on a closed case, it is read-only.
+- No migration. `hr` may now depend on `evidence`.
+
+**Still not done**
+
+- No description or note per file (the kind and file name only), and no way to tick a file off against a charge or a witness.
+- No virus scan, and no check of what is inside a Word or Excel file beyond its first bytes. No video, and no older .doc or .xls formats.
+- Files cannot be shared with the employee or their representative (for example, evidence to be relied on at a hearing). Fairness usually requires that; it is a separate decision about what is disclosed and when.
+- The company-wide evidence listing and the auditor sharing check were changed in the evidence module and are used by the auditor module; I did not read the auditor screens beyond finding the calls.
+- A removed file still sits in storage and in the evidence table; nothing reports it or purges it after a retention period.
+- Opening a file is recorded in the audit trail but not on the case timeline.
+
+**Not verified**
+
+- Maven, Spring and the database have not run. `EvidenceFacade` gained five methods, `EvidenceService` implements them, and the tenant-wide query gained a `NOT LIKE 'restricted-%'` condition that has never run against PostgreSQL. `ErController` gained a field and four endpoints; the multipart upload and the download headers have not been exercised. `ErEvidenceServiceTest` (8) and `RestrictedEvidenceTest` (7) use real Mockito and are unexecuted. The `MockMultipartFile` and `FileStorageService` signatures were read from source, not compiled against.
+- In my harness `ErEvidenceRulesTest` (9) passes, and switching off the first-bytes check is caught.
+- Front end: 11 new tests pass, and all 231 tests in the HR folder pass. New files are lint-clean.

@@ -49,4 +49,25 @@ public interface EvidenceFacade {
     DownloadedEvidence download(TenantId tenantId, UUID evidenceId);
 
     void detach(TenantId tenantId, UUID evidenceId);
+
+    /**
+     * Evidence whose source module starts with this prefix is restricted: only its own module can attach, list, download or remove it, through
+     * the methods below. The generic endpoints, the tenant-wide listing and sharing with an external auditor never see it. Used for files
+     * that must not leave the case they belong to, such as employee relations evidence.
+     */
+    String RESTRICTED_PREFIX = "restricted-";
+
+    static boolean isRestricted(String sourceModule) { return sourceModule != null && sourceModule.startsWith(RESTRICTED_PREFIX); }
+
+    EvidenceResponse attachRestricted(TenantId tenantId, MultipartFile file, String evidenceType,
+                                      String sourceModule, String relatedEntityType, UUID relatedEntityId,
+                                      UUID uploadedBy, String uploadedByName);
+
+    List<EvidenceResponse> listRestricted(TenantId tenantId, String sourceModule, String relatedEntityType, UUID relatedEntityId);
+
+    /** Not found unless the file is active and attached to exactly this entity. */
+    DownloadedEvidence downloadRestricted(TenantId tenantId, String sourceModule, String relatedEntityType, UUID relatedEntityId, UUID evidenceId);
+
+    /** Not found unless the file is active and attached to exactly this entity. */
+    void detachRestricted(TenantId tenantId, String sourceModule, String relatedEntityType, UUID relatedEntityId, UUID evidenceId);
 }

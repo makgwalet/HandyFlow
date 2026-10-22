@@ -52,6 +52,24 @@ public class EvidenceService implements EvidenceFacade {
     public EvidenceResponse attach(TenantId tenantId, MultipartFile file, String evidenceType,
                                    String sourceModule, String relatedEntityType, UUID relatedEntityId,
                                    UUID periodId, UUID uploadedBy, String uploadedByName) {
+        if (EvidenceFacade.isRestricted(sourceModule)) {
+            throw new HandyFlowException("That kind of evidence can only be attached from its own screen", HttpStatus.FORBIDDEN, "EVIDENCE_RESTRICTED");
+        }
+        return store(tenantId, file, evidenceType, sourceModule, relatedEntityType, relatedEntityId, periodId, uploadedBy, uploadedByName);
+    }
+
+    @Override
+    @Transactional
+    public EvidenceResponse attachRestricted(TenantId tenantId, MultipartFile file, String evidenceType,
+                                             String sourceModule, String relatedEntityType, UUID relatedEntityId,
+                                             UUID uploadedBy, String uploadedByName) {
+        requireRestricted(sourceModule);
+        return store(tenantId, file, evidenceType, sourceModule, relatedEntityType, relatedEntityId, null, uploadedBy, uploadedByName);
+    }
+
+    private EvidenceResponse store(TenantId tenantId, MultipartFile file, String evidenceType,
+                                   String sourceModule, String relatedEntityType, UUID relatedEntityId,
+                                   UUID periodId, UUID uploadedBy, String uploadedByName) {
         if (file == null || file.isEmpty()) {
             throw new HandyFlowException("A file is required", HttpStatus.BAD_REQUEST, "FILE_REQUIRED");
         }
@@ -85,8 +103,10 @@ public class EvidenceService implements EvidenceFacade {
                 evidenceType, sourceModule, relatedEntityType, relatedEntityId, periodId,
                 hash, uploadedBy, uploadedByName);
         evidenceRepo.save(evidence);
-        trail.record(tenantId, "EVIDENCE_ATTACHED", "EVIDENCE", evidence.getId(), null,
-                java.util.Map.of("fileName", String.valueOf(file.getOriginalFilename()), "sourceModule", sourceModule, "sha256", hash));
+        // A restricted file's name can name a person, so the general audit trail carries only what proves the file.
+        trail.record(tenantId, "EVIDENCE_ATTACHED", "EVIDENCE", evidence.getId(), null, EvidenceFacade.isRestricted(sourceModule)
+                ? java.util.Map.of("sourceModule", sourceModule, "sha256", hash)
+                : java.util.Map.of("fileName", String.valueOf(file.getOriginalFilename()), "sourceModule", sourceModule, "sha256", hash));
 
         log.info("Evidence attached: type={} source={} entity={}:{} tenant={}",
                 evidenceType, sourceModule, relatedEntityType, relatedEntityId, tenantId.getValue());
@@ -98,6 +118,7 @@ public class EvidenceService implements EvidenceFacade {
     @Transactional(readOnly = true)
     public List<EvidenceResponse> listFor(TenantId tenantId, String sourceModule,
                                           String relatedEntityType, UUID relatedEntityId) {
+        if (EvidenceFacade.isRestricted(sourceModule)) return List.of();
         return evidenceRepo.findActiveForEntity(tenantId.getValue(), sourceModule, relatedEntityType, relatedEntityId)
                 .stream()
                 .map(p -> new EvidenceResponse(p.getId(), p.getFileName(), p.getContentType(), p.getFileSizeBytes(),
@@ -131,10 +152,58 @@ public class EvidenceService implements EvidenceFacade {
     @Transactional
     public DownloadedEvidence download(TenantId tenantId, UUID evidenceId) {
         Evidence evidence = evidenceRepo.findByTenantAndId(tenantId.getValue(), evidenceId)
+                .filter(e -> !EvidenceFacade.isRestricted(e.getSourceModule()))
                 .orElseThrow(() -> new ResourceNotFoundException("Evidence", evidenceId.toString()));
+        return read(tenantId, evidence);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EvidenceResponse> listRestricted(TenantId tenantId, String sourceModule, String relatedEntityType, UUID relatedEntityId) {
+        requireRestricted(sourceModule);
+        return evidenceRepo.findActiveForEntity(tenantId.getValue(), sourceModule, relatedEntityType, relatedEntityId)
+                .stream()
+                .map(p -> new EvidenceResponse(p.getId(), p.getFileName(), p.getContentType(), p.getFileSizeBytes(),
+                        p.getEvidenceType(), p.getStatus(), p.getUploadedByName(), p.getCreatedAt()))
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public DownloadedEvidence downloadRestricted(TenantId tenantId, String sourceModule, String relatedEntityType, UUID relatedEntityId, UUID evidenceId) {
+        return read(tenantId, restricted(tenantId, sourceModule, relatedEntityType, relatedEntityId, evidenceId));
+    }
+
+    @Override
+    @Transactional
+    public void detachRestricted(TenantId tenantId, String sourceModule, String relatedEntityType, UUID relatedEntityId, UUID evidenceId) {
+        Evidence evidence = restricted(tenantId, sourceModule, relatedEntityType, relatedEntityId, evidenceId);
+        evidence.detach();
+        evidenceRepo.save(evidence);
+        trail.record(tenantId, "EVIDENCE_DETACHED", "EVIDENCE", evidenceId, java.util.Map.of("status", "ACTIVE"), java.util.Map.of("status", "DETACHED"));
+    }
+
+    private static void requireRestricted(String sourceModule) {
+        if (!EvidenceFacade.isRestricted(sourceModule))
+            throw new IllegalArgumentException("A restricted source module must start with '" + EvidenceFacade.RESTRICTED_PREFIX + "'.");
+    }
+
+    /** The active file, only if it is attached to exactly this entity of this restricted module. */
+    private Evidence restricted(TenantId tenantId, String sourceModule, String relatedEntityType, UUID relatedEntityId, UUID evidenceId) {
+        requireRestricted(sourceModule);
+        return evidenceRepo.findByTenantAndId(tenantId.getValue(), evidenceId)
+                .filter(e -> "ACTIVE".equals(e.getStatus()) && sourceModule.equals(e.getSourceModule())
+                        && relatedEntityType.equals(e.getRelatedEntityType()) && relatedEntityId.equals(e.getRelatedEntityId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Evidence", evidenceId.toString()));
+    }
+
+    private DownloadedEvidence read(TenantId tenantId, Evidence evidence) {
+        UUID evidenceId = evidence.getId();
         try {
             byte[] content = fileStorageService.retrieve(evidence.getStorageKey());
-            trail.record(tenantId, "EVIDENCE_DOWNLOADED", "EVIDENCE", evidenceId, null, java.util.Map.of("fileName", evidence.getFileName()));
+            trail.record(tenantId, "EVIDENCE_DOWNLOADED", "EVIDENCE", evidenceId, null, EvidenceFacade.isRestricted(evidence.getSourceModule())
+                    ? java.util.Map.of("sourceModule", evidence.getSourceModule())
+                    : java.util.Map.of("fileName", evidence.getFileName()));
             return new DownloadedEvidence(content, evidence.getFileName(), evidence.getContentType());
         } catch (IOException e) {
             log.error("Failed to retrieve evidence={}: {}", evidenceId, e.getMessage(), e);
@@ -146,6 +215,7 @@ public class EvidenceService implements EvidenceFacade {
     @Transactional
     public void detach(TenantId tenantId, UUID evidenceId) {
         Evidence evidence = evidenceRepo.findByTenantAndId(tenantId.getValue(), evidenceId)
+                .filter(e -> !EvidenceFacade.isRestricted(e.getSourceModule()))
                 .orElseThrow(() -> new ResourceNotFoundException("Evidence", evidenceId.toString()));
         // Soft-detach only — never calls fileStorageService.delete() here.
         // Evidence that's been cited (an approved expense, a sent invoice)

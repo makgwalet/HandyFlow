@@ -8,6 +8,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import za.co.handyflow.platform.evidence.application.EvidenceFacade;
+import za.co.handyflow.platform.evidence.dto.EvidenceResponse;
 import za.co.handyflow.platform.hr.application.internal.*;
 import za.co.handyflow.platform.hr.dto.ErDtos.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -37,6 +39,7 @@ public class ErController {
     private final IncapacityService incapacity;
     private final ErPolicyService policy;
     private final ErTerminationService termination;
+    private final ErEvidenceService evidenceFiles;
 
     // ── For HR ────────────────────────────────────────────────────────────────────────────────────
 
@@ -268,6 +271,44 @@ public class ErController {
         Detail d = cases.get(tenant(), id, held, user(auth));
         if (za.co.handyflow.platform.hr.domain.model.ErRules.INCAPACITY.equals(d.type())) return incapacity.decideAppeal(tenant(), id, req, user(auth), held);
         return discipline.decideAppeal(tenant(), id, req, user(auth), held);
+    }
+
+    // ── Evidence files ────────────────────────────────────────────────────────────────────────────
+
+    @GetMapping("/cases/{id}/evidence")
+    @PreAuthorize(READ)
+    @Operation(summary = "The files attached to a case")
+    public ResponseEntity<ApiResponse<List<EvidenceResponse>>> evidence(@PathVariable UUID id, Authentication auth) {
+        return ok(evidenceFiles.list(tenant(), id, HrAccess.held(auth), user(auth)));
+    }
+
+    @PostMapping(value = "/cases/{id}/evidence", consumes = "multipart/form-data")
+    @PreAuthorize(MANAGE)
+    @Operation(summary = "Attach a file to a case. Only these screens can open it; it is never shared with an auditor")
+    public ResponseEntity<ApiResponse<EvidenceResponse>> addEvidence(@PathVariable UUID id, @RequestParam String kind,
+                                                                     @RequestParam("file") org.springframework.web.multipart.MultipartFile file, Authentication auth) {
+        return ok(evidenceFiles.add(tenant(), id, kind, file, HrAccess.held(auth), user(auth), TenantContext.getCurrentUserName()));
+    }
+
+    @GetMapping("/cases/{id}/evidence/{evidenceId}/download")
+    @PreAuthorize(READ)
+    @Operation(summary = "Download a file attached to a case")
+    public ResponseEntity<byte[]> downloadEvidence(@PathVariable UUID id, @PathVariable UUID evidenceId, Authentication auth) {
+        EvidenceFacade.DownloadedEvidence file = evidenceFiles.download(tenant(), id, evidenceId, HrAccess.held(auth), user(auth));
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"" + file.fileName().replace("\"", "") + "\"")
+                .header("X-Content-Type-Options", "nosniff")
+                .header("Cache-Control", "no-store")
+                .contentType(org.springframework.http.MediaType.parseMediaType(file.contentType()))
+                .body(file.content());
+    }
+
+    @PostMapping("/cases/{id}/evidence/{evidenceId}/remove")
+    @PreAuthorize(MANAGE)
+    @Operation(summary = "Take a file off a case, with the reason. The file is kept")
+    public ResponseEntity<ApiResponse<Void>> removeEvidence(@PathVariable UUID id, @PathVariable UUID evidenceId, @RequestBody ReasonRequest req, Authentication auth) {
+        evidenceFiles.remove(tenant(), id, evidenceId, req == null ? null : req.reason(), HrAccess.held(auth), user(auth));
+        return ok(null);
     }
 
     private static <T> ResponseEntity<ApiResponse<T>> ok(T body) { return ResponseEntity.ok(ApiResponse.success(body)); }
