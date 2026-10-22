@@ -1,0 +1,16 @@
+package za.co.handyflow.platform.hr.domain.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import za.co.handyflow.platform.hr.domain.model.*;
+import za.co.handyflow.platform.shared.TenantId;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface HrPerfEventRepository extends JpaRepository<HrPerfEvent, UUID> {
+
+    @Query("SELECT e FROM HrPerfEvent e WHERE e.kind = :kind AND e.refId = :refId ORDER BY e.doneAt")
+    List<HrPerfEvent> forRef(String kind, UUID refId);
+}
