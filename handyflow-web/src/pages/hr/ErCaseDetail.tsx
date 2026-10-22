@@ -4,7 +4,7 @@ import { useAuth } from "../../hooks/useAuth"
 import { letterRights } from "./letters.logic"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { ACTION_LABEL, TYPE_LABEL, fmtDate, words } from "./er.logic"
+import { ACTION_LABEL, TYPE_LABEL, erRights, fmtDate, words } from "./er.logic"
 import { errorText, plain, primary, unwrap, type Detail } from "./er.shared"
 import CasePlans from "./CasePlans"
 import { perfRights } from "./perf.logic"
@@ -12,6 +12,7 @@ import CaseLetters from "./CaseLetters"
 import ErActionForm from "./ErActionForms"
 import { Chip, Notice, Section, StatusChip } from "./ErParts"
 import ErSections from "./ErSections"
+import ValidityRow from "./ErValidity"
 
 const BASE = "/api/v1/hr/employee-relations"
 
@@ -20,6 +21,7 @@ export default function ErCaseDetail({ id, back }: { id: string; back: () => voi
   const { user } = useAuth() as { user?: { permissions?: string[] } }
   const letters = letterRights(user?.permissions ?? [])
   const perf = perfRights(user?.permissions ?? [])
+  const rights = erRights(user?.permissions ?? [])
   const [action, setAction] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
@@ -89,7 +91,7 @@ export default function ErCaseDetail({ id, back }: { id: string; back: () => voi
             <>
               <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Earlier warnings with no recorded validity (not counted as in force)</div>
               <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
-                {a.unknownValidity.map(w => <li key={w.caseId}>{words(w.sanction)} ({w.number}), given {fmtDate(w.issuedOn)}</li>)}
+                {a.unknownValidity.map(w => <ValidityRow key={w.caseId} w={w} canSet={rights.decide} />)}
               </ul>
             </>
           )}
@@ -111,7 +113,7 @@ function labelFor(path: string): string {
     assign: "ASSIGN", parties: "PARTIES", confidential: "CONFIDENTIAL", investigate: "INVESTIGATE", withdraw: "WITHDRAW", close: "CLOSE", informal: "INFORMAL",
     notice: "NOTICE", hearing: "HEARING", decision: "DECIDE", "grievance-decision": "DECIDE", "incapacity-decision": "DECIDE", communicate: "COMMUNICATE",
     appeal: "APPEAL", "appeal-decision": "DECIDE_APPEAL", "grievance-escalation-decision": "DECIDE_APPEAL", suspend: "SUSPEND", "suspension/end": "END_SUSPENSION",
-    steps: "STEP", review: "REVIEW", "return-to-investigation": "RETURN_TO_INVESTIGATION",
+    "end-employment": "END_EMPLOYMENT", steps: "STEP", review: "REVIEW", "return-to-investigation": "RETURN_TO_INVESTIGATION",
   }
   return map[path] ?? ""
 }

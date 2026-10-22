@@ -15,7 +15,12 @@ public final class GrievanceRules {
     public static final String UPHELD = "UPHELD", PARTLY_UPHELD = "PARTLY_UPHELD", NOT_UPHELD = "NOT_UPHELD";
 
     public static LocalDate responseDue(LocalDate lodgedOn, ErPolicy policy) {
-        return ErRules.addWorkingDays(lodgedOn, policy.grievanceResponseDays());
+        return responseDue(lodgedOn, policy, java.util.Set.of());
+    }
+
+    /** Working days skip weekends and the public holidays given. */
+    public static LocalDate responseDue(LocalDate lodgedOn, ErPolicy policy, java.util.Set<LocalDate> holidays) {
+        return ErRules.addWorkingDays(lodgedOn, policy.grievanceResponseDays(), holidays);
     }
 
     /** A grievance still waiting for its outcome after the response time the company set. */

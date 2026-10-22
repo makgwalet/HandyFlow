@@ -584,3 +584,24 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - A leaver recorded more than 3 months late is not picked up by a run.
 
 **Not verified.** Maven and real Mockito have not run: `PayrollServiceTest` (five new tests), `TaxCertificateServiceTest` and the changed `PayrollControlServiceTest` constructor were written but not executed. The `terminatedForPay` JPQL (a correlated NOT EXISTS across two entities) and V497 have not been run against PostgreSQL. `PayPeriodRules` (11 tests) and `LeaveRules.annualOwing` (4 new tests) ran in the stub harness, and two deliberate breaks of `PayPeriodRules` were caught. Front end: 4 tests; ESLint on `PayrollTab.tsx` still reports its existing `any` uses.
+
+## 19. Slice 12b: employee relations follow-ups (dismissal ends employment, holidays, old warnings)
+
+**What changed**
+
+- **A dismissal can now end employment.** A new action, "End employment (dismissal)", is offered to someone with `HR_ER_DECIDE` once a case has a DISMISSAL outcome that the employee was told of and no appeal is waiting. It terminates the employee with the last day given and the reason "Dismissal after case ER-…", writes the employee audit entry and a timeline entry. The next pay run then pays them to that day with their annual leave owing (Slice 12). It stays available after the case is closed, until the employee has been terminated. A dismissal the appeal overturned or lowered no longer has the DISMISSAL outcome, so it is refused. The last day cannot be before the day the employee was told, or in the future (the existing termination rule).
+- **Grievance response times skip public holidays.** The company's working-day count now uses the public holiday calendar for the due date shown in the list and on the case.
+- **Old warnings can be given a validity.** A warning recorded before cases had a validity (listed under "no recorded validity") can be given months by someone with `HR_ER_DECIDE`, counted from the decision date. It can be set once; it is then counted as in force or expired like any other. Cases without a decision date are refused.
+
+**Still not done**
+
+- Evidence and attachments for cases.
+- Notifications and reminders. The case list already shows what is due or late, but nothing is sent.
+- The grievance due date asks the holiday table once for every grievance in the list (a query per open grievance), which is fine for tens, not thousands.
+- Ending employment does not cancel approved leave after the last day, stop portal access, or work out notice pay.
+- The Security complaint referral still opens a plain disciplinary case.
+
+**Not verified**
+
+- Maven, real Mockito and PostgreSQL have not run. The new `ErTerminationService`, `ErCaseService.setWarningValidity`, `ErCaseViews.responseDue` and the controller endpoints (`/end-employment`, `/warning-validity`) have compiled only against my stand-in classes. Spring wiring of `ErTerminationService` and the new `PublicHolidayRepository` dependency of `ErCaseViews` is untested.
+- In the stub harness: 6 rules tests and 8 service tests pass (the service tests use hand-made stand-ins for the audit and view classes); two deliberate breaks, skipping the appeal check and the permission check, were each caught. Front end: 3 new tests (22 in the file), ESLint clean.

@@ -421,6 +421,18 @@ public class ErCaseService {
                 .toList();
     }
 
+    /** A warning from before cases had a validity is not counted as in force until someone says how long it lasts. */
+    @Transactional
+    public Detail setWarningValidity(TenantId tenantId, UUID id, ValidityRequest req, UUID userId, Set<String> held) {
+        requireDecide(held);
+        HrErCase c = support.findToAct(tenantId, id, held, userId);
+        fail(DisciplineRules.validityProblem(c.getOutcome(), c.getDecidedOn(), c.getWarningValidUntil(), req == null ? null : req.months()));
+        c.setWarningValidity(req.months());
+        caseRepo.save(c);
+        support.event(c, "WARNING_VALIDITY_SET", "Valid for " + req.months() + " months, until " + c.getWarningValidUntil(), true, userId);
+        return views.detail(tenantId, c, held, userId, support.today());
+    }
+
     private static void requireOpen(HrErCase c) {
         if (!ErRules.isOpen(c.getStatus())) throw new IllegalStateException("This case is " + words(c.getStatus()) + " and can no longer be changed.");
     }

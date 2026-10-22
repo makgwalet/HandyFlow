@@ -44,7 +44,7 @@ export const ACTION_LABEL: Record<string, string> = {
   WITHDRAW: "Withdraw", INFORMAL: "Informal outcome", CLOSE_NO_CASE: "Close – no case to answer", NOTICE: "Issue notice of hearing",
   HEARING: "Record the hearing", DECIDE: "Record the decision", RETURN_TO_INVESTIGATION: "Back to investigation",
   COMMUNICATE: "Record that the employee was told", APPEAL: "Record an appeal", CLOSE: "Close the case", DECIDE_APPEAL: "Decide the appeal",
-  SUSPEND: "Precautionary suspension", END_SUSPENSION: "End the suspension", STEP: "Record a step", REVIEW: "Set the review period",
+  END_EMPLOYMENT: "End employment (dismissal)", SUSPEND: "Precautionary suspension", END_SUSPENSION: "End the suspension", STEP: "Record a step", REVIEW: "Set the review period",
 }
 
 /** Colour tokens for a status chip: [text, background]. */

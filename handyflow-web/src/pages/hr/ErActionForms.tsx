@@ -61,6 +61,7 @@ export default function ErActionForm(p: ActionProps) {
     case "COMMUNICATE": return <Communicate {...p} />
     case "APPEAL": return <Appeal {...p} />
     case "DECIDE_APPEAL": return <AppealDecision {...p} />
+    case "END_EMPLOYMENT": return <EndEmployment {...p} />
     case "SUSPEND": return <Suspend {...p} />
     case "END_SUSPENSION": return <EndSuspension {...p} />
     case "STEP": return <StepForm {...p} />
@@ -323,6 +324,21 @@ function AppealDecision(p: ActionProps) {
         <Field id="er-amonths" text="Warning valid for (months)"><input id="er-amonths" type="number" min={1} max={60} value={m} onChange={e => setM(e.target.value)} style={input} /></Field>
       )}
       <Field id="er-anote" text="Reasons"><textarea id="er-anote" rows={4} value={note} onChange={e => setNote(e.target.value)} style={input} /></Field>
+    </Shell>
+  )
+}
+
+function EndEmployment(p: ActionProps) {
+  const [lastDay, setLastDay] = useState(todaySast())
+  const told = p.c.decision?.communicatedOn
+  const problem = !lastDay ? "Give the last day of employment." : told && lastDay < told ? "The last day cannot be before the employee was told." : lastDay > todaySast() ? "The last day cannot be in the future." : null
+  return (
+    <Shell title={ACTION_LABEL.END_EMPLOYMENT} problem={problem} submitText="End employment" tone="danger" busy={p.busy} error={p.error} cancel={p.cancel}
+      onSubmit={() => p.send("end-employment", { lastDay })}>
+      <p style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 0 }}>
+        This marks {p.c.employee.name} as terminated. The next pay run pays them up to this day, with any annual leave owing. Notice pay and anything owed back are not worked out for you.
+      </p>
+      <Field id="er-lastday" text="Last day of employment"><input id="er-lastday" type="date" value={lastDay} max={todaySast()} onChange={e => setLastDay(e.target.value)} style={input} /></Field>
     </Shell>
   )
 }

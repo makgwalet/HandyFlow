@@ -223,6 +223,32 @@ public final class DisciplineRules {
         return null;
     }
 
+    // ── Ending employment after a dismissal ──────────────────────────────────────────────────────────
+
+    /**
+     * Null when employment may be ended because of this case. Only a dismissal that the employee was told of, and that no appeal is still
+     * waiting on, ends employment. A dismissal the appeal overturned or lowered has a different outcome, so it is refused here.
+     */
+    public static String endEmploymentProblem(String status, String outcome, LocalDate communicatedOn, String employeeStatus, LocalDate lastDay) {
+        if (!DISMISSAL.equals(outcome)) return "Only a case that ended in dismissal can end the employee's employment.";
+        if (ErRules.APPEALED.equals(status)) return "An appeal is waiting for a decision. Employment cannot be ended until it is decided.";
+        if (!ErRules.DECIDED.equals(status) && !ErRules.CLOSED.equals(status)) return "The case has no decision yet.";
+        if (communicatedOn == null) return "Tell the employee the outcome before ending their employment.";
+        if ("TERMINATED".equals(employeeStatus)) return "This employee's employment has already ended.";
+        if (lastDay == null) return "Give the last day of employment.";
+        if (lastDay.isBefore(communicatedOn)) return "The last day cannot be before the employee was told of the dismissal (" + communicatedOn + ").";
+        return null;
+    }
+
+    /** Null when a warning that was recorded without a validity can be given one. */
+    public static String validityProblem(String outcome, LocalDate decidedOn, LocalDate currentValidUntil, Integer months) {
+        if (!WARNINGS.contains(outcome)) return "Only a warning has a validity.";
+        if (decidedOn == null) return "This warning has no date, so its validity cannot be worked out.";
+        if (currentValidUntil != null) return "This warning already has a validity (until " + currentValidUntil + ").";
+        if (months == null || months < 1 || months > 60) return "Say how many months the warning stays valid (1 to 60).";
+        return null;
+    }
+
     // ── Precautionary suspension ──────────────────────────────────────────────────────────────────────
 
     /** A precautionary suspension is always on full pay and needs a reason. Suspension without pay is not offered. */

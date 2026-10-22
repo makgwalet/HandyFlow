@@ -36,6 +36,7 @@ public class ErController {
     private final GrievanceService grievances;
     private final IncapacityService incapacity;
     private final ErPolicyService policy;
+    private final ErTerminationService termination;
 
     // ── For HR ────────────────────────────────────────────────────────────────────────────────────
 
@@ -170,6 +171,20 @@ public class ErController {
     @PreAuthorize(MANAGE)
     public ResponseEntity<ApiResponse<Detail>> endSuspension(@PathVariable UUID id, @RequestBody(required = false) DateRequest req, Authentication auth) {
         return ok(cases.endSuspension(tenant(), id, req, user(auth), HrAccess.held(auth)));
+    }
+
+    @PostMapping("/cases/{id}/end-employment")
+    @PreAuthorize(DECIDE)
+    @Operation(summary = "End the employee's employment after a dismissal that was communicated and not under appeal. The next pay run pays the final pay")
+    public ResponseEntity<ApiResponse<Detail>> endEmployment(@PathVariable UUID id, @RequestBody EndEmploymentRequest req, Authentication auth) {
+        return ok(termination.endEmployment(tenant(), id, req, user(auth), HrAccess.held(auth)));
+    }
+
+    @PostMapping("/cases/{id}/warning-validity")
+    @PreAuthorize(DECIDE)
+    @Operation(summary = "Say how long a warning recorded before validity existed stays in force")
+    public ResponseEntity<ApiResponse<Detail>> warningValidity(@PathVariable UUID id, @RequestBody ValidityRequest req, Authentication auth) {
+        return ok(cases.setWarningValidity(tenant(), id, req, user(auth), HrAccess.held(auth)));
     }
 
     @PostMapping("/cases/{id}/steps")

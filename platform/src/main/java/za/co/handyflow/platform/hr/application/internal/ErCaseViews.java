@@ -22,6 +22,13 @@ class ErCaseViews {
     private final HrErEventRepository eventRepo;
     private final HrEmployeeRepository employeeRepo;
     private final ErPolicyService policyService;
+    private final za.co.handyflow.platform.shared.PublicHolidayRepository holidayRepo;
+
+    /** Working days after the grievance was lodged, skipping weekends and public holidays. */
+    LocalDate responseDue(LocalDate lodgedOn, ErPolicy policy) {
+        Set<LocalDate> holidays = new HashSet<>(holidayRepo.datesBetween(lodgedOn, lodgedOn.plusDays(policy.grievanceResponseDays() * 2L + 14)));
+        return GrievanceRules.responseDue(lodgedOn, policy, holidays);
+    }
 
     // ── The list ──────────────────────────────────────────────────────────────────────────────────
 
@@ -37,7 +44,7 @@ class ErCaseViews {
         boolean overdue = false;
         String s = c.getStatus();
         if (ErRules.GRIEVANCE.equals(c.getCaseType()) && (ErRules.REPORTED.equals(s) || ErRules.INVESTIGATING.equals(s))) {
-            due = GrievanceRules.responseDue(c.getReportedOn(), policy);
+            due = responseDue(c.getReportedOn(), policy);
             label = "Response due";
             overdue = today.isAfter(due);
         } else if (ErRules.NOTICE_ISSUED.equals(s)) {
@@ -88,7 +95,7 @@ class ErCaseViews {
 
     private Advice advice(TenantId tenantId, HrErCase c, ErPolicy policy, LocalDate today, Row row) {
         if (ErRules.GRIEVANCE.equals(c.getCaseType())) {
-            LocalDate due = GrievanceRules.responseDue(c.getReportedOn(), policy);
+            LocalDate due = responseDue(c.getReportedOn(), policy);
             return new Advice(List.of(), List.of(), null, due, row.overdue());
         }
         if (!ErRules.DISCIPLINARY.equals(c.getCaseType())) return null;
@@ -158,6 +165,11 @@ class ErCaseViews {
     /** Action names the screen turns into buttons. The service checks each one again when it is used. */
     List<String> actions(HrErCase c, Set<String> held, LocalDate today, ErPolicy policy) {
         List<String> out = new ArrayList<>();
+        // A dismissal ends employment only when someone says so, and that can still be done after the case is closed.
+        if (ErRules.canDecide(held) && DisciplineRules.DISMISSAL.equals(c.getOutcome()) && c.getCommunicatedOn() != null
+                && (ErRules.DECIDED.equals(c.getStatus()) || ErRules.CLOSED.equals(c.getStatus()))
+                && employeeRepo.findActiveById(TenantId.of(c.getTenantId()), c.getEmployeeId()).map(e -> !"TERMINATED".equals(e.getStatus())).orElse(false))
+            out.add("END_EMPLOYMENT");
         if (!ErRules.isOpen(c.getStatus())) return out;
         boolean manage = ErRules.canManage(held);
         boolean decide = ErRules.canDecide(held);

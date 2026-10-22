@@ -85,14 +85,17 @@ public final class ErRules {
         return held.contains("HR_SENSITIVE_READ") || (userId != null && userId.equals(ownerUserId));
     }
 
-    /** The date a number of working days (Monday to Friday) after a date. Public holidays are not skipped. */
-    public static LocalDate addWorkingDays(LocalDate from, int days) {
+    /** The date a number of working days (Monday to Friday) after a date. Public holidays are not skipped; see the overload that takes them. */
+    public static LocalDate addWorkingDays(LocalDate from, int days) { return addWorkingDays(from, days, Set.of()); }
+
+    /** The date a number of working days after a date, skipping weekends and the public holidays given. */
+    public static LocalDate addWorkingDays(LocalDate from, int days, Set<LocalDate> holidays) {
         LocalDate d = from;
         int left = days;
         while (left > 0) {
             d = d.plusDays(1);
             DayOfWeek w = d.getDayOfWeek();
-            if (w != DayOfWeek.SATURDAY && w != DayOfWeek.SUNDAY) left--;
+            if (w != DayOfWeek.SATURDAY && w != DayOfWeek.SUNDAY && !holidays.contains(d)) left--;
         }
         return d;
     }

@@ -192,6 +192,13 @@ public class HrErCase {
         touch();
     }
 
+    /** Gives a warning that was recorded without a validity its months, counted from the decision date. */
+    public void setWarningValidity(int months) {
+        this.warningMonths = months;
+        this.warningValidUntil = DisciplineRules.validUntil(decidedOn, months);
+        touch();
+    }
+
     public void close(LocalDate on, String reason) {
         this.status = ErRules.CLOSED;
         this.closedOn = on;

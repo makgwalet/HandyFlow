@@ -218,6 +218,51 @@ describe("HR cases", () => {
     expect(screen.queryByLabelText("Actions")).toBeNull()
   })
 
+  it("ends employment after a dismissal that the employee was told of", async () => {
+    perms = ["HR_ER_READ", "HR_ER_DECIDE"]
+    const d = detail({ status: "DECIDED", actions: ["END_EMPLOYMENT"], decision: { outcome: "DISMISSAL", decidedOn: "2026-10-12", note: "Guilty.", warningMonths: null, warningValidUntil: null,
+      employeeResponse: null, communicatedOn: "2026-10-13", dismissalRightsExplainedOn: "2026-10-13", ccmaDeadline: "2026-11-12", acknowledged: false, acknowledgedAt: null } })
+    routes({ [`${BASE}/cases`]: [row({ status: "DECIDED" })], [`${BASE}/cases/c1`]: d })
+    post.mockResolvedValue({ data: { data: detail({ status: "DECIDED", actions: [] }) } })
+    wrap(<EmployeeRelationsTab />)
+    fireEvent.click(await screen.findByRole("button", { name: "ER-2026-0001" }))
+    fireEvent.click(await screen.findByRole("button", { name: "End employment (dismissal)" }))
+    expect(screen.getByText(/The next pay run pays them up to this day/)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText("Last day of employment"), { target: { value: "2026-10-01" } })
+    fireEvent.click(screen.getByRole("button", { name: "End employment" }))
+    expect(await screen.findByText("The last day cannot be before the employee was told.")).toBeTruthy()
+    expect(post).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText("Last day of employment"), { target: { value: "2026-10-14" } })
+    fireEvent.click(screen.getByRole("button", { name: "End employment" }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith(`${BASE}/cases/c1/end-employment`, { lastDay: "2026-10-14" }))
+  })
+
+  it("lets someone who may decide give an old warning its validity", async () => {
+    perms = ["HR_ER_READ", "HR_ER_DECIDE"]
+    const d = detail({ actions: [], advice: { activeWarnings: [], guidance: null, responseDue: null, overdue: false,
+      unknownValidity: [{ caseId: "w0", number: "ER-2025-0002", sanction: "WRITTEN_WARNING", issuedOn: "2025-01-10", validUntil: null }] } })
+    routes({ [`${BASE}/cases`]: [row()], [`${BASE}/cases/c1`]: d })
+    post.mockResolvedValue({ data: { data: d } })
+    wrap(<EmployeeRelationsTab />)
+    fireEvent.click(await screen.findByRole("button", { name: "ER-2026-0001" }))
+    const setBtn = await screen.findByRole("button", { name: "Set validity" })
+    expect((setBtn as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText("Months valid for ER-2025-0002"), { target: { value: "6" } })
+    fireEvent.click(setBtn)
+    await waitFor(() => expect(post).toHaveBeenCalledWith(`${BASE}/cases/w0/warning-validity`, { months: 6 }))
+  })
+
+  it("does not offer to set a validity to someone who may only read", async () => {
+    perms = ["HR_ER_READ"]
+    const d = detail({ actions: [], advice: { activeWarnings: [], guidance: null, responseDue: null, overdue: false,
+      unknownValidity: [{ caseId: "w0", number: "ER-2025-0002", sanction: "WRITTEN_WARNING", issuedOn: "2025-01-10", validUntil: null }] } })
+    routes({ [`${BASE}/cases`]: [row()], [`${BASE}/cases/c1`]: d })
+    wrap(<EmployeeRelationsTab />)
+    fireEvent.click(await screen.findByRole("button", { name: "ER-2026-0001" }))
+    expect(await screen.findByText(/Written warning \(ER-2025-0002\), given 10 Jan 2025/)).toBeTruthy()
+    expect(screen.queryByRole("button", { name: "Set validity" })).toBeNull()
+  })
+
   it("says plainly when a case cannot be opened", async () => {
     perms = ["HR_ER_READ"]
     routes({ [`${BASE}/cases`]: [row()], [`${BASE}/cases/c1`]: Object.assign(new Error("404"), { response: { data: { message: "Case not found." } } }) })

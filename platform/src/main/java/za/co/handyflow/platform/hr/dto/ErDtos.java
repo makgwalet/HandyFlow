@@ -94,6 +94,10 @@ public final class ErDtos {
 
     public record ReasonRequest(String reason) {}
 
+    public record EndEmploymentRequest(LocalDate lastDay) {}
+
+    public record ValidityRequest(Integer months) {}
+
     public record AssignRequest(UUID ownerUserId) {}
 
     public record PartiesRequest(UUID initiatorId, UUID chairId, UUID respondentId) {}
