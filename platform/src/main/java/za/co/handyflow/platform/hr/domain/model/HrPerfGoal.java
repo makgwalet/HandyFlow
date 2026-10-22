@@ -3,6 +3,8 @@ package za.co.handyflow.platform.hr.domain.model;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -24,7 +26,7 @@ public class HrPerfGoal {
     String measure;
     @Column(name = "due_date") LocalDate dueDate;
     String status = PerfRules.PROPOSED;
-    int progress;
+    @JdbcTypeCode(SqlTypes.SMALLINT) int progress;
     @Column(name = "set_by") UUID setBy;
     @Column(name = "approved_by") UUID approvedBy;
     @Column(name = "approved_at") Instant approvedAt;

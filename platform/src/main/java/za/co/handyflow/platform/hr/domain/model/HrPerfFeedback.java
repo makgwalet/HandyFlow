@@ -3,6 +3,8 @@ package za.co.handyflow.platform.hr.domain.model;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -21,7 +23,7 @@ public class HrPerfFeedback {
     @Column(name = "provider_id") UUID providerId;
     String relationship;
     String status = "REQUESTED";
-    Integer rating;
+    @JdbcTypeCode(SqlTypes.SMALLINT) Integer rating;
     String strengths;
     String improvements;
     @Column(name = "decline_reason") String declineReason;

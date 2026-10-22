@@ -3,6 +3,8 @@ package za.co.handyflow.platform.hr.domain.model;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -22,14 +24,14 @@ public class HrPerfReview {
     @Column(name = "reviewer_id") UUID reviewerId;
     @Column(name = "job_title") String jobTitle;
     String status = PerfRules.AWAITING_SELF;
-    @Column(name = "self_rating") Integer selfRating;
+    @Column(name = "self_rating") @JdbcTypeCode(SqlTypes.SMALLINT) Integer selfRating;
     @Column(name = "self_comment") String selfComment;
     @Column(name = "self_at") Instant selfAt;
-    @Column(name = "mgr_rating") Integer mgrRating;
+    @Column(name = "mgr_rating") @JdbcTypeCode(SqlTypes.SMALLINT) Integer mgrRating;
     @Column(name = "mgr_comment") String mgrComment;
     @Column(name = "mgr_at") Instant mgrAt;
     @Column(name = "mgr_by") UUID mgrBy;
-    @Column(name = "final_rating") Integer finalRating;
+    @Column(name = "final_rating") @JdbcTypeCode(SqlTypes.SMALLINT) Integer finalRating;
     boolean calibrated;
     @Column(name = "calibration_reason") String calibrationReason;
     @Column(name = "shared_at") Instant sharedAt;
