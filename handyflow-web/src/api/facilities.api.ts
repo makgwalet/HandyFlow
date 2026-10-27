@@ -138,6 +138,24 @@ export interface TechnicianLicence {
 }
 export interface LicenceBody { licenceType: string; reference?: string; issuedBy?: string; issueDate?: string | null; expiryDate?: string | null }
 
+export interface TrendPoint { start: string; end: string; raised: number; completed: number; avgCompletionHours: number | null; reworked: number; downtimeMinutes: number; cost: number }
+export interface TrendReport { from: string; to: string; bucket: 'WEEK' | 'MONTH' | string; points: TrendPoint[] }
+export interface VendorPerformanceRow {
+  vendorId: Id | null; vendorName: string; jobs: number; completed: number; cancelled: number; open: number; avgCompletionHours: number | null
+  reworkJobs: number; reworkRatePercent: number | null; totalCost: number; avgCost: number | null
+}
+export interface VendorPerformance { from: string; to: string; vendors: VendorPerformanceRow[] }
+export interface AssetReliabilityRow {
+  assetId: Id; assetTag: string; assetName: string; siteId: Id; failures: number; repeatFailures: number; downtimeMinutes: number
+  mttrHours: number | null; mtbfHours: number | null; topFailureCause: string | null; totalCost: number
+}
+export interface AssetReliability { from: string; to: string; limit: number; assets: AssetReliabilityRow[] }
+export interface InspectionSchedule {
+  id: Id; templateId: Id; templateName: string; siteId: Id; siteName: string; assetId: Id | null; assetName: string | null
+  frequencyDays: number; nextDueDate: string; lastCompletedDate: string | null; active: boolean; overdue: boolean; daysUntilDue: number; createdAt: string
+}
+export type ExportName = 'work-orders' | 'vendor-performance' | 'asset-reliability' | 'certificates' | 'corrective-actions' | 'stock-valuation' | 'technician-licences'
+
 // ── request bodies ──────────────────────────────────────────────────────────────────────────
 export interface CreateWorkOrderBody {
   siteId: Id; assetId?: Id | null; category: string; priority?: string; description: string
@@ -230,6 +248,25 @@ export const facilitiesApi = {
   /** Files come back as bytes, so they are fetched with the signed-in client and saved from a blob URL. */
   downloadEvidence: async (evidenceId: Id) => (await apiClient.get(`/api/v1/evidence/${evidenceId}/download`, { responseType: 'blob' })).data as Blob,
   jobCardPdf: async (workOrderId: Id) => (await apiClient.get(`${B}/work-orders/${workOrderId}/job-card.pdf`, { responseType: 'blob' })).data as Blob,
+
+
+  trends: async (from: string, to: string, bucket: string) => data<TrendReport>(await apiClient.get(`${B}/reports/trends`, { params: { from, to, bucket } })),
+  vendorPerformance: async (from: string, to: string) => data<VendorPerformance>(await apiClient.get(`${B}/reports/vendor-performance`, { params: { from, to } })),
+  assetReliability: async (from: string, to: string, limit = 25) => data<AssetReliability>(await apiClient.get(`${B}/reports/asset-reliability`, { params: { from, to, limit } })),
+  /** CSV exports come back as a file; the server names it (Content-Disposition), with a fallback here. */
+  exportCsv: async (name: ExportName, params: Record<string, string | undefined> = {}) => {
+    const r = await apiClient.get(`${B}/reports/export/${name}.csv`, { params, responseType: 'blob' })
+    const m = /filename="?([^";]+)"?/.exec(String(r.headers?.['content-disposition'] ?? ''))
+    return { blob: r.data as Blob, fileName: m?.[1] ?? `facilities-${name}.csv` }
+  },
+
+  inspectionSchedules: async (siteId?: Id) => page<InspectionSchedule>(await apiClient.get(`${B}/inspection-schedules`, { params: { siteId: siteId || undefined, size: 100 } })),
+  createInspectionSchedule: async (b: { templateId: Id; siteId: Id; assetId?: Id | null; frequencyDays: number; firstDueDate?: string | null }) =>
+    data<InspectionSchedule>(await apiClient.post(`${B}/inspection-schedules`, b)),
+  updateInspectionSchedule: async (id: Id, b: { frequencyDays?: number; nextDueDate?: string | null }) =>
+    data<InspectionSchedule>(await apiClient.put(`${B}/inspection-schedules/${id}`, b)),
+  inspectionScheduleActive: async (id: Id, action: 'deactivate' | 'reactivate') => data<InspectionSchedule>(await apiClient.post(`${B}/inspection-schedules/${id}/${action}`)),
+  deleteInspectionSchedule: async (id: Id) => { await apiClient.delete(`${B}/inspection-schedules/${id}`) },
 
   inspectionTemplates: async (includeInactive = false) =>
     page<InspectionTemplate>(await apiClient.get(`${B}/inspection-templates`, { params: { includeInactive } })),

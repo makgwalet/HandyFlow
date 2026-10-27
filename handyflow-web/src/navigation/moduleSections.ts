@@ -191,6 +191,7 @@ export const FACILITIES_SECTIONS: ModuleSections = {
         { id: 'inspections', label: 'Inspections', icon: ClipboardCheck, anyPermission: [...FACILITIES_READ_ANY, 'FACILITIES_TECHNICIAN', 'FACILITIES_INSPECT', 'FACILITIES_COMPLIANCE_MANAGE'] },
         { id: 'corrective-actions', label: 'Corrective actions', icon: ClipboardList, anyPermission: [...FACILITIES_READ_ANY, 'FACILITIES_TECHNICIAN', 'FACILITIES_INSPECT', 'FACILITIES_COMPLIANCE_MANAGE'] },
         { id: 'ppm', label: 'Planned maintenance', icon: CalendarClock, anyPermission: [...FACILITIES_READ_ANY, 'FACILITIES_PPM_MANAGE'] },
+        { id: 'inspection-schedules', label: 'Inspection schedules', icon: CalendarClock, anyPermission: [...FACILITIES_READ_ANY, 'FACILITIES_COMPLIANCE_MANAGE', 'FACILITIES_INSPECT', 'FACILITIES_TECHNICIAN'] },
       ],
     },
     {
@@ -210,6 +211,7 @@ export const FACILITIES_SECTIONS: ModuleSections = {
         { id: 'technicians', label: 'Technicians', icon: HardHat, anyPermission: FACILITIES_READ_ANY },
       ],
     },
+    { label: 'Insight', sections: [{ id: 'reports', label: 'Reports & exports', icon: FileBarChart, anyPermission: FACILITIES_READ_ANY }] },
   ],
 }
 
