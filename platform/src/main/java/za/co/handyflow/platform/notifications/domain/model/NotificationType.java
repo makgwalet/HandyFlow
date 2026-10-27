@@ -345,6 +345,8 @@ public enum NotificationType {
     /** A vendor's required document has expired; the vendor can no longer be assigned work. */
     FACILITY_VENDOR_DOC_EXPIRED(CRITICAL, Set.of(IN_APP, EMAIL)),
     /** An inspection was completed with failed checks; corrective actions have been raised. */
+    /** A stocked item has fallen to or below its reorder level. */
+    FACILITY_STOCK_LOW(WARNING, Set.of(IN_APP, EMAIL)),
     FACILITY_INSPECTION_FAILED(WARNING, Set.of(IN_APP, EMAIL)),
     FACILITY_COMPLIANCE_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
     FACILITY_COMPLIANCE_EXPIRED(CRITICAL, Set.of(IN_APP, EMAIL)),

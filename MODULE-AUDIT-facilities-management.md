@@ -11,9 +11,14 @@ Scope: the `facilitiesmanagement` backend module (contract coverage, SLAs, billi
 | V511 | this pass | client/supplier VAT + address, invoice party snapshot, `credited_amount`, payment `idempotency_key`, `fm_credit_notes` |
 | V512 | this pass | `fm_work_orders.requested_by_portal_user_id` + partial index (client portal requests) |
 | V513 | this pass | reporting indexes only (work orders by tenant+created/completed, invoices by status/issue date, credit notes by status, certificates by expiry). No table or column changes. Idempotent. |
-| **V514** | next free | |
+| V514 | this pass | `fm_work_orders.client_message` (decline message shown to the client portal) |
+| V515 | this pass | internal facilities: inspection templates and items, inspections and results, corrective actions |
+| V516 | this pass | internal facilities: vendor onboarding columns (existing vendors grandfathered as APPROVED) and `facility_vendor_documents` |
+| V517 | this pass | internal facilities: `facility_sync_ops` (offline idempotency) and a work-order `updated_at` index |
+| V518 | this pass | internal facilities: `facility_stock_items`, `facility_stock_movements`, `facility_purchase_orders`, `facility_purchase_order_lines` |
+| **V519** | next free | |
 
-All new migrations (V510–V513) were run twice against PostgreSQL 16 (idempotency) and every FM entity was checked against the resulting schema (0 mismatches).
+Migrations V510–V513 were run twice against PostgreSQL 16 (idempotency) and every FM entity was checked against the resulting schema (0 mismatches).
 Do **not** edit V506–V509 to tidy their "rename" header comments: Flyway checksums them.
 
 ## Fixed
@@ -78,6 +83,15 @@ Do **not** edit V506–V509 to tidy their "rename" header comments: Flyway check
 - **Change feed:** `GET /sync/work-orders?since=` returns work orders the caller can see that changed at or after the instant (inclusive, upsert by id), up to 200 per call with `more`/`nextSince` for paging.
 - Not done: uploading photos offline (evidence still goes through the evidence endpoints and is not part of sync), offline creation of new work orders or inspections (a device must be online to start them), conflict resolution beyond "the server's current state wins and the rejection is reported", and the same for the FM (provider) module.
 
+## Inventory and purchasing (internal facilities, V518)
+
+- **Stock items** (`/api/v1/facilities/stock`): SKU (unique per tenant, case-insensitive), unit, location, reorder level and quantity, quantity on hand, and a weighted-average unit cost that moves only when stock is received. Optional opening balance on creation is booked as a receipt. Items are deactivated, not deleted; an inactive item cannot be issued, received or ordered.
+- **Ledger:** every receipt, issue, return and stocktake adjustment writes an immutable movement line with the signed quantity, cost and balance afterwards, and an audit entry. Quantity changes re-read the item under a row lock and the database refuses negative stock, so concurrent issues cannot take the same units twice. Issuing more than is on hand is 409 `INSUFFICIENT_STOCK`.
+- **Issue to a work order:** goes through the existing cost service, so the caller's scope applies (technicians: own jobs only) and costs stay frozen once a job is complete. It adds a PARTS cost line at the current average cost and links it to the movement. If the work order refuses, no stock is deducted. Removing a cost line does not put the parts back — use a return.
+- **Low stock:** one alert (`FACILITY_STOCK_LOW`) as the level is crossed, not on every later issue; `GET /stock/reorder-suggestions` lists items at or below level, net of quantity already on approved or part-received orders, with a suggested quantity (the standard reorder quantity, or whatever restores twice the level if larger).
+- **Purchase orders** (`/purchase-orders`): numbered FPO-…, raised against an active vendor for active items; draft can be edited. Approval needs the vendor to be eligible right now (approved, required documents in force — the same rule as work-order assignment) and someone other than the creator (an admin may approve their own, audited `PO_SELF_APPROVED`). A delivery (`POST /{id}/receipts`) is all-or-nothing under a lock on the order, books stock in, refuses over-receipt (409 `OVER_RECEIPT`), and takes the invoiced unit cost if it differs from the order. Status DRAFT → APPROVED → PARTLY_RECEIVED → RECEIVED; cancel only while nothing is received, otherwise close short with a reason.
+- Not done: goods-receipt documents/GRNs as their own record, three-way match against vendor invoices, approval limits by order value, multiple stores or bin transfers, serial or batch tracking, stock valuation report, a daily low-stock digest, creating a draft order straight from the suggestions, and hiding unit costs from technicians (they can read stock and cost to issue it).
+
 ## Reporting (new, both modules)
 
 All figures are computed on request from the work orders / invoices themselves, inside the caller's access scope, and the vendor and asset arithmetic lives once in `shared.MaintenanceAnalytics` so the two modules cannot drift. FM SLA figures use the same `FmSlaStatus` rules as the API and the SLA monitor.
@@ -101,7 +115,7 @@ Definitions worth knowing: a *failure* is a reactive (non-PPM, non-inspection), 
 
 ## Not done (honest list)
 
-Portal quote approvals (the rest of the portal roadmap is done); site and client scope for vendor and technician records and audit on FM vendor changes; report exports (CSV/PDF), scheduled report emails and trend-over-time charts (the reports are point-in-time); inventory and procurement; multi-entity portfolios and integrations. None have migrations or code.
+Portal quote approvals (the rest of the portal roadmap is done); site and client scope for vendor and technician records and audit on FM vendor changes; report exports (CSV/PDF), scheduled report emails and trend-over-time charts (the reports are point-in-time); multi-entity portfolios and integrations. None have migrations or code.
 
 ## Known limitations (carried over from your list, unchanged)
 
@@ -115,5 +129,6 @@ Maven Central is unreachable from the build sandbox, so **no Spring or Mockito t
 
 - Executed (harness), FM: FmInvoice, FmCreditNote, FmVatNumber, FmWorkOrder, FmServiceAgreement, FmInvoicePayment, FmSlaClock, FmSlaStatus, FmPriorityRules, FmBillingSettings, FmTime, FmGlJournals, and the services FmContractTermsService, FmServiceAgreementService, FmCreditNoteService, FmBillingService, FmWorkOrderCostService, FmSlaMonitor, FmPortalDataService, FmPortalRequestService, FmPortalStatus, FmSlaReportService, FmReportingService.
 - Executed (harness), internal facilities: FacilityWorkOrder (22), FacilityAsset, FacilityPpmSchedule, FacilityComplianceCertificate, FacilityOverduePolicy, and the services FacilityWorkOrderService (20), FacilityVendorService, FacilityReportService (15). Shared: MaintenanceAnalytics (19).
+- Inventory and purchasing (0450), executed on the harness: FacilityInventoryServicesTest (25) and FacilityStockAndPurchaseOrderModelTest (17); a deliberate break of the low-stock crossing rule was caught. The `PESSIMISTIC_WRITE` queries, the new JPQL, the controllers and V518 itself (including its CHECK constraints) have not been run against PostgreSQL or Spring.
 - **Written but not executed**: FmBillingControllerTest, FmWorkOrderControllerTest, FacilityWorkOrderControllerTest and FacilityComplianceCertificateControllerTest (`@WebMvcTest` + `@MockitoBean`); the record constructors they use were compile-checked against the DTOs. Pre-existing FmAssetTest and FmPpmScheduleTest pass unchanged.
 - **Not covered**: the new report controllers (no controller tests), the FM portal controller, FmPortalService invite/revoke and FmPortalAuthService, FmGlPostingService, FmPdfService, FmWorkOrderService, FmAccessPolicy, FmAlerts, the other internal-facilities services (site, asset, technician, PPM, compliance, access admin), FacilityNotificationScheduler, FacilityPdfService, FacilityAccessPolicy, and **the JPQL queries** (only checked by schema/entity comparison, never executed — the new reporting queries, including a subquery in the PPM overdue count, are the first thing to exercise). Please run `mvn test` and the FM and facilities integration paths once.

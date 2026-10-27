@@ -1,0 +1,410 @@
+package za.co.handyflow.platform.facilities.application.internal;
+
+import org.junit.jupiter.api.Test;
+import za.co.handyflow.platform.facilities.domain.model.*;
+import za.co.handyflow.platform.facilities.domain.repository.*;
+import za.co.handyflow.platform.facilities.dto.*;
+import za.co.handyflow.platform.notifications.domain.model.NotificationType;
+import za.co.handyflow.platform.shared.HandyFlowException;
+import za.co.handyflow.platform.shared.ResourceNotFoundException;
+import za.co.handyflow.platform.shared.TenantContext;
+import za.co.handyflow.platform.shared.TenantId;
+
+import java.lang.reflect.Proxy;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.*;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/** Stock ledger, issuing to work orders, purchase orders and goods receipt, with in-memory repositories. */
+class FacilityInventoryServicesTest {
+
+    private final TenantId tenant = TenantId.generate();
+    private final UUID creator = UUID.randomUUID();
+    private final UUID approver = UUID.randomUUID();
+
+    private final Map<UUID, FacilityStockItem> items = new LinkedHashMap<>();
+    private final List<FacilityStockMovement> movements = new ArrayList<>();
+    private final Map<UUID, FacilityPurchaseOrder> orders = new LinkedHashMap<>();
+    private final Map<UUID, FacilityVendor> vendors = new HashMap<>();
+    private final List<String> audit = new ArrayList<>();
+    private final List<NotificationType> alertTypes = new ArrayList<>();
+    private final List<String> costLines = new ArrayList<>();
+    private final Set<String> authorities = new HashSet<>();
+    private String workOrderError;
+    private List<String> vendorProblems = List.of();
+    private int seq;
+
+    @SuppressWarnings("unchecked")
+    private static <T> T fake(Class<T> type, java.util.function.BiFunction<String, Object[], Object> f) {
+        return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type}, (p, m, a) -> {
+            Object r = f.apply(m.getName(), a == null ? new Object[0] : a);
+            if (r == NOPE) throw new UnsupportedOperationException(m.getName());
+            return r;
+        });
+    }
+    private static final Object NOPE = new Object();
+
+    private final FacilityStockItemRepository itemRepo = fake(FacilityStockItemRepository.class, (n, a) -> switch (n) {
+        case "save" -> { FacilityStockItem i = (FacilityStockItem) a[0]; items.put(i.getId(), i); yield i; }
+        case "findForTenant", "findForUpdate" -> Optional.ofNullable(items.get(a[1]));
+        case "skuExists" -> items.values().stream().anyMatch(i -> i.getSku().equals(a[1]));
+        case "findBelowReorderLevel" -> items.values().stream().filter(FacilityStockItem::isBelowReorderLevel).toList();
+        case "findByIds" -> items.values().stream().filter(i -> ((Collection<?>) a[1]).contains(i.getId())).toList();
+        default -> NOPE;
+    });
+    private final FacilityStockMovementRepository movementRepo = fake(FacilityStockMovementRepository.class, (n, a) -> {
+        if ("save".equals(n)) { movements.add((FacilityStockMovement) a[0]); return a[0]; }
+        return NOPE;
+    });
+    private final FacilityPurchaseOrderRepository orderRepo = fake(FacilityPurchaseOrderRepository.class, (n, a) -> switch (n) {
+        case "save" -> { FacilityPurchaseOrder o = (FacilityPurchaseOrder) a[0]; orders.put(o.getId(), o); yield o; }
+        case "findForTenant", "findForUpdate" -> Optional.ofNullable(orders.get(a[1]));
+        case "findOpen" -> orders.values().stream().filter(FacilityPurchaseOrder::isOpen).toList();
+        default -> NOPE;
+    });
+    private final FacilityVendorRepository vendorRepo = fake(FacilityVendorRepository.class, (n, a) ->
+            "findActiveById".equals(n) ? Optional.ofNullable(vendors.get(a[1])) : NOPE);
+
+    private final FacilityWorkOrderCostService costService = new FacilityWorkOrderCostService(null, null, null, null) {
+        @Override public CostLineResponse add(TenantId t, UUID workOrderId, AddCostLineRequest r) {
+            if (workOrderError != null) throw new IllegalStateException(workOrderError);
+            costLines.add(workOrderId + "|" + r.costType() + "|" + r.quantity() + "|" + r.unitCost());
+            return new CostLineResponse(UUID.randomUUID(), workOrderId, r.costType(), r.description(), r.quantity(), r.unitCost(),
+                    r.quantity().multiply(r.unitCost()), creator, Instant.now());
+        }
+    };
+    private final FacilityAuditService auditService = new FacilityAuditService(null) {
+        @Override public void record(TenantId t, String action, String type, UUID id, String details) { audit.add(action); }
+    };
+    private final FacilityAlerts alerts = new FacilityAlerts(null, null) {
+        @Override public void toAdmins(TenantId t, NotificationType type, String title, String message, String url, String src) { alertTypes.add(type); }
+    };
+    private final FacilityAccessPolicy policy = new FacilityAccessPolicy(null, null, null) {
+        @Override public boolean hasAuthority(String a) { return authorities.contains(a); }
+    };
+    private final FacilityVendorEligibility eligibility = new FacilityVendorEligibility(null) {
+        @Override public List<String> problems(TenantId t, FacilityVendor v) { return vendorProblems; }
+    };
+    private final FacilityNumberGenerator numbers = new FacilityNumberGenerator(null) {
+        @Override public String nextPurchaseOrderNumber(TenantId t) { return "FPO-" + (++seq); }
+    };
+
+    private final FacilityStockService stock = new FacilityStockService(itemRepo, movementRepo, orderRepo, costService, auditService, alerts);
+    private final FacilityPurchaseOrderService po = new FacilityPurchaseOrderService(orderRepo, itemRepo, vendorRepo, eligibility, stock,
+            numbers, policy, auditService);
+
+    private FacilityVendor vendor;
+
+    FacilityInventoryServicesTest() {
+        TenantContext.setUserId(creator.toString());
+        vendor = FacilityVendor.create(tenant, "ACME Supplies", "PARTS", null, null, null, null);
+        vendors.put(vendor.getId(), vendor);
+    }
+
+    private static BigDecimal n(String s) { return new BigDecimal(s); }
+
+    private UUID newItem(String sku, String level, String qty, String opening, String cost) {
+        StockItemResponse r = stock.createItem(tenant, new UpsertStockItemRequest(sku, "Item " + sku, "each", "Shelf 1",
+                n(level), n(qty), opening == null ? null : n(opening), cost == null ? null : n(cost)));
+        return r.id();
+    }
+
+    private PurchaseOrderRequest orderOf(UUID itemId, String qty, String cost) {
+        return new PurchaseOrderRequest(vendor.getId(), null, null, List.of(new PurchaseOrderRequest.Line(itemId, n(qty), n(cost))));
+    }
+
+    // ── items and the ledger ────────────────────────────────────────────────────
+
+    @Test
+    void creatingAnItemWithOpeningStockBooksAReceipt() {
+        UUID id = newItem("bolt-m8", "10", "100", "40", "2.50");
+        assertEquals(0, n("40").compareTo(items.get(id).getOnHand()));
+        assertEquals("BOLT-M8", items.get(id).getSku());
+        assertEquals(1, movements.size());
+        assertEquals("RECEIPT", movements.get(0).getMovementType());
+        assertEquals(0, n("40").compareTo(movements.get(0).getBalanceAfter()));
+        assertEquals(List.of("STOCK_ITEM_CREATED", "STOCK_RECEIVED"), audit);
+    }
+
+    @Test
+    void aDuplicateSkuIsRefusedRegardlessOfCase() {
+        newItem("A1", "0", "0", null, null);
+        HandyFlowException e = assertThrows(HandyFlowException.class, () -> newItem("a1", "0", "0", null, null));
+        assertEquals("SKU_TAKEN", e.getErrorCode());
+    }
+
+    @Test
+    void issuingToAWorkOrderAddsAPartsCostLineAndALedgerEntry() {
+        UUID id = newItem("A1", "0", "0", "10", "4.00");
+        UUID wo = UUID.randomUUID();
+        StockItemResponse r = stock.issue(tenant, id, new IssueStockRequest(wo, n("3"), "valve swap"));
+        assertEquals(0, n("7").compareTo(r.onHand()));
+        assertEquals(1, costLines.size());
+        assertTrue(costLines.get(0).startsWith(wo + "|PARTS|3|4.00"));
+        FacilityStockMovement m = movements.get(movements.size() - 1);
+        assertEquals("ISSUE", m.getMovementType());
+        assertEquals(0, n("-3").compareTo(m.getQuantity()));
+        assertEquals(wo, m.getWorkOrderId());
+        assertNotNull(m.getCostLineId());
+        assertTrue(audit.contains("STOCK_ISSUED"));
+    }
+
+    @Test
+    void youCannotIssueMoreThanIsOnHand() {
+        UUID id = newItem("A1", "0", "0", "2", "4.00");
+        HandyFlowException e = assertThrows(HandyFlowException.class,
+                () -> stock.issue(tenant, id, new IssueStockRequest(UUID.randomUUID(), n("3"), null)));
+        assertEquals("INSUFFICIENT_STOCK", e.getErrorCode());
+        assertEquals(0, n("2").compareTo(items.get(id).getOnHand()));
+        assertTrue(costLines.isEmpty());
+    }
+
+    @Test
+    void ifTheWorkOrderRejectsTheCostNothingIsDeducted() {
+        UUID id = newItem("A1", "0", "0", "10", "4.00");
+        int before = movements.size();
+        workOrderError = "Costs can only be changed while the work order is ASSIGNED, IN_PROGRESS or ON_HOLD";
+        assertThrows(IllegalStateException.class, () -> stock.issue(tenant, id, new IssueStockRequest(UUID.randomUUID(), n("3"), null)));
+        assertEquals(0, n("10").compareTo(items.get(id).getOnHand()));
+        assertEquals(before, movements.size());
+    }
+
+    @Test
+    void anInactiveItemCannotBeIssuedOrReceived() {
+        UUID id = newItem("A1", "0", "0", "10", "4.00");
+        stock.setActive(tenant, id, false);
+        assertEquals("STOCK_ITEM_INACTIVE", assertThrows(HandyFlowException.class,
+                () -> stock.issue(tenant, id, new IssueStockRequest(UUID.randomUUID(), n("1"), null))).getErrorCode());
+        assertEquals("STOCK_ITEM_INACTIVE", assertThrows(HandyFlowException.class,
+                () -> stock.receive(tenant, id, new ReceiveStockRequest(n("1"), n("1"), null))).getErrorCode());
+    }
+
+    @Test
+    void returnsPutStockBackAtTheCurrentAverageCost() {
+        UUID id = newItem("A1", "0", "0", "10", "4.00");
+        stock.issue(tenant, id, new IssueStockRequest(UUID.randomUUID(), n("4"), null));
+        StockItemResponse r = stock.returnStock(tenant, id, new ReturnStockRequest(null, n("1"), "unused"));
+        assertEquals(0, n("7").compareTo(r.onHand()));
+        assertEquals(0, n("4.00").compareTo(r.unitCost()));
+        assertEquals("RETURN", movements.get(movements.size() - 1).getMovementType());
+        assertTrue(audit.contains("STOCK_RETURNED"));
+    }
+
+    @Test
+    void aStocktakeBooksTheDifferenceAndASameCountBooksNothing() {
+        UUID id = newItem("A1", "0", "0", "10", "4.00");
+        int before = movements.size();
+        stock.adjust(tenant, id, new AdjustStockRequest(n("10"), "count"));
+        assertEquals(before, movements.size());
+        StockItemResponse r = stock.adjust(tenant, id, new AdjustStockRequest(n("8"), "two broken"));
+        assertEquals(0, n("8").compareTo(r.onHand()));
+        FacilityStockMovement m = movements.get(movements.size() - 1);
+        assertEquals("ADJUSTMENT", m.getMovementType());
+        assertEquals(0, n("-2").compareTo(m.getQuantity()));
+        assertTrue(audit.contains("STOCK_ADJUSTED"));
+    }
+
+    @Test
+    void theLowStockAlertFiresOnceAsTheLevelIsCrossed() {
+        UUID id = newItem("A1", "5", "20", "8", "1.00");
+        UUID wo = UUID.randomUUID();
+        stock.issue(tenant, id, new IssueStockRequest(wo, n("2"), null));      // 6, still above
+        assertTrue(alertTypes.isEmpty());
+        stock.issue(tenant, id, new IssueStockRequest(wo, n("1"), null));      // 5, at level
+        assertEquals(List.of(NotificationType.FACILITY_STOCK_LOW), alertTypes);
+        stock.issue(tenant, id, new IssueStockRequest(wo, n("1"), null));      // 4, already low
+        assertEquals(1, alertTypes.size());
+        stock.receive(tenant, id, new ReceiveStockRequest(n("30"), n("1"), "restock"));
+        stock.issue(tenant, id, new IssueStockRequest(wo, n("30"), null));     // crosses again
+        assertEquals(2, alertTypes.size());
+    }
+
+    @Test
+    void anUnknownItemReadsAsNotFound() {
+        assertThrows(ResourceNotFoundException.class, () -> stock.get(tenant, UUID.randomUUID()));
+    }
+
+    @Test
+    void reorderSuggestionsNetOffOpenOrders() {
+        UUID id = newItem("A1", "10", "20", "4", "1.00");
+        assertEquals(1, stock.reorderSuggestions(tenant).size());
+        PurchaseOrderResponse draft = po.create(tenant, orderOf(id, "20", "1.00"));
+        assertEquals(1, stock.reorderSuggestions(tenant).size());   // a draft does not count
+        TenantContext.setUserId(approver.toString());
+        po.approve(tenant, draft.id());
+        assertTrue(stock.reorderSuggestions(tenant).isEmpty());
+    }
+
+    // ── purchase orders ─────────────────────────────────────────────────────────
+
+    @Test
+    void anOrderIsNumberedAndStartsAsADraft() {
+        UUID id = newItem("A1", "0", "0", null, null);
+        PurchaseOrderResponse r = po.create(tenant, orderOf(id, "10", "3.00"));
+        assertEquals("FPO-1", r.poNumber());
+        assertEquals("DRAFT", r.status());
+        assertEquals(0, n("30.00").compareTo(r.totalValue()));
+        assertEquals("ACME Supplies", r.vendorName());
+        assertEquals(List.of("STOCK_ITEM_CREATED", "PO_CREATED"), audit);
+    }
+
+    @Test
+    void anInactiveVendorCannotBeOrderedFrom() {
+        UUID id = newItem("A1", "0", "0", null, null);
+        vendor.deactivate();
+        assertEquals("VENDOR_INACTIVE", assertThrows(HandyFlowException.class, () -> po.create(tenant, orderOf(id, "1", "1"))).getErrorCode());
+    }
+
+    @Test
+    void anInactiveItemCannotBeOrdered() {
+        UUID id = newItem("A1", "0", "0", null, null);
+        stock.setActive(tenant, id, false);
+        assertEquals("STOCK_ITEM_INACTIVE", assertThrows(HandyFlowException.class, () -> po.create(tenant, orderOf(id, "1", "1"))).getErrorCode());
+    }
+
+    @Test
+    void theCreatorCannotApproveButAnotherPersonCan() {
+        UUID id = newItem("A1", "0", "0", null, null);
+        PurchaseOrderResponse r = po.create(tenant, orderOf(id, "1", "1"));
+        assertEquals("PO_SELF_APPROVAL", assertThrows(HandyFlowException.class, () -> po.approve(tenant, r.id())).getErrorCode());
+        TenantContext.setUserId(approver.toString());
+        PurchaseOrderResponse ok = po.approve(tenant, r.id());
+        assertEquals("APPROVED", ok.status());
+        assertEquals(approver, ok.approvedByUserId());
+        assertTrue(audit.contains("PO_APPROVED"));
+    }
+
+    @Test
+    void anAdminMayApproveTheirOwnOrderButItIsAuditedAsSuch() {
+        UUID id = newItem("A1", "0", "0", null, null);
+        PurchaseOrderResponse r = po.create(tenant, orderOf(id, "1", "1"));
+        authorities.add("FACILITIES_ADMIN");
+        po.approve(tenant, r.id());
+        assertTrue(audit.contains("PO_SELF_APPROVED"));
+        assertFalse(audit.contains("PO_APPROVED"));
+    }
+
+    @Test
+    void anIneligibleVendorBlocksApproval() {
+        UUID id = newItem("A1", "0", "0", null, null);
+        PurchaseOrderResponse r = po.create(tenant, orderOf(id, "1", "1"));
+        vendorProblems = List.of("TAX_CLEARANCE expired");
+        TenantContext.setUserId(approver.toString());
+        HandyFlowException e = assertThrows(HandyFlowException.class, () -> po.approve(tenant, r.id()));
+        assertEquals("VENDOR_NOT_ELIGIBLE", e.getErrorCode());
+        assertTrue(e.getMessage().contains("TAX_CLEARANCE"));
+        assertEquals("DRAFT", orders.get(r.id()).getStatus());
+    }
+
+    @Test
+    void anApprovedOrderCannotBeEdited() {
+        UUID id = newItem("A1", "0", "0", null, null);
+        PurchaseOrderResponse r = po.create(tenant, orderOf(id, "1", "1"));
+        TenantContext.setUserId(approver.toString());
+        po.approve(tenant, r.id());
+        assertEquals("PO_NOT_EDITABLE", assertThrows(HandyFlowException.class, () -> po.update(tenant, r.id(), orderOf(id, "2", "1"))).getErrorCode());
+    }
+
+    private PurchaseOrderResponse approvedOrder(UUID... itemIds) {
+        List<PurchaseOrderRequest.Line> lines = new ArrayList<>();
+        for (UUID i : itemIds) lines.add(new PurchaseOrderRequest.Line(i, n("10"), n("5.00")));
+        TenantContext.setUserId(creator.toString());
+        PurchaseOrderResponse r = po.create(tenant, new PurchaseOrderRequest(vendor.getId(), null, null, lines));
+        TenantContext.setUserId(approver.toString());
+        return po.approve(tenant, r.id());
+    }
+
+    @Test
+    void aDraftOrderCannotBeReceived() {
+        UUID id = newItem("A1", "0", "0", null, null);
+        PurchaseOrderResponse r = po.create(tenant, orderOf(id, "1", "1"));
+        UUID line = r.lines().get(0).id();
+        assertEquals("PO_NOT_RECEIVABLE", assertThrows(HandyFlowException.class,
+                () -> po.receive(tenant, r.id(), new ReceiveOrderRequest(null, List.of(new ReceiveOrderRequest.Line(line, n("1"), null))))).getErrorCode());
+    }
+
+    @Test
+    void receivingBooksStockInAndMovesTheStatusOn() {
+        UUID id = newItem("A1", "0", "0", null, null);
+        PurchaseOrderResponse o = approvedOrder(id);
+        UUID line = o.lines().get(0).id();
+
+        PurchaseOrderResponse part = po.receive(tenant, o.id(), new ReceiveOrderRequest("DN-77", List.of(new ReceiveOrderRequest.Line(line, n("4"), null))));
+        assertEquals("PARTLY_RECEIVED", part.status());
+        assertEquals(0, n("4").compareTo(items.get(id).getOnHand()));
+        assertEquals(0, n("5.00").compareTo(items.get(id).getUnitCost()));
+        FacilityStockMovement m = movements.get(movements.size() - 1);
+        assertEquals(o.id(), m.getPurchaseOrderId());
+        assertTrue(m.getReference().contains("DN-77"));
+
+        PurchaseOrderResponse done = po.receive(tenant, o.id(), new ReceiveOrderRequest(null, List.of(new ReceiveOrderRequest.Line(line, n("6"), n("6.00")))));
+        assertEquals("RECEIVED", done.status());
+        assertEquals(0, n("10").compareTo(items.get(id).getOnHand()));
+        // average of 4 @ 5.00 and 6 @ 6.00 = 5.60
+        assertEquals(0, n("5.60").compareTo(items.get(id).getUnitCost()));
+        assertTrue(audit.contains("PO_RECEIVED"));
+    }
+
+    @Test
+    void overReceivingIsRefusedAndNothingIsBooked() {
+        UUID id = newItem("A1", "0", "0", null, null);
+        PurchaseOrderResponse o = approvedOrder(id);
+        UUID line = o.lines().get(0).id();
+        HandyFlowException e = assertThrows(HandyFlowException.class, () -> po.receive(tenant, o.id(),
+                new ReceiveOrderRequest(null, List.of(new ReceiveOrderRequest.Line(line, n("11"), null)))));
+        assertEquals("OVER_RECEIPT", e.getErrorCode());
+        assertEquals(0, items.get(id).getOnHand().signum());
+    }
+
+    @Test
+    void aDeliveryWithOneBadLineBooksNone() {
+        UUID a = newItem("A1", "0", "0", null, null);
+        UUID b = newItem("B1", "0", "0", null, null);
+        PurchaseOrderResponse o = approvedOrder(a, b);
+        UUID la = o.lines().get(0).id(), lb = o.lines().get(1).id();
+        assertThrows(HandyFlowException.class, () -> po.receive(tenant, o.id(), new ReceiveOrderRequest(null, List.of(
+                new ReceiveOrderRequest.Line(la, n("5"), null), new ReceiveOrderRequest.Line(lb, n("50"), null)))));
+        assertEquals(0, items.get(a).getOnHand().signum());
+        assertEquals("APPROVED", orders.get(o.id()).getStatus());
+    }
+
+    @Test
+    void aLineCannotAppearTwiceInOneDeliveryOrComeFromAnotherOrder() {
+        UUID id = newItem("A1", "0", "0", null, null);
+        PurchaseOrderResponse o = approvedOrder(id);
+        UUID line = o.lines().get(0).id();
+        assertThrows(IllegalArgumentException.class, () -> po.receive(tenant, o.id(), new ReceiveOrderRequest(null, List.of(
+                new ReceiveOrderRequest.Line(line, n("1"), null), new ReceiveOrderRequest.Line(line, n("1"), null)))));
+        assertThrows(IllegalArgumentException.class, () -> po.receive(tenant, o.id(), new ReceiveOrderRequest(null,
+                List.of(new ReceiveOrderRequest.Line(UUID.randomUUID(), n("1"), null)))));
+    }
+
+    @Test
+    void receivingCanCrossBackAboveTheReorderLevelWithoutAlerting() {
+        UUID id = newItem("A1", "5", "10", "2", "1.00");
+        alertTypes.clear();
+        PurchaseOrderResponse o = approvedOrder(id);
+        po.receive(tenant, o.id(), new ReceiveOrderRequest(null, List.of(new ReceiveOrderRequest.Line(o.lines().get(0).id(), n("10"), null))));
+        assertTrue(alertTypes.isEmpty());
+        assertFalse(items.get(id).isBelowReorderLevel());
+    }
+
+    @Test
+    void cancelWorksUntilGoodsArriveThenYouCloseShort() {
+        UUID id = newItem("A1", "0", "0", null, null);
+        PurchaseOrderResponse o = approvedOrder(id);
+        UUID line = o.lines().get(0).id();
+        po.receive(tenant, o.id(), new ReceiveOrderRequest(null, List.of(new ReceiveOrderRequest.Line(line, n("3"), null))));
+        assertEquals("PO_NOT_CANCELLABLE", assertThrows(HandyFlowException.class, () -> po.cancel(tenant, o.id(), "no")).getErrorCode());
+        PurchaseOrderResponse closed = po.closeShort(tenant, o.id(), "Vendor out of stock");
+        assertEquals("RECEIVED", closed.status());
+        assertEquals("Vendor out of stock", closed.closedReason());
+        assertTrue(audit.contains("PO_CLOSED_SHORT"));
+
+        PurchaseOrderResponse fresh = approvedOrder(id);
+        assertEquals("CANCELLED", po.cancel(tenant, fresh.id(), "Duplicate").status());
+        assertEquals("PO_NOT_CLOSABLE", assertThrows(HandyFlowException.class, () -> po.closeShort(tenant, fresh.id(), "x")).getErrorCode());
+    }
+}

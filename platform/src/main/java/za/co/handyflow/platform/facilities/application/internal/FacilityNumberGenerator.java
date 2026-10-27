@@ -35,9 +35,15 @@ public class FacilityNumberGenerator {
 
     private static final String WORKORDER_SEQUENCE = "FACILITY_WORKORDER";
 
+    private static final String PURCHASE_ORDER_SEQUENCE = "FACILITY_PURCHASE_ORDER";
+
     private final TenantNumberingFacade numberingFacade;
 
     public String nextWorkOrderNumber(TenantId tenantId) {
         return numberingFacade.next(tenantId, WORKORDER_SEQUENCE, "FWO");
+    }
+
+    public String nextPurchaseOrderNumber(TenantId tenantId) {
+        return numberingFacade.next(tenantId, PURCHASE_ORDER_SEQUENCE, "FPO");
     }
 }
