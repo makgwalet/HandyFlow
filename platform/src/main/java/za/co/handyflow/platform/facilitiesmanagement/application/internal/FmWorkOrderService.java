@@ -66,6 +66,7 @@ public class FmWorkOrderService {
     private final FmAccessPolicy accessPolicy;
     private final FmAuditService auditService;
     private final FmContractTermsService contractTermsService;
+    private final FmVendorEligibility vendorEligibility;
 
     // ── Reads ────────────────────────────────────────────────────────────────
 
@@ -229,6 +230,7 @@ public class FmWorkOrderService {
         }
 
         String vendorName = null;
+        String overrideNote = null;
         if (req.vendorId() != null) {
             FmVendor v = vendorRepository.findActiveById(tenantId, req.vendorId())
                     .orElseThrow(() -> new ResourceNotFoundException("FmVendor", req.vendorId().toString()));
@@ -236,12 +238,21 @@ public class FmWorkOrderService {
                 throw new IllegalStateException("Vendor " + v.getCompanyName() + " is deactivated and cannot be assigned work");
             }
             vendorName = v.getCompanyName();
+            List<String> problems = vendorEligibility.problems(tenantId, v);
+            if (!problems.isEmpty()) {
+                if (!accessPolicy.hasAuthority("FACILITIESMANAGEMENT_ADMIN")) {
+                    throw new HandyFlowException("Cannot assign work to " + vendorName + ": " + String.join("; ", problems),
+                            HttpStatus.CONFLICT, "VENDOR_NOT_ELIGIBLE");
+                }
+                overrideNote = String.join("; ", problems);
+            }
         }
 
         wo.assign(req.technicianId(), technicianName, req.vendorId(), vendorName);
         workOrderRepository.save(wo);
-        auditService.record(tenantId, "WORK_ORDER_ASSIGNED", "WORK_ORDER", id,
-                wo.getWorkOrderNumber() + " technician=" + technicianName + " vendor=" + vendorName);
+        auditService.record(tenantId, overrideNote != null ? "WORK_ORDER_ASSIGNED_INELIGIBLE_VENDOR" : "WORK_ORDER_ASSIGNED", "WORK_ORDER", id,
+                wo.getWorkOrderNumber() + " technician=" + technicianName + " vendor=" + vendorName
+                        + (overrideNote != null ? " ADMIN OVERRIDE: " + overrideNote : ""));
         return toResponse(wo);
     }
 

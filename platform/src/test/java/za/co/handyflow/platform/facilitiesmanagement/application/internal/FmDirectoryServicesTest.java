@@ -53,6 +53,8 @@ class FmDirectoryServicesTest {
         case "findActiveLinkedToUser" -> techs.values().stream().filter(t -> t.isActive() && a[1].equals(t.getLinkedUserId())).toList();
         default -> NOPE;
     });
+    private final za.co.handyflow.platform.facilitiesmanagement.domain.repository.FmVendorDocumentRepository docRepo =
+            fake(za.co.handyflow.platform.facilitiesmanagement.domain.repository.FmVendorDocumentRepository.class, (n, a) -> NOPE);
     private final FmWorkOrderRepository woRepo = fake(FmWorkOrderRepository.class, (n, a) ->
             n.startsWith("countOpenFor") ? (Object) openWork : NOPE);
     private final FmAccessPolicy policy = new FmAccessPolicy(null, null, null, null) {
@@ -61,7 +63,7 @@ class FmDirectoryServicesTest {
     private final FmAuditService auditService = new FmAuditService(null) {
         @Override public void record(TenantId t, String action, String type, UUID id, String details) { audit.add(action + ":" + details); }
     };
-    private final FmVendorService vendorService = new FmVendorService(vendorRepo, woRepo, policy, auditService);
+    private final FmVendorService vendorService = new FmVendorService(vendorRepo, woRepo, policy, auditService, docRepo);
     private final FmTechnicianService techService = new FmTechnicianService(techRepo, auditService, woRepo, policy);
 
     FmDirectoryServicesTest() { TenantContext.setUserId(me.toString()); }

@@ -50,6 +50,18 @@ public class FmVendor {
     @Column(nullable = false)
     private boolean active = true;
 
+    /** PENDING (just added), APPROVED or SUSPENDED. Vendors that predate onboarding were set to APPROVED by V523. */
+    @Column(name = "onboarding_status", nullable = false, length = 20)
+    private String onboardingStatus = "PENDING";
+    @Column(name = "approved_by_user_id")
+    private UUID approvedByUserId;
+    @Column(name = "approved_at")
+    private Instant approvedAt;
+    @Column(name = "suspended_reason", length = 500)
+    private String suspendedReason;
+    @Column(name = "created_by_user_id")
+    private UUID createdByUserId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -88,6 +100,28 @@ public class FmVendor {
         this.notes = notes;
         this.updatedAt = Instant.now();
     }
+
+    public void recordCreator(UUID userId) { this.createdByUserId = userId; }
+
+    /** Clear the vendor to receive work. The caller has already checked its documents. */
+    public void approve(UUID approverId) {
+        if ("APPROVED".equals(onboardingStatus)) throw new IllegalStateException("This vendor is already approved");
+        this.onboardingStatus = "APPROVED";
+        this.approvedByUserId = approverId;
+        this.approvedAt = Instant.now();
+        this.suspendedReason = null;
+        this.updatedAt = Instant.now();
+    }
+
+    public void suspend(String reason) {
+        if ("SUSPENDED".equals(onboardingStatus)) throw new IllegalStateException("This vendor is already suspended");
+        if (reason == null || reason.isBlank()) throw new IllegalArgumentException("A reason is required to suspend a vendor");
+        this.onboardingStatus = "SUSPENDED";
+        this.suspendedReason = reason.trim();
+        this.updatedAt = Instant.now();
+    }
+
+    public boolean isApproved() { return "APPROVED".equals(onboardingStatus); }
 
     public void deactivate() { this.active = false; this.updatedAt = Instant.now(); }
     public void reactivate() { this.active = true; this.updatedAt = Instant.now(); }

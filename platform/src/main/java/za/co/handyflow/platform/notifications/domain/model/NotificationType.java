@@ -355,6 +355,10 @@ public enum NotificationType {
     FACILITY_COMPLIANCE_EXPIRED(CRITICAL, Set.of(IN_APP, EMAIL)),
 
     // ── Facilities Management (Provider — Track 7 Module 5b) ────────────────
+    /** An FM subcontractor's insurance, tax or licence document is about to expire. */
+    FM_VENDOR_DOC_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
+    /** An FM subcontractor's required document has expired; it can no longer be assigned work. */
+    FM_VENDOR_DOC_EXPIRED(CRITICAL, Set.of(IN_APP, EMAIL)),
     FM_PPM_DUE(INFO, Set.of(IN_APP, EMAIL)),
     FM_WORKORDER_URGENT(WARNING, Set.of(IN_APP, EMAIL)),
     FM_WORKORDER_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
