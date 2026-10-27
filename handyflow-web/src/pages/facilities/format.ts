@@ -34,3 +34,18 @@ export const inputStyle: CSSProperties = {
   boxSizing: 'border-box', background: 'var(--hf-surface)', color: 'var(--hf-text)', outline: 'none',
 }
 
+
+/** Saves a downloaded blob under a file name (the browser's normal download). */
+export function saveBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = fileName
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}
+
+export const fmtBytes = (n: number) => (n < 1024 ? `${n} B` : n < 1_048_576 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1_048_576).toFixed(1)} MB`)
+
+export const CERTIFICATE_TYPES = ['ELECTRICAL_COC', 'FIRE_EQUIPMENT', 'ELEVATOR', 'GAS', 'OTHER']
+export const VENDOR_DOC_TYPES = ['PUBLIC_LIABILITY_INSURANCE', 'COIDA_LETTER', 'TAX_CLEARANCE', 'TRADE_LICENCE', 'BEE_CERTIFICATE', 'OTHER']
+export const LICENCE_TYPES = ['ELECTRICAL_WIREMAN', 'GAS_INSTALLER', 'PLUMBING', 'HVAC_REFRIGERATION', 'FIRE_EQUIPMENT', 'WORKING_AT_HEIGHTS', 'FIRST_AID', 'DRIVERS_LICENCE', 'OTHER']

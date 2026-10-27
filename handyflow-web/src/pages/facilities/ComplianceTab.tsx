@@ -4,9 +4,12 @@
 // valid certificates, so a certificate that lapsed overnight shows as expired even before the server's daily job runs.
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Plus, RefreshCw } from 'lucide-react'
 import { facilitiesApi, type Certificate } from '../../api/facilities.api'
 import Chip from '../../components/ui/Chip'
-import { DataTable, StatusChip, Toolbar, type Column } from './ui'
+import { usePermissions } from '../../hooks/usePermission'
+import { Btn, DataTable, StatusChip, Toolbar, type Column } from './ui'
+import { CertificateFormDialog, ReasonDialog } from './ComplianceForms'
 import { daysUntil, fmtDate, titleCase } from './format'
 
 const FILTERS = [{ id: 'all', label: 'All' }, { id: 'attention', label: 'Needs attention' }, { id: 'valid', label: 'Valid' }]
@@ -20,6 +23,10 @@ function effective(c: Certificate): { status: string; days: number | null } {
 export default function ComplianceTab() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
+  const [form, setForm] = useState<Certificate | 'new' | null>(null)
+  const [revoking, setRevoking] = useState<Certificate | null>(null)
+  const canManage = usePermissions(['FACILITIES_MANAGE', 'FACILITIES_ADMIN', 'FACILITIES_COMPLIANCE_MANAGE'])
+  const canRevoke = usePermissions(['FACILITIES_ADMIN', 'FACILITIES_COMPLIANCE_REVOKE'])
   const q = useQuery({ queryKey: ['facilities', 'certificates'], queryFn: facilitiesApi.certificates })
   const sites = useQuery({ queryKey: ['facilities', 'sites'], queryFn: facilitiesApi.sites, staleTime: 5 * 60_000 })
   const siteName = useMemo(() => new Map((sites.data ?? []).map(s => [s.id, s.name])), [sites.data])
@@ -43,6 +50,14 @@ export default function ComplianceTab() {
       return e.days < 0 ? <Chip tone="bad">Expired {-e.days} d ago</Chip> : e.days <= 30 ? <Chip tone="warn">{e.days} d left</Chip> : <span>{e.days} d</span>
     } },
     { key: 'st', header: 'Status', render: c => <StatusChip status={effective(c).status} /> },
+    ...(canManage || canRevoke ? [{
+      key: 'do', header: '', align: 'right' as const, render: (c: Certificate) => c.status === 'REVOKED' ? <span style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>{c.revokedReason}</span> : (
+        <span style={{ display: 'inline-flex', gap: 6 }}>
+          {canManage && <Btn onClick={() => setForm(c)}><RefreshCw size={13} />Renew</Btn>}
+          {canRevoke && <Btn onClick={() => setRevoking(c)}>Revoke</Btn>}
+        </span>
+      ),
+    }] : []),
   ]
   return (
     <div>
@@ -54,9 +69,14 @@ export default function ComplianceTab() {
                 background: filter === f.id ? 'var(--hf-accent-soft)' : 'var(--hf-surface)', color: filter === f.id ? 'var(--hf-accent-text-strong)' : 'var(--hf-text-secondary)' }}>{f.label}</button>
           ))}
         </div>
+        {canManage && <Btn kind="primary" onClick={() => setForm('new')}><Plus size={15} />New certificate</Btn>}
       </Toolbar>
       <DataTable rows={rows} columns={cols} rowKey={c => c.id} loading={q.isLoading} error={q.error} empty="No certificates match."
         rowTone={c => (effective(c).status === 'EXPIRED' ? 'bad' : undefined)} />
+      {form && <CertificateFormDialog renewing={form === 'new' ? undefined : form} onClose={() => setForm(null)} />}
+      {revoking && <ReasonDialog title={`Revoke ${titleCase(revoking.certificateType)}`} confirm="Revoke" onClose={() => setRevoking(null)}
+        intro="A revoked certificate no longer counts as valid. This is recorded in the audit log and cannot be undone."
+        onConfirm={reason => facilitiesApi.revokeCertificate(revoking.id, reason)} />}
     </div>
   )
 }

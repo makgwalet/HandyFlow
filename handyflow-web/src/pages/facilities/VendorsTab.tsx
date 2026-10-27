@@ -4,18 +4,20 @@
 // be given work or ordered from; approval needs someone other than the person who added it (the server enforces both).
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Pencil, Plus } from 'lucide-react'
+import { Check, FileCheck, Pencil, Plus } from 'lucide-react'
 import { facilitiesApi, type Vendor } from '../../api/facilities.api'
 import { usePermissions } from '../../hooks/usePermission'
 import { errorMessage, toast } from '../../store/toast.store'
 import { Btn, DataTable, Dialog, Field, StatusChip, Toolbar, type Column } from './ui'
 import { VendorFormDialog } from './forms'
+import VendorDocumentsDialog from './VendorDocumentsDialog'
 import { inputStyle } from './format'
 
 export default function VendorsTab() {
   const [search, setSearch] = useState('')
   const [form, setForm] = useState<Vendor | 'new' | null>(null)
   const [suspending, setSuspending] = useState<Vendor | null>(null)
+  const [docs, setDocs] = useState<Vendor | null>(null)
   const qc = useQueryClient()
   const canManage = usePermissions(['FACILITIES_MANAGE', 'FACILITIES_ADMIN'])
   const q = useQuery({ queryKey: ['facilities', 'vendors'], queryFn: facilitiesApi.vendors })
@@ -31,6 +33,7 @@ export default function VendorsTab() {
     { key: 'contact', header: 'Contact', render: v => <div>{v.contactName ?? '—'}<div style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>{[v.contactPhone, v.contactEmail].filter(Boolean).join(' · ')}</div></div> },
     { key: 'ob', header: 'Onboarding', render: v => <StatusChip status={v.onboardingStatus} /> },
     { key: 'act', header: 'Active', render: v => (v.active ? 'Yes' : 'No') },
+    { key: 'docs', header: 'Compliance', render: (v: Vendor) => <Btn onClick={() => setDocs(v)}><FileCheck size={13} />Documents</Btn> },
     ...(canManage ? [{
       key: 'do', header: '', align: 'right' as const, render: (v: Vendor) => (
         <span style={{ display: 'inline-flex', gap: 6 }}>
@@ -48,6 +51,7 @@ export default function VendorsTab() {
       </Toolbar>
       <DataTable rows={rows} columns={cols} rowKey={v => v.id} loading={q.isLoading} error={q.error} empty="No vendors yet." />
       {form && <VendorFormDialog vendor={form === 'new' ? undefined : form} onClose={() => setForm(null)} />}
+      {docs && <VendorDocumentsDialog vendor={docs} onClose={() => setDocs(null)} />}
       {suspending && <SuspendDialog vendor={suspending} onClose={() => setSuspending(null)} />}
     </div>
   )

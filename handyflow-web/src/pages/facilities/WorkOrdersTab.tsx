@@ -6,13 +6,14 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, ShieldAlert, RotateCcw } from 'lucide-react'
+import { FileDown, Plus, ShieldAlert, RotateCcw } from 'lucide-react'
 import { facilitiesApi, type WorkOrder, type CreateWorkOrderBody } from '../../api/facilities.api'
 import { usePermissions } from '../../hooks/usePermission'
 import { errorMessage, toast } from '../../store/toast.store'
 import Chip from '../../components/ui/Chip'
 import { Btn, DataTable, DefList, Dialog, Field, PriorityChip, StatusChip, Toolbar, type Column } from './ui'
-import { daysUntil, fmtDate, fmtDateTime, fmtMoney, inputStyle, titleCase } from './format'
+import { EvidencePanel } from './Evidence'
+import { daysUntil, fmtDate, fmtDateTime, fmtMoney, inputStyle, saveBlob, titleCase } from './format'
 
 const FILTERS: { id: string; label: string }[] = [
   { id: '', label: 'All' }, { id: 'REQUESTED', label: 'Requested' }, { id: 'OPEN', label: 'Open' }, { id: 'ASSIGNED', label: 'Assigned' },
@@ -26,6 +27,7 @@ const CAN_APPROVE = ['FACILITIES_MANAGE', 'FACILITIES_ADMIN', 'FACILITIES_WORKOR
 const CAN_ASSIGN = ['FACILITIES_MANAGE', 'FACILITIES_ADMIN', 'FACILITIES_WORKORDER_ASSIGN']
 const CAN_EXECUTE = ['FACILITIES_MANAGE', 'FACILITIES_ADMIN', 'FACILITIES_TECHNICIAN']
 const CAN_VERIFY = ['FACILITIES_MANAGE', 'FACILITIES_ADMIN', 'FACILITIES_WORKORDER_VERIFY']
+const CAN_ATTACH = ['FACILITIES_MANAGE', 'FACILITIES_ADMIN', 'FACILITIES_TECHNICIAN', 'FACILITIES_WORKORDER_REQUEST']
 const FINISHED = ['COMPLETED', 'REJECTED', 'CANCELLED']
 
 const isOverdue = (w: WorkOrder) => !FINISHED.includes(w.status) && w.status !== 'PENDING_VERIFICATION' && w.status !== 'REQUESTED'
@@ -140,7 +142,11 @@ type ActionKind = 'approve' | 'reject' | 'assign' | 'start' | 'hold' | 'complete
 function JobCard({ id, siteName, assetName, onClose }: { id: string; siteName: Map<string, string>; assetName: Map<string, string>; onClose: () => void }) {
   const [action, setAction] = useState<ActionKind | null>(null)
   const canApprove = usePermissions(CAN_APPROVE), canAssign = usePermissions(CAN_ASSIGN)
-  const canExecute = usePermissions(CAN_EXECUTE), canVerify = usePermissions(CAN_VERIFY)
+  const canExecute = usePermissions(CAN_EXECUTE), canVerify = usePermissions(CAN_VERIFY), canAttach = usePermissions(CAN_ATTACH)
+  const pdf = useMutation({
+    mutationFn: async () => saveBlob(await facilitiesApi.jobCardPdf(id), `job-card-${wo.data?.workOrderNumber ?? id}.pdf`),
+    onError: e => toast.error(errorMessage(e)),
+  })
   const wo = useQuery({ queryKey: ['facilities', 'work-order', id], queryFn: () => facilitiesApi.workOrder(id) })
   const costs = useQuery({ queryKey: ['facilities', 'work-order', id, 'costs'], queryFn: () => facilitiesApi.costs(id) })
   const w = wo.data
@@ -158,7 +164,7 @@ function JobCard({ id, siteName, assetName, onClose }: { id: string; siteName: M
 
   return (
     <Dialog title={w ? `${w.workOrderNumber}` : 'Work order'} onClose={onClose} side width={520}
-      footer={buttons.length ? buttons.map(b => <Btn key={b.kind} kind={b.primary ? 'primary' : b.danger ? 'danger' : 'secondary'} onClick={() => setAction(b.kind)}>{b.label}</Btn>) : undefined}>
+      footer={buttons.length || w ? <>{w && <Btn busy={pdf.isPending} onClick={() => pdf.mutate()} style={{ marginRight: 'auto' }}><FileDown size={14} />Job card PDF</Btn>}{buttons.map(b => <Btn key={b.kind} kind={b.primary ? 'primary' : b.danger ? 'danger' : 'secondary'} onClick={() => setAction(b.kind)}>{b.label}</Btn>)}</> : undefined}>
       {wo.isError && <div role="alert" style={{ color: 'var(--hf-danger-text)', fontSize: 13 }}>This work order could not be loaded. It may be outside your sites.</div>}
       {!w && !wo.isError && <div aria-busy="true" style={{ color: 'var(--hf-text-muted)', fontSize: 13 }}>Loading…</div>}
       {w && (
@@ -196,6 +202,9 @@ function JobCard({ id, siteName, assetName, onClose }: { id: string; siteName: M
               </tbody>
             </table>
           ) : <div style={{ fontSize: 12.5, color: 'var(--hf-text-muted)' }}>No cost recorded yet. Parts issued from stock appear here.</div>}
+          <EvidencePanel queryKey={['work-order', id]} load={() => facilitiesApi.evidence('work-orders', id)}
+            attach={f => facilitiesApi.attachEvidence('work-orders', id, f)} canAttach={canAttach && !FINISHED.includes(w.status)}
+            note={w.requiresVerification ? 'Photos of the finished work are needed before this job can be completed.' : undefined} />
         </>
       )}
       {w && action && <ActionDialog kind={action} wo={w} onClose={() => setAction(null)} />}

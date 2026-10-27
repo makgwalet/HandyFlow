@@ -11,6 +11,7 @@ import Chip from '../../components/ui/Chip'
 import { usePermissions } from '../../hooks/usePermission'
 import { errorMessage, toast } from '../../store/toast.store'
 import { Btn, DataTable, DefList, Dialog, Field, Notice, StatusChip, Toolbar, type Column } from './ui'
+import { EvidencePanel } from './Evidence'
 import { fmtDateTime, inputStyle } from './format'
 
 const CAN_INSPECT = ['FACILITIES_MANAGE', 'FACILITIES_ADMIN', 'FACILITIES_TECHNICIAN', 'FACILITIES_INSPECT']
@@ -106,6 +107,7 @@ function InspectionPanel({ id, siteName, onClose }: { id: string; siteName: Map<
   const [completing, setCompleting] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [notes, setNotes] = useState('')
+  const [cancelReason, setCancelReason] = useState('')
   const insp = q.data
   const editable = canInspect && insp?.status === 'IN_PROGRESS'
   const refresh = () => { qc.invalidateQueries({ queryKey: ['facilities'] }) }
@@ -129,7 +131,7 @@ function InspectionPanel({ id, siteName, onClose }: { id: string; siteName: Map<
     onError: e => toast.error(errorMessage(e)),
   })
   const cancel = useMutation({
-    mutationFn: () => facilitiesApi.cancelInspection(id),
+    mutationFn: () => facilitiesApi.cancelInspection(id, cancelReason.trim()),
     onSuccess: () => { refresh(); toast.success('Inspection cancelled'); onClose() },
     onError: e => toast.error(errorMessage(e)),
   })
@@ -186,10 +188,14 @@ function InspectionPanel({ id, siteName, onClose }: { id: string; siteName: Map<
               )
             })}
           </ol>
+          <EvidencePanel queryKey={['inspection', id]} load={() => facilitiesApi.evidence('inspections', id)}
+            attach={f => facilitiesApi.attachEvidence('inspections', id, f)} canAttach={canInspect && insp?.status === 'IN_PROGRESS'}
+            note="Photos of what you found, especially for failed checks." />
           {confirmCancel && (
             <Dialog title="Cancel inspection" onClose={() => setConfirmCancel(false)} width={420}
-              footer={<><Btn onClick={() => setConfirmCancel(false)}>Keep going</Btn><Btn kind="danger" busy={cancel.isPending} onClick={() => cancel.mutate()}>Cancel inspection</Btn></>}>
-              <p style={{ margin: 0, fontSize: 14, color: 'var(--hf-text-secondary)' }}>This inspection will be cancelled and its answers will not count. Continue?</p>
+              footer={<><Btn onClick={() => setConfirmCancel(false)}>Keep going</Btn><Btn kind="danger" busy={cancel.isPending} disabled={!cancelReason.trim()} onClick={() => cancel.mutate()}>Cancel inspection</Btn></>}>
+              <p style={{ margin: '0 0 14px', fontSize: 14, color: 'var(--hf-text-secondary)' }}>This inspection will be cancelled and its answers will not count.</p>
+              <Field label="Reason *"><textarea value={cancelReason} onChange={e => setCancelReason(e.target.value)} rows={3} maxLength={500} style={{ ...inputStyle, resize: 'vertical' }} autoFocus /></Field>
             </Dialog>
           )}
           {completing && (

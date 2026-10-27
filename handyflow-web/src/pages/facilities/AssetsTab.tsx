@@ -7,6 +7,7 @@ import { facilitiesApi, type Asset } from '../../api/facilities.api'
 import { usePermissions } from '../../hooks/usePermission'
 import { Btn, DataTable, DefList, Dialog, StatusChip, Toolbar, type Column } from './ui'
 import { AssetFormDialog } from './forms'
+import { EvidencePanel } from './Evidence'
 import { daysUntil, fmtDate, inputStyle, titleCase } from './format'
 
 const CRIT_TONE = { LOW: 'neutral', MEDIUM: 'info', HIGH: 'warn', CRITICAL: 'bad' } as const
@@ -50,6 +51,8 @@ export default function AssetsTab() {
             ['Installed', fmtDate(open.installDate)], ['Warranty until', fmtDate(open.warrantyExpiryDate)], ['Criticality', titleCase(open.criticality)],
             ['Status', <StatusChip key="s" status={open.status} />], ['Notes', open.notes ?? '—'],
           ]} />
+          <EvidencePanel queryKey={['asset', open.id]} load={() => facilitiesApi.evidence('assets', open.id)}
+            attach={f => facilitiesApi.attachEvidence('assets', open.id, f)} canAttach={canManage} />
         </Dialog>
       )}
       {form && <AssetFormDialog asset={form === 'new' ? undefined : form} defaultSiteId={siteId || undefined} onClose={() => setForm(null)} />}

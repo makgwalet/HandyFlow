@@ -207,6 +207,7 @@ export const FACILITIES_SECTIONS: ModuleSections = {
         { id: 'stock', label: 'Stock', icon: Package },
         { id: 'purchase-orders', label: 'Purchase orders', icon: ShoppingCart, anyPermission: FACILITIES_READ_ANY },
         { id: 'vendors', label: 'Vendors', icon: Handshake, anyPermission: FACILITIES_READ_ANY },
+        { id: 'technicians', label: 'Technicians', icon: HardHat, anyPermission: FACILITIES_READ_ANY },
       ],
     },
   ],

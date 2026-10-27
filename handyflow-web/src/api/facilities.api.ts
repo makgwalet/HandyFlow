@@ -110,6 +110,34 @@ export interface PpmSchedule {
   nextDueDate: string | null; lastCompletedDate: string | null; active: boolean; createdAt: string
 }
 
+export interface Evidence { id: Id; fileName: string; contentType: string; fileSizeBytes: number; evidenceType: string; status: string; uploadedByName: string | null; createdAt: string }
+export type EvidenceKind = 'work-orders' | 'assets' | 'inspections'
+
+export interface VendorDocument {
+  id: Id; vendorId: Id; docType: string; reference: string | null; issuedBy: string | null; issueDate: string | null
+  expiryDate: string | null; coverAmount: number | null; documentRef: string | null; status: string; inForce: boolean
+  revokedReason: string | null; createdAt: string
+}
+export interface VendorCompliance {
+  vendorId: Id; onboardingStatus: string; complianceStatus: string; eligible: boolean; problems: string[]; missing: string[]
+  lapsed: string[]; expiring: { docType: string; expiryDate: string; daysLeft: number }[]; documents: VendorDocument[]
+}
+export interface VendorDocumentBody {
+  docType: string; reference?: string; issuedBy?: string; issueDate?: string | null; expiryDate?: string | null
+  coverAmount?: number | null; documentRef?: string
+}
+export interface CertificateBody {
+  siteId: Id; assetId?: Id | null; certificateType: string; certificateNumber?: string; issuedBy?: string
+  issueDate: string; expiryDate: string; documentRef?: string
+}
+export interface TechnicianBody { name: string; contactPhone?: string; contactEmail?: string; specialization?: string; linkedUserId?: Id | null }
+export interface TechnicianLicence {
+  id: Id; technicianId: Id; technicianName: string | null; licenceType: string; reference: string | null; issuedBy: string | null
+  issueDate: string | null; expiryDate: string | null; daysToExpiry: number | null; status: string; inForce: boolean
+  revokedReason: string | null; createdAt: string
+}
+export interface LicenceBody { licenceType: string; reference?: string; issuedBy?: string; issueDate?: string | null; expiryDate?: string | null }
+
 // ── request bodies ──────────────────────────────────────────────────────────────────────────
 export interface CreateWorkOrderBody {
   siteId: Id; assetId?: Id | null; category: string; priority?: string; description: string
@@ -171,6 +199,38 @@ export const facilitiesApi = {
   approveVendor: async (id: Id) => data<Vendor>(await apiClient.post(`${B}/vendors/${id}/approve`)),
   technicians: async () => page<Technician>(await apiClient.get(`${B}/technicians`, { params: { size: 200 } })),
 
+
+  issueCertificate: async (b: CertificateBody) => data<Certificate>(await apiClient.post(`${B}/compliance`, b)),
+  revokeCertificate: async (id: Id, reason: string) => data<Certificate>(await apiClient.post(`${B}/compliance/${id}/revoke`, { reason })),
+
+  vendorCompliance: async (id: Id) => data<VendorCompliance>(await apiClient.get(`${B}/vendors/${id}/compliance`)),
+  addVendorDocument: async (id: Id, b: VendorDocumentBody) => data<VendorDocument>(await apiClient.post(`${B}/vendors/${id}/documents`, b)),
+  revokeVendorDocument: async (id: Id, documentId: Id, reason: string) =>
+    data<VendorDocument>(await apiClient.post(`${B}/vendors/${id}/documents/${documentId}/revoke`, { reason })),
+
+  createTechnician: async (b: TechnicianBody) => data<Technician>(await apiClient.post(`${B}/technicians`, b)),
+  updateTechnician: async (id: Id, b: TechnicianBody) => data<Technician>(await apiClient.put(`${B}/technicians/${id}`, b)),
+  technicianActive: async (id: Id, action: 'deactivate' | 'reactivate') => data<Technician>(await apiClient.post(`${B}/technicians/${id}/${action}`)),
+  licences: async (technicianId: Id) => data<TechnicianLicence[]>(await apiClient.get(`${B}/technicians/${technicianId}/licences`)),
+  addLicence: async (technicianId: Id, b: LicenceBody) => data<TechnicianLicence>(await apiClient.post(`${B}/technicians/${technicianId}/licences`, b)),
+  revokeLicence: async (technicianId: Id, licenceId: Id, reason: string) =>
+    data<TechnicianLicence>(await apiClient.post(`${B}/technicians/${technicianId}/licences/${licenceId}/revoke`, { reason })),
+  licencesNeedingAttention: async (withinDays = 60) => data<TechnicianLicence[]>(await apiClient.get(`${B}/technician-licences/attention`, { params: { withinDays } })),
+
+  evidence: async (kind: EvidenceKind, id: Id) => data<Evidence[]>(await apiClient.get(`${B}/${kind}/${id}/evidence`)),
+  attachEvidence: async (kind: EvidenceKind, id: Id, file: File, evidenceType = 'PHOTO') => {
+    const form = new FormData(); form.append('file', file); form.append('evidenceType', evidenceType)
+    return data<Evidence>(await apiClient.post(`${B}/${kind}/${id}/evidence`, form))
+  },
+  licenceEvidence: async (technicianId: Id, licenceId: Id) => data<Evidence[]>(await apiClient.get(`${B}/technicians/${technicianId}/licences/${licenceId}/evidence`)),
+  attachLicenceEvidence: async (technicianId: Id, licenceId: Id, file: File) => {
+    const form = new FormData(); form.append('file', file); form.append('evidenceType', 'DOCUMENT')
+    return data<Evidence>(await apiClient.post(`${B}/technicians/${technicianId}/licences/${licenceId}/evidence`, form))
+  },
+  /** Files come back as bytes, so they are fetched with the signed-in client and saved from a blob URL. */
+  downloadEvidence: async (evidenceId: Id) => (await apiClient.get(`/api/v1/evidence/${evidenceId}/download`, { responseType: 'blob' })).data as Blob,
+  jobCardPdf: async (workOrderId: Id) => (await apiClient.get(`${B}/work-orders/${workOrderId}/job-card.pdf`, { responseType: 'blob' })).data as Blob,
+
   inspectionTemplates: async (includeInactive = false) =>
     page<InspectionTemplate>(await apiClient.get(`${B}/inspection-templates`, { params: { includeInactive } })),
   saveInspectionTemplate: async (id: Id | null, b: { name: string; description?: string; assetCategory?: string; items: { prompt: string; critical: boolean }[] }) =>
@@ -183,7 +243,7 @@ export const facilitiesApi = {
   answerInspection: async (id: Id, answers: { itemId: Id; outcome: string; comment?: string }[]) =>
     data<Inspection>(await apiClient.post(`${B}/inspections/${id}/answers`, { answers })),
   completeInspection: async (id: Id, notes?: string) => data<Inspection>(await apiClient.post(`${B}/inspections/${id}/complete`, { notes })),
-  cancelInspection: async (id: Id) => data<Inspection>(await apiClient.post(`${B}/inspections/${id}/cancel`)),
+  cancelInspection: async (id: Id, reason: string) => data<Inspection>(await apiClient.post(`${B}/inspections/${id}/cancel`, { reason })),
 
   correctiveActions: async (status?: string) =>
     page<CorrectiveAction>(await apiClient.get(`${B}/corrective-actions`, { params: { status: status || undefined, size: 100, sort: 'dueDate,asc' } })),

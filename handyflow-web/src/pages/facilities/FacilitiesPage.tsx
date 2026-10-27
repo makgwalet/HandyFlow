@@ -13,6 +13,7 @@ import ComplianceTab from './ComplianceTab'
 import StockTab from './StockTab'
 import PurchaseOrdersTab from './PurchaseOrdersTab'
 import VendorsTab from './VendorsTab'
+import TechniciansTab from './TechniciansTab'
 import InspectionsTab from './InspectionsTab'
 import CorrectiveActionsTab from './CorrectiveActionsTab'
 import PlannedMaintenanceTab from './PlannedMaintenanceTab'
@@ -33,6 +34,7 @@ export function FacilitiesPage() {
         case 'stock':           return <StockTab />
         case 'purchase-orders': return <PurchaseOrdersTab />
         case 'vendors':        return <VendorsTab />
+        case 'technicians':    return <TechniciansTab />
         default:                return null
       }
     }} />
