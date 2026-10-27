@@ -86,7 +86,7 @@ class FacilityWorkOrderServiceTest {
         @Override public void applyCompletion(TenantId t, UUID scheduleId, LocalDate d) { advanced.add(scheduleId); }
     };
     private final FacilityAlerts alerts = new FacilityAlerts(
-            new NotificationService() {
+            new NotificationService(null, null) {
                 @Override public void send(za.co.handyflow.platform.notifications.application.NotificationRequest r) {
                     if (alertsDown) throw new IllegalStateException("mail server down");
                     alertTypes.add(r.type());
