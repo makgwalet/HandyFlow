@@ -18,7 +18,7 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class FacilityStockMovement {
 
-    public static final Set<String> TYPES = Set.of("RECEIPT", "ISSUE", "RETURN", "ADJUSTMENT");
+    public static final Set<String> TYPES = Set.of("RECEIPT", "ISSUE", "RETURN", "ADJUSTMENT", "TRANSFER_OUT", "TRANSFER_IN");
 
     @Id
     private UUID id = UUID.randomUUID();
@@ -51,6 +51,9 @@ public class FacilityStockMovement {
     @Column(name = "purchase_order_id")
     private UUID purchaseOrderId;
 
+    @Column(name = "store_id")
+    private UUID storeId;
+
     @Column(length = 300)
     private String reference;
 
@@ -63,10 +66,18 @@ public class FacilityStockMovement {
     public static FacilityStockMovement of(TenantId tenantId, UUID itemId, String type, BigDecimal signedQuantity,
                                            BigDecimal unitCost, BigDecimal balanceAfter, UUID workOrderId,
                                            UUID costLineId, UUID purchaseOrderId, String reference, UUID by) {
+        return of(tenantId, itemId, null, type, signedQuantity, unitCost, balanceAfter, workOrderId, costLineId, purchaseOrderId, reference, by);
+    }
+
+    /** {@code balanceAfter} is the item's total on hand across all stores after this line. */
+    public static FacilityStockMovement of(TenantId tenantId, UUID itemId, UUID storeId, String type, BigDecimal signedQuantity,
+                                           BigDecimal unitCost, BigDecimal balanceAfter, UUID workOrderId,
+                                           UUID costLineId, UUID purchaseOrderId, String reference, UUID by) {
         if (!TYPES.contains(type)) throw new IllegalArgumentException("movement type must be one of " + TYPES);
         FacilityStockMovement m = new FacilityStockMovement();
         m.tenantId = tenantId;
         m.itemId = itemId;
+        m.storeId = storeId;
         m.movementType = type;
         m.quantity = signedQuantity;
         m.unitCost = unitCost;

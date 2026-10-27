@@ -59,6 +59,22 @@ class FacilityInventoryServicesTest {
         if ("save".equals(n)) { movements.add((FacilityStockMovement) a[0]); return a[0]; }
         return NOPE;
     });
+    private final Map<UUID, FacilityStore> stores = new LinkedHashMap<>();
+    private final List<FacilityStockLevel> levelList = new ArrayList<>();
+    private final FacilityStoreRepository storeRepo = fake(FacilityStoreRepository.class, (n, a) -> switch (n) {
+        case "save" -> { FacilityStore st = (FacilityStore) a[0]; stores.put(st.getId(), st); yield st; }
+        case "findDefault" -> stores.values().stream().filter(FacilityStore::isDefaultStore).findFirst();
+        case "findByIdForTenant" -> Optional.ofNullable(stores.get(a[1]));
+        case "findAllForTenant" -> new ArrayList<>(stores.values());
+        default -> NOPE;
+    });
+    private final FacilityStockLevelRepository levelRepo = fake(FacilityStockLevelRepository.class, (n, a) -> switch (n) {
+        case "save" -> { FacilityStockLevel l = (FacilityStockLevel) a[0]; if (!levelList.contains(l)) levelList.add(l); yield l; }
+        case "findForStoreItem" -> levelList.stream().filter(l -> l.getStoreId().equals(a[1]) && l.getItemId().equals(a[2])).findFirst();
+        case "findForItem" -> levelList.stream().filter(l -> l.getItemId().equals(a[1])).toList();
+        case "findAllPositive" -> levelList.stream().filter(l -> l.getOnHand().signum() > 0).toList();
+        default -> NOPE;
+    });
     private final FacilityPurchaseOrderRepository orderRepo = fake(FacilityPurchaseOrderRepository.class, (n, a) -> switch (n) {
         case "save" -> { FacilityPurchaseOrder o = (FacilityPurchaseOrder) a[0]; orders.put(o.getId(), o); yield o; }
         case "findForTenant", "findForUpdate" -> Optional.ofNullable(orders.get(a[1]));
@@ -105,7 +121,7 @@ class FacilityInventoryServicesTest {
         @Override public String nextGoodsReceiptNumber(TenantId t) { return "FGR-" + (++grnSeq); }
     };
 
-    private final FacilityStockService stock = new FacilityStockService(itemRepo, movementRepo, orderRepo, costService, auditService, alerts);
+    private final FacilityStockService stock = new FacilityStockService(itemRepo, movementRepo, orderRepo, costService, auditService, alerts, storeRepo, levelRepo);
     private final FacilityPurchaseOrderService po = new FacilityPurchaseOrderService(orderRepo, itemRepo, vendorRepo, eligibility, stock,
             numbers, policy, auditService, receiptRepo, limitRepo);
 
@@ -499,5 +515,107 @@ class FacilityInventoryServicesTest {
         authorities.add("FACILITIES_ADMIN");
         TenantContext.setUserId(approver.toString());
         assertEquals("APPROVED", po.approve(tenant, d.id()).status());
+    }
+
+    // ── multiple stores ─────────────────────────────────────────────────────────────────────
+
+    private FacilityStore newStore(String code) {
+        FacilityStore st = FacilityStore.create(tenant, code, "Store " + code, null, false);
+        stores.put(st.getId(), st);
+        return st;
+    }
+
+    private BigDecimal levelOf(FacilityStore st, UUID item) {
+        return levelList.stream().filter(l -> l.getStoreId().equals(st.getId()) && l.getItemId().equals(item)).map(FacilityStockLevel::getOnHand)
+                .findFirst().orElse(BigDecimal.ZERO);
+    }
+
+    @Test
+    void theDefaultStoreIsCreatedOnFirstUseAndHoldsTheOpeningStock() {
+        UUID id = newItem("S-1", "1", "0", "10", "5.00");
+        assertEquals(1, stores.size());
+        FacilityStore main = stores.values().iterator().next();
+        assertTrue(main.isDefaultStore());
+        assertEquals("MAIN", main.getCode());
+        assertEquals(0, n("10").compareTo(levelOf(main, id)));
+    }
+
+    @Test
+    void receivingIntoANamedStoreLeavesTheDefaultAlone() {
+        UUID id = newItem("S-2", "1", "0", "10", "5.00");
+        FacilityStore van = newStore("VAN1");
+        stock.receive(tenant, id, new ReceiveStockRequest(n("4"), n("5.00"), null), van.getId());
+        assertEquals(0, n("4").compareTo(levelOf(van, id)));
+        assertEquals(0, n("14").compareTo(stock.get(tenant, id).onHand()));
+        assertEquals(van.getId(), movements.get(movements.size() - 1).getStoreId());
+    }
+
+    @Test
+    void issuingIsLimitedToTheChosenStoresLevel() {
+        UUID id = newItem("S-3", "1", "0", "10", "5.00");
+        FacilityStore van = newStore("VAN2");
+        stock.receive(tenant, id, new ReceiveStockRequest(n("2"), n("5.00"), null), van.getId());
+        HandyFlowException e = assertThrows(HandyFlowException.class,
+                () -> stock.issue(tenant, id, new IssueStockRequest(UUID.randomUUID(), n("3"), null), van.getId()));
+        assertEquals("INSUFFICIENT_STOCK", e.getErrorCode());
+        assertTrue(e.getMessage().contains("Store VAN2"));
+        // The item total (12) would have covered it; the store (2) does not.
+        assertEquals(0, n("12").compareTo(stock.get(tenant, id).onHand()));
+    }
+
+    @Test
+    void aTransferMovesStockButNotTheTotalAndWritesTwoMovements() {
+        UUID id = newItem("S-4", "1", "0", "10", "5.00");
+        FacilityStore van = newStore("VAN3");
+        FacilityStore main = stores.values().stream().filter(FacilityStore::isDefaultStore).findFirst().orElseThrow();
+        int before = movements.size();
+        stock.transfer(tenant, id, new TransferStockRequest(main.getId(), van.getId(), n("4"), "for call-outs"));
+        assertEquals(0, n("6").compareTo(levelOf(main, id)));
+        assertEquals(0, n("4").compareTo(levelOf(van, id)));
+        assertEquals(0, n("10").compareTo(stock.get(tenant, id).onHand()));
+        assertEquals(2, movements.size() - before);
+        assertEquals("TRANSFER_OUT", movements.get(before).getMovementType());
+        assertEquals("TRANSFER_IN", movements.get(before + 1).getMovementType());
+        assertTrue(audit.contains("STOCK_TRANSFERRED"));
+    }
+
+    @Test
+    void aTransferRefusesTheSameStoreAndMoreThanTheSourceHolds() {
+        UUID id = newItem("S-5", "1", "0", "10", "5.00");
+        FacilityStore van = newStore("VAN4");
+        FacilityStore main = stores.values().stream().filter(FacilityStore::isDefaultStore).findFirst().orElseThrow();
+        assertThrows(IllegalArgumentException.class,
+                () -> stock.transfer(tenant, id, new TransferStockRequest(main.getId(), main.getId(), n("1"), null)));
+        assertEquals("INSUFFICIENT_STOCK", assertThrows(HandyFlowException.class,
+                () -> stock.transfer(tenant, id, new TransferStockRequest(van.getId(), main.getId(), n("1"), null))).getErrorCode());
+    }
+
+    @Test
+    void aStocktakeCountsOneStoreAndMovesTheTotalByTheDifference() {
+        UUID id = newItem("S-6", "1", "0", "10", "5.00");
+        FacilityStore van = newStore("VAN5");
+        stock.receive(tenant, id, new ReceiveStockRequest(n("5"), n("5.00"), null), van.getId());
+        stock.adjust(tenant, id, new AdjustStockRequest(n("3"), "two missing"), van.getId());
+        assertEquals(0, n("3").compareTo(levelOf(van, id)));
+        assertEquals(0, n("13").compareTo(stock.get(tenant, id).onHand()));
+    }
+
+    @Test
+    void anInactiveOrUnknownStoreIsRefused() {
+        UUID id = newItem("S-7", "1", "0", "10", "5.00");
+        FacilityStore van = newStore("VAN6");
+        van.deactivate();
+        assertEquals("STORE_INACTIVE", assertThrows(HandyFlowException.class,
+                () -> stock.receive(tenant, id, new ReceiveStockRequest(n("1"), n("5.00"), null), van.getId())).getErrorCode());
+        assertThrows(ResourceNotFoundException.class,
+                () -> stock.receive(tenant, id, new ReceiveStockRequest(n("1"), n("5.00"), null), UUID.randomUUID()));
+    }
+
+    @Test
+    void levelsListsEachStoreThatHoldsTheItem() {
+        UUID id = newItem("S-8", "1", "0", "10", "5.00");
+        FacilityStore van = newStore("VAN7");
+        stock.receive(tenant, id, new ReceiveStockRequest(n("2"), n("5.00"), null), van.getId());
+        assertEquals(2, stock.levels(tenant, id).size());
     }
 }

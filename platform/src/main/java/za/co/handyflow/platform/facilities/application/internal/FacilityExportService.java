@@ -38,6 +38,7 @@ public class FacilityExportService {
     private final FacilityAssetRepository assetRepository;
     private final FacilityAccessPolicy accessPolicy;
     private final FacilityAuditService auditService;
+    private final FacilityStockValuationService valuationService;
 
     @Transactional
     public Export workOrders(TenantId tenantId, LocalDate from, LocalDate to) {
@@ -123,6 +124,20 @@ public class FacilityExportService {
         }
         return done(tenantId, "corrective-actions", null, null, FacilityCsv.build(List.of("Site", "Source", "Description", "Priority",
                 "Critical", "Status", "Due", "Overdue", "Closure note", "Closed", "Raised"), rows), rows.size());
+    }
+
+    @Transactional
+    public Export stockValuation(TenantId tenantId, UUID storeId) {
+        requireManagementScope(tenantId);
+        var v = valuationService.valuation(tenantId, storeId);
+        requireWithinLimit(v.lines().size());
+        List<List<?>> rows = new ArrayList<>();
+        for (var l : v.lines()) {
+            rows.add(Arrays.asList(l.storeCode(), l.sku(), l.name(), l.unit(), l.onHand(), l.unitCost(), l.value(), l.itemActive()));
+        }
+        rows.add(Arrays.asList("TOTAL", null, null, null, null, null, v.totalValue(), null));
+        return done(tenantId, "stock-valuation", null, null, FacilityCsv.build(List.of("Store", "SKU", "Item", "Unit", "On hand",
+                "Average cost", "Value", "Item active"), rows), v.lines().size());
     }
 
     @Transactional

@@ -93,29 +93,47 @@ public class FacilityStockController {
 
     @PostMapping("/{id}/receive")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<StockItemResponse>> receive(@PathVariable UUID id, @Valid @RequestBody ReceiveStockRequest request) {
+    public ResponseEntity<ApiResponse<StockItemResponse>> receive(@PathVariable UUID id, @Valid @RequestBody ReceiveStockRequest request,
+                                                                  @RequestParam(required = false) UUID storeId) {
         featureGuard.requireModule("facilities");
-        return ResponseEntity.ok(ApiResponse.success("Stock received", stockService.receive(TenantContext.getTenantIdAsObject(), id, request)));
+        return ResponseEntity.ok(ApiResponse.success("Stock received", stockService.receive(TenantContext.getTenantIdAsObject(), id, request, storeId)));
     }
 
     @PostMapping("/{id}/issue")
     @PreAuthorize(CAN_ISSUE)
-    public ResponseEntity<ApiResponse<StockItemResponse>> issue(@PathVariable UUID id, @Valid @RequestBody IssueStockRequest request) {
+    public ResponseEntity<ApiResponse<StockItemResponse>> issue(@PathVariable UUID id, @Valid @RequestBody IssueStockRequest request,
+                                                                @RequestParam(required = false) UUID storeId) {
         featureGuard.requireModule("facilities");
-        return ResponseEntity.ok(ApiResponse.success("Stock issued to work order", stockService.issue(TenantContext.getTenantIdAsObject(), id, request)));
+        return ResponseEntity.ok(ApiResponse.success("Stock issued to work order", stockService.issue(TenantContext.getTenantIdAsObject(), id, request, storeId)));
     }
 
     @PostMapping("/{id}/return")
     @PreAuthorize(CAN_ISSUE)
-    public ResponseEntity<ApiResponse<StockItemResponse>> returnStock(@PathVariable UUID id, @Valid @RequestBody ReturnStockRequest request) {
+    public ResponseEntity<ApiResponse<StockItemResponse>> returnStock(@PathVariable UUID id, @Valid @RequestBody ReturnStockRequest request,
+                                                                      @RequestParam(required = false) UUID storeId) {
         featureGuard.requireModule("facilities");
-        return ResponseEntity.ok(ApiResponse.success("Stock returned", stockService.returnStock(TenantContext.getTenantIdAsObject(), id, request)));
+        return ResponseEntity.ok(ApiResponse.success("Stock returned", stockService.returnStock(TenantContext.getTenantIdAsObject(), id, request, storeId)));
     }
 
     @PostMapping("/{id}/adjust")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<StockItemResponse>> adjust(@PathVariable UUID id, @Valid @RequestBody AdjustStockRequest request) {
+    public ResponseEntity<ApiResponse<StockItemResponse>> adjust(@PathVariable UUID id, @Valid @RequestBody AdjustStockRequest request,
+                                                                 @RequestParam(required = false) UUID storeId) {
         featureGuard.requireModule("facilities");
-        return ResponseEntity.ok(ApiResponse.success("Stock adjusted", stockService.adjust(TenantContext.getTenantIdAsObject(), id, request)));
+        return ResponseEntity.ok(ApiResponse.success("Stock adjusted", stockService.adjust(TenantContext.getTenantIdAsObject(), id, request, storeId)));
+    }
+
+    @GetMapping("/{id}/levels")
+    @PreAuthorize(CAN_VIEW)
+    public ResponseEntity<ApiResponse<List<StockLevelResponse>>> levels(@PathVariable UUID id) {
+        featureGuard.requireModule("facilities");
+        return ResponseEntity.ok(ApiResponse.success(stockService.levels(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/{id}/transfer")
+    @PreAuthorize(CAN_MANAGE)
+    public ResponseEntity<ApiResponse<StockItemResponse>> transfer(@PathVariable UUID id, @Valid @RequestBody TransferStockRequest request) {
+        featureGuard.requireModule("facilities");
+        return ResponseEntity.ok(ApiResponse.success("Stock transferred", stockService.transfer(TenantContext.getTenantIdAsObject(), id, request)));
     }
 }

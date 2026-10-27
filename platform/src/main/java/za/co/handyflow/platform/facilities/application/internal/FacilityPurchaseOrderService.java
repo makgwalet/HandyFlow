@@ -118,6 +118,12 @@ public class FacilityPurchaseOrderService {
 
     @Transactional
     public PurchaseOrderResponse receive(TenantId tenantId, UUID id, ReceiveOrderRequest req) {
+        return receive(tenantId, id, req, null);
+    }
+
+    /** Book a delivery into {@code storeId} (the default store when null). */
+    @Transactional
+    public PurchaseOrderResponse receive(TenantId tenantId, UUID id, ReceiveOrderRequest req, UUID storeId) {
         FacilityPurchaseOrder po = lock(tenantId, id);
         if (!po.isOpen())
             throw new HandyFlowException("Goods can only be received against an approved order — status is " + po.getStatus(),
@@ -136,6 +142,7 @@ public class FacilityPurchaseOrderService {
                         HttpStatus.CONFLICT, "OVER_RECEIPT");
         }
 
+        UUID receivingStore = stockService.resolveStore(tenantId, storeId).getId();
         // Item rows are locked in a fixed order so two deliveries touching the same items cannot deadlock.
         List<ReceiveOrderRequest.Line> ordered = new ArrayList<>(req.lines());
         ordered.sort(Comparator.comparing(l -> byId.get(l.lineId()).getItemId()));
@@ -145,14 +152,14 @@ public class FacilityPurchaseOrderService {
         for (ReceiveOrderRequest.Line l : ordered) {
             FacilityPurchaseOrderLine line = byId.get(l.lineId());
             BigDecimal cost = l.unitCost() != null ? l.unitCost() : line.getUnitCost();
-            stockService.receiveAgainstOrder(tenantId, line.getItemId(), l.quantity(), cost, po.getId(), reference);
+            stockService.receiveAgainstOrder(tenantId, line.getItemId(), l.quantity(), cost, po.getId(), reference, receivingStore);
             po.receiveLine(line.getId(), l.quantity());
             receiptLines.add(new FacilityGoodsReceipt.LineSpec(line.getId(), line.getItemId(), line.getDescription(), l.quantity(), cost));
             summary.append(' ').append(line.getDescription()).append(" +").append(l.quantity().stripTrailingZeros().toPlainString());
         }
         orderRepository.save(po);
         FacilityGoodsReceipt receipt = FacilityGoodsReceipt.create(tenantId, numberGenerator.nextGoodsReceiptNumber(tenantId), po.getId(),
-                po.getVendorId(), req.reference(), FacilityTime.today(), TenantContext.getCurrentUserId(), receiptLines);
+                po.getVendorId(), receivingStore, req.reference(), FacilityTime.today(), TenantContext.getCurrentUserId(), receiptLines);
         receiptRepository.save(receipt);
         auditService.record(tenantId, "PO_RECEIVED", "PURCHASE_ORDER", id,
                 po.getPoNumber() + " " + receipt.getGrnNumber() + " -> " + po.getStatus() + ":" + summary);
@@ -192,7 +199,7 @@ public class FacilityPurchaseOrderService {
     }
 
     static GoodsReceiptResponse toResponse(FacilityGoodsReceipt r) {
-        return new GoodsReceiptResponse(r.getId(), r.getGrnNumber(), r.getPurchaseOrderId(), r.getVendorId(), r.getDeliveryNote(),
+        return new GoodsReceiptResponse(r.getId(), r.getGrnNumber(), r.getPurchaseOrderId(), r.getVendorId(), r.getStoreId(), r.getDeliveryNote(),
                 r.getReceivedOn(), r.getTotalValue(), r.getReceivedByUserId(), r.getCreatedAt(),
                 r.getLines().stream().map(l -> new GoodsReceiptResponse.Line(l.getPoLineId(), l.getItemId(), l.getDescription(),
                         l.getQuantity(), l.getUnitCost(), l.lineValue())).toList());

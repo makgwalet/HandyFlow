@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.facilities.application.internal.FacilityExportService;
 import za.co.handyflow.platform.facilities.application.internal.FacilityReportService;
+import za.co.handyflow.platform.facilities.application.internal.FacilityStockValuationService;
+import za.co.handyflow.platform.facilities.dto.StockValuationResponse;
 import za.co.handyflow.platform.facilities.dto.FacilityAssetReliabilityResponse;
 import za.co.handyflow.platform.facilities.dto.FacilityDashboardResponse;
 import za.co.handyflow.platform.facilities.dto.FacilityTrendResponse;
@@ -19,6 +21,7 @@ import za.co.handyflow.platform.shared.TenantContext;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.UUID;
 
 /**
  * Management reporting for the in-house facilities function. The dashboard is open to anyone who can see work orders
@@ -38,6 +41,7 @@ public class FacilityReportController {
 
     private final FacilityReportService reportService;
     private final FacilityExportService exportService;
+    private final FacilityStockValuationService valuationService;
     private final FeatureGuard featureGuard;
 
     @GetMapping("/dashboard")
@@ -83,6 +87,14 @@ public class FacilityReportController {
                 reportService.trends(TenantContext.getTenantIdAsObject(), from, to, bucket)));
     }
 
+    @GetMapping("/stock-valuation")
+    @PreAuthorize(CAN_VIEW_REPORTS)
+    @Operation(summary = "Stock on hand valued at average cost, per store and in total (as at now). Optionally one store")
+    public ResponseEntity<ApiResponse<StockValuationResponse>> stockValuation(@RequestParam(required = false) UUID storeId) {
+        featureGuard.requireModule("facilities");
+        return ResponseEntity.ok(ApiResponse.success(valuationService.valuation(TenantContext.getTenantIdAsObject(), storeId)));
+    }
+
     // ── CSV exports ──────────────────────────────────────────────────────────
 
     @GetMapping(value = "/export/work-orders.csv", produces = "text/csv")
@@ -126,6 +138,13 @@ public class FacilityReportController {
     public ResponseEntity<byte[]> exportCorrectiveActions(@RequestParam(required = false) String status) {
         featureGuard.requireModule("facilities");
         return csv(exportService.correctiveActions(TenantContext.getTenantIdAsObject(), status));
+    }
+
+    @GetMapping(value = "/export/stock-valuation.csv", produces = "text/csv")
+    @PreAuthorize(CAN_VIEW_REPORTS)
+    public ResponseEntity<byte[]> exportStockValuation(@RequestParam(required = false) UUID storeId) {
+        featureGuard.requireModule("facilities");
+        return csv(exportService.stockValuation(TenantContext.getTenantIdAsObject(), storeId));
     }
 
     @GetMapping(value = "/export/technician-licences.csv", produces = "text/csv")

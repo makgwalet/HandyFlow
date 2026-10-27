@@ -37,6 +37,9 @@ public class FacilityGoodsReceipt {
     @Column(name = "vendor_id", nullable = false)
     private UUID vendorId;
 
+    @Column(name = "store_id")
+    private UUID storeId;
+
     @Column(name = "delivery_note", length = 300)
     private String deliveryNote;
 
@@ -60,12 +63,18 @@ public class FacilityGoodsReceipt {
 
     public static FacilityGoodsReceipt create(TenantId tenantId, String grnNumber, UUID purchaseOrderId, UUID vendorId,
                                               String deliveryNote, LocalDate receivedOn, UUID receivedBy, List<LineSpec> specs) {
+        return create(tenantId, grnNumber, purchaseOrderId, vendorId, null, deliveryNote, receivedOn, receivedBy, specs);
+    }
+
+    public static FacilityGoodsReceipt create(TenantId tenantId, String grnNumber, UUID purchaseOrderId, UUID vendorId, UUID storeId,
+                                              String deliveryNote, LocalDate receivedOn, UUID receivedBy, List<LineSpec> specs) {
         if (specs == null || specs.isEmpty()) throw new IllegalArgumentException("A goods receipt needs at least one line");
         FacilityGoodsReceipt r = new FacilityGoodsReceipt();
         r.tenantId = tenantId;
         r.grnNumber = grnNumber;
         r.purchaseOrderId = purchaseOrderId;
         r.vendorId = vendorId;
+        r.storeId = storeId;
         r.deliveryNote = deliveryNote == null || deliveryNote.isBlank() ? null : deliveryNote.trim();
         r.receivedOn = receivedOn;
         r.receivedByUserId = receivedBy;

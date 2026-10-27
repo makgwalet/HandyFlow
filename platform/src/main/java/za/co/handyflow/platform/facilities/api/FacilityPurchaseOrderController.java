@@ -68,9 +68,10 @@ public class FacilityPurchaseOrderController {
 
     @PostMapping("/{id}/receipts")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<PurchaseOrderResponse>> receive(@PathVariable UUID id, @Valid @RequestBody ReceiveOrderRequest request) {
+    public ResponseEntity<ApiResponse<PurchaseOrderResponse>> receive(@PathVariable UUID id, @Valid @RequestBody ReceiveOrderRequest request,
+                                                                       @RequestParam(required = false) UUID storeId) {
         featureGuard.requireModule("facilities");
-        return ResponseEntity.ok(ApiResponse.success("Goods received", orderService.receive(TenantContext.getTenantIdAsObject(), id, request)));
+        return ResponseEntity.ok(ApiResponse.success("Goods received", orderService.receive(TenantContext.getTenantIdAsObject(), id, request, storeId)));
     }
 
     @GetMapping("/{id}/goods-receipts")

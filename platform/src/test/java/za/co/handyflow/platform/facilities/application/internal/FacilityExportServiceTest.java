@@ -75,8 +75,12 @@ class FacilityExportServiceTest {
     private final FacilityAuditService auditService = new FacilityAuditService(null) {
         @Override public void record(TenantId t, String action, String type, UUID id, String details) { audit.add(action + ":" + details); }
     };
+    private za.co.handyflow.platform.facilities.dto.StockValuationResponse valuation;
+    private final FacilityStockValuationService valuationService = new FacilityStockValuationService(null, null, null) {
+        @Override public za.co.handyflow.platform.facilities.dto.StockValuationResponse valuation(TenantId t, UUID storeId) { return valuation; }
+    };
     private final FacilityExportService service = new FacilityExportService(reports, certRepo, actionRepo, licenceRepo, techRepo,
-            siteRepo, assetRepo, policy, auditService);
+            siteRepo, assetRepo, policy, auditService, valuationService);
 
     private List<String> lines(FacilityExportService.Export e) { return Arrays.asList(e.csv().substring(1).split("\r\n")); }
 
@@ -158,5 +162,20 @@ class FacilityExportServiceTest {
         reportedTotal = FacilityExportService.MAX_ROWS + 1;
         assertThrows(IllegalArgumentException.class, () -> service.certificates(tenant));
         assertTrue(audit.isEmpty());
+    }
+
+    @Test
+    void stockValuationExportListsLinesAndATotalRow() {
+        UUID store = UUID.randomUUID();
+        valuation = new za.co.handyflow.platform.facilities.dto.StockValuationResponse(java.time.Instant.now(), new java.math.BigDecimal("50.00"),
+                List.of(), List.of(new za.co.handyflow.platform.facilities.dto.StockValuationResponse.Line(store, "MAIN", UUID.randomUUID(),
+                "S-1", "Valve", "each", new java.math.BigDecimal("10"), new java.math.BigDecimal("5.00"), new java.math.BigDecimal("50.00"), true)));
+        FacilityExportService.Export e = service.stockValuation(tenant, null);
+        List<String> l = lines(e);
+        assertEquals(3, l.size());
+        assertTrue(l.get(0).startsWith("Store,SKU,Item"));
+        assertTrue(l.get(1).startsWith("MAIN,S-1,Valve,each,10,5.00,50.00"));
+        assertTrue(l.get(2).startsWith("TOTAL,"));
+        assertTrue(l.get(2).contains("50.00"));
     }
 }
