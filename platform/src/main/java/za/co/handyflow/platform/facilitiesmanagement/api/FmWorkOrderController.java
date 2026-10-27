@@ -18,6 +18,7 @@ import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.evidence.application.EvidenceFacade;
 import za.co.handyflow.platform.evidence.dto.EvidenceResponse;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPdfService;
+import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmWorkOrderCostService;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmWorkOrderService;
 import za.co.handyflow.platform.facilitiesmanagement.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -48,6 +49,7 @@ public class FmWorkOrderController {
 
     private final FmWorkOrderService workOrderService;
     private final FmPdfService pdfService;
+    private final FmWorkOrderCostService costService;
     private final EvidenceFacade evidenceFacade;
     private final FeatureGuard featureGuard;
 
@@ -164,6 +166,31 @@ public class FmWorkOrderController {
     }
 
     // ── Evidence (before/after repair photos) ───────────────────────────────
+
+    // ── cost lines ──────────────────────────────────────────────────────────────────────────
+
+    @GetMapping("/{id}/cost-lines")
+    @PreAuthorize(CAN_VIEW)
+    public ResponseEntity<ApiResponse<List<FmCostLineResponse>>> costLines(@PathVariable UUID id) {
+        featureGuard.requireModule("facilitiesmanagement");
+        return ResponseEntity.ok(ApiResponse.success(costService.list(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/{id}/cost-lines")
+    @PreAuthorize(CAN_EXECUTE)
+    public ResponseEntity<ApiResponse<FmCostLineResponse>> addCostLine(@PathVariable UUID id, @Valid @RequestBody AddFmCostLineRequest request) {
+        featureGuard.requireModule("facilitiesmanagement");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Cost line added",
+                costService.add(TenantContext.getTenantIdAsObject(), id, request)));
+    }
+
+    @DeleteMapping("/{id}/cost-lines/{lineId}")
+    @PreAuthorize(CAN_EXECUTE)
+    public ResponseEntity<ApiResponse<Void>> removeCostLine(@PathVariable UUID id, @PathVariable UUID lineId) {
+        featureGuard.requireModule("facilitiesmanagement");
+        costService.remove(TenantContext.getTenantIdAsObject(), id, lineId);
+        return ResponseEntity.ok(ApiResponse.success("Cost line removed", null));
+    }
 
     @PostMapping("/{id}/evidence")
     @PreAuthorize(CAN_EXECUTE)

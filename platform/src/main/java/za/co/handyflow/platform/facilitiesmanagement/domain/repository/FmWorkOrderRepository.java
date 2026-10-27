@@ -198,4 +198,14 @@ public interface FmWorkOrderRepository extends JpaRepository<FmWorkOrder, UUID> 
             "AND w.deletedAt IS NULL AND (:allClients = true OR w.clientId IN :clientIds)")
     BigDecimal sumUnbilledChargeInScope(@Param("tenantId") TenantId tenantId,
                                         @Param("allClients") boolean allClients, @Param("clientIds") Collection<UUID> clientIds);
+
+    /** Unfinished work still assigned to a technician (anything not completed, cancelled or rejected). */
+    @Query("SELECT COUNT(w) FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.technicianId = :technicianId " +
+            "AND w.deletedAt IS NULL AND w.status NOT IN ('COMPLETED','CANCELLED','REJECTED')")
+    long countOpenForTechnician(@Param("tenantId") TenantId tenantId, @Param("technicianId") UUID technicianId);
+
+    /** Unfinished work still assigned to a subcontractor. */
+    @Query("SELECT COUNT(w) FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.vendorId = :vendorId " +
+            "AND w.deletedAt IS NULL AND w.status NOT IN ('COMPLETED','CANCELLED','REJECTED')")
+    long countOpenForVendor(@Param("tenantId") TenantId tenantId, @Param("vendorId") UUID vendorId);
 }

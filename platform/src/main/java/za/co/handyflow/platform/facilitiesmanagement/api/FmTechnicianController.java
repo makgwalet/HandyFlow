@@ -33,6 +33,13 @@ public class FmTechnicianController {
         return ResponseEntity.ok(ApiResponse.success(technicianService.getTechnicians(TenantContext.getTenantIdAsObject(), pageable)));
     }
 
+    @GetMapping("/me")
+    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_TECHNICIAN','FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    public ResponseEntity<ApiResponse<FmTechnicianResponse>> me() {
+        featureGuard.requireModule("facilitiesmanagement");
+        return ResponseEntity.ok(ApiResponse.success(technicianService.me(TenantContext.getTenantIdAsObject())));
+    }
+
     @PostMapping
     @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
     public ResponseEntity<ApiResponse<FmTechnicianResponse>> createTechnician(@Valid @RequestBody UpsertFmTechnicianRequest request) {

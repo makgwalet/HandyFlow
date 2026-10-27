@@ -14,6 +14,7 @@ import za.co.handyflow.platform.WebMvcTestSecuritySupport;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.evidence.application.EvidenceFacade;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPdfService;
+import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmWorkOrderCostService;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmWorkOrderService;
 import za.co.handyflow.platform.facilitiesmanagement.dto.FmWorkOrderResponse;
 
@@ -35,6 +36,7 @@ class FmWorkOrderControllerTest {
 
     @MockitoBean FmWorkOrderService workOrderService;
     @MockitoBean FmPdfService pdfService;
+    @MockitoBean FmWorkOrderCostService costService;
     @MockitoBean EvidenceFacade evidenceFacade;
     @MockitoBean FeatureGuard featureGuard;
 

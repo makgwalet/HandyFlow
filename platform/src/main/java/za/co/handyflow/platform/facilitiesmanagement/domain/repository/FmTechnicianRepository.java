@@ -30,4 +30,9 @@ public interface FmTechnicianRepository extends JpaRepository<FmTechnician, UUID
             "AND t.linkedUserId = :userId AND t.id <> :excludeId AND t.deletedAt IS NULL")
     boolean existsOtherLinkedToUser(@Param("tenantId") TenantId tenantId, @Param("userId") UUID userId,
                                     @Param("excludeId") UUID excludeId);
+
+    /** The active technician record(s) linked to this user, for "my profile". */
+    @Query("SELECT t FROM FmTechnician t WHERE t.tenantId.value = :#{#tenantId.value} AND t.deletedAt IS NULL AND t.active = true " +
+            "AND t.linkedUserId = :userId ORDER BY t.createdAt ASC")
+    List<FmTechnician> findActiveLinkedToUser(@Param("tenantId") TenantId tenantId, @Param("userId") UUID userId);
 }
