@@ -16,6 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPdfService;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPortalDataService;
+import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPortalQuoteService;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPortalRequestService;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPortalSla;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPortalStatus;
@@ -49,6 +50,7 @@ public class FmPortalDataController {
 
     private final FmPortalDataService portalDataService;
     private final FmPortalRequestService portalRequestService;
+    private final FmPortalQuoteService portalQuoteService;
     private final FmPdfService pdfService;
 
     @GetMapping("/clients")
@@ -100,6 +102,35 @@ public class FmPortalDataController {
     @Operation(summary = "At-a-glance position: work by status, SLA risk, and what is owed")
     public ResponseEntity<ApiResponse<FmPortalSummaryResponse>> getMySummary(@RequestParam(required = false) UUID clientId) {
         return ResponseEntity.ok(ApiResponse.success(portalDataService.getMySummary(getPortalUserId(), clientId)));
+    }
+
+    @GetMapping("/quotes")
+    @PreAuthorize("hasAuthority('PORTAL_USER')")
+    @Operation(summary = "Quotes sent to this client (drafts are never shown)")
+    public ResponseEntity<ApiResponse<List<FmPortalQuoteResponse>>> getMyQuotes(@RequestParam(required = false) UUID clientId) {
+        return ResponseEntity.ok(ApiResponse.success(portalQuoteService.list(getPortalUserId(), clientId)));
+    }
+
+    @GetMapping("/quotes/{id}")
+    @PreAuthorize("hasAuthority('PORTAL_USER')")
+    public ResponseEntity<ApiResponse<FmPortalQuoteResponse>> getMyQuote(@PathVariable UUID id, @RequestParam(required = false) UUID clientId) {
+        return ResponseEntity.ok(ApiResponse.success(portalQuoteService.get(getPortalUserId(), clientId, id)));
+    }
+
+    @PostMapping("/quotes/{id}/accept")
+    @PreAuthorize("hasAuthority('PORTAL_USER')")
+    @Operation(summary = "Accept an open quote: authorises the work (a work order is created if the quote was not tied to a request)")
+    public ResponseEntity<ApiResponse<FmPortalQuoteResponse>> acceptQuote(@PathVariable UUID id, @RequestParam(required = false) UUID clientId,
+            @Valid @RequestBody(required = false) FmQuoteDecisionRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(portalQuoteService.accept(getPortalUserId(), clientId, id, request == null ? null : request.note())));
+    }
+
+    @PostMapping("/quotes/{id}/decline")
+    @PreAuthorize("hasAuthority('PORTAL_USER')")
+    @Operation(summary = "Decline an open quote (a reason is required)")
+    public ResponseEntity<ApiResponse<FmPortalQuoteResponse>> declineQuote(@PathVariable UUID id, @RequestParam(required = false) UUID clientId,
+            @Valid @RequestBody FmQuoteDecisionRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(portalQuoteService.decline(getPortalUserId(), clientId, id, request.note())));
     }
 
     @GetMapping("/invoices")

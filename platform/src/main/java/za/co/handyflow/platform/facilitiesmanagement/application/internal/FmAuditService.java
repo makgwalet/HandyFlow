@@ -40,6 +40,12 @@ public class FmAuditService {
         auditRepository.save(FmAuditLog.of(tenantId, portalUserId, "Client portal", action, entityType, entityId, details));
     }
 
+    /** For actions taken by the platform itself (a scheduled sweep): there is no signed-in user. */
+    @Transactional
+    public void recordSystem(TenantId tenantId, String action, String entityType, UUID entityId, String details) {
+        auditRepository.save(FmAuditLog.of(tenantId, null, "System", action, entityType, entityId, details));
+    }
+
     @Transactional(readOnly = true)
     public Page<FmAuditLogResponse> list(TenantId tenantId, String entityType, UUID entityId, Pageable pageable) {
         if (entityId != null && (entityType == null || entityType.isBlank())) {

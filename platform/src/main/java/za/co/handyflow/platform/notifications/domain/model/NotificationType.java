@@ -359,6 +359,12 @@ public enum NotificationType {
     FM_VENDOR_DOC_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
     /** An FM subcontractor's required document has expired; it can no longer be assigned work. */
     FM_VENDOR_DOC_EXPIRED(CRITICAL, Set.of(IN_APP, EMAIL)),
+    /** A client accepted a quote in the portal. */
+    FM_QUOTE_ACCEPTED(INFO, Set.of(IN_APP, EMAIL)),
+    /** A client declined a quote in the portal. */
+    FM_QUOTE_DECLINED(WARNING, Set.of(IN_APP, EMAIL)),
+    /** A sent quote passed its validity without an answer. */
+    FM_QUOTE_EXPIRED(INFO, Set.of(IN_APP)),
     FM_PPM_DUE(INFO, Set.of(IN_APP, EMAIL)),
     FM_WORKORDER_URGENT(WARNING, Set.of(IN_APP, EMAIL)),
     FM_WORKORDER_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
