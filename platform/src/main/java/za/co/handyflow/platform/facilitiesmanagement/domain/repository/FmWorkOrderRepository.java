@@ -208,4 +208,23 @@ public interface FmWorkOrderRepository extends JpaRepository<FmWorkOrder, UUID> 
     @Query("SELECT COUNT(w) FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.vendorId = :vendorId " +
             "AND w.deletedAt IS NULL AND w.status NOT IN ('COMPLETED','CANCELLED','REJECTED')")
     long countOpenForVendor(@Param("tenantId") TenantId tenantId, @Param("vendorId") UUID vendorId);
+
+    /** Unfinished work orders for one asset, newest first (visibility is applied by the caller). */
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.assetId = :assetId AND w.deletedAt IS NULL " +
+            "AND w.status NOT IN ('COMPLETED','CANCELLED','REJECTED') ORDER BY w.createdAt DESC")
+    List<FmWorkOrder> findOpenForAsset(@Param("tenantId") TenantId tenantId, @Param("assetId") UUID assetId);
+
+    /**
+     * Work orders changed at or after {@code since}, oldest change first, for offline sync. Same visibility flags as
+     * {@link #findAllInScope}: {@code allClients=false} limits to {@code clientIds}, {@code allJobs=false} to the
+     * technicians' own jobs. Collections are never empty (the policy supplies a placeholder).
+     */
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.deletedAt IS NULL AND w.updatedAt >= :since " +
+            "AND (:allClients = true OR w.clientId IN :clientIds) " +
+            "AND (:allJobs = true OR w.technicianId IN :technicianIds) " +
+            "ORDER BY w.updatedAt ASC, w.id ASC")
+    List<FmWorkOrder> findChangedSinceInScope(@Param("tenantId") TenantId tenantId, @Param("since") Instant since,
+                                              @Param("allClients") boolean allClients, @Param("clientIds") Collection<UUID> clientIds,
+                                              @Param("allJobs") boolean allJobs, @Param("technicianIds") Collection<UUID> technicianIds,
+                                              Pageable pageable);
 }

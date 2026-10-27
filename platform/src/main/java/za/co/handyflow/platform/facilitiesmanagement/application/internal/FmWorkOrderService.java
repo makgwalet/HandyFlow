@@ -94,6 +94,19 @@ public class FmWorkOrderService {
         findActive(tenantId, id, accessPolicy.scope(tenantId));
     }
 
+    /** Offline-sync pull: what changed at or after {@code since} that the caller can see, oldest change first. */
+    @Transactional(readOnly = true)
+    public FmWorkOrderChangesResponse getChangedSince(TenantId tenantId, Instant since, int limit) {
+        int size = Math.max(1, Math.min(limit, 200));
+        FmAccessScope scope = accessPolicy.scope(tenantId);
+        List<FmWorkOrder> rows = workOrderRepository.findChangedSinceInScope(tenantId, since, scope.workOrderClientFilterOff(),
+                scope.clientIds(), scope.allJobs(), scope.technicianIds(), PageRequest.of(0, size + 1));
+        boolean more = rows.size() > size;
+        List<FmWorkOrder> page = more ? rows.subList(0, size) : rows;
+        Instant next = page.isEmpty() ? since : page.get(page.size() - 1).getUpdatedAt();
+        return new FmWorkOrderChangesResponse(page.stream().map(this::toResponse).toList(), next, more);
+    }
+
     /** Per-asset history is a planner/manager view; a technician limited to their own jobs may not use it. */
     @Transactional(readOnly = true)
     public Page<FmWorkOrderResponse> getWorkOrdersForAsset(TenantId tenantId, UUID assetId, Pageable pageable) {

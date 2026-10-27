@@ -9,6 +9,7 @@ import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmAsset;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,4 +29,8 @@ public interface FmAssetRepository extends JpaRepository<FmAsset, UUID> {
             "AND (:allSites = true OR a.siteId IN :siteIds)")
     Page<FmAsset> findAllActiveInScope(@Param("tenantId") TenantId tenantId, @Param("allSites") boolean allSites,
                                        @Param("siteIds") Collection<UUID> siteIds, Pageable pageable);
+
+    /** Live assets with exactly this tag. Tags are not guaranteed unique, so the caller refuses an ambiguous match. */
+    @Query("SELECT a FROM FmAsset a WHERE a.tenantId.value = :#{#tenantId.value} AND a.assetTag = :tag AND a.deletedAt IS NULL")
+    List<FmAsset> findActiveByTag(@Param("tenantId") TenantId tenantId, @Param("tag") String tag);
 }
