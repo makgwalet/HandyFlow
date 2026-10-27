@@ -79,6 +79,10 @@ public class FmWorkOrder {
     @Column(name = "requested_by_user_id")
     private UUID requestedByUserId;
 
+    /** Set when the request was raised by a client through the portal (then {@code requestedByUserId} is null). */
+    @Column(name = "requested_by_portal_user_id")
+    private UUID requestedByPortalUserId;
+
     @Column(name = "safety_impact", nullable = false)
     private boolean safetyImpact = false;
 
@@ -247,6 +251,20 @@ public class FmWorkOrder {
         w.duplicateOfWorkOrderId = duplicateOfWorkOrderId;
         return w;
     }
+
+    /** A request raised by a client contact through the portal; staff must approve it before it becomes work. */
+    public static FmWorkOrder createPortalRequest(TenantId tenantId, String workOrderNumber, UUID clientId, UUID siteId,
+                                                  UUID assetId, String category, String priority, String description,
+                                                  String reportedBy, UUID portalUserId, boolean safetyImpact,
+                                                  UUID duplicateOfWorkOrderId) {
+        if (portalUserId == null) throw new IllegalArgumentException("portalUserId is required");
+        FmWorkOrder w = createRequest(tenantId, workOrderNumber, clientId, siteId, assetId, category, priority,
+                description, reportedBy, null, safetyImpact, duplicateOfWorkOrderId);
+        w.requestedByPortalUserId = portalUserId;
+        return w;
+    }
+
+    public boolean isPortalRequest() { return requestedByPortalUserId != null; }
 
     public void requireVerification(boolean required) {
         this.requiresVerification = required;

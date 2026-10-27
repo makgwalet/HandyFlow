@@ -14,16 +14,9 @@ import za.co.handyflow.platform.facilitiesmanagement.dto.FmPortalRegisterRequest
 import za.co.handyflow.platform.shared.ApiResponse;
 
 /**
- * NOTE: /register and /login live under /auth/** — needs adding to
- * SecurityConfig's permitAll() list AND RateLimitFilter's LIMITS array,
- * the same two additions every other module's own portal-auth controller
- * in this codebase needed (accountant, payroll bureau, recruitment agency,
- * booking agency, collections agency, warehousing, training provider) —
- * flagged here, not applied (no write access to those files this
- * session). No FeatureGuard on these endpoints, matching the confirmed
- * convention of every sibling portal-auth controller (TrainProvPortalAuthController,
- * CollAgencyPortalAuthController): the module gate applies to staff-facing
- * endpoints, not to an unauthenticated client registering/logging in.
+ * Open (no staff login) by design: {@code /portal/auth/**} is permitted in SecurityConfig and rate-limited in
+ * RateLimitFilter (register 5/hour, login 10/10 min). No FeatureGuard here, matching every sibling portal-auth
+ * controller: the module gate applies to staff-facing endpoints, not to a client registering or logging in.
  */
 @RestController
 @RequestMapping("/api/v1/facilitiesmanagement/portal")

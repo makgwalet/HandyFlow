@@ -318,4 +318,31 @@ class FmWorkOrderTest {
         assertEquals(t1, wo.getResolutionBreachedAt());
         assertEquals(t1, wo.getResolutionWarnedAt()); // a breach that was never warned about is also marked warned
     }
+
+    // ── client portal requests ───────────────────────────────────────────────
+
+    @Test
+    void aPortalRequestIsARequestRaisedByThePortalUserNotAStaffMember() {
+        UUID portalUser = UUID.randomUUID();
+        FmWorkOrder wo = FmWorkOrder.createPortalRequest(TenantId.generate(), "WO-00020", UUID.randomUUID(), UUID.randomUUID(),
+                null, "CORRECTIVE", "NORMAL", "Light out in corridor", "Client portal", portalUser, false, null);
+        assertEquals("REQUESTED", wo.getStatus());
+        assertTrue(wo.isPortalRequest());
+        assertEquals(portalUser, wo.getRequestedByPortalUserId());
+        assertNull(wo.getRequestedByUserId());
+        assertThrows(IllegalStateException.class, () -> wo.assign(UUID.randomUUID(), "T", null, null)); // needs approval first
+    }
+
+    @Test
+    void aStaffRequestIsNotAPortalRequest() {
+        FmWorkOrder wo = FmWorkOrder.createRequest(TenantId.generate(), "WO-00021", UUID.randomUUID(), UUID.randomUUID(),
+                null, "CORRECTIVE", "NORMAL", "d", "r", UUID.randomUUID(), false, null);
+        assertFalse(wo.isPortalRequest());
+    }
+
+    @Test
+    void aPortalRequestNeedsAPortalUser() {
+        assertThrows(IllegalArgumentException.class, () -> FmWorkOrder.createPortalRequest(TenantId.generate(), "WO-00022",
+                UUID.randomUUID(), UUID.randomUUID(), null, "CORRECTIVE", "NORMAL", "d", "r", null, false, null));
+    }
 }

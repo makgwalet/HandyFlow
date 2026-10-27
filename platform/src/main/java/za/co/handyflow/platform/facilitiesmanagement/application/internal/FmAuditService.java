@@ -31,6 +31,15 @@ public class FmAuditService {
                 TenantContext.getCurrentUserName(), action, entityType, entityId, details));
     }
 
+    /**
+     * For actions taken by a client through the portal. A portal token carries no staff user and no tenant context,
+     * so the actor is the portal user's id with a fixed label.
+     */
+    @Transactional
+    public void recordPortal(TenantId tenantId, UUID portalUserId, String action, String entityType, UUID entityId, String details) {
+        auditRepository.save(FmAuditLog.of(tenantId, portalUserId, "Client portal", action, entityType, entityId, details));
+    }
+
     @Transactional(readOnly = true)
     public Page<FmAuditLogResponse> list(TenantId tenantId, String entityType, UUID entityId, Pageable pageable) {
         if (entityId != null && (entityType == null || entityType.isBlank())) {

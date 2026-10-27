@@ -58,9 +58,15 @@ public interface FmWorkOrderRepository extends JpaRepository<FmWorkOrder, UUID> 
      * clients as IN_PROGRESS).
      */
     @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.clientId = :clientId AND w.deletedAt IS NULL " +
-            "AND w.status IN :statuses AND w.status NOT IN ('REQUESTED','REJECTED') ORDER BY w.createdAt DESC")
+            "AND w.status IN :statuses AND (w.status NOT IN ('REQUESTED','REJECTED') OR w.requestedByPortalUserId IS NOT NULL) " +
+            "ORDER BY w.createdAt DESC")
     Page<FmWorkOrder> findAllForClientPortal(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId,
                                              @Param("statuses") Collection<String> statuses, Pageable pageable);
+
+    /** Requests a client raised through the portal since {@code since} — intake throttle. */
+    @Query("SELECT COUNT(w) FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.clientId = :clientId " +
+            "AND w.requestedByPortalUserId IS NOT NULL AND w.createdAt >= :since")
+    long countPortalRequestsSince(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId, @Param("since") Instant since);
 
     @Query("SELECT DISTINCT w.siteId FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} " +
             "AND w.technicianId IN :technicianIds AND w.deletedAt IS NULL")
