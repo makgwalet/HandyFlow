@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import za.co.handyflow.platform.facilities.domain.model.FacilityWorkOrder;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -64,4 +65,42 @@ public interface FacilityWorkOrderRepository extends JpaRepository<FacilityWorkO
     @Query("SELECT w FROM FacilityWorkOrder w WHERE w.status NOT IN ('COMPLETED','CANCELLED','REJECTED','PENDING_VERIFICATION') " +
             "AND w.deletedAt IS NULL AND w.scheduledDate IS NOT NULL AND w.scheduledDate < :today")
     List<FacilityWorkOrder> findOverdueAcrossTenants(@Param("today") LocalDate today);
+
+
+    // ── Reporting (same scope parameters as findAllInScope; collections never empty) ──
+
+    /** Everything not yet finished within the caller's scope (dashboard). */
+    @Query("SELECT w FROM FacilityWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.deletedAt IS NULL " +
+            "AND w.status NOT IN ('COMPLETED','CANCELLED','REJECTED') " +
+            "AND (:allSites = true OR w.siteId IN :siteIds) " +
+            "AND (:allJobs = true OR w.technicianId IN :technicianIds) " +
+            "AND (:allRequesters = true OR w.requestedByUserId = :requesterUserId)")
+    List<FacilityWorkOrder> findOpenInScope(@Param("tenantId") TenantId tenantId,
+            @Param("allSites") boolean allSites, @Param("siteIds") Collection<UUID> siteIds,
+            @Param("allJobs") boolean allJobs, @Param("technicianIds") Collection<UUID> technicianIds,
+            @Param("allRequesters") boolean allRequesters, @Param("requesterUserId") UUID requesterUserId);
+
+    /** Work orders created in the period (REQUESTED/REJECTED triage states excluded) — vendor and asset reports. */
+    @Query("SELECT w FROM FacilityWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.deletedAt IS NULL " +
+            "AND w.status NOT IN ('REQUESTED','REJECTED') AND w.createdAt >= :from AND w.createdAt < :toExclusive " +
+            "AND (:allSites = true OR w.siteId IN :siteIds) " +
+            "AND (:allJobs = true OR w.technicianId IN :technicianIds) " +
+            "AND (:allRequesters = true OR w.requestedByUserId = :requesterUserId)")
+    List<FacilityWorkOrder> findCreatedBetweenInScope(@Param("tenantId") TenantId tenantId,
+            @Param("from") Instant from, @Param("toExclusive") Instant toExclusive,
+            @Param("allSites") boolean allSites, @Param("siteIds") Collection<UUID> siteIds,
+            @Param("allJobs") boolean allJobs, @Param("technicianIds") Collection<UUID> technicianIds,
+            @Param("allRequesters") boolean allRequesters, @Param("requesterUserId") UUID requesterUserId);
+
+    /** Work completed in the period within scope (dashboard throughput). */
+    @Query("SELECT w FROM FacilityWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.deletedAt IS NULL " +
+            "AND w.status = 'COMPLETED' AND w.completedAt >= :from AND w.completedAt < :toExclusive " +
+            "AND (:allSites = true OR w.siteId IN :siteIds) " +
+            "AND (:allJobs = true OR w.technicianId IN :technicianIds) " +
+            "AND (:allRequesters = true OR w.requestedByUserId = :requesterUserId)")
+    List<FacilityWorkOrder> findCompletedBetweenInScope(@Param("tenantId") TenantId tenantId,
+            @Param("from") Instant from, @Param("toExclusive") Instant toExclusive,
+            @Param("allSites") boolean allSites, @Param("siteIds") Collection<UUID> siteIds,
+            @Param("allJobs") boolean allJobs, @Param("technicianIds") Collection<UUID> technicianIds,
+            @Param("allRequesters") boolean allRequesters, @Param("requesterUserId") UUID requesterUserId);
 }

@@ -148,4 +148,43 @@ public interface FmWorkOrderRepository extends JpaRepository<FmWorkOrder, UUID> 
     List<FmWorkOrder> findBillableForClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId,
                                             @Param("periodStart") Instant periodStart,
                                             @Param("periodEndExclusive") Instant periodEndExclusive);
+
+
+    // ── Reporting (scope-aware; collections are never empty — the policy supplies a placeholder) ──
+
+    /** Everything not yet finished, within the caller's scope (dashboard). */
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.deletedAt IS NULL " +
+            "AND w.status NOT IN ('COMPLETED','CANCELLED','REJECTED') " +
+            "AND (:allClients = true OR w.clientId IN :clientIds) " +
+            "AND (:allJobs = true OR w.technicianId IN :technicianIds)")
+    List<FmWorkOrder> findOpenInScope(@Param("tenantId") TenantId tenantId,
+                                      @Param("allClients") boolean allClients, @Param("clientIds") Collection<UUID> clientIds,
+                                      @Param("allJobs") boolean allJobs, @Param("technicianIds") Collection<UUID> technicianIds);
+
+    /** Work orders created in the period (any status except REQUESTED/REJECTED triage states) — vendor and asset reports. */
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.deletedAt IS NULL " +
+            "AND w.status NOT IN ('REQUESTED','REJECTED') AND w.createdAt >= :from AND w.createdAt < :toExclusive " +
+            "AND (:allClients = true OR w.clientId IN :clientIds) " +
+            "AND (:allJobs = true OR w.technicianId IN :technicianIds)")
+    List<FmWorkOrder> findCreatedBetweenInScope(@Param("tenantId") TenantId tenantId,
+                                                @Param("from") Instant from, @Param("toExclusive") Instant toExclusive,
+                                                @Param("allClients") boolean allClients, @Param("clientIds") Collection<UUID> clientIds,
+                                                @Param("allJobs") boolean allJobs, @Param("technicianIds") Collection<UUID> technicianIds);
+
+    /** Work completed in the period, within scope (dashboard throughput). */
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.deletedAt IS NULL " +
+            "AND w.status = 'COMPLETED' AND w.completedAt >= :from AND w.completedAt < :toExclusive " +
+            "AND (:allClients = true OR w.clientId IN :clientIds) " +
+            "AND (:allJobs = true OR w.technicianId IN :technicianIds)")
+    List<FmWorkOrder> findCompletedBetweenInScope(@Param("tenantId") TenantId tenantId,
+                                                  @Param("from") Instant from, @Param("toExclusive") Instant toExclusive,
+                                                  @Param("allClients") boolean allClients, @Param("clientIds") Collection<UUID> clientIds,
+                                                  @Param("allJobs") boolean allJobs, @Param("technicianIds") Collection<UUID> technicianIds);
+
+    /** Charge on completed, not-yet-invoiced, billable work within client scope. Null when there is none. */
+    @Query("SELECT SUM(w.cost) FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.status = 'COMPLETED' " +
+            "AND w.invoiced = false AND w.cost IS NOT NULL AND w.cost > 0 AND (w.coverage IS NULL OR w.coverage <> 'INCLUDED') " +
+            "AND w.deletedAt IS NULL AND (:allClients = true OR w.clientId IN :clientIds)")
+    BigDecimal sumUnbilledChargeInScope(@Param("tenantId") TenantId tenantId,
+                                        @Param("allClients") boolean allClients, @Param("clientIds") Collection<UUID> clientIds);
 }

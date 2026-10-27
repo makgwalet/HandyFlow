@@ -19,6 +19,7 @@ import java.util.UUID;
 public class FacilityVendorService {
 
     private final FacilityVendorRepository vendorRepository;
+    private final FacilityAuditService auditService;
 
     @Transactional(readOnly = true)
     public Page<VendorResponse> getVendors(TenantId tenantId, Pageable pageable) {
@@ -47,6 +48,7 @@ public class FacilityVendorService {
         FacilityVendor v = findActive(tenantId, id);
         v.deactivate();
         vendorRepository.save(v);
+        auditService.record(tenantId, "VENDOR_DEACTIVATED", "VENDOR", id, "name=" + v.getCompanyName());
         return toResponse(v);
     }
 
@@ -55,6 +57,7 @@ public class FacilityVendorService {
         FacilityVendor v = findActive(tenantId, id);
         v.reactivate();
         vendorRepository.save(v);
+        auditService.record(tenantId, "VENDOR_REACTIVATED", "VENDOR", id, "name=" + v.getCompanyName());
         return toResponse(v);
     }
 
@@ -63,6 +66,7 @@ public class FacilityVendorService {
         FacilityVendor v = findActive(tenantId, id);
         v.softDelete();
         vendorRepository.save(v);
+        auditService.record(tenantId, "VENDOR_DELETED", "VENDOR", id, "name=" + v.getCompanyName());
     }
 
     private FacilityVendor findActive(TenantId tenantId, UUID id) {

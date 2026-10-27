@@ -14,6 +14,7 @@ import za.co.handyflow.platform.WebMvcTestSecuritySupport;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.evidence.application.EvidenceFacade;
 import za.co.handyflow.platform.facilities.application.internal.FacilityPdfService;
+import za.co.handyflow.platform.facilities.application.internal.FacilityWorkOrderCostService;
 import za.co.handyflow.platform.facilities.application.internal.FacilityWorkOrderService;
 import za.co.handyflow.platform.facilities.dto.WorkOrderResponse;
 
@@ -34,6 +35,7 @@ class FacilityWorkOrderControllerTest {
     @Autowired ObjectMapper mapper;
 
     @MockitoBean FacilityWorkOrderService workOrderService;
+    @MockitoBean FacilityWorkOrderCostService costService;
     @MockitoBean FacilityPdfService pdfService;
     @MockitoBean EvidenceFacade evidenceFacade;
     @MockitoBean FeatureGuard featureGuard;
@@ -43,7 +45,8 @@ class FacilityWorkOrderControllerTest {
     private WorkOrderResponse testResponse() {
         return new WorkOrderResponse(UUID.randomUUID(), "WO-00001", UUID.randomUUID(), null, null,
                 "CORRECTIVE", "NORMAL", "OPEN", "Leaking tap", "Jane", null, null, null, null,
-                LocalDate.now(), null, null, null, null, java.time.Instant.now());
+                LocalDate.now(), null, null, null, null, null, java.time.Instant.now(),
+                null, false, null, null, null, false, null, 0, null, null, null);
     }
 
     @Test

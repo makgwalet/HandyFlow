@@ -90,7 +90,7 @@ public class FacilityNotificationScheduler {
     }
 
     public int generateDuePpmWorkOrders() {
-        List<FacilityPpmSchedule> due = ppmScheduleRepository.findAllDueAcrossTenants(LocalDate.now());
+        List<FacilityPpmSchedule> due = ppmScheduleRepository.findAllDueAcrossTenants(FacilityTime.today());
         int generated = 0;
         for (FacilityPpmSchedule schedule : due) {
             try {
@@ -120,9 +120,12 @@ public class FacilityNotificationScheduler {
     }
 
     public int alertOverdueWorkOrders() {
-        List<FacilityWorkOrder> overdue = workOrderRepository.findOverdueAcrossTenants(LocalDate.now());
+        LocalDate today = FacilityTime.today();
+        List<FacilityWorkOrder> overdue = workOrderRepository.findOverdueAcrossTenants(today);
         int alerts = 0;
         for (FacilityWorkOrder wo : overdue) {
+            // Remind at milestones (1, 3, 7, 14, 30 days, then monthly) instead of every day forever.
+            if (!FacilityOverduePolicy.shouldAlert(ChronoUnit.DAYS.between(wo.getScheduledDate(), today))) continue;
             try {
                 notifyOverdueWorkOrder(wo.getTenantId(), wo);
                 alerts++;
@@ -134,7 +137,7 @@ public class FacilityNotificationScheduler {
     }
 
     public int alertExpiringCertificates() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FacilityTime.today();
         LocalDate cutoff = today.plusDays(CERT_EXPIRY_WARNING_DAYS);
         List<FacilityComplianceCertificate> candidates = certificateRepository.findAllValidWithExpiryAcrossTenants(cutoff);
         int alerts = 0;
@@ -153,7 +156,7 @@ public class FacilityNotificationScheduler {
     }
 
     public int expireAndAlertCertificates() {
-        List<FacilityComplianceCertificate> candidates = certificateRepository.findAllValidWithExpiryAcrossTenants(LocalDate.now());
+        List<FacilityComplianceCertificate> candidates = certificateRepository.findAllValidWithExpiryAcrossTenants(FacilityTime.today());
         int alerts = 0;
         for (FacilityComplianceCertificate cert : candidates) {
             if (cert.isExpired()) {

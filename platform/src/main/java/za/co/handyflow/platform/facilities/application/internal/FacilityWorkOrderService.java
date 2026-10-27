@@ -15,10 +15,6 @@ import za.co.handyflow.platform.facilities.domain.model.FacilityVendor;
 import za.co.handyflow.platform.facilities.domain.model.FacilityWorkOrder;
 import za.co.handyflow.platform.facilities.domain.repository.*;
 import za.co.handyflow.platform.facilities.dto.*;
-import za.co.handyflow.platform.notifications.application.NotificationRequest;
-import za.co.handyflow.platform.notifications.application.Recipient;
-import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
-import za.co.handyflow.platform.notifications.application.internal.NotificationService;
 import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
@@ -62,8 +58,7 @@ public class FacilityWorkOrderService {
     private final FacilityWorkOrderCostLineRepository costLineRepository;
     private final FacilityNumberGenerator numberGenerator;
     private final FacilityPpmScheduleService ppmScheduleService;
-    private final NotificationService notificationService;
-    private final TenantAdminRecipients tenantAdminRecipients;
+    private final FacilityAlerts alerts;
     private final EvidenceFacade evidenceFacade;
     private final FacilityAccessPolicy accessPolicy;
     private final FacilityAuditService auditService;
@@ -140,6 +135,8 @@ public class FacilityWorkOrderService {
 
         if (req.safetyImpact() || "URGENT".equals(priority) || "EMERGENCY".equals(priority)) {
             notifyUrgent(tenantId, wo, req.safetyImpact() ? "Safety-related request" : "Urgent request");
+        } else {
+            notifyRequested(tenantId, wo);
         }
         return toResponse(wo);
     }
@@ -157,6 +154,8 @@ public class FacilityWorkOrderService {
                 req.category(), req.priority(), req.description(), req.reportedBy(), req.scheduledDate());
         if (Boolean.TRUE.equals(req.requiresVerification())) wo.requireVerification(true);
         workOrderRepository.save(wo);
+        auditService.record(tenantId, "WORK_ORDER_CREATED", "WORK_ORDER", wo.getId(),
+                number + " category=" + wo.getCategory() + " priority=" + wo.getPriority() + " site=" + req.siteId());
         log.info("Work order created number={} tenant={}", number, tenantId);
 
         if ("EMERGENCY".equals(wo.getPriority()) || "URGENT".equals(wo.getPriority())) {
@@ -242,6 +241,7 @@ public class FacilityWorkOrderService {
         FacilityWorkOrder wo = findActive(tenantId, id, accessPolicy.scope(tenantId));
         wo.start();
         workOrderRepository.save(wo);
+        auditService.record(tenantId, "WORK_ORDER_STARTED", "WORK_ORDER", id, wo.getWorkOrderNumber());
         return toResponse(wo);
     }
 
@@ -250,6 +250,7 @@ public class FacilityWorkOrderService {
         FacilityWorkOrder wo = findActive(tenantId, id, accessPolicy.scope(tenantId));
         wo.putOnHold(req.reason());
         workOrderRepository.save(wo);
+        auditService.record(tenantId, "WORK_ORDER_ON_HOLD", "WORK_ORDER", id, wo.getWorkOrderNumber() + " reason=" + req.reason());
         return toResponse(wo);
     }
 
@@ -275,6 +276,7 @@ public class FacilityWorkOrderService {
         log.info("Work order completed number={} status={} tenant={}", wo.getWorkOrderNumber(), wo.getStatus(), tenantId);
 
         if ("COMPLETED".equals(wo.getStatus())) advancePpmSchedule(tenantId, wo);
+        else if ("PENDING_VERIFICATION".equals(wo.getStatus())) notifyAwaitingVerification(tenantId, wo);
         return toResponse(wo);
     }
 
@@ -334,8 +336,8 @@ public class FacilityWorkOrderService {
     private void advancePpmSchedule(TenantId tenantId, FacilityWorkOrder wo) {
         if (wo.getPpmScheduleId() == null) return;
         LocalDate completedDate = wo.getCompletedAt() != null
-                ? wo.getCompletedAt().atZone(java.time.ZoneId.systemDefault()).toLocalDate()
-                : LocalDate.now();
+                ? FacilityTime.toLocalDate(wo.getCompletedAt())
+                : FacilityTime.today();
         ppmScheduleService.applyCompletion(tenantId, wo.getPpmScheduleId(), completedDate);
     }
 
@@ -349,19 +351,21 @@ public class FacilityWorkOrderService {
     }
 
     private void notifyUrgent(TenantId tenantId, FacilityWorkOrder wo, String titlePrefix) {
-        List<Recipient> recipients = tenantAdminRecipients.resolveTenantAdmins(tenantId);
-        if (recipients.isEmpty()) return;
+        alerts.toAdmins(tenantId, NotificationType.FACILITY_WORKORDER_URGENT, titlePrefix + ": " + wo.getWorkOrderNumber(),
+                wo.getDescription(), "/facilities/work-orders/" + wo.getId(), wo.getId().toString());
+    }
 
-        notificationService.send(NotificationRequest.builder()
-                .tenantId(tenantId)
-                .type(NotificationType.FACILITY_WORKORDER_URGENT)
-                .title(titlePrefix + ": " + wo.getWorkOrderNumber())
-                .message(wo.getDescription())
-                .actionUrl("/facilities/work-orders/" + wo.getId())
-                .sourceModule("facilities")
-                .sourceEntityId(wo.getId().toString())
-                .recipients(recipients)
-                .build());
+    private void notifyRequested(TenantId tenantId, FacilityWorkOrder wo) {
+        alerts.toAdmins(tenantId, NotificationType.FACILITY_WORKORDER_REQUESTED, "Work request submitted: " + wo.getWorkOrderNumber(),
+                "A " + wo.getPriority() + " request is waiting for approval: " + wo.getDescription(),
+                "/facilities/work-orders/" + wo.getId(), wo.getId().toString());
+    }
+
+    private void notifyAwaitingVerification(TenantId tenantId, FacilityWorkOrder wo) {
+        alerts.toAdmins(tenantId, NotificationType.FACILITY_WORKORDER_AWAITING_VERIFICATION,
+                "Awaiting verification: " + wo.getWorkOrderNumber(),
+                wo.getWorkOrderNumber() + " has been completed and needs checking by someone other than the person who did the work.",
+                "/facilities/work-orders/" + wo.getId(), wo.getId().toString());
     }
 
     private FacilityWorkOrder findActive(TenantId tenantId, UUID id, AccessScope scope) {

@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import za.co.handyflow.platform.shared.TenantId;
 
+import za.co.handyflow.platform.facilities.application.internal.FacilityTime;
+
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -75,7 +77,7 @@ public class FacilityPpmSchedule {
         s.taskName = taskName;
         s.description = description;
         s.frequencyDays = frequencyDays;
-        s.nextDueDate = startDate != null ? startDate : LocalDate.now();
+        s.nextDueDate = startDate != null ? startDate : FacilityTime.today();
         s.createdAt = Instant.now();
         s.updatedAt = Instant.now();
         return s;

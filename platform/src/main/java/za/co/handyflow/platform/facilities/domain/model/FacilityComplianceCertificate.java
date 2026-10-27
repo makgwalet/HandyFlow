@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import za.co.handyflow.platform.shared.TenantId;
 
+import za.co.handyflow.platform.facilities.application.internal.FacilityTime;
+
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -111,12 +113,13 @@ public class FacilityComplianceCertificate {
         }
     }
 
-    public boolean isExpired() { return "EXPIRED".equals(status) || (!"REVOKED".equals(status) && expiryDate.isBefore(LocalDate.now())); }
+    public boolean isExpired() { return "EXPIRED".equals(status) || (!"REVOKED".equals(status) && expiryDate.isBefore(FacilityTime.today())); }
 
     public boolean isExpiringWithin(int days) {
         if (!"VALID".equals(status)) return false;
-        LocalDate cutoff = LocalDate.now().plusDays(days);
-        return !expiryDate.isBefore(LocalDate.now()) && !expiryDate.isAfter(cutoff);
+        LocalDate today = FacilityTime.today();
+        LocalDate cutoff = today.plusDays(days);
+        return !expiryDate.isBefore(today) && !expiryDate.isAfter(cutoff);
     }
 
     @PreUpdate

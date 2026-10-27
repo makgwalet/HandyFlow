@@ -34,4 +34,17 @@ public interface FacilityComplianceCertificateRepository extends JpaRepository<F
     /** Cross-tenant sweep: every certificate still VALID with an expiry date to check (used for both the expiring-soon and just-expired alerts). */
     @Query("SELECT c FROM FacilityComplianceCertificate c WHERE c.status = 'VALID' AND c.expiryDate <= :cutoff")
     List<FacilityComplianceCertificate> findAllValidWithExpiryAcrossTenants(@Param("cutoff") LocalDate cutoff);
+
+
+    /** VALID certificates expiring from {@code today} up to and including {@code cutoff}, within site scope. */
+    @Query("SELECT COUNT(c) FROM FacilityComplianceCertificate c WHERE c.tenantId = :#{#tenantId.value} AND c.status = 'VALID' " +
+            "AND c.expiryDate >= :today AND c.expiryDate <= :cutoff AND (:allSites = true OR c.siteId IN :siteIds)")
+    long countExpiringInScope(@Param("tenantId") TenantId tenantId, @Param("today") LocalDate today, @Param("cutoff") LocalDate cutoff,
+                              @Param("allSites") boolean allSites, @Param("siteIds") Collection<UUID> siteIds);
+
+    /** Certificates past their expiry date (swept to EXPIRED or not yet swept) that were not revoked, within site scope. */
+    @Query("SELECT COUNT(c) FROM FacilityComplianceCertificate c WHERE c.tenantId = :#{#tenantId.value} AND c.status <> 'REVOKED' " +
+            "AND c.expiryDate < :today AND (:allSites = true OR c.siteId IN :siteIds)")
+    long countLapsedInScope(@Param("tenantId") TenantId tenantId, @Param("today") LocalDate today,
+                            @Param("allSites") boolean allSites, @Param("siteIds") Collection<UUID> siteIds);
 }

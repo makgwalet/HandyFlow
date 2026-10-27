@@ -243,6 +243,9 @@ public class FacilityWorkOrder {
         this.updatedAt = Instant.now();
     }
 
+    /** Tolerated difference between a device clock and the server when a technician records the completion time. */
+    private static final java.time.Duration COMPLETION_CLOCK_SKEW = java.time.Duration.ofMinutes(5);
+
     /** Ends as COMPLETED, or as PENDING_VERIFICATION when this work order requires verification. */
     public void complete(String completionNotes, BigDecimal cost, Instant completedAt, UUID completedByUserId,
                          Integer downtimeMinutes, String failureCause) {
@@ -252,6 +255,11 @@ public class FacilityWorkOrder {
             throw new IllegalArgumentException("cost must not be negative");
         if (downtimeMinutes != null && downtimeMinutes < 0)
             throw new IllegalArgumentException("downtimeMinutes must not be negative");
+        Instant now = Instant.now();
+        if (completedAt != null && completedAt.isAfter(now.plus(COMPLETION_CLOCK_SKEW)))
+            throw new IllegalArgumentException("completedAt cannot be in the future");
+        if (completedAt != null && createdAt != null && completedAt.isBefore(createdAt))
+            throw new IllegalArgumentException("completedAt cannot be before the work order was created");
         this.status = requiresVerification ? "PENDING_VERIFICATION" : "COMPLETED";
         this.completionNotes = completionNotes;
         this.holdReason = null;

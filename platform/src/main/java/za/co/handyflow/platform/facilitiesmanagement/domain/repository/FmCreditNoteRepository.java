@@ -9,6 +9,7 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,4 +40,11 @@ public interface FmCreditNoteRepository extends JpaRepository<FmCreditNote, UUID
 
     @Query("SELECT c FROM FmCreditNote c WHERE c.tenantId = :#{#tenantId.value} AND c.glStatus = 'FAILED' ORDER BY c.approvedAt ASC")
     List<FmCreditNote> findGlExceptions(@Param("tenantId") TenantId tenantId);
+
+
+    /** Credit notes in a status within client scope (e.g. DRAFT = awaiting approval). */
+    @Query("SELECT COUNT(c) FROM FmCreditNote c WHERE c.tenantId = :#{#tenantId.value} AND c.status = :status " +
+            "AND (:allClients = true OR c.clientId IN :clientIds)")
+    long countByStatusInScope(@Param("tenantId") TenantId tenantId, @Param("status") String status,
+                              @Param("allClients") boolean allClients, @Param("clientIds") Collection<UUID> clientIds);
 }

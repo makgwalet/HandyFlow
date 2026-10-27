@@ -11,6 +11,7 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -54,4 +55,19 @@ public interface FmInvoiceRepository extends JpaRepository<FmInvoice, UUID> {
             "AND i.status NOT IN ('DRAFT','CANCELLED') AND i.issueDate >= :from AND i.issueDate <= :to")
     BigDecimal sumRevenueForClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId,
                                    @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+
+    // ── Reporting (client-scope aware) ──
+
+    /** Invoices in the given statuses within client scope (receivables, drafts). */
+    @Query("SELECT i FROM FmInvoice i WHERE i.tenantId = :#{#tenantId.value} AND i.status IN :statuses " +
+            "AND (:allClients = true OR i.clientId IN :clientIds)")
+    List<FmInvoice> findByStatusesInScope(@Param("tenantId") TenantId tenantId, @Param("statuses") Collection<String> statuses,
+                                          @Param("allClients") boolean allClients, @Param("clientIds") Collection<UUID> clientIds);
+
+    /** Approved-or-later invoices issued in the period within client scope. */
+    @Query("SELECT i FROM FmInvoice i WHERE i.tenantId = :#{#tenantId.value} AND i.status NOT IN ('DRAFT','CANCELLED') " +
+            "AND i.issueDate >= :from AND i.issueDate <= :to AND (:allClients = true OR i.clientId IN :clientIds)")
+    List<FmInvoice> findIssuedBetweenInScope(@Param("tenantId") TenantId tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to,
+                                             @Param("allClients") boolean allClients, @Param("clientIds") Collection<UUID> clientIds);
 }

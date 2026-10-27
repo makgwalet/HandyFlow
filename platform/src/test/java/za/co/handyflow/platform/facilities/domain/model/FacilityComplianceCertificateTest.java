@@ -12,7 +12,7 @@ class FacilityComplianceCertificateTest {
 
     private FacilityComplianceCertificate newCertificate(LocalDate expiryDate) {
         return FacilityComplianceCertificate.create(TenantId.generate(), UUID.randomUUID(), null,
-                "ELECTRICAL_COC", "COC-2026-001", "ABC Electrical", LocalDate.now(), expiryDate, null);
+                "ELECTRICAL_COC", "COC-2026-001", "ABC Electrical", expiryDate.minusYears(1), expiryDate, null);
     }
 
     @Test
