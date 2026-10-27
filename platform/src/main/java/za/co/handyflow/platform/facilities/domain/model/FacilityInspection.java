@@ -65,6 +65,10 @@ public class FacilityInspection {
     @OrderBy("position ASC")
     private List<FacilityInspectionResult> results = new ArrayList<>();
 
+    /** The recurring schedule this run belongs to, if any; completing the inspection moves that schedule on. */
+    @Column(name = "schedule_id")
+    private UUID scheduleId;
+
     @Column(name = "started_at", nullable = false)
     private Instant startedAt;
     @Column(name = "completed_at")
@@ -95,6 +99,10 @@ public class FacilityInspection {
         i.createdAt = i.startedAt;
         i.updatedAt = i.startedAt;
         return i;
+    }
+
+    public void linkSchedule(UUID scheduleId) {
+        this.scheduleId = scheduleId;
     }
 
     /** Save one answer. Safe to repeat or change while the inspection is still open. */

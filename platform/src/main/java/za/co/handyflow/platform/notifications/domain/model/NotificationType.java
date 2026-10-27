@@ -348,6 +348,7 @@ public enum NotificationType {
     /** A stocked item has fallen to or below its reorder level. */
     FACILITY_STOCK_LOW(WARNING, Set.of(IN_APP, EMAIL)),
     FACILITY_INSPECTION_FAILED(WARNING, Set.of(IN_APP, EMAIL)),
+    FACILITY_INSPECTION_DUE(INFO, Set.of(IN_APP, EMAIL)),
     FACILITY_COMPLIANCE_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
     FACILITY_COMPLIANCE_EXPIRED(CRITICAL, Set.of(IN_APP, EMAIL)),
 

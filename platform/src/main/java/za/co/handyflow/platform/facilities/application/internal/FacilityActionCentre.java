@@ -2,6 +2,7 @@ package za.co.handyflow.platform.facilities.application.internal;
 
 import za.co.handyflow.platform.facilities.domain.model.FacilityComplianceCertificate;
 import za.co.handyflow.platform.facilities.domain.model.FacilityCorrectiveAction;
+import za.co.handyflow.platform.facilities.domain.model.FacilityInspectionSchedule;
 import za.co.handyflow.platform.facilities.domain.model.FacilityVendorDocument;
 import za.co.handyflow.platform.facilities.dto.ActionCentreResponse;
 import za.co.handyflow.platform.facilities.dto.ActionCentreResponse.Item;
@@ -35,7 +36,29 @@ public final class FacilityActionCentre {
                                              Collection<FacilityCorrectiveAction> unfinishedActions,
                                              Collection<FacilityVendorDocument> vendorDocuments,
                                              Map<UUID, String> vendorNames, LocalDate today, int warningDays) {
+        return build(certificates, unfinishedActions, vendorDocuments, vendorNames, List.of(), Map.of(), today, warningDays);
+    }
+
+    /**
+     * @param overdueInspections active recurring inspections already past due
+     * @param inspectionLabels   schedule id -> "Checklist at Site", for the item titles
+     */
+    public static ActionCentreResponse build(Collection<FacilityComplianceCertificate> certificates,
+                                             Collection<FacilityCorrectiveAction> unfinishedActions,
+                                             Collection<FacilityVendorDocument> vendorDocuments,
+                                             Map<UUID, String> vendorNames,
+                                             Collection<FacilityInspectionSchedule> overdueInspections,
+                                             Map<UUID, String> inspectionLabels, LocalDate today, int warningDays) {
         List<Item> items = new ArrayList<>();
+
+        for (FacilityInspectionSchedule s : overdueInspections) {
+            if (!s.isOverdue(today)) continue;
+            long late = ChronoUnit.DAYS.between(s.getNextDueDate(), today);
+            items.add(new Item(late > SEVERELY_OVERDUE_DAYS ? "CRITICAL" : "HIGH", "INSPECTION_OVERDUE", s.getSiteId(), s.getAssetId(),
+                    "Inspection overdue: " + inspectionLabels.getOrDefault(s.getId(), "Recurring inspection"),
+                    "Was due " + s.getNextDueDate() + " (" + late + " day(s) ago); every " + s.getFrequencyDays() + " days",
+                    s.getNextDueDate(), "INSPECTION_SCHEDULE", s.getId()));
+        }
 
         for (FacilityVendorDocument d : vendorDocuments) {
             if (!"VALID".equals(d.getStatus()) || d.getExpiryDate() == null) continue;

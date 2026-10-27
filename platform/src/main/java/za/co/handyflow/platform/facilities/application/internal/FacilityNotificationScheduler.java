@@ -72,6 +72,7 @@ public class FacilityNotificationScheduler {
     private final NotificationService notificationService;
     private final TenantAdminRecipients tenantAdminRecipients;
     private final SchedulerLease schedulerLease;
+    private final FacilityInspectionScheduleService inspectionScheduleService;
 
     @Scheduled(cron = "0 45 8 * * *")
     public void runDailySweep() {
@@ -84,9 +85,19 @@ public class FacilityNotificationScheduler {
         int overdueAlerts = alertOverdueWorkOrders();
         int expiringAlerts = alertExpiringCertificates();
         int expiredAlerts = expireAndAlertCertificates();
+        int inspectionReminders = remindInspections();
         log.info("[Facilities] Daily sweep complete — {} PPM work orders generated, {} overdue alerts, " +
-                        "{} expiring-certificate alerts, {} expired-certificate alerts",
-                ppmGenerated, overdueAlerts, expiringAlerts, expiredAlerts);
+                        "{} expiring-certificate alerts, {} expired-certificate alerts, {} inspection reminders",
+                ppmGenerated, overdueAlerts, expiringAlerts, expiredAlerts, inspectionReminders);
+    }
+
+    public int remindInspections() {
+        try {
+            return inspectionScheduleService.sendReminders(FacilityTime.today());
+        } catch (Exception e) {
+            log.error("[Facilities] Inspection reminder sweep failed: {}", e.getMessage(), e);
+            return 0;
+        }
     }
 
     public int generateDuePpmWorkOrders() {

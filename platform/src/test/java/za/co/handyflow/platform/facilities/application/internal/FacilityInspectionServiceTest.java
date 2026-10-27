@@ -77,8 +77,18 @@ class FacilityInspectionServiceTest {
             t -> List.of(new za.co.handyflow.platform.notifications.application.Recipient(UUID.randomUUID(), "Admin", "a@x.co.za", null)));
     private final FacilityCorrectiveActionService actionService = new FacilityCorrectiveActionService(
             actionRepo, siteRepo, assetRepo, null, null, null, policy, auditService);
+    private final Map<UUID, FacilityInspectionSchedule> schedules = new LinkedHashMap<>();
+    private final FacilityInspectionScheduleRepository scheduleRepo = fake(FacilityInspectionScheduleRepository.class, (n, a) -> switch (n) {
+        case "findForAsset" -> Optional.empty();
+        case "findForSite" -> schedules.values().stream().filter(x -> x.getTemplateId().equals(a[1]) && x.getSiteId().equals(a[2]) && x.getAssetId() == null).findFirst();
+        case "findByIdForTenant" -> Optional.ofNullable(schedules.get(a[1]));
+        case "save" -> { FacilityInspectionSchedule x = (FacilityInspectionSchedule) a[0]; schedules.put(x.getId(), x); yield x; }
+        default -> NOPE;
+    });
+    private final FacilityInspectionScheduleService scheduleService = new FacilityInspectionScheduleService(
+            scheduleRepo, templateRepo, siteRepo, assetRepo, policy, auditService, alerts);
     private final FacilityInspectionService service = new FacilityInspectionService(templateRepo, inspectionRepo, actionRepo,
-            siteRepo, assetRepo, policy, auditService, actionService, alerts);
+            siteRepo, assetRepo, policy, auditService, actionService, alerts, scheduleService);
 
     private InspectionTemplateRequest templateReq(String name) {
         return new InspectionTemplateRequest(name, "d", "hvac", List.of(
@@ -126,6 +136,52 @@ class FacilityInspectionServiceTest {
         assertThrows(IllegalStateException.class, () -> service.start(tenant, new StartInspectionRequest(t.id(), site.getId(), null)));
         service.setTemplateActive(tenant, t.id(), true);
         assertEquals("IN_PROGRESS", service.start(tenant, new StartInspectionRequest(t.id(), site.getId(), null)).status());
+    }
+
+    // ── recurring schedules ──────────────────────────────────────────────────
+
+    @Test
+    void completingAnInspectionOfAScheduledChecklistMovesTheScheduleOn() {
+        TenantContext.setUserId(me.toString());
+        InspectionTemplateResponse t = service.createTemplate(tenant, templateReq("Aircon monthly"));
+        FacilityInspectionSchedule sched = FacilityInspectionSchedule.create(tenant, t.id(), site.getId(), null, 30, FacilityTime.today());
+        schedules.put(sched.getId(), sched);
+        InspectionResponse r = service.start(tenant, new StartInspectionRequest(t.id(), site.getId(), null));
+        answerAll(r, "PASS", "PASS");
+        service.complete(tenant, r.id(), new CompleteInspectionRequest(null));
+        assertEquals(FacilityTime.today().plusDays(30), sched.getNextDueDate());
+        assertEquals(FacilityTime.today(), sched.getLastCompletedDate());
+    }
+
+    @Test
+    void aFailedInspectionStillCountsAsDoneForTheSchedule() {
+        TenantContext.setUserId(me.toString());
+        InspectionTemplateResponse t = service.createTemplate(tenant, templateReq("Aircon monthly"));
+        FacilityInspectionSchedule sched = FacilityInspectionSchedule.create(tenant, t.id(), site.getId(), null, 30, FacilityTime.today());
+        schedules.put(sched.getId(), sched);
+        InspectionResponse r = service.start(tenant, new StartInspectionRequest(t.id(), site.getId(), null));
+        answerAll(r, "FAIL", "PASS");
+        assertEquals("FAIL", service.complete(tenant, r.id(), new CompleteInspectionRequest(null)).result());
+        assertEquals(FacilityTime.today().plusDays(30), sched.getNextDueDate());
+    }
+
+    @Test
+    void anInspectionWithNoScheduleCompletesNormally() {
+        InspectionResponse r = startInspection();
+        answerAll(r, "PASS", "PASS");
+        assertEquals("PASS", service.complete(tenant, r.id(), new CompleteInspectionRequest(null)).result());
+        assertTrue(schedules.isEmpty());
+    }
+
+    @Test
+    void aCancelledInspectionDoesNotMoveTheSchedule() {
+        TenantContext.setUserId(me.toString());
+        InspectionTemplateResponse t = service.createTemplate(tenant, templateReq("Aircon monthly"));
+        FacilityInspectionSchedule sched = FacilityInspectionSchedule.create(tenant, t.id(), site.getId(), null, 30, FacilityTime.today());
+        schedules.put(sched.getId(), sched);
+        InspectionResponse r = service.start(tenant, new StartInspectionRequest(t.id(), site.getId(), null));
+        service.cancel(tenant, r.id(), "not needed");
+        assertEquals(FacilityTime.today(), sched.getNextDueDate());
     }
 
     // ── inspections ──────────────────────────────────────────────────────────

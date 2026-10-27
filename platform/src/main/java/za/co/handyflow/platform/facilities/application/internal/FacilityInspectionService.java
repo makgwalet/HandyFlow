@@ -38,6 +38,7 @@ public class FacilityInspectionService {
     private final FacilityAuditService auditService;
     private final FacilityCorrectiveActionService actionService;
     private final FacilityAlerts alerts;
+    private final FacilityInspectionScheduleService scheduleService;
 
     // ── Templates ────────────────────────────────────────────────────────────
 
@@ -116,6 +117,7 @@ public class FacilityInspectionService {
         FacilityInspectionTemplate template = findTemplate(tenantId, req.templateId());
         FacilityInspection i = FacilityInspection.start(tenantId, template, req.siteId(), req.assetId(),
                 TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName());
+        scheduleService.findScheduleId(tenantId, template.getId(), req.siteId(), req.assetId()).ifPresent(i::linkSchedule);
         inspectionRepository.save(i);
         auditService.record(tenantId, "INSPECTION_STARTED", "INSPECTION", i.getId(),
                 template.getName() + " site=" + req.siteId() + (req.assetId() != null ? " asset=" + req.assetId() : ""));
@@ -135,6 +137,7 @@ public class FacilityInspectionService {
         FacilityInspection i = find(tenantId, id);
         i.complete(req != null ? req.notes() : null);
         inspectionRepository.save(i);
+        if (i.getScheduleId() != null) scheduleService.applyCompletion(tenantId, i.getScheduleId(), FacilityTime.today());
         List<UUID> actions = i.failures().isEmpty() ? List.of() : actionService.createFromFailures(tenantId, i);
         auditService.record(tenantId, "INSPECTION_COMPLETED", "INSPECTION", id,
                 i.getTemplateName() + " result=" + i.getResult() + " failures=" + i.failures().size()

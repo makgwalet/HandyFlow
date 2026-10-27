@@ -53,7 +53,7 @@ class FacilitySyncServiceTest {
             calls.add("complete " + r.completionNotes() + " cost=" + r.cost() + " at=" + r.completedAt()); maybeFail(); return null;
         }
     };
-    private final FacilityInspectionService inspections = new FacilityInspectionService(null, null, null, null, null, null, null, null, null) {
+    private final FacilityInspectionService inspections = new FacilityInspectionService(null, null, null, null, null, null, null, null, null, null) {
         @Override public InspectionResponse answer(TenantId t, UUID id, InspectionAnswersRequest r) { calls.add("answers " + r.answers().size()); maybeFail(); return null; }
         @Override public InspectionResponse complete(TenantId t, UUID id, CompleteInspectionRequest r) { calls.add("finish " + r.notes()); maybeFail(); return null; }
     };

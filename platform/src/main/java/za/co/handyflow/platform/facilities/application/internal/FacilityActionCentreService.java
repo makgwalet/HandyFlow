@@ -3,9 +3,14 @@ package za.co.handyflow.platform.facilities.application.internal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.facilities.domain.model.FacilityInspectionSchedule;
+import za.co.handyflow.platform.facilities.domain.model.FacilitySite;
 import za.co.handyflow.platform.facilities.domain.model.FacilityVendor;
 import za.co.handyflow.platform.facilities.domain.model.FacilityVendorDocument;
 import za.co.handyflow.platform.facilities.domain.repository.FacilityComplianceCertificateRepository;
+import za.co.handyflow.platform.facilities.domain.repository.FacilityInspectionScheduleRepository;
+import za.co.handyflow.platform.facilities.domain.repository.FacilityInspectionTemplateRepository;
+import za.co.handyflow.platform.facilities.domain.repository.FacilitySiteRepository;
 import za.co.handyflow.platform.facilities.domain.repository.FacilityVendorDocumentRepository;
 import za.co.handyflow.platform.facilities.domain.repository.FacilityVendorRepository;
 import za.co.handyflow.platform.facilities.domain.repository.FacilityCorrectiveActionRepository;
@@ -29,6 +34,9 @@ public class FacilityActionCentreService {
     private final FacilityCorrectiveActionRepository actionRepository;
     private final FacilityVendorDocumentRepository vendorDocumentRepository;
     private final FacilityVendorRepository vendorRepository;
+    private final FacilityInspectionScheduleRepository inspectionScheduleRepository;
+    private final FacilityInspectionTemplateRepository templateRepository;
+    private final FacilitySiteRepository siteRepository;
     private final FacilityAccessPolicy accessPolicy;
 
     @Transactional(readOnly = true)
@@ -42,9 +50,20 @@ public class FacilityActionCentreService {
                 vendorNames.put(v.getId(), v.getCompanyName());
             }
         }
+        List<FacilityInspectionSchedule> overdueInspections = inspectionScheduleRepository.findOverdueInScope(tenantId, today, scope.allSites(), scope.siteIds());
+        Map<UUID, String> labels = new HashMap<>();
+        if (!overdueInspections.isEmpty()) {
+            Map<UUID, String> templates = new HashMap<>();
+            templateRepository.findAllForTenant(tenantId, true).forEach(t -> templates.put(t.getId(), t.getName()));
+            Map<UUID, String> sites = new HashMap<>();
+            for (FacilityInspectionSchedule s : overdueInspections) {
+                String site = sites.computeIfAbsent(s.getSiteId(), id -> siteRepository.findActiveById(tenantId, id).map(FacilitySite::getName).orElse("site"));
+                labels.put(s.getId(), templates.getOrDefault(s.getTemplateId(), "Checklist") + " at " + site);
+            }
+        }
         return FacilityActionCentre.build(
                 certificateRepository.findLapsedOrExpiringInScope(tenantId, today.plusDays(WARNING_DAYS), scope.allSites(), scope.siteIds()),
                 actionRepository.findUnfinishedInScope(tenantId, scope.allSites(), scope.siteIds()),
-                vendorDocs, vendorNames, today, WARNING_DAYS);
+                vendorDocs, vendorNames, overdueInspections, labels, today, WARNING_DAYS);
     }
 }
