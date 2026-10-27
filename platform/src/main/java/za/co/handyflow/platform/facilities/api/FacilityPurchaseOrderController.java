@@ -73,6 +73,13 @@ public class FacilityPurchaseOrderController {
         return ResponseEntity.ok(ApiResponse.success("Goods received", orderService.receive(TenantContext.getTenantIdAsObject(), id, request)));
     }
 
+    @GetMapping("/{id}/goods-receipts")
+    @PreAuthorize(CAN_VIEW)
+    public ResponseEntity<ApiResponse<java.util.List<GoodsReceiptResponse>>> goodsReceipts(@PathVariable UUID id) {
+        featureGuard.requireModule("facilities");
+        return ResponseEntity.ok(ApiResponse.success(orderService.goodsReceipts(TenantContext.getTenantIdAsObject(), id)));
+    }
+
     @PostMapping("/{id}/cancel")
     @PreAuthorize(CAN_MANAGE)
     public ResponseEntity<ApiResponse<PurchaseOrderResponse>> cancel(@PathVariable UUID id, @Valid @RequestBody ReasonRequest request) {

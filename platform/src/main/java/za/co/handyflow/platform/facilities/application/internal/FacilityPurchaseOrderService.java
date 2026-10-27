@@ -7,13 +7,17 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.facilities.domain.model.FacilityGoodsReceipt;
 import za.co.handyflow.platform.facilities.domain.model.FacilityPurchaseOrder;
 import za.co.handyflow.platform.facilities.domain.model.FacilityPurchaseOrderLine;
 import za.co.handyflow.platform.facilities.domain.model.FacilityStockItem;
 import za.co.handyflow.platform.facilities.domain.model.FacilityVendor;
+import za.co.handyflow.platform.facilities.domain.repository.FacilityApprovalLimitRepository;
+import za.co.handyflow.platform.facilities.domain.repository.FacilityGoodsReceiptRepository;
 import za.co.handyflow.platform.facilities.domain.repository.FacilityPurchaseOrderRepository;
 import za.co.handyflow.platform.facilities.domain.repository.FacilityStockItemRepository;
 import za.co.handyflow.platform.facilities.domain.repository.FacilityVendorRepository;
+import za.co.handyflow.platform.facilities.dto.GoodsReceiptResponse;
 import za.co.handyflow.platform.facilities.dto.PurchaseOrderRequest;
 import za.co.handyflow.platform.facilities.dto.PurchaseOrderResponse;
 import za.co.handyflow.platform.facilities.dto.ReceiveOrderRequest;
@@ -36,6 +40,8 @@ import java.util.stream.Collectors;
  *       order: it is all-or-nothing, over-receiving is refused (409 {@code OVER_RECEIPT}), and the status moves
  *       to PARTLY_RECEIVED or RECEIVED. The invoiced unit cost, if different from the order, feeds the item's
  *       average cost.</li>
+ *   <li>Approval is also held to the approver's value limit once any limits are set (admins are never limited).</li>
+ *   <li>Every delivery produces a goods-receipt document (its own record, numbered), the basis for matching invoices.</li>
  *   <li>An order with nothing received can be cancelled; a part-delivered one is closed short.</li>
  *   <li>Every step is audited.</li>
  * </ul>
@@ -53,6 +59,8 @@ public class FacilityPurchaseOrderService {
     private final FacilityNumberGenerator numberGenerator;
     private final FacilityAccessPolicy accessPolicy;
     private final FacilityAuditService auditService;
+    private final FacilityGoodsReceiptRepository receiptRepository;
+    private final FacilityApprovalLimitRepository limitRepository;
 
     @Transactional
     public PurchaseOrderResponse create(TenantId tenantId, PurchaseOrderRequest req) {
@@ -89,6 +97,11 @@ public class FacilityPurchaseOrderService {
         boolean ownOrder = approver != null && approver.equals(po.getCreatedByUserId());
         if (ownOrder && !accessPolicy.hasAuthority("FACILITIES_ADMIN"))
             throw new HandyFlowException("You raised this order, so someone else must approve it", HttpStatus.FORBIDDEN, "PO_SELF_APPROVAL");
+
+        String overLimit = FacilityProcurementRules.approvalProblem(accessPolicy.hasAuthority("FACILITIES_ADMIN"),
+                limitRepository.anyForTenant(tenantId),
+                limitRepository.findForUser(tenantId, approver).map(l -> l.getMaxOrderValue()).orElse(null), po.totalValue());
+        if (overLimit != null) throw new HandyFlowException(overLimit, HttpStatus.FORBIDDEN, "PO_ABOVE_LIMIT");
 
         FacilityVendor vendor = requireActiveVendor(tenantId, po.getVendorId());
         List<String> problems = vendorEligibility.problems(tenantId, vendor);
@@ -128,15 +141,21 @@ public class FacilityPurchaseOrderService {
         ordered.sort(Comparator.comparing(l -> byId.get(l.lineId()).getItemId()));
         String reference = (req.reference() == null || req.reference().isBlank() ? "" : req.reference().trim() + " · ") + po.getPoNumber();
         StringBuilder summary = new StringBuilder();
+        List<FacilityGoodsReceipt.LineSpec> receiptLines = new ArrayList<>();
         for (ReceiveOrderRequest.Line l : ordered) {
             FacilityPurchaseOrderLine line = byId.get(l.lineId());
             BigDecimal cost = l.unitCost() != null ? l.unitCost() : line.getUnitCost();
             stockService.receiveAgainstOrder(tenantId, line.getItemId(), l.quantity(), cost, po.getId(), reference);
             po.receiveLine(line.getId(), l.quantity());
+            receiptLines.add(new FacilityGoodsReceipt.LineSpec(line.getId(), line.getItemId(), line.getDescription(), l.quantity(), cost));
             summary.append(' ').append(line.getDescription()).append(" +").append(l.quantity().stripTrailingZeros().toPlainString());
         }
         orderRepository.save(po);
-        auditService.record(tenantId, "PO_RECEIVED", "PURCHASE_ORDER", id, po.getPoNumber() + " -> " + po.getStatus() + ":" + summary);
+        FacilityGoodsReceipt receipt = FacilityGoodsReceipt.create(tenantId, numberGenerator.nextGoodsReceiptNumber(tenantId), po.getId(),
+                po.getVendorId(), req.reference(), FacilityTime.today(), TenantContext.getCurrentUserId(), receiptLines);
+        receiptRepository.save(receipt);
+        auditService.record(tenantId, "PO_RECEIVED", "PURCHASE_ORDER", id,
+                po.getPoNumber() + " " + receipt.getGrnNumber() + " -> " + po.getStatus() + ":" + summary);
         return toResponse(po, vendorName(tenantId, po.getVendorId()));
     }
 
@@ -164,6 +183,19 @@ public class FacilityPurchaseOrderService {
         orderRepository.save(po);
         auditService.record(tenantId, "PO_CLOSED_SHORT", "PURCHASE_ORDER", id, po.getPoNumber() + ": " + reason.trim());
         return toResponse(po, vendorName(tenantId, po.getVendorId()));
+    }
+
+    @Transactional(readOnly = true)
+    public List<GoodsReceiptResponse> goodsReceipts(TenantId tenantId, UUID id) {
+        find(tenantId, id);
+        return receiptRepository.findForPurchaseOrder(tenantId, id).stream().map(FacilityPurchaseOrderService::toResponse).toList();
+    }
+
+    static GoodsReceiptResponse toResponse(FacilityGoodsReceipt r) {
+        return new GoodsReceiptResponse(r.getId(), r.getGrnNumber(), r.getPurchaseOrderId(), r.getVendorId(), r.getDeliveryNote(),
+                r.getReceivedOn(), r.getTotalValue(), r.getReceivedByUserId(), r.getCreatedAt(),
+                r.getLines().stream().map(l -> new GoodsReceiptResponse.Line(l.getPoLineId(), l.getItemId(), l.getDescription(),
+                        l.getQuantity(), l.getUnitCost(), l.lineValue())).toList());
     }
 
     @Transactional(readOnly = true)

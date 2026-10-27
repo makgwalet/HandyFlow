@@ -37,6 +37,8 @@ public class FacilityNumberGenerator {
 
     private static final String PURCHASE_ORDER_SEQUENCE = "FACILITY_PURCHASE_ORDER";
 
+    private static final String GOODS_RECEIPT_SEQUENCE = "FACILITY_GOODS_RECEIPT";
+
     private final TenantNumberingFacade numberingFacade;
 
     public String nextWorkOrderNumber(TenantId tenantId) {
@@ -45,5 +47,9 @@ public class FacilityNumberGenerator {
 
     public String nextPurchaseOrderNumber(TenantId tenantId) {
         return numberingFacade.next(tenantId, PURCHASE_ORDER_SEQUENCE, "FPO");
+    }
+
+    public String nextGoodsReceiptNumber(TenantId tenantId) {
+        return numberingFacade.next(tenantId, GOODS_RECEIPT_SEQUENCE, "FGR");
     }
 }

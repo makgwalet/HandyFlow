@@ -35,6 +35,7 @@ class FacilityInventoryServicesTest {
     private String workOrderError;
     private List<String> vendorProblems = List.of();
     private int seq;
+    private int grnSeq;
 
     @SuppressWarnings("unchecked")
     private static <T> T fake(Class<T> type, java.util.function.BiFunction<String, Object[], Object> f) {
@@ -64,6 +65,18 @@ class FacilityInventoryServicesTest {
         case "findOpen" -> orders.values().stream().filter(FacilityPurchaseOrder::isOpen).toList();
         default -> NOPE;
     });
+    private final List<FacilityGoodsReceipt> receipts = new ArrayList<>();
+    private final Map<UUID, FacilityApprovalLimit> limits = new HashMap<>();
+    private final FacilityGoodsReceiptRepository receiptRepo = fake(FacilityGoodsReceiptRepository.class, (n, a) -> switch (n) {
+        case "save" -> { receipts.add((FacilityGoodsReceipt) a[0]); yield a[0]; }
+        case "findForPurchaseOrder" -> receipts.stream().filter(r -> r.getPurchaseOrderId().equals(a[1])).toList();
+        default -> NOPE;
+    });
+    private final FacilityApprovalLimitRepository limitRepo = fake(FacilityApprovalLimitRepository.class, (n, a) -> switch (n) {
+        case "anyForTenant" -> !limits.isEmpty();
+        case "findForUser" -> Optional.ofNullable(limits.get(a[1]));
+        default -> NOPE;
+    });
     private final FacilityVendorRepository vendorRepo = fake(FacilityVendorRepository.class, (n, a) ->
             "findActiveById".equals(n) ? Optional.ofNullable(vendors.get(a[1])) : NOPE);
 
@@ -89,11 +102,12 @@ class FacilityInventoryServicesTest {
     };
     private final FacilityNumberGenerator numbers = new FacilityNumberGenerator(null) {
         @Override public String nextPurchaseOrderNumber(TenantId t) { return "FPO-" + (++seq); }
+        @Override public String nextGoodsReceiptNumber(TenantId t) { return "FGR-" + (++grnSeq); }
     };
 
     private final FacilityStockService stock = new FacilityStockService(itemRepo, movementRepo, orderRepo, costService, auditService, alerts);
     private final FacilityPurchaseOrderService po = new FacilityPurchaseOrderService(orderRepo, itemRepo, vendorRepo, eligibility, stock,
-            numbers, policy, auditService);
+            numbers, policy, auditService, receiptRepo, limitRepo);
 
     private FacilityVendor vendor;
 
@@ -406,5 +420,84 @@ class FacilityInventoryServicesTest {
         PurchaseOrderResponse fresh = approvedOrder(id);
         assertEquals("CANCELLED", po.cancel(tenant, fresh.id(), "Duplicate").status());
         assertEquals("PO_NOT_CLOSABLE", assertThrows(HandyFlowException.class, () -> po.closeShort(tenant, fresh.id(), "x")).getErrorCode());
+    }
+
+    // ── goods receipts ──────────────────────────────────────────────────────────
+
+    @Test
+    void everyDeliveryProducesANumberedGoodsReceiptAtTheBookedCost() {
+        UUID id = newItem("A1", "0", "0", null, null);
+        PurchaseOrderResponse o = approvedOrder(id);
+        UUID line = o.lines().get(0).id();
+        po.receive(tenant, o.id(), new ReceiveOrderRequest("DN-77", List.of(new ReceiveOrderRequest.Line(line, n("4"), n("5.50")))));
+        po.receive(tenant, o.id(), new ReceiveOrderRequest(null, List.of(new ReceiveOrderRequest.Line(line, n("6"), null))));
+        List<GoodsReceiptResponse> grns = po.goodsReceipts(tenant, o.id());
+        assertEquals(List.of("FGR-1", "FGR-2"), grns.stream().map(GoodsReceiptResponse::grnNumber).toList());
+        assertEquals("DN-77", grns.get(0).deliveryNote());
+        assertEquals(0, n("22.00").compareTo(grns.get(0).totalValue()));   // 4 x 5.50
+        assertEquals(0, n("30.00").compareTo(grns.get(1).totalValue()));   // 6 x ordered 5.00
+        assertEquals(line, grns.get(0).lines().get(0).poLineId());
+        assertTrue(audit.stream().anyMatch(a -> a.equals("PO_RECEIVED")));
+    }
+
+    @Test
+    void aRefusedDeliveryLeavesNoGoodsReceipt() {
+        UUID id = newItem("A1", "0", "0", null, null);
+        PurchaseOrderResponse o = approvedOrder(id);
+        UUID line = o.lines().get(0).id();
+        assertThrows(HandyFlowException.class, () -> po.receive(tenant, o.id(),
+                new ReceiveOrderRequest(null, List.of(new ReceiveOrderRequest.Line(line, n("11"), null)))));
+        assertTrue(receipts.isEmpty());
+    }
+
+    // ── approval limits ─────────────────────────────────────────────────────────
+
+    private PurchaseOrderResponse draftOf(String qty) {
+        UUID id = newItem("L" + (++seq), "0", "0", null, null);
+        TenantContext.setUserId(creator.toString());
+        return po.create(tenant, orderOf(id, qty, "10.00"));
+    }
+
+    @Test
+    void withNoLimitsConfiguredAnyApproverMayApprove() {
+        PurchaseOrderResponse d = draftOf("1000");
+        TenantContext.setUserId(approver.toString());
+        assertEquals("APPROVED", po.approve(tenant, d.id()).status());
+    }
+
+    @Test
+    void anApproverCannotApproveAboveTheirLimit() {
+        limits.put(approver, FacilityApprovalLimit.create(tenant, approver, n("500.00"), creator));
+        PurchaseOrderResponse d = draftOf("60");   // R600
+        TenantContext.setUserId(approver.toString());
+        HandyFlowException e = assertThrows(HandyFlowException.class, () -> po.approve(tenant, d.id()));
+        assertEquals("PO_ABOVE_LIMIT", e.getErrorCode());
+        assertTrue(e.getMessage().contains("R600.00") && e.getMessage().contains("R500.00"));
+        assertEquals("DRAFT", orders.get(d.id()).getStatus());
+    }
+
+    @Test
+    void anOrderAtTheLimitIsApprovable() {
+        limits.put(approver, FacilityApprovalLimit.create(tenant, approver, n("500.00"), creator));
+        PurchaseOrderResponse d = draftOf("50");   // R500 exactly
+        TenantContext.setUserId(approver.toString());
+        assertEquals("APPROVED", po.approve(tenant, d.id()).status());
+    }
+
+    @Test
+    void onceLimitsExistAnApproverWithoutOneCannotApprove() {
+        limits.put(UUID.randomUUID(), FacilityApprovalLimit.create(tenant, UUID.randomUUID(), n("100.00"), creator));
+        PurchaseOrderResponse d = draftOf("1");
+        TenantContext.setUserId(approver.toString());
+        assertEquals("PO_ABOVE_LIMIT", assertThrows(HandyFlowException.class, () -> po.approve(tenant, d.id())).getErrorCode());
+    }
+
+    @Test
+    void anAdminIsNeverLimited() {
+        limits.put(UUID.randomUUID(), FacilityApprovalLimit.create(tenant, UUID.randomUUID(), n("1.00"), creator));
+        PurchaseOrderResponse d = draftOf("1000");
+        authorities.add("FACILITIES_ADMIN");
+        TenantContext.setUserId(approver.toString());
+        assertEquals("APPROVED", po.approve(tenant, d.id()).status());
     }
 }
