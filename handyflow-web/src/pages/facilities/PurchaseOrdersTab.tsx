@@ -5,12 +5,14 @@
 // show its message when it refuses.
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
+import { Plus, ShieldCheck } from 'lucide-react'
 import { facilitiesApi, type PurchaseOrder } from '../../api/facilities.api'
 import { usePermissions } from '../../hooks/usePermission'
 import { errorMessage, toast } from '../../store/toast.store'
 import { Btn, DataTable, DefList, Dialog, Field, StatusChip, Toolbar, type Column } from './ui'
 import { PurchaseOrderFormDialog } from './forms'
+import { GoodsReceipts, InvoiceMatch } from './InvoiceMatch'
+import ApprovalLimitsDialog from './ApprovalLimitsDialog'
 import { fmtDate, fmtMoney, fmtQty, inputStyle } from './format'
 
 const FILTERS = [{ id: '', label: 'All' }, { id: 'DRAFT', label: 'Draft' }, { id: 'APPROVED', label: 'Approved' }, { id: 'PARTLY_RECEIVED', label: 'Part received' }, { id: 'RECEIVED', label: 'Received' }, { id: 'CANCELLED', label: 'Cancelled' }]
@@ -19,7 +21,9 @@ export default function PurchaseOrdersTab() {
   const [status, setStatus] = useState('')
   const [open, setOpen] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [limits, setLimits] = useState(false)
   const canManage = usePermissions(['FACILITIES_MANAGE', 'FACILITIES_ADMIN'])
+  const isAdmin = usePermissions(['FACILITIES_ADMIN'])
   const q = useQuery({ queryKey: ['facilities', 'purchase-orders', status], queryFn: () => facilitiesApi.purchaseOrders(status || undefined) })
   const cols: Column<PurchaseOrder>[] = [
     { key: 'no', header: 'Number', render: p => <strong>{p.poNumber}</strong> },
@@ -39,9 +43,11 @@ export default function PurchaseOrdersTab() {
                 background: status === f.id ? 'var(--hf-accent-soft)' : 'var(--hf-surface)', color: status === f.id ? 'var(--hf-accent-text-strong)' : 'var(--hf-text-secondary)' }}>{f.label}</button>
           ))}
         </div>
+        {isAdmin && <Btn onClick={() => setLimits(true)}><ShieldCheck size={15} />Approval limits</Btn>}
         {canManage && <Btn kind="primary" onClick={() => setCreating(true)}><Plus size={15} />New order</Btn>}
       </Toolbar>
       <DataTable rows={q.data ?? []} columns={cols} rowKey={p => p.id} loading={q.isLoading} error={q.error} onRowClick={p => setOpen(p.id)} empty="No purchase orders." />
+      {limits && <ApprovalLimitsDialog onClose={() => setLimits(false)} />}
       {creating && <PurchaseOrderFormDialog onClose={() => setCreating(false)} />}
       {open && q.data?.find(p => p.id === open) && <OrderPanel order={q.data.find(p => p.id === open)!} onClose={() => setOpen(null)} />}
     </div>
@@ -80,6 +86,8 @@ function OrderPanel({ order, onClose }: { order: PurchaseOrder; onClose: () => v
           ))}
         </tbody>
       </table>
+      {order.status !== 'DRAFT' && order.status !== 'CANCELLED' && <GoodsReceipts orderId={order.id} />}
+      {order.status !== 'DRAFT' && order.status !== 'CANCELLED' && <InvoiceMatch order={order} canManage={canManage} />}
       {act && <OrderAction act={act} order={order} onClose={() => setAct(null)} onDone={onClose} />}
     </Dialog>
   )
@@ -90,10 +98,13 @@ function OrderAction({ act, order, onClose, onDone }: { act: Act; order: Purchas
   const [reason, setReason] = useState('')
   const [reference, setReference] = useState('')
   const [qty, setQty] = useState<Record<string, string>>({})
+  const [storeId, setStoreId] = useState('')
+  const stores = useQuery({ queryKey: ['facilities', 'stores'], queryFn: facilitiesApi.stores, enabled: act === 'receive' })
+  const activeStores = (stores.data ?? []).filter(s => s.active)
   const needsReason = act === 'cancel' || act === 'close-short'
   const lines = Object.entries(qty).filter(([, v]) => Number(v) > 0).map(([lineId, v]) => ({ lineId, quantity: Number(v) }))
   const run = useMutation({
-    mutationFn: () => act === 'receive' ? facilitiesApi.receiveOrder(order.id, { reference: reference || undefined, lines })
+    mutationFn: () => act === 'receive' ? facilitiesApi.receiveOrderAt(order.id, { reference: reference || undefined, lines }, storeId)
       : facilitiesApi.purchaseOrderAction(order.id, act, needsReason ? { reason } : {}),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['facilities'] }); toast.success(`${order.poNumber} updated`); onClose(); onDone() },
     onError: e => toast.error(errorMessage(e)),
@@ -107,6 +118,13 @@ function OrderAction({ act, order, onClose, onDone }: { act: Act; order: Purchas
       {needsReason && <Field label={act === 'cancel' ? 'Why is the order being cancelled? *' : 'Why is the rest not coming? *'}><textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} maxLength={500} style={{ ...inputStyle, resize: 'vertical' }} autoFocus /></Field>}
       {act === 'receive' && (
         <>
+          {activeStores.length > 1 && (
+            <Field label="Receive into" hint="Leave blank for the default store.">
+              <select value={storeId} onChange={e => setStoreId(e.target.value)} style={inputStyle}>
+                <option value="">Default store</option>{activeStores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </Field>
+          )}
           <Field label="Delivery note / invoice reference"><input value={reference} onChange={e => setReference(e.target.value)} maxLength={200} style={inputStyle} /></Field>
           {order.lines.filter(l => l.outstandingQty > 0).map(l => (
             <Field key={l.id} label={l.description} hint={`${fmtQty(l.outstandingQty)} outstanding`}>

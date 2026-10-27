@@ -169,6 +169,23 @@ export interface StockValuation {
   lines: { storeId: Id; storeCode: string; itemId: Id; sku: string; name: string; unit: string; onHand: number; unitCost: number; value: number; itemActive: boolean }[]
 }
 
+export interface GoodsReceipt {
+  id: Id; grnNumber: string; purchaseOrderId: Id; vendorId: Id; storeId: Id | null; deliveryNote: string | null; receivedOn: string
+  totalValue: number; receivedByUserId: Id | null; createdAt: string
+  lines: { poLineId: Id; itemId: Id; description: string; quantity: number; unitCost: number; lineValue: number }[]
+}
+export interface VendorInvoice {
+  id: Id; purchaseOrderId: Id; poNumber: string; vendorId: Id; vendorName: string | null; invoiceNumber: string; invoiceDate: string
+  subtotal: number; vatAmount: number; total: number; status: 'RECORDED' | 'APPROVED' | 'DISPUTED' | string
+  recordedByUserId: Id | null; decidedByUserId: Id | null; decidedAt: string | null; decisionNote: string | null; createdAt: string
+}
+export interface OrderMatch {
+  purchaseOrderId: Id; poNumber: string; orderedValue: number; receivedValue: number; invoicedValue: number; variance: number
+  tolerance: number; status: string; invoices: VendorInvoice[]
+}
+export interface ApprovalLimit { userId: Id; maxOrderValue: number; setByUserId: Id | null; updatedAt: string }
+export interface UserOption { id: Id; name: string }
+
 // ── request bodies ──────────────────────────────────────────────────────────────────────────
 export interface CreateWorkOrderBody {
   siteId: Id; assetId?: Id | null; category: string; priority?: string; description: string
@@ -280,6 +297,25 @@ export const facilitiesApi = {
     data<InspectionSchedule>(await apiClient.put(`${B}/inspection-schedules/${id}`, b)),
   inspectionScheduleActive: async (id: Id, action: 'deactivate' | 'reactivate') => data<InspectionSchedule>(await apiClient.post(`${B}/inspection-schedules/${id}/${action}`)),
   deleteInspectionSchedule: async (id: Id) => { await apiClient.delete(`${B}/inspection-schedules/${id}`) },
+
+
+  receiveOrderAt: async (id: Id, body: { reference?: string; lines: { lineId: Id; quantity: number; unitCost?: number }[] }, storeId?: Id) =>
+    data<PurchaseOrder>(await apiClient.post(`${B}/purchase-orders/${id}/receipts`, body, { params: { storeId: storeId || undefined } })),
+  goodsReceipts: async (id: Id) => data<GoodsReceipt[]>(await apiClient.get(`${B}/purchase-orders/${id}/goods-receipts`)),
+  orderMatch: async (id: Id) => data<OrderMatch>(await apiClient.get(`${B}/purchase-orders/${id}/match`)),
+  vendorInvoices: async (status?: string) => page<VendorInvoice>(await apiClient.get(`${B}/vendor-invoices`, { params: { status: status || undefined, size: 100 } })),
+  recordVendorInvoice: async (b: { purchaseOrderId: Id; invoiceNumber: string; invoiceDate: string; subtotal: number; vatAmount?: number | null }) =>
+    data<VendorInvoice>(await apiClient.post(`${B}/vendor-invoices`, b)),
+  approveVendorInvoice: async (id: Id, note?: string) => data<VendorInvoice>(await apiClient.post(`${B}/vendor-invoices/${id}/approve`, { note })),
+  disputeVendorInvoice: async (id: Id, reason: string) => data<VendorInvoice>(await apiClient.post(`${B}/vendor-invoices/${id}/dispute`, { reason })),
+  approvalLimits: async () => data<ApprovalLimit[]>(await apiClient.get(`${B}/approval-limits`)),
+  setApprovalLimit: async (userId: Id, maxOrderValue: number) => data<ApprovalLimit>(await apiClient.put(`${B}/approval-limits/${userId}`, { maxOrderValue })),
+  removeApprovalLimit: async (userId: Id) => { await apiClient.delete(`${B}/approval-limits/${userId}`) },
+  /** Logins in this company, for choosing an approver. Needs the user-read permission; callers fall back to ids if it is refused. */
+  users: async (): Promise<UserOption[]> => {
+    const rows = data<{ id: string; firstName?: string; lastName?: string; email?: string }[]>(await apiClient.get('/api/v1/identity/users'))
+    return (Array.isArray(rows) ? rows : []).map(u => ({ id: u.id, name: `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() + (u.email ? ` · ${u.email}` : '') }))
+  },
 
   inspectionTemplates: async (includeInactive = false) =>
     page<InspectionTemplate>(await apiClient.get(`${B}/inspection-templates`, { params: { includeInactive } })),
