@@ -20,6 +20,12 @@ public interface FacilityTechnicianLicenceRepository extends JpaRepository<Facil
             "ORDER BY l.licenceType ASC, l.expiryDate DESC")
     List<FacilityTechnicianLicence> findForTechnician(@Param("tenantId") TenantId tenantId, @Param("technicianId") UUID technicianId);
 
+    /** Every licence of the tenant's active technicians, revoked ones included: the register behind the CSV export. */
+    @Query("SELECT l FROM FacilityTechnicianLicence l WHERE l.tenantId.value = :#{#tenantId.value} AND l.technicianId IN " +
+            "(SELECT t.id FROM FacilityTechnician t WHERE t.tenantId.value = :#{#tenantId.value} AND t.deletedAt IS NULL) " +
+            "ORDER BY l.technicianId ASC, l.licenceType ASC, l.expiryDate DESC")
+    List<FacilityTechnicianLicence> findAllForTenant(@Param("tenantId") TenantId tenantId);
+
     /** VALID licences of active technicians that have lapsed or expire by {@code cutoff}: the attention list. */
     @Query("SELECT l FROM FacilityTechnicianLicence l WHERE l.tenantId.value = :#{#tenantId.value} AND l.status = 'VALID' " +
             "AND l.expiryDate IS NOT NULL AND l.expiryDate <= :cutoff AND l.technicianId IN " +

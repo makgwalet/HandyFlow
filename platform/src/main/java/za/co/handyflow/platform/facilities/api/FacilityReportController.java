@@ -8,13 +8,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.facilities.application.internal.FacilityExportService;
 import za.co.handyflow.platform.facilities.application.internal.FacilityReportService;
 import za.co.handyflow.platform.facilities.dto.FacilityAssetReliabilityResponse;
 import za.co.handyflow.platform.facilities.dto.FacilityDashboardResponse;
+import za.co.handyflow.platform.facilities.dto.FacilityTrendResponse;
 import za.co.handyflow.platform.facilities.dto.FacilityVendorPerformanceResponse;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 
 /**
@@ -34,6 +37,7 @@ public class FacilityReportController {
     private static final String CAN_VIEW_REPORTS = "hasAnyAuthority('FACILITIES_READ','FACILITIES_MANAGE','FACILITIES_ADMIN')";
 
     private final FacilityReportService reportService;
+    private final FacilityExportService exportService;
     private final FeatureGuard featureGuard;
 
     @GetMapping("/dashboard")
@@ -65,5 +69,76 @@ public class FacilityReportController {
         featureGuard.requireModule("facilities");
         return ResponseEntity.ok(ApiResponse.success(
                 reportService.assetReliability(TenantContext.getTenantIdAsObject(), from, to, limit)));
+    }
+
+    @GetMapping("/trends")
+    @PreAuthorize(CAN_VIEW_REPORTS)
+    @Operation(summary = "Work raised and completed per WEEK (default) or MONTH over a period: volume, completion time, rework, downtime, cost")
+    public ResponseEntity<ApiResponse<FacilityTrendResponse>> trends(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String bucket) {
+        featureGuard.requireModule("facilities");
+        return ResponseEntity.ok(ApiResponse.success(
+                reportService.trends(TenantContext.getTenantIdAsObject(), from, to, bucket)));
+    }
+
+    // ── CSV exports ──────────────────────────────────────────────────────────
+
+    @GetMapping(value = "/export/work-orders.csv", produces = "text/csv")
+    @PreAuthorize(CAN_VIEW_REPORTS)
+    @Operation(summary = "Work orders created in the period, as a spreadsheet (at most 5000 rows)")
+    public ResponseEntity<byte[]> exportWorkOrders(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        featureGuard.requireModule("facilities");
+        return csv(exportService.workOrders(TenantContext.getTenantIdAsObject(), from, to));
+    }
+
+    @GetMapping(value = "/export/vendor-performance.csv", produces = "text/csv")
+    @PreAuthorize(CAN_VIEW_REPORTS)
+    public ResponseEntity<byte[]> exportVendorPerformance(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        featureGuard.requireModule("facilities");
+        return csv(exportService.vendorPerformance(TenantContext.getTenantIdAsObject(), from, to));
+    }
+
+    @GetMapping(value = "/export/asset-reliability.csv", produces = "text/csv")
+    @PreAuthorize(CAN_VIEW_REPORTS)
+    public ResponseEntity<byte[]> exportAssetReliability(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        featureGuard.requireModule("facilities");
+        return csv(exportService.assetReliability(TenantContext.getTenantIdAsObject(), from, to));
+    }
+
+    @GetMapping(value = "/export/certificates.csv", produces = "text/csv")
+    @PreAuthorize(CAN_VIEW_REPORTS)
+    @Operation(summary = "Compliance certificate register with days to expiry")
+    public ResponseEntity<byte[]> exportCertificates() {
+        featureGuard.requireModule("facilities");
+        return csv(exportService.certificates(TenantContext.getTenantIdAsObject()));
+    }
+
+    @GetMapping(value = "/export/corrective-actions.csv", produces = "text/csv")
+    @PreAuthorize(CAN_VIEW_REPORTS)
+    public ResponseEntity<byte[]> exportCorrectiveActions(@RequestParam(required = false) String status) {
+        featureGuard.requireModule("facilities");
+        return csv(exportService.correctiveActions(TenantContext.getTenantIdAsObject(), status));
+    }
+
+    @GetMapping(value = "/export/technician-licences.csv", produces = "text/csv")
+    @PreAuthorize(CAN_VIEW_REPORTS)
+    public ResponseEntity<byte[]> exportTechnicianLicences() {
+        featureGuard.requireModule("facilities");
+        return csv(exportService.technicianLicences(TenantContext.getTenantIdAsObject()));
+    }
+
+    private static ResponseEntity<byte[]> csv(FacilityExportService.Export export) {
+        return ResponseEntity.ok()
+                .header("Content-Type", "text/csv; charset=UTF-8")
+                .header("Content-Disposition", "attachment; filename=\"" + export.filename() + "\"")
+                .body(export.csv().getBytes(StandardCharsets.UTF_8));
     }
 }

@@ -12,6 +12,7 @@ import za.co.handyflow.platform.facilities.domain.repository.FacilityPpmSchedule
 import za.co.handyflow.platform.facilities.domain.repository.FacilityWorkOrderRepository;
 import za.co.handyflow.platform.facilities.dto.FacilityAssetReliabilityResponse;
 import za.co.handyflow.platform.facilities.dto.FacilityDashboardResponse;
+import za.co.handyflow.platform.facilities.dto.FacilityTrendResponse;
 import za.co.handyflow.platform.facilities.dto.FacilityVendorPerformanceResponse;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.MaintenanceAnalytics;
@@ -150,6 +151,33 @@ public class FacilityReportService {
                     s.downtimeMinutes(), s.mttrHours(), s.mtbfHours(), s.topFailureCause(), s.totalCost());
         }).toList();
         return new FacilityAssetReliabilityResponse(from, to, cap, rows);
+    }
+
+    // ── Trends ───────────────────────────────────────────────────────────────
+
+    /** Work raised and completed per week or month over a period (at most {@value #MAX_SPAN_DAYS} days). Manager view. */
+    @Transactional(readOnly = true)
+    public FacilityTrendResponse trends(TenantId tenantId, LocalDate from, LocalDate to, String bucket) {
+        AccessScope scope = requireManagementScope(tenantId);
+        validatePeriod(from, to);
+        String b = FacilityTrendRules.normaliseBucket(bucket);
+        List<LocalDate> raisedOn = createdBetween(tenantId, scope, from, to).stream()
+                .map(w -> FacilityTime.toLocalDate(w.getCreatedAt())).toList();
+        Instant start = from.atStartOfDay(FacilityTime.ZONE).toInstant();
+        Instant endExclusive = to.plusDays(1).atStartOfDay(FacilityTime.ZONE).toInstant();
+        List<FacilityTrendRules.Done> done = workOrderRepository.findCompletedBetweenInScope(tenantId, start, endExclusive,
+                        scope.allSites(), scope.siteIds(), scope.allJobs(), scope.technicianIds(), scope.allRequesters(), scope.requesterUserId())
+                .stream().map(w -> new FacilityTrendRules.Done(w.getCreatedAt(), w.getCompletedAt(), w.getReworkCount(),
+                        w.getDowntimeMinutes(), w.getCost())).toList();
+        return new FacilityTrendResponse(from, to, b, FacilityTrendRules.trend(from, to, b, raisedOn, done));
+    }
+
+    /** Work orders created in the period, for the CSV export. Manager view, same period rules as the reports. */
+    @Transactional(readOnly = true)
+    public List<FacilityWorkOrder> workOrdersCreatedBetween(TenantId tenantId, LocalDate from, LocalDate to) {
+        AccessScope scope = requireManagementScope(tenantId);
+        validatePeriod(from, to);
+        return createdBetween(tenantId, scope, from, to);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

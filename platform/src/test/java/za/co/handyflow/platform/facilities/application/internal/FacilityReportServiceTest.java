@@ -314,4 +314,27 @@ class FacilityReportServiceTest {
         BigDecimal mtbf = service.assetReliability(tenant, today().minusDays(10), today().plusDays(20), null).assets().get(0).mtbfHours();
         assertTrue(mtbf.compareTo(bd("264.1")) < 0 && mtbf.compareTo(bd("240")) >= 0, "was " + mtbf);
     }
+
+    // ── trends ───────────────────────────────────────────────────────────────
+
+    @Test
+    void trendsCountRaisedAndCompletedWorkInTheirWeeks() {
+        completed(4, "200.00", 1, 60);
+        wo("OPEN", "NORMAL");
+        FacilityTrendResponse t = service.trends(tenant, from(), today(), null);
+        assertEquals("WEEK", t.bucket());
+        assertEquals(2, t.points().stream().mapToLong(FacilityTrendResponse.Point::raised).sum());
+        assertEquals(1, t.points().stream().mapToLong(FacilityTrendResponse.Point::completed).sum());
+        assertEquals(1, t.points().stream().mapToLong(FacilityTrendResponse.Point::reworked).sum());
+        assertEquals(60, t.points().stream().mapToLong(FacilityTrendResponse.Point::downtimeMinutes).sum());
+    }
+
+    @Test
+    void trendsAreAManagerViewWithTheSamePeriodRules() {
+        scope = AccessScope.assignedJobs(List.of(site), List.of(UUID.randomUUID()));
+        assertEquals("SCOPE_RESTRICTED", assertThrows(HandyFlowException.class, () -> service.trends(tenant, from(), today(), "WEEK")).getErrorCode());
+        scope = AccessScope.unrestricted();
+        assertThrows(IllegalArgumentException.class, () -> service.trends(tenant, today(), from(), "WEEK"));
+        assertThrows(IllegalArgumentException.class, () -> service.trends(tenant, from(), today(), "DAY"));
+    }
 }
