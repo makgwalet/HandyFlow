@@ -2,6 +2,7 @@ package za.co.handyflow.platform.facilities.application.internal;
 
 import za.co.handyflow.platform.facilities.domain.model.FacilityComplianceCertificate;
 import za.co.handyflow.platform.facilities.domain.model.FacilityCorrectiveAction;
+import za.co.handyflow.platform.facilities.domain.model.FacilityVendorDocument;
 import za.co.handyflow.platform.facilities.dto.ActionCentreResponse;
 import za.co.handyflow.platform.facilities.dto.ActionCentreResponse.Item;
 
@@ -23,7 +24,35 @@ public final class FacilityActionCentre {
     public static ActionCentreResponse build(Collection<FacilityComplianceCertificate> certificates,
                                              Collection<FacilityCorrectiveAction> unfinishedActions,
                                              LocalDate today, int warningDays) {
+        return build(certificates, unfinishedActions, List.of(), Map.of(), today, warningDays);
+    }
+
+    /**
+     * @param vendorDocuments VALID vendor documents that have lapsed or expire soon (any type)
+     * @param vendorNames     vendor id -> name, for the item titles
+     */
+    public static ActionCentreResponse build(Collection<FacilityComplianceCertificate> certificates,
+                                             Collection<FacilityCorrectiveAction> unfinishedActions,
+                                             Collection<FacilityVendorDocument> vendorDocuments,
+                                             Map<UUID, String> vendorNames, LocalDate today, int warningDays) {
         List<Item> items = new ArrayList<>();
+
+        for (FacilityVendorDocument d : vendorDocuments) {
+            if (!"VALID".equals(d.getStatus()) || d.getExpiryDate() == null) continue;
+            long daysLeft = ChronoUnit.DAYS.between(today, d.getExpiryDate());
+            String vendor = vendorNames.getOrDefault(d.getVendorId(), "Vendor");
+            boolean required = FacilityVendorCompliance.REQUIRED.contains(d.getDocType());
+            if (daysLeft < 0) {
+                items.add(new Item(required ? "CRITICAL" : "HIGH", "VENDOR_DOCUMENT_LAPSED", null, null,
+                        vendor + ": " + d.getDocType() + " lapsed",
+                        "Expired " + (-daysLeft) + " day(s) ago on " + d.getExpiryDate() + (required ? " — vendor cannot be assigned work" : ""),
+                        d.getExpiryDate(), "VENDOR", d.getVendorId()));
+            } else if (daysLeft <= warningDays) {
+                items.add(new Item(daysLeft <= URGENT_EXPIRY_DAYS ? "HIGH" : "MEDIUM", "VENDOR_DOCUMENT_EXPIRING", null, null,
+                        vendor + ": " + d.getDocType() + " expiring",
+                        "Expires in " + daysLeft + " day(s) on " + d.getExpiryDate(), d.getExpiryDate(), "VENDOR", d.getVendorId()));
+            }
+        }
 
         for (FacilityComplianceCertificate c : certificates) {
             if ("REVOKED".equals(c.getStatus())) continue;

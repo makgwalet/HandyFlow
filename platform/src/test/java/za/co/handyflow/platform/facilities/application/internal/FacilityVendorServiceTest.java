@@ -27,9 +27,10 @@ class FacilityVendorServiceTest {
     private final FacilityAuditService auditService = new FacilityAuditService(null) {
         @Override public void record(TenantId t, String action, String type, UUID id, String details) { audit.add(action); }
     };
-    private final FacilityVendorService service = new FacilityVendorService(repo, auditService);
+    private final FacilityVendorService service = new FacilityVendorService(repo, null, new FacilityAccessPolicy(null, null, null), auditService);
 
     private UUID newVendor() {
+        za.co.handyflow.platform.shared.TenantContext.setUserId(UUID.randomUUID().toString());
         return service.createVendor(tenant, new UpsertVendorRequest("ACME Plumbing", "PLUMBING", null, null, null, null)).id();
     }
 
@@ -38,14 +39,14 @@ class FacilityVendorServiceTest {
         UUID id = newVendor();
         assertFalse(service.deactivate(tenant, id).active());
         assertTrue(service.reactivate(tenant, id).active());
-        assertEquals(List.of("VENDOR_DEACTIVATED", "VENDOR_REACTIVATED"), audit);
+        assertEquals(List.of("VENDOR_CREATED", "VENDOR_DEACTIVATED", "VENDOR_REACTIVATED"), audit);
     }
 
     @Test
     void deletingIsAudited() {
         UUID id = newVendor();
         service.deleteVendor(tenant, id);
-        assertEquals(List.of("VENDOR_DELETED"), audit);
+        assertEquals(List.of("VENDOR_CREATED", "VENDOR_DELETED"), audit);
     }
 
     @Test

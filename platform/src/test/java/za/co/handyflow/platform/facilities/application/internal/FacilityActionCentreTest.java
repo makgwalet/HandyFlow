@@ -115,4 +115,51 @@ class FacilityActionCentreTest {
         assertEquals(today.plusDays(2), FacilityActionRules.dueDateForFailure(true, today));
         assertEquals(today.plusDays(14), FacilityActionRules.dueDateForFailure(false, today));
     }
+
+    // ── vendor documents ─────────────────────────────────────────────────────
+
+    private za.co.handyflow.platform.facilities.domain.model.FacilityVendorDocument vendorDoc(String type, int expiresInDays, UUID vendor) {
+        return za.co.handyflow.platform.facilities.domain.model.FacilityVendorDocument.create(tenant, vendor, type, "R1", null, null,
+                today.plusDays(expiresInDays), null, null);
+    }
+
+    @Test
+    void aLapsedRequiredVendorDocumentIsCriticalAndNamesTheVendor() {
+        UUID v = UUID.randomUUID();
+        ActionCentreResponse r = FacilityActionCentre.build(List.of(), List.of(),
+                List.of(vendorDoc("COIDA_LETTER", -2, v)), java.util.Map.of(v, "ACME Plumbing"), today, 30);
+        assertEquals(1, r.critical());
+        ActionCentreResponse.Item i = r.items().get(0);
+        assertEquals("VENDOR_DOCUMENT_LAPSED", i.type());
+        assertEquals("VENDOR", i.entityType());
+        assertEquals(v, i.entityId());
+        assertTrue(i.title().startsWith("ACME Plumbing"));
+        assertTrue(i.detail().contains("cannot be assigned work"));
+    }
+
+    @Test
+    void aLapsedOptionalVendorDocumentIsOnlyHigh() {
+        ActionCentreResponse r = FacilityActionCentre.build(List.of(), List.of(),
+                List.of(vendorDoc("TRADE_LICENCE", -2, UUID.randomUUID())), java.util.Map.of(), today, 30);
+        assertEquals(1, r.high());
+        assertEquals(0, r.critical());
+    }
+
+    @Test
+    void expiringVendorDocumentsFollowTheSameWindowsAsCertificates() {
+        UUID v = UUID.randomUUID();
+        ActionCentreResponse r = FacilityActionCentre.build(List.of(), List.of(),
+                List.of(vendorDoc("TAX_CLEARANCE", 10, v), vendorDoc("TAX_CLEARANCE", 25, v), vendorDoc("TAX_CLEARANCE", 45, v)),
+                java.util.Map.of(), today, 30);
+        assertEquals(1, r.high());
+        assertEquals(1, r.medium());
+        assertEquals(2, r.items().size());
+    }
+
+    @Test
+    void revokedVendorDocumentsAreIgnored() {
+        var d = vendorDoc("COIDA_LETTER", -2, UUID.randomUUID());
+        d.revoke("replaced");
+        assertTrue(FacilityActionCentre.build(List.of(), List.of(), List.of(d), java.util.Map.of(), today, 30).items().isEmpty());
+    }
 }

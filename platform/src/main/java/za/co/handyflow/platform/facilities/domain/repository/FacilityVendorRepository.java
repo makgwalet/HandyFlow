@@ -18,4 +18,7 @@ public interface FacilityVendorRepository extends JpaRepository<FacilityVendor, 
 
     @Query("SELECT v FROM FacilityVendor v WHERE v.tenantId.value = :#{#tenantId.value} AND v.deletedAt IS NULL")
     Page<FacilityVendor> findAllActive(@Param("tenantId") TenantId tenantId, Pageable pageable);
+
+    @Query("SELECT v FROM FacilityVendor v WHERE v.tenantId.value = :#{#tenantId.value} AND v.id IN :ids AND v.deletedAt IS NULL")
+    java.util.List<FacilityVendor> findActiveByIds(@Param("tenantId") TenantId tenantId, @Param("ids") java.util.Collection<UUID> ids);
 }

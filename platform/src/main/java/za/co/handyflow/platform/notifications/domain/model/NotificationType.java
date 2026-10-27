@@ -340,6 +340,10 @@ public enum NotificationType {
     FACILITY_WORKORDER_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
     FACILITY_WORKORDER_REQUESTED(INFO, Set.of(IN_APP, EMAIL)),
     FACILITY_WORKORDER_AWAITING_VERIFICATION(INFO, Set.of(IN_APP, EMAIL)),
+    /** A vendor's insurance, tax or licence document is about to expire. */
+    FACILITY_VENDOR_DOC_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
+    /** A vendor's required document has expired; the vendor can no longer be assigned work. */
+    FACILITY_VENDOR_DOC_EXPIRED(CRITICAL, Set.of(IN_APP, EMAIL)),
     /** An inspection was completed with failed checks; corrective actions have been raised. */
     FACILITY_INSPECTION_FAILED(WARNING, Set.of(IN_APP, EMAIL)),
     FACILITY_COMPLIANCE_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),

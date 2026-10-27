@@ -62,6 +62,15 @@ Do **not** edit V506–V509 to tidy their "rename" header comments: Flyway check
 - Alert `FACILITY_INSPECTION_FAILED` to tenant admins when an inspection fails. New authority string `FACILITIES_INSPECT` for people who may run inspections but nothing else (templates and actions need MANAGE, ADMIN or COMPLIANCE_MANAGE).
 - Not done: scheduling recurring inspections (no "inspection due" reminders yet), inspection photos (the evidence module is not wired to inspections), and turning a lapsed certificate into an action automatically. A manual CERTIFICATE action covers it for now.
 
+## Vendor onboarding and compliance (internal facilities, V516)
+
+- A new vendor starts **PENDING**. Approval needs a public liability insurance, a COIDA letter and a tax clearance document in force (the one expiring last counts, so renewing early leaves no gap). The person who added the vendor cannot approve it (403 `VENDOR_SELF_APPROVAL`); an admin may, audited as `VENDOR_SELF_APPROVED`. Vendors that existed before this change were set to APPROVED by the migration.
+- **Assignment gate:** a vendor that is not APPROVED, or has a required document missing or expired, cannot be assigned a work order (409 `VENDOR_NOT_ELIGIBLE`, with reasons). An admin can override; it is audited as `WORK_ORDER_ASSIGNED_INELIGIBLE_VENDOR`. Technicians are not affected.
+- Documents (`/vendors/{id}/documents`): insurance (with cover amount), COIDA, tax clearance, trade licence, B-BBEE, other; expiry date required except for OTHER; revoke with a reason. `GET /vendors/{id}/compliance` explains why a vendor is or is not eligible.
+- Approve and suspend (`/vendors/{id}/approve`, `/suspend`), plus audit on vendor create and update, which were not audited before.
+- Daily 08:50 reminders to admins at 30/14/7/3/1/0 days before a vendor document expires, and once the day after it lapses (critical). Lapsed and expiring vendor documents also appear in the action centre.
+- Not done: the same onboarding for the FM (provider) module's vendors and technicians; technician licence/certification tracking; automatic suspension on lapse (the gate already blocks assignment, so nothing is mutated).
+
 ## Reporting (new, both modules)
 
 All figures are computed on request from the work orders / invoices themselves, inside the caller's access scope, and the vendor and asset arithmetic lives once in `shared.MaintenanceAnalytics` so the two modules cannot drift. FM SLA figures use the same `FmSlaStatus` rules as the API and the SLA monitor.
@@ -85,7 +94,7 @@ Definitions worth knowing: a *failure* is a reactive (non-PPM, non-inspection), 
 
 ## Not done (honest list)
 
-Portal quote approvals (the rest of the portal roadmap is done); site and client scope for vendor and technician records and audit on FM vendor changes; report exports (CSV/PDF), scheduled report emails and trend-over-time charts (the reports are point-in-time); mobile/QR/offline; inventory and procurement; vendor onboarding with insurance/licence tracking; multi-entity portfolios and integrations. None have migrations or code.
+Portal quote approvals (the rest of the portal roadmap is done); site and client scope for vendor and technician records and audit on FM vendor changes; report exports (CSV/PDF), scheduled report emails and trend-over-time charts (the reports are point-in-time); mobile/QR/offline; inventory and procurement; multi-entity portfolios and integrations. None have migrations or code.
 
 ## Known limitations (carried over from your list, unchanged)
 

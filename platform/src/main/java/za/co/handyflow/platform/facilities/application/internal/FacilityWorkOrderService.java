@@ -55,6 +55,7 @@ public class FacilityWorkOrderService {
     private final FacilityPpmScheduleRepository ppmScheduleRepository;
     private final FacilityTechnicianRepository technicianRepository;
     private final FacilityVendorRepository vendorRepository;
+    private final FacilityVendorEligibility vendorEligibility;
     private final FacilityWorkOrderCostLineRepository costLineRepository;
     private final FacilityNumberGenerator numberGenerator;
     private final FacilityPpmScheduleService ppmScheduleService;
@@ -220,6 +221,7 @@ public class FacilityWorkOrderService {
         }
 
         String vendorName = null;
+        String overrideNote = null;
         if (req.vendorId() != null) {
             FacilityVendor v = vendorRepository.findActiveById(tenantId, req.vendorId())
                     .orElseThrow(() -> new ResourceNotFoundException("FacilityVendor", req.vendorId().toString()));
@@ -227,12 +229,21 @@ public class FacilityWorkOrderService {
                 throw new IllegalStateException("Vendor " + v.getCompanyName() + " is deactivated and cannot be assigned work");
             }
             vendorName = v.getCompanyName();
+            List<String> problems = vendorEligibility.problems(tenantId, v);
+            if (!problems.isEmpty()) {
+                if (!accessPolicy.hasAuthority("FACILITIES_ADMIN")) {
+                    throw new HandyFlowException("Cannot assign work to " + vendorName + ": " + String.join("; ", problems),
+                            HttpStatus.CONFLICT, "VENDOR_NOT_ELIGIBLE");
+                }
+                overrideNote = String.join("; ", problems);
+            }
         }
 
         wo.assign(req.technicianId(), technicianName, req.vendorId(), vendorName);
         workOrderRepository.save(wo);
-        auditService.record(tenantId, "WORK_ORDER_ASSIGNED", "WORK_ORDER", id,
-                wo.getWorkOrderNumber() + " technician=" + technicianName + " vendor=" + vendorName);
+        auditService.record(tenantId, overrideNote != null ? "WORK_ORDER_ASSIGNED_INELIGIBLE_VENDOR" : "WORK_ORDER_ASSIGNED", "WORK_ORDER", id,
+                wo.getWorkOrderNumber() + " technician=" + technicianName + " vendor=" + vendorName
+                        + (overrideNote != null ? " ADMIN OVERRIDE: " + overrideNote : ""));
         return toResponse(wo);
     }
 

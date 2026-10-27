@@ -68,6 +68,10 @@ class FacilityWorkOrderServiceTest {
             "findActiveById".equals(n) ? Optional.ofNullable(asset != null && asset.getId().equals(a[1]) ? asset : null) : NOPE);
     private final FacilityVendorRepository vendorRepo = fake(FacilityVendorRepository.class, (n, a) ->
             "findActiveById".equals(n) ? Optional.of(FacilityVendor.create(tenant, "ACME Plumbing", "PLUMBING", null, null, null, null)) : NOPE);
+    private List<String> vendorProblems = List.of();
+    private final FacilityVendorEligibility vendorEligibility = new FacilityVendorEligibility(null) {
+        @Override public List<String> problems(TenantId t, FacilityVendor v) { return vendorProblems; }
+    };
     private final FacilityWorkOrderCostLineRepository costRepo = fake(FacilityWorkOrderCostLineRepository.class, (n, a) ->
             "sumForWorkOrder".equals(n) ? lineTotal : NOPE);
 
@@ -96,7 +100,7 @@ class FacilityWorkOrderServiceTest {
     private final EvidenceFacade evidenceFacade = fake(EvidenceFacade.class, (n, a) ->
             "listFor".equals(n) ? List.copyOf(evidence) : NOPE);
 
-    private final FacilityWorkOrderService service = new FacilityWorkOrderService(woRepo, siteRepo, assetRepo, null, null, vendorRepo,
+    private final FacilityWorkOrderService service = new FacilityWorkOrderService(woRepo, siteRepo, assetRepo, null, null, vendorRepo, vendorEligibility,
             costRepo, numbers, ppm, alerts, evidenceFacade, policy, auditService);
 
     private void actAs(UUID user) { TenantContext.setUserId(user.toString()); TenantContext.setUserName("Tester"); }
@@ -307,9 +311,41 @@ class FacilityWorkOrderServiceTest {
         FacilityAccessPolicy narrow = new FacilityAccessPolicy(null, null, null) {
             @Override public AccessScope scope(TenantId t) { return AccessScope.restrictedToSites(List.of(UUID.randomUUID())); }
         };
-        FacilityWorkOrderService restricted = new FacilityWorkOrderService(woRepo, siteRepo, assetRepo, null, null, vendorRepo,
+        FacilityWorkOrderService restricted = new FacilityWorkOrderService(woRepo, siteRepo, assetRepo, null, null, vendorRepo, vendorEligibility,
                 costRepo, numbers, ppm, alerts, evidenceFacade, narrow, auditService);
         assertThrows(ResourceNotFoundException.class, () -> restricted.getWorkOrder(tenant, wo.id()));
         assertThrows(ResourceNotFoundException.class, () -> restricted.start(tenant, wo.id()));
+    }
+
+    // ── vendor eligibility ───────────────────────────────────────────────────
+
+    @Test
+    void anIneligibleVendorCannotBeAssignedWork() {
+        WorkOrderResponse wo = create("NORMAL", false);
+        vendorProblems = List.of("no COIDA_LETTER on file");
+        HandyFlowException e = assertThrows(HandyFlowException.class,
+                () -> service.assign(tenant, wo.id(), new AssignWorkOrderRequest(null, null, UUID.randomUUID(), "ACME")));
+        assertEquals("VENDOR_NOT_ELIGIBLE", e.getErrorCode());
+        assertTrue(e.getMessage().contains("COIDA_LETTER"));
+        assertEquals("OPEN", service.getWorkOrder(tenant, wo.id()).status());
+        assertFalse(audit.contains("WORK_ORDER_ASSIGNED"));
+    }
+
+    @Test
+    void anAdminCanOverrideButItIsAuditedAsSuch() {
+        WorkOrderResponse wo = create("NORMAL", false);
+        vendorProblems = List.of("PUBLIC_LIABILITY_INSURANCE has expired");
+        authorities.add("FACILITIES_ADMIN");
+        service.assign(tenant, wo.id(), new AssignWorkOrderRequest(null, null, UUID.randomUUID(), "ACME"));
+        assertTrue(audit.contains("WORK_ORDER_ASSIGNED_INELIGIBLE_VENDOR"));
+        assertFalse(audit.contains("WORK_ORDER_ASSIGNED"));
+        assertEquals("ASSIGNED", service.getWorkOrder(tenant, wo.id()).status());
+    }
+
+    @Test
+    void anEligibleVendorIsAssignedNormallyAndTechniciansAreNotChecked() {
+        WorkOrderResponse wo = create("NORMAL", false);
+        service.assign(tenant, wo.id(), new AssignWorkOrderRequest(null, null, UUID.randomUUID(), "ACME"));
+        assertTrue(audit.contains("WORK_ORDER_ASSIGNED"));
     }
 }

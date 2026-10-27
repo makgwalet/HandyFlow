@@ -55,7 +55,7 @@ class FacilityCorrectiveActionServiceTest {
     private final FacilityAuditService auditService = new FacilityAuditService(null) {
         @Override public void record(TenantId t, String action, String type, UUID id, String details) { audit.add(action); }
     };
-    private final FacilityWorkOrderService woService = new FacilityWorkOrderService(null, null, null, null, null, null, null, null,
+    private final FacilityWorkOrderService woService = new FacilityWorkOrderService(null, null, null, null, null, null, null, null, null,
             null, null, null, policy, auditService) {
         @Override public WorkOrderResponse createWorkOrder(TenantId t, CreateWorkOrderRequest req) {
             raised.add(req);
