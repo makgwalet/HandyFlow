@@ -13,6 +13,8 @@ import { apiClient } from "../../api/client"
 import { Plus, X, ChevronDown, ChevronUp, Download, DollarSign, AlertCircle } from "lucide-react"
 import { useAuth } from "../../hooks/useAuth"
 import { RunActions, RunReview } from "./PayRunControls"
+import PayRunPaymentsPanel from "./PayRunPaymentsPanel"
+import { canPayRun } from "./payRunPayments.logic"
 import { hasTotals, rightsFrom, STATUS_STYLE, STATUS_TEXT } from "./payrollControls.logic"
 import { taxYearName } from "./payrollChecks.logic"
 
@@ -175,6 +177,7 @@ export default function PayrollTab() {
                 {isOpen && (
                   <div style={{ borderTop: "1px solid var(--hf-border)", padding: "14px 20px", background: "var(--hf-surface-muted)" }}>
                     <RunReview run={run} userId={user?.userId} />
+                    {canPayRun(run.status) && (rights.finalise || rights.read) && <PayRunPaymentsPanel runId={run.id} canAct={rights.finalise} />}
                     {(payslips as any[]).length > 0 ? (
                       <div>
                         <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>Payslips ({payslips.length} employees)</div>

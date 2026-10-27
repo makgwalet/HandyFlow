@@ -64,4 +64,8 @@ public interface HrEmployeeRepository extends JpaRepository<HrEmployee, UUID> {
     /** Everyone not yet terminated, for building the reporting lines. */
     @Query("SELECT e FROM HrEmployee e WHERE e.tenantId = :#{#tenantId.value} AND e.status <> 'TERMINATED' AND e.deletedAt IS NULL")
     List<HrEmployee> findNotTerminated(TenantId tenantId);
+
+    /** Live employees by id, whatever their status, so a leaver on the last run can still be paid. */
+    @Query("SELECT e FROM HrEmployee e WHERE e.tenantId = :#{#tenantId.value} AND e.id IN :ids AND e.deletedAt IS NULL")
+    List<HrEmployee> findAllByIds(TenantId tenantId, java.util.Collection<UUID> ids);
 }

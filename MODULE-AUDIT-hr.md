@@ -922,3 +922,30 @@ I read the four training services, the entities and the session screen. The modu
 - Maven, Spring and the database have not run. V526 has never run against PostgreSQL; `HrPayAdjustmentRepository` queries are untested against a real database. `PayrollService`, `PayrollControlService` and their tests gained constructor arguments; the 4 new tests in `PayrollServiceTest` and `PayrollControlServiceTest` use real Mockito and are unexecuted.
 - In my harness `SarsPayeCalculatorBonusTest` (8), `PayAdjustmentRulesTest` (11) and `PayAdjustmentServiceTest` (15) pass. Annualising the bonus is caught (4 failures); removing the self-entry check is caught (2).
 - Front end: lint is clean and the type check shows no new errors in the touched files. The new tests in `PayAdjustments.test.tsx` and `payslipNotes.test.ts` have not run, because vitest is not installed here.
+
+## 32. Slice 19b: bank payment file and paid state (V527)
+
+**What was there.** A finalised pay run said nothing about whether anyone had been paid. Finance rebuilt the list of names, accounts and amounts by hand for the bank, and nothing recorded that it had been sent, accepted or bounced.
+
+**What changed**
+
+- **Making up payments (V527).** For a finalised (or older completed) run, one payment per payslip with a net pay above zero. The employee's bank details are copied into the payment, so a later change does not rewrite what was sent. People with no name, an account number that is not 6 to 16 digits, or a branch code that is not 6 digits are left out, and the screen lists each one with the reason. A zero or negative net pay is listed too. Leavers on the run are included. Making up again replaces payments that are still pending (for example after fixing someone's bank details); it is refused once any payment has been paid or returned. A reference of at most 20 letters, digits and spaces ("SAL PR00005 E001") goes on each line.
+- **The file.** A CSV (name, bank, branch code, account number, amount, reference) with a byte order mark so Excel reads it as UTF-8. Names that start with a formula character are neutralised. It is not any one bank's own layout; most business banking sites can import a CSV after mapping columns. Downloading it is written to the pay run's history, because it holds everyone's bank details. It is sent as an attachment, not cached.
+- **Paid state.** After the file has been downloaded, "Confirm paid" turns every pending payment into paid, with who and when, and an optional note. It is refused until the file has been downloaded. A single payment can be marked returned with a reason (from pending or paid); it stays in the record.
+- **Access.** Only people who may finalise a pay run can make up, download, confirm or return. People who can review payroll can see the list, with account numbers masked to the last four digits.
+- **Screen.** A "Bank payments" panel on each finalised run, under the review: next step in words, the counts, the list, and the buttons.
+
+**Still not done**
+
+- No bank-specific layouts (FNB, Standard Bank, ABSA, Nedbank, ACB). The generic CSV needs a column mapping on the bank's side.
+- No import of the bank's return or statement file, so returned payments are keyed in by hand. A returned payment cannot be paid again from this file; it is paid outside the system.
+- The person who downloads the file can also confirm it. There is no second-person check on the bank file itself, only on the pay run.
+- Bank account numbers are stored in plain text in the employee record and copied as plain text into the payment (as they already were on the employee). Nothing checks the account number's check digit, or that the account holder's name matches.
+- Payments are made up for the whole run at once; no part payments, and no separate file for a late leaver.
+- Cancelled payslips and the Emp201 liability are not linked to this; EMP201 payment is still to do.
+
+**Not verified**
+
+- Maven, Spring and the database have not run. V527 has never run against PostgreSQL. `HrPayRunPaymentRepository`, the new `findAllByIds` query and `PayRunPaymentController` (the CSV download headers and the permission checks) have never run.
+- In my harness `PayrollPaymentRulesTest` (9) and `PayRunPaymentServiceTest` (11) pass. Removing the "file downloaded first" check and the "nothing paid yet" check is caught (4 failures).
+- Front end: lint is clean on the new files and the type check shows no new errors apart from vitest not being installed here. `PayRunPayments.test.tsx` (10 tests) has not run. `PayrollTab.tsx` still has its 19 existing lint errors for `any`; I added none.
