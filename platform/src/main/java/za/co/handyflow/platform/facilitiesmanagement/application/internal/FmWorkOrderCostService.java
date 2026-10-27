@@ -56,6 +56,7 @@ public class FmWorkOrderCostService {
     public FmCostLineResponse add(TenantId tenantId, UUID workOrderId, AddFmCostLineRequest req) {
         FmWorkOrder wo = findScoped(tenantId, workOrderId);
         requireEditable(wo);
+        requirePricingAuthority(req);
 
         FmWorkOrderCostLine line = FmWorkOrderCostLine.create(tenantId, workOrderId, req.costType(), req.description(),
                 req.quantity(), req.unitCost(), defaultCharge(wo, req), req.billable() == null || req.billable(),
@@ -77,7 +78,7 @@ public class FmWorkOrderCostService {
                 .orElseThrow(() -> new ResourceNotFoundException("FmWorkOrderCostLine", lineId.toString()));
 
         UUID me = TenantContext.getCurrentUserId();
-        boolean privileged = accessPolicy.hasAuthority("FACILITIESMANAGEMENT_MANAGE") || accessPolicy.hasAuthority("FACILITIESMANAGEMENT_ADMIN");
+        boolean privileged = canPrice();
         if (!privileged && (me == null || !me.equals(line.getRecordedByUserId()))) {
             throw new HandyFlowException("You can only remove cost lines you recorded", HttpStatus.FORBIDDEN, "COST_LINE_NOT_OWNED");
         }
@@ -102,6 +103,23 @@ public class FmWorkOrderCostService {
             return req.unitCost().multiply(factor).setScale(2, RoundingMode.HALF_UP);
         }
         return null;
+    }
+
+    /**
+     * What the client is charged is a commercial decision. A technician records what was used (cost); the charge then
+     * comes from the agreement's rate card. Overriding the charge, or marking a line non-billable (which writes the
+     * cost off), is reserved for managers.
+     */
+    private void requirePricingAuthority(AddFmCostLineRequest req) {
+        boolean overrides = req.unitCharge() != null || Boolean.FALSE.equals(req.billable());
+        if (overrides && !canPrice()) {
+            throw new HandyFlowException("Only a manager can set the client charge or mark a cost line non-billable",
+                    HttpStatus.FORBIDDEN, "COST_LINE_PRICING_RESTRICTED");
+        }
+    }
+
+    private boolean canPrice() {
+        return accessPolicy.hasAuthority("FACILITIESMANAGEMENT_MANAGE") || accessPolicy.hasAuthority("FACILITIESMANAGEMENT_ADMIN");
     }
 
     private void requireEditable(FmWorkOrder wo) {

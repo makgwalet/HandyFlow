@@ -83,7 +83,7 @@ public class FmNotificationScheduler {
     }
 
     public int generateDuePpmWorkOrders() {
-        List<FmPpmSchedule> due = ppmScheduleRepository.findAllDueAcrossTenants(LocalDate.now());
+        List<FmPpmSchedule> due = ppmScheduleRepository.findAllDueAcrossTenants(FmTime.today());
         int generated = 0;
         for (FmPpmSchedule schedule : due) {
             try {
@@ -115,7 +115,7 @@ public class FmNotificationScheduler {
     }
 
     public int alertOverdueWorkOrders() {
-        List<FmWorkOrder> overdue = workOrderRepository.findOverdueAcrossTenants(LocalDate.now());
+        List<FmWorkOrder> overdue = workOrderRepository.findOverdueAcrossTenants(FmTime.today());
         int alerts = 0;
         for (FmWorkOrder wo : overdue) {
             try {
@@ -129,7 +129,7 @@ public class FmNotificationScheduler {
     }
 
     public int alertExpiringAgreements() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FmTime.today();
         LocalDate cutoff = today.plusDays(AGREEMENT_EXPIRY_WARNING_DAYS);
         List<FmServiceAgreement> expiring = serviceAgreementRepository.findExpiringAcrossTenants(today, cutoff);
         int alerts = 0;
@@ -147,7 +147,7 @@ public class FmNotificationScheduler {
     }
 
     public int alertOverdueInvoices() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FmTime.today();
         List<FmInvoice> overdue = invoiceRepository.findOverdueAcrossTenants();
         int alerts = 0;
         for (FmInvoice invoice : overdue) {

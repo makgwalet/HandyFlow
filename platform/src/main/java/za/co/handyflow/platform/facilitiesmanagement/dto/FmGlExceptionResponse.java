@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
-/** A document that should be in the ledger but isn't. {@code type} is INVOICE or PAYMENT. */
+/** A document that should be in the ledger but isn't. {@code type} is INVOICE, CREDIT_NOTE or PAYMENT. */
 public record FmGlExceptionResponse(
         String type, UUID id, UUID invoiceId, String reference, BigDecimal amount,
         int attempts, String lastError, Instant lastAttemptAt

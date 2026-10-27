@@ -13,7 +13,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
@@ -39,8 +38,8 @@ public class FmSlaReportService {
         if (ChronoUnit.DAYS.between(from, to) > MAX_SPAN_DAYS)
             throw new IllegalArgumentException("The reporting period cannot exceed " + MAX_SPAN_DAYS + " days");
 
-        Instant fromInstant = from.atStartOfDay(ZoneOffset.UTC).toInstant();
-        Instant toExclusive = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant fromInstant = from.atStartOfDay(FmTime.ZONE).toInstant();
+        Instant toExclusive = to.plusDays(1).atStartOfDay(FmTime.ZONE).toInstant();
         Instant now = Instant.now();
         List<FmWorkOrder> orders = workOrderRepository.findWithSlaForClient(tenantId, clientId, fromInstant, toExclusive);
 

@@ -54,6 +54,7 @@ public class FmClientService {
         String code = numberGenerator.nextClientCode(tenantId);
         FmClient client = FmClient.create(tenantId, code, req.tradingName(), req.registrationNumber(),
                 req.contactName(), req.contactEmail(), req.contactPhone(), req.address());
+        client.changeVatNumber(req.vatNumber());
         clientRepository.save(client);
         log.info("FM client created code={} tenant={}", code, tenantId);
         return toResponse(client);
@@ -64,7 +65,13 @@ public class FmClientService {
         FmClient client = findActive(tenantId, id, accessPolicy.scope(tenantId));
         client.update(req.tradingName(), req.registrationNumber(), req.contactName(),
                 req.contactEmail(), req.contactPhone(), req.address());
+        String beforeVat = client.getVatNumber();
+        client.changeVatNumber(req.vatNumber());
         clientRepository.save(client);
+        if (!java.util.Objects.equals(beforeVat, client.getVatNumber())) {
+            auditService.record(tenantId, "CLIENT_VAT_NUMBER_CHANGED", "CLIENT", id,
+                    client.getClientCode() + " " + beforeVat + " -> " + client.getVatNumber());
+        }
         return toResponse(client);
     }
 
@@ -103,6 +110,6 @@ public class FmClientService {
 
     private FmClientResponse toResponse(FmClient c) {
         return new FmClientResponse(c.getId(), c.getClientCode(), c.getTradingName(), c.getRegistrationNumber(),
-                c.getContactName(), c.getContactEmail(), c.getContactPhone(), c.getAddress(), c.getStatus(), c.getCreatedAt());
+                c.getContactName(), c.getContactEmail(), c.getContactPhone(), c.getAddress(), c.getStatus(), c.getCreatedAt(), c.getVatNumber());
     }
 }

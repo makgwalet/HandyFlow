@@ -15,10 +15,6 @@ import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmVendor;
 import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmWorkOrder;
 import za.co.handyflow.platform.facilitiesmanagement.domain.repository.*;
 import za.co.handyflow.platform.facilitiesmanagement.dto.*;
-import za.co.handyflow.platform.notifications.application.NotificationRequest;
-import za.co.handyflow.platform.notifications.application.Recipient;
-import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
-import za.co.handyflow.platform.notifications.application.internal.NotificationService;
 import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
@@ -65,8 +61,7 @@ public class FmWorkOrderService {
     private final FmWorkOrderCostLineRepository costLineRepository;
     private final FmNumberGenerator numberGenerator;
     private final FmPpmScheduleService ppmScheduleService;
-    private final NotificationService notificationService;
-    private final TenantAdminRecipients tenantAdminRecipients;
+    private final FmAlerts alerts;
     private final EvidenceFacade evidenceFacade;
     private final FmAccessPolicy accessPolicy;
     private final FmAuditService auditService;
@@ -146,6 +141,8 @@ public class FmWorkOrderService {
 
         if (req.safetyImpact() || "URGENT".equals(priority) || "EMERGENCY".equals(priority)) {
             notifyUrgent(tenantId, wo, req.safetyImpact() ? "Safety-related request" : "Urgent request");
+        } else {
+            notifyRequested(tenantId, wo);
         }
         return toResponse(wo);
     }
@@ -309,6 +306,7 @@ public class FmWorkOrderService {
         log.info("FM work order completed number={} status={} tenant={}", wo.getWorkOrderNumber(), wo.getStatus(), tenantId);
 
         if ("COMPLETED".equals(wo.getStatus())) advancePpmSchedule(tenantId, wo);
+        if ("PENDING_VERIFICATION".equals(wo.getStatus())) notifyAwaitingVerification(tenantId, wo);
         return toResponse(wo);
     }
 
@@ -389,25 +387,27 @@ public class FmWorkOrderService {
     private void advancePpmSchedule(TenantId tenantId, FmWorkOrder wo) {
         if (wo.getPpmScheduleId() == null) return;
         LocalDate completedDate = wo.getCompletedAt() != null
-                ? wo.getCompletedAt().atZone(java.time.ZoneId.systemDefault()).toLocalDate()
-                : LocalDate.now();
+                ? FmTime.toLocalDate(wo.getCompletedAt())
+                : FmTime.today();
         ppmScheduleService.applyCompletion(tenantId, wo.getPpmScheduleId(), completedDate);
     }
 
     private void notifyUrgent(TenantId tenantId, FmWorkOrder wo, String titlePrefix) {
-        List<Recipient> recipients = tenantAdminRecipients.resolveTenantAdmins(tenantId);
-        if (recipients.isEmpty()) return;
+        alerts.toAdmins(tenantId, NotificationType.FM_WORKORDER_URGENT, titlePrefix + ": " + wo.getWorkOrderNumber(),
+                wo.getDescription(), "/facilitiesmanagement/work-orders/" + wo.getId(), wo.getId().toString());
+    }
 
-        notificationService.send(NotificationRequest.builder()
-                .tenantId(tenantId)
-                .type(NotificationType.FM_WORKORDER_URGENT)
-                .title(titlePrefix + ": " + wo.getWorkOrderNumber())
-                .message(wo.getDescription())
-                .actionUrl("/facilitiesmanagement/work-orders/" + wo.getId())
-                .sourceModule("facilitiesmanagement")
-                .sourceEntityId(wo.getId().toString())
-                .recipients(recipients)
-                .build());
+    private void notifyRequested(TenantId tenantId, FmWorkOrder wo) {
+        alerts.toAdmins(tenantId, NotificationType.FM_WORKORDER_REQUESTED, "Work request submitted: " + wo.getWorkOrderNumber(),
+                "A " + wo.getPriority() + " request is waiting for approval: " + wo.getDescription(),
+                "/facilitiesmanagement/work-orders/" + wo.getId(), wo.getId().toString());
+    }
+
+    private void notifyAwaitingVerification(TenantId tenantId, FmWorkOrder wo) {
+        alerts.toAdmins(tenantId, NotificationType.FM_WORKORDER_AWAITING_VERIFICATION,
+                "Awaiting verification: " + wo.getWorkOrderNumber(),
+                wo.getWorkOrderNumber() + " has been completed and needs checking by someone other than the person who did the work.",
+                "/facilitiesmanagement/work-orders/" + wo.getId(), wo.getId().toString());
     }
 
     FmWorkOrder findActive(TenantId tenantId, UUID id, FmAccessScope scope) {

@@ -63,7 +63,7 @@ public class FmServiceAgreementService {
         if (!FmServiceAgreement.CATEGORIES.contains(normalizedCategory)) {
             throw new IllegalArgumentException("category must be one of " + FmServiceAgreement.CATEGORIES);
         }
-        LocalDate onDate = date != null ? date : LocalDate.now();
+        LocalDate onDate = date != null ? date : FmTime.today();
         return contractTermsService.resolveAgreement(tenantId, clientId, siteId, normalizedCategory, onDate)
                 .map(a -> new FmResolvedTermsResponse(true, a.getId(), a.getName(), a.getBillingType(),
                         a.isRetainer() ? "INCLUDED" : "CHARGEABLE", a.getHourlyRate(), a.getPartsMarkupPercent(), targetDtos(a)))

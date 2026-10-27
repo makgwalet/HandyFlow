@@ -43,6 +43,10 @@ public class FmProfile {
 
     private String notes;
 
+    /** The FM company's own address, printed as the supplier address on tax invoices. */
+    @Column(length = 500)
+    private String address;
+
     @Column(name = "vat_registered", nullable = false)
     private boolean vatRegistered = false;
 
@@ -108,7 +112,7 @@ public class FmProfile {
                                       Integer paymentTermsDays, String arAccountCode, String revenueAccountCode,
                                       String vatAccountCode, String bankAccountCode) {
         if (vatRegistered != null) this.vatRegistered = vatRegistered;
-        if (vatNumber != null) this.vatNumber = blankToNull(vatNumber);
+        if (vatNumber != null) this.vatNumber = FmVatNumber.normalize(vatNumber);
         if (vatRate != null) this.vatRate = vatRate;
         if (paymentTermsDays != null) this.paymentTermsDays = paymentTermsDays;
         if (arAccountCode != null && !arAccountCode.isBlank()) this.arAccountCode = arAccountCode.trim();
@@ -126,6 +130,13 @@ public class FmProfile {
             if (this.vatAccountCode == null)
                 throw new IllegalArgumentException("A VAT-registered company must have a VAT ledger account code (where output VAT is posted)");
         }
+        this.updatedAt = Instant.now();
+    }
+
+    /** null leaves the address unchanged; blank clears it. */
+    public void changeAddress(String address) {
+        if (address == null) return;
+        this.address = blankToNull(address);
         this.updatedAt = Instant.now();
     }
 

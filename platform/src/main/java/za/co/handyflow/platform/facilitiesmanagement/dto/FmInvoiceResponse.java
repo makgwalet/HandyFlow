@@ -11,5 +11,8 @@ public record FmInvoiceResponse(
         LocalDate issueDate, LocalDate dueDate, BigDecimal subtotal, BigDecimal vatAmount, BigDecimal total,
         BigDecimal amountPaid, BigDecimal balance, String status, Instant createdAt,
         BigDecimal vatRate, UUID preparedByUserId, UUID approvedByUserId, Instant approvedAt,
-        String glStatus, String glLastError, UUID agreementId
+        String glStatus, String glLastError, UUID agreementId,
+        BigDecimal creditedAmount, boolean taxInvoice,
+        String supplierName, String supplierVatNumber, String supplierAddress,
+        String clientName, String clientVatNumber, String clientAddress
 ) {}

@@ -14,9 +14,11 @@ import za.co.handyflow.platform.accounting.dto.AccountResponse;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmClient;
+import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmCreditNote;
 import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmInvoice;
 import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmInvoicePayment;
 import za.co.handyflow.platform.facilitiesmanagement.domain.repository.FmClientRepository;
+import za.co.handyflow.platform.facilitiesmanagement.domain.repository.FmCreditNoteRepository;
 import za.co.handyflow.platform.facilitiesmanagement.domain.repository.FmInvoicePaymentRepository;
 import za.co.handyflow.platform.facilitiesmanagement.domain.repository.FmInvoiceRepository;
 import za.co.handyflow.platform.facilitiesmanagement.domain.repository.FmProfileRepository;
@@ -37,6 +39,7 @@ import java.util.UUID;
  * Posts approved invoices and recorded payments to the general ledger — reliably.
  * <ul>
  *   <li><b>Invoice</b> (on approval): DR accounts receivable (total); CR revenue (subtotal); CR output VAT (VAT, if any).</li>
+ *   <li><b>Credit note</b> (on approval): DR revenue (net); DR output VAT (VAT, if any); CR accounts receivable (total).</li>
  *   <li><b>Payment</b>: DR bank (amount); CR accounts receivable (amount).</li>
  * </ul>
  * Account codes come from the tenant's billing settings.
@@ -60,6 +63,7 @@ public class FmGlPostingService {
 
     private final FmInvoiceRepository invoiceRepository;
     private final FmInvoicePaymentRepository paymentRepository;
+    private final FmCreditNoteRepository creditNoteRepository;
     private final FmClientRepository clientRepository;
     private final FmProfileRepository profileRepository;
     private final AccountingFacade accountingFacade;
@@ -70,6 +74,10 @@ public class FmGlPostingService {
     /** Attempt the posting once the surrounding transaction has committed (or immediately when there isn't one). */
     public void postInvoiceAfterCommit(TenantId tenantId, UUID invoiceId) {
         afterCommit(() -> attemptInvoice(tenantId, invoiceId));
+    }
+
+    public void postCreditNoteAfterCommit(TenantId tenantId, UUID creditNoteId) {
+        afterCommit(() -> attemptCreditNote(tenantId, creditNoteId));
     }
 
     public void postPaymentAfterCommit(TenantId tenantId, UUID paymentId) {
@@ -104,6 +112,19 @@ public class FmGlPostingService {
         }
     }
 
+    public void attemptCreditNote(TenantId tenantId, UUID creditNoteId) {
+        try {
+            requiresNew().executeWithoutResult(s -> doPostCreditNote(tenantId, creditNoteId));
+        } catch (Exception e) {
+            String error = describe(e);
+            log.error("Ledger posting failed for FM credit note={} tenant={}: {}", creditNoteId, tenantId.getValue(), error, e);
+            recordFailure(() -> creditNoteRepository.findActiveById(tenantId, creditNoteId).ifPresent(c -> {
+                c.markGlFailed(error);
+                creditNoteRepository.save(c);
+            }));
+        }
+    }
+
     public void attemptPayment(TenantId tenantId, UUID paymentId) {
         try {
             requiresNew().executeWithoutResult(s -> doPostPayment(tenantId, paymentId));
@@ -128,19 +149,11 @@ public class FmGlPostingService {
         UUID revenue = requireAccount(accounts, settings.revenueAccountCode(), "revenue");
 
         String clientName = clientName(tenantId, invoice.getClientId());
-        List<CreateJournalEntryRequest.JournalLineRequest> lines = new ArrayList<>();
-        lines.add(new CreateJournalEntryRequest.JournalLineRequest(ar,
-                "FM invoice " + invoice.getInvoiceNumber() + " — " + clientName, invoice.getTotal(), null));
-        lines.add(new CreateJournalEntryRequest.JournalLineRequest(revenue,
-                "Facilities management revenue — " + clientName, null, invoice.getSubtotal()));
-        if (invoice.getVatAmount().signum() > 0) {
-            UUID vat = requireAccount(accounts, settings.vatAccountCode(), "output VAT");
-            lines.add(new CreateJournalEntryRequest.JournalLineRequest(vat,
-                    "Output VAT " + invoice.getVatRate() + "% — " + invoice.getInvoiceNumber(), null, invoice.getVatAmount()));
-        }
+        UUID vat = invoice.getVatAmount().signum() > 0 ? requireAccount(accounts, settings.vatAccountCode(), "output VAT") : null;
+        List<CreateJournalEntryRequest.JournalLineRequest> lines = FmGlJournals.invoiceLines(invoice, clientName, ar, revenue, vat);
 
         LocalDate date = invoice.getApprovedAt() != null
-                ? invoice.getApprovedAt().atZone(ZoneId.systemDefault()).toLocalDate() : LocalDate.now();
+                ? FmTime.toLocalDate(invoice.getApprovedAt()) : FmTime.today();
         JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, new CreateJournalEntryRequest(
                 date, "Facilities management invoice " + invoice.getInvoiceNumber(), invoice.getInvoiceNumber(), "MANUAL", lines));
         accountingFacade.postJournalEntry(tenantId, created.id());
@@ -149,6 +162,38 @@ public class FmGlPostingService {
         invoiceRepository.save(invoice);
         log.info("Posted FM invoice={} to ledger tenant={} total={} vat={}",
                 invoice.getInvoiceNumber(), tenantId.getValue(), invoice.getTotal(), invoice.getVatAmount());
+    }
+
+    /** DR revenue (net) and output VAT; CR accounts receivable (total) — the mirror image of the invoice posting. */
+    private void doPostCreditNote(TenantId tenantId, UUID creditNoteId) {
+        FmCreditNote note = creditNoteRepository.findActiveById(tenantId, creditNoteId).orElse(null);
+        if (note == null || !"APPROVED".equals(note.getStatus())) return;
+        if (!"PENDING".equals(note.getGlStatus()) && !"FAILED".equals(note.getGlStatus())) return;
+
+        FmInvoice invoice = invoiceRepository.findActiveById(tenantId, note.getInvoiceId())
+                .orElseThrow(() -> new IllegalStateException("Invoice for credit note " + creditNoteId + " not found"));
+        if (!invoice.isInLedger()) {
+            // Never credit a receivable that isn't in the ledger yet — the invoice must post first.
+            throw new IllegalStateException("Invoice " + invoice.getInvoiceNumber() + " has not been posted to the ledger yet");
+        }
+
+        FmBillingSettings settings = FmBillingSettings.resolve(profileRepository.findByTenant(tenantId));
+        List<AccountResponse> accounts = accountingFacade.getAccounts(tenantId);
+        UUID ar = requireAccount(accounts, settings.arAccountCode(), "accounts receivable");
+        UUID revenue = requireAccount(accounts, settings.revenueAccountCode(), "revenue");
+
+        String clientName = clientName(tenantId, note.getClientId());
+        UUID vat = note.getVatAmount().signum() > 0 ? requireAccount(accounts, settings.vatAccountCode(), "output VAT") : null;
+        List<CreateJournalEntryRequest.JournalLineRequest> lines = FmGlJournals.creditNoteLines(note, invoice, clientName, ar, revenue, vat);
+
+        LocalDate date = note.getApprovedAt() != null ? FmTime.toLocalDate(note.getApprovedAt()) : FmTime.today();
+        JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, new CreateJournalEntryRequest(
+                date, "Facilities management credit note " + note.getCreditNoteNumber(), note.getCreditNoteNumber(), "MANUAL", lines));
+        accountingFacade.postJournalEntry(tenantId, created.id());
+
+        note.markGlPosted(created.id());
+        creditNoteRepository.save(note);
+        log.info("Posted FM credit note={} to ledger tenant={} total={}", note.getCreditNoteNumber(), tenantId.getValue(), note.getTotal());
     }
 
     private void doPostPayment(TenantId tenantId, UUID paymentId) {
@@ -172,16 +217,11 @@ public class FmGlPostingService {
         UUID ar = requireAccount(accounts, settings.arAccountCode(), "accounts receivable");
 
         String clientName = clientName(tenantId, invoice.getClientId());
-        String ref = payment.getReference() != null ? " ref " + payment.getReference() : "";
-        List<CreateJournalEntryRequest.JournalLineRequest> lines = List.of(
-                new CreateJournalEntryRequest.JournalLineRequest(bank,
-                        "Payment on " + invoice.getInvoiceNumber() + " — " + clientName + ref, payment.getAmount(), null),
-                new CreateJournalEntryRequest.JournalLineRequest(ar,
-                        "Payment on " + invoice.getInvoiceNumber() + " — " + clientName, null, payment.getAmount()));
+        List<CreateJournalEntryRequest.JournalLineRequest> lines = FmGlJournals.paymentLines(payment, invoice, clientName, bank, ar);
 
         JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, new CreateJournalEntryRequest(
                 payment.getPaymentDate(), "Payment received for facilities management invoice " + invoice.getInvoiceNumber(),
-                invoice.getInvoiceNumber() + "-PMT", "MANUAL", lines));
+                invoice.getInvoiceNumber() + "-PMT-" + paymentId.toString().substring(0, 8), "MANUAL", lines));
         accountingFacade.postJournalEntry(tenantId, created.id());
 
         payment.markGlPosted(created.id());
@@ -197,6 +237,10 @@ public class FmGlPostingService {
         int attempted = 0;
         for (FmInvoice invoice : invoiceRepository.findDueForGlRetry(cutoff, MAX_AUTO_ATTEMPTS)) {
             attemptInvoice(invoice.getTenantId(), invoice.getId());
+            attempted++;
+        }
+        for (FmCreditNote note : creditNoteRepository.findDueForGlRetry(cutoff, MAX_AUTO_ATTEMPTS)) {
+            attemptCreditNote(note.getTenantId(), note.getId());
             attempted++;
         }
         for (FmInvoicePayment payment : paymentRepository.findDueForGlRetry(cutoff, MAX_AUTO_ATTEMPTS)) {
@@ -215,6 +259,12 @@ public class FmGlPostingService {
             invoiceRepository.save(i);
             invoiceIds.add(i.getId());
         }
+        List<UUID> creditNoteIds = new ArrayList<>();
+        for (FmCreditNote c : creditNoteRepository.findGlExceptions(tenantId)) {
+            c.resetGlRetry();
+            creditNoteRepository.save(c);
+            creditNoteIds.add(c.getId());
+        }
         List<UUID> paymentIds = new ArrayList<>();
         for (FmInvoicePayment p : paymentRepository.findGlExceptions(tenantId)) {
             p.resetGlRetry();
@@ -223,9 +273,10 @@ public class FmGlPostingService {
         }
         afterCommit(() -> {
             invoiceIds.forEach(id -> attemptInvoice(tenantId, id));
+            creditNoteIds.forEach(id -> attemptCreditNote(tenantId, id));
             paymentIds.forEach(id -> attemptPayment(tenantId, id));
         });
-        return invoiceIds.size() + paymentIds.size();
+        return invoiceIds.size() + creditNoteIds.size() + paymentIds.size();
     }
 
     @Transactional(readOnly = true)
@@ -234,6 +285,10 @@ public class FmGlPostingService {
         for (FmInvoice i : invoiceRepository.findGlExceptions(tenantId)) {
             result.add(new FmGlExceptionResponse("INVOICE", i.getId(), i.getId(), i.getInvoiceNumber(), i.getTotal(),
                     i.getGlAttempts(), i.getGlLastError(), i.getGlLastAttemptAt()));
+        }
+        for (FmCreditNote c : creditNoteRepository.findGlExceptions(tenantId)) {
+            result.add(new FmGlExceptionResponse("CREDIT_NOTE", c.getId(), c.getInvoiceId(), c.getCreditNoteNumber(), c.getTotal(),
+                    c.getGlAttempts(), c.getGlLastError(), c.getGlLastAttemptAt()));
         }
         for (FmInvoicePayment p : paymentRepository.findGlExceptions(tenantId)) {
             String ref = invoiceRepository.findActiveById(tenantId, p.getInvoiceId())

@@ -15,6 +15,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmBillingService;
+import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmCreditNoteService;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPdfService;
 import za.co.handyflow.platform.facilitiesmanagement.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -46,6 +47,7 @@ public class FmBillingController {
     private static final String CAN_SEE_EXCEPTIONS = "hasAnyAuthority('FACILITIESMANAGEMENT_ADMIN','FACILITIESMANAGEMENT_BILLING_MANAGE','FACILITIESMANAGEMENT_BILLING_APPROVE')";
 
     private final FmBillingService billingService;
+    private final FmCreditNoteService creditNoteService;
     private final FmPdfService pdfService;
     private final FeatureGuard featureGuard;
 
@@ -128,10 +130,74 @@ public class FmBillingController {
     @PreAuthorize(CAN_PREPARE)
     @Operation(summary = "Record a payment (date, method and reference optional); posts DR bank / CR receivables")
     public ResponseEntity<ApiResponse<FmInvoiceResponse>> recordPayment(
-            @PathVariable UUID id, @Valid @RequestBody RecordFmPaymentRequest request) {
+            @PathVariable UUID id,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @Valid @RequestBody RecordFmPaymentRequest request) {
         featureGuard.requireModule("facilitiesmanagement");
+        // A key in the body wins; the header is the conventional place for it, so accept either.
+        RecordFmPaymentRequest effective = request.idempotencyKey() == null && idempotencyKey != null
+                ? request.withIdempotencyKey(idempotencyKey) : request;
         return ResponseEntity.ok(ApiResponse.success("Payment recorded",
-                billingService.recordPayment(TenantContext.getTenantIdAsObject(), id, request)));
+                billingService.recordPayment(TenantContext.getTenantIdAsObject(), id, effective)));
+    }
+
+    // ── Credit notes ─────────────────────────────────────────────────────────
+
+    @GetMapping("/invoices/{id}/credit-notes")
+    @PreAuthorize(CAN_READ)
+    @Operation(summary = "Credit notes issued against an invoice")
+    public ResponseEntity<ApiResponse<List<FmCreditNoteResponse>>> getCreditNotes(@PathVariable UUID id) {
+        featureGuard.requireModule("facilitiesmanagement");
+        return ResponseEntity.ok(ApiResponse.success(creditNoteService.forInvoice(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/invoices/{id}/credit-notes")
+    @PreAuthorize(CAN_PREPARE)
+    @Operation(summary = "Prepare a DRAFT credit note against an issued invoice (a subtotal, or the full outstanding balance)")
+    public ResponseEntity<ApiResponse<FmCreditNoteResponse>> createCreditNote(
+            @PathVariable UUID id, @Valid @RequestBody CreateFmCreditNoteRequest request) {
+        featureGuard.requireModule("facilitiesmanagement");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Credit note prepared",
+                creditNoteService.create(TenantContext.getTenantIdAsObject(), id, request)));
+    }
+
+    @GetMapping("/credit-notes/{id}")
+    @PreAuthorize(CAN_READ)
+    public ResponseEntity<ApiResponse<FmCreditNoteResponse>> getCreditNote(@PathVariable UUID id) {
+        featureGuard.requireModule("facilitiesmanagement");
+        return ResponseEntity.ok(ApiResponse.success(creditNoteService.get(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/credit-notes/{id}/approve")
+    @PreAuthorize(CAN_APPROVE)
+    @Operation(summary = "Approve a credit note: reduces the invoice balance and posts to the ledger (the preparer cannot approve their own)")
+    public ResponseEntity<ApiResponse<FmCreditNoteResponse>> approveCreditNote(@PathVariable UUID id) {
+        featureGuard.requireModule("facilitiesmanagement");
+        return ResponseEntity.ok(ApiResponse.success("Credit note approved",
+                creditNoteService.approve(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/credit-notes/{id}/cancel")
+    @PreAuthorize(CAN_PREPARE)
+    @Operation(summary = "Cancel a DRAFT credit note")
+    public ResponseEntity<ApiResponse<FmCreditNoteResponse>> cancelCreditNote(
+            @PathVariable UUID id, @Valid @RequestBody FmReasonRequest request) {
+        featureGuard.requireModule("facilitiesmanagement");
+        return ResponseEntity.ok(ApiResponse.success("Credit note cancelled",
+                creditNoteService.cancel(TenantContext.getTenantIdAsObject(), id, request.reason())));
+    }
+
+    @GetMapping(value = "/credit-notes/{id}/credit-note.pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize(CAN_READ)
+    @Operation(summary = "Printable credit note (a Tax Credit Note when the supplier is a VAT vendor)")
+    public ResponseEntity<byte[]> downloadCreditNote(@PathVariable UUID id) {
+        featureGuard.requireModule("facilitiesmanagement");
+        creditNoteService.requireAccessible(TenantContext.getTenantIdAsObject(), id);
+        byte[] pdf = pdfService.generateCreditNotePdf(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"credit-note.pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     // ── Ledger exceptions ────────────────────────────────────────────────────

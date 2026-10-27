@@ -36,6 +36,9 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class FmWorkOrder {
 
+    /** Tolerated device clock drift when a completion time is supplied by the client. */
+    static final java.time.Duration COMPLETION_CLOCK_SKEW = java.time.Duration.ofMinutes(5);
+
     @Id
     private UUID id = UUID.randomUUID();
 
@@ -325,6 +328,14 @@ public class FmWorkOrder {
             throw new IllegalArgumentException("internalCost must not be negative");
         if (downtimeMinutes != null && downtimeMinutes < 0)
             throw new IllegalArgumentException("downtimeMinutes must not be negative");
+        Instant now = Instant.now();
+        Instant effectiveCompletedAt = completedAt != null ? completedAt : now;
+        if (effectiveCompletedAt.isAfter(now.plus(COMPLETION_CLOCK_SKEW)))
+            throw new IllegalArgumentException("completedAt cannot be in the future");
+        if (createdAt != null && effectiveCompletedAt.isBefore(createdAt))
+            throw new IllegalArgumentException("completedAt cannot be before the work order was raised");
+        // A completion time is evidence for SLA and billing: it may be set back (finished on site, captured later)
+        // but never into the future or before the work order existed.
         this.status = requiresVerification ? "PENDING_VERIFICATION" : "COMPLETED";
         this.completionNotes = completionNotes;
         this.holdReason = null;
@@ -332,7 +343,7 @@ public class FmWorkOrder {
         this.internalCost = internalCost;
         this.downtimeMinutes = downtimeMinutes;
         this.failureCause = failureCause;
-        this.completedAt = completedAt != null ? completedAt : Instant.now();
+        this.completedAt = effectiveCompletedAt;
         this.completedByUserId = completedByUserId;
         this.updatedAt = Instant.now();
     }

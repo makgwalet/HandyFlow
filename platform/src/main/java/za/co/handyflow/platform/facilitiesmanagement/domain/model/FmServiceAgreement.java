@@ -151,7 +151,7 @@ public class FmServiceAgreement {
 
     public void end() {
         this.status = "ENDED";
-        if (this.endDate == null) this.endDate = LocalDate.now();
+        if (this.endDate == null) this.endDate = LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg"));
         this.updatedAt = Instant.now();
     }
 

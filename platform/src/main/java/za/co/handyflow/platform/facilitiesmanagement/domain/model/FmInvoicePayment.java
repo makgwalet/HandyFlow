@@ -47,6 +47,10 @@ public class FmInvoicePayment {
     @Column(length = 100)
     private String reference;
 
+    /** Client-supplied key that makes recording this payment safe to retry; unique per invoice. */
+    @Column(name = "idempotency_key", length = 100)
+    private String idempotencyKey;
+
     @Column(name = "recorded_by_user_id")
     private UUID recordedByUserId;
 
@@ -66,10 +70,15 @@ public class FmInvoicePayment {
 
     public static FmInvoicePayment create(TenantId tenantId, UUID invoiceId, BigDecimal amount, LocalDate paymentDate,
                                           String method, String reference, UUID recordedByUserId) {
+        return create(tenantId, invoiceId, amount, paymentDate, method, reference, recordedByUserId, null);
+    }
+
+    public static FmInvoicePayment create(TenantId tenantId, UUID invoiceId, BigDecimal amount, LocalDate paymentDate,
+                                          String method, String reference, UUID recordedByUserId, String idempotencyKey) {
         if (amount == null || amount.signum() <= 0)
             throw new IllegalArgumentException("Payment amount must be positive");
-        LocalDate date = paymentDate != null ? paymentDate : LocalDate.now();
-        if (date.isAfter(LocalDate.now()))
+        LocalDate date = paymentDate != null ? paymentDate : LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg"));
+        if (date.isAfter(LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg"))))
             throw new IllegalArgumentException("paymentDate cannot be in the future");
         String normalizedMethod = null;
         if (method != null && !method.isBlank()) {
@@ -88,6 +97,7 @@ public class FmInvoicePayment {
         p.method = normalizedMethod;
         p.reference = reference != null && !reference.isBlank() ? reference.trim() : null;
         p.recordedByUserId = recordedByUserId;
+        p.idempotencyKey = idempotencyKey != null && !idempotencyKey.isBlank() ? idempotencyKey.trim() : null;
         p.createdAt = Instant.now();
         return p;
     }

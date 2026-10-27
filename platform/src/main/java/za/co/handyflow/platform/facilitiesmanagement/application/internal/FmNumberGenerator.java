@@ -27,6 +27,7 @@ public class FmNumberGenerator {
     private static final String CLIENT_SEQUENCE = "FM_CLIENT";
     private static final String WORKORDER_SEQUENCE = "FM_WORKORDER";
     private static final String INVOICE_SEQUENCE = "FM_INVOICE";
+    private static final String CREDIT_NOTE_SEQUENCE = "FM_CREDIT_NOTE";
 
     private final TenantSequenceService sequenceService;
     private final TenantNumberingFacade numberingFacade;
@@ -43,5 +44,10 @@ public class FmNumberGenerator {
 
     public String nextInvoiceNumber(TenantId tenantId) {
         return numberingFacade.next(tenantId, INVOICE_SEQUENCE, "FMINV");
+    }
+
+    /** Credit notes are numbered in their own gap-free-per-tenant series, as the VAT Act expects. */
+    public String nextCreditNoteNumber(TenantId tenantId) {
+        return numberingFacade.next(tenantId, CREDIT_NOTE_SEQUENCE, "FMCN");
     }
 }

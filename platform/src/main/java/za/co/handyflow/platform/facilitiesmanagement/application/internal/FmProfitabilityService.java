@@ -3,6 +3,7 @@ package za.co.handyflow.platform.facilitiesmanagement.application.internal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.facilitiesmanagement.domain.repository.FmCreditNoteRepository;
 import za.co.handyflow.platform.facilitiesmanagement.domain.repository.FmInvoiceRepository;
 import za.co.handyflow.platform.facilitiesmanagement.domain.repository.FmWorkOrderRepository;
 import za.co.handyflow.platform.facilitiesmanagement.dto.FmClientProfitabilityResponse;
@@ -12,7 +13,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
@@ -32,6 +32,7 @@ public class FmProfitabilityService {
 
     private final FmInvoiceRepository invoiceRepository;
     private final FmWorkOrderRepository workOrderRepository;
+    private final FmCreditNoteRepository creditNoteRepository;
     private final FmAccessPolicy accessPolicy;
 
     @Transactional(readOnly = true)
@@ -44,10 +45,12 @@ public class FmProfitabilityService {
             throw new IllegalArgumentException("The reporting period cannot exceed " + MAX_SPAN_DAYS + " days");
         }
 
-        Instant fromInstant = from.atStartOfDay(ZoneOffset.UTC).toInstant();
-        Instant toExclusive = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant fromInstant = from.atStartOfDay(FmTime.ZONE).toInstant();
+        Instant toExclusive = to.plusDays(1).atStartOfDay(FmTime.ZONE).toInstant();
 
-        BigDecimal revenue = nz(invoiceRepository.sumRevenueForClient(tenantId, clientId, from, to));
+        // Recognised revenue is invoiced revenue less approved credit notes issued in the same period.
+        BigDecimal revenue = nz(invoiceRepository.sumRevenueForClient(tenantId, clientId, from, to))
+                .subtract(nz(creditNoteRepository.sumApprovedSubtotalForClient(tenantId, clientId, from, to)));
         BigDecimal internalCost = nz(workOrderRepository.sumInternalCostForClient(tenantId, clientId, fromInstant, toExclusive));
         long completed = workOrderRepository.countCompletedForClient(tenantId, clientId, fromInstant, toExclusive);
         BigDecimal unbilled = nz(workOrderRepository.sumUnbilledChargeForClient(tenantId, clientId));

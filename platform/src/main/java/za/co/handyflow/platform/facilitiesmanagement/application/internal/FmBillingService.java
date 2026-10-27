@@ -7,7 +7,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmClient;
 import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmInvoice;
+import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmProfile;
 import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmInvoicePayment;
 import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmServiceAgreement;
 import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmWorkOrder;
@@ -16,6 +18,7 @@ import za.co.handyflow.platform.facilitiesmanagement.dto.FmGlExceptionResponse;
 import za.co.handyflow.platform.facilitiesmanagement.dto.FmInvoicePaymentResponse;
 import za.co.handyflow.platform.facilitiesmanagement.dto.FmInvoiceResponse;
 import za.co.handyflow.platform.facilitiesmanagement.dto.RecordFmPaymentRequest;
+import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -24,8 +27,8 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -45,8 +48,10 @@ import java.util.UUID;
  * Duplicate protection: a retainer cannot be invoiced twice for an overlapping period (a cancelled draft frees
  * the period); work orders already invoiced are never picked up again.
  * <p>
- * STILL OPEN: credit notes; rate-card pricing from agreements (Chunk 8); client VAT number on invoices;
- * double-submit protection on payment recording.
+ * Tax invoice: the supplier's and client's name, address and VAT number are snapshotted onto the invoice when it
+ * is drafted and again when it is approved ({@link FmInvoice#requireIssuable} enforces the VAT Act s20 content rules).
+ * Credit notes are handled by {@link FmCreditNoteService}. Recording a payment is safe to retry (idempotency key,
+ * duplicate bank-reference check, versioned invoice row).
  */
 @Slf4j
 @Service
@@ -63,6 +68,7 @@ public class FmBillingService {
     private final FmGlPostingService glPostingService;
     private final FmAccessPolicy accessPolicy;
     private final FmAuditService auditService;
+    private final FmAlerts alerts;
 
     // ── Reads ────────────────────────────────────────────────────────────────
 
@@ -130,8 +136,8 @@ public class FmBillingService {
             subtotal = retainer.getMonthlyFee();
             billableWorkOrders = List.of();
         } else {
-            Instant periodStartInstant = periodStart.atStartOfDay(ZoneOffset.UTC).toInstant();
-            Instant periodEndExclusive = periodEnd.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+            Instant periodStartInstant = periodStart.atStartOfDay(FmTime.ZONE).toInstant();
+            Instant periodEndExclusive = periodEnd.plusDays(1).atStartOfDay(FmTime.ZONE).toInstant();
             billableWorkOrders = workOrderRepository.findBillableForClient(tenantId, clientId, periodStartInstant, periodEndExclusive);
             subtotal = billableWorkOrders.stream().map(FmWorkOrder::getCost).reduce(BigDecimal.ZERO, BigDecimal::add);
         }
@@ -142,10 +148,11 @@ public class FmBillingService {
 
         BigDecimal vatAmount = settings.vatOn(subtotal);
         String invoiceNumber = numberGenerator.nextInvoiceNumber(tenantId);
-        LocalDate issueDate = LocalDate.now();
+        LocalDate issueDate = FmTime.today();
         FmInvoice invoice = FmInvoice.create(tenantId, clientId, invoiceNumber, periodStart, periodEnd, issueDate,
                 issueDate.plusDays(settings.paymentTermsDays()), subtotal, vatAmount, settings.effectiveVatRate(),
                 TenantContext.getCurrentUserId(), retainer != null ? retainer.getId() : null);
+        snapshotParties(tenantId, invoice);
         invoice = invoiceRepository.save(invoice);
 
         for (FmWorkOrder wo : billableWorkOrders) {
@@ -161,6 +168,9 @@ public class FmBillingService {
                         : "WORK_ORDERS(" + billableWorkOrders.size() + ")"));
         log.info("FM invoice prepared number={} client={} tenant={} subtotal={} vat={} workOrders={}",
                 invoiceNumber, clientId, tenantId.getValue(), subtotal, vatAmount, billableWorkOrders.size());
+        alerts.toAdmins(tenantId, NotificationType.FM_INVOICE_AWAITING_APPROVAL, "Invoice awaiting approval: " + invoiceNumber,
+                invoiceNumber + " for R " + invoice.getTotal() + " has been prepared and needs approving by someone other than its preparer.",
+                "/facilitiesmanagement/invoices/" + invoice.getId(), invoice.getId().toString());
         return toResponse(invoice);
     }
 
@@ -217,6 +227,8 @@ public class FmBillingService {
         UUID approver = TenantContext.getCurrentUserId();
         enforceSegregation(tenantId, invoice, approver);
 
+        // Party details are fixed at the moment of issue: refresh the draft's snapshot, then check the tax-invoice rules.
+        if ("DRAFT".equals(invoice.getStatus())) snapshotParties(tenantId, invoice);
         invoice.approve(approver);
         invoiceRepository.save(invoice);
         auditService.record(tenantId, "INVOICE_APPROVED", "INVOICE", invoiceId,
@@ -241,11 +253,27 @@ public class FmBillingService {
     @Transactional
     public FmInvoiceResponse recordPayment(TenantId tenantId, UUID invoiceId, RecordFmPaymentRequest req) {
         FmInvoice invoice = findInvoice(tenantId, invoiceId, accessPolicy.scope(tenantId));
+
+        // Double-submit protection. (1) The same idempotency key is a retry: hand back the original result, record nothing.
+        String key = req.idempotencyKey() == null || req.idempotencyKey().isBlank() ? null : req.idempotencyKey().trim();
+        if (key != null && paymentRepository.findByIdempotencyKey(tenantId, invoiceId, key).isPresent()) {
+            log.info("FM payment replay ignored invoice={} tenant={} key={}", invoice.getInvoiceNumber(), tenantId.getValue(), key);
+            return toResponse(invoice);
+        }
+        // (2) The same bank reference twice on one invoice is almost always the same payment captured twice.
+        String reference = req.reference() == null || req.reference().isBlank() ? null : req.reference().trim();
+        if (reference != null && paymentRepository.existsByReference(tenantId, invoiceId, reference)) {
+            throw new HandyFlowException("A payment with reference '" + reference + "' is already recorded against "
+                    + invoice.getInvoiceNumber() + ". If this is a second, separate payment, use a different reference.",
+                    HttpStatus.CONFLICT, "DUPLICATE_PAYMENT");
+        }
+        // (3) Two requests racing for the same invoice cannot both apply: the invoice row is versioned, so the loser fails.
+
         BigDecimal applied = invoice.recordPayment(req.amount());
         invoiceRepository.save(invoice);
 
         FmInvoicePayment payment = FmInvoicePayment.create(tenantId, invoiceId, applied, req.paymentDate(),
-                req.method(), req.reference(), TenantContext.getCurrentUserId());
+                req.method(), req.reference(), TenantContext.getCurrentUserId(), key);
         paymentRepository.save(payment);
 
         auditService.record(tenantId, "PAYMENT_RECORDED", "INVOICE", invoiceId,
@@ -284,6 +312,18 @@ public class FmBillingService {
         }
     }
 
+    /** Copies the supplier's and client's current details onto a DRAFT invoice (see {@link FmInvoice#snapshotParties}). */
+    private void snapshotParties(TenantId tenantId, FmInvoice invoice) {
+        Optional<FmProfile> profile = profileRepository.findByTenant(tenantId);
+        FmBillingSettings settings = FmBillingSettings.resolve(profile);
+        String supplierVat = settings.vatRegistered() ? profile.map(FmProfile::getVatNumber).orElse(null) : null;
+        FmClient client = clientRepository.findActiveById(tenantId, invoice.getClientId())
+                .orElseThrow(() -> new ResourceNotFoundException("FmClient", invoice.getClientId().toString()));
+        invoice.snapshotParties(profile.map(FmProfile::getCompanyName).orElse(null), supplierVat,
+                profile.map(FmProfile::getAddress).orElse(null),
+                client.getTradingName(), client.getVatNumber(), client.getAddress());
+    }
+
     /** The preparer may not approve their own invoice. A FACILITIESMANAGEMENT_ADMIN may; that override is audited. */
     private void enforceSegregation(TenantId tenantId, FmInvoice invoice, UUID approver) {
         UUID preparer = invoice.getPreparedByUserId();
@@ -316,6 +356,8 @@ public class FmBillingService {
                 i.getIssueDate(), i.getDueDate(), i.getSubtotal(), i.getVatAmount(), i.getTotal(), i.getAmountPaid(),
                 i.balance(), i.getStatus(), i.getCreatedAt(),
                 i.getVatRate(), i.getPreparedByUserId(), i.getApprovedByUserId(), i.getApprovedAt(),
-                i.getGlStatus(), i.getGlLastError(), i.getAgreementId());
+                i.getGlStatus(), i.getGlLastError(), i.getAgreementId(),
+                i.getCreditedAmount(), i.isTaxInvoice(), i.getSupplierName(), i.getSupplierVatNumber(), i.getSupplierAddress(),
+                i.getClientName(), i.getClientVatNumber(), i.getClientAddress());
     }
 }

@@ -66,7 +66,7 @@ public class FmPpmSchedule {
         s.taskName = taskName;
         s.description = description;
         s.frequencyDays = frequencyDays;
-        s.nextDueDate = startDate != null ? startDate : LocalDate.now();
+        s.nextDueDate = startDate != null ? startDate : LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg"));
         s.createdAt = Instant.now();
         s.updatedAt = Instant.now();
         return s;

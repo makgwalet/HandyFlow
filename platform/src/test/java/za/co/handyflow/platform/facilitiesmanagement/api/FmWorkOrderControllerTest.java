@@ -42,8 +42,16 @@ class FmWorkOrderControllerTest {
 
     private FmWorkOrderResponse testResponse() {
         return new FmWorkOrderResponse(UUID.randomUUID(), "WO-00001", UUID.randomUUID(), UUID.randomUUID(), null, null,
-                "CORRECTIVE", "NORMAL", "OPEN", "Leaking tap", "Jane", null, null, null, null,
-                LocalDate.now(), null, null, null, false, null, java.time.Instant.now());
+                "CORRECTIVE", "NORMAL", "OPEN", "Leaking tap", "Jane",
+                null, null, null, null,
+                LocalDate.now(), null, null, null,
+                null, false, null, java.time.Instant.now(),
+                null, false, null, null,
+                null, false, null,
+                0, null, null, null,
+                null,
+                null, "CHARGEABLE", null, null, null,
+                "NONE", "NONE", null);
     }
 
     @Test

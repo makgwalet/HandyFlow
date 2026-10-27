@@ -12,5 +12,7 @@ public record UpsertFmProfileRequest(
         @NotBlank String companyName, String registrationNumber, String contactEmail,
         String contactPhone, String notes,
         Boolean vatRegistered, String vatNumber, BigDecimal vatRate, Integer paymentTermsDays,
-        String arAccountCode, String revenueAccountCode, String vatAccountCode, String bankAccountCode
+        String arAccountCode, String revenueAccountCode, String vatAccountCode, String bankAccountCode,
+        /** Supplier address printed on tax invoices. null = unchanged, blank = clear. */
+        String address
 ) {}

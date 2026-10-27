@@ -6,16 +6,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmWorkOrder;
 import za.co.handyflow.platform.facilitiesmanagement.domain.repository.FmWorkOrderRepository;
-import za.co.handyflow.platform.notifications.application.NotificationRequest;
-import za.co.handyflow.platform.notifications.application.Recipient;
-import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
-import za.co.handyflow.platform.notifications.application.internal.NotificationService;
 import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.shared.SchedulerLease;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 
 /**
  * Every 10 minutes, watches open work orders that carry an SLA and alerts tenant admins:
@@ -28,7 +23,7 @@ import java.util.List;
  * is on record whether or not anyone read the notification. Runs under {@link SchedulerLease}, so only one
  * app instance sweeps. A paused resolution clock is not watched; work awaiting verification counts as resolved.
  * <p>
- * NOTE: alerts reuse the {@code FM_WORKORDER_OVERDUE} notification type until dedicated SLA types exist.
+ * Alerts use the dedicated {@code FM_SLA_AT_RISK} and {@code FM_SLA_BREACHED} notification types.
  * Escalation beyond tenant admins (a configurable path) is not built yet.
  */
 @Slf4j
@@ -40,8 +35,7 @@ public class FmSlaMonitor {
     private static final Duration LOCK_MAX_HOLD = Duration.ofMinutes(8);
 
     private final FmWorkOrderRepository workOrderRepository;
-    private final NotificationService notificationService;
-    private final TenantAdminRecipients tenantAdminRecipients;
+    private final FmAlerts alerts;
     private final SchedulerLease schedulerLease;
 
     @Scheduled(cron = "0 */10 * * * *")
@@ -64,13 +58,13 @@ public class FmSlaMonitor {
                 if (now.isAfter(due)) {
                     wo.markResponseBreached(now);
                     workOrderRepository.save(wo);
-                    notifyAdmins(wo, "SLA response BREACHED: " + wo.getWorkOrderNumber(),
+                    notifyAdmins(wo, NotificationType.FM_SLA_BREACHED, "SLA response BREACHED: " + wo.getWorkOrderNumber(),
                             wo.getWorkOrderNumber() + " (" + wo.getPriority() + ") was not assigned by " + due + ".");
                     alerts++;
                 } else if (wo.getResponseWarnedAt() == null && !now.isBefore(FmSlaStatus.warnAt(wo.getCreatedAt(), due))) {
                     wo.markResponseWarned(now);
                     workOrderRepository.save(wo);
-                    notifyAdmins(wo, "SLA response at risk: " + wo.getWorkOrderNumber(),
+                    notifyAdmins(wo, NotificationType.FM_SLA_AT_RISK, "SLA response at risk: " + wo.getWorkOrderNumber(),
                             wo.getWorkOrderNumber() + " (" + wo.getPriority() + ") must be assigned by " + due + ".");
                     alerts++;
                 }
@@ -89,13 +83,13 @@ public class FmSlaMonitor {
                 if (now.isAfter(due)) {
                     wo.markResolutionBreached(now);
                     workOrderRepository.save(wo);
-                    notifyAdmins(wo, "SLA resolution BREACHED: " + wo.getWorkOrderNumber(),
+                    notifyAdmins(wo, NotificationType.FM_SLA_BREACHED, "SLA resolution BREACHED: " + wo.getWorkOrderNumber(),
                             wo.getWorkOrderNumber() + " (" + wo.getPriority() + ") was not resolved by " + due + ".");
                     alerts++;
                 } else if (wo.getResolutionWarnedAt() == null && !now.isBefore(FmSlaStatus.warnAt(wo.getCreatedAt(), due))) {
                     wo.markResolutionWarned(now);
                     workOrderRepository.save(wo);
-                    notifyAdmins(wo, "SLA resolution at risk: " + wo.getWorkOrderNumber(),
+                    notifyAdmins(wo, NotificationType.FM_SLA_AT_RISK, "SLA resolution at risk: " + wo.getWorkOrderNumber(),
                             wo.getWorkOrderNumber() + " (" + wo.getPriority() + ") must be resolved by " + due + ".");
                     alerts++;
                 }
@@ -106,18 +100,8 @@ public class FmSlaMonitor {
         return alerts;
     }
 
-    private void notifyAdmins(FmWorkOrder wo, String title, String message) {
-        List<Recipient> recipients = tenantAdminRecipients.resolveTenantAdmins(wo.getTenantId());
-        if (recipients.isEmpty()) return;
-        notificationService.send(NotificationRequest.builder()
-                .tenantId(wo.getTenantId())
-                .type(NotificationType.FM_WORKORDER_OVERDUE)
-                .title(title)
-                .message(message)
-                .actionUrl("/facilitiesmanagement/work-orders/" + wo.getId())
-                .sourceModule("facilitiesmanagement")
-                .sourceEntityId(wo.getId().toString())
-                .recipients(recipients)
-                .build());
+    private void notifyAdmins(FmWorkOrder wo, NotificationType type, String title, String message) {
+        alerts.toAdmins(wo.getTenantId(), type, title, message,
+                "/facilitiesmanagement/work-orders/" + wo.getId(), wo.getId().toString());
     }
 }

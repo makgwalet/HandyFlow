@@ -44,6 +44,10 @@ public class FmClient {
 
     private String address;
 
+    /** The client's VAT number when it is VAT-registered (printed on tax invoices); null otherwise. */
+    @Column(name = "vat_number", length = 10)
+    private String vatNumber;
+
     @Column(nullable = false)
     private String status = "ACTIVE"; // ACTIVE, INACTIVE
 
@@ -84,6 +88,13 @@ public class FmClient {
         this.contactEmail = contactEmail;
         this.contactPhone = contactPhone;
         this.address = address;
+        this.updatedAt = Instant.now();
+    }
+
+    /** null leaves the number unchanged; a blank value clears it; anything else must be a valid SA VAT number. */
+    public void changeVatNumber(String vatNumber) {
+        if (vatNumber == null) return;
+        this.vatNumber = FmVatNumber.normalize(vatNumber);
         this.updatedAt = Instant.now();
     }
 

@@ -49,7 +49,7 @@ public class FmContractTermsService {
 
     /** Stamp agreement, coverage, rate card and SLA onto a newly created work order. */
     public void applyTerms(TenantId tenantId, FmWorkOrder wo) {
-        LocalDate date = wo.getScheduledDate() != null ? wo.getScheduledDate() : LocalDate.now();
+        LocalDate date = wo.getScheduledDate() != null ? wo.getScheduledDate() : FmTime.today();
         Optional<FmServiceAgreement> resolved = resolveAgreement(tenantId, wo.getClientId(), wo.getSiteId(), wo.getCategory(), date);
         if (resolved.isEmpty()) {
             wo.applyContract(null, "CHARGEABLE", null, null);
@@ -58,12 +58,22 @@ public class FmContractTermsService {
         FmServiceAgreement agreement = resolved.get();
         wo.applyContract(agreement.getId(), agreement.isRetainer() ? "INCLUDED" : "CHARGEABLE",
                 agreement.getHourlyRate(), agreement.getPartsMarkupPercent());
+        if (!hasSla(wo)) return;
         applySlaFrom(tenantId, wo, agreement);
+    }
+
+    /**
+     * Planned preventive maintenance is scheduled work with a due date, not a call-out: it has no response or
+     * resolution clock, otherwise every PPM job would start "ticking" the moment the schedule generated it and
+     * breach (and alert) days before anyone was meant to touch it.
+     */
+    static boolean hasSla(FmWorkOrder wo) {
+        return !"PPM".equals(wo.getCategory());
     }
 
     /** Re-derive the SLA after the work order's priority changed (e.g. raised at approval). */
     public void reapplySla(TenantId tenantId, FmWorkOrder wo) {
-        if (wo.getAgreementId() == null) return;
+        if (wo.getAgreementId() == null || !hasSla(wo)) return;
         agreementRepository.findActiveById(tenantId, wo.getAgreementId()).ifPresent(a -> applySlaFrom(tenantId, wo, a));
     }
 

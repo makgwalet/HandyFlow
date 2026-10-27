@@ -347,6 +347,18 @@ public enum NotificationType {
     FM_WORKORDER_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
     FM_AGREEMENT_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
     FM_INVOICE_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
+    /** A client or staff member has raised a work request that needs approving before it can be dispatched. */
+    FM_WORKORDER_REQUESTED(INFO, Set.of(IN_APP, EMAIL)),
+    /** Work has been completed and must be checked by a second person before it becomes billable. */
+    FM_WORKORDER_AWAITING_VERIFICATION(INFO, Set.of(IN_APP, EMAIL)),
+    /** An SLA response or resolution target is about to be missed. */
+    FM_SLA_AT_RISK(WARNING, Set.of(IN_APP, EMAIL)),
+    /** An SLA response or resolution target has been missed. */
+    FM_SLA_BREACHED(CRITICAL, Set.of(IN_APP, EMAIL)),
+    /** A prepared invoice is waiting for a second person to approve it. */
+    FM_INVOICE_AWAITING_APPROVAL(INFO, Set.of(IN_APP, EMAIL)),
+    /** A prepared credit note is waiting for a second person to approve it. */
+    FM_CREDIT_NOTE_AWAITING_APPROVAL(INFO, Set.of(IN_APP, EMAIL)),
 
     // ── Bookkeeping Services (Track 7 Module 6) ──────────────────────────────
     BK_TRANSACTION_UNRECONCILED(WARNING, Set.of(IN_APP, EMAIL)),

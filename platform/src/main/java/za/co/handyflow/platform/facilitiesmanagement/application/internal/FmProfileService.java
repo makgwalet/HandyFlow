@@ -40,6 +40,7 @@ public class FmProfileService {
             profile.update(req.companyName(), req.registrationNumber(), req.contactEmail(),
                     req.contactPhone(), req.notes());
         }
+        profile.changeAddress(req.address());
         profile.updateBillingSettings(req.vatRegistered(), req.vatNumber(), req.vatRate(), req.paymentTermsDays(),
                 req.arAccountCode(), req.revenueAccountCode(), req.vatAccountCode(), req.bankAccountCode());
         profileRepository.save(profile);
@@ -54,13 +55,14 @@ public class FmProfileService {
     private String billingSummary(FmProfile p) {
         return "vatRegistered=" + p.isVatRegistered() + " vatNumber=" + p.getVatNumber() + " vatRate=" + p.getVatRate()
                 + " terms=" + p.getPaymentTermsDays() + " ar=" + p.getArAccountCode() + " revenue=" + p.getRevenueAccountCode()
-                + " vatAcct=" + p.getVatAccountCode() + " bankAcct=" + p.getBankAccountCode();
+                + " vatAcct=" + p.getVatAccountCode() + " bankAcct=" + p.getBankAccountCode()
+                + " address=" + p.getAddress();
     }
 
     private FmProfileResponse toResponse(FmProfile p) {
         return new FmProfileResponse(p.getId(), p.getCompanyName(), p.getRegistrationNumber(),
                 p.getContactEmail(), p.getContactPhone(), p.getNotes(), p.getCreatedAt(),
                 p.isVatRegistered(), p.getVatNumber(), p.getVatRate(), p.getPaymentTermsDays(),
-                p.getArAccountCode(), p.getRevenueAccountCode(), p.getVatAccountCode(), p.getBankAccountCode());
+                p.getArAccountCode(), p.getRevenueAccountCode(), p.getVatAccountCode(), p.getBankAccountCode(), p.getAddress());
     }
 }
