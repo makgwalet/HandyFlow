@@ -28,4 +28,8 @@ public interface FacilityAssetRepository extends JpaRepository<FacilityAsset, UU
             "AND (:allSites = true OR a.siteId IN :siteIds)")
     Page<FacilityAsset> findAllActiveInScope(@Param("tenantId") TenantId tenantId, @Param("allSites") boolean allSites,
                                              @Param("siteIds") Collection<UUID> siteIds, Pageable pageable);
+
+    /** Exact asset-tag match (tags are unique per tenant among live assets). */
+    @Query("SELECT a FROM FacilityAsset a WHERE a.tenantId = :#{#tenantId.value} AND a.assetTag = :tag AND a.deletedAt IS NULL")
+    Optional<FacilityAsset> findActiveByTag(@Param("tenantId") TenantId tenantId, @Param("tag") String tag);
 }

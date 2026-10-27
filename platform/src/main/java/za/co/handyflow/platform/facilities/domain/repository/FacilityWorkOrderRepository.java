@@ -103,4 +103,25 @@ public interface FacilityWorkOrderRepository extends JpaRepository<FacilityWorkO
             @Param("allSites") boolean allSites, @Param("siteIds") Collection<UUID> siteIds,
             @Param("allJobs") boolean allJobs, @Param("technicianIds") Collection<UUID> technicianIds,
             @Param("allRequesters") boolean allRequesters, @Param("requesterUserId") UUID requesterUserId);
+
+    /** Unfinished work orders for one asset, newest first (visibility is applied by the caller). */
+    @Query("SELECT w FROM FacilityWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.assetId = :assetId AND w.deletedAt IS NULL " +
+            "AND w.status NOT IN ('COMPLETED','CANCELLED','REJECTED') ORDER BY w.createdAt DESC")
+    List<FacilityWorkOrder> findOpenForAsset(@Param("tenantId") TenantId tenantId, @Param("assetId") UUID assetId);
+
+    /**
+     * Work orders changed at or after {@code since}, oldest change first, for offline sync. Same visibility flags as
+     * {@link #findOpenInScope}; all id lists must be non-empty.
+     */
+    @Query("SELECT w FROM FacilityWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.deletedAt IS NULL " +
+            "AND w.updatedAt >= :since " +
+            "AND (:allSites = true OR w.siteId IN :siteIds) " +
+            "AND (:allJobs = true OR w.technicianId IN :technicianIds) " +
+            "AND (:allRequesters = true OR w.requestedByUserId = :requesterUserId) " +
+            "ORDER BY w.updatedAt ASC, w.id ASC")
+    List<FacilityWorkOrder> findChangedSinceInScope(@Param("tenantId") TenantId tenantId, @Param("since") Instant since,
+            @Param("allSites") boolean allSites, @Param("siteIds") Collection<UUID> siteIds,
+            @Param("allJobs") boolean allJobs, @Param("technicianIds") Collection<UUID> technicianIds,
+            @Param("allRequesters") boolean allRequesters, @Param("requesterUserId") UUID requesterUserId,
+            org.springframework.data.domain.Pageable pageable);
 }

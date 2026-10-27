@@ -38,4 +38,9 @@ public interface FacilityInspectionRepository extends JpaRepository<FacilityInsp
 
     @Query("SELECT COUNT(i) FROM FacilityInspection i WHERE i.tenantId = :#{#tenantId.value} AND i.templateId = :templateId")
     long countForTemplate(@Param("tenantId") TenantId tenantId, @Param("templateId") UUID templateId);
+
+    @Query("SELECT i FROM FacilityInspection i WHERE i.tenantId = :#{#tenantId.value} AND i.assetId = :assetId " +
+            "AND i.status = 'COMPLETED' ORDER BY i.completedAt DESC")
+    List<FacilityInspection> findLatestCompletedForAsset(@Param("tenantId") TenantId tenantId, @Param("assetId") UUID assetId,
+                                                         Pageable pageable);
 }

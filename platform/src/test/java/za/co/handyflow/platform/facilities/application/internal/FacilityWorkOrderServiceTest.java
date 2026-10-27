@@ -348,4 +348,51 @@ class FacilityWorkOrderServiceTest {
         service.assign(tenant, wo.id(), new AssignWorkOrderRequest(null, null, UUID.randomUUID(), "ACME"));
         assertTrue(audit.contains("WORK_ORDER_ASSIGNED"));
     }
+
+    // ── offline change feed ──────────────────────────────────────────────────
+
+    private final List<FacilityWorkOrder> changed = new ArrayList<>();
+    private int lastPageSize;
+
+    @Test
+    void theChangeFeedReturnsAPageAndSaysWhenThereIsMore() throws Exception {
+        FacilityWorkOrderService feed = new FacilityWorkOrderService(fake(FacilityWorkOrderRepository.class, (n, a) -> {
+            if (!"findChangedSinceInScope".equals(n)) return NOPE;
+            lastPageSize = ((org.springframework.data.domain.Pageable) a[8]).getPageSize();
+            return List.copyOf(changed);
+        }), siteRepo, assetRepo, null, null, vendorRepo, vendorEligibility, costRepo, numbers, ppm, alerts, evidenceFacade, policy, auditService);
+        for (int i = 0; i < 3; i++) {
+            actAs(me);
+            FacilityWorkOrder w = FacilityWorkOrder.create(tenant, "WO-" + i, site.getId(), null, null, "CORRECTIVE", "NORMAL", "d", "r", null);
+            changed.add(w);
+        }
+        WorkOrderChangesResponse r = feed.getChangedSince(tenant, java.time.Instant.EPOCH, 2);
+        assertEquals(3, lastPageSize); // asks for one extra to know whether there is more
+        assertEquals(2, r.items().size());
+        assertTrue(r.more());
+        assertEquals(changed.get(1).getUpdatedAt(), r.nextSince());
+
+        changed.remove(2);
+        WorkOrderChangesResponse last = feed.getChangedSince(tenant, java.time.Instant.EPOCH, 2);
+        assertFalse(last.more());
+        assertEquals(2, last.items().size());
+
+        changed.clear();
+        java.time.Instant since = java.time.Instant.parse("2026-10-27T08:00:00Z");
+        WorkOrderChangesResponse none = feed.getChangedSince(tenant, since, 50);
+        assertTrue(none.items().isEmpty());
+        assertEquals(since, none.nextSince());
+    }
+
+    @Test
+    void theChangeFeedLimitIsClamped() {
+        FacilityWorkOrderService feed = new FacilityWorkOrderService(fake(FacilityWorkOrderRepository.class, (n, a) -> {
+            lastPageSize = ((org.springframework.data.domain.Pageable) a[8]).getPageSize();
+            return List.of();
+        }), siteRepo, assetRepo, null, null, vendorRepo, vendorEligibility, costRepo, numbers, ppm, alerts, evidenceFacade, policy, auditService);
+        feed.getChangedSince(tenant, java.time.Instant.EPOCH, 100_000);
+        assertEquals(201, lastPageSize);
+        feed.getChangedSince(tenant, java.time.Instant.EPOCH, 0);
+        assertEquals(2, lastPageSize);
+    }
 }

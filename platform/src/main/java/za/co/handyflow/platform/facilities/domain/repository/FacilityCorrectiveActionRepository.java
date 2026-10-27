@@ -37,4 +37,8 @@ public interface FacilityCorrectiveActionRepository extends JpaRepository<Facili
             "AND a.sourceId = :sourceId ORDER BY a.createdAt ASC")
     List<FacilityCorrectiveAction> findBySource(@Param("tenantId") TenantId tenantId, @Param("sourceType") String sourceType,
                                                 @Param("sourceId") UUID sourceId);
+
+    @Query("SELECT COUNT(a) FROM FacilityCorrectiveAction a WHERE a.tenantId = :#{#tenantId.value} AND a.assetId = :assetId " +
+            "AND a.status IN ('OPEN','IN_PROGRESS')")
+    long countUnfinishedForAsset(@Param("tenantId") TenantId tenantId, @Param("assetId") UUID assetId);
 }

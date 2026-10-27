@@ -101,6 +101,19 @@ public class FacilityWorkOrderService {
 
     // ── Creation ─────────────────────────────────────────────────────────────
 
+    /** Offline-sync pull: what changed at or after {@code since} that the caller can see, oldest change first. */
+    @Transactional(readOnly = true)
+    public WorkOrderChangesResponse getChangedSince(TenantId tenantId, java.time.Instant since, int limit) {
+        int size = Math.max(1, Math.min(limit, 200));
+        AccessScope scope = accessPolicy.scope(tenantId);
+        List<FacilityWorkOrder> rows = workOrderRepository.findChangedSinceInScope(tenantId, since, scope.allSites(), scope.siteIds(),
+                scope.allJobs(), scope.technicianIds(), scope.allRequesters(), scope.requesterUserId(), PageRequest.of(0, size + 1));
+        boolean more = rows.size() > size;
+        List<FacilityWorkOrder> page = more ? rows.subList(0, size) : rows;
+        java.time.Instant next = page.isEmpty() ? since : page.get(page.size() - 1).getUpdatedAt();
+        return new WorkOrderChangesResponse(page.stream().map(this::toResponse).toList(), next, more);
+    }
+
     /** Request intake: the work order starts REQUESTED and cannot be assigned until approved. */
     @Transactional
     public WorkOrderResponse raiseRequest(TenantId tenantId, RaiseWorkRequest req) {

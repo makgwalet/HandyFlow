@@ -71,6 +71,13 @@ Do **not** edit V506–V509 to tidy their "rename" header comments: Flyway check
 - Daily 08:50 reminders to admins at 30/14/7/3/1/0 days before a vendor document expires, and once the day after it lapses (critical). Lapsed and expiring vendor documents also appear in the action centre.
 - Not done: the same onboarding for the FM (provider) module's vendors and technicians; technician licence/certification tracking; automatic suspension on lapse (the gate already blocks assignment, so nothing is mutated).
 
+## Field app support: QR lookup and offline sync (internal facilities, V517)
+
+- **QR lookup:** `GET /api/v1/facilities/assets/lookup?code=` accepts the QR payload `HF:ASSET:<id>`, a bare id, a link ending in the id, or the printed asset tag, and returns the asset with its open work orders (only ones the caller may see), unfinished corrective actions, last completed inspection and next PPM due. `GET /assets/{id}/qr` gives the text to print on the label. Site scope applies; an out-of-scope or unknown code is "not found". The server returns the payload text only; drawing the QR image is left to the client.
+- **Offline sync:** `POST /api/v1/facilities/sync` takes up to 50 operations (start, hold or complete a work order; save answers to or complete an inspection), each with a device-made `opId`. Every operation runs in its own transaction through the normal services, so scope, status rules, completion-time checks and audit all still apply, and one failure does not stop the others. An applied operation is recorded under a unique (tenant, user, opId) key; resending it returns DUPLICATE and changes nothing, including when two uploads race. A rejected operation is not recorded, so the device can fix it and resend under the same opId. Sync checks authority per operation type, so an inspector cannot do technician work through it. Records are purged after 90 days.
+- **Change feed:** `GET /sync/work-orders?since=` returns work orders the caller can see that changed at or after the instant (inclusive, upsert by id), up to 200 per call with `more`/`nextSince` for paging.
+- Not done: uploading photos offline (evidence still goes through the evidence endpoints and is not part of sync), offline creation of new work orders or inspections (a device must be online to start them), conflict resolution beyond "the server's current state wins and the rejection is reported", and the same for the FM (provider) module.
+
 ## Reporting (new, both modules)
 
 All figures are computed on request from the work orders / invoices themselves, inside the caller's access scope, and the vendor and asset arithmetic lives once in `shared.MaintenanceAnalytics` so the two modules cannot drift. FM SLA figures use the same `FmSlaStatus` rules as the API and the SLA monitor.
@@ -94,7 +101,7 @@ Definitions worth knowing: a *failure* is a reactive (non-PPM, non-inspection), 
 
 ## Not done (honest list)
 
-Portal quote approvals (the rest of the portal roadmap is done); site and client scope for vendor and technician records and audit on FM vendor changes; report exports (CSV/PDF), scheduled report emails and trend-over-time charts (the reports are point-in-time); mobile/QR/offline; inventory and procurement; multi-entity portfolios and integrations. None have migrations or code.
+Portal quote approvals (the rest of the portal roadmap is done); site and client scope for vendor and technician records and audit on FM vendor changes; report exports (CSV/PDF), scheduled report emails and trend-over-time charts (the reports are point-in-time); inventory and procurement; multi-entity portfolios and integrations. None have migrations or code.
 
 ## Known limitations (carried over from your list, unchanged)
 
