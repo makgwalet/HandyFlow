@@ -15,9 +15,9 @@ import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPort
 import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmInvoice;
 import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmSite;
 import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmWorkOrder;
-import za.co.handyflow.platform.facilitiesmanagement.dto.FmInvoiceResponse;
-import za.co.handyflow.platform.facilitiesmanagement.dto.FmSiteResponse;
-import za.co.handyflow.platform.facilitiesmanagement.dto.FmWorkOrderResponse;
+import za.co.handyflow.platform.facilitiesmanagement.dto.FmPortalInvoiceResponse;
+import za.co.handyflow.platform.facilitiesmanagement.dto.FmPortalSiteResponse;
+import za.co.handyflow.platform.facilitiesmanagement.dto.FmPortalWorkOrderResponse;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -27,13 +27,12 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Client-facing reads, gated by the portal JWT (not the staff
- * FACILITIESMANAGEMENT_* authorities) — same {@code PORTAL_USER} authority
- * convention every sibling portal-data controller in this codebase uses
- * (TrainProvPortalDataController, CollAgencyPortalDataController), and the
- * same "PortalJwtFilter stores the portal user's ID as the Authentication
- * principal" mechanism confirmed there. No FeatureGuard here either,
- * matching that same confirmed convention.
+ * Client-facing reads, gated by the portal JWT ({@code PORTAL_USER} authority). Responses use portal-specific
+ * DTOs that omit internal cost, technician/vendor details and staff notes (Chunk 2).
+ * <p>
+ * Chunk 6: internal lifecycle detail is hidden too. A job awaiting internal verification is shown as
+ * IN_PROGRESS with no completion date until it is verified, so clients never see the verification step,
+ * rework, or unapproved/rejected requests.
  */
 @RestController
 @RequestMapping("/api/v1/facilitiesmanagement/portal/me")
@@ -46,7 +45,7 @@ public class FmPortalDataController {
     @GetMapping("/sites")
     @PreAuthorize("hasAuthority('PORTAL_USER')")
     @Operation(summary = "This client's own sites")
-    public ResponseEntity<ApiResponse<Page<FmSiteResponse>>> getMySites(@PageableDefault(size = 20) Pageable pageable) {
+    public ResponseEntity<ApiResponse<Page<FmPortalSiteResponse>>> getMySites(@PageableDefault(size = 20) Pageable pageable) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 portalDataService.getMySites(tenantId, getPortalUserId(), pageable).map(this::toResponse)));
@@ -54,8 +53,8 @@ public class FmPortalDataController {
 
     @GetMapping("/work-orders")
     @PreAuthorize("hasAuthority('PORTAL_USER')")
-    @Operation(summary = "This client's own work orders")
-    public ResponseEntity<ApiResponse<Page<FmWorkOrderResponse>>> getMyWorkOrders(
+    @Operation(summary = "This client's own work orders (internal triage and verification states are never shown)")
+    public ResponseEntity<ApiResponse<Page<FmPortalWorkOrderResponse>>> getMyWorkOrders(
             @RequestParam(required = false) String status, @PageableDefault(size = 20) Pageable pageable) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
@@ -64,15 +63,15 @@ public class FmPortalDataController {
 
     @GetMapping("/invoices")
     @PreAuthorize("hasAuthority('PORTAL_USER')")
-    @Operation(summary = "This client's own invoices")
-    public ResponseEntity<ApiResponse<List<FmInvoiceResponse>>> getMyInvoices() {
+    @Operation(summary = "This client's own invoices (sent invoices only — drafts, unsent and cancelled invoices are never shown)")
+    public ResponseEntity<ApiResponse<List<FmPortalInvoiceResponse>>> getMyInvoices() {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
-        List<FmInvoiceResponse> invoices = portalDataService.getMyInvoices(tenantId, getPortalUserId())
+        List<FmPortalInvoiceResponse> invoices = portalDataService.getMyInvoices(tenantId, getPortalUserId())
                 .stream().map(this::toResponse).toList();
         return ResponseEntity.ok(ApiResponse.success(invoices));
     }
 
-    /** PortalJwtFilter stores the portal user's ID (UUID string) as the Authentication principal — confirmed against every sibling portal-data controller's own identical helper. */
+    /** PortalJwtFilter stores the portal user's ID (UUID string) as the Authentication principal. */
     private UUID getPortalUserId() {
         try {
             return UUID.fromString(SecurityContextHolder.getContext().getAuthentication().getName());
@@ -81,21 +80,23 @@ public class FmPortalDataController {
         }
     }
 
-    private FmSiteResponse toResponse(FmSite s) {
-        return new FmSiteResponse(s.getId(), s.getClientId(), s.getName(), s.getSiteType(), s.getAddress(),
-                s.getNotes(), s.getStatus(), s.getCreatedAt());
+    private FmPortalSiteResponse toResponse(FmSite s) {
+        return new FmPortalSiteResponse(s.getId(), s.getName(), s.getSiteType(), s.getAddress(),
+                s.getStatus(), s.getCreatedAt());
     }
 
-    private FmWorkOrderResponse toResponse(FmWorkOrder w) {
-        return new FmWorkOrderResponse(w.getId(), w.getWorkOrderNumber(), w.getClientId(), w.getSiteId(), w.getAssetId(),
-                w.getPpmScheduleId(), w.getCategory(), w.getPriority(), w.getStatus(), w.getDescription(), w.getReportedBy(),
-                w.getTechnicianId(), w.getTechnicianName(), w.getVendorId(), w.getVendorName(), w.getScheduledDate(),
-                w.getCompletedAt(), w.getCompletionNotes(), w.getCost(), w.isInvoiced(), w.getCancellationReason(), w.getCreatedAt());
+    private FmPortalWorkOrderResponse toResponse(FmWorkOrder w) {
+        boolean pendingVerification = "PENDING_VERIFICATION".equals(w.getStatus());
+        return new FmPortalWorkOrderResponse(w.getId(), w.getWorkOrderNumber(), w.getSiteId(), w.getAssetId(),
+                w.getCategory(), w.getPriority(),
+                pendingVerification ? "IN_PROGRESS" : w.getStatus(),
+                w.getDescription(), w.getReportedBy(), w.getScheduledDate(),
+                pendingVerification ? null : w.getCompletedAt(), w.getCreatedAt());
     }
 
-    private FmInvoiceResponse toResponse(FmInvoice i) {
-        return new FmInvoiceResponse(i.getId(), i.getClientId(), i.getInvoiceNumber(), i.getPeriodStart(), i.getPeriodEnd(),
+    private FmPortalInvoiceResponse toResponse(FmInvoice i) {
+        return new FmPortalInvoiceResponse(i.getId(), i.getInvoiceNumber(), i.getPeriodStart(), i.getPeriodEnd(),
                 i.getIssueDate(), i.getDueDate(), i.getSubtotal(), i.getVatAmount(), i.getTotal(), i.getAmountPaid(),
-                i.balance(), i.getStatus(), i.getCreatedAt());
+                i.balance(), i.getStatus());
     }
 }

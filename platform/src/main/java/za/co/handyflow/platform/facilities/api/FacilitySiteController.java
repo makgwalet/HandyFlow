@@ -20,6 +20,7 @@ import za.co.handyflow.platform.shared.TenantContext;
 
 import java.util.UUID;
 
+/** Chunk 3: field technicians (FACILITIES_TECHNICIAN) may read — the service narrows them to sites of their assigned jobs. */
 @RestController
 @RequestMapping("/api/v1/facilities/sites")
 @RequiredArgsConstructor
@@ -30,14 +31,14 @@ public class FacilitySiteController {
     private final FeatureGuard featureGuard;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('FACILITIES_READ','FACILITIES_MANAGE','FACILITIES_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('FACILITIES_READ','FACILITIES_MANAGE','FACILITIES_ADMIN','FACILITIES_TECHNICIAN')")
     public ResponseEntity<ApiResponse<Page<SiteResponse>>> getSites(@PageableDefault(size = 20) Pageable pageable) {
         featureGuard.requireModule("facilities");
         return ResponseEntity.ok(ApiResponse.success(siteService.getSites(TenantContext.getTenantIdAsObject(), pageable)));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('FACILITIES_READ','FACILITIES_MANAGE','FACILITIES_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('FACILITIES_READ','FACILITIES_MANAGE','FACILITIES_ADMIN','FACILITIES_TECHNICIAN')")
     public ResponseEntity<ApiResponse<SiteResponse>> getSite(@PathVariable UUID id) {
         featureGuard.requireModule("facilities");
         return ResponseEntity.ok(ApiResponse.success(siteService.getSite(TenantContext.getTenantIdAsObject(), id)));

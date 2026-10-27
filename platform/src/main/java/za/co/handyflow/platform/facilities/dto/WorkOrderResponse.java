@@ -9,6 +9,9 @@ public record WorkOrderResponse(
         UUID id, String workOrderNumber, UUID siteId, UUID assetId, UUID ppmScheduleId,
         String category, String priority, String status, String description, String reportedBy,
         UUID technicianId, String technicianName, UUID vendorId, String vendorName,
-        LocalDate scheduledDate, Instant completedAt, String completionNotes,
-        BigDecimal cost, String cancellationReason, Instant createdAt
+        LocalDate scheduledDate, Instant completedAt, String completionNotes, String holdReason,
+        BigDecimal cost, String cancellationReason, Instant createdAt,
+        UUID requestedByUserId, boolean safetyImpact, UUID duplicateOfWorkOrderId, Instant approvedAt,
+        String rejectionReason, boolean requiresVerification, Instant verifiedAt,
+        int reworkCount, String lastReworkReason, Integer downtimeMinutes, String failureCause
 ) {}

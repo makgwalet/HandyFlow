@@ -17,6 +17,12 @@ import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.UUID;
 
+/**
+ * Chunk 3: reads and writes are limited to the caller's {@link AccessScope}
+ * (an asset is visible if its site is); status changes and deletions are
+ * audited. {@link #requireAccessible} lets controllers guard the evidence
+ * endpoints, which don't load the asset themselves.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -24,20 +30,33 @@ public class FacilityAssetService {
 
     private final FacilityAssetRepository assetRepository;
     private final FacilitySiteRepository siteRepository;
+    private final FacilityAccessPolicy accessPolicy;
+    private final FacilityAuditService auditService;
 
     @Transactional(readOnly = true)
     public Page<AssetResponse> getAssets(TenantId tenantId, UUID siteId, Pageable pageable) {
-        if (siteId != null) return assetRepository.findBySite(tenantId, siteId, pageable).map(this::toResponse);
-        return assetRepository.findAllActive(tenantId, pageable).map(this::toResponse);
+        AccessScope scope = accessPolicy.scope(tenantId);
+        if (siteId != null) {
+            scope.requireSite(siteId);
+            return assetRepository.findBySite(tenantId, siteId, pageable).map(this::toResponse);
+        }
+        return assetRepository.findAllActiveInScope(tenantId, scope.allSites(), scope.siteIds(), pageable).map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
     public AssetResponse getAsset(TenantId tenantId, UUID id) {
-        return toResponse(findActive(tenantId, id));
+        return toResponse(findActive(tenantId, id, accessPolicy.scope(tenantId)));
+    }
+
+    /** Throws NOT FOUND unless the asset exists for this tenant and the caller may see its site. */
+    @Transactional(readOnly = true)
+    public void requireAccessible(TenantId tenantId, UUID id) {
+        findActive(tenantId, id, accessPolicy.scope(tenantId));
     }
 
     @Transactional
     public AssetResponse createAsset(TenantId tenantId, CreateAssetRequest req) {
+        accessPolicy.scope(tenantId).requireSite(req.siteId());
         siteRepository.findActiveById(tenantId, req.siteId())
                 .orElseThrow(() -> new ResourceNotFoundException("FacilitySite", req.siteId().toString()));
 
@@ -51,7 +70,7 @@ public class FacilityAssetService {
 
     @Transactional
     public AssetResponse updateAsset(TenantId tenantId, UUID id, UpdateAssetRequest req) {
-        FacilityAsset asset = findActive(tenantId, id);
+        FacilityAsset asset = findActive(tenantId, id, accessPolicy.scope(tenantId));
         asset.update(req.name(), req.location(), req.manufacturer(), req.model(), req.serialNumber(),
                 req.warrantyExpiryDate(), req.criticality(), req.notes());
         assetRepository.save(asset);
@@ -60,7 +79,11 @@ public class FacilityAssetService {
 
     @Transactional
     public AssetResponse updateStatus(TenantId tenantId, UUID id, String status) {
-        FacilityAsset asset = findActive(tenantId, id);
+        if (status == null || status.isBlank()) {
+            throw new IllegalArgumentException("status is required. Valid values: OPERATIONAL, DOWN, MAINTENANCE, DECOMMISSIONED");
+        }
+        FacilityAsset asset = findActive(tenantId, id, accessPolicy.scope(tenantId));
+        String previous = asset.getStatus();
         switch (status.toUpperCase()) {
             case "OPERATIONAL" -> asset.markOperational();
             case "DOWN" -> asset.markDown();
@@ -70,20 +93,27 @@ public class FacilityAssetService {
                     "Unknown status: " + status + ". Valid values: OPERATIONAL, DOWN, MAINTENANCE, DECOMMISSIONED");
         }
         assetRepository.save(asset);
+        auditService.record(tenantId, "ASSET_STATUS_CHANGED", "ASSET", id, previous + " -> " + asset.getStatus());
         log.info("Facility asset status changed id={} status={}", id, status);
         return toResponse(asset);
     }
 
     @Transactional
     public void deleteAsset(TenantId tenantId, UUID id, UUID deletedByUserId) {
-        FacilityAsset asset = findActive(tenantId, id);
+        FacilityAsset asset = findActive(tenantId, id, accessPolicy.scope(tenantId));
         asset.softDelete(deletedByUserId);
         assetRepository.save(asset);
+        auditService.record(tenantId, "ASSET_DELETED", "ASSET", id,
+                "name=" + asset.getName() + (asset.getAssetTag() != null ? " tag=" + asset.getAssetTag() : ""));
     }
 
-    private FacilityAsset findActive(TenantId tenantId, UUID id) {
-        return assetRepository.findActiveById(tenantId, id)
+    private FacilityAsset findActive(TenantId tenantId, UUID id, AccessScope scope) {
+        FacilityAsset asset = assetRepository.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("FacilityAsset", id.toString()));
+        if (!scope.canSeeSite(asset.getSiteId())) {
+            throw new ResourceNotFoundException("FacilityAsset", id.toString());
+        }
+        return asset;
     }
 
     private AssetResponse toResponse(FacilityAsset a) {

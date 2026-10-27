@@ -26,11 +26,23 @@ import za.co.handyflow.platform.shared.TenantContext;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Authority split (MANAGE and ADMIN keep full access everywhere):
+ * create — FACILITIESMANAGEMENT_WORKORDER_CREATE; assign, cancel — FACILITIESMANAGEMENT_WORKORDER_ASSIGN;
+ * start, hold, complete, attach evidence — FACILITIESMANAGEMENT_TECHNICIAN (own jobs only).
+ * Evidence and job-card endpoints verify the caller may see the work order first; previously they accepted
+ * any work order id in the tenant.
+ */
 @RestController
 @RequestMapping("/api/v1/facilitiesmanagement/work-orders")
 @RequiredArgsConstructor
 @Tag(name = "Facilities Management - Work Orders", description = "Job cards raised from PPM schedules or ad-hoc/reactive client requests")
 public class FmWorkOrderController {
+
+    private static final String CAN_VIEW = "hasAnyAuthority('FACILITIESMANAGEMENT_READ','FACILITIESMANAGEMENT_MANAGE'," +
+            "'FACILITIESMANAGEMENT_ADMIN','FACILITIESMANAGEMENT_TECHNICIAN','FACILITIESMANAGEMENT_WORKORDER_CREATE'," +
+            "'FACILITIESMANAGEMENT_WORKORDER_ASSIGN')";
+    private static final String CAN_EXECUTE = "hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN','FACILITIESMANAGEMENT_TECHNICIAN')";
 
     private final FmWorkOrderService workOrderService;
     private final FmPdfService pdfService;
@@ -38,7 +50,7 @@ public class FmWorkOrderController {
     private final FeatureGuard featureGuard;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_READ','FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    @PreAuthorize(CAN_VIEW)
     public ResponseEntity<ApiResponse<Page<FmWorkOrderResponse>>> getWorkOrders(
             @RequestParam(required = false) UUID clientId,
             @RequestParam(required = false) String status,
@@ -49,14 +61,14 @@ public class FmWorkOrderController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_READ','FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    @PreAuthorize(CAN_VIEW)
     public ResponseEntity<ApiResponse<FmWorkOrderResponse>> getWorkOrder(@PathVariable UUID id) {
         featureGuard.requireModule("facilitiesmanagement");
         return ResponseEntity.ok(ApiResponse.success(workOrderService.getWorkOrder(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN','FACILITIESMANAGEMENT_WORKORDER_CREATE')")
     public ResponseEntity<ApiResponse<FmWorkOrderResponse>> createWorkOrder(@Valid @RequestBody CreateFmWorkOrderRequest request) {
         featureGuard.requireModule("facilitiesmanagement");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Work order created",
@@ -64,7 +76,7 @@ public class FmWorkOrderController {
     }
 
     @PostMapping("/{id}/assign")
-    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN','FACILITIESMANAGEMENT_WORKORDER_ASSIGN')")
     public ResponseEntity<ApiResponse<FmWorkOrderResponse>> assign(@PathVariable UUID id, @RequestBody AssignFmWorkOrderRequest request) {
         featureGuard.requireModule("facilitiesmanagement");
         return ResponseEntity.ok(ApiResponse.success("Work order assigned",
@@ -72,7 +84,7 @@ public class FmWorkOrderController {
     }
 
     @PostMapping("/{id}/start")
-    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    @PreAuthorize(CAN_EXECUTE)
     public ResponseEntity<ApiResponse<FmWorkOrderResponse>> start(@PathVariable UUID id) {
         featureGuard.requireModule("facilitiesmanagement");
         return ResponseEntity.ok(ApiResponse.success("Work order started",
@@ -80,7 +92,7 @@ public class FmWorkOrderController {
     }
 
     @PostMapping("/{id}/hold")
-    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    @PreAuthorize(CAN_EXECUTE)
     public ResponseEntity<ApiResponse<FmWorkOrderResponse>> hold(@PathVariable UUID id, @RequestBody HoldFmWorkOrderRequest request) {
         featureGuard.requireModule("facilitiesmanagement");
         return ResponseEntity.ok(ApiResponse.success("Work order put on hold",
@@ -88,7 +100,7 @@ public class FmWorkOrderController {
     }
 
     @PostMapping("/{id}/complete")
-    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    @PreAuthorize(CAN_EXECUTE)
     public ResponseEntity<ApiResponse<FmWorkOrderResponse>> complete(@PathVariable UUID id, @RequestBody CompleteFmWorkOrderRequest request) {
         featureGuard.requireModule("facilitiesmanagement");
         return ResponseEntity.ok(ApiResponse.success("Work order completed",
@@ -96,7 +108,7 @@ public class FmWorkOrderController {
     }
 
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN','FACILITIESMANAGEMENT_WORKORDER_ASSIGN')")
     public ResponseEntity<ApiResponse<FmWorkOrderResponse>> cancel(@PathVariable UUID id, @RequestBody CancelFmWorkOrderRequest request) {
         featureGuard.requireModule("facilitiesmanagement");
         return ResponseEntity.ok(ApiResponse.success("Work order cancelled",
@@ -106,20 +118,22 @@ public class FmWorkOrderController {
     // ── Evidence (before/after repair photos) ───────────────────────────────
 
     @PostMapping("/{id}/evidence")
-    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    @PreAuthorize(CAN_EXECUTE)
     public ResponseEntity<ApiResponse<EvidenceResponse>> attachEvidence(
             @PathVariable UUID id, @RequestParam MultipartFile file,
             @RequestParam(defaultValue = "PHOTO") String evidenceType) {
         featureGuard.requireModule("facilitiesmanagement");
+        workOrderService.requireAccessible(TenantContext.getTenantIdAsObject(), id);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Evidence attached",
                 evidenceFacade.attach(TenantContext.getTenantIdAsObject(), file, evidenceType, "facilitiesmanagement",
                         "FmWorkOrder", id, null, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
     }
 
     @GetMapping("/{id}/evidence")
-    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_READ','FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    @PreAuthorize(CAN_VIEW)
     public ResponseEntity<ApiResponse<List<EvidenceResponse>>> getEvidence(@PathVariable UUID id) {
         featureGuard.requireModule("facilitiesmanagement");
+        workOrderService.requireAccessible(TenantContext.getTenantIdAsObject(), id);
         return ResponseEntity.ok(ApiResponse.success(
                 evidenceFacade.listFor(TenantContext.getTenantIdAsObject(), "facilitiesmanagement", "FmWorkOrder", id)));
     }
@@ -127,10 +141,11 @@ public class FmWorkOrderController {
     // ── Job card PDF ─────────────────────────────────────────────────────────
 
     @GetMapping(value = "/{id}/job-card.pdf", produces = MediaType.APPLICATION_PDF_VALUE)
-    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_READ','FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    @PreAuthorize(CAN_VIEW)
     @Operation(summary = "Printable job card for the assigned technician/vendor")
     public ResponseEntity<byte[]> downloadJobCard(@PathVariable UUID id) {
         featureGuard.requireModule("facilitiesmanagement");
+        workOrderService.requireAccessible(TenantContext.getTenantIdAsObject(), id);
         byte[] pdf = pdfService.generateJobCard(TenantContext.getTenantIdAsObject(), id);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"job-card.pdf\"")

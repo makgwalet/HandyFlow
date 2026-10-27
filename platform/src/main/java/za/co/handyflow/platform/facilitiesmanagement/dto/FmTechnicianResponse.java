@@ -5,5 +5,5 @@ import java.util.UUID;
 
 public record FmTechnicianResponse(
         UUID id, String name, String contactPhone, String contactEmail,
-        String specialization, boolean active, Instant createdAt
+        String specialization, UUID linkedUserId, boolean active, Instant createdAt
 ) {}

@@ -9,7 +9,11 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.time.Instant;
 import java.util.UUID;
 
-/** The FM company's own field staff — mirrors Module 5a's own FacilityTechnician shape. */
+/**
+ * The FM company's own field staff. {@code linkedUserId} (new in Chunk 5) ties the technician to a system
+ * user: a user holding only FACILITIESMANAGEMENT_TECHNICIAN sees and works only the jobs assigned to their
+ * linked technician record. Unvalidated reference — no identity-module dependency.
+ */
 @Entity
 @Table(name = "fm_technicians")
 @Getter
@@ -34,6 +38,9 @@ public class FmTechnician {
     @Column(nullable = false)
     private String specialization = "GENERAL";
 
+    @Column(name = "linked_user_id")
+    private UUID linkedUserId;
+
     @Column(nullable = false)
     private boolean active = true;
 
@@ -50,23 +57,26 @@ public class FmTechnician {
     private Long version;
 
     public static FmTechnician create(TenantId tenantId, String name, String contactPhone,
-                                       String contactEmail, String specialization) {
+                                      String contactEmail, String specialization, UUID linkedUserId) {
         FmTechnician t = new FmTechnician();
         t.tenantId = tenantId;
         t.name = name;
         t.contactPhone = contactPhone;
         t.contactEmail = contactEmail;
         t.specialization = specialization != null ? specialization.toUpperCase() : "GENERAL";
+        t.linkedUserId = linkedUserId;
         t.createdAt = Instant.now();
         t.updatedAt = Instant.now();
         return t;
     }
 
-    public void update(String name, String contactPhone, String contactEmail, String specialization) {
+    /** Full-replace semantics for the contact fields and the user link (null unlinks). */
+    public void update(String name, String contactPhone, String contactEmail, String specialization, UUID linkedUserId) {
         if (name != null) this.name = name;
         this.contactPhone = contactPhone;
         this.contactEmail = contactEmail;
         if (specialization != null) this.specialization = specialization.toUpperCase();
+        this.linkedUserId = linkedUserId;
         this.updatedAt = Instant.now();
     }
 

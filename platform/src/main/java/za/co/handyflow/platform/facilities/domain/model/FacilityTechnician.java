@@ -12,14 +12,14 @@ import java.util.UUID;
 /**
  * An internal maintenance staff member who can be assigned work orders.
  * Deliberately its own lightweight record rather than a link to
- * {@code HrEmployee} via {@code HrFacade} — this module declares no
- * dependency on {@code hr} (see package-info), matching {@code fleet}'s own
- * {@code Vehicle.assignedDriverId}, which is a bare UUID with no FK
- * integrity and no {@code hr} dependency in {@code fleet}'s own
- * {@code package-info.java} (confirmed by direct read before this module
- * was designed). {@code linkedUserId} is an optional, unvalidated
- * reference for tenants that want to tie a technician back to a system
- * user for their own reporting — never resolved through any facade.
+ * {@code HrEmployee} (no {@code hr} dependency, matching {@code fleet}).
+ * <p>
+ * {@code linkedUserId} ties the technician to a system user. As of Chunk 3
+ * it drives access: a user holding only FACILITIES_TECHNICIAN sees and
+ * works only the jobs assigned to their linked technician record. Chunk 3
+ * fix: {@code update()} now sets it — previously it could be supplied on
+ * create but never changed afterwards, so existing technicians could not be
+ * linked.
  */
 @Entity
 @Table(name = "facility_technicians")
@@ -65,7 +65,7 @@ public class FacilityTechnician {
     private Long version;
 
     public static FacilityTechnician create(TenantId tenantId, String name, String contactPhone,
-                                             String contactEmail, String specialization, UUID linkedUserId) {
+                                            String contactEmail, String specialization, UUID linkedUserId) {
         FacilityTechnician t = new FacilityTechnician();
         t.tenantId = tenantId;
         t.name = name;
@@ -78,11 +78,13 @@ public class FacilityTechnician {
         return t;
     }
 
-    public void update(String name, String contactPhone, String contactEmail, String specialization) {
+    /** Full-replace semantics for the contact fields and the user link (null unlinks). */
+    public void update(String name, String contactPhone, String contactEmail, String specialization, UUID linkedUserId) {
         if (name != null) this.name = name;
         this.contactPhone = contactPhone;
         this.contactEmail = contactEmail;
         if (specialization != null) this.specialization = specialization.toUpperCase();
+        this.linkedUserId = linkedUserId;
         this.updatedAt = Instant.now();
     }
 

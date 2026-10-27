@@ -21,17 +21,20 @@ import za.co.handyflow.platform.shared.TenantContext;
 
 import java.util.UUID;
 
+/** Chunk 5: field technicians may read — the service narrows them to sites of their assigned jobs. */
 @RestController
 @RequestMapping("/api/v1/facilitiesmanagement/sites")
 @RequiredArgsConstructor
 @Tag(name = "Facilities Management - Sites", description = "Client premises register")
 public class FmSiteController {
 
+    private static final String CAN_VIEW = "hasAnyAuthority('FACILITIESMANAGEMENT_READ','FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN','FACILITIESMANAGEMENT_TECHNICIAN')";
+
     private final FmSiteService siteService;
     private final FeatureGuard featureGuard;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_READ','FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    @PreAuthorize(CAN_VIEW)
     public ResponseEntity<ApiResponse<Page<FmSiteResponse>>> getSites(
             @RequestParam(required = false) UUID clientId,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -41,7 +44,7 @@ public class FmSiteController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_READ','FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    @PreAuthorize(CAN_VIEW)
     public ResponseEntity<ApiResponse<FmSiteResponse>> getSite(@PathVariable UUID id) {
         featureGuard.requireModule("facilitiesmanagement");
         return ResponseEntity.ok(ApiResponse.success(siteService.getSite(TenantContext.getTenantIdAsObject(), id)));

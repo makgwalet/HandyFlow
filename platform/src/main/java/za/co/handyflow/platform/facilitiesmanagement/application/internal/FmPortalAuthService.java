@@ -14,12 +14,19 @@ import za.co.handyflow.platform.shared.PortalJwtService;
 import za.co.handyflow.platform.shared.PortalUser;
 import za.co.handyflow.platform.shared.PortalUserRepository;
 
+import java.util.Optional;
+
 /**
- * Deliberately named FmPortalAuthService, not a generic "PortalAuthService"
- * — handles accepting invites TO THIS MODULE specifically, using the shared
- * PortalUser identity underneath. Direct mirror of
- * TrainProvPortalAuthService/CollAgencyPortalAuthService/WhsePortalAuthService,
- * confirmed identical in shape by direct source read.
+ * Handles accepting invites TO THIS MODULE specifically, using the shared
+ * {@link PortalUser} identity underneath.
+ * <p>
+ * Chunk 2 change: {@code PortalUser} is a shared identity, so a person
+ * invited by a second client or tenant already has an account. Previously
+ * that invite always failed with ACCOUNT_EXISTS and could never be
+ * accepted. Now, if an account exists for the invited email, the invitee
+ * must supply that account's existing password, and the grant is linked to
+ * it — proving ownership of the existing identity, so an invite can't be
+ * used to attach access to someone else's account.
  */
 @Slf4j
 @Service
@@ -43,20 +50,29 @@ public class FmPortalAuthService {
                     HttpStatus.BAD_REQUEST, "INVITE_EXPIRED");
         }
 
-        if (portalUserRepo.findByEmail(grant.getInviteEmail()).isPresent()) {
-            throw new HandyFlowException(
-                    "An account already exists for this email — please log in instead",
-                    HttpStatus.CONFLICT, "ACCOUNT_EXISTS");
+        Optional<PortalUser> existing = portalUserRepo.findByEmail(grant.getInviteEmail());
+        PortalUser user;
+        if (existing.isPresent()) {
+            user = existing.get();
+            if (!user.isActive()) {
+                throw new HandyFlowException("This account has been disabled", HttpStatus.UNAUTHORIZED, "ACCOUNT_DISABLED");
+            }
+            if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+                throw new HandyFlowException(
+                        "An account already exists for this email — enter your existing password to accept this invite",
+                        HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS");
+            }
+            log.info("FM portal invite accepted by existing portal user: {}", user.getEmail());
+        } else {
+            user = PortalUser.create(grant.getInviteEmail(), passwordEncoder.encode(password), fullName);
+            portalUserRepo.save(user);
+            log.info("FM portal user registered via invite: {}", user.getEmail());
         }
-
-        PortalUser user = PortalUser.create(grant.getInviteEmail(), passwordEncoder.encode(password), fullName);
-        portalUserRepo.save(user);
 
         grant.acceptInvite(user.getId());
         grantRepo.save(grant);
 
         String token = portalJwtService.generateToken(user.getId(), user.getEmail());
-        log.info("FM portal user registered via invite: {}", user.getEmail());
         return new FmPortalAuthResponse(token, user.getId(), user.getEmail(), user.getFullName());
     }
 

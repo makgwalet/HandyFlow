@@ -21,10 +21,13 @@ import java.io.ByteArrayOutputStream;
 import java.util.UUID;
 
 /**
- * Printable job card for the technician/vendor assigned to a work order,
- * plus a client invoice PDF — OpenPDF, same brand colour and table/footer
- * conventions used by every other module's PDF service in this codebase
- * (mirrors {@code FacilityPdfService} exactly for the job card).
+ * Printable job card for the technician/vendor assigned to a work order, plus a client invoice PDF —
+ * OpenPDF, same brand colour and table/footer conventions as every other module's PDF service.
+ * <p>
+ * Chunk 7: when VAT is charged on an invoice the document is titled "Tax Invoice" and shows the supplier's
+ * VAT number and the VAT rate applied; otherwise it stays a plain "Invoice". NOT YET COVERED (needed for a
+ * fully compliant South African tax invoice): the client's VAT number (FmClient has none yet), a line-by-line
+ * description of the services, and the supplier's address.
  */
 @Service
 @RequiredArgsConstructor
@@ -104,6 +107,9 @@ public class FmPdfService {
         FmClient client = clientRepository.findActiveById(tenantId, invoice.getClientId()).orElse(null);
         FmProfile profile = profileRepository.findByTenant(tenantId).orElse(null);
 
+        boolean taxInvoice = invoice.getVatRate() != null && invoice.getVatRate().signum() > 0;
+        String vatLabel = taxInvoice ? "VAT (" + invoice.getVatRate().stripTrailingZeros().toPlainString() + "%)" : "VAT";
+
         try {
             Document document = new Document(PageSize.A4, 40, 40, 50, 50);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -117,7 +123,10 @@ public class FmPdfService {
             Font totalFont = new Font(Font.HELVETICA, 13, Font.BOLD, BRAND_COLOR);
 
             document.add(new Paragraph(profile != null ? profile.getCompanyName() : "Facilities Management Company", companyFont));
-            document.add(new Paragraph("Invoice", titleFont));
+            if (taxInvoice && profile != null && profile.getVatNumber() != null) {
+                document.add(new Paragraph("VAT No: " + profile.getVatNumber(), valueFont));
+            }
+            document.add(new Paragraph(taxInvoice ? "Tax Invoice" : "Invoice", titleFont));
             document.add(new Paragraph(invoice.getInvoiceNumber(), new Font(Font.HELVETICA, 12, Font.NORMAL, Color.DARK_GRAY)));
             document.add(Chunk.NEWLINE);
 
@@ -133,14 +142,14 @@ public class FmPdfService {
 
             PdfPTable lineTable = new PdfPTable(2);
             lineTable.setWidthPercentage(100);
-            addRow(lineTable, "Facilities management services", "R " + invoice.getSubtotal(), labelFont, valueFont);
-            addRow(lineTable, "VAT", "R " + invoice.getVatAmount(), labelFont, valueFont);
+            addRow(lineTable, "Facilities management services" + (taxInvoice ? " (excl. VAT)" : ""), "R " + invoice.getSubtotal(), labelFont, valueFont);
+            addRow(lineTable, vatLabel, "R " + invoice.getVatAmount(), labelFont, valueFont);
             document.add(lineTable);
             document.add(Chunk.NEWLINE);
 
             PdfPTable totalTable = new PdfPTable(2);
             totalTable.setWidthPercentage(100);
-            addRow(totalTable, "Total", "R " + invoice.getTotal(), totalFont, totalFont);
+            addRow(totalTable, taxInvoice ? "Total (incl. VAT)" : "Total", "R " + invoice.getTotal(), totalFont, totalFont);
             addRow(totalTable, "Amount paid", "R " + invoice.getAmountPaid(), labelFont, valueFont);
             addRow(totalTable, "Balance due", "R " + invoice.balance(), totalFont, totalFont);
             document.add(totalTable);

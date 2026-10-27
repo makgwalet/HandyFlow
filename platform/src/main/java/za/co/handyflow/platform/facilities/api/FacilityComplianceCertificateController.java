@@ -31,7 +31,7 @@ public class FacilityComplianceCertificateController {
     private final FeatureGuard featureGuard;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('FACILITIES_READ','FACILITIES_MANAGE','FACILITIES_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('FACILITIES_READ','FACILITIES_MANAGE','FACILITIES_ADMIN','FACILITIES_COMPLIANCE_MANAGE')")
     public ResponseEntity<ApiResponse<Page<ComplianceCertificateResponse>>> getCertificates(
             @RequestParam(required = false) UUID siteId,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -41,14 +41,14 @@ public class FacilityComplianceCertificateController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('FACILITIES_READ','FACILITIES_MANAGE','FACILITIES_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('FACILITIES_READ','FACILITIES_MANAGE','FACILITIES_ADMIN','FACILITIES_COMPLIANCE_MANAGE')")
     public ResponseEntity<ApiResponse<ComplianceCertificateResponse>> getCertificate(@PathVariable UUID id) {
         featureGuard.requireModule("facilities");
         return ResponseEntity.ok(ApiResponse.success(certificateService.getCertificate(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('FACILITIES_MANAGE','FACILITIES_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('FACILITIES_MANAGE','FACILITIES_ADMIN','FACILITIES_COMPLIANCE_MANAGE')")
     public ResponseEntity<ApiResponse<ComplianceCertificateResponse>> issue(@Valid @RequestBody CreateComplianceCertificateRequest request) {
         featureGuard.requireModule("facilities");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Certificate issued",
@@ -56,9 +56,8 @@ public class FacilityComplianceCertificateController {
     }
 
     @PostMapping("/{id}/revoke")
-    @PreAuthorize("hasAuthority('FACILITIES_ADMIN')")
-    @Operation(summary = "Revoke a certificate — ADMIN-only, matching this module's own equivalent of every " +
-            "other module's issue/revoke gating on its own certificate-shaped entity (Training's TrainingCertificate, etc.)")
+    @PreAuthorize("hasAnyAuthority('FACILITIES_ADMIN','FACILITIES_COMPLIANCE_REVOKE')")
+    @Operation(summary = "Revoke a certificate — ADMIN or FACILITIES_COMPLIANCE_REVOKE only; audited")
     public ResponseEntity<ApiResponse<ComplianceCertificateResponse>> revoke(
             @PathVariable UUID id, @Valid @RequestBody RevokeCertificateRequest request) {
         featureGuard.requireModule("facilities");

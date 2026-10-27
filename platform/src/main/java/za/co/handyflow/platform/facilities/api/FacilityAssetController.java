@@ -26,6 +26,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Chunk 3: technicians may read assets and view evidence (the service limits
+ * them to sites of their assigned jobs); evidence endpoints now verify the
+ * caller may see the asset before touching the evidence store — they
+ * previously accepted any asset id in the tenant.
+ */
 @RestController
 @RequestMapping("/api/v1/facilities/assets")
 @RequiredArgsConstructor
@@ -37,7 +43,7 @@ public class FacilityAssetController {
     private final FeatureGuard featureGuard;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('FACILITIES_READ','FACILITIES_MANAGE','FACILITIES_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('FACILITIES_READ','FACILITIES_MANAGE','FACILITIES_ADMIN','FACILITIES_TECHNICIAN')")
     public ResponseEntity<ApiResponse<Page<AssetResponse>>> getAssets(
             @RequestParam(required = false) UUID siteId,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -47,7 +53,7 @@ public class FacilityAssetController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('FACILITIES_READ','FACILITIES_MANAGE','FACILITIES_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('FACILITIES_READ','FACILITIES_MANAGE','FACILITIES_ADMIN','FACILITIES_TECHNICIAN')")
     public ResponseEntity<ApiResponse<AssetResponse>> getAsset(@PathVariable UUID id) {
         featureGuard.requireModule("facilities");
         return ResponseEntity.ok(ApiResponse.success(assetService.getAsset(TenantContext.getTenantIdAsObject(), id)));
@@ -93,15 +99,17 @@ public class FacilityAssetController {
             @PathVariable UUID id, @RequestParam MultipartFile file,
             @RequestParam(defaultValue = "PHOTO") String evidenceType) {
         featureGuard.requireModule("facilities");
+        assetService.requireAccessible(TenantContext.getTenantIdAsObject(), id);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Evidence attached",
                 evidenceFacade.attach(TenantContext.getTenantIdAsObject(), file, evidenceType, "facilities",
                         "FacilityAsset", id, null, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
     }
 
     @GetMapping("/{id}/evidence")
-    @PreAuthorize("hasAnyAuthority('FACILITIES_READ','FACILITIES_MANAGE','FACILITIES_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('FACILITIES_READ','FACILITIES_MANAGE','FACILITIES_ADMIN','FACILITIES_TECHNICIAN')")
     public ResponseEntity<ApiResponse<List<EvidenceResponse>>> getEvidence(@PathVariable UUID id) {
         featureGuard.requireModule("facilities");
+        assetService.requireAccessible(TenantContext.getTenantIdAsObject(), id);
         return ResponseEntity.ok(ApiResponse.success(
                 evidenceFacade.listFor(TenantContext.getTenantIdAsObject(), "facilities", "FacilityAsset", id)));
     }

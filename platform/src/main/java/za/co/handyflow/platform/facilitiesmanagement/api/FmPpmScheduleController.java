@@ -17,16 +17,19 @@ import za.co.handyflow.platform.shared.TenantContext;
 import java.util.List;
 import java.util.UUID;
 
+/** Chunk 5: a maintenance planner can hold FACILITIESMANAGEMENT_PPM_MANAGE to manage schedules; deletion stays ADMIN-only. */
 @RestController
 @RequestMapping("/api/v1/facilitiesmanagement")
 @RequiredArgsConstructor
 public class FmPpmScheduleController {
 
+    private static final String CAN_MANAGE = "hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN','FACILITIESMANAGEMENT_PPM_MANAGE')";
+
     private final FmPpmScheduleService ppmScheduleService;
     private final FeatureGuard featureGuard;
 
     @GetMapping("/assets/{assetId}/ppm-schedules")
-    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_READ','FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_READ','FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN','FACILITIESMANAGEMENT_PPM_MANAGE')")
     public ResponseEntity<ApiResponse<List<FmPpmScheduleResponse>>> getSchedulesForAsset(@PathVariable UUID assetId) {
         featureGuard.requireModule("facilitiesmanagement");
         return ResponseEntity.ok(ApiResponse.success(
@@ -34,7 +37,7 @@ public class FmPpmScheduleController {
     }
 
     @PostMapping("/ppm-schedules")
-    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    @PreAuthorize(CAN_MANAGE)
     public ResponseEntity<ApiResponse<FmPpmScheduleResponse>> createSchedule(@Valid @RequestBody CreateFmPpmScheduleRequest request) {
         featureGuard.requireModule("facilitiesmanagement");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("PPM schedule created",
@@ -42,7 +45,7 @@ public class FmPpmScheduleController {
     }
 
     @PutMapping("/ppm-schedules/{id}")
-    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    @PreAuthorize(CAN_MANAGE)
     public ResponseEntity<ApiResponse<FmPpmScheduleResponse>> updateSchedule(
             @PathVariable UUID id, @RequestBody UpdateFmPpmScheduleRequest request) {
         featureGuard.requireModule("facilitiesmanagement");
@@ -51,7 +54,7 @@ public class FmPpmScheduleController {
     }
 
     @PostMapping("/ppm-schedules/{id}/deactivate")
-    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    @PreAuthorize(CAN_MANAGE)
     public ResponseEntity<ApiResponse<FmPpmScheduleResponse>> deactivate(@PathVariable UUID id) {
         featureGuard.requireModule("facilitiesmanagement");
         return ResponseEntity.ok(ApiResponse.success("PPM schedule deactivated",
@@ -59,7 +62,7 @@ public class FmPpmScheduleController {
     }
 
     @PostMapping("/ppm-schedules/{id}/reactivate")
-    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    @PreAuthorize(CAN_MANAGE)
     public ResponseEntity<ApiResponse<FmPpmScheduleResponse>> reactivate(@PathVariable UUID id) {
         featureGuard.requireModule("facilitiesmanagement");
         return ResponseEntity.ok(ApiResponse.success("PPM schedule reactivated",

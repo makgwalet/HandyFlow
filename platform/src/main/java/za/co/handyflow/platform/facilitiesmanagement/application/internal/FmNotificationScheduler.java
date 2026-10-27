@@ -2,9 +2,9 @@ package za.co.handyflow.platform.facilitiesmanagement.application.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.facilitiesmanagement.domain.model.*;
 import za.co.handyflow.platform.facilitiesmanagement.domain.repository.*;
 import za.co.handyflow.platform.notifications.application.NotificationRequest;
@@ -12,35 +12,48 @@ import za.co.handyflow.platform.notifications.application.Recipient;
 import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
 import za.co.handyflow.platform.notifications.application.internal.NotificationService;
 import za.co.handyflow.platform.notifications.domain.model.NotificationType;
+import za.co.handyflow.platform.shared.SchedulerLease;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Daily cross-tenant sweep, scheduled at 09:00 — the next free slot after
- * Module 5a's own Facilities sweep at 08:45 (established convention: PSIRA
- * 07:00, Armoury 07:15, DebtCollection 07:30, CollAgency 07:45, Warehousing
- * 08:00, Training-internal 08:15, TrainingProvider 08:30, Facilities 08:45).
+ * Module 5a's Facilities sweep at 08:45.
  * <p>
- * Four sweeps: (1) PPM schedules due today or earlier — generates a work
- * order per due schedule (skipping any schedule that already has an open
- * work order, so a slow-to-close job doesn't spawn duplicates every day it
- * stays open), mirroring {@code FacilityNotificationScheduler}'s own PPM
- * sweep exactly, resolving the owning site/client via the schedule's asset;
- * (2) work orders overdue against their own scheduled date; (3) service
- * agreements whose {@code endDate} falls within 30 days — a lapsed
- * retainer silently reverting to ad-hoc time-and-materials billing is a
- * real revenue-continuity risk for an FM company; (4) invoices past their
- * due date and not yet PAID.
+ * Four sweeps: (1) due PPM schedules generate a work order each, resolving
+ * the owning site/client via the schedule's asset (skipping a schedule that
+ * already has an open one); (2) work orders overdue against their scheduled
+ * date; (3) service agreements reaching an expiry reminder milestone;
+ * (4) invoices past due and not yet PAID, at overdue milestones.
+ * <p>
+ * Chunk 2 changes:
+ * <ul>
+ *   <li>Runs under {@link SchedulerLease} — one instance sweeps at a time.</li>
+ *   <li>Removed {@code @Transactional} from the sweep methods: they were
+ *       invoked via {@code this.} so the proxy never applied it, and the
+ *       intent is one transaction per item.</li>
+ *   <li>Agreement-expiry reminders fire at 30/14/7/1 days out; overdue-invoice
+ *       reminders fire at 1/7/14/30/60/90 days overdue — not every day.</li>
+ *   <li>A concurrent duplicate PPM work order is rejected by the partial
+ *       unique index (see migration) and treated as a benign skip.</li>
+ * </ul>
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class FmNotificationScheduler {
 
+    private static final String LOCK_NAME = "fm-daily-sweep";
+    private static final Duration LOCK_MAX_HOLD = Duration.ofMinutes(30);
     private static final int AGREEMENT_EXPIRY_WARNING_DAYS = 30;
+    private static final Set<Long> AGREEMENT_REMINDER_DAYS = Set.of(30L, 14L, 7L, 1L);
+    private static final Set<Long> INVOICE_OVERDUE_REMINDER_DAYS = Set.of(1L, 7L, 14L, 30L, 60L, 90L);
 
     private final FmPpmScheduleRepository ppmScheduleRepository;
     private final FmAssetRepository assetRepository;
@@ -51,20 +64,24 @@ public class FmNotificationScheduler {
     private final FmWorkOrderService workOrderService;
     private final NotificationService notificationService;
     private final TenantAdminRecipients tenantAdminRecipients;
+    private final SchedulerLease schedulerLease;
 
     @Scheduled(cron = "0 0 9 * * *")
     public void runDailySweep() {
+        schedulerLease.runExclusively(LOCK_NAME, LOCK_MAX_HOLD, this::sweep);
+    }
+
+    private void sweep() {
         log.info("[FM] Daily sweep starting");
         int ppmGenerated = generateDuePpmWorkOrders();
         int overdueWoAlerts = alertOverdueWorkOrders();
         int expiringAgreementAlerts = alertExpiringAgreements();
         int overdueInvoiceAlerts = alertOverdueInvoices();
         log.info("[FM] Daily sweep complete — {} PPM work orders generated, {} overdue-work-order alerts, " +
-                "{} expiring-agreement alerts, {} overdue-invoice alerts",
+                        "{} expiring-agreement alerts, {} overdue-invoice alerts",
                 ppmGenerated, overdueWoAlerts, expiringAgreementAlerts, overdueInvoiceAlerts);
     }
 
-    @Transactional
     public int generateDuePpmWorkOrders() {
         List<FmPpmSchedule> due = ppmScheduleRepository.findAllDueAcrossTenants(LocalDate.now());
         int generated = 0;
@@ -88,6 +105,8 @@ public class FmNotificationScheduler {
                         schedule.getAssetId(), site.get().getId(), schedule.getId(), schedule.getTaskName(), schedule.getNextDueDate());
                 notifyPpmDue(tenantId, schedule, wo);
                 generated++;
+            } catch (DataIntegrityViolationException e) {
+                log.info("[FM] PPM schedule={} already has an open work order (concurrent creation) — skipped", schedule.getId());
             } catch (Exception e) {
                 log.error("[FM] Failed to generate PPM work order for schedule={}: {}", schedule.getId(), e.getMessage(), e);
             }
@@ -95,7 +114,6 @@ public class FmNotificationScheduler {
         return generated;
     }
 
-    @Transactional(readOnly = true)
     public int alertOverdueWorkOrders() {
         List<FmWorkOrder> overdue = workOrderRepository.findOverdueAcrossTenants(LocalDate.now());
         int alerts = 0;
@@ -110,13 +128,14 @@ public class FmNotificationScheduler {
         return alerts;
     }
 
-    @Transactional(readOnly = true)
     public int alertExpiringAgreements() {
         LocalDate today = LocalDate.now();
         LocalDate cutoff = today.plusDays(AGREEMENT_EXPIRY_WARNING_DAYS);
         List<FmServiceAgreement> expiring = serviceAgreementRepository.findExpiringAcrossTenants(today, cutoff);
         int alerts = 0;
         for (FmServiceAgreement agreement : expiring) {
+            long daysLeft = ChronoUnit.DAYS.between(today, agreement.getEndDate());
+            if (!AGREEMENT_REMINDER_DAYS.contains(daysLeft)) continue;
             try {
                 notifyAgreementExpiring(agreement.getTenantId(), agreement);
                 alerts++;
@@ -127,11 +146,13 @@ public class FmNotificationScheduler {
         return alerts;
     }
 
-    @Transactional(readOnly = true)
     public int alertOverdueInvoices() {
+        LocalDate today = LocalDate.now();
         List<FmInvoice> overdue = invoiceRepository.findOverdueAcrossTenants();
         int alerts = 0;
         for (FmInvoice invoice : overdue) {
+            long daysOverdue = ChronoUnit.DAYS.between(invoice.getDueDate(), today);
+            if (!INVOICE_OVERDUE_REMINDER_DAYS.contains(daysOverdue)) continue;
             try {
                 notifyInvoiceOverdue(invoice.getTenantId(), invoice);
                 alerts++;
