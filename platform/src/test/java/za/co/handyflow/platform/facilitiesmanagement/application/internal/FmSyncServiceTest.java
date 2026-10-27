@@ -44,7 +44,7 @@ class FmSyncServiceTest {
     private final FmSyncExecutor executor = new FmSyncExecutor() {
         @Override public <T> T inNewTransaction(Supplier<T> work) { executions++; return work.get(); }
     };
-    private final FmWorkOrderService workOrders = new FmWorkOrderService() {
+    private final FmWorkOrderService workOrders = new FmWorkOrderService(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null) {
         @Override public FmWorkOrderResponse start(TenantId t, UUID id) { calls.add("start " + id); maybeFail(); return null; }
         @Override public FmWorkOrderResponse putOnHold(TenantId t, UUID id, HoldFmWorkOrderRequest r) {
             calls.add("hold " + r.reason() + " pause=" + r.pauseSla()); maybeFail(); return null;
