@@ -11,6 +11,6 @@ import java.util.UUID;
 
 public interface FmBusinessCalendarRepository extends JpaRepository<FmBusinessCalendar, UUID> {
 
-    @Query("SELECT c FROM FmBusinessCalendar c WHERE c.tenantId = :#{#tenantId.value}")
+    @Query("SELECT c FROM FmBusinessCalendar c WHERE c.tenantId.value = :#{#tenantId.value}")
     Optional<FmBusinessCalendar> findByTenant(@Param("tenantId") TenantId tenantId);
 }

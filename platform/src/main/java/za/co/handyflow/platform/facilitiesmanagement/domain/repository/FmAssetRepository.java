@@ -14,17 +14,17 @@ import java.util.UUID;
 
 public interface FmAssetRepository extends JpaRepository<FmAsset, UUID> {
 
-    @Query("SELECT a FROM FmAsset a WHERE a.tenantId = :#{#tenantId.value} AND a.id = :id AND a.deletedAt IS NULL")
+    @Query("SELECT a FROM FmAsset a WHERE a.tenantId.value = :#{#tenantId.value} AND a.id = :id AND a.deletedAt IS NULL")
     Optional<FmAsset> findActiveById(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT a FROM FmAsset a WHERE a.tenantId = :#{#tenantId.value} AND a.deletedAt IS NULL")
+    @Query("SELECT a FROM FmAsset a WHERE a.tenantId.value = :#{#tenantId.value} AND a.deletedAt IS NULL")
     Page<FmAsset> findAllActive(@Param("tenantId") TenantId tenantId, Pageable pageable);
 
-    @Query("SELECT a FROM FmAsset a WHERE a.tenantId = :#{#tenantId.value} AND a.siteId = :siteId AND a.deletedAt IS NULL")
+    @Query("SELECT a FROM FmAsset a WHERE a.tenantId.value = :#{#tenantId.value} AND a.siteId = :siteId AND a.deletedAt IS NULL")
     Page<FmAsset> findBySite(@Param("tenantId") TenantId tenantId, @Param("siteId") UUID siteId, Pageable pageable);
 
     /** Scope-aware list across sites. {@code siteIds} must never be empty. */
-    @Query("SELECT a FROM FmAsset a WHERE a.tenantId = :#{#tenantId.value} AND a.deletedAt IS NULL " +
+    @Query("SELECT a FROM FmAsset a WHERE a.tenantId.value = :#{#tenantId.value} AND a.deletedAt IS NULL " +
             "AND (:allSites = true OR a.siteId IN :siteIds)")
     Page<FmAsset> findAllActiveInScope(@Param("tenantId") TenantId tenantId, @Param("allSites") boolean allSites,
                                        @Param("siteIds") Collection<UUID> siteIds, Pageable pageable);

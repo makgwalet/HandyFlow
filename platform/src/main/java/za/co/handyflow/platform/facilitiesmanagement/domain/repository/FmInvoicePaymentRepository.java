@@ -13,20 +13,20 @@ import java.util.UUID;
 
 public interface FmInvoicePaymentRepository extends JpaRepository<FmInvoicePayment, UUID> {
 
-    @Query("SELECT p FROM FmInvoicePayment p WHERE p.tenantId = :#{#tenantId.value} AND p.id = :id")
+    @Query("SELECT p FROM FmInvoicePayment p WHERE p.tenantId.value = :#{#tenantId.value} AND p.id = :id")
     Optional<FmInvoicePayment> findActiveById(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT p FROM FmInvoicePayment p WHERE p.tenantId = :#{#tenantId.value} AND p.invoiceId = :invoiceId " +
+    @Query("SELECT p FROM FmInvoicePayment p WHERE p.tenantId.value = :#{#tenantId.value} AND p.invoiceId = :invoiceId " +
             "ORDER BY p.paymentDate ASC, p.createdAt ASC")
     List<FmInvoicePayment> findForInvoice(@Param("tenantId") TenantId tenantId, @Param("invoiceId") UUID invoiceId);
 
-    @Query("SELECT p FROM FmInvoicePayment p WHERE p.tenantId = :#{#tenantId.value} AND p.invoiceId = :invoiceId " +
+    @Query("SELECT p FROM FmInvoicePayment p WHERE p.tenantId.value = :#{#tenantId.value} AND p.invoiceId = :invoiceId " +
             "AND p.idempotencyKey = :key")
     Optional<FmInvoicePayment> findByIdempotencyKey(@Param("tenantId") TenantId tenantId, @Param("invoiceId") UUID invoiceId,
                                                     @Param("key") String key);
 
     /** Whether this bank reference was already captured against the invoice (a repeat is almost always a duplicate entry). */
-    @Query("SELECT COUNT(p) > 0 FROM FmInvoicePayment p WHERE p.tenantId = :#{#tenantId.value} AND p.invoiceId = :invoiceId " +
+    @Query("SELECT COUNT(p) > 0 FROM FmInvoicePayment p WHERE p.tenantId.value = :#{#tenantId.value} AND p.invoiceId = :invoiceId " +
             "AND LOWER(p.reference) = LOWER(:reference)")
     boolean existsByReference(@Param("tenantId") TenantId tenantId, @Param("invoiceId") UUID invoiceId,
                               @Param("reference") String reference);
@@ -36,6 +36,6 @@ public interface FmInvoicePaymentRepository extends JpaRepository<FmInvoicePayme
             "AND ((p.glLastAttemptAt IS NULL AND p.createdAt < :cutoff) OR p.glLastAttemptAt < :cutoff)")
     List<FmInvoicePayment> findDueForGlRetry(@Param("cutoff") Instant cutoff, @Param("maxAttempts") int maxAttempts);
 
-    @Query("SELECT p FROM FmInvoicePayment p WHERE p.tenantId = :#{#tenantId.value} AND p.glStatus = 'FAILED' ORDER BY p.createdAt ASC")
+    @Query("SELECT p FROM FmInvoicePayment p WHERE p.tenantId.value = :#{#tenantId.value} AND p.glStatus = 'FAILED' ORDER BY p.createdAt ASC")
     List<FmInvoicePayment> findGlExceptions(@Param("tenantId") TenantId tenantId);
 }

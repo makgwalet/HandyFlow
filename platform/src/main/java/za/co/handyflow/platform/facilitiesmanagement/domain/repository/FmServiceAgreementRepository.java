@@ -15,20 +15,20 @@ import java.util.UUID;
 
 public interface FmServiceAgreementRepository extends JpaRepository<FmServiceAgreement, UUID> {
 
-    @Query("SELECT a FROM FmServiceAgreement a WHERE a.tenantId = :#{#tenantId.value} AND a.id = :id")
+    @Query("SELECT a FROM FmServiceAgreement a WHERE a.tenantId.value = :#{#tenantId.value} AND a.id = :id")
     Optional<FmServiceAgreement> findActiveById(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT a FROM FmServiceAgreement a WHERE a.tenantId = :#{#tenantId.value} AND a.clientId = :clientId ORDER BY a.startDate DESC")
+    @Query("SELECT a FROM FmServiceAgreement a WHERE a.tenantId.value = :#{#tenantId.value} AND a.clientId = :clientId ORDER BY a.startDate DESC")
     Page<FmServiceAgreement> findAllActiveForClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId, Pageable pageable);
 
-    @Query("SELECT a FROM FmServiceAgreement a WHERE a.tenantId = :#{#tenantId.value} AND a.clientId = :clientId ORDER BY a.startDate DESC")
+    @Query("SELECT a FROM FmServiceAgreement a WHERE a.tenantId.value = :#{#tenantId.value} AND a.clientId = :clientId ORDER BY a.startDate DESC")
     List<FmServiceAgreement> findAllForClientList(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId);
 
     /**
      * The client's ACTIVE agreements in force on a given date (endDate NULL means open-ended). A client may now
      * have several; callers narrow by site and category (see {@code FmContractTermsService}).
      */
-    @Query("SELECT a FROM FmServiceAgreement a WHERE a.tenantId = :#{#tenantId.value} AND a.clientId = :clientId " +
+    @Query("SELECT a FROM FmServiceAgreement a WHERE a.tenantId.value = :#{#tenantId.value} AND a.clientId = :clientId " +
             "AND a.status = 'ACTIVE' AND a.startDate <= :asOfDate AND (a.endDate IS NULL OR a.endDate >= :asOfDate) " +
             "ORDER BY a.startDate DESC")
     List<FmServiceAgreement> findActiveAsOfDate(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId,
@@ -39,7 +39,7 @@ public interface FmServiceAgreementRepository extends JpaRepository<FmServiceAgr
      * agreement that would cover the same sites and categories at the same time. {@code end} must not be null
      * (pass a far-future date for an open-ended agreement); {@code excludeId} excludes the agreement being edited.
      */
-    @Query("SELECT a FROM FmServiceAgreement a WHERE a.tenantId = :#{#tenantId.value} AND a.clientId = :clientId " +
+    @Query("SELECT a FROM FmServiceAgreement a WHERE a.tenantId.value = :#{#tenantId.value} AND a.clientId = :clientId " +
             "AND a.status = 'ACTIVE' AND a.id <> :excludeId AND a.startDate <= :end " +
             "AND (a.endDate IS NULL OR a.endDate >= :start)")
     List<FmServiceAgreement> findActiveOverlapping(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId,

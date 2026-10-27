@@ -16,15 +16,15 @@ import java.util.UUID;
 
 public interface FacilityComplianceCertificateRepository extends JpaRepository<FacilityComplianceCertificate, UUID> {
 
-    @Query("SELECT c FROM FacilityComplianceCertificate c WHERE c.tenantId = :#{#tenantId.value} AND c.id = :id")
+    @Query("SELECT c FROM FacilityComplianceCertificate c WHERE c.tenantId.value = :#{#tenantId.value} AND c.id = :id")
     Optional<FacilityComplianceCertificate> findByIdForTenant(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT c FROM FacilityComplianceCertificate c WHERE c.tenantId = :#{#tenantId.value} " +
+    @Query("SELECT c FROM FacilityComplianceCertificate c WHERE c.tenantId.value = :#{#tenantId.value} " +
             "AND (:siteId IS NULL OR c.siteId = :siteId) ORDER BY c.expiryDate ASC")
     Page<FacilityComplianceCertificate> findAll(@Param("tenantId") TenantId tenantId, @Param("siteId") UUID siteId, Pageable pageable);
 
     /** Scope-aware list. {@code siteIds} must never be empty. */
-    @Query("SELECT c FROM FacilityComplianceCertificate c WHERE c.tenantId = :#{#tenantId.value} " +
+    @Query("SELECT c FROM FacilityComplianceCertificate c WHERE c.tenantId.value = :#{#tenantId.value} " +
             "AND (:siteId IS NULL OR c.siteId = :siteId) " +
             "AND (:allSites = true OR c.siteId IN :siteIds) ORDER BY c.expiryDate ASC")
     Page<FacilityComplianceCertificate> findAllInScope(@Param("tenantId") TenantId tenantId, @Param("siteId") UUID siteId,
@@ -37,19 +37,19 @@ public interface FacilityComplianceCertificateRepository extends JpaRepository<F
 
 
     /** VALID certificates expiring from {@code today} up to and including {@code cutoff}, within site scope. */
-    @Query("SELECT COUNT(c) FROM FacilityComplianceCertificate c WHERE c.tenantId = :#{#tenantId.value} AND c.status = 'VALID' " +
+    @Query("SELECT COUNT(c) FROM FacilityComplianceCertificate c WHERE c.tenantId.value = :#{#tenantId.value} AND c.status = 'VALID' " +
             "AND c.expiryDate >= :today AND c.expiryDate <= :cutoff AND (:allSites = true OR c.siteId IN :siteIds)")
     long countExpiringInScope(@Param("tenantId") TenantId tenantId, @Param("today") LocalDate today, @Param("cutoff") LocalDate cutoff,
                               @Param("allSites") boolean allSites, @Param("siteIds") Collection<UUID> siteIds);
 
     /** Certificates past their expiry date (swept to EXPIRED or not yet swept) that were not revoked, within site scope. */
-    @Query("SELECT COUNT(c) FROM FacilityComplianceCertificate c WHERE c.tenantId = :#{#tenantId.value} AND c.status <> 'REVOKED' " +
+    @Query("SELECT COUNT(c) FROM FacilityComplianceCertificate c WHERE c.tenantId.value = :#{#tenantId.value} AND c.status <> 'REVOKED' " +
             "AND c.expiryDate < :today AND (:allSites = true OR c.siteId IN :siteIds)")
     long countLapsedInScope(@Param("tenantId") TenantId tenantId, @Param("today") LocalDate today,
                             @Param("allSites") boolean allSites, @Param("siteIds") Collection<UUID> siteIds);
 
     /** Non-revoked certificates that have already lapsed or expire by {@code cutoff}, soonest first, within site scope. */
-    @Query("SELECT c FROM FacilityComplianceCertificate c WHERE c.tenantId = :#{#tenantId.value} AND c.status <> 'REVOKED' " +
+    @Query("SELECT c FROM FacilityComplianceCertificate c WHERE c.tenantId.value = :#{#tenantId.value} AND c.status <> 'REVOKED' " +
             "AND c.expiryDate <= :cutoff AND (:allSites = true OR c.siteId IN :siteIds) ORDER BY c.expiryDate ASC")
     List<FacilityComplianceCertificate> findLapsedOrExpiringInScope(@Param("tenantId") TenantId tenantId, @Param("cutoff") LocalDate cutoff,
                                                                     @Param("allSites") boolean allSites,

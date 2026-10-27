@@ -18,10 +18,10 @@ import java.util.UUID;
 
 public interface FmWorkOrderRepository extends JpaRepository<FmWorkOrder, UUID> {
 
-    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.id = :id AND w.deletedAt IS NULL")
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.id = :id AND w.deletedAt IS NULL")
     Optional<FmWorkOrder> findActiveById(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.deletedAt IS NULL " +
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.deletedAt IS NULL " +
             "AND (:status IS NULL OR w.status = :status) ORDER BY w.createdAt DESC")
     Page<FmWorkOrder> findAll(@Param("tenantId") TenantId tenantId, @Param("status") String status, Pageable pageable);
 
@@ -30,7 +30,7 @@ public interface FmWorkOrderRepository extends JpaRepository<FmWorkOrder, UUID> 
      * {@code allJobs=false} limits to jobs assigned to {@code technicianIds}. Collections are never empty
      * (policy supplies a placeholder).
      */
-    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.deletedAt IS NULL " +
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.deletedAt IS NULL " +
             "AND (:status IS NULL OR w.status = :status) " +
             "AND (:allClients = true OR w.clientId IN :clientIds) " +
             "AND (:allJobs = true OR w.technicianId IN :technicianIds) ORDER BY w.createdAt DESC")
@@ -39,13 +39,13 @@ public interface FmWorkOrderRepository extends JpaRepository<FmWorkOrder, UUID> 
                                      @Param("allJobs") boolean allJobs, @Param("technicianIds") Collection<UUID> technicianIds,
                                      Pageable pageable);
 
-    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.clientId = :clientId AND w.deletedAt IS NULL " +
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.clientId = :clientId AND w.deletedAt IS NULL " +
             "AND (:status IS NULL OR w.status = :status) ORDER BY w.createdAt DESC")
     Page<FmWorkOrder> findAllForClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId,
                                        @Param("status") String status, Pageable pageable);
 
     /** One client's work orders, additionally narrowed to assigned jobs for field technicians. */
-    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.clientId = :clientId AND w.deletedAt IS NULL " +
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.clientId = :clientId AND w.deletedAt IS NULL " +
             "AND (:status IS NULL OR w.status = :status) " +
             "AND (:allJobs = true OR w.technicianId IN :technicianIds) ORDER BY w.createdAt DESC")
     Page<FmWorkOrder> findAllForClientInScope(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId,
@@ -57,46 +57,46 @@ public interface FmWorkOrderRepository extends JpaRepository<FmWorkOrder, UUID> 
      * must be non-empty; the service translates the client's filter (PENDING_VERIFICATION is presented to
      * clients as IN_PROGRESS).
      */
-    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.clientId = :clientId AND w.deletedAt IS NULL " +
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.clientId = :clientId AND w.deletedAt IS NULL " +
             "AND w.status IN :statuses AND (w.status NOT IN ('REQUESTED','REJECTED') OR w.requestedByPortalUserId IS NOT NULL) " +
             "ORDER BY w.createdAt DESC")
     Page<FmWorkOrder> findAllForClientPortal(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId,
                                              @Param("statuses") Collection<String> statuses, Pageable pageable);
 
     /** Status -> count for what a client may see (staff-raised unapproved requests are hidden from them). */
-    @Query("SELECT w.status, COUNT(w) FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.clientId = :clientId " +
+    @Query("SELECT w.status, COUNT(w) FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.clientId = :clientId " +
             "AND w.deletedAt IS NULL AND (w.status NOT IN ('REQUESTED','REJECTED') OR w.requestedByPortalUserId IS NOT NULL) " +
             "GROUP BY w.status")
     List<Object[]> countByStatusForClientPortal(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId);
 
     /** A client's unfinished, approved work that carries a resolution target. */
-    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.clientId = :clientId AND w.deletedAt IS NULL " +
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.clientId = :clientId AND w.deletedAt IS NULL " +
             "AND w.resolutionDueAt IS NOT NULL AND w.status IN ('OPEN','ASSIGNED','IN_PROGRESS','ON_HOLD')")
     List<FmWorkOrder> findOpenWithSlaForClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId);
 
     /** Requests a client raised through the portal since {@code since} — intake throttle. */
-    @Query("SELECT COUNT(w) FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.clientId = :clientId " +
+    @Query("SELECT COUNT(w) FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.clientId = :clientId " +
             "AND w.requestedByPortalUserId IS NOT NULL AND w.createdAt >= :since")
     long countPortalRequestsSince(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId, @Param("since") Instant since);
 
-    @Query("SELECT DISTINCT w.siteId FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} " +
+    @Query("SELECT DISTINCT w.siteId FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} " +
             "AND w.technicianId IN :technicianIds AND w.deletedAt IS NULL")
     List<UUID> findSiteIdsForTechnicians(@Param("tenantId") TenantId tenantId, @Param("technicianIds") Collection<UUID> technicianIds);
 
     /** Ids (newest first) of open, non-PPM work orders on an asset — used to flag a possible duplicate on intake. */
-    @Query("SELECT w.id FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.assetId = :assetId " +
+    @Query("SELECT w.id FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.assetId = :assetId " +
             "AND w.category <> 'PPM' AND w.status NOT IN ('COMPLETED','CANCELLED','REJECTED') AND w.deletedAt IS NULL " +
             "ORDER BY w.createdAt DESC")
     List<UUID> findOpenReactiveIdsForAsset(@Param("tenantId") TenantId tenantId, @Param("assetId") UUID assetId, Pageable pageable);
 
-    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.siteId = :siteId AND w.deletedAt IS NULL ORDER BY w.createdAt DESC")
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.siteId = :siteId AND w.deletedAt IS NULL ORDER BY w.createdAt DESC")
     Page<FmWorkOrder> findBySite(@Param("tenantId") TenantId tenantId, @Param("siteId") UUID siteId, Pageable pageable);
 
-    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.assetId = :assetId AND w.deletedAt IS NULL ORDER BY w.createdAt DESC")
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.assetId = :assetId AND w.deletedAt IS NULL ORDER BY w.createdAt DESC")
     Page<FmWorkOrder> findByAsset(@Param("tenantId") TenantId tenantId, @Param("assetId") UUID assetId, Pageable pageable);
 
     /** A PPM schedule still has an open work order until that work order is COMPLETED, CANCELLED or REJECTED (PENDING_VERIFICATION counts as open). */
-    @Query("SELECT COUNT(w) > 0 FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.ppmScheduleId = :ppmScheduleId " +
+    @Query("SELECT COUNT(w) > 0 FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.ppmScheduleId = :ppmScheduleId " +
             "AND w.status NOT IN ('COMPLETED','CANCELLED','REJECTED') AND w.deletedAt IS NULL")
     boolean existsOpenForPpmSchedule(@Param("tenantId") TenantId tenantId, @Param("ppmScheduleId") UUID ppmScheduleId);
 
@@ -116,30 +116,30 @@ public interface FmWorkOrderRepository extends JpaRepository<FmWorkOrder, UUID> 
     List<FmWorkOrder> findOpenForResolutionSla();
 
     /** A client's work orders created in the period that carry an SLA (cancelled/rejected excluded) — for the SLA report. */
-    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.clientId = :clientId AND w.deletedAt IS NULL " +
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.clientId = :clientId AND w.deletedAt IS NULL " +
             "AND (w.responseDueAt IS NOT NULL OR w.resolutionDueAt IS NOT NULL) AND w.status NOT IN ('CANCELLED','REJECTED') " +
             "AND w.createdAt >= :from AND w.createdAt < :toExclusive")
     List<FmWorkOrder> findWithSlaForClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId,
                                            @Param("from") Instant from, @Param("toExclusive") Instant toExclusive);
 
     /** Work orders billed by a given invoice — released again if that DRAFT invoice is cancelled. */
-    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.invoiceId = :invoiceId AND w.deletedAt IS NULL")
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.invoiceId = :invoiceId AND w.deletedAt IS NULL")
     List<FmWorkOrder> findByInvoiceId(@Param("tenantId") TenantId tenantId, @Param("invoiceId") UUID invoiceId);
 
     /** Internal cost of work COMPLETED in the period (billed or not). Null when there is none. */
-    @Query("SELECT SUM(w.internalCost) FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.clientId = :clientId " +
+    @Query("SELECT SUM(w.internalCost) FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.clientId = :clientId " +
             "AND w.status = 'COMPLETED' AND w.completedAt >= :periodStart AND w.completedAt < :periodEndExclusive AND w.deletedAt IS NULL")
     BigDecimal sumInternalCostForClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId,
                                         @Param("periodStart") Instant periodStart,
                                         @Param("periodEndExclusive") Instant periodEndExclusive);
 
-    @Query("SELECT COUNT(w) FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.clientId = :clientId " +
+    @Query("SELECT COUNT(w) FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.clientId = :clientId " +
             "AND w.status = 'COMPLETED' AND w.completedAt >= :periodStart AND w.completedAt < :periodEndExclusive AND w.deletedAt IS NULL")
     long countCompletedForClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId,
                                  @Param("periodStart") Instant periodStart, @Param("periodEndExclusive") Instant periodEndExclusive);
 
     /** Charge on completed work that has not been invoiced yet (all time). Null when there is none. */
-    @Query("SELECT SUM(w.cost) FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.clientId = :clientId " +
+    @Query("SELECT SUM(w.cost) FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.clientId = :clientId " +
             "AND w.status = 'COMPLETED' AND w.invoiced = false AND w.cost IS NOT NULL AND w.cost > 0 " +
             "AND (w.coverage IS NULL OR w.coverage <> 'INCLUDED') AND w.deletedAt IS NULL")
     BigDecimal sumUnbilledChargeForClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId);
@@ -151,7 +151,7 @@ public interface FmWorkOrderRepository extends JpaRepository<FmWorkOrder, UUID> 
      * an Instant, so the period bounds are widened to the start of periodStart and the start of the day
      * AFTER periodEnd).
      */
-    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.clientId = :clientId " +
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.clientId = :clientId " +
             "AND w.status = 'COMPLETED' AND w.invoiced = false AND w.cost IS NOT NULL AND w.cost > 0 " +
             "AND (w.coverage IS NULL OR w.coverage <> 'INCLUDED') " +
             "AND w.completedAt >= :periodStart AND w.completedAt < :periodEndExclusive AND w.deletedAt IS NULL " +
@@ -164,7 +164,7 @@ public interface FmWorkOrderRepository extends JpaRepository<FmWorkOrder, UUID> 
     // ── Reporting (scope-aware; collections are never empty — the policy supplies a placeholder) ──
 
     /** Everything not yet finished, within the caller's scope (dashboard). */
-    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.deletedAt IS NULL " +
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.deletedAt IS NULL " +
             "AND w.status NOT IN ('COMPLETED','CANCELLED','REJECTED') " +
             "AND (:allClients = true OR w.clientId IN :clientIds) " +
             "AND (:allJobs = true OR w.technicianId IN :technicianIds)")
@@ -173,7 +173,7 @@ public interface FmWorkOrderRepository extends JpaRepository<FmWorkOrder, UUID> 
                                       @Param("allJobs") boolean allJobs, @Param("technicianIds") Collection<UUID> technicianIds);
 
     /** Work orders created in the period (any status except REQUESTED/REJECTED triage states) — vendor and asset reports. */
-    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.deletedAt IS NULL " +
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.deletedAt IS NULL " +
             "AND w.status NOT IN ('REQUESTED','REJECTED') AND w.createdAt >= :from AND w.createdAt < :toExclusive " +
             "AND (:allClients = true OR w.clientId IN :clientIds) " +
             "AND (:allJobs = true OR w.technicianId IN :technicianIds)")
@@ -183,7 +183,7 @@ public interface FmWorkOrderRepository extends JpaRepository<FmWorkOrder, UUID> 
                                                 @Param("allJobs") boolean allJobs, @Param("technicianIds") Collection<UUID> technicianIds);
 
     /** Work completed in the period, within scope (dashboard throughput). */
-    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.deletedAt IS NULL " +
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.deletedAt IS NULL " +
             "AND w.status = 'COMPLETED' AND w.completedAt >= :from AND w.completedAt < :toExclusive " +
             "AND (:allClients = true OR w.clientId IN :clientIds) " +
             "AND (:allJobs = true OR w.technicianId IN :technicianIds)")
@@ -193,7 +193,7 @@ public interface FmWorkOrderRepository extends JpaRepository<FmWorkOrder, UUID> 
                                                   @Param("allJobs") boolean allJobs, @Param("technicianIds") Collection<UUID> technicianIds);
 
     /** Charge on completed, not-yet-invoiced, billable work within client scope. Null when there is none. */
-    @Query("SELECT SUM(w.cost) FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.status = 'COMPLETED' " +
+    @Query("SELECT SUM(w.cost) FROM FmWorkOrder w WHERE w.tenantId.value = :#{#tenantId.value} AND w.status = 'COMPLETED' " +
             "AND w.invoiced = false AND w.cost IS NOT NULL AND w.cost > 0 AND (w.coverage IS NULL OR w.coverage <> 'INCLUDED') " +
             "AND w.deletedAt IS NULL AND (:allClients = true OR w.clientId IN :clientIds)")
     BigDecimal sumUnbilledChargeInScope(@Param("tenantId") TenantId tenantId,

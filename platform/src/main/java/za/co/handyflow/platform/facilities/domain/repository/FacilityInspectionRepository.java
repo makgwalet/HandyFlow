@@ -16,11 +16,11 @@ import java.util.UUID;
 
 public interface FacilityInspectionRepository extends JpaRepository<FacilityInspection, UUID> {
 
-    @Query("SELECT i FROM FacilityInspection i WHERE i.tenantId = :#{#tenantId.value} AND i.id = :id")
+    @Query("SELECT i FROM FacilityInspection i WHERE i.tenantId.value = :#{#tenantId.value} AND i.id = :id")
     Optional<FacilityInspection> findByIdForTenant(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
     /** Scope-aware list. {@code siteIds} must never be empty; null filters are ignored. */
-    @Query("SELECT i FROM FacilityInspection i WHERE i.tenantId = :#{#tenantId.value} " +
+    @Query("SELECT i FROM FacilityInspection i WHERE i.tenantId.value = :#{#tenantId.value} " +
             "AND (:siteId IS NULL OR i.siteId = :siteId) AND (:assetId IS NULL OR i.assetId = :assetId) " +
             "AND (:status IS NULL OR i.status = :status) " +
             "AND (:allSites = true OR i.siteId IN :siteIds) ORDER BY i.startedAt DESC")
@@ -30,16 +30,16 @@ public interface FacilityInspectionRepository extends JpaRepository<FacilityInsp
                                             Pageable pageable);
 
     /** Failed inspections completed since {@code since}, within site scope — for the action centre. */
-    @Query("SELECT i FROM FacilityInspection i WHERE i.tenantId = :#{#tenantId.value} AND i.status = 'COMPLETED' " +
+    @Query("SELECT i FROM FacilityInspection i WHERE i.tenantId.value = :#{#tenantId.value} AND i.status = 'COMPLETED' " +
             "AND i.result = 'FAIL' AND i.completedAt >= :since AND (:allSites = true OR i.siteId IN :siteIds) " +
             "ORDER BY i.completedAt DESC")
     List<FacilityInspection> findRecentFailuresInScope(@Param("tenantId") TenantId tenantId, @Param("since") Instant since,
                                                        @Param("allSites") boolean allSites, @Param("siteIds") Collection<UUID> siteIds);
 
-    @Query("SELECT COUNT(i) FROM FacilityInspection i WHERE i.tenantId = :#{#tenantId.value} AND i.templateId = :templateId")
+    @Query("SELECT COUNT(i) FROM FacilityInspection i WHERE i.tenantId.value = :#{#tenantId.value} AND i.templateId = :templateId")
     long countForTemplate(@Param("tenantId") TenantId tenantId, @Param("templateId") UUID templateId);
 
-    @Query("SELECT i FROM FacilityInspection i WHERE i.tenantId = :#{#tenantId.value} AND i.assetId = :assetId " +
+    @Query("SELECT i FROM FacilityInspection i WHERE i.tenantId.value = :#{#tenantId.value} AND i.assetId = :assetId " +
             "AND i.status = 'COMPLETED' ORDER BY i.completedAt DESC")
     List<FacilityInspection> findLatestCompletedForAsset(@Param("tenantId") TenantId tenantId, @Param("assetId") UUID assetId,
                                                          Pageable pageable);

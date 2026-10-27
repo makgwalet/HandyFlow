@@ -12,10 +12,10 @@ import java.util.UUID;
 
 public interface FacilitySiteAccessRepository extends JpaRepository<FacilitySiteAccess, UUID> {
 
-    @Query("SELECT a.siteId FROM FacilitySiteAccess a WHERE a.tenantId = :#{#tenantId.value} AND a.userId = :userId")
+    @Query("SELECT a.siteId FROM FacilitySiteAccess a WHERE a.tenantId.value = :#{#tenantId.value} AND a.userId = :userId")
     List<UUID> findSiteIds(@Param("tenantId") TenantId tenantId, @Param("userId") UUID userId);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("DELETE FROM FacilitySiteAccess a WHERE a.tenantId = :#{#tenantId.value} AND a.userId = :userId")
+    @Query("DELETE FROM FacilitySiteAccess a WHERE a.tenantId.value = :#{#tenantId.value} AND a.userId = :userId")
     void deleteForUser(@Param("tenantId") TenantId tenantId, @Param("userId") UUID userId);
 }
