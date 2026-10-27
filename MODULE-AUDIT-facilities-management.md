@@ -32,6 +32,12 @@ Do **not** edit V506–V509 to tidy their "rename" header comments: Flyway check
 - Fully credited invoices disappeared from the portal and credited invoices showed a balance with no explanation: CREDITED invoices are now visible and the response carries `creditedAmount`.
 - New: approved credit notes (`/portal/me/credit-notes`), invoice and credit-note PDFs (`.../invoice.pdf`, `.../credit-note.pdf`), each checked to belong to the caller's client and to be visible.
 - New: **client self-service requests** — `POST /portal/me/work-orders`. Lands as REQUESTED (nothing is billable until staff approve), site/asset must be the client's own, category CORRECTIVE/EMERGENCY/OTHER, **priority is never client-set** (safety → HIGH, emergency → EMERGENCY; staff confirm on approval), contract coverage and SLA stamped, possible duplicates flagged, audit (`PORTAL_REQUEST_RAISED`) and admin alert, throttled to 20 per client per 24 h (429 `REQUEST_LIMIT`). The client sees its own requests as SUBMITTED / DECLINED (staff's reason stays internal).
+- **Portal round 2 (V514):**
+  - **Gap fixed:** `FmWorkOrderController` had no endpoints for approving or declining requests, or for verifying or sending back completed work, so a portal request could never be approved through the API. Added `POST /work-orders/requests`, `/{id}/approve`, `/{id}/reject`, `/{id}/verify`, `/{id}/rework` (MANAGE, ADMIN or WORKORDER_ASSIGN; segregation of duties and audit unchanged in the service).
+  - Declining takes `reason` (internal) and an optional `clientMessage`, stored in the new `client_message` column and shown to the client as `declineMessage`.
+  - Clients can withdraw a request they submitted (`DELETE /portal/me/work-orders/{id}`): same person only, REQUESTED only (409 `REQUEST_NOT_WITHDRAWABLE` once staff have picked it up), audited `PORTAL_REQUEST_WITHDRAWN`, admins alerted.
+  - Portal work orders now carry `resolutionDueAt` and `resolutionSla` (ON_TRACK, AT_RISK, PAUSED, MET, BREACHED). Only the fix-by target is shown, never the internal response target, and nothing before approval or for declined or withdrawn requests.
+  - `GET /portal/me/summary`: work by portal status, open work, SLA at-risk and breached counts, outstanding and overdue balance.
 - Stale comment in the auth controller removed: `/portal/auth/**` is already permitted and rate-limited.
 - Not changed, worth a look: `bookkeeping` has a portal controller using the same `TenantContext.getTenantIdAsObject()` pattern (not verified, not touched).
 
@@ -70,7 +76,7 @@ Definitions worth knowing: a *failure* is a reactive (non-PPM, non-inspection), 
 
 ## Not done (honest list)
 
-Portal quote approvals and client work summary (self-service requests, credit notes and PDFs are done); cancelling a submitted request from the portal; a client-facing reason for a declined request; showing the SLA to clients; site and client scope for vendor and technician records and audit on FM vendor changes; inspection templates, corrective actions, compliance action centre; report exports (CSV/PDF), scheduled report emails and trend-over-time charts (the reports are point-in-time); mobile/QR/offline; inventory and procurement; vendor onboarding with insurance/licence tracking; multi-entity portfolios and integrations. None have migrations or code.
+Portal quote approvals (the rest of the portal roadmap is done); site and client scope for vendor and technician records and audit on FM vendor changes; inspection templates, corrective actions, compliance action centre; report exports (CSV/PDF), scheduled report emails and trend-over-time charts (the reports are point-in-time); mobile/QR/offline; inventory and procurement; vendor onboarding with insurance/licence tracking; multi-entity portfolios and integrations. None have migrations or code.
 
 ## Known limitations (carried over from your list, unchanged)
 

@@ -200,8 +200,13 @@ public class FmWorkOrderService {
 
     @Transactional
     public FmWorkOrderResponse reject(TenantId tenantId, UUID id, String reason) {
+        return reject(tenantId, id, reason, null);
+    }
+
+    @Transactional
+    public FmWorkOrderResponse reject(TenantId tenantId, UUID id, String reason, String clientMessage) {
         FmWorkOrder wo = findActive(tenantId, id, accessPolicy.scope(tenantId));
-        wo.reject(TenantContext.getCurrentUserId(), reason);
+        wo.reject(TenantContext.getCurrentUserId(), reason, clientMessage);
         workOrderRepository.save(wo);
         auditService.record(tenantId, "WORK_REQUEST_REJECTED", "WORK_ORDER", id, wo.getWorkOrderNumber() + " reason=" + reason);
         return toResponse(wo);

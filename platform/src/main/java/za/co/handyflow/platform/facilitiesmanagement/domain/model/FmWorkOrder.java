@@ -96,6 +96,9 @@ public class FmWorkOrder {
     private Instant approvedAt;
     @Column(name = "rejection_reason", length = 1000)
     private String rejectionReason;
+    /** Plain-language note for the client when a request is declined (the internal reason is never shown to them). */
+    @Column(name = "client_message", length = 1000)
+    private String clientMessage;
 
     @Column(name = "technician_id")
     private UUID technicianId;
@@ -284,6 +287,10 @@ public class FmWorkOrder {
     }
 
     public void reject(UUID approverId, String reason) {
+        reject(approverId, reason, null);
+    }
+
+    public void reject(UUID approverId, String reason, String clientMessage) {
         if (!"REQUESTED".equals(status))
             throw new IllegalStateException("Only a REQUESTED work order can be rejected — current status: " + status);
         if (reason == null || reason.isBlank())
@@ -292,6 +299,18 @@ public class FmWorkOrder {
         this.approvedByUserId = approverId;
         this.approvedAt = Instant.now();
         this.rejectionReason = reason.trim();
+        this.clientMessage = clientMessage == null || clientMessage.isBlank() ? null : clientMessage.trim();
+        this.updatedAt = Instant.now();
+    }
+
+    /** A client withdraws a request they submitted themselves, before staff have decided it. */
+    public void cancelByClient(UUID portalUserId) {
+        if (portalUserId == null || !portalUserId.equals(requestedByPortalUserId))
+            throw new IllegalStateException("Only the person who submitted a request can withdraw it");
+        if (!"REQUESTED".equals(status))
+            throw new IllegalStateException("This request has already been picked up and can no longer be withdrawn — please phone the helpdesk");
+        this.status = "CANCELLED";
+        this.cancellationReason = "Withdrawn by the client";
         this.updatedAt = Instant.now();
     }
 

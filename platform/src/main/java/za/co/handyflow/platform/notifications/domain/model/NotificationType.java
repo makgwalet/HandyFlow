@@ -351,6 +351,8 @@ public enum NotificationType {
     FM_INVOICE_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
     /** A client or staff member has raised a work request that needs approving before it can be dispatched. */
     FM_WORKORDER_REQUESTED(INFO, Set.of(IN_APP, EMAIL)),
+    /** A client withdrew a request before staff had decided it. */
+    FM_WORKORDER_REQUEST_WITHDRAWN(INFO, Set.of(IN_APP)),
     /** Work has been completed and must be checked by a second person before it becomes billable. */
     FM_WORKORDER_AWAITING_VERIFICATION(INFO, Set.of(IN_APP, EMAIL)),
     /** An SLA response or resolution target is about to be missed. */

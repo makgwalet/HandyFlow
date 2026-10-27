@@ -63,6 +63,17 @@ public interface FmWorkOrderRepository extends JpaRepository<FmWorkOrder, UUID> 
     Page<FmWorkOrder> findAllForClientPortal(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId,
                                              @Param("statuses") Collection<String> statuses, Pageable pageable);
 
+    /** Status -> count for what a client may see (staff-raised unapproved requests are hidden from them). */
+    @Query("SELECT w.status, COUNT(w) FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.clientId = :clientId " +
+            "AND w.deletedAt IS NULL AND (w.status NOT IN ('REQUESTED','REJECTED') OR w.requestedByPortalUserId IS NOT NULL) " +
+            "GROUP BY w.status")
+    List<Object[]> countByStatusForClientPortal(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId);
+
+    /** A client's unfinished, approved work that carries a resolution target. */
+    @Query("SELECT w FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.clientId = :clientId AND w.deletedAt IS NULL " +
+            "AND w.resolutionDueAt IS NOT NULL AND w.status IN ('OPEN','ASSIGNED','IN_PROGRESS','ON_HOLD')")
+    List<FmWorkOrder> findOpenWithSlaForClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId);
+
     /** Requests a client raised through the portal since {@code since} — intake throttle. */
     @Query("SELECT COUNT(w) FROM FmWorkOrder w WHERE w.tenantId = :#{#tenantId.value} AND w.clientId = :clientId " +
             "AND w.requestedByPortalUserId IS NOT NULL AND w.createdAt >= :since")

@@ -11,9 +11,14 @@ import java.util.UUID;
  * by staff for internal use) and the invoiced flag. A client-visible
  * completion summary should be added later as its own explicit field rather
  * than exposing internal notes.
+ * <p>
+ * {@code declineMessage} is the note staff wrote for the client (never the internal rejection reason). The SLA
+ * pair is the agreed fix-by time and its state (ON_TRACK, AT_RISK, PAUSED, MET, BREACHED); both are absent until
+ * a request is approved, and for withdrawn or declined requests.
  */
 public record FmPortalWorkOrderResponse(
         UUID id, String workOrderNumber, UUID siteId, UUID assetId,
         String category, String priority, String status, String description, String reportedBy,
-        LocalDate scheduledDate, Instant completedAt, Instant createdAt
+        LocalDate scheduledDate, Instant completedAt, Instant createdAt,
+        String declineMessage, Instant resolutionDueAt, String resolutionSla
 ) {}

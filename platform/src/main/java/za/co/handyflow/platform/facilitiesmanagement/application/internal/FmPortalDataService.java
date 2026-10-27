@@ -13,10 +13,13 @@ import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmSite;
 import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmWorkOrder;
 import za.co.handyflow.platform.facilitiesmanagement.domain.repository.*;
 import za.co.handyflow.platform.facilitiesmanagement.dto.FmPortalClientResponse;
+import za.co.handyflow.platform.facilitiesmanagement.dto.FmPortalSummaryResponse;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 
 /**
@@ -102,6 +105,19 @@ public class FmPortalDataService {
     public Page<FmWorkOrder> getMyWorkOrders(UUID portalUserId, UUID selectedClientId, String status, Pageable pageable) {
         Scope s = resolveScope(portalUserId, selectedClientId);
         return workOrderRepo.findAllForClientPortal(s.tenantId(), s.clientId(), FmPortalStatus.filter(status), pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public FmPortalSummaryResponse getMySummary(UUID portalUserId, UUID selectedClientId) {
+        Scope s = resolveScope(portalUserId, selectedClientId);
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (Object[] row : workOrderRepo.countByStatusForClientPortal(s.tenantId(), s.clientId())) {
+            counts.merge((String) row[0], ((Number) row[1]).longValue(), Long::sum);
+        }
+        List<FmInvoice> payable = invoiceRepo.findAllForClientList(s.tenantId(), s.clientId()).stream()
+                .filter(i -> Set.of("SENT", "PARTIAL").contains(i.getStatus())).toList();
+        return FmPortalSummary.build(counts, workOrderRepo.findOpenWithSlaForClient(s.tenantId(), s.clientId()),
+                payable, Instant.now(), LocalDate.now());
     }
 
     /** Only invoices the FM company has actually sent: SENT, PARTIAL, PAID or fully CREDITED. */

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPdfService;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPortalDataService;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPortalRequestService;
+import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPortalSla;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPortalStatus;
 import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmCreditNote;
 import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmInvoice;
@@ -26,6 +27,7 @@ import za.co.handyflow.platform.facilitiesmanagement.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.HandyFlowException;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -82,6 +84,22 @@ public class FmPortalDataController {
             @RequestParam(required = false) UUID clientId, @Valid @RequestBody FmPortalRaiseRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Request submitted",
                 toResponse(portalRequestService.raise(getPortalUserId(), clientId, request))));
+    }
+
+    @DeleteMapping("/work-orders/{id}")
+    @PreAuthorize("hasAuthority('PORTAL_USER')")
+    @Operation(summary = "Withdraw a request you submitted, while staff have not yet picked it up")
+    public ResponseEntity<ApiResponse<FmPortalWorkOrderResponse>> withdrawRequest(
+            @PathVariable UUID id, @RequestParam(required = false) UUID clientId) {
+        return ResponseEntity.ok(ApiResponse.success("Request withdrawn",
+                toResponse(portalRequestService.withdraw(getPortalUserId(), clientId, id))));
+    }
+
+    @GetMapping("/summary")
+    @PreAuthorize("hasAuthority('PORTAL_USER')")
+    @Operation(summary = "At-a-glance position: work by status, SLA risk, and what is owed")
+    public ResponseEntity<ApiResponse<FmPortalSummaryResponse>> getMySummary(@RequestParam(required = false) UUID clientId) {
+        return ResponseEntity.ok(ApiResponse.success(portalDataService.getMySummary(getPortalUserId(), clientId)));
     }
 
     @GetMapping("/invoices")
@@ -144,7 +162,9 @@ public class FmPortalDataController {
         return new FmPortalWorkOrderResponse(w.getId(), w.getWorkOrderNumber(), w.getSiteId(), w.getAssetId(),
                 w.getCategory(), w.getPriority(), FmPortalStatus.present(w.getStatus()),
                 w.getDescription(), w.getReportedBy(), w.getScheduledDate(),
-                hideCompletion ? null : w.getCompletedAt(), w.getCreatedAt());
+                hideCompletion ? null : w.getCompletedAt(), w.getCreatedAt(),
+                "REJECTED".equals(w.getStatus()) ? w.getClientMessage() : null,
+                FmPortalSla.dueAt(w), FmPortalSla.state(w, Instant.now()));
     }
 
     private FmPortalInvoiceResponse toResponse(FmInvoice i) {

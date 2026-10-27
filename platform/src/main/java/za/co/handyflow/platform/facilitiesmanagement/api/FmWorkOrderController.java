@@ -42,6 +42,8 @@ public class FmWorkOrderController {
     private static final String CAN_VIEW = "hasAnyAuthority('FACILITIESMANAGEMENT_READ','FACILITIESMANAGEMENT_MANAGE'," +
             "'FACILITIESMANAGEMENT_ADMIN','FACILITIESMANAGEMENT_TECHNICIAN','FACILITIESMANAGEMENT_WORKORDER_CREATE'," +
             "'FACILITIESMANAGEMENT_WORKORDER_ASSIGN')";
+    private static final String CAN_TRIAGE = "hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN'," +
+            "'FACILITIESMANAGEMENT_WORKORDER_ASSIGN')";
     private static final String CAN_EXECUTE = "hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN','FACILITIESMANAGEMENT_TECHNICIAN')";
 
     private final FmWorkOrderService workOrderService;
@@ -73,6 +75,52 @@ public class FmWorkOrderController {
         featureGuard.requireModule("facilitiesmanagement");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Work order created",
                 workOrderService.createWorkOrder(TenantContext.getTenantIdAsObject(), request)));
+    }
+
+    @PostMapping("/requests")
+    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN','FACILITIESMANAGEMENT_WORKORDER_CREATE')")
+    @Operation(summary = "Log a client's fault report (starts REQUESTED; must be approved before it can be assigned)")
+    public ResponseEntity<ApiResponse<FmWorkOrderResponse>> raiseRequest(@Valid @RequestBody RaiseFmWorkRequest request) {
+        featureGuard.requireModule("facilitiesmanagement");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Request raised",
+                workOrderService.raiseRequest(TenantContext.getTenantIdAsObject(), request)));
+    }
+
+    @PostMapping("/{id}/approve")
+    @PreAuthorize(CAN_TRIAGE)
+    @Operation(summary = "Approve a request (you cannot approve your own unless ADMIN — audited)")
+    public ResponseEntity<ApiResponse<FmWorkOrderResponse>> approve(
+            @PathVariable UUID id, @RequestBody(required = false) ApproveFmWorkRequest request) {
+        featureGuard.requireModule("facilitiesmanagement");
+        return ResponseEntity.ok(ApiResponse.success("Request approved",
+                workOrderService.approve(TenantContext.getTenantIdAsObject(), id, request)));
+    }
+
+    @PostMapping("/{id}/reject")
+    @PreAuthorize(CAN_TRIAGE)
+    @Operation(summary = "Decline a request. 'reason' is internal; 'clientMessage' is shown to the client in the portal")
+    public ResponseEntity<ApiResponse<FmWorkOrderResponse>> reject(@PathVariable UUID id, @Valid @RequestBody FmRejectRequest request) {
+        featureGuard.requireModule("facilitiesmanagement");
+        return ResponseEntity.ok(ApiResponse.success("Request declined",
+                workOrderService.reject(TenantContext.getTenantIdAsObject(), id, request.reason(), request.clientMessage())));
+    }
+
+    @PostMapping("/{id}/verify")
+    @PreAuthorize(CAN_TRIAGE)
+    @Operation(summary = "Verify completed work so it becomes billable (the person who completed it cannot verify it unless ADMIN — audited)")
+    public ResponseEntity<ApiResponse<FmWorkOrderResponse>> verify(@PathVariable UUID id) {
+        featureGuard.requireModule("facilitiesmanagement");
+        return ResponseEntity.ok(ApiResponse.success("Work verified",
+                workOrderService.verify(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/{id}/rework")
+    @PreAuthorize(CAN_TRIAGE)
+    @Operation(summary = "Send completed work back for rework")
+    public ResponseEntity<ApiResponse<FmWorkOrderResponse>> rework(@PathVariable UUID id, @Valid @RequestBody FmReasonRequest request) {
+        featureGuard.requireModule("facilitiesmanagement");
+        return ResponseEntity.ok(ApiResponse.success("Work sent back for rework",
+                workOrderService.rejectVerification(TenantContext.getTenantIdAsObject(), id, request.reason())));
     }
 
     @PostMapping("/{id}/assign")

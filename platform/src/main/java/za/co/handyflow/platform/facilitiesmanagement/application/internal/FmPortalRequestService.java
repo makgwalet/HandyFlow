@@ -113,4 +113,31 @@ public class FmPortalRequestService {
         }
         return wo;
     }
+
+    /**
+     * A client withdraws a request they submitted themselves. Only the submitting portal user may do so, only
+     * while it is still REQUESTED, and only for their own client's work. Anything else looks like "not found".
+     */
+    @Transactional
+    public FmWorkOrder withdraw(UUID portalUserId, UUID selectedClientId, UUID workOrderId) {
+        FmPortalDataService.Scope scope = portalDataService.resolveScope(portalUserId, selectedClientId);
+        FmWorkOrder wo = workOrderRepository.findActiveById(scope.tenantId(), workOrderId)
+                .filter(w -> scope.clientId().equals(w.getClientId()))
+                .orElseThrow(() -> new ResourceNotFoundException("FmWorkOrder", workOrderId.toString()));
+        if (!portalUserId.equals(wo.getRequestedByPortalUserId())) {
+            throw new ResourceNotFoundException("FmWorkOrder", workOrderId.toString());
+        }
+        try {
+            wo.cancelByClient(portalUserId);
+        } catch (IllegalStateException e) {
+            throw new HandyFlowException(e.getMessage(), HttpStatus.CONFLICT, "REQUEST_NOT_WITHDRAWABLE");
+        }
+        workOrderRepository.save(wo);
+        auditService.recordPortal(scope.tenantId(), portalUserId, "PORTAL_REQUEST_WITHDRAWN", "WORK_ORDER", wo.getId(),
+                wo.getWorkOrderNumber() + " client=" + scope.clientId());
+        alerts.toAdmins(scope.tenantId(), NotificationType.FM_WORKORDER_REQUEST_WITHDRAWN,
+                "Client withdrew request " + wo.getWorkOrderNumber(), wo.getDescription(),
+                "/facilitiesmanagement/work-orders/" + wo.getId(), wo.getId().toString());
+        return wo;
+    }
 }
