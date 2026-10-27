@@ -5,10 +5,12 @@
 // show its message when it refuses.
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Plus } from 'lucide-react'
 import { facilitiesApi, type PurchaseOrder } from '../../api/facilities.api'
 import { usePermissions } from '../../hooks/usePermission'
 import { errorMessage, toast } from '../../store/toast.store'
 import { Btn, DataTable, DefList, Dialog, Field, StatusChip, Toolbar, type Column } from './ui'
+import { PurchaseOrderFormDialog } from './forms'
 import { fmtDate, fmtMoney, fmtQty, inputStyle } from './format'
 
 const FILTERS = [{ id: '', label: 'All' }, { id: 'DRAFT', label: 'Draft' }, { id: 'APPROVED', label: 'Approved' }, { id: 'PARTLY_RECEIVED', label: 'Part received' }, { id: 'RECEIVED', label: 'Received' }, { id: 'CANCELLED', label: 'Cancelled' }]
@@ -16,6 +18,8 @@ const FILTERS = [{ id: '', label: 'All' }, { id: 'DRAFT', label: 'Draft' }, { id
 export default function PurchaseOrdersTab() {
   const [status, setStatus] = useState('')
   const [open, setOpen] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+  const canManage = usePermissions(['FACILITIES_MANAGE', 'FACILITIES_ADMIN'])
   const q = useQuery({ queryKey: ['facilities', 'purchase-orders', status], queryFn: () => facilitiesApi.purchaseOrders(status || undefined) })
   const cols: Column<PurchaseOrder>[] = [
     { key: 'no', header: 'Number', render: p => <strong>{p.poNumber}</strong> },
@@ -35,8 +39,10 @@ export default function PurchaseOrdersTab() {
                 background: status === f.id ? 'var(--hf-accent-soft)' : 'var(--hf-surface)', color: status === f.id ? 'var(--hf-accent-text-strong)' : 'var(--hf-text-secondary)' }}>{f.label}</button>
           ))}
         </div>
+        {canManage && <Btn kind="primary" onClick={() => setCreating(true)}><Plus size={15} />New order</Btn>}
       </Toolbar>
       <DataTable rows={q.data ?? []} columns={cols} rowKey={p => p.id} loading={q.isLoading} error={q.error} onRowClick={p => setOpen(p.id)} empty="No purchase orders." />
+      {creating && <PurchaseOrderFormDialog onClose={() => setCreating(false)} />}
       {open && q.data?.find(p => p.id === open) && <OrderPanel order={q.data.find(p => p.id === open)!} onClose={() => setOpen(null)} />}
     </div>
   )

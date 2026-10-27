@@ -15,6 +15,7 @@ const STATUS_TONE: Record<string, ChipTone> = {
   ACTIVE: 'ok', INACTIVE: 'neutral', UNDER_MAINTENANCE: 'warn', DECOMMISSIONED: 'neutral', CLOSED: 'neutral',
   VALID: 'ok', EXPIRED: 'bad', REVOKED: 'neutral', EXPIRING_SOON: 'warn',
   PENDING: 'warn', APPROVED: 'ok', SUSPENDED: 'bad',
+  OPERATIONAL: 'ok', DOWN: 'bad', MAINTENANCE: 'warn',
   DRAFT: 'neutral', PARTLY_RECEIVED: 'warn', RECEIVED: 'ok',
 }
 export function StatusChip({ status }: { status?: string | null }) {

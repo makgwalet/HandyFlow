@@ -1,9 +1,12 @@
 // src/pages/facilities/AssetsTab.tsx
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Pencil, Plus } from 'lucide-react'
 import Chip from '../../components/ui/Chip'
 import { facilitiesApi, type Asset } from '../../api/facilities.api'
-import { DataTable, DefList, Dialog, StatusChip, Toolbar, type Column } from './ui'
+import { usePermissions } from '../../hooks/usePermission'
+import { Btn, DataTable, DefList, Dialog, StatusChip, Toolbar, type Column } from './ui'
+import { AssetFormDialog } from './forms'
 import { daysUntil, fmtDate, inputStyle, titleCase } from './format'
 
 const CRIT_TONE = { LOW: 'neutral', MEDIUM: 'info', HIGH: 'warn', CRITICAL: 'bad' } as const
@@ -12,6 +15,8 @@ export default function AssetsTab() {
   const [search, setSearch] = useState('')
   const [siteId, setSiteId] = useState('')
   const [open, setOpen] = useState<Asset | null>(null)
+  const [form, setForm] = useState<Asset | 'new' | null>(null)
+  const canManage = usePermissions(['FACILITIES_MANAGE', 'FACILITIES_ADMIN'])
   const sites = useQuery({ queryKey: ['facilities', 'sites'], queryFn: facilitiesApi.sites, staleTime: 5 * 60_000 })
   const q = useQuery({ queryKey: ['facilities', 'assets', siteId], queryFn: () => facilitiesApi.assets(siteId || undefined) })
   const siteName = useMemo(() => new Map((sites.data ?? []).map(s => [s.id, s.name])), [sites.data])
@@ -33,10 +38,12 @@ export default function AssetsTab() {
           <option value="">All sites</option>
           {(sites.data ?? []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
+        {canManage && <Btn kind="primary" onClick={() => setForm('new')}><Plus size={15} />New asset</Btn>}
       </Toolbar>
       <DataTable rows={rows} columns={cols} rowKey={a => a.id} loading={q.isLoading} error={q.error} onRowClick={setOpen} empty="No assets found." />
       {open && (
-        <Dialog title={`${open.assetTag} · ${open.name}`} onClose={() => setOpen(null)} side width={460}>
+        <Dialog title={`${open.assetTag} · ${open.name}`} onClose={() => setOpen(null)} side width={460}
+          footer={canManage ? <Btn onClick={() => { setForm(open); setOpen(null) }}><Pencil size={13} />Edit</Btn> : undefined}>
           <DefList items={[
             ['Site', siteName.get(open.siteId) ?? '—'], ['Type', titleCase(open.assetType)], ['Location', open.location ?? '—'],
             ['Manufacturer', open.manufacturer ?? '—'], ['Model', open.model ?? '—'], ['Serial number', open.serialNumber ?? '—'],
@@ -45,6 +52,7 @@ export default function AssetsTab() {
           ]} />
         </Dialog>
       )}
+      {form && <AssetFormDialog asset={form === 'new' ? undefined : form} defaultSiteId={siteId || undefined} onClose={() => setForm(null)} />}
     </div>
   )
 }

@@ -13,6 +13,9 @@ import ComplianceTab from './ComplianceTab'
 import StockTab from './StockTab'
 import PurchaseOrdersTab from './PurchaseOrdersTab'
 import VendorsTab from './VendorsTab'
+import InspectionsTab from './InspectionsTab'
+import CorrectiveActionsTab from './CorrectiveActionsTab'
+import PlannedMaintenanceTab from './PlannedMaintenanceTab'
 
 export function FacilitiesPage() {
   return (
@@ -21,6 +24,9 @@ export function FacilitiesPage() {
         case 'dashboard':       return <FacilitiesDashboard onNavigate={goTo} />
         case 'action-centre':   return <ActionCentreTab onNavigate={goTo} />
         case 'work-orders':     return <WorkOrdersTab />
+        case 'inspections':     return <InspectionsTab />
+        case 'corrective-actions': return <CorrectiveActionsTab onOpenWorkOrder={wo => goTo(`work-orders?wo=${wo}`)} />
+        case 'ppm':             return <PlannedMaintenanceTab />
         case 'sites':           return <SitesTab />
         case 'assets':          return <AssetsTab />
         case 'compliance':      return <ComplianceTab />

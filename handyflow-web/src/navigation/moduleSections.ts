@@ -186,6 +186,14 @@ export const FACILITIES_SECTIONS: ModuleSections = {
     },
     { label: 'Work', sections: [{ id: 'work-orders', label: 'Work orders', icon: Wrench }] },
     {
+      label: 'Maintenance',
+      sections: [
+        { id: 'inspections', label: 'Inspections', icon: ClipboardCheck, anyPermission: [...FACILITIES_READ_ANY, 'FACILITIES_TECHNICIAN', 'FACILITIES_INSPECT', 'FACILITIES_COMPLIANCE_MANAGE'] },
+        { id: 'corrective-actions', label: 'Corrective actions', icon: ClipboardList, anyPermission: [...FACILITIES_READ_ANY, 'FACILITIES_TECHNICIAN', 'FACILITIES_INSPECT', 'FACILITIES_COMPLIANCE_MANAGE'] },
+        { id: 'ppm', label: 'Planned maintenance', icon: CalendarClock, anyPermission: [...FACILITIES_READ_ANY, 'FACILITIES_PPM_MANAGE'] },
+      ],
+    },
+    {
       label: 'Sites & assets',
       sections: [
         { id: 'sites', label: 'Sites', icon: MapPin },

@@ -4,12 +4,13 @@
 // Issuing needs an open job: the server adds a PARTS cost line to it and refuses more than is on hand.
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, PackagePlus, PackageMinus } from 'lucide-react'
+import { AlertTriangle, PackagePlus, PackageMinus, Pencil, Plus } from 'lucide-react'
 import { facilitiesApi, type StockItem } from '../../api/facilities.api'
 import { usePermissions } from '../../hooks/usePermission'
 import { errorMessage, toast } from '../../store/toast.store'
 import Chip from '../../components/ui/Chip'
 import { Btn, DataTable, DefList, Dialog, Field, KpiTile, Notice, Toolbar, type Column } from './ui'
+import { StockItemFormDialog } from './forms'
 import { fmtDateTime, fmtMoney, fmtQty, inputStyle, kpiGrid, titleCase } from './format'
 
 type Mode = 'receive' | 'issue' | 'return' | 'adjust'
@@ -20,6 +21,7 @@ export default function StockTab() {
   const [search, setSearch] = useState('')
   const [lowOnly, setLowOnly] = useState(false)
   const [open, setOpen] = useState<StockItem | null>(null)
+  const [creating, setCreating] = useState(false)
   const canManage = usePermissions(CAN_MANAGE)
   const q = useQuery({ queryKey: ['facilities', 'stock', search], queryFn: () => facilitiesApi.stock(search.trim() || undefined) })
   const sugg = useQuery({ queryKey: ['facilities', 'reorder'], queryFn: facilitiesApi.reorderSuggestions, enabled: canManage })
@@ -59,29 +61,40 @@ export default function StockTab() {
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--hf-text-secondary)' }}>
           <input type="checkbox" checked={lowOnly} onChange={e => setLowOnly(e.target.checked)} /> Low stock only
         </label>
+        {canManage && <Btn kind="primary" onClick={() => setCreating(true)}><Plus size={15} />New item</Btn>}
       </Toolbar>
       <DataTable rows={rows} columns={cols} rowKey={i => i.id} loading={q.isLoading} error={q.error} onRowClick={setOpen}
         empty={search || lowOnly ? 'No stock items match.' : 'No stock items yet.'} rowTone={i => (i.belowReorderLevel ? 'warn' : undefined)} />
       {open && <ItemPanel id={open.id} initial={open} onClose={() => setOpen(null)} />}
+      {creating && <StockItemFormDialog onClose={() => setCreating(false)} />}
     </div>
   )
 }
 
 function ItemPanel({ id, initial, onClose }: { id: string; initial: StockItem; onClose: () => void }) {
   const [mode, setMode] = useState<Mode | null>(null)
+  const [editing, setEditing] = useState(false)
+  const qc = useQueryClient()
   const canManage = usePermissions(CAN_MANAGE), canIssue = usePermissions(CAN_ISSUE)
   const moves = useQuery({ queryKey: ['facilities', 'stock', id, 'movements'], queryFn: () => facilitiesApi.stockMovements(id) })
   // The list query refreshes after each action; read the live row from it so the panel updates in place.
   const live = useQuery({ queryKey: ['facilities', 'stock', ''], queryFn: () => facilitiesApi.stock(), select: l => l.find(i => i.id === id) })
   const item = live.data ?? initial
+  const toggle = useMutation({
+    mutationFn: () => facilitiesApi.stockActive(item.id, item.active ? 'deactivate' : 'reactivate'),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['facilities'] }); toast.success(`${item.sku} ${item.active ? 'deactivated' : 'reactivated'}`) },
+    onError: e => toast.error(errorMessage(e)),
+  })
   return (
     <Dialog title={`${item.sku} · ${item.name}`} onClose={onClose} side width={500}
-      footer={item.active ? (
+      footer={canManage || item.active ? (
         <>
-          {canManage && <Btn onClick={() => setMode('adjust')}>Stocktake</Btn>}
-          {canIssue && <Btn onClick={() => setMode('return')}>Return</Btn>}
-          {canIssue && <Btn kind="primary" onClick={() => setMode('issue')}>Issue to job</Btn>}
-          {canManage && <Btn kind="primary" onClick={() => setMode('receive')}>Receive</Btn>}
+          {canManage && <Btn onClick={() => setEditing(true)}><Pencil size={13} />Edit</Btn>}
+          {canManage && <Btn busy={toggle.isPending} onClick={() => toggle.mutate()}>{item.active ? 'Deactivate' : 'Reactivate'}</Btn>}
+          {item.active && canManage && <Btn onClick={() => setMode('adjust')}>Stocktake</Btn>}
+          {item.active && canIssue && <Btn onClick={() => setMode('return')}>Return</Btn>}
+          {item.active && canIssue && <Btn kind="primary" onClick={() => setMode('issue')}>Issue to job</Btn>}
+          {item.active && canManage && <Btn kind="primary" onClick={() => setMode('receive')}>Receive</Btn>}
         </>
       ) : undefined}>
       <DefList items={[
@@ -102,6 +115,7 @@ function ItemPanel({ id, initial, onClose }: { id: string; initial: StockItem; o
           </tbody>
         </table>
       ) : <div style={{ fontSize: 12.5, color: 'var(--hf-text-muted)' }}>{moves.isLoading ? 'Loading…' : 'No movements yet.'}</div>}
+      {editing && <StockItemFormDialog item={item} onClose={() => setEditing(false)} />}
       {mode && <MovementDialog mode={mode} item={item} onClose={() => setMode(null)} />}
     </Dialog>
   )
