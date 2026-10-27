@@ -69,10 +69,10 @@ public class FacilitySyncService {
         } catch (DataIntegrityViolationException e) {
             // Two uploads of the same operation raced; the other one won and this one rolled back.
             return new SyncResponse.Result(op.opId(), op.targetId(), "DUPLICATE", null, null);
-        } catch (HandyFlowException e) {
-            return rejected(op, e.getErrorCode(), e.getMessage());
         } catch (ResourceNotFoundException e) {
             return rejected(op, "NOT_FOUND", e.getMessage());
+        } catch (HandyFlowException e) {
+            return rejected(op, e.getErrorCode(), e.getMessage());
         } catch (IllegalStateException e) {
             return rejected(op, "CONFLICT", e.getMessage());
         } catch (IllegalArgumentException e) {
