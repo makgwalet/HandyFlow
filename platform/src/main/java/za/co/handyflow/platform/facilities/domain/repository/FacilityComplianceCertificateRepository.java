@@ -47,4 +47,11 @@ public interface FacilityComplianceCertificateRepository extends JpaRepository<F
             "AND c.expiryDate < :today AND (:allSites = true OR c.siteId IN :siteIds)")
     long countLapsedInScope(@Param("tenantId") TenantId tenantId, @Param("today") LocalDate today,
                             @Param("allSites") boolean allSites, @Param("siteIds") Collection<UUID> siteIds);
+
+    /** Non-revoked certificates that have already lapsed or expire by {@code cutoff}, soonest first, within site scope. */
+    @Query("SELECT c FROM FacilityComplianceCertificate c WHERE c.tenantId = :#{#tenantId.value} AND c.status <> 'REVOKED' " +
+            "AND c.expiryDate <= :cutoff AND (:allSites = true OR c.siteId IN :siteIds) ORDER BY c.expiryDate ASC")
+    List<FacilityComplianceCertificate> findLapsedOrExpiringInScope(@Param("tenantId") TenantId tenantId, @Param("cutoff") LocalDate cutoff,
+                                                                    @Param("allSites") boolean allSites,
+                                                                    @Param("siteIds") Collection<UUID> siteIds);
 }
