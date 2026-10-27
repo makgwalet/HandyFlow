@@ -13,7 +13,7 @@ import {
   Palette, Headphones, CheckSquare, Megaphone, UserCheck, ShoppingCart,
   Truck, Receipt, UserCog, ShieldCheck, Wheat,
   Handshake, Warehouse, Scale, ClipboardCheck, Landmark, GraduationCap, BookOpen,
-  CalendarClock, Banknote, UserSearch, ShieldAlert,
+  CalendarClock, Banknote, UserSearch, ShieldAlert, Wrench,
 } from 'lucide-react'
 import type { ElementType } from 'react'
 import { apiClient } from '../api/client'
@@ -44,6 +44,7 @@ export const MODULE_REGISTRY: Record<string, Omit<ModuleNavItem, 'key'>> = {
   catalogue:    { icon: Package,       label: 'Catalogue',    route: '/catalogue'    },
   security:     { icon: Shield,        label: 'Security',     route: '/security'     },
   fuel:         { icon: Fuel,          label: 'Fuel',         route: '/fuel'         },
+  facilities:   { icon: Wrench,        label: 'Facilities',   route: '/facilities'   },
   earthmoving:  { icon: HardHat,       label: 'Earthmoving',  route: '/earthmoving'  },
   property:     { icon: Building2,     label: 'Property',     route: '/property'     },
   fleet:        { icon: Car,           label: 'Fleet',        route: '/fleet'        },

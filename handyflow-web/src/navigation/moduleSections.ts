@@ -168,6 +168,42 @@ export const AGRICULTURE_SECTIONS: ModuleSections = {
   ],
 }
 
+const FACILITIES_READ_ANY = ['FACILITIES_READ', 'FACILITIES_MANAGE', 'FACILITIES_ADMIN']
+
+export const FACILITIES_SECTIONS: ModuleSections = {
+  moduleKey: 'facilities',
+  basePath: '/facilities',
+  title: 'Facilities',
+  icon: Wrench,
+  defaultSection: 'dashboard',
+  groups: [
+    {
+      label: 'Overview',
+      sections: [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'action-centre', label: 'Action centre', icon: AlertTriangle, anyPermission: [...FACILITIES_READ_ANY, 'FACILITIES_COMPLIANCE_MANAGE'] },
+      ],
+    },
+    { label: 'Work', sections: [{ id: 'work-orders', label: 'Work orders', icon: Wrench }] },
+    {
+      label: 'Sites & assets',
+      sections: [
+        { id: 'sites', label: 'Sites', icon: MapPin },
+        { id: 'assets', label: 'Assets', icon: Building2 },
+        { id: 'compliance', label: 'Compliance', icon: ShieldCheck, anyPermission: [...FACILITIES_READ_ANY, 'FACILITIES_COMPLIANCE_MANAGE'] },
+      ],
+    },
+    {
+      label: 'Supply',
+      sections: [
+        { id: 'stock', label: 'Stock', icon: Package },
+        { id: 'purchase-orders', label: 'Purchase orders', icon: ShoppingCart, anyPermission: FACILITIES_READ_ANY },
+        { id: 'vendors', label: 'Vendors', icon: Handshake, anyPermission: FACILITIES_READ_ANY },
+      ],
+    },
+  ],
+}
+
 export const FUEL_SECTIONS: ModuleSections = {
   moduleKey: 'fuel',
   basePath: '/fuel',
@@ -1027,7 +1063,7 @@ export const CRM_SECTIONS: ModuleSections = {
 
 const REGISTRY: ModuleSections[] = [
   BOOKKEEPING_SECTIONS,
-  SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS, FLEET_SECTIONS, ACCOUNTING_SECTIONS, ACCOUNTANT_SECTIONS,
+  SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS, FACILITIES_SECTIONS, FLEET_SECTIONS, ACCOUNTING_SECTIONS, ACCOUNTANT_SECTIONS,
   HR_SECTIONS, BOOKINGS_SECTIONS, TRAINING_PROVIDER_SECTIONS, LEGAL_COMPLIANCE_SECTIONS, EARTHMOVING_SECTIONS,
   SUPPLY_CHAIN_SECTIONS, COMPLIANCE_TENDER_SECTIONS,
   EVENTS_SECTIONS, CONTRACTING_SECTIONS, AP_SECTIONS, PROPERTY_SECTIONS, CLINIC_SECTIONS,

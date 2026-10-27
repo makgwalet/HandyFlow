@@ -15,7 +15,7 @@ import {
   Handshake,
   Warehouse,
   ClipboardCheck,
-  ShieldCheck, Wheat, GraduationCap, CalendarClock, Banknote, UserSearch,
+  ShieldCheck, Wheat, GraduationCap, CalendarClock, Banknote, UserSearch, Wrench,
 } from 'lucide-react'
 import { apiClient } from '../../api/client'
 import { useAuthStore } from '../../store/auth.store'
@@ -47,6 +47,7 @@ const MODULE_REGISTRY: Record<string, AppTile> = {
   accounting:  { key: 'accounting',  name: 'Accounting',     description: 'Accounts & reports',            icon: Calculator,   bg: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text)', route: '/accounting'   },
   security:    { key: 'security',    name: 'Security',       description: 'Guards, sites & QR patrols',   icon: Shield,       bg: 'var(--hf-success-soft)', iconColor: 'var(--hf-accent-text)', route: '/security'     },
   fuel:        { key: 'fuel',        name: 'Fuel',           description: 'Tanks, dispatch & deliveries', icon: Fuel,         bg: 'var(--hf-warning-soft-strong)', iconColor: 'var(--hf-warning-text)', route: '/fuel'         },
+  facilities:  { key: 'facilities',  name: 'Facilities',     description: 'Sites, assets & work orders',  icon: Wrench,       bg: 'var(--hf-info-soft-strong)', iconColor: 'var(--hf-info-text)', route: '/facilities'   },
   earthmoving: { key: 'earthmoving', name: 'Earthmoving',    description: 'Assets & operators',           icon: HardHat,      bg: 'var(--hf-warning-soft)', iconColor: 'var(--hf-warning-text-deep)', route: '/earthmoving'  },
   property:    { key: 'property',    name: 'Property',       description: 'Units, leases & rent',         icon: Building2,    bg: 'var(--hf-violet-soft-strong)', iconColor: 'var(--hf-violet-text)', route: '/property'     },
   fleet:       { key: 'fleet',       name: 'Fleet',          description: 'Vehicles & trips',             icon: Car,          bg: 'var(--hf-sky-soft-strong)', iconColor: 'var(--hf-sky-text-strong)', route: '/fleet'        },
