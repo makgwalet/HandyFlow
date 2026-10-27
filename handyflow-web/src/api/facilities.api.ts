@@ -156,6 +156,19 @@ export interface InspectionSchedule {
 }
 export type ExportName = 'work-orders' | 'vendor-performance' | 'asset-reliability' | 'certificates' | 'corrective-actions' | 'stock-valuation' | 'technician-licences'
 
+export interface AssetLookup {
+  asset: Asset; qrPayload: string
+  openWorkOrders: { id: Id; workOrderNumber: string; status: string; priority: string; description: string; scheduledDate: string | null }[]
+  openCorrectiveActions: number; lastInspection: { id: Id; templateName: string; result: string | null; completedAt: string | null } | null; nextPpmDue: string | null
+}
+export interface Store { id: Id; code: string; name: string; siteId: Id | null; defaultStore: boolean; active: boolean; itemLines: number; stockValue: number }
+export interface StockLevel { storeId: Id; storeCode: string; storeName: string; onHand: number }
+export interface StockValuation {
+  asOf: string; totalValue: number
+  byStore: { storeId: Id; storeCode: string; storeName: string; itemLines: number; value: number }[]
+  lines: { storeId: Id; storeCode: string; itemId: Id; sku: string; name: string; unit: string; onHand: number; unitCost: number; value: number; itemActive: boolean }[]
+}
+
 // ── request bodies ──────────────────────────────────────────────────────────────────────────
 export interface CreateWorkOrderBody {
   siteId: Id; assetId?: Id | null; category: string; priority?: string; description: string
@@ -304,8 +317,21 @@ export const facilitiesApi = {
   createStockItem: async (b: StockItemBody) => data<StockItem>(await apiClient.post(`${B}/stock`, b)),
   updateStockItem: async (id: Id, b: StockItemBody) => data<StockItem>(await apiClient.put(`${B}/stock/${id}`, b)),
   stockActive: async (id: Id, action: 'deactivate' | 'reactivate') => data<StockItem>(await apiClient.post(`${B}/stock/${id}/${action}`)),
-  stockAction: async (id: Id, action: 'receive' | 'issue' | 'return' | 'adjust', body: object) =>
-    data<StockItem>(await apiClient.post(`${B}/stock/${id}/${action}`, body)),
+  /** Pass storeId to act on one store's stock; without it the default store is used. */
+  stockAction: async (id: Id, action: 'receive' | 'issue' | 'return' | 'adjust', body: object, storeId?: Id) =>
+    data<StockItem>(await apiClient.post(`${B}/stock/${id}/${action}`, body, { params: { storeId: storeId || undefined } })),
+  stockLevels: async (id: Id) => data<StockLevel[]>(await apiClient.get(`${B}/stock/${id}/levels`)),
+  transferStock: async (id: Id, b: { fromStoreId: Id; toStoreId: Id; quantity: number; reason?: string }) =>
+    data<StockItem>(await apiClient.post(`${B}/stock/${id}/transfer`, b)),
+
+  stores: async () => data<Store[]>(await apiClient.get(`${B}/stores`)),
+  saveStore: async (id: Id | null, b: { code: string; name: string; siteId?: Id | null }) =>
+    data<Store>(id ? await apiClient.put(`${B}/stores/${id}`, b) : await apiClient.post(`${B}/stores`, b)),
+  storeAction: async (id: Id, action: 'make-default' | 'deactivate' | 'reactivate') => data<Store>(await apiClient.post(`${B}/stores/${id}/${action}`)),
+  stockValuation: async (storeId?: Id) => data<StockValuation>(await apiClient.get(`${B}/reports/stock-valuation`, { params: { storeId: storeId || undefined } })),
+
+  assetLookup: async (code: string) => data<AssetLookup>(await apiClient.get(`${B}/assets/lookup`, { params: { code } })),
+  assetQr: async (id: Id) => data<string>(await apiClient.get(`${B}/assets/${id}/qr`)),
 
   purchaseOrders: async (status?: string) =>
     page<PurchaseOrder>(await apiClient.get(`${B}/purchase-orders`, { params: { status: status || undefined, size: 100 } })),

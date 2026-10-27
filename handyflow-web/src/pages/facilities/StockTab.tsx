@@ -4,8 +4,8 @@
 // Issuing needs an open job: the server adds a PARTS cost line to it and refuses more than is on hand.
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, PackagePlus, PackageMinus, Pencil, Plus } from 'lucide-react'
-import { facilitiesApi, type StockItem } from '../../api/facilities.api'
+import { AlertTriangle, ArrowRightLeft, PackagePlus, PackageMinus, Pencil, Plus } from 'lucide-react'
+import { facilitiesApi, type StockItem, type StockLevel } from '../../api/facilities.api'
 import { usePermissions } from '../../hooks/usePermission'
 import { errorMessage, toast } from '../../store/toast.store'
 import Chip from '../../components/ui/Chip'
@@ -13,7 +13,7 @@ import { Btn, DataTable, DefList, Dialog, Field, KpiTile, Notice, Toolbar, type 
 import { StockItemFormDialog } from './forms'
 import { fmtDateTime, fmtMoney, fmtQty, inputStyle, kpiGrid, titleCase } from './format'
 
-type Mode = 'receive' | 'issue' | 'return' | 'adjust'
+type Mode = 'receive' | 'issue' | 'return' | 'adjust' | 'transfer'
 const CAN_MANAGE = ['FACILITIES_MANAGE', 'FACILITIES_ADMIN']
 const CAN_ISSUE = ['FACILITIES_MANAGE', 'FACILITIES_ADMIN', 'FACILITIES_TECHNICIAN']
 
@@ -76,6 +76,7 @@ function ItemPanel({ id, initial, onClose }: { id: string; initial: StockItem; o
   const [editing, setEditing] = useState(false)
   const qc = useQueryClient()
   const canManage = usePermissions(CAN_MANAGE), canIssue = usePermissions(CAN_ISSUE)
+  const levels = useQuery({ queryKey: ['facilities', 'stock', id, 'levels'], queryFn: () => facilitiesApi.stockLevels(id) })
   const moves = useQuery({ queryKey: ['facilities', 'stock', id, 'movements'], queryFn: () => facilitiesApi.stockMovements(id) })
   // The list query refreshes after each action; read the live row from it so the panel updates in place.
   const live = useQuery({ queryKey: ['facilities', 'stock', ''], queryFn: () => facilitiesApi.stock(), select: l => l.find(i => i.id === id) })
@@ -91,6 +92,7 @@ function ItemPanel({ id, initial, onClose }: { id: string; initial: StockItem; o
         <>
           {canManage && <Btn onClick={() => setEditing(true)}><Pencil size={13} />Edit</Btn>}
           {canManage && <Btn busy={toggle.isPending} onClick={() => toggle.mutate()}>{item.active ? 'Deactivate' : 'Reactivate'}</Btn>}
+          {item.active && canManage && (levels.data?.length ?? 0) > 1 && <Btn onClick={() => setMode('transfer')}><ArrowRightLeft size={13} />Transfer</Btn>}
           {item.active && canManage && <Btn onClick={() => setMode('adjust')}>Stocktake</Btn>}
           {item.active && canIssue && <Btn onClick={() => setMode('return')}>Return</Btn>}
           {item.active && canIssue && <Btn kind="primary" onClick={() => setMode('issue')}>Issue to job</Btn>}
@@ -101,6 +103,16 @@ function ItemPanel({ id, initial, onClose }: { id: string; initial: StockItem; o
         ['On hand', <strong key="oh">{fmtQty(item.onHand)} {item.unit}</strong>], ['Reorder level', item.reorderLevel ? `${fmtQty(item.reorderLevel)} ${item.unit}` : 'Not set'],
         ['Standard reorder qty', item.reorderQty ? fmtQty(item.reorderQty) : '—'], ['Average unit cost', fmtMoney(item.unitCost)], ['Stock value', fmtMoney(item.stockValue)], ['Location', item.location ?? '—'],
       ]} />
+      {(levels.data?.length ?? 0) > 1 && (
+        <>
+          <h3 style={{ margin: '22px 0 8px', fontSize: 13, fontWeight: 700 }}>By store</h3>
+          <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
+            <tbody>{levels.data!.map(l => (
+              <tr key={l.storeId} style={{ borderTop: '1px solid var(--hf-border-subtle)' }}><td style={{ padding: '7px 0' }}>{l.storeName} <span style={{ color: 'var(--hf-text-muted)' }}>({l.storeCode})</span></td><td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtQty(l.onHand)} {item.unit}</td></tr>
+            ))}</tbody>
+          </table>
+        </>
+      )}
       <h3 style={{ margin: '22px 0 8px', fontSize: 13, fontWeight: 700 }}>Recent movements</h3>
       {moves.data && moves.data.length > 0 ? (
         <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
@@ -116,24 +128,26 @@ function ItemPanel({ id, initial, onClose }: { id: string; initial: StockItem; o
         </table>
       ) : <div style={{ fontSize: 12.5, color: 'var(--hf-text-muted)' }}>{moves.isLoading ? 'Loading…' : 'No movements yet.'}</div>}
       {editing && <StockItemFormDialog item={item} onClose={() => setEditing(false)} />}
-      {mode && <MovementDialog mode={mode} item={item} onClose={() => setMode(null)} />}
+      {mode === 'transfer' && <TransferDialog item={item} levels={levels.data ?? []} onClose={() => setMode(null)} />}
+      {mode && mode !== 'transfer' && <MovementDialog mode={mode} item={item} stores={levels.data ?? []} onClose={() => setMode(null)} />}
     </Dialog>
   )
 }
 
-const MODE_COPY: Record<Mode, { title: string; confirm: string }> = {
+const MODE_COPY: Record<Exclude<Mode, 'transfer'>, { title: string; confirm: string }> = {
   receive: { title: 'Receive stock', confirm: 'Receive' },
   issue: { title: 'Issue to work order', confirm: 'Issue' },
   return: { title: 'Return to stock', confirm: 'Return' },
   adjust: { title: 'Stocktake', confirm: 'Save count' },
 }
 
-function MovementDialog({ mode, item, onClose }: { mode: Mode; item: StockItem; onClose: () => void }) {
+function MovementDialog({ mode, item, stores, onClose }: { mode: Exclude<Mode, 'transfer'>; item: StockItem; stores: StockLevel[]; onClose: () => void }) {
   const qc = useQueryClient()
   const [qty, setQty] = useState('')
   const [cost, setCost] = useState(String(item.unitCost || ''))
   const [text, setText] = useState('')
   const [woId, setWoId] = useState('')
+  const [storeId, setStoreId] = useState('')
   const orders = useQuery({
     queryKey: ['facilities', 'work-orders', 'IN_PROGRESS'], queryFn: () => facilitiesApi.workOrders('IN_PROGRESS'),
     enabled: mode === 'issue' || mode === 'return',
@@ -145,10 +159,10 @@ function MovementDialog({ mode, item, onClose }: { mode: Mode; item: StockItem; 
   const run = useMutation({
     mutationFn: () => {
       switch (mode) {
-        case 'receive': return facilitiesApi.stockAction(item.id, 'receive', { quantity: n, unitCost: Number(cost), reference: text || undefined })
-        case 'issue': return facilitiesApi.stockAction(item.id, 'issue', { workOrderId: woId, quantity: n, note: text || undefined })
-        case 'return': return facilitiesApi.stockAction(item.id, 'return', { workOrderId: woId || undefined, quantity: n, reason: text })
-        case 'adjust': return facilitiesApi.stockAction(item.id, 'adjust', { countedQuantity: n, reason: text })
+        case 'receive': return facilitiesApi.stockAction(item.id, 'receive', { quantity: n, unitCost: Number(cost), reference: text || undefined }, storeId)
+        case 'issue': return facilitiesApi.stockAction(item.id, 'issue', { workOrderId: woId, quantity: n, note: text || undefined }, storeId)
+        case 'return': return facilitiesApi.stockAction(item.id, 'return', { workOrderId: woId || undefined, quantity: n, reason: text }, storeId)
+        case 'adjust': return facilitiesApi.stockAction(item.id, 'adjust', { countedQuantity: n, reason: text }, storeId)
       }
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['facilities'] }); toast.success(`${MODE_COPY[mode].title}: ${item.sku} updated`); onClose() },
@@ -159,6 +173,13 @@ function MovementDialog({ mode, item, onClose }: { mode: Mode; item: StockItem; 
   return (
     <Dialog title={`${MODE_COPY[mode].title}: ${item.sku}`} onClose={onClose} width={440}
       footer={<><Btn onClick={onClose}>Back</Btn><Btn kind="primary" busy={run.isPending} disabled={!ok} onClick={() => run.mutate()}>{MODE_COPY[mode].confirm}</Btn></>}>
+      {stores.length > 1 && (
+        <Field label="Store" hint={mode === 'issue' ? 'Issuing is limited to what that store holds.' : 'Leave blank for the default store.'}>
+          <select value={storeId} onChange={e => setStoreId(e.target.value)} style={inputStyle}>
+            <option value="">Default store</option>{stores.map(s => <option key={s.storeId} value={s.storeId}>{s.storeName} ({fmtQty(s.onHand)} {item.unit})</option>)}
+          </select>
+        </Field>
+      )}
       {mode === 'issue' && (
         <Field label="Work order *" hint="Jobs that are assigned or in progress. Costs are frozen once a job is complete.">
           <select value={woId} onChange={e => setWoId(e.target.value)} style={inputStyle}>
@@ -182,6 +203,41 @@ function MovementDialog({ mode, item, onClose }: { mode: Mode; item: StockItem; 
       <Field label={mode === 'receive' ? 'Reference' : mode === 'issue' ? 'Note' : 'Reason *'} hint={mode === 'receive' ? 'Delivery note or invoice number.' : undefined}>
         <input value={text} onChange={e => setText(e.target.value)} maxLength={300} style={inputStyle} />
       </Field>
+    </Dialog>
+  )
+}
+
+function TransferDialog({ item, levels, onClose }: { item: StockItem; levels: StockLevel[]; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [from, setFrom] = useState(levels.find(l => l.onHand > 0)?.storeId ?? '')
+  const [to, setTo] = useState('')
+  const [qty, setQty] = useState('')
+  const [reason, setReason] = useState('')
+  const n = Number(qty)
+  const held = levels.find(l => l.storeId === from)?.onHand ?? 0
+  const ok = !!from && !!to && from !== to && n > 0 && n <= held
+  const run = useMutation({
+    mutationFn: () => facilitiesApi.transferStock(item.id, { fromStoreId: from, toStoreId: to, quantity: n, reason: reason.trim() || undefined }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['facilities'] }); toast.success(`${item.sku} transferred`); onClose() },
+    onError: e => toast.error(errorMessage(e)),
+  })
+  return (
+    <Dialog title={`Transfer ${item.sku}`} onClose={onClose} width={440}
+      footer={<><Btn onClick={onClose}>Back</Btn><Btn kind="primary" busy={run.isPending} disabled={!ok} onClick={() => run.mutate()}>Transfer</Btn></>}>
+      <Field label="From *">
+        <select value={from} onChange={e => setFrom(e.target.value)} style={inputStyle}>
+          <option value="">Select a store…</option>{levels.map(l => <option key={l.storeId} value={l.storeId}>{l.storeName} ({fmtQty(l.onHand)} {item.unit})</option>)}
+        </select>
+      </Field>
+      <Field label="To *">
+        <select value={to} onChange={e => setTo(e.target.value)} style={inputStyle}>
+          <option value="">Select a store…</option>{levels.filter(l => l.storeId !== from).map(l => <option key={l.storeId} value={l.storeId}>{l.storeName}</option>)}
+        </select>
+      </Field>
+      <Field label={`Quantity (${item.unit}) *`} hint={from ? `${fmtQty(held)} ${item.unit} available there.` : undefined}>
+        <input type="number" min="0" step="0.001" value={qty} onChange={e => setQty(e.target.value)} style={inputStyle} />
+      </Field>
+      <Field label="Reason"><input value={reason} onChange={e => setReason(e.target.value)} maxLength={200} style={inputStyle} /></Field>
     </Dialog>
   )
 }

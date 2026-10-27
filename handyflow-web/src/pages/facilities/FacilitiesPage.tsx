@@ -15,6 +15,7 @@ import PurchaseOrdersTab from './PurchaseOrdersTab'
 import VendorsTab from './VendorsTab'
 import TechniciansTab from './TechniciansTab'
 import ReportsTab from './ReportsTab'
+import StoresTab from './StoresTab'
 import InspectionSchedulesTab from './InspectionSchedulesTab'
 import InspectionsTab from './InspectionsTab'
 import CorrectiveActionsTab from './CorrectiveActionsTab'
@@ -37,6 +38,7 @@ export function FacilitiesPage() {
         case 'purchase-orders': return <PurchaseOrdersTab />
         case 'vendors':        return <VendorsTab />
         case 'technicians':    return <TechniciansTab />
+        case 'stores':         return <StoresTab />
         case 'reports':        return <ReportsTab />
         case 'inspection-schedules': return <InspectionSchedulesTab />
         default:                return null
