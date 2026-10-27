@@ -21,6 +21,7 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -106,6 +107,29 @@ public class FacilityCorrectiveActionService {
             ids.add(a.getId());
         }
         return ids;
+    }
+
+    /**
+     * Called by the daily sweep when a certificate lapses: one CRITICAL action to renew it. Safe to call again for
+     * the same certificate (does nothing while an unfinished action for it exists). No signed-in user, no scope check.
+     * Returns the new action id, or empty when one was already open.
+     */
+    @Transactional
+    public Optional<UUID> raiseForLapsedCertificate(FacilityComplianceCertificate cert) {
+        TenantId tenantId = cert.getTenantId();
+        boolean alreadyOpen = actionRepository.findBySource(tenantId, "CERTIFICATE", cert.getId()).stream()
+                .anyMatch(a -> !a.isTerminal());
+        if (alreadyOpen) return Optional.empty();
+        String label = cert.getCertificateType() + (cert.getCertificateNumber() != null ? " " + cert.getCertificateNumber() : "");
+        String description = "Certificate lapsed: " + label + " expired on " + cert.getExpiryDate()
+                + ". Renew or replace it, then close this action.";
+        FacilityCorrectiveAction a = FacilityCorrectiveAction.create(tenantId, "CERTIFICATE", cert.getId(), cert.getSiteId(),
+                cert.getAssetId(), description, "URGENT", true,
+                FacilityActionRules.dueDateForLapsedCertificate(FacilityTime.today()), null);
+        actionRepository.save(a);
+        auditService.recordSystem(tenantId, "ACTION_CREATED", "CORRECTIVE_ACTION", a.getId(),
+                "source=CERTIFICATE certificate=" + cert.getId() + " due=" + a.getDueDate());
+        return Optional.of(a.getId());
     }
 
     /** Raise a (directly created, OPEN) corrective work order for this action and link it. */

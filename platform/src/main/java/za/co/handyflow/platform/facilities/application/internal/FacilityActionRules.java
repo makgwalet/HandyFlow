@@ -7,6 +7,7 @@ public final class FacilityActionRules {
 
     public static final int CRITICAL_DUE_DAYS = 2;
     public static final int STANDARD_DUE_DAYS = 14;
+    public static final int LAPSED_CERTIFICATE_DUE_DAYS = 7;
 
     private FacilityActionRules() {}
 
@@ -17,5 +18,10 @@ public final class FacilityActionRules {
 
     public static LocalDate dueDateForFailure(boolean critical, LocalDate today) {
         return today.plusDays(critical ? CRITICAL_DUE_DAYS : STANDARD_DUE_DAYS);
+    }
+
+    /** A lapsed certificate is a legal/insurance exposure: always critical, a week to renew. */
+    public static LocalDate dueDateForLapsedCertificate(LocalDate today) {
+        return today.plusDays(LAPSED_CERTIFICATE_DUE_DAYS);
     }
 }

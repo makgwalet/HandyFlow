@@ -162,4 +162,64 @@ class FacilityActionCentreTest {
         d.revoke("replaced");
         assertTrue(FacilityActionCentre.build(List.of(), List.of(), List.of(d), java.util.Map.of(), today, 30).items().isEmpty());
     }
+
+    // ── lapsed certificates with an action; technician licences ──────────────
+
+    @Test
+    void aLapsedCertificateWithAnOpenActionShowsOnlyAsTheAction() {
+        FacilityComplianceCertificate c = cert(-3);
+        FacilityCorrectiveAction a = FacilityCorrectiveAction.create(tenant, "CERTIFICATE", c.getId(), c.getSiteId(), null,
+                "Certificate lapsed: renew", "URGENT", true, today.plusDays(7), null);
+        ActionCentreResponse r = build(List.of(c), List.of(a));
+        assertEquals(1, r.items().size());
+        assertEquals("ACTION_CRITICAL_OPEN", r.items().get(0).type());
+    }
+
+    @Test
+    void aLapsedCertificateWhoseActionIsClosedShowsAgain() {
+        FacilityComplianceCertificate c = cert(-3);
+        FacilityCorrectiveAction a = FacilityCorrectiveAction.create(tenant, "CERTIFICATE", c.getId(), c.getSiteId(), null,
+                "Certificate lapsed: renew", "URGENT", true, today.plusDays(7), null);
+        a.close("Done");
+        ActionCentreResponse r = build(List.of(c), List.of(a));
+        assertEquals("CERTIFICATE_LAPSED", r.items().get(0).type());
+    }
+
+    private za.co.handyflow.platform.facilities.domain.model.FacilityTechnicianLicence licence(int expiresInDays, UUID tech) {
+        return za.co.handyflow.platform.facilities.domain.model.FacilityTechnicianLicence.create(tenant, tech, "GAS_INSTALLER", "L1",
+                null, null, today.plusDays(expiresInDays));
+    }
+
+    private ActionCentreResponse withLicences(List<za.co.handyflow.platform.facilities.domain.model.FacilityTechnicianLicence> l,
+                                              java.util.Map<UUID, String> names) {
+        return FacilityActionCentre.build(List.of(), List.of(), List.of(), java.util.Map.of(), List.of(), java.util.Map.of(), l, names, today, 30);
+    }
+
+    @Test
+    void aLapsedTechnicianLicenceIsHighAndNamesTheTechnician() {
+        UUID t = UUID.randomUUID();
+        ActionCentreResponse r = withLicences(List.of(licence(-2, t)), java.util.Map.of(t, "Thabo"));
+        assertEquals(1, r.high());
+        ActionCentreResponse.Item i = r.items().get(0);
+        assertEquals("TECHNICIAN_LICENCE_LAPSED", i.type());
+        assertEquals("TECHNICIAN", i.entityType());
+        assertEquals(t, i.entityId());
+        assertTrue(i.title().startsWith("Thabo"));
+    }
+
+    @Test
+    void expiringTechnicianLicencesFollowTheSameWindowsAsCertificates() {
+        UUID t = UUID.randomUUID();
+        ActionCentreResponse r = withLicences(List.of(licence(10, t), licence(25, t), licence(45, t)), java.util.Map.of());
+        assertEquals(1, r.high());
+        assertEquals(1, r.medium());
+        assertEquals(2, r.items().size());
+    }
+
+    @Test
+    void revokedTechnicianLicencesAreIgnored() {
+        var l = licence(-2, UUID.randomUUID());
+        l.revoke("Struck off");
+        assertTrue(withLicences(List.of(l), java.util.Map.of()).items().isEmpty());
+    }
 }

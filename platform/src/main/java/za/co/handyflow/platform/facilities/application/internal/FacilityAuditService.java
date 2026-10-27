@@ -32,6 +32,12 @@ public class FacilityAuditService {
                 TenantContext.getCurrentUserName(), action, entityType, entityId, details));
     }
 
+    /** For scheduled jobs, where there is no signed-in user: recorded with no actor and the name "System". */
+    @Transactional
+    public void recordSystem(TenantId tenantId, String action, String entityType, UUID entityId, String details) {
+        auditRepository.save(FacilityAuditLog.of(tenantId, null, "System", action, entityType, entityId, details));
+    }
+
     @Transactional(readOnly = true)
     public Page<AuditLogResponse> list(TenantId tenantId, String entityType, UUID entityId, Pageable pageable) {
         if (entityId != null && (entityType == null || entityType.isBlank())) {

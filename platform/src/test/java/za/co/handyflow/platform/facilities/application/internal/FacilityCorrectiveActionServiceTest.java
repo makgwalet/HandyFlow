@@ -40,6 +40,8 @@ class FacilityCorrectiveActionServiceTest {
     private final FacilityCorrectiveActionRepository actionRepo = fake(FacilityCorrectiveActionRepository.class, (n, a) -> switch (n) {
         case "save" -> { FacilityCorrectiveAction x = (FacilityCorrectiveAction) a[0]; actions.put(x.getId(), x); yield x; }
         case "findByIdForTenant" -> Optional.ofNullable(actions.get(a[1]));
+        case "findBySource" -> actions.values().stream()
+                .filter(x -> x.getSourceType().equals(a[1]) && Objects.equals(x.getSourceId(), a[2])).toList();
         default -> NOPE;
     });
     private final FacilitySiteRepository siteRepo = fake(FacilitySiteRepository.class, (n, a) ->
@@ -54,6 +56,7 @@ class FacilityCorrectiveActionServiceTest {
     };
     private final FacilityAuditService auditService = new FacilityAuditService(null) {
         @Override public void record(TenantId t, String action, String type, UUID id, String details) { audit.add(action); }
+        @Override public void recordSystem(TenantId t, String action, String type, UUID id, String details) { audit.add("SYSTEM:" + action); }
     };
     private final FacilityWorkOrderService woService = new FacilityWorkOrderService(null, null, null, null, null, null, null, null, null,
             null, null, null, policy, auditService) {
@@ -173,5 +176,45 @@ class FacilityCorrectiveActionServiceTest {
         java.lang.reflect.Field f = target.getClass().getDeclaredField(name);
         f.setAccessible(true);
         f.set(target, value);
+    }
+
+    // ── lapsed certificates ──────────────────────────────────────────────────
+
+    private FacilityComplianceCertificate lapsed() {
+        return FacilityComplianceCertificate.create(tenant, site.getId(), null, "GAS", "G-77", "SAQCC",
+                FacilityTime.today().minusYears(1), FacilityTime.today().minusDays(1), null);
+    }
+
+    @Test
+    void aLapsedCertificateRaisesOneUrgentCriticalActionDueInAWeek() {
+        FacilityComplianceCertificate cert = lapsed();
+        Optional<UUID> id = service.raiseForLapsedCertificate(cert);
+        assertTrue(id.isPresent());
+        FacilityCorrectiveAction a = actions.get(id.get());
+        assertEquals("CERTIFICATE", a.getSourceType());
+        assertEquals(cert.getId(), a.getSourceId());
+        assertEquals(site.getId(), a.getSiteId());
+        assertEquals("URGENT", a.getPriority());
+        assertTrue(a.isCritical());
+        assertEquals(FacilityTime.today().plusDays(7), a.getDueDate());
+        assertTrue(a.getDescription().contains("GAS G-77"));
+        assertEquals(List.of("SYSTEM:ACTION_CREATED"), audit); // no signed-in user in the sweep
+    }
+
+    @Test
+    void theSweepRunningAgainDoesNotDuplicateTheAction() {
+        FacilityComplianceCertificate cert = lapsed();
+        service.raiseForLapsedCertificate(cert);
+        assertTrue(service.raiseForLapsedCertificate(cert).isEmpty());
+        assertEquals(1, actions.size());
+    }
+
+    @Test
+    void aClosedActionDoesNotBlockANewOneIfTheCertificateLapsesAgain() {
+        FacilityComplianceCertificate cert = lapsed();
+        UUID first = service.raiseForLapsedCertificate(cert).orElseThrow();
+        actions.get(first).close("Renewed");
+        assertTrue(service.raiseForLapsedCertificate(cert).isPresent());
+        assertEquals(2, actions.size());
     }
 }

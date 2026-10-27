@@ -3,6 +3,7 @@ package za.co.handyflow.platform.facilities.application.internal;
 import za.co.handyflow.platform.facilities.domain.model.FacilityComplianceCertificate;
 import za.co.handyflow.platform.facilities.domain.model.FacilityCorrectiveAction;
 import za.co.handyflow.platform.facilities.domain.model.FacilityInspectionSchedule;
+import za.co.handyflow.platform.facilities.domain.model.FacilityTechnicianLicence;
 import za.co.handyflow.platform.facilities.domain.model.FacilityVendorDocument;
 import za.co.handyflow.platform.facilities.dto.ActionCentreResponse;
 import za.co.handyflow.platform.facilities.dto.ActionCentreResponse.Item;
@@ -49,7 +50,37 @@ public final class FacilityActionCentre {
                                              Map<UUID, String> vendorNames,
                                              Collection<FacilityInspectionSchedule> overdueInspections,
                                              Map<UUID, String> inspectionLabels, LocalDate today, int warningDays) {
+        return build(certificates, unfinishedActions, vendorDocuments, vendorNames, overdueInspections, inspectionLabels,
+                List.of(), Map.of(), today, warningDays);
+    }
+
+    /**
+     * @param technicianLicences VALID licences that have lapsed or expire soon (others are ignored)
+     * @param technicianNames    technician id -> name, for the item titles
+     */
+    public static ActionCentreResponse build(Collection<FacilityComplianceCertificate> certificates,
+                                             Collection<FacilityCorrectiveAction> unfinishedActions,
+                                             Collection<FacilityVendorDocument> vendorDocuments,
+                                             Map<UUID, String> vendorNames,
+                                             Collection<FacilityInspectionSchedule> overdueInspections,
+                                             Map<UUID, String> inspectionLabels,
+                                             Collection<FacilityTechnicianLicence> technicianLicences,
+                                             Map<UUID, String> technicianNames, LocalDate today, int warningDays) {
         List<Item> items = new ArrayList<>();
+
+        for (FacilityTechnicianLicence l : technicianLicences) {
+            if (!"VALID".equals(l.getStatus()) || l.getExpiryDate() == null) continue;
+            long daysLeft = ChronoUnit.DAYS.between(today, l.getExpiryDate());
+            String who = technicianNames.getOrDefault(l.getTechnicianId(), "Technician");
+            if (daysLeft < 0) {
+                items.add(new Item("HIGH", "TECHNICIAN_LICENCE_LAPSED", null, null, who + ": " + l.getLicenceType() + " licence lapsed",
+                        "Expired " + (-daysLeft) + " day(s) ago on " + l.getExpiryDate(), l.getExpiryDate(), "TECHNICIAN", l.getTechnicianId()));
+            } else if (daysLeft <= warningDays) {
+                items.add(new Item(daysLeft <= URGENT_EXPIRY_DAYS ? "HIGH" : "MEDIUM", "TECHNICIAN_LICENCE_EXPIRING", null, null,
+                        who + ": " + l.getLicenceType() + " licence expiring",
+                        "Expires in " + daysLeft + " day(s) on " + l.getExpiryDate(), l.getExpiryDate(), "TECHNICIAN", l.getTechnicianId()));
+            }
+        }
 
         for (FacilityInspectionSchedule s : overdueInspections) {
             if (!s.isOverdue(today)) continue;
@@ -77,11 +108,18 @@ public final class FacilityActionCentre {
             }
         }
 
+        // A lapsed certificate that already has an open corrective action shows up as that action, not twice.
+        Set<UUID> certificatesWithAction = new HashSet<>();
+        for (FacilityCorrectiveAction a : unfinishedActions) {
+            if (!a.isTerminal() && "CERTIFICATE".equals(a.getSourceType()) && a.getSourceId() != null) certificatesWithAction.add(a.getSourceId());
+        }
+
         for (FacilityComplianceCertificate c : certificates) {
             if ("REVOKED".equals(c.getStatus())) continue;
             long daysLeft = ChronoUnit.DAYS.between(today, c.getExpiryDate());
             String label = c.getCertificateType() + (c.getCertificateNumber() != null ? " " + c.getCertificateNumber() : "");
             if (daysLeft < 0) {
+                if (certificatesWithAction.contains(c.getId())) continue;
                 items.add(new Item("CRITICAL", "CERTIFICATE_LAPSED", c.getSiteId(), c.getAssetId(),
                         "Certificate lapsed: " + label, "Expired " + (-daysLeft) + " day(s) ago on " + c.getExpiryDate(),
                         c.getExpiryDate(), "CERTIFICATE", c.getId()));

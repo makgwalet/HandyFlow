@@ -73,6 +73,8 @@ public class FacilityNotificationScheduler {
     private final TenantAdminRecipients tenantAdminRecipients;
     private final SchedulerLease schedulerLease;
     private final FacilityInspectionScheduleService inspectionScheduleService;
+    private final FacilityCorrectiveActionService correctiveActionService;
+    private final FacilityTechnicianLicenceService technicianLicenceService;
 
     @Scheduled(cron = "0 45 8 * * *")
     public void runDailySweep() {
@@ -86,9 +88,10 @@ public class FacilityNotificationScheduler {
         int expiringAlerts = alertExpiringCertificates();
         int expiredAlerts = expireAndAlertCertificates();
         int inspectionReminders = remindInspections();
+        int licenceReminders = remindLicences();
         log.info("[Facilities] Daily sweep complete — {} PPM work orders generated, {} overdue alerts, " +
-                        "{} expiring-certificate alerts, {} expired-certificate alerts, {} inspection reminders",
-                ppmGenerated, overdueAlerts, expiringAlerts, expiredAlerts, inspectionReminders);
+                        "{} expiring-certificate alerts, {} expired-certificate alerts, {} inspection reminders, {} licence reminders",
+                ppmGenerated, overdueAlerts, expiringAlerts, expiredAlerts, inspectionReminders, licenceReminders);
     }
 
     public int remindInspections() {
@@ -96,6 +99,15 @@ public class FacilityNotificationScheduler {
             return inspectionScheduleService.sendReminders(FacilityTime.today());
         } catch (Exception e) {
             log.error("[Facilities] Inspection reminder sweep failed: {}", e.getMessage(), e);
+            return 0;
+        }
+    }
+
+    public int remindLicences() {
+        try {
+            return technicianLicenceService.sendReminders(FacilityTime.today());
+        } catch (Exception e) {
+            log.error("[Facilities] Technician licence reminder sweep failed: {}", e.getMessage(), e);
             return 0;
         }
     }
@@ -172,6 +184,8 @@ public class FacilityNotificationScheduler {
         for (FacilityComplianceCertificate cert : candidates) {
             if (cert.isExpired()) {
                 try {
+                    // Action first: it is idempotent, so if marking the certificate fails we retry tomorrow without duplicating it.
+                    correctiveActionService.raiseForLapsedCertificate(cert);
                     cert.markExpired();
                     certificateRepository.save(cert);
                     notifyCertificateExpired(cert.getTenantId(), cert);

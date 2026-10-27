@@ -103,6 +103,19 @@ public class FacilityInspectionService {
         return toResponse(i, actions);
     }
 
+    /** Throws NOT FOUND unless the inspection is within the caller's site scope (used by the evidence endpoints). */
+    @Transactional(readOnly = true)
+    public void requireAccessible(TenantId tenantId, UUID id) {
+        find(tenantId, id);
+    }
+
+    /** As {@link #requireAccessible}, and also refuses a cancelled inspection: nothing more is recorded against it. */
+    @Transactional(readOnly = true)
+    public void requireCanAttachEvidence(TenantId tenantId, UUID id) {
+        if ("CANCELLED".equals(find(tenantId, id).getStatus()))
+            throw new IllegalStateException("This inspection was cancelled, so evidence can no longer be added");
+    }
+
     @Transactional
     public InspectionResponse start(TenantId tenantId, StartInspectionRequest req) {
         accessPolicy.scope(tenantId).requireSite(req.siteId());

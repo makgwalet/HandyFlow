@@ -11,7 +11,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.evidence.application.EvidenceFacade;
+import za.co.handyflow.platform.evidence.dto.EvidenceResponse;
 import za.co.handyflow.platform.facilities.application.internal.FacilityInspectionService;
 import za.co.handyflow.platform.facilities.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -37,6 +40,7 @@ public class FacilityInspectionController {
 
     private final FacilityInspectionService service;
     private final FeatureGuard featureGuard;
+    private final EvidenceFacade evidenceFacade;
 
     // ── Templates ────────────────────────────────────────────────────────────
 
@@ -137,5 +141,29 @@ public class FacilityInspectionController {
         featureGuard.requireModule("facilities");
         return ResponseEntity.ok(ApiResponse.success("Inspection cancelled",
                 service.cancel(TenantContext.getTenantIdAsObject(), id, request.reason())));
+    }
+
+    // ── Evidence (photos) ────────────────────────────────────────────────────
+
+    @PostMapping("/inspections/{id}/evidence")
+    @PreAuthorize(CAN_INSPECT)
+    @Operation(summary = "Attach a photo or document to an inspection (not once it is cancelled)")
+    public ResponseEntity<ApiResponse<EvidenceResponse>> attachEvidence(
+            @PathVariable UUID id, @RequestParam MultipartFile file,
+            @RequestParam(defaultValue = "PHOTO") String evidenceType) {
+        featureGuard.requireModule("facilities");
+        service.requireCanAttachEvidence(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Evidence attached",
+                evidenceFacade.attach(TenantContext.getTenantIdAsObject(), file, evidenceType, "facilities",
+                        "FacilityInspection", id, null, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
+    }
+
+    @GetMapping("/inspections/{id}/evidence")
+    @PreAuthorize(CAN_READ)
+    public ResponseEntity<ApiResponse<List<EvidenceResponse>>> getEvidence(@PathVariable UUID id) {
+        featureGuard.requireModule("facilities");
+        service.requireAccessible(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok(ApiResponse.success(
+                evidenceFacade.listFor(TenantContext.getTenantIdAsObject(), "facilities", "FacilityInspection", id)));
     }
 }

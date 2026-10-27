@@ -297,4 +297,31 @@ class FacilityInspectionServiceTest {
         assertEquals("CANCELLED", service.cancel(tenant, r.id(), "Site closed").status());
         assertTrue(audit.contains("INSPECTION_CANCELLED"));
     }
+
+    // ── evidence guards ──────────────────────────────────────────────────────
+
+    @Test
+    void evidenceCanBeAttachedWhileAnInspectionIsRunningAndAfterItIsCompleted() {
+        InspectionResponse r = startInspection();
+        assertDoesNotThrow(() -> service.requireCanAttachEvidence(tenant, r.id()));
+        answerAll(r, "PASS", "PASS");
+        service.complete(tenant, r.id(), null);
+        assertDoesNotThrow(() -> service.requireCanAttachEvidence(tenant, r.id()));
+    }
+
+    @Test
+    void evidenceCannotBeAttachedToACancelledInspection() {
+        InspectionResponse r = startInspection();
+        service.cancel(tenant, r.id(), "Wrong site");
+        assertThrows(IllegalStateException.class, () -> service.requireCanAttachEvidence(tenant, r.id()));
+        assertDoesNotThrow(() -> service.requireAccessible(tenant, r.id())); // still readable
+    }
+
+    @Test
+    void evidenceOnAnInspectionOutsideTheCallersSitesIsNotFound() {
+        InspectionResponse r = startInspection();
+        scope = AccessScope.restrictedToSites(List.of(UUID.randomUUID()));
+        assertThrows(ResourceNotFoundException.class, () -> service.requireAccessible(tenant, r.id()));
+        assertThrows(ResourceNotFoundException.class, () -> service.requireCanAttachEvidence(tenant, r.id()));
+    }
 }
