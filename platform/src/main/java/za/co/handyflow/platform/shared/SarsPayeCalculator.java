@@ -25,7 +25,16 @@ public final class SarsPayeCalculator {
     public record Inputs(BigDecimal monthlySalary, BigDecimal travelAllowance, BigDecimal pensionContribution,
                          BigDecimal medicalAidContribution, LocalDate dateOfBirth, int medicalMembers,
                          BigDecimal annualPayroll,
-                         BigDecimal employerMedical, BigDecimal employerRetirement, BigDecimal otherFringe) {
+                         BigDecimal employerMedical, BigDecimal employerRetirement, BigDecimal otherFringe,
+                         BigDecimal irregular) {
+        /** Without a bonus or back pay, as before they existed. */
+        public Inputs(BigDecimal monthlySalary, BigDecimal travelAllowance, BigDecimal pensionContribution,
+                      BigDecimal medicalAidContribution, LocalDate dateOfBirth, int medicalMembers, BigDecimal annualPayroll,
+                      BigDecimal employerMedical, BigDecimal employerRetirement, BigDecimal otherFringe) {
+            this(monthlySalary, travelAllowance, pensionContribution, medicalAidContribution, dateOfBirth, medicalMembers, annualPayroll,
+                    employerMedical, employerRetirement, otherFringe, BigDecimal.ZERO);
+        }
+
         /** Without employer benefits, as before they existed. */
         public Inputs(BigDecimal monthlySalary, BigDecimal travelAllowance, BigDecimal pensionContribution,
                       BigDecimal medicalAidContribution, LocalDate dateOfBirth, int medicalMembers, BigDecimal annualPayroll) {
@@ -53,32 +62,54 @@ public final class SarsPayeCalculator {
         BigDecimal annualPension = pension.add(employerRetirement).multiply(TWELVE);
         BigDecimal remuneration = annualGross.add(annualTravel).add(annualFringe);
 
-        BigDecimal cap = remuneration.multiply(r.retirementCapPct()).min(r.retirementCapAmount());
-        BigDecimal pensionDeduction = annualPension.min(cap);
-        BigDecimal taxable = remuneration.subtract(pensionDeduction).max(BigDecimal.ZERO);
-
-        BigDecimal taxBefore = tax(taxable, r);
-
         // Age is taken at the last day of the tax year: someone who turns 65 during the year gets the rebate for the whole year.
         int age = in.dateOfBirth() == null ? 0 : Period.between(in.dateOfBirth(), r.effectiveTo()).getYears();
         BigDecimal primary = r.primaryRebate();
         BigDecimal secondary = age >= 65 ? r.secondaryRebate() : BigDecimal.ZERO;
         BigDecimal tertiary = age >= 75 ? r.tertiaryRebate() : BigDecimal.ZERO;
-
-        BigDecimal afterRebates = taxBefore.subtract(primary).subtract(secondary).subtract(tertiary).max(BigDecimal.ZERO);
         BigDecimal annualCredit = r.monthlyMedicalCredit(in.medicalMembers()).multiply(TWELVE);
-        BigDecimal paye = afterRebates.subtract(annualCredit).max(BigDecimal.ZERO).divide(TWELVE, 2, RoundingMode.HALF_UP);
 
-        BigDecimal uifBase = salary.min(r.uifMonthlyCeiling());
+        // The month's regular pay, annualised: what the periodic method has always done.
+        BigDecimal taxable = taxableOf(remuneration, annualPension, r);
+        BigDecimal taxBefore = tax(taxable, r);
+        BigDecimal annualPaye = annualPayeOf(taxBefore, primary, secondary, tertiary, annualCredit);
+        BigDecimal paye = annualPaye.divide(TWELVE, 2, RoundingMode.HALF_UP);
+
+        // A bonus or back pay is not annualised. The tax on it is the extra tax the year bears once it is added to the annualised
+        // regular pay (the method SARS prescribes for annual payments), and all of it falls in the month it is paid.
+        BigDecimal irregular = nvl(in.irregular());
+        if (irregular.signum() > 0) {
+            BigDecimal taxableWith = taxableOf(remuneration.add(irregular), annualPension, r);
+            BigDecimal taxBeforeWith = tax(taxableWith, r);
+            BigDecimal annualPayeWith = annualPayeOf(taxBeforeWith, primary, secondary, tertiary, annualCredit);
+            paye = paye.add(annualPayeWith.subtract(annualPaye).setScale(2, RoundingMode.HALF_UP));
+            taxable = taxableWith;
+            taxBefore = taxBeforeWith;
+        }
+
+        // A bonus or back pay is remuneration for UIF and SDL in the month it is paid.
+        BigDecimal subject = salary.add(irregular);
+        BigDecimal uifBase = subject.min(r.uifMonthlyCeiling());
         BigDecimal uifEmployee = uifBase.multiply(r.uifRateEmployee()).setScale(2, RoundingMode.HALF_UP);
         BigDecimal uifEmployer = uifBase.multiply(r.uifRateEmployer()).setScale(2, RoundingMode.HALF_UP);
 
         BigDecimal sdl = in.annualPayroll().compareTo(r.sdlThreshold()) > 0
-                ? salary.multiply(r.sdlRate()).setScale(2, RoundingMode.HALF_UP)
+                ? subject.multiply(r.sdlRate()).setScale(2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
 
         return new SarsPayrollResult(salary, travel, medicalAid, pension, paye, uifEmployee, uifEmployer, sdl,
                 taxable, taxBefore, primary, secondary, tertiary, annualCredit, r.taxYear());
+    }
+
+    /** The income tax is worked out on: the remuneration less the retirement deduction, which is capped at a share of the remuneration. */
+    private static BigDecimal taxableOf(BigDecimal remuneration, BigDecimal annualPension, StatutoryYearRules r) {
+        BigDecimal cap = remuneration.multiply(r.retirementCapPct()).min(r.retirementCapAmount());
+        return remuneration.subtract(annualPension.min(cap)).max(BigDecimal.ZERO);
+    }
+
+    /** The year's tax after the rebates and the medical credit; never below nil. */
+    private static BigDecimal annualPayeOf(BigDecimal taxBefore, BigDecimal primary, BigDecimal secondary, BigDecimal tertiary, BigDecimal credit) {
+        return taxBefore.subtract(primary).subtract(secondary).subtract(tertiary).max(BigDecimal.ZERO).subtract(credit).max(BigDecimal.ZERO);
     }
 
     /** Annual tax before rebates: the last line whose floor is below the income (the first line for nil income). */

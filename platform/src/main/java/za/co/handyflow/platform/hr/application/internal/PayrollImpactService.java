@@ -83,7 +83,7 @@ public class PayrollImpactService {
         BigDecimal recordedPaye = BigDecimal.ZERO, recalculatedPaye = BigDecimal.ZERO;
         for (HrPayslip s : slips) {
             HrEmployee emp = staff.get(s.getEmployeeId());
-            boolean ignored = positive(s.getOvertimeAmount()) || positive(s.getBonusAmount());
+            boolean ignored = positive(s.getOvertimeAmount()) || positive(s.getBonusAmount()) || positive(s.getBackPayAmount());
             recordedPaye = recordedPaye.add(nvl(s.getPayeAmount()));
 
             if (rules.isEmpty() || emp == null) {

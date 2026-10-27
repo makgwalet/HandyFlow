@@ -9,6 +9,7 @@
 import { useState } from "react"
 import MedicalSchemeModal from "./MedicalSchemeModal"
 import EmployeeBenefitsModal from "./EmployeeBenefitsModal"
+import PayAdjustmentsModal from "./PayAdjustmentsModal"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useAuth } from "../../hooks/useAuth"
@@ -91,6 +92,7 @@ export default function EmployeesTab() {
   const [terminating, setTerminating] = useState<Employee | null>(null)
   const [medicalFor, setMedicalFor] = useState<Employee | null>(null)
   const [benefitsFor, setBenefitsFor] = useState<Employee | null>(null)
+  const [payItemsFor, setPayItemsFor] = useState<Employee | null>(null)
   const [endDate, setEndDate]       = useState("")
   const [reason, setReason]         = useState("")
   const { user } = useAuth() as { user?: { permissions?: string[] } }
@@ -502,6 +504,7 @@ export default function EmployeesTab() {
                 Medical scheme
               </button>
               {(rights.manage || rights.compensation) && <button onClick={() => { setBenefitsFor(selected); setSelected(null) }} style={secondaryBtn}>Employer benefits</button>}
+              {(rights.manage || rights.compensation) && selected.status === "ACTIVE" && <button onClick={() => { setPayItemsFor(selected); setSelected(null) }} style={secondaryBtn}>Bonus & back pay</button>}
               {rights.manage && selected.status === "ACTIVE" && (
                 <button onClick={() => { setTerminating(selected); setEndDate(""); setReason(""); setError(""); setSelected(null) }}
                   style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
@@ -536,6 +539,7 @@ export default function EmployeesTab() {
 
       {medicalFor && <MedicalSchemeModal employee={medicalFor} onClose={() => setMedicalFor(null)} />}
       {benefitsFor && <EmployeeBenefitsModal employee={benefitsFor} permissions={user?.permissions ?? []} onClose={() => setBenefitsFor(null)} />}
+      {payItemsFor && <PayAdjustmentsModal employee={payItemsFor} permissions={user?.permissions ?? []} onClose={() => setPayItemsFor(null)} />}
       {changeFor && <RequestChangeModal kind={changeFor.kind} employee={{ ...changeFor.emp, grossSalary: changeFor.emp.grossSalary }} onClose={() => setChangeFor(null)} />}
       {showApprovals && <ApprovalsModal canDecide={rights.decidePay} onClose={() => setShowApprovals(false)} />}
       {historyFor && <HistoryModal employee={historyFor} showChanges={rights.compensation} showAudit={rights.audit} onClose={() => setHistoryFor(null)} />}

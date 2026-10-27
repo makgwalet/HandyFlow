@@ -19,4 +19,11 @@ describe('payslipNotes', () => {
     expect(n[0]).toBe('Final pay')
     expect(n[1]).toContain('10.5 annual leave days paid out')
   })
+  it('mentions a bonus and back pay when there are any', () => {
+    expect(payslipNotes({ bonusAmount: '20000.00', backPayAmount: '0' })).toEqual([expect.stringContaining('Bonus of R')])
+    const n = payslipNotes({ bonusAmount: 0, backPayAmount: 10000 })
+    expect(n).toHaveLength(1)
+    expect(n[0]).toContain('Back pay of R')
+    expect(payslipNotes({ bonusAmount: 0, backPayAmount: null })).toEqual([])
+  })
 })

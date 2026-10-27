@@ -35,6 +35,7 @@ class PayrollControlServiceTest {
     private HrPayrollSettingsRepository settingsRepo;
     private MedicalSchemeService medical;
     private HrOvertimeClaimRepository claimRepo;
+    private PayAdjustmentService payAdjustments;
     private PayrollControlService service;
 
     private final TenantId tenant = TenantId.of(UUID.randomUUID());
@@ -51,8 +52,9 @@ class PayrollControlServiceTest {
         settingsRepo = mock(HrPayrollSettingsRepository.class);
         medical = mock(MedicalSchemeService.class);
         claimRepo = mock(HrOvertimeClaimRepository.class);
+        payAdjustments = mock(PayAdjustmentService.class);
         service = new PayrollControlService(payRunRepo, payslipRepo, employeeRepo, eventRepo, settingsRepo, mock(HrEmployeeChangeRepository.class), medical,
-                new OvertimeService(claimRepo, employeeRepo, mock(AttendanceService.class), mock(EmployeeViewService.class)), mock(JdbcTemplate.class));
+                new OvertimeService(claimRepo, employeeRepo, mock(AttendanceService.class), mock(EmployeeViewService.class)), payAdjustments, mock(JdbcTemplate.class));
 
         run = HrPayRun.create(tenant, "PR00002", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), LocalDate.of(2026, 10, 25), 2027);
         run.prepared(BigDecimal.TEN, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.TEN, 1, maker);
@@ -189,6 +191,15 @@ class PayrollControlServiceTest {
         verify(claimRepo, times(2)).save(any());
         verify(eventRepo).save(argThat((HrPayRunEvent e) -> e.getAction().equals("CANCELLED") && checker.equals(e.getActorId())
                 && e.getNote().startsWith("Wrong period") && e.getNote().contains("2 overtime claim(s) released")));
+    }
+
+    @Test
+    void cancellingADraftAlsoReleasesItsBonusesAndBackPay() {
+        run.sendBack();
+        when(payAdjustments.releaseFor(any(), eq(run.getId()))).thenReturn(3);
+        service.cancel(tenant, run.getId(), checker, "Wrong period");
+        verify(payAdjustments).releaseFor(any(), eq(run.getId()));
+        verify(eventRepo).save(argThat((HrPayRunEvent e) -> e.getAction().equals("CANCELLED") && e.getNote().contains("3 bonus or back pay item(s) released")));
     }
 
     @Test

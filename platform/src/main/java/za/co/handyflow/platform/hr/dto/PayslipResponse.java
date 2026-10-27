@@ -39,5 +39,6 @@ public record PayslipResponse(
         boolean finalPay,
         BigDecimal employerMedical,
         BigDecimal employerRetirement,
-        BigDecimal otherFringe
+        BigDecimal otherFringe,
+        BigDecimal backPayAmount
 ) {}

@@ -36,6 +36,7 @@ public class PayrollControlService {
     private final HrEmployeeChangeRepository changeRepo;
     private final MedicalSchemeService medicalSchemeService;
     private final OvertimeService overtimeService;
+    private final PayAdjustmentService payAdjustmentService;
     private final JdbcTemplate jdbc;
 
     // ── Review ────────────────────────────────────────────────────────────────
@@ -150,8 +151,10 @@ public class PayrollControlService {
         run.cancel();
         payRunRepo.save(run);
         int released = overtimeService.releaseFor(tenantId, runId);
+        int releasedPay = payAdjustmentService.releaseFor(tenantId, runId);
         eventRepo.save(HrPayRunEvent.of(tenantId.getValue(), runId, "CANCELLED", from, run.getStatus(), actor,
-                reason.trim() + (released > 0 ? " (" + released + " overtime claim(s) released)" : "")));
+                reason.trim() + (released > 0 ? " (" + released + " overtime claim(s) released)" : "")
+                + (releasedPay > 0 ? " (" + releasedPay + " bonus or back pay item(s) released)" : "")));
         log.info("Pay run {} cancelled by {}, {} overtime claim(s) released", run.getPayRunNumber(), actor, released);
         return toResponse(run);
     }

@@ -37,6 +37,7 @@ class PayrollServiceTest {
     private MedicalSchemeService medicalSchemeService;
     private HrPayRunEventRepository eventRepo;
     private OvertimeService overtimeService;
+    private PayAdjustmentService payAdjustmentService;
     private BenefitService benefitService;
     private za.co.handyflow.platform.shared.PublicHolidayRepository holidayRepo;
     private HrLeaveRequestRepository leaveRepo;
@@ -69,6 +70,8 @@ class PayrollServiceTest {
         eventRepo = mock(HrPayRunEventRepository.class);
         overtimeService = mock(OvertimeService.class);
         benefitService = mock(BenefitService.class);
+        payAdjustmentService = mock(PayAdjustmentService.class);
+        when(payAdjustmentService.takeFor(any(), any(), any())).thenReturn(Map.of());
         holidayRepo = mock(za.co.handyflow.platform.shared.PublicHolidayRepository.class);
         leaveRepo = mock(HrLeaveRequestRepository.class);
         leaveService = mock(LeaveService.class);
@@ -80,7 +83,7 @@ class PayrollServiceTest {
         when(overtimeService.waitingCount(any(), any())).thenReturn(0);
         service = new PayrollService(payRunRepo, payslipRepo, emp201Repo, employeeRepo, new PayrollEngine(), numberGen,
                 rulesService, medicalSchemeService, eventRepo, mock(EmployeeChangeService.class), overtimeService,
-                holidayRepo, leaveRepo, leaveService, benefitService);
+                holidayRepo, leaveRepo, leaveService, benefitService, payAdjustmentService);
         when(numberGen.next(any(), any())).thenReturn("PR00001");
         when(payRunRepo.save(any())).thenAnswer(i -> i.getArgument(0));
         when(payslipRepo.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -186,6 +189,75 @@ class PayrollServiceTest {
         HrPayslip slip = savedSlip().getValue();
         assertThat(slip.getEmployerMedical()).isEqualByComparingTo("3000");
         assertThat(slip.getEmployerRetirement()).isEqualByComparingTo("0");
+    }
+
+    private HrPayAdjustment payItem(HrEmployee emp, String kind, String amount) {
+        boolean back = PayAdjustmentRules.BACK_PAY.equals(kind);
+        return HrPayAdjustment.of(tenant.getValue(), emp.getId(), kind, d(amount), LocalDate.of(2026, 10, 1), back ? "Raise agreed late" : "Annual bonus",
+                back ? LocalDate.of(2026, 7, 1) : null, back ? LocalDate.of(2026, 9, 30) : null, "Approved by the board", maker);
+    }
+
+    @Test
+    void aBonusIsPaidTaxedOnTopOfTheMonthAndTakenByTheRun() {
+        HrPayRun run = draftRun(LocalDate.of(2026, 10, 31), 2027);
+        HrEmployee emp = employee("30003.00");
+        when(rulesService.rulesFor(2027)).thenReturn(rules2027());
+        when(employeeRepo.findAllActiveList(any())).thenReturn(List.of(emp));
+        when(medicalSchemeService.membersOn(any(), any(), any())).thenReturn(Map.of(emp.getId(), new MedicalSchemeRules.Members(0, false)));
+        HrPayAdjustment bonus = payItem(emp, PayAdjustmentRules.BONUS, "20000.00");
+        when(payAdjustmentService.takeFor(any(), any(), eq(LocalDate.of(2026, 10, 31)))).thenReturn(Map.of(emp.getId(), List.of(bonus)));
+
+        PayRunResponse r = service.processPayRun(tenant, UUID.randomUUID(), maker);
+
+        // the month alone: 360 036 gives 4 681.78. With the bonus: 380 036 gives 44 118 + 26% x 134 936 = 79 201.36 - 17 820 = 61 381.36, which is
+        // 5 200.00 more a year; all of it falls in this month.
+        assertThat(r.totalPaye()).isEqualByComparingTo("9881.78");
+        assertThat(r.totalGross()).isEqualByComparingTo("50003.00");
+        HrPayslip slip = savedSlip().getValue();
+        assertThat(slip.getBonusAmount()).isEqualByComparingTo("20000.00");
+        assertThat(slip.getBackPayAmount()).isEqualByComparingTo("0");
+        assertThat(slip.getGrossSalary()).isEqualByComparingTo("30003.00");
+        assertThat(slip.getTotalEarnings()).isEqualByComparingTo("50003.00");
+        assertThat(r.warnings()).anyMatch(w -> w.contains("bonus 20000.00 included"));
+        verify(payAdjustmentService).markTaken(eq(List.of(bonus)), eq(run.getId()));
+    }
+
+    @Test
+    void backPayIsKeptApartFromTheBonusOnThePayslip() {
+        draftRun(LocalDate.of(2026, 10, 31), 2027);
+        HrEmployee emp = employee("30003.00");
+        when(rulesService.rulesFor(2027)).thenReturn(rules2027());
+        when(employeeRepo.findAllActiveList(any())).thenReturn(List.of(emp));
+        when(medicalSchemeService.membersOn(any(), any(), any())).thenReturn(Map.of(emp.getId(), new MedicalSchemeRules.Members(0, false)));
+        HrPayAdjustment back = payItem(emp, PayAdjustmentRules.BACK_PAY, "10000.00");
+        when(payAdjustmentService.takeFor(any(), any(), any())).thenReturn(Map.of(emp.getId(), List.of(back)));
+
+        PayRunResponse r = service.processPayRun(tenant, UUID.randomUUID(), maker);
+
+        // 370 036 is still in the 26% band: 2 600.00 more than the month alone
+        assertThat(r.totalPaye()).isEqualByComparingTo("7281.78");
+        HrPayslip slip = savedSlip().getValue();
+        assertThat(slip.getBackPayAmount()).isEqualByComparingTo("10000.00");
+        assertThat(slip.getBonusAmount()).isEqualByComparingTo("0");
+        assertThat(slip.getTotalEarnings()).isEqualByComparingTo("40003.00");
+    }
+
+    @Test
+    void aPayItemForSomeoneNotOnTheRunIsReportedAndLeftOpen() {
+        HrPayRun run = draftRun(LocalDate.of(2026, 10, 31), 2027);
+        HrEmployee emp = employee("30003.00");
+        HrEmployee other = employee("20000.00");
+        when(rulesService.rulesFor(2027)).thenReturn(rules2027());
+        when(employeeRepo.findAllActiveList(any())).thenReturn(List.of(emp));
+        when(medicalSchemeService.membersOn(any(), any(), any())).thenReturn(Map.of(emp.getId(), new MedicalSchemeRules.Members(0, false)));
+        HrPayAdjustment stray = payItem(other, PayAdjustmentRules.BONUS, "5000.00");
+        when(payAdjustmentService.takeFor(any(), any(), any())).thenReturn(Map.of(other.getId(), List.of(stray)));
+
+        PayRunResponse r = service.processPayRun(tenant, UUID.randomUUID(), maker);
+
+        assertThat(r.totalGross()).isEqualByComparingTo("30003.00");
+        assertThat(r.warnings()).anyMatch(w -> w.contains("1 bonus or back pay item(s) belong to people who are not on this run"));
+        verify(payAdjustmentService, never()).markTaken(eq(List.of(stray)), any());
     }
 
     @Test

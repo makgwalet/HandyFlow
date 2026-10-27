@@ -10,6 +10,8 @@ export interface PayslipPeriodFields {
   leavePayoutDays?: number | string | null
   leavePayoutAmount?: number | string | null
   finalPay?: boolean | null
+  bonusAmount?: number | string | null
+  backPayAmount?: number | string | null
 }
 
 const num = (v: unknown): number => {
@@ -29,5 +31,9 @@ export function payslipNotes(p: PayslipPeriodFields): string[] {
   if (unpaid > 0) out.push(`${unpaid} unpaid leave day${unpaid === 1 ? '' : 's'} deducted (${money(num(p.unpaidLeaveAmount))})`)
   const payout = num(p.leavePayoutAmount)
   if (payout > 0) out.push(`${num(p.leavePayoutDays)} annual leave day${num(p.leavePayoutDays) === 1 ? '' : 's'} paid out (${money(payout)})`)
+  const bonus = num(p.bonusAmount)
+  if (bonus > 0) out.push(`Bonus of ${money(bonus)} included`)
+  const back = num(p.backPayAmount)
+  if (back > 0) out.push(`Back pay of ${money(back)} included`)
   return out
 }

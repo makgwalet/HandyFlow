@@ -39,6 +39,7 @@ public class PayrollService {
     private final HrLeaveRequestRepository leaveRepo;
     private final LeaveService          leaveService;
     private final BenefitService        benefitService;
+    private final PayAdjustmentService  payAdjustmentService;
 
     // ── Pay runs ──────────────────────────────────────────────────────────────
 
@@ -153,6 +154,13 @@ public class PayrollService {
             warnings.add("Overtime for " + overtime.size() + " employee(s) is included. PAYE treats each month's overtime as if it recurred every month "
                     + "(the periodic method), so it can be higher than the year turns out to need; it is corrected when the year is assessed.");
 
+        // Bonuses and back pay entered and dated up to the end of the period that no other run has taken. Taken again from scratch on a recalculation.
+        Map<UUID, List<HrPayAdjustment>> payItems = payAdjustmentService.takeFor(tenantId, run.getId(), run.getPeriodEnd());
+        java.util.Set<UUID> onRun = employees.stream().map(HrEmployee::getId).collect(java.util.stream.Collectors.toSet());
+        int stranded = (int) payItems.entrySet().stream().filter(en -> !onRun.contains(en.getKey())).mapToLong(en -> en.getValue().size()).sum();
+        if (stranded > 0)
+            warnings.add(stranded + " bonus or back pay item(s) belong to people who are not on this run, so they were not paid. They stay open for a later run.");
+
         BigDecimal runGross = BigDecimal.ZERO, runPaye = BigDecimal.ZERO;
         BigDecimal runUif   = BigDecimal.ZERO, runSdl  = BigDecimal.ZERO;
         BigDecimal runNet   = BigDecimal.ZERO;
@@ -189,15 +197,23 @@ public class PayrollService {
             if (!benefit.isEmpty())
                 warnings.add(who + ": taxable benefits of " + benefit.medical().add(benefit.retirement()).add(benefit.other())
                         + " a month (not paid in cash) are included in the income PAYE is worked out on.");
+            List<HrPayAdjustment> items = payItems.getOrDefault(emp.getId(), List.of());
+            BigDecimal bonus = PayAdjustmentService.total(items, PayAdjustmentRules.BONUS);
+            BigDecimal backPay = PayAdjustmentService.total(items, PayAdjustmentRules.BACK_PAY);
+            if (!items.isEmpty())
+                warnings.add(who + ": " + (bonus.signum() > 0 ? "bonus " + bonus : "") + (bonus.signum() > 0 && backPay.signum() > 0 ? " and " : "")
+                        + (backPay.signum() > 0 ? "back pay " + backPay : "")
+                        + " included. Taxed by the annual-payment method: the extra tax the year bears once it is added to the annualised month.");
             PayrollEngine.PayrollResult result = engine.calculate(emp, rules, annualPayroll, m.count(), overtimePay,
                     new PayrollEngine.Period(pay.paid(), travel, emp.getPensionContribution(), payout,
-                            benefit.medical(), benefit.retirement(), benefit.other()));
+                            benefit.medical(), benefit.retirement(), benefit.other(), bonus, backPay));
 
             HrPayslip slip = HrPayslip.create(tenantId, run.getId(), emp.getId(),
                     result.grossSalary(), result.travelAllowance(),
                     result.medicalAid(), result.pension());
             slip.setOvertimeAmount(overtimePay);
             slip.setBenefits(benefit.medical(), benefit.retirement(), benefit.other());
+            slip.setBonusAndBackPay(bonus, backPay);
             slip.setPeriodPay(pay.workingDays(), pay.daysPaid(), pay.proration(), pay.unpaidDays(), pay.unpaidAmount());
             if (finalPay) { slip.setLeavePayout(payoutDays, payout); slip.markFinalPay(); }
 
@@ -224,6 +240,7 @@ public class PayrollService {
 
             payslipRepo.save(slip);
             overtimeService.markTaken(claims, run.getId());
+            payAdjustmentService.markTaken(items, run.getId());
 
             runGross = runGross.add(result.totalEarnings());
             runPaye  = runPaye.add(result.payeAmount());
@@ -314,7 +331,7 @@ public class PayrollService {
                 s.getTaxableIncome(), s.getTaxYear() != null ? s.getTaxYear() : 0,
                 s.getCreatedAt(), s.getDaysInPeriod(), s.getDaysPaid(), s.getProrationAmount(), s.getUnpaidLeaveDays(), s.getUnpaidLeaveAmount(),
                 s.getLeavePayoutDays(), s.getLeavePayoutAmount(), s.isFinalPay(),
-                s.getEmployerMedical(), s.getEmployerRetirement(), s.getOtherFringe());
+                s.getEmployerMedical(), s.getEmployerRetirement(), s.getOtherFringe(), s.getBackPayAmount());
     }
 
     private Emp201Response toEmp201Response(HrEmp201 e) {

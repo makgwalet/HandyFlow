@@ -179,8 +179,8 @@ public class TaxCertificateService {
 
     private static Totals totals(List<HrPayslip> l) {
         int withoutCredit = (int) l.stream().filter(p -> p.getMedicalTaxCredit() == null).count();
-        // Annual leave paid out on the last pay is reported with the basic salary.
-        return new Totals(sum(l, HrPayslip::getGrossSalary).add(sum(l, HrPayslip::getLeavePayoutAmount)), sum(l, HrPayslip::getOvertimeAmount), sum(l, HrPayslip::getBonusAmount),
+        // Annual leave paid out on the last pay, and back pay, are reported with the basic salary.
+        return new Totals(sum(l, HrPayslip::getGrossSalary).add(sum(l, HrPayslip::getLeavePayoutAmount)).add(sum(l, HrPayslip::getBackPayAmount)), sum(l, HrPayslip::getOvertimeAmount), sum(l, HrPayslip::getBonusAmount),
                 sum(l, HrPayslip::getOtherEarnings), sum(l, HrPayslip::getTravelAllowance), sum(l, HrPayslip::getPension),
                 sum(l, HrPayslip::getMedicalAid), sum(l, HrPayslip::getPayeAmount), sum(l, HrPayslip::getUifEmployee),
                 sum(l, HrPayslip::getUifEmployer), sum(l, HrPayslip::getSdlAmount), sum(l, HrPayslip::getMedicalTaxCredit),

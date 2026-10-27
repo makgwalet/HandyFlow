@@ -893,3 +893,32 @@ I read the four training services, the entities and the session screen. The modu
 - Maven, Spring and the database have not run. `EvidenceFacade` gained five methods, `EvidenceService` implements them, and the tenant-wide query gained a `NOT LIKE 'restricted-%'` condition that has never run against PostgreSQL. `ErController` gained a field and four endpoints; the multipart upload and the download headers have not been exercised. `ErEvidenceServiceTest` (8) and `RestrictedEvidenceTest` (7) use real Mockito and are unexecuted. The `MockMultipartFile` and `FileStorageService` signatures were read from source, not compiled against.
 - In my harness `ErEvidenceRulesTest` (9) passes, and switching off the first-bytes check is caught.
 - Front end: 11 new tests pass, and all 231 tests in the HR folder pass. New files are lint-clean.
+
+## 31. Slice 19a: bonus and back pay
+
+**What was there.** Payroll could only pay salary, overtime and recurring benefits. A bonus or arrears had to be bodged into another field, with no record of who entered it or why, and with PAYE worked out as if it were ordinary monthly pay.
+
+**What changed**
+
+- **Pay items (V526).** A payroll preparer can enter a bonus or back pay for an active employee: amount, the pay month it is paid from, a description and a reason. Back pay also records the period it covers, which must already have passed and must not start before the employee did. A bonus carries no dates. Amounts are above zero, up to 2 decimals, up to R10 000 000. A payment cannot be dated more than a year ahead. Nobody can enter one for themselves.
+- **Cancelling.** An open item can be cancelled with a reason. Once a pay run has taken it, it cannot be cancelled; cancel the pay run instead. Cancelling a draft pay run releases its items, and the note on the run's event says how many.
+- **Pay run.** Processing a run takes every open item due by the period end for people on the run, puts them on the payslip (new `back_pay_amount` column; the bonus uses the existing bonus field), and marks them as taken by that run. Items for people not on the run are left open and listed in a warning. A warning on the run names each person who received one.
+- **Tax.** A bonus or back pay is taxed by the annual-payment method: PAYE on (annualised regular pay + the payment) minus PAYE on annualised regular pay. UIF is on regular pay plus the payment, up to the ceiling; SDL is on both. Retirement deductions reduce the taxable amount as normal. Worked figures are in `SarsPayeCalculatorBonusTest` (for example R30 000 salary plus R30 000 bonus gives PAYE of 13 558.08).
+- **Reports and PDF.** The payslip PDF shows a "Back pay (arrears)" row. The tax certificate adds back pay to the basic-pay total. The payroll impact preview marks payslips with back pay as ones it cannot recompute, as it already does for bonuses.
+- **Screen.** A "Bonus & back pay" button on active employees (for people who manage employees or compensation) opens the list, an add form and a cancel-with-reason form. The payslip notes mention a bonus or back pay. Without preparer rights the list is read-only.
+
+**Still not done**
+
+- No SARS averaging or year-to-date method. The method used is the simple annual-payment one, and for someone paid a different amount each month it can differ from what a bureau would calculate.
+- Back pay is taxed like a bonus, and is reported under the basic-pay code (3601) on the certificate. I have not checked that against the SARS IRP5 guide. A payroll specialist should check both.
+- The SDL threshold is tested against payroll without bonuses.
+- Taxable income and tax before rebate on the payslip include the bonus, so the payslip no longer shows regular pay on its own for those lines.
+- No separate approval of an item before it is paid, other than approval of the pay run.
+- A leaver is paid a bonus or back pay only if they are on the run.
+- Items cannot be edited; cancel and enter again.
+
+**Not verified**
+
+- Maven, Spring and the database have not run. V526 has never run against PostgreSQL; `HrPayAdjustmentRepository` queries are untested against a real database. `PayrollService`, `PayrollControlService` and their tests gained constructor arguments; the 4 new tests in `PayrollServiceTest` and `PayrollControlServiceTest` use real Mockito and are unexecuted.
+- In my harness `SarsPayeCalculatorBonusTest` (8), `PayAdjustmentRulesTest` (11) and `PayAdjustmentServiceTest` (15) pass. Annualising the bonus is caught (4 failures); removing the self-entry check is caught (2).
+- Front end: lint is clean and the type check shows no new errors in the touched files. The new tests in `PayAdjustments.test.tsx` and `payslipNotes.test.ts` have not run, because vitest is not installed here.

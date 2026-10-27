@@ -159,6 +159,8 @@ public class PayslipPdfGenerator {
         if (p.getLeavePayoutAmount() != null && p.getLeavePayoutAmount().signum() > 0)
             rows.add(new String[]{ "Annual leave paid out (" + p.getLeavePayoutDays().stripTrailingZeros().toPlainString() + " days)", fmt(p.getLeavePayoutAmount()) });
         rows.add(new String[]{ "Bonus",            fmt(p.getBonusAmount()) });
+        if (p.getBackPayAmount() != null && p.getBackPayAmount().signum() > 0)
+            rows.add(new String[]{ "Back pay (arrears)", fmt(p.getBackPayAmount()) });
         rows.add(new String[]{ "Other earnings",   fmt(p.getOtherEarnings()) });
         earningsCell.add(buildAmountTable(rows.toArray(new String[0][]), "Total earnings", fmt(p.getTotalEarnings()), BRAND_TEAL));
         two.addCell(earningsCell);
