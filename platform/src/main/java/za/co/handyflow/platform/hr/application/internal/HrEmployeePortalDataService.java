@@ -82,6 +82,13 @@ public class HrEmployeePortalDataService {
         return taxCertificateService.releasedFor(TenantId.of(grant.getTenantId()), employeeId);
     }
 
+    /** One of the employee's own released annual certificates as a PDF. */
+    @Transactional(readOnly = true)
+    public byte[] getMyTaxCertificatePdf(UUID portalUserId, UUID employeeId, UUID certificateId) {
+        HrEmployeePortalAccessGrant grant = requireAccess(portalUserId, employeeId);
+        return taxCertificateService.releasedPdf(TenantId.of(grant.getTenantId()), employeeId, certificateId);
+    }
+
     // Not read-only: reading a balance first posts any leave earned since the last visit.
     @Transactional
     public List<LeaveBalanceResponse> getMyLeaveBalances(UUID portalUserId, UUID employeeId, int year) {

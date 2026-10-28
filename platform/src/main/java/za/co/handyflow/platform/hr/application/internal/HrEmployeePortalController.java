@@ -97,6 +97,18 @@ public class HrEmployeePortalController {
                 portalDataService.getMyTaxCertificates(getPortalUserId(), employeeId)));
     }
 
+    @GetMapping(value = "/employees/{employeeId}/tax-certificates/{certificateId}/pdf", produces = "application/pdf")
+    @PreAuthorize("hasAuthority('PORTAL_USER')")
+    @Operation(summary = "Download one of my released annual tax certificates as a PDF")
+    public ResponseEntity<byte[]> getMyTaxCertificatePdf(@PathVariable UUID employeeId, @PathVariable UUID certificateId) {
+        byte[] body = portalDataService.getMyTaxCertificatePdf(getPortalUserId(), employeeId, certificateId);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Cache-Control", "no-store")
+                .header("Content-Disposition", "attachment; filename=\"tax-certificate.pdf\"")
+                .body(body);
+    }
+
     @GetMapping("/employees/{employeeId}/leave-balances")
     @PreAuthorize("hasAuthority('PORTAL_USER')")
     @Operation(summary = "View my own leave balances")

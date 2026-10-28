@@ -32,6 +32,7 @@ class TaxCertificateServiceTest {
     HrTaxSettingsRepository settingsRepo;
     HrTaxCertificateRepository certRepo;
     HrTaxCertificateLineRepository lineRepo;
+    EmployerDetails employerDetails;
     TaxCertificateService service;
 
     HrEmployee emp;
@@ -49,7 +50,11 @@ class TaxCertificateServiceTest {
         settingsRepo = mock(HrTaxSettingsRepository.class);
         certRepo = mock(HrTaxCertificateRepository.class);
         lineRepo = mock(HrTaxCertificateLineRepository.class);
-        service = new TaxCertificateService(payRunRepo, payslipRepo, emp201Repo, employeeRepo, settingsRepo, certRepo, lineRepo);
+        employerDetails = mock(EmployerDetails.class);
+        when(employerDetails.of(any())).thenReturn(new EmployerDetails.Company("Acme (Pty) Ltd", "0115550100", "payroll@acme.test",
+                Map.of("street", "12 Mining Road", "suburb", "Germiston", "city", "Johannesburg", "postalCode", "1401")));
+        service = new TaxCertificateService(payRunRepo, payslipRepo, emp201Repo, employeeRepo, settingsRepo, certRepo, lineRepo,
+                employerDetails, new TaxCertificatePdfGenerator());
 
         HrTaxSettings settings = HrTaxSettings.of(tenant.getValue());
         settings.update("7123456789", "L123456789", "U123456789", "PENSION", actor);
@@ -293,5 +298,54 @@ class TaxCertificateServiceTest {
             assertThat(c.lines().stream().noneMatch(l -> l.code().equals("3699") || l.code().equals("4149"))).isTrue();
         ArgumentCaptor<HrTaxCertificate> none = ArgumentCaptor.forClass(HrTaxCertificate.class);
         verify(certRepo, never()).save(none.capture());
+    }
+
+    // ── e@syFile file and PDF ───────────────────────────────────────────────────────────────────
+
+    private void issueCertificates() {
+        service.issue(tenant, YEAR, INTERIM, null, actor);
+    }
+
+    @Test
+    void theEasyFileWaitsForTheContactPersonAndTheEmployeesAddress() {
+        issueCertificates();
+        List<String> problems = service.easyFileProblems(tenant, YEAR, INTERIM);
+        assertThat(problems).anyMatch(p -> p.contains("contact person"));
+        assertThat(problems).anyMatch(p -> p.contains("SIC7"));
+        assertThat(problems).anyMatch(p -> p.contains("residential street address"));
+        assertThatThrownBy(() -> service.easyFile(tenant, YEAR, INTERIM, false)).isInstanceOf(IllegalStateException.class).hasMessageContaining("cannot be made yet");
+    }
+
+    @Test
+    void theEasyFileIsMadeOnceTheDetailsAreThere() {
+        issueCertificates();
+        HrTaxSettings settings = HrTaxSettings.of(tenant.getValue());
+        settings.update("7123456789", "L123456789", "U123456789", "PENSION", actor);
+        settings.updateFileDetails("Thandi", "Mokoena", "41000");
+        when(settingsRepo.findById(any())).thenReturn(Optional.of(settings));
+        ReflectionTestUtils.setField(emp, "address", Map.of("street", "5 Oak Street", "city", "Johannesburg", "postalCode", "2007"));
+        ReflectionTestUtils.setField(emp, "dateOfBirth", LocalDate.of(1980, 1, 1));
+        for (HrTaxCertificate c : saved) ReflectionTestUtils.setField(c, "dateOfBirth", LocalDate.of(1980, 1, 1));
+
+        assertThat(service.easyFileProblems(tenant, YEAR, INTERIM)).isEmpty();
+        String text = service.easyFile(tenant, YEAR, INTERIM, false);
+        assertThat(text).startsWith("2010,\"Acme (Pty) Ltd\"");
+        assertThat(text).contains("2015,\"TEST\"").contains("3030,\"Dlamini\"").contains("6010,2,");
+    }
+
+    @Test
+    void aCertificateIsMadeIntoAPdf() {
+        issueCertificates();
+        UUID id = saved.get(0).getId();
+        byte[] pdf = service.pdf(tenant, id);
+        assertThat(new String(pdf, 0, 4, java.nio.charset.StandardCharsets.US_ASCII)).isEqualTo("%PDF");
+    }
+
+    @Test
+    void anEmployeeCannotGetAnotherPersonsPdf() {
+        issueCertificates();
+        when(certRepo.releasedFor(any(), any())).thenReturn(List.of());
+        assertThatThrownBy(() -> service.releasedPdf(tenant, UUID.randomUUID(), saved.get(0).getId()))
+                .isInstanceOf(za.co.handyflow.platform.shared.ResourceNotFoundException.class);
     }
 }

@@ -3,7 +3,7 @@ import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import TaxCertificatesTab from "./TaxCertificatesTab"
 import {
-  countBySeverity, defaultSelection, issueSummary, needsReason, periodLabel, settingsProblem, taxRights, taxYearOf, yearOptions,
+  countBySeverity, defaultSelection, issueSummary, needsReason, periodLabel, settingsProblem, sic7Problem, taxRights, taxYearOf, yearOptions,
 } from "./taxCertificates.logic"
 
 const get = vi.fn()
@@ -51,6 +51,11 @@ describe("tax certificate rules in the browser", () => {
     expect(needsReason([{ state: "CHANGED" }])).toBe(true)
     expect(issueSummary([{ state: "NEW" }, { state: "NEW" }, { state: "CHANGED" }, { state: "UNCHANGED" }])).toBe("2 new, 1 to replace, 1 already issued")
     expect(issueSummary([])).toBe("nothing to issue")
+  })
+  it("checks the SIC7 code", () => {
+    expect(sic7Problem("")).toBeNull()
+    expect(sic7Problem("41 000")).toBeNull()
+    expect(sic7Problem("4100")).toMatch(/5 characters/)
   })
   it("checks the PAYE reference", () => {
     expect(settingsProblem("")).toBeNull()
@@ -168,5 +173,68 @@ describe("TaxCertificatesTab", () => {
     fireEvent.click(screen.getByRole("button", { name: /save tax settings/i }))
     await waitFor(() => expect(put).toHaveBeenCalled())
     expect(put.mock.calls[0][1]).toMatchObject({ payeReference: "7000000001" })
+  })
+
+  const issuedCert = () => cert({ id: "c1", certificateNumber: "712345678920270800000000000001", state: "UNCHANGED", status: "ISSUED" })
+
+  it("lists what is missing before the e@syFile file can be made", async () => {
+    mockApi(recon({ certificates: [issuedCert()] }))
+    get.mockImplementation((url: string) => {
+      if (url.includes("/easyfile/check")) return ok(["Employer: the SIC7 code must be 5 characters (Tax settings).", "Jane Dlamini (EMP001): the residential street address is not set."])
+      if (url.includes("/settings")) return ok({ payeReference: "7123456789", sdlReference: null, uifReference: null, retirementFundType: "PENSION" })
+      if (url.includes("/reconciliation")) return ok(recon({ certificates: [issuedCert()] }))
+      return ok([])
+    })
+    wrap(<TaxCertificatesTab />)
+    fireEvent.click(await screen.findByRole("button", { name: /e@syFile file/i }))
+    expect(await screen.findByText(/2 thing\(s\) to fix/)).toBeTruthy()
+    expect(screen.getByText(/residential street address/)).toBeTruthy()
+    expect(screen.queryByRole("button", { name: /download test file/i })).toBeNull()
+  })
+
+  it("offers the test file and the live file when nothing is missing", async () => {
+    URL.createObjectURL = vi.fn(() => "blob:x")
+    URL.revokeObjectURL = vi.fn()
+    mockApi(recon({ certificates: [issuedCert()] }))
+    wrap(<TaxCertificatesTab />)
+    fireEvent.click(await screen.findByRole("button", { name: /e@syFile file/i }))
+    fireEvent.click(await screen.findByRole("button", { name: /download test file/i }))
+    await waitFor(() => expect(get.mock.calls.some(c => String(c[0]).includes("export.easyfile.csv") && String(c[0]).includes("live=false"))).toBe(true))
+    fireEvent.click(screen.getByRole("button", { name: /download live file/i }))
+    await waitFor(() => expect(get.mock.calls.some(c => String(c[0]).includes("live=true"))).toBe(true))
+  })
+
+  it("downloads a certificate as a PDF", async () => {
+    URL.createObjectURL = vi.fn(() => "blob:x")
+    URL.revokeObjectURL = vi.fn()
+    mockApi(recon({ certificates: [issuedCert()] }))
+    wrap(<TaxCertificatesTab />)
+    fireEvent.click(await screen.findByText("Jane Dlamini"))
+    fireEvent.click(await screen.findByRole("button", { name: /certificate pdf/i }))
+    await waitFor(() => expect(get.mock.calls.some(c => String(c[0]).endsWith("/c1/pdf"))).toBe(true))
+  })
+
+  it("does not offer a PDF for a certificate that is not issued yet", async () => {
+    mockApi(recon())
+    wrap(<TaxCertificatesTab />)
+    fireEvent.click(await screen.findByText("Jane Dlamini"))
+    await screen.findByText("3601")
+    expect(screen.queryByRole("button", { name: /certificate pdf/i })).toBeNull()
+  })
+
+  it("saves the contact person and the SIC7 code with the settings", async () => {
+    perms = ["PAYROLL_STATUTORY_EXPORT", "PAYROLL_CONFIGURATION_ADMIN"]
+    mockApi(recon())
+    put.mockReturnValue(ok({}))
+    wrap(<TaxCertificatesTab />)
+    fireEvent.change(await screen.findByLabelText(/contact person: first name/i), { target: { value: "Thandi" } })
+    fireEvent.change(screen.getByLabelText(/contact person: surname/i), { target: { value: "Mokoena" } })
+    fireEvent.change(screen.getByLabelText(/sic7/i), { target: { value: "410" } })
+    expect(screen.getByText(/5 characters/)).toBeTruthy()
+    expect((screen.getByRole("button", { name: /save tax settings/i }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText(/sic7/i), { target: { value: "41000" } })
+    fireEvent.click(screen.getByRole("button", { name: /save tax settings/i }))
+    await waitFor(() => expect(put).toHaveBeenCalled())
+    expect(put.mock.calls[0][1]).toMatchObject({ contactFirstName: "Thandi", contactSurname: "Mokoena", sic7Code: "41000" })
   })
 })

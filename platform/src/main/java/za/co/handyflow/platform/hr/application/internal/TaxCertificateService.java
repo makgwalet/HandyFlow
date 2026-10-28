@@ -35,6 +35,8 @@ public class TaxCertificateService {
     private final HrTaxSettingsRepository settingsRepo;
     private final HrTaxCertificateRepository certRepo;
     private final HrTaxCertificateLineRepository lineRepo;
+    private final EmployerDetails employerDetails;
+    private final TaxCertificatePdfGenerator pdfGenerator;
 
     // ── Settings ────────────────────────────────────────────────────────────────────────────────
 
@@ -42,7 +44,8 @@ public class TaxCertificateService {
     public Settings settings(TenantId tenantId) {
         HrTaxSettings s = settingsRepo.findById(tenantId.getValue()).orElse(null);
         return s == null ? new Settings(null, null, null, TaxCertificateRules.PENSION)
-                : new Settings(s.getPayeReference(), s.getSdlReference(), s.getUifReference(), s.getRetirementFundType());
+                : new Settings(s.getPayeReference(), s.getSdlReference(), s.getUifReference(), s.getRetirementFundType(),
+                        s.getContactFirstName(), s.getContactSurname(), s.getSic7Code());
     }
 
     @Transactional
@@ -52,6 +55,9 @@ public class TaxCertificateService {
         if (problem != null) throw new IllegalArgumentException(problem);
         HrTaxSettings s = settingsRepo.findById(tenantId.getValue()).orElseGet(() -> HrTaxSettings.of(tenantId.getValue()));
         s.update(req.payeReference(), req.sdlReference(), req.uifReference(), fund, actor);
+        String sic = req.sic7Code() == null ? null : req.sic7Code().replaceAll("\\s", "");
+        if (sic != null && !sic.isEmpty() && !sic.matches("[0-9A-Za-z]{5}")) throw new IllegalArgumentException("The SIC7 code is 5 characters, for example 41000.");
+        s.updateFileDetails(req.contactFirstName(), req.contactSurname(), req.sic7Code());
         settingsRepo.save(s);
         return settings(tenantId);
     }
@@ -241,6 +247,21 @@ public class TaxCertificateService {
         return respond(List.of(c)).get(0);
     }
 
+    /** The certificate as a PDF. */
+    @Transactional(readOnly = true)
+    public byte[] pdf(TenantId tenantId, UUID id) {
+        Certificate c = get(tenantId, id);
+        return pdfGenerator.generate(c, employerDetails.of(tenantId).name(), settings(tenantId).payeReference());
+    }
+
+    /** A released annual certificate of this employee as a PDF. Anything else, including another person's certificate, is not found. */
+    @Transactional(readOnly = true)
+    public byte[] releasedPdf(TenantId tenantId, UUID employeeId, UUID certificateId) {
+        Certificate c = releasedFor(tenantId, employeeId).stream().filter(x -> x.id().equals(certificateId)).findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("TaxCertificate", certificateId.toString()));
+        return pdfGenerator.generate(c, employerDetails.of(tenantId).name(), settings(tenantId).payeReference());
+    }
+
     /** Annual certificates released to an employee. Interim ones and unreleased ones are never shown. */
     @Transactional(readOnly = true)
     public List<Certificate> releasedFor(TenantId tenantId, UUID employeeId) {
@@ -353,6 +374,65 @@ public class TaxCertificateService {
             }
         }
         return sb.toString();
+    }
+
+    // ── e@syFile import file ────────────────────────────────────────────────────────────────────
+
+    private record EasyBuilt(EasyFileRules.Employer employer, List<EasyFileRules.Person> people, List<String> problems) {}
+
+    private EasyBuilt buildEasy(TenantId tenantId, int taxYear, String period, boolean live) {
+        TaxCertificateRules.Window window = TaxCertificateRules.window(taxYear, period);
+        Settings st = settings(tenantId);
+        EmployerDetails.Company co = employerDetails.of(tenantId);
+        Map<String, String> ca = co.address() == null ? Map.of() : co.address();
+        EasyFileRules.Address employerAddress = new EasyFileRules.Address(ca.get("street"), ca.get("suburb"), ca.get("city"), ca.get("postalCode"));
+        EasyFileRules.Employer employer = new EasyFileRules.Employer(co.name(), st.payeReference(), st.sdlReference(), st.uifReference(),
+                st.contactFirstName(), st.contactSurname(), co.phone(), co.email(), st.sic7Code(), employerAddress, taxYear, period, live);
+
+        List<HrTaxCertificate> certs = certRepo.forReconciliation(tenantId, taxYear, period).stream().filter(c -> "ISSUED".equals(c.getStatus())).toList();
+        Map<UUID, List<HrTaxCertificateLine>> lines = certs.isEmpty() ? Map.of() : lineRepo.forCertificates(certs.stream().map(HrTaxCertificate::getId).toList())
+                .stream().collect(Collectors.groupingBy(HrTaxCertificateLine::getCertificateId));
+        Map<UUID, HrEmployee> employees = certs.isEmpty() ? Map.of() : employeeRepo.findAllById(certs.stream().map(HrTaxCertificate::getEmployeeId).toList()).stream()
+                .filter(e -> tenantId.getValue().equals(e.getTenantId())).collect(Collectors.toMap(HrEmployee::getId, e -> e));
+
+        List<String> extra = new ArrayList<>();
+        List<EasyFileRules.Person> people = new ArrayList<>();
+        for (HrTaxCertificate c : certs) {
+            HrEmployee emp = employees.get(c.getEmployeeId());
+            Map<String, String> a = emp == null || emp.getAddress() == null ? Map.of() : emp.getAddress();
+            BigDecimal periods = emp == null ? BigDecimal.valueOf(12) : switch (emp.getPayFrequency() == null ? "MONTHLY" : emp.getPayFrequency()) {
+                case "WEEKLY" -> BigDecimal.valueOf(52);
+                case "FORTNIGHTLY" -> BigDecimal.valueOf(26);
+                default -> BigDecimal.valueOf(12);
+            };
+            String who = (c.getFirstNames() + " " + c.getSurname()).trim() + " (" + c.getEmployeeNumber() + ")";
+            if (emp != null && payslipRepo.etiMonthsBefore(emp.getId(), window.end().plusDays(1)) - payslipRepo.etiMonthsBefore(emp.getId(), window.start()) > 0)
+                extra.add(who + ": the employment tax incentive was claimed in this period, and the monthly incentive records are not in the file yet.");
+            people.add(new EasyFileRules.Person(c.getCertificateNumber(), c.getCertificateType(), c.getSurname(), c.getFirstNames(), c.getIdNumber(), c.getTaxNumber(),
+                    c.getDateOfBirth(), c.getEmployeeNumber(), emp == null ? null : emp.getEmail(), emp == null ? null : emp.getPhone(),
+                    new EasyFileRules.Address(a.get("street"), a.get("suburb"), a.get("city"), a.get("postalCode")), c.getPeriodFrom(), c.getPeriodTo(),
+                    periods, BigDecimal.valueOf(c.getPayslipCount()),
+                    lines.getOrDefault(c.getId(), List.of()).stream().map(l -> new TaxCertificateRules.Line(l.getCode(), l.getDescription(), l.getAmount())).toList()));
+        }
+        List<String> problems = new ArrayList<>(EasyFileRules.problems(employer, people));
+        problems.addAll(extra);
+        return new EasyBuilt(employer, people, problems);
+    }
+
+    /** What stops the e@syFile file being made for the issued certificates of a reconciliation. Empty means it can be made. */
+    @Transactional(readOnly = true)
+    public List<String> easyFileProblems(TenantId tenantId, int taxYear, String period) {
+        return buildEasy(tenantId, taxYear, period, false).problems();
+    }
+
+    /** The file e@syFile imports. A test file by default, so SARS does not take it as a live submission. */
+    @Transactional(readOnly = true)
+    public String easyFile(TenantId tenantId, int taxYear, String period, boolean live) {
+        EasyBuilt b = buildEasy(tenantId, taxYear, period, live);
+        if (!b.problems().isEmpty())
+            throw new IllegalStateException("The e@syFile file cannot be made yet: " + String.join(" ", b.problems().stream().limit(5).toList())
+                    + (b.problems().size() > 5 ? " (and " + (b.problems().size() - 5) + " more)" : ""));
+        return EasyFileRules.file(b.employer(), b.people());
     }
 
     /** CSV cell: quoted, and a leading = + - @ is defused so a spreadsheet does not run it as a formula. */

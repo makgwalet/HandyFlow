@@ -62,6 +62,18 @@ public class TaxCertificateController {
         return ResponseEntity.ok(ApiResponse.success(service.get(TenantContext.getTenantIdAsObject(), id)));
     }
 
+    @GetMapping(value = "/{id}/pdf", produces = "application/pdf")
+    @PreAuthorize(EXPORT)
+    @Operation(summary = "The certificate as a PDF")
+    public ResponseEntity<byte[]> pdf(@PathVariable UUID id) {
+        byte[] body = service.pdf(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Cache-Control", "no-store")
+                .header("Content-Disposition", "attachment; filename=\"tax-certificate-" + id + ".pdf\"")
+                .body(body);
+    }
+
     @PostMapping("/issue")
     @PreAuthorize("hasAuthority('PAYROLL_CERTIFICATE_ISSUE')")
     @Operation(summary = "Issue the certificates of a reconciliation. Refused while any run, EMP201, employer or employee check fails")
@@ -96,6 +108,26 @@ public class TaxCertificateController {
         return ResponseEntity.ok()
                 .header("Content-Type", "text/csv; charset=UTF-8")
                 .header("Content-Disposition", "attachment; filename=\"tax-certificates-" + taxYear + "-" + p.toLowerCase() + ".csv\"")
+                .body(body);
+    }
+
+    @GetMapping("/easyfile/check")
+    @PreAuthorize(EXPORT)
+    @Operation(summary = "What is missing before the e@syFile import file can be made for the issued certificates. Empty when it can")
+    public ResponseEntity<ApiResponse<List<String>>> easyFileCheck(@RequestParam int taxYear, @RequestParam String period) {
+        return ResponseEntity.ok(ApiResponse.success(service.easyFileProblems(TenantContext.getTenantIdAsObject(), taxYear, period.toUpperCase())));
+    }
+
+    @GetMapping(value = "/export.easyfile.csv", produces = "text/csv")
+    @PreAuthorize(EXPORT)
+    @Operation(summary = "The import file for SARS e@syFile Employer, from the issued certificates. A test file unless live=true")
+    public ResponseEntity<byte[]> easyFile(@RequestParam int taxYear, @RequestParam String period, @RequestParam(defaultValue = "false") boolean live) {
+        String p = period.toUpperCase();
+        byte[] body = service.easyFile(TenantContext.getTenantIdAsObject(), taxYear, p, live).getBytes(StandardCharsets.US_ASCII);
+        return ResponseEntity.ok()
+                .header("Content-Type", "text/csv; charset=US-ASCII")
+                .header("Cache-Control", "no-store")
+                .header("Content-Disposition", "attachment; filename=\"easyfile-" + taxYear + "-" + p.toLowerCase() + (live ? "" : "-test") + ".csv\"")
                 .body(body);
     }
 

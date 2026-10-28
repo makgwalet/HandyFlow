@@ -11,7 +11,13 @@ public final class TaxCertificateDtos {
 
     private TaxCertificateDtos() {}
 
-    public record Settings(String payeReference, String sdlReference, String uifReference, String retirementFundType) {}
+    public record Settings(String payeReference, String sdlReference, String uifReference, String retirementFundType,
+                           String contactFirstName, String contactSurname, String sic7Code) {
+        /** Without the details only the e@syFile file needs. */
+        public Settings(String payeReference, String sdlReference, String uifReference, String retirementFundType) {
+            this(payeReference, sdlReference, uifReference, retirementFundType, null, null, null);
+        }
+    }
 
     public record Problem(String severity, String subject, String message) {}
 

@@ -1,8 +1,8 @@
 // src/pages/hr/TaxCertificatesTab.tsx
 //
 // Tax certificates (IRP5 / IT3(a)) and the reconciliation with the EMP201 returns. The server builds and checks everything;
-// this screen shows what it found, and issues only when nothing must be fixed. The figures are a workpaper to complete the
-// SARS submission from, not a file SARS accepts as it is.
+// this screen shows what it found, and issues only when nothing must be fixed. The spreadsheet is a workpaper; the e@syFile file is the import file
+// for SARS's own program, and SARS checks it on upload.
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Download } from "lucide-react"
@@ -10,7 +10,7 @@ import { apiClient } from "../../api/client"
 import { useAuth } from "../../hooks/useAuth"
 import {
   countBySeverity, defaultSelection, FUND_LABEL, issueSummary, needsReason, periodLabel, rand, reasonProblem, SEVERITY_STYLE,
-  settingsProblem, taxRights, TYPE_LABEL, yearOptions, type Period, type Problem,
+  settingsProblem, sic7Problem, taxRights, TYPE_LABEL, yearOptions, type Period, type Problem,
 } from "./taxCertificates.logic"
 
 type Wrapped = { data?: { data?: unknown } }
@@ -29,7 +29,10 @@ interface Reconciliation {
   taxYear: number; period: Period; runs: number; canIssue: boolean; interim: boolean
   problems: Problem[]; reconciliation: Recon[]; certificates: Cert[]; notProduced: string[]
 }
-interface Settings { payeReference: string | null; sdlReference: string | null; uifReference: string | null; retirementFundType: string }
+interface Settings {
+  payeReference: string | null; sdlReference: string | null; uifReference: string | null; retirementFundType: string
+  contactFirstName?: string | null; contactSurname?: string | null; sic7Code?: string | null
+}
 
 const card: React.CSSProperties = { border: "1px solid var(--hf-border)", borderRadius: 12, background: "var(--hf-surface)", marginBottom: 20, overflow: "hidden" }
 const head: React.CSSProperties = { padding: "14px 18px", borderBottom: "1px solid var(--hf-border-subtle)" }
@@ -56,6 +59,7 @@ export default function TaxCertificatesTab() {
   const [cancelReason, setCancelReason] = useState("")
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
+  const [easyOpen, setEasyOpen] = useState(false)
 
   const recon = useQuery<Reconciliation>({
     queryKey: ["tax-reconciliation", taxYear, period],
@@ -69,11 +73,15 @@ export default function TaxCertificatesTab() {
   })
 
   // The form shows what is saved, with whatever has been typed over it.
-  type Form = { payeReference: string; sdlReference: string; uifReference: string; retirementFundType: string }
+  type Form = {
+    payeReference: string; sdlReference: string; uifReference: string; retirementFundType: string
+    contactFirstName: string; contactSurname: string; sic7Code: string
+  }
   const [edits, setEdits] = useState<Partial<Form>>({})
   const saved: Form = {
     payeReference: settings.data?.payeReference ?? "", sdlReference: settings.data?.sdlReference ?? "",
     uifReference: settings.data?.uifReference ?? "", retirementFundType: settings.data?.retirementFundType ?? "PENSION",
+    contactFirstName: settings.data?.contactFirstName ?? "", contactSurname: settings.data?.contactSurname ?? "", sic7Code: settings.data?.sic7Code ?? "",
   }
   const form: Form = { ...saved, ...edits }
   const setForm = (f: (cur: Form) => Form) => setEdits(f(form))
@@ -105,6 +113,30 @@ export default function TaxCertificatesTab() {
     onError: (e) => setError(errorText(e, "The certificates could not be released")),
   })
 
+  const easyCheck = useQuery<string[]>({
+    queryKey: ["tax-easyfile", taxYear, period],
+    queryFn: async () => unwrap<string[]>(await apiClient.get(`/api/v1/hr/tax-certificates/easyfile/check?taxYear=${taxYear}&period=${period}`)),
+    enabled: rights.view && easyOpen,
+  })
+
+  const save = (blob: Blob, name: string) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a"); a.href = url; a.download = name; a.click()
+    URL.revokeObjectURL(url)
+  }
+  const downloadEasy = async (live: boolean) => {
+    try {
+      const res = await apiClient.get(`/api/v1/hr/tax-certificates/export.easyfile.csv?taxYear=${taxYear}&period=${period}&live=${live}`, { responseType: "blob" })
+      save(new Blob([res.data], { type: "text/csv" }), `easyfile-${taxYear}-${period.toLowerCase()}${live ? "" : "-test"}.csv`)
+    } catch (e) { setError(errorText(e, "The e@syFile file could not be made")) }
+  }
+  const downloadPdf = async (id: string) => {
+    try {
+      const res = await apiClient.get(`/api/v1/hr/tax-certificates/${id}/pdf`, { responseType: "blob" })
+      save(new Blob([res.data], { type: "application/pdf" }), `tax-certificate-${id}.pdf`)
+    } catch { setError("The certificate PDF could not be downloaded") }
+  }
+
   const download = async () => {
     try {
       const res = await apiClient.get(`/api/v1/hr/tax-certificates/export.csv?taxYear=${taxYear}&period=${period}`, { responseType: "blob" })
@@ -125,6 +157,7 @@ export default function TaxCertificatesTab() {
   const reasonMissing = reasonNeeded && !!reasonProblem(reason, "replacing certificates")
   const hasIssued = certs.some(c => c.certificateNumber)
   const payeProblem = settingsProblem(form.payeReference)
+  const sicProblem = sic7Problem(form.sic7Code)
 
   return (
     <div>
@@ -146,7 +179,7 @@ export default function TaxCertificatesTab() {
       <div style={{ ...card, padding: "14px 18px", background: "var(--hf-warning-soft)", borderColor: "var(--hf-warning-border)" }}>
         <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-warning-text)", marginBottom: 6 }}>These certificates are a workpaper</div>
         <p style={{ margin: "0 0 8px", fontSize: 12, color: "var(--hf-warning-text-deep)" }}>
-          Only the codes that match payslip figures are produced. Check them against e@syFile before you submit. Left out:
+          Only the codes that match payslip figures are produced. Import the e@syFile test file and check it against the program before you submit. Left out:
         </p>
         <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "var(--hf-warning-text-deep)" }}>
           {(data?.notProduced ?? []).map(n => <li key={n}>{n}</li>)}
@@ -174,8 +207,15 @@ export default function TaxCertificatesTab() {
               <select id="tc-fund" value={form.retirementFundType} onChange={e => setForm(f => ({ ...f, retirementFundType: e.target.value }))} style={{ ...input, background: "var(--hf-surface)" }}>
                 {Object.entries(FUND_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select></div>
+            <div><label style={label} htmlFor="tc-contact-first">Contact person: first name</label>
+              <input id="tc-contact-first" value={form.contactFirstName} onChange={e => setForm(f => ({ ...f, contactFirstName: e.target.value }))} style={input} /></div>
+            <div><label style={label} htmlFor="tc-contact-last">Contact person: surname</label>
+              <input id="tc-contact-last" value={form.contactSurname} onChange={e => setForm(f => ({ ...f, contactSurname: e.target.value }))} style={input} /></div>
+            <div><label style={label} htmlFor="tc-sic7">SIC7 industry code</label>
+              <input id="tc-sic7" value={form.sic7Code} onChange={e => setForm(f => ({ ...f, sic7Code: e.target.value }))} style={input} />
+              {sicProblem && <div style={{ fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>{sicProblem}</div>}</div>
             <div style={{ alignSelf: "end" }}>
-              <button onClick={() => saveSettings.mutate()} disabled={!!payeProblem || saveSettings.isPending} style={{ ...primary, opacity: payeProblem ? 0.6 : 1 }}>Save tax settings</button></div>
+              <button onClick={() => saveSettings.mutate()} disabled={!!payeProblem || !!sicProblem || saveSettings.isPending} style={{ ...primary, opacity: payeProblem || sicProblem ? 0.6 : 1 }}>Save tax settings</button></div>
           </> : <div style={{ fontSize: 13, color: "var(--hf-text-secondary)" }}>
             PAYE reference: {settings.data?.payeReference ?? "not set"} · Retirement fund: {FUND_LABEL[settings.data?.retirementFundType ?? "PENSION"]}.
             Changing these needs the payroll configuration permission.
@@ -226,10 +266,35 @@ export default function TaxCertificatesTab() {
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {hasIssued && <button onClick={download} style={{ ...plain, display: "flex", alignItems: "center", gap: 6 }}><Download size={13} /> Download spreadsheet</button>}
+              {hasIssued && <button onClick={() => setEasyOpen(o => !o)} aria-expanded={easyOpen} style={{ ...plain, display: "flex", alignItems: "center", gap: 6 }}><Download size={13} /> e@syFile file</button>}
               {rights.issue && period === "ANNUAL" && hasIssued && <button onClick={() => release.mutate()} disabled={release.isPending} style={plain}>Release to employees</button>}
               {rights.issue && <button onClick={() => issue.mutate()} disabled={!data.canIssue || reasonMissing || issue.isPending} style={{ ...primary, opacity: !data.canIssue || reasonMissing ? 0.6 : 1 }}>Issue certificates</button>}
             </div>
           </div>
+          {easyOpen && hasIssued && (
+            <div role="region" aria-label="e@syFile import file" style={{ padding: "12px 18px", borderBottom: "1px solid var(--hf-border-subtle)", fontSize: 13 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>File for SARS e@syFile Employer</div>
+              <p style={{ margin: "0 0 8px", fontSize: 12, color: "var(--hf-text-muted)" }}>
+                Made from the issued certificates. Import the test file first: e@syFile shows an error report on upload, and rejects the whole file if there is one.
+                Certificates of employees who claimed the employment tax incentive, IT3(a) certificates and employees without a 13-digit ID number cannot be included yet.
+              </p>
+              {easyCheck.isLoading && <div style={{ color: "var(--hf-text-faint)" }}>Checking…</div>}
+              {easyCheck.isError && <div role="alert" style={{ color: "var(--hf-danger-text)" }}>{errorText(easyCheck.error, "The file could not be checked")}</div>}
+              {easyCheck.data && easyCheck.data.length > 0 && (
+                <div>
+                  <div style={{ color: "var(--hf-danger-text)", fontWeight: 600, marginBottom: 4 }}>{easyCheck.data.length} thing(s) to fix before the file can be made:</div>
+                  <ul style={{ margin: 0, paddingLeft: 18, color: "var(--hf-danger-text)", fontSize: 12 }}>{easyCheck.data.map((m, i) => <li key={i}>{m}</li>)}</ul>
+                </div>
+              )}
+              {easyCheck.data && easyCheck.data.length === 0 && (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <button onClick={() => downloadEasy(false)} style={primary}>Download test file</button>
+                  <button onClick={() => downloadEasy(true)} style={plain}>Download live file</button>
+                  <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>The live file is the one you submit to SARS.</span>
+                </div>
+              )}
+            </div>
+          )}
           {rights.issue && reasonNeeded && (
             <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--hf-border-subtle)" }}>
               <label style={label} htmlFor="tc-reason">Reason for replacing issued certificates</label>
@@ -247,7 +312,7 @@ export default function TaxCertificatesTab() {
                     const errs = c.problems.filter(p => p.severity === "ERROR").length
                     return <CertRow key={key} c={c} isOpen={isOpen} errs={errs} onToggle={() => setOpen(isOpen ? null : key)}
                       canCancel={rights.issue && !!c.id && c.state !== "NEW"} cancelReason={cancelReason} setCancelReason={setCancelReason}
-                      onCancel={() => c.id && cancel.mutate(c.id)} cancelling={cancel.isPending} />
+                      onCancel={() => c.id && cancel.mutate(c.id)} cancelling={cancel.isPending} onPdf={() => c.id && downloadPdf(c.id)} />
                   })}
                 </tbody>
               </table>
@@ -259,9 +324,9 @@ export default function TaxCertificatesTab() {
   )
 }
 
-function CertRow({ c, isOpen, errs, onToggle, canCancel, cancelReason, setCancelReason, onCancel, cancelling }: {
+function CertRow({ c, isOpen, errs, onToggle, canCancel, cancelReason, setCancelReason, onCancel, cancelling, onPdf }: {
   c: Cert; isOpen: boolean; errs: number; onToggle: () => void; canCancel: boolean
-  cancelReason: string; setCancelReason: (v: string) => void; onCancel: () => void; cancelling: boolean
+  cancelReason: string; setCancelReason: (v: string) => void; onCancel: () => void; cancelling: boolean; onPdf: () => void
 }) {
   const state: Record<string, { text: string; color: string; bg: string }> = {
     NEW: { text: "To issue", color: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
@@ -286,6 +351,11 @@ function CertRow({ c, isOpen, errs, onToggle, canCancel, cancelReason, setCancel
           <thead><tr><th style={th}>Code</th><th style={th}>Description</th><th style={{ ...th, textAlign: "right" }}>Amount</th></tr></thead>
           <tbody>{c.lines.map(l => <tr key={l.code}><td style={td}>{l.code}</td><td style={td}>{l.description}</td><td style={{ ...td, textAlign: "right" }}>{rand(l.amount)}</td></tr>)}</tbody>
         </table>
+        {c.id && c.certificateNumber && (
+          <div style={{ marginTop: 10 }}>
+            <button onClick={e => { e.stopPropagation(); onPdf() }} style={{ ...plain, display: "flex", alignItems: "center", gap: 6 }}><Download size={13} /> Certificate PDF</button>
+          </div>
+        )}
         {canCancel && (
           <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 220 }}><label style={label} htmlFor={`tc-cancel-${c.employeeId}`}>Reason for cancelling</label>

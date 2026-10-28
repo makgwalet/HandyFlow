@@ -19,6 +19,9 @@ public class HrTaxSettings {
     @Column(name = "sdl_reference")        String sdlReference;
     @Column(name = "uif_reference")        String uifReference;
     @Column(name = "retirement_fund_type") String retirementFundType = TaxCertificateRules.PENSION;
+    @Column(name = "contact_first_name")   String contactFirstName;
+    @Column(name = "contact_surname")      String contactSurname;
+    @Column(name = "sic7_code")            String sic7Code;
     @Column(name = "updated_by")           UUID updatedBy;
     @Column(name = "updated_at")           Instant updatedAt;
 
@@ -36,6 +39,13 @@ public class HrTaxSettings {
         this.retirementFundType = fundType;
         this.updatedBy = actor;
         this.updatedAt = Instant.now();
+    }
+
+    /** The contact person and industry code SARS asks for in the e@syFile import file. */
+    public void updateFileDetails(String contactFirstName, String contactSurname, String sic7Code) {
+        this.contactFirstName = contactFirstName == null || contactFirstName.isBlank() ? null : contactFirstName.trim();
+        this.contactSurname = contactSurname == null || contactSurname.isBlank() ? null : contactSurname.trim();
+        this.sic7Code = sic7Code == null || sic7Code.isBlank() ? null : sic7Code.replaceAll("\\s", "").toUpperCase();
     }
 
     private static String blank(String s) { return s == null || s.isBlank() ? null : s.replaceAll("\\s", ""); }

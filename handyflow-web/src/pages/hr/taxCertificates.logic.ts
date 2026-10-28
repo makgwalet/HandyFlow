@@ -88,6 +88,13 @@ export function settingsProblem(payeRef: string): string | null {
   return null
 }
 
+/** The SIC7 industry code is five characters, for example 41000. Blank is allowed until the e@syFile file is wanted. */
+export function sic7Problem(code: string): string | null {
+  const v = code.replace(/\s/g, "")
+  if (v && !/^[0-9A-Za-z]{5}$/.test(v)) return "The SIC7 code is 5 characters, for example 41000."
+  return null
+}
+
 export const FUND_LABEL: Record<string, string> = { PENSION: "Pension fund", PROVIDENT: "Provident fund", RETIREMENT_ANNUITY: "Retirement annuity" }
 
 export const TYPE_LABEL: Record<string, string> = { IRP5: "IRP5", IT3A: "IT3(a)" }

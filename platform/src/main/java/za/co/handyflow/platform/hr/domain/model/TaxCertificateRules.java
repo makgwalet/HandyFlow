@@ -31,7 +31,7 @@ public final class TaxCertificateRules {
 
     /** Codes SARS requires that this class does not produce, and why. Shown to the person preparing the submission. */
     public static final List<String> NOT_PRODUCED = List.of(
-            "3695, 3696 (gross non-taxable income), 3699 (gross employment income, taxable; the amounts in 3696 are not part of it) and 4149 (statutory total): SARS's 2027 code guide describes them, but the full list of codes each one adds up could not be read, so they are not produced. 3697 and 3698 have not applied since the 2017 year of assessment and are correctly left out.",
+            "3695, 3696 (gross non-taxable income), 3699 (gross employment income, taxable; the amounts in 3696 are not part of it) and 4149 (statutory total): SARS's 2027 code guide describes them, but the full list of codes each one adds up could not be read, so they are not shown on the certificate. The e@syFile file does carry 3699 (the sum of the income codes) and 4149 (the sum of 4102, 4141 and 4142), worked out when it is made, because SARS's file layout lists them as mandatory. 3697 and 3698 have not applied since the 2017 year of assessment and are correctly left out.",
             "4582 and the taxable portion of the travel allowance: how SARS wants it reported could not be confirmed.",
             "Employer contributions and other fringe benefits are reported under 3801, 3810, 3817, 3825, 3828 and 4472 to 4475, taken from a payroll vendor's code list rather than from SARS itself, and only what payroll recorded. Payslips made before benefits were recorded carry none, and the totals codes (3695, 3696 and 3699) are not produced, so check a certificate for an employee with benefits against SARS's own code list before submitting it.");
 
