@@ -3,6 +3,7 @@ package za.co.handyflow.platform.recruiter.domain.model;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
 import za.co.handyflow.platform.recruiter.api.RecruiterAuditController;
+import za.co.handyflow.platform.recruiter.api.RecruiterCalendarController;
 import za.co.handyflow.platform.recruiter.api.RecruiterController;
 import za.co.handyflow.platform.recruiter.api.RecruiterDashboardController;
 import za.co.handyflow.platform.recruiter.api.RecruiterPoolController;
@@ -28,7 +29,7 @@ class RecruiterPermissionsTest {
 
     @Test
     void everyEndpointAsksForAPermissionThatExists() {
-        for (Class<?> c : new Class<?>[]{RecruiterController.class, RecruiterPoolController.class, RecruiterReportController.class, RecruiterAuditController.class, RecruiterDashboardController.class}) {
+        for (Class<?> c : new Class<?>[]{RecruiterController.class, RecruiterPoolController.class, RecruiterReportController.class, RecruiterAuditController.class, RecruiterDashboardController.class, RecruiterCalendarController.class}) {
             for (Method m : c.getDeclaredMethods()) {
                 PreAuthorize pa = m.getAnnotation(PreAuthorize.class);
                 if (pa == null) continue;
