@@ -545,7 +545,12 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
         <div style={{ padding: '20px 24px 0', borderBottom: '1px solid var(--hf-border-subtle)', flexShrink: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--hf-text)', marginBottom: 5 }}>{app?.applicantName}</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
+                <span aria-hidden style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--hf-primary-soft, var(--hf-info-soft))', color: 'var(--hf-primary-text)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
+                  {(app?.applicantName ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w: string) => w[0]?.toUpperCase()).join('')}
+                </span>
+                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--hf-text)' }}>{app?.applicantName}</h2>
+              </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
                   <span style={{ width: 5, height: 5, borderRadius: '50%', background: sc.dot }} />{sc.label}
@@ -570,6 +575,23 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
             <span>Applied {fmtDate(app?.appliedAt)}</span>
             <span>Source: {app?.source?.replace('_',' ') ?? '—'}</span>
           </div>
+
+          {/* Where they are in the pipeline */}
+          {app && PIPELINE_STAGES.includes(app.stage) && (
+            <ol aria-label="Pipeline progress" style={{ display: 'flex', listStyle: 'none', margin: '0 0 14px', padding: 0, gap: 4 }}>
+              {PIPELINE_STAGES.map((st, i) => {
+                const at = PIPELINE_STAGES.indexOf(app.stage)
+                const state = i < at ? 'done' : i === at ? 'now' : 'next'
+                return (
+                  <li key={st} aria-current={state === 'now' ? 'step' : undefined} style={{ flex: 1, textAlign: 'center', fontSize: 10, fontWeight: state === 'now' ? 800 : 500,
+                    color: state === 'next' ? 'var(--hf-text-faint)' : 'var(--hf-primary-text)' }}>
+                    <div style={{ height: 4, borderRadius: 2, marginBottom: 4, background: state === 'next' ? 'var(--hf-border)' : 'var(--hf-primary)', opacity: state === 'done' ? 0.55 : 1 }} />
+                    {STAGE[st]?.label ?? st}
+                  </li>
+                )
+              })}
+            </ol>
+          )}
 
           {/* Action buttons */}
           <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 14 }}>
@@ -1418,6 +1440,13 @@ export function RecruiterPage() {
     },
   })
 
+  const { data: jobClients } = useQuery<{ jobId: string; clientName: string }[]>({
+    queryKey: ['rec-job-clients'],
+    queryFn: async () => { const r = await apiClient.get('/api/v1/recruiter/job-clients'); return r.data?.data ?? r.data },
+    retry: false,
+  })
+  const clientByJob: Record<string, string> = Object.fromEntries((Array.isArray(jobClients) ? jobClients : []).map(c => [c.jobId, c.clientName]))
+
   const { data: appsPage } = useQuery({
     queryKey: ['rec-applications', stageFilter, jobFilter, serverSearch],
     queryFn: async () => {
@@ -1582,6 +1611,7 @@ export function RecruiterPage() {
                             {closing && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}><AlertTriangle size={9} /> Closing date passed</span>}
                           </div>
                           <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--hf-text-muted)', flexWrap: 'wrap', marginBottom: 8 }}>
+                            {clientByJob[job.id] && <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600, color: 'var(--hf-text-secondary)' }}><Building2 size={11} />Client: {clientByJob[job.id]}</span>}
                             {job.department && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Building2 size={11} />{job.department}</span>}
                             {job.location && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={11} />{job.location}</span>}
                             <span>{job.jobType.replace('_',' ')} · {job.experienceLevel}</span>
