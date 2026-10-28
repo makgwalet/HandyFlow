@@ -13,5 +13,6 @@ public record SubmitApplicationRequest(
         String cvFileName,
         String source,         // CAREERS_PAGE, LINKEDIN, REFERRAL etc.
         String referrerName,   // free text, only meaningful when source=REFERRAL — candidate has no way to know internal user IDs
-        Boolean consent        // the applicant agreed to RecruiterConsentRules.STATEMENT; required
+        Boolean consent,       // the applicant agreed to RecruiterConsentRules.STATEMENT; required
+        java.util.List<RecruiterScreeningDtos.AnswerInput> screeningAnswers // answers to the job's screening questions; null when it has none
 ) {}

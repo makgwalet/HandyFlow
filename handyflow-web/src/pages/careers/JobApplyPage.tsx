@@ -81,6 +81,7 @@ export function JobApplyPage() {
   const [cvError, setCvError] = useState('')
   const [formError, setFormError] = useState('')
   const [consent, setConsent] = useState(false)
+  const [answers, setAnswers] = useState<Record<string, string>>({})
 
   const { data: job, isLoading, isError, error } = useQuery<JobDetail>({
     queryKey: ['public-job', tenantSlug, jobSlug],
@@ -89,6 +90,17 @@ export function JobApplyPage() {
       return r.data?.data ?? r.data
     },
     enabled: !!tenantSlug && !!jobSlug,
+    retry: false,
+  })
+
+  type Question = { id: string; text: string; type: 'YES_NO' | 'NUMBER' | 'TEXT'; required: boolean }
+  const { data: questions } = useQuery<Question[]>({
+    queryKey: ['public-screening', tenantSlug, job?.id],
+    queryFn: async () => {
+      const r = await publicApi.get(`/api/v1/recruiter/careers/${tenantSlug}/jobs/${job!.id}/screening`)
+      return r.data?.data ?? r.data
+    },
+    enabled: !!job?.id,
     retry: false,
   })
 
@@ -122,6 +134,7 @@ export function JobApplyPage() {
           cvBase64, cvFileName: cvFile?.name || null,
           source: 'CAREERS_PAGE',
           consent,
+          screeningAnswers: (questions ?? []).map(q => ({ questionId: q.id, answer: answers[q.id] ?? '' })),
         })
       return r.data?.data ?? r.data
     },
@@ -140,6 +153,11 @@ export function JobApplyPage() {
     setFormError('')
     if (!firstName.trim() || !lastName.trim() || !email.trim()) {
       setFormError('Please fill in your first name, last name, and email.')
+      return
+    }
+    const missing = (questions ?? []).find(q => q.required && !(answers[q.id] ?? '').trim())
+    if (missing) {
+      setFormError(`Please answer: ${missing.text}`)
       return
     }
     if (!consent) {
@@ -314,6 +332,27 @@ export function JobApplyPage() {
                 )}
                 {cvError && <div style={{ fontSize: 12, color: danger, marginTop: 6 }}>{cvError}</div>}
               </div>
+
+              {(questions ?? []).length > 0 && (
+                <div style={{ marginBottom: 18 }}>
+                  <div style={{ ...labelStyle, marginBottom: 10 }}>A few questions</div>
+                  {(questions ?? []).map(q => (
+                    <div key={q.id} style={{ marginBottom: 14 }}>
+                      <label style={labelStyle} htmlFor={`sq-${q.id}`}>{q.text}{q.required ? ' *' : ''}</label>
+                      {q.type === 'YES_NO' ? (
+                        <select id={`sq-${q.id}`} value={answers[q.id] ?? ''} onChange={e => setAnswers(a => ({ ...a, [q.id]: e.target.value }))} style={inputStyle}>
+                          <option value="">Choose...</option>
+                          <option value="YES">Yes</option>
+                          <option value="NO">No</option>
+                        </select>
+                      ) : (
+                        <input id={`sq-${q.id}`} type={q.type === 'NUMBER' ? 'number' : 'text'} maxLength={q.type === 'TEXT' ? 1000 : undefined}
+                          value={answers[q.id] ?? ''} onChange={e => setAnswers(a => ({ ...a, [q.id]: e.target.value }))} style={inputStyle} />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, color: muted, lineHeight: 1.5, marginBottom: 18 }}>
                 <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} style={{ marginTop: 3 }} />

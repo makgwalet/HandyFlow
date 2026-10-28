@@ -16,6 +16,7 @@ import { useParams } from 'react-router-dom'
 import ApprovalPanel from './RecApproval'
 import OfferPanel from './RecOffer'
 import RequisitionPanel from './RecRequisition'
+import { ScreeningAnswers, ScreeningEditor } from './RecScreening'
 import RecPrivacy from './RecPrivacy'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -617,6 +618,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
 
           {app?.stage === 'OFFER' && app?.offeredSalary != null && !app?.offerLetterSentAt && <ApprovalPanel kind="offer" id={app.id} />}
           {app?.stage === 'OFFER' && app?.offerLetterSentAt && <OfferPanel id={app.id} onChanged={invalidate} />}
+          {app && <ScreeningAnswers applicationId={app.id} />}
 
           {/* Tabs */}
           <div style={{ display: 'flex' }}>
@@ -1584,6 +1586,7 @@ export function RecruiterPage() {
                           </div>
                           {job.status === 'DRAFT' && <ApprovalPanel kind="job" id={job.id} />}
                           <RequisitionPanel jobId={job.id} canEdit />
+                          <ScreeningEditor jobId={job.id} canEdit />
                         </div>
                         <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                           {job.status === 'DRAFT' && (

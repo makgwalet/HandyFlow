@@ -119,6 +119,28 @@ public class RecruiterController {
         return ResponseEntity.ok(ApiResponse.success("Saved", recruiterService.setRequisition(TenantContext.getTenantIdAsObject(), id, req)));
     }
 
+    @GetMapping("/jobs/{id}/screening")
+    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    @Operation(summary = "The screening questions a job asks, with their criteria")
+    public ResponseEntity<ApiResponse<List<RecruiterScreeningDtos.StaffQuestion>>> getScreening(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(recruiterService.getScreening(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PutMapping("/jobs/{id}/screening")
+    @PreAuthorize("hasAuthority('RECRUITER_MANAGE')")
+    @Operation(summary = "Replace the screening questions of a job. Answers already given keep the question as it was asked")
+    public ResponseEntity<ApiResponse<List<RecruiterScreeningDtos.StaffQuestion>>> saveScreening(
+            @PathVariable UUID id, @RequestBody RecruiterScreeningDtos.SaveQuestionsRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Saved", recruiterService.saveScreening(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @GetMapping("/applications/{id}/screening")
+    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    @Operation(summary = "The screening answers of an application and which did not meet the job's criteria (advisory)")
+    public ResponseEntity<ApiResponse<RecruiterScreeningDtos.ScreeningView>> getApplicationScreening(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(recruiterService.getApplicationScreening(TenantContext.getTenantIdAsObject(), id)));
+    }
+
     @DeleteMapping("/jobs/{id}")
     @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
     @Operation(summary = "Delete a job")
@@ -369,6 +391,13 @@ public class RecruiterController {
             @PathVariable String tenantSlug, @PathVariable String slug) {
         return ResponseEntity.ok(ApiResponse.success(
                 recruiterService.getPublicJobBySlugAndTenant(tenantSlug, slug)));
+    }
+
+    @GetMapping("/careers/{tenantSlug}/jobs/{jobId}/screening")
+    @Operation(summary = "PUBLIC — The screening questions an applicant answers (without the criteria)")
+    public ResponseEntity<ApiResponse<List<RecruiterScreeningDtos.PublicQuestion>>> publicScreening(
+            @PathVariable String tenantSlug, @PathVariable UUID jobId) {
+        return ResponseEntity.ok(ApiResponse.success(recruiterService.getPublicScreening(tenantSlug, jobId)));
     }
 
     @PostMapping("/careers/{tenantSlug}/jobs/{jobId}/apply")

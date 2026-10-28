@@ -330,6 +330,8 @@ public class RecruiterService {
         String consentProblem = RecruiterConsentRules.problem(req.consent());
         if (consentProblem != null) throw new HandyFlowException(consentProblem, HttpStatus.BAD_REQUEST, "CONSENT_REQUIRED");
 
+        List<ScreeningAnswerRow> screening = checkScreeningAnswers(jobId, req.screeningAnswers());
+
         // The same person is found by email (any capitalisation). A repeat application is refused before the CV is stored, so a refused
         // application leaves no file behind.
         String email = RecruiterPublicRules.normaliseEmail(req.email());
@@ -358,6 +360,8 @@ public class RecruiterService {
         // Update job application count
         job.incrementApplicationCount();
         jobRepo.save(job);
+        applicationRepo.flush();
+        saveScreeningAnswers(tenantId, application.getId(), screening);
 
         // Add stage history
         historyRepo.save(RecStageHistory.create(application.getId(),
@@ -979,6 +983,102 @@ public class RecruiterService {
                 "Interview: " + candidate + (job.isBlank() ? "" : " (" + job + ")"),
                 iv.getInterviewType() + " interview" + (iv.getInterviewerName() == null ? "" : " with " + iv.getInterviewerName()),
                 iv.getLocation(), iv.getInterviewerName(), java.time.Instant.now());
+    }
+
+    // ── Screening questions ─────────────────────────────────────────────────────
+
+    private record ScreeningAnswerRow(UUID questionId, int position, String text, String type, boolean knockout, String answer, Boolean meets) {}
+
+    @Transactional(readOnly = true)
+    public List<RecruiterScreeningDtos.StaffQuestion> getScreening(TenantId tenantId, UUID jobId) {
+        findJob(tenantId, jobId);
+        return jdbc.query("SELECT id, position, question_text, question_type, required, expected_answer, minimum_number "
+                        + "FROM rec_screening_questions WHERE job_id = ? ORDER BY position",
+                (rs, i) -> new RecruiterScreeningDtos.StaffQuestion(rs.getObject("id", UUID.class), rs.getInt("position"), rs.getString("question_text"),
+                        rs.getString("question_type"), rs.getBoolean("required"), rs.getString("expected_answer"), rs.getBigDecimal("minimum_number")), jobId);
+    }
+
+    @Transactional
+    public List<RecruiterScreeningDtos.StaffQuestion> saveScreening(TenantId tenantId, UUID jobId, RecruiterScreeningDtos.SaveQuestionsRequest req) {
+        findJob(tenantId, jobId);
+        List<RecruiterScreeningDtos.QuestionInput> qs = req == null || req.questions() == null ? List.of() : req.questions();
+        String listProblem = RecruiterScreeningRules.listProblem(qs.size());
+        if (listProblem != null) throw new HandyFlowException(listProblem, HttpStatus.BAD_REQUEST, "INVALID_SCREENING");
+        for (RecruiterScreeningDtos.QuestionInput q : qs) {
+            String p = RecruiterScreeningRules.questionProblem(q.text(), q.type(), q.required(), q.expectedAnswer(), q.minimumNumber());
+            if (p != null) throw new HandyFlowException(p, HttpStatus.BAD_REQUEST, "INVALID_SCREENING");
+        }
+        jdbc.update("DELETE FROM rec_screening_questions WHERE job_id = ? AND tenant_id = ?", jobId, tenantId.getValue());
+        int pos = 1;
+        for (RecruiterScreeningDtos.QuestionInput q : qs) {
+            String expected = q.expectedAnswer() == null || q.expectedAnswer().isBlank() ? null : q.expectedAnswer().trim().toUpperCase();
+            jdbc.update("INSERT INTO rec_screening_questions (id, tenant_id, job_id, position, question_text, question_type, required, expected_answer, minimum_number) "
+                            + "VALUES (?,?,?,?,?,?,?,?,?)", UUID.randomUUID(), tenantId.getValue(), jobId, pos++, q.text().trim(), q.type(), q.required(), expected, q.minimumNumber());
+        }
+        return getScreening(tenantId, jobId);
+    }
+
+    /** What the applicant is asked, without the criteria. */
+    @Transactional(readOnly = true)
+    public List<RecruiterScreeningDtos.PublicQuestion> getPublicScreening(String tenantSlug, UUID jobId) {
+        TenantId tenantId = resolveTenantBySlug(tenantSlug);
+        findJob(tenantId, jobId);
+        return getScreening(tenantId, jobId).stream()
+                .map(q -> new RecruiterScreeningDtos.PublicQuestion(q.id(), q.text(), q.type(), q.required())).toList();
+    }
+
+    private List<ScreeningAnswerRow> checkScreeningAnswers(UUID jobId, List<RecruiterScreeningDtos.AnswerInput> given) {
+        List<Object[]> qs = jdbc.query("SELECT id, position, question_text, question_type, required, expected_answer, minimum_number "
+                        + "FROM rec_screening_questions WHERE job_id = ? ORDER BY position",
+                (rs, i) -> new Object[]{rs.getObject("id", UUID.class), rs.getInt("position"), rs.getString("question_text"), rs.getString("question_type"),
+                        rs.getBoolean("required"), rs.getString("expected_answer"), rs.getBigDecimal("minimum_number")}, jobId);
+        java.util.Map<UUID, String> byId = new java.util.HashMap<>();
+        if (given != null) for (RecruiterScreeningDtos.AnswerInput a : given) {
+            if (a == null || a.questionId() == null) continue;
+            byId.put(a.questionId(), RecruiterScreeningRules.clean(a.answer()));
+        }
+        java.util.Set<UUID> known = new java.util.HashSet<>();
+        for (Object[] q : qs) known.add((UUID) q[0]);
+        if (!known.containsAll(byId.keySet()))
+            throw new HandyFlowException("Those questions are no longer part of this application. Reload the page and try again.", HttpStatus.BAD_REQUEST, "INVALID_SCREENING");
+        List<ScreeningAnswerRow> rows = new java.util.ArrayList<>();
+        for (Object[] q : qs) {
+            UUID id = (UUID) q[0]; String text = (String) q[2], type = (String) q[3]; boolean required = (Boolean) q[4];
+            String expected = (String) q[5]; java.math.BigDecimal min = (java.math.BigDecimal) q[6];
+            String answer = byId.get(id);
+            String p = RecruiterScreeningRules.answerProblem(text, type, required, answer);
+            if (p != null) throw new HandyFlowException(p, HttpStatus.BAD_REQUEST, "INVALID_SCREENING");
+            rows.add(new ScreeningAnswerRow(id, (Integer) q[1], text, type, RecruiterScreeningRules.isKnockout(expected, min), answer,
+                    RecruiterScreeningRules.meets(type, expected, min, answer)));
+        }
+        return rows;
+    }
+
+    private void saveScreeningAnswers(TenantId tenantId, UUID applicationId, List<ScreeningAnswerRow> rows) {
+        int failed = 0;
+        for (ScreeningAnswerRow r : rows) {
+            if (Boolean.FALSE.equals(r.meets())) failed++;
+            jdbc.update("INSERT INTO rec_screening_answers (id, tenant_id, application_id, question_id, position, question_text, question_type, knockout, answer, meets_criteria) "
+                            + "VALUES (?,?,?,?,?,?,?,?,?,?)", UUID.randomUUID(), tenantId.getValue(), applicationId, r.questionId(), r.position(), r.text(), r.type(),
+                    r.knockout(), r.answer(), r.meets());
+        }
+        if (failed > 0) {
+            jdbc.update("UPDATE rec_applications SET knockouts_failed = ? WHERE id = ?", failed, applicationId);
+            historyRepo.save(RecStageHistory.create(applicationId, null, "APPLIED", "Screening",
+                    failed + (failed == 1 ? " answer does" : " answers do") + " not meet the job's criteria. Please review."));
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public RecruiterScreeningDtos.ScreeningView getApplicationScreening(TenantId tenantId, UUID applicationId) {
+        RecApplication app = applicationRepo.findByIdAndTenantId(applicationId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Application", applicationId.toString()));
+        List<RecruiterScreeningDtos.AnswerView> answers = jdbc.query(
+                "SELECT question_text, question_type, knockout, answer, meets_criteria FROM rec_screening_answers WHERE application_id = ? ORDER BY position",
+                (rs, i) -> new RecruiterScreeningDtos.AnswerView(rs.getString("question_text"), rs.getString("question_type"), rs.getBoolean("knockout"),
+                        rs.getString("answer"), (Boolean) rs.getObject("meets_criteria")), applicationId);
+        int failed = (int) answers.stream().filter(a -> Boolean.FALSE.equals(a.meetsCriteria())).count();
+        return new RecruiterScreeningDtos.ScreeningView(app.getId(), failed, answers);
     }
 
     @Transactional(readOnly = true)
