@@ -332,6 +332,10 @@ public class RecruiterService {
         if (consentProblem != null) throw new HandyFlowException(consentProblem, HttpStatus.BAD_REQUEST, "CONSENT_REQUIRED");
 
         List<ScreeningAnswerRow> screening = checkScreeningAnswers(jobId, req.screeningAnswers());
+        if (req.diversity() != null) {
+            String diversityProblem = RecruiterDiversityRules.problem(req.diversity().gender(), req.diversity().race(), req.diversity().disability());
+            if (diversityProblem != null) throw new HandyFlowException(diversityProblem, HttpStatus.BAD_REQUEST, "INVALID_DECLARATION");
+        }
 
         // The same person is found by email (any capitalisation). A repeat application is refused before the CV is stored, so a refused
         // application leaves no file behind.
@@ -363,6 +367,10 @@ public class RecruiterService {
         jobRepo.save(job);
         applicationRepo.flush();
         saveScreeningAnswers(tenantId, application.getId(), screening);
+        if (req.diversity() != null && !RecruiterDiversityRules.isEmpty(req.diversity().gender(), req.diversity().race(), req.diversity().disability())) {
+            jdbc.update("INSERT INTO rec_diversity (application_id, tenant_id, gender, race, disability) VALUES (?, ?, ?, ?, ?)", application.getId(), tenantId.getValue(),
+                    RecruiterDiversityRules.normalise(req.diversity().gender()), RecruiterDiversityRules.normalise(req.diversity().race()), RecruiterDiversityRules.normalise(req.diversity().disability()));
+        }
 
         // Add stage history
         historyRepo.save(RecStageHistory.create(application.getId(),

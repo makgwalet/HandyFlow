@@ -81,6 +81,9 @@ export function JobApplyPage() {
   const [cvError, setCvError] = useState('')
   const [formError, setFormError] = useState('')
   const [consent, setConsent] = useState(false)
+  const [gender, setGender] = useState('')
+  const [race, setRace] = useState('')
+  const [disability, setDisability] = useState('')
   const [answers, setAnswers] = useState<Record<string, string>>({})
 
   const { data: job, isLoading, isError, error } = useQuery<JobDetail>({
@@ -135,6 +138,7 @@ export function JobApplyPage() {
           source: 'CAREERS_PAGE',
           consent,
           screeningAnswers: (questions ?? []).map(q => ({ questionId: q.id, answer: answers[q.id] ?? '' })),
+          diversity: gender || race || disability ? { gender: gender || null, race: race || null, disability: disability || null } : null,
         })
       return r.data?.data ?? r.data
     },
@@ -353,6 +357,35 @@ export function JobApplyPage() {
                   ))}
                 </div>
               )}
+
+              <details style={{ marginBottom: 18, fontSize: 13, color: muted }}>
+                <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Equal opportunity questions (optional)</summary>
+                <p style={{ margin: '8px 0', lineHeight: 1.5 }}>
+                  Answering is your choice and you can skip every question. Your answers are kept apart from your application, are never shown to the people
+                  hiring and are never used to decide about you. They are only counted, in groups of five or more, to check that hiring is fair.
+                </p>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  <label style={labelStyle}>Gender
+                    <select value={gender} onChange={e => setGender(e.target.value)} style={inputStyle}>
+                      <option value="">Skip</option><option value="FEMALE">Female</option><option value="MALE">Male</option>
+                      <option value="OTHER">Another gender</option><option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
+                    </select>
+                  </label>
+                  <label style={labelStyle}>Race
+                    <select value={race} onChange={e => setRace(e.target.value)} style={inputStyle}>
+                      <option value="">Skip</option><option value="AFRICAN">African</option><option value="COLOURED">Coloured</option>
+                      <option value="INDIAN">Indian</option><option value="WHITE">White</option><option value="OTHER">Another group</option>
+                      <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
+                    </select>
+                  </label>
+                  <label style={labelStyle}>Do you have a disability?
+                    <select value={disability} onChange={e => setDisability(e.target.value)} style={inputStyle}>
+                      <option value="">Skip</option><option value="YES">Yes</option><option value="NO">No</option>
+                      <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
+                    </select>
+                  </label>
+                </div>
+              </details>
 
               <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, color: muted, lineHeight: 1.5, marginBottom: 18 }}>
                 <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} style={{ marginTop: 3 }} />

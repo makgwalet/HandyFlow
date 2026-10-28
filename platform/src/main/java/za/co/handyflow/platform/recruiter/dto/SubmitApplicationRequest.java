@@ -14,5 +14,6 @@ public record SubmitApplicationRequest(
         String source,         // CAREERS_PAGE, LINKEDIN, REFERRAL etc.
         String referrerName,   // free text, only meaningful when source=REFERRAL — candidate has no way to know internal user IDs
         Boolean consent,       // the applicant agreed to RecruiterConsentRules.STATEMENT; required
-        java.util.List<RecruiterScreeningDtos.AnswerInput> screeningAnswers // answers to the job's screening questions; null when it has none
+        java.util.List<RecruiterScreeningDtos.AnswerInput> screeningAnswers, // answers to the job's screening questions; null when it has none
+        RecruiterDiversityDtos.Declaration diversity // the optional equal-opportunity declaration; null or blank when not given
 ) {}

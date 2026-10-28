@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.recruiter.domain.model.RecruiterDiversityRules;
 import za.co.handyflow.platform.recruiter.domain.model.RecruiterReportRules;
 import za.co.handyflow.platform.recruiter.dto.RecruiterReportDtos.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
@@ -35,7 +36,8 @@ public class RecruiterReportService {
             new ReportInfo("interviews", "Interview outcomes", "Interviews scheduled in the range by outcome. Pass rate is passed over passed plus failed.", true),
             new ReportInfo("drop-off", "Rejections and withdrawals", "Applications rejected in the range grouped by the reason recorded, and applications the candidate withdrew in the range.", true),
             new ReportInfo("recruiter-performance", "Recruiter activity", "For each person, the stage changes they made in the range: how many in total, and how many moved a candidate into Screening, Interview, Offer, Hired or Rejected. Average days to hire is from application to the moment that person marked the candidate hired.", true),
-            new ReportInfo("cost-per-hire", "Cost per hire", "Costs recorded against jobs, dated in the range, and people hired in the range, per job. Cost per hire is the job's costs divided by its hires, and is left empty when nobody was hired. The total line adds up every job.", true));
+            new ReportInfo("cost-per-hire", "Cost per hire", "Costs recorded against jobs, dated in the range, and people hired in the range, per job. Cost per hire is the job's costs divided by its hires, and is left empty when nobody was hired. The total line adds up every job.", true,
+            new ReportInfo("diversity", "Diversity of applicants", "Applications received in the range, by the voluntary equal-opportunity answers applicants chose to give: how many were interviewed, reached an offer and were hired. The answers are never shown on an application and never used to rank anyone. A group of fewer than 5 is shown as \"<5\", so no one can be picked out.", true));
 
     public List<ReportInfo> catalogue() { return CATALOGUE; }
 
@@ -199,6 +201,24 @@ public class RecruiterReportService {
                 if (!rows.isEmpty()) {
                     java.math.BigDecimal per = za.co.handyflow.platform.recruiter.domain.model.RecruiterCostRules.costPerHire(all, allHires);
                     rows.add(List.of("All jobs", allHires, all, per == null ? "" : (Object) per));
+                }
+            }
+            case "diversity" -> {
+                cols = List.of("Group", "Applications", "Interviewed", "Reached offer", "Hired");
+                String[][] dimensions = {{"Gender", "gender"}, {"Race", "race"}, {"Disability", "disability"}};
+                for (String[] dim : dimensions) {
+                    java.util.Map<String, String> words = "gender".equals(dim[1]) ? RecruiterDiversityRules.GENDERS : "race".equals(dim[1]) ? RecruiterDiversityRules.RACES : RecruiterDiversityRules.DISABILITY;
+                    // dim[1] comes from the fixed list above, never from the request.
+                    jdbc.query("SELECT d." + dim[1] + " AS grp, COUNT(*) AS apps, "
+                            + "COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM rec_interviews i WHERE i.application_id = x.id)) AS interviewed, "
+                            + "COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM rec_stage_history h WHERE h.application_id = x.id AND h.to_stage = 'OFFER')) AS offered, "
+                            + "COUNT(*) FILTER (WHERE x.stage = 'HIRED') AS hired "
+                            + "FROM rec_applications x LEFT JOIN rec_diversity d ON d.application_id = x.id "
+                            + "WHERE x.tenant_id = ? AND x.applied_at >= ? AND x.applied_at < ? GROUP BY 1 ORDER BY 1", rs -> {
+                        String g = rs.getString("grp");
+                        Object[] c = RecruiterDiversityRules.row(rs.getLong("apps"), rs.getLong("interviewed"), rs.getLong("offered"), rs.getLong("hired"));
+                        rows.add(List.of(dim[0] + ": " + (g == null ? "Did not answer" : words.getOrDefault(g, g)), c[0], c[1], c[2], c[3]));
+                    }, t, a, b);
                 }
             }
             default -> throw new HandyFlowException("There is no such report.", HttpStatus.NOT_FOUND, "NO_SUCH_REPORT");
