@@ -14,6 +14,7 @@ import za.co.handyflow.platform.recruiter.application.internal.RecruiterApproval
 import za.co.handyflow.platform.recruiter.application.internal.RecruiterRetentionService;
 import za.co.handyflow.platform.recruiter.application.internal.RecruiterService;
 import za.co.handyflow.platform.recruiter.application.internal.RecruiterVerificationService;
+import za.co.handyflow.platform.recruiter.application.internal.RecruiterOutboxService;
 import za.co.handyflow.platform.recruiter.dto.RecruiterApprovalDtos.*;
 import za.co.handyflow.platform.recruiter.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -46,6 +47,7 @@ public class RecruiterController {
     private final RecruiterApprovalService approvalService;
     private final RecruiterRetentionService retentionService;
     private final RecruiterVerificationService verificationService;
+    private final RecruiterOutboxService outboxService;
 
     // ── Summary ───────────────────────────────────────────────────────────────
 
@@ -547,5 +549,21 @@ public class RecruiterController {
     @Operation(summary = "Remove a check that has not been decided")
     public ResponseEntity<ApiResponse<RecruiterVerificationDtos.VerificationView>> removeCheck(@PathVariable UUID id, @PathVariable UUID checkId) {
         return ResponseEntity.ok(ApiResponse.success("Removed", verificationService.remove(TenantContext.getTenantIdAsObject(), id, checkId)));
+    }
+
+    // ── Candidate email delivery ────────────────────────────────────────────────
+
+    @GetMapping("/outbox")
+    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @Operation(summary = "Candidate emails: how many are waiting, sent and given up on, with the ones that failed")
+    public ResponseEntity<ApiResponse<RecruiterOutboxDtos.OutboxView>> outbox() {
+        return ResponseEntity.ok(ApiResponse.success(outboxService.view(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/outbox/{id}/retry")
+    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @Operation(summary = "Try an email that could not be sent again")
+    public ResponseEntity<ApiResponse<RecruiterOutboxDtos.OutboxView>> retryEmail(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Queued", outboxService.retry(TenantContext.getTenantIdAsObject(), id)));
     }
 }

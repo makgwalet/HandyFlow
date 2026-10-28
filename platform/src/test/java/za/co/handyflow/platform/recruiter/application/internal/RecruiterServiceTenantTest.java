@@ -31,7 +31,7 @@ class RecruiterServiceTenantTest {
     @BeforeEach
     void setUp() {
         service = new RecruiterService(jobs, mock(RecApplicantRepository.class), applications, interviews, mock(RecStageHistoryRepository.class),
-                null, null, null, null, null, null, mock(RecInterviewPanelistRepository.class), mock(RecJobInterviewRoundRepository.class), null, null);
+                null, null, null, null, null, null, mock(RecInterviewPanelistRepository.class), mock(RecJobInterviewRoundRepository.class), null, null, null);
     }
 
     @Test

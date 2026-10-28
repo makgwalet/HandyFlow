@@ -90,4 +90,20 @@ public class EmailService {
             log.error("Failed to send email with attachment to={}: {}", to, e.getMessage(), e);
         }
     }
+
+    /**
+     * Sends now, on the calling thread, and throws if it fails. For senders that keep their own record of delivery and retry (the recruiter
+     * outbox); everyone else keeps using {@link #send} and {@link #sendWithAttachment}, which log a failure and carry on.
+     */
+    public void sendNow(String to, String subject, String htmlBody, String attachmentName, byte[] pdfBytes) throws Exception {
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+        helper.setFrom(fromAddress, fromName);
+        helper.setTo(to);
+        helper.setSubject(subject);
+        helper.setText(htmlBody, true);
+        if (attachmentName != null && pdfBytes != null) helper.addAttachment(attachmentName, new ByteArrayResource(pdfBytes), "application/pdf");
+        mailSender.send(message);
+        log.info("Email sent to={} subject={}", to, subject);
+    }
 }

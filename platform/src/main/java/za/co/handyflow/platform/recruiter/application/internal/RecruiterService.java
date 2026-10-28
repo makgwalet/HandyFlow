@@ -60,6 +60,7 @@ public class RecruiterService {
     private final RecJobInterviewRoundRepository    roundRepo;
     private final CvStorage                          cvStorage;
     private final RecruiterApprovalService           approvalService;
+    private final RecruiterOutboxService             outbox;
 
     private static final Map<String, String> STAGE_LABELS = Map.of(
             "APPLIED",    "Application Received",
@@ -879,17 +880,13 @@ public class RecruiterService {
         String jobTitle = jobRepo.findById(app.getJobId()).map(RecJob::getTitle).orElse("the position");
         byte[] pdf = recruiterPdfGenerator.generateOfferLetter(tenantId, applicationId);
 
-        emailService.sendWithAttachment(applicant.getEmail(),
-                "Your offer — " + jobTitle,
-                "<h2>Hi " + applicant.getFirstName() + ",</h2>"
-                        + "<p>Please find your offer letter for <strong>" + jobTitle + "</strong> attached.</p>"
-                        + "<p>Congratulations — we look forward to hearing from you. This offer is open until "
-                        + expiry + ".</p>",
-                "Offer Letter - " + applicant.getFullName() + ".pdf", pdf);
+        RecruiterEmailTemplates.Mail offerMail = RecruiterEmailTemplates.offer(applicant.getFirstName(), jobTitle, expiry.toString());
+        outbox.enqueue(tenantId, applicationId, "OFFER", applicant.getEmail(), offerMail.subject(), offerMail.body(),
+                "Offer Letter - " + applicant.getFullName().replaceAll("[\\r\\n\\\\/:*?\"<>|]", " ") + ".pdf", pdf);
 
         app.markOfferLetterSent(expiry);
         applicationRepo.save(app);
-        log.info("Offer letter sent for application={}", applicationId);
+        log.info("Offer letter queued for application={}", applicationId);
     }
 
 
@@ -1222,43 +1219,13 @@ public class RecruiterService {
 
     private void notifyApplicantInterviewScheduled(RecApplication app, RecInterview interview) {
         applicantRepo.findById(app.getApplicantId()).ifPresent(applicant -> {
-            if (applicant.getEmail() == null) return;
-            try {
-                String jobTitle = jobRepo.findById(app.getJobId())
-                        .map(RecJob::getTitle).orElse("the position");
-                String portalUrl = "https://app.handyflow.co.za/careers/track/" + applicant.getPortalToken();
-                String when = interview.getScheduledAt() != null
-                        ? DATETIME_FMT.format(interview.getScheduledAt()) : "to be confirmed";
-                boolean isVideo = "VIDEO".equals(interview.getInterviewType());
-                String locationLine = interview.getLocation() != null && !interview.getLocation().isBlank()
-                        ? "<br>" + (isVideo ? "Meeting link" : "Venue") + ": <strong>"
-                        + interview.getLocation() + "</strong>"
-                        : "";
-                // Panelist names, alongside the primary interviewer — not
-                // instead of. "Interviewer: A" stays as the lead; panel
-                // members (if any) get their own line so the applicant
-                // knows who else will be in the room.
-                List<String> panelistNames = panelistRepo.findByInterviewId(interview.getId()).stream()
-                        .map(RecInterviewPanelist::getUserName)
-                        .filter(n -> n != null && !n.isBlank())
-                        .toList();
-                String panelLine = panelistNames.isEmpty() ? ""
-                        : "<br>Also interviewing: <strong>" + String.join(", ", panelistNames) + "</strong>";
-                emailService.send(applicant.getEmail(),
-                        "Interview scheduled — " + jobTitle,
-                        "<h2>Hi " + applicant.getFirstName() + ",</h2>"
-                                + "<p>An interview has been scheduled for your application to <strong>" + jobTitle + "</strong>.</p>"
-                                + "<p>Type: <strong>" + interview.getInterviewType() + "</strong><br>"
-                                + "When: <strong>" + when + "</strong>"
-                                + (interview.getInterviewerName() != null
-                                ? "<br>Interviewer: <strong>" + interview.getInterviewerName() + "</strong>" : "")
-                                + panelLine
-                                + locationLine
-                                + "</p>"
-                                + "<p><a href=\"" + portalUrl + "\">View your application</a></p>");
-            } catch (Exception e) {
-                log.warn("Failed to send interview-scheduled email: {}", e.getMessage());
-            }
+            String jobTitle = jobRepo.findById(app.getJobId()).map(RecJob::getTitle).orElse("the position");
+            List<String> panelistNames = panelistRepo.findByInterviewId(interview.getId()).stream()
+                    .map(RecInterviewPanelist::getUserName).filter(n -> n != null && !n.isBlank()).toList();
+            RecruiterEmailTemplates.Mail mail = RecruiterEmailTemplates.interviewScheduled(applicant.getFirstName(), jobTitle, interview.getInterviewType(),
+                    interview.getScheduledAt() != null ? DATETIME_FMT.format(interview.getScheduledAt()) : "to be confirmed", interview.getInterviewerName(),
+                    panelistNames, interview.getLocation(), "VIDEO".equals(interview.getInterviewType()), portalUrl(applicant));
+            outbox.enqueue(app.getTenantId(), app.getId(), "INTERVIEW_SCHEDULED", applicant.getEmail(), mail.subject(), mail.body());
         });
     }
 
@@ -1295,90 +1262,36 @@ public class RecruiterService {
 
     private void notifyApplicantInterviewRescheduled(RecApplication app, RecInterview interview, String reason) {
         applicantRepo.findById(app.getApplicantId()).ifPresent(applicant -> {
-            if (applicant.getEmail() == null) return;
-            try {
-                String jobTitle = jobRepo.findById(app.getJobId())
-                        .map(RecJob::getTitle).orElse("the position");
-                String portalUrl = "https://app.handyflow.co.za/careers/track/" + applicant.getPortalToken();
-                String when = interview.getScheduledAt() != null
-                        ? DATETIME_FMT.format(interview.getScheduledAt()) : "to be confirmed";
-                boolean isVideo = "VIDEO".equals(interview.getInterviewType());
-                String locationLine = interview.getLocation() != null && !interview.getLocation().isBlank()
-                        ? "<br>" + (isVideo ? "Meeting link" : "Venue") + ": <strong>"
-                        + interview.getLocation() + "</strong>"
-                        : "";
-                emailService.send(applicant.getEmail(),
-                        "Interview rescheduled — " + jobTitle,
-                        "<h2>Hi " + applicant.getFirstName() + ",</h2>"
-                                + "<p>Your interview for <strong>" + jobTitle + "</strong> has been rescheduled.</p>"
-                                + "<p>Reason: " + reason + "</p>"
-                                + "<p>New time: <strong>" + when + "</strong>"
-                                + (interview.getInterviewerName() != null
-                                ? "<br>Interviewer: <strong>" + interview.getInterviewerName() + "</strong>" : "")
-                                + locationLine
-                                + "</p>"
-                                + "<p><a href=\"" + portalUrl + "\">View your application</a></p>");
-            } catch (Exception e) {
-                log.warn("Failed to send interview-rescheduled email: {}", e.getMessage());
-            }
+            String jobTitle = jobRepo.findById(app.getJobId()).map(RecJob::getTitle).orElse("the position");
+            RecruiterEmailTemplates.Mail mail = RecruiterEmailTemplates.interviewRescheduled(applicant.getFirstName(), jobTitle, reason,
+                    interview.getScheduledAt() != null ? DATETIME_FMT.format(interview.getScheduledAt()) : "to be confirmed", interview.getInterviewerName(),
+                    interview.getLocation(), "VIDEO".equals(interview.getInterviewType()), portalUrl(applicant));
+            outbox.enqueue(app.getTenantId(), app.getId(), "INTERVIEW_RESCHEDULED", applicant.getEmail(), mail.subject(), mail.body());
         });
     }
 
     private void sendApplicationConfirmation(RecApplicant a, RecJob job, RecApplication app) {
-        if (a.getEmail() == null) return;
-        try {
-            String portalUrl = "https://app.handyflow.co.za/careers/track/" + a.getPortalToken();
-            emailService.send(a.getEmail(),
-                    "Application received — " + job.getTitle(),
-                    "<h2>Hi " + a.getFirstName() + ",</h2>"
-                            + "<p>We've received your application for <strong>" + job.getTitle() + "</strong>.</p>"
-                            + "<p>You can track your application status at any time using the link below:</p>"
-                            + "<p><a href=\"" + portalUrl + "\" style=\"background:#1B3A6B;color:white;"
-                            + "padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block\">"
-                            + "Track My Application</a></p>"
-                            + "<p style=\"color:#64748B;font-size:12px\">Bookmark this link — it's unique to you and doesn't require a password.</p>");
-        } catch (Exception e) {
-            log.warn("Failed to send application confirmation: {}", e.getMessage());
-        }
+        RecruiterEmailTemplates.Mail mail = RecruiterEmailTemplates.confirmation(a.getFirstName(), job.getTitle(), portalUrl(a));
+        outbox.enqueue(app.getTenantId(), app.getId(), "CONFIRMATION", a.getEmail(), mail.subject(), mail.body());
     }
+
+    private static String portalUrl(RecApplicant a) { return "https://app.handyflow.co.za/careers/track/" + a.getPortalToken(); }
 
     private void notifyApplicantStageChange(RecApplication app, String stage, TenantId tenantId) {
         applicantRepo.findById(app.getApplicantId()).ifPresent(applicant -> {
-            if (applicant.getEmail() == null) return;
-            try {
-                String label   = STAGE_LABELS.getOrDefault(stage, stage);
-                String portalUrl = "https://app.handyflow.co.za/careers/track/" + applicant.getPortalToken();
-                String jobTitle = jobRepo.findById(app.getJobId())
-                        .map(RecJob::getTitle).orElse("the position");
-                emailService.send(applicant.getEmail(),
-                        "Application update — " + jobTitle,
-                        "<h2>Hi " + applicant.getFirstName() + ",</h2>"
-                                + "<p>Your application for <strong>" + jobTitle + "</strong> has been updated.</p>"
-                                + "<p>Status: <strong>" + label + "</strong></p>"
-                                + "<p><a href=\"" + portalUrl + "\">View your application</a></p>");
-            } catch (Exception e) {
-                log.warn("Failed to notify applicant of stage change: {}", e.getMessage());
-            }
+            String jobTitle = jobRepo.findById(app.getJobId()).map(RecJob::getTitle).orElse("the position");
+            RecruiterEmailTemplates.Mail mail = RecruiterEmailTemplates.stageChange(applicant.getFirstName(), jobTitle,
+                    STAGE_LABELS.getOrDefault(stage, stage), portalUrl(applicant));
+            outbox.enqueue(tenantId, app.getId(), "STAGE_CHANGE", applicant.getEmail(), mail.subject(), mail.body());
         });
     }
 
+    /** The reason recorded against a rejection is for staff and is not sent to the candidate. */
     private void notifyApplicantRejected(RecApplication app, String reason, TenantId tenantId) {
         applicantRepo.findById(app.getApplicantId()).ifPresent(applicant -> {
-            if (applicant.getEmail() == null) return;
-            try {
-                String jobTitle = jobRepo.findById(app.getJobId())
-                        .map(RecJob::getTitle).orElse("the position");
-                emailService.send(applicant.getEmail(),
-                        "Application outcome — " + jobTitle,
-                        "<h2>Hi " + applicant.getFirstName() + ",</h2>"
-                                + "<p>Thank you for your interest in <strong>" + jobTitle + "</strong>.</p>"
-                                + "<p>After careful consideration, we will not be moving forward "
-                                + "with your application at this time.</p>"
-                                + (reason != null ? "<p>" + reason + "</p>" : "")
-                                + "<p>We appreciate the time you invested and wish you the best in your search.</p>");
-            } catch (Exception e) {
-                log.warn("Failed to send rejection email: {}", e.getMessage());
-            }
+            String jobTitle = jobRepo.findById(app.getJobId()).map(RecJob::getTitle).orElse("the position");
+            RecruiterEmailTemplates.Mail mail = RecruiterEmailTemplates.rejected(applicant.getFirstName(), jobTitle);
+            outbox.enqueue(tenantId, app.getId(), "REJECTION", applicant.getEmail(), mail.subject(), mail.body());
         });
     }
 

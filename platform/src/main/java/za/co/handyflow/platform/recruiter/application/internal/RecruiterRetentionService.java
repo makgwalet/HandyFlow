@@ -81,6 +81,7 @@ public class RecruiterRetentionService {
             jdbc.update("UPDATE rec_applications SET notes = NULL, rejection_reason = NULL, referrer_name = NULL WHERE applicant_id = ?", id);
             jdbc.update("UPDATE rec_interviews SET notes = NULL WHERE application_id IN (SELECT id FROM rec_applications WHERE applicant_id = ?)", id);
             jdbc.update("UPDATE rec_stage_history SET notes = NULL WHERE application_id IN (SELECT id FROM rec_applications WHERE applicant_id = ?)", id);
+            jdbc.update("DELETE FROM rec_outbox WHERE application_id IN (SELECT id FROM rec_applications WHERE applicant_id = ?)", id);
             jdbc.update("INSERT INTO rec_retention_log (id, tenant_id, applicant_id, removed_by, removed_at, applications, had_cv) VALUES (?, ?, ?, ?, NOW(), ?, ?)",
                     UUID.randomUUID(), tenantId.getValue(), id, by, apps.size(), hadCv);
             removed++;

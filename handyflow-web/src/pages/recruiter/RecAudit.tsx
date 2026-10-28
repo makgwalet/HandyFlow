@@ -1,12 +1,15 @@
 // The audit trail: who did what in Recruiter and when. Request bodies are never copied into it, so candidates' details and notes are not in it.
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 
 type Entry = { id: string; occurredAt: string; actorName: string | null; action: string; entityType: string; entityId: string | null; applicationId: string | null; detail: string | null }
 type Page = { entries: Entry[]; hasMore: boolean }
 type CvRow = { actorName: string; views: number; candidates: number; busiestHour: string; busiestHourViews: number; flagged: boolean }
+type Failed = { id: string; kind: string; toEmail: string; subject: string; attempts: number; lastError: string | null; createdAt: string }
+type Outbox = { pending: number; sent: number; failed: number; failures: Failed[] }
 const BASE = '/api/v1/recruiter/audit'
+const OUTBOX = '/api/v1/recruiter/outbox'
 const data = <T,>(r: { data?: { data?: T } & T }): T => (r.data?.data ?? r.data) as T
 const field = { padding: '6px 9px', background: 'var(--hf-surface)', color: 'var(--hf-text-secondary)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 12 } as const
 const words = (a: string) => { const s = a.toLowerCase().replace(/_/g, ' '); return s.charAt(0).toUpperCase() + s.slice(1) }
@@ -20,6 +23,12 @@ export default function RecAudit() {
   const [exportError, setExportError] = useState('')
   const actions = useQuery<string[]>({ queryKey: ['rec-audit-actions'], queryFn: async () => data(await apiClient.get(`${BASE}/actions`)) })
   const cv = useQuery<CvRow[]>({ queryKey: ['rec-cv-access'], queryFn: async () => data(await apiClient.get(`${BASE}/cv-access?days=30`)), retry: false })
+  const qc = useQueryClient()
+  const outbox = useQuery<Outbox>({ queryKey: ['rec-outbox'], queryFn: async () => data(await apiClient.get(OUTBOX)), retry: false })
+  const retry = useMutation({
+    mutationFn: async (id: string) => apiClient.post(`${OUTBOX}/${id}/retry`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rec-outbox'] }),
+  })
   const params = () => { const p = new URLSearchParams(); if (from) p.set('from', from); if (to) p.set('to', to); if (action) p.set('action', action); return p }
   const q = useQuery<Page>({
     queryKey: ['rec-audit', from, to, action, page],
@@ -39,6 +48,20 @@ export default function RecAudit() {
 
   return (
     <div style={{ fontSize: 12 }}>
+      {outbox.data && (outbox.data.failed > 0 || outbox.data.pending > 0) && (
+        <div style={{ border: '1px solid var(--hf-border)', borderRadius: 8, padding: 12, marginBottom: 14 }}>
+          <strong>Candidate emails</strong>
+          <div style={{ marginTop: 4, color: 'var(--hf-text-muted)' }}>{outbox.data.pending} waiting to send. {outbox.data.failed} could not be delivered.</div>
+          {retry.isError && <div role="alert" style={{ color: 'var(--hf-danger-text)' }}>That email could not be queued again.</div>}
+          {outbox.data.failures.map(f => (
+            <div key={f.id} style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ color: 'var(--hf-danger-text)' }}>{f.subject} to {f.toEmail}</span>
+              <span style={{ color: 'var(--hf-text-muted)' }}>{f.attempts} attempts{f.lastError ? `: ${f.lastError}` : ''}</span>
+              <button style={{ ...field, cursor: 'pointer' }} disabled={retry.isPending} onClick={() => retry.mutate(f.id)}>Try again</button>
+            </div>
+          ))}
+        </div>
+      )}
       {cv.data && cv.data.length > 0 && (
         <div style={{ border: '1px solid var(--hf-border)', borderRadius: 8, padding: 12, marginBottom: 14 }}>
           <strong>Who opened CVs in the last 30 days</strong>

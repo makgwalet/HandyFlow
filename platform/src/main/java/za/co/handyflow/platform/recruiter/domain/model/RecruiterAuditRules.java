@@ -45,6 +45,7 @@ public final class RecruiterAuditRules {
         ACTIONS.put("POST /applications/{id}/verification/{checkId}/decision", "CHECK_DECIDED");
         ACTIONS.put("DELETE /applications/{id}/verification/{checkId}", "CHECK_REMOVED");
         ACTIONS.put("PUT /settings", "SETTINGS_CHANGED");
+        ACTIONS.put("POST /outbox/{id}/retry", "EMAIL_RETRIED");
         ACTIONS.put("POST /retention/remove", "PERSONAL_DATA_REMOVED");
         ACTIONS.put("POST /pools", "POOL_CREATED");
         ACTIONS.put("DELETE /pools/{poolId}", "POOL_DELETED");
