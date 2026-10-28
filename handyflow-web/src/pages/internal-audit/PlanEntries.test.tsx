@@ -10,7 +10,7 @@ const e = (o: Partial<PlanEntry>): PlanEntry => ({ id: Math.random().toString(),
 describe("Plan entries", () => {
   it("summarises the plan and lists its entries", () => {
     render(<PlanEntries entries={[e({ status: "COMPLETED" }), e({ universeEntryName: "Stores", plannedQuarter: null }), e({ status: "DEFERRED" })]} />)
-    expect(screen.getByText("Procurement", { selector: "td" })).toBeTruthy()
+    expect(screen.getAllByText("Procurement", { selector: "td" })).toHaveLength(2)
     expect(screen.getByLabelText("Plan completed").getAttribute("aria-valuenow")).toBe("50")
     expect(screen.getByText("No quarter: 1")).toBeTruthy()
   })

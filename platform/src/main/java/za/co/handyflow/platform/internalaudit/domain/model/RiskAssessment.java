@@ -59,6 +59,16 @@ public class RiskAssessment {
                                         int inherentRiskScore, int controlRiskScore,
                                         int historicalFindingsScore, int timeSinceLastAuditScore,
                                         int businessRegulatoryImpactScore, UUID assessedBy) {
+        return create(tenantId, universeEntryId, inherentRiskScore, controlRiskScore, historicalFindingsScore,
+                timeSinceLastAuditScore, businessRegulatoryImpactScore, assessedBy, LOW_MAX, MEDIUM_MAX, HIGH_MAX);
+    }
+
+    /** As above, with the company's own band limits: the highest total that is still Low, Medium and High. */
+    public static RiskAssessment create(UUID tenantId, UUID universeEntryId,
+                                        int inherentRiskScore, int controlRiskScore,
+                                        int historicalFindingsScore, int timeSinceLastAuditScore,
+                                        int businessRegulatoryImpactScore, UUID assessedBy,
+                                        int lowMax, int mediumMax, int highMax) {
         RiskAssessment r = new RiskAssessment();
         r.tenantId = tenantId;
         r.universeEntryId = universeEntryId;
@@ -69,7 +79,7 @@ public class RiskAssessment {
         r.businessRegulatoryImpactScore = businessRegulatoryImpactScore;
         r.systemCalculatedRisk = calculateLevel(
                 inherentRiskScore, controlRiskScore, historicalFindingsScore,
-                timeSinceLastAuditScore, businessRegulatoryImpactScore);
+                timeSinceLastAuditScore, businessRegulatoryImpactScore, lowMax, mediumMax, highMax);
         r.finalAuditRisk = r.systemCalculatedRisk; // defaults to the calculated value until overridden
         r.assessedBy = assessedBy;
         r.assessedAt = Instant.now();
@@ -86,11 +96,11 @@ public class RiskAssessment {
     public static final int LOW_MAX = 10, MEDIUM_MAX = 15, HIGH_MAX = 20;
 
     private static String calculateLevel(int inherent, int control, int historical,
-                                         int timeSinceAudit, int businessImpact) {
+                                         int timeSinceAudit, int businessImpact, int lowMax, int mediumMax, int highMax) {
         int sum = inherent + control + historical + timeSinceAudit + businessImpact;
-        if (sum <= LOW_MAX) return "LOW";
-        if (sum <= MEDIUM_MAX) return "MEDIUM";
-        if (sum <= HIGH_MAX) return "HIGH";
+        if (sum <= lowMax) return "LOW";
+        if (sum <= mediumMax) return "MEDIUM";
+        if (sum <= highMax) return "HIGH";
         return "CRITICAL";
     }
 

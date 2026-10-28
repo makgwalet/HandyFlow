@@ -32,7 +32,7 @@ describe("Findings & Remediation", () => {
     expect(screen.getByText("Stale accounts")).toBeTruthy()
     expect(screen.queryByText("Late returns")).toBeNull()
     expect(screen.getByText("1 critical, 1 high")).toBeTruthy()
-    expect(screen.getByText("4 days late")).toBeTruthy()
+    expect(screen.getByText("8 days late")).toBeTruthy()
   })
   it("shows every finding when asked, and filters by text", async () => {
     m.board.mockResolvedValue(board)

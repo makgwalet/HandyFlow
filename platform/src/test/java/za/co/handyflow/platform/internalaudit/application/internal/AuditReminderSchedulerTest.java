@@ -32,13 +32,15 @@ class AuditReminderSchedulerTest {
     UserRecipientResolver resolver = mock(UserRecipientResolver.class);
     TenantAdminRecipients admins = mock(TenantAdminRecipients.class);
     NotificationService notifications = mock(NotificationService.class);
+    AuditSettingsService settings = mock(AuditSettingsService.class);
     AuditReminderScheduler scheduler;
     UUID tenant = UUID.randomUUID(), owner = UUID.randomUUID(), head = UUID.randomUUID(), findingId = UUID.randomUUID(), eng = UUID.randomUUID();
     LocalDate today = LocalDate.of(2026, 10, 15);
 
     @BeforeEach
     void setUp() {
-        scheduler = new AuditReminderScheduler(actions, findings, assignments, factItems, reports, resolver, admins, notifications);
+        scheduler = new AuditReminderScheduler(actions, findings, assignments, factItems, reports, resolver, admins, notifications, settings);
+        when(settings.valuesFor(any())).thenReturn(AuditSettings.DEFAULTS);
         when(resolver.resolveUser(any(), any())).thenAnswer(i -> Optional.of(Recipient.user(i.getArgument(1), "N", "n@x.test", null)));
         when(factItems.findOpenRaisedBefore(any())).thenReturn(List.of());
     }
@@ -52,6 +54,25 @@ class AuditReminderSchedulerTest {
         when(actions.findOverdueAcrossTenants(today)).thenReturn(List.of(late(1)));
         assertEquals(1, scheduler.sweep(today));
         verify(notifications).send(argThat((NotificationRequest r) -> r.type() == NotificationType.AUDIT_ACTION_OVERDUE));
+    }
+
+    @Test
+    void aCompanyThatRemindsEveryThreeDaysIsRemindedOnDayThree() {
+        when(settings.valuesFor(tenant)).thenReturn(new AuditSettings.Values(10, 15, 20, 14, 3, 3));
+        when(actions.findOverdueAcrossTenants(today)).thenReturn(List.of(late(3)));
+        assertEquals(1, scheduler.sweep(today));
+    }
+
+    @Test
+    void aCompanyThatEscalatesAfterTwoDaysEscalatesOnTheFirstReminderDayAfterThat() {
+        when(settings.valuesFor(tenant)).thenReturn(new AuditSettings.Values(10, 15, 20, 2, 1, 3));
+        var finding = mock(AuditFinding.class);
+        when(finding.getEngagementId()).thenReturn(eng);
+        when(findings.findByTenantAndId(tenant, findingId)).thenReturn(Optional.of(finding));
+        when(assignments.findByEngagement(tenant, eng)).thenReturn(List.of());
+        when(admins.resolveTenantAdmins(any())).thenReturn(List.of(Recipient.user(head, "H", "h@x.test", null)));
+        when(actions.findOverdueAcrossTenants(today)).thenReturn(List.of(late(2)));
+        assertEquals(2, scheduler.sweep(today));
     }
 
     @Test

@@ -71,6 +71,7 @@ public class InternalAuditService {
     private final AuditEngagementRepository engagementRepo;
     private final EngagementAssignmentRepository assignmentRepo;
     private final UserRepository userRepo;
+    private final AuditSettingsService settingsService;
     private final SpecificMaterialityRepository specificMaterialityRepo;
     private final AuditWorkpaperFolderRepository workpaperFolderRepo;
     private final AuditWorkpaperFileRepository workpaperFileRepo;
@@ -133,10 +134,11 @@ public class InternalAuditService {
         AuditUniverseEntry universeEntry = universeRepo.findByTenantAndId(tenantId.getValue(), universeEntryId)
                 .orElseThrow(() -> new ResourceNotFoundException("AuditUniverseEntry", universeEntryId.toString()));
 
+        AuditSettings.Values rules = settingsService.valuesFor(tenantId.getValue());
         RiskAssessment r = RiskAssessment.create(tenantId.getValue(), universeEntryId,
                 req.inherentRiskScore(), req.controlRiskScore(), req.historicalFindingsScore(),
                 universeEntry.timeSinceLastAuditScore(), // the one system-calculated input, per the agreed design
-                req.businessRegulatoryImpactScore(), assessedBy);
+                req.businessRegulatoryImpactScore(), assessedBy, rules.lowMax(), rules.mediumMax(), rules.highMax());
         riskRepo.save(r);
         return toRiskResponse(r);
     }

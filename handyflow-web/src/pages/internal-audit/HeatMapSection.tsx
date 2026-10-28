@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 import { auditHeatMapApi, type HeatCell } from "../../api/auditHeatMap.api"
 import { Panel, Stat } from "./auditUi"
 import { grid } from "./auditUi.styles"
+import { ControlView, ResidualView } from "./HeatMapViews"
 import { BAND_STYLE, cellBand, cellLabel, gridRows, highShare, rowCounts, scoreWord } from "./heatMap.logic"
 
 const MUTED = "var(--hf-text-muted)"
@@ -13,7 +14,7 @@ const td: React.CSSProperties = { padding: "8px 10px", fontSize: 13, color: "var
 
 export function HeatMapSection({ onGo }: { onGo?: (section: string) => void }) {
   const { data, isLoading, isError } = useQuery({ queryKey: ["ia-heat-map"], queryFn: auditHeatMapApi.get })
-  const [view, setView] = useState<"grid" | "areas">("grid")
+  const [view, setView] = useState<"grid" | "residual" | "control" | "areas">("grid")
   const [picked, setPicked] = useState<HeatCell | null>(null)
 
   if (isLoading) return <div style={{ color: MUTED, fontSize: 13 }}>Loading…</div>
@@ -30,14 +31,16 @@ export function HeatMapSection({ onGo }: { onGo?: (section: string) => void }) {
         <Stat label="Rated high or critical" value={`${highShare(data.byProcessArea)}%`} sub="of the areas assessed" />
       </div>
 
-      <div role="tablist" aria-label="Heat map view" style={{ display: "flex", gap: 6 }}>
-        {([["grid", "Inherent and control risk"], ["areas", "By process area"]] as const).map(([id, label]) => (
+      <div role="tablist" aria-label="Heat map view" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {([["grid", "Inherent and control risk"], ["residual", "Residual risk"], ["control", "Control effectiveness"], ["areas", "By process area"]] as const).map(([id, label]) => (
           <button key={id} role="tab" aria-selected={view === id} onClick={() => setView(id)}
             style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--hf-border)", background: view === id ? "var(--hf-info-soft)" : "var(--hf-surface)", color: view === id ? "var(--hf-primary-text)" : "var(--hf-text-secondary)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>{label}</button>
         ))}
       </div>
 
-      {data.assessed === 0 && view === "grid" ? (
+      {view === "residual" ? <ResidualView areas={data.areas ?? []} />
+      : view === "control" ? <ControlView areas={data.areas ?? []} />
+      : data.assessed === 0 && view === "grid" ? (
         <Panel title="Inherent and control risk"><span style={{ fontSize: 13, color: MUTED }}>No area has been assessed yet. Assess areas in the Audit Universe and they appear here.</span></Panel>
       ) : view === "grid" ? (
         <Panel title="Inherent risk against control risk">

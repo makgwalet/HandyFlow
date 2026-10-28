@@ -2,15 +2,20 @@
 // Managers see every report; reviewers and recipients see only the reports they are named on (the server decides).
 import { useEffect, useState } from "react"
 import { auditReportsApi, type ReportSummary, type ReportTemplate, type ReportView } from "../../api/auditReports.api"
-import { Card } from "../../components/DashboardBits"
+import { Panel, Pill, Stat } from "./auditUi"
+import { filterField, grid } from "./auditUi.styles"
+import { reportCounts, REPORT_STEPS, statusText, statusTone, stepStates } from "./reportsUi.logic"
+
+/** A titled panel with space below it, so a stack of them reads as one page. */
+const Card = ({ title, children }: { title: string; children: React.ReactNode }) => <div style={{ marginBottom: 14 }}><Panel title={title}>{children}</Panel></div>
 
 const MUTED = "var(--hf-text-muted)"
 const BORDER = "var(--hf-border)"
 const MIN = 10
 const msg = (e: any, f: string) => e?.response?.data?.message ?? f
-const btn: React.CSSProperties = { padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", borderRadius: 6, border: `1px solid ${BORDER}`, background: "var(--hf-surface)" }
-const area: React.CSSProperties = { width: "100%", minHeight: 80, padding: 8, border: `1.5px solid ${BORDER}`, borderRadius: 6, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }
-const STATUS: Record<string, string> = { DRAFT: "Draft", FACTUAL_REVIEW: "In factual-accuracy review", READY: "Ready to issue", ISSUED: "Issued", SUPERSEDED: "Replaced by a newer version" }
+const btn: React.CSSProperties = { padding: "7px 14px", fontSize: 12.5, fontWeight: 700, cursor: "pointer", borderRadius: 8, border: `1px solid ${BORDER}`, background: "var(--hf-surface)", color: "var(--hf-text-secondary)" }
+const primaryBtn: React.CSSProperties = { ...btn, background: "var(--hf-primary)", borderColor: "var(--hf-primary)", color: "var(--hf-text-on-solid)" }
+const area: React.CSSProperties = { width: "100%", minHeight: 80, padding: 8, border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }
 
 export function ReportsSection() {
   const [list, setList] = useState<ReportSummary[]>([])
@@ -35,20 +40,27 @@ export function ReportsSection() {
   }
 
   if (openId) return <ReportDetail id={openId} onBack={() => { setOpenId(null); load() }} />
+  const counts = reportCounts(list)
   return (
     <div>
       {error && <div role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 13, marginBottom: 8 }}>{error}</div>}
+      <div style={{ ...grid(150), marginBottom: 14 }}>
+        <Stat label="Reports" value={counts.total} />
+        <Stat label="In factual review" value={counts.inReview} tone={counts.inReview ? "warning" : undefined} sub={counts.openComments ? `${counts.openComments} open comment${counts.openComments === 1 ? "" : "s"}` : undefined} />
+        <Stat label="Ready to issue" value={counts.ready} />
+        <Stat label="Issued" value={counts.issued} />
+      </div>
       {templates.length > 0 && engagements.length > 0 && (
         <Card title="New report">
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <select aria-label="Engagement for the report" value={engagementId} onChange={e => setEngagementId(e.target.value)}>
+            <select aria-label="Engagement for the report" style={filterField} value={engagementId} onChange={e => setEngagementId(e.target.value)}>
               <option value="">Choose an engagement…</option>
               {engagements.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
-            <select aria-label="Report template" value={template} onChange={e => setTemplate(e.target.value)}>
+            <select aria-label="Report template" style={filterField} value={template} onChange={e => setTemplate(e.target.value)}>
               {templates.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
             </select>
-            <button style={btn} disabled={!engagementId} onClick={create}>Start report</button>
+            <button style={primaryBtn} disabled={!engagementId} onClick={create}>Start report</button>
           </div>
         </Card>
       )}
@@ -56,9 +68,15 @@ export function ReportsSection() {
         {list.length === 0 ? <span style={{ fontSize: 13, color: MUTED }}>No reports.</span> : (
           <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none" }}>
             {list.map(r => (
-              <li key={r.id} style={{ padding: "8px 0", borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", gap: 8 }}>
-                <span style={{ fontSize: 13 }}>{r.title} <span style={{ color: MUTED }}>· v{r.version} · {STATUS[r.status] ?? r.status}{r.openItems ? ` · ${r.openItems} open comment${r.openItems === 1 ? "" : "s"}` : ""}</span></span>
-                <button style={btn} onClick={() => setOpenId(r.id)}>Open</button>
+              <li key={r.id} style={{ padding: "10px 0", borderBottom: `1px solid var(--hf-border-subtle)`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--hf-text)", overflowWrap: "anywhere" }}>{r.title}</div>
+                  <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>{`Version ${r.version}`}{r.openItems ? ` · ${r.openItems} open comment${r.openItems === 1 ? "" : "s"}` : ""}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <Pill label={statusText(r.status)} tone={statusTone(r.status)} />
+                  <button style={btn} onClick={() => setOpenId(r.id)}>Open</button>
+                </div>
               </li>
             ))}
           </ul>
@@ -95,16 +113,28 @@ function ReportDetail({ id, onBack }: { id: string; onBack: () => void }) {
   return (
     <div>
       <button style={btn} onClick={onBack}>← Back to reports</button>
-      <h2 style={{ fontSize: 16, margin: "12px 0 2px" }}>{s.title}</h2>
-      <div style={{ fontSize: 12.5, color: MUTED, marginBottom: 12 }}>Version {s.version} · {STATUS[s.status] ?? s.status}{v.contentHash ? ` · fingerprint ${v.contentHash.slice(0, 12)}…` : ""}</div>
+      <h2 style={{ fontSize: 18, fontWeight: 800, margin: "14px 0 2px", color: "var(--hf-text)" }}>{s.title}</h2>
+      <div style={{ fontSize: 12.5, color: MUTED, marginBottom: 12 }}>Version {s.version} · {statusText(s.status)}{v.contentHash ? ` · fingerprint ${v.contentHash.slice(0, 12)}…` : ""}</div>
+      <ol aria-label="Report stage" style={{ display: "flex", gap: 6, flexWrap: "wrap", listStyle: "none", margin: "0 0 14px", padding: 0 }}>
+        {REPORT_STEPS.map((step, i) => {
+          const st = stepStates(s.status)[i]
+          return (
+            <li key={step.status} aria-current={st === "current" ? "step" : undefined}
+              style={{ padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 700, border: "1px solid var(--hf-border)",
+                background: st === "current" ? "var(--hf-info-soft)" : "var(--hf-surface)", color: st === "current" ? "var(--hf-primary-text)" : st === "done" ? "var(--hf-success-text)" : "var(--hf-text-faint)" }}>
+              {st === "done" ? "✓ " : ""}{step.label}
+            </li>
+          )
+        })}
+      </ol>
       {error && <div role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 13, marginBottom: 8 }}>{error}</div>}
 
       {isManager && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-          {s.status === "DRAFT" && <button style={btn} disabled={busy} onClick={() => run(() => auditReportsApi.startReview(id), "Failed to start the review")}>Start factual-accuracy review</button>}
+          {s.status === "DRAFT" && <button style={primaryBtn} disabled={busy} onClick={() => run(() => auditReportsApi.startReview(id), "Failed to start the review")}>Start factual-accuracy review</button>}
           {reviewing && <button style={btn} disabled={busy} onClick={() => run(() => auditReportsApi.closeReview(id), "Failed to close the review")}>Close review</button>}
           {(reviewing || s.status === "READY") && <button style={btn} disabled={busy} onClick={() => run(() => auditReportsApi.reopen(id), "Failed to reopen")}>Back to draft</button>}
-          {s.status === "READY" && <button style={btn} disabled={busy} onClick={() => run(() => auditReportsApi.issue(id), "Failed to issue the report")}>Issue report</button>}
+          {s.status === "READY" && <button style={primaryBtn} disabled={busy} onClick={() => run(() => auditReportsApi.issue(id), "Failed to issue the report")}>Issue report</button>}
           {s.status === "ISSUED" && <button style={btn} disabled={busy} onClick={() => run(() => auditReportsApi.newVersion(id), "Failed to start a new version")}>Start a new version</button>}
         </div>
       )}
@@ -157,11 +187,11 @@ function ReportDetail({ id, onBack }: { id: string; onBack: () => void }) {
             </div>
           ))}
           <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-            <select aria-label="Role on the report" value={personKind} onChange={e => setPersonKind(e.target.value as any)}>
+            <select aria-label="Role on the report" style={filterField} value={personKind} onChange={e => setPersonKind(e.target.value as any)}>
               <option value="REVIEWER">Reviewer (checks facts in the draft)</option>
               <option value="RECIPIENT">Recipient (reads the issued report)</option>
             </select>
-            <select aria-label="Person" value={personId} onChange={e => setPersonId(e.target.value)}>
+            <select aria-label="Person" style={filterField} value={personId} onChange={e => setPersonId(e.target.value)}>
               <option value="">Choose a person…</option>
               {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>

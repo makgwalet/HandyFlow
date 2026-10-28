@@ -20,7 +20,9 @@ public final class RiskHeatMap {
     /** One square of the grid: how many areas have this inherent and control score, and which. */
     public record Cell(int inherent, int control, int count, List<String> areas) {}
     public record Row(String processArea, int low, int medium, int high, int critical, int notAssessed, int total) {}
-    public record HeatMap(List<Cell> cells, List<Row> byProcessArea, int assessed, int notAssessed, int total) {}
+    /** One assessed area with the scores it was given, for the residual and control views. Scores are clamped to 1 to 5. */
+    public record AreaScore(String name, String processArea, int inherent, int control, String finalRisk) {}
+    public record HeatMap(List<Cell> cells, List<Row> byProcessArea, int assessed, int notAssessed, int total, List<AreaScore> areas) {}
 
     /** Scores outside 1 to 5 are put at the nearest end, so that one bad row cannot take the screen down. */
     static int clamp(int score) { return Math.max(1, Math.min(5, score)); }
@@ -32,12 +34,14 @@ public final class RiskHeatMap {
         Map<String, List<String>> grid = new HashMap<>();
         Map<String, int[]> rows = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         int assessed = 0;
+        List<AreaScore> scored = new ArrayList<>();
         for (AreaIn a : areas) {
             AssessmentIn r = byArea.get(a.id());
             String pa = a.processArea() == null || a.processArea().isBlank() ? NO_AREA : a.processArea().trim();
             int[] row = rows.computeIfAbsent(pa, k -> new int[5]);     // low, medium, high, critical, not assessed
             if (r == null) { row[4]++; continue; }
             assessed++;
+            scored.add(new AreaScore(a.name(), pa, clamp(r.inherent()), clamp(r.control()), r.finalRisk()));
             grid.computeIfAbsent(clamp(r.inherent()) + ":" + clamp(r.control()), k -> new ArrayList<>()).add(a.name());
             int i = LEVELS.indexOf(r.finalRisk() == null ? "" : r.finalRisk().toUpperCase());
             if (i >= 0) row[i]++; else row[4]++;
@@ -54,6 +58,7 @@ public final class RiskHeatMap {
                         e.getValue()[0] + e.getValue()[1] + e.getValue()[2] + e.getValue()[3] + e.getValue()[4]))
                 .sorted(Comparator.comparingInt((Row r) -> -(r.critical() * 1000 + r.high())).thenComparing(Row::processArea, String.CASE_INSENSITIVE_ORDER))
                 .toList();
-        return new HeatMap(cells, out, assessed, areas.size() - assessed, areas.size());
+        scored.sort(Comparator.comparing(AreaScore::name, String.CASE_INSENSITIVE_ORDER));
+        return new HeatMap(cells, out, assessed, areas.size() - assessed, areas.size(), scored);
     }
 }

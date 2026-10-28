@@ -77,4 +77,17 @@ class RiskHeatMapTest {
         assertTrue(m.byProcessArea().isEmpty());
         assertEquals(0, m.total());
     }
+
+    @Test void assessedAreasComeWithTheirClampedScoresAndUnassessedOnesDoNot() {
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID(), c = UUID.randomUUID();
+        HeatMap m = RiskHeatMap.build(
+                List.of(new AreaIn(a, "Payroll", "HR"), new AreaIn(b, "Stores", null), new AreaIn(c, "Fleet", "Ops")),
+                List.of(new AssessmentIn(a, 9, 0, "HIGH"), new AssessmentIn(b, 2, 3, "LOW")));
+        assertEquals(2, m.areas().size());
+        assertEquals("Payroll", m.areas().get(0).name());
+        assertEquals(5, m.areas().get(0).inherent());
+        assertEquals(1, m.areas().get(0).control());
+        assertEquals("No process area", m.areas().get(1).processArea());
+        assertEquals("LOW", m.areas().get(1).finalRisk());
+    }
 }

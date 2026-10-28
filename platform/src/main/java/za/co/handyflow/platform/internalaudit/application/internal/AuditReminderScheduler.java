@@ -40,6 +40,7 @@ public class AuditReminderScheduler {
     private final UserRecipientResolver userResolver;
     private final TenantAdminRecipients adminRecipients;
     private final NotificationService notifications;
+    private final AuditSettingsService settings;
 
     @Scheduled(cron = "0 30 7 * * *", zone = "Africa/Johannesburg")
     public void daily() {
@@ -48,17 +49,23 @@ public class AuditReminderScheduler {
 
     /** Returns how many notifications were sent, so the caller (and tests) can see what happened. */
     public int sweep(LocalDate today) {
+        rulesCache.clear();
         int sent = 0;
         try { sent += overdueActions(today); } catch (Exception e) { log.error("[InternalAudit] Overdue action sweep failed: {}", e.getMessage(), e); }
         try { sent += unansweredComments(today); } catch (Exception e) { log.error("[InternalAudit] Factual-review reminder sweep failed: {}", e.getMessage(), e); }
         return sent;
     }
 
+    /** Each company's own timing, read once per sweep. */
+    private final Map<UUID, AuditSettings.Values> rulesCache = new HashMap<>();
+    private AuditSettings.Values rulesFor(UUID tenantId) { return rulesCache.computeIfAbsent(tenantId, settings::valuesFor); }
+
     int overdueActions(LocalDate today) {
         int sent = 0;
         for (AuditActionPlan a : actions.findOverdueAcrossTenants(today)) {
             long days = ChronoUnit.DAYS.between(a.getDueDate(), today);
-            Stage stage = ReminderRules.stageFor(days);
+            AuditSettings.Values rules = rulesFor(a.getTenantId());
+            Stage stage = ReminderRules.stageFor(days, rules.escalateAfterDays(), rules.repeatEveryDays());
             if (stage == Stage.NONE) continue;
             TenantId tenant = TenantId.of(a.getTenantId());
             String what = a.getDescription() + " (" + days + " day" + (days == 1 ? "" : "s") + " late, due " + a.getDueDate() + ")";
@@ -70,10 +77,12 @@ public class AuditReminderScheduler {
 
     int unansweredComments(LocalDate today) {
         int sent = 0;
-        Instant cutoff = today.minusDays(3).atStartOfDay(ZoneId.of("Africa/Johannesburg")).toInstant();
+        // Fetch everything raised before today: each company's own first-reminder day is applied per item below.
+        Instant cutoff = today.minusDays(1).atStartOfDay(ZoneId.of("Africa/Johannesburg")).toInstant();
         for (AuditReportFactItem i : factItems.findOpenRaisedBefore(cutoff.plus(1, ChronoUnit.DAYS))) {
             long waiting = ChronoUnit.DAYS.between(i.getRaisedAt().atZone(ZoneId.of("Africa/Johannesburg")).toLocalDate(), today);
-            if (!ReminderRules.reviewReminderDue(waiting)) continue;
+            AuditSettings.Values rules = rulesFor(i.getTenantId());
+            if (!ReminderRules.reviewReminderDue(waiting, rules.firstReviewReminderDay(), rules.repeatEveryDays())) continue;
             var report = reports.findByTenantIdAndId(i.getTenantId(), i.getReportId()).orElse(null);
             if (report == null || !"FACTUAL_REVIEW".equals(report.getStatus())) continue;
             TenantId tenant = TenantId.of(i.getTenantId());

@@ -1,6 +1,6 @@
 // How the risk heat map is coloured and described. Scores are the 1 to 5 inputs of a risk assessment.
 
-import type { HeatCell, HeatRow } from "../../api/auditHeatMap.api"
+import type { HeatArea, HeatCell, HeatRow } from "../../api/auditHeatMap.api"
 
 export type Band = "low" | "medium" | "high" | "critical"
 
@@ -46,4 +46,53 @@ export function highShare(rows: HeatRow[]): number {
   const assessed = rows.reduce((s, r) => s + r.low + r.medium + r.high + r.critical, 0)
   const high = rows.reduce((s, r) => s + r.high + r.critical, 0)
   return assessed === 0 ? 0 : Math.round((high / assessed) * 100)
+}
+
+// ── Residual risk and control effectiveness ────────────────────────────────────────────────────────────────
+// Neither is stored. Both are read from the two scores in the assessment: control risk 1 to 5, where higher means weaker control.
+
+/** Residual risk: what is left once controls are taken into account, read as the product of the two scores, banded as the grid is. */
+export const residualBand = (a: Pick<HeatArea, "inherent" | "control">): Band => cellBand(a.inherent, a.control)
+
+export type Effectiveness = "effective" | "partly" | "weak"
+export const EFFECTIVENESS_STYLE: Record<Effectiveness, { label: string; tone: "success" | "info" | "warning"; hint: string }> = {
+  effective: { label: "Effective", tone: "success", hint: "control risk 1 or 2" },
+  partly: { label: "Partly effective", tone: "info", hint: "control risk 3" },
+  weak: { label: "Weak", tone: "warning", hint: "control risk 4 or 5" },
+}
+export const effectiveness = (control: number): Effectiveness => (control <= 2 ? "effective" : control === 3 ? "partly" : "weak")
+
+const BAND_ORDER: Band[] = ["low", "medium", "high", "critical"]
+export const EFFECTIVENESS_ORDER: Effectiveness[] = ["effective", "partly", "weak"]
+
+/** Areas worst residual first (then by product, then name). */
+export function byResidual(areas: HeatArea[]): HeatArea[] {
+  return [...areas].sort((a, b) =>
+    BAND_ORDER.indexOf(residualBand(b)) - BAND_ORDER.indexOf(residualBand(a)) || b.inherent * b.control - a.inherent * a.control || a.name.localeCompare(b.name))
+}
+
+/** Areas weakest control first (then highest inherent risk, then name). */
+export function byControl(areas: HeatArea[]): HeatArea[] {
+  return [...areas].sort((a, b) => b.control - a.control || b.inherent - a.inherent || a.name.localeCompare(b.name))
+}
+
+export function residualCounts(areas: HeatArea[]): Record<Band, number> {
+  const out: Record<Band, number> = { low: 0, medium: 0, high: 0, critical: 0 }
+  areas.forEach(a => { out[residualBand(a)]++ })
+  return out
+}
+
+export function effectivenessCounts(areas: HeatArea[]): Record<Effectiveness, number> {
+  const out: Record<Effectiveness, number> = { effective: 0, partly: 0, weak: 0 }
+  areas.forEach(a => { out[effectiveness(a.control)]++ })
+  return out
+}
+
+/** Per process area, how many areas fall in each control effectiveness group; weakest areas first. */
+export function controlByProcessArea(areas: HeatArea[]): { processArea: string; counts: Record<Effectiveness, number>; total: number }[] {
+  const m = new Map<string, HeatArea[]>()
+  areas.forEach(a => { const k = a.processArea.toLowerCase(); m.set(k, [...(m.get(k) ?? []), a]) })
+  return [...m.values()]
+    .map(list => ({ processArea: list[0].processArea, counts: effectivenessCounts(list), total: list.length }))
+    .sort((a, b) => b.counts.weak - a.counts.weak || b.counts.partly - a.counts.partly || a.processArea.localeCompare(b.processArea))
 }

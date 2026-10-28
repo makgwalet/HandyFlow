@@ -56,4 +56,16 @@ describe("Risk heat map", () => {
     mount()
     expect((await screen.findByRole("alert")).textContent).toContain("could not be loaded")
   })
+
+  it("shows residual risk and control effectiveness from the two scores", async () => {
+    const areas = [{ name: "Payroll", processArea: "Finance", inherent: 5, control: 4, finalRisk: "HIGH" }, { name: "Stores", processArea: "Ops", inherent: 2, control: 1, finalRisk: "LOW" }]
+    m.get.mockResolvedValue({ ...map, areas })
+    mount()
+    fireEvent.click(await screen.findByRole("tab", { name: "Residual risk" }))
+    expect(screen.getByText("Critical residual")).toBeTruthy()
+    expect(screen.getByText("Payroll")).toBeTruthy()
+    fireEvent.click(screen.getByRole("tab", { name: "Control effectiveness" }))
+    expect(screen.getAllByText("Weak").length).toBeGreaterThan(0)
+    expect(screen.getByText("Weakest controls first")).toBeTruthy()
+  })
 })
