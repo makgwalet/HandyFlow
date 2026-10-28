@@ -32,7 +32,8 @@ export const today = () => iso(new Date())
 
 export const END_TYPES: { value: string; label: string }[] = [
   { value: "RESIGNATION", label: "Resigned" },
-  { value: "EMPLOYER_NOTICE", label: "Ended by the employer, with notice owed (retrenchment, incapacity, poor performance)" },
+  { value: "EMPLOYER_NOTICE", label: "Ended by the employer, with notice owed (incapacity, poor performance)" },
+  { value: "RETRENCHMENT", label: "Retrenched: operational reasons (notice and severance are owed)" },
   { value: "SUMMARY_DISMISSAL", label: "Dismissed without notice (misconduct)" },
   { value: "CONTRACT_END", label: "Fixed-term contract ended" },
   { value: "MUTUAL", label: "Agreed by both sides" },

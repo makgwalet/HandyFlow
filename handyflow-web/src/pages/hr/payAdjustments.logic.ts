@@ -1,7 +1,7 @@
 // src/pages/hr/payAdjustments.logic.ts
 //
 // Bonuses, back pay and recoveries of overpayments. Mirrors PayAdjustmentRules on the server, which has the last word.
-export type PayKind = "BONUS" | "BACK_PAY" | "RECOVERY" | "NOTICE_PAY"
+export type PayKind = "BONUS" | "BACK_PAY" | "RECOVERY" | "NOTICE_PAY" | "SEVERANCE"
 
 export type PayAdjustment = {
   id: string; employeeId: string; employeeNumber: string; employeeName: string; kind: PayKind; kindLabel: string; amount: number
@@ -93,7 +93,7 @@ export type NoticePay = {
 export type NoticeForm = { amount: string; reason: string }
 
 /** Only for someone the employer let go with notice owed and not all of it given; nothing to enter twice. */
-export const noticeShown = (n: NoticePay | undefined): n is NoticePay => !!n && n.terminated && n.endType === "EMPLOYER_NOTICE"
+export const noticeShown = (n: NoticePay | undefined): n is NoticePay => !!n && n.terminated && (n.endType === "EMPLOYER_NOTICE" || n.endType === "RETRENCHMENT")
 
 /** Mirrors NoticePayRules: up to the pay for the whole notice period, never more. A blank amount means the pay owed. */
 export function noticeProblem(f: NoticeForm, n: NoticePay): string | null {
@@ -109,3 +109,46 @@ export function noticeProblem(f: NoticeForm, n: NoticePay): string | null {
 }
 
 export const noticeBody = (f: NoticeForm) => ({ amount: f.amount.trim() === "" ? null : Number(f.amount), reason: f.reason.trim() })
+
+// ── Severance on retrenchment ─────────────────────────────────────────────────────────────────
+
+export type Severance = {
+  retrenched: boolean; endType: string | null; completedYears: number; weeklyPay: number; minimum: number; summary: string | null; alreadyEntered: boolean
+}
+export type SeveranceForm = { amount: string; directive: string; tax: string; refused: boolean; reason: string }
+export const EMPTY_SEVERANCE_FORM: SeveranceForm = { amount: "", directive: "", tax: "", refused: false, reason: "" }
+
+/** Only for someone who was retrenched. */
+export const severanceShown = (s: Severance | undefined): s is Severance => !!s && s.retrenched
+
+const cents = (n: number) => Math.abs(Math.round(n * 100) - n * 100) < 1e-6
+
+/** Mirrors SeveranceRules: a directive and its tax are needed, and the BCEA minimum holds unless other work was refused. */
+export function severanceProblem(f: SeveranceForm, s: Severance): string | null {
+  if (s.alreadyEntered) return "Severance is already entered for this employee."
+  const amount = Number(f.amount)
+  if (f.amount.trim() === "" || !Number.isFinite(amount) || amount <= 0) return "Enter the severance amount."
+  if (!cents(amount)) return "Use at most two decimals for the amount."
+  const d = f.directive.trim()
+  if (!d) return "Enter the SARS directive number. Severance cannot be paid without a tax directive."
+  if (d.length > 40) return "The directive number is too long (40 characters at most)."
+  if (!/^[A-Za-z0-9/\- ]+$/.test(d)) return "The directive number has letters, digits, slashes and dashes only."
+  const tax = Number(f.tax)
+  if (f.tax.trim() === "" || !Number.isFinite(tax) || tax < 0) return "Enter the tax SARS directed on the severance (0 if it directed none)."
+  if (!cents(tax)) return "Use at most two decimals for the tax."
+  if (tax > amount) return "The directed tax cannot be more than the severance."
+  if (!f.refused && amount < s.minimum) return "That is less than the BCEA minimum of " + money(s.minimum) + " (a week's pay for each completed year). Pay at least that, or tick that the employee unreasonably refused alternative employment."
+  if (!f.reason.trim()) return "Give the reason for the payment."
+  if (f.reason.trim().length > 300) return "The reason is too long (300 characters at most)."
+  return null
+}
+
+export const severanceBody = (f: SeveranceForm) => ({
+  amount: Number(f.amount), directiveNumber: f.directive.trim(), directiveTax: Number(f.tax), refusedAlternative: f.refused, reason: f.reason.trim(),
+})
+
+/** What the employee receives of it. */
+export const severanceNet = (f: SeveranceForm): number => {
+  const a = Number(f.amount), t = Number(f.tax)
+  return (Number.isFinite(a) ? a : 0) - (Number.isFinite(t) ? t : 0)
+}

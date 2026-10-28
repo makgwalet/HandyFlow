@@ -231,6 +231,8 @@ public class PayrollService {
             BigDecimal bonus = PayAdjustmentService.total(items, PayAdjustmentRules.BONUS);
             BigDecimal backPay = PayAdjustmentService.total(items, PayAdjustmentRules.BACK_PAY);
             BigDecimal noticePay = PayAdjustmentService.total(items, PayAdjustmentRules.NOTICE_PAY);
+            BigDecimal severance = PayAdjustmentService.total(items, PayAdjustmentRules.SEVERANCE);
+            BigDecimal severanceTax = PayAdjustmentService.severanceTax(items);
             java.util.List<String> lumps = new ArrayList<>();
             if (bonus.signum() > 0) lumps.add("bonus " + bonus);
             if (backPay.signum() > 0) lumps.add("back pay " + backPay);
@@ -239,6 +241,9 @@ public class PayrollService {
             if (!lumps.isEmpty())
                 warnings.add(who + ": " + String.join(" and ", lumps)
                         + " included. Taxed by the annual-payment method: the extra tax the year bears once it is added to the annualised month.");
+            if (severance.signum() > 0)
+                warnings.add(who + ": severance " + severance + " is paid outside the monthly PAYE, UIF and SDL. The tax SARS directed (" + severanceTax
+                        + ", directive " + PayAdjustmentService.severanceDirectives(items) + ") is taken from it and added to the PAYE on the EMP201.");
             PayrollEngine.Prior prior = null;
             if (averaging) {
                 prior = new PayrollEngine.Prior(payslipRepo.sumRegularTaxable(emp.getId(), taxYear, run.getPayDate(), run.getId()),
@@ -260,6 +265,7 @@ public class PayrollService {
             slip.setBenefits(benefit.medical(), benefit.retirement(), benefit.other());
             slip.setBonusAndBackPay(bonus, backPay);
             slip.setNoticePay(noticePay);
+            slip.setSeverance(severance, severanceTax, PayAdjustmentService.severanceDirectives(items));
             slip.setRegular(calc.regularTaxable(), calc.regularPaye());
             if (etiTable != null) {
                 boolean idValid = emp.getIdNumber() != null && !emp.getIdNumber().isBlank()
@@ -324,8 +330,8 @@ public class PayrollService {
             overtimeService.markTaken(claims, run.getId());
             payAdjustmentService.markTaken(taken, run.getId());
 
-            runGross = runGross.add(result.totalEarnings());
-            runPaye  = runPaye.add(result.payeAmount());
+            runGross = runGross.add(result.totalEarnings()).add(severance);
+            runPaye  = runPaye.add(result.payeAmount()).add(severanceTax);
             runUif   = runUif.add(result.uifEmployee()).add(result.uifEmployer());
             runSdl   = runSdl.add(result.sdlAmount());
             runNet   = runNet.add(slip.getNetPay());
@@ -421,7 +427,7 @@ public class PayrollService {
                 s.getCreatedAt(), s.getDaysInPeriod(), s.getDaysPaid(), s.getProrationAmount(), s.getUnpaidLeaveDays(), s.getUnpaidLeaveAmount(),
                 s.getLeavePayoutDays(), s.getLeavePayoutAmount(), s.isFinalPay(),
                 s.getEmployerMedical(), s.getEmployerRetirement(), s.getOtherFringe(), s.getBackPayAmount(), s.getNoticePayAmount(),
-                s.getEtiAmount(), s.getEtiMonth());
+                s.getEtiAmount(), s.getEtiMonth(), s.getSeveranceAmount(), s.getSeveranceTax(), s.getSeveranceDirective());
     }
 
     private Emp201Response toEmp201Response(HrEmp201 e, LocalDate today, boolean runIssued) {

@@ -7,8 +7,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { X } from "lucide-react"
 import { apiClient } from "../../api/client"
 import {
-  EMPTY_ADVANCE_FORM, EMPTY_PAY_FORM, noticeBody, noticeProblem, noticeShown, PAY_KINDS, advanceBody, advanceProblem, advanceShown, canEnterPay, cancelProblem, money, payBody, payProblem,
-  type AdvanceForm, type LeaveAdvance, type NoticeForm, type NoticePay, type PayAdjustment, type PayForm,
+  EMPTY_ADVANCE_FORM, EMPTY_PAY_FORM, EMPTY_SEVERANCE_FORM, severanceBody, severanceNet, severanceProblem, severanceShown, noticeBody, noticeProblem, noticeShown, PAY_KINDS, advanceBody, advanceProblem, advanceShown, canEnterPay, cancelProblem, money, payBody, payProblem,
+  type AdvanceForm, type LeaveAdvance, type NoticeForm, type NoticePay, type Severance, type SeveranceForm, type PayAdjustment, type PayForm,
 } from "./payAdjustments.logic"
 
 type ApiErr = { response?: { data?: { message?: string } } }
@@ -50,6 +50,13 @@ export default function PayAdjustmentsModal({ employee, permissions, onClose }: 
   })
   const [nf, setNf] = useState<NoticeForm>({ amount: "", reason: "" })
   const nProblem = noticeShown(notice.data) ? noticeProblem(nf, notice.data) : null
+  const severanceKey = ["hr-severance", employee.id]
+  const severance = useQuery<Severance>({
+    queryKey: severanceKey, enabled: employee.status === "TERMINATED", retry: false,
+    queryFn: async () => { const r = await apiClient.get(`/api/v1/hr/employees/${employee.id}/severance`); return (r.data?.data ?? r.data) as Severance },
+  })
+  const [sf, setSf] = useState<SeveranceForm>(EMPTY_SEVERANCE_FORM)
+  const sProblem = severanceShown(severance.data) ? severanceProblem(sf, severance.data) : null
   const [adv, setAdv] = useState<AdvanceForm>(EMPTY_ADVANCE_FORM)
   const advProblem = advanceProblem(adv, today())
 
@@ -68,6 +75,11 @@ export default function PayAdjustmentsModal({ employee, permissions, onClose }: 
     mutationFn: () => apiClient.post(`/api/v1/hr/employees/${employee.id}/notice-pay/enter`, noticeBody(nf)),
     onSuccess: () => { qc.invalidateQueries({ queryKey: key }); qc.invalidateQueries({ queryKey: noticeKey }); setNf({ amount: "", reason: "" }); setError("") },
     onError: onErr("The notice pay could not be entered."),
+  })
+  const enterSeverance = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/hr/employees/${employee.id}/severance/enter`, severanceBody(sf)),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: key }); qc.invalidateQueries({ queryKey: severanceKey }); setSf(EMPTY_SEVERANCE_FORM); setError("") },
+    onError: onErr("The severance could not be entered."),
   })
   const cancel = useMutation({
     mutationFn: (v: { id: string; reason: string }) => apiClient.post(`/api/v1/hr/pay-adjustments/${v.id}/cancel`, { reason: v.reason.trim() }),
@@ -175,6 +187,35 @@ export default function PayAdjustmentsModal({ employee, permissions, onClose }: 
                     {enterNotice.isPending ? "Saving…" : "Enter notice pay"}
                   </button>
                   {(nf.amount || nf.reason) && nProblem && <div role="alert" style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--hf-danger-text)" }}>{nProblem}</div>}
+                </form>
+              ) : null}
+          </section>
+        )}
+
+        {severanceShown(severance.data) && (
+          <section aria-label="Severance pay" style={{ border: "1px solid var(--hf-border)", borderRadius: 10, padding: 12, marginBottom: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Severance pay (retrenchment)</div>
+            <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "4px 0 8px" }}>
+              {severance.data.summary} Service: {severance.data.completedYears} completed year{severance.data.completedYears === 1 ? "" : "s"}; a week's pay is {money(severance.data.weeklyPay)}; the BCEA minimum is {money(severance.data.minimum)}.
+              Severance is paid outside the monthly PAYE: enter the tax SARS directed, and it is taken from the payment and added to the PAYE on the EMP201.
+            </p>
+            {severance.data.alreadyEntered ? <div style={{ fontSize: 13, color: "var(--hf-text-secondary)" }}>Severance is already entered; see the list above.</div>
+              : canEdit ? (
+                <form onSubmit={e => { e.preventDefault(); if (!sProblem) enterSeverance.mutate() }} noValidate style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10, alignItems: "end" }}>
+                  <div><label htmlFor="sv-amount" style={label}>Severance amount *</label><input id="sv-amount" style={input} inputMode="decimal" value={sf.amount} onChange={e => setSf(f => ({ ...f, amount: e.target.value }))} /></div>
+                  <div><label htmlFor="sv-directive" style={label}>SARS directive number *</label><input id="sv-directive" style={input} maxLength={40} value={sf.directive} onChange={e => setSf(f => ({ ...f, directive: e.target.value }))} /></div>
+                  <div><label htmlFor="sv-tax" style={label}>Tax the directive asks for *</label><input id="sv-tax" style={input} inputMode="decimal" value={sf.tax} onChange={e => setSf(f => ({ ...f, tax: e.target.value }))} /></div>
+                  <div><label htmlFor="sv-reason" style={label}>Reason *</label><input id="sv-reason" style={input} maxLength={300} value={sf.reason} onChange={e => setSf(f => ({ ...f, reason: e.target.value }))} /></div>
+                  <label style={{ gridColumn: "1 / -1", fontSize: 13, color: "var(--hf-text-secondary)", display: "flex", gap: 8, alignItems: "center" }}>
+                    <input type="checkbox" checked={sf.refused} onChange={e => setSf(f => ({ ...f, refused: e.target.checked }))} />
+                    The employee unreasonably refused alternative employment, so the BCEA minimum does not apply
+                  </label>
+                  {sf.amount && sf.tax && !sProblem && <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--hf-text-muted)" }}>The employee receives {money(severanceNet(sf))} of it.</div>}
+                  <button type="submit" disabled={!!sProblem || enterSeverance.isPending}
+                    style={{ padding: "9px 16px", background: sProblem || enterSeverance.isPending ? "var(--hf-text-faint)" : "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: sProblem ? "not-allowed" : "pointer" }}>
+                    {enterSeverance.isPending ? "Saving…" : "Enter severance"}
+                  </button>
+                  {(sf.amount || sf.directive || sf.tax || sf.reason) && sProblem && <div role="alert" style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--hf-danger-text)" }}>{sProblem}</div>}
                 </form>
               ) : null}
           </section>

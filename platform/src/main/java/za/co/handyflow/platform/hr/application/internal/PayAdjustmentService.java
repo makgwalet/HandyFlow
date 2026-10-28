@@ -9,6 +9,7 @@ import za.co.handyflow.platform.hr.domain.model.HrEmployee;
 import za.co.handyflow.platform.hr.domain.model.HrPayAdjustment;
 import za.co.handyflow.platform.hr.domain.model.HrPayRun;
 import za.co.handyflow.platform.hr.domain.model.NoticePayRules;
+import za.co.handyflow.platform.hr.domain.model.SeveranceRules;
 import za.co.handyflow.platform.hr.domain.model.NoticeRules;
 import za.co.handyflow.platform.hr.domain.model.PayAdjustmentRules;
 import za.co.handyflow.platform.hr.domain.repository.HrEmployeeRepository;
@@ -58,6 +59,8 @@ public class PayAdjustmentService {
             if (problem.startsWith("You cannot")) throw new AccessDeniedException(problem);
             throw new IllegalArgumentException(problem);
         }
+        if (PayAdjustmentRules.SEVERANCE.equals(req.kind()))
+            throw new IllegalArgumentException("Severance needs a SARS tax directive. Enter it from the severance panel of the employee who was retrenched.");
         if (PayAdjustmentRules.NOTICE_PAY.equals(req.kind())) {
             boolean already = repo.forEmployee(tenantId, employeeId).stream().anyMatch(i -> PayAdjustmentRules.NOTICE_PAY.equals(i.getKind()) && PayAdjustmentRules.OPEN.equals(i.getStatus()));
             String notice = NoticePayRules.problem(emp.getStatus(), emp.getEndType(), req.amount(),
@@ -72,6 +75,31 @@ public class PayAdjustmentService {
         log.info("Pay item {} {} entered for employee={} by user={}", saved.getKind(), saved.getAmount(), employeeId, actor);
         return view(saved, emp, null);
     }
+
+    /**
+     * Severance for someone retrenched: the amount, the SARS directive number and the tax the directive asks to be withheld. The
+     * amount may not be below the BCEA minimum unless the employee unreasonably refused alternative work.
+     */
+    @Transactional
+    public View addSeverance(TenantId tenantId, UUID employeeId, SeveranceRequest req, UUID actor) {
+        if (actor == null) throw new AccessDeniedException("Your user could not be identified, so this step cannot be recorded.");
+        HrEmployee emp = employee(tenantId, employeeId);
+        if (actor.equals(emp.getUserId())) throw new AccessDeniedException("You cannot enter a payment for yourself. Ask another payroll user.");
+        if (emp.getEndDate() == null) throw new IllegalArgumentException("Severance is entered once employment has ended.");
+        if (req.reason() == null || req.reason().isBlank()) throw new IllegalArgumentException("Give the reason for the payment.");
+        if (req.reason().trim().length() > 300) throw new IllegalArgumentException("The reason is too long (300 characters at most).");
+        boolean already = repo.forEmployee(tenantId, employeeId).stream().anyMatch(i -> PayAdjustmentRules.SEVERANCE.equals(i.getKind()) && PayAdjustmentRules.OPEN.equals(i.getStatus()));
+        String problem = SeveranceRules.problem(emp.getStatus(), emp.getEndType(), req.amount(), req.directiveNumber(), req.directiveTax(),
+                req.refusedAlternative(), SeveranceRules.statutoryMinimum(emp.getGrossSalary(), emp.getStartDate(), emp.getEndDate()), already);
+        if (problem != null) throw new IllegalArgumentException(problem);
+        HrPayAdjustment item = HrPayAdjustment.severance(tenantId.getValue(), employeeId, req.amount().setScale(2, RoundingMode.HALF_UP), emp.getEndDate(),
+                req.reason(), req.directiveNumber(), req.directiveTax().setScale(2, RoundingMode.HALF_UP), req.refusedAlternative(), actor);
+        HrPayAdjustment saved = repo.save(item);
+        log.info("Severance {} (directive tax {}) entered for employee={} by user={}", saved.getAmount(), saved.getDirectiveTax(), employeeId, actor);
+        return view(saved, emp, null);
+    }
+
+    public record SeveranceRequest(BigDecimal amount, String directiveNumber, BigDecimal directiveTax, boolean refusedAlternative, String reason) {}
 
     @Transactional
     public View cancel(TenantId tenantId, UUID id, CancelRequest req, UUID actor) {
@@ -136,6 +164,20 @@ public class PayAdjustmentService {
         List<HrPayAdjustment> taken = repo.takenBy(tenantId, payRunId);
         for (HrPayAdjustment a : taken) { a.linkTo(null); repo.save(a); }
         return taken.size();
+    }
+
+    /** The tax the SARS directives ask to be withheld on the severance items. */
+    public static BigDecimal severanceTax(Collection<HrPayAdjustment> items) {
+        BigDecimal sum = BigDecimal.ZERO;
+        for (HrPayAdjustment a : items) if (PayAdjustmentRules.SEVERANCE.equals(a.getKind()) && a.getDirectiveTax() != null) sum = sum.add(a.getDirectiveTax());
+        return sum;
+    }
+
+    /** The directive numbers of the severance items, comma separated; null when there are none. */
+    public static String severanceDirectives(Collection<HrPayAdjustment> items) {
+        String s = items.stream().filter(a -> PayAdjustmentRules.SEVERANCE.equals(a.getKind()) && a.getDirectiveNumber() != null)
+                .map(HrPayAdjustment::getDirectiveNumber).collect(java.util.stream.Collectors.joining(", "));
+        return s.isEmpty() ? null : s;
     }
 
     public static BigDecimal total(Collection<HrPayAdjustment> items, String kind) {

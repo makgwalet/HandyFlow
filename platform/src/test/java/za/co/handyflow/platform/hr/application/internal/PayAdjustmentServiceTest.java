@@ -247,4 +247,77 @@ class PayAdjustmentServiceTest {
         letGoWithNotice(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 9, 15));
         assertThrows(IllegalArgumentException.class, () -> service.add(tenant, jane.getId(), notice("100"), actor));
     }
+
+    // ── Severance ──────────────────────────────────────────────────────────
+
+    private PayAdjustmentService.SeveranceRequest sev(String amount, String directive, String tax, boolean refused) {
+        return new PayAdjustmentService.SeveranceRequest(new BigDecimal(amount), directive, tax == null ? null : new BigDecimal(tax), refused, "Position made redundant");
+    }
+
+    private void retrench() {
+        // 30 000 a month, started 2024-01-01, last day 2026-09-15: two completed years, so at least 2 x 6 923.08
+        jane.terminate(LocalDate.of(2026, 9, 15), "Retrenched", actor, "RETRENCHMENT", LocalDate.of(2026, 8, 1));
+    }
+
+    @Test
+    void severanceCannotBeEnteredAsAnOrdinaryPayItem() {
+        retrench();
+        AddRequest r = new AddRequest("SEVERANCE", new BigDecimal("20000"), LocalDate.now(), "Severance", null, null, "x");
+        assertThrows(IllegalArgumentException.class, () -> service.add(tenant, jane.getId(), r, actor));
+        assertTrue(store.isEmpty());
+    }
+
+    @Test
+    void severanceIsKeptWithItsDirectiveAndTax() {
+        retrench();
+        View v = service.addSeverance(tenant, jane.getId(), sev("20000", "IRP3-1", "1500.50", false), actor);
+        assertEquals("Severance pay", v.kindLabel());
+        assertEquals(1, store.size());
+        HrPayAdjustment a = store.get(0);
+        assertEquals("IRP3-1", a.getDirectiveNumber());
+        assertEquals(0, new BigDecimal("1500.50").compareTo(a.getDirectiveTax()));
+        assertEquals(LocalDate.of(2026, 9, 15), a.getPayFrom());
+        assertEquals(0, new BigDecimal("1500.50").compareTo(PayAdjustmentService.severanceTax(store)));
+        assertEquals("IRP3-1", PayAdjustmentService.severanceDirectives(store));
+    }
+
+    @Test
+    void severanceBelowTheMinimumNeedsARefusalOfOtherWork() {
+        retrench();
+        assertThrows(IllegalArgumentException.class, () -> service.addSeverance(tenant, jane.getId(), sev("13846.15", "D1", "0", false), actor));
+        assertTrue(store.isEmpty());
+        service.addSeverance(tenant, jane.getId(), sev("13846.15", "D1", "0", true), actor);
+        assertEquals(1, store.size());
+        assertTrue(store.get(0).isRefusedAlternative());
+    }
+
+    @Test
+    void severanceIsRefusedWithoutADirectiveOrForOtherEndings() {
+        retrench();
+        assertThrows(IllegalArgumentException.class, () -> service.addSeverance(tenant, jane.getId(), sev("20000", " ", "0", false), actor));
+        assertThrows(IllegalArgumentException.class, () -> service.addSeverance(tenant, jane.getId(), sev("20000", "D1", null, false), actor));
+        assertTrue(store.isEmpty());
+    }
+
+    @Test
+    void severanceIsRefusedForSomeoneStillWorkingAndForAnotherEnding() {
+        assertThrows(IllegalArgumentException.class, () -> service.addSeverance(tenant, jane.getId(), sev("20000", "D1", "0", false), actor));
+        jane.terminate(LocalDate.of(2026, 9, 15), "Resigned", actor, "RESIGNATION", null);
+        assertThrows(IllegalArgumentException.class, () -> service.addSeverance(tenant, jane.getId(), sev("20000", "D1", "0", false), actor));
+    }
+
+    @Test
+    void severanceIsEnteredOnceAndNotForYourself() {
+        retrench();
+        service.addSeverance(tenant, jane.getId(), sev("20000", "D1", "0", false), actor);
+        assertThrows(IllegalArgumentException.class, () -> service.addSeverance(tenant, jane.getId(), sev("20000", "D2", "0", false), actor));
+        assertThrows(AccessDeniedException.class, () -> service.addSeverance(tenant, jane.getId(), sev("20000", "D1", "0", false), null));
+    }
+
+    @Test
+    void severanceNeedsAReason() {
+        retrench();
+        var r = new PayAdjustmentService.SeveranceRequest(new BigDecimal("20000"), "D1", BigDecimal.ZERO, false, " ");
+        assertThrows(IllegalArgumentException.class, () -> service.addSeverance(tenant, jane.getId(), r, actor));
+    }
 }

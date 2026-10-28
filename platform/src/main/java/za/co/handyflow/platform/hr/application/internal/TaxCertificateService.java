@@ -119,7 +119,7 @@ public class TaxCertificateService {
         Map<UUID, List<HrPayslip>> byRun = slips.stream().collect(Collectors.groupingBy(HrPayslip::getPayRunId));
         for (HrPayRun r : issued) {
             List<HrPayslip> rs = byRun.getOrDefault(r.getId(), List.of());
-            BigDecimal paye = sum(rs, HrPayslip::getPayeAmount);
+            BigDecimal paye = sum(rs, HrPayslip::getPayeAmount).add(sum(rs, HrPayslip::getSeveranceTax));
             if (paye.compareTo(r.getTotalPaye()) != 0)
                 general.add(new TaxCertificateRules.Problem("WARNING", r.getPayRunNumber(), "The PAYE total of the run (" + TaxCertificateRules.cents(r.getTotalPaye())
                         + ") is not the sum of its payslips (" + TaxCertificateRules.cents(paye) + ")."));
@@ -145,12 +145,12 @@ public class TaxCertificateService {
                 continue;
             }
             Totals t = totals(entry.getValue());
-            slipPaye = slipPaye.add(t.paye());
+            slipPaye = slipPaye.add(t.paye()).add(t.severanceTax());
             slipUif = slipUif.add(t.uif());
             slipSdl = slipSdl.add(t.sdl());
             List<TaxCertificateRules.Line> lines = TaxCertificateRules.lines(t, settings.retirementFundType());
             for (var l : lines) {
-                if ("4102".equals(l.code())) certPaye = certPaye.add(l.amount());
+                if ("4102".equals(l.code()) || "4115".equals(l.code())) certPaye = certPaye.add(l.amount());
                 if ("4141".equals(l.code())) certUif = certUif.add(l.amount());
                 if ("4142".equals(l.code())) certSdl = certSdl.add(l.amount());
             }
@@ -190,7 +190,8 @@ public class TaxCertificateService {
                 sum(l, HrPayslip::getOtherEarnings), sum(l, HrPayslip::getTravelAllowance), sum(l, HrPayslip::getPension),
                 sum(l, HrPayslip::getMedicalAid), sum(l, HrPayslip::getPayeAmount), sum(l, HrPayslip::getUifEmployee),
                 sum(l, HrPayslip::getUifEmployer), sum(l, HrPayslip::getSdlAmount), sum(l, HrPayslip::getMedicalTaxCredit),
-                l.size(), withoutCredit, sum(l, HrPayslip::getEmployerMedical), sum(l, HrPayslip::getEmployerRetirement), sum(l, HrPayslip::getOtherFringe));
+                l.size(), withoutCredit, sum(l, HrPayslip::getEmployerMedical), sum(l, HrPayslip::getEmployerRetirement), sum(l, HrPayslip::getOtherFringe),
+                sum(l, HrPayslip::getSeveranceAmount), sum(l, HrPayslip::getSeveranceTax));
     }
 
     private static boolean sameLines(List<TaxCertificateRules.Line> lines, List<HrTaxCertificateLine> stored) {

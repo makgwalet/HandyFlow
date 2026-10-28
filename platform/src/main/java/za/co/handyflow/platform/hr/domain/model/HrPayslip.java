@@ -28,6 +28,11 @@ public class HrPayslip {
     @Column(name = "back_pay_amount")   BigDecimal backPayAmount   = BigDecimal.ZERO;
     /** Pay in place of notice, paid with the last pay. Part of the total earnings. */
     @Column(name = "notice_pay_amount") BigDecimal noticePayAmount = BigDecimal.ZERO;
+    /** Severance on retrenchment: a lump sum taxed as the SARS directive says, not by the monthly PAYE. Part of the total earnings. */
+    @Column(name = "severance_amount")  BigDecimal severanceAmount = BigDecimal.ZERO;
+    /** The tax the directive asks to be withheld on the severance. Part of the total deductions and of the PAYE on the EMP201. */
+    @Column(name = "severance_tax")     BigDecimal severanceTax    = BigDecimal.ZERO;
+    @Column(name = "severance_directive") String severanceDirective;
     @Column(name = "travel_allowance")  BigDecimal travelAllowance = BigDecimal.ZERO;
     @Column(name = "other_earnings")    BigDecimal otherEarnings   = BigDecimal.ZERO;
     @Column(name = "total_earnings")    BigDecimal totalEarnings;
@@ -87,6 +92,8 @@ public class HrPayslip {
         p.bonusAmount     = BigDecimal.ZERO;
         p.backPayAmount   = BigDecimal.ZERO;
         p.noticePayAmount = BigDecimal.ZERO;
+        p.severanceAmount = BigDecimal.ZERO;
+        p.severanceTax    = BigDecimal.ZERO;
         p.travelAllowance = travelAllowance != null ? travelAllowance : BigDecimal.ZERO;
         p.otherEarnings   = BigDecimal.ZERO;
         p.medicalAid      = medicalAid != null ? medicalAid : BigDecimal.ZERO;
@@ -134,6 +141,13 @@ public class HrPayslip {
     /** Pay in place of notice paid this month. Set before the calculations are applied, which add it to the earnings. */
     public void setNoticePay(BigDecimal amount) { this.noticePayAmount = amount == null ? BigDecimal.ZERO : amount; }
 
+    /** Severance and the directed tax on it. Set before the calculations are applied, which add them to the earnings and deductions. */
+    public void setSeverance(BigDecimal amount, BigDecimal tax, String directive) {
+        this.severanceAmount = amount == null ? BigDecimal.ZERO : amount;
+        this.severanceTax = tax == null ? BigDecimal.ZERO : tax;
+        this.severanceDirective = directive;
+    }
+
     /** Overpayments recovered from this month's net pay, after tax. Called after the calculations; they change neither tax nor earnings. */
     public void recover(BigDecimal amount) {
         if (amount == null || amount.signum() <= 0) return;
@@ -160,11 +174,11 @@ public class HrPayslip {
 
         this.totalEarnings = grossSalary
                 .add(overtimeAmount).add(bonusAmount).add(backPayAmount).add(noticePayAmount)
-                .add(travelAllowance).add(otherEarnings).add(leavePayoutAmount);
+                .add(travelAllowance).add(otherEarnings).add(leavePayoutAmount).add(severanceAmount);
 
         this.totalDeductions = payeAmount
                 .add(uifEmployee).add(medicalAid)
-                .add(pension).add(otherDeductions);
+                .add(pension).add(otherDeductions).add(severanceTax);
 
         this.netPay = totalEarnings.subtract(totalDeductions);
     }

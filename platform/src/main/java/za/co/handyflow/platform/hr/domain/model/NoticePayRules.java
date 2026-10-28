@@ -22,7 +22,7 @@ public final class NoticePayRules {
     public static String problem(String employeeStatus, String endType, BigDecimal amount, BigDecimal owed, BigDecimal cap, boolean alreadyEntered) {
         if (!"TERMINATED".equals(employeeStatus)) return "Notice pay is entered once employment has ended.";
         if (endType == null) return "Record how employment ended first. Notice pay is owed only when the employer ends it with notice owed.";
-        if (!NoticeRules.EMPLOYER_NOTICE.equals(endType)) return "Employment ended by " + NoticeRules.typeLabel(endType) + ", which owes no pay in place of notice.";
+        if (!NoticeRules.employerEnds(endType)) return "Employment ended by " + NoticeRules.typeLabel(endType) + ", which owes no pay in place of notice.";
         if (alreadyEntered) return "Notice pay is already entered for this employee.";
         if (owed == null || owed.signum() <= 0) return "The whole notice period was given, so no pay in place of it is owed.";
         if (amount == null || amount.signum() <= 0) return "Enter the amount.";

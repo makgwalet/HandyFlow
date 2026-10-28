@@ -16,8 +16,11 @@ public final class NoticeRules {
     private NoticeRules() {}
 
     public static final String RESIGNATION = "RESIGNATION", EMPLOYER_NOTICE = "EMPLOYER_NOTICE", SUMMARY_DISMISSAL = "SUMMARY_DISMISSAL",
-            CONTRACT_END = "CONTRACT_END", MUTUAL = "MUTUAL", OTHER = "OTHER";
-    public static final Set<String> TYPES = Set.of(RESIGNATION, EMPLOYER_NOTICE, SUMMARY_DISMISSAL, CONTRACT_END, MUTUAL, OTHER);
+            RETRENCHMENT = "RETRENCHMENT", CONTRACT_END = "CONTRACT_END", MUTUAL = "MUTUAL", OTHER = "OTHER";
+    public static final Set<String> TYPES = Set.of(RESIGNATION, EMPLOYER_NOTICE, SUMMARY_DISMISSAL, RETRENCHMENT, CONTRACT_END, MUTUAL, OTHER);
+
+    /** The employer ends employment and owes notice (or pay for the days not given). Retrenchment is one. */
+    public static boolean employerEnds(String endType) { return EMPLOYER_NOTICE.equals(endType) || RETRENCHMENT.equals(endType); }
 
     /** Null when the answers can be saved. Both are optional; a notice date needs a type to mean anything. */
     public static String problem(String endType, LocalDate noticeGivenOn, LocalDate lastDay, LocalDate start) {
@@ -46,7 +49,7 @@ public final class NoticeRules {
 
     /** Days of notice not given. Only an employer ending employment owes pay in place of it. */
     public static int shortfallDays(String endType, LocalDate start, LocalDate noticeGivenOn, LocalDate lastDay) {
-        if (!EMPLOYER_NOTICE.equals(endType)) return 0;
+        if (!employerEnds(endType)) return 0;
         return Math.max(0, requiredDays(start, noticeGivenOn, lastDay) - givenDays(noticeGivenOn, lastDay));
     }
 
@@ -58,7 +61,7 @@ public final class NoticeRules {
 
     /** The pay for the whole notice period: the most pay in place of notice can come to. */
     public static BigDecimal fullPay(String endType, BigDecimal monthlySalary, LocalDate start, LocalDate noticeGivenOn, LocalDate lastDay) {
-        if (!EMPLOYER_NOTICE.equals(endType)) return BigDecimal.ZERO;
+        if (!employerEnds(endType)) return BigDecimal.ZERO;
         return pay(monthlySalary, requiredDays(start, noticeGivenOn, lastDay));
     }
 
@@ -73,6 +76,7 @@ public final class NoticeRules {
             case RESIGNATION -> "resignation";
             case EMPLOYER_NOTICE -> "ended by the employer, with notice owed";
             case SUMMARY_DISMISSAL -> "summary dismissal";
+            case RETRENCHMENT -> "retrenchment (operational reasons)";
             case CONTRACT_END -> "end of a fixed-term contract";
             case MUTUAL -> "mutual agreement";
             default -> "other";
@@ -81,7 +85,7 @@ public final class NoticeRules {
 
     /** One plain paragraph for the person ending employment and for the final-pay review. Null when there is nothing to say. */
     public static String summary(String endType, BigDecimal monthlySalary, LocalDate start, LocalDate noticeGivenOn, LocalDate lastDay) {
-        if (!EMPLOYER_NOTICE.equals(endType)) return null;
+        if (!employerEnds(endType)) return null;
         int required = requiredDays(start, noticeGivenOn, lastDay);
         int given = givenDays(noticeGivenOn, lastDay);
         int short_ = shortfallDays(endType, start, noticeGivenOn, lastDay);

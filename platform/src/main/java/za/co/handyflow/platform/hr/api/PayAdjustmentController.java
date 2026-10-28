@@ -12,8 +12,9 @@ import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.hr.application.internal.EtiService;
 import za.co.handyflow.platform.hr.application.internal.LeaveAdvanceService;
 import za.co.handyflow.platform.hr.application.internal.NoticePayService;
-import za.co.handyflow.platform.hr.application.internal.PayCorrectionService;
+import za.co.handyflow.platform.hr.application.internal.SeveranceService;
 import za.co.handyflow.platform.hr.application.internal.PayAdjustmentService;
+import za.co.handyflow.platform.hr.application.internal.PayCorrectionService;
 import za.co.handyflow.platform.hr.application.internal.PayrollAccess;
 import za.co.handyflow.platform.hr.dto.PayAdjustmentDtos.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -33,6 +34,7 @@ public class PayAdjustmentController {
     private final PayAdjustmentService service;
     private final LeaveAdvanceService leaveAdvance;
     private final NoticePayService noticePay;
+    private final SeveranceService severance;
     private final PayCorrectionService corrections;
     private final EtiService eti;
 
@@ -112,6 +114,24 @@ public class PayAdjustmentController {
         if (!PayrollAccess.canPrepare(authentication)) throw new AccessDeniedException("You may not enter a payment.");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Notice pay entered",
                 noticePay.enter(TenantContext.getTenantIdAsObject(), id, req, user(principal))));
+    }
+
+    @GetMapping("/employees/{id}/severance")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Severance for someone retrenched: the BCEA minimum, the years served, and whether it is already entered")
+    public ResponseEntity<ApiResponse<SeveranceService.Position>> severance(@PathVariable UUID id, Authentication authentication) {
+        if (!PayrollAccess.canReview(authentication)) throw new AccessDeniedException("You may not see this.");
+        return ResponseEntity.ok(ApiResponse.success(severance.position(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/employees/{id}/severance/enter")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Enter severance with its SARS directive number and the tax the directive asks to be withheld; the final run pays it")
+    public ResponseEntity<ApiResponse<View>> enterSeverance(@PathVariable UUID id, @RequestBody PayAdjustmentService.SeveranceRequest req,
+                                                            Authentication authentication, Principal principal) {
+        if (!PayrollAccess.canPrepare(authentication)) throw new AccessDeniedException("You may not enter a payment.");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Severance entered",
+                severance.enter(TenantContext.getTenantIdAsObject(), id, req, user(principal))));
     }
 
     @GetMapping("/payslips/{id}/corrections")

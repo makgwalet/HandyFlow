@@ -204,4 +204,24 @@ class TaxCertificateRulesTest {
         assertThat(probs).noneMatch(TaxCertificateRules.Problem::isError);
         assertThat(probs).anyMatch(p -> !p.isError() && p.message().contains("passport is used"));
     }
+
+    @Test
+    void severanceIsReportedUnder3901WithTheDirectedTaxUnder4115() {
+        var t = new TaxCertificateRules.Totals(d("30000"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("2000"), d("300"), d("300"), d("300"), d("0"), 1, 0,
+                d("0"), d("0"), d("0"), d("60000"), d("4500.50"));
+        var lines = TaxCertificateRules.lines(t, null);
+        assertThat(lines.stream().anyMatch(l -> l.code().equals("3901") && l.amount().compareTo(d("60000")) == 0)).isTrue();
+        assertThat(lines.stream().anyMatch(l -> l.code().equals("4115") && l.amount().compareTo(d("4500.50")) == 0)).isTrue();
+        assertThat(lines.stream().anyMatch(l -> l.code().equals("4102") && l.amount().compareTo(d("2000")) == 0)).isTrue();
+        assertThat(TaxCertificateRules.certificateType(t)).isEqualTo("IRP5");
+        var none = new TaxCertificateRules.Totals(d("30000"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), 1, 0);
+        assertThat(TaxCertificateRules.lines(none, null).stream().noneMatch(l -> l.code().equals("3901") || l.code().equals("4115"))).isTrue();
+    }
+
+    @Test
+    void aCertificateWithOnlyDirectedTaxIsAnIrp5() {
+        var t = new TaxCertificateRules.Totals(d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), 1, 0,
+                d("0"), d("0"), d("0"), d("60000"), d("4500"));
+        assertThat(TaxCertificateRules.certificateType(t)).isEqualTo("IRP5");
+    }
 }

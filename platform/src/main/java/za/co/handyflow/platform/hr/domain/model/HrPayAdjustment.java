@@ -37,6 +37,10 @@ public class HrPayAdjustment {
     @Column(name = "cancelled_by")  UUID cancelledBy;
     @Column(name = "cancelled_at")  Instant cancelledAt;
     @Column(name = "cancel_reason") String cancelReason;
+    /** Severance only: the SARS directive number and the tax it directs. */
+    @Column(name = "directive_number")    String directiveNumber;
+    @Column(name = "directive_tax")       BigDecimal directiveTax;
+    @Column(name = "refused_alternative") boolean refusedAlternative;
     /** The issued payslip this item corrects, if it is a correction. */
     @Column(name = "corrects_payslip_id") UUID correctsPayslipId;
 
@@ -56,6 +60,17 @@ public class HrPayAdjustment {
         a.status = PayAdjustmentRules.OPEN;
         a.createdBy = by;
         a.createdAt = Instant.now();
+        return a;
+    }
+
+    /** Severance: the SARS directive number and the tax it directs, and whether the minimum was waived by a refusal of other work. */
+    public static HrPayAdjustment severance(UUID tenantId, UUID employeeId, BigDecimal amount, LocalDate payFrom, String reason, String directive,
+                                            BigDecimal directiveTax, boolean refusedAlternative, UUID by) {
+        HrPayAdjustment a = of(tenantId, employeeId, PayAdjustmentRules.SEVERANCE, amount, payFrom,
+                SeveranceRules.DESCRIPTION + ", SARS directive " + directive.trim(), null, null, reason, by);
+        a.directiveNumber = directive.trim();
+        a.directiveTax = directiveTax;
+        a.refusedAlternative = refusedAlternative;
         return a;
     }
 

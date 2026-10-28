@@ -163,6 +163,8 @@ public class PayslipPdfGenerator {
             rows.add(new String[]{ "Back pay (arrears)", fmt(p.getBackPayAmount()) });
         if (p.getNoticePayAmount() != null && p.getNoticePayAmount().signum() > 0)
             rows.add(new String[]{ "Pay in place of notice", fmt(p.getNoticePayAmount()) });
+        if (p.getSeveranceAmount() != null && p.getSeveranceAmount().signum() > 0)
+            rows.add(new String[]{ "Severance pay", fmt(p.getSeveranceAmount()) });
         rows.add(new String[]{ "Other earnings",   fmt(p.getOtherEarnings()) });
         earningsCell.add(buildAmountTable(rows.toArray(new String[0][]), "Total earnings", fmt(p.getTotalEarnings()), BRAND_TEAL));
         two.addCell(earningsCell);
@@ -170,13 +172,15 @@ public class PayslipPdfGenerator {
         // Right: Deductions
         Cell deductionsCell = new Cell().setBorder(null).setPaddingLeft(8);
         deductionsCell.add(sectionTitle("Deductions"));
-        deductionsCell.add(buildAmountTable(new String[][]{
-                { "PAYE (Income tax)", fmt(p.getPayeAmount())    },
-                { "UIF (Employee)",    fmt(p.getUifEmployee())   },
-                { "Medical aid",       fmt(p.getMedicalAid())    },
-                { "Pension fund",      fmt(p.getPension())       },
-                { "Other deductions",  fmt(p.getOtherDeductions())},
-        }, "Total deductions", fmt(p.getTotalDeductions()), new DeviceRgb(220, 38, 38)));
+        java.util.List<String[]> deductions = new java.util.ArrayList<>(java.util.List.of(
+                new String[]{ "PAYE (Income tax)", fmt(p.getPayeAmount())    },
+                new String[]{ "UIF (Employee)",    fmt(p.getUifEmployee())   },
+                new String[]{ "Medical aid",       fmt(p.getMedicalAid())    },
+                new String[]{ "Pension fund",      fmt(p.getPension())       },
+                new String[]{ "Other deductions",  fmt(p.getOtherDeductions())}));
+        if (positive(p.getSeveranceTax()))
+            deductions.add(new String[]{ "Tax on severance (SARS directive)", fmt(p.getSeveranceTax()) });
+        deductionsCell.add(buildAmountTable(deductions.toArray(new String[0][]), "Total deductions", fmt(p.getTotalDeductions()), new DeviceRgb(220, 38, 38)));
         two.addCell(deductionsCell);
 
         doc.add(two);
@@ -185,6 +189,9 @@ public class PayslipPdfGenerator {
         if (positive(p.getEmployerMedical())) benefits.add("Employer medical aid contribution " + fmt(p.getEmployerMedical()));
         if (positive(p.getEmployerRetirement())) benefits.add("Employer retirement fund contribution " + fmt(p.getEmployerRetirement()));
         if (positive(p.getOtherFringe())) benefits.add("Other taxable benefits " + fmt(p.getOtherFringe()));
+        if (positive(p.getSeveranceAmount()) && p.getSeveranceDirective() != null)
+            doc.add(new Paragraph("Severance is taxed as SARS directive " + p.getSeveranceDirective() + " says, not with the monthly PAYE.")
+                    .setFontSize(8).setMarginTop(8));
         if (!benefits.isEmpty())
             doc.add(new Paragraph("Taxable benefits this month, not paid in cash but included in the income your tax is worked out on: "
                     + String.join("; ", benefits) + ".").setFontSize(8).setMarginTop(8));

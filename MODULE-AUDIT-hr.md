@@ -1499,3 +1499,25 @@ Sources: PaySpace, "e@syFile employer error: Passport number (3070), country of 
 - Matching uses the account number the file shows. A file that masks the account (for example "••••7890") cannot be matched; it is reported as unmatched.
 - The amount's sign is ignored, so a credit line for the same amount would match as readily as a debit. Check the preview.
 - The bank-change history shows the stored value (CURRENT, SAVINGS…) rather than the friendly name.
+
+## 65. Retrenchment severance (Slice 31, V548)
+
+**What it does.** `RETRENCHMENT` is a new way employment can end (V548 widens the check on `hr_employees.end_type`). It is employer-initiated, so notice and pay in place of notice apply to it exactly as they do to `EMPLOYER_NOTICE` (`NoticeRules.employerEnds`). Once the employee is terminated, the pay-items screen shows a severance panel with the completed years of service, a week's pay (monthly × 12 / 52) and the BCEA section 41 minimum (a week's pay per completed year). Severance is entered with the amount, the SARS directive number, the tax the directive asks to be withheld, and a reason. It becomes a pay item of kind `SEVERANCE` (V548 adds the kind, `directive_number`, `directive_tax`, `refused_alternative`) dated on the last day, and the final run pays it. The ordinary pay-item form refuses the kind.
+
+**Rules.** Only for a terminated employee whose end type is retrenchment; once per employee; a directive number is required (letters, digits, slash, dash, 40 at most); the directed tax is required (nil is a valid entry) and cannot exceed the severance; an amount below the BCEA minimum is refused unless the employee unreasonably refused alternative employment, which is recorded on the item. Entering a payment for yourself is refused, as for other pay items.
+
+**Payroll.** Severance is outside the payroll engine: it is not in the PAYE, UIF, SDL or ETI base. `hr_payslips` gains `severance_amount`, `severance_tax`, `severance_directive`. Total earnings include the severance and total deductions include the directed tax, so net pay is the severance less the tax. The directed tax is added to the run's PAYE (and so to the EMP201), and the severance to the run's gross. A calculation warning names the amount, the tax and the directive. The payslip PDF shows "Severance pay" among the earnings, "Tax on severance (SARS directive)" among the deductions and a line naming the directive; the payslip response and payslip notes carry the three fields.
+
+**Certificate.** `TaxCertificateRules.Totals` gains `severance` and `severanceTax` (the old constructors default them to nil). The certificate shows code 3901 (severance) and 4115 (employees' tax on lump sums); 4102 stays the monthly PAYE. The certificate type is IRP5 when either tax is above nil, the "tax more than income" check counts both, and the reconciliation compares payslips, certificates and EMP201 with 4102 + 4115 on the certificate side. The e@syFile writer already counted 4115 in the 4149 total and 3901 in the 3699 income total.
+
+**Tests.**
+- Run offline, passing: `SeveranceRulesTest` (8), `HrPayslipSeveranceTest` (3), `PayAdjustmentServiceTest` (27, seven new), `TaxCertificateRulesTest` (23, two new), `NoticeRulesTest`, `NoticePayRulesTest`, `HrPayslipRecoveryTest`. One mutation (minimum check removed) was caught.
+- Frontend: types and lint clean; the four severance logic cases pass under Node. The modal test and `payslipNotes` addition were written but not run (vitest is not installed).
+- Not compiled or run: `PayrollService`, `TaxCertificateService`, `PayslipPdfGenerator`, the controller and `SeveranceService` (Spring, iText and Mockito are not available here); nothing ran against Postgres or a browser.
+
+**Limits and things I could not verify**
+- SARS works out the tax. This does not calculate it; it records what the directive says. The R550 000 tax-free amount and the reduction for earlier lump sums are SARS's to apply when it issues the directive. The directive must be obtained before the final pay.
+- I took severance to be outside UIF and SDL. I could not confirm the SDL treatment from SARS's own text; check it with your tax adviser before the first retrenchment run.
+- Qualifying reasons for the exemption (employer stopping trade, reduction of staff and so on) are SARS's to judge; the screen records only that employment ended by retrenchment.
+- A severance paid in a later run than the final one is dated on the last day, so it is taken by the next run that includes that date.
+- Code 4115 amount is reported to the cent and 3901 in whole Rand, as for the other codes; I did not check these against a SARS sample file.

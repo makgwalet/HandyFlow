@@ -15,7 +15,7 @@ import java.util.List;
  *       naming as the tax year of a pay run). The interim reconciliation covers March to August; the annual one covers
  *       March to February. SARS: interim certificates are sent to SARS only and are not given to employees.</li>
  *   <li>Only the codes that map one-to-one to what a payslip holds are produced: 3601, 3605, 3607, 3713 and 3701 for
- *       income, 4001/4003/4006 and 4005 for the employee's contributions, and 4102, 4116, 4141 and 4142 for tax. The totals
+ *       income, 4001/4003/4006 and 4005 for the employee's contributions, and 4102, 4116, 4141 and 4142 for tax; severance adds 3901 with the directed tax under 4115. The totals
  *       SARS also requires (3695 to 3699, 4149, 4582 and others) are not produced, because their definitions could not be
  *       confirmed from SARS's own documents; see {@link #NOT_PRODUCED}. A certificate from here is therefore a workpaper to
  *       complete in e@syFile, not a submission.</li>
@@ -62,13 +62,22 @@ public final class TaxCertificateRules {
     public record Totals(BigDecimal basic, BigDecimal overtime, BigDecimal bonus, BigDecimal otherEarnings, BigDecimal travel,
                          BigDecimal pension, BigDecimal medicalAid, BigDecimal paye, BigDecimal uifEmployee, BigDecimal uifEmployer,
                          BigDecimal sdl, BigDecimal medicalCredit, int payslips, int payslipsWithoutCredit,
-                         BigDecimal employerMedical, BigDecimal employerRetirement, BigDecimal otherFringe) {
+                         BigDecimal employerMedical, BigDecimal employerRetirement, BigDecimal otherFringe,
+                         BigDecimal severance, BigDecimal severanceTax) {
+        /** Without severance, as before payroll paid it. */
+        public Totals(BigDecimal basic, BigDecimal overtime, BigDecimal bonus, BigDecimal otherEarnings, BigDecimal travel,
+                      BigDecimal pension, BigDecimal medicalAid, BigDecimal paye, BigDecimal uifEmployee, BigDecimal uifEmployer,
+                      BigDecimal sdl, BigDecimal medicalCredit, int payslips, int payslipsWithoutCredit,
+                      BigDecimal employerMedical, BigDecimal employerRetirement, BigDecimal otherFringe) {
+            this(basic, overtime, bonus, otherEarnings, travel, pension, medicalAid, paye, uifEmployee, uifEmployer, sdl, medicalCredit,
+                    payslips, payslipsWithoutCredit, employerMedical, employerRetirement, otherFringe, ZERO, ZERO);
+        }
         /** Without taxable benefits, as before payroll recorded them. */
         public Totals(BigDecimal basic, BigDecimal overtime, BigDecimal bonus, BigDecimal otherEarnings, BigDecimal travel,
                       BigDecimal pension, BigDecimal medicalAid, BigDecimal paye, BigDecimal uifEmployee, BigDecimal uifEmployer,
                       BigDecimal sdl, BigDecimal medicalCredit, int payslips, int payslipsWithoutCredit) {
             this(basic, overtime, bonus, otherEarnings, travel, pension, medicalAid, paye, uifEmployee, uifEmployer, sdl, medicalCredit,
-                    payslips, payslipsWithoutCredit, ZERO, ZERO, ZERO);
+                    payslips, payslipsWithoutCredit, ZERO, ZERO, ZERO, ZERO, ZERO);
         }
         public static Totals empty() {
             return new Totals(ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, 0, 0);
@@ -93,6 +102,7 @@ public final class TaxCertificateRules {
         add(out, "3607", "Overtime", t.overtime());
         add(out, "3701", "Travel allowance", t.travel());
         add(out, "3713", "Other taxable allowances", t.otherEarnings());
+        add(out, "3901", "Severance benefits (retrenchment)", t.severance());
         String fund = retirementFund == null ? PENSION : retirementFund;
         // Taxable benefits: the employer's contribution shows as a fringe benefit and again in the 44xx code beside it.
         add(out, "3801", "General fringe benefits", t.otherFringe());
@@ -120,6 +130,7 @@ public final class TaxCertificateRules {
         add(out, "4005", "Medical scheme contributions (employee)", t.medicalAid());
         // Tax codes are reported to the cent even when zero.
         out.add(new Line("4102", "PAYE (employees' tax)", cents(t.paye())));
+        add(out, "4115", "Employees' tax on lump sums (severance directive)", t.severanceTax());
         add(out, "4116", "Medical tax credit applied against PAYE", t.medicalCredit());
         out.add(new Line("4141", "UIF contributions (employee and employer)", cents(t.uif())));
         out.add(new Line("4142", "Skills development levy", cents(t.sdl())));
@@ -133,7 +144,7 @@ public final class TaxCertificateRules {
     }
 
     /** IRP5 when tax was deducted, IT3(a) when none was. */
-    public static String certificateType(Totals t) { return t.paye().signum() > 0 ? IRP5 : IT3A; }
+    public static String certificateType(Totals t) { return t.paye().add(t.severanceTax()).signum() > 0 ? IRP5 : IT3A; }
 
     // ── Certificate number ──────────────────────────────────────────────────────────────────────
 
@@ -188,7 +199,7 @@ public final class TaxCertificateRules {
         if (taxProblem != null) out.add(error(subject, taxProblem));
         if (taxNumber == null || taxNumber.isBlank()) out.add(warning(subject, "No income tax reference number is recorded."));
         if (!hasIncome(lines)) out.add(error(subject, "Nothing is reported as income, but a certificate needs at least one income code."));
-        if (t.paye().compareTo(t.basic().add(t.bonus()).add(t.overtime()).add(t.otherEarnings()).add(t.travel())) > 0)
+        if (t.paye().add(t.severanceTax()).compareTo(t.basic().add(t.bonus()).add(t.overtime()).add(t.otherEarnings()).add(t.travel()).add(t.severance())) > 0)
             out.add(error(subject, "The tax deducted is more than the income paid, so the figures need to be checked before a certificate is issued."));
         if (t.payslipsWithoutCredit() > 0)
             out.add(warning(subject, t.payslipsWithoutCredit() + " payslip(s) were made before the medical tax credit was recorded, so code 4116 may be understated."));

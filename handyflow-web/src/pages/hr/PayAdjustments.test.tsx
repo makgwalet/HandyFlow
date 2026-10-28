@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import PayAdjustmentsModal from "./PayAdjustmentsModal"
-import { EMPTY_PAY_FORM, noticeBody, noticeProblem, noticeShown, type NoticePay, advanceBody, advanceProblem, advanceShown, cancelProblem, canEnterPay, payBody, payProblem, type PayAdjustment, type PayForm } from "./payAdjustments.logic"
+import { EMPTY_PAY_FORM, EMPTY_SEVERANCE_FORM, severanceBody, severanceNet, severanceProblem, severanceShown, type Severance, noticeBody, noticeProblem, noticeShown, type NoticePay, advanceBody, advanceProblem, advanceShown, cancelProblem, canEnterPay, payBody, payProblem, type PayAdjustment, type PayForm } from "./payAdjustments.logic"
 
 const get = vi.fn()
 const post = vi.fn()
@@ -192,6 +192,7 @@ describe("pay in place of notice", () => {
     expect(noticeShown({ ...NP, endType: "RESIGNATION" })).toBe(false)
     expect(noticeShown({ ...NP, terminated: false })).toBe(false)
     expect(noticeShown(NP)).toBe(true)
+    expect(noticeShown({ ...NP, endType: "RETRENCHMENT" })).toBe(true)
   })
   it("takes the pay owed when the amount is blank, allows more up to the whole period, and needs a reason", () => {
     expect(noticeProblem({ amount: "", reason: "" }, NP)).toMatch(/reason/)
@@ -215,5 +216,53 @@ describe("pay in place of notice", () => {
     fireEvent.change(screen.getByLabelText(/^Reason/), { target: { value: "Two weeks short" } })
     fireEvent.click(btn)
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/hr/employees/e1/notice-pay/enter", { amount: null, reason: "Two weeks short" }))
+  })
+})
+
+describe("severance on retrenchment", () => {
+  const SV: Severance = { retrenched: true, endType: "RETRENCHMENT", completedYears: 2, weeklyPay: 6923.08, minimum: 13846.16, summary: "Severance owed at least: 13846.16.", alreadyEntered: false }
+  const OK = { amount: "20000", directive: "IRP3-1", tax: "1500.50", refused: false, reason: "Position made redundant" }
+  it("is shown only for someone who was retrenched", () => {
+    expect(severanceShown(undefined)).toBe(false)
+    expect(severanceShown({ ...SV, retrenched: false })).toBe(false)
+    expect(severanceShown(SV)).toBe(true)
+  })
+  it("needs the amount, a directive, its tax and a reason", () => {
+    expect(severanceProblem(OK, SV)).toBeNull()
+    expect(severanceProblem({ ...OK, amount: "" }, SV)).toMatch(/severance amount/)
+    expect(severanceProblem({ ...OK, amount: "10.123" }, SV)).toMatch(/two decimals/)
+    expect(severanceProblem({ ...OK, directive: " " }, SV)).toMatch(/directive number/)
+    expect(severanceProblem({ ...OK, directive: "a$b" }, SV)).toMatch(/digits/)
+    expect(severanceProblem({ ...OK, tax: "" }, SV)).toMatch(/tax SARS directed/)
+    expect(severanceProblem({ ...OK, tax: "20000.01" }, SV)).toMatch(/more than the severance/)
+    expect(severanceProblem({ ...OK, tax: "20000" }, SV)).toBeNull()
+    expect(severanceProblem({ ...OK, reason: "" }, SV)).toMatch(/reason/)
+    expect(severanceProblem(OK, { ...SV, alreadyEntered: true })).toMatch(/already entered/)
+  })
+  it("holds to the BCEA minimum unless other work was refused", () => {
+    expect(severanceProblem({ ...OK, amount: "13846.15", tax: "0" }, SV)).toMatch(/BCEA minimum/)
+    expect(severanceProblem({ ...OK, amount: "13846.16", tax: "0" }, SV)).toBeNull()
+    expect(severanceProblem({ ...OK, amount: "100", tax: "0", refused: true }, SV)).toBeNull()
+  })
+  it("sends the figures and works out what the employee receives", () => {
+    expect(severanceBody({ ...OK, directive: " IRP3-1 ", reason: " r " })).toEqual({ amount: 20000, directiveNumber: "IRP3-1", directiveTax: 1500.5, refusedAlternative: false, reason: "r" })
+    expect(severanceNet(OK)).toBeCloseTo(18499.5, 2)
+    expect(severanceNet(EMPTY_SEVERANCE_FORM)).toBe(0)
+  })
+  it("enters the severance", async () => {
+    get.mockImplementation((url: string) => Promise.resolve({ data: { data: url.endsWith("severance") ? SV : url.endsWith("leave-advance") ? { terminated: true, days: 0, amount: 0, alreadyEntered: false } : [] } }))
+    post.mockResolvedValue({ data: {} })
+    wrap(<PayAdjustmentsModal employee={{ ...EMP, status: "TERMINATED" }} permissions={["PAYROLL_PREPARE"]} onClose={() => {}} />)
+    await screen.findByText(/the BCEA minimum is/)
+    const btn = screen.getByRole("button", { name: "Enter severance" }) as HTMLButtonElement
+    expect(btn.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText(/^Severance amount/), { target: { value: "20000" } })
+    fireEvent.change(screen.getByLabelText(/^SARS directive number/), { target: { value: "IRP3-1" } })
+    fireEvent.change(screen.getByLabelText(/^Tax the directive asks for/), { target: { value: "1500.50" } })
+    fireEvent.change(screen.getByLabelText(/^Reason/), { target: { value: "Position made redundant" } })
+    expect(btn.disabled).toBe(false)
+    fireEvent.click(btn)
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/hr/employees/" + EMP.id + "/severance/enter",
+      { amount: 20000, directiveNumber: "IRP3-1", directiveTax: 1500.5, refusedAlternative: false, reason: "Position made redundant" }))
   })
 })

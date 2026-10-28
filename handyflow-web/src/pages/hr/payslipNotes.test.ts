@@ -27,4 +27,11 @@ describe('payslipNotes', () => {
     expect(payslipNotes({ bonusAmount: 0, backPayAmount: null })).toEqual([])
     expect(payslipNotes({ noticePayAmount: 12000 })).toEqual([expect.stringContaining('Pay in place of notice of R')])
   })
+  it('mentions severance and the tax SARS directed', () => {
+    const n = payslipNotes({ severanceAmount: 60000, severanceTax: 4500.5 })
+    expect(n).toHaveLength(1)
+    expect(n[0]).toContain('Severance of R')
+    expect(n[0]).toContain('tax as directed by SARS')
+    expect(payslipNotes({ severanceAmount: 0 })).toEqual([])
+  })
 })
