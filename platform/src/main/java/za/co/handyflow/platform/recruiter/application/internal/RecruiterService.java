@@ -232,7 +232,7 @@ public class RecruiterService {
             throw new HandyFlowException("This position is no longer accepting applications",
                     HttpStatus.GONE, "JOB_CLOSED");
         }
-        return toJobResponse(job, fetchTenantName(tenantId));
+        return toJobResponse(job, fetchTenantName(tenantId)).withRetentionMonths(approvalService.retentionMonths(tenantId));
     }
 
     // ── Applications — public submission (no auth) ────────────────────────────
@@ -643,6 +643,9 @@ public class RecruiterService {
                     HttpStatus.BAD_REQUEST, "SALARY_REQUIRED");
         }
 
+        String personal = HireDetailsRules.problem(req.gender(), req.emergencyContactName(), req.emergencyContactPhone());
+        if (personal != null) throw new HandyFlowException(personal, HttpStatus.BAD_REQUEST, "INVALID_HIRE_DETAILS");
+
         // Route through the real HR module instead of a raw JDBC insert.
         // This reuses the one real EmployeeNumberGenerator (previously this
         // method had its own separate, equally race-prone COUNT(*)+1 copy)
@@ -651,14 +654,14 @@ public class RecruiterService {
         // started with zero leave on the books.
         CreateEmployeeRequest hrReq = new CreateEmployeeRequest(
                 applicant.getFirstName(), applicant.getLastName(),
-                blank(req.idNumber()), blank(req.taxNumber()), null, null, null,   // dob/gender/race are not captured here; HR completes them
+                blank(req.idNumber()), blank(req.taxNumber()), req.dateOfBirth(), blank(req.gender()), null,   // race is not captured here; HR completes it
                 applicant.getEmail(), applicant.getPhone(),
                 req.startDate(), req.employmentType(),
                 jobTitle, department,
                 req.grossSalary(), req.payFrequency(),
                 blank(req.bankName()), blank(req.bankAccountNumber()), blank(req.bankBranchCode()),   // banking, when the new hire gave it
                 null, null, null,                              // medical/pension/travel — completed later in HR
-                null, null,                                     // emergency contact — completed later in HR
+                blank(req.emergencyContactName()), blank(req.emergencyContactPhone()),   // emergency contact, when the new hire gave it
                 "Converted from recruiter application " + applicationId
         );
         EmployeeSummary created = hrFacade.createEmployee(tenantId, hrReq);

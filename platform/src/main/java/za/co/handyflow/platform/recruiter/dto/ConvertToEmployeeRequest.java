@@ -19,6 +19,9 @@ import java.time.LocalDate;
  * HR's own rules (a South African ID number, a 10-digit tax number, a bank name with an account and branch); when they have not, they stay
  * empty and the employee's onboarding keeps asking for them.
  *
+ * dateOfBirth, gender and an emergency contact (name and phone, given together) are optional in the same way; HR's rules check them (a date of birth
+ * that matches the ID number, a phone that looks like one).
+ *
  * employmentType / payFrequency are optional passthroughs — HrEmployee.create()
  * already defaults them (PERMANENT / MONTHLY) when null.
  */
@@ -34,11 +37,23 @@ public record ConvertToEmployeeRequest(
         String     taxNumber,
         String     bankName,
         String     bankAccountNumber,
-        String     bankBranchCode
+        String     bankBranchCode,
+        LocalDate  dateOfBirth,
+        String     gender,
+        String     emergencyContactName,
+        String     emergencyContactPhone
 ) {
+    /** The request as it was before the personal details were added. */
+    public ConvertToEmployeeRequest(LocalDate startDate, String jobTitle, String department, boolean createHrRecord,
+                                    BigDecimal grossSalary, String employmentType, String payFrequency,
+                                    String idNumber, String taxNumber, String bankName, String bankAccountNumber, String bankBranchCode) {
+        this(startDate, jobTitle, department, createHrRecord, grossSalary, employmentType, payFrequency,
+                idNumber, taxNumber, bankName, bankAccountNumber, bankBranchCode, null, null, null, null);
+    }
+
     /** The request as it was before the optional payroll details were added. */
     public ConvertToEmployeeRequest(LocalDate startDate, String jobTitle, String department, boolean createHrRecord,
                                     BigDecimal grossSalary, String employmentType, String payFrequency) {
-        this(startDate, jobTitle, department, createHrRecord, grossSalary, employmentType, payFrequency, null, null, null, null, null);
+        this(startDate, jobTitle, department, createHrRecord, grossSalary, employmentType, payFrequency, null, null, null, null, null, null, null, null, null);
     }
 }

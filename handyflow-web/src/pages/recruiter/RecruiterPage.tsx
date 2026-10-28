@@ -1,5 +1,5 @@
 // src/pages/recruiter/RecruiterPage.tsx
-import { EMPTY_HIRE_DETAILS, hireDetailsBody, hireDetailsProblem, missingCount, type HireDetails } from './hireDetails.logic'
+import { EMPTY_HIRE_DETAILS, GENDERS, hireDetailsBody, hireDetailsProblem, missingCount, personalMissing, type HireDetails } from './hireDetails.logic'
 import { useState } from 'react'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
@@ -332,7 +332,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
   const [createHrRecord, setCreateHrRecord] = useState(true)
   const [grossSalary, setGrossSalary]     = useState('')
   const [hire, setHire]                   = useState<HireDetails>(EMPTY_HIRE_DETAILS)
-  const setHireField = (k: keyof HireDetails) => (e: React.ChangeEvent<HTMLInputElement>) => setHire(h => ({ ...h, [k]: e.target.value }))
+  const setHireField = (k: keyof HireDetails) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setHire(h => ({ ...h, [k]: e.target.value }))
   const hireProblem = createHrRecord ? hireDetailsProblem(hire) : null
   const [error, setError]                 = useState('')
 
@@ -1105,6 +1105,18 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                   <div><label style={lbl} htmlFor="hire-bank">Bank</label><input id="hire-bank" value={hire.bankName} onChange={setHireField('bankName')} style={inp} /></div>
                   <div><label style={lbl} htmlFor="hire-acc">Account number</label><input id="hire-acc" inputMode="numeric" value={hire.bankAccountNumber} onChange={setHireField('bankAccountNumber')} style={inp} /></div>
                   <div><label style={lbl} htmlFor="hire-branch">Branch code</label><input id="hire-branch" inputMode="numeric" value={hire.bankBranchCode} onChange={setHireField('bankBranchCode')} style={inp} /></div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginTop: 10 }}>
+                  <div><label style={lbl} htmlFor="hire-dob">Date of birth</label><input id="hire-dob" type="date" value={hire.dateOfBirth} onChange={setHireField('dateOfBirth')} style={inp} /></div>
+                  <div><label style={lbl} htmlFor="hire-gender">Gender</label>
+                    <select id="hire-gender" value={hire.gender} onChange={setHireField('gender')} style={inp}>
+                      <option value="">Not given</option>{GENDERS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+                    </select></div>
+                  <div><label style={lbl} htmlFor="hire-ec-name">Emergency contact</label><input id="hire-ec-name" value={hire.emergencyContactName} onChange={setHireField('emergencyContactName')} style={inp} /></div>
+                  <div><label style={lbl} htmlFor="hire-ec-phone">Emergency contact phone</label><input id="hire-ec-phone" inputMode="tel" value={hire.emergencyContactPhone} onChange={setHireField('emergencyContactPhone')} style={inp} /></div>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 8 }}>
+                  {personalMissing(hire) === 0 ? 'Date of birth, gender and emergency contact given.' : `${personalMissing(hire)} of 3 personal details left empty. HR can add them later.`}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 8 }}>
                   {missingCount(hire) === 0 ? 'All given.' : `${missingCount(hire)} of 5 left empty. HR can add them later; onboarding will keep asking for them, and payroll cannot pay or certify the employee without them.`}

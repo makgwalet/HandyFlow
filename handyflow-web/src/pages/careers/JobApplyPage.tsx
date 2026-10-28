@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { consentStatement } from './consent.logic'
 import type { CSSProperties } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
@@ -19,6 +20,7 @@ interface JobDetail {
   description: string; requirements: string | null; benefits: string | null
   salaryMin: number | null; salaryMax: number | null; showSalary: boolean
   salaryCurrency?: string; companyName: string | null
+  retentionMonths?: number | null
 }
 interface ApplyResult {
   applicationId: string; jobTitle: string; companyName: string
@@ -58,10 +60,6 @@ const inputStyle: CSSProperties = {
 const labelStyle: CSSProperties = {
   display: 'block', fontSize: 13, fontWeight: 500, color: ink, marginBottom: 6,
 }
-
-// Must match RecruiterConsentRules.STATEMENT on the server; the server records which version the applicant agreed to.
-const CONSENT_STATEMENT =
-  "I agree that this company may keep my application, CV and contact details to consider me for this and similar roles, and that they will be removed after the company's retention period. I can ask to see, correct or delete them at any time."
 
 const MAX_CV_BYTES = 5 * 1024 * 1024 // 5MB — reasonable client-side guard; cv storage is
 // base64-in-DB on the backend (a known, separately-flagged gap, not something to fix here),
@@ -318,7 +316,7 @@ export function JobApplyPage() {
 
               <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, color: muted, lineHeight: 1.5, marginBottom: 18 }}>
                 <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} style={{ marginTop: 3 }} />
-                <span>{CONSENT_STATEMENT}</span>
+                <span>{consentStatement(job?.retentionMonths)}</span>
               </label>
 
               {formError && (

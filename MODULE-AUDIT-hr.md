@@ -741,10 +741,10 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 **Still not done**
 
 - Approvers are the tenant administrators. There is no "approver" permission, so a company cannot name particular people.
-- The consent statement does not show the company's actual retention months (the public job endpoint does not return the setting) and does not link to a privacy notice.
+- (Done since: the consent text shows the retention months, section 54. It still does not link to a privacy notice.)
 - Other public entry points that create applications, if any exist besides the careers page, were not looked for beyond `submitApplicationBySlug`.
-- Converting a hire into an employee with ID, tax and bank details is not done; the existing "place as employee" step is unchanged.
-- No reminder to an approver who has not acted.
+- (Done since: hire conversion takes ID, tax and bank details, section 43, and date of birth, gender and emergency contact, section 54.)
+- (Done since: section 54.)
 
 **Not verified**
 
@@ -1127,7 +1127,7 @@ I read the four training services, the entities and the session screen. The modu
 
 **Code.** `ConvertToEmployeeRequest` gained five optional fields (the old seven-field form still works); `RecruiterService.convertToEmployee` passes them on; `hireDetails.logic.ts` and the form. Checking the screen logic under node found a real fault in my first draft (an all-empty block was refused because HR's bank check treats empty as missing); it is fixed and the test file covers it.
 
-**Not done.** Date of birth, gender and emergency contact are still left to HR. Nothing here changes how an applicant gives these details; the recruiter types them in. `hireDetails.test.ts` (4 tests) has not run (no vitest); no backend test was added for the conversion, and Spring and the database have not run.
+**Not done.** (Date of birth, gender and emergency contact: done in section 54.) Nothing here changes how an applicant gives these details; the recruiter types them in. `hireDetails.test.ts` (4 tests) has not run (no vitest); no backend test was added for the conversion, and Spring and the database have not run.
 
 ## 44. Saved and scheduled reports (Slice 21a, V531)
 
@@ -1292,3 +1292,15 @@ Setting `hr_payroll_settings.tax_method`: PERIODIC (default, unchanged) or AVERA
 **Screen.** Payroll checks: "How PAYE is worked out". A run in averaging mode says so, and each employee whose PAYE differs from the periodic figure gets a line with both.
 
 **For the payroll specialist, before relying on it:** the formula follows the published description of the averaging method, not a SARS rule I could cite; months are counted from the later of tax-year start and the start month (so a starter is annualised over the months employed); the retirement deduction cap is applied per month as the periodic method does; a second run in the same month counts that month's earlier payslips as prior months; switching in the middle of a year uses approximate history; leave payout and overtime count as regular pay; the bureau `SarsPayrollCalculator` is untouched.
+
+## 54. Recruiter: approver reminders, retention months in the consent text, personal details on hire (Slice 23)
+
+No migration.
+
+- **Approver reminder.** A job or an offer waiting for approval is reminded on the 2nd day and every 3rd day after (2, 5, 8 ...), until it is decided or withdrawn. A daily check at 07:30 (SAST) finds requests in "submitted" (offers only if the letter has not gone and the application is not rejected or withdrawn) and sends `REC_APPROVAL_REMINDER` (in-app and email) to the company's administrators other than the person who asked. The message names the role and the wait, never the candidate or salary. Rules: `RecruiterApprovalRules.reminderDue`; scheduler `RecruiterApprovalReminderScheduler`.
+- **Retention months on the careers page.** The public job response now carries `retentionMonths` (the company's setting, default 12). The consent tick-box reads "...removed 12 months after my last activity unless I am hired...", and falls back to the general wording if no number arrives. Consent wording version is now `2026-10b`; applications keep the version they agreed to.
+- **Personal details on hire.** "Convert to HR employee" (internal hires) takes optional date of birth, gender (male, female, non-binary, prefer not to say) and an emergency contact name with phone, given together. HR's own rules still check them (a date of birth that matches the ID number, a phone that looks like one), so a wrong entry stops the conversion with the reason. Not captured: race, and the emergency contact's relation (HR's create request has no field for it).
+
+**Limits.** The reminder scheduler is not locked across several app instances, so two instances would send twice. Reminders go to all administrators; there is still no named-approver permission. The consent text names the period but still links to no privacy notice. Race and relation are left to HR.
+
+**Not verified.** Rules, consent and scheduler date tests pass in my harness; the scheduler's SQL, the notification enum addition, the form and Spring wiring have not run. `hireDetails.test.ts` and the careers tests need vitest, which is not installed here; the logic was checked under node.

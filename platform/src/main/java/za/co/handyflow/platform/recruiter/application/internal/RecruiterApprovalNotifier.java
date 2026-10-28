@@ -41,6 +41,17 @@ class RecruiterApprovalNotifier {
         }
     }
 
+    void reminder(TenantId tenant, boolean job, UUID refId, String jobTitle, UUID submitter, long daysWaiting) {
+        try {
+            List<Recipient> approvers = admins.resolveTenantAdmins(tenant).stream()
+                    .filter(r -> r.userId() == null || !r.userId().equals(submitter)).toList();
+            send(tenant, NotificationType.REC_APPROVAL_REMINDER, RecruiterApprovalRules.reminderTitle(job),
+                    RecruiterApprovalRules.reminderMessage(job, jobTitle, daysWaiting), refId, job, approvers);
+        } catch (RuntimeException ex) {
+            log.warn("Recruiter approval reminder could not be sent: {}", ex.getMessage());
+        }
+    }
+
     void decided(TenantId tenant, boolean job, UUID refId, String jobTitle, UUID submitter, UUID decider, boolean approved) {
         if (submitter == null) return;
         try {

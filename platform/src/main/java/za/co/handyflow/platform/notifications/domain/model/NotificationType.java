@@ -224,6 +224,8 @@ public enum NotificationType {
     // The message names the role, never the candidate or the salary.
     REC_APPROVAL_REQUESTED(INFO, Set.of(IN_APP, EMAIL)),
     REC_APPROVAL_DECIDED(INFO, Set.of(IN_APP, EMAIL)),
+    // An approval nobody has acted on after a few days. Same wording rule: the role, never the candidate or the salary.
+    REC_APPROVAL_REMINDER(INFO, Set.of(IN_APP, EMAIL)),
 
     // ── Invoicing ────────────────────────────────────────────────────────────
     QUOTE_SENT(INFO, Set.of(IN_APP)),

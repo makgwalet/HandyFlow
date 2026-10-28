@@ -50,4 +50,15 @@ describe("careers apply form consent", () => {
     await waitFor(() => expect(post).toHaveBeenCalled())
     expect((post.mock.calls[0][1] as { consent: boolean }).consent).toBe(true)
   })
+
+  it("shows the company's retention months in the consent text", async () => {
+    get.mockResolvedValue({ data: { data: { ...job, retentionMonths: 18 } } })
+    show()
+    expect(await screen.findByText(/removed 18 months after my last activity/)).toBeTruthy()
+  })
+
+  it("falls back to the general wording when the company's period is not given", async () => {
+    show()
+    expect(await screen.findByText(/removed after the company's retention period/)).toBeTruthy()
+  })
 })

@@ -51,6 +51,9 @@ public class RecruiterApprovalService {
         return new SettingsView(current.isRequireJobApproval(), current.isRequireOfferApproval(), current.getRetentionMonths());
     }
 
+    /** How many months the company keeps an unsuccessful applicant's details; shown to applicants in the consent text. */
+    public int retentionMonths(TenantId tenantId) { return settings(tenantId).getRetentionMonths(); }
+
     RecSettings settings(TenantId tenantId) {
         return settingsRepo.findById(tenantId.getValue()).orElseGet(() -> RecSettings.defaults(tenantId.getValue()));
     }

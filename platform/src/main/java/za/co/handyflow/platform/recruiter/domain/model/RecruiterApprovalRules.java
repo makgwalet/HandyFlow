@@ -86,6 +86,22 @@ public final class RecruiterApprovalRules {
                 : " has asked you to approve an offer for the \"" + clean(jobTitle) + "\" role before the letter is sent.");
     }
 
+    /** Days an approval may wait before the first reminder, and the gap between reminders after that. */
+    public static final int REMIND_AFTER_DAYS = 2, REMIND_EVERY_DAYS = 3;
+
+    /** True on the 2nd day of waiting and every 3rd day after (2, 5, 8, ...), so a daily check nags rarely and never twice for the same day. */
+    public static boolean reminderDue(long daysWaiting) {
+        return daysWaiting >= REMIND_AFTER_DAYS && (daysWaiting - REMIND_AFTER_DAYS) % REMIND_EVERY_DAYS == 0;
+    }
+
+    public static String reminderTitle(boolean job) { return job ? "A job is still waiting for your approval" : "An offer is still waiting for your approval"; }
+
+    /** Names the role and how long it has waited. Never the candidate, the salary or the submitter's note. */
+    public static String reminderMessage(boolean job, String jobTitle, long daysWaiting) {
+        return (job ? "The job \"" : "The offer for the \"") + clean(jobTitle) + (job ? "\" has been waiting " : "\" role has been waiting ")
+                + daysWaiting + " days for approval. Someone other than the person who asked has to decide it.";
+    }
+
     public static String decidedTitle(boolean job, boolean approved) {
         return (job ? "Your job was " : "Your offer was ") + (approved ? "approved" : "not approved");
     }
