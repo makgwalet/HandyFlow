@@ -15,11 +15,11 @@ public interface RecApplicationRepository extends JpaRepository<RecApplication, 
 
     @Query("""
         SELECT a FROM RecApplication a
-        WHERE a.jobId = :jobId
+        WHERE a.tenantId = :tenantId AND a.jobId = :jobId
         AND (:stage IS NULL OR a.stage = :stage)
         ORDER BY a.appliedAt DESC
         """)
-    Page<RecApplication> findByJob(UUID jobId, String stage, Pageable pageable);
+    Page<RecApplication> findByJob(TenantId tenantId, UUID jobId, String stage, Pageable pageable);
 
     @Query("""
         SELECT a FROM RecApplication a

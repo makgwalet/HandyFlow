@@ -345,8 +345,13 @@ public class RecruiterService {
     @Transactional(readOnly = true)
     public Page<ApplicationResponse> getApplications(TenantId tenantId, UUID jobId,
                                                      String stage, Pageable pageable) {
+        if (jobId != null) {
+            // The job must belong to this company; another company's job reads as not found.
+            jobRepo.findByIdAndTenantId(jobId, tenantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Job", jobId.toString()));
+        }
         Page<RecApplication> apps = jobId != null
-                ? applicationRepo.findByJob(jobId, stage, pageable)
+                ? applicationRepo.findByJob(tenantId, jobId, stage, pageable)
                 : applicationRepo.findAll(tenantId, stage, pageable);
         return apps.map(a -> toApplicationResponse(a, false));
     }
@@ -405,6 +410,8 @@ public class RecruiterService {
     private String storeCv(String base64, String fileName) {
         try {
             byte[] bytes = java.util.Base64.getDecoder().decode(base64);
+            String problem = RecruiterSecurityRules.cvProblem(bytes, fileName);
+            if (problem != null) throw new HandyFlowException(problem, HttpStatus.BAD_REQUEST, "CV_INVALID");
             return cvStorage.store(bytes, fileName);
         } catch (IllegalArgumentException e) {
             log.error("Failed to decode uploaded CV base64: {}", e.getMessage());
@@ -586,9 +593,15 @@ public class RecruiterService {
     @Transactional
     public InterviewResponse recordOutcome(TenantId tenantId, UUID applicationId,
                                            UUID interviewId, RecordInterviewOutcomeRequest req) {
+        RecApplication app = applicationRepo.findByIdAndTenantId(applicationId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Application", applicationId.toString()));
         RecInterview interview = interviewRepo.findById(interviewId)
+                .filter(i -> applicationId.equals(i.getApplicationId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Interview", interviewId.toString()));
-        interview.recordOutcome(req.outcome(), req.notes(), req.score());
+        String problem = RecruiterSecurityRules.outcomeProblem(req.outcome(), req.score(), req.notes());
+        if (problem == null) problem = RecruiterSecurityRules.outcomeStateProblem(interview.getOutcome(), app.isActive());
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.BAD_REQUEST, "INTERVIEW_OUTCOME_INVALID");
+        interview.recordOutcome(req.outcome().trim().toUpperCase(), req.notes(), req.score());
         interviewRepo.save(interview);
         return toInterviewResponse(interview);
     }
