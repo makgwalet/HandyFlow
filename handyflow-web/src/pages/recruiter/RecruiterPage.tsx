@@ -20,6 +20,7 @@ import RecDashboard from './RecDashboard'
 import RecCalendar from './RecCalendar'
 import RecClients from './RecClients'
 import RecJobCosts from './RecJobCosts'
+import RecJobImport from './RecJobImport'
 import RecPlacements from './RecPlacements'
 import RequisitionPanel from './RecRequisition'
 import { ScreeningAnswers, ScreeningEditor } from './RecScreening'
@@ -1732,6 +1733,7 @@ export function RecruiterPage() {
                                     <RequisitionPanel jobId={job.id} canEdit />
                                     <ScreeningEditor jobId={job.id} canEdit />
                                     <RecJobCosts jobId={job.id} />
+                                    <RecJobImport jobId={job.id} />
                                   </td>
                                 </tr>
                               )}

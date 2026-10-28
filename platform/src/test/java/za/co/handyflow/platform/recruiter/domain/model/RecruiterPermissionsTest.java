@@ -8,6 +8,7 @@ import za.co.handyflow.platform.recruiter.api.RecruiterClientController;
 import za.co.handyflow.platform.recruiter.api.RecruiterCvMigrationController;
 import za.co.handyflow.platform.recruiter.api.RecruiterController;
 import za.co.handyflow.platform.recruiter.api.RecruiterCostController;
+import za.co.handyflow.platform.recruiter.api.RecruiterImportController;
 import za.co.handyflow.platform.recruiter.api.RecruiterDashboardController;
 import za.co.handyflow.platform.recruiter.api.RecruiterPoolController;
 import za.co.handyflow.platform.recruiter.api.RecruiterReportController;
@@ -32,7 +33,7 @@ class RecruiterPermissionsTest {
 
     @Test
     void everyEndpointAsksForAPermissionThatExists() {
-        for (Class<?> c : new Class<?>[]{RecruiterController.class, RecruiterPoolController.class, RecruiterReportController.class, RecruiterAuditController.class, RecruiterDashboardController.class, RecruiterCalendarController.class, RecruiterClientController.class, RecruiterCvMigrationController.class, RecruiterCostController.class}) {
+        for (Class<?> c : new Class<?>[]{RecruiterController.class, RecruiterPoolController.class, RecruiterReportController.class, RecruiterAuditController.class, RecruiterDashboardController.class, RecruiterCalendarController.class, RecruiterClientController.class, RecruiterCvMigrationController.class, RecruiterCostController.class, RecruiterImportController.class}) {
             for (Method m : c.getDeclaredMethods()) {
                 PreAuthorize pa = m.getAnnotation(PreAuthorize.class);
                 if (pa == null) continue;
