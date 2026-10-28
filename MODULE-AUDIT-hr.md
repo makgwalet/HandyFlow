@@ -989,7 +989,7 @@ I read the four training services, the entities and the session screen. The modu
 
 **Still not done**
 
-- Leave paid out is still taxed like salary (annualised with the month), although SARS treats it as an annual payment on the certificate. For a leaver paid a large leave balance in the last month the monthly PAYE is higher than the annual-payment method would give; the difference is settled when SARS assesses the employee. Changing the tax method needs a specialist's check.
+- (Changed in section 56: leave paid out is now taxed as an annual payment.)
 - Existing certificates already issued keep the old codes; only new ones use 3605 for leave.
 
 **Not verified**
@@ -1323,3 +1323,11 @@ No migration.
 - *Age:* taken at the end of the pay period.
 - *Other:* the disqualifications for displacing staff and for government and public-entity employers are the business's to judge. The incentive ends on 28 February 2029.
 - Payslip PDFs and tax certificates are unchanged. Not verified: Spring wiring, the JPQL counts, V539 and the screens have not run.
+
+## 56. Leave paid out is taxed as an annual payment (Slice 24b)
+
+No migration. Annual leave paid out on a last pay was annualised with the month's salary, which taxes it as if it recurred every month. It is now taxed like a bonus: the month's regular pay is annualised on its own, and the leave pay bears the extra tax the year carries once it is added (the same method as bonus, back pay and notice pay). UIF and SDL still see it. The payslip, the certificate (code 3605) and the earnings are unchanged; only the PAYE moves. For R15,000 of salary plus R40,000 of leave pay the PAYE is R8,463.75 (the earlier way gave R8,380.42 with no medical credit, so the difference here is small; it grows with the payout); the larger the payout against the salary, the larger the difference. A run says "annual leave paid out ... Taxed by the annual-payment method".
+
+With the averaging method the payout stays out of the year to date, like the other annual payments.
+
+**For the payroll specialist.** SARS treats leave pay on termination as an annual payment; confirm that the extra-tax method is the one it expects for a leaver's last month. A part month's salary is still annualised as if it recurred (section 24), which can under-tax a leaver; SARS settles it on assessment. Not verified: the PayrollService change (a warning line) has not run, and `PayrollServiceTest` was not re-run.

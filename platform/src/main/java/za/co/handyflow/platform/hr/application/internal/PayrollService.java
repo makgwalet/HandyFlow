@@ -237,6 +237,7 @@ public class PayrollService {
             if (bonus.signum() > 0) lumps.add("bonus " + bonus);
             if (backPay.signum() > 0) lumps.add("back pay " + backPay);
             if (noticePay.signum() > 0) lumps.add("pay in place of notice " + noticePay);
+            if (payout.signum() > 0) lumps.add("annual leave paid out " + payout);
             if (!lumps.isEmpty())
                 warnings.add(who + ": " + String.join(" and ", lumps)
                         + " included. Taxed by the annual-payment method: the extra tax the year bears once it is added to the annualised month.");

@@ -64,9 +64,9 @@ public class PayrollEngine {
 
     /**
      * For a part period, or a last pay that includes annual leave paid out. The basic salary is what is payable for the days paid; the leave
-     * payout is remuneration like the salary, so PAYE, UIF and SDL see it, and it is reported separately. The periodic method annualises the
-     * month, so a payout in the last month is taxed as if it recurred and a part month as if the person were paid that little all year;
-     * the difference is settled when the employee's year is assessed.
+     * payout is remuneration for UIF and SDL, and for PAYE an annual payment: taxed as the extra tax the year bears once it is added to the annualised
+     * month, as SARS prescribes for leave pay, and reported separately. A part month is still annualised as if the person were paid that little
+     * all year; the difference is settled when the employee's year is assessed.
      */
     public PayrollResult calculate(HrEmployee employee, StatutoryYearRules rules, BigDecimal annualPayroll, int medicalMembers, BigDecimal overtime, Period period) {
         BigDecimal ot = overtime == null ? BigDecimal.ZERO : overtime;
@@ -74,17 +74,18 @@ public class PayrollEngine {
         BigDecimal bonus = period.bonus() == null ? BigDecimal.ZERO : period.bonus();
         BigDecimal backPay = period.backPay() == null ? BigDecimal.ZERO : period.backPay();
         BigDecimal noticePay = period.noticePay() == null ? BigDecimal.ZERO : period.noticePay();
-        // A bonus and back pay are not part of the month that is annualised: they are taxed on top of it as annual payments.
+        // A bonus, back pay, pay in place of notice and annual leave paid out are not part of the month that is annualised: they are taxed on
+        // top of it as annual payments.
         SarsPayrollResult r = SarsPayeCalculator.calculate(new SarsPayeCalculator.Inputs(
-                period.basic().add(ot).add(payout), period.travel(), period.pension(),
+                period.basic().add(ot), period.travel(), period.pension(),
                 employee.getMedicalAidContribution(), employee.getDateOfBirth(), medicalMembers, annualPayroll,
-                period.employerMedical(), period.employerRetirement(), period.otherFringe(), bonus.add(backPay).add(noticePay)), rules);
+                period.employerMedical(), period.employerRetirement(), period.otherFringe(), bonus.add(backPay).add(noticePay).add(payout)), rules);
 
         log.debug("Payroll employee={} year={} taxable={} paye={} uif={} sdl={} medicalMembers={}",
                 employee.getId(), rules.taxYear(), r.taxableIncome(), r.payeAmount(), r.uifEmployee(), r.sdlAmount(), medicalMembers);
 
         return new PayrollResult(
-                r.grossSalary().subtract(ot).subtract(payout), r.travelAllowance(), r.medicalAid(), r.pension(),
+                r.grossSalary().subtract(ot), r.travelAllowance(), r.medicalAid(), r.pension(),
                 r.payeAmount(), r.uifEmployee(), r.uifEmployer(), r.sdlAmount(),
                 r.taxableIncome(), r.taxBeforeRebate(), r.primaryRebate(),
                 r.secondaryRebate(), r.tertiaryRebate(), r.medicalTaxCredit(), r.taxYear(), ot, payout, bonus, backPay, noticePay);
@@ -108,9 +109,8 @@ public class PayrollEngine {
                           Period period, Prior prior) {
         PayrollResult full = calculate(employee, rules, annualPayroll, medicalMembers, overtime, period);
         BigDecimal ot = overtime == null ? BigDecimal.ZERO : overtime;
-        BigDecimal payout = period.leavePayout() == null ? BigDecimal.ZERO : period.leavePayout();
         SarsPayrollResult regular = SarsPayeCalculator.calculate(new SarsPayeCalculator.Inputs(
-                period.basic().add(ot).add(payout), period.travel(), period.pension(),
+                period.basic().add(ot), period.travel(), period.pension(),
                 employee.getMedicalAidContribution(), employee.getDateOfBirth(), medicalMembers, annualPayroll,
                 period.employerMedical(), period.employerRetirement(), period.otherFringe(), BigDecimal.ZERO), rules);
         BigDecimal monthlyTaxable = regular.taxableIncome().divide(BigDecimal.valueOf(12), 2, java.math.RoundingMode.HALF_UP);
