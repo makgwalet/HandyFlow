@@ -44,6 +44,12 @@ public class PayAdjustmentService {
 
     @Transactional
     public View add(TenantId tenantId, UUID employeeId, AddRequest req, UUID actor) {
+        return add(tenantId, employeeId, req, actor, null);
+    }
+
+    /** As {@link #add}, for a correction of an issued payslip: the item remembers which one. */
+    @Transactional
+    public View add(TenantId tenantId, UUID employeeId, AddRequest req, UUID actor, UUID correctsPayslipId) {
         if (actor == null) throw new AccessDeniedException("Your user could not be identified, so this step cannot be recorded.");
         HrEmployee emp = employee(tenantId, employeeId);
         String problem = PayAdjustmentRules.addProblem(req.kind(), req.amount(), req.payFrom(), req.description(), req.reason(),
@@ -59,8 +65,10 @@ public class PayAdjustmentService {
                     NoticeRules.fullPay(emp.getEndType(), emp.getGrossSalary(), emp.getStartDate(), emp.getNoticeGivenOn(), emp.getEndDate()), already);
             if (notice != null) throw new IllegalArgumentException(notice);
         }
-        HrPayAdjustment saved = repo.save(HrPayAdjustment.of(tenantId.getValue(), employeeId, req.kind(), req.amount().setScale(2, RoundingMode.HALF_UP),
-                req.payFrom(), req.description(), req.relatesFrom(), req.relatesTo(), req.reason(), actor));
+        HrPayAdjustment item = HrPayAdjustment.of(tenantId.getValue(), employeeId, req.kind(), req.amount().setScale(2, RoundingMode.HALF_UP),
+                req.payFrom(), req.description(), req.relatesFrom(), req.relatesTo(), req.reason(), actor);
+        item.correcting(correctsPayslipId);
+        HrPayAdjustment saved = repo.save(item);
         log.info("Pay item {} {} entered for employee={} by user={}", saved.getKind(), saved.getAmount(), employeeId, actor);
         return view(saved, emp, null);
     }
@@ -88,6 +96,18 @@ public class PayAdjustmentService {
     public List<View> forEmployee(TenantId tenantId, UUID employeeId) {
         employee(tenantId, employeeId);
         return views(tenantId, repo.forEmployee(tenantId, employeeId));
+    }
+
+    /** Corrections entered against one issued payslip, newest first. */
+    @Transactional(readOnly = true)
+    public List<View> forPayslip(TenantId tenantId, UUID payslipId) {
+        return views(tenantId, repo.forPayslip(tenantId, payslipId));
+    }
+
+    /** Whether a correction of this kind is already waiting (not cancelled) for the payslip. */
+    @Transactional(readOnly = true)
+    public boolean correctionWaiting(TenantId tenantId, UUID payslipId, String kind) {
+        return repo.forPayslip(tenantId, payslipId).stream().anyMatch(a -> kind.equals(a.getKind()) && PayAdjustmentRules.OPEN.equals(a.getStatus()));
     }
 
     // ── Payroll ────────────────────────────────────────────────────────────

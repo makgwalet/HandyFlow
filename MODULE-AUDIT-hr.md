@@ -650,7 +650,7 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 
 - The payslips of a cancelled run are kept (reports and certificates already skip cancelled runs); they are not deleted.
 - Cancelling does not undo other things a calculation consumed (for example nothing else is linked today, but any future link would need releasing here).
-- A finalised run cannot be cancelled or corrected; corrections to finalised runs are still on the backlog.
+- A finalised run cannot be cancelled or altered. Mistakes on an issued payslip are corrected with a linked pay item (section 52).
 
 **Not verified**
 
@@ -1268,3 +1268,15 @@ I read the four training services, the entities and the session screen. The modu
 - The employee record has no account type, so every payment is written as a current (cheque) account (type 1). A savings account may need type 2.
 - Other banks' layouts (Standard Bank, ABSA, Nedbank) are not built; some of them accept a BankServ-style file, but I have no specification to say so.
 - Still no import of the bank's return file, and no account check digit.
+
+## 52. Corrections to issued payslips (Slice 22c, V537)
+
+An issued payslip is never changed: it is the record behind the bank payment, the EMP201 and the tax certificate. A mistake is settled by a pay item linked to the payslip (`hr_pay_adjustments.corrects_payslip_id`).
+
+- **Underpaid:** back pay for the payslip's period (clipped to the employee's service and to today), taxed by the annual-payment method in the next run.
+- **Overpaid:** a recovery of the net amount paid by mistake, no more than the payslip's net pay, taken from the next run's net pay when affordable (existing recovery rules).
+- Only for a payslip in a finalised or completed run, for an employee still employed, one open correction of each kind per payslip, never your own payslip. The run's history records `PAYSLIP_CORRECTION_ENTERED`.
+- Screen: "Correct" on each payslip row of an issued run (prepare rights); the dialog lists corrections already entered.
+- API: `GET/POST /api/v1/hr/payslips/{id}/corrections`.
+
+Limits, for the payroll specialist: tax and UIF already paid on an overpayment are not reclaimed (the employee repays net); back-pay tax is the annual-payment approximation, not a re-run of the old month; a leaver's correction is settled outside payroll; no whole-run reversal, because of EMP201, certificates and bank payments already made.

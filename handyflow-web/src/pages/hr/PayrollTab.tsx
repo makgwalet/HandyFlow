@@ -15,6 +15,8 @@ import { useAuth } from "../../hooks/useAuth"
 import { RunActions, RunReview } from "./PayRunControls"
 import PayRunPaymentsPanel from "./PayRunPaymentsPanel"
 import { canPayRun } from "./payRunPayments.logic"
+import PayCorrectionModal from "./PayCorrectionModal"
+import { canCorrect } from "./payCorrection.logic"
 import { hasTotals, rightsFrom, STATUS_STYLE, STATUS_TEXT } from "./payrollControls.logic"
 import { taxYearName } from "./payrollChecks.logic"
 
@@ -30,6 +32,7 @@ export default function PayrollTab() {
   const [expanded, setExpanded]     = useState<string | null>(null)
   const [error, setError]           = useState("")
   const [warnings, setWarnings] = useState<string[]>([])
+  const [correcting, setCorrecting] = useState<{ slip: any; runNumber: string } | null>(null)
   const { user } = useAuth()
 
   // The business's choice about one person calculating and approving, and whether the old permissions still work.
@@ -211,6 +214,12 @@ export default function PayrollTab() {
                                       style={{ display: "flex", alignItems: "center", gap: 4, background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer" }}>
                                       <Download size={11} /> PDF
                                     </button>
+                                    {canCorrect(run.status, rights.prepare) && (
+                                      <button onClick={() => setCorrecting({ slip, runNumber: run.payRunNumber })}
+                                        style={{ marginTop: 4, background: "none", color: "var(--hf-text-muted)", border: "1px solid var(--hf-border)", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}>
+                                        Correct
+                                      </button>
+                                    )}
                                   </td>
                                 </tr>
                               ))}
@@ -290,6 +299,9 @@ export default function PayrollTab() {
             </div>
           </div>
         </div>
+      )}
+      {correcting && (
+        <PayCorrectionModal slip={correcting.slip} runNumber={correcting.runNumber} canEdit={rights.prepare} onClose={() => setCorrecting(null)} />
       )}
     </div>
   )

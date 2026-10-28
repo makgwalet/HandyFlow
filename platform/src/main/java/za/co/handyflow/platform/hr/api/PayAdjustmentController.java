@@ -11,6 +11,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.hr.application.internal.LeaveAdvanceService;
 import za.co.handyflow.platform.hr.application.internal.NoticePayService;
+import za.co.handyflow.platform.hr.application.internal.PayCorrectionService;
 import za.co.handyflow.platform.hr.application.internal.PayAdjustmentService;
 import za.co.handyflow.platform.hr.application.internal.PayrollAccess;
 import za.co.handyflow.platform.hr.dto.PayAdjustmentDtos.*;
@@ -31,6 +32,7 @@ public class PayAdjustmentController {
     private final PayAdjustmentService service;
     private final LeaveAdvanceService leaveAdvance;
     private final NoticePayService noticePay;
+    private final PayCorrectionService corrections;
 
     @GetMapping("/pay-adjustments")
     @PreAuthorize("isAuthenticated()")
@@ -91,6 +93,24 @@ public class PayAdjustmentController {
         if (!PayrollAccess.canPrepare(authentication)) throw new AccessDeniedException("You may not enter a payment.");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Notice pay entered",
                 noticePay.enter(TenantContext.getTenantIdAsObject(), id, req, user(principal))));
+    }
+
+    @GetMapping("/payslips/{id}/corrections")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Corrections entered against an issued payslip")
+    public ResponseEntity<ApiResponse<List<View>>> corrections(@PathVariable UUID id, Authentication authentication) {
+        if (!PayrollAccess.canReview(authentication)) throw new AccessDeniedException("You may not see this.");
+        return ResponseEntity.ok(ApiResponse.success(corrections.forPayslip(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/payslips/{id}/corrections")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Correct an issued payslip: back pay for money owed, or a recovery of money paid by mistake. The payslip itself is not changed")
+    public ResponseEntity<ApiResponse<View>> correct(@PathVariable UUID id, @RequestBody PayCorrectionService.EnterRequest req,
+                                                     Authentication authentication, Principal principal) {
+        if (!PayrollAccess.canPrepare(authentication)) throw new AccessDeniedException("You may not enter a correction.");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Correction entered",
+                corrections.enter(TenantContext.getTenantIdAsObject(), id, req, user(principal))));
     }
 
     @PostMapping("/pay-adjustments/{id}/cancel")

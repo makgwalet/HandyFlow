@@ -37,6 +37,8 @@ public class HrPayAdjustment {
     @Column(name = "cancelled_by")  UUID cancelledBy;
     @Column(name = "cancelled_at")  Instant cancelledAt;
     @Column(name = "cancel_reason") String cancelReason;
+    /** The issued payslip this item corrects, if it is a correction. */
+    @Column(name = "corrects_payslip_id") UUID correctsPayslipId;
 
     public static HrPayAdjustment of(UUID tenantId, UUID employeeId, String kind, BigDecimal amount, LocalDate payFrom, String description,
                                      LocalDate relatesFrom, LocalDate relatesTo, String reason, UUID by) {
@@ -65,4 +67,6 @@ public class HrPayAdjustment {
     }
 
     public void linkTo(UUID payRunId) { this.payRunId = payRunId; }
+
+    public void correcting(UUID payslipId) { this.correctsPayslipId = payslipId; }
 }

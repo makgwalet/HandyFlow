@@ -32,4 +32,8 @@ public interface HrPayAdjustmentRepository extends JpaRepository<HrPayAdjustment
 
     @Query("SELECT a FROM HrPayAdjustment a WHERE a.tenantId = :#{#tenantId.value} AND a.payRunId = :payRunId")
     List<HrPayAdjustment> takenBy(TenantId tenantId, UUID payRunId);
+
+    /** Corrections entered against one issued payslip, newest first. */
+    @Query("SELECT a FROM HrPayAdjustment a WHERE a.tenantId = :#{#tenantId.value} AND a.correctsPayslipId = :payslipId ORDER BY a.createdAt DESC")
+    List<HrPayAdjustment> forPayslip(TenantId tenantId, UUID payslipId);
 }
