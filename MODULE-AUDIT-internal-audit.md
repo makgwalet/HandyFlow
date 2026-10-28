@@ -34,3 +34,18 @@ The screens already covered the whole audit cycle; this slice changes how they r
 - High-risk areas counts universe entries whose latest assessment's final risk is HIGH or CRITICAL.
 - Activity covers only actions that already write to the audit trail; plan approvals, universe edits and engagement creation do not, so they do not appear.
 - Not compiled or run: the Spring classes (`AuditSnapshotStore`, `InternalAuditTrendService`, `AuditActivityService`, the controller, `AuditTrailService.recent`) and the SQL, including `LIKE ANY (?)` with an array parameter. Run: `DashboardTrendsTest` (6, offline) and `auditUi.test.ts` (18, under Node). Frontend dashboard cases written, not run.
+
+## 3. Findings & Remediation across engagements (Slice 3)
+
+New section **Findings & Remediation** in the Internal Audit menu (needs `AUDIT_READ`), backed by `GET /internal-audit/remediation`. Until now findings could only be seen one engagement at a time.
+
+- **Summary:** open findings (with critical and high counts), past due, open with no action agreed, actions overdue (and waiting for validation), and the share of actions validated.
+- **Findings tab:** every finding, worst first (open before settled, then severity, then earliest due date), with engagement, area, owner, due date, a "Repeat" mark and a remediation bar. Filters: text, severity and state (open and in progress by default; past due; open with no action; resolved or closed). "View" opens a panel with what was found, the recommendation, management's response and the finding's actions.
+- **Actions tab:** every action plan, overdue first (longest late first), then those still to do, then settled ones.
+- **Remediation meaning:** an action counts as done once the auditor has *validated* it; one that is only completed is "awaiting validation"; cancelled actions are left out. A finding's percentage is validated over live actions, and is 0 with no actions.
+
+**Limits**
+- The whole list is loaded and filtered in the browser; fine for hundreds of findings, but a company with many thousands would need server paging.
+- Actions can be completed, validated or returned only from the existing finding screens; this screen is read-only.
+- The panel shows what the list carries (description, recommendation, management response); the root cause, criteria, condition and consequence are still only in the engagement's own finding view.
+- Not compiled or run: `AuditRemediationService`, the controller and the new `findAllForTenant` query (Spring and PostgreSQL). Run: `RemediationBoardTest` (8, offline), `remediation.test.ts` (4, under Node); the new screen was server-rendered once with data. `Remediation.test.tsx` is written but not run (vitest is not installed).

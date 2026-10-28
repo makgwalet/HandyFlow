@@ -21,6 +21,9 @@ public interface AuditActionPlanRepository extends JpaRepository<AuditActionPlan
     @Query("SELECT p FROM AuditActionPlan p WHERE p.tenantId = :tenantId AND p.status IN ('OPEN', 'COMPLETED') AND p.dueDate < :today ORDER BY p.dueDate")
     List<AuditActionPlan> findOverdue(@Param("tenantId") UUID tenantId, @Param("today") LocalDate today);
 
+    @Query("SELECT p FROM AuditActionPlan p WHERE p.tenantId = :tenantId ORDER BY p.dueDate, p.createdAt")
+    List<AuditActionPlan> findAllForTenant(@Param("tenantId") UUID tenantId);
+
     /** Cross-tenant sweep for reminders: every action past its due date and still not validated. */
     @Query("SELECT p FROM AuditActionPlan p WHERE p.status IN ('OPEN', 'COMPLETED') AND p.dueDate < :today")
     List<AuditActionPlan> findOverdueAcrossTenants(@Param("today") LocalDate today);

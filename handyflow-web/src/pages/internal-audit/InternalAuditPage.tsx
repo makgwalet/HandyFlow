@@ -7,6 +7,7 @@ import { InternalAuditDashboard } from "./InternalAuditDashboard"
 import { CommitteeReport } from "./CommitteeReport"
 import { ReportsSection } from "./ReportsSection"
 import { QualitySection } from "./QualitySection"
+import { RemediationSection } from "./RemediationSection"
 import { ProgrammeSection } from "./ProgrammeSection"
 import { MonitoringSection } from "./MonitoringSection"
 import { FollowUpSection } from "./FollowUpSection"
@@ -53,6 +54,7 @@ export default function InternalAuditPage() {
       render={id => {
         switch (id) {
           case "reports":     return <ReportsSection />
+          case "findings":    return <RemediationSection />
           case "quality":     return <QualitySection />
           case "programme":   return <ProgrammeSection />
           case "monitoring":  return <MonitoringSection />
