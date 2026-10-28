@@ -106,10 +106,13 @@ public class HrController {
     public ResponseEntity<ApiResponse<EmployeeViewResponse>> terminateEmployee(
             @PathVariable UUID id,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam String reason, Authentication authentication, Principal principal) {
+            @RequestParam String reason,
+            @RequestParam(required = false) String endType,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate noticeGivenOn,
+            Authentication authentication, Principal principal) {
         UUID actor = resolveUserId(principal);
-        hrService.terminateEmployee(TenantContext.getTenantIdAsObject(), id, endDate, reason, actor);
-        return ResponseEntity.ok(ApiResponse.success("Employee terminated",
+        var done = hrService.terminateEmployee(TenantContext.getTenantIdAsObject(), id, endDate, reason, endType, noticeGivenOn, actor);
+        return ResponseEntity.ok(ApiResponse.success(String.join(" ", java.util.stream.Stream.concat(java.util.stream.Stream.of("Employee terminated."), done.followUp().stream()).toList()),
                 employeeViewService.get(TenantContext.getTenantIdAsObject(), id, HrAccess.held(authentication), actor)));
     }
 

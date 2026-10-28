@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import EmployeesTab from "./EmployeesTab"
 import { ApprovalsModal, RequestChangeModal } from "./EmployeeChanges"
 import {
-  auditText, bankProblem, cannotDecide, compensationProblem, effectiveProblem, employeeRights, reasonProblem, terminationProblem,
+  auditText, bankProblem, cannotDecide, compensationProblem, effectiveProblem, employeeRights, reasonProblem, terminationProblem, terminationQuery,
   type EmployeeChange,
 } from "./employees.logic"
 
@@ -63,6 +63,14 @@ describe("employeeRights", () => {
   })
 })
 
+describe("the terminate call", () => {
+  it("sends notice details only when how employment ended is given", () => {
+    expect(terminationQuery("2026-10-20", " Resigned ")).toBe("endDate=2026-10-20&reason=Resigned")
+    expect(terminationQuery("2026-10-20", "Retrenched", "EMPLOYER_NOTICE", "2026-10-01")).toBe("endDate=2026-10-20&reason=Retrenched&endType=EMPLOYER_NOTICE&noticeGivenOn=2026-10-01")
+    expect(terminationQuery("2026-10-20", "Left", "", "2026-10-01")).toBe("endDate=2026-10-20&reason=Left")
+  })
+})
+
 describe("checks before sending", () => {
   it("termination needs a last day that has come, and a reason", () => {
     expect(terminationProblem("", "Resigned", "2024-01-01", "2026-10-21")).toMatch(/last day/i)
@@ -70,6 +78,10 @@ describe("checks before sending", () => {
     expect(terminationProblem("2023-12-31", "Resigned", "2024-01-01", "2026-10-21")).toMatch(/before the start/)
     expect(terminationProblem("2026-10-20", " ", "2024-01-01", "2026-10-21")).toMatch(/reason/)
     expect(terminationProblem("2026-10-20", "Resigned", "2024-01-01", "2026-10-21")).toBeNull()
+    expect(terminationProblem("2026-10-20", "Retrenched", "2024-01-01", "2026-10-21", "EMPLOYER_NOTICE", "2026-10-01")).toBeNull()
+    expect(terminationProblem("2026-10-20", "Left", "2024-01-01", "2026-10-21", "", "2026-10-01")).toMatch(/how employment ended/)
+    expect(terminationProblem("2026-10-20", "Left", "2024-01-01", "2026-10-21", "RESIGNATION", "2026-10-21")).toMatch(/after the last day/)
+    expect(terminationProblem("2026-10-20", "Left", "2024-01-01", "2026-10-21", "RESIGNATION", "2023-12-01")).toMatch(/before the start/)
   })
   it("effective date runs from a month back to a year ahead", () => {
     expect(effectiveProblem("", null, "2026-10-21")).toBeTruthy()

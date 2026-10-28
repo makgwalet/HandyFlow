@@ -32,6 +32,7 @@ public class HrService {
     private final ApplicationEventPublisher eventPublisher;
     private final EmployeeAuditService audit;
     private final LeaveService leaveService;
+    private final TerminationFollowUp termination;
 
     // ── Employees ─────────────────────────────────────────────────────────────
 
@@ -161,16 +162,27 @@ public class HrService {
         return toEmployeeResponse(emp);
     }
 
-    /** Terminate with the last day worked and a reason. The portal access of the person is left as it is. */
+    /** Terminate with the last day worked and a reason. Leave after the last day is cancelled and portal access is closed. */
     @Transactional
     public EmployeeResponse terminateEmployee(TenantId tenantId, UUID id, LocalDate endDate, String reason, UUID actor) {
+        return terminateEmployee(tenantId, id, endDate, reason, null, null, actor).employee();
+    }
+
+    /** What recording a termination gave back: the employee as saved and what followed from it. */
+    public record Terminated(EmployeeResponse employee, List<String> followUp) {}
+
+    /** As above, also keeping how employment ended and when notice was given, and reporting what followed. */
+    @Transactional
+    public Terminated terminateEmployee(TenantId tenantId, UUID id, LocalDate endDate, String reason, String endType, LocalDate noticeGivenOn, UUID actor) {
         HrEmployee emp = findActive(tenantId, id);
         fail(EmployeeRules.terminationProblem(emp.getStatus(), emp.getStartDate(), endDate, reason, LocalDate.now()));
-        emp.terminate(endDate, reason, actor);
+        fail(NoticeRules.problem(endType, noticeGivenOn, endDate, emp.getStartDate()));
+        emp.terminate(endDate, reason, actor, endType, noticeGivenOn);
         employeeRepo.save(emp);
-        audit.record(tenantId, id, "TERMINATED", "last day " + endDate, actor);
+        audit.record(tenantId, id, "TERMINATED", "last day " + endDate + ", " + NoticeRules.typeLabel(endType), actor);
+        List<String> followUp = termination.run(tenantId, emp, actor);
         log.info("Terminated employee={}", emp.getEmployeeNumber());
-        return toEmployeeResponse(emp);
+        return new Terminated(toEmployeeResponse(emp), followUp);
     }
 
     @Transactional

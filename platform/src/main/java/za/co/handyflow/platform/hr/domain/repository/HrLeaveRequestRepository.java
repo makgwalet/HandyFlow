@@ -38,4 +38,10 @@ public interface HrLeaveRequestRepository extends JpaRepository<HrLeaveRequest, 
             SELECT r FROM HrLeaveRequest r WHERE r.tenantId = :#{#tenantId.value} AND r.status = 'APPROVED'
               AND r.leaveType = 'UNPAID' AND r.startDate <= :to AND r.endDate >= :from""")
     List<HrLeaveRequest> approvedUnpaidIn(TenantId tenantId, java.time.LocalDate from, java.time.LocalDate to);
+
+    /** Waiting or approved requests of an employee that run past a date. Used when employment ends. */
+    @Query("""
+            SELECT r FROM HrLeaveRequest r WHERE r.tenantId = :#{#tenantId.value} AND r.employeeId = :employeeId
+              AND r.status IN ('PENDING', 'APPROVED') AND r.endDate > :after""")
+    List<HrLeaveRequest> openEndingAfter(TenantId tenantId, UUID employeeId, java.time.LocalDate after);
 }

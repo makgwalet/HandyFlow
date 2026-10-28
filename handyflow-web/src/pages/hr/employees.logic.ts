@@ -30,14 +30,36 @@ export function employeeRights(permissions: string[]): EmployeeRights {
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 export const today = () => iso(new Date())
 
-/** Same rules as the server: a last day that has come, not before the start date, and a reason. */
-export function terminationProblem(lastDay: string, reason: string, startDate: string | null, now: string = today()): string | null {
+export const END_TYPES: { value: string; label: string }[] = [
+  { value: "RESIGNATION", label: "Resigned" },
+  { value: "EMPLOYER_NOTICE", label: "Ended by the employer, with notice owed (retrenchment, incapacity, poor performance)" },
+  { value: "SUMMARY_DISMISSAL", label: "Dismissed without notice (misconduct)" },
+  { value: "CONTRACT_END", label: "Fixed-term contract ended" },
+  { value: "MUTUAL", label: "Agreed by both sides" },
+  { value: "OTHER", label: "Other" },
+]
+
+/** Same rules as the server: a last day that has come, not before the start date, a reason, and notice dates that make sense. */
+export function terminationProblem(lastDay: string, reason: string, startDate: string | null, now: string = today(), endType = "", noticeGivenOn = ""): string | null {
   if (!lastDay) return "Enter the last day worked."
   if (startDate && lastDay < startDate) return "The last day worked is before the start date."
   if (lastDay > now) return "The last day worked is in the future. Record the termination on or after that day, so final pay is not missed."
   if (!reason.trim()) return "Give a reason for the termination."
   if (reason.trim().length > 200) return "The reason can be at most 200 characters."
+  if (noticeGivenOn) {
+    if (!endType) return "Say how employment ended before giving the date notice was given."
+    if (noticeGivenOn > lastDay) return "Notice cannot be given after the last day worked."
+    if (startDate && noticeGivenOn < startDate) return "Notice cannot be given before the start date."
+  }
   return null
+}
+
+/** The query string of the terminate call. Notice details are sent only when they were given. */
+export function terminationQuery(lastDay: string, reason: string, endType = "", noticeGivenOn = ""): string {
+  const q = new URLSearchParams({ endDate: lastDay, reason: reason.trim() })
+  if (endType) q.set("endType", endType)
+  if (endType && noticeGivenOn) q.set("noticeGivenOn", noticeGivenOn)
+  return q.toString()
 }
 
 export function reasonProblem(reason: string): string | null {

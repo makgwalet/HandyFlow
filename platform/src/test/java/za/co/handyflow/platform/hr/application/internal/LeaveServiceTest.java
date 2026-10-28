@@ -489,4 +489,38 @@ class LeaveServiceTest {
     void theAtRiskListIsEmptyWhenNoLimitAppliesYet() {
         assertThat(service.atRisk(tenant).employees()).isEmpty();
     }
+
+    // ── Employment ends ─────────────────────────────────────────────────────────────────────────
+
+    private HrLeaveRequest request(String status, LocalDate from, LocalDate to) {
+        HrLeaveRequest r = HrLeaveRequest.create(tenant, emp.getId(), "ANNUAL", from, to, new BigDecimal("1"), "Holiday");
+        if ("APPROVED".equals(status)) r.approve(approver);
+        return r;
+    }
+
+    @Test
+    void leaveStartingAfterTheLastDayIsCancelledAndItsDaysGivenBack() {
+        LocalDate last = today.minusDays(2);
+        HrLeaveRequest pending = request("PENDING", last.plusDays(10), last.plusDays(11));
+        when(requestRepo.openEndingAfter(any(), eq(emp.getId()), eq(last))).thenReturn(List.of(pending));
+
+        var result = service.cancelAfterEmploymentEnds(tenant, emp.getId(), last, approver);
+
+        assertThat(result.cancelled()).isEqualTo(1);
+        assertThat(pending.getStatus()).isEqualTo("CANCELLED");
+        assertThat(pending.getCancelReason()).contains("Employment ended");
+    }
+
+    @Test
+    void leaveThatRunsPastTheLastDayIsLeftAndCounted() {
+        LocalDate last = today.minusDays(2);
+        HrLeaveRequest straddling = request("PENDING", last.minusDays(1), last.plusDays(3));
+        when(requestRepo.openEndingAfter(any(), eq(emp.getId()), eq(last))).thenReturn(List.of(straddling));
+
+        var result = service.cancelAfterEmploymentEnds(tenant, emp.getId(), last, approver);
+
+        assertThat(result.cancelled()).isEqualTo(0);
+        assertThat(result.straddling()).isEqualTo(1);
+        assertThat(straddling.getStatus()).isEqualTo("PENDING");
+    }
 }

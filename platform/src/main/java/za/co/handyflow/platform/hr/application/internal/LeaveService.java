@@ -192,6 +192,37 @@ public class LeaveService {
         return toResponse(req, nameOf(tenantId, req.getEmployeeId()));
     }
 
+    /** What happened to an employee's leave when employment ended: requests cancelled, and requests that straddle the last day and were left. */
+    public record EndOfEmployment(int cancelled, int straddling) {}
+
+    /**
+     * Employment ended on {@code lastDay}: leave asked for or approved that starts after it is cancelled, reserved days are given back and
+     * days already marked taken are reversed. Leave that starts on or before the last day and runs past it is left alone, because part of it
+     * is real; it is counted so the person ending employment can be told to look at it.
+     */
+    @Transactional
+    public EndOfEmployment cancelAfterEmploymentEnds(TenantId tenantId, UUID employeeId, LocalDate lastDay, UUID actor) {
+        int cancelled = 0, straddling = 0;
+        String why = "Employment ended on " + lastDay;
+        for (HrLeaveRequest req : requestRepo.openEndingAfter(tenantId, employeeId, lastDay)) {
+            if (!req.getStartDate().isAfter(lastDay)) { straddling++; continue; }
+            boolean wasApproved = "APPROVED".equals(req.getStatus());
+            req.cancel(actor, why);
+            requestRepo.save(req);
+            if (wasApproved) {
+                for (HrLeaveLedger t : ledgerRepo.forRequest(tenantId, req.getId())) {
+                    if (!LeaveRules.TAKEN.equals(t.getKind())) continue;
+                    post(tenantId, req.getEmployeeId(), req.getLeaveType(), t.getEntryDate(), LeaveRules.REVERSAL, t.getDays().negate(), req.getId(),
+                            "rev:" + t.getId(), why, actor);
+                }
+            } else {
+                release(tenantId, req, actor, why);
+            }
+            cancelled++;
+        }
+        return new EndOfEmployment(cancelled, straddling);
+    }
+
     /** HR adjustment of a balance, dated, signed and explained. */
     @Transactional
     public LeaveStatementResponse.Entry adjust(TenantId tenantId, UUID employeeId, LeaveAdjustmentRequest req, UUID actor) {

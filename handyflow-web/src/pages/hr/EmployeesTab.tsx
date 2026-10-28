@@ -13,7 +13,7 @@ import PayAdjustmentsModal from "./PayAdjustmentsModal"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useAuth } from "../../hooks/useAuth"
-import { employeeRights, terminationProblem, today } from "./employees.logic"
+import { END_TYPES, employeeRights, terminationProblem, terminationQuery, today } from "./employees.logic"
 import { ApprovalsModal, HistoryModal, ReportingModal, RequestChangeModal } from "./EmployeeChanges"
 import { Plus, X, Search, Users, AlertTriangle, AlertCircle, Edit2, UserX } from "lucide-react"
 
@@ -95,6 +95,9 @@ export default function EmployeesTab() {
   const [payItemsFor, setPayItemsFor] = useState<Employee | null>(null)
   const [endDate, setEndDate]       = useState("")
   const [reason, setReason]         = useState("")
+  const [endType, setEndType]       = useState("")
+  const [noticeOn, setNoticeOn]       = useState("")
+  const [outcome, setOutcome]         = useState("")
   const { user } = useAuth() as { user?: { permissions?: string[] } }
   const rights = employeeRights(user?.permissions ?? [])
   const [changeFor, setChangeFor]   = useState<{ kind: "pay" | "bank"; emp: Employee } | null>(null)
@@ -137,8 +140,11 @@ export default function EmployeesTab() {
 
   const terminateEmployee = useMutation({
     mutationFn: ({ id, date, why }: { id: string; date: string; why: string }) =>
-      apiClient.post(`/api/v1/hr/employees/${id}/terminate?endDate=${date}&reason=${encodeURIComponent(why.trim())}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["hr-employees"] }); setTerminating(null); setSelected(null); setEndDate(""); setReason(""); setError("") },
+      apiClient.post(`/api/v1/hr/employees/${id}/terminate?${terminationQuery(date, why, endType, noticeOn)}`),
+    onSuccess: (res: { data?: { message?: string } }) => {
+      qc.invalidateQueries({ queryKey: ["hr-employees"] }); setTerminating(null); setSelected(null); setEndDate(""); setReason(""); setEndType(""); setNoticeOn(""); setError("")
+      setOutcome(res?.data?.message ?? "Employee terminated.")
+    },
     onError: (e: any) => setError(e.response?.data?.message ?? "Failed to terminate employee"),
   })
 
@@ -354,6 +360,12 @@ export default function EmployeesTab() {
 
   return (
     <div>
+      {outcome && (
+        <div role="status" style={{ marginBottom: 14, padding: "10px 14px", background: "var(--hf-surface-sunken)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, display: "flex", gap: 12, justifyContent: "space-between" }}>
+          <span>{outcome}</span>
+          <button type="button" aria-label="Dismiss" onClick={() => setOutcome("")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-muted)" }}>×</button>
+        </div>
+      )}
       {/* Stats */}
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {Object.entries(STATUS_CFG).filter(([k]) => k !== "TERMINATED").map(([k, cfg]) => (
@@ -436,7 +448,7 @@ export default function EmployeesTab() {
                     <td style={{ padding: "12px 16px", borderBottom: "1px solid var(--hf-border-subtle)" }}>
                       <div style={{ display: "flex", gap: 5 }}>
                         {rights.manage && <button aria-label={`Edit ${emp.fullName}`} onClick={e => { e.stopPropagation(); openEdit(emp) }} style={{ background: "var(--hf-info-soft)", border: "none", borderRadius: 6, padding: "5px 7px", cursor: "pointer", color: "var(--hf-info-text)" }}><Edit2 size={12} /></button>}
-                        {rights.manage && emp.status === "ACTIVE" && <button aria-label={`Terminate ${emp.fullName}`} onClick={e => { e.stopPropagation(); setTerminating(emp); setEndDate(""); setReason(""); setError("") }} style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "5px 7px", cursor: "pointer", color: "var(--hf-danger-text)" }}><UserX size={12} /></button>}
+                        {rights.manage && emp.status === "ACTIVE" && <button aria-label={`Terminate ${emp.fullName}`} onClick={e => { e.stopPropagation(); setTerminating(emp); setEndDate(""); setReason(""); setEndType(""); setNoticeOn(""); setError("") }} style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "5px 7px", cursor: "pointer", color: "var(--hf-danger-text)" }}><UserX size={12} /></button>}
                       </div>
                     </td>
                   </tr>
@@ -506,7 +518,7 @@ export default function EmployeesTab() {
               {(rights.manage || rights.compensation) && <button onClick={() => { setBenefitsFor(selected); setSelected(null) }} style={secondaryBtn}>Employer benefits</button>}
               {(rights.manage || rights.compensation) && selected.status === "ACTIVE" && <button onClick={() => { setPayItemsFor(selected); setSelected(null) }} style={secondaryBtn}>Bonus & back pay</button>}
               {rights.manage && selected.status === "ACTIVE" && (
-                <button onClick={() => { setTerminating(selected); setEndDate(""); setReason(""); setError(""); setSelected(null) }}
+                <button onClick={() => { setTerminating(selected); setEndDate(""); setReason(""); setEndType(""); setNoticeOn(""); setError(""); setSelected(null) }}
                   style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                   <AlertTriangle size={13} /> Terminate
                 </button>
@@ -555,7 +567,7 @@ export default function EmployeesTab() {
               <div><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Terminate Employee</h3><div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>{terminating.fullName} · {terminating.employeeNumber}</div></div>
             </div>
             <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text-strong)" }}>
-              This sets the employee to Terminated. Leave balances are preserved for final pay calculation.
+              This sets the employee to Terminated. Leave balances are kept for final pay, leave booked after the last day is cancelled, and self-service portal access is closed.
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Last Working Day *</label>
@@ -566,10 +578,24 @@ export default function EmployeesTab() {
               <label style={lbl}>Reason *</label>
               <input value={reason} maxLength={200} onChange={e => setReason(e.target.value)} placeholder="Resigned, dismissed, contract ended..." style={{ ...inp("_"), width: "100%" }} />
             </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl} htmlFor="end-type">How did employment end?</label>
+              <select id="end-type" value={endType} onChange={e => setEndType(e.target.value)} style={{ ...inp("_"), width: "100%" }}>
+                <option value="">Not recorded</option>
+                {END_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+              <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 2 }}>Needed to work out notice pay. Leave after the last day is cancelled and portal access is closed whichever you choose.</div>
+            </div>
+            {endType && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={lbl} htmlFor="notice-on">Date notice was given</label>
+                <input id="notice-on" type="date" max={endDate || today()} value={noticeOn} onChange={e => setNoticeOn(e.target.value)} style={{ ...inp("_"), width: "100%" }} />
+              </div>
+            )}
             {error && <ErrBanner msg={error} />}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button onClick={() => { setTerminating(null); setError("") }} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
-              <button onClick={() => { const p = terminationProblem(endDate, reason, terminating.startDate); if (p) { setError(p); return } setError(""); terminateEmployee.mutate({ id: terminating.id, date: endDate, why: reason }) }} disabled={!endDate || !reason.trim() || terminateEmployee.isPending}
+              <button onClick={() => { const p = terminationProblem(endDate, reason, terminating.startDate, today(), endType, noticeOn); if (p) { setError(p); return } setError(""); terminateEmployee.mutate({ id: terminating.id, date: endDate, why: reason }) }} disabled={!endDate || !reason.trim() || terminateEmployee.isPending}
                 style={{ padding: "9px 22px", background: !endDate || !reason.trim() ? "var(--hf-text-faint)" : "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {terminateEmployee.isPending ? "Processing..." : "Terminate"}
               </button>

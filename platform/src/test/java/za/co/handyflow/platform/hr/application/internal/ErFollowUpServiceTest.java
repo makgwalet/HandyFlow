@@ -22,7 +22,7 @@ class ErFollowUpServiceTest {
     private final ErHarness h = new ErHarness();
     private final EmployeeAuditService audit = mock(EmployeeAuditService.class);
     private final ErCaseViews views = mock(ErCaseViews.class);
-    private final ErTerminationService termination = new ErTerminationService(h.support, h.employees, audit, views);
+    private final ErTerminationService termination = new ErTerminationService(h.support, h.employees, audit, views, org.mockito.Mockito.mock(TerminationFollowUp.class));
 
     private HrEmployee realEmployee() {
         HrEmployee e = HrEmployee.create(TENANT, "EMP-9", "Sipho", "Nkosi", LocalDate.of(2024, 1, 1), "PERMANENT", new BigDecimal("20000"), "MONTHLY");

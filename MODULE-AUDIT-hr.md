@@ -1162,3 +1162,21 @@ I read the four training services, the entities and the session screen. The modu
 - Cash-out during employment is not built. The BCEA only allows pay in place of leave when employment ends (section 40) apart from narrow agreed cases, so I left it out rather than guess.
 - A negative balance at leaving is still not taken off the final pay: a deduction needs the employee's written agreement (section 34), which the system does not record.
 - Expiry uses the first-in rule (carried days are used first); a company that wants a different order has no setting for it.
+
+## 46. Ending employment: leave, portal access and notice pay (Slice 21c, V533)
+
+**What was wrong.** Terminating an employee only changed their status. Leave they or their manager had booked after the last day stayed on the books (with days still reserved), the self-service portal stayed open, and the final-pay review said "notice pay is not handled". The dismissal route from an employee relations case was the same.
+
+**What changed.** Both ways of ending employment (the Terminate button, and "end employment" on a dismissal case) now run the same follow-up inside the same transaction:
+- **Leave:** requests, waiting or approved, that start after the last day are cancelled with the note "Employment ended on …"; reserved days are given back and days already marked taken are reversed. A request that starts on or before the last day and runs past it is left alone (part of it is real) and counted, and the person ending employment is told to look at it.
+- **Portal:** every active or pending self-service grant for the employee is revoked, so the login stops working for their record and an unused invite cannot be accepted. The shared portal login itself is not touched, and the staff login linked to the employee is left to Identity.
+- **Notice:** the Terminate form asks "How did employment end?" (resigned, ended by the employer with notice owed, dismissed without notice, fixed-term contract ended, agreed, other) and, optionally, the date notice was given. For "ended by the employer with notice owed" the system sets the notice the BCEA requires (section 37: 7 days to six months of service, 14 days to one year, 28 days after that, by service on the day notice was given) against the days between that date and the last day, and works out pay in place of the shortfall (section 38) as a year's pay over 52 weeks per week. It is **reported, not paid**: the confirmation banner and the final-pay review both show it, and HR enters it as a payment if it is owed. Other endings owe no pay in place of notice. If the ending was not recorded the review says notice pay was not worked out.
+- Migration V533 adds `end_type` and `notice_given_on` to `hr_employees`; both optional, so earlier terminations are unaffected. The audit trail gets `LEAVE_CANCELLED` and `PORTAL_CLOSED` lines (counts only).
+
+**Tests.** `NoticeRulesTest` (7) passes in my harness and a deliberate break of the six-month boundary was caught. `TerminationFollowUpTest` (5) and two new cases in `LeaveServiceTest` are Mockito and have not run; the constructors in `HrServiceEmployeeTest` and `ErFollowUpServiceTest` were updated for the new dependency. The screen's logic was checked under node; the added cases in `Employees.test.tsx` have not run. Spring, the migration and a browser have not been used.
+
+**Not done.**
+- Notice pay is not put into the pay run. It is taxed as ordinary pay, and I did not want to guess which pay item to use; a "notice pay" item kind would be the next step.
+- The dismissal route from a case does not ask how employment ended, so it never works out notice pay (the message says so). A dismissal for incapacity or poor performance owes notice; one for misconduct usually does not, and the case does not say which.
+- Farm and domestic workers have four weeks' notice after six months; not applied.
+- A leave request that runs past the last day is not shortened.

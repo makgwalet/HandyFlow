@@ -188,7 +188,9 @@ public class PayrollService {
                 payout = PayPeriodRules.leavePayout(emp.getGrossSalary(), payoutDays);
                 warnings.add(who + ": last pay (left " + emp.getEndDate() + ")"
                         + (payout.signum() > 0 ? ", including " + payoutDays + " day(s) of annual leave paid out at " + payout + "." : ", no annual leave owing.")
-                        + " Notice pay, bonus and any leave taken in advance are not handled; check them by hand.");
+                        + " Bonus and any leave taken in advance are not handled; check them by hand.");
+                String notice = NoticeRules.summary(emp.getEndType(), emp.getGrossSalary(), emp.getStartDate(), emp.getNoticeGivenOn(), emp.getEndDate());
+                warnings.add(who + ": " + (notice != null ? notice : "how employment ended was not recorded, so notice pay was not worked out; check it by hand."));
             }
             if (pay.partPeriod() && !finalPay)
                 warnings.add(who + ": paid " + pay.daysPaid() + " of " + pay.workingDays() + " working days"

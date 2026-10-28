@@ -17,7 +17,7 @@ import static za.co.handyflow.platform.hr.application.internal.ErCaseSupport.*;
 
 /**
  * A dismissal on its own does not end anyone's employment: it is a decision. This ends it, on purpose, by someone who may decide, once the
- * employee has been told and no appeal is waiting. The next pay run then pays them up to the last day, with the annual leave owing.
+ * employee has been told and no appeal is waiting. The next pay run then pays them up to the last day, with the annual leave owing; leave after that day is cancelled and portal access is closed.
  */
 @Slf4j
 @Service
@@ -28,6 +28,7 @@ public class ErTerminationService {
     private final HrEmployeeRepository employeeRepo;
     private final EmployeeAuditService audit;
     private final ErCaseViews views;
+    private final TerminationFollowUp followUp;
 
     @Transactional
     public Detail endEmployment(TenantId tenantId, UUID id, EndEmploymentRequest req, UUID userId, Set<String> held) {
@@ -41,6 +42,7 @@ public class ErTerminationService {
         e.terminate(lastDay, reason, userId);
         employeeRepo.save(e);
         audit.record(tenantId, e.getId(), "TERMINATED", "last day " + lastDay + ", dismissal, case " + c.getCaseNumber(), userId);
+        followUp.run(tenantId, e, userId);
         support.event(c, "EMPLOYMENT_ENDED", "Employment ended on " + lastDay, true, userId);
         log.info("Ended employment of employee={} after case={}", e.getEmployeeNumber(), c.getCaseNumber());
         return views.detail(tenantId, c, held, userId, support.today());

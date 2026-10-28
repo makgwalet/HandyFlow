@@ -66,6 +66,8 @@ public class HrEmployee {
     @Column(name = "termination_reason") String terminationReason;
     @Column(name = "terminated_by")      UUID terminatedBy;
     @Column(name = "terminated_at")      Instant terminatedAt;
+    @Column(name = "end_type")           String endType;
+    @Column(name = "notice_given_on")    LocalDate noticeGivenOn;
 
     String notes;
     @Column(name = "created_at") Instant createdAt;
@@ -111,6 +113,13 @@ public class HrEmployee {
         this.terminationReason = reason == null ? null : reason.trim();
         this.terminatedBy = actor;
         this.terminatedAt = Instant.now();
+    }
+
+    /** Terminate, also keeping how employment ended and when notice was given. Both may be null. */
+    public void terminate(LocalDate endDate, String reason, UUID actor, String endType, LocalDate noticeGivenOn) {
+        terminate(endDate, reason, actor);
+        this.endType = endType;
+        this.noticeGivenOn = endType == null ? null : noticeGivenOn;
     }
 
     public void suspend() {
