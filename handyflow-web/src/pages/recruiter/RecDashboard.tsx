@@ -2,7 +2,10 @@
 // the busiest jobs, the next interviews and what happened lately. Every number comes from the same records as the screens and reports.
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { Bell, CalendarDays, Plus, Search, Upload } from 'lucide-react'
+import { NotificationDrawer } from '../../components/layout/NotificationDrawer'
+import { usePermission } from '../../hooks/usePermission'
 import { apiClient } from '../../api/client'
 import RecFunnel from './RecFunnel'
 
@@ -81,6 +84,42 @@ function Donut({ parts, unit }: { parts: { label: string; n: number }[]; unit: s
   )
 }
 
+const quick = { display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 10px', background: 'var(--hf-surface)', color: 'var(--hf-text-secondary)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 12, textDecoration: 'none', cursor: 'pointer' } as const
+
+/** Find a candidate or job, jump to the common actions, and see unread notifications, from the top of the overview. */
+function Toolbar() {
+  const nav = useNavigate()
+  const mayManage = usePermission('RECRUITER_MANAGE')
+  const [text, setText] = useState('')
+  const [bellOpen, setBellOpen] = useState(false)
+  const unread = useQuery<{ unreadCount: number }>({
+    queryKey: ['notifications-unread-count'], queryFn: async () => (await apiClient.get('/api/v1/notifications/unread-count')).data, refetchInterval: 60_000,
+  }).data?.unreadCount ?? 0
+  const go = (e: React.FormEvent) => {
+    e.preventDefault()
+    const t = text.trim()
+    nav(t ? `/recruiter/applications?q=${encodeURIComponent(t.slice(0, 100))}` : '/recruiter/applications')
+  }
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+      <form role="search" onSubmit={go} style={{ position: 'relative', flex: '1 1 220px', maxWidth: 360 }}>
+        <Search size={13} aria-hidden style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--hf-text-faint)' }} />
+        <input aria-label="Search candidates" placeholder="Search candidates by name, email or job" value={text} onChange={e => setText(e.target.value)}
+          style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px 7px 28px', background: 'var(--hf-surface)', color: 'var(--hf-text)', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12 }} />
+      </form>
+      {mayManage && <Link to="/recruiter/jobs?new=1" style={quick}><Plus size={13} aria-hidden /> Post job</Link>}
+      {mayManage && <Link to="/recruiter/jobs" style={quick} title="Open a job, then choose Import candidates from CSV"><Upload size={13} aria-hidden /> Import candidates</Link>}
+      <Link to="/recruiter/calendar" style={quick}><CalendarDays size={13} aria-hidden /> Interview calendar</Link>
+      <button type="button" style={{ ...quick, position: 'relative' }} onClick={() => setBellOpen(true)}
+        aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}>
+        <Bell size={14} aria-hidden />
+        {unread > 0 && <span aria-hidden style={{ background: 'var(--hf-danger-solid-strong)', color: 'var(--hf-text-on-solid)', borderRadius: 20, padding: '0 6px', fontSize: 10, fontWeight: 700 }}>{unread > 99 ? '99+' : unread}</span>}
+      </button>
+      <NotificationDrawer open={bellOpen} onClose={() => setBellOpen(false)} />
+    </div>
+  )
+}
+
 export default function RecDashboard() {
   const [days, setDays] = useState(30)
   const [sourceBy, setSourceBy] = useState<'applications' | 'hires'>('applications')
@@ -100,6 +139,7 @@ export default function RecDashboard() {
           <option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option>
         </select>
       </div>
+      <Toolbar />
       {err && <div role="alert" style={{ color: 'var(--hf-danger-text)' }}>{err}</div>}
       {q.isLoading && <div style={muted}>Loading...</div>}
       {q.isError && !err && <div role="alert" style={{ color: 'var(--hf-danger-text)' }}>The dashboard could not be loaded.</div>}

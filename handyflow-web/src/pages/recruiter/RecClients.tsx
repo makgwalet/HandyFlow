@@ -55,7 +55,7 @@ function ClientDetailView({ id, onClose, onChanged }: { id: string; onClose: () 
   const d = useQuery<Detail>({ queryKey: ['rec-client', id], queryFn: async () => data(await apiClient.get(`${BASE}/clients/${id}`)), retry: false })
   const jobs = useQuery<JobLite[]>({
     queryKey: ['rec-jobs-lite'],
-    queryFn: async () => { const x = data<{ content?: JobLite[] } & JobLite[]>(await apiClient.get(`${BASE}/jobs?size=200`)); return Array.isArray(x) ? x : x?.content ?? [] },
+    queryFn: async () => { const x = data<unknown>(await apiClient.get(`${BASE}/jobs?size=200`)) as JobLite[] | { content?: JobLite[] } | undefined; return Array.isArray(x) ? x : x?.content ?? [] },
   })
   const refresh = () => { qc.invalidateQueries({ queryKey: ['rec-client', id] }); qc.invalidateQueries({ queryKey: ['rec-clients'] }); qc.invalidateQueries({ queryKey: ['rec-job-clients'] }); onChanged() }
   const done = () => { setError(''); refresh() }

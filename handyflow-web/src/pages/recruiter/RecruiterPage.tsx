@@ -6,11 +6,9 @@ import { apiClient } from '../../api/client'
 import { usePermission } from '../../hooks/usePermission'
 import {
   Plus, X, Search, Download, ChevronRight, Briefcase, Users, Calendar, UserCheck, AlertTriangle,
-  CheckCircle, Clock, MapPin, Building2, ExternalLink,
-  FileText, Edit3, Trash2, Send, Video, Phone,
-  Monitor, Mic, Link2, UserPlus, Filter,
-  ChevronDown, ChevronUp,
-} from 'lucide-react'
+  CheckCircle, MapPin, ExternalLink,
+  FileText, Edit3, Trash2, Video, Phone,
+  Monitor, Mic, UserPlus, } from 'lucide-react'
 import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
 import { RECRUITER_SECTIONS } from '../../navigation/moduleSections'
 import { useParams, useSearchParams } from 'react-router-dom'
@@ -67,11 +65,6 @@ interface StageHistory {
   fromStage: string | null; toStage: string; changedByName: string | null
   notes: string | null; createdAt: string
 }
-interface Summary {
-  openJobs: number; draftJobs: number; filledJobs: number
-  newApplications: number; inScreening: number; inInterview: number
-  offersMade: number; hiredThisMonth: number
-}
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const STAGE: Record<string, { color: string; bg: string; border: string; dot: string; label: string }> = {
@@ -105,7 +98,6 @@ const btnS: React.CSSProperties = { display: 'inline-flex', alignItems: 'center'
 const fmtDate = (d: any) => d ? new Date(d + (String(d).includes('T') ? '' : 'T00:00:00')).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
 const fmtDT   = (d: any) => d ? new Date(d).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'
 const fmtR    = (n: any) => n ? `R\u00A0${Number(n).toLocaleString('en-ZA')}` : ''
-const stars   = (n: number | null) => n ? '★'.repeat(n) + '☆'.repeat(5 - n) : '—'
 
 // ── Star Rating ────────────────────────────────────────────────────────────
 function StarRating({ value, onChange }: { value: number | null; onChange: (n: number) => void }) {
@@ -1462,6 +1454,17 @@ export function RecruiterPage() {
   // A link such as /recruiter/applications?open=<id> (the interview calendar uses it) opens that candidate.
   const [searchParams, setSearchParams] = useSearchParams()
   const openId = searchParams.get('open')
+  // /recruiter/jobs?new=1 opens the new-job form, and /recruiter/applications?q=name starts a search (the Dashboard uses both).
+  const wantsNew = searchParams.get('new') === '1'
+  const startQuery = searchParams.get('q')
+  useEffect(() => {
+    if (!wantsNew && !startQuery) return
+    if (wantsNew) setShowCreate(true)
+    if (startQuery) setSearch(startQuery.slice(0, 100))
+    const next = new URLSearchParams(searchParams); next.delete('new'); next.delete('q')
+    setSearchParams(next, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantsNew, startQuery])
   useEffect(() => {
     if (!openId) return
     let cancelled = false
@@ -1483,11 +1486,6 @@ export function RecruiterPage() {
     qc.invalidateQueries({ queryKey: ['rec-applications'] })
   }
 
-  const { data: summary } = useQuery<Summary>({
-    queryKey: ['rec-summary'],
-    queryFn: async () => { const r = await apiClient.get('/api/v1/recruiter/summary'); return r.data?.data ?? r.data },
-    refetchInterval: 30_000,
-  })
 
   const { data: jobsPage } = useQuery({
     queryKey: ['rec-jobs', statusFilter],
@@ -1562,15 +1560,6 @@ export function RecruiterPage() {
     const el = document.createElement('a'); el.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv); el.download = 'applications.csv'; el.click()
   }
 
-  const kpis = [
-    { label: 'Open positions',  value: summary?.openJobs ?? 0,        color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)', icon: <Briefcase size={16} /> },
-    { label: 'New applications',value: summary?.newApplications ?? 0,  color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)', icon: <Users size={16} /> },
-    { label: 'In interview',    value: summary?.inInterview ?? 0,      color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)', icon: <Calendar size={16} /> },
-    { label: 'Offers made',     value: summary?.offersMade ?? 0,       color: 'var(--hf-accent-text)', bg: 'var(--hf-accent-soft)', icon: <Send size={16} /> },
-    { label: 'Hired this month',value: summary?.hiredThisMonth ?? 0,   color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)', icon: <UserCheck size={16} /> },
-    { label: 'Draft jobs',      value: summary?.draftJobs ?? 0,        color: 'var(--hf-text-muted)', bg: 'var(--hf-surface-muted)', icon: <FileText size={16} /> },
-  ]
-
   return (
     <SectionedModulePage config={RECRUITER_SECTIONS}
       subtitle="Job postings · Applicant pipeline · Interviews · HR onboarding"
@@ -1581,22 +1570,6 @@ export function RecruiterPage() {
           )}
           <button onClick={() => setShowCreate(true)} style={btnP}><Plus size={14} /> Post job</button>
         </div>
-      )}
-      banner={(
-        <>
-          {/* KPI strip */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 22 }}>
-            {kpis.map(k => (
-              <div key={k.label} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: k.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: k.color, flexShrink: 0 }}>{k.icon}</div>
-                <div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: k.color }}>{k.value}</div>
-                  <div style={{ fontSize: 10, color: 'var(--hf-text-faint)' }}>{k.label}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
       )}
       render={id => {
         switch (id) {
@@ -1746,38 +1719,56 @@ export function RecruiterPage() {
                 )
               )}
 
-              {/* ── PIPELINE TAB (Kanban) ── */}
+              {/* ── PIPELINE TAB (board) ── */}
               {tab === 'pipeline' && (
                 <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 16, alignItems: 'flex-start' }}>
                   {PIPELINE_STAGES.map(stage => {
                     const cfg  = STAGE[stage]
                     const col  = pipelineGroups[stage] ?? []
                     return (
-                      <div key={stage} style={{ minWidth: 230, maxWidth: 230, flexShrink: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
-                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.dot }} />
-                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-secondary)' }}>{cfg.label}</span>
-                          <span style={{ background: 'var(--hf-surface-sunken)', color: 'var(--hf-text-muted)', borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>{col.length}</span>
+                      <section key={stage} aria-label={`${cfg.label}, ${col.length}`}
+                        style={{ minWidth: 252, maxWidth: 252, flexShrink: 0, background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderTop: `3px solid ${cfg.dot}`, borderRadius: 12, padding: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)' }}>{cfg.label}</span>
+                          <span style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`, borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>{col.length}</span>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          {col.map(a => (
-                            <div key={a.id} onClick={() => setSelectedApp(a)}
-                              style={{ border: '1px solid var(--hf-border)', borderLeft: `3px solid ${cfg.dot}`, borderRadius: 9, padding: '11px 13px', cursor: 'pointer', background: 'var(--hf-surface)', transition: 'box-shadow 0.15s' }}
-                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'}
-                              onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
-                              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)', marginBottom: 3 }}>{a.applicantName}</div>
-                              <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginBottom: 6 }}>{a.jobTitle}</div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                                <span style={{ color: 'var(--hf-text-muted)' }}>{fmtDate(a.appliedAt)}</span>
-                                {a.score && <span style={{ color: 'var(--hf-warning-text)' }}>{'★'.repeat(a.score)}</span>}
+                          {col.map(a => {
+                            const days = Math.max(0, Math.floor((Date.now() - new Date(a.stageChangedAt).getTime()) / 86_400_000))
+                            const stale = days >= 14 && stage !== 'HIRED'
+                            const client = clientByJob[a.jobId]
+                            return (
+                              <div key={a.id} role="button" tabIndex={0} onClick={() => setSelectedApp(a)}
+                                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedApp(a) } }}
+                                style={{ border: '1px solid var(--hf-border)', borderRadius: 10, padding: '10px 12px', cursor: 'pointer', background: 'var(--hf-surface)', transition: 'box-shadow 0.15s' }}
+                                onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'}
+                                onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <div aria-hidden style={{ width: 28, height: 28, borderRadius: '50%', background: cfg.bg, color: cfg.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                                    {(a.applicantName ?? 'A').split(' ').map(w => w.charAt(0)).slice(0, 2).join('').toUpperCase()}
+                                  </div>
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.applicantName}</div>
+                                    <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.jobTitle}{client ? ` · ${client}` : ''}</div>
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 11 }}>
+                                  <span style={{ color: stale ? 'var(--hf-warning-text)' : 'var(--hf-text-muted)', fontWeight: stale ? 700 : 400 }}>
+                                    {days === 0 ? 'Today' : `${days}d in stage`}
+                                  </span>
+                                  <span style={{ display: 'inline-flex', gap: 5, alignItems: 'center' }}>
+                                    {a.source && a.source !== 'CAREERS_PAGE' && <span style={{ background: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)', border: '1px solid var(--hf-border)', borderRadius: 20, padding: '0 6px' }}>{a.source.replace(/_/g, ' ').toLowerCase()}</span>}
+                                    {a.score != null && <span title="Rating" style={{ background: 'var(--hf-warning-soft)', color: 'var(--hf-warning-text)', borderRadius: 20, padding: '0 6px', fontWeight: 700 }}>★ {a.score}</span>}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            )
+                          })}
                           {col.length === 0 && (
-                            <div style={{ padding: '16px', textAlign: 'center', fontSize: 12, color: 'var(--hf-text-disabled)', border: '1.5px dashed var(--hf-border)', borderRadius: 9 }}>Empty</div>
+                            <div style={{ padding: '16px', textAlign: 'center', fontSize: 12, color: 'var(--hf-text-muted)', border: '1.5px dashed var(--hf-border)', borderRadius: 9 }}>No candidates</div>
                           )}
                         </div>
-                      </div>
+                      </section>
                     )
                   })}
                 </div>
