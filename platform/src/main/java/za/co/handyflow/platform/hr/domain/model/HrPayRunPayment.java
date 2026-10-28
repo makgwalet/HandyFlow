@@ -31,6 +31,7 @@ public class HrPayRunPayment {
     String reference;
     String status;
     @Column(name = "exported_at")      Instant exportedAt;
+    @Column(name = "exported_by")      UUID exportedBy;
     @Column(name = "paid_at")          Instant paidAt;
     @Column(name = "paid_by")          UUID paidBy;
     @Column(name = "returned_at")      Instant returnedAt;
@@ -59,7 +60,10 @@ public class HrPayRunPayment {
         return p;
     }
 
-    public void markExported() { if (exportedAt == null) exportedAt = Instant.now(); }
+    public void markExported() { markExported(null); }
+
+    /** Records who downloaded the file; downloading again by someone else is remembered too (the latest person). */
+    public void markExported(UUID by) { if (exportedAt == null) exportedAt = Instant.now(); if (by != null) exportedBy = by; }
 
     public void markPaid(UUID by) {
         this.status = PayrollPaymentRules.PAID;

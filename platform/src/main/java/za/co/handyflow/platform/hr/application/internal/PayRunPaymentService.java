@@ -31,6 +31,7 @@ public class PayRunPaymentService {
     private final HrEmployeeRepository employeeRepo;
     private final HrPayRunPaymentRepository paymentRepo;
     private final HrPayRunEventRepository eventRepo;
+    private final HrPayrollSettingsRepository settingsRepo;
 
     @Transactional(readOnly = true)
     public Summary summary(TenantId tenantId, UUID runId) {
@@ -76,20 +77,36 @@ public class PayRunPaymentService {
         return toSummary(run, made, emps, skipped);
     }
 
-    /** The CSV for the pending payments. Recorded in the history, because it holds everyone's bank details. */
+    /** The generic CSV for the pending payments. */
     @Transactional
     public FileResult file(TenantId tenantId, UUID runId, UUID actor) {
+        return file(tenantId, runId, actor, BankFileRules.GENERIC_CSV);
+    }
+
+    /**
+     * The bank file for the pending payments, in the layout asked for. Recorded in the history, because it holds everyone's bank details.
+     * Nothing is marked as downloaded when the layout cannot be written (for example the company's own account is missing).
+     */
+    @Transactional
+    public FileResult file(TenantId tenantId, UUID runId, UUID actor, String layout) {
         requireActor(actor);
         HrPayRun run = load(tenantId, runId);
+        HrPayrollSettings settings = settingsRepo.findById(tenantId.getValue()).orElse(null);
+        String branch = settings == null ? null : settings.getBankNominatedBranch(), account = settings == null ? null : settings.getBankNominatedAccount();
+        String problem = BankFileRules.layoutProblem(layout, branch, account);
+        if (problem != null) throw new IllegalStateException(problem);
         List<HrPayRunPayment> pending = paymentRepo.forRun(tenantId, runId).stream()
                 .filter(p -> PayrollPaymentRules.PENDING.equals(p.getStatus())).toList();
         if (pending.isEmpty()) throw new IllegalStateException("There are no pending payments. Make up the payments first.");
-        pending.forEach(HrPayRunPayment::markExported);
-        paymentRepo.saveAll(pending);
-        event(tenantId, run, "PAYMENT_FILE_DOWNLOADED", actor, pending.size() + " payments");
         List<PayrollPaymentRules.Line> lines = pending.stream().map(p -> new PayrollPaymentRules.Line(p.getBeneficiaryName(), p.getBankName(),
                 p.getBranchCode(), p.getAccountNumber(), p.getAmount(), p.getReference())).toList();
-        return new FileResult(PayrollPaymentRules.filename(run.getPayRunNumber()), PayrollPaymentRules.csv(lines));
+        String content = BankFileRules.BANKSERV_ACB.equals(layout)
+                ? BankFileRules.bankserv(lines, branch, account, BankFileRules.actionDate(run.getPayDate(), java.time.LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg"))))
+                : PayrollPaymentRules.csv(lines);
+        pending.forEach(p -> p.markExported(actor));
+        paymentRepo.saveAll(pending);
+        event(tenantId, run, "PAYMENT_FILE_DOWNLOADED", actor, pending.size() + " payments, R" + BankFileRules.total(lines).toPlainString() + ", " + layout);
+        return new FileResult(BankFileRules.filename(layout, run.getPayRunNumber()), content, layout);
     }
 
     /** Payroll confirms that the bank accepted the file: every pending payment becomes paid. */
@@ -101,6 +118,10 @@ public class PayRunPaymentService {
         List<HrPayRunPayment> pending = all.stream().filter(p -> PayrollPaymentRules.PENDING.equals(p.getStatus())).toList();
         String problem = PayrollPaymentRules.markPaidProblem(pending.size(), pending.stream().filter(p -> p.getExportedAt() == null).count());
         if (problem != null) throw new IllegalStateException(problem);
+        boolean secondCheck = settingsRepo.findById(tenantId.getValue()).map(HrPayrollSettings::isBankFileSecondCheck).orElse(false);
+        String confirmer = PayrollPaymentRules.confirmerProblem(secondCheck, actor,
+                pending.stream().map(HrPayRunPayment::getExportedBy).filter(java.util.Objects::nonNull).collect(Collectors.toSet()));
+        if (confirmer != null) throw new IllegalStateException(confirmer);
         pending.forEach(p -> p.markPaid(actor));
         paymentRepo.saveAll(pending);
         event(tenantId, run, "PAYMENTS_CONFIRMED_PAID", actor, pending.size() + " payments" + (note == null || note.isBlank() ? "" : ". " + note.trim()));

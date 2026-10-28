@@ -16,6 +16,9 @@ public class HrPayrollSettings {
 
     @Id @Column(name = "tenant_id") UUID tenantId;
     @Column(name = "allow_self_approval") boolean allowSelfApproval;
+    @Column(name = "bank_nominated_branch") String bankNominatedBranch;
+    @Column(name = "bank_nominated_account") String bankNominatedAccount;
+    @Column(name = "bank_file_second_check") boolean bankFileSecondCheck;
     @Column(name = "updated_by") UUID updatedBy;
     @Column(name = "updated_at") Instant updatedAt;
 
@@ -23,6 +26,14 @@ public class HrPayrollSettings {
         HrPayrollSettings s = new HrPayrollSettings();
         s.tenantId = tenantId;
         return s;
+    }
+
+    public void setBankFile(boolean secondCheck, String branch, String account, UUID actor) {
+        this.bankFileSecondCheck = secondCheck;
+        this.bankNominatedBranch = branch == null || branch.isBlank() ? null : branch;
+        this.bankNominatedAccount = account == null || account.isBlank() ? null : account;
+        this.updatedBy = actor;
+        this.updatedAt = Instant.now();
     }
 
     public void setAllowSelfApproval(boolean allow, UUID actor) {

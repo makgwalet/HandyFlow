@@ -184,8 +184,11 @@ public class PayrollControlService {
     @Transactional(readOnly = true)
     public PayrollSettingsResponse settings(TenantId tenantId) {
         HrPayrollSettings s = settingsRepo.findById(tenantId.getValue()).orElse(null);
+        String acct = s == null ? null : s.getBankNominatedAccount();
         return new PayrollSettingsResponse(s != null && s.isAllowSelfApproval(), s != null ? s.getUpdatedAt() : null,
-                PayrollAccess.LEGACY_ACCESS_ENDS, PayrollAccess.legacyOpen(LocalDate.now()));
+                PayrollAccess.LEGACY_ACCESS_ENDS, PayrollAccess.legacyOpen(LocalDate.now()),
+                s != null && s.isBankFileSecondCheck(), s == null ? null : s.getBankNominatedBranch(), acct != null,
+                acct == null ? null : acct.substring(Math.max(0, acct.length() - 4)));
     }
 
     @Transactional
@@ -194,6 +197,23 @@ public class PayrollControlService {
         s.setAllowSelfApproval(allowSelfApproval, actor);
         settingsRepo.save(s);
         log.info("Payroll self-approval set to {} for tenant {} by {}", allowSelfApproval, tenantId.getValue(), actor);
+        return settings(tenantId);
+    }
+
+    /** The bank file choices. A null leaves that choice as it is; a blank branch or account clears it. */
+    @Transactional
+    public PayrollSettingsResponse updateBankFileSettings(TenantId tenantId, Boolean secondCheck, String branch, String account, UUID actor) {
+        HrPayrollSettings s = settingsRepo.findById(tenantId.getValue()).orElseGet(() -> HrPayrollSettings.create(tenantId.getValue()));
+        String b = branch == null ? s.getBankNominatedBranch() : PayrollPaymentRules.digits(branch);
+        String a = account == null ? s.getBankNominatedAccount() : PayrollPaymentRules.digits(account);
+        boolean touched = branch != null || account != null;
+        if (touched && ((b != null && !b.isBlank()) || (a != null && !a.isBlank()))) {
+            String problem = BankFileRules.nominatedProblem(b, a);
+            if (problem != null) throw new IllegalArgumentException("The company's bank account: " + problem + ".");
+        }
+        s.setBankFile(secondCheck != null ? secondCheck : s.isBankFileSecondCheck(), b, a, actor);
+        settingsRepo.save(s);
+        log.info("Bank file settings changed for tenant {} by {}", tenantId.getValue(), actor);
         return settings(tenantId);
     }
 

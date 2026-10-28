@@ -62,7 +62,10 @@ class PayRunPaymentServiceTest {
         events.add(((HrPayRunEvent) a[0]).getAction() + ":" + ((HrPayRunEvent) a[0]).getNote());
         return a[0];
     });
-    private final PayRunPaymentService service = new PayRunPaymentService(payRunRepo, payslipRepo, employeeRepo, paymentRepo, eventRepo);
+    private HrPayrollSettings settings;
+    private final HrPayrollSettingsRepository settingsRepo = fake(HrPayrollSettingsRepository.class, (n, a) ->
+            "findById".equals(n) ? Optional.ofNullable(settings) : NOPE);
+    private final PayRunPaymentService service = new PayRunPaymentService(payRunRepo, payslipRepo, employeeRepo, paymentRepo, eventRepo, settingsRepo);
 
     private HrEmployee person(String number, String first, String account, String branch) {
         HrEmployee e = HrEmployee.create(tenant, number, first, "Nkosi", LocalDate.of(2024, 1, 1), "PERMANENT", new BigDecimal("20000"), "MONTHLY");
@@ -203,5 +206,72 @@ class PayRunPaymentServiceTest {
         HrEmployee leaver = person("E9", "Zanele", "1234567890", "250655");
         pay(leaver, "5000");
         assertEquals(1, service.makeUp(tenant, run.getId(), actor).count());
+    }
+
+    // ── Bank layouts and the second-person check ──────────────────────────
+
+    private void companyAccount(boolean secondCheck) {
+        settings = HrPayrollSettings.create(tenant.getValue());
+        settings.setBankFile(secondCheck, "250655", "62011234567", actor);
+    }
+
+    @Test
+    void aBankServFileHasTheHeadersOneTransactionPerPaymentTheContraAndTheTrailers() {
+        finalised();
+        companyAccount(false);
+        pay(person("E1", "Thandi", "1234567890", "632005"), "3728.68");
+        pay(person("E2", "Sipho", "9876543210", "250655"), "100");
+        service.makeUp(tenant, run.getId(), actor);
+
+        FileResult f = service.file(tenant, run.getId(), actor, "BANKSERV_ACB");
+
+        String[] rows = f.csv().split("\r\n");
+        assertEquals(7, rows.length);                       // 02, 04, two payments, contra, 92, 94
+        for (String r : rows) assertEquals(180, r.length());
+        assertEquals("02", rows[0].substring(0, 2));
+        assertEquals("04", rows[1].substring(0, 2));
+        assertEquals("10", rows[2].substring(0, 2));
+        assertEquals("12", rows[4].substring(0, 2));
+        assertEquals("92", rows[5].substring(0, 2));
+        assertEquals("94", rows[6].substring(0, 2));
+        assertEquals("salary-payments-PR00005.txt", f.filename());
+        assertEquals("BANKSERV_ACB", f.layout());
+        assertTrue(payments.get(0).getExportedAt() != null);
+        assertEquals(actor, payments.get(0).getExportedBy());
+        assertTrue(events.stream().anyMatch(x -> x.startsWith("PAYMENT_FILE_DOWNLOADED") && x.contains("BANKSERV_ACB")));
+    }
+
+    @Test
+    void aBankServFileNeedsTheCompanysOwnAccountAndNothingIsMarkedDownloadedWithout() {
+        finalised();
+        pay(person("E1", "Thandi", "1234567890", "632005"), "100");
+        service.makeUp(tenant, run.getId(), actor);
+        assertThrows(IllegalStateException.class, () -> service.file(tenant, run.getId(), actor, "BANKSERV_ACB"));
+        assertNull(payments.get(0).getExportedAt());
+        assertThrows(IllegalStateException.class, () -> service.file(tenant, run.getId(), actor, "NOPE"));
+    }
+
+    @Test
+    void withTheSecondPersonCheckOnTheOneWhoDownloadedCannotConfirm() {
+        finalised();
+        companyAccount(true);
+        pay(person("E1", "Thandi", "1234567890", "632005"), "100");
+        service.makeUp(tenant, run.getId(), actor);
+        service.file(tenant, run.getId(), actor);
+        assertThrows(IllegalStateException.class, () -> service.confirmPaid(tenant, run.getId(), actor, null));
+        assertEquals("PENDING", payments.get(0).getStatus());
+        service.confirmPaid(tenant, run.getId(), UUID.randomUUID(), null);
+        assertEquals("PAID", payments.get(0).getStatus());
+    }
+
+    @Test
+    void withTheCheckOffTheSamePersonMayConfirm() {
+        finalised();
+        companyAccount(false);
+        pay(person("E1", "Thandi", "1234567890", "632005"), "100");
+        service.makeUp(tenant, run.getId(), actor);
+        service.file(tenant, run.getId(), actor);
+        service.confirmPaid(tenant, run.getId(), actor, null);
+        assertEquals("PAID", payments.get(0).getStatus());
     }
 }

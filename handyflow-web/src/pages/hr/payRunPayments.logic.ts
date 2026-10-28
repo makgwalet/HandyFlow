@@ -37,3 +37,44 @@ export function nextStep(s: PaymentsSummary): string {
 }
 
 export const rand = (n: number) => `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+// ── File layouts and the company's own account ────────────────────────────────────────────────
+
+export type BankLayout = "GENERIC_CSV" | "BANKSERV_ACB"
+export const BANK_LAYOUTS: { value: BankLayout; label: string; hint: string }[] = [
+  { value: "GENERIC_CSV", label: "Generic CSV", hint: "Name, bank, branch, account, amount and reference. Map the columns at your bank." },
+  { value: "BANKSERV_ACB", label: "BankServ (ACB), as FNB imports",
+    hint: "Fixed-width file for FNB Online Banking's BankServ (ACB) import. Needs the company's own account under Payroll settings. Import a small test file first: the bank reports errors before anything is paid." },
+]
+
+export const layoutFilename = (layout: BankLayout, runNumber: string | undefined) =>
+  `salary-payments-${(runNumber ?? "run").replace(/[^A-Za-z0-9-]/g, "")}${layout === "BANKSERV_ACB" ? ".txt" : ".csv"}`
+
+export const layoutMime = (layout: BankLayout) => (layout === "BANKSERV_ACB" ? "text/plain" : "text/csv")
+
+const digits = (s: string) => s.replace(/[\s-]/g, "")
+
+/** Mirrors BankFileRules.nominatedProblem. Blank means "leave as it is" and is fine. */
+export function nominatedProblem(branch: string, account: string): string | null {
+  if (!branch.trim() && !account.trim()) return null
+  if (branch.trim() && !/^\d{6}$/.test(digits(branch))) return "The branch code must be 6 digits."
+  if (account.trim() && !/^\d{1,11}$/.test(digits(account))) return "The account number must be 1 to 11 digits."
+  return null
+}
+
+/** The server reads null as "leave as it is" and blank as "clear". */
+export const nominatedBody = (allowSelfApproval: boolean, secondCheck: boolean, branch: string, account: string) => ({
+  allowSelfApproval, bankFileSecondCheck: secondCheck,
+  nominatedBranch: branch.trim() ? digits(branch) : null,
+  nominatedAccount: account.trim() ? digits(account) : null,
+})
+
+/** A file download that failed comes back as a blob; its text holds the server's message. */
+export async function blobMessage(e: unknown, fallback: string): Promise<string> {
+  const data = (e as { response?: { data?: unknown } })?.response?.data
+  try {
+    const text = data instanceof Blob ? await data.text() : typeof data === "string" ? data : ""
+    const msg = text ? (JSON.parse(text) as { message?: string }).message : (data as { message?: string } | undefined)?.message
+    return msg || fallback
+  } catch { return fallback }
+}

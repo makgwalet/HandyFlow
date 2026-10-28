@@ -435,8 +435,11 @@ public class HrController {
     @Operation(summary = "Choose whether one person may calculate and approve the same pay run")
     public ResponseEntity<ApiResponse<PayrollSettingsResponse>> updatePayrollSettings(
             @Valid @RequestBody PayrollSettingsRequest req, Principal principal) {
-        return ResponseEntity.ok(ApiResponse.success("Payroll settings saved",
-                payrollControlService.updateSettings(TenantContext.getTenantIdAsObject(), req.allowSelfApproval(), resolveUserId(principal))));
+        UUID actor = resolveUserId(principal);
+        PayrollSettingsResponse saved = payrollControlService.updateSettings(TenantContext.getTenantIdAsObject(), req.allowSelfApproval(), actor);
+        if (req.bankFileSecondCheck() != null || req.nominatedBranch() != null || req.nominatedAccount() != null)
+            saved = payrollControlService.updateBankFileSettings(TenantContext.getTenantIdAsObject(), req.bankFileSecondCheck(), req.nominatedBranch(), req.nominatedAccount(), actor);
+        return ResponseEntity.ok(ApiResponse.success("Payroll settings saved", saved));
     }
 
     @GetMapping("/payroll/access-review")

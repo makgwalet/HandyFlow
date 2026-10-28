@@ -5,7 +5,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { STATUS_LABEL, nextStep, rand, returnProblem, type PaymentsSummary } from "./payRunPayments.logic"
+import { BANK_LAYOUTS, STATUS_LABEL, blobMessage, layoutFilename, layoutMime, nextStep, rand, returnProblem, type BankLayout, type PaymentsSummary } from "./payRunPayments.logic"
 
 type ApiErr = { response?: { data?: { message?: string } } }
 const messageOf = (e: unknown, fallback: string) => (e as ApiErr)?.response?.data?.message ?? fallback
@@ -21,6 +21,7 @@ export default function PayRunPaymentsPanel({ runId, canAct }: { runId: string; 
   const [returning, setReturning] = useState<{ id: string; reason: string } | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [note, setNote] = useState("")
+  const [layout, setLayout] = useState<BankLayout>("GENERIC_CSV")
   const [left, setLeft] = useState<PaymentsSummary["skipped"]>([])
 
   const q = useQuery<PaymentsSummary>({ queryKey: key, queryFn: async () => unwrap(await apiClient.get(`/api/v1/hr/pay-runs/${runId}/payments`)) })
@@ -49,12 +50,12 @@ export default function PayRunPaymentsPanel({ runId, canAct }: { runId: string; 
   })
   const download = async () => {
     try {
-      const res = await apiClient.get(`/api/v1/hr/pay-runs/${runId}/payments/file`, { responseType: "blob" })
-      const url = URL.createObjectURL(new Blob([res.data], { type: "text/csv" }))
-      const a = document.createElement("a"); a.href = url; a.download = `salary-payments-${s?.payRunNumber ?? "run"}.csv`; a.click()
+      const res = await apiClient.get(`/api/v1/hr/pay-runs/${runId}/payments/file`, { responseType: "blob", params: { layout } })
+      const url = URL.createObjectURL(new Blob([res.data], { type: layoutMime(layout) }))
+      const a = document.createElement("a"); a.href = url; a.download = layoutFilename(layout, s?.payRunNumber); a.click()
       URL.revokeObjectURL(url)
       setError(""); qc.invalidateQueries({ queryKey: key }); qc.invalidateQueries({ queryKey: ["hr-run-history", runId] })
-    } catch (e) { setError(messageOf(e, "The bank file could not be downloaded.")) }
+    } catch (e) { setError(await blobMessage(e, "The bank file could not be downloaded.")) }
   }
 
   if (q.isLoading) return <div style={{ padding: "8px 0", fontSize: 13, color: "var(--hf-text-faint)" }}>Loading bank payments…</div>
@@ -74,12 +75,18 @@ export default function PayRunPaymentsPanel({ runId, canAct }: { runId: string; 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {s.canMakeUp && <button type="button" style={btn} disabled={makeUp.isPending} onClick={() => makeUp.mutate()}>
               {makeUp.isPending ? "Working…" : s.count ? "Make up again" : "Make up payments"}</button>}
+            {s.pending > 0 && (
+              <select aria-label="File layout" value={layout} onChange={e => setLayout(e.target.value as BankLayout)} style={{ ...btn, fontWeight: 500 }}>
+                {BANK_LAYOUTS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+              </select>
+            )}
             {s.pending > 0 && <button type="button" style={btn} onClick={download}>Download bank file</button>}
             {s.pending > 0 && s.downloaded && !confirming && <button type="button" style={solid} onClick={() => setConfirming(true)}>Confirm paid</button>}
           </div>
         )}
       </div>
 
+      {canAct && s.pending > 0 && <div style={{ marginTop: 6, fontSize: 12, color: "var(--hf-text-faint)" }}>{BANK_LAYOUTS.find(l => l.value === layout)?.hint}</div>}
       {error && <div role="alert" style={{ marginTop: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
 
       {left.length > 0 && (

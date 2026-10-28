@@ -193,16 +193,41 @@ describe("PayrollControlsPanel", () => {
     expect(await screen.findByText(/still calculate pay runs until/)).toBeTruthy()
     expect(await screen.findByText("1 role needs a decision.")).toBeTruthy()
     expect(screen.getByText("Needs a decision")).toBeTruthy()
-    fireEvent.click(screen.getByRole("checkbox"))
+    fireEvent.click(screen.getByRole("checkbox", { name: /One person may calculate and approve/ }))
     await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/hr/payroll/settings", { allowSelfApproval: true }))
   })
 
   it("is read-only for everyone else and does not ask for the access review", async () => {
     perms = ["PAYROLL_READ"]; serve()
     wrap(<PayrollControlsPanel />)
-    const box = (await screen.findByRole("checkbox")) as HTMLInputElement
-    expect(box.disabled).toBe(true)
+    const boxes = (await screen.findAllByRole("checkbox")) as HTMLInputElement[]
+    expect(boxes.length).toBe(2)
+    expect(boxes.every(b => b.disabled)).toBe(true)
     expect(screen.getByText(/Only someone with payroll configuration access/)).toBeTruthy()
     expect(get.mock.calls.some(c => String(c[0]).includes("access-review"))).toBe(false)
+  })
+
+  it("turns the second-person check on without touching the account", async () => {
+    perms = ["PAYROLL_CONFIGURATION_ADMIN"]; serve(); put.mockResolvedValue({ data: {} })
+    wrap(<PayrollControlsPanel />)
+    fireEvent.click(await screen.findByRole("checkbox", { name: /A second person confirms/ }))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/hr/payroll/settings",
+      { allowSelfApproval: false, bankFileSecondCheck: true, nominatedBranch: null, nominatedAccount: null }))
+  })
+
+  it("saves the company's own account only when it is valid", async () => {
+    perms = ["PAYROLL_CONFIGURATION_ADMIN"]; serve(); put.mockResolvedValue({ data: {} })
+    wrap(<PayrollControlsPanel />)
+    await screen.findByText(/The company's own bank account/)
+    const save = screen.getByRole("button", { name: "Save account" }) as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText("Branch code"), { target: { value: "2506" } })
+    expect(await screen.findByText("The branch code must be 6 digits.")).toBeTruthy()
+    expect(save.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText("Branch code"), { target: { value: "250 655" } })
+    fireEvent.change(screen.getByLabelText("Account number"), { target: { value: "6201 123 4567" } })
+    fireEvent.click(save)
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/hr/payroll/settings",
+      { allowSelfApproval: false, bankFileSecondCheck: false, nominatedBranch: "250655", nominatedAccount: "62011234567" }))
   })
 })

@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AlertCircle, CheckCircle2 } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { useAuth } from "../../hooks/useAuth"
+import { nominatedBody, nominatedProblem } from "./payRunPayments.logic"
 import {
   impactSummary, rand, signedRand, taxYearName, VERDICT_STYLE, VERDICT_TEXT,
   type Impact, type ImpactRun, type TaxYear,
@@ -199,7 +200,10 @@ function RunRows({ run, open, onToggle }: { run: ImpactRun; open: boolean; onTog
 }
 
 interface AccessReview { legacyAccessEnds: string; rolesNeedingReview: number; roles: { roleId: string; roleName: string; usersInRole: number; held: string; granted: string; needsReview: boolean; note: string }[] }
-interface PayrollSettings { allowSelfApproval: boolean; legacyAccessEnds: string; legacyAccessOpen: boolean }
+interface PayrollSettings {
+  allowSelfApproval: boolean; legacyAccessEnds: string; legacyAccessOpen: boolean
+  bankFileSecondCheck?: boolean; nominatedBranch?: string | null; nominatedAccountSet?: boolean; nominatedAccountLast4?: string | null
+}
 
 /** Who can do what in payroll: the self-approval choice and what the permissions migration did to each role. */
 export function PayrollControlsPanel() {
@@ -220,6 +224,15 @@ export function PayrollControlsPanel() {
     mutationFn: (allow: boolean) => apiClient.put("/api/v1/hr/payroll/settings", { allowSelfApproval: allow }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["hr-payroll-settings"] }); setError("") },
     onError: e => setError(errorText(e, "The setting could not be saved.")),
+  })
+  const [branch, setBranch] = useState("")
+  const [account, setAccount] = useState("")
+  const bankProblem = nominatedProblem(branch, account)
+  const saveBank = useMutation({
+    mutationFn: (v: { secondCheck: boolean; branch: string; account: string }) =>
+      apiClient.put("/api/v1/hr/payroll/settings", nominatedBody(settings.data?.allowSelfApproval ?? false, v.secondCheck, v.branch, v.account)),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["hr-payroll-settings"] }); setError(""); setBranch(""); setAccount("") },
+    onError: e => setError(errorText(e, "The bank file setting could not be saved.")),
   })
   return (
     <section style={card} aria-labelledby="hr-controls-h">
@@ -244,6 +257,37 @@ export function PayrollControlsPanel() {
                 </span>
               </span>
             </label>
+            <label style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 12, cursor: canConfigure ? "pointer" : "default" }}>
+              <input type="checkbox" checked={!!settings.data.bankFileSecondCheck} disabled={!canConfigure || saveBank.isPending}
+                onChange={e => saveBank.mutate({ secondCheck: e.target.checked, branch: "", account: "" })} style={{ marginTop: 3 }} />
+              <span>
+                <strong>A second person confirms the bank file was paid</strong>
+                <span style={{ display: "block", fontSize: 12, color: "var(--hf-text-muted)" }}>
+                  Off by default. When on, whoever downloaded the bank file cannot also confirm it. Leave it off for a business with one payroll person.
+                </span>
+              </span>
+            </label>
+            <fieldset style={{ marginTop: 12, border: "1px solid var(--hf-border-subtle)", borderRadius: 8, padding: "10px 12px" }} disabled={!canConfigure}>
+              <legend style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-muted)" }}>The company's own bank account (for the BankServ file)</legend>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <div>
+                  <label htmlFor="bf-branch" style={{ display: "block", fontSize: 12, marginBottom: 3 }}>Branch code</label>
+                  <input id="bf-branch" inputMode="numeric" maxLength={7} value={branch} onChange={e => setBranch(e.target.value)}
+                    placeholder={settings.data.nominatedBranch ?? "6 digits"} style={{ padding: "7px 9px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, width: 120, background: "var(--hf-surface)", color: "var(--hf-text)" }} />
+                </div>
+                <div>
+                  <label htmlFor="bf-account" style={{ display: "block", fontSize: 12, marginBottom: 3 }}>Account number</label>
+                  <input id="bf-account" inputMode="numeric" maxLength={13} value={account} onChange={e => setAccount(e.target.value)}
+                    placeholder={settings.data.nominatedAccountSet ? `Saved, ends ${settings.data.nominatedAccountLast4}` : "up to 11 digits"}
+                    style={{ padding: "7px 9px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, width: 180, background: "var(--hf-surface)", color: "var(--hf-text)" }} />
+                </div>
+                <button type="button" disabled={!(branch || account) || !!bankProblem || saveBank.isPending}
+                  onClick={() => saveBank.mutate({ secondCheck: !!settings.data?.bankFileSecondCheck, branch, account })}
+                  style={{ padding: "8px 14px", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "var(--hf-text-on-solid)", cursor: "pointer",
+                    background: !(branch || account) || bankProblem ? "var(--hf-text-faint)" : "var(--hf-primary)" }}>Save account</button>
+              </div>
+              {bankProblem && <div role="alert" style={{ marginTop: 6, fontSize: 12, color: "var(--hf-danger-text)" }}>{bankProblem}</div>}
+            </fieldset>
             {error && <div role="alert" style={{ marginTop: 8, color: "var(--hf-danger-text)" }}>{error}</div>}
             {settings.data.legacyAccessOpen && (
               <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-warning-text)" }}>

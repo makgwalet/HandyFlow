@@ -62,6 +62,16 @@ public final class PayrollPaymentRules {
         return null;
     }
 
+    /**
+     * Null when this person may confirm the payments. With the second-person check on, the person who downloaded the file cannot also say
+     * it was paid.
+     */
+    public static String confirmerProblem(boolean secondCheck, java.util.UUID confirmer, java.util.Collection<java.util.UUID> downloaders) {
+        if (secondCheck && confirmer != null && downloaders.contains(confirmer))
+            return "Another person must confirm that the bank paid this file: you downloaded it, and the second-person check is on.";
+        return null;
+    }
+
     public static String returnProblem(String status, String reason) {
         if (!PENDING.equals(status) && !PAID.equals(status)) return "This payment is already " + status.toLowerCase() + ".";
         if (reason == null || reason.isBlank()) return "Say why the bank returned it.";

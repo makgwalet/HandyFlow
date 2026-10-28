@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import PayRunPaymentsPanel from "./PayRunPaymentsPanel"
-import { canPayRun, nextStep, returnProblem, type PaymentsSummary, type RunPayment } from "./payRunPayments.logic"
+import { blobMessage, canPayRun, layoutFilename, layoutMime, nextStep, nominatedBody, nominatedProblem, returnProblem, type PaymentsSummary, type RunPayment } from "./payRunPayments.logic"
 
 const get = vi.fn()
 const post = vi.fn()
@@ -113,5 +113,39 @@ describe("PayRunPaymentsPanel", () => {
     wrap(<PayRunPaymentsPanel runId="r1" canAct={false} />)
     await screen.findByText("Thandi Nkosi")
     for (const name of [/Make up/, /Download bank file/, "Confirm paid", /Bank returned/]) expect(screen.queryByRole("button", { name })).toBeNull()
+  })
+})
+
+describe("bank file layouts", () => {
+  it("names the file by layout", () => {
+    expect(layoutFilename("GENERIC_CSV", "PR00005")).toBe("salary-payments-PR00005.csv")
+    expect(layoutFilename("BANKSERV_ACB", "PR 00005")).toBe("salary-payments-PR00005.txt")
+    expect(layoutFilename("BANKSERV_ACB", undefined)).toBe("salary-payments-run.txt")
+    expect(layoutMime("BANKSERV_ACB")).toBe("text/plain")
+    expect(layoutMime("GENERIC_CSV")).toBe("text/csv")
+  })
+  it("checks the company's account the way the server does", () => {
+    expect(nominatedProblem("", "")).toBeNull()
+    expect(nominatedProblem("25065", "")).toMatch(/6 digits/)
+    expect(nominatedProblem("250655", "123456789012")).toMatch(/1 to 11 digits/)
+    expect(nominatedProblem("250 655", "6201-123-4567")).toBeNull()
+    expect(nominatedBody(false, true, "250 655", " ")).toEqual({ allowSelfApproval: false, bankFileSecondCheck: true, nominatedBranch: "250655", nominatedAccount: null })
+  })
+  it("reads the server's message out of a failed download", async () => {
+    const blob = new Blob([JSON.stringify({ message: "Enter the company account." })])
+    expect(await blobMessage({ response: { data: blob } }, "fallback")).toBe("Enter the company account.")
+    expect(await blobMessage({ response: { data: { message: "Plain" } } }, "fallback")).toBe("Plain")
+    expect(await blobMessage({}, "fallback")).toBe("fallback")
+  })
+  it("asks for the chosen layout and shows the server's reason when it is refused", async () => {
+    loaded(summary())
+    const refused = { response: { data: new Blob([JSON.stringify({ message: "The BankServ layout needs the company's own bank account." })]) } }
+    get.mockImplementation((url: string) => url.endsWith("/payments/file") ? Promise.reject(refused) : Promise.resolve({ data: { data: summary() } }))
+    wrap(<PayRunPaymentsPanel runId="r1" canAct />)
+    await screen.findByText("Thandi Nkosi")
+    fireEvent.change(screen.getByLabelText("File layout"), { target: { value: "BANKSERV_ACB" } })
+    fireEvent.click(screen.getByRole("button", { name: "Download bank file" }))
+    expect(await screen.findByText(/needs the company's own bank account/)).toBeTruthy()
+    expect(get).toHaveBeenCalledWith("/api/v1/hr/pay-runs/r1/payments/file", expect.objectContaining({ params: { layout: "BANKSERV_ACB" } }))
   })
 })

@@ -20,5 +20,7 @@ public final class PayRunPaymentDtos {
     public record Summary(UUID payRunId, String payRunNumber, String runStatus, int count, BigDecimal total, int pending, int paid, int returned,
                           BigDecimal returnedTotal, boolean downloaded, boolean canMakeUp, List<Skipped> skipped, List<Payment> payments) {}
 
-    public record FileResult(String filename, String csv) {}
+    public record FileResult(String filename, String csv, String layout) {
+        public FileResult(String filename, String csv) { this(filename, csv, "GENERIC_CSV"); }
+    }
 }

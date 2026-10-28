@@ -12,6 +12,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.hr.application.internal.PayRunPaymentService;
 import za.co.handyflow.platform.hr.application.internal.PayrollAccess;
+import za.co.handyflow.platform.hr.domain.model.BankFileRules;
 import za.co.handyflow.platform.hr.dto.PayRunPaymentDtos.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -45,18 +46,19 @@ public class PayRunPaymentController {
         return ResponseEntity.ok(ApiResponse.success("Payments made up", service.makeUp(TenantContext.getTenantIdAsObject(), id, user(p))));
     }
 
-    @GetMapping(value = "/pay-runs/{id}/payments/file", produces = "text/csv")
+    @GetMapping(value = "/pay-runs/{id}/payments/file", produces = {"text/csv", "text/plain"})
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Download the bank payment file (CSV) for the pending payments")
-    public ResponseEntity<byte[]> file(@PathVariable UUID id, Authentication a, Principal p) {
+    @Operation(summary = "Download the bank payment file for the pending payments, as a generic CSV or a BankServ (ACB) file")
+    public ResponseEntity<byte[]> file(@PathVariable UUID id, @RequestParam(name = "layout", defaultValue = "GENERIC_CSV") String layout, Authentication a, Principal p) {
         requireFinalise(a);
-        FileResult f = service.file(TenantContext.getTenantIdAsObject(), id, user(p));
+        FileResult f = service.file(TenantContext.getTenantIdAsObject(), id, user(p), layout);
+        boolean csv = BankFileRules.GENERIC_CSV.equals(f.layout());
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + f.filename() + "\"")
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .header("X-Content-Type-Options", "nosniff")
-                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
-                .body(f.csv().getBytes(StandardCharsets.UTF_8));
+                .contentType(new MediaType("text", csv ? "csv" : "plain", csv ? StandardCharsets.UTF_8 : StandardCharsets.US_ASCII))
+                .body(f.csv().getBytes(csv ? StandardCharsets.UTF_8 : StandardCharsets.US_ASCII));
     }
 
     @PostMapping("/pay-runs/{id}/payments/confirm-paid")

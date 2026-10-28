@@ -937,9 +937,9 @@ I read the four training services, the entities and the session screen. The modu
 
 **Still not done**
 
-- No bank-specific layouts (FNB, Standard Bank, ABSA, Nedbank, ACB). The generic CSV needs a column mapping on the bank's side.
+- ~~No bank-specific layouts.~~ FNB's BankServ (ACB) import is built (section 51). Standard Bank, ABSA and Nedbank layouts are not: I could not find their published specifications.
 - No import of the bank's return or statement file, so returned payments are keyed in by hand. A returned payment cannot be paid again from this file; it is paid outside the system.
-- The person who downloads the file can also confirm it. There is no second-person check on the bank file itself, only on the pay run.
+- ~~No second-person check on the bank file.~~ An optional setting in section 51.
 - Bank account numbers are stored in plain text in the employee record and copied as plain text into the payment (as they already were on the employee). Nothing checks the account number's check digit, or that the account holder's name matches.
 - Payments are made up for the whole run at once; no part payments, and no separate file for a late leaver.
 - Cancelled payslips and the Emp201 liability are not linked to this; EMP201 payment is still to do.
@@ -1250,3 +1250,21 @@ I read the four training services, the entities and the session screen. The modu
 - Farm and domestic workers (four weeks' notice after six months) are not handled.
 - Pay for notice an employee was asked not to work but is still paid for as normal salary is not "pay in place of notice" and is just salary.
 - Retrenchment severance (BCEA section 41) is not built.
+
+## 51. Bank file layouts and a second-person check (Slice 22b, V536)
+
+**What was there.** One generic CSV that the bank's own site had to be taught to read, and no check on who says the money was paid.
+
+**BankServ (ACB) layout.** The payments panel now has a layout choice. "BankServ (ACB), as FNB imports" writes the fixed-width file described in FNB's published "Payment Bankserv File Format": records of 180 characters then CR LF; an installation header (02) and a user header (04); one payment record (10) per employee with the sequence number, the employee's branch and account (zero-filled; an account longer than 11 digits goes in the long-account field), account type, the amount in cents, a 20-character reference and a 15-character name; a contra record (12) naming the company's account and the action date (YYMMDD); and the two trailers (92, 94). Names and references are cut to capitals, digits and spaces, so an apostrophe, an accent or a leading "=" cannot reach the file. The action date is the pay run's pay date, or today if that has gone. The file is plain ASCII, downloaded as `.txt`. Every field's position is tested against the document's positions, including its own example (R3 728.68 is `00000372868`).
+- **The company's own account** (the account the salaries are paid from) is needed by this layout: payroll settings has a branch code (6 digits) and account number (up to 11), saved by someone with payroll configuration access. The account number is never shown again in full, only its last four digits. Without it the file is refused with a message saying so and nothing is marked as downloaded.
+- The download history records the layout, the number of payments and the total.
+
+**Second-person check.** A new payroll setting, off by default. When on, the person who downloaded the file cannot also confirm that it was paid; someone else must. The download records who did it (V536 `exported_by`). It is off by default because a business with one payroll person could not otherwise confirm.
+
+**Tests.** `BankFileRulesTest` (11) passes in my harness, and moving the amount field by one place was caught. `PayRunPaymentServiceTest` (15) passes, including the BankServ file, a missing company account, and the second-person check on and off. On the screen, the logic was checked under node; the new cases in `PayRunPayments.test.tsx` and `PayrollControls.test.tsx` have not run. Spring and the migration have not been used, and no bank has read a file I made.
+
+**Not done / to check.**
+- **Try a small file first.** Two things in the bank's document are unclear and I chose the likelier reading: the order of the contra record (it is listed before the payments but the user trailer "must follow a contra record"; I wrote it after them, as BankServ files usually have it), and the record length (it says 181 characters including CR LF while its fields add up to 180; I followed the fields). If the bank's import rejects the file, the error will name the record.
+- The employee record has no account type, so every payment is written as a current (cheque) account (type 1). A savings account may need type 2.
+- Other banks' layouts (Standard Bank, ABSA, Nedbank) are not built; some of them accept a BankServ-style file, but I have no specification to say so.
+- Still no import of the bank's return file, and no account check digit.
