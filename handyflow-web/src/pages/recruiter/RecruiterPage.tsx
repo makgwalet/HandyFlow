@@ -16,6 +16,7 @@ import { RECRUITER_SECTIONS } from '../../navigation/moduleSections'
 import { useParams } from 'react-router-dom'
 import ApprovalPanel from './RecApproval'
 import OfferPanel from './RecOffer'
+import RecDashboard from './RecDashboard'
 import RequisitionPanel from './RecRequisition'
 import { ScreeningAnswers, ScreeningEditor } from './RecScreening'
 import RecPrivacy from './RecPrivacy'
@@ -1735,6 +1736,7 @@ export function RecruiterPage() {
               )}
             </>
           )
+          case 'dashboard': return <RecDashboard />
           case 'talent-pool': return <RecPool />
           case 'reports': return <RecReports />
           case 'audit': return <RecAudit />

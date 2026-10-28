@@ -865,11 +865,12 @@ export const RECRUITER_SECTIONS: ModuleSections = {
   basePath: '/recruiter',
   title: 'Recruiter',
   icon: UserCheck,
-  defaultSection: 'jobs',
+  defaultSection: 'dashboard',
   groups: [
     {
       label: 'Hiring',
       sections: [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'jobs', label: 'Job Postings', icon: Briefcase },
         { id: 'pipeline', label: 'Pipeline', icon: BarChart2 },
         { id: 'applications', label: 'Applications', icon: Users },
