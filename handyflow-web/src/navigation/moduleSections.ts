@@ -875,6 +875,8 @@ export const RECRUITER_SECTIONS: ModuleSections = {
         { id: 'pipeline', label: 'Pipeline', icon: BarChart2 },
         { id: 'applications', label: 'Applications', icon: Users },
         { id: 'calendar', label: 'Interview calendar', icon: CalendarDays },
+        { id: 'clients', label: 'Clients', icon: Building2 },
+        { id: 'placements', label: 'Placements', icon: UserCheck },
         { id: 'talent-pool', label: 'Talent Pool', icon: Users },
         { id: 'reports', label: 'Reports', icon: BarChart2, permission: 'RECRUITER_REPORTS' },
       ],

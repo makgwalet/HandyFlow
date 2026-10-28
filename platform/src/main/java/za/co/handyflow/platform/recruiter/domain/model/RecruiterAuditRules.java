@@ -47,6 +47,13 @@ public final class RecruiterAuditRules {
         ACTIONS.put("PUT /settings", "SETTINGS_CHANGED");
         ACTIONS.put("POST /outbox/{id}/retry", "EMAIL_RETRIED");
         ACTIONS.put("POST /retention/remove", "PERSONAL_DATA_REMOVED");
+        ACTIONS.put("POST /clients", "CLIENT_CREATED");
+        ACTIONS.put("PUT /clients/{id}", "CLIENT_UPDATED");
+        ACTIONS.put("DELETE /clients/{id}", "CLIENT_DELETED");
+        ACTIONS.put("POST /clients/{id}/contacts", "CLIENT_CONTACT_ADDED");
+        ACTIONS.put("DELETE /clients/{id}/contacts/{contactId}", "CLIENT_CONTACT_REMOVED");
+        ACTIONS.put("PUT /jobs/{jobId}/client", "JOB_CLIENT_SET");
+        ACTIONS.put("PUT /placements/{applicationId}/fee", "PLACEMENT_FEE_SET");
         ACTIONS.put("POST /pools", "POOL_CREATED");
         ACTIONS.put("DELETE /pools/{poolId}", "POOL_DELETED");
         ACTIONS.put("POST /pools/{poolId}/members", "POOL_MEMBER_ADDED");
@@ -74,6 +81,8 @@ public final class RecruiterAuditRules {
         if (route.startsWith("/applications")) return "APPLICATION";
         if (route.startsWith("/jobs")) return "JOB";
         if (route.startsWith("/pools")) return "POOL";
+        if (route.startsWith("/clients")) return "CLIENT";
+        if (route.startsWith("/placements")) return "APPLICATION";
         if (route.startsWith("/candidates")) return "CANDIDATE";
         if (route.startsWith("/retention")) return "CANDIDATE";
         return "SETTINGS";

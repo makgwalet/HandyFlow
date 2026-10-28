@@ -18,6 +18,8 @@ import ApprovalPanel from './RecApproval'
 import OfferPanel from './RecOffer'
 import RecDashboard from './RecDashboard'
 import RecCalendar from './RecCalendar'
+import RecClients from './RecClients'
+import RecPlacements from './RecPlacements'
 import RequisitionPanel from './RecRequisition'
 import { ScreeningAnswers, ScreeningEditor } from './RecScreening'
 import RecPrivacy from './RecPrivacy'
@@ -1739,6 +1741,8 @@ export function RecruiterPage() {
           )
           case 'dashboard': return <RecDashboard />
           case 'calendar': return <RecCalendar />
+          case 'clients': return <RecClients />
+          case 'placements': return <RecPlacements />
           case 'talent-pool': return <RecPool />
           case 'reports': return <RecReports />
           case 'audit': return <RecAudit />

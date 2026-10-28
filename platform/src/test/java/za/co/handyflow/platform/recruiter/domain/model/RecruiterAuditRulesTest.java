@@ -2,7 +2,10 @@ package za.co.handyflow.platform.recruiter.domain.model;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.*;
+import za.co.handyflow.platform.recruiter.api.RecruiterCalendarController;
+import za.co.handyflow.platform.recruiter.api.RecruiterClientController;
 import za.co.handyflow.platform.recruiter.api.RecruiterController;
+import za.co.handyflow.platform.recruiter.api.RecruiterDashboardController;
 import za.co.handyflow.platform.recruiter.api.RecruiterPoolController;
 import za.co.handyflow.platform.recruiter.api.RecruiterReportController;
 
@@ -60,7 +63,7 @@ class RecruiterAuditRulesTest {
         Set<String> exempt = Set.of("POST /careers/{tenantSlug}/jobs/{jobId}/apply", "PUT /portal/{token}/profile",
                 "POST /portal/{token}/applications/{applicationId}/withdraw");
         List<String> missing = new ArrayList<>();
-        for (Class<?> c : List.of(RecruiterController.class, RecruiterPoolController.class, RecruiterReportController.class)) {
+        for (Class<?> c : List.of(RecruiterController.class, RecruiterPoolController.class, RecruiterReportController.class, RecruiterClientController.class, RecruiterCalendarController.class, RecruiterDashboardController.class)) {
             String base = c.getAnnotation(RequestMapping.class).value()[0].replace("/api/v1/recruiter", "");
             for (Method m : c.getDeclaredMethods()) {
                 String verb = null; String path = "";
