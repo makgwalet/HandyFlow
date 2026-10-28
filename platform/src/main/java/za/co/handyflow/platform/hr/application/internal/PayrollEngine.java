@@ -119,7 +119,10 @@ public class PayrollEngine {
 
         BigDecimal averaged = PayeAveragingRules.paye(monthlyTaxable, prior.taxable(), prior.paye(), prior.months(),
                 regular.primaryRebate(), regular.secondaryRebate(), regular.tertiaryRebate(), regular.medicalTaxCredit(), rules);
-        BigDecimal annualPaymentTax = full.payeAmount().subtract(periodic);
+        // The extra tax on a bonus, back pay, notice pay or leave payout sits on top of the annualised year to date.
+        BigDecimal annualPayments = full.bonus().add(full.backPay()).add(full.noticePay()).add(full.leavePayout());
+        BigDecimal annualPaymentTax = PayeAveragingRules.annualPaymentTax(monthlyTaxable, prior.taxable(), prior.months(), annualPayments,
+                regular.primaryRebate(), regular.secondaryRebate(), regular.tertiaryRebate(), regular.medicalTaxCredit(), rules);
         BigDecimal paye = averaged.add(annualPaymentTax);
         PayrollResult r = new PayrollResult(full.grossSalary(), full.travelAllowance(), full.medicalAid(), full.pension(),
                 paye, full.uifEmployee(), full.uifEmployer(), full.sdlAmount(), full.taxableIncome(), full.taxBeforeRebate(),

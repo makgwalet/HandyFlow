@@ -45,14 +45,15 @@ class Emp201ServiceTest {
         case "save" -> a[0];
         default -> NOPE;
     });
-    private final HrPayRunRepository payRunRepo = fake(HrPayRunRepository.class, (n, a) ->
-            "findByTenantAndId".equals(n) ? Optional.of(run) : NOPE);
     private final HrPayRunEventRepository eventRepo = fake(HrPayRunEventRepository.class, (n, a) -> {
         if (!"save".equals(n)) return NOPE;
         events.add(((HrPayRunEvent) a[0]).getAction() + ":" + ((HrPayRunEvent) a[0]).getNote());
         return a[0];
     });
-    private final Emp201Service service = new Emp201Service(repo, payRunRepo, eventRepo);
+    private final Emp201Fakes fakes = new Emp201Fakes();
+    private final Emp201Service service = new Emp201Service(repo, eventRepo, fakes.merge);
+
+    { fakes.add(run); fakes.links.add(HrEmp201Run.of(emp.getId(), run.getId())); }
 
     private BigDecimal total() { return emp.getTotalPayable(); }
 

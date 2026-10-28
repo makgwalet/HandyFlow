@@ -26,6 +26,8 @@ public class HrEmp201 {
     @Column(name = "total_uif")     BigDecimal totalUif;
     @Column(name = "total_sdl")     BigDecimal totalSdl;
     @Column(name = "total_payable") BigDecimal totalPayable;
+    /** First day of the tax month the return is for. */
+    @Column(name = "tax_month")     LocalDate taxMonth;
     @Column(name = "total_eti")     BigDecimal totalEti = BigDecimal.ZERO;
     @Column(name = "eti_carried")   BigDecimal etiCarried = BigDecimal.ZERO;
     String status = "DRAFT";
@@ -49,6 +51,7 @@ public class HrEmp201 {
         e.payRunId     = payRunId;
         e.periodStart  = periodStart;
         e.periodEnd    = periodEnd;
+        e.taxMonth     = periodEnd.withDayOfMonth(1);
         e.dueDate      = Emp201Rules.dueDate(periodEnd);
         e.totalPaye    = totalPaye;
         e.totalUif     = totalUif;
@@ -69,6 +72,23 @@ public class HrEmp201 {
         e.etiCarried = split[1];
         e.totalPayable = totalPaye.subtract(split[0]).add(totalUif).add(totalSdl);
         return e;
+    }
+
+    /** Sets the totals from the runs the return covers. Only a return not yet filed may change. */
+    public void refresh(UUID firstRunId, LocalDate periodStart, LocalDate periodEnd, BigDecimal paye, BigDecimal uif, BigDecimal sdl, BigDecimal etiWorkedOut) {
+        if (!"DRAFT".equals(status)) throw new IllegalStateException("A return that has been filed cannot change.");
+        BigDecimal[] split = EtiRules.split(etiWorkedOut == null ? BigDecimal.ZERO : etiWorkedOut, paye);
+        this.payRunId = firstRunId;
+        this.periodStart = periodStart;
+        this.periodEnd = periodEnd;
+        this.dueDate = Emp201Rules.dueDate(periodEnd);
+        this.totalPaye = paye;
+        this.totalUif = uif;
+        this.totalSdl = sdl;
+        this.totalEti = split[0];
+        this.etiCarried = split[1];
+        this.totalPayable = paye.subtract(split[0]).add(uif).add(sdl);
+        this.updatedAt = Instant.now();
     }
 
     public void markSubmitted(String paymentRef, UUID by) {

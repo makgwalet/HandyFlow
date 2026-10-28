@@ -74,6 +74,7 @@ class TaxCertificateServiceTest {
         HrEmp201 emp201 = HrEmp201.create(tenant, run.getId(), run.getPeriodStart(), run.getPeriodEnd(),
                 new BigDecimal("3000.00"), new BigDecimal("600.00"), new BigDecimal("300.00"));
         when(emp201Repo.forPayRuns(any(), any())).thenReturn(List.of(emp201));
+        when(emp201Repo.coveredRuns(any())).thenReturn(List.of(run.getId()));
 
         when(certRepo.forReconciliation(any(), any(Integer.class), any())).thenAnswer(i -> saved.stream().filter(c -> c.getTaxYear() == (int) i.getArgument(1) && c.getPeriod().equals(i.getArgument(2))).toList());
         when(certRepo.nextSequence()).thenAnswer(i -> ++seq);
@@ -86,7 +87,7 @@ class TaxCertificateServiceTest {
         });
     }
 
-    private void withoutEmp201() { when(emp201Repo.forPayRuns(any(), any())).thenReturn(List.of()); }
+    private void withoutEmp201() { when(emp201Repo.forPayRuns(any(), any())).thenReturn(List.of()); when(emp201Repo.coveredRuns(any())).thenReturn(List.of()); }
 
     // ── Checks ──────────────────────────────────────────────────────────────────────────────────
 

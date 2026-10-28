@@ -54,5 +54,21 @@ public final class PayeAveragingRules {
         return liability.subtract(nvl(priorPaye)).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
     }
 
+    /**
+     * The extra tax a bonus, back pay, notice pay or leave payout bears: the year's tax on the annualised year to date with the payment added, less
+     * the year's tax without it. Worked on the year to date rather than on this run's pay alone, so a second run in the same month that holds only
+     * the extra payment is taxed on top of the salary already paid, not as if the person earned nothing.
+     */
+    public static BigDecimal annualPaymentTax(BigDecimal monthlyTaxable, BigDecimal priorTaxable, int months, BigDecimal payment,
+                                              BigDecimal primary, BigDecimal secondary, BigDecimal tertiary, BigDecimal annualCredit,
+                                              StatutoryYearRules rules) {
+        if (nvl(payment).signum() <= 0) return BigDecimal.ZERO.setScale(2);
+        BigDecimal annualEquivalent = nvl(priorTaxable).add(monthlyTaxable).multiply(BigDecimal.valueOf(12))
+                .divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
+        BigDecimal without = SarsPayeCalculator.annualPaye(annualEquivalent, primary, secondary, tertiary, annualCredit, rules);
+        BigDecimal with = SarsPayeCalculator.annualPaye(annualEquivalent.add(payment), primary, secondary, tertiary, annualCredit, rules);
+        return with.subtract(without).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+    }
+
     private static BigDecimal nvl(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
 }

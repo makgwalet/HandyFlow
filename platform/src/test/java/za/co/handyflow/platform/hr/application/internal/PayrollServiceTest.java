@@ -31,6 +31,7 @@ class PayrollServiceTest {
     private HrPayRunRepository payRunRepo;
     private HrPayslipRepository payslipRepo;
     private HrEmp201Repository emp201Repo;
+    private Emp201Merge emp201Merge;
     private HrEmployeeRepository employeeRepo;
     private PayRunNumberGenerator numberGen;
     private StatutoryRulesService rulesService;
@@ -63,6 +64,7 @@ class PayrollServiceTest {
         payRunRepo = mock(HrPayRunRepository.class);
         payslipRepo = mock(HrPayslipRepository.class);
         emp201Repo = mock(HrEmp201Repository.class);
+        emp201Merge = mock(Emp201Merge.class);
         employeeRepo = mock(HrEmployeeRepository.class);
         numberGen = mock(PayRunNumberGenerator.class);
         rulesService = mock(StatutoryRulesService.class);
@@ -83,7 +85,11 @@ class PayrollServiceTest {
         when(overtimeService.waitingCount(any(), any())).thenReturn(0);
         service = new PayrollService(payRunRepo, payslipRepo, emp201Repo, employeeRepo, new PayrollEngine(), numberGen,
                 rulesService, medicalSchemeService, eventRepo, mock(EmployeeChangeService.class), overtimeService,
-                holidayRepo, leaveRepo, leaveService, benefitService, payAdjustmentService);
+                holidayRepo, leaveRepo, leaveService, benefitService, payAdjustmentService, emp201Merge);
+        when(emp201Merge.attach(any(), any())).thenAnswer(i -> {
+            HrPayRun r = i.getArgument(1);
+            return HrEmp201.create(tenant, r.getId(), r.getPeriodStart(), r.getPeriodEnd(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        });
         when(numberGen.next(any(), any())).thenReturn("PR00001");
         when(payRunRepo.save(any())).thenAnswer(i -> i.getArgument(0));
         when(payslipRepo.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -505,12 +511,11 @@ class PayrollServiceTest {
     void aRunWhoseEmp201WasSubmittedIsNotRecalculated() {
         draftRun(LocalDate.of(2026, 10, 31), 2027);
         when(rulesService.rulesFor(2027)).thenReturn(rules2027());
-        HrEmp201 submitted = mock(HrEmp201.class);
-        when(submitted.getStatus()).thenReturn("SUBMITTED");
-        when(emp201Repo.forPayRun(any(), any())).thenReturn(List.of(submitted));
+        org.mockito.Mockito.doThrow(new IllegalStateException("The EMP201 of this run has already been submitted, so the run cannot be recalculated or cancelled."))
+                .when(emp201Merge).detach(any(), any());
         assertThatThrownBy(() -> service.processPayRun(tenant, UUID.randomUUID(), maker)).hasMessageContaining("already been submitted");
         verify(payslipRepo, never()).save(any());
-        verify(emp201Repo, never()).deleteAll(any());
+        verify(emp201Merge, never()).attach(any(), any());
     }
 
     @Test

@@ -54,6 +54,13 @@ public class Emp201PdfGenerator {
     public byte[] generate(HrEmp201 emp201, HrPayRun payRun,
                             String tenantName, String tenantVat,
                             int employeeCount) {
+        return generate(emp201, payRun != null ? payRun.getPayRunNumber() : null, tenantName, tenantVat, employeeCount);
+    }
+
+    /** @param runLabel the pay run number, or the numbers of every run the return covers */
+    public byte[] generate(HrEmp201 emp201, String runLabel,
+                            String tenantName, String tenantVat,
+                            int employeeCount) {
         try {
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             PdfWriter   writer  = new PdfWriter(bos);
@@ -123,7 +130,7 @@ public class Emp201PdfGenerator {
             addDetail(empDetails, "VAT Registration Number",
                     tenantVat != null ? tenantVat : "Not registered", false);
             addDetail(empDetails, "Payroll Reference Number",
-                    payRun != null ? payRun.getPayRunNumber() : "—", true);
+                    runLabel != null ? runLabel : "—", true);
             addDetail(empDetails, "Number of Employees", String.valueOf(employeeCount), false);
             addDetail(empDetails, "Period Start",
                     DATE_FMT.format(emp201.getPeriodStart().atStartOfDay(
@@ -166,6 +173,13 @@ public class Emp201PdfGenerator {
             addLevyRow(levies, "SDL",
                     "Skills Development Levy — 1% of gross payroll (if annual payroll > R500,000)",
                     emp201.getTotalSdl(), false);
+
+            // Employment tax incentive: taken off the PAYE of the return; what exceeds the PAYE is carried forward.
+            if (emp201.getTotalEti() != null && emp201.getTotalEti().signum() > 0)
+                addLevyRow(levies, "ETI",
+                        "Employment tax incentive claimed against PAYE" + (emp201.getEtiCarried() != null && emp201.getEtiCarried().signum() > 0
+                                ? " (R " + fmt(emp201.getEtiCarried()) + " more is carried forward)" : ""),
+                        emp201.getTotalEti().negate(), true);
 
             doc.add(levies);
 

@@ -51,17 +51,21 @@ public interface HrPayslipRepository extends JpaRepository<HrPayslip, UUID> {
         SELECT COALESCE(SUM(p.regularTaxable), 0) FROM HrPayslip p
         WHERE p.employeeId = :employeeId
         AND p.taxYear = :taxYear
-        AND p.payRunId IN (SELECT r.id FROM HrPayRun r WHERE r.status <> 'CANCELLED' AND r.payDate < :before)
+        AND p.payRunId IN (SELECT r.id FROM HrPayRun r WHERE r.status <> 'CANCELLED' AND r.payDate <= :before AND r.id <> :exceptRunId)
         """)
-    java.math.BigDecimal sumRegularTaxable(UUID employeeId, int taxYear, java.time.LocalDate before);
+    java.math.BigDecimal sumRegularTaxable(UUID employeeId, int taxYear, java.time.LocalDate before, UUID exceptRunId);
 
     @Query("""
         SELECT COALESCE(SUM(p.payeRegular), 0) FROM HrPayslip p
         WHERE p.employeeId = :employeeId
         AND p.taxYear = :taxYear
-        AND p.payRunId IN (SELECT r.id FROM HrPayRun r WHERE r.status <> 'CANCELLED' AND r.payDate < :before)
+        AND p.payRunId IN (SELECT r.id FROM HrPayRun r WHERE r.status <> 'CANCELLED' AND r.payDate <= :before AND r.id <> :exceptRunId)
         """)
-    java.math.BigDecimal sumRegularPaye(UUID employeeId, int taxYear, java.time.LocalDate before);
+    java.math.BigDecimal sumRegularPaye(UUID employeeId, int taxYear, java.time.LocalDate before, UUID exceptRunId);
+
+    /** The incentive worked out across the payslips of the given runs. */
+    @Query("SELECT COALESCE(SUM(p.etiAmount), 0) FROM HrPayslip p WHERE p.payRunId IN :runIds")
+    java.math.BigDecimal sumEti(java.util.Collection<UUID> runIds);
 
     /** Qualifying ETI months already used by payslips of earlier pay runs. */
     @Query("""

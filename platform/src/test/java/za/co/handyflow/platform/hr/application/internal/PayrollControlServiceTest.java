@@ -54,7 +54,7 @@ class PayrollControlServiceTest {
         claimRepo = mock(HrOvertimeClaimRepository.class);
         payAdjustments = mock(PayAdjustmentService.class);
         service = new PayrollControlService(payRunRepo, payslipRepo, employeeRepo, eventRepo, settingsRepo, mock(HrEmployeeChangeRepository.class), medical,
-                new OvertimeService(claimRepo, employeeRepo, mock(AttendanceService.class), mock(EmployeeViewService.class)), payAdjustments, mock(JdbcTemplate.class));
+                new OvertimeService(claimRepo, employeeRepo, mock(AttendanceService.class), mock(EmployeeViewService.class)), payAdjustments, mock(JdbcTemplate.class), mock(Emp201Merge.class));
 
         run = HrPayRun.create(tenant, "PR00002", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), LocalDate.of(2026, 10, 25), 2027);
         run.prepared(BigDecimal.TEN, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.TEN, 1, maker);

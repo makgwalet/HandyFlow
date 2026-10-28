@@ -43,6 +43,7 @@ public class PayrollService {
     private final LeaveService          leaveService;
     private final BenefitService        benefitService;
     private final PayAdjustmentService  payAdjustmentService;
+    private final Emp201Merge           emp201Merge;
     /** Optional so older constructions still work; no settings means the periodic method. */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     HrPayrollSettingsRepository settingsRepo;
@@ -109,11 +110,8 @@ public class PayrollService {
             payslipRepo.deleteAll(existing);
         }
 
-        // A recalculation replaces the EMP201 draft too. One that has already moved on is not touched.
-        List<HrEmp201> oldEmp201 = emp201Repo.forPayRun(tenantId, run.getId());
-        if (oldEmp201.stream().anyMatch(e -> !"DRAFT".equals(e.getStatus())))
-            throw new IllegalStateException("The EMP201 of this run has already been submitted, so the run cannot be recalculated.");
-        emp201Repo.deleteAll(oldEmp201);
+        // A recalculation takes the run out of its month's EMP201 draft; the return is rebuilt below. One already filed is not touched.
+        emp201Merge.detach(tenantId, run.getId());
 
         run.markProcessing();
         payRunRepo.save(run);
@@ -243,8 +241,8 @@ public class PayrollService {
                         + " included. Taxed by the annual-payment method: the extra tax the year bears once it is added to the annualised month.");
             PayrollEngine.Prior prior = null;
             if (averaging) {
-                prior = new PayrollEngine.Prior(payslipRepo.sumRegularTaxable(emp.getId(), taxYear, run.getPayDate()),
-                        payslipRepo.sumRegularPaye(emp.getId(), taxYear, run.getPayDate()),
+                prior = new PayrollEngine.Prior(payslipRepo.sumRegularTaxable(emp.getId(), taxYear, run.getPayDate(), run.getId()),
+                        payslipRepo.sumRegularPaye(emp.getId(), taxYear, run.getPayDate(), run.getId()),
                         PayeAveragingRules.monthsElapsed(rules.effectiveFrom(), emp.getStartDate(), run.getPayDate()));
             }
             PayrollEngine.Calc calc = engine.calculate(emp, rules, annualPayroll, m.count(), overtimePay,
@@ -338,12 +336,10 @@ public class PayrollService {
         eventRepo.save(HrPayRunEvent.of(tenantId.getValue(), run.getId(), "CALCULATED", before, run.getStatus(), actor,
                 employees.size() + " payslips" + (warnings.isEmpty() ? "" : ", " + warnings.size() + " warnings")));
 
-        HrEmp201 emp201 = HrEmp201.create(tenantId, run.getId(),
-                run.getPeriodStart(), run.getPeriodEnd(), runPaye, runUif, runSdl, runEti);
-        emp201Repo.save(emp201);
+        HrEmp201 emp201 = emp201Merge.attach(tenantId, run);
         if (emp201.getEtiCarried().signum() > 0)
-            warnings.add("The employment tax incentive worked out (" + runEti + ") is more than the PAYE of this return, so " + emp201.getEtiCarried()
-                    + " is carried forward, not claimed now.");
+            warnings.add("The employment tax incentive worked out (" + emp201.getTotalEti().add(emp201.getEtiCarried()) + ") is more than the PAYE of this month's return, so "
+                    + emp201.getEtiCarried() + " is carried forward, not claimed now.");
 
         log.info("Processed pay run={} taxYear={} employees={} gross={} paye={} uif={} sdl={} net={} warnings={}",
                 run.getPayRunNumber(), taxYear, employees.size(), runGross, runPaye, runUif, runSdl, runNet, warnings.size());
@@ -392,12 +388,9 @@ public class PayrollService {
     @Transactional(readOnly = true)
     public List<Emp201Response> getEmp201s(TenantId tenantId) {
         List<HrEmp201> all = emp201Repo.findAllByTenant(tenantId);
-        Set<UUID> issued = new HashSet<>();
-        Set<UUID> ids = new HashSet<>();
-        for (HrEmp201 e : all) if (e.getPayRunId() != null) ids.add(e.getPayRunId());
-        if (!ids.isEmpty()) for (HrPayRun r : payRunRepo.findAllById(ids)) if (PayRunWorkflowRules.isIssued(r.getStatus())) issued.add(r.getId());
+        Set<UUID> issued = emp201Merge.issuedReturns(all);
         LocalDate today = LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg"));
-        return all.stream().map(e -> toEmp201Response(e, today, e.getPayRunId() == null || issued.contains(e.getPayRunId()))).toList();
+        return all.stream().map(e -> toEmp201Response(e, today, issued.contains(e.getId()))).toList();
     }
 
     // ── Mappers ───────────────────────────────────────────────────────────────

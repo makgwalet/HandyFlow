@@ -76,4 +76,23 @@ class PayrollEngineAveragingTest {
         assertThat(a.result().grossSalary()).isEqualByComparingTo(p.result().grossSalary());
         assertThat(a.result().taxableIncome()).isEqualByComparingTo(p.result().taxableIncome());
     }
+
+    @Test
+    void aSecondRunInTheSameMonthDoesNotTaxTheSameMonthTwice() {
+        BigDecimal each = engine.calculate(jane, Y2026, d("5000000"), 1, BigDecimal.ZERO, month("30000", "0"), null).periodicPaye();
+        // Two earlier months and this month's first run are in the year to date; months is still 3 because it counts calendar months.
+        PayrollEngine.Prior prior = new PayrollEngine.Prior(d("90000"), each.multiply(d("3")), 3);
+        PayrollEngine.Calc second = engine.calculate(jane, Y2026, d("5000000"), 1, BigDecimal.ZERO, month("0", "0"), prior);
+        assertThat(second.regularPaye().compareTo(d("0.05")) <= 0).isTrue();
+    }
+
+    @Test
+    void aSecondRunWithABonusOnlyAddsTheBonusTax() {
+        BigDecimal each = engine.calculate(jane, Y2026, d("5000000"), 1, BigDecimal.ZERO, month("30000", "0"), null).periodicPaye();
+        PayrollEngine.Prior prior = new PayrollEngine.Prior(d("90000"), each.multiply(d("3")), 3);
+        PayrollEngine.Calc empty = engine.calculate(jane, Y2026, d("5000000"), 1, BigDecimal.ZERO, month("0", "0"), prior);
+        PayrollEngine.Calc bonus = engine.calculate(jane, Y2026, d("5000000"), 1, BigDecimal.ZERO, month("0", "20000"), prior);
+        assertThat(bonus.regularPaye()).isEqualByComparingTo(empty.regularPaye());
+        assertThat(bonus.result().payeAmount().compareTo(empty.result().payeAmount()) > 0).isTrue();
+    }
 }

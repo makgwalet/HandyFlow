@@ -92,22 +92,20 @@ public class TaxCertificateService {
         Set<UUID> issuedIds = issued.stream().map(HrPayRun::getId).collect(Collectors.toSet());
 
         // EMP201 returns of the included runs.
-        Map<UUID, List<HrEmp201>> emp201ByRun = issuedIds.isEmpty() ? Map.of() : emp201Repo.forPayRuns(tenantId, issuedIds).stream()
-                .collect(Collectors.groupingBy(HrEmp201::getPayRunId));
+        // One return can cover several runs of a month, so each return is counted once however many of the included runs it covers.
+        List<HrEmp201> returnsOfRuns = issuedIds.isEmpty() ? List.of() : emp201Repo.forPayRuns(tenantId, issuedIds);
+        java.util.Set<UUID> covered = issuedIds.isEmpty() ? java.util.Set.of() : new java.util.HashSet<>(emp201Repo.coveredRuns(issuedIds));
         BigDecimal e201Paye = BigDecimal.ZERO, e201Uif = BigDecimal.ZERO, e201Sdl = BigDecimal.ZERO;
-        for (HrPayRun r : issued) {
-            List<HrEmp201> returns = emp201ByRun.getOrDefault(r.getId(), List.of());
-            if (returns.isEmpty()) {
+        for (HrPayRun r : issued)
+            if (!covered.contains(r.getId()))
                 general.add(new TaxCertificateRules.Problem("ERROR", r.getPayRunNumber(), "No EMP201 exists for this pay run."));
-                continue;
-            }
-            for (HrEmp201 e : returns) {
-                e201Paye = e201Paye.add(e.getTotalPaye());
-                e201Uif = e201Uif.add(e.getTotalUif());
-                e201Sdl = e201Sdl.add(e.getTotalSdl());
-                if ("DRAFT".equals(e.getStatus()))
-                    general.add(new TaxCertificateRules.Problem("WARNING", r.getPayRunNumber(), "The EMP201 for this run is still a draft: it has not been marked as submitted to SARS."));
-            }
+        for (HrEmp201 e : returnsOfRuns) {
+            e201Paye = e201Paye.add(e.getTotalPaye());
+            e201Uif = e201Uif.add(e.getTotalUif());
+            e201Sdl = e201Sdl.add(e.getTotalSdl());
+            if ("DRAFT".equals(e.getStatus()))
+                general.add(new TaxCertificateRules.Problem("WARNING", "EMP201 " + e.getPeriodStart() + " to " + e.getPeriodEnd(),
+                        "This EMP201 is still a draft: it has not been marked as submitted to SARS."));
         }
 
         List<HrPayslip> slips = issuedIds.isEmpty() ? List.of() : payslipRepo.findByPayRuns(issuedIds);

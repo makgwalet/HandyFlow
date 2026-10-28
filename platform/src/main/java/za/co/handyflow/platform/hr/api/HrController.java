@@ -42,6 +42,7 @@ public class HrController {
     private final HrEmployeeRepository   employeeRepo;
     private final HrPayRunRepository     payRunRepo;
     private final HrEmp201Repository     emp201Repo;
+    private final Emp201Merge            emp201Merge;
     private final Emp201PdfGenerator     emp201PdfGenerator;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private final HrEmployeePortalAuthService hrEmployeePortalAuthService;
@@ -524,16 +525,14 @@ public class HrController {
         var tenantId = TenantContext.getTenantIdAsObject();
         HrEmp201 emp201 = emp201Repo.findByTenantAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("EMP201", id.toString()));
-        HrPayRun payRun = emp201.getPayRunId() != null
-                ? payRunRepo.findByTenantAndId(tenantId, emp201.getPayRunId()).orElse(null)
-                : null;
-        if (payRun != null && !PayRunWorkflowRules.isIssued(payRun.getStatus()))
-            throw new IllegalStateException("The EMP201 can be exported once its pay run has been finalised.");
-        int employeeCount = emp201.getPayRunId() != null
-                ? emp201Repo.countByPayRunId(emp201.getPayRunId()) : 0;
+        List<HrPayRun> payRuns = emp201Merge.runsOf(tenantId, emp201).stream().filter(r -> !"CANCELLED".equals(r.getStatus())).toList();
+        if (!emp201Merge.allIssued(tenantId, emp201))
+            throw new IllegalStateException("The EMP201 can be exported once its pay runs have been finalised.");
+        int employeeCount = payRuns.isEmpty() ? 0 : emp201Repo.employeesInRuns(payRuns.stream().map(HrPayRun::getId).toList());
+        String runLabel = payRuns.isEmpty() ? null : payRuns.stream().map(HrPayRun::getPayRunNumber).sorted().collect(java.util.stream.Collectors.joining(", "));
 
         String[] tenantDetails = fetchTenantDetails(tenantId.getValue());
-        byte[] pdf = emp201PdfGenerator.generate(emp201, payRun, tenantDetails[0], tenantDetails[1], employeeCount);
+        byte[] pdf = emp201PdfGenerator.generate(emp201, runLabel, tenantDetails[0], tenantDetails[1], employeeCount);
 
         String period = emp201.getPeriodEnd()
                 .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));

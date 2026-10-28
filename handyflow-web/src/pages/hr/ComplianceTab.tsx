@@ -163,7 +163,7 @@ export default function ComplianceTab() {
                       {canRecord && e.status === "SUBMITTED" && (
                         <button type="button" onClick={() => setActing({ emp: e, mode: "pay" })} aria-label={`Record EMP201 for ${fmtDate(e.periodEnd)} as paid`}
                           style={{ marginTop: 6, background: "var(--hf-surface)", color: "var(--hf-text-secondary)", border: "1px solid var(--hf-border)", borderRadius: 7, padding: "5px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Mark paid</button>)}
-                      {e.status === "DRAFT" && !e.runIssued && <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>Finalise the pay run first</div>}
+                      {e.status === "DRAFT" && !e.runIssued && <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>Finalise the pay runs of this month first</div>}
                     </td>
                   </tr>
                 )

@@ -38,6 +38,7 @@ public class PayrollControlService {
     private final OvertimeService overtimeService;
     private final PayAdjustmentService payAdjustmentService;
     private final JdbcTemplate jdbc;
+    private final Emp201Merge emp201Merge;
 
     // ── Review ────────────────────────────────────────────────────────────────
 
@@ -150,6 +151,7 @@ public class PayrollControlService {
         requireActor(actor);
         run.cancel();
         payRunRepo.save(run);
+        emp201Merge.detach(tenantId, runId);
         int released = overtimeService.releaseFor(tenantId, runId);
         int releasedPay = payAdjustmentService.releaseFor(tenantId, runId);
         eventRepo.save(HrPayRunEvent.of(tenantId.getValue(), runId, "CANCELLED", from, run.getStatus(), actor,
