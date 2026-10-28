@@ -89,6 +89,11 @@ public class HrFacade {
         }
     }
 
+    /** The employee record linked to a signed-in user, or empty when the login is not linked to one. */
+    public Optional<EmployeeSummary> findEmployeeByUserId(TenantId tenantId, UUID userId) {
+        return hrService.findEmployeeByUserId(tenantId, userId).map(EmployeeSummary::from);
+    }
+
     /**
      * The pay of an employee, for labour costing only. Callers must already have checked that the person asking may see
      * salaries; this call does not.

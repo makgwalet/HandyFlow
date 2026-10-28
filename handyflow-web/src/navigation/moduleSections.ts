@@ -389,6 +389,7 @@ export const HR_SECTIONS: ModuleSections = {
         { id: 'disciplinary', label: 'Employee relations', icon: AlertOctagon },
         { id: 'letters', label: 'Letters', icon: Mail },
         { id: 'performance', label: 'Performance', icon: Target },
+        { id: 'my-training', label: 'My training', icon: GraduationCap },
         { id: 'hr-reports', label: 'Reports', icon: FileBarChart, anyPermission: ['HR_REPORT_READ'] },
       ],
     },

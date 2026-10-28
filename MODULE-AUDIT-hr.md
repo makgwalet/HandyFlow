@@ -1105,3 +1105,16 @@ I read the four training services, the entities and the session screen. The modu
 **What it does now.** A valid certificate is mentioned **30, 14, 7 and 1 days before** its expiry date (`CertificateExpiryRules`, pure, 4 tests pass in my harness). The certificate holder gets the message too, when the employee record has an email address; the administrators still get theirs. The day after the expiry date the certificate is marked expired (as before) and the holder and administrators are told once. The sweep uses South African dates.
 
 **Still not done.** The holder's manager is not told; there is still no required-training matrix, so nothing says who ought to hold a certificate; and still no screen where an employee sees their own bookings and certificates. No migration. Spring and the database have not run this; the sweep itself has no test.
+
+## 42. "My training": an employee's own bookings and certificates (Slice 20d)
+
+**What was missing.** An employee could not see which training they were booked on or which certificates they hold; only training administrators could.
+
+**What was added.**
+- `GET /api/v1/training/mine`: the signed-in person's bookings (course, dates, venue, status, score and pass) and certificates (number, dates, and a state of valid, expiring within 30 days, expired or withdrawn; a certificate whose date has passed shows as expired even before the morning sweep marks it). `GET /api/v1/training/mine/certificates/{id}/pdf` gives the PDF of one of their own. Both need only a signed-in login that is linked to an employee record; nothing takes an employee id from the request, so nobody can ask for someone else's. A withdrawn certificate has no PDF, and another person's certificate answers "not found".
+- A new facade call, `HrFacade.findEmployeeByUserId`, which returns the same limited summary as the other facade calls.
+- Screen: HR → **My training** (every HR user sees it), with the certificate list (status wording such as "Expires in 12 days") and the bookings, coming sessions first.
+
+**Tests.** `TrainingSelfRulesTest` (5) passes in my harness; the screen's logic was checked by running it under node (the frontend test file `MyTraining.test.ts`, 7 tests, has not run: no vitest here). `TrainingSelfServiceTest` (4, Mockito) has not run. No migration. Spring, the database and a browser have not been used.
+
+**Still not done.** A manager does not see their team's training or certificates; no required-training matrix; a person cannot book themselves onto a session.

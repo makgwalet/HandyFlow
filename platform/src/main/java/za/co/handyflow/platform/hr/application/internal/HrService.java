@@ -329,6 +329,13 @@ public class HrService {
 
     // ── Mappers ───────────────────────────────────────────────────────────────
 
+    /** The employee record linked to a login, if there is one. Used by other modules for "my own" screens. */
+    @Transactional(readOnly = true)
+    public java.util.Optional<EmployeeResponse> findEmployeeByUserId(TenantId tenantId, UUID userId) {
+        if (userId == null) return java.util.Optional.empty();
+        return employeeRepo.findByUserId(tenantId, userId).map(this::toEmployeeResponse);
+    }
+
     private EmployeeResponse toEmployeeResponse(HrEmployee e) {
         return new EmployeeResponse(e.getId(), e.getEmployeeNumber(),
                 e.getFirstName(), e.getLastName(), e.getFullName(),
