@@ -20,4 +20,8 @@ public interface HrErCaseRepository extends JpaRepository<HrErCase, UUID> {
 
     @Query("SELECT c FROM HrErCase c WHERE c.tenantId = :#{#tenantId.value} AND c.employeeId = :employeeId ORDER BY c.reportedOn DESC, c.createdAt DESC")
     List<HrErCase> forEmployee(TenantId tenantId, UUID employeeId);
+
+    /** Every case of every company that is not closed or withdrawn, for the daily reminders. */
+    @Query("SELECT c FROM HrErCase c WHERE c.status NOT IN ('CLOSED', 'WITHDRAWN')")
+    List<HrErCase> allOpen();
 }

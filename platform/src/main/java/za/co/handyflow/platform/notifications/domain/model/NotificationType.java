@@ -205,6 +205,10 @@ public enum NotificationType {
     // Annual leave that would be lost at the coming rollover under the company's carry-over limit, or a summary for HR.
     LEAVE_AT_RISK(WARNING, Set.of(IN_APP, EMAIL)),
 
+    // A step in an employee relations case is due tomorrow or late. The message names the case number and the step, never the person,
+    // the type of case or what it is about.
+    ER_CASE_DUE(WARNING, Set.of(IN_APP, EMAIL)),
+
     // An HR letter was issued to the employee. The message never says what the letter is about: letters can concern discipline
     // or health, and an email is not a private place.
     LETTER_ISSUED(INFO, Set.of(IN_APP, EMAIL)),

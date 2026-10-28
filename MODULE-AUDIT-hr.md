@@ -1020,3 +1020,27 @@ I read the four training services, the entities and the session screen. The modu
 
 - Maven, Spring and the database have not run. `LeaveReminderServiceTest` (4) uses real Mockito and has not been executed; it builds the real `PerfNotifier` over a mocked notification service. The scheduled job has not run.
 - In my harness `LeaveReminderRulesTest` (4) passes.
+
+## 36. Slice 19e: reminders for employee relations cases
+
+**What was there.** The case list showed what was due or late, but nothing was sent. A meeting, a grievance response, a decision still to be told to the employee, or the end of an appeal period passed unnoticed unless someone opened the list.
+
+**What changed**
+
+- **Reminders.** Every morning, a case step that is due tomorrow gets one reminder, and a step that is late gets one the day after and then every seventh day. The steps are the ones the list already shows: a hearing or meeting date, a grievance response date (working days, holidays skipped), a decision the employee has not yet been told of (late from the day after it was made), and the end of the appeal period. The dates come from the same code as the list, so the two cannot disagree.
+- **Who.** The person who owns the case. When there is no owner, or the owner has left or has no email, the company's administrators.
+- **Privacy.** A message carries the case number and the step ("ER-2026-007: meeting is due tomorrow"). It never carries the employee's name, the type of case, the category, the title or any detail: an email is not a private place and a case can be about discipline, health or a complaint against a manager. Confidential cases are reminded the same way.
+- **Left out.** Closed and withdrawn cases, and cases recorded from before the system. One case failing does not stop the others. Runs with the existing switch `app.notifications.enabled`, at 07:55 South African time.
+- One new notification type, `ER_CASE_DUE`. No migration; no screen change.
+
+**Still not done**
+
+- The chair, initiator and employee are not reminded; only the case owner.
+- An appeal period that ends, a review date or a suspension end are reminded only if the list shows them as the case's due date (the end of the appeal period is; suspension and review dates are not).
+- The job does not remember what it sent, so running it twice in one day would send twice.
+- Termination of employment still does not cancel approved leave, stop portal access or work out notice pay (section 19).
+
+**Not verified**
+
+- Maven, Spring and the database have not run. `ErReminderServiceTest` (7) uses real Mockito and has not been executed, including mocking the package-private `ErCaseViews`. The new `allOpen` query has never run against PostgreSQL. The scheduled job has not run.
+- In my harness `ErReminderRulesTest` (5) passes.
