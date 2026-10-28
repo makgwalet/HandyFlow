@@ -1097,3 +1097,11 @@ I read the four training services, the entities and the session screen. The modu
 **Limits.** Weekly chasing stops 8 weeks after the date it started from; after that a person has to act. People who have left, or have no email address, are skipped. One failing item does not stop the others. The jobs still do not remember what they sent; the day arithmetic is what stops repeats.
 
 **Code.** `WorkReminderRules` (pure; 6 tests pass in my harness, and a deliberate break was caught), `WorkReminderService` and `WorkReminderScheduler`, three notification types (`LETTER_UNACKNOWLEDGED`, `PERF_GOAL_OVERDUE`, `PERF_GOAL_WAITING`), and two repository queries (`awaitingAcknowledgement`, `allOpen`). No migration, no screen change. `WorkReminderServiceTest` (Mockito, 6 tests) has not run; Spring and the database have not run this.
+
+## 41. Training certificate expiry: warnings that reach the holder (Slice 20c)
+
+**What was wrong.** The morning sweep told the company's administrators about every certificate expiring within 30 days **every day** for 30 days, and never told the person it belongs to. It also read the server's date instead of South African time.
+
+**What it does now.** A valid certificate is mentioned **30, 14, 7 and 1 days before** its expiry date (`CertificateExpiryRules`, pure, 4 tests pass in my harness). The certificate holder gets the message too, when the employee record has an email address; the administrators still get theirs. The day after the expiry date the certificate is marked expired (as before) and the holder and administrators are told once. The sweep uses South African dates.
+
+**Still not done.** The holder's manager is not told; there is still no required-training matrix, so nothing says who ought to hold a certificate; and still no screen where an employee sees their own bookings and certificates. No migration. Spring and the database have not run this; the sweep itself has no test.

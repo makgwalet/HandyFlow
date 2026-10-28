@@ -10,7 +10,9 @@ import za.co.handyflow.platform.notifications.application.Recipient;
 import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
 import za.co.handyflow.platform.notifications.application.internal.NotificationService;
 import za.co.handyflow.platform.notifications.domain.model.NotificationType;
+import za.co.handyflow.platform.hr.application.HrFacade;
 import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.training.domain.model.CertificateExpiryRules;
 import za.co.handyflow.platform.training.domain.model.TrainingCertificate;
 import za.co.handyflow.platform.training.domain.model.TrainingSession;
 import za.co.handyflow.platform.training.domain.repository.TrainingCertificateRepository;
@@ -49,12 +51,12 @@ import java.util.stream.Collectors;
 public class TrainingNotificationScheduler {
 
     private static final int SESSION_LOOKAHEAD_DAYS = 3;
-    private static final int CERTIFICATE_EXPIRY_LOOKAHEAD_DAYS = 30;
 
     private final TrainingSessionRepository sessionRepository;
     private final TrainingCertificateRepository certificateRepository;
     private final NotificationService notificationService;
     private final TenantAdminRecipients tenantAdminRecipients;
+    private final HrFacade hrFacade;
 
     @org.springframework.beans.factory.annotation.Value("${app.notifications.enabled:true}")
     private boolean enabled = true;
@@ -68,7 +70,7 @@ public class TrainingNotificationScheduler {
     }
 
     private void sweepUpcomingSessions() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(SAST);
         List<TrainingSession> upcoming = sessionRepository.findUpcomingAcrossTenants(today, today.plusDays(SESSION_LOOKAHEAD_DAYS));
 
         upcoming.stream()
@@ -91,8 +93,10 @@ public class TrainingNotificationScheduler {
                 });
     }
 
+    private static final java.time.ZoneId SAST = java.time.ZoneId.of("Africa/Johannesburg");
+
     private void sweepExpiringCertificates() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(SAST);
         List<TrainingCertificate> validCertificates = certificateRepository.findAllValidWithExpiryAcrossTenants();
 
         validCertificates.stream()
@@ -100,9 +104,11 @@ public class TrainingNotificationScheduler {
                 .forEach((tenantId, certificates) -> {
                     List<Recipient> admins = tenantAdminRecipients.resolveTenantAdmins(tenantId);
                     for (TrainingCertificate certificate : certificates) {
-                        if (certificate.isExpired()) {
+                        if (CertificateExpiryRules.lapsed(certificate.getExpiryDate(), today)) {
                             certificate.markExpired();
                             certificateRepository.save(certificate);
+                            tellHolder(tenantId, certificate, NotificationType.TRAINING_CERTIFICATE_EXPIRED,
+                                    "Your training certificate has expired", CertificateExpiryRules.holderExpired(certificate.getCourseTitleSnapshot(), certificate.getCertificateNumber(), certificate.getExpiryDate()));
                             if (admins.isEmpty()) continue;
                             notificationService.send(NotificationRequest.builder()
                                     .tenantId(tenantId)
@@ -116,7 +122,11 @@ public class TrainingNotificationScheduler {
                                     .sourceModule("training")
                                     .sourceEntityId(certificate.getId().toString())
                                     .build());
-                        } else if (certificate.isExpiringWithin(CERTIFICATE_EXPIRY_LOOKAHEAD_DAYS)) {
+                        } else if (CertificateExpiryRules.warnToday(certificate.getExpiryDate(), today)) {
+                            long left = CertificateExpiryRules.daysLeft(certificate.getExpiryDate(), today);
+                            tellHolder(tenantId, certificate, NotificationType.TRAINING_CERTIFICATE_EXPIRING,
+                                    CertificateExpiryRules.holderTitle(certificate.getCourseTitleSnapshot(), left),
+                                    CertificateExpiryRules.holderWarning(certificate.getCourseTitleSnapshot(), certificate.getCertificateNumber(), certificate.getExpiryDate()));
                             if (admins.isEmpty()) continue;
                             notificationService.send(NotificationRequest.builder()
                                     .tenantId(tenantId)
@@ -133,5 +143,19 @@ public class TrainingNotificationScheduler {
                         }
                     }
                 });
+    }
+
+    /** Best effort: the certificate holder, if the employee record has an email address. */
+    private void tellHolder(TenantId tenantId, TrainingCertificate certificate, NotificationType type, String title, String message) {
+        try {
+            Recipient to = hrFacade.findEmployeeById(tenantId, certificate.getEmployeeId())
+                    .map(TrainingNotifier::contact).orElse(null);
+            if (to == null) return;
+            notificationService.send(NotificationRequest.builder()
+                    .tenantId(tenantId).type(type).recipients(List.of(to)).title(title).message(message)
+                    .actionUrl("/training").sourceModule("training").sourceEntityId(certificate.getId().toString()).build());
+        } catch (RuntimeException ex) {
+            log.warn("Certificate message to the holder could not be sent: {}", ex.getMessage());
+        }
     }
 }
