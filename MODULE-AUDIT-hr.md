@@ -1458,3 +1458,24 @@ Closes the four recruiter leftovers.
 - The employee list does not yet filter by "documents expiring"; the repository query for it exists.
 
 Sources: PaySpace, "e@syFile employer error: Passport number (3070), country of issue (3075) must be completed"; Sage Community Hub, "Nature of Person B".
+
+## 63. Employee profile: next of kin, dependants and career timeline (Slice 29, V546)
+
+**Family.** New `hr_employee_relatives`: next of kin and dependants (name, relationship, phone, email, date of birth, address, beneficiary flag and share, note), up to 20 per employee. Next of kin must have a phone number; a dependant must have a date of birth; beneficiary shares across the employee can never add up to more than 100%. Removing a person keeps the row (who, when) and hides it. HR needs `HR_SENSITIVE_READ` to see them and `HR_MANAGE`/`USER_UPDATE` to change them; reading is logged once an hour per person ("VIEWED_FAMILY"); the audit trail records that someone was added, changed or removed, never their details. Employees keep their own through `/hr/profile/relatives` (found from the login; an unlinked login gets "not found").
+
+**Career timeline.** New `hr_career_events`. The system writes a line, in the same transaction as the change, when someone is hired (V546 also back-fills one for everyone already on the books, and a "Left" line for those who have left), when job title, department or employment type is changed on the employee form, when the manager is changed, when termination is recorded, and when an approved pay change alters gross salary (a pay-related line with old and new amount; the screen shows the percentage). HR adds earlier employers (must end on or before the day the person joined), promotions, transfers and notes by hand and can remove those; system lines cannot be removed. Pay-related lines are only returned to people with pay access. Managers with team-only access do not see the timeline.
+
+**Screens.** "Career & family" on the employee panel (career for anyone who can open the employee; family only with personal-data access) and "My profile" under People for employees (their own family, editable, and their own career without pay lines).
+
+**Tests.**
+- Run offline, passing (38): `RelativeRulesTest` (10), `CareerRulesTest` (12), `ProfileServicesTest` (16, with in-memory repositories: add/list/update/remove, share limit, another employee's line, unidentified user, pay lines hidden, only hand entries removable, recorder). One mutation (shares counting the edited line twice) was caught.
+- Frontend: `profile.test.ts` (12 cases) passes under Node. Types clean; `EmployeesTab.tsx` lint is unchanged (16 before and after). No component tests were written (vitest is not installed here).
+- Updated but not run: `EmployeeChangeServiceTest` (constructor now takes an event publisher).
+
+**Limits and things I could not verify**
+- `ProfileController`, `HrService` and `EmployeeChangeService` changes were not compiled or run (Spring is not available here); nothing ran against Postgres or a browser. The event listener relies on a plain Spring `@EventListener` running inside the publisher's transaction.
+- Only changes made through the employee form, manager change, termination and approved pay changes are recorded. Changes made directly in the database or through other routes (the `HrFacade` update, imports) that bypass `HrService.updateDetails` leave no line. Earlier history before this patch is only the hire and leave dates.
+- A change of department made through the org chart or the recruiter hand-over is not recorded unless it goes through `updateDetails`.
+- The existing single emergency contact on the employee record is unchanged and not linked to next of kin.
+- Beneficiary details are recorded only; nothing yet uses them (funeral and provident policies come in a later patch).
+- Dependants are not yet used for the medical tax credit; that still comes from the medical scheme membership.

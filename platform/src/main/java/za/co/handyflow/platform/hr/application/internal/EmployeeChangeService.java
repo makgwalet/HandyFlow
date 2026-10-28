@@ -29,6 +29,7 @@ public class EmployeeChangeService {
     private final HrEmployeeRepository employeeRepo;
     private final HrPayrollSettingsRepository settingsRepo;
     private final EmployeeAuditService audit;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     @Transactional
     public EmployeeChangeResponse requestCompensation(TenantId tenantId, UUID employeeId, CompensationChangeRequest req, UUID actor) {
@@ -128,13 +129,19 @@ public class EmployeeChangeService {
     private void apply(TenantId tenantId, HrEmployeeChange c, UUID actor) {
         HrEmployee emp = employee(tenantId, c.getEmployeeId());
         Map<String, String> v = c.getNewValues();
+        BigDecimal wasGross = null;
         if (EmployeeChangeRules.COMPENSATION.equals(c.getChangeType())) {
+            wasGross = emp.getGrossSalary();
             emp.applyCompensation(dec(v.get(EmployeeChangeRules.GROSS)), dec(v.get(EmployeeChangeRules.TRAVEL)),
                     dec(v.get(EmployeeChangeRules.MEDICAL)), dec(v.get(EmployeeChangeRules.PENSION)), v.get(EmployeeChangeRules.FREQUENCY));
         } else {
             emp.applyBank(v.get(EmployeeChangeRules.BANK_NAME), v.get(EmployeeChangeRules.ACCOUNT), v.get(EmployeeChangeRules.BRANCH));
         }
         employeeRepo.save(emp);
+        if (EmployeeChangeRules.COMPENSATION.equals(c.getChangeType()) && emp.getGrossSalary() != null && wasGross != null
+                && emp.getGrossSalary().compareTo(wasGross) != 0)
+            events.publishEvent(new CareerChange(tenantId, emp.getId(), CareerRules.SALARY_CHANGED, c.getEffectiveFrom() == null ? LocalDate.now() : c.getEffectiveFrom(),
+                    null, null, str(wasGross), str(emp.getGrossSalary()), c.getDecisionNote(), true, actor));
         c.markApplied();
         changeRepo.save(c);
         audit.record(tenantId, emp.getId(), "CHANGE_APPLIED", summary(c), actor);

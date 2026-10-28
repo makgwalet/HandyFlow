@@ -47,7 +47,7 @@ class EmployeeChangeServiceTest {
         employeeRepo = mock(HrEmployeeRepository.class);
         settingsRepo = mock(HrPayrollSettingsRepository.class);
         audit = mock(EmployeeAuditService.class);
-        service = new EmployeeChangeService(changeRepo, employeeRepo, settingsRepo, audit);
+        service = new EmployeeChangeService(changeRepo, employeeRepo, settingsRepo, audit, mock(org.springframework.context.ApplicationEventPublisher.class));
 
         emp = HrEmployee.create(tenant, "EMP-1", "Jane", "Dlamini", LocalDate.of(2024, 1, 1), "PERMANENT", new BigDecimal("30000"), "MONTHLY");
         emp.setBankName("FNB");

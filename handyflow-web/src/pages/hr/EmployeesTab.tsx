@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useAuth } from "../../hooks/useAuth"
 import ForeignIdentityFields from "./ForeignIdentityFields"
+import EmployeeProfileModal from "./EmployeeProfileModal"
 import { EMPTY_FOREIGN, anyForeign, expiryState, expiryText, foreignBody, foreignProblem, fromServer, permitLabel, type ForeignBody } from "./foreignIdentity.logic"
 import { END_TYPES, employeeRights, terminationProblem, terminationQuery, today } from "./employees.logic"
 import { ApprovalsModal, HistoryModal, ReportingModal, RequestChangeModal } from "./EmployeeChanges"
@@ -94,6 +95,7 @@ export default function EmployeesTab() {
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing]       = useState<Employee | null>(null)
   const [selected, setSelected]     = useState<Employee | null>(null)
+  const [profileOf, setProfileOf]     = useState<Employee | null>(null)
   const [terminating, setTerminating] = useState<Employee | null>(null)
   const [medicalFor, setMedicalFor] = useState<Employee | null>(null)
   const [benefitsFor, setBenefitsFor] = useState<Employee | null>(null)
@@ -524,6 +526,7 @@ export default function EmployeesTab() {
               ))}
             </div>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setProfileOf(selected)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: "var(--hf-surface)", color: "var(--hf-text-secondary)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Career &amp; family</button>
               {rights.manage && <button onClick={() => openEdit(selected)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1px solid var(--hf-info-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}><Edit2 size={13} /> Edit</button>}
               {rights.askPay && selected.status !== "TERMINATED" && <button onClick={() => { setChangeFor({ kind: "pay", emp: selected }); setSelected(null) }} style={secondaryBtn}>Request pay change</button>}
               {rights.askPay && selected.status !== "TERMINATED" && <button onClick={() => { setChangeFor({ kind: "bank", emp: selected }); setSelected(null) }} style={secondaryBtn}>Request bank change</button>}
@@ -577,6 +580,8 @@ export default function EmployeesTab() {
       {historyFor && <HistoryModal employee={historyFor} showChanges={rights.compensation} showAudit={rights.audit} onClose={() => setHistoryFor(null)} />}
       {reportingFor && <ReportingModal employee={reportingFor} managerId={reportingFor.managerId} userId={reportingFor.userId}
         candidates={(employees as Employee[]).filter(e => e.status !== "TERMINATED")} onClose={() => setReportingFor(null)} />}
+
+      {profileOf && <EmployeeProfileModal employeeId={profileOf.id} name={profileOf.fullName} startDate={profileOf.startDate} canSeeFamily={rights.sensitive} canEdit={rights.manage} onClose={() => setProfileOf(null)} />}
 
       {/* Terminate modal */}
       {terminating && (

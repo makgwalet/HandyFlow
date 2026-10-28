@@ -87,6 +87,8 @@ public class HrService {
 
         employeeRepo.save(emp);
         audit.record(tenantId, emp.getId(), "CREATED", null, null);
+        eventPublisher.publishEvent(new CareerChange(tenantId, emp.getId(), CareerRules.HIRED, emp.getStartDate(), emp.getJobTitle(), emp.getDepartment(),
+                null, emp.getJobTitle(), null, false, null));
         log.info("Created employee={} {} tenant={}", number, emp.getFullName(), tenantId);
 
         // FIX: backlog 3.3 — this was the one missing piece. The
@@ -122,6 +124,7 @@ public class HrService {
         HrEmployee emp = findActive(tenantId, id);
         LocalDate today = LocalDate.now();
         List<String> changed = new ArrayList<>();
+        String wasTitle = emp.getJobTitle(), wasDepartment = emp.getDepartment(), wasType = emp.getEmploymentType();
 
         fail(EmployeeRules.emailProblem(req.email()));
         fail(EmployeeRules.phoneProblem(req.phone()));
@@ -165,6 +168,8 @@ public class HrService {
             if (req.emergencyContactPhone() != null) { emp.setEmergencyContactPhone(blankToNull(req.emergencyContactPhone())); changed.add("emergency contact"); }
         }
         employeeRepo.save(emp);
+        for (CareerRules.Change c : CareerRules.changes(wasTitle, emp.getJobTitle(), wasDepartment, emp.getDepartment(), wasType, emp.getEmploymentType()))
+            eventPublisher.publishEvent(CareerChange.of(tenantId, id, c.kind(), today, c.from(), c.to(), null, actor));
         if (!changed.isEmpty()) audit.record(tenantId, id, "UPDATED", String.join(", ", new LinkedHashSet<>(changed)), actor);
         log.info("Updated employee={}", emp.getEmployeeNumber());
         return toEmployeeResponse(emp);
@@ -187,6 +192,7 @@ public class HrService {
         fail(NoticeRules.problem(endType, noticeGivenOn, endDate, emp.getStartDate()));
         emp.terminate(endDate, reason, actor, endType, noticeGivenOn);
         employeeRepo.save(emp);
+        eventPublisher.publishEvent(CareerChange.of(tenantId, id, CareerRules.TERMINATED, endDate, null, null, reason, actor));
         audit.record(tenantId, id, "TERMINATED", "last day " + endDate + ", " + NoticeRules.typeLabel(endType), actor);
         List<String> followUp = termination.run(tenantId, emp, actor);
         log.info("Terminated employee={}", emp.getEmployeeNumber());
@@ -205,8 +211,12 @@ public class HrService {
         HrEmployee manager = managerId == null ? null : byId.get(managerId);
         if (managerId != null && manager == null) throw new IllegalArgumentException("The manager must be a current employee.");
         fail(OrgRules.managerProblem(id, managerId, managerOf));
+        HrEmployee was = emp.getManagerId() == null ? null : byId.get(emp.getManagerId());
+        boolean moved = !java.util.Objects.equals(emp.getManagerId(), managerId);
         emp.setManagerId(managerId);
         employeeRepo.save(emp);
+        if (moved) eventPublisher.publishEvent(CareerChange.of(tenantId, id, CareerRules.MANAGER_CHANGED, LocalDate.now(),
+                was == null ? null : was.getFullName(), manager == null ? null : manager.getFullName(), null, actor));
         audit.record(tenantId, id, "MANAGER_CHANGED", manager == null ? "removed" : manager.getFullName(), actor);
         return toEmployeeResponse(emp);
     }
