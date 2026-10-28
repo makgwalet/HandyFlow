@@ -58,6 +58,13 @@ public interface HrEmployeeRepository extends JpaRepository<HrEmployee, UUID> {
     @Query("SELECT COUNT(e) FROM HrEmployee e WHERE e.tenantId = :#{#tenantId.value} AND e.deletedAt IS NULL AND e.idNumber = :idNumber AND (:excludeId IS NULL OR e.id <> :excludeId)")
     long countByIdNumber(TenantId tenantId, String idNumber, UUID excludeId);
 
+    /** Current employees, in every company, whose work permit or passport ends on or before the date (including those already past). */
+    @Query("SELECT e FROM HrEmployee e WHERE e.deletedAt IS NULL AND e.status <> 'TERMINATED' AND ((e.workPermitExpiry IS NOT NULL AND e.workPermitExpiry <= :limit) OR (e.passportExpiry IS NOT NULL AND e.passportExpiry <= :limit))")
+    List<HrEmployee> withDocumentsExpiringBy(java.time.LocalDate limit);
+
+    @Query("SELECT COUNT(e) FROM HrEmployee e WHERE e.tenantId = :#{#tenantId.value} AND e.deletedAt IS NULL AND e.passportCountry = :country AND e.passportNumber = :number AND (:excludeId IS NULL OR e.id <> :excludeId)")
+    long countByPassport(TenantId tenantId, String country, String number, UUID excludeId);
+
     @Query("SELECT e FROM HrEmployee e WHERE e.tenantId = :#{#tenantId.value} AND e.userId = :userId AND e.deletedAt IS NULL")
     Optional<HrEmployee> findByUserId(TenantId tenantId, UUID userId);
 

@@ -190,6 +190,9 @@ public enum NotificationType {
     // is late, and the reminder repeats weekly for required tasks rather than daily.
     ONBOARDING_TASKS_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
 
+    // A work permit or passport is about to expire, or has. Names the person and the date, never a document number.
+    WORK_PERMIT_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
+
     // Performance reviews. INFO for the ordinary hand-overs (your turn, a result is ready); WARNING when a due date has passed.
     // None of them carries a rating or any comment: the message only says whose turn it is.
     PERF_SELF_REVIEW_DUE(INFO, Set.of(IN_APP, EMAIL)),

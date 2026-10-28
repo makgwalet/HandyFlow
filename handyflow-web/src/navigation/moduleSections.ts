@@ -390,6 +390,7 @@ export const HR_SECTIONS: ModuleSections = {
         { id: 'letters', label: 'Letters', icon: Mail },
         { id: 'performance', label: 'Performance', icon: Target },
         { id: 'my-training', label: 'My training', icon: GraduationCap },
+        { id: 'my-tax-certificates', label: 'My tax certificates', icon: FileText },
         { id: 'team-training', label: 'Team training', icon: UserCheck },
         { id: 'hr-reports', label: 'Reports', icon: FileBarChart, anyPermission: ['HR_REPORT_READ'] },
       ],

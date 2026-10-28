@@ -12,6 +12,7 @@ import za.co.handyflow.platform.hr.domain.model.HrEmployee;
 import za.co.handyflow.platform.hr.domain.model.OrgRules;
 import za.co.handyflow.platform.hr.domain.repository.HrEmployeeRepository;
 import za.co.handyflow.platform.hr.dto.EmployeeViewResponse;
+import za.co.handyflow.platform.hr.dto.ForeignIdentity;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -94,6 +95,8 @@ public class EmployeeViewService {
                 pay ? e.getGrossSalary() : null, pay ? e.getPayFrequency() : null,
                 pay ? e.getMedicalAidContribution() : null, pay ? e.getPensionContribution() : null,
                 pay ? e.getTravelAllowance() : null, pay ? e.getBankName() : null,
-                pay ? EmployeeRules.maskAccount(e.getBankAccountNumber()) : null, pay ? e.getBankBranchCode() : null);
+                pay ? EmployeeRules.maskAccount(e.getBankAccountNumber()) : null, pay ? e.getBankBranchCode() : null,
+                sensitive ? new ForeignIdentity(e.getPassportNumber(), e.getPassportCountry(), e.getPassportExpiry(),
+                        e.getWorkPermitType(), e.getWorkPermitNumber(), e.getWorkPermitExpiry()) : null);
     }
 }

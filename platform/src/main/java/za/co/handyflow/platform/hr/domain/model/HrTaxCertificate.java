@@ -29,6 +29,8 @@ public class HrTaxCertificate {
     String surname;
     @Column(name = "id_number")          String idNumber;
     @Column(name = "tax_number")         String taxNumber;
+    @Column(name = "passport_number")    String passportNumber;
+    @Column(name = "passport_country")   String passportCountry;
     @Column(name = "date_of_birth")      LocalDate dateOfBirth;
     @Column(name = "employer_paye_ref")  String employerPayeRef;
     @Column(name = "period_from")        LocalDate periodFrom;
@@ -61,6 +63,8 @@ public class HrTaxCertificate {
         c.surname = emp.getLastName();
         c.idNumber = emp.getIdNumber();
         c.taxNumber = emp.getTaxNumber();
+        c.passportNumber = emp.getPassportNumber();
+        c.passportCountry = emp.getPassportCountry();
         c.dateOfBirth = emp.getDateOfBirth();
         c.employerPayeRef = employerPayeRef;
         c.periodFrom = from;

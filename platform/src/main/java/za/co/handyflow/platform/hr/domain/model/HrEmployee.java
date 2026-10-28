@@ -62,6 +62,13 @@ public class HrEmployee {
     @Column(name = "emergency_contact_phone")    String emergencyContactPhone;
     @Column(name = "emergency_contact_relation") String emergencyContactRelation;
 
+    @Column(name = "passport_number")    String passportNumber;
+    @Column(name = "passport_country")   String passportCountry;
+    @Column(name = "passport_expiry")    LocalDate passportExpiry;
+    @Column(name = "work_permit_type")   String workPermitType;
+    @Column(name = "work_permit_number") String workPermitNumber;
+    @Column(name = "work_permit_expiry") LocalDate workPermitExpiry;
+
     @Column(name = "user_id")            UUID userId;
     @Column(name = "termination_reason") String terminationReason;
     @Column(name = "terminated_by")      UUID terminatedBy;
@@ -149,6 +156,20 @@ public class HrEmployee {
     }
 
     public void setIdNumber(String idNumber)                { this.idNumber = idNumber; }
+
+    /** The passport, kept whole: number, issuing country and expiry change together. */
+    public void setPassport(String number, String country, LocalDate expiry) {
+        this.passportNumber = number;
+        this.passportCountry = country;
+        this.passportExpiry = expiry;
+    }
+
+    /** The work permit, kept whole: type, number and expiry change together. */
+    public void setWorkPermit(String type, String number, LocalDate expiry) {
+        this.workPermitType = type;
+        this.workPermitNumber = number;
+        this.workPermitExpiry = expiry;
+    }
     public void setTaxNumber(String taxNumber)              { this.taxNumber = taxNumber; }
     public void setDateOfBirth(java.time.LocalDate dob)     { this.dateOfBirth = dob; }
     public void setGender(String gender)                    { this.gender = gender; }

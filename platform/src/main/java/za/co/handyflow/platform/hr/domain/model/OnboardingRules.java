@@ -36,7 +36,7 @@ public final class OnboardingRules {
         l.add(new Spec("Written particulars of employment signed",
                 "Give the employee their written particulars (contract or letter) on the day they start. BCEA section 29 sets what it must contain.",
                 "CONTRACT", true, 0, START, null));
-        l.add(new Spec("ID number recorded", "The employee's ID number is on their record and is valid.", "DOCUMENTS", true, 0, START, "ID_NUMBER"));
+        l.add(new Spec("ID number recorded", "The employee's South African ID number, or their passport and the country that issued it, is on their record and is valid.", "DOCUMENTS", true, 0, START, "ID_NUMBER"));
         l.add(new Spec("Certified copy of ID or passport kept", "Keep a copy of the ID, or the passport and work permit for a foreign national.", "DOCUMENTS", true, 7, START, null));
         l.add(new Spec("Qualifications and references verified", "Check the qualifications and speak to the references the employee gave.", "DOCUMENTS", false, 14, START, null));
         l.add(new Spec("Emergency contact recorded", "Name and phone number of someone to call in an emergency.", "DOCUMENTS", true, 7, START, "EMERGENCY_CONTACT"));
@@ -81,7 +81,14 @@ public final class OnboardingRules {
 
     public static Facts facts(String idNumber, String taxNumber, String bankName, String account, String branch, java.math.BigDecimal gross,
                               UUID managerId, UUID userId, String emergencyName, String emergencyPhone, LocalDate today) {
-        boolean id = idNumber != null && !idNumber.isBlank() && EmployeeRules.idProblem(idNumber, today) == null;
+        return facts(idNumber, null, null, taxNumber, bankName, account, branch, gross, managerId, userId, emergencyName, emergencyPhone, today);
+    }
+
+    /** As above. The identity check passes with a valid South African ID, or with a passport and the country that issued it. */
+    public static Facts facts(String idNumber, String passportNumber, String passportCountry, String taxNumber, String bankName, String account,
+                              String branch, java.math.BigDecimal gross, UUID managerId, UUID userId, String emergencyName, String emergencyPhone,
+                              LocalDate today) {
+        boolean id = EmployeeRules.identified(idNumber, passportNumber, passportCountry, today);
         boolean tax = taxNumber != null && !taxNumber.isBlank() && EmployeeRules.taxNumberProblem(taxNumber) == null;
         boolean bank = account != null && !account.isBlank() && EmployeeRules.bankProblem(bankName, account, branch) == null;
         boolean salary = gross != null && gross.signum() > 0;

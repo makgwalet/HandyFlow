@@ -77,7 +77,7 @@ public class TaxCertificatePdfGenerator {
             who.addCell(block("Employer", List.of(employerName == null ? "" : employerName,
                     "PAYE reference: " + (employerPayeReference == null ? "not set" : employerPayeReference))));
             who.addCell(block("Employee", List.of(c.employeeName() == null ? "" : c.employeeName(),
-                    "ID number: " + (c.idNumber() == null ? "not recorded" : c.idNumber()),
+                    identification(c),
                     "Income tax number: " + (c.taxNumber() == null ? "not recorded" : c.taxNumber()),
                     "Employee number: " + (c.employeeNumber() == null ? "" : c.employeeNumber()))));
             doc.add(who);
@@ -133,5 +133,13 @@ public class TaxCertificatePdfGenerator {
         Cell c = new Cell().setBorder(null).setPadding(4).add(new Paragraph(text == null ? "" : text).setFontSize(9.5f).setMargin(0));
         if (bg != null) c.setBackgroundColor(bg);
         return right ? c.setTextAlignment(TextAlignment.RIGHT) : c;
+    }
+
+    /** "ID number: ..." when there is one, otherwise the passport and its country. */
+    static String identification(Certificate c) {
+        boolean id = c.idNumber() != null && !c.idNumber().isBlank();
+        boolean passport = c.passportNumber() != null && !c.passportNumber().isBlank();
+        if (id || !passport) return "ID number: " + (id ? c.idNumber() : "not recorded");
+        return "Passport: " + c.passportNumber() + (c.passportCountry() == null || c.passportCountry().isBlank() ? "" : " (" + c.passportCountry() + ")");
     }
 }

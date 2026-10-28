@@ -19,5 +19,22 @@ public record EmployeeViewResponse(
         String emergencyContactName, String emergencyContactPhone, String terminationReason,
         // pay
         BigDecimal grossSalary, String payFrequency, BigDecimal medicalAidContribution, BigDecimal pensionContribution,
-        BigDecimal travelAllowance, String bankName, String bankAccountMasked, String bankBranchCode
-) {}
+        BigDecimal travelAllowance, String bankName, String bankAccountMasked, String bankBranchCode,
+        // passport and work permit: personal data, so null without the sensitive permission
+        ForeignIdentity foreign
+) {
+    /** Without the passport and permit block, as before they were kept. */
+    public EmployeeViewResponse(UUID id, String employeeNumber, String firstName, String lastName, String fullName,
+                                String email, String phone, String employmentType, String jobTitle, String department,
+                                LocalDate startDate, LocalDate endDate, String status, UUID managerId, String managerName, UUID userId,
+                                boolean canSeeSensitive, boolean canSeeCompensation,
+                                String idNumber, String taxNumber, LocalDate dateOfBirth, String gender, String race,
+                                String emergencyContactName, String emergencyContactPhone, String terminationReason,
+                                BigDecimal grossSalary, String payFrequency, BigDecimal medicalAidContribution, BigDecimal pensionContribution,
+                                BigDecimal travelAllowance, String bankName, String bankAccountMasked, String bankBranchCode) {
+        this(id, employeeNumber, firstName, lastName, fullName, email, phone, employmentType, jobTitle, department, startDate, endDate, status,
+                managerId, managerName, userId, canSeeSensitive, canSeeCompensation, idNumber, taxNumber, dateOfBirth, gender, race,
+                emergencyContactName, emergencyContactPhone, terminationReason, grossSalary, payFrequency, medicalAidContribution,
+                pensionContribution, travelAllowance, bankName, bankAccountMasked, bankBranchCode, null);
+    }
+}

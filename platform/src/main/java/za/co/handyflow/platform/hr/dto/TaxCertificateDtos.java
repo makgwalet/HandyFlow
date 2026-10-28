@@ -33,7 +33,17 @@ public final class TaxCertificateDtos {
                               String idNumber, String taxNumber, String certificateNumber, String certificateType, int version,
                               String status, String state, LocalDate periodFrom, LocalDate periodTo, int payslipCount,
                               Instant issuedAt, Instant cancelledAt, String cancelReason, Instant releasedAt,
-                              List<Line> lines, List<Problem> problems) {}
+                              List<Line> lines, List<Problem> problems, String passportNumber, String passportCountry) {
+        /** Without a passport, as before passports were kept. */
+        public Certificate(UUID id, int taxYear, String period, UUID employeeId, String employeeNumber, String employeeName,
+                           String idNumber, String taxNumber, String certificateNumber, String certificateType, int version,
+                           String status, String state, LocalDate periodFrom, LocalDate periodTo, int payslipCount,
+                           Instant issuedAt, Instant cancelledAt, String cancelReason, Instant releasedAt,
+                           List<Line> lines, List<Problem> problems) {
+            this(id, taxYear, period, employeeId, employeeNumber, employeeName, idNumber, taxNumber, certificateNumber, certificateType, version,
+                    status, state, periodFrom, periodTo, payslipCount, issuedAt, cancelledAt, cancelReason, releasedAt, lines, problems, null, null);
+        }
+    }
 
     public record Reconciliation(int taxYear, String period, LocalDate periodFrom, LocalDate periodTo, int runs, boolean canIssue,
                                  boolean interim, List<Problem> problems, List<Recon> reconciliation,

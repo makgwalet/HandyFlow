@@ -149,4 +149,11 @@ class OnboardingRulesTest {
         assertThat(OnboardingRules.templateProblem("x", "ACCESS", "START", null, 4000)).contains("typing mistake");
         assertThat(OnboardingRules.templateProblem("x", "ACCESS", "START", "MANAGER", -3)).isNull();
     }
+
+    @Test
+    void aPassportWithItsCountryAlsoSatisfiesTheIdentityCheck() {
+        assertThat(OnboardingRules.facts(null, "A1234567", "ZW", null, null, null, null, null, null, null, null, null, TODAY).idNumber()).isTrue();
+        assertThat(OnboardingRules.facts(null, "A1234567", null, null, null, null, null, null, null, null, null, null, TODAY).idNumber()).isFalse();
+        assertThat(OnboardingRules.facts("1234", "A1234567", "ZW", null, null, null, null, null, null, null, null, null, TODAY).idNumber()).isTrue();
+    }
 }

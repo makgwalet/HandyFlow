@@ -14,6 +14,8 @@ import EtiModal from "./EtiModal"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useAuth } from "../../hooks/useAuth"
+import ForeignIdentityFields from "./ForeignIdentityFields"
+import { EMPTY_FOREIGN, anyForeign, expiryState, expiryText, foreignBody, foreignProblem, fromServer, permitLabel, type ForeignBody } from "./foreignIdentity.logic"
 import { END_TYPES, employeeRights, terminationProblem, terminationQuery, today } from "./employees.logic"
 import { ApprovalsModal, HistoryModal, ReportingModal, RequestChangeModal } from "./EmployeeChanges"
 import { Plus, X, Search, Users, AlertTriangle, AlertCircle, Edit2, UserX } from "lucide-react"
@@ -31,6 +33,7 @@ interface Employee {
   bankName: string | null; bankAccountMasked: string | null; bankBranchCode: string | null
   emergencyContactName: string | null; emergencyContactPhone: string | null; notes?: string | null
   managerId: string | null; managerName: string | null; userId: string | null; terminationReason: string | null
+  foreign?: ForeignBody | null   // passport and work permit; null when the caller may not see personal data
 }
 
 // Correct ApiResponse unwrap — handles both wrapped and bare responses
@@ -81,6 +84,7 @@ const EMPTY_FORM = {
   bankName: "", bankAccountNumber: "", bankBranchCode: "",
   medicalAidContribution: "", pensionContribution: "", travelAllowance: "",
   emergencyContactName: "", emergencyContactPhone: "", notes: "",
+  foreign: EMPTY_FOREIGN,
 }
 
 export default function EmployeesTab() {
@@ -170,6 +174,8 @@ export default function EmployeesTab() {
     if (!form.startDate)        errs.startDate = "Required"
     if (!form.grossSalary || isNaN(Number(form.grossSalary))) errs.grossSalary = "Valid amount required"
     if (form.idNumber?.length === 13 && !validateSaId(form.idNumber).valid) errs.idNumber = "Invalid SA ID"
+    const fp = foreignProblem(form.foreign, editing ? undefined : form.startDate)
+    if (fp) errs.foreign = fp
     setFieldErrors(errs); return Object.keys(errs).length === 0
   }
 
@@ -188,6 +194,7 @@ export default function EmployeesTab() {
     emergencyContactName:  f.emergencyContactName  || null,
     emergencyContactPhone: f.emergencyContactPhone || null,
     notes: f.notes || null,
+    ...(anyForeign(f.foreign) ? { foreign: foreignBody(f.foreign) } : {}),
   })
 
   // Editing sends working details only. Pay and bank details change through a request that someone else approves.
@@ -198,6 +205,7 @@ export default function EmployeesTab() {
       idNumber: f.idNumber || "", taxNumber: f.taxNumber || "", dateOfBirth: f.dateOfBirth || null,
       gender: f.gender || "", race: f.race || "",
       emergencyContactName: f.emergencyContactName || "", emergencyContactPhone: f.emergencyContactPhone || "",
+      foreign: foreignBody(f.foreign),   // the whole block, so clearing a field clears it
     } : {}),
   })
 
@@ -217,6 +225,7 @@ export default function EmployeesTab() {
       emergencyContactName:  emp.emergencyContactName ?? "",
       emergencyContactPhone: emp.emergencyContactPhone ?? "",
       notes: emp.notes ?? "",
+      foreign: fromServer(emp.foreign),
     })
     setError(""); setSelected(null)
   }
@@ -282,6 +291,8 @@ export default function EmployeesTab() {
             </select>
             <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 2 }}>Required for Employment Equity</div>
           </div>
+          <ForeignIdentityFields value={form.foreign} onChange={foreign => { setForm(f => ({ ...f, foreign })); setFieldErrors(f => omit(f, "foreign")) }}
+            lbl={lbl} inp={inp("foreign")} problem={fieldErrors.foreign} />
           </>}
           <div><label style={lbl}>Email</label><input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="employee@co.za" style={inp("email")} /></div>
           <div><label style={lbl}>Phone</label><input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+27 82 555 1234" style={inp("phone")} /></div>
@@ -490,6 +501,8 @@ export default function EmployeesTab() {
                   { l: "SA ID",           v: selected.idNumber || "—" },
                   { l: "Tax Number",      v: selected.taxNumber || "—" },
                   { l: "Date of birth",   v: fmtDate(selected.dateOfBirth) },
+                  ...(selected.foreign?.passportNumber ? [{ l: "Passport", v: `${selected.foreign.passportNumber} (${selected.foreign.passportCountry ?? "?"})`, note: selected.foreign.passportExpiry ? `${expiryText(selected.foreign.passportExpiry)} · ${fmtDate(selected.foreign.passportExpiry)}` : undefined, state: expiryState(selected.foreign.passportExpiry) }] : []),
+                  ...(selected.foreign?.workPermitType ? [{ l: "Work permit", v: `${permitLabel(selected.foreign.workPermitType)} · ${selected.foreign.workPermitNumber ?? ""}`, note: selected.foreign.workPermitExpiry ? `${expiryText(selected.foreign.workPermitExpiry)} · ${fmtDate(selected.foreign.workPermitExpiry)}` : "No end date", state: expiryState(selected.foreign.workPermitExpiry) }] : []),
                   { l: "Emergency",       v: selected.emergencyContactName ? `${selected.emergencyContactName} · ${selected.emergencyContactPhone}` : "—" },
                 ] : [{ l: "Personal data", v: "Restricted" }]),
                 ...(selected.canSeeCompensation ? [
@@ -504,6 +517,9 @@ export default function EmployeesTab() {
                 <div key={item.l} style={{ padding: "9px 12px", background: "var(--hf-surface-muted)", borderRadius: 7 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 2 }}>{item.l}</div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{item.v}</div>
+                  {"note" in item && item.note && (
+                    <div style={{ fontSize: 11, marginTop: 2, color: "state" in item && item.state === "expired" ? "var(--hf-danger-text)" : "state" in item && item.state === "soon" ? "var(--hf-warning-text)" : "var(--hf-text-muted)" }}>{item.note as string}</div>
+                  )}
                 </div>
               ))}
             </div>

@@ -95,6 +95,78 @@ public final class EmployeeRules {
         return relation.trim().length() > MAX_RELATION ? "The emergency contact's relation is too long (" + MAX_RELATION + " characters at most)." : null;
     }
 
+    // ── Foreign nationals: passport and work permit ─────────────────────────────────────────────
+
+    /** The kinds of right to work HR records. Permanent residence has no end date; the others do. */
+    public static final java.util.Map<String, String> PERMIT_TYPES = new java.util.LinkedHashMap<>();
+    static {
+        PERMIT_TYPES.put("PERMANENT_RESIDENCE", "Permanent residence");
+        PERMIT_TYPES.put("GENERAL_WORK", "General work visa");
+        PERMIT_TYPES.put("CRITICAL_SKILLS", "Critical skills work visa");
+        PERMIT_TYPES.put("INTRA_COMPANY_TRANSFER", "Intra-company transfer visa");
+        PERMIT_TYPES.put("CORPORATE", "Corporate visa");
+        PERMIT_TYPES.put("RELATIVE", "Relative's visa (spouse or life partner)");
+        PERMIT_TYPES.put("ASYLUM_OR_REFUGEE", "Asylum seeker permit or refugee status");
+        PERMIT_TYPES.put("OTHER", "Other");
+    }
+    public static final String PERMANENT_RESIDENCE = "PERMANENT_RESIDENCE";
+    public static final int MAX_PASSPORT = 20, MIN_PASSPORT = 5, MAX_PERMIT_NUMBER = 40;
+
+    /** A passport number as stored: letters and digits only, upper case; null when empty. */
+    public static String normalisePassport(String raw) {
+        if (raw == null) return null;
+        String s = raw.replaceAll("[\\s-]", "").toUpperCase(java.util.Locale.ROOT);
+        return s.isEmpty() ? null : s;
+    }
+
+    /** A two-letter country code as stored: upper case; null when empty. */
+    public static String normaliseCountry(String raw) {
+        return raw == null || raw.isBlank() ? null : raw.trim().toUpperCase(java.util.Locale.ROOT);
+    }
+
+    /** Null when the passport is empty, or the number and issuing country are both given and look right. */
+    public static String passportProblem(String number, String country, java.time.LocalDate expiry, LocalDate today) {
+        String n = normalisePassport(number);
+        String c = normaliseCountry(country);
+        if (n == null && c == null && expiry == null) return null;
+        if (n == null) return "Give the passport number as well as its country or expiry date.";
+        if (!n.matches("[A-Z0-9]+")) return "The passport number can only have letters and digits.";
+        if (n.length() < MIN_PASSPORT || n.length() > MAX_PASSPORT) return "The passport number must be " + MIN_PASSPORT + " to " + MAX_PASSPORT + " letters and digits.";
+        if (c == null) return "Give the country that issued the passport.";
+        if (!java.util.Set.of(java.util.Locale.getISOCountries()).contains(c)) return "The passport country must be a two-letter country code, for example ZW or MW.";
+        if (expiry != null && (expiry.isBefore(LocalDate.of(1950, 1, 1)) || expiry.isAfter(today.plusYears(20))))
+            return "The passport expiry date does not look right.";
+        return null;
+    }
+
+    /** Null when the permit is empty, or its type, number and (unless permanent) expiry are given. */
+    public static String permitProblem(String type, String number, java.time.LocalDate expiry, LocalDate today) {
+        boolean anyNumber = number != null && !number.isBlank();
+        if (type == null || type.isBlank()) {
+            return anyNumber || expiry != null ? "Choose the kind of work permit or visa." : null;
+        }
+        if (!PERMIT_TYPES.containsKey(type.trim())) return "That kind of work permit is not one HR offers.";
+        if (!anyNumber) return "Give the permit or visa number.";
+        if (number.trim().length() > MAX_PERMIT_NUMBER) return "The permit number is too long (" + MAX_PERMIT_NUMBER + " characters at most).";
+        boolean permanent = PERMANENT_RESIDENCE.equals(type.trim());
+        if (!permanent && expiry == null) return "Give the date the permit or visa expires.";
+        if (expiry != null && (expiry.isBefore(LocalDate.of(1990, 1, 1)) || expiry.isAfter(today.plusYears(20))))
+            return "The permit expiry date does not look right.";
+        return null;
+    }
+
+    /** A person starting work cannot rely on a permit that ends before they start. Null when fine or when either date is missing. */
+    public static String permitStartProblem(java.time.LocalDate expiry, java.time.LocalDate startDate) {
+        return expiry != null && startDate != null && expiry.isBefore(startDate) ? "The work permit expires before the start date." : null;
+    }
+
+    /** Whether the record says who the person is for SARS: a valid South African ID, or a passport with its country. */
+    public static boolean identified(String idNumber, String passportNumber, String passportCountry, LocalDate today) {
+        boolean id = idNumber != null && !idNumber.isBlank() && idProblem(idNumber, today) == null;
+        boolean passport = normalisePassport(passportNumber) != null && normaliseCountry(passportCountry) != null;
+        return id || passport;
+    }
+
     public static String phoneProblem(String phone) {
         if (phone == null || phone.isBlank()) return null;
         return PHONE.matcher(phone.trim()).matches() ? null : "This phone number does not look right.";

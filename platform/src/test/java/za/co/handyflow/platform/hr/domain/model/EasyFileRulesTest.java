@@ -162,4 +162,36 @@ class EasyFileRulesTest {
     void noCertificatesIsAProblem() {
         assertTrue(EasyFileRules.problems(employer, new ArrayList<>()).stream().anyMatch(m -> m.contains("no issued certificates")));
     }
+
+    private Person passportHolder(String number, String country) {
+        return new Person("712345678920270200000000000001", "IRP5", "Moyo", "Tendai", null, "1234567890", LocalDate.of(1990, 5, 17), "EMP-3",
+                "tendai@acme.test", "082 555 0102", new Address("5 Oak Street", "Bedfordview", "Johannesburg", "2007"),
+                LocalDate.of(2026, 3, 1), LocalDate.of(2027, 2, 28), d("12"), d("12"), LINES, number, country);
+    }
+
+    @Test
+    void aPassportHolderIsWrittenWithThePassportInsteadOfAnId() {
+        Person p = passportHolder("ab 123456".replace(" ", ""), "ZW");
+        assertTrue(EasyFileRules.problems(employer, List.of(p)).stream().noneMatch(m -> m.contains("ID number") || m.contains("passport")));
+        String row = EasyFileRules.file(employer, List.of(p)).split("\r\n")[1];
+        assertTrue(row.contains(",3070,\"AB123456\","), row);
+        assertTrue(row.contains(",3075,\"ZW\","), row);
+        assertFalse(row.contains(",3060,"), row);
+    }
+
+    @Test
+    void aValidIdWinsOverAPassport() {
+        Person p = new Person("712345678920270200000000000001", "IRP5", "Dlamini", "Jane Mary Ann", "9005175800083", "1234567890", LocalDate.of(1990, 5, 17), "EMP-1",
+                "jane@acme.test", "082 555 0101", new Address("5 Oak Street", "Bedfordview", "Johannesburg", "2007"),
+                LocalDate.of(2026, 3, 1), LocalDate.of(2027, 2, 28), d("12"), d("12"), LINES, "AB123456", "ZW");
+        String row = EasyFileRules.file(employer, List.of(p)).split("\r\n")[1];
+        assertTrue(row.contains(",3060,9005175800083,"), row);
+        assertFalse(row.contains(",3070,"), row);
+    }
+
+    @Test
+    void aPassportWithoutItsCountryOrNeitherIsReported() {
+        assertTrue(EasyFileRules.problems(employer, List.of(passportHolder("AB123456", null))).stream().anyMatch(m -> m.contains("passport number with its country")));
+        assertTrue(EasyFileRules.problems(employer, List.of(passportHolder(null, null))).stream().anyMatch(m -> m.contains("13-digit ID number, or a passport")));
+    }
 }

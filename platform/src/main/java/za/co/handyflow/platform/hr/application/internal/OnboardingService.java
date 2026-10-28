@@ -137,7 +137,7 @@ public class OnboardingService {
     }
 
     static OnboardingRules.Facts facts(HrEmployee e, LocalDate today) {
-        return OnboardingRules.facts(e.getIdNumber(), e.getTaxNumber(), e.getBankName(), e.getBankAccountNumber(), e.getBankBranchCode(),
+        return OnboardingRules.facts(e.getIdNumber(), e.getPassportNumber(), e.getPassportCountry(), e.getTaxNumber(), e.getBankName(), e.getBankAccountNumber(), e.getBankBranchCode(),
                 e.getGrossSalary(), e.getManagerId(), e.getUserId(), e.getEmergencyContactName(), e.getEmergencyContactPhone(), today);
     }
 

@@ -24,7 +24,8 @@ import java.util.stream.Collectors;
 /**
  * Tells people about onboarding tasks that are past their due date. A task with someone assigned goes to that person; the rest go
  * to the new employee's manager, or to the company's administrators when there is no manager with an email address. Which tasks
- * are mentioned on which day is decided by {@link OnboardingReminderRules}.
+ * are mentioned on which day is decided by {@link OnboardingReminderRules}. Each person gets a given message once a day: the
+ * {@link ReminderLedger} remembers who has had it, so a second run or a second app instance stays quiet.
  */
 @Slf4j
 @Service
@@ -37,6 +38,7 @@ public class OnboardingReminderService {
     private final NotificationService notificationService;
     private final TenantAdminRecipients adminRecipients;
     private final UserRecipientResolver userResolver;
+    private final ReminderLedger ledger;
 
     /** Sends today's reminders for every company. Returns how many notifications went out. One bad onboarding does not stop the rest. */
     @Transactional(readOnly = true)
@@ -101,18 +103,39 @@ public class OnboardingReminderService {
         return l.stream().sorted(Comparator.comparing(Late::due)).toList();
     }
 
+    /**
+     * One message to these people, unless the ledger shows they already had these exact words today (a second run, a restart or
+     * another app instance). If sending fails the claims are given back so the next run can try again.
+     */
     private int send(TenantId tenant, HrOnboarding o, HrEmployee emp, List<Late> tasks, List<Recipient> to, LocalDate today) {
         List<Late> ordered = sortedByDue(tasks);
-        notificationService.send(NotificationRequest.builder()
-                .tenantId(tenant)
-                .type(NotificationType.ONBOARDING_TASKS_OVERDUE)
-                .title(OnboardingReminderRules.title(emp.getFullName(), ordered.size()))
-                .message(OnboardingReminderRules.message(emp.getFullName(), ordered, today))
-                .actionUrl("/hr/onboarding")
-                .sourceModule("hr")
-                .sourceEntityId(o.getId().toString())
-                .recipients(to)
-                .build());
+        String title = OnboardingReminderRules.title(emp.getFullName(), ordered.size());
+        String message = OnboardingReminderRules.message(emp.getFullName(), ordered, today);
+        List<String> claimed = new ArrayList<>();
+        List<Recipient> fresh;
+        try {
+            fresh = ledger.unclaimed(tenant, today, NotificationType.ONBOARDING_TASKS_OVERDUE.name(), o.getId().toString(), title, message, to, claimed);
+        } catch (RuntimeException ex) {
+            log.warn("Reminder ledger unavailable, sending anyway: {}", ex.getMessage());
+            fresh = to;
+            claimed.clear();
+        }
+        if (fresh.isEmpty()) return 0;
+        try {
+            notificationService.send(NotificationRequest.builder()
+                    .tenantId(tenant)
+                    .type(NotificationType.ONBOARDING_TASKS_OVERDUE)
+                    .title(title)
+                    .message(message)
+                    .actionUrl("/hr/onboarding")
+                    .sourceModule("hr")
+                    .sourceEntityId(o.getId().toString())
+                    .recipients(fresh)
+                    .build());
+        } catch (RuntimeException e) {
+            claimed.forEach(d -> ledger.release(tenant, today, d));
+            throw e;
+        }
         return 1;
     }
 }

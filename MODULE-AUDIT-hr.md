@@ -1433,3 +1433,28 @@ Closes the four recruiter leftovers.
 - The privacy link is a single company-wide address. There is no per-job link and no check that the address loads.
 - The lease uses the database clock and a 10-minute hold. Two instances with badly different clocks cannot disagree, because only the database's `now()` is used.
 - Race is stored on HR's existing employee field. HR's own employee form is unchanged.
+
+## 62. Passport and work permit, reminders behind the ledger, employee tax-certificate screen (Slice 28, V545)
+
+**Passport and work permit.** `hr_employees` gains passport number, country (ISO 3166 two letters), passport expiry, permit type, permit number and permit expiry; `hr_tax_certificates` keeps a passport snapshot like it already did for the ID. They travel as one `ForeignIdentity` block on the create, update and view DTOs (sensitive viewers only; on update a missing block leaves the values alone and a present block replaces all six). Rules live in `EmployeeRules`: passport 5–20 letters/digits (spaces and hyphens stripped, upper-cased), known country code, permit type from a fixed list, permit number up to 40, expiry required unless permanent residence, permit may not end before the start date on hire, and the same passport (country and number) cannot belong to two employees. Onboarding's "ID recorded" check, the certificate readiness check and the e@syFile file all accept a passport when there is no valid 13-digit ID: the file writes 3060 for an ID, otherwise 3070 and 3075 (nature of person stays "A"). The tax-certificate PDF prints "Passport: X (CC)" when there is no ID.
+
+**Expiry reminders.** `ForeignIdentityReminderScheduler` (07:40) calls `ForeignIdentityReminderService`: at 90, 60, 30, 14, 7, 1 and 0 days, then weekly for eight weeks after expiry, one digest to the tenant administrators plus a personal message to each employee who has a login. New notification type `WORK_PERMIT_EXPIRING`. Messages never contain document numbers; a lapsed permit says the person may not lawfully keep working.
+
+**Reminders behind the ledger.** `OnboardingReminderService` now sends through `ReminderLedger.unclaimed`, so two instances, or a re-run, cannot send the same message twice in a day; a failed send releases its claims, and a ledger outage falls back to sending (a duplicate is better than silence). `ReminderLedger` calls now run in their own transaction (`REQUIRES_NEW`), because the reminder services are read-only transactions and a claim made inside one would not have been saved. The performance reminders use the same ledger, so they get the fix too.
+
+**Employee screen.** "My tax certificates" under People lists the signed-in employee's released annual certificates and downloads each PDF (`GET /hr/tax-certificates/mine` and `/mine/{id}/pdf`). The employee is found from the login; someone else's certificate id is reported as not found. The employee form gains the passport and permit fields and the view panel shows both with "expires in N days" or "expired N days ago".
+
+**Tests.**
+- Run offline, passing (100): additions to `EmployeeRulesTest`, `OnboardingRulesTest`, `TaxCertificateRulesTest`, `EasyFileRulesTest`; new `ForeignIdentityRulesTest`, `ForeignIdentityReminderServiceTest`, `OnboardingReminderLedgerTest`. Two deliberate mutations were caught.
+- Frontend: `foreignIdentity.test.ts` (12 cases) passes under Node; type-check clean for the new files; `EmployeesTab.tsx` lint errors are the same 19 as before.
+- Updated but not run (no Mockito here): `OnboardingReminderServiceTest` (three new cases).
+
+**Limits and things I could not verify**
+- `HrService`, the controller and the PDF generator were not compiled or run here (Spring, iText missing); they were read through by eye. Nothing ran against Postgres or a browser.
+- I could not confirm from SARS itself that 3070 allows 20 characters, or whether the file may carry an ID and a passport together. The file sends the ID when it is valid and only then omits the passport. Sources are two payroll-vendor support pages (below).
+- ETI eligibility still looks only at the ID; foreign employees are not yet considered for it.
+- Permanent residents get no expiry reminder (they have no end date); their passport expiry is still reminded.
+- `/mine` returns only annual certificates that payroll has released, not interim ones.
+- The employee list does not yet filter by "documents expiring"; the repository query for it exists.
+
+Sources: PaySpace, "e@syFile employer error: Passport number (3070), country of issue (3075) must be completed"; Sage Community Hub, "Nature of Person B".

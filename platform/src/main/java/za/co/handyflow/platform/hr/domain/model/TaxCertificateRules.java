@@ -170,13 +170,20 @@ public final class TaxCertificateRules {
     /** Problems with one employee's certificate. Errors stop it from being issued. */
     public static List<Problem> employeeProblems(String subject, String firstName, String lastName, String idNumber, String taxNumber,
                                                  LocalDate today, Totals t, List<Line> lines) {
+        return employeeProblems(subject, firstName, lastName, idNumber, null, null, taxNumber, today, t, lines);
+    }
+
+    /** As above, for an employee who may be identified by a passport instead of a South African ID. */
+    public static List<Problem> employeeProblems(String subject, String firstName, String lastName, String idNumber, String passportNumber,
+                                                 String passportCountry, String taxNumber, LocalDate today, Totals t, List<Line> lines) {
         List<Problem> out = new ArrayList<>();
         if (firstName == null || firstName.isBlank() || lastName == null || lastName.isBlank())
             out.add(error(subject, "The employee's first names and surname are needed on the certificate."));
         String idProblem = EmployeeRules.idProblem(idNumber, today);
         boolean hasId = idNumber != null && !idNumber.isBlank();
-        if (idProblem != null) out.add(error(subject, idProblem));
-        if (!hasId) out.add(error(subject, "No ID number is recorded. SARS needs the ID number (or passport details) to match the certificate to the employee."));
+        boolean hasPassport = EmployeeRules.normalisePassport(passportNumber) != null && EmployeeRules.normaliseCountry(passportCountry) != null;
+        if (idProblem != null) out.add(hasPassport ? warning(subject, idProblem + " The passport is used on the certificate instead.") : error(subject, idProblem));
+        if (!hasId && !hasPassport) out.add(error(subject, "No ID number or passport is recorded. SARS needs one of them to match the certificate to the employee."));
         String taxProblem = EmployeeRules.taxNumberProblem(taxNumber);
         if (taxProblem != null) out.add(error(subject, taxProblem));
         if (taxNumber == null || taxNumber.isBlank()) out.add(warning(subject, "No income tax reference number is recorded."));

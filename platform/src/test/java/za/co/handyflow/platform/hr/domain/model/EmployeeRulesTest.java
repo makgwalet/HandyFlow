@@ -121,4 +121,66 @@ class EmployeeRulesTest {
         assertThat(EmployeeRules.relationProblem(null, "Brother")).contains("name");
         assertThat(EmployeeRules.relationProblem("Sipho", "x".repeat(51))).contains("too long");
     }
+
+    @Test
+    void aPassportNeedsItsNumberAndCountry() {
+        assertThat(EmployeeRules.passportProblem(null, null, null, TODAY)).isNull();
+        assertThat(EmployeeRules.passportProblem("A1234567", "ZW", null, TODAY)).isNull();
+        assertThat(EmployeeRules.passportProblem("ab 123-456", "mw", LocalDate.of(2031, 3, 1), TODAY)).isNull();
+        assertThat(EmployeeRules.passportProblem(null, "ZW", null, TODAY)).contains("passport number");
+        assertThat(EmployeeRules.passportProblem("A1234567", null, null, TODAY)).contains("country");
+        assertThat(EmployeeRules.passportProblem("A1234567", "ZZ", null, TODAY)).contains("two-letter");
+        assertThat(EmployeeRules.passportProblem("A1234567", "ZIM", null, TODAY)).contains("two-letter");
+        assertThat(EmployeeRules.passportProblem("A12", "ZW", null, TODAY)).contains("5 to 20");
+        assertThat(EmployeeRules.passportProblem("A".repeat(21), "ZW", null, TODAY)).contains("5 to 20");
+        assertThat(EmployeeRules.passportProblem("A12345*7", "ZW", null, TODAY)).contains("letters and digits");
+        assertThat(EmployeeRules.passportProblem("A1234567", "ZW", LocalDate.of(2060, 1, 1), TODAY)).contains("expiry");
+    }
+
+    @Test
+    void aPassportIsStoredWithoutSpacesAndInUpperCase() {
+        assertThat(EmployeeRules.normalisePassport(" ab 123-456 ")).isEqualTo("AB123456");
+        assertThat(EmployeeRules.normalisePassport("  ")).isNull();
+        assertThat(EmployeeRules.normaliseCountry(" zw ")).isEqualTo("ZW");
+        assertThat(EmployeeRules.normaliseCountry("")).isNull();
+    }
+
+    @Test
+    void aWorkPermitNeedsItsTypeNumberAndUnlessPermanentAnExpiry() {
+        LocalDate later = LocalDate.of(2028, 5, 1);
+        assertThat(EmployeeRules.permitProblem(null, null, null, TODAY)).isNull();
+        assertThat(EmployeeRules.permitProblem("CRITICAL_SKILLS", "VISA-123", later, TODAY)).isNull();
+        assertThat(EmployeeRules.permitProblem("PERMANENT_RESIDENCE", "PR-9", null, TODAY)).isNull();
+        assertThat(EmployeeRules.permitProblem(null, "VISA-123", null, TODAY)).contains("kind of work permit");
+        assertThat(EmployeeRules.permitProblem(null, null, later, TODAY)).contains("kind of work permit");
+        assertThat(EmployeeRules.permitProblem("MAGIC", "VISA-123", later, TODAY)).contains("not one HR offers");
+        assertThat(EmployeeRules.permitProblem("GENERAL_WORK", " ", later, TODAY)).contains("number");
+        assertThat(EmployeeRules.permitProblem("GENERAL_WORK", "VISA-123", null, TODAY)).contains("expires");
+        assertThat(EmployeeRules.permitProblem("GENERAL_WORK", "x".repeat(41), later, TODAY)).contains("too long");
+        assertThat(EmployeeRules.permitProblem("GENERAL_WORK", "VISA-123", LocalDate.of(2060, 1, 1), TODAY)).contains("expiry");
+    }
+
+    @Test
+    void aPermitThatEndsBeforeTheStartDateIsRefused() {
+        assertThat(EmployeeRules.permitStartProblem(LocalDate.of(2026, 11, 1), LocalDate.of(2026, 12, 1))).contains("before the start date");
+        assertThat(EmployeeRules.permitStartProblem(LocalDate.of(2027, 11, 1), LocalDate.of(2026, 12, 1))).isNull();
+        assertThat(EmployeeRules.permitStartProblem(null, LocalDate.of(2026, 12, 1))).isNull();
+        assertThat(EmployeeRules.permitStartProblem(LocalDate.of(2026, 11, 1), null)).isNull();
+    }
+
+    @Test
+    void aPersonIsIdentifiedByAValidIdOrAPassportWithItsCountry() {
+        assertThat(EmployeeRules.identified("8001015009087", null, null, TODAY)).isTrue();
+        assertThat(EmployeeRules.identified(null, "A1234567", "ZW", TODAY)).isTrue();
+        assertThat(EmployeeRules.identified("1234", "A1234567", "ZW", TODAY)).isTrue();
+        assertThat(EmployeeRules.identified("1234", null, null, TODAY)).isFalse();
+        assertThat(EmployeeRules.identified(null, "A1234567", null, TODAY)).isFalse();
+        assertThat(EmployeeRules.identified(null, null, null, TODAY)).isFalse();
+    }
+
+    @Test
+    void everyPermitTypeHasAPlainName() {
+        assertThat(EmployeeRules.PERMIT_TYPES.containsKey("PERMANENT_RESIDENCE")).isTrue();
+        assertThat(EmployeeRules.PERMIT_TYPES.values().stream().allMatch(v -> v != null && !v.isBlank())).isTrue();
+    }
 }

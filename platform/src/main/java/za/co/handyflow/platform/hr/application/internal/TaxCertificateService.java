@@ -156,7 +156,7 @@ public class TaxCertificateService {
             }
             String subject = emp.getFullName() + " (" + emp.getEmployeeNumber() + ")";
             List<TaxCertificateRules.Problem> problems = TaxCertificateRules.employeeProblems(subject, emp.getFirstName(), emp.getLastName(),
-                    emp.getIdNumber(), emp.getTaxNumber(), today, t, lines);
+                    emp.getIdNumber(), emp.getPassportNumber(), emp.getPassportCountry(), emp.getTaxNumber(), today, t, lines);
             HrTaxCertificate existing = live.get(emp.getId());
             String state = existing == null ? "NEW" : sameLines(lines, liveLines.getOrDefault(existing.getId(), List.of())) ? "UNCHANGED" : "CHANGED";
             drafts.add(new Draft(emp, t, lines, TaxCertificateRules.certificateType(t), problems, existing, state));
@@ -227,7 +227,7 @@ public class TaxCertificateService {
                 ex == null ? null : ex.getCertificateNumber(), d.type(), ex == null ? 1 : ex.getVersion() + ("CHANGED".equals(d.state()) ? 1 : 0), "DRAFT", d.state(),
                 p.window().start(), p.window().end(), d.totals().payslips(), ex == null ? null : ex.getIssuedAt(), null, null, ex == null ? null : ex.getReleasedAt(),
                 d.lines().stream().map(l -> new Line(l.code(), l.description(), l.amount())).toList(),
-                d.problems().stream().map(TaxCertificateService::problem).toList());
+                d.problems().stream().map(TaxCertificateService::problem).toList(), e.getPassportNumber(), e.getPassportCountry());
     }
 
     private static TaxCertificateDtos.Problem problem(TaxCertificateRules.Problem p) {
@@ -262,6 +262,26 @@ public class TaxCertificateService {
         return pdfGenerator.generate(c, employerDetails.of(tenantId).name(), settings(tenantId).payeReference());
     }
 
+    /**
+     * The signed-in person's own released annual certificates. The employee is the one linked to the login; nothing comes from the
+     * request. A login with no linked employee, or whose employee has none released, gets an empty list.
+     */
+    @Transactional(readOnly = true)
+    public List<Certificate> mine(TenantId tenantId, UUID userId) {
+        return linked(tenantId, userId).map(e -> releasedFor(tenantId, e.getId())).orElse(List.of());
+    }
+
+    /** One of the signed-in person's own released annual certificates as a PDF. Someone else's is reported as not found. */
+    @Transactional(readOnly = true)
+    public byte[] minePdf(TenantId tenantId, UUID userId, UUID certificateId) {
+        HrEmployee e = linked(tenantId, userId).orElseThrow(() -> new ResourceNotFoundException("TaxCertificate", certificateId.toString()));
+        return releasedPdf(tenantId, e.getId(), certificateId);
+    }
+
+    private Optional<HrEmployee> linked(TenantId tenantId, UUID userId) {
+        return userId == null ? Optional.empty() : employeeRepo.findByUserId(tenantId, userId);
+    }
+
     /** Annual certificates released to an employee. Interim ones and unreleased ones are never shown. */
     @Transactional(readOnly = true)
     public List<Certificate> releasedFor(TenantId tenantId, UUID employeeId) {
@@ -276,7 +296,8 @@ public class TaxCertificateService {
                 (c.getFirstNames() + " " + c.getSurname()).trim(), c.getIdNumber(), c.getTaxNumber(), c.getCertificateNumber(), c.getCertificateType(),
                 c.getVersion(), c.getStatus(), c.getStatus(), c.getPeriodFrom(), c.getPeriodTo(), c.getPayslipCount(), c.getIssuedAt(), c.getCancelledAt(),
                 c.getCancelReason(), c.getReleasedAt(),
-                lines.getOrDefault(c.getId(), List.of()).stream().map(l -> new Line(l.getCode(), l.getDescription(), l.getAmount())).toList(), List.of())).toList();
+                lines.getOrDefault(c.getId(), List.of()).stream().map(l -> new Line(l.getCode(), l.getDescription(), l.getAmount())).toList(), List.of(),
+                c.getPassportNumber(), c.getPassportCountry())).toList();
     }
 
     // ── Issuing ─────────────────────────────────────────────────────────────────────────────────
@@ -412,7 +433,8 @@ public class TaxCertificateService {
                     c.getDateOfBirth(), c.getEmployeeNumber(), emp == null ? null : emp.getEmail(), emp == null ? null : emp.getPhone(),
                     new EasyFileRules.Address(a.get("street"), a.get("suburb"), a.get("city"), a.get("postalCode")), c.getPeriodFrom(), c.getPeriodTo(),
                     periods, BigDecimal.valueOf(c.getPayslipCount()),
-                    lines.getOrDefault(c.getId(), List.of()).stream().map(l -> new TaxCertificateRules.Line(l.getCode(), l.getDescription(), l.getAmount())).toList()));
+                    lines.getOrDefault(c.getId(), List.of()).stream().map(l -> new TaxCertificateRules.Line(l.getCode(), l.getDescription(), l.getAmount())).toList(),
+                    c.getPassportNumber(), c.getPassportCountry()));
         }
         List<String> problems = new ArrayList<>(EasyFileRules.problems(employer, people));
         problems.addAll(extra);

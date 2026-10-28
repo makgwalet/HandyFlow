@@ -36,6 +36,7 @@ class OnboardingReminderServiceTest {
     private NotificationService notifications;
     private TenantAdminRecipients admins;
     private UserRecipientResolver users;
+    private ReminderLedger ledger;
     private OnboardingReminderService service;
 
     private HrEmployee employee;
@@ -49,7 +50,10 @@ class OnboardingReminderServiceTest {
         notifications = mock(NotificationService.class);
         admins = mock(TenantAdminRecipients.class);
         users = mock(UserRecipientResolver.class);
-        service = new OnboardingReminderService(onboardingRepo, taskRepo, employeeRepo, notifications, admins, users);
+        ledger = mock(ReminderLedger.class);
+        // By default nobody has had the message yet, so everyone is sent it.
+        when(ledger.unclaimed(any(), any(), any(), any(), any(), any(), any(), any())).thenAnswer(inv -> inv.getArgument(6));
+        service = new OnboardingReminderService(onboardingRepo, taskRepo, employeeRepo, notifications, admins, users, ledger);
 
         employee = HrEmployee.create(tenant, "E-1", "Thandi", "Mokoena", TODAY.minusDays(20), "PERMANENT", new BigDecimal("20000"), "MONTHLY");
         onboarding = HrOnboarding.start(tenant.getValue(), employee.getId(), TODAY.minusDays(20), TODAY.plusMonths(2), UUID.randomUUID());
@@ -139,5 +143,34 @@ class OnboardingReminderServiceTest {
         tasks(task("Induction held", true, 1, null));
         doThrow(new IllegalStateException("mail down")).when(notifications).send(any());
         assertThat(service.remindAll(TODAY)).isZero();
+    }
+
+    @Test
+    void aMessageThePeopleAlreadyHadTodayIsNotSentAgain() {
+        when(ledger.unclaimed(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(List.of());
+        tasks(task("Bank details recorded", true, 1, null));
+        service.remindAll(TODAY);
+        verify(notifications, never()).send(any());
+    }
+
+    @Test
+    void theClaimsAreGivenBackWhenSendingFails() {
+        when(ledger.unclaimed(any(), any(), any(), any(), any(), any(), any(), any())).thenAnswer(inv -> {
+            List<String> claimed = inv.getArgument(7);
+            claimed.add("digest-1");
+            return inv.getArgument(6);
+        });
+        doThrow(new IllegalStateException("mail down")).when(notifications).send(any());
+        tasks(task("Bank details recorded", true, 1, null));
+        service.remindAll(TODAY);
+        verify(ledger).release(eq(tenant), eq(TODAY), eq("digest-1"));
+    }
+
+    @Test
+    void aLedgerThatCannotBeReachedNeverStopsTheReminder() {
+        when(ledger.unclaimed(any(), any(), any(), any(), any(), any(), any(), any())).thenThrow(new IllegalStateException("db"));
+        tasks(task("Bank details recorded", true, 1, null));
+        assertThat(service.remindAll(TODAY)).isEqualTo(1);
+        verify(notifications).send(any());
     }
 }

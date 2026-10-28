@@ -177,4 +177,31 @@ class TaxCertificateRulesTest {
     private static BigDecimal amount(List<TaxCertificateRules.Line> l, String code) {
         return l.stream().filter(x -> x.code().equals(code)).findFirst().orElseThrow().amount();
     }
+
+    @Test
+    void aPassportHolderCanGetACertificateWithoutAnIdNumber() {
+        var t = totals("1000", "0", "0", "0", "100", "10", "10", "0", "0", 1, 0);
+        var lines = TaxCertificateRules.lines(t, "PENSION");
+        var probs = TaxCertificateRules.employeeProblems("Tendai", "Tendai", "Moyo", null, "AB123456", "ZW", "0123456789", TODAY, t, lines);
+        assertThat(probs).noneMatch(TaxCertificateRules.Problem::isError);
+    }
+
+    @Test
+    void aPassportWithoutItsCountryOrAnIdIsStillAnError() {
+        var t = totals("1000", "0", "0", "0", "100", "10", "10", "0", "0", 1, 0);
+        var lines = TaxCertificateRules.lines(t, "PENSION");
+        assertThat(TaxCertificateRules.employeeProblems("T", "Tendai", "Moyo", null, "AB123456", null, "0123456789", TODAY, t, lines))
+                .anyMatch(p -> p.isError() && p.message().contains("ID number or passport"));
+        assertThat(TaxCertificateRules.employeeProblems("T", "Tendai", "Moyo", null, null, null, "0123456789", TODAY, t, lines))
+                .anyMatch(p -> p.isError() && p.message().contains("ID number or passport"));
+    }
+
+    @Test
+    void aBadIdIsOnlyAWarningWhenAPassportCanStandInForIt() {
+        var t = totals("1000", "0", "0", "0", "100", "10", "10", "0", "0", 1, 0);
+        var lines = TaxCertificateRules.lines(t, "PENSION");
+        var probs = TaxCertificateRules.employeeProblems("T", "Tendai", "Moyo", "1234", "AB123456", "ZW", "0123456789", TODAY, t, lines);
+        assertThat(probs).noneMatch(TaxCertificateRules.Problem::isError);
+        assertThat(probs).anyMatch(p -> !p.isError() && p.message().contains("passport is used"));
+    }
 }

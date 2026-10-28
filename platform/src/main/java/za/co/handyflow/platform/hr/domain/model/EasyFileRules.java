@@ -26,7 +26,19 @@ public final class EasyFileRules {
 
     public record Person(String certificateNumber, String type, String surname, String firstNames, String idNumber, String taxNumber, LocalDate dateOfBirth,
                          String employeeNumber, String email, String phone, Address address, LocalDate from, LocalDate to,
-                         BigDecimal payPeriods, BigDecimal periodsWorked, List<TaxCertificateRules.Line> lines) {
+                         BigDecimal payPeriods, BigDecimal periodsWorked, List<TaxCertificateRules.Line> lines,
+                         String passportNumber, String passportCountry) {
+        /** Without a passport, as the person was before passports were kept. */
+        public Person(String certificateNumber, String type, String surname, String firstNames, String idNumber, String taxNumber, LocalDate dateOfBirth,
+                      String employeeNumber, String email, String phone, Address address, LocalDate from, LocalDate to,
+                      BigDecimal payPeriods, BigDecimal periodsWorked, List<TaxCertificateRules.Line> lines) {
+            this(certificateNumber, type, surname, firstNames, idNumber, taxNumber, dateOfBirth, employeeNumber, email, phone, address, from, to,
+                    payPeriods, periodsWorked, lines, null, null);
+        }
+
+        /** The 13-digit ID goes in the file when there is one; otherwise the passport does. */
+        boolean usesId() { return idNumber != null && idNumber.matches("\\d{13}"); }
+        boolean hasPassport() { return !blank(passportNumber) && !blank(passportCountry); }
         String label() { return (firstNames == null ? "" : firstNames + " ") + (surname == null ? "" : surname) + (employeeNumber == null ? "" : " (" + employeeNumber + ")"); }
     }
 
@@ -58,9 +70,9 @@ public final class EasyFileRules {
             String who = p.label() + ": ";
             if (isIt3a(p.type()))
                 out.add(who + "this is an IT3(a) certificate, which needs a SARS reason code that HandyFlow does not hold yet, so the file cannot include it.");
-            if (p.idNumber() == null || !p.idNumber().matches("\\d{13}"))
-                out.add(who + "a 13-digit ID number is needed. Passports and permits are not supported in the file yet.");
-            else if (p.dateOfBirth() != null && !p.idNumber().startsWith(String.format("%02d%02d%02d", p.dateOfBirth().getYear() % 100, p.dateOfBirth().getMonthValue(), p.dateOfBirth().getDayOfMonth())))
+            if (!p.usesId() && !p.hasPassport())
+                out.add(who + "a 13-digit ID number, or a passport number with its country, is needed.");
+            else if (p.usesId() && p.dateOfBirth() != null && !p.idNumber().startsWith(String.format("%02d%02d%02d", p.dateOfBirth().getYear() % 100, p.dateOfBirth().getMonthValue(), p.dateOfBirth().getDayOfMonth())))
                 out.add(who + "the ID number does not match the date of birth.");
             if (p.dateOfBirth() == null) out.add(who + "the date of birth is not set.");
             if (blank(p.surname()) || blank(p.firstNames())) out.add(who + "the first names and surname are needed.");
@@ -142,7 +154,11 @@ public final class EasyFileRules {
         p.text("3030", x.surname(), 120);
         p.text("3040", firstTwo(x.firstNames()), 90);
         p.text("3050", initials(x.firstNames()), 5);
-        p.num("3060", x.idNumber());
+        if (x.usesId()) p.num("3060", x.idNumber());
+        else {
+            p.text("3070", x.passportNumber().replaceAll("[\\s-]", "").toUpperCase(), 20);
+            p.text("3075", x.passportCountry().trim().toUpperCase(), 2);
+        }
         p.num("3080", x.dateOfBirth().format(DAY));
         if (x.taxNumber() != null && x.taxNumber().matches("\\d{10}")) p.num("3100", x.taxNumber());
         if (!blank(x.email())) p.text("3125", x.email(), 70);

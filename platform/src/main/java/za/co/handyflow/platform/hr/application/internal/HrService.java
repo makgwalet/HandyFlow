@@ -62,6 +62,7 @@ public class HrService {
 
         // Direct setter calls — no reflection, no silent failures
         emp.setIdNumber(req.idNumber());
+        applyForeign(emp, req.foreign());
         emp.setTaxNumber(req.taxNumber());
         emp.setDateOfBirth(req.dateOfBirth());
         emp.setGender(req.gender());
@@ -147,6 +148,12 @@ public class HrService {
                 fail(EmployeeRules.dobProblem(idNumber, dob, emp.getStartDate(), today));
                 if (req.dateOfBirth() != null) { emp.setDateOfBirth(req.dateOfBirth()); changed.add("date of birth"); }
             }
+            if (req.foreign() != null) {
+                fail(foreignProblem(tenantId, req.foreign(), today, id));
+                if (foreignChanged(emp, req.foreign(), true)) changed.add("passport");
+                if (foreignChanged(emp, req.foreign(), false)) changed.add("work permit");
+                applyForeign(emp, req.foreign());
+            }
             if (req.taxNumber() != null) {
                 fail(EmployeeRules.taxNumberProblem(req.taxNumber()));
                 emp.setTaxNumber(blankToNull(req.taxNumber()));
@@ -224,6 +231,10 @@ public class HrService {
         String id = EmployeeRules.normaliseId(req.idNumber());
         fail(EmployeeRules.idProblem(id, today));
         fail(EmployeeRules.dobProblem(id, req.dateOfBirth(), req.startDate(), today));
+        if (req.foreign() != null) {
+            fail(foreignProblem(tenantId, req.foreign(), today, null));
+            fail(EmployeeRules.permitStartProblem(req.foreign().workPermitExpiry(), req.startDate()));
+        }
         fail(EmployeeRules.taxNumberProblem(req.taxNumber()));
         fail(EmployeeRules.emailProblem(req.email()));
         fail(EmployeeRules.phoneProblem(req.phone()));
@@ -236,6 +247,38 @@ public class HrService {
         if (id != null && !id.isBlank() && employeeRepo.countByIdNumber(tenantId, id, null) > 0) {
             throw new IllegalStateException("An employee with this ID number already exists.");
         }
+    }
+
+    /** The first thing wrong with a passport and work permit block, or null. A passport already held by another employee is refused. */
+    private String foreignProblem(TenantId tenantId, ForeignIdentity f, LocalDate today, UUID self) {
+        String problem = EmployeeRules.passportProblem(f.passportNumber(), f.passportCountry(), f.passportExpiry(), today);
+        if (problem == null) problem = EmployeeRules.permitProblem(f.workPermitType(), f.workPermitNumber(), f.workPermitExpiry(), today);
+        if (problem != null) return problem;
+        String number = EmployeeRules.normalisePassport(f.passportNumber());
+        if (number != null && employeeRepo.countByPassport(tenantId, EmployeeRules.normaliseCountry(f.passportCountry()), number, self) > 0)
+            return "Another employee already has this passport.";
+        return null;
+    }
+
+    private static void applyForeign(HrEmployee emp, ForeignIdentity f) {
+        if (f == null) return;
+        String number = EmployeeRules.normalisePassport(f.passportNumber());
+        emp.setPassport(number, number == null ? null : EmployeeRules.normaliseCountry(f.passportCountry()), number == null ? null : f.passportExpiry());
+        String type = blankToNull(f.workPermitType());
+        emp.setWorkPermit(type, type == null ? null : blankToNull(f.workPermitNumber()), type == null ? null : f.workPermitExpiry());
+    }
+
+    private static boolean foreignChanged(HrEmployee emp, ForeignIdentity f, boolean passport) {
+        if (passport) {
+            String number = EmployeeRules.normalisePassport(f.passportNumber());
+            return !Objects.equals(number, emp.getPassportNumber())
+                    || !Objects.equals(number == null ? null : EmployeeRules.normaliseCountry(f.passportCountry()), emp.getPassportCountry())
+                    || !Objects.equals(number == null ? null : f.passportExpiry(), emp.getPassportExpiry());
+        }
+        String type = blankToNull(f.workPermitType());
+        return !Objects.equals(type, emp.getWorkPermitType())
+                || !Objects.equals(type == null ? null : blankToNull(f.workPermitNumber()), emp.getWorkPermitNumber())
+                || !Objects.equals(type == null ? null : f.workPermitExpiry(), emp.getWorkPermitExpiry());
     }
 
     private static void fail(String problem) {

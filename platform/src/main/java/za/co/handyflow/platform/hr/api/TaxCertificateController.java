@@ -56,6 +56,27 @@ public class TaxCertificateController {
         return ResponseEntity.ok(ApiResponse.success(service.issuedCertificates(TenantContext.getTenantIdAsObject(), taxYear, period.toUpperCase())));
     }
 
+    // ── For the employee: their own released annual certificates ──────────────────────────────────
+
+    @GetMapping("/mine")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "My annual tax certificates once they have been released to employees")
+    public ResponseEntity<ApiResponse<List<Certificate>>> mine(Principal principal) {
+        return ResponseEntity.ok(ApiResponse.success(service.mine(TenantContext.getTenantIdAsObject(), user(principal))));
+    }
+
+    @GetMapping(value = "/mine/{id}/pdf", produces = "application/pdf")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "One of my released annual tax certificates as a PDF")
+    public ResponseEntity<byte[]> minePdf(@PathVariable UUID id, Principal principal) {
+        byte[] body = service.minePdf(TenantContext.getTenantIdAsObject(), user(principal), id);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Cache-Control", "no-store")
+                .header("Content-Disposition", "attachment; filename=\"tax-certificate.pdf\"")
+                .body(body);
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize(EXPORT)
     public ResponseEntity<ApiResponse<Certificate>> get(@PathVariable UUID id) {
