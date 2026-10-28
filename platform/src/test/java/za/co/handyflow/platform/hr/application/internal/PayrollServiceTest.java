@@ -515,4 +515,19 @@ class PayrollServiceTest {
         assertThat(service.getEmployeePayslips(tenant, empId, true).size()).isEqualTo(1);
         assertThat(service.getEmployeePayslips(tenant, empId, false).size()).isEqualTo(2);
     }
+
+    @Test
+    void aCancelledRunsPayslipsAreShownToNobody() {
+        UUID empId = UUID.randomUUID();
+        when(employeeRepo.findActiveById(any(), eq(empId))).thenReturn(Optional.of(employee("30003.00")));
+        HrPayRun cancelled = HrPayRun.create(tenant, "PR00003", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), LocalDate.of(2026, 9, 25), 2027);
+        cancelled.cancel();
+        HrPayslip slip = mock(HrPayslip.class);
+        when(slip.getPayRunId()).thenReturn(cancelled.getId());
+        when(payslipRepo.findByEmployee(empId)).thenReturn(List.of(slip));
+        when(payRunRepo.findAllById(any())).thenReturn(List.of(cancelled));
+
+        assertThat(service.getEmployeePayslips(tenant, empId, true)).isEmpty();
+        assertThat(service.getEmployeePayslips(tenant, empId, false)).isEmpty();
+    }
 }

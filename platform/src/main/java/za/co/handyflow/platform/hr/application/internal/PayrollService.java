@@ -289,11 +289,15 @@ public class PayrollService {
         employeeRepo.findActiveById(tenantId, employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee", employeeId.toString()));
         List<HrPayslip> slips = payslipRepo.findByEmployee(employeeId);
-        if (issuedOnly && !slips.isEmpty()) {
+        if (!slips.isEmpty()) {
             Map<UUID, String> status = new java.util.HashMap<>();
             payRunRepo.findAllById(slips.stream().map(HrPayslip::getPayRunId).distinct().toList())
                     .forEach(r -> status.put(r.getId(), r.getStatus()));
-            slips = slips.stream().filter(sl -> PayRunWorkflowRules.isIssued(status.get(sl.getPayRunId()))).toList();
+            // A cancelled run was never paid, so its payslips are not shown to anyone.
+            slips = slips.stream()
+                    .filter(sl -> !PayRunWorkflowRules.CANCELLED.equals(status.get(sl.getPayRunId())))
+                    .filter(sl -> !issuedOnly || PayRunWorkflowRules.isIssued(status.get(sl.getPayRunId())))
+                    .toList();
         }
         return slips.stream().map(sl -> toPayslipResponse(sl, tenantId)).toList();
     }

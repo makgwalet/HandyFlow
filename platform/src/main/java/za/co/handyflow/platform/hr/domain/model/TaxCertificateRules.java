@@ -31,9 +31,9 @@ public final class TaxCertificateRules {
 
     /** Codes SARS requires that this class does not produce, and why. Shown to the person preparing the submission. */
     public static final List<String> NOT_PRODUCED = List.of(
-            "3695 to 3699 (gross employment income totals), 3696 (non-taxable income) and 4149 (statutory total): the exact definitions and the way they relate to the other codes could not be confirmed from SARS documents.",
+            "3695, 3696 (gross non-taxable income), 3699 (gross employment income, taxable; the amounts in 3696 are not part of it) and 4149 (statutory total): SARS's 2027 code guide describes them, but the full list of codes each one adds up could not be read, so they are not produced. 3697 and 3698 have not applied since the 2017 year of assessment and are correctly left out.",
             "4582 and the taxable portion of the travel allowance: how SARS wants it reported could not be confirmed.",
-            "Employer contributions and other fringe benefits are reported under 3801, 3810, 3817, 3825, 3828 and 4472 to 4475, taken from a payroll vendor's code list rather than from SARS itself, and only what payroll recorded. Payslips made before benefits were recorded carry none, and the totals codes (3695 to 3699) are not produced, so check a certificate for an employee with benefits against SARS's own code list before submitting it.");
+            "Employer contributions and other fringe benefits are reported under 3801, 3810, 3817, 3825, 3828 and 4472 to 4475, taken from a payroll vendor's code list rather than from SARS itself, and only what payroll recorded. Payslips made before benefits were recorded carry none, and the totals codes (3695, 3696 and 3699) are not produced, so check a certificate for an employee with benefits against SARS's own code list before submitting it.");
 
     private TaxCertificateRules() {}
 
@@ -89,7 +89,7 @@ public final class TaxCertificateRules {
     public static List<Line> lines(Totals t, String retirementFund) {
         List<Line> out = new ArrayList<>();
         add(out, "3601", "Income: salary or wages", t.basic());
-        add(out, "3605", "Annual payment: bonus", t.bonus());
+        add(out, "3605", "Annual payment: bonus and leave paid out", t.bonus());
         add(out, "3607", "Overtime", t.overtime());
         add(out, "3701", "Travel allowance", t.travel());
         add(out, "3713", "Other taxable allowances", t.otherEarnings());

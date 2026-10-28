@@ -976,3 +976,23 @@ I read the four training services, the entities and the session screen. The modu
 - Maven, Spring and the database have not run. V528 has never run against PostgreSQL, including the due date `CASE` expression. `Emp201Controller` and the changed `getEmp201s` (now also loads the pay runs) have never run under Spring. `HrEmp201.markSubmitted` and `markPaid` changed signature; nothing else called them. I did not run the existing `HrControllerTest` or `PayrollServiceTest` against the new response fields.
 - In my harness `Emp201RulesTest` (4) and `Emp201ServiceTest` (9) pass. Removing the weekend roll-back and the full-amount check is caught.
 - Front end: lint is clean on the new files, and the screen has 3 fewer lint errors than before (the other 4 are old `any`s). `Emp201.test.tsx` (8 tests) has not run; vitest is not installed here.
+
+## 34. Payroll fixes found while checking the tax codes
+
+**What was wrong, and what changed**
+
+- **Year-to-date totals counted cancelled runs.** The gross, PAYE and UIF year-to-date sums on a payslip added up every payslip of the employee in the tax year, including those of cancelled pay runs. After a cancelled run, every later payslip showed inflated year-to-date figures. The three sums now leave out payslips of cancelled runs.
+- **A cancelled run's payslips were still listed.** An employee's payslip list, including the manager's view of it, now leaves out payslips of cancelled runs.
+- **Leave paid out was reported as salary.** SARS's 2027 code guide lists "leave pay (on resignation/encashment of leave credits)" as an example of code 3605, annual payment, and the certificate put it under 3601. It now goes under 3605 with the bonus (the line reads "Annual payment: bonus and leave paid out").
+- **Back pay stays under 3601.** The same guide lists "backdated salary/wages (accrued in current year of assessment)" under 3601. Back pay due to a settlement, arbitration award or court order that spans earlier years goes under 3623 and needs a SARS tax directive; payroll does not handle that.
+- **Totals codes.** The guide says 3696 is gross non-taxable income, 3699 is gross employment income (taxable) without the 3696 amounts, and that 3697 and 3698 no longer apply from the 2017 year. I could not read the full list of codes that make up each total, so 3695, 3696, 3699 and 4149 are still not produced, and the note shown to the person preparing the certificate says so.
+
+**Still not done**
+
+- Leave paid out is still taxed like salary (annualised with the month), although SARS treats it as an annual payment on the certificate. For a leaver paid a large leave balance in the last month the monthly PAYE is higher than the annual-payment method would give; the difference is settled when SARS assesses the employee. Changing the tax method needs a specialist's check.
+- Existing certificates already issued keep the old codes; only new ones use 3605 for leave.
+
+**Not verified**
+
+- Maven, Spring and the database have not run. The three year-to-date queries now have a subquery on pay runs; they have never run against PostgreSQL. The new `PayrollServiceTest` case uses real Mockito and has not been executed; the changed `TaxCertificateServiceTest` case likewise.
+- The code definitions come from SARS's published guide as read through a text fetch; the guide was truncated in the part I could read.

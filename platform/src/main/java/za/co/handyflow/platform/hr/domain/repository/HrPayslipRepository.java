@@ -25,6 +25,7 @@ public interface HrPayslipRepository extends JpaRepository<HrPayslip, UUID> {
         WHERE p.employeeId = :employeeId
         AND p.taxYear = :taxYear
         AND p.id != :excludePayslipId
+        AND p.payRunId NOT IN (SELECT r.id FROM HrPayRun r WHERE r.status = 'CANCELLED')
         """)
     java.math.BigDecimal sumYtdGross(UUID employeeId, int taxYear, UUID excludePayslipId);
 
@@ -33,6 +34,7 @@ public interface HrPayslipRepository extends JpaRepository<HrPayslip, UUID> {
         WHERE p.employeeId = :employeeId
         AND p.taxYear = :taxYear
         AND p.id != :excludePayslipId
+        AND p.payRunId NOT IN (SELECT r.id FROM HrPayRun r WHERE r.status = 'CANCELLED')
         """)
     java.math.BigDecimal sumYtdPaye(UUID employeeId, int taxYear, UUID excludePayslipId);
 
@@ -41,6 +43,7 @@ public interface HrPayslipRepository extends JpaRepository<HrPayslip, UUID> {
     WHERE p.employeeId = :employeeId
     AND p.taxYear = :taxYear
     AND p.id != :excludePayslipId
+    AND p.payRunId NOT IN (SELECT r.id FROM HrPayRun r WHERE r.status = 'CANCELLED')
     """)
     java.math.BigDecimal sumYtdUif(UUID employeeId, int taxYear, UUID excludePayslipId);
 
