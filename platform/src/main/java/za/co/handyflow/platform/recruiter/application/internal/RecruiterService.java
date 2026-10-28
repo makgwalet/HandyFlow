@@ -440,7 +440,7 @@ public class RecruiterService {
     @Transactional
     public ApplicationResponse moveStage(TenantId tenantId, UUID id,
                                          MoveStageRequest req, String movedByName) {
-        RecApplication app = applicationRepo.findByIdAndTenantId(id, tenantId)
+        RecApplication app = applicationRepo.lockByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Application", id.toString()));
 
         // Guardrail: RecApplication.isActive() already existed but nothing
@@ -453,6 +453,12 @@ public class RecruiterService {
         }
 
         String prevStage = app.getStage();
+
+        String moveProblem = RecruiterWorkflowRules.stageMoveProblem(prevStage, req.stage(), req.rejectionReason(), req.offeredSalary(),
+                approvalService.offerApprovalRequired(tenantId), app.getOfferApprovalStatus());
+        if (moveProblem != null) throw new HandyFlowException(moveProblem, HttpStatus.BAD_REQUEST, "INVALID_STAGE_MOVE");
+        req = new MoveStageRequest(req.stage().trim().toUpperCase(), req.notes(), req.rejectionReason(), req.offeredSalary(),
+                req.offeredSalaryFrequency(), req.offeredStartDate(), req.offerBenefits());
 
         if ("REJECTED".equals(req.stage())) {
             app.reject(req.rejectionReason());
@@ -503,6 +509,11 @@ public class RecruiterService {
                     "This application is in a terminal stage (" + app.getStage() + ") — cannot schedule an interview",
                     HttpStatus.BAD_REQUEST, "APPLICATION_TERMINAL");
         }
+
+        boolean samePending = req.scheduledAt() != null && interviewRepo.findByApplicationIdOrderByScheduledAtAsc(applicationId).stream()
+                .anyMatch(i -> "PENDING".equals(i.getOutcome()) && req.scheduledAt().equals(i.getScheduledAt()));
+        String scheduleProblem = RecruiterWorkflowRules.scheduleProblem(req.scheduledAt(), java.time.Instant.now(), samePending);
+        if (scheduleProblem != null) throw new HandyFlowException(scheduleProblem, HttpStatus.BAD_REQUEST, "INVALID_INTERVIEW");
 
         RecInterview interview = RecInterview.create(applicationId, tenantId.getValue(),
                 req.interviewType(), req.scheduledAt(),
@@ -613,7 +624,7 @@ public class RecruiterService {
     @Transactional
     public UUID convertToEmployee(TenantId tenantId, UUID applicationId,
                                   ConvertToEmployeeRequest req, UUID convertedByUserId) {
-        RecApplication app = applicationRepo.findByIdAndTenantId(applicationId, tenantId)
+        RecApplication app = applicationRepo.lockByIdAndTenantId(applicationId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Application", applicationId.toString()));
 
         // Guardrail: previously this method had no stage check at all — any
@@ -702,8 +713,10 @@ public class RecruiterService {
 
     @Transactional
     public void sendOfferLetter(TenantId tenantId, UUID applicationId) {
-        RecApplication app = applicationRepo.findByIdAndTenantId(applicationId, tenantId)
+        RecApplication app = applicationRepo.lockByIdAndTenantId(applicationId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Application", applicationId.toString()));
+        String sendProblem = RecruiterWorkflowRules.offerSendProblem(app.getStage());
+        if (sendProblem != null) throw new HandyFlowException(sendProblem, HttpStatus.BAD_REQUEST, "NOT_AT_OFFER");
         RecApplicant applicant = applicantRepo.findById(app.getApplicantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Applicant", app.getApplicantId().toString()));
         approvalService.requireOfferSendable(tenantId, app);

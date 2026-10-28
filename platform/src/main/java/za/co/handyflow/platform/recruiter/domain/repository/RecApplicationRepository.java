@@ -2,7 +2,9 @@ package za.co.handyflow.platform.recruiter.domain.repository;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.recruiter.domain.model.RecApplication;
 import za.co.handyflow.platform.shared.TenantId;
@@ -30,6 +32,11 @@ public interface RecApplicationRepository extends JpaRepository<RecApplication, 
     Page<RecApplication> findAll(TenantId tenantId, String stage, Pageable pageable);
 
     Optional<RecApplication> findByIdAndTenantId(UUID id, TenantId tenantId);
+
+    /** Same, but the row stays locked until the transaction ends, so two requests for one application take turns. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM RecApplication a WHERE a.id = :id AND a.tenantId = :tenantId")
+    Optional<RecApplication> lockByIdAndTenantId(UUID id, TenantId tenantId);
 
     Optional<RecApplication> findByJobIdAndApplicantId(UUID jobId, UUID applicantId);
 

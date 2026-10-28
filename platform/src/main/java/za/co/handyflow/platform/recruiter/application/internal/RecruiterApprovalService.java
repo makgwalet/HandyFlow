@@ -138,6 +138,11 @@ public class RecruiterApprovalService {
         fail(RecruiterApprovalRules.sendOfferProblem(settings(tenantId).isRequireOfferApproval(), app.getOfferApprovalStatus()));
     }
 
+    /** Whether this company needs an offer approved before it can lead to a hire. */
+    boolean offerApprovalRequired(TenantId tenantId) {
+        return settings(tenantId).isRequireOfferApproval();
+    }
+
     /** Called when someone downloads the offer letter PDF: refused for an offer that still needs approval. */
     @Transactional(readOnly = true)
     public void requireOfferPdf(TenantId tenantId, UUID applicationId) {

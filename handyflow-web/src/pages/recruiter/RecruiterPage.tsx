@@ -509,7 +509,8 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
   })
 
   const sc   = STAGE[app?.stage ?? 'APPLIED'] ?? STAGE.APPLIED
-  const availableStages = PIPELINE_STAGES.filter(s => s !== app?.stage)
+  // Mirrors RecruiterWorkflowRules on the server: a hire can only follow the Offer stage.
+  const availableStages = PIPELINE_STAGES.filter(s => s !== app?.stage && (s !== 'HIRED' || app?.stage === 'OFFER'))
   // Mirrors RecApplication.isActive() on the backend — HIRED/REJECTED/WITHDRAWN
   // are terminal. Backend now rejects moveStage/scheduleInterview on these
   // with a 400 (APPLICATION_TERMINAL); this just keeps the buttons from
