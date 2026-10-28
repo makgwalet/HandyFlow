@@ -64,4 +64,31 @@ class ErFollowUpRulesTest {
         assertThat(DisciplineRules.validityProblem("VERBAL_WARNING", d(2026, 3, 1), null, 61)).contains("1 to 60");
         assertThat(DisciplineRules.validityProblem("VERBAL_WARNING", d(2026, 3, 1), null, null)).contains("1 to 60");
     }
+
+    @Test
+    void aDismissalEndsEmploymentWithNoticeOrSummarilyAndNothingElse() {
+        LocalDate told = LocalDate.of(2026, 10, 13), last = LocalDate.of(2026, 10, 20);
+        assertThat(DisciplineRules.endTypeProblem(null, null, told, last)).contains("with notice, or summarily");
+        assertThat(DisciplineRules.endTypeProblem("RESIGNATION", null, told, last)).contains("with notice, or summarily");
+        assertThat(DisciplineRules.endTypeProblem("EMPLOYER_NOTICE", null, told, last)).isNull();
+        assertThat(DisciplineRules.endTypeProblem("SUMMARY_DISMISSAL", null, told, last)).isNull();
+    }
+
+    @Test
+    void noticeDatesStayBetweenTheDayTheEmployeeWasToldAndTheLastDay() {
+        LocalDate told = LocalDate.of(2026, 10, 13), last = LocalDate.of(2026, 10, 20);
+        assertThat(DisciplineRules.endTypeProblem("EMPLOYER_NOTICE", told.minusDays(1), told, last)).contains("before the employee was told");
+        assertThat(DisciplineRules.endTypeProblem("EMPLOYER_NOTICE", last.plusDays(1), told, last)).contains("after the last day");
+        assertThat(DisciplineRules.endTypeProblem("EMPLOYER_NOTICE", told, told, last)).isNull();
+        assertThat(DisciplineRules.endTypeProblem("EMPLOYER_NOTICE", last, told, last)).isNull();
+        assertThat(DisciplineRules.endTypeProblem("SUMMARY_DISMISSAL", told, told, last)).contains("no notice date");
+    }
+
+    @Test
+    void noticeCountsFromTheDayGivenElseTheDayTheEmployeeWasToldAndSummaryHasNone() {
+        LocalDate told = LocalDate.of(2026, 10, 13);
+        assertThat(DisciplineRules.noticeDay("EMPLOYER_NOTICE", null, told)).isEqualTo(told);
+        assertThat(DisciplineRules.noticeDay("EMPLOYER_NOTICE", told.plusDays(2), told)).isEqualTo(told.plusDays(2));
+        assertThat(DisciplineRules.noticeDay("SUMMARY_DISMISSAL", told.plusDays(2), told)).isNull();
+    }
 }

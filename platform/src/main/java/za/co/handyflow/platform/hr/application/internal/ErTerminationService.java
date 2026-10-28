@@ -10,6 +10,7 @@ import za.co.handyflow.platform.hr.dto.ErDtos.*;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -37,13 +38,21 @@ public class ErTerminationService {
         HrEmployee e = support.employee(tenantId, c.getEmployeeId());
         LocalDate lastDay = req == null ? null : req.lastDay();
         fail(DisciplineRules.endEmploymentProblem(c.getStatus(), c.getOutcome(), c.getCommunicatedOn(), e.getStatus(), lastDay));
+        String endType = req.endType();
+        fail(DisciplineRules.endTypeProblem(endType, req.noticeGivenOn(), c.getCommunicatedOn(), lastDay));
+        LocalDate noticeDay = DisciplineRules.noticeDay(endType, req.noticeGivenOn(), c.getCommunicatedOn());
+        fail(NoticeRules.problem(endType, noticeDay, lastDay, e.getStartDate()));
         String reason = "Dismissal after case " + c.getCaseNumber();
         fail(EmployeeRules.terminationProblem(e.getStatus(), e.getStartDate(), lastDay, reason, support.today()));
-        e.terminate(lastDay, reason, userId);
+        e.terminate(lastDay, reason, userId, endType, noticeDay);
         employeeRepo.save(e);
-        audit.record(tenantId, e.getId(), "TERMINATED", "last day " + lastDay + ", dismissal, case " + c.getCaseNumber(), userId);
-        followUp.run(tenantId, e, userId);
-        support.event(c, "EMPLOYMENT_ENDED", "Employment ended on " + lastDay, true, userId);
+        audit.record(tenantId, e.getId(), "TERMINATED", "last day " + lastDay + ", " + NoticeRules.typeLabel(endType) + ", case " + c.getCaseNumber(), userId);
+        List<String> done = followUp.run(tenantId, e, userId);
+        support.event(c, "EMPLOYMENT_ENDED", "Employment ended on " + lastDay + " (" + NoticeRules.typeLabel(endType) + ")", true, userId);
+        // The pay in place of notice is for HR and payroll, not for the employee's view of the case.
+        String notice = NoticeRules.summary(endType, e.getGrossSalary(), e.getStartDate(), noticeDay, lastDay);
+        if (notice != null) support.event(c, "NOTICE_WORKED_OUT", notice, false, userId);
+        if (done.isEmpty()) log.debug("No follow-up for {}", e.getEmployeeNumber());
         log.info("Ended employment of employee={} after case={}", e.getEmployeeNumber(), c.getCaseNumber());
         return views.detail(tenantId, c, held, userId, support.today());
     }

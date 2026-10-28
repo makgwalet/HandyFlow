@@ -240,6 +240,26 @@ public final class DisciplineRules {
         return null;
     }
 
+    /**
+     * Null when the answers about how a dismissal ends employment are usable. A dismissal ends employment with notice (the employer gives it,
+     * or pays for the days not given) or summarily, which is for serious misconduct. Notice is taken to have been given the day the employee
+     * was told, unless a later day is given; a summary dismissal has no notice date.
+     */
+    public static String endTypeProblem(String endType, LocalDate noticeGivenOn, LocalDate communicatedOn, LocalDate lastDay) {
+        if (!NoticeRules.EMPLOYER_NOTICE.equals(endType) && !NoticeRules.SUMMARY_DISMISSAL.equals(endType))
+            return "Say how the dismissal ends employment: with notice, or summarily.";
+        if (NoticeRules.SUMMARY_DISMISSAL.equals(endType)) return noticeGivenOn != null ? "A summary dismissal has no notice date." : null;
+        if (noticeGivenOn == null) return null;
+        if (communicatedOn != null && noticeGivenOn.isBefore(communicatedOn)) return "Notice cannot be given before the employee was told of the dismissal (" + communicatedOn + ").";
+        if (lastDay != null && noticeGivenOn.isAfter(lastDay)) return "Notice cannot be given after the last day worked.";
+        return null;
+    }
+
+    /** The day notice counts from: the one given, else the day the employee was told. Null for anything but a dismissal with notice. */
+    public static LocalDate noticeDay(String endType, LocalDate noticeGivenOn, LocalDate communicatedOn) {
+        return NoticeRules.EMPLOYER_NOTICE.equals(endType) ? (noticeGivenOn != null ? noticeGivenOn : communicatedOn) : null;
+    }
+
     /** Null when a warning that was recorded without a validity can be given one. */
     public static String validityProblem(String outcome, LocalDate decidedOn, LocalDate currentValidUntil, Integer months) {
         if (!WARNINGS.contains(outcome)) return "Only a warning has a validity.";

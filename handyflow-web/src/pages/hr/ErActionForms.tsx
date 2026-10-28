@@ -1,5 +1,6 @@
 // The forms behind the buttons on a case. Each one collects what the server needs, checks the obvious mistakes and hands a path and
 // a body to `send`. The server checks everything again, and says so plainly when it refuses.
+import { DISMISSAL_ENDS, defaultEndType, endBody, endProblem, type EndForm } from "./erEnd.logic"
 import type React from "react"
 import { useState } from "react"
 import {
@@ -329,16 +330,27 @@ function AppealDecision(p: ActionProps) {
 }
 
 function EndEmployment(p: ActionProps) {
-  const [lastDay, setLastDay] = useState(todaySast())
   const told = p.c.decision?.communicatedOn
-  const problem = !lastDay ? "Give the last day of employment." : told && lastDay < told ? "The last day cannot be before the employee was told." : lastDay > todaySast() ? "The last day cannot be in the future." : null
+  const [f, setF] = useState<EndForm>({ lastDay: todaySast(), endType: defaultEndType(p.c.type), noticeGivenOn: "" })
+  const problem = endProblem(f, told, todaySast())
   return (
     <Shell title={ACTION_LABEL.END_EMPLOYMENT} problem={problem} submitText="End employment" tone="danger" busy={p.busy} error={p.error} cancel={p.cancel}
-      onSubmit={() => p.send("end-employment", { lastDay })}>
+      onSubmit={() => p.send("end-employment", endBody(f))}>
       <p style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 0 }}>
-        This marks {p.c.employee.name} as terminated. The next pay run pays them up to this day, with any annual leave owing. Notice pay and anything owed back are not worked out for you.
+        This marks {p.c.employee.name} as terminated. The next pay run pays them up to this day, with any annual leave owing. Leave after that day is cancelled and portal access is closed.
+        Pay in place of notice is worked out for HR to see, but not paid for you.
       </p>
-      <Field id="er-lastday" text="Last day of employment"><input id="er-lastday" type="date" value={lastDay} max={todaySast()} onChange={e => setLastDay(e.target.value)} style={input} /></Field>
+      <Field id="er-endtype" text="How does the dismissal end employment?">
+        <select id="er-endtype" value={f.endType} onChange={e => setF(x => ({ ...x, endType: e.target.value }))} style={input}>
+          <option value="">Choose…</option>{DISMISSAL_ENDS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </Field>
+      <Field id="er-lastday" text="Last day of employment"><input id="er-lastday" type="date" value={f.lastDay} max={todaySast()} onChange={e => setF(x => ({ ...x, lastDay: e.target.value }))} style={input} /></Field>
+      {f.endType === "EMPLOYER_NOTICE" && (
+        <Field id="er-noticeon" text="Notice given on (blank: the day the employee was told)">
+          <input id="er-noticeon" type="date" value={f.noticeGivenOn} min={told ?? undefined} max={f.lastDay || undefined} onChange={e => setF(x => ({ ...x, noticeGivenOn: e.target.value }))} style={input} />
+        </Field>
+      )}
     </Shell>
   )
 }

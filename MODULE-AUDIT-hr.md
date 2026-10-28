@@ -1177,7 +1177,7 @@ I read the four training services, the entities and the session screen. The modu
 
 **Not done.**
 - Notice pay is not put into the pay run. It is taxed as ordinary pay, and I did not want to guess which pay item to use; a "notice pay" item kind would be the next step.
-- The dismissal route from a case does not ask how employment ended, so it never works out notice pay (the message says so). A dismissal for incapacity or poor performance owes notice; one for misconduct usually does not, and the case does not say which.
+- ~~The dismissal route from a case does not ask how employment ended.~~ Done in section 49.
 - Farm and domestic workers have four weeks' notice after six months; not applied.
 - A leave request that runs past the last day is not shortened.
 
@@ -1194,10 +1194,10 @@ I read the four training services, the entities and the session screen. The modu
 **Tests.** `ErReminderRulesTest` now has 12 cases (five new groups) and passes in my harness; a deliberate change of the hearing day was caught. Six new Mockito cases in `ErReminderServiceTest` (three parties told, a leaver skipped, hearing not tomorrow, suspension ending, open-ended suspension to administrators, review ended) have not run. Spring and the database have not been used.
 
 **Not done.**
-- The respondent in a grievance (usually a manager) is not reminded of the hearing, and a representative or witness has no contact on the case to remind.
+- ~~The respondent in a grievance is not reminded of the hearing.~~ A grievance has no hearing in this system (it is investigated and decided), so there is nothing to remind the respondent of; see section 49 for who is reminded instead. A representative or witness has no contact on the case to remind.
 - No reminder to the employee about suspension or review dates; they are told in their letter.
 - A hearing that is moved is reminded for its new date, but nobody is told it moved.
-- Reminders are still not remembered, so nothing stops a second run on the same day sending twice (the job runs once a day).
+- ~~Reminders are not remembered.~~ Done in section 49 for the case, leave and performance reminders.
 
 ## 48. Expiry reminders and leave taken in advance (Slice 21e, no migration)
 
@@ -1216,3 +1216,19 @@ I read the four training services, the entities and the session screen. The modu
 - A recovery that does not fit in final net pay is not carried to anyone's next pay or followed up; the amount stays open on the list.
 - The amount uses the daily rate on the last salary, not an averaged rate for variable pay.
 - The manager is not told when a leaver's advance has been recovered.
+
+## 49. How a dismissal ends employment, grievance deciders, and no double reminders (Slice 21f, V534)
+
+**Dismissal route.** Ending employment from a case now asks **how** it ends: with notice (the employer gives notice or pays for the days not given) or summarily. Nothing else is accepted, so a resignation cannot be recorded as a dismissal. For a dismissal with notice, notice counts from the day the employee was told, or a later day if one is given (never before they were told, never after the last day); a summary dismissal has no notice date. The form picks "with notice" for an incapacity case (poor performance or ill health) and leaves misconduct for the person deciding. The employee record keeps the end type and notice date, so the final-pay review and the notice summary work as for any other leaver. The pay in place of notice is written to the case as a note **hidden from the employee**; the employee sees only "Employment ended on ... (with notice)". Notice pay is still not paid by itself.
+
+**Grievances.** The "response due" reminder went only to the case owner. It now also goes to the person chosen to **decide** the grievance, who is often not the owner. I did not remind the **person the grievance is about**: they are asked to do nothing, a grievance has no hearing here, and a reminder is a poor way to hear of it.
+
+**No double reminders (V534).** The morning jobs sent a second copy if they ran twice in a day (a restart, or a second application instance). They now remember what they sent: one row per message, per person, per day, in `hr_reminders_sent`, written with a single atomic insert, so the first run sends and any other stays quiet. The row holds only a hash of the type, the case or person it concerns, the recipient, and the words; no names, emails or text. If sending fails the claim is given back so the next run can try again; if the table cannot be reached the reminder is sent anyway (better twice than never). Rows older than 14 days are deleted at 03:20.
+- Covered: case reminders, leave at-risk and expiry reminders, unacknowledged letters, goal reminders, plan check-ins, and overdue reviews. Messages that report something that has just happened (a review opened, a goal approved) are never held back.
+
+**Tests.** `ErFollowUpRulesTest` (9) and `ReminderKeyRulesTest` (4) pass in my harness; breaking the notice-date check was caught. In `ErFollowUpServiceTest` the existing calls now carry an end type and four cases are new (end type required, notice from the day told, summary keeps no notice date, notice not before the employee was told); `PerfNotifierDailyTest` (6) and two cases in `ErReminderServiceTest` (decider told, respondent and chair-in-discipline not) are Mockito and have not run. On the screen, `erEnd.logic.ts` was checked under node; the new cases in `EmployeeRelations.test.tsx` have not run. Spring and the migration have not been used.
+
+**Not done.**
+- Training certificate, onboarding and saved-report reminders have their own senders and are not behind the ledger. Certificate and report reminders already avoid repeats by date or by a "last notified" column; onboarding does not.
+- A reminder is held back for the same words to the same person on the same day. If the numbers in a message change between two runs, both go.
+- The "other" end types (a dismissal for operational reasons, retrenchment) are not handled; a retrenchment has its own process (BCEA section 41 severance) that is not built.

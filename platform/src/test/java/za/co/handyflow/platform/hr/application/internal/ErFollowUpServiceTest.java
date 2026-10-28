@@ -39,6 +39,9 @@ class ErFollowUpServiceTest {
 
     // ── Ending employment ─────────────────────────────────────────────────────────────────────────
 
+    /** A dismissal with notice, which is what most of these cases are about. */
+    private static EndEmploymentRequest ending(java.time.LocalDate lastDay) { return new EndEmploymentRequest(lastDay, "EMPLOYER_NOTICE", null); }
+
     @Test
     void aCommunicatedDismissalEndsEmploymentAndKeepsWhoDidIt() {
         HrEmployee e = realEmployee();
@@ -56,10 +59,49 @@ class ErFollowUpServiceTest {
     }
 
     @Test
+    void theDismissalMustSayHowEmploymentEnds() {
+        HrEmployee e = realEmployee();
+        HrErCase c = dismissed(e, true);
+        assertThatThrownBy(() -> termination.endEmployment(TENANT, c.getId(), new EndEmploymentRequest(today().minusDays(1), null, null), HR_USER, DECIDE))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("with notice, or summarily");
+        assertThatThrownBy(() -> termination.endEmployment(TENANT, c.getId(), new EndEmploymentRequest(today().minusDays(1), "RESIGNATION", null), HR_USER, DECIDE))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("with notice, or summarily");
+        assertThat(e.getStatus()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void noticeCountsFromTheDayTheEmployeeWasToldUnlessALaterDayIsGiven() {
+        HrEmployee e = realEmployee();
+        HrErCase c = dismissed(e, true);
+        termination.endEmployment(TENANT, c.getId(), ending(today().minusDays(1)), HR_USER, DECIDE);
+        assertThat(e.getEndType()).isEqualTo("EMPLOYER_NOTICE");
+        assertThat(e.getNoticeGivenOn()).isEqualTo(c.getCommunicatedOn());
+    }
+
+    @Test
+    void aSummaryDismissalKeepsNoNoticeDateAndRefusesOne() {
+        HrEmployee e = realEmployee();
+        HrErCase c = dismissed(e, true);
+        assertThatThrownBy(() -> termination.endEmployment(TENANT, c.getId(), new EndEmploymentRequest(today().minusDays(1), "SUMMARY_DISMISSAL", today().minusDays(1)), HR_USER, DECIDE))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("no notice date");
+        termination.endEmployment(TENANT, c.getId(), new EndEmploymentRequest(today().minusDays(1), "SUMMARY_DISMISSAL", null), HR_USER, DECIDE);
+        assertThat(e.getEndType()).isEqualTo("SUMMARY_DISMISSAL");
+        assertThat(e.getNoticeGivenOn()).isNull();
+    }
+
+    @Test
+    void noticeCannotBeGivenBeforeTheEmployeeWasTold() {
+        HrEmployee e = realEmployee();
+        HrErCase c = dismissed(e, true);
+        assertThatThrownBy(() -> termination.endEmployment(TENANT, c.getId(), new EndEmploymentRequest(today().minusDays(1), "EMPLOYER_NOTICE", today().minusDays(5)), HR_USER, DECIDE))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("before the employee was told");
+    }
+
+    @Test
     void ItNeedsThePermissionToDecide() {
         HrEmployee e = realEmployee();
         HrErCase c = dismissed(e, true);
-        assertThatThrownBy(() -> termination.endEmployment(TENANT, c.getId(), new EndEmploymentRequest(today()), HR_USER, MANAGE))
+        assertThatThrownBy(() -> termination.endEmployment(TENANT, c.getId(), ending(today()), HR_USER, MANAGE))
                 .isInstanceOf(AccessDeniedException.class);
         assertThat(e.getStatus()).isEqualTo("ACTIVE");
     }
@@ -68,11 +110,11 @@ class ErFollowUpServiceTest {
     void ItIsRefusedBeforeTheEmployeeWasToldOrWhenAnAppealIsWaiting() {
         HrEmployee e = realEmployee();
         HrErCase notTold = dismissed(e, false);
-        assertThatThrownBy(() -> termination.endEmployment(TENANT, notTold.getId(), new EndEmploymentRequest(today()), HR_USER, DECIDE))
+        assertThatThrownBy(() -> termination.endEmployment(TENANT, notTold.getId(), ending(today()), HR_USER, DECIDE))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Tell the employee");
         HrErCase appealed = dismissed(e, true);
         appealed.lodgeAppeal(today().minusDays(1), "Unfair");
-        assertThatThrownBy(() -> termination.endEmployment(TENANT, appealed.getId(), new EndEmploymentRequest(today()), HR_USER, DECIDE))
+        assertThatThrownBy(() -> termination.endEmployment(TENANT, appealed.getId(), ending(today()), HR_USER, DECIDE))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("appeal");
         assertThat(e.getStatus()).isEqualTo("ACTIVE");
         verify(h.employees, never()).save(any());
@@ -84,7 +126,7 @@ class ErFollowUpServiceTest {
         HrErCase warning = h.newCase("DISCIPLINARY", "LATENESS", e.getId());
         warning.decide("FINAL_WRITTEN_WARNING", today().minusDays(3), "ok", HR_USER, 12, "sorry");
         warning.communicate(today().minusDays(2), false);
-        assertThatThrownBy(() -> termination.endEmployment(TENANT, warning.getId(), new EndEmploymentRequest(today()), HR_USER, DECIDE))
+        assertThatThrownBy(() -> termination.endEmployment(TENANT, warning.getId(), ending(today()), HR_USER, DECIDE))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("dismissal");
         HrErCase c = dismissed(e, true);
         assertThatThrownBy(() -> termination.endEmployment(TENANT, c.getId(), new EndEmploymentRequest(today().plusDays(5)), HR_USER, DECIDE))

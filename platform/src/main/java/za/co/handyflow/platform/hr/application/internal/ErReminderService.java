@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import za.co.handyflow.platform.hr.domain.model.ErPolicy;
 import za.co.handyflow.platform.hr.domain.model.ErReminderRules;
+import za.co.handyflow.platform.hr.domain.model.ErRules;
 import za.co.handyflow.platform.hr.domain.model.ErReminderRules.When;
 import za.co.handyflow.platform.hr.domain.model.HrEmployee;
 import za.co.handyflow.platform.hr.domain.model.HrErCase;
@@ -79,6 +80,13 @@ public class ErReminderService {
         if (to.isEmpty()) return 0;
         notifier.send(tenant, NotificationType.ER_CASE_DUE, ErReminderRules.title(c.getCaseNumber(), row.dueLabel(), when),
                 ErReminderRules.message(c.getCaseNumber(), row.dueLabel(), due, when, today), c.getId(), "/hr/disciplinary", to);
+        // A grievance is answered by the person chosen to decide it, who is not always the case owner. The person it is about is not told:
+        // they are not asked to do anything, and hearing of it early from a reminder helps nobody.
+        if (ErRules.GRIEVANCE.equals(c.getCaseType()) && c.getChairId() != null && "Response due".equals(row.dueLabel())) {
+            Recipient decider = employeeRepo.findActiveById(tenant, c.getChairId()).filter(x -> !"TERMINATED".equals(x.getStatus())).map(PerfNotifier::contactOf).orElse(null);
+            if (decider != null) notifier.send(tenant, NotificationType.ER_CASE_DUE, ErReminderRules.title(c.getCaseNumber(), row.dueLabel(), when),
+                    ErReminderRules.message(c.getCaseNumber(), row.dueLabel(), due, when, today), c.getId(), "/hr/disciplinary", decider);
+        }
         return 1;
     }
 

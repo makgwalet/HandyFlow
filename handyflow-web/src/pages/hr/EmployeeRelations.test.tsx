@@ -1,3 +1,4 @@
+import { defaultEndType, endBody, endProblem } from "./erEnd.logic"
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, waitFor, fireEvent, cleanup, within } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
@@ -234,7 +235,12 @@ describe("HR cases", () => {
     expect(post).not.toHaveBeenCalled()
     fireEvent.change(screen.getByLabelText("Last day of employment"), { target: { value: "2026-10-14" } })
     fireEvent.click(screen.getByRole("button", { name: "End employment" }))
-    await waitFor(() => expect(post).toHaveBeenCalledWith(`${BASE}/cases/c1/end-employment`, { lastDay: "2026-10-14" }))
+    expect(await screen.findByText(/Say how the dismissal ends employment/)).toBeTruthy()
+    expect(post).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText("How does the dismissal end employment?"), { target: { value: "EMPLOYER_NOTICE" } })
+    fireEvent.change(screen.getByLabelText(/^Notice given on/), { target: { value: "2026-10-14" } })
+    fireEvent.click(screen.getByRole("button", { name: "End employment" }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith(`${BASE}/cases/c1/end-employment`, { lastDay: "2026-10-14", endType: "EMPLOYER_NOTICE", noticeGivenOn: "2026-10-14" }))
   })
 
   it("lets someone who may decide give an old warning its validity", async () => {
@@ -348,5 +354,28 @@ describe("my cases", () => {
     fireEvent.click(screen.getByRole("button", { name: "Lodge grievance" }))
     await waitFor(() => expect(post).toHaveBeenCalled())
     expect(post.mock.calls[0]).toEqual([`${BASE}/mine/grievances`, { category: "WORKLOAD", description: "Too much work.", incidentDate: todaySast(), respondentId: null }])
+  })
+})
+
+describe("how a dismissal ends employment", () => {
+  const T = "2026-10-28"
+  const f = (o = {}) => ({ lastDay: "2026-10-20", endType: "EMPLOYER_NOTICE", noticeGivenOn: "", ...o })
+  it("must be with notice or summary", () => {
+    expect(endProblem(f({ endType: "" }), "2026-10-13", T)).toMatch(/with notice, or summarily/)
+    expect(endProblem(f({ endType: "RESIGNATION" }), "2026-10-13", T)).toMatch(/with notice, or summarily/)
+    expect(endProblem(f(), "2026-10-13", T)).toBeNull()
+    expect(endProblem(f({ endType: "SUMMARY_DISMISSAL" }), "2026-10-13", T)).toBeNull()
+  })
+  it("keeps notice dates in order", () => {
+    expect(endProblem(f({ noticeGivenOn: "2026-10-12" }), "2026-10-13", T)).toMatch(/before the employee was told/)
+    expect(endProblem(f({ noticeGivenOn: "2026-10-25" }), "2026-10-13", T)).toMatch(/after the last day/)
+    expect(endProblem(f({ lastDay: "2026-10-12" }), "2026-10-13", T)).toMatch(/last day cannot be before/)
+    expect(endProblem(f({ lastDay: "2026-11-01" }), "2026-10-13", T)).toMatch(/future/)
+  })
+  it("sends no notice date for a summary dismissal, and picks notice for incapacity", () => {
+    expect(endBody(f({ endType: "SUMMARY_DISMISSAL", noticeGivenOn: "2026-10-14" })).noticeGivenOn).toBeNull()
+    expect(endBody(f())).toEqual({ lastDay: "2026-10-20", endType: "EMPLOYER_NOTICE", noticeGivenOn: null })
+    expect(defaultEndType("INCAPACITY")).toBe("EMPLOYER_NOTICE")
+    expect(defaultEndType("DISCIPLINARY")).toBe("")
   })
 })

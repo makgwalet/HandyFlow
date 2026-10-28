@@ -94,7 +94,9 @@ public final class ErDtos {
 
     public record ReasonRequest(String reason) {}
 
-    public record EndEmploymentRequest(LocalDate lastDay) {}
+    public record EndEmploymentRequest(LocalDate lastDay, String endType, LocalDate noticeGivenOn) {
+        public EndEmploymentRequest(LocalDate lastDay) { this(lastDay, null, null); }
+    }
 
     public record ValidityRequest(Integer months) {}
 

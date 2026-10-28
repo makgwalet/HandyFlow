@@ -243,4 +243,30 @@ class ErReminderServiceTest {
         assertThat(service.remindAll(today)).isEqualTo(1);
         assertThat(sent().get(0).title()).isEqualTo("ER-2026-007: review period has ended");
     }
+
+    @Test
+    void aGrievanceResponseDueTellsTheDeciderAsWellAsTheOwnerAndNeverTheRespondent() {
+        HrErCase c = HrErCase.open(tenantId, "ER-2026-008", "GRIEVANCE", "BULLYING", UUID.randomUUID(), "Details", null,
+                today.minusDays(10), today.minusDays(9), true, UUID.randomUUID(), owner);
+        UUID decider = UUID.randomUUID(), respondent = UUID.randomUUID();
+        c.setParties(null, decider, respondent);
+        caseWith(c, rowDue(today.plusDays(1), "Response due"));
+        when(employeeRepo.findByUserId(any(), eq(owner))).thenReturn(Optional.of(ownerEmployee("olive@example.com", "ACTIVE")));
+        when(employeeRepo.findActiveById(any(), eq(decider))).thenReturn(Optional.of(person("Dina Decider", "dina@example.com")));
+        when(employeeRepo.findActiveById(any(), eq(respondent))).thenReturn(Optional.of(person("Rob Respondent", "rob@example.com")));
+
+        service.remindAll(today);
+
+        assertThat(sent()).extracting(n -> n.recipients().get(0).email()).containsExactly("olive@example.com", "dina@example.com");
+    }
+
+    @Test
+    void aDisciplinaryStepDoesNotGoToTheChair() {
+        HrErCase c = aCase(owner);
+        c.setParties(null, UUID.randomUUID(), null);
+        caseWith(c, rowDue(today.plusDays(1), "Meeting"));
+        when(employeeRepo.findByUserId(any(), eq(owner))).thenReturn(Optional.of(ownerEmployee("olive@example.com", "ACTIVE")));
+        service.remindAll(today);
+        assertThat(sent()).hasSize(1);
+    }
 }
