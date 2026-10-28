@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.recruiter.domain.model.RecApplication;
+import za.co.handyflow.platform.recruiter.domain.model.RecApplicant;
+import za.co.handyflow.platform.recruiter.domain.model.RecJob;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.List;
@@ -30,6 +32,19 @@ public interface RecApplicationRepository extends JpaRepository<RecApplication, 
         ORDER BY a.appliedAt DESC
         """)
     Page<RecApplication> findAll(TenantId tenantId, String stage, Pageable pageable);
+
+    /** Applications whose candidate name, email or job title contains the text. {@code pattern} comes from RecruiterSearchRules.pattern. */
+    @Query("""
+        SELECT a FROM RecApplication a, RecApplicant p, RecJob j
+        WHERE a.tenantId = :tenantId AND p.id = a.applicantId AND j.id = a.jobId
+        AND (:jobId IS NULL OR a.jobId = :jobId)
+        AND (:stage IS NULL OR a.stage = :stage)
+        AND (LOWER(CONCAT(p.firstName, ' ', p.lastName)) LIKE :pattern ESCAPE '\\'
+             OR LOWER(p.email) LIKE :pattern ESCAPE '\\'
+             OR LOWER(j.title) LIKE :pattern ESCAPE '\\')
+        ORDER BY a.appliedAt DESC
+        """)
+    Page<RecApplication> search(TenantId tenantId, UUID jobId, String stage, String pattern, Pageable pageable);
 
     Optional<RecApplication> findByIdAndTenantId(UUID id, TenantId tenantId);
 

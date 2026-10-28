@@ -1,6 +1,6 @@
 // src/pages/recruiter/RecruiterPage.tsx
 import { EMPTY_HIRE_DETAILS, GENDERS, RACES, hireDetailsBody, hireDetailsProblem, missingCount, personalMissing, type HireDetails } from './hireDetails.logic'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import {
@@ -752,6 +752,16 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                           <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>
                             {iv.scheduledAt ? fmtDT(iv.scheduledAt) : 'Not scheduled'}
                             {iv.interviewerName && ` · ${iv.interviewerName}`}
+                            {iv.scheduledAt && (
+                              <button type="button" onClick={async () => {
+                                try {
+                                  const r = await apiClient.get(`/api/v1/recruiter/interviews/${iv.id}/invite.ics`, { responseType: 'blob' })
+                                  downloadBlob(r.data, 'interview.ics')
+                                } catch (e) { setError(await parseBlobError(e, 'The calendar file could not be made.')) }
+                              }} style={{ marginLeft: 8, background: 'none', border: 'none', color: 'var(--hf-primary-text)', cursor: 'pointer', fontSize: 11, padding: 0 }}>
+                                Add to calendar
+                              </button>
+                            )}
                             {iv.panelists && iv.panelists.length > 0 &&
                               ` + ${iv.panelists.map(p => p.userName).filter(Boolean).join(', ')}`}
                           </div>
@@ -1354,6 +1364,12 @@ export function RecruiterPage() {
   const [stageFilter,   setStageFilter]   = useState('')
   const [jobFilter,     setJobFilter]     = useState('')
   const [search,        setSearch]        = useState('')
+  // The server searches all applications; wait for a pause in typing so each key press is not a request.
+  const [serverSearch,  setServerSearch]  = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setServerSearch(search.trim().length >= 2 ? search.trim() : ''), 350)
+    return () => clearTimeout(t)
+  }, [search])
   const [showCreate,    setShowCreate]    = useState(false)
   const [editJob,       setEditJob]       = useState<Job | null>(null)
   const [selectedApp,   setSelectedApp]   = useState<Application | null>(null)
@@ -1386,11 +1402,12 @@ export function RecruiterPage() {
   })
 
   const { data: appsPage } = useQuery({
-    queryKey: ['rec-applications', stageFilter, jobFilter],
+    queryKey: ['rec-applications', stageFilter, jobFilter, serverSearch],
     queryFn: async () => {
       const params = new URLSearchParams({ size: '200' })
       if (stageFilter) params.set('stage', stageFilter)
       if (jobFilter)   params.set('jobId', jobFilter)
+      if (serverSearch) params.set('q', serverSearch)
       const r = await apiClient.get(`/api/v1/recruiter/applications?${params}`)
       return r.data?.data ?? r.data
     },

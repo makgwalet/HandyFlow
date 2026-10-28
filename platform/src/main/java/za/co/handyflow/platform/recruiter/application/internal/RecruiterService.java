@@ -423,12 +423,22 @@ public class RecruiterService {
     @Transactional(readOnly = true)
     public Page<ApplicationResponse> getApplications(TenantId tenantId, UUID jobId,
                                                      String stage, Pageable pageable) {
+        return getApplications(tenantId, jobId, stage, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ApplicationResponse> getApplications(TenantId tenantId, UUID jobId,
+                                                     String stage, String q, Pageable pageable) {
+        String searchProblem = RecruiterSearchRules.problem(q);
+        if (searchProblem != null) throw new HandyFlowException(searchProblem, HttpStatus.BAD_REQUEST, "INVALID_SEARCH");
         if (jobId != null) {
             // The job must belong to this company; another company's job reads as not found.
             jobRepo.findByIdAndTenantId(jobId, tenantId)
                     .orElseThrow(() -> new ResourceNotFoundException("Job", jobId.toString()));
         }
-        Page<RecApplication> apps = jobId != null
+        Page<RecApplication> apps = RecruiterSearchRules.active(q)
+                ? applicationRepo.search(tenantId, jobId, stage, RecruiterSearchRules.pattern(q), pageable)
+                : jobId != null
                 ? applicationRepo.findByJob(tenantId, jobId, stage, pageable)
                 : applicationRepo.findAll(tenantId, stage, pageable);
         return apps.map(a -> toApplicationResponse(a, false));
@@ -951,6 +961,24 @@ public class RecruiterService {
         }
         applicationRepo.save(app);
         return toOfferView(app);
+    }
+
+    /** The interview as a calendar file. */
+    @Transactional(readOnly = true)
+    public String interviewInvite(TenantId tenantId, UUID interviewId) {
+        RecInterview iv = interviewRepo.findById(interviewId)
+                .filter(i -> tenantId.getValue().equals(i.getTenantId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Interview", interviewId.toString()));
+        String problem = InterviewInvite.problem(iv.getScheduledAt());
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.BAD_REQUEST, "NO_INTERVIEW_TIME");
+        RecApplication app = applicationRepo.findByIdAndTenantId(iv.getApplicationId(), tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Application", iv.getApplicationId().toString()));
+        String candidate = applicantRepo.findById(app.getApplicantId()).map(RecApplicant::getFullName).orElse("candidate");
+        String job = jobRepo.findById(app.getJobId()).map(RecJob::getTitle).orElse("");
+        return InterviewInvite.build(iv.getId().toString(), iv.getScheduledAt(), iv.getDurationMinutes(),
+                "Interview: " + candidate + (job.isBlank() ? "" : " (" + job + ")"),
+                iv.getInterviewType() + " interview" + (iv.getInterviewerName() == null ? "" : " with " + iv.getInterviewerName()),
+                iv.getLocation(), iv.getInterviewerName(), java.time.Instant.now());
     }
 
     @Transactional(readOnly = true)

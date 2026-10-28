@@ -174,10 +174,11 @@ public class RecruiterController {
     public ResponseEntity<ApiResponse<Page<ApplicationResponse>>> getApplications(
             @RequestParam(required = false) UUID   jobId,
             @RequestParam(required = false) String stage,
+            @RequestParam(required = false) String q,
             Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success(
                 recruiterService.getApplications(TenantContext.getTenantIdAsObject(),
-                        jobId, stage, pageable)));
+                        jobId, stage, q, pageable)));
     }
 
     @GetMapping("/applications/{id}")
@@ -303,6 +304,17 @@ public class RecruiterController {
                                                                                  @RequestBody RecruiterOfferDtos.ReviseOfferRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Offer revised", recruiterService.reviseOffer(
                 TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
+    }
+
+    @GetMapping("/interviews/{id}/invite.ics")
+    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    @Operation(summary = "Calendar file (.ics) for an interview")
+    public ResponseEntity<byte[]> interviewInvite(@PathVariable UUID id) {
+        String ics = recruiterService.interviewInvite(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok()
+                .header("Content-Type", "text/calendar; charset=utf-8")
+                .header("Content-Disposition", "attachment; filename=interview.ics")
+                .body(ics.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     @GetMapping("/applications/{id}/scorecard")
