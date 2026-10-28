@@ -874,6 +874,7 @@ export const RECRUITER_SECTIONS: ModuleSections = {
         { id: 'pipeline', label: 'Pipeline', icon: BarChart2 },
         { id: 'applications', label: 'Applications', icon: Users },
         { id: 'talent-pool', label: 'Talent Pool', icon: Users },
+        { id: 'reports', label: 'Reports', icon: BarChart2 },
       ],
     },
     {

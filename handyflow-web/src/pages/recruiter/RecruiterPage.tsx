@@ -19,6 +19,7 @@ import RequisitionPanel from './RecRequisition'
 import { ScreeningAnswers, ScreeningEditor } from './RecScreening'
 import RecPrivacy from './RecPrivacy'
 import RecPool from './RecPool'
+import RecReports from './RecReports'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Job {
@@ -1726,6 +1727,7 @@ export function RecruiterPage() {
             </>
           )
           case 'talent-pool': return <RecPool />
+          case 'reports': return <RecReports />
           case 'settings': return <RecPrivacy />
           default: return null
         }
