@@ -92,13 +92,13 @@ public class RecruiterRetentionService {
 
     private static String problem(RecApplicant a, List<RecApplication> apps, int months, Instant now) {
         List<RecruiterRetentionRules.App> view = apps.stream()
-                .map(x -> new RecruiterRetentionRules.App(x.getStage(), x.getHrEmployeeId() != null, latest(x))).toList();
+                .map(x -> new RecruiterRetentionRules.App(x.getStage(), x.getHrEmployeeId() != null, latest(x), "TALENT_POOL".equals(x.getSource()))).toList();
         return RecruiterRetentionRules.removalProblem(a.isAnonymised(), a.getUpdatedAt(), view, months, now);
     }
 
     private static Instant lastActivity(RecApplicant a, List<RecApplication> apps) {
         Instant last = a.getUpdatedAt() == null ? a.getCreatedAt() : a.getUpdatedAt();
-        for (RecApplication x : apps) { Instant t = latest(x); if (t != null && (last == null || t.isAfter(last))) last = t; }
+        for (RecApplication x : apps) { Instant t = "TALENT_POOL".equals(x.getSource()) ? null : latest(x); if (t != null && (last == null || t.isAfter(last))) last = t; }
         return last == null ? Instant.EPOCH : last;
     }
 

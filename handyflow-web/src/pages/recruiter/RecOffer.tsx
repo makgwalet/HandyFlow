@@ -24,6 +24,53 @@ const message = (e: unknown, fallback: string): string =>
 const unwrap = (r: { data?: { data?: OfferView } & OfferView }): OfferView => (r.data?.data ?? r.data) as OfferView
 const btn = { padding: '5px 12px', background: 'var(--hf-surface-muted)', color: 'var(--hf-text-secondary)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer' } as const
 
+const FREQUENCIES: [string, string][] = [['MONTHLY', 'Monthly'], ['WEEKLY', 'Weekly'], ['BIWEEKLY', 'Every two weeks'], ['ANNUALLY', 'Yearly']]
+const field = { padding: '6px 9px', background: 'var(--hf-surface)', color: 'var(--hf-text-secondary)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 12 } as const
+
+/** Change the terms of an offer. Before the letter goes out no reason is needed; afterwards the old terms are kept with the reason and the letter must be sent again. */
+export function ReviseOfferForm({ id, onChanged, onClose }: { id: string; onChanged: () => void; onClose: () => void }) {
+  const qc = useQueryClient()
+  const q = useQuery<OfferView>({ queryKey: ['rec-offer', id], queryFn: async () => unwrap(await apiClient.get(`${BASE}/${id}/offer`)), retry: false })
+  const v = q.data
+  const [salary, setSalary] = useState<string | null>(null)
+  const [frequency, setFrequency] = useState<string | null>(null)
+  const [start, setStart] = useState<string | null>(null)
+  const [benefits, setBenefits] = useState<string | null>(null)
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const sent = v?.sentAt != null
+  const save = useMutation({
+    mutationFn: async () => unwrap(await apiClient.post(`${BASE}/${id}/offer/revise`, {
+      offeredSalary: Number(salary ?? v?.offeredSalary), offeredSalaryFrequency: frequency ?? v?.offeredSalaryFrequency ?? 'MONTHLY',
+      offeredStartDate: (start ?? v?.offeredStartDate) || null, offerBenefits: (benefits ?? v?.offerBenefits) || null, reason: reason.trim() || null,
+    })),
+    onSuccess: view => { qc.setQueryData(['rec-offer', id], view); setError(null); onChanged(); onClose() },
+    onError: e => setError(message(e, 'The terms could not be changed.')),
+  })
+  if (!v) return null
+  const salaryText = salary ?? (v.offeredSalary == null ? '' : String(v.offeredSalary))
+  const bad = !(Number(salaryText) > 0) || (sent && !reason.trim())
+  return (
+    <div style={{ marginTop: 8, display: 'grid', gap: 8, padding: 10, border: '1px solid var(--hf-border)', borderRadius: 8 }}>
+      <strong>Change the offer terms</strong>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <label>Salary (R) <input inputMode="decimal" aria-label="Offered salary" value={salaryText} onChange={e => setSalary(e.target.value)} style={{ ...field, width: 110 }} /></label>
+        <label>Paid <select value={frequency ?? v.offeredSalaryFrequency ?? 'MONTHLY'} onChange={e => setFrequency(e.target.value)} style={field}>
+          {FREQUENCIES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+        <label>Start date <input type="date" value={start ?? v.offeredStartDate ?? ''} onChange={e => setStart(e.target.value)} style={field} /></label>
+      </div>
+      <label>Benefits <textarea rows={2} value={benefits ?? v.offerBenefits ?? ''} onChange={e => setBenefits(e.target.value)} style={{ ...field, width: '100%' }} /></label>
+      {sent && <label>Why are the terms changing? <input aria-label="Reason" value={reason} onChange={e => setReason(e.target.value)} style={{ ...field, width: '100%' }} /></label>}
+      {sent && <div style={{ color: 'var(--hf-text-muted)' }}>The old terms are kept with this reason. The letter has to be sent again.</div>}
+      {error && <div role="alert" style={{ color: 'var(--hf-danger-text)' }}>{error}</div>}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button style={btn} disabled={save.isPending || bad} onClick={() => save.mutate()}>{save.isPending ? 'Saving...' : 'Save terms'}</button>
+        <button style={btn} onClick={onClose}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
 export function offerNeedsAnswer(s?: OfferView['status']) { return s === 'AWAITING' || s === 'EXPIRED' || s === 'DRAFT' }
 
 export default function OfferPanel({ id, onChanged }: { id: string; onChanged: () => void }) {
@@ -33,6 +80,7 @@ export default function OfferPanel({ id, onChanged }: { id: string; onChanged: (
   const [note, setNote] = useState('')
   const [mode, setMode] = useState<null | 'DECLINED' | 'WITHDRAWN'>(null)
   const [resendOn, setResendOn] = useState('')
+  const [revising, setRevising] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const q = useQuery<OfferView>({ queryKey: key, queryFn: async () => unwrap(await apiClient.get(`${BASE}/${id}/offer`)), retry: false })
   const done = (v?: OfferView) => { if (v) qc.setQueryData(key, v); setError(null); setNote(''); setMode(null); onChanged() }
@@ -64,12 +112,14 @@ export default function OfferPanel({ id, onChanged }: { id: string; onChanged: (
           {v.status === 'AWAITING' && <button style={btn} disabled={respond.isPending} onClick={() => respond.mutate({ response: 'ACCEPTED', note: null })}>Candidate accepted</button>}
           <button style={btn} onClick={() => setMode('DECLINED')}>Candidate declined</button>
           <button style={btn} onClick={() => setMode('WITHDRAWN')}>Withdraw offer</button>
+          <button style={btn} onClick={() => setRevising(r => !r)}>Change terms</button>
           {v.status === 'EXPIRED' && (
             <>
               <input type="date" aria-label="New expiry date" value={resendOn} onChange={e => setResendOn(e.target.value)} style={{ ...btn, cursor: 'text' }} />
               <button style={btn} disabled={resend.isPending} onClick={() => resend.mutate()}>{resend.isPending ? 'Sending...' : 'Send again'}</button>
             </>
           )}
+      {revising && mayOffer && <ReviseOfferForm id={id} onChanged={onChanged} onClose={() => setRevising(false)} />}
         </div>
       )}
       {mode && (

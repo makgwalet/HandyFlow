@@ -129,6 +129,19 @@ class RecruiterRulesTest {
     }
 
     @Test
+    void reusingACandidateDoesNotExtendTheTimeTheyAgreedTo() {
+        // Agreed 30 months ago, kept for 12; reused for a new job two months ago, which was then closed.
+        var reused = List.of(new RecruiterRetentionRules.App("REJECTED", false, ago(2), true));
+        assertThat(RecruiterRetentionRules.removalProblem(false, ago(30), reused, 12, NOW)).isNull();
+        // An open reused application still keeps their details.
+        var open = List.of(new RecruiterRetentionRules.App("INTERVIEW", false, ago(2), true));
+        assertThat(RecruiterRetentionRules.removalProblem(false, ago(30), open, 12, NOW)).contains("still open");
+        // A new, ordinary application they made themselves does restart the clock.
+        var fresh = List.of(new RecruiterRetentionRules.App("REJECTED", false, ago(2), false));
+        assertThat(RecruiterRetentionRules.removalProblem(false, ago(30), fresh, 12, NOW)).contains("has not ended");
+    }
+
+    @Test
     void anApplicantAlreadyRemovedIsNotRemovedAgain() {
         assertThat(RecruiterRetentionRules.removalProblem(true, ago(20), List.of(), 12, NOW)).contains("already removed");
     }

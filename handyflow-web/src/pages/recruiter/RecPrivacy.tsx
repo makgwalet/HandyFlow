@@ -20,6 +20,7 @@ export default function RecPrivacy() {
     <div>
       <SettingsCard admin={rights.admin} />
       {rights.admin && <RetentionCard />}
+      {rights.admin && <OldCvCard />}
     </div>
   )
 }
@@ -121,6 +122,43 @@ function RetentionCard() {
           {result.refused.length > 0 && <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>{result.refused.map(f => <li key={f.applicantId}>{f.reason}</li>)}</ul>}
         </div>
       )}
+      {error && <div role="alert" style={{ color: 'var(--hf-danger-text)', fontSize: 12, marginTop: 6 }}>{error}</div>}
+    </section>
+  )
+}
+
+/** CVs saved before file storage existed are moved into it, a few at a time, so every CV lives in one place. A CV that is not a readable PDF is left as it was. */
+function OldCvCard() {
+  const [running, setRunning] = useState(false)
+  const [moved, setMoved] = useState<number | null>(null)
+  const [unreadable, setUnreadable] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const run = async () => {
+    setRunning(true); setError(null); setMoved(0); setUnreadable(0)
+    let after: string | null = null, totalMoved = 0, totalUnreadable = 0
+    try {
+      for (let round = 0; round < 1000; round++) {
+        const r: { moved: number; unreadable: number; done: boolean; nextAfter: string | null } =
+          body(await apiClient.post(`${BASE}/cv/migrate-legacy${after ? `?after=${after}&limit=25` : '?limit=25'}`))
+        totalMoved += r.moved; totalUnreadable += r.unreadable
+        setMoved(totalMoved); setUnreadable(totalUnreadable)
+        if (r.done || !r.nextAfter) break
+        after = r.nextAfter
+      }
+    } catch (e) {
+      setError(message(e, 'Moving the CVs stopped. What was moved is kept; you can start again.'))
+    } finally {
+      setRunning(false)
+    }
+  }
+  return (
+    <section style={card}>
+      <h3 style={{ margin: '0 0 4px', fontSize: 14 }}>Move old CVs into file storage</h3>
+      <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--hf-text-muted)' }}>
+        CVs uploaded a long time ago are kept inside the applicant record. This moves them into file storage like every newer CV. It is safe to run again, and any CV that cannot be read as a PDF is left as it is.
+      </p>
+      <button type="button" style={btn} disabled={running} onClick={run}>{running ? 'Moving…' : 'Move old CVs'}</button>
+      {moved !== null && <span role="status" style={{ marginLeft: 10, fontSize: 12 }}>{moved} moved{unreadable > 0 ? `, ${unreadable} could not be read and were left alone` : ''}{running ? '' : '.'}</span>}
       {error && <div role="alert" style={{ color: 'var(--hf-danger-text)', fontSize: 12, marginTop: 6 }}>{error}</div>}
     </section>
   )

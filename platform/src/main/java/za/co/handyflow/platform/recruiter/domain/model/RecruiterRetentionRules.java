@@ -17,8 +17,14 @@ public final class RecruiterRetentionRules {
     public static final int DEFAULT_MONTHS = 12, MIN_MONTHS = 3, MAX_MONTHS = 60;
     private static final ZoneId ZONE = ZoneId.of("Africa/Johannesburg");
 
-    /** One of an applicant's applications, as far as retention is concerned. */
-    public record App(String stage, boolean linkedToEmployee, Instant lastActivity) {}
+    /**
+     * One of an applicant's applications, as far as retention is concerned. {@code reused} is an application opened from the talent pool on the strength of
+     * an earlier agreement: while it is open it keeps their details, but once it is closed it does not start the retention period again, because the person
+     * never agreed to be kept longer than the period that agreement gave.
+     */
+    public record App(String stage, boolean linkedToEmployee, Instant lastActivity, boolean reused) {
+        public App(String stage, boolean linkedToEmployee, Instant lastActivity) { this(stage, linkedToEmployee, lastActivity, false); }
+    }
 
     public static String monthsProblem(Integer months) {
         if (months == null || months < MIN_MONTHS || months > MAX_MONTHS)
@@ -39,7 +45,7 @@ public final class RecruiterRetentionRules {
         if (alreadyRemoved) return "This applicant's details were already removed.";
         for (App a : apps) if (live(a)) return "This applicant has an application that is still open, or was hired. Their details are needed.";
         Instant last = applicantUpdated;
-        for (App a : apps) if (a.lastActivity() != null && (last == null || a.lastActivity().isAfter(last))) last = a.lastActivity();
+        for (App a : apps) if (!a.reused() && a.lastActivity() != null && (last == null || a.lastActivity().isAfter(last))) last = a.lastActivity();
         if (last == null) return null;
         if (!dueOn(last, months).isBefore(now)) return "The retention period of " + months + " months has not ended yet (it ends " + dueOn(last, months) + ").";
         return null;

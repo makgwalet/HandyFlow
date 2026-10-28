@@ -18,6 +18,9 @@ public class RecApplication {
 
     @Id private UUID id = UUID.randomUUID();
 
+    /** Counts changes, so two people saving the same application at once cannot silently overwrite each other: the second save is refused (409). */
+    @Version @Column(name = "version", nullable = false) private Long version;
+
     @Embedded
     @AttributeOverride(name = "value", column = @Column(name = "tenant_id", nullable = false))
     private TenantId tenantId;

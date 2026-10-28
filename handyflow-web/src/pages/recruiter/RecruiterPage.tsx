@@ -15,7 +15,7 @@ import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
 import { RECRUITER_SECTIONS } from '../../navigation/moduleSections'
 import { useParams, useSearchParams } from 'react-router-dom'
 import ApprovalPanel from './RecApproval'
-import OfferPanel from './RecOffer'
+import OfferPanel, { ReviseOfferForm } from './RecOffer'
 import RecDashboard from './RecDashboard'
 import RecCalendar from './RecCalendar'
 import RecClients from './RecClients'
@@ -450,8 +450,10 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
     onError: async (e: any) => setError(await parseBlobError(e, 'Failed to download offer letter — offer terms may not be recorded yet')),
   })
 
+  const [sendExpiry, setSendExpiry] = useState('')
+  const [revisingBeforeSend, setRevisingBeforeSend] = useState(false)
   const sendOfferLetter = useMutation({
-    mutationFn: () => apiClient.post(`/api/v1/recruiter/applications/${app!.id}/offer-letter/send`),
+    mutationFn: () => apiClient.post(`/api/v1/recruiter/applications/${app!.id}/offer-letter/send`, { expiresOn: sendExpiry || null }),
     onSuccess: () => invalidate(),
     onError: (e: any) => setError(e.response?.data?.message || 'Failed to send offer letter'),
   })
@@ -653,16 +655,27 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                     <CheckCircle size={10} /> Sent {fmtDate(app.offerLetterSentAt)}
                   </span>
                 ) : mayOffer && (
+                  <>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--hf-text-muted)' }}>
+                    Open until
+                    <input type="date" aria-label="Offer open until" value={sendExpiry} min={new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Johannesburg' })}
+                      onChange={e => setSendExpiry(e.target.value)} title="Leave empty for 14 days"
+                      style={{ padding: '4px 6px', border: '1px solid var(--hf-border)', borderRadius: 6, fontSize: 11 }} />
+                  </label>
+                  <button onClick={() => setRevisingBeforeSend(r => !r)}
+                    style={{ padding: '5px 12px', background: 'var(--hf-surface-muted)', color: 'var(--hf-text-secondary)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>Change terms</button>
                   <button onClick={() => sendOfferLetter.mutate()} disabled={sendOfferLetter.isPending}
                     style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', border: '1px solid var(--hf-success-border)', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                     <Calendar size={10} /> {sendOfferLetter.isPending ? 'Sending...' : 'Send offer letter'}
                   </button>
+                  </>
                 )}
               </>
             )}
           </div>
 
           {app?.stage === 'OFFER' && app?.offeredSalary != null && !app?.offerLetterSentAt && <ApprovalPanel kind="offer" id={app.id} />}
+          {app?.stage === 'OFFER' && app?.offeredSalary != null && !app?.offerLetterSentAt && revisingBeforeSend && mayOffer && <ReviseOfferForm id={app.id} onChanged={invalidate} onClose={() => setRevisingBeforeSend(false)} />}
           {app?.stage === 'OFFER' && app?.offerLetterSentAt && <OfferPanel id={app.id} onChanged={invalidate} />}
           {app && <ScreeningAnswers applicationId={app.id} />}
           {app && <VerificationPanel applicationId={app.id} closed={app.stage === 'HIRED' || app.stage === 'REJECTED' || app.stage === 'WITHDRAWN'} />}
