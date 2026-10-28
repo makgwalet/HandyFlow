@@ -7,7 +7,7 @@ import {
   CalendarRange, Plus, ChevronDown, ChevronUp, CheckCircle2,
 } from "lucide-react"
 import { type UniverseEntry, type AnnualPlan, lbl, inp, cancelBtn, submitBtn, modalOverlay, modalBox } from "./auditShared"
-import { RiskBadge } from "./RiskBadge"
+import { PlanEntries } from "./PlanEntries"
 
 export function PlansSection({ plans, universe, isLoading, qc }: { plans: AnnualPlan[]; universe: UniverseEntry[]; isLoading: boolean; qc: ReturnType<typeof useQueryClient> }) {
   const [error, setError] = useState("")
@@ -79,22 +79,7 @@ export function PlansSection({ plans, universe, isLoading, qc }: { plans: Annual
                       <Plus size={11} /> Add Entry
                     </button>
                   </div>
-                  {p.entries.length === 0 ? (
-                    <p style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>No universe entries selected into this plan yet.</p>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {p.entries.map(e => (
-                        <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 12px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
-                          <div>
-                            <strong style={{ color: "var(--hf-text)" }}>{e.universeEntryName}</strong>
-                            {e.plannedQuarter && <span style={{ color: "var(--hf-text-faint)", marginLeft: 8 }}>Q{e.plannedQuarter}</span>}
-                            {e.rationale && <div style={{ color: "var(--hf-text-faint)", marginTop: 2 }}>{e.rationale}</div>}
-                          </div>
-                          <RiskBadge level={e.riskLevel} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <PlanEntries entries={p.entries} />
                 </div>
               )}
             </div>

@@ -8,6 +8,9 @@ import ReviewNotesPanel from "./ReviewNotesPanel"
 import {
   ClipboardList, Plus, ChevronDown, ChevronUp, Users2, UserPlus, FileText, Upload, Trash2, RotateCcw, Eye, Folder,
 } from "lucide-react"
+import { EngagementFilters } from "./EngagementFilters"
+import { StagePill } from "./auditUi"
+import { engagementStage, filterEngagements, shortDate, type Group } from "./auditUi.logic"
 import { type UniverseEntry, type AnnualPlan, type Engagement, type UserOption, type WorkpaperFolder, type WorkpaperFile, type AuditExceptionResp, type FindingResp, type ReportSignOffStatus, type SamplingPlanResp, ENGAGEMENT_ROLES, ALLOWED_WP_TYPES, MAX_WP_BYTES, WP_STATUS_CFG, lbl, inp, cancelBtn, submitBtn, modalOverlay, modalBox } from "./auditShared"
 
 export function EngagementsSection({ engagements, universe, plans, users, isLoading, qc }: {
@@ -16,6 +19,8 @@ export function EngagementsSection({ engagements, universe, plans, users, isLoad
 }) {
   const [error, setError] = useState("")
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [stage, setStage] = useState<Group | "all">("all")
+  const [search, setSearch] = useState("")
   const [showNew, setShowNew] = useState(false)
   const [form, setForm] = useState({ universeEntryId: "", planEntryId: "", name: "", startDate: "", endDate: "" })
   const [showAssign, setShowAssign] = useState<string | null>(null)
@@ -259,6 +264,8 @@ export function EngagementsSection({ engagements, universe, plans, users, isLoad
     onError: (e: any) => setError(e.response?.data?.message ?? "Failed to assign role"),
   })
 
+  const visible = filterEngagements(engagements, { group: stage, q: search })
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
@@ -278,7 +285,9 @@ export function EngagementsSection({ engagements, universe, plans, users, isLoad
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {engagements.map(e => (
+          <EngagementFilters engagements={engagements} stage={stage} onStage={setStage} q={search} onQ={setSearch} />
+          {visible.length === 0 && <div style={{ fontSize: 13, color: "var(--hf-text-muted)", padding: "14px 4px" }}>No engagements match these filters.</div>}
+          {visible.map(e => (
             <div key={e.id} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -290,7 +299,10 @@ export function EngagementsSection({ engagements, universe, plans, users, isLoad
                     <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>{e.universeEntryName}{!e.planEntryId && " · Ad-hoc"}</div>
                   </div>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: "var(--hf-surface-sunken)", color: "var(--hf-text-muted)" }}>{e.status}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{shortDate(e.startDate)} – {shortDate(e.endDate)}</span>
+                  <StagePill label={engagementStage(e.status).label} group={engagementStage(e.status).group} />
+                </div>
               </div>
 
               {expanded === e.id && (

@@ -4,6 +4,7 @@ import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/re
 vi.mock("../../api/auditDashboards.api", () => ({ auditDashboardsApi: { internal: vi.fn(), external: vi.fn(), committee: vi.fn() } }))
 import { auditDashboardsApi } from "../../api/auditDashboards.api"
 import { InternalAuditDashboard } from "./InternalAuditDashboard"
+import type { Engagement } from "./auditShared"
 import { ExternalAuditDashboard } from "../settings/ExternalAuditDashboard"
 
 const m = auditDashboardsApi as any
@@ -101,5 +102,29 @@ describe("Audit committee report", () => {
     m.committee = vi.fn().mockRejectedValue({ response: { data: { message: "No access" } } })
     render(<CommitteeReport />)
     expect((await screen.findByRole("alert")).textContent).toContain("No access")
+  })
+})
+
+describe("Internal audit dashboard: key dates and links", () => {
+  it("lists upcoming engagement dates and goes to a section from the links", async () => {
+    m.internal.mockResolvedValue(internal)
+    const go = vi.fn()
+    const eng = [{ id: "g1", name: "Payroll review", universeEntryName: "HR", status: "FIELDWORK", startDate: "2026-09-01", endDate: "2026-11-05" }] as unknown as Engagement[]
+    render(<InternalAuditDashboard engagements={eng} onGo={go} today="2026-10-28" />)
+    expect(await screen.findByText("Payroll review")).toBeTruthy()
+    expect(screen.getByText("5 Nov 2026")).toBeTruthy()
+    fireEvent.click(screen.getByText("Audit universe"))
+    expect(go).toHaveBeenCalledWith("universe")
+  })
+  it("says so when nothing is coming up", async () => {
+    m.internal.mockResolvedValue(internal)
+    render(<InternalAuditDashboard engagements={[]} onGo={vi.fn()} today="2026-10-28" />)
+    expect(await screen.findByText("No engagement starts or ends in the next 90 days.")).toBeTruthy()
+  })
+  it("sizes the severity bars from open findings and shows all four levels", async () => {
+    m.internal.mockResolvedValue(internal)
+    render(<InternalAuditDashboard />)
+    expect((await screen.findByLabelText("High open findings")).getAttribute("aria-valuenow")).toBe("100")
+    expect(screen.getByLabelText("Critical open findings").getAttribute("aria-valuenow")).toBe("0")
   })
 })

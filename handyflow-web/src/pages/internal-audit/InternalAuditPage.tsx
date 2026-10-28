@@ -1,6 +1,7 @@
 // Internal Audit: routes each section of the module to its screen. Shared lists are loaded once here.
 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useNavigate } from "react-router-dom"
 import { apiClient } from "../../api/client"
 import { InternalAuditDashboard } from "./InternalAuditDashboard"
 import { CommitteeReport } from "./CommitteeReport"
@@ -24,6 +25,7 @@ function LoadFailed({ show }: { show: boolean }) {
 
 export default function InternalAuditPage() {
   const qc = useQueryClient()
+  const navigate = useNavigate()
 
   const { data: universe = [], isLoading: universeLoading, isError: universeError } = useQuery<UniverseEntry[]>({
     queryKey: ["ia-universe"],
@@ -57,7 +59,7 @@ export default function InternalAuditPage() {
           case "follow-ups":  return <FollowUpSection />
           case "investigations": return <InvestigationsSection />
           case "committee":   return <CommitteeReport />
-          case "dashboard":   return <InternalAuditDashboard />
+          case "dashboard":   return <InternalAuditDashboard engagements={engagements} onGo={section => navigate(`/internal-audit/${section}`)} />
           case "universe":    return <><LoadFailed show={universeError} /><UniverseSection universe={universe} isLoading={universeLoading} qc={qc} /></>
           case "plans":       return <><LoadFailed show={plansError} /><PlansSection plans={plans} universe={universe} isLoading={plansLoading} qc={qc} /></>
           case "engagements": return <><LoadFailed show={engagementsError} /><EngagementsSection engagements={engagements} universe={universe} plans={plans} users={users} isLoading={engagementsLoading} qc={qc} /></>
