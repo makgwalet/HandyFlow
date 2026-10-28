@@ -11,12 +11,12 @@ import { apiClient } from "../../api/client"
 import { useAuth } from "../../hooks/useAuth"
 import { FileText, AlertCircle, CheckCircle, Download, Clock } from "lucide-react"
 import Emp201ActionModal from "./Emp201ActionModal"
-import { canRecordEmp201, stateOf, STATE_LABEL, type Emp201, type Emp201State } from "./emp201.logic"
+import { canRecordEmp201, monthsWithSeveralReturns, rand, stateOf, STATE_LABEL, type Emp201, type Emp201State } from "./emp201.logic"
 
 // FIX: correct ApiResponse<List<Emp201>> unwrap
-const unwrapList = (r: any): any[] => { const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : (d?.content ?? []) }
-const fmtR    = (n: any) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
-const fmtDate = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
+const unwrapList = (r: { data?: { data?: unknown; content?: unknown[] } & Record<string, unknown> }): Emp201[] => { const d = (r.data?.data ?? r.data) as unknown; return (Array.isArray(d) ? d : ((d as { content?: Emp201[] } | undefined)?.content ?? [])) as Emp201[] }
+const fmtR    = (n: number | string | null | undefined) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
+const fmtDate = (d: string | null | undefined) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
 
 const STATUS_CFG: Record<Emp201State | "OVERDUE", { color: string; bg: string; icon: React.ElementType; label: string }> = {
   NOT_FILED: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", icon: Clock, label: STATE_LABEL.NOT_FILED },
@@ -51,6 +51,7 @@ export default function ComplianceTab() {
   const totalSdl      = emp201s.reduce((s, e) => s + Number(e.totalSdl ?? 0), 0)
   const totalPayable  = emp201s.reduce((s, e) => s + Number(e.totalPayable ?? 0), 0)
   const pendingTotal  = emp201s.filter(e => e.status !== "PAID").reduce((s, e) => s + Number(e.totalPayable ?? 0), 0)
+  const severalInAMonth = monthsWithSeveralReturns(emp201s)
   const overdueCount  = emp201s.filter(e => e.overdue).length
 
   if (isLoading) return <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading EMP201 records...</div>
@@ -83,6 +84,15 @@ export default function ComplianceTab() {
             <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-danger-text)" }}>{overdueCount} overdue EMP201 declaration{overdueCount > 1 ? "s" : ""}</div>
             <div style={{ fontSize: 12, color: "var(--hf-danger-text-strong)" }}>Late submission attracts a 10% penalty plus interest. Submit on SARS eFiling immediately.</div>
           </div>
+        </div>
+      )}
+
+      {severalInAMonth.length > 0 && (
+        <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 10, fontSize: 13, color: "var(--hf-warning-text)" }}>
+          <strong>More than one return in a month.</strong> SARS takes one EMP201 and one payment for a month, so file these together and pay the combined amount:
+          <ul style={{ margin: "6px 0 0 18px", padding: 0 }}>
+            {severalInAMonth.map(m => <li key={m.month}>{m.month}: {m.count} returns, {rand(m.total)} in all{m.unpaid ? ` (${m.unpaid} not yet paid)` : ""}</li>)}
+          </ul>
         </div>
       )}
 

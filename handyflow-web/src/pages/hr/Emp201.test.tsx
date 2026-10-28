@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import Emp201ActionModal from "./Emp201ActionModal"
-import { canRecordEmp201, cleanReference, fileProblem, payProblem, stateOf, type Emp201 } from "./emp201.logic"
+import { canRecordEmp201, cleanReference, monthsWithSeveralReturns, fileProblem, payProblem, stateOf, type Emp201 } from "./emp201.logic"
 
 const post = vi.fn()
 vi.mock("../../api/client", () => ({ apiClient: { post: (...a: unknown[]) => post(...a), get: vi.fn() } }))
@@ -18,6 +18,20 @@ const emp = (over: Partial<Emp201> = {}): Emp201 => ({
 
 beforeEach(() => post.mockReset())
 afterEach(cleanup)
+
+describe("several returns in one month", () => {
+  it("finds months where a second run produced a second return", () => {
+    const rows = [
+      emp({ periodEnd: "2026-09-30", totalPayable: 1000 }),
+      emp({ periodEnd: "2026-10-31", totalPayable: 11345.67, status: "PAID" }),
+      emp({ periodEnd: "2026-10-31", totalPayable: 2000.33, status: "DRAFT" }),
+    ]
+    expect(monthsWithSeveralReturns(rows)).toEqual([{ month: "2026-10", count: 2, total: 13346, unpaid: 1 }])
+  })
+  it("says nothing when every month has one return", () => {
+    expect(monthsWithSeveralReturns([emp({ periodEnd: "2026-09-30" }), emp({ periodEnd: "2026-10-31" })])).toEqual([])
+  })
+})
 
 describe("EMP201 helpers", () => {
   it("maps the server status to what the person sees", () => {

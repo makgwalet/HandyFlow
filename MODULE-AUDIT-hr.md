@@ -1064,3 +1064,13 @@ I read the four training services, the entities and the session screen. The modu
 **Not HR, not touched.** `PermissionConsistencyTest` lists 24 facilities and facilities-management permissions used in `@PreAuthorize` but never seeded. Plus legal-compliance, training, training-provider, warehousing, internal-audit, bookkeeping and clinic repository tests. These need their own pass.
 
 **Still unverified.** The frontend has not been run in a browser against the real backend. Flyway history holds a hand-added version 999, newer than the latest migration, so `outOfOrder` must stay on.
+
+## 38. EMP201: months with more than one return (Slice 19f)
+
+**What changed.** SARS takes one EMP201 and one payment for a month, but each pay run makes its own return here. When a month has more than one (a bonus run beside the monthly run, say), the Compliance tab now shows a notice naming the month, how many returns, the combined amount and how many are not yet paid, so they are filed and paid together. Frontend only: `monthsWithSeveralReturns` in `emp201.logic.ts`, two new tests in `Emp201.test.tsx`. No migration.
+
+**Left as it was.** The returns are still separate records; they are not merged into one, and the payment is still recorded per return at its full amount.
+
+**Also.** The `any` types in `ComplianceTab.tsx` were replaced, so the file lints clean.
+
+**Still unrun.** The frontend tests cannot run in my environment (no vitest); not seen in a browser.

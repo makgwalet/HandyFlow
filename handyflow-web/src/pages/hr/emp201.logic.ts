@@ -38,3 +38,22 @@ export function payProblem(paidOn: string, amount: string, e: Pick<Emp201, "tota
 }
 
 export const rand = (n: number) => `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+export interface SameMonth { month: string; count: number; total: number; unpaid: number }
+
+/**
+ * SARS takes one EMP201 and one payment for each month. When a month has more than one pay run (a bonus run, say), each run
+ * has its own return here; these are the months where the returns should be filed and paid together.
+ */
+export function monthsWithSeveralReturns(rows: readonly Pick<Emp201, "periodEnd" | "totalPayable" | "status">[]): SameMonth[] {
+  const byMonth = new Map<string, SameMonth>()
+  for (const r of rows) {
+    const month = r.periodEnd.slice(0, 7)
+    const m = byMonth.get(month) ?? { month, count: 0, total: 0, unpaid: 0 }
+    m.count += 1
+    m.total = Math.round((m.total + Number(r.totalPayable)) * 100) / 100
+    if (r.status !== "PAID") m.unpaid += 1
+    byMonth.set(month, m)
+  }
+  return [...byMonth.values()].filter(m => m.count > 1).sort((a, b) => a.month.localeCompare(b.month))
+}
