@@ -9,6 +9,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import za.co.handyflow.platform.hr.application.internal.LeaveAdvanceService;
 import za.co.handyflow.platform.hr.application.internal.PayAdjustmentService;
 import za.co.handyflow.platform.hr.application.internal.PayrollAccess;
 import za.co.handyflow.platform.hr.dto.PayAdjustmentDtos.*;
@@ -27,6 +28,7 @@ import java.util.UUID;
 public class PayAdjustmentController {
 
     private final PayAdjustmentService service;
+    private final LeaveAdvanceService leaveAdvance;
 
     @GetMapping("/pay-adjustments")
     @PreAuthorize("isAuthenticated()")
@@ -51,6 +53,24 @@ public class PayAdjustmentController {
         if (!PayrollAccess.canPrepare(authentication)) throw new AccessDeniedException("You may not enter bonuses or back pay.");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Payment entered",
                 service.add(TenantContext.getTenantIdAsObject(), id, req, user(principal))));
+    }
+
+    @GetMapping("/employees/{id}/leave-advance")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Annual leave a terminated employee took before earning it, what it comes to, and whether a recovery is already entered")
+    public ResponseEntity<ApiResponse<LeaveAdvanceService.Position>> leaveAdvance(@PathVariable UUID id, Authentication authentication) {
+        if (!PayrollAccess.canReview(authentication)) throw new AccessDeniedException("You may not see this.");
+        return ResponseEntity.ok(ApiResponse.success(leaveAdvance.position(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/employees/{id}/leave-advance/recover")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Take leave taken in advance back from final pay, on the strength of the employee's written agreement, named and dated")
+    public ResponseEntity<ApiResponse<View>> recoverLeaveAdvance(@PathVariable UUID id, @RequestBody LeaveAdvanceService.RecoverRequest req,
+                                                                 Authentication authentication, Principal principal) {
+        if (!PayrollAccess.canPrepare(authentication)) throw new AccessDeniedException("You may not enter a recovery.");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Recovery entered",
+                leaveAdvance.recover(TenantContext.getTenantIdAsObject(), id, req, user(principal))));
     }
 
     @PostMapping("/pay-adjustments/{id}/cancel")

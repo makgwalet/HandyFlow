@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import PayAdjustmentsModal from "./PayAdjustmentsModal"
-import { EMPTY_PAY_FORM, cancelProblem, canEnterPay, payBody, payProblem, type PayAdjustment, type PayForm } from "./payAdjustments.logic"
+import { EMPTY_PAY_FORM, advanceBody, advanceProblem, advanceShown, cancelProblem, canEnterPay, payBody, payProblem, type PayAdjustment, type PayForm } from "./payAdjustments.logic"
 
 const get = vi.fn()
 const post = vi.fn()
@@ -140,5 +140,46 @@ describe("PayAdjustmentsModal", () => {
     await screen.findByText(/Reason: Board decision/)
     expect(screen.queryByRole("button", { name: "Save payment" })).toBeNull()
     expect(screen.queryByRole("button", { name: /^Cancel Bonus/ })).toBeNull()
+  })
+})
+
+describe("leave taken in advance", () => {
+  const ADV = { terminated: true, days: 2.5, amount: 3571.43, alreadyEntered: false }
+  const GONE = { ...EMP, status: "TERMINATED" }
+  it("needs a named, dated agreement that is not in the future", () => {
+    expect(advanceProblem({ ref: "", date: "2026-10-01" }, TODAY)).toMatch(/written agreement/)
+    expect(advanceProblem({ ref: "x".repeat(101), date: "2026-10-01" }, TODAY)).toMatch(/too long/)
+    expect(advanceProblem({ ref: "Letter", date: "" }, TODAY)).toMatch(/date/)
+    expect(advanceProblem({ ref: "Letter", date: "2026-11-01" }, TODAY)).toMatch(/future/)
+    expect(advanceProblem({ ref: "Letter", date: "2026-10-01" }, TODAY)).toBeNull()
+    expect(advanceBody({ ref: " Letter ", date: "2026-10-01" })).toEqual({ agreementRef: "Letter", agreementDate: "2026-10-01" })
+  })
+  it("shows the panel only for a terminated employee with days taken", () => {
+    expect(advanceShown(undefined)).toBe(false)
+    expect(advanceShown({ ...ADV, terminated: false })).toBe(false)
+    expect(advanceShown({ ...ADV, days: 0 })).toBe(false)
+    expect(advanceShown(ADV)).toBe(true)
+  })
+  it("takes the leave back with the agreement", async () => {
+    get.mockImplementation((url: string) => Promise.resolve({ data: { data: url.endsWith("leave-advance") ? ADV : [] } }))
+    post.mockResolvedValue({ data: {} })
+    wrap(<PayAdjustmentsModal employee={GONE} permissions={["PAYROLL_PREPARE"]} onClose={() => {}} />)
+    await screen.findByText(/2.5 day\(s\) of annual leave were taken before/)
+    const btn = screen.getByRole("button", { name: "Take back from final pay" }) as HTMLButtonElement
+    expect(btn.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText(/^Written agreement/), { target: { value: "Leave letter" } })
+    fireEvent.change(screen.getByLabelText(/^Dated/), { target: { value: "2026-09-01" } })
+    fireEvent.click(btn)
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/hr/employees/e1/leave-advance/recover", { agreementRef: "Leave letter", agreementDate: "2026-09-01" }))
+  })
+  it("does not offer a second recovery, and is not asked for an active employee", async () => {
+    get.mockImplementation((url: string) => Promise.resolve({ data: { data: url.endsWith("leave-advance") ? { ...ADV, alreadyEntered: true } : [] } }))
+    wrap(<PayAdjustmentsModal employee={GONE} permissions={["PAYROLL_PREPARE"]} onClose={() => {}} />)
+    await screen.findByText(/A recovery is already entered/)
+    expect(screen.queryByRole("button", { name: "Take back from final pay" })).toBeNull()
+    cleanup(); get.mockReset(); get.mockResolvedValue({ data: { data: [] } })
+    wrap(<PayAdjustmentsModal employee={EMP} permissions={["PAYROLL_PREPARE"]} onClose={() => {}} />)
+    await screen.findByText(/No bonuses, back pay or recoveries/)
+    expect(get).not.toHaveBeenCalledWith("/api/v1/hr/employees/e1/leave-advance")
   })
 })

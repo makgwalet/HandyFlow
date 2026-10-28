@@ -361,11 +361,26 @@ public class LeaveService {
      */
     @Transactional
     public BigDecimal annualLeaveOwing(TenantId tenantId, HrEmployee emp, LocalDate leavingDate) {
+        return LeaveRules.annualOwing(leavingLines(tenantId, emp, leavingDate), leavingEarned(tenantId, emp, leavingDate));
+    }
+
+    /**
+     * Days of annual leave taken in advance on the day employment ended (a negative balance), in days. Same working as
+     * {@link #annualLeaveOwing}; see {@link LeaveRules#annualAdvance}.
+     */
+    @Transactional
+    public BigDecimal annualLeaveAdvance(TenantId tenantId, HrEmployee emp, LocalDate leavingDate) {
+        return LeaveRules.annualAdvance(leavingLines(tenantId, emp, leavingDate), leavingEarned(tenantId, emp, leavingDate));
+    }
+
+    private List<LeaveRules.Line> leavingLines(TenantId tenantId, HrEmployee emp, LocalDate leavingDate) {
         ensureAccrued(tenantId, emp, leavingDate);
-        List<LeaveRules.Line> lines = ledgerRepo.window(tenantId, emp.getId(), LeaveRules.ANNUAL, LocalDate.of(leavingDate.getYear(), 1, 1), leavingDate)
+        return ledgerRepo.window(tenantId, emp.getId(), LeaveRules.ANNUAL, LocalDate.of(leavingDate.getYear(), 1, 1), leavingDate)
                 .stream().map(l -> new LeaveRules.Line(l.getKind(), l.getDays())).toList();
-        BigDecimal earned = LeaveRules.annualEarned(emp.getStartDate(), ledgerStart(tenantId), leavingDate.getYear(), leavingDate);
-        return LeaveRules.annualOwing(lines, earned);
+    }
+
+    private BigDecimal leavingEarned(TenantId tenantId, HrEmployee emp, LocalDate leavingDate) {
+        return LeaveRules.annualEarned(emp.getStartDate(), ledgerStart(tenantId), leavingDate.getYear(), leavingDate);
     }
 
     private void accrue(TenantId tenantId, UUID employeeId, String type, LocalDate from, LocalDate to, BigDecimal earned, LocalDate on) {

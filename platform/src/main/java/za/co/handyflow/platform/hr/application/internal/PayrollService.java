@@ -191,6 +191,14 @@ public class PayrollService {
                         + " Bonus and any leave taken in advance are not handled; check them by hand.");
                 String notice = NoticeRules.summary(emp.getEndType(), emp.getGrossSalary(), emp.getStartDate(), emp.getNoticeGivenOn(), emp.getEndDate());
                 warnings.add(who + ": " + (notice != null ? notice : "how employment ended was not recorded, so notice pay was not worked out; check it by hand."));
+                BigDecimal advanceDays = leaveService.annualLeaveAdvance(tenantId, emp, emp.getEndDate());
+                if (advanceDays != null && advanceDays.signum() > 0) {
+                    boolean recovered = payItems.getOrDefault(emp.getId(), List.of()).stream().anyMatch(i -> PayAdjustmentRules.RECOVERY.equals(i.getKind()) && LeaveAdvanceRules.DESCRIPTION.equals(i.getDescription()));
+                    warnings.add(who + ": " + advanceDays + " day(s) of annual leave were taken before they were earned (about "
+                            + LeaveAdvanceRules.amount(emp.getGrossSalary(), advanceDays) + ")."
+                            + (recovered ? " A recovery is entered and is taken from net pay if it fits."
+                            : " Nothing is taken off pay unless the employee's written agreement is recorded under Pay items."));
+                }
             }
             if (pay.partPeriod() && !finalPay)
                 warnings.add(who + ": paid " + pay.daysPaid() + " of " + pay.workingDays() + " working days"

@@ -7,6 +7,7 @@ import za.co.handyflow.platform.hr.domain.model.HrLeavePolicy;
 import za.co.handyflow.platform.hr.domain.repository.HrEmployeeRepository;
 import za.co.handyflow.platform.hr.domain.repository.HrLeavePolicyRepository;
 import za.co.handyflow.platform.hr.dto.LeavePolicyDtos.AtRisk;
+import za.co.handyflow.platform.hr.dto.LeavePolicyDtos.Expiring;
 import za.co.handyflow.platform.hr.dto.LeavePolicyDtos.AtRiskReport;
 import za.co.handyflow.platform.notifications.application.NotificationRequest;
 import za.co.handyflow.platform.notifications.application.Recipient;
@@ -125,5 +126,72 @@ class LeaveReminderServiceTest {
         when(admins.resolveTenantAdmins(any(TenantId.class))).thenReturn(List.of());
 
         assertThat(service.remindAll(firstOfNovember)).isEqualTo(1);
+    }
+
+    // ── Managers, and carried leave that expires ─────────────────────────────────
+
+    private HrEmployee managedBy(String name, String email, UUID manager) {
+        HrEmployee e = person(email, "ACTIVE");
+        lenient().when(e.getFullName()).thenReturn(name);
+        lenient().when(e.getManagerId()).thenReturn(manager);
+        return e;
+    }
+
+    private HrLeavePolicy expiryPolicy() {
+        HrLeavePolicy p = HrLeavePolicy.none(tenant.getValue());
+        p.set(null, 6, 2027, "Leave policy v3", UUID.randomUUID());
+        return p;
+    }
+
+    @Test
+    void aManagerIsToldWhoInTheirTeamCouldLoseLeaveAtYearEnd() {
+        UUID emp = UUID.randomUUID(), boss = UUID.randomUUID();
+        when(policyRepo.findAll()).thenReturn(List.of(policy(2027)));
+        when(leaveService.atRisk(any())).thenReturn(new AtRiskReport(new BigDecimal("10"), 2027,
+                List.of(new AtRisk(emp, "Thandi Nkosi", new BigDecimal("14"), new BigDecimal("16"), new BigDecimal("6")))));
+        when(employeeRepo.findActiveById(any(), eq(emp))).thenReturn(Optional.of(managedBy("Thandi Nkosi", "thandi@example.com", boss)));
+        when(employeeRepo.findActiveById(any(), eq(boss))).thenReturn(Optional.of(managedBy("Boss Dube", "boss@example.com", null)));
+        when(admins.resolveTenantAdmins(any(TenantId.class))).thenReturn(List.of());
+
+        assertThat(service.remindAll(firstOfNovember)).isEqualTo(2);
+
+        NotificationRequest toBoss = sent().stream().filter(n -> n.recipients().get(0).email().equals("boss@example.com")).findFirst().orElseThrow();
+        assertThat(toBoss.title()).isEqualTo("1 person in your team could lose annual leave at year end");
+        assertThat(toBoss.message()).contains("Thandi Nkosi (6 days)");
+    }
+
+    @Test
+    void carriedLeaveThatWillExpireIsRemindedToTheEmployeeAndTheManagerOnTheRightDay() {
+        UUID emp = UUID.randomUUID(), boss = UUID.randomUUID();
+        LocalDate expiry = LocalDate.of(2027, 6, 30);
+        when(policyRepo.findAll()).thenReturn(List.of(expiryPolicy()));
+        when(leaveService.atRisk(any())).thenReturn(new AtRiskReport(null, 2028, List.of(), 6, expiry,
+                List.of(new Expiring(emp, "Thandi Nkosi", new BigDecimal("5"), expiry))));
+        when(employeeRepo.findActiveById(any(), eq(emp))).thenReturn(Optional.of(managedBy("Thandi Nkosi", "thandi@example.com", boss)));
+        when(employeeRepo.findActiveById(any(), eq(boss))).thenReturn(Optional.of(managedBy("Boss Dube", "boss@example.com", null)));
+
+        assertThat(service.remindAll(expiry.minusDays(14))).isEqualTo(2);
+
+        List<NotificationRequest> out = sent();
+        NotificationRequest toEmployee = out.stream().filter(n -> n.recipients().get(0).email().equals("thandi@example.com")).findFirst().orElseThrow();
+        assertThat(toEmployee.message()).contains("5 days").contains("14 days from now");
+        NotificationRequest toBoss = out.stream().filter(n -> n.recipients().get(0).email().equals("boss@example.com")).findFirst().orElseThrow();
+        assertThat(toBoss.title()).contains("will lose carried-over leave");
+    }
+
+    @Test
+    void nothingGoesOutOnADayThatIsNotAnExpiryReminderDay() {
+        when(policyRepo.findAll()).thenReturn(List.of(expiryPolicy()));
+        assertThat(service.remindAll(LocalDate.of(2027, 6, 1))).isZero();
+        verifyNoInteractions(leaveService);
+    }
+
+    @Test
+    void anExpiryThatStartsNextYearIsNotRemindedThisYear() {
+        HrLeavePolicy later = HrLeavePolicy.none(tenant.getValue());
+        later.set(null, 6, 2028, "Leave policy v3", UUID.randomUUID());
+        when(policyRepo.findAll()).thenReturn(List.of(later));
+        assertThat(service.remindAll(LocalDate.of(2027, 6, 16))).isZero();
+        verifyNoInteractions(leaveService);
     }
 }

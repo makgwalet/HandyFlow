@@ -6,7 +6,10 @@ import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { X } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { EMPTY_PAY_FORM, PAY_KINDS, canEnterPay, cancelProblem, money, payBody, payProblem, type PayAdjustment, type PayForm } from "./payAdjustments.logic"
+import {
+  EMPTY_ADVANCE_FORM, EMPTY_PAY_FORM, PAY_KINDS, advanceBody, advanceProblem, advanceShown, canEnterPay, cancelProblem, money, payBody, payProblem,
+  type AdvanceForm, type LeaveAdvance, type PayAdjustment, type PayForm,
+} from "./payAdjustments.logic"
 
 type ApiErr = { response?: { data?: { message?: string } } }
 const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
@@ -15,7 +18,7 @@ const label: React.CSSProperties = { display: "block", fontSize: 12, fontWeight:
 const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" })
 
 export default function PayAdjustmentsModal({ employee, permissions, onClose }: {
-  employee: { id: string; fullName: string; employeeNumber: string; startDate?: string | null }; permissions: string[]; onClose: () => void
+  employee: { id: string; fullName: string; employeeNumber: string; startDate?: string | null; status?: string }; permissions: string[]; onClose: () => void
 }) {
   const qc = useQueryClient()
   const canEdit = canEnterPay(permissions)
@@ -35,12 +38,24 @@ export default function PayAdjustmentsModal({ employee, permissions, onClose }: 
     queryFn: async () => { const r = await apiClient.get(`/api/v1/hr/employees/${employee.id}/pay-adjustments`); return (r.data?.data ?? r.data) as PayAdjustment[] },
   })
   const items = list.data ?? []
+  const advanceKey = ["hr-leave-advance", employee.id]
+  const advance = useQuery<LeaveAdvance>({
+    queryKey: advanceKey, enabled: employee.status === "TERMINATED", retry: false,
+    queryFn: async () => { const r = await apiClient.get(`/api/v1/hr/employees/${employee.id}/leave-advance`); return (r.data?.data ?? r.data) as LeaveAdvance },
+  })
+  const [adv, setAdv] = useState<AdvanceForm>(EMPTY_ADVANCE_FORM)
+  const advProblem = advanceProblem(adv, today())
 
   const onErr = (fallback: string) => (e: unknown) => setError((e as ApiErr)?.response?.data?.message ?? fallback)
   const add = useMutation({
     mutationFn: () => apiClient.post(`/api/v1/hr/employees/${employee.id}/pay-adjustments`, payBody(form)),
     onSuccess: () => { qc.invalidateQueries({ queryKey: key }); setForm(EMPTY_PAY_FORM); setError("") },
     onError: onErr("The payment could not be saved."),
+  })
+  const recover = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/hr/employees/${employee.id}/leave-advance/recover`, advanceBody(adv)),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: key }); qc.invalidateQueries({ queryKey: advanceKey }); setAdv(EMPTY_ADVANCE_FORM); setError("") },
+    onError: onErr("The recovery could not be entered."),
   })
   const cancel = useMutation({
     mutationFn: (v: { id: string; reason: string }) => apiClient.post(`/api/v1/hr/pay-adjustments/${v.id}/cancel`, { reason: v.reason.trim() }),
@@ -107,6 +122,28 @@ export default function PayAdjustmentsModal({ employee, permissions, onClose }: 
               </table>
             </div>
           )}
+
+        {advanceShown(advance.data) && (
+          <section aria-label="Leave taken in advance" style={{ border: "1px solid var(--hf-border)", borderRadius: 10, padding: 12, marginBottom: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Leave taken in advance</div>
+            <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "4px 0 8px" }}>
+              {advance.data.days} day(s) of annual leave were taken before they were earned, about {money(advance.data.amount)} at the daily rate.
+              Nothing is taken off final pay unless the employee agreed to it in writing (BCEA section 34). The deduction comes off net pay in the final run, and only if net pay covers it.
+            </p>
+            {advance.data.alreadyEntered ? <div style={{ fontSize: 13, color: "var(--hf-text-secondary)" }}>A recovery is already entered; see the list above.</div>
+              : canEdit ? (
+                <form onSubmit={e => { e.preventDefault(); if (!advProblem) recover.mutate() }} noValidate style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10, alignItems: "end" }}>
+                  <div><label htmlFor="adv-ref" style={label}>Written agreement *</label><input id="adv-ref" style={input} maxLength={100} value={adv.ref} onChange={e => setAdv(a => ({ ...a, ref: e.target.value }))} placeholder="Document name or number" /></div>
+                  <div><label htmlFor="adv-date" style={label}>Dated *</label><input id="adv-date" style={input} type="date" max={today()} value={adv.date} onChange={e => setAdv(a => ({ ...a, date: e.target.value }))} /></div>
+                  <button type="submit" disabled={!!advProblem || recover.isPending}
+                    style={{ padding: "9px 16px", background: advProblem || recover.isPending ? "var(--hf-text-faint)" : "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: advProblem ? "not-allowed" : "pointer" }}>
+                    {recover.isPending ? "Saving…" : "Take back from final pay"}
+                  </button>
+                  {(adv.ref || adv.date) && advProblem && <div role="alert" style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--hf-danger-text)" }}>{advProblem}</div>}
+                </form>
+              ) : null}
+          </section>
+        )}
 
         {cancelling && cancellingItem && (
           <form onSubmit={e => { e.preventDefault(); if (!cancelErr) cancel.mutate(cancelling) }} noValidate

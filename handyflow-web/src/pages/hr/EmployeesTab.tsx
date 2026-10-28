@@ -516,7 +516,7 @@ export default function EmployeesTab() {
                 Medical scheme
               </button>
               {(rights.manage || rights.compensation) && <button onClick={() => { setBenefitsFor(selected); setSelected(null) }} style={secondaryBtn}>Employer benefits</button>}
-              {(rights.manage || rights.compensation) && selected.status === "ACTIVE" && <button onClick={() => { setPayItemsFor(selected); setSelected(null) }} style={secondaryBtn}>Bonus & back pay</button>}
+              {(rights.manage || rights.compensation) && (selected.status === "ACTIVE" || selected.status === "TERMINATED") && <button onClick={() => { setPayItemsFor(selected); setSelected(null) }} style={secondaryBtn}>Bonus & back pay</button>}
               {rights.manage && selected.status === "ACTIVE" && (
                 <button onClick={() => { setTerminating(selected); setEndDate(""); setReason(""); setEndType(""); setNoticeOn(""); setError(""); setSelected(null) }}
                   style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>

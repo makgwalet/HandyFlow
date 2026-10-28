@@ -148,6 +148,28 @@ class LeaveRulesTest {
     }
 
     @Test
+    void leaveTakenBeforeItWasEarnedIsTheNegativeBalanceAndNothingIsOwing() {
+        List<LeaveRules.Line> lines = List.of(line("ACCRUAL", "4"), line("TAKEN", "-9.5"));
+        assertThat(LeaveRules.annualAdvance(lines, new BigDecimal("4")).compareTo(new BigDecimal("5.5"))).isEqualTo(0);
+        assertThat(LeaveRules.annualOwing(lines, new BigDecimal("4")).signum()).isEqualTo(0);
+    }
+
+    @Test
+    void noAdvanceWhenTheBalanceIsNotNegative() {
+        List<LeaveRules.Line> lines = List.of(line("ACCRUAL", "10"), line("TAKEN", "-4"));
+        assertThat(LeaveRules.annualAdvance(lines, new BigDecimal("10")).signum()).isEqualTo(0);
+        assertThat(LeaveRules.annualAdvance(List.of(line("ACCRUAL", "5"), line("TAKEN", "-5")), new BigDecimal("5")).signum()).isEqualTo(0);
+    }
+
+    @Test
+    void leaveEarnedByTheLeavingDateReducesTheAdvanceAndAFractionIsRoundedInTheEmployeesFavour() {
+        List<LeaveRules.Line> lines = List.of(line("ACCRUAL", "2"), line("TAKEN", "-6"));
+        assertThat(LeaveRules.annualAdvance(lines, new BigDecimal("3.5")).compareTo(new BigDecimal("2.5"))).isEqualTo(0);
+        List<LeaveRules.Line> odd = List.of(line("ACCRUAL", "1"), line("TAKEN", "-2.333"));
+        assertThat(LeaveRules.annualAdvance(odd, BigDecimal.ONE).compareTo(new BigDecimal("1.33"))).isEqualTo(0);
+    }
+
+    @Test
     void carriedLeaveThatExpiredIsNotPaidOut() {
         List<LeaveRules.Line> lines = List.of(line("ACCRUAL", "10"), line("CARRY_FORWARD", "8"), line("EXPIRY", "-5"), line("TAKEN", "-3"));
         assertThat(LeaveRules.annualOwing(lines, new BigDecimal("10")).compareTo(new BigDecimal("10"))).isEqualTo(0);

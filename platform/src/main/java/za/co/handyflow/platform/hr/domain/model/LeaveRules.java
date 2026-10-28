@@ -94,6 +94,20 @@ public final class LeaveRules {
      * taken in advance, pays nothing; it is not taken off the pay here.
      */
     public static BigDecimal annualOwing(List<Line> lines, BigDecimal earnedToLeavingDate) {
+        BigDecimal owing = leavingBalance(lines, earnedToLeavingDate);
+        return owing.signum() <= 0 ? BigDecimal.ZERO : owing.setScale(2, RoundingMode.DOWN);
+    }
+
+    /**
+     * The other side of {@link #annualOwing}: days of annual leave taken in advance that the employee had not yet earned on the leaving date,
+     * so the balance is below zero. Zero when the balance is not negative. Rounded down, in the employee's favour.
+     */
+    public static BigDecimal annualAdvance(List<Line> lines, BigDecimal earnedToLeavingDate) {
+        BigDecimal balance = leavingBalance(lines, earnedToLeavingDate);
+        return balance.signum() >= 0 ? BigDecimal.ZERO : balance.negate().setScale(2, RoundingMode.DOWN);
+    }
+
+    private static BigDecimal leavingBalance(List<Line> lines, BigDecimal earnedToLeavingDate) {
         BigDecimal accrued = BigDecimal.ZERO, other = BigDecimal.ZERO, taken = BigDecimal.ZERO;
         for (Line l : lines) {
             switch (l.kind()) {
@@ -104,8 +118,7 @@ public final class LeaveRules {
             }
         }
         BigDecimal earned = accrued.max(earnedToLeavingDate == null ? BigDecimal.ZERO : earnedToLeavingDate);
-        BigDecimal owing = earned.add(other).subtract(taken);
-        return owing.signum() <= 0 ? BigDecimal.ZERO : owing.setScale(2, RoundingMode.DOWN);
+        return earned.add(other).subtract(taken);
     }
 
     /** Family responsibility leave: 3 days a year once four months of service are complete. */

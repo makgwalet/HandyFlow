@@ -63,3 +63,23 @@ export function cancelProblem(reason: string): string {
 }
 
 export const money = (n: number) => n.toLocaleString("en-ZA", { style: "currency", currency: "ZAR" })
+
+// ── Leave taken in advance, taken back from final pay ─────────────────────────────────────────
+
+export type LeaveAdvance = { terminated: boolean; days: number; amount: number; alreadyEntered: boolean }
+export type AdvanceForm = { ref: string; date: string }
+export const EMPTY_ADVANCE_FORM: AdvanceForm = { ref: "", date: "" }
+
+/** Mirrors the server: the deduction needs the employee's written agreement, named and dated. */
+export function advanceProblem(f: AdvanceForm, today: string): string | null {
+  if (!f.ref.trim()) return "Name the employee's written agreement to this deduction. Pay may not be deducted without one (BCEA section 34)."
+  if (f.ref.trim().length > 100) return "The agreement reference is too long (100 characters at most)."
+  if (!f.date) return "Give the date of the written agreement."
+  if (f.date > today) return "The agreement cannot be dated in the future."
+  return null
+}
+
+export const advanceBody = (f: AdvanceForm) => ({ agreementRef: f.ref.trim(), agreementDate: f.date })
+
+/** Whether the panel has anything to show. */
+export const advanceShown = (a: LeaveAdvance | undefined): a is LeaveAdvance => !!a && a.terminated && a.days > 0

@@ -578,7 +578,7 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - Only the UNPAID leave type is deducted. Other leave that a policy treats as unpaid (for example some maternity) is not.
 - Pension and medical contributions are not prorated.
 - PAYE uses the periodic method on the month's pay, so a part month is taxed as if the person earned that little all year and a payout is taxed as if it recurred. The difference is settled on assessment.
-- Leave taken in advance (a negative balance) is not recovered from the final pay. Approved leave dated after the leaving date is not cancelled.
+- ~~Leave taken in advance (a negative balance) is not recovered from the final pay.~~ Done in section 48. ~~Approved leave dated after the leaving date is not cancelled.~~ Done in section 46.
 - Notice pay, bonus and back pay are not handled; the final-pay warning on the run says so.
 - Whether SARS wants leave pay under code 3601 or a separate code is **not checked against the current IRP5 guide**. Confirm before issuing certificates for a leaver.
 - A leaver recorded more than 3 months late is not picked up by a run.
@@ -1158,9 +1158,9 @@ I read the four training services, the entities and the session screen. The modu
 **Tests.** `LeavePolicyRulesTest` (14, seven new) and `LeaveRulesTest` (22, one new, for payout on leaving) pass in my harness and a deliberate break of the expiry date was caught. Four new Mockito cases in `LeaveServiceTest` (kept until the date, taken off once and dated that day, a later start year leaves the past alone, the policy saves and shows back) have not run; one needs the date to be after 30 June and skips itself otherwise. The screen's logic was checked under node; the frontend tests (new ones in `LeavePolicy.test.tsx`) have not run. Spring, the migration and a browser have not been used.
 
 **Not done.**
-- No reminder yet to the employee or the manager before carried leave expires (the existing reminder only covers the year-end cap), so people find out from the at-risk list or the statement.
+- ~~No reminder before carried leave expires.~~ Done in section 48.
 - Cash-out during employment is not built. The BCEA only allows pay in place of leave when employment ends (section 40) apart from narrow agreed cases, so I left it out rather than guess.
-- A negative balance at leaving is still not taken off the final pay: a deduction needs the employee's written agreement (section 34), which the system does not record.
+- ~~A negative balance at leaving is not taken off the final pay.~~ Done in section 48, with the written agreement named.
 - Expiry uses the first-in rule (carried days are used first); a company that wants a different order has no setting for it.
 
 ## 46. Ending employment: leave, portal access and notice pay (Slice 21c, V533)
@@ -1198,3 +1198,21 @@ I read the four training services, the entities and the session screen. The modu
 - No reminder to the employee about suspension or review dates; they are told in their letter.
 - A hearing that is moved is reminded for its new date, but nobody is told it moved.
 - Reminders are still not remembered, so nothing stops a second run on the same day sending twice (the job runs once a day).
+
+## 48. Expiry reminders and leave taken in advance (Slice 21e, no migration)
+
+**Expiry reminders.** The 07:50 morning job already warned about the year-end cap. It now also warns when carried leave is about to expire (policy expiry months set, applying this year):
+- The employee is told **30, 14, 7 and 1 days before** the expiry date, with the days at risk.
+- The manager gets one message per day listing the people concerned (up to 10 names, then a count); administrators get a count only when a person has no manager.
+- Which day a message goes is decided in `LeaveReminderRules` (pure, dates only); `LeaveReminderService` finds the people. Reminders still do not remember what they sent; the date arithmetic stops repeats.
+
+**Leave taken in advance.** When employment has ended and the leave taken is more than was earned to the last day, the shortfall is shown on the pay-items window (now also open for people who have left): days (rounded down, in the employee's favour), the amount at the daily rate, and whether a recovery is already entered.
+- Someone with prepare-payroll rights can **take it back from final pay** only by naming the employee's written agreement and its date (BCEA section 34). Nothing is deducted without it. It is entered as an ordinary RECOVERY dated on the last day, so the final run takes it from net pay in the order entered, and only if net pay covers it; otherwise it stays open and nothing is taken.
+- `GET /api/v1/hr/employees/{id}/leave-advance` (review right) and `POST .../leave-advance/recover` (prepare right). The payroll final-pay warning now says how many days were taken in advance and whether a recovery is entered.
+
+**Tests.** `LeaveReminderRulesTest` (8) and `LeaveAdvanceRulesTest` (3) pass in my harness, `LeaveRulesTest` has 25 passing (a rounding mutation was caught). New Mockito cases in `LeaveReminderServiceTest` (4) and `LeaveAdvanceServiceTest` (6) have not run. On the screen, the logic was checked under node; four new cases in `PayAdjustments.test.tsx` have not run (no vitest). Spring, the database and a browser have not been used.
+
+**Not done.**
+- A recovery that does not fit in final net pay is not carried to anyone's next pay or followed up; the amount stays open on the list.
+- The amount uses the daily rate on the last salary, not an averaged rate for variable pay.
+- The manager is not told when a leaver's advance has been recovered.
