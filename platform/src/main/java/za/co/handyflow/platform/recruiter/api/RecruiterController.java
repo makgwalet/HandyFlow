@@ -259,9 +259,35 @@ public class RecruiterController {
     @PostMapping("/applications/{id}/offer-letter/send")
     @PreAuthorize("hasAuthority('RECRUITER_MANAGE')")
     @Operation(summary = "Generate the offer letter PDF and email it to the applicant as an attachment")
-    public ResponseEntity<ApiResponse<Void>> sendOfferLetter(@PathVariable UUID id) {
-        recruiterService.sendOfferLetter(TenantContext.getTenantIdAsObject(), id);
+    public ResponseEntity<ApiResponse<Void>> sendOfferLetter(@PathVariable UUID id,
+                                                             @RequestBody(required = false) RecruiterOfferDtos.SendOfferRequest req) {
+        recruiterService.sendOfferLetter(TenantContext.getTenantIdAsObject(), id, req == null ? null : req.expiresOn());
         return ResponseEntity.ok(ApiResponse.success("Offer letter sent", null));
+    }
+
+    @GetMapping("/applications/{id}/offer")
+    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    @Operation(summary = "Where the offer stands: draft, awaiting an answer, lapsed, accepted, declined or withdrawn, with its revisions")
+    public ResponseEntity<ApiResponse<RecruiterOfferDtos.OfferView>> getOffer(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(recruiterService.getOffer(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/applications/{id}/offer/response")
+    @PreAuthorize("hasAuthority('RECRUITER_MANAGE')")
+    @Operation(summary = "Record that the candidate accepted or declined the offer, or that it was withdrawn")
+    public ResponseEntity<ApiResponse<RecruiterOfferDtos.OfferView>> respondToOffer(@PathVariable UUID id,
+                                                                                    @RequestBody RecruiterOfferDtos.OfferResponseRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Recorded", recruiterService.recordOfferResponse(
+                TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/applications/{id}/offer/revise")
+    @PreAuthorize("hasAuthority('RECRUITER_MANAGE')")
+    @Operation(summary = "Change the terms of an offer, keeping the old terms and the reason")
+    public ResponseEntity<ApiResponse<RecruiterOfferDtos.OfferView>> reviseOffer(@PathVariable UUID id,
+                                                                                 @RequestBody RecruiterOfferDtos.ReviseOfferRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Offer revised", recruiterService.reviseOffer(
+                TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
     }
 
     @GetMapping("/applications/{id}/scorecard")

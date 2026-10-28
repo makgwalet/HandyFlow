@@ -467,6 +467,10 @@ public class RecruiterService {
         String moveProblem = RecruiterWorkflowRules.stageMoveProblem(prevStage, req.stage(), req.rejectionReason(), req.offeredSalary(),
                 approvalService.offerApprovalRequired(tenantId), app.getOfferApprovalStatus());
         if (moveProblem != null) throw new HandyFlowException(moveProblem, HttpStatus.BAD_REQUEST, "INVALID_STAGE_MOVE");
+        if ("HIRED".equalsIgnoreCase(req.stage().trim())) {
+            String hire = RecruiterOfferRules.hireProblem(offerStatus(app));
+            if (hire != null) throw new HandyFlowException(hire, HttpStatus.BAD_REQUEST, "OFFER_NOT_ACCEPTED");
+        }
         req = new MoveStageRequest(req.stage().trim().toUpperCase(), req.notes(), req.rejectionReason(), req.offeredSalary(),
                 req.offeredSalaryFrequency(), req.offeredStartDate(), req.offerBenefits());
 
@@ -765,7 +769,7 @@ public class RecruiterService {
     // action (sends an email, mutates offerLetterSentAt), not pure generation.
 
     @Transactional
-    public void sendOfferLetter(TenantId tenantId, UUID applicationId) {
+    public void sendOfferLetter(TenantId tenantId, UUID applicationId, java.time.LocalDate expiresOn) {
         RecApplication app = applicationRepo.lockByIdAndTenantId(applicationId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Application", applicationId.toString()));
         String sendProblem = RecruiterWorkflowRules.offerSendProblem(app.getStage());
@@ -773,6 +777,13 @@ public class RecruiterService {
         RecApplicant applicant = applicantRepo.findById(app.getApplicantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Applicant", app.getApplicantId().toString()));
         approvalService.requireOfferSendable(tenantId, app);
+        java.time.LocalDate today = today();
+        String sendState = RecruiterOfferRules.sendProblem(
+                RecruiterOfferRules.status(app.getOfferLetterSentAt(), app.getOfferResponse(), app.getOfferExpiresOn(), today));
+        if (sendState != null) throw new HandyFlowException(sendState, HttpStatus.BAD_REQUEST, "OFFER_STATE");
+        String expiryProblem = RecruiterOfferRules.expiryProblem(expiresOn, today);
+        if (expiryProblem != null) throw new HandyFlowException(expiryProblem, HttpStatus.BAD_REQUEST, "INVALID_OFFER");
+        java.time.LocalDate expiry = RecruiterOfferRules.expiryOrDefault(expiresOn, today);
         if (applicant.getEmail() == null) {
             throw new HandyFlowException("Applicant has no email on file",
                     HttpStatus.BAD_REQUEST, "NO_EMAIL");
@@ -784,14 +795,92 @@ public class RecruiterService {
                 "Your offer — " + jobTitle,
                 "<h2>Hi " + applicant.getFirstName() + ",</h2>"
                         + "<p>Please find your offer letter for <strong>" + jobTitle + "</strong> attached.</p>"
-                        + "<p>Congratulations — we look forward to hearing from you.</p>",
+                        + "<p>Congratulations — we look forward to hearing from you. This offer is open until "
+                        + expiry + ".</p>",
                 "Offer Letter - " + applicant.getFullName() + ".pdf", pdf);
 
-        app.markOfferLetterSent();
+        app.markOfferLetterSent(expiry);
         applicationRepo.save(app);
         log.info("Offer letter sent for application={}", applicationId);
     }
 
+
+    private String offerStatus(RecApplication app) {
+        return RecruiterOfferRules.status(app.getOfferLetterSentAt(), app.getOfferResponse(), app.getOfferExpiresOn(), today());
+    }
+
+    @Transactional(readOnly = true)
+    public RecruiterOfferDtos.OfferView getOffer(TenantId tenantId, UUID applicationId) {
+        RecApplication app = applicationRepo.findByIdAndTenantId(applicationId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Application", applicationId.toString()));
+        return toOfferView(app);
+    }
+
+    private RecruiterOfferDtos.OfferView toOfferView(RecApplication app) {
+        List<RecruiterOfferDtos.OfferRevision> revisions = jdbc.query(
+                "SELECT old_salary, old_frequency, old_start_date, old_benefits, reason, revised_by, revised_at "
+                        + "FROM rec_offer_revisions WHERE application_id = ? ORDER BY revised_at",
+                (rs, i) -> new RecruiterOfferDtos.OfferRevision(rs.getBigDecimal("old_salary"), rs.getString("old_frequency"),
+                        rs.getObject("old_start_date", java.time.LocalDate.class), rs.getString("old_benefits"), rs.getString("reason"),
+                        rs.getObject("revised_by", UUID.class), rs.getTimestamp("revised_at").toInstant()),
+                app.getId());
+        return new RecruiterOfferDtos.OfferView(app.getId(), offerStatus(app), app.getOfferedSalary(), app.getOfferedSalaryFrequency(),
+                app.getOfferedStartDate(), app.getOfferBenefits(), app.getOfferLetterSentAt(), app.getOfferExpiresOn(),
+                app.getOfferResponse(), app.getOfferRespondedAt(), app.getOfferResponseNote(), revisions);
+    }
+
+    /** Record the candidate's answer (or the company withdrawing). A decline or withdrawal closes the application. */
+    @Transactional
+    public RecruiterOfferDtos.OfferView recordOfferResponse(TenantId tenantId, UUID applicationId,
+                                                            RecruiterOfferDtos.OfferResponseRequest req, UUID by) {
+        RecApplication app = applicationRepo.lockByIdAndTenantId(applicationId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Application", applicationId.toString()));
+        if (!"OFFER".equals(app.getStage()))
+            throw new HandyFlowException("The application is not at the Offer stage.", HttpStatus.BAD_REQUEST, "NOT_AT_OFFER");
+        if (app.getOfferedSalary() == null)
+            throw new HandyFlowException("No offer has been made yet.", HttpStatus.BAD_REQUEST, "NO_OFFER");
+        String problem = RecruiterOfferRules.responseProblem(offerStatus(app), req == null ? null : req.response(), req == null ? null : req.note());
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.BAD_REQUEST, "OFFER_STATE");
+        String response = req.response().trim().toUpperCase();
+        app.recordOfferResponse(response, req.note(), by);
+        if (!RecruiterOfferRules.ACCEPTED.equals(response)) {
+            String reason = ("DECLINED".equals(response) ? "Offer declined: " : "Offer withdrawn: ") + req.note().trim();
+            app.reject(reason.length() > RecruiterWorkflowRules.MAX_REASON ? reason.substring(0, RecruiterWorkflowRules.MAX_REASON) : reason);
+            historyRepo.save(RecStageHistory.create(applicationId, "OFFER", "REJECTED", fetchUserName(by), reason));
+        } else {
+            historyRepo.save(RecStageHistory.create(applicationId, "OFFER", "OFFER", fetchUserName(by), "Offer accepted"
+                    + (req.note() == null || req.note().isBlank() ? "" : ": " + req.note().trim())));
+        }
+        applicationRepo.save(app);
+        return toOfferView(app);
+    }
+
+    /** Change the terms of an offer. If it had been sent, the old terms are kept with the reason and the letter must go out again. */
+    @Transactional
+    public RecruiterOfferDtos.OfferView reviseOffer(TenantId tenantId, UUID applicationId, RecruiterOfferDtos.ReviseOfferRequest req, UUID by) {
+        RecApplication app = applicationRepo.lockByIdAndTenantId(applicationId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Application", applicationId.toString()));
+        if (!"OFFER".equals(app.getStage()))
+            throw new HandyFlowException("The application is not at the Offer stage.", HttpStatus.BAD_REQUEST, "NOT_AT_OFFER");
+        if (req == null || req.offeredSalary() == null || req.offeredSalary().signum() <= 0)
+            throw new HandyFlowException("Enter the offered salary.", HttpStatus.BAD_REQUEST, "INVALID_OFFER");
+        String status = offerStatus(app);
+        String problem = RecruiterOfferRules.reviseProblem(status, req.reason());
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.BAD_REQUEST, "OFFER_STATE");
+        boolean wasPut = app.getOfferLetterSentAt() != null;
+        if (wasPut) {
+            jdbc.update("INSERT INTO rec_offer_revisions (id, tenant_id, application_id, old_salary, old_frequency, old_start_date, old_benefits, reason, revised_by) "
+                            + "VALUES (?,?,?,?,?,?,?,?,?)", UUID.randomUUID(), tenantId.getValue(), applicationId, app.getOfferedSalary(),
+                    app.getOfferedSalaryFrequency(), app.getOfferedStartDate(), app.getOfferBenefits(), req.reason().trim(), by);
+        }
+        app.recordOfferTerms(req.offeredSalary(), req.offeredSalaryFrequency(), req.offeredStartDate(), req.offerBenefits());
+        if (wasPut) {
+            app.reopenOfferAfterRevision();
+            historyRepo.save(RecStageHistory.create(applicationId, "OFFER", "OFFER", fetchUserName(by), "Offer terms revised: " + req.reason().trim()));
+        }
+        applicationRepo.save(app);
+        return toOfferView(app);
+    }
 
     @Transactional(readOnly = true)
     public List<JobResponse> getPublicJobsBySlug(String slug) {

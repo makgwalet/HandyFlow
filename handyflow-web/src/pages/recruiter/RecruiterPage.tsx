@@ -14,6 +14,7 @@ import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
 import { RECRUITER_SECTIONS } from '../../navigation/moduleSections'
 import { useParams } from 'react-router-dom'
 import ApprovalPanel from './RecApproval'
+import OfferPanel from './RecOffer'
 import RecPrivacy from './RecPrivacy'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -614,6 +615,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
           </div>
 
           {app?.stage === 'OFFER' && app?.offeredSalary != null && !app?.offerLetterSentAt && <ApprovalPanel kind="offer" id={app.id} />}
+          {app?.stage === 'OFFER' && app?.offerLetterSentAt && <OfferPanel id={app.id} onChanged={invalidate} />}
 
           {/* Tabs */}
           <div style={{ display: 'flex' }}>

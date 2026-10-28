@@ -56,6 +56,11 @@ public class RecApplication {
     @Column(name = "offer_approved_by")        private UUID      offerApprovedBy;
     @Column(name = "offer_approved_at")        private Instant   offerApprovedAt;
     @Column(name = "offer_approval_note")      private String    offerApprovalNote;
+    @Column(name = "offer_expires_on")         private LocalDate offerExpiresOn;
+    @Column(name = "offer_response", nullable = false) private String offerResponse = "NONE";
+    @Column(name = "offer_responded_at")       private Instant   offerRespondedAt;
+    @Column(name = "offer_response_note")      private String    offerResponseNote;
+    @Column(name = "offer_response_by")        private UUID      offerResponseBy;
 
     // Referral tracking. referrerName is candidate-supplied free text at
     // apply time (a public applicant has no way to know internal user
@@ -168,6 +173,27 @@ public class RecApplication {
 
     public void markOfferLetterSent() {
         this.offerLetterSentAt = Instant.now();
+        touch();
+    }
+
+    public void markOfferLetterSent(LocalDate expiresOn) {
+        this.offerExpiresOn = expiresOn;
+        markOfferLetterSent();
+    }
+
+    public void recordOfferResponse(String response, String note, UUID by) {
+        this.offerResponse = response;
+        this.offerRespondedAt = Instant.now();
+        this.offerResponseNote = note == null || note.isBlank() ? null : note.trim();
+        this.offerResponseBy = by;
+        touch();
+    }
+
+    /** New terms put to the candidate: the letter, its date and the approval start again. */
+    public void reopenOfferAfterRevision() {
+        this.offerLetterSentAt = null; this.offerExpiresOn = null;
+        this.offerResponse = "NONE"; this.offerRespondedAt = null; this.offerResponseNote = null; this.offerResponseBy = null;
+        withdrawOfferApproval();
         touch();
     }
 
