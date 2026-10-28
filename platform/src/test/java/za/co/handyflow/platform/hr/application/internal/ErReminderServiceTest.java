@@ -145,4 +145,102 @@ class ErReminderServiceTest {
 
         assertThat(service.remindAll(today)).isEqualTo(1);
     }
+
+    // ── Hearing, suspension and review ───────────────────────────────────────────
+
+    private HrEmployee person(String name, String email) {
+        HrEmployee e = mock(HrEmployee.class);
+        lenient().when(e.getEmail()).thenReturn(email);
+        lenient().when(e.getFullName()).thenReturn(name);
+        lenient().when(e.getStatus()).thenReturn("ACTIVE");
+        return e;
+    }
+
+    private void idle(HrErCase c) {
+        // No step is due, so only the new reminders can send.
+        caseWith(c, rowDue(null, "Case step"));
+    }
+
+    @Test
+    void theDayBeforeAHearingTheChairTheInitiatorAndTheEmployeeEachAreTold() {
+        HrErCase c = aCase(owner);
+        UUID chair = UUID.randomUUID(), initiator = UUID.randomUUID();
+        c.issueNotice(java.time.Instant.now(), today.plusDays(1), java.time.LocalTime.of(9, 30), "Boardroom", chair, initiator);
+        idle(c);
+        HrEmployee chairP = person("Charles Chair", "chair@example.com");
+        HrEmployee initP = person("Ina Initiator", "init@example.com");
+        HrEmployee empP = person("Thandi Nkosi", "thandi@example.com");
+        when(employeeRepo.findActiveById(any(), eq(chair))).thenReturn(Optional.of(chairP));
+        when(employeeRepo.findActiveById(any(), eq(initiator))).thenReturn(Optional.of(initP));
+        when(employeeRepo.findActiveById(any(), eq(c.getEmployeeId()))).thenReturn(Optional.of(empP));
+
+        assertThat(service.remindAll(today)).isEqualTo(3);
+
+        List<NotificationRequest> out = sent();
+        assertThat(out).extracting(n -> n.recipients().get(0).email()).containsExactly("chair@example.com", "init@example.com", "thandi@example.com");
+        assertThat(out.get(0).message()).contains("You chair");
+        assertThat(out.get(2).message()).contains("Your hearing").contains("09:30");
+        for (NotificationRequest n : out) assertThat(n.message()).doesNotContain("Theft").doesNotContain("Secret").doesNotContain("Boardroom");
+    }
+
+    @Test
+    void aPartyWhoHasLeftOrHasNoEmailIsSkippedAndTheOthersStillGetTheirs() {
+        HrErCase c = aCase(owner);
+        UUID chair = UUID.randomUUID();
+        c.issueNotice(java.time.Instant.now(), today.plusDays(1), null, null, chair, null);
+        idle(c);
+        HrEmployee gone = person("Charles Chair", "chair@example.com");
+        when(gone.getStatus()).thenReturn("TERMINATED");
+        HrEmployee empP = person("Thandi Nkosi", "thandi@example.com");
+        when(employeeRepo.findActiveById(any(), eq(chair))).thenReturn(Optional.of(gone));
+        when(employeeRepo.findActiveById(any(), eq(c.getEmployeeId()))).thenReturn(Optional.of(empP));
+
+        assertThat(service.remindAll(today)).isEqualTo(1);
+    }
+
+    @Test
+    void aHearingNotTomorrowSendsNothing() {
+        HrErCase c = aCase(owner);
+        c.issueNotice(java.time.Instant.now(), today.plusDays(4), null, null, UUID.randomUUID(), UUID.randomUUID());
+        idle(c);
+
+        assertThat(service.remindAll(today)).isZero();
+    }
+
+    @Test
+    void theOwnerIsToldTheDayBeforeASuspensionEnds() {
+        HrErCase c = aCase(owner);
+        c.suspend(today.minusDays(5), today.plusDays(1), "Investigation");
+        idle(c);
+        HrEmployee mocked = ownerEmployee("olive@example.com", "ACTIVE");
+        when(employeeRepo.findByUserId(any(), eq(owner))).thenReturn(Optional.of(mocked));
+
+        assertThat(service.remindAll(today)).isEqualTo(1);
+        NotificationRequest n = sent().get(0);
+        assertThat(n.title()).isEqualTo("ER-2026-007: suspension ends tomorrow");
+        assertThat(n.message()).doesNotContain("Investigation").doesNotContain("Thandi");
+    }
+
+    @Test
+    void anOpenEndedSuspensionGoesToTheAdministratorsWhenThereIsNoOwner() {
+        HrErCase c = aCase(null);
+        c.suspend(today.minusDays(30), null, "Investigation");
+        idle(c);
+        when(admins.resolveTenantAdmins(any(TenantId.class))).thenReturn(List.of(Recipient.external("HR", "hr@example.com", null)));
+
+        assertThat(service.remindAll(today)).isEqualTo(1);
+        assertThat(sent().get(0).title()).contains("no end date");
+    }
+
+    @Test
+    void theOwnerIsToldWhenAReviewPeriodEndsWithNoOutcome() {
+        HrErCase c = aCase(owner);
+        c.setReview(today.minusDays(60), today.minusDays(1));
+        idle(c);
+        HrEmployee mocked = ownerEmployee("olive@example.com", "ACTIVE");
+        when(employeeRepo.findByUserId(any(), eq(owner))).thenReturn(Optional.of(mocked));
+
+        assertThat(service.remindAll(today)).isEqualTo(1);
+        assertThat(sent().get(0).title()).isEqualTo("ER-2026-007: review period has ended");
+    }
 }

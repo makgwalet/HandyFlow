@@ -1035,8 +1035,8 @@ I read the four training services, the entities and the session screen. The modu
 
 **Still not done**
 
-- The chair, initiator and employee are not reminded; only the case owner.
-- An appeal period that ends, a review date or a suspension end are reminded only if the list shows them as the case's due date (the end of the appeal period is; suspension and review dates are not).
+- ~~The chair, initiator and employee are not reminded; only the case owner.~~ Done in section 47.
+- ~~Suspension and review dates are not reminded.~~ Done in section 47; the end of the appeal period was already covered.
 - The job does not remember what it sent, so running it twice in one day would send twice.
 - Termination of employment still does not cancel approved leave, stop portal access or work out notice pay (section 19).
 
@@ -1180,3 +1180,21 @@ I read the four training services, the entities and the session screen. The modu
 - The dismissal route from a case does not ask how employment ended, so it never works out notice pay (the message says so). A dismissal for incapacity or poor performance owes notice; one for misconduct usually does not, and the case does not say which.
 - Farm and domestic workers have four weeks' notice after six months; not applied.
 - A leave request that runs past the last day is not shortened.
+
+## 47. Case reminders for the hearing, suspensions and review periods (Slice 21d)
+
+**What was missing.** Only the case owner was reminded, and only about the step the case list shows as due (a meeting, a grievance response, telling the employee, the end of the appeal period). The chair, the person presenting the case and the employee were never reminded of a hearing, and a suspension or an incapacity review period could pass without a word.
+
+**What was added** (same 07:55 morning job as before; no migration):
+- **Hearing tomorrow.** A case with a noticed hearing that has not been held gets three messages the day before: to the chair ("You chair the hearing for case ER-… on 2026-11-10 at 09:30"), to the person presenting the case, and to the employee ("Your hearing … is on …. The venue and your rights are in the notice you were given. If you cannot attend, tell HR today."). Each goes to that person's own contact; someone who has left or has no email is skipped and the others still get theirs.
+- **Suspension.** The case owner (or the administrators when there is none) is told the day before a suspension with an end date ends, and, for a suspension with **no end date**, at 30 days and every seventh day after that, because a precautionary suspension should be short. Nothing is sent after an end date: a suspension that ended on its planned date and one that someone ended leave the same record, and a "has ended" message would nag about work already done.
+- **Review period** (incapacity cases). The owner is told the day before a review period ends and the day after it ended if no outcome has been recorded, then weekly.
+- As before, the words carry the case number and dates only: no name, case type, reason, venue or subject, because an email is not a private place. Which day a message goes is decided in `ErReminderRules` (pure); `ErReminderService` only finds the people.
+
+**Tests.** `ErReminderRulesTest` now has 12 cases (five new groups) and passes in my harness; a deliberate change of the hearing day was caught. Six new Mockito cases in `ErReminderServiceTest` (three parties told, a leaver skipped, hearing not tomorrow, suspension ending, open-ended suspension to administrators, review ended) have not run. Spring and the database have not been used.
+
+**Not done.**
+- The respondent in a grievance (usually a manager) is not reminded of the hearing, and a representative or witness has no contact on the case to remind.
+- No reminder to the employee about suspension or review dates; they are told in their letter.
+- A hearing that is moved is reminded for its new date, but nobody is told it moved.
+- Reminders are still not remembered, so nothing stops a second run on the same day sending twice (the job runs once a day).
