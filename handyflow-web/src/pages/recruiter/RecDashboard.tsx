@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { apiClient } from '../../api/client'
+import RecFunnel from './RecFunnel'
 
 type Metric = { value: number | null; previous: number | null; changePercent: number | null }
 type Dash = {
@@ -23,7 +24,6 @@ const STAGE_WORD: Record<string, string> = { APPLIED: 'Applied', SCREENING: 'Scr
 const SOURCE_WORD: Record<string, string> = { CAREERS_PAGE: 'Careers page', REFERRAL: 'Referral', LINKEDIN: 'LinkedIn', INDEED: 'Indeed', MANUAL: 'Added by us', TALENT_POOL: 'Talent pool', OTHER: 'Other' }
 const TYPE_WORD: Record<string, string> = { PHONE: 'Phone', VIDEO: 'Video', IN_PERSON: 'On site', TECHNICAL: 'Technical', PANEL: 'Panel' }
 const PALETTE = ['var(--hf-primary)', 'var(--hf-success)', 'var(--hf-warning)', 'var(--hf-violet)', 'var(--hf-sky)', 'var(--hf-orange)', 'var(--hf-text-faint)']
-const FUNNEL_TONE = ['var(--hf-info)', 'var(--hf-sky)', 'var(--hf-violet)', 'var(--hf-warning)', 'var(--hf-success)']
 const word = (m: Record<string, string>, k: string) => m[k] ?? k.charAt(0) + k.slice(1).toLowerCase().replace(/_/g, ' ')
 const when = (iso: string) => new Date(iso).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 const ago = (iso: string) => {
@@ -115,19 +115,9 @@ export default function RecDashboard() {
 
           <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
             <div style={card}>
-              <strong>Hiring funnel</strong>
-              <div style={{ ...muted, margin: '2px 0 8px' }}>Of the {d.funnel[0].count} applications received, how many reached each stage.</div>
-              {d.funnel.map((f, i) => {
-                const pct = d.funnel[0].count === 0 ? 0 : Math.round((f.count / d.funnel[0].count) * 100)
-                return (
-                  <div key={f.stage} style={{ marginBottom: 7 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>{word(STAGE_WORD, f.stage)}</span><span>{f.count} <span style={muted}>({pct}%)</span></span></div>
-                    <div style={{ background: 'var(--hf-surface-muted)', borderRadius: 4, height: 10 }}>
-                      <div style={{ width: `${pct}%`, minWidth: f.count > 0 ? 4 : 0, height: 10, borderRadius: 4, background: FUNNEL_TONE[i] }} />
-                    </div>
-                  </div>
-                )
-              })}
+              <strong>Recruitment pipeline</strong>
+              <div style={{ ...muted, margin: '2px 0 10px' }}>Of the {d.funnel[0].count} applications received in this period, how many reached each stage.</div>
+              <RecFunnel stages={d.funnel.map(f => ({ label: word(STAGE_WORD, f.stage), count: f.count }))} />
             </div>
 
             <div style={card}>

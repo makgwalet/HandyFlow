@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
+import RecFunnel from './RecFunnel'
 
 type Info = { id: string; title: string; definition: string; usesDateRange: boolean }
 type Table = { id: string; title: string; definition: string; from: string | null; to: string | null; columns: string[]; rows: (string | number | null)[][] }
@@ -64,6 +65,11 @@ export default function RecReports() {
       {report.data && (
         <>
           {report.data.from && <div style={{ color: 'var(--hf-text-muted)', marginBottom: 6 }}>{report.data.from} to {report.data.to}</div>}
+          {id === 'funnel' && report.data.rows.length > 0 && Number(report.data.rows[0][1]) > 0 && (
+            <div style={{ margin: '4px 0 14px' }}>
+              <RecFunnel stages={report.data.rows.map(r => ({ label: String(r[0]), count: Number(r[1]) || 0 }))} caption="Applications received in the range, and how many reached each stage." />
+            </div>
+          )}
           <table style={{ borderCollapse: 'collapse', width: '100%' }}>
             <thead>
               <tr>{report.data.columns.map(c => <th key={c} style={{ textAlign: 'left', padding: '6px 8px', borderBottom: '1px solid var(--hf-border)' }}>{c}</th>)}</tr>
