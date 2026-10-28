@@ -1143,3 +1143,22 @@ I read the four training services, the entities and the session screen. The modu
 **Tests.** `SavedReportRulesTest` (10) passes in my harness and a deliberate break of the once-a-day rule was caught. The screen's logic was checked under node. `SavedReportServiceTest` (8, Mockito) and the frontend tests (`savedReports.test.ts` and three added to `Reports.test.tsx`) have not run (no Mockito or vitest here). Spring, the migration and a browser have not been used.
 
 **Not done.** Reminders are in the app only: no email, because the owner's address is not held by this module and sending figures by email is not safe. No sharing a saved report with someone else, and no editing one (delete and save again). A person whose user is not linked cannot save reports.
+
+## 45. Carried-over leave that expires (Slice 21b, V532)
+
+**What was missing.** A company could cap how many days are carried into a new year, but not say that carried days must be used within a set time. Carried leave therefore lived forever and was paid out in full at the end of employment.
+
+**What was added.**
+- The carry-over policy (HR → Leave) has a second setting: **carried leave expires after N months**, from 6 to 24. Six is the floor because the BCEA gives employees six months after a leave cycle to take their leave. Like the cap, it needs the written agreement named (BCEA section 20(7)), starts from next year at the earliest, and never changes a year that has already rolled over. The cap and the expiry can be used together or alone.
+- Once the expiry date has passed (the last day of the Nth month of the year the leave was carried into), the unused carried days are taken off in one ledger entry dated that day, with a note naming the months and the agreement, so the statement shows where they went. Leave taken in the new year uses the carried days first. Posted once; reading the balance again changes nothing, and a late first read gives the same answer because it works from entry dates.
+- **Leaving the company:** carried leave that has already expired is no longer in the balance that is paid out.
+- The "at risk" view (HR → Leave) now also lists who has unused carried days that go on the expiry date. It lists no-one once the date has passed.
+- Migration V532 adds `carry_expiry_months` to `hr_leave_policy` with a check that an expiry needs a year and an agreement. The policy request and view gained `carryExpiryMonths`; the old three-field forms still work.
+
+**Tests.** `LeavePolicyRulesTest` (14, seven new) and `LeaveRulesTest` (22, one new, for payout on leaving) pass in my harness and a deliberate break of the expiry date was caught. Four new Mockito cases in `LeaveServiceTest` (kept until the date, taken off once and dated that day, a later start year leaves the past alone, the policy saves and shows back) have not run; one needs the date to be after 30 June and skips itself otherwise. The screen's logic was checked under node; the frontend tests (new ones in `LeavePolicy.test.tsx`) have not run. Spring, the migration and a browser have not been used.
+
+**Not done.**
+- No reminder yet to the employee or the manager before carried leave expires (the existing reminder only covers the year-end cap), so people find out from the at-risk list or the statement.
+- Cash-out during employment is not built. The BCEA only allows pay in place of leave when employment ends (section 40) apart from narrow agreed cases, so I left it out rather than guess.
+- A negative balance at leaving is still not taken off the final pay: a deduction needs the employee's written agreement (section 34), which the system does not record.
+- Expiry uses the first-in rule (carried days are used first); a company that wants a different order has no setting for it.

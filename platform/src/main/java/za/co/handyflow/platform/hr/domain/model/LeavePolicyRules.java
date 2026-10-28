@@ -13,12 +13,24 @@ public final class LeavePolicyRules {
 
     public static final BigDecimal MAX_CAP = new BigDecimal("100");
 
-    /** Null when the policy may be saved. A null cap removes the limit. */
+    /** Carried leave can be made to expire no sooner than the six months the BCEA gives after a leave cycle ends (section 20(2)). */
+    public static final int MIN_EXPIRY_MONTHS = 6, MAX_EXPIRY_MONTHS = 24;
+
+    /** Null when the policy may be saved. A null cap and a null expiry remove the policy. */
     public static String policyProblem(BigDecimal cap, Integer effectiveYear, String agreementRef, int thisYear) {
-        if (cap == null) return null;
-        if (cap.signum() < 0) return "The most that can be carried over cannot be negative.";
-        if (cap.compareTo(MAX_CAP) > 0) return "The most that can be carried over cannot be more than " + MAX_CAP.toBigInteger() + " days.";
-        if (cap.scale() > 2) return "Use at most two decimals for the days.";
+        return policyProblem(cap, null, effectiveYear, agreementRef, thisYear);
+    }
+
+    /** As above, for a policy that may also make leave carried into a year expire after a number of months. */
+    public static String policyProblem(BigDecimal cap, Integer expiryMonths, Integer effectiveYear, String agreementRef, int thisYear) {
+        if (cap == null && expiryMonths == null) return null;
+        if (cap != null) {
+            if (cap.signum() < 0) return "The most that can be carried over cannot be negative.";
+            if (cap.compareTo(MAX_CAP) > 0) return "The most that can be carried over cannot be more than " + MAX_CAP.toBigInteger() + " days.";
+            if (cap.scale() > 2) return "Use at most two decimals for the days.";
+        }
+        if (expiryMonths != null && (expiryMonths < MIN_EXPIRY_MONTHS || expiryMonths > MAX_EXPIRY_MONTHS))
+            return "Carried leave can expire after " + MIN_EXPIRY_MONTHS + " to " + MAX_EXPIRY_MONTHS + " months. Employees have six months after a leave cycle to take their leave.";
         if (effectiveYear == null) return "Say from which year the limit applies.";
         if (effectiveYear <= thisYear)
             return "The limit can only start from next year (" + (thisYear + 1) + ") or later; leave already carried into " + thisYear + " cannot be changed.";
@@ -53,6 +65,32 @@ public final class LeavePolicyRules {
 
     public static String forfeitNote(BigDecimal cap, String agreementRef, int fromYear) {
         return "Over the " + cap.stripTrailingZeros().toPlainString() + "-day limit for carrying leave into " + (fromYear + 1)
+                + (agreementRef == null || agreementRef.isBlank() ? "" : " (" + agreementRef.trim() + ")");
+    }
+
+    /** The number of months carried leave lasts in the given year, or null when it does not expire. */
+    public static Integer expiryFor(Integer expiryMonths, Integer effectiveYear, int carriedIntoYear) {
+        if (expiryMonths == null || effectiveYear == null || carriedIntoYear < effectiveYear) return null;
+        return expiryMonths;
+    }
+
+    /** The last day carried leave can be used: the end of the Nth month of the year it was carried into. */
+    public static java.time.LocalDate expiryDate(int carriedIntoYear, int months) {
+        return java.time.LocalDate.of(carriedIntoYear, 1, 1).plusMonths(months).minusDays(1);
+    }
+
+    /**
+     * Carried days still unused on the expiry date. Leave taken in the new year uses the carried days first, so only what is left of them
+     * goes. {@code takenInWindow} is a positive number of days taken from 1 January to the expiry date, reversals netted off.
+     */
+    public static BigDecimal unusedCarried(BigDecimal carried, BigDecimal takenInWindow) {
+        if (carried == null || carried.signum() <= 0) return BigDecimal.ZERO;
+        BigDecimal left = carried.subtract(takenInWindow == null ? BigDecimal.ZERO : takenInWindow.max(BigDecimal.ZERO));
+        return left.signum() <= 0 ? BigDecimal.ZERO : left.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    public static String expireNote(int months, String agreementRef, int carriedIntoYear) {
+        return "Leave carried into " + carriedIntoYear + " not used within " + months + " months"
                 + (agreementRef == null || agreementRef.isBlank() ? "" : " (" + agreementRef.trim() + ")");
     }
 }

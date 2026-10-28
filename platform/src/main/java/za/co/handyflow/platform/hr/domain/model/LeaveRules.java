@@ -90,7 +90,7 @@ public final class LeaveRules {
      * Annual leave still owing at the end of employment, to be paid out (BCEA section 40). Lines are the ledger entries of the year of the
      * leaving date, dated up to the leaving date. What was earned is the larger of what the ledger shows and what the rule says was earned by
      * that date, so an accrual posted later than the leaving date (the ledger is topped up whenever someone opens it) is not missed and one
-     * posted for days after it is not counted. Reservations are ignored: they are leave asked for, not leave taken. A negative balance, leave
+     * posted for days after it is not counted. Reservations are ignored: they are leave asked for, not leave taken. Carried leave that expired under the company policy is already off the balance. A negative balance, leave
      * taken in advance, pays nothing; it is not taken off the pay here.
      */
     public static BigDecimal annualOwing(List<Line> lines, BigDecimal earnedToLeavingDate) {
@@ -98,7 +98,7 @@ public final class LeaveRules {
         for (Line l : lines) {
             switch (l.kind()) {
                 case ACCRUAL, OPENING -> accrued = accrued.add(l.days());
-                case CARRY_FORWARD, ADJUSTMENT -> other = other.add(l.days());
+                case CARRY_FORWARD, ADJUSTMENT, EXPIRY -> other = other.add(l.days());
                 case TAKEN, REVERSAL -> taken = taken.subtract(l.days());
                 default -> { }
             }

@@ -88,14 +88,24 @@ export const canSetPolicy = (permissions: string[]) => permissions.includes("HR_
 
 export const MAX_CAP = 100
 
-/** Null when the policy may be sent. An empty cap means "no limit". Messages match the server's. */
-export function policyProblem(cap: string, effectiveYear: string, agreement: string, thisYear: number): string | null {
-  if (cap.trim() === "") return null
-  const n = Number(cap)
-  if (!Number.isFinite(n)) return "Enter the most days that may be carried over."
-  if (n < 0) return "The most that can be carried over cannot be negative."
-  if (n > MAX_CAP) return `The most that can be carried over cannot be more than ${MAX_CAP} days.`
-  if (!/^\d+(\.\d{1,2})?$/.test(cap.trim())) return "Use at most two decimals for the days."
+export const MIN_EXPIRY = 6
+export const MAX_EXPIRY = 24
+
+/** Null when the policy may be sent. An empty cap and an empty expiry together mean "no policy". Messages match the server's. */
+export function policyProblem(cap: string, effectiveYear: string, agreement: string, thisYear: number, expiry = ""): string | null {
+  if (cap.trim() === "" && expiry.trim() === "") return null
+  if (cap.trim() !== "") {
+    const n = Number(cap)
+    if (!Number.isFinite(n)) return "Enter the most days that may be carried over."
+    if (n < 0) return "The most that can be carried over cannot be negative."
+    if (n > MAX_CAP) return `The most that can be carried over cannot be more than ${MAX_CAP} days.`
+    if (!/^\d+(\.\d{1,2})?$/.test(cap.trim())) return "Use at most two decimals for the days."
+  }
+  if (expiry.trim() !== "") {
+    const m = Number(expiry)
+    if (!Number.isInteger(m) || m < MIN_EXPIRY || m > MAX_EXPIRY)
+      return `Carried leave can expire after ${MIN_EXPIRY} to ${MAX_EXPIRY} months. Employees have six months after a leave cycle to take their leave.`
+  }
   const y = Number(effectiveYear)
   if (!Number.isInteger(y)) return "Say from which year the limit applies."
   if (y <= thisYear) return `The limit can only start from next year (${thisYear + 1}) or later.`
@@ -103,4 +113,22 @@ export function policyProblem(cap: string, effectiveYear: string, agreement: str
   if (!agreement.trim()) return "Leave can only be forfeited by written agreement. Say which agreement or policy document allows it."
   if (agreement.trim().length > 200) return "The agreement reference is too long (200 characters at most)."
   return null
+}
+
+/** The body sent to the server. Both empty removes the policy. */
+export function policyBody(cap: string, expiry: string, effectiveYear: string, agreement: string) {
+  if (cap.trim() === "" && expiry.trim() === "") return { carryOverCapDays: null, carryExpiryMonths: null, effectiveYear: null, agreementRef: null }
+  return {
+    carryOverCapDays: cap.trim() === "" ? null : Number(cap), carryExpiryMonths: expiry.trim() === "" ? null : Number(expiry),
+    effectiveYear: Number(effectiveYear), agreementRef: agreement.trim(),
+  }
+}
+
+/** One plain sentence on what the policy does. */
+export function policySummary(p: { carryOverCapDays: number | null; carryExpiryMonths?: number | null; effectiveYear: number | null; agreementRef: string | null }): string {
+  const parts: string[] = []
+  if (p.carryOverCapDays != null) parts.push(`At most ${p.carryOverCapDays} days are carried over from the end of ${(p.effectiveYear ?? 0) - 1} onward.`)
+  if (p.carryExpiryMonths != null) parts.push(`Leave carried into ${p.effectiveYear} or later that is not used within ${p.carryExpiryMonths} months is forfeited.`)
+  if (parts.length === 0) return "No limit: all unused annual leave is carried over."
+  return `${parts.join(" ")} Agreement: ${p.agreementRef ?? "–"}.`
 }

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import LeavePolicy from "./LeavePolicy"
-import { canSetPolicy, kindLabel, policyProblem } from "./leave.logic"
+import { canSetPolicy, kindLabel, policyBody, policyProblem, policySummary } from "./leave.logic"
 
 const get = vi.fn()
 const put = vi.fn()
@@ -29,6 +29,11 @@ describe("leave policy rules in the browser", () => {
     expect(policyProblem("101", String(THIS + 1), "x", THIS)).toMatch(/more than 100/)
     expect(policyProblem("5.123", String(THIS + 1), "x", THIS)).toMatch(/two decimals/)
     expect(policyProblem("5", String(THIS + 9), "x", THIS)).toMatch(/too far/)
+    expect(policyProblem("", String(THIS + 1), "Policy 1", THIS, "12")).toBeNull()
+    expect(policyProblem("", String(THIS + 1), "Policy 1", THIS, "5")).toMatch(/6 to 24 months/)
+    expect(policyProblem("", String(THIS + 1), "Policy 1", THIS, "25")).toMatch(/6 to 24 months/)
+    expect(policyProblem("", String(THIS + 1), "Policy 1", THIS, "7.5")).toMatch(/6 to 24 months/)
+    expect(policyProblem("", String(THIS + 1), "  ", THIS, "12")).toMatch(/written agreement/)
   })
   it("only offers the form to HR managers, and labels forfeited days", () => {
     expect(canSetPolicy(["HR_MANAGE"])).toBe(true)
@@ -57,7 +62,7 @@ describe("LeavePolicy panel", () => {
     fireEvent.change(screen.getByLabelText("Agreement"), { target: { value: "Leave policy 2026" } })
     expect(save.disabled).toBe(false)
     fireEvent.click(save)
-    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/hr/leave-policy", { carryOverCapDays: 5, effectiveYear: THIS + 1, agreementRef: "Leave policy 2026" }))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/hr/leave-policy", { carryOverCapDays: 5, carryExpiryMonths: null, effectiveYear: THIS + 1, agreementRef: "Leave policy 2026" }))
   })
 
   it("shows the server's reason when the policy is refused", async () => {
@@ -86,5 +91,17 @@ describe("LeavePolicy panel", () => {
     const { container } = show(["HR_READ"])
     await waitFor(() => expect(get).toHaveBeenCalled())
     expect(container.textContent).toBe("")
+  })
+})
+
+describe("carried leave expiry", () => {
+  it("sends both settings, or nothing when both are empty", () => {
+    expect(policyBody("", "12", "2027", " Policy 1 ")).toEqual({ carryOverCapDays: null, carryExpiryMonths: 12, effectiveYear: 2027, agreementRef: "Policy 1" })
+    expect(policyBody("5", "12", "2027", "P")).toEqual({ carryOverCapDays: 5, carryExpiryMonths: 12, effectiveYear: 2027, agreementRef: "P" })
+    expect(policyBody(" ", " ", "2027", "P")).toEqual({ carryOverCapDays: null, carryExpiryMonths: null, effectiveYear: null, agreementRef: null })
+  })
+  it("says in one sentence what the policy does", () => {
+    expect(policySummary({ carryOverCapDays: null, effectiveYear: null, agreementRef: null })).toMatch(/No limit/)
+    expect(policySummary({ carryOverCapDays: null, carryExpiryMonths: 12, effectiveYear: 2027, agreementRef: "P1" })).toBe("Leave carried into 2027 or later that is not used within 12 months is forfeited. Agreement: P1.")
   })
 })

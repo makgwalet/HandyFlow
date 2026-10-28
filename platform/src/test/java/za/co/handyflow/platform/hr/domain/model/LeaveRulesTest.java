@@ -148,6 +148,12 @@ class LeaveRulesTest {
     }
 
     @Test
+    void carriedLeaveThatExpiredIsNotPaidOut() {
+        List<LeaveRules.Line> lines = List.of(line("ACCRUAL", "10"), line("CARRY_FORWARD", "8"), line("EXPIRY", "-5"), line("TAKEN", "-3"));
+        assertThat(LeaveRules.annualOwing(lines, new BigDecimal("10")).compareTo(new BigDecimal("10"))).isEqualTo(0);
+    }
+
+    @Test
     void leaveEarnedUpToTheLeavingDateCountsEvenWhenNotYetPosted() {
         List<LeaveRules.Line> lines = List.of(line("ACCRUAL", "8"), line("TAKEN", "-3"));
         assertThat(LeaveRules.annualOwing(lines, new BigDecimal("12.5")).compareTo(new BigDecimal("9.5"))).isEqualTo(0);

@@ -216,43 +216,86 @@ public class LeaveService {
     @Transactional(readOnly = true)
     public PolicyView policy(TenantId tenantId) {
         return policyRepo.findById(tenantId.getValue()).map(LeaveService::view)
-                .orElseGet(() -> new PolicyView(null, null, null, null));
+                .orElseGet(() -> new PolicyView(null, null, null, null, null));
     }
 
     /** Sets or removes the limit on carrying annual leave into a new year. Only rollovers that have not happened yet are affected. */
     @Transactional
     public PolicyView updatePolicy(TenantId tenantId, PolicyRequest req, UUID actor) {
         if (actor == null) throw new AccessDeniedException("Your user could not be identified, so this step cannot be recorded.");
-        fail(LeavePolicyRules.policyProblem(req.carryOverCapDays(), req.effectiveYear(), req.agreementRef(), LocalDate.now(ZONE).getYear()));
+        fail(LeavePolicyRules.policyProblem(req.carryOverCapDays(), req.carryExpiryMonths(), req.effectiveYear(), req.agreementRef(), LocalDate.now(ZONE).getYear()));
         HrLeavePolicy p = policyRepo.findById(tenantId.getValue()).orElseGet(() -> HrLeavePolicy.none(tenantId.getValue()));
-        p.set(req.carryOverCapDays() == null ? null : req.carryOverCapDays().setScale(2, RoundingMode.HALF_UP), req.effectiveYear(), req.agreementRef(), actor);
+        p.set(req.carryOverCapDays() == null ? null : req.carryOverCapDays().setScale(2, RoundingMode.HALF_UP), req.carryExpiryMonths(), req.effectiveYear(), req.agreementRef(), actor);
         policyRepo.save(p);
         return view(p);
     }
 
-    /** Who would lose annual leave at the coming rollover if they took no more. Empty when there is no limit that will apply. */
+    /**
+     * Who would lose annual leave at the coming rollover if they took no more, and whose carried-over leave is still unused and will
+     * go on the expiry date. Each list is empty when no limit applies to it.
+     */
     @Transactional
     public AtRiskReport atRisk(TenantId tenantId) {
         LocalDate today = LocalDate.now(ZONE);
         int next = today.getYear() + 1;
         HrLeavePolicy policy = policyRepo.findById(tenantId.getValue()).orElse(null);
         BigDecimal cap = policy == null ? null : LeavePolicyRules.capFor(policy.getCarryOverCapDays(), policy.getEffectiveYear(), next);
-        if (cap == null) return new AtRiskReport(null, next, List.of());
+        Integer months = policy == null ? null : LeavePolicyRules.expiryFor(policy.getCarryExpiryMonths(), policy.getEffectiveYear(), today.getYear());
+        LocalDate expiresOn = months == null ? null : LeavePolicyRules.expiryDate(today.getYear(), months);
+        if (expiresOn != null && today.isAfter(expiresOn)) { months = null; expiresOn = null; }
+        if (cap == null && months == null) return new AtRiskReport(null, next, List.of());
         List<AtRisk> out = new ArrayList<>();
+        List<Expiring> expiring = new ArrayList<>();
         for (HrEmployee emp : employeeRepo.findNotTerminated(tenantId)) {
             ensureAccrued(tenantId, emp, today);
-            BigDecimal available = totalsAt(tenantId, emp, LeaveRules.ANNUAL, today).available();
-            BigDecimal ahead = LeaveRules.annualEarned(emp.getStartDate(), ledgerStart(tenantId), today.getYear(), LocalDate.of(today.getYear(), 12, 31))
-                    .subtract(LeaveRules.annualEarned(emp.getStartDate(), ledgerStart(tenantId), today.getYear(), today)).max(BigDecimal.ZERO);
-            BigDecimal lose = LeavePolicyRules.atRisk(available, ahead, cap);
-            if (lose.signum() > 0) out.add(new AtRisk(emp.getId(), emp.getFullName(), available, available.add(ahead), lose));
+            if (cap != null) {
+                BigDecimal available = totalsAt(tenantId, emp, LeaveRules.ANNUAL, today).available();
+                BigDecimal ahead = LeaveRules.annualEarned(emp.getStartDate(), ledgerStart(tenantId), today.getYear(), LocalDate.of(today.getYear(), 12, 31))
+                        .subtract(LeaveRules.annualEarned(emp.getStartDate(), ledgerStart(tenantId), today.getYear(), today)).max(BigDecimal.ZERO);
+                BigDecimal lose = LeavePolicyRules.atRisk(available, ahead, cap);
+                if (lose.signum() > 0) out.add(new AtRisk(emp.getId(), emp.getFullName(), available, available.add(ahead), lose));
+            }
+            if (months != null) {
+                BigDecimal unused = unusedCarriedAt(tenantId, emp.getId(), today.getYear(), expiresOn);
+                if (unused.signum() > 0) expiring.add(new Expiring(emp.getId(), emp.getFullName(), unused, expiresOn));
+            }
         }
         out.sort(Comparator.comparing(AtRisk::wouldLose).reversed());
-        return new AtRiskReport(cap, next, out);
+        expiring.sort(Comparator.comparing(Expiring::unused).reversed());
+        return new AtRiskReport(cap, next, out, months, expiresOn, expiring);
+    }
+
+    /** Carried-in days not yet used by the expiry date, counting only leave taken so far. */
+    private BigDecimal unusedCarriedAt(TenantId tenantId, UUID employeeId, int year, LocalDate expiryDate) {
+        LocalDate jan1 = LocalDate.of(year, 1, 1);
+        BigDecimal carried = ledgerRepo.window(tenantId, employeeId, LeaveRules.ANNUAL, jan1, jan1).stream()
+                .filter(l -> LeaveRules.CARRY_FORWARD.equals(l.getKind())).map(HrLeaveLedger::getDays).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal taken = ledgerRepo.window(tenantId, employeeId, LeaveRules.ANNUAL, jan1, expiryDate).stream()
+                .filter(l -> LeaveRules.TAKEN.equals(l.getKind()) || LeaveRules.REVERSAL.equals(l.getKind()))
+                .map(HrLeaveLedger::getDays).reduce(BigDecimal.ZERO, BigDecimal::add).negate();
+        return LeavePolicyRules.unusedCarried(carried, taken);
+    }
+
+    /**
+     * Once the expiry date has passed, takes off the carried-over days that were not used. Posted once, dated the expiry date, so the
+     * statement shows where the days went. Does nothing before the date, and for a year the policy does not cover.
+     */
+    private void expireCarried(TenantId tenantId, UUID employeeId, int year, LocalDate asOf) {
+        HrLeavePolicy policy = policyRepo.findById(tenantId.getValue()).orElse(null);
+        Integer months = policy == null ? null : LeavePolicyRules.expiryFor(policy.getCarryExpiryMonths(), policy.getEffectiveYear(), year);
+        if (months == null) return;
+        LocalDate expiryDate = LeavePolicyRules.expiryDate(year, months);
+        if (!asOf.isAfter(expiryDate)) return;
+        String key = "expire-carry:" + year;
+        if (ledgerRepo.countKey(tenantId, employeeId, LeaveRules.ANNUAL, LeaveRules.EXPIRY, key) > 0) return;
+        BigDecimal unused = unusedCarriedAt(tenantId, employeeId, year, expiryDate);
+        if (unused.signum() <= 0) return;
+        post(tenantId, employeeId, LeaveRules.ANNUAL, expiryDate, LeaveRules.EXPIRY, unused.negate(), null, key,
+                LeavePolicyRules.expireNote(months, policy.getAgreementRef(), year), null);
     }
 
     private static PolicyView view(HrLeavePolicy p) {
-        return new PolicyView(p.getCarryOverCapDays(), p.getEffectiveYear(), p.getAgreementRef(), p.getUpdatedAt());
+        return new PolicyView(p.getCarryOverCapDays(), p.getCarryExpiryMonths(), p.getEffectiveYear(), p.getAgreementRef(), p.getUpdatedAt());
     }
 
     // ── Accrual ─────────────────────────────────────────────────────────────────────────────────
@@ -271,7 +314,7 @@ public class LeaveService {
         for (int y = firstYear; y <= asOf.getYear(); y++) {
             LocalDate yearStart = LocalDate.of(y, 1, 1), yearEnd = LocalDate.of(y, 12, 31);
             LocalDate upTo = asOf.isAfter(yearEnd) ? yearEnd : asOf;
-            if (y > firstYear) carryForward(tenantId, id, y);
+            if (y > firstYear) { carryForward(tenantId, id, y); expireCarried(tenantId, id, y, asOf); }
             accrue(tenantId, id, LeaveRules.ANNUAL, yearStart, yearEnd, LeaveRules.annualEarned(start, ledgerStart, y, upTo), upTo);
             if (y >= ledgerStart.getYear()) {
                 accrue(tenantId, id, LeaveRules.FAMILY, yearStart, yearEnd, LeaveRules.familyEarned(start, y, upTo), upTo);

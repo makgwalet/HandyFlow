@@ -419,6 +419,53 @@ class LeaveServiceTest {
         assertThat(lastYear.availableDays().compareTo(new BigDecimal("5"))).isLessThanOrEqualTo(0);
     }
 
+    // ── Carried leave that expires ──────────────────────────────────────────────────────────────
+
+    private void expiryOf(int months, int fromYear) {
+        HrLeavePolicy policy = HrLeavePolicy.none(tenant.getValue());
+        policy.set(null, months, fromYear, "Leave policy 2026, signed by staff", approver);
+        when(policyRepo.findById(any())).thenReturn(Optional.of(policy));
+    }
+
+    @Test
+    void carriedLeaveIsKeptUntilItsExpiryDate() {
+        expiryOf(24, today.getYear());
+        balance("ANNUAL");
+
+        assertThat(count("EXPIRY")).isZero();
+    }
+
+    @Test
+    void carriedLeaveNotUsedByTheExpiryDateIsTakenOffOnceAndDatedThatDay() {
+        org.junit.jupiter.api.Assumptions.assumeTrue(today.getMonthValue() > 6);
+        expiryOf(6, today.getYear());
+        balance("ANNUAL");
+        balance("ANNUAL");
+
+        assertThat(count("EXPIRY")).isEqualTo(1);
+        HrLeaveLedger lost = ledger.stream().filter(l -> l.getKind().equals("EXPIRY")).findFirst().orElseThrow();
+        assertThat(lost.getEntryDate()).isEqualTo(LocalDate.of(today.getYear(), 6, 30));
+        assertThat(lost.getDays().signum()).isEqualTo(-1);
+        assertThat(lost.getNote()).contains("6 months");
+    }
+
+    @Test
+    void anExpiryThatStartsNextYearDoesNotTouchLeaveAlreadyCarried() {
+        expiryOf(6, today.getYear() + 1);
+        balance("ANNUAL");
+
+        assertThat(count("EXPIRY")).isZero();
+    }
+
+    @Test
+    void aPolicyWithOnlyAnExpiryIsSavedAndShownBack() {
+        var saved = service.updatePolicy(tenant, new LeavePolicyDtos.PolicyRequest(null, 12, today.getYear() + 1, "Policy 1"), approver);
+
+        assertThat(saved.carryExpiryMonths()).isEqualTo(12);
+        assertThatThrownBy(() -> service.updatePolicy(tenant, new LeavePolicyDtos.PolicyRequest(null, 3, today.getYear() + 1, "Policy 1"), approver))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test
     void thePolicyCannotBeSavedWithoutTheAgreementOrForThisYear() {
         assertThatThrownBy(() -> service.updatePolicy(tenant, new LeavePolicyDtos.PolicyRequest(new BigDecimal("5"), today.getYear() + 1, " "), approver))

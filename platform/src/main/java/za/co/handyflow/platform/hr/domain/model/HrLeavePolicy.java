@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
-/** A company's limit on annual leave carried into a new year. No row, or no cap, means no limit. */
+/** A company's limit on annual leave carried into a new year, and how long carried leave lasts. No row, or no cap, means no limit. */
 @Entity
 @Table(name = "hr_leave_policy")
 @Getter
@@ -20,6 +20,7 @@ public class HrLeavePolicy {
 
     @Id @Column(name = "tenant_id") UUID tenantId;
     @Column(name = "carry_over_cap_days") BigDecimal carryOverCapDays;
+    @Column(name = "carry_expiry_months") Integer carryExpiryMonths;
     @Column(name = "effective_year")      Integer effectiveYear;
     @Column(name = "agreement_ref")       String agreementRef;
     @Column(name = "updated_by")          UUID updatedBy;
@@ -32,10 +33,14 @@ public class HrLeavePolicy {
         return p;
     }
 
-    public void set(BigDecimal cap, Integer effectiveYear, String agreementRef, UUID by) {
+    public void set(BigDecimal cap, Integer effectiveYear, String agreementRef, UUID by) { set(cap, null, effectiveYear, agreementRef, by); }
+
+    public void set(BigDecimal cap, Integer expiryMonths, Integer effectiveYear, String agreementRef, UUID by) {
+        boolean none = cap == null && expiryMonths == null;
         this.carryOverCapDays = cap;
-        this.effectiveYear = cap == null ? null : effectiveYear;
-        this.agreementRef = cap == null ? null : (agreementRef == null ? null : agreementRef.trim());
+        this.carryExpiryMonths = expiryMonths;
+        this.effectiveYear = none ? null : effectiveYear;
+        this.agreementRef = none ? null : (agreementRef == null ? null : agreementRef.trim());
         this.updatedBy = by;
         this.updatedAt = Instant.now();
     }
