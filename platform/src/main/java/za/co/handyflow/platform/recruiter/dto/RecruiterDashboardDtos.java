@@ -11,7 +11,8 @@ public final class RecruiterDashboardDtos {
     public record Metric(Double value, Double previous, Double changePercent) {}
     public record StageCount(String stage, long count) {}
     public record TopJob(UUID id, String title, long applications, long hires) {}
-    public record SourceCount(String source, long count) {}
+    /** Applications received from a source in the period, and how many of those people are hired now. */
+    public record SourceCount(String source, long count, long hires) {}
     public record UpcomingInterview(UUID applicationId, String candidate, String jobTitle, String type, Instant scheduledAt) {}
     public record Activity(Instant at, String kind, UUID applicationId, String candidate, String jobTitle, String stage) {}
     public record Dashboard(int days, long activeJobs, Metric applications, Metric interviews, Metric offers, Metric hires, Metric timeToHireDays,

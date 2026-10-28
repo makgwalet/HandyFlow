@@ -58,9 +58,9 @@ public class RecruiterDashboardService {
                 """, (rs, i) -> new TopJob(rs.getObject("id", UUID.class), rs.getString("title"), rs.getLong("apps"), rs.getLong("hires")), from, end, t);
 
         List<SourceCount> sources = jdbc.query("""
-                SELECT COALESCE(source, 'OTHER') AS source, COUNT(*) AS n FROM rec_applications
+                SELECT COALESCE(source, 'OTHER') AS source, COUNT(*) AS n, COUNT(*) FILTER (WHERE stage = 'HIRED') AS hires FROM rec_applications
                 WHERE tenant_id = ? AND applied_at >= ? AND applied_at < ? GROUP BY 1 ORDER BY n DESC
-                """, (rs, i) -> new SourceCount(rs.getString("source"), rs.getLong("n")), t, from, end);
+                """, (rs, i) -> new SourceCount(rs.getString("source"), rs.getLong("n"), rs.getLong("hires")), t, from, end);
 
         List<UpcomingInterview> upcoming = jdbc.query("""
                 SELECT i.application_id, ap.first_name || ' ' || ap.last_name AS candidate, j.title, i.interview_type, i.scheduled_at
@@ -85,6 +85,13 @@ public class RecruiterDashboardService {
                 rs.getString("candidate"), rs.getString("title"), rs.getString("stage")), t, t);
 
         return new Dashboard(days, activeJobs, applications, interviews, offers, hires, timeToHire, funnel, topJobs, sources, upcoming, activity);
+    }
+
+    /** The company's slug as it appears in its public careers address, or null when it has none. */
+    @Transactional(readOnly = true)
+    public String careersSlug(TenantId tenantId) {
+        List<String> slugs = jdbc.queryForList("SELECT slug FROM tenants WHERE id = ?", String.class, tenantId.getValue());
+        return slugs.isEmpty() || slugs.get(0) == null || slugs.get(0).isBlank() ? null : slugs.get(0);
     }
 
     private Metric metric(long current, long previous) {

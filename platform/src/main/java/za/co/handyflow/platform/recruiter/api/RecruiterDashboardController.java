@@ -32,4 +32,12 @@ public class RecruiterDashboardController {
         if (problem != null) throw new HandyFlowException(problem, HttpStatus.BAD_REQUEST, "INVALID_PERIOD");
         return ResponseEntity.ok(ApiResponse.success(dashboard.dashboard(TenantContext.getTenantIdAsObject(), RecruiterDashboardRules.daysOrDefault(days), Instant.now())));
     }
+
+    @GetMapping("/careers-slug")
+    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    @Operation(summary = "The company's name as used in its public careers page address")
+    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> careersSlug() {
+        String slug = dashboard.careersSlug(TenantContext.getTenantIdAsObject());
+        return ResponseEntity.ok(ApiResponse.success(java.util.Collections.singletonMap("slug", slug)));
+    }
 }

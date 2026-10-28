@@ -12,7 +12,7 @@ type Dash = {
   applications: Metric; interviews: Metric; offers: Metric; hires: Metric; timeToHireDays: Metric
   funnel: { stage: string; count: number }[]
   topJobs: { id: string; title: string; applications: number; hires: number }[]
-  sources: { source: string; count: number }[]
+  sources: { source: string; count: number; hires: number }[]
   upcoming: { applicationId: string; candidate: string; jobTitle: string; type: string; scheduledAt: string }[]
   activity: { at: string; kind: 'APPLIED' | 'STAGE'; applicationId: string; candidate: string; jobTitle: string; stage: string }[]
 }
@@ -51,13 +51,13 @@ function Kpi({ label, value, m, days, suffix, lowerIsBetter, plain }: { label: s
   )
 }
 
-function Donut({ parts }: { parts: { label: string; n: number }[] }) {
+function Donut({ parts, unit }: { parts: { label: string; n: number }[]; unit: string }) {
   const total = parts.reduce((s, p) => s + p.n, 0)
   const r = 52, c = 2 * Math.PI * r
   let used = 0
   return (
     <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-      <svg width="150" height="150" viewBox="0 0 150 150" role="img" aria-label={`${total} applications by source`}>
+      <svg width="150" height="150" viewBox="0 0 150 150" role="img" aria-label={`${total} ${unit} by source`}>
         <circle cx="75" cy="75" r={r} fill="none" stroke="var(--hf-border)" strokeWidth="22" />
         {total > 0 && parts.map((p, i) => {
           const len = (p.n / total) * c
@@ -67,7 +67,7 @@ function Donut({ parts }: { parts: { label: string; n: number }[] }) {
           return el
         })}
         <text x="75" y="72" textAnchor="middle" fontSize="22" fontWeight="700" fill="var(--hf-text)">{total}</text>
-        <text x="75" y="90" textAnchor="middle" fontSize="10" fill="var(--hf-text-muted)">applications</text>
+        <text x="75" y="90" textAnchor="middle" fontSize="10" fill="var(--hf-text-muted)">{unit}</text>
       </svg>
       <div style={{ display: 'grid', gap: 5, fontSize: 12 }}>
         {parts.map((p, i) => (
@@ -83,6 +83,7 @@ function Donut({ parts }: { parts: { label: string; n: number }[] }) {
 
 export default function RecDashboard() {
   const [days, setDays] = useState(30)
+  const [sourceBy, setSourceBy] = useState<'applications' | 'hires'>('applications')
   const q = useQuery<Dash>({ queryKey: ['rec-dashboard', days], queryFn: async () => data(await apiClient.get(`${URL}?days=${days}`)), retry: false })
   const d = q.data
   const err = (q.error as { response?: { data?: { message?: string } } } | null)?.response?.data?.message
@@ -121,10 +122,24 @@ export default function RecDashboard() {
             </div>
 
             <div style={card}>
-              <strong>Where applications come from</strong>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <strong>Source of hire</strong>
+                <span role="group" aria-label="Count by" style={{ display: 'inline-flex', border: '1px solid var(--hf-border)', borderRadius: 7, overflow: 'hidden' }}>
+                  {(['applications', 'hires'] as const).map(k => (
+                    <button key={k} type="button" aria-pressed={sourceBy === k} onClick={() => setSourceBy(k)}
+                      style={{ padding: '4px 10px', border: 'none', cursor: 'pointer', fontSize: 11, background: sourceBy === k ? 'var(--hf-primary)' : 'var(--hf-surface)', color: sourceBy === k ? 'var(--hf-text-on-solid)' : 'var(--hf-text-secondary)' }}>
+                      {k === 'applications' ? 'Applications' : 'Hires'}
+                    </button>
+                  ))}
+                </span>
+              </div>
               <div style={{ marginTop: 10 }}>
-                {d.sources.length === 0 ? <div style={muted}>No applications in this period.</div>
-                  : <Donut parts={d.sources.map(s => ({ label: word(SOURCE_WORD, s.source), n: s.count }))} />}
+                {(() => {
+                  const parts = d.sources.map(s => ({ label: word(SOURCE_WORD, s.source), n: sourceBy === 'hires' ? s.hires : s.count })).filter(p => p.n > 0)
+                  return parts.length === 0
+                    ? <div style={muted}>{sourceBy === 'hires' ? 'Nobody who applied in this period has been hired yet.' : 'No applications in this period.'}</div>
+                    : <Donut parts={parts} unit={sourceBy} />
+                })()}
               </div>
             </div>
 

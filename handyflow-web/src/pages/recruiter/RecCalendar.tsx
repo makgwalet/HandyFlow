@@ -1,6 +1,7 @@
 // The interview calendar: one week at a time, South African time, every interview that still stands. A list under the grid says the same in words.
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../api/client'
 
 type Item = { id: string; applicationId: string; candidate: string; jobTitle: string; type: string; scheduledAt: string; durationMinutes: number; outcome: string; interviewerName: string | null; location: string | null }
@@ -32,6 +33,8 @@ const dayLabel = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateStrin
 const btn = { padding: '6px 10px', background: 'var(--hf-surface)', color: 'var(--hf-text-secondary)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer' } as const
 
 export default function RecCalendar() {
+  const navigate = useNavigate()
+  const openCandidate = (applicationId: string) => navigate(`/recruiter/applications?open=${applicationId}`)
   const [monday, setMonday] = useState(() => mondayOf(todaySast()))
   const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
   const q = useQuery<Item[]>({ queryKey: ['rec-calendar', monday], queryFn: async () => data(await apiClient.get(`${URL}?from=${monday}&to=${days[6]}`)), retry: false })
@@ -76,11 +79,11 @@ export default function RecCalendar() {
                 const height = Math.max(24, (i.durationMinutes / 60) * ROW - 2)
                 const tone = TYPE_TONE[i.type] ?? TYPE_TONE.VIDEO
                 return (
-                  <div key={i.id} title={`${i.candidate}, ${i.jobTitle}. ${clock(start)} to ${clock(start + i.durationMinutes)}. ${TYPE_WORD[i.type] ?? i.type}${i.interviewerName ? `, with ${i.interviewerName}` : ''}${i.location ? `, ${i.location}` : ''}`}
-                    style={{ position: 'absolute', left: 3, right: 3, top, height, overflow: 'hidden', borderRadius: 6, padding: '2px 5px', fontSize: 11,
+                  <button type="button" key={i.id} onClick={() => openCandidate(i.applicationId)} title={`${i.candidate}, ${i.jobTitle}. ${clock(start)} to ${clock(start + i.durationMinutes)}. ${TYPE_WORD[i.type] ?? i.type}${i.interviewerName ? `, with ${i.interviewerName}` : ''}${i.location ? `, ${i.location}` : ''}`}
+                    style={{ position: 'absolute', left: 3, right: 3, top, height, overflow: 'hidden', borderRadius: 6, padding: '2px 5px', fontSize: 11, textAlign: 'left', cursor: 'pointer',
                       background: tone.bg, border: `1px solid ${tone.border}`, color: tone.text, opacity: i.outcome === 'PENDING' ? 1 : 0.7 }}>
                     <strong>{i.candidate}</strong><br />{clock(start)} {i.jobTitle}
-                  </div>
+                  </button>
                 )
               })}
             </div>
@@ -97,7 +100,7 @@ export default function RecCalendar() {
           return (
             <div key={i.id} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', padding: '6px 0', borderBottom: '1px solid var(--hf-border-subtle)' }}>
               <span style={{ minWidth: 120 }}>{dayLabel(dayOf(i.scheduledAt))}, {clock(start)}</span>
-              <span style={{ flex: 1, minWidth: 180 }}><strong>{i.candidate}</strong> <span style={{ color: 'var(--hf-text-muted)' }}>for {i.jobTitle}</span></span>
+              <span style={{ flex: 1, minWidth: 180 }}><button type="button" onClick={() => openCandidate(i.applicationId)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700, color: 'var(--hf-primary-text)', fontSize: 12 }}>{i.candidate}</button> <span style={{ color: 'var(--hf-text-muted)' }}>for {i.jobTitle}</span></span>
               <span>{TYPE_WORD[i.type] ?? i.type}{i.interviewerName ? `, with ${i.interviewerName}` : ''}{i.location ? `, ${i.location}` : ''}</span>
               <span style={{ color: 'var(--hf-text-muted)' }}>{OUTCOME_WORD[i.outcome] ?? i.outcome}</span>
             </div>

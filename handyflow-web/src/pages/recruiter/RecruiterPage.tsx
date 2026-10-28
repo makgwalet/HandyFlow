@@ -1,6 +1,6 @@
 // src/pages/recruiter/RecruiterPage.tsx
 import { EMPTY_HIRE_DETAILS, GENDERS, RACES, hireDetailsBody, hireDetailsProblem, missingCount, personalMissing, type HireDetails } from './hireDetails.logic'
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import { usePermission } from '../../hooks/usePermission'
@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
 import { RECRUITER_SECTIONS } from '../../navigation/moduleSections'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import ApprovalPanel from './RecApproval'
 import OfferPanel from './RecOffer'
 import RecDashboard from './RecDashboard'
@@ -318,7 +318,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
   const mayHire = usePermission('RECRUITER_HIRE')
   const isAdmin = usePermission('RECRUITER_ADMIN')
   const qc = useQueryClient()
-  const [tab, setTab]             = useState<'overview'|'interviews'|'history'>('overview')
+  const [tab, setTab]             = useState<'overview'|'notes'|'cv'|'interviews'|'history'>('overview')
   const [showMoveModal, setShowMoveModal] = useState(false)
   const [showInterview, setShowInterview] = useState(false)
   const [showReferral, setShowReferral] = useState(false)
@@ -474,6 +474,16 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
     },
     onError: async (e: any) => setError(await parseBlobError(e, 'Failed to load CV — none may be on file for this candidate')),
   })
+
+  const [cvUrl, setCvUrl] = useState<string | null>(null)
+  const loadCv = useMutation({
+    mutationFn: async () => {
+      const r = await apiClient.get(`/api/v1/recruiter/applications/${app!.id}/cv`, { responseType: 'blob' })
+      setCvUrl(URL.createObjectURL(new Blob([r.data], { type: 'application/pdf' })))
+    },
+    onError: async (e: any) => setError(await parseBlobError(e, 'Failed to load CV — none may be on file for this candidate')),
+  })
+  useEffect(() => () => { if (cvUrl) URL.revokeObjectURL(cvUrl) }, [cvUrl])
 
   const score = useMutation({
     mutationFn: () => apiClient.post(`/api/v1/recruiter/applications/${app!.id}/score`, {
@@ -659,10 +669,10 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
 
           {/* Tabs */}
           <div style={{ display: 'flex' }}>
-            {(['overview','interviews','history'] as const).map(t => (
+            {(['overview','notes', ...(mayCv && app?.hasCv ? ['cv' as const] : []),'interviews','history'] as const).map(t => (
               <button key={t} onClick={() => setTab(t)}
                 style={{ padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t ? 'var(--hf-primary-text)' : 'var(--hf-text-faint)', borderBottom: `2px solid ${tab === t ? 'var(--hf-primary)' : 'transparent'}`, marginBottom: -1, textTransform: 'capitalize' }}>
-                {t === 'interviews' ? `Interviews (${app?.interviews?.length ?? 0})` : t === 'history' ? `History (${app?.history?.length ?? 0})` : 'Overview'}
+                {t === 'interviews' ? `Interviews (${app?.interviews?.length ?? 0})` : t === 'history' ? `History (${app?.history?.length ?? 0})` : t === 'notes' ? 'Rating & notes' : t === 'cv' ? 'CV' : 'Overview'}
               </button>
             ))}
           </div>
@@ -674,22 +684,6 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
 
           {tab === 'overview' && (
             <div>
-              {/* Score */}
-              <div style={{ marginBottom: 18, padding: '14px 16px', background: 'var(--hf-surface-muted)', borderRadius: 10, border: '1px solid var(--hf-border)' }}>
-                <label style={{ ...lbl, marginBottom: 10 }}>Candidate rating</label>
-                <StarRating value={scoreVal} onChange={v => setScoreVal(v)} />
-                {scoreVal && (
-                  <div style={{ marginTop: 10 }}>
-                    <label style={lbl}>Internal notes</label>
-                    <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
-                      placeholder="Notes visible only to your team..." style={{ ...inp, resize: 'none' as const, fontFamily: 'inherit' }} />
-                    <button onClick={() => score.mutate()} style={{ ...btnP, marginTop: 8, fontSize: 12, padding: '6px 14px' }}>
-                      Save rating
-                    </button>
-                  </div>
-                )}
-              </div>
-
               {/* Details */}
               {[
                 ['Email',     app?.applicantEmail ?? '—'],
@@ -756,6 +750,37 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {tab === 'notes' && (
+            <div>
+              {/* Score */}
+              <div style={{ marginBottom: 18, padding: '14px 16px', background: 'var(--hf-surface-muted)', borderRadius: 10, border: '1px solid var(--hf-border)' }}>
+                <label style={{ ...lbl, marginBottom: 10 }}>Candidate rating</label>
+                <StarRating value={scoreVal} onChange={v => setScoreVal(v)} />
+                {scoreVal && (
+                  <div style={{ marginTop: 10 }}>
+                    <label style={lbl}>Internal notes</label>
+                    <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
+                      placeholder="Notes visible only to your team..." style={{ ...inp, resize: 'none' as const, fontFamily: 'inherit' }} />
+                    <button onClick={() => score.mutate()} style={{ ...btnP, marginTop: 8, fontSize: 12, padding: '6px 14px' }}>
+                      Save rating
+                    </button>
+                  </div>
+                )}
+              </div>
+
+            </div>
+          )}
+
+          {tab === 'cv' && mayCv && app?.hasCv && (
+            <div>
+              {!cvUrl && <button onClick={() => loadCv.mutate()} disabled={loadCv.isPending}
+                style={{ padding: '8px 14px', border: '1px solid var(--hf-border)', borderRadius: 8, background: 'var(--hf-surface)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                {loadCv.isPending ? 'Loading...' : 'Show CV'}</button>}
+              {!cvUrl && <div style={{ marginTop: 8, fontSize: 11, color: 'var(--hf-text-faint)' }}>Opening a CV is recorded in the audit trail.</div>}
+              {cvUrl && <iframe title="CV" src={cvUrl} style={{ width: '100%', height: '70vh', border: '1px solid var(--hf-border)', borderRadius: 8 }} />}
             </div>
           )}
 
@@ -1412,6 +1437,25 @@ export function RecruiterPage() {
   const [showCreate,    setShowCreate]    = useState(false)
   const [editJob,       setEditJob]       = useState<Job | null>(null)
   const [selectedApp,   setSelectedApp]   = useState<Application | null>(null)
+  const { data: careers } = useQuery<{ slug: string | null }>({
+    queryKey: ['rec-careers-slug'],
+    queryFn: async () => { const r = await apiClient.get('/api/v1/recruiter/dashboard/careers-slug'); return r.data?.data ?? r.data },
+    retry: false, staleTime: Infinity,
+  })
+  const careersSlug = careers?.slug ?? null
+  const [jobDetailsOpen, setJobDetailsOpen] = useState<Record<string, boolean>>({})
+  // A link such as /recruiter/applications?open=<id> (the interview calendar uses it) opens that candidate.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const openId = searchParams.get('open')
+  useEffect(() => {
+    if (!openId) return
+    let cancelled = false
+    apiClient.get(`/api/v1/recruiter/applications/${openId}`)
+      .then(r => { if (!cancelled) setSelectedApp((r.data?.data ?? r.data) as Application) })
+      .catch(() => { /* the candidate may have been removed; the page just stays as it is */ })
+      .finally(() => { if (!cancelled) setSearchParams({}, { replace: true }) })
+    return () => { cancelled = true }
+  }, [openId, setSearchParams])
   const [showDeleteJob, setShowDeleteJob] = useState<Job | null>(null)
   const [showPublish,   setShowPublish]   = useState<Job | null>(null)
   const [jobError,      setJobError]      = useState<string | null>(null)
@@ -1587,53 +1631,53 @@ export function RecruiterPage() {
 
               {/* ── JOBS TAB ── */}
               {tab === 'jobs' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {filteredJobs.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-                      <Briefcase size={36} style={{ marginBottom: 12, color: 'var(--hf-text-disabled)' }} />
-                      <div style={{ fontWeight: 700, color: 'var(--hf-text-tertiary)', fontSize: 15, marginBottom: 6 }}>No job postings yet</div>
-                      <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', marginBottom: 18 }}>Create your first job posting to start receiving applications.</div>
-                      <button onClick={() => setShowCreate(true)} style={btnP}><Plus size={14} /> Post first job</button>
-                    </div>
-                  ) : filteredJobs.map(job => {
-                    const cfg = JOB_STATUS[job.status] ?? JOB_STATUS.DRAFT
-                    const closing = job.closesAt && new Date(job.closesAt) < new Date() && job.status === 'OPEN'
-                    return (
-                      <div key={job.id} style={{ border: `1px solid ${closing ? 'var(--hf-danger-border)' : 'var(--hf-border)'}`, borderRadius: 12, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: 'var(--hf-surface)' }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                            <span style={{ fontWeight: 800, fontSize: 15, color: 'var(--hf-text)' }}>{job.title}</span>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`, padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
-                              <span style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.color }} />{cfg.label}
-                            </span>
-                            {closing && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}><AlertTriangle size={9} /> Closing date passed</span>}
-                          </div>
-                          <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--hf-text-muted)', flexWrap: 'wrap', marginBottom: 8 }}>
-                            {clientByJob[job.id] && <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600, color: 'var(--hf-text-secondary)' }}><Building2 size={11} />Client: {clientByJob[job.id]}</span>}
-                            {job.department && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Building2 size={11} />{job.department}</span>}
-                            {job.location && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={11} />{job.location}</span>}
-                            <span>{job.jobType.replace('_',' ')} · {job.experienceLevel}</span>
-                            {job.showSalary && job.salaryMin && <span style={{ color: 'var(--hf-accent-text)', fontWeight: 600 }}>{fmtR(job.salaryMin)}{job.salaryMax ? ` – ${fmtR(job.salaryMax)}` : '+'}</span>}
-                            {job.closesAt && <span>Closes {fmtDate(job.closesAt)}</span>}
-                          </div>
-                          <div style={{ display: 'flex', gap: 12, fontSize: 12 }}>
-                            <span style={{ color: job.applicationCount > 0 ? 'var(--hf-accent-text)' : 'var(--hf-text-faint)', fontWeight: job.applicationCount > 0 ? 700 : 400 }}>
-                              {job.applicationCount} application{job.applicationCount !== 1 ? 's' : ''}
-                            </span>
-                            {job.slug && (
-                              <a href={`/careers/zeta-earthmoving/${job.slug}`} target="_blank" rel="noreferrer"
-                                style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--hf-primary-text)', fontWeight: 600, textDecoration: 'none' }}>
-                                <ExternalLink size={10} /> View posting
-                              </a>
-                            )}
-                          </div>
-                          {job.status === 'DRAFT' && <ApprovalPanel kind="job" id={job.id} />}
-                          <RequisitionPanel jobId={job.id} canEdit />
-                          <ScreeningEditor jobId={job.id} canEdit />
-                        </div>
-                        <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                filteredJobs.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+                    <Briefcase size={36} style={{ marginBottom: 12, color: 'var(--hf-text-disabled)' }} />
+                    <div style={{ fontWeight: 700, color: 'var(--hf-text-tertiary)', fontSize: 15, marginBottom: 6 }}>No job postings yet</div>
+                    <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', marginBottom: 18 }}>Create your first job posting to start receiving applications.</div>
+                    <button onClick={() => setShowCreate(true)} style={btnP}><Plus size={14} /> Post first job</button>
+                  </div>
+                ) : (
+                  <div style={{ border: '1px solid var(--hf-border)', borderRadius: 12, background: 'var(--hf-surface)', overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                      <thead>
+                        <tr>{['Job title', 'Client', 'Location', 'Status', 'Applications', 'Actions'].map((h, i) => (
+                          <th key={h} style={{ textAlign: i === 4 ? 'right' : i === 5 ? 'right' : 'left', padding: '10px 12px', borderBottom: '1px solid var(--hf-border)', color: 'var(--hf-text-muted)', fontWeight: 600 }}>{h}</th>
+                        ))}</tr>
+                      </thead>
+                      <tbody>
+                        {filteredJobs.map(job => {
+                          const cfg = JOB_STATUS[job.status] ?? JOB_STATUS.DRAFT
+                          const closing = job.closesAt && new Date(job.closesAt) < new Date() && job.status === 'OPEN'
+                          const expanded = jobDetailsOpen[job.id] ?? job.status === 'DRAFT'
+                          const cell = { padding: '10px 12px', borderBottom: expanded ? 'none' : '1px solid var(--hf-border-subtle)', verticalAlign: 'top' } as const
+                          return (
+                            <Fragment key={job.id}>
+                              <tr>
+                                <td style={cell}>
+                                  <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--hf-text)' }}>{job.title}</div>
+                                  <div style={{ color: 'var(--hf-text-muted)', marginTop: 2 }}>
+                                    {job.department ? `${job.department} · ` : ''}{job.jobType.replace('_', ' ')} · {job.experienceLevel}
+                                    {job.showSalary && job.salaryMin ? <span style={{ color: 'var(--hf-accent-text)', fontWeight: 600 }}> · {fmtR(job.salaryMin)}{job.salaryMax ? ` – ${fmtR(job.salaryMax)}` : '+'}</span> : null}
+                                  </div>
+                                  <button type="button" aria-expanded={expanded} onClick={() => setJobDetailsOpen(o => ({ ...o, [job.id]: !expanded }))}
+                                    style={{ background: 'none', border: 'none', padding: 0, marginTop: 4, cursor: 'pointer', color: 'var(--hf-primary-text)', fontSize: 11, fontWeight: 600 }}>
+                                    {expanded ? 'Hide details' : 'Approval, requisition and screening'}
+                                  </button>
+                                </td>
+                                <td style={cell}>{clientByJob[job.id] ?? <span style={{ color: 'var(--hf-text-faint)' }}>-</span>}</td>
+                                <td style={cell}>{job.location ?? <span style={{ color: 'var(--hf-text-faint)' }}>-</span>}</td>
+                                <td style={cell}>
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`, padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                                    <span style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.color }} />{cfg.label}
+                                  </span>
+                                  {closing && <div style={{ color: 'var(--hf-danger-text)', fontWeight: 700, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}><AlertTriangle size={9} /> Closing date passed</div>}
+                                  {job.closesAt && !closing && <div style={{ color: 'var(--hf-text-muted)', marginTop: 4 }}>Closes {fmtDate(job.closesAt)}</div>}
+                                </td>
+                                <td style={{ ...cell, textAlign: 'right', fontWeight: job.applicationCount > 0 ? 700 : 400, color: job.applicationCount > 0 ? 'var(--hf-accent-text)' : 'var(--hf-text-faint)' }}>{job.applicationCount}</td>
+                                <td style={cell}>
+                                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                           {job.status === 'DRAFT' && (
                             <button onClick={() => setShowPublish(job)}
                               style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', border: '1px solid var(--hf-success-border)', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
@@ -1659,10 +1703,30 @@ export function RecruiterPage() {
                             <Trash2 size={11} />
                           </button>
                         </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                                </td>
+                              </tr>
+                              {expanded && (
+                                <tr>
+                                  <td colSpan={6} style={{ padding: '0 12px 14px', borderBottom: '1px solid var(--hf-border-subtle)' }}>
+                                    {job.slug && careersSlug && (
+                                      <a href={`/careers/${careersSlug}/${job.slug}`} target="_blank" rel="noreferrer"
+                                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--hf-primary-text)', fontWeight: 600, textDecoration: 'none', marginBottom: 6 }}>
+                                        <ExternalLink size={10} /> View posting
+                                      </a>
+                                    )}
+                                    {job.status === 'DRAFT' && <ApprovalPanel kind="job" id={job.id} />}
+                                    <RequisitionPanel jobId={job.id} canEdit />
+                                    <ScreeningEditor jobId={job.id} canEdit />
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )
               )}
 
               {/* ── PIPELINE TAB (Kanban) ── */}
