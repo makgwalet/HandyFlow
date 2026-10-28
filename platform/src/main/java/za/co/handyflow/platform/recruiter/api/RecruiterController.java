@@ -386,7 +386,7 @@ public class RecruiterController {
     }
 
     @PostMapping("/jobs/{id}/approval/decision")
-    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @PreAuthorize("hasAuthority('RECRUITER_APPROVE')")
     @Operation(summary = "Approve or not approve a job. Not the person who sent it")
     public ResponseEntity<ApiResponse<ApprovalView>> decideJob(@PathVariable UUID id, @RequestBody DecisionRequest req) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -408,7 +408,7 @@ public class RecruiterController {
     }
 
     @PostMapping("/applications/{id}/offer-approval/decision")
-    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @PreAuthorize("hasAuthority('RECRUITER_APPROVE')")
     @Operation(summary = "Approve or not approve an offer. Not the person who sent it")
     public ResponseEntity<ApiResponse<ApprovalView>> decideOffer(@PathVariable UUID id, @RequestBody DecisionRequest req) {
         return ResponseEntity.ok(ApiResponse.success(

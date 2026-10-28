@@ -9,7 +9,7 @@ export interface ApprovalView {
   canDecide: boolean
 }
 
-export interface RecSettings { requireJobApproval: boolean; requireOfferApproval: boolean; retentionMonths: number }
+export interface RecSettings { requireJobApproval: boolean; requireOfferApproval: boolean; retentionMonths: number; privacyNoticeUrl?: string | null }
 
 export interface RemovalCandidate { applicantId: string; name: string; email: string; lastActivity: string; dueSince: string; applications: number; hasCv: boolean }
 
@@ -21,7 +21,9 @@ export const APPROVAL_LABEL: Record<ApprovalView['status'], string> = {
 
 export function recruiterRights(permissions: readonly string[]) {
   const has = (p: string) => permissions.includes(p)
-  return { read: has('RECRUITER_READ') || has('RECRUITER_MANAGE') || has('RECRUITER_ADMIN'), manage: has('RECRUITER_MANAGE') || has('RECRUITER_ADMIN'), admin: has('RECRUITER_ADMIN') }
+  return { read: has('RECRUITER_READ') || has('RECRUITER_MANAGE') || has('RECRUITER_ADMIN'), manage: has('RECRUITER_MANAGE') || has('RECRUITER_ADMIN'), admin: has('RECRUITER_ADMIN'),
+    /** May approve or not approve a job or an offer. A separate right, so administrators who should not decide can be left out. */
+    approve: has('RECRUITER_APPROVE') }
 }
 
 /** Whether the panel has anything to say: the company asks for the approval, or one has already been started. */

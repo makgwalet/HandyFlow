@@ -6,6 +6,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import za.co.handyflow.platform.recruiter.domain.model.RecruiterApprovalRules;
+import za.co.handyflow.platform.shared.SchedulerLease;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.Instant;
@@ -17,8 +18,8 @@ import java.util.UUID;
 
 /**
  * Reminds the approvers of a job or an offer that has waited for a decision: on the 2nd day and every 3rd day after, until someone decides it
- * or the request is withdrawn. Runs once a day, so the day-count rule is what stops it repeating. The reminder goes to the company's
- * administrators other than the person who asked, as the first request did. Best effort: one bad row never stops the rest.
+ * or the request is withdrawn. Runs once a day, so the day-count rule is what stops it repeating. The reminder goes to the users who hold the
+ * approve permission, other than the person who asked, as the first request did. One instance at a time runs it. Best effort: one bad row never stops the rest.
  */
 @Slf4j
 @Component
@@ -29,6 +30,9 @@ public class RecruiterApprovalReminderScheduler {
 
     private final JdbcTemplate jdbc;
     private final RecruiterApprovalNotifier notifier;
+    private final SchedulerLease lease;
+
+    static final String LOCK = "recruiter-approval-reminders";
 
     /** One request waiting for a decision. */
     record Waiting(UUID tenantId, boolean job, UUID refId, String jobTitle, UUID submitter, Instant since) {}
@@ -47,6 +51,10 @@ public class RecruiterApprovalReminderScheduler {
 
     @Scheduled(cron = "0 30 7 * * *", zone = "Africa/Johannesburg")
     public void remindApprovers() {
+        lease.runExclusively(LOCK, java.time.Duration.ofMinutes(10), this::sweep);
+    }
+
+    void sweep() {
         List<Waiting> waiting = jdbc.query("""
                 SELECT tenant_id, TRUE AS job, id AS ref, title, submitted_by AS who, submitted_at AS since
                   FROM rec_jobs WHERE approval_status = 'SUBMITTED'

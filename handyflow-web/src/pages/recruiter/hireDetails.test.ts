@@ -21,7 +21,7 @@ describe("hire details", () => {
     expect(hireDetailsProblem(d({ bankName: "FNB", bankAccountNumber: "62012345678", bankBranchCode: "25" }))).toMatch(/6 digits/)
   })
   it("sends blanks as null and trims what is given", () => {
-    expect(hireDetailsBody(d({ idNumber: " 8001015009087 ", bankName: "  " }))).toEqual({ idNumber: "8001015009087", taxNumber: null, bankName: null, bankAccountNumber: null, bankBranchCode: null, dateOfBirth: null, gender: null, emergencyContactName: null, emergencyContactPhone: null })
+    expect(hireDetailsBody(d({ idNumber: " 8001015009087 ", bankName: "  " }))).toEqual({ idNumber: "8001015009087", taxNumber: null, bankName: null, bankAccountNumber: null, bankBranchCode: null, dateOfBirth: null, gender: null, race: null, emergencyContactName: null, emergencyContactPhone: null, emergencyContactRelation: null })
   })
   it("checks the date of birth is not in the future and the emergency contact comes whole", () => {
     expect(hireDetailsProblem(d({ dateOfBirth: "1990-05-01" }), "2026-10-28")).toBeNull()
@@ -37,5 +37,18 @@ describe("hire details", () => {
     expect(personalMissing(d())).toBe(3)
     expect(personalMissing(d({ gender: "MALE" }))).toBe(2)
     expect(missingCount(full)).toBe(5)
+  })
+  it("takes an optional race from HR's list and sends it, or null when left", () => {
+    expect(hireDetailsProblem(d({ race: "AFRICAN" }))).toBeNull()
+    expect(hireDetailsProblem(d({ race: "MARTIAN" }))).toMatch(/Race must be/)
+    expect(hireDetailsBody(d({ race: "INDIAN" })).race).toBe("INDIAN")
+    expect(hireDetailsBody(d()).race).toBeNull()
+    expect(personalMissing(d({ race: "WHITE" }))).toBe(3)
+  })
+  it("wants the emergency relation to come with a contact name and stay short", () => {
+    expect(hireDetailsProblem(d({ emergencyContactRelation: "Brother" }))).toMatch(/name as well/)
+    expect(hireDetailsProblem(d({ emergencyContactName: "Sipho", emergencyContactPhone: "0821234567", emergencyContactRelation: "Brother" }))).toBeNull()
+    expect(hireDetailsProblem(d({ emergencyContactName: "Sipho", emergencyContactPhone: "0821234567", emergencyContactRelation: "x".repeat(51) }))).toMatch(/too long/)
+    expect(hireDetailsBody(d({ emergencyContactName: "Sipho", emergencyContactPhone: "0821234567", emergencyContactRelation: " Brother " })).emergencyContactRelation).toBe("Brother")
   })
 })

@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import { useAuth } from '../../hooks/useAuth'
+import { privacyUrlProblem } from '../careers/consent.logic'
 import { fmtDay, recruiterRights, retentionProblem, type RecSettings, type RemovalCandidate, type RemovalResult } from './recApproval.logic'
 
 const BASE = '/api/v1/recruiter'
@@ -26,19 +27,19 @@ export default function RecPrivacy() {
 function SettingsCard({ admin }: { admin: boolean }) {
   const qc = useQueryClient()
   const q = useQuery<RecSettings>({ queryKey: ['rec-settings'], queryFn: async () => body<RecSettings>(await apiClient.get(`${BASE}/settings`)) })
-  const [draft, setDraft] = useState<{ job: boolean; offer: boolean; months: string } | null>(null)
+  const [draft, setDraft] = useState<{ job: boolean; offer: boolean; months: string; url: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const save = useMutation({
-    mutationFn: async (d: { job: boolean; offer: boolean; months: string }) =>
-      body<RecSettings>(await apiClient.put(`${BASE}/settings`, { requireJobApproval: d.job, requireOfferApproval: d.offer, retentionMonths: Number(d.months) })),
+    mutationFn: async (d: { job: boolean; offer: boolean; months: string; url: string }) =>
+      body<RecSettings>(await apiClient.put(`${BASE}/settings`, { requireJobApproval: d.job, requireOfferApproval: d.offer, retentionMonths: Number(d.months), privacyNoticeUrl: d.url.trim() })),
     onSuccess: s => { qc.setQueryData(['rec-settings'], s); qc.invalidateQueries({ queryKey: ['rec-retention'] }); qc.invalidateQueries({ queryKey: ['rec-approval'] }); setDraft(null); setError(null); setSaved(true) },
     onError: e => setError(message(e, 'The settings could not be saved.')),
   })
   if (q.isLoading) return <div style={card}>Loading…</div>
   if (!q.data) return <div style={card}>The settings could not be loaded.</div>
-  const d = draft ?? { job: q.data.requireJobApproval, offer: q.data.requireOfferApproval, months: String(q.data.retentionMonths) }
-  const problem = retentionProblem(d.months)
+  const d = draft ?? { job: q.data.requireJobApproval, offer: q.data.requireOfferApproval, months: String(q.data.retentionMonths), url: q.data.privacyNoticeUrl ?? '' }
+  const problem = retentionProblem(d.months) ?? privacyUrlProblem(d.url)
   const change = (patch: Partial<typeof d>) => { setSaved(false); setDraft({ ...d, ...patch }) }
   return (
     <section style={card} aria-label="Recruiting settings">
@@ -52,6 +53,9 @@ function SettingsCard({ admin }: { admin: boolean }) {
       <label htmlFor="rec-months" style={{ fontSize: 13 }}>Keep unsuccessful applicants' details for (months)</label>
       <input id="rec-months" type="number" min={3} max={60} disabled={!admin} value={d.months} onChange={e => change({ months: e.target.value })}
         style={{ display: 'block', width: 90, margin: '4px 0 6px', padding: 6, border: '1px solid var(--hf-border)', borderRadius: 6, background: 'var(--hf-surface)', color: 'var(--hf-text)' }} />
+      <label htmlFor="rec-privacy-url" style={{ fontSize: 13, display: 'block', marginTop: 6 }}>Privacy notice link (shown beside the consent text on your careers page)</label>
+      <input id="rec-privacy-url" type="url" inputMode="url" placeholder="https://yourcompany.co.za/privacy" disabled={!admin} value={d.url} onChange={e => change({ url: e.target.value })}
+        style={{ display: 'block', width: '100%', maxWidth: 420, margin: '4px 0 10px', padding: 6, border: '1px solid var(--hf-border)', borderRadius: 6, background: 'var(--hf-surface)', color: 'var(--hf-text)' }} />
       <p style={{ fontSize: 12, color: 'var(--hf-text-muted)', margin: '0 0 8px' }}>
         POPIA asks that personal information is not kept longer than it is needed. It does not name a number of months for job applicants, so this is your company's choice. Applicants with an open application, or who were hired, are never listed.
       </p>

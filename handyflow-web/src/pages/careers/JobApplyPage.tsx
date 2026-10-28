@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { consentStatement } from './consent.logic'
+import { consentStatement, safePrivacyUrl } from './consent.logic'
 import type { CSSProperties } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
@@ -21,6 +21,7 @@ interface JobDetail {
   salaryMin: number | null; salaryMax: number | null; showSalary: boolean
   salaryCurrency?: string; companyName: string | null
   retentionMonths?: number | null
+  privacyNoticeUrl?: string | null
 }
 interface ApplyResult {
   applicationId: string; jobTitle: string; companyName: string
@@ -316,7 +317,12 @@ export function JobApplyPage() {
 
               <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, color: muted, lineHeight: 1.5, marginBottom: 18 }}>
                 <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} style={{ marginTop: 3 }} />
-                <span>{consentStatement(job?.retentionMonths)}</span>
+                <span>
+                  {consentStatement(job?.retentionMonths)}
+                  {safePrivacyUrl(job?.privacyNoticeUrl) && (
+                    <>{' '}<a href={safePrivacyUrl(job?.privacyNoticeUrl)!} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>Read our privacy notice</a></>
+                  )}
+                </span>
               </label>
 
               {formError && (

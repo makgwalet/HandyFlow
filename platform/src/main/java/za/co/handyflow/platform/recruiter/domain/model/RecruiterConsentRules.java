@@ -25,6 +25,27 @@ public final class RecruiterConsentRules {
                 + " after my last activity unless I am hired. I can ask to see, correct or delete them at any time.";
     }
 
+    public static final int MAX_URL = 500;
+
+    /** Null when the link is usable as a privacy-notice link: empty (none), or an http(s) address of reasonable length with a host. */
+    public static String privacyUrlProblem(String url) {
+        if (url == null || url.isBlank()) return null;
+        String u = url.trim();
+        if (u.length() > MAX_URL) return "The privacy notice link is too long (" + MAX_URL + " characters at most).";
+        String lower = u.toLowerCase(java.util.Locale.ROOT);
+        if (!(lower.startsWith("https://") || lower.startsWith("http://"))) return "The privacy notice link must start with https:// or http://.";
+        String rest = u.substring(lower.startsWith("https://") ? 8 : 7);
+        int end = rest.length();
+        for (char c : new char[]{'/', '?', '#'}) { int i = rest.indexOf(c); if (i >= 0 && i < end) end = i; }
+        String host = rest.substring(0, end);
+        if (host.isEmpty() || host.contains("@") || host.chars().anyMatch(Character::isWhitespace) || u.chars().anyMatch(Character::isWhitespace))
+            return "That does not look like a web address.";
+        return null;
+    }
+
+    /** The link as it is stored: trimmed, and null when empty. */
+    public static String normaliseUrl(String url) { return url == null || url.isBlank() ? null : url.trim(); }
+
     /** Null when the application may go ahead. */
     public static String problem(Boolean consent) {
         return Boolean.TRUE.equals(consent) ? null : "Please agree to the use of your details before you apply.";

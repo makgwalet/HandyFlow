@@ -42,6 +42,7 @@ public class RecApplication {
     // generated.
     @Column(name = "consent_given_at")         private Instant   consentGivenAt;
     @Column(name = "consent_statement_ver")    private String    consentStatementVer;
+    @Column(name = "consent_privacy_url", length = 500) private String consentPrivacyUrl;
 
     @Column(name = "offered_salary", precision = 12, scale = 2)
     private BigDecimal offeredSalary;
@@ -86,9 +87,13 @@ public class RecApplication {
     }
 
     /** The applicant agreed to the wording of the given version. */
-    public void recordConsent(String statementVersion) {
+    public void recordConsent(String statementVersion) { recordConsent(statementVersion, null); }
+
+    /** As above, and the privacy-notice link the applicant was shown beside the wording (null when the company had none). */
+    public void recordConsent(String statementVersion, String privacyUrl) {
         this.consentGivenAt = Instant.now();
         this.consentStatementVer = statementVersion;
+        this.consentPrivacyUrl = privacyUrl;
     }
 
     // ── Pipeline progression ──────────────────────────────────────────────────

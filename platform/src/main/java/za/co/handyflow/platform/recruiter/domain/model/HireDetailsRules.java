@@ -12,7 +12,21 @@ public final class HireDetailsRules {
 
     private HireDetailsRules() {}
 
+    public static final Set<String> RACES = Set.of("AFRICAN", "COLOURED", "INDIAN", "WHITE", "OTHER");
+    public static final int MAX_RELATION = 50;
+
     public static String problem(String gender, String contactName, String contactPhone) {
+        return problem(gender, null, contactName, contactPhone, null);
+    }
+
+    /** Null when race, relation and the rest can go to HR. Race and relation are optional; a relation needs a contact name. */
+    public static String problem(String gender, String race, String contactName, String contactPhone, String relation) {
+        if (race != null && !race.isBlank() && !RACES.contains(race.trim().toUpperCase(java.util.Locale.ROOT)))
+            return "Race must be one of: African, Coloured, Indian, White or Other.";
+        if (relation != null && !relation.isBlank()) {
+            if (contactName == null || contactName.isBlank()) return "Give the emergency contact's name as well as their relation.";
+            if (relation.trim().length() > MAX_RELATION) return "The emergency contact's relation is too long (" + MAX_RELATION + " characters at most).";
+        }
         if (gender != null && !gender.isBlank() && !GENDERS.contains(gender.trim()))
             return "Gender must be one of: male, female, non-binary, or prefer not to say.";
         boolean name = contactName != null && !contactName.isBlank();

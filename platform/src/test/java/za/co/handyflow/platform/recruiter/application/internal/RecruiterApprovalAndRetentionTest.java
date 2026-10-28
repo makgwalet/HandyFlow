@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.recruiter.application.internal;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import za.co.handyflow.platform.recruiter.domain.model.*;
@@ -32,8 +33,15 @@ class RecruiterApprovalAndRetentionTest {
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
     private final CvStorage cv = mock(CvStorage.class);
     private final RecruiterApprovalNotifier notifier = mock(RecruiterApprovalNotifier.class);
-    private final RecruiterApprovalService approvals = new RecruiterApprovalService(jobs, applications, settingsRepo, jdbc, notifier);
+    private final RecruiterApprovers approvers = mock(RecruiterApprovers.class);
+    private final RecruiterApprovalService approvals = new RecruiterApprovalService(jobs, applications, settingsRepo, jdbc, notifier, approvers);
     private final RecruiterRetentionService retention = new RecruiterRetentionService(applicants, applications, approvals, cv, jdbc);
+
+    @BeforeEach
+    void everyoneMayApprove() {
+        when(approvers.anyoneBut(any(), any())).thenReturn(true);
+        when(approvers.mayApprove(any(), any())).thenReturn(true);
+    }
 
     private final List<String> sqls = new java.util.ArrayList<>();
     private static final Instant NOW = Instant.parse("2026-10-22T08:00:00Z");
@@ -89,6 +97,24 @@ class RecruiterApprovalAndRetentionTest {
         verify(settingsRepo).save(any());
         assertThatThrownBy(() -> approvals.updateSettings(tenant, new SettingsRequest(null, null, 2), maker))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("between 3 and 60");
+    }
+
+    @Test
+    void thePrivacyNoticeLinkIsCheckedKeptAndCanBeRemoved() {
+        SettingsView v = approvals.updateSettings(tenant, new SettingsRequest(null, null, null, " https://acme.co.za/privacy "), maker);
+        assertThat(v.privacyNoticeUrl()).isEqualTo("https://acme.co.za/privacy");
+        assertThatThrownBy(() -> approvals.updateSettings(tenant, new SettingsRequest(null, null, null, "javascript:alert(1)"), maker))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("https://");
+        assertThat(approvals.updateSettings(tenant, new SettingsRequest(true, null, null, ""), maker).privacyNoticeUrl()).isNull();
+    }
+
+    @Test
+    void aRequestNobodyElseCanAnswerIsRefusedWhenItIsSent() {
+        settings(true, false, 12);
+        RecJob job = draftJob();
+        when(approvers.anyoneBut(tenant, maker)).thenReturn(false);
+        assertThatThrownBy(() -> approvals.submitJob(tenant, job.getId(), maker)).hasMessageContaining("Nobody else can approve");
+        assertThat(job.getApprovalStatus()).isEqualTo("NOT_SUBMITTED");
     }
 
     // ── Jobs ──────────────────────────────────────────────────────────────────────────────────────

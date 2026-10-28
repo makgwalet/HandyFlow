@@ -43,7 +43,7 @@ describe('logic', () => {
 
 describe('ApprovalPanel', () => {
   it('lets an approver reject only with a note, and sends it', async () => {
-    as('RECRUITER_ADMIN')
+    as('RECRUITER_APPROVE')
     ;mk(apiClient.get).mockResolvedValue({ data: view() })
     ;mk(apiClient.post).mockResolvedValue({ data: view({ status: 'REJECTED', note: 'Pay range missing' }) })
     wrap(<ApprovalPanel kind="job" id="j1" />)
@@ -56,11 +56,19 @@ describe('ApprovalPanel', () => {
     expect(await screen.findByText('Not approved')).toBeTruthy()
   })
   it('does not offer to decide what you sent yourself', async () => {
-    as('RECRUITER_ADMIN')
+    as('RECRUITER_APPROVE')
     ;mk(apiClient.get).mockResolvedValue({ data: view({ canDecide: false }) })
     wrap(<ApprovalPanel kind="offer" id="a1" />)
     expect(await screen.findByText(/you sent this yourself/)).toBeTruthy()
     expect(screen.queryByText('Approve')).toBeNull()
+  })
+  it('does not offer a decision to an administrator who lacks the approve right', async () => {
+    as('RECRUITER_ADMIN')
+    ;mk(apiClient.get).mockResolvedValue({ data: view() })
+    wrap(<ApprovalPanel kind="job" id="j1" />)
+    await screen.findByText('Waiting for approval')
+    expect(screen.queryByText('Approve')).toBeNull()
+    expect(screen.queryByText('Do not approve')).toBeNull()
   })
   it('renders nothing when approval is off and nothing started', async () => {
     as('RECRUITER_ADMIN')
@@ -109,5 +117,18 @@ describe('RecPrivacy', () => {
     wrap(<RecPrivacy />)
     await screen.findByText('Recruiting settings')
     expect(screen.queryByText(/retention period has ended/)).toBeNull()
+  })
+})
+
+describe('privacy notice link setting', () => {
+  it('blocks a link that is not a web address before sending', async () => {
+    as('RECRUITER_ADMIN')
+    ;mk(apiClient.get).mockResolvedValue({ data: { requireJobApproval: false, requireOfferApproval: false, retentionMonths: 12, privacyNoticeUrl: null } })
+    wrap(<RecPrivacy />)
+    const url = await screen.findByLabelText(/Privacy notice link/)
+    await userEvent.type(url, 'javascript:alert(1)')
+    await userEvent.click(screen.getByText('Save settings'))
+    expect((await screen.findByRole('alert')).textContent).toMatch(/https:\/\//)
+    expect(apiClient.put).not.toHaveBeenCalled()
   })
 })

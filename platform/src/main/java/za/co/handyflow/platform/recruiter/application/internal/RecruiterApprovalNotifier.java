@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import za.co.handyflow.platform.notifications.application.NotificationRequest;
 import za.co.handyflow.platform.notifications.application.Recipient;
-import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
 import za.co.handyflow.platform.notifications.application.UserRecipientResolver;
 import za.co.handyflow.platform.notifications.application.internal.NotificationService;
 import za.co.handyflow.platform.notifications.domain.model.NotificationType;
@@ -17,7 +16,7 @@ import java.util.UUID;
 
 /**
  * Tells approvers a job or offer is waiting for them, and tells the person who asked how it went. Best effort: a message that cannot
- * be sent is logged and never stops the approval step. Approvers are the company's administrators other than the person who asked,
+ * be sent is logged and never stops the approval step. Approvers are the users who hold the approve permission, other than the person who asked,
  * because the rules do not let anyone approve their own request.
  */
 @Slf4j
@@ -26,14 +25,13 @@ import java.util.UUID;
 class RecruiterApprovalNotifier {
 
     private final NotificationService notificationService;
-    private final TenantAdminRecipients admins;
+    private final RecruiterApprovers approvers;
     private final UserRecipientResolver users;
 
     void requested(TenantId tenant, boolean job, UUID refId, String jobTitle, UUID submitter) {
         try {
             String submitterName = submitter == null ? null : users.resolveUser(tenant, submitter).map(Recipient::displayName).orElse(null);
-            List<Recipient> approvers = admins.resolveTenantAdmins(tenant).stream()
-                    .filter(r -> r.userId() == null || !r.userId().equals(submitter)).toList();
+            List<Recipient> approvers = this.approvers.approversFor(tenant, submitter);
             send(tenant, NotificationType.REC_APPROVAL_REQUESTED, RecruiterApprovalRules.requestedTitle(job),
                     RecruiterApprovalRules.requestedMessage(job, jobTitle, submitterName), refId, job, approvers);
         } catch (RuntimeException ex) {
@@ -43,8 +41,7 @@ class RecruiterApprovalNotifier {
 
     void reminder(TenantId tenant, boolean job, UUID refId, String jobTitle, UUID submitter, long daysWaiting) {
         try {
-            List<Recipient> approvers = admins.resolveTenantAdmins(tenant).stream()
-                    .filter(r -> r.userId() == null || !r.userId().equals(submitter)).toList();
+            List<Recipient> approvers = this.approvers.approversFor(tenant, submitter);
             send(tenant, NotificationType.REC_APPROVAL_REMINDER, RecruiterApprovalRules.reminderTitle(job),
                     RecruiterApprovalRules.reminderMessage(job, jobTitle, daysWaiting), refId, job, approvers);
         } catch (RuntimeException ex) {

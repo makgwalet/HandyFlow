@@ -30,13 +30,14 @@ public class RecruiterApprovalService {
     private final RecSettingsRepository settingsRepo;
     private final JdbcTemplate jdbc;
     private final RecruiterApprovalNotifier notifier;
+    private final RecruiterApprovers approvers;
 
     // ── Settings ──────────────────────────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public SettingsView settingsView(TenantId tenantId) {
         RecSettings s = settings(tenantId);
-        return new SettingsView(s.isRequireJobApproval(), s.isRequireOfferApproval(), s.getRetentionMonths());
+        return new SettingsView(s.isRequireJobApproval(), s.isRequireOfferApproval(), s.getRetentionMonths(), s.getPrivacyNoticeUrl());
     }
 
     @Transactional
@@ -45,14 +46,20 @@ public class RecruiterApprovalService {
         int months = req.retentionMonths() == null ? current.getRetentionMonths() : req.retentionMonths();
         String problem = RecruiterRetentionRules.monthsProblem(months);
         if (problem != null) throw new IllegalArgumentException(problem);
+        String urlProblem = RecruiterConsentRules.privacyUrlProblem(req.privacyNoticeUrl());
+        if (urlProblem != null) throw new IllegalArgumentException(urlProblem);
+        String url = req.privacyNoticeUrl() == null ? current.getPrivacyNoticeUrl() : RecruiterConsentRules.normaliseUrl(req.privacyNoticeUrl());
         current.update(req.requireJobApproval() == null ? current.isRequireJobApproval() : req.requireJobApproval(),
-                req.requireOfferApproval() == null ? current.isRequireOfferApproval() : req.requireOfferApproval(), months, by);
+                req.requireOfferApproval() == null ? current.isRequireOfferApproval() : req.requireOfferApproval(), months, url, by);
         settingsRepo.save(current);
-        return new SettingsView(current.isRequireJobApproval(), current.isRequireOfferApproval(), current.getRetentionMonths());
+        return new SettingsView(current.isRequireJobApproval(), current.isRequireOfferApproval(), current.getRetentionMonths(), current.getPrivacyNoticeUrl());
     }
 
     /** How many months the company keeps an unsuccessful applicant's details; shown to applicants in the consent text. */
     public int retentionMonths(TenantId tenantId) { return settings(tenantId).getRetentionMonths(); }
+
+    /** The company's privacy notice, shown beside the careers consent text; null when it has not set one. */
+    public String privacyNoticeUrl(TenantId tenantId) { return settings(tenantId).getPrivacyNoticeUrl(); }
 
     RecSettings settings(TenantId tenantId) {
         return settingsRepo.findById(tenantId.getValue()).orElseGet(() -> RecSettings.defaults(tenantId.getValue()));
@@ -70,6 +77,7 @@ public class RecruiterApprovalService {
         RecJob job = job(tenantId, jobId);
         fail(RecruiterApprovalRules.submitJobProblem(job.getStatus(), job.getApprovalStatus(), job.getTitle(), job.getDescription(),
                 job.getSalaryMin(), job.getSalaryMax()));
+        fail(RecruiterApprovalRules.noApproverProblem(approvers.anyoneBut(tenantId, by)));
         job.submitForApproval(by);
         jobRepo.save(job);
         log.info("Job={} sent for approval by user={}", jobId, by);
@@ -105,6 +113,7 @@ public class RecruiterApprovalService {
     public ApprovalView submitOffer(TenantId tenantId, UUID applicationId, UUID by) {
         RecApplication app = application(tenantId, applicationId);
         fail(RecruiterApprovalRules.submitOfferProblem(app.getStage(), app.getOfferApprovalStatus(), app.getOfferedSalary(), app.getOfferLetterSentAt() != null));
+        fail(RecruiterApprovalRules.noApproverProblem(approvers.anyoneBut(tenantId, by)));
         app.submitOfferForApproval(by);
         applicationRepo.save(app);
         log.info("Offer for application={} sent for approval by user={}", applicationId, by);
@@ -145,13 +154,13 @@ public class RecruiterApprovalService {
     private ApprovalView jobView(TenantId tenantId, RecJob j, UUID caller) {
         return new ApprovalView(j.getApprovalStatus(), settings(tenantId).isRequireJobApproval(), j.getSubmittedBy(), name(j.getSubmittedBy()), j.getSubmittedAt(),
                 j.getApprovedBy(), name(j.getApprovedBy()), j.getApprovedAt(), j.getApprovalNote(),
-                RecruiterApprovalRules.SUBMITTED.equals(j.getApprovalStatus()) && caller != null && !caller.equals(j.getSubmittedBy()));
+                RecruiterApprovalRules.SUBMITTED.equals(j.getApprovalStatus()) && caller != null && !caller.equals(j.getSubmittedBy()) && approvers.mayApprove(tenantId, caller));
     }
 
     private ApprovalView offerView(TenantId tenantId, RecApplication a, UUID caller) {
         return new ApprovalView(a.getOfferApprovalStatus(), settings(tenantId).isRequireOfferApproval(), a.getOfferSubmittedBy(), name(a.getOfferSubmittedBy()), a.getOfferSubmittedAt(),
                 a.getOfferApprovedBy(), name(a.getOfferApprovedBy()), a.getOfferApprovedAt(), a.getOfferApprovalNote(),
-                RecruiterApprovalRules.SUBMITTED.equals(a.getOfferApprovalStatus()) && caller != null && !caller.equals(a.getOfferSubmittedBy()));
+                RecruiterApprovalRules.SUBMITTED.equals(a.getOfferApprovalStatus()) && caller != null && !caller.equals(a.getOfferSubmittedBy()) && approvers.mayApprove(tenantId, caller));
     }
 
     private String name(UUID userId) {

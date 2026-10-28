@@ -1,5 +1,5 @@
 // src/pages/recruiter/RecruiterPage.tsx
-import { EMPTY_HIRE_DETAILS, GENDERS, hireDetailsBody, hireDetailsProblem, missingCount, personalMissing, type HireDetails } from './hireDetails.logic'
+import { EMPTY_HIRE_DETAILS, GENDERS, RACES, hireDetailsBody, hireDetailsProblem, missingCount, personalMissing, type HireDetails } from './hireDetails.logic'
 import { useState } from 'react'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
@@ -1112,7 +1112,12 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                     <select id="hire-gender" value={hire.gender} onChange={setHireField('gender')} style={inp}>
                       <option value="">Not given</option>{GENDERS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
                     </select></div>
+                  <div><label style={lbl} htmlFor="hire-race">Race (optional)</label>
+                    <select id="hire-race" value={hire.race} onChange={setHireField('race')} style={inp}>
+                      <option value="">Prefer not to say</option>{RACES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}</select>
+                    <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 2 }}>Used only for employment-equity reporting.</div></div>
                   <div><label style={lbl} htmlFor="hire-ec-name">Emergency contact</label><input id="hire-ec-name" value={hire.emergencyContactName} onChange={setHireField('emergencyContactName')} style={inp} /></div>
+                  <div><label style={lbl} htmlFor="hire-ec-rel">Emergency contact relation</label><input id="hire-ec-rel" maxLength={50} placeholder="e.g. Spouse, Brother" value={hire.emergencyContactRelation} onChange={setHireField('emergencyContactRelation')} style={inp} /></div>
                   <div><label style={lbl} htmlFor="hire-ec-phone">Emergency contact phone</label><input id="hire-ec-phone" inputMode="tel" value={hire.emergencyContactPhone} onChange={setHireField('emergencyContactPhone')} style={inp} /></div>
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 8 }}>

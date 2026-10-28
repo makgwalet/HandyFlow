@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.notifications.application.NotificationRequest;
 import za.co.handyflow.platform.notifications.application.Recipient;
 import za.co.handyflow.platform.notifications.application.internal.NotificationService;
@@ -22,6 +21,7 @@ import za.co.handyflow.platform.recruiter.domain.repository.RecInterviewPanelist
 import za.co.handyflow.platform.recruiter.domain.repository.RecInterviewRepository;
 import za.co.handyflow.platform.recruiter.domain.repository.RecJobRepository;
 import za.co.handyflow.platform.shared.EmailService;
+import za.co.handyflow.platform.shared.SchedulerLease;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.Instant;
@@ -83,13 +83,19 @@ public class InterviewReminderScheduler {
     private final EmailService                   emailService;
     private final NotificationService            notificationService;
     private final JdbcTemplate                   jdbc;
+    private final SchedulerLease                 lease;
+
+    static final String LOCK = "recruiter-interview-reminders";
 
     @Value("${recruiter.interview-reminder.hours-before:24}")
     private int hoursBefore;
 
     @Scheduled(cron = "0 0 * * * *") // top of every hour
-    @Transactional
     public void sendUpcomingInterviewReminders() {
+        lease.runExclusively(LOCK, java.time.Duration.ofMinutes(10), this::sweep);
+    }
+
+    void sweep() {
         Instant now = Instant.now();
         Instant windowEnd = now.plus(hoursBefore, ChronoUnit.HOURS);
         List<RecInterview> due = interviewRepo.findDueForReminder(now, windowEnd);

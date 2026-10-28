@@ -8,9 +8,14 @@ public final class RecruiterApprovalDtos {
 
     private RecruiterApprovalDtos() {}
 
-    public record SettingsView(boolean requireJobApproval, boolean requireOfferApproval, int retentionMonths) {}
+    public record SettingsView(boolean requireJobApproval, boolean requireOfferApproval, int retentionMonths, String privacyNoticeUrl) {
+        public SettingsView(boolean requireJobApproval, boolean requireOfferApproval, int retentionMonths) { this(requireJobApproval, requireOfferApproval, retentionMonths, null); }
+    }
 
-    public record SettingsRequest(Boolean requireJobApproval, Boolean requireOfferApproval, Integer retentionMonths) {}
+    /** {@code privacyNoticeUrl}: null leaves the link as it is, an empty string removes it. */
+    public record SettingsRequest(Boolean requireJobApproval, Boolean requireOfferApproval, Integer retentionMonths, String privacyNoticeUrl) {
+        public SettingsRequest(Boolean requireJobApproval, Boolean requireOfferApproval, Integer retentionMonths) { this(requireJobApproval, requireOfferApproval, retentionMonths, null); }
+    }
 
     public record DecisionRequest(Boolean approve, String note) {}
 

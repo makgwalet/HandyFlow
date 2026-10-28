@@ -59,10 +59,10 @@ export default function ApprovalPanel({ kind, id }: { kind: 'job' | 'offer'; id:
           <button type="button" disabled={submit.isPending} onClick={() => submit.mutate()} style={btn}>{submit.isPending ? 'Sending…' : 'Send for approval'}</button>
         </div>
       )}
-      {v.status === 'SUBMITTED' && rights.admin && !v.canDecide && (
+      {v.status === 'SUBMITTED' && rights.approve && !v.canDecide && (
         <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 6 }}>Someone else needs to decide: you sent this yourself.</div>
       )}
-      {v.status === 'SUBMITTED' && rights.admin && v.canDecide && (
+      {v.status === 'SUBMITTED' && rights.approve && v.canDecide && (
         <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
           <label style={{ fontSize: 12 }}>Note (needed if not approved)
             <textarea aria-label="Approval note" rows={2} value={note} onChange={e => setNote(e.target.value)}

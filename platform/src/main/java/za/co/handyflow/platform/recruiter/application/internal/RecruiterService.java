@@ -232,7 +232,10 @@ public class RecruiterService {
             throw new HandyFlowException("This position is no longer accepting applications",
                     HttpStatus.GONE, "JOB_CLOSED");
         }
-        return toJobResponse(job, fetchTenantName(tenantId)).withRetentionMonths(approvalService.retentionMonths(tenantId));
+        JobResponse out = toJobResponse(job, fetchTenantName(tenantId));
+        // The salary range is shown only when the company chose to show it, here as on the list.
+        if (!job.isShowSalary()) out = withoutSalary(out);
+        return out.withRetentionMonths(approvalService.retentionMonths(tenantId)).withPrivacyNoticeUrl(approvalService.privacyNoticeUrl(tenantId));
     }
 
     // ── Applications — public submission (no auth) ────────────────────────────
@@ -275,7 +278,7 @@ public class RecruiterService {
 
         RecApplication application = RecApplication.create(tenantId, jobId,
                 applicant.getId(), req.source(), req.referrerName());
-        application.recordConsent(RecruiterConsentRules.VERSION);
+        application.recordConsent(RecruiterConsentRules.VERSION, approvalService.privacyNoticeUrl(tenantId));
         applicationRepo.save(application);
 
         // Update job application count
@@ -643,7 +646,7 @@ public class RecruiterService {
                     HttpStatus.BAD_REQUEST, "SALARY_REQUIRED");
         }
 
-        String personal = HireDetailsRules.problem(req.gender(), req.emergencyContactName(), req.emergencyContactPhone());
+        String personal = HireDetailsRules.problem(req.gender(), req.race(), req.emergencyContactName(), req.emergencyContactPhone(), req.emergencyContactRelation());
         if (personal != null) throw new HandyFlowException(personal, HttpStatus.BAD_REQUEST, "INVALID_HIRE_DETAILS");
 
         // Route through the real HR module instead of a raw JDBC insert.
@@ -654,7 +657,7 @@ public class RecruiterService {
         // started with zero leave on the books.
         CreateEmployeeRequest hrReq = new CreateEmployeeRequest(
                 applicant.getFirstName(), applicant.getLastName(),
-                blank(req.idNumber()), blank(req.taxNumber()), req.dateOfBirth(), blank(req.gender()), null,   // race is not captured here; HR completes it
+                blank(req.idNumber()), blank(req.taxNumber()), req.dateOfBirth(), blank(req.gender()), blank(req.race()),   // race is optional: given for employment-equity reporting, or left for HR
                 applicant.getEmail(), applicant.getPhone(),
                 req.startDate(), req.employmentType(),
                 jobTitle, department,
@@ -662,7 +665,8 @@ public class RecruiterService {
                 blank(req.bankName()), blank(req.bankAccountNumber()), blank(req.bankBranchCode()),   // banking, when the new hire gave it
                 null, null, null,                              // medical/pension/travel — completed later in HR
                 blank(req.emergencyContactName()), blank(req.emergencyContactPhone()),   // emergency contact, when the new hire gave it
-                "Converted from recruiter application " + applicationId
+                "Converted from recruiter application " + applicationId,
+                blank(req.emergencyContactRelation())
         );
         EmployeeSummary created = hrFacade.createEmployee(tenantId, hrReq);
         UUID employeeId = created.id();
@@ -1022,6 +1026,11 @@ public class RecruiterService {
                     "SELECT name FROM tenants WHERE id = ?",
                     String.class, tenantId.getValue());
         } catch (Exception e) { return "HandyFlow"; }
+    }
+
+    private static JobResponse withoutSalary(JobResponse r) {
+        return new JobResponse(r.id(), r.title(), r.department(), r.location(), r.jobType(), r.experienceLevel(), r.description(), r.requirements(),
+                r.benefits(), null, null, false, r.status(), r.slug(), r.closesAt(), r.applicationCount(), r.companyName(), r.createdAt());
     }
 
     private JobResponse toJobResponse(RecJob j) {

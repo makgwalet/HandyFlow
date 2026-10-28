@@ -103,4 +103,22 @@ class EmployeeRulesTest {
         assertThat(EmployeeRules.maskAccount(" ")).isNull();
         assertThat(EmployeeRules.maskAccount(null)).isNull();
     }
+
+    @Test
+    void raceIsOptionalAndStoredInUpperCase() {
+        assertThat(EmployeeRules.raceProblem(null)).isNull();
+        assertThat(EmployeeRules.raceProblem("")).isNull();
+        assertThat(EmployeeRules.raceProblem("Coloured")).isNull();
+        assertThat(EmployeeRules.raceProblem("martian")).contains("Race must be");
+        assertThat(EmployeeRules.normaliseRace(" white ")).isEqualTo("WHITE");
+        assertThat(EmployeeRules.normaliseRace("  ")).isNull();
+    }
+
+    @Test
+    void anEmergencyRelationNeedsAContactAndStaysShort() {
+        assertThat(EmployeeRules.relationProblem(null, null)).isNull();
+        assertThat(EmployeeRules.relationProblem("Sipho", "Brother")).isNull();
+        assertThat(EmployeeRules.relationProblem(null, "Brother")).contains("name");
+        assertThat(EmployeeRules.relationProblem("Sipho", "x".repeat(51))).contains("too long");
+    }
 }

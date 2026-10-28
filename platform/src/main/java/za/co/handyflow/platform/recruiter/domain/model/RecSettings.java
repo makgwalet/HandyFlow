@@ -21,6 +21,7 @@ public class RecSettings {
     @Column(name = "require_job_approval",   nullable = false) private boolean requireJobApproval = false;
     @Column(name = "require_offer_approval", nullable = false) private boolean requireOfferApproval = false;
     @Column(name = "retention_months",       nullable = false) private int retentionMonths = RecruiterRetentionRules.DEFAULT_MONTHS;
+    @Column(name = "privacy_notice_url", length = 500) private String privacyNoticeUrl;
     @Column(name = "updated_by") private UUID updatedBy;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt = Instant.now();
 
@@ -28,6 +29,11 @@ public class RecSettings {
         RecSettings s = new RecSettings();
         s.tenantId = tenantId;
         return s;
+    }
+
+    public void update(boolean requireJobApproval, boolean requireOfferApproval, int retentionMonths, String privacyNoticeUrl, UUID by) {
+        this.privacyNoticeUrl = privacyNoticeUrl;
+        update(requireJobApproval, requireOfferApproval, retentionMonths, by);
     }
 
     public void update(boolean requireJobApproval, boolean requireOfferApproval, int retentionMonths, UUID by) {

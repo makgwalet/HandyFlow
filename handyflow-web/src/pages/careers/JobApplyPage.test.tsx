@@ -61,4 +61,20 @@ describe("careers apply form consent", () => {
     show()
     expect(await screen.findByText(/removed after the company's retention period/)).toBeTruthy()
   })
+
+  it("links the company's privacy notice beside the consent text, opening in a new tab", async () => {
+    get.mockResolvedValue({ data: { data: { ...job, retentionMonths: 18, privacyNoticeUrl: "https://acme.co.za/privacy" } } })
+    show()
+    const link = await screen.findByText("Read our privacy notice")
+    expect(link.getAttribute("href")).toBe("https://acme.co.za/privacy")
+    expect(link.getAttribute("target")).toBe("_blank")
+    expect(link.getAttribute("rel")).toMatch(/noopener/)
+  })
+
+  it("shows no link when there is none, or when it is not a web address", async () => {
+    get.mockResolvedValue({ data: { data: { ...job, privacyNoticeUrl: "javascript:alert(1)" } } })
+    show()
+    await screen.findByText(/removed after the company's retention period/)
+    expect(screen.queryByText("Read our privacy notice")).toBeNull()
+  })
 })

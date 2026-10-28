@@ -19,6 +19,9 @@ import java.time.LocalDate;
  * HR's own rules (a South African ID number, a 10-digit tax number, a bank name with an account and branch); when they have not, they stay
  * empty and the employee's onboarding keeps asking for them.
  *
+ * race (one of the races HR offers) and the emergency contact's relation (needs a contact name) are optional too. Race is asked for employment-equity
+ * reporting and may be left empty.
+ *
  * dateOfBirth, gender and an emergency contact (name and phone, given together) are optional in the same way; HR's rules check them (a date of birth
  * that matches the ID number, a phone that looks like one).
  *
@@ -41,19 +44,30 @@ public record ConvertToEmployeeRequest(
         LocalDate  dateOfBirth,
         String     gender,
         String     emergencyContactName,
-        String     emergencyContactPhone
+        String     emergencyContactPhone,
+        String     race,
+        String     emergencyContactRelation
 ) {
+    /** The request as it was before race and the emergency contact's relation were added. */
+    public ConvertToEmployeeRequest(LocalDate startDate, String jobTitle, String department, boolean createHrRecord,
+                                    BigDecimal grossSalary, String employmentType, String payFrequency,
+                                    String idNumber, String taxNumber, String bankName, String bankAccountNumber, String bankBranchCode,
+                                    LocalDate dateOfBirth, String gender, String emergencyContactName, String emergencyContactPhone) {
+        this(startDate, jobTitle, department, createHrRecord, grossSalary, employmentType, payFrequency,
+                idNumber, taxNumber, bankName, bankAccountNumber, bankBranchCode, dateOfBirth, gender, emergencyContactName, emergencyContactPhone, null, null);
+    }
+
     /** The request as it was before the personal details were added. */
     public ConvertToEmployeeRequest(LocalDate startDate, String jobTitle, String department, boolean createHrRecord,
                                     BigDecimal grossSalary, String employmentType, String payFrequency,
                                     String idNumber, String taxNumber, String bankName, String bankAccountNumber, String bankBranchCode) {
         this(startDate, jobTitle, department, createHrRecord, grossSalary, employmentType, payFrequency,
-                idNumber, taxNumber, bankName, bankAccountNumber, bankBranchCode, null, null, null, null);
+                idNumber, taxNumber, bankName, bankAccountNumber, bankBranchCode, null, null, null, null, null, null);
     }
 
     /** The request as it was before the optional payroll details were added. */
     public ConvertToEmployeeRequest(LocalDate startDate, String jobTitle, String department, boolean createHrRecord,
                                     BigDecimal grossSalary, String employmentType, String payFrequency) {
-        this(startDate, jobTitle, department, createHrRecord, grossSalary, employmentType, payFrequency, null, null, null, null, null, null, null, null, null);
+        this(startDate, jobTitle, department, createHrRecord, grossSalary, employmentType, payFrequency, null, null, null, null, null, null, null, null, null, null, null);
     }
 }

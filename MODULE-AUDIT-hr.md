@@ -1406,3 +1406,30 @@ Closes the four "still not done" items left in §26, §41 and §42.
 - A required course with no session scheduled shows people as "not held" with nothing to book; the matrix does not yet tell the administrator that no session exists.
 - Manager alerts reach the manager's login in the app and their email if they have an address. A manager with only an email is reached by email alone.
 - Training provider module (`trainingprovider`) is separate and untouched.
+
+## 61. Recruiter: race and relation on hire, privacy link, named approvers, reminder locks (Slice 27, V544)
+
+Closes the four recruiter leftovers.
+
+**Race and emergency-contact relation on hire conversion.** HR's `CreateEmployeeRequest` now has `emergencyContactRelation` (a 24-argument constructor is kept), and `HrService` stores race and relation on create, checking both with `EmployeeRules.raceProblem` / `relationProblem`. Race is optional and must be one of African, Coloured, Indian, White, Other (stored upper case). A relation needs a contact name and is 50 characters at most. `ConvertToEmployeeRequest` gained `race` and `emergencyContactRelation` (older constructors kept); the recruiter checks them with `HireDetailsRules.problem` before calling HR through `HrFacade`. The convert dialog has "Race (optional)" with "Prefer not to say", a note that it is used only for employment-equity reporting, and "Emergency contact relation". Neither counts towards the "details left empty" line.
+
+**Privacy-notice link.** `rec_settings.privacy_notice_url` (set under Recruiter → Privacy by an administrator; empty removes it). Only `http://` or `https://` addresses with a host are accepted (no `javascript:`, `data:`, user-info or spaces; 500 characters at most), checked on the server and again before the link is rendered. The public careers job carries it, the apply form shows "Read our privacy notice" beside the consent text (new tab, `noopener noreferrer`), and the link shown is stored with the consent on the application (`rec_applications.consent_privacy_url`), taken from settings on the server and never from the request. Changing the link later does not rewrite what earlier applicants saw. The consent wording is unchanged, so its version is unchanged.
+
+**Named approvers.** New permission `RECRUITER_APPROVE` ("Approve jobs and offers"). The decision endpoints for jobs and offers need it instead of `RECRUITER_ADMIN`. Approval requests and reminders go to active users holding it, other than the person who asked, instead of every administrator. The migration grants it to every role that holds `RECRUITER_ADMIN`, so nothing changes until a company removes it from a role. Sending a job or offer for approval is refused when nobody else holds the permission ("Nobody else can approve this yet…"). `canDecide` now also requires the permission, and the approval panel shows the buttons only to people who hold it.
+
+**Reminder locks.** `RecruiterApprovalReminderScheduler` (07:30) and `InterviewReminderScheduler` (hourly) run inside `SchedulerLease.runExclusively` with their own lock names; an instance that does not get the lease skips the run. The interview sweep lost its method-level `@Transactional` so each interview's "reminder sent" flag commits on its own, as the other leased sweeps do. A crashed instance's lease lapses after 10 minutes.
+
+**Also fixed in passing.** The public single-job endpoint (`/public/.../jobs/{slug}`) returned the salary range even when the company had chosen not to show it; the list already hid it. It now hides it too.
+
+**Tests.**
+- Run offline and passing: `RecruiterConsentRulesTest` (5), `HireDetailsRulesTest` (6), `EmployeeRulesTest` (13), `RecruiterApproversRulesTest` (3), `RecruiterApprovalReminderSchedulerTest` (2), and the approval-reminder case of `RecruiterSchedulerLeaseTest` (1). One deliberate break (accepting any link scheme) was caught.
+- Updated but not run (Mockito is not available here): `RecruiterApprovalNotifierTest`, `RecruiterApprovalAndRetentionTest` (new cases for the link setting and for "nobody else can approve"). The interview-lease cases in `RecruiterSchedulerLeaseTest` have not run either, because the interview scheduler pulls in mail and entity classes the offline harness lacks.
+- Frontend: `consent.test.ts` and `hireDetails.test.ts` pass under Node except one older case that needs vitest's `toMatchObject`. Component tests (`RecApproval.test.tsx`, `JobApplyPage.test.tsx`) have not run: vitest is not installed here. tsc is clean for these files; `RecruiterPage.tsx` keeps its existing `any` and unused-import lint errors.
+
+**Limits and things I could not verify**
+- Nothing has run against Postgres, Spring or a browser. The approver query (users → user_roles → role_permissions → permissions) is the same shape as `ReportAudience` but is new SQL.
+- Because the migration grants the permission to every `RECRUITER_ADMIN` role, existing companies see no change in who is asked until they edit roles. A user who holds the permission through a role but is not active is not asked.
+- If the only holder is the person who sent the request, sending is refused rather than waiting forever; there is no fallback to administrators on purpose.
+- The privacy link is a single company-wide address. There is no per-job link and no check that the address loads.
+- The lease uses the database clock and a 10-minute hold. Two instances with badly different clocks cannot disagree, because only the database's `now()` is used.
+- Race is stored on HR's existing employee field. HR's own employee form is unchanged.

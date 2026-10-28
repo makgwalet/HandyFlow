@@ -36,6 +36,17 @@ public final class RecruiterApprovalRules {
         return null;
     }
 
+    /** Null when someone other than the submitter can decide. Refusing here is kinder than a request nobody can ever answer. */
+    public static String noApproverProblem(boolean someoneElseCanApprove) {
+        return someoneElseCanApprove ? null
+                : "Nobody else can approve this yet. Give another person the Approve jobs and offers permission, then send it again.";
+    }
+
+    /** Who to ask: the people holding the approve permission, other than the one who asked. Null ids are kept only for those with no user account. */
+    public static <T> java.util.List<T> approversFor(java.util.List<T> holders, java.util.function.Function<T, UUID> id, UUID submitter) {
+        return holders.stream().filter(h -> id.apply(h) == null || !id.apply(h).equals(submitter)).toList();
+    }
+
     /** Null when the job may go live. */
     public static String publishProblem(boolean approvalRequired, String approvalStatus) {
         if (!approvalRequired || APPROVED.equals(approvalStatus)) return null;

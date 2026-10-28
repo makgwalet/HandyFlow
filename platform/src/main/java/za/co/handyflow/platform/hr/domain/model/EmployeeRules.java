@@ -73,6 +73,28 @@ public final class EmployeeRules {
         return EMAIL.matcher(email.trim()).matches() ? null : "This email address does not look right.";
     }
 
+    /** The races HR offers, as stored. */
+    public static final java.util.Set<String> RACES = java.util.Set.of("AFRICAN", "COLOURED", "INDIAN", "WHITE", "OTHER");
+    public static final int MAX_RELATION = 50;
+
+    /** Null when the race is empty or one HR offers (any capitals). */
+    public static String raceProblem(String race) {
+        if (race == null || race.isBlank()) return null;
+        return RACES.contains(race.trim().toUpperCase(java.util.Locale.ROOT)) ? null : "Race must be one of: African, Coloured, Indian, White or Other.";
+    }
+
+    /** The stored form of a race: upper case, or null when empty. */
+    public static String normaliseRace(String race) {
+        return race == null || race.isBlank() ? null : race.trim().toUpperCase(java.util.Locale.ROOT);
+    }
+
+    /** Null when the relation is empty, or is given with a contact name and is short enough. */
+    public static String relationProblem(String contactName, String relation) {
+        if (relation == null || relation.isBlank()) return null;
+        if (contactName == null || contactName.isBlank()) return "Give the emergency contact's name as well as their relation.";
+        return relation.trim().length() > MAX_RELATION ? "The emergency contact's relation is too long (" + MAX_RELATION + " characters at most)." : null;
+    }
+
     public static String phoneProblem(String phone) {
         if (phone == null || phone.isBlank()) return null;
         return PHONE.matcher(phone.trim()).matches() ? null : "This phone number does not look right.";

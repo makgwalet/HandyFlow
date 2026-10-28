@@ -4,7 +4,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import za.co.handyflow.platform.notifications.application.NotificationRequest;
 import za.co.handyflow.platform.notifications.application.Recipient;
-import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
 import za.co.handyflow.platform.notifications.application.UserRecipientResolver;
 import za.co.handyflow.platform.notifications.application.internal.NotificationService;
 import za.co.handyflow.platform.notifications.domain.model.NotificationType;
@@ -23,16 +22,16 @@ class RecruiterApprovalNotifierTest {
     private final TenantId tenant = TenantId.of(UUID.randomUUID());
     private final UUID maker = UUID.randomUUID(), other = UUID.randomUUID(), ref = UUID.randomUUID();
     private final NotificationService notifications = mock(NotificationService.class);
-    private final TenantAdminRecipients admins = mock(TenantAdminRecipients.class);
+    private final RecruiterApprovers approvers = mock(RecruiterApprovers.class);
     private final UserRecipientResolver users = mock(UserRecipientResolver.class);
-    private final RecruiterApprovalNotifier notifier = new RecruiterApprovalNotifier(notifications, admins, users);
+    private final RecruiterApprovalNotifier notifier = new RecruiterApprovalNotifier(notifications, approvers, users);
 
     private Recipient user(UUID id, String name) { return Recipient.user(id, name, name.toLowerCase().replace(' ', '.') + "@x.co.za", null); }
 
     @Test
-    void approversAreTheAdministratorsExceptTheSubmitter() {
+    void approversAreTheOnesHoldingThePermission() {
         Recipient me = user(maker, "Thandi Mokoena"), boss = user(other, "Sam Boss");
-        when(admins.resolveTenantAdmins(tenant)).thenReturn(List.of(me, boss));
+        when(approvers.approversFor(tenant, maker)).thenReturn(List.of(boss));
         when(users.resolveUser(tenant, maker)).thenReturn(Optional.of(me));
         notifier.requested(tenant, true, ref, "Clerk", maker);
         ArgumentCaptor<NotificationRequest> c = ArgumentCaptor.forClass(NotificationRequest.class);
@@ -43,9 +42,9 @@ class RecruiterApprovalNotifierTest {
     }
 
     @Test
-    void nothingIsSentWhenTheSubmitterIsTheOnlyAdministrator() {
+    void nothingIsSentWhenNobodyElseCanApprove() {
         Recipient me = user(maker, "Thandi Mokoena");
-        when(admins.resolveTenantAdmins(tenant)).thenReturn(List.of(me));
+        when(approvers.approversFor(tenant, maker)).thenReturn(List.of());
         when(users.resolveUser(tenant, maker)).thenReturn(Optional.of(me));
         notifier.requested(tenant, false, ref, "Clerk", maker);
         verify(notifications, never()).send(any());
@@ -66,7 +65,7 @@ class RecruiterApprovalNotifierTest {
 
     @Test
     void aFailureNeverEscapes() {
-        when(admins.resolveTenantAdmins(tenant)).thenThrow(new IllegalStateException("down"));
+        when(approvers.approversFor(tenant, maker)).thenThrow(new IllegalStateException("down"));
         notifier.requested(tenant, true, ref, "Clerk", maker);
         verify(notifications, never()).send(any());
     }

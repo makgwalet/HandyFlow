@@ -65,7 +65,7 @@ public class HrService {
         emp.setTaxNumber(req.taxNumber());
         emp.setDateOfBirth(req.dateOfBirth());
         emp.setGender(req.gender());
-        emp.setRace(req.race());
+        emp.setRace(EmployeeRules.normaliseRace(req.race()));
         emp.setEmail(req.email());
         emp.setPhone(req.phone());
         emp.setJobTitle(req.jobTitle());
@@ -81,6 +81,7 @@ public class HrService {
                 ? req.travelAllowance() : BigDecimal.ZERO);
         emp.setEmergencyContactName(req.emergencyContactName());
         emp.setEmergencyContactPhone(req.emergencyContactPhone());
+        emp.setEmergencyContactRelation(blankToNull(req.emergencyContactRelation()));
         emp.setNotes(req.notes());
 
         employeeRepo.save(emp);
@@ -227,6 +228,8 @@ public class HrService {
         fail(EmployeeRules.emailProblem(req.email()));
         fail(EmployeeRules.phoneProblem(req.phone()));
         fail(EmployeeRules.phoneProblem(req.emergencyContactPhone()));
+        fail(EmployeeRules.raceProblem(req.race()));
+        fail(EmployeeRules.relationProblem(req.emergencyContactName(), req.emergencyContactRelation()));
         fail(EmployeeRules.bankProblem(req.bankName(), req.bankAccountNumber(), req.bankBranchCode()));
         fail(EmployeeChangeRules.compensationProblem(req.grossSalary(), req.travelAllowance(), req.medicalAidContribution(),
                 req.pensionContribution(), req.payFrequency()));
