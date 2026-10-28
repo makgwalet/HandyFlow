@@ -773,6 +773,7 @@ export const TRAINING_SECTIONS: ModuleSections = {
         { id: 'required', label: 'Required training', icon: ListChecks },
       ],
     },
+    { label: 'Settings', sections: [{ id: 'audit', label: 'Audit trail', icon: ShieldCheck, permission: 'TRAINING_AUDIT' }] },
   ],
 }
 

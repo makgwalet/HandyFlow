@@ -53,7 +53,7 @@ public class TrainingCertificateService {
             throw new IllegalStateException("Course '" + course.getTitle() + "' does not offer certification");
         }
 
-        LocalDate issueDate = LocalDate.now();
+        LocalDate issueDate = LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg"));
         LocalDate expiryDate = course.getCertificateValidityMonths() != null
                 ? issueDate.plusMonths(course.getCertificateValidityMonths())
                 : null;

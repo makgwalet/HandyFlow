@@ -86,10 +86,10 @@ public class TrainingCertificate {
     public boolean isExpiringWithin(int days) {
         return this.expiryDate != null
                 && "VALID".equals(this.status)
-                && !this.expiryDate.isAfter(LocalDate.now().plusDays(days));
+                && !this.expiryDate.isAfter(LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg")).plusDays(days));
     }
 
     public boolean isExpired() {
-        return this.expiryDate != null && this.expiryDate.isBefore(LocalDate.now());
+        return this.expiryDate != null && this.expiryDate.isBefore(LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg")));
     }
 }

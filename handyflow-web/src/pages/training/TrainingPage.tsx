@@ -11,6 +11,7 @@ import TrainingCoursesTab from "./TrainingCoursesTab"
 import TrainingSessionsTab from "./TrainingSessionsTab"
 import TrainingCertificatesTab from "./TrainingCertificatesTab"
 import RequiredTrainingTab from "./RequiredTrainingTab"
+import TrainingAudit from "./TrainingAudit"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { TRAINING_SECTIONS } from "../../navigation/moduleSections"
 
@@ -25,6 +26,7 @@ export default function TrainingPage() {
           case "sessions":     return <TrainingSessionsTab />
           case "certificates": return <TrainingCertificatesTab />
           case "required":     return <RequiredTrainingTab />
+          case "audit":        return <TrainingAudit />
           default:             return null
         }
       }} />
