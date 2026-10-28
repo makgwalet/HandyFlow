@@ -49,3 +49,17 @@ New section **Findings & Remediation** in the Internal Audit menu (needs `AUDIT_
 - Actions can be completed, validated or returned only from the existing finding screens; this screen is read-only.
 - The panel shows what the list carries (description, recommendation, management response); the root cause, criteria, condition and consequence are still only in the engagement's own finding view.
 - Not compiled or run: `AuditRemediationService`, the controller and the new `findAllForTenant` query (Spring and PostgreSQL). Run: `RemediationBoardTest` (8, offline), `remediation.test.ts` (4, under Node); the new screen was server-rendered once with data. `Remediation.test.tsx` is written but not run (vitest is not installed).
+
+## 4. Risk Heat Map (Slice 4)
+
+New section **Risk Heat Map** (needs `AUDIT_READ`), backed by `GET /internal-audit/heat-map`. It reads each active universe area's latest risk assessment.
+
+- **Inherent and control risk:** a 5 by 5 grid, inherent risk down the side (highest at the top) and control risk across (higher is weaker control). Each square shows how many areas sit there; pick one to list them. Squares are coloured by the product of the two scores: up to 4 low, up to 9 medium, up to 15 high, above that critical.
+- **By process area:** for each process area, how many areas are rated low, medium, high and critical (final audit risk, including any override), and how many are not assessed. Worst process area first.
+- Tiles: areas, assessed, not assessed (links to the Audit Universe), and the share rated high or critical.
+
+**Limits**
+- The mockup's Inherent / Residual / Control-effectiveness tabs are not built: the assessment stores inherent risk, control risk and a final level, but no residual score or control-effectiveness rating, so those views would be invented.
+- The square colours are a standard 5 by 5 convention, not the assessment's own formula, which adds five inputs (inherent, control, past findings, time since last audit, business impact) and can put an area in a different level than its square. The screen says so.
+- Process areas are grouped by the universe entry's free-text process area, case-insensitively; spellings that differ other than in case are separate rows.
+- Not compiled or run: `AuditHeatMapService`, the controller (Spring). Run: `RiskHeatMapTest` (7, offline), `heatMap.test.ts` (4, under Node); the screen was server-rendered once with data. `HeatMap.test.tsx` is written but not run.

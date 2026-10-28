@@ -836,6 +836,7 @@ export const INTERNAL_AUDIT_SECTIONS: ModuleSections = {
       label: 'Audit programme',
       sections: [
         { id: 'universe', label: 'Audit Universe', icon: Database, permission: 'AUDIT_READ' },
+        { id: 'heat-map', label: 'Risk Heat Map', icon: Gauge, permission: 'AUDIT_READ' },
         { id: 'plans', label: 'Annual Plans', icon: CalendarRange, permission: 'AUDIT_READ' },
         { id: 'engagements', label: 'Engagements', icon: ClipboardList, permission: 'AUDIT_READ' },
         { id: 'findings', label: 'Findings & Remediation', icon: AlertTriangle, permission: 'AUDIT_READ' },

@@ -8,6 +8,7 @@ import { CommitteeReport } from "./CommitteeReport"
 import { ReportsSection } from "./ReportsSection"
 import { QualitySection } from "./QualitySection"
 import { RemediationSection } from "./RemediationSection"
+import { HeatMapSection } from "./HeatMapSection"
 import { ProgrammeSection } from "./ProgrammeSection"
 import { MonitoringSection } from "./MonitoringSection"
 import { FollowUpSection } from "./FollowUpSection"
@@ -55,6 +56,7 @@ export default function InternalAuditPage() {
         switch (id) {
           case "reports":     return <ReportsSection />
           case "findings":    return <RemediationSection />
+          case "heat-map":    return <HeatMapSection onGo={section => navigate(`/internal-audit/${section}`)} />
           case "quality":     return <QualitySection />
           case "programme":   return <ProgrammeSection />
           case "monitoring":  return <MonitoringSection />
