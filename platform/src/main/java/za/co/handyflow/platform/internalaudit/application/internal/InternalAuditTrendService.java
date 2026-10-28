@@ -10,7 +10,9 @@ import za.co.handyflow.platform.internalaudit.domain.repository.*;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.LocalDate;
-import java.util.UUID;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -33,7 +35,30 @@ public class InternalAuditTrendService {
         Metrics now = current(t, today);
         var history = store.history(t, today, HISTORY_LIMIT);
         try { store.save(t, today, now); } catch (RuntimeException e) { log.warn("[InternalAudit] Could not save the dashboard snapshot: {}", e.getMessage()); }
-        return DashboardTrends.compare(now, history, today);
+        Trends saved = DashboardTrends.compare(now, history, today);
+        if (saved.daysAgo() != null) return saved;
+        try { return reconstructed(t, now, today); }
+        catch (RuntimeException e) { log.warn("[InternalAudit] Could not work out earlier dashboard figures: {}", e.getMessage()); return saved; }
+    }
+
+    /**
+     * Nothing saved is old enough, so work the earlier figures out from recorded dates. The comparison is with a quarter ago, or with the day the
+     * company's oldest record was made if that is later; with records under a week old there is nothing to compare with yet.
+     */
+    Trends reconstructed(UUID t, Metrics now, LocalDate today) {
+        var eng = engagements.findAllForTenant(t).stream().map(e -> new HistoricalMetrics.EngagementIn(e.getCreatedAt())).toList();
+        var fin = findings.findAllForTenant(t).stream().map(f -> new HistoricalMetrics.FindingIn(f.getCreatedAt(), f.getResolvedAt(), f.getClosedAt(), f.getStatus())).toList();
+        var act = actions.findAllForTenant(t).stream().map(a -> new HistoricalMetrics.ActionIn(a.getCreatedAt(), a.getDueDate(), a.getValidatedAt(), a.getStatus())).toList();
+        Map<UUID, List<HistoricalMetrics.RatingIn>> ratings = risks.findAllForTenant(t).stream().collect(Collectors.groupingBy(
+                r -> r.getUniverseEntryId(), Collectors.mapping(r -> new HistoricalMetrics.RatingIn(r.getAssessedAt(), r.getFinalAuditRisk()), Collectors.toList())));
+        var areas = universe.findAllActive(t).stream().map(u -> new HistoricalMetrics.AreaIn(u.getCreatedAt(), ratings.getOrDefault(u.getId(), List.of()))).toList();
+
+        LocalDate earliest = HistoricalMetrics.earliest(eng, fin, act, areas);
+        if (earliest == null) return DashboardTrends.none();
+        LocalDate base = today.minusDays(DashboardTrends.TARGET_AGE_DAYS);
+        if (earliest.isAfter(base)) base = earliest;
+        if (ChronoUnit.DAYS.between(base, today) < DashboardTrends.MIN_AGE_DAYS) return DashboardTrends.none();
+        return DashboardTrends.against(now, base, HistoricalMetrics.asAt(base, eng, fin, act, areas), today, DashboardTrends.RECONSTRUCTED);
     }
 
     Metrics current(UUID t, LocalDate today) {

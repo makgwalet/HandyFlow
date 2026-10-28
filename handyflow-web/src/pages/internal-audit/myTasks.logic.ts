@@ -8,6 +8,7 @@ export const KIND_LABEL: Record<MyTaskKind, { label: string; tone: Tone }> = {
   FINDING: { label: "Finding", tone: "warning" },
   NOTE_ANSWER: { label: "Answer note", tone: "warning" },
   NOTE_CLEAR: { label: "Clear note", tone: "success" },
+  ACTION_VALIDATE: { label: "Validate", tone: "success" },
 }
 
 export type TaskGroupKey = "overdue" | "week" | "later" | "undated"

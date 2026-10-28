@@ -394,14 +394,12 @@ public class InternalAuditService {
 
     @Transactional(readOnly = true)
     public List<WorkpaperFileResponse> getWorkpaperFiles(TenantId tenantId, UUID folderId) {
-        return workpaperFileRepo.findActiveByFolder(tenantId.getValue(), folderId).stream()
-                .map(this::toFileResponse).toList();
+        return workpaperFileRepo.listActiveByFolder(tenantId.getValue(), folderId);
     }
 
     @Transactional(readOnly = true)
     public List<WorkpaperFileResponse> getDeletedWorkpaperFiles(TenantId tenantId, UUID folderId) {
-        return workpaperFileRepo.findDeletedByFolder(tenantId.getValue(), folderId).stream()
-                .map(this::toFileResponse).toList();
+        return workpaperFileRepo.listDeletedByFolder(tenantId.getValue(), folderId);
     }
 
     /**

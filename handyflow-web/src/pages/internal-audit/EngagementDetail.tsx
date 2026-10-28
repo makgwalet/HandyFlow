@@ -8,13 +8,13 @@ import type { Engagement, UserOption } from "./auditShared"
 import { Meter, Panel, Pill, Stat, StagePill } from "./auditUi"
 import { grid } from "./auditUi.styles"
 import { engagementStage, shortDate } from "./auditUi.logic"
-import { MILESTONE_STYLE, phaseColor } from "./engagementDetail.logic"
+import { MILESTONE_STYLE, phaseColor, rand, roleLabel } from "./engagementDetail.logic"
 import { RemediationSection } from "./RemediationSection"
 import { WorkpapersSplit } from "./WorkpapersSplit"
 
 const MUTED = "var(--hf-text-muted)"
-type Tab = "overview" | "workpapers" | "findings"
-const TABS: { id: Tab; label: string }[] = [{ id: "overview", label: "Overview" }, { id: "workpapers", label: "Workpapers" }, { id: "findings", label: "Findings & actions" }]
+type Tab = "overview" | "planning" | "team" | "workpapers" | "findings"
+const TABS: { id: Tab; label: string }[] = [{ id: "overview", label: "Overview" }, { id: "planning", label: "Planning" }, { id: "team", label: "Team" }, { id: "workpapers", label: "Workpapers" }, { id: "findings", label: "Findings & actions" }]
 
 export function EngagementDetail({ engagement: e, users, onBack }: { engagement: Engagement; users: UserOption[]; onBack: () => void }) {
   const [tab, setTab] = useState<Tab>("overview")
@@ -79,12 +79,58 @@ export function EngagementDetail({ engagement: e, users, onBack }: { engagement:
                   </ol>
                 </Panel>
               </div>
-              <p style={{ fontSize: 12, color: MUTED, margin: 0 }}>Progress is worked out from the work recorded here. Planning, sampling and testing are still managed in the Engagements list.</p>
+              <p style={{ fontSize: 12, color: MUTED, margin: 0 }}>Progress is worked out from the work recorded here. Sampling and testing, and changes to planning and the team, are still made in the Engagements list.</p>
             </div>
           )
       )}
+      {tab === "planning" && <PlanningView e={e} />}
+      {tab === "team" && <TeamView e={e} />}
       {tab === "workpapers" && <WorkpapersSplit engagementId={e.id} users={users} />}
       {tab === "findings" && <RemediationSection engagementId={e.id} />}
     </div>
+  )
+}
+
+const label: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase", marginBottom: 4 }
+const text: React.CSSProperties = { fontSize: 13, color: "var(--hf-text)", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }
+const none = <span style={{ fontSize: 13, color: MUTED }}>Not set</span>
+
+function PlanningView({ e }: { e: Engagement }) {
+  return (
+    <div style={{ display: "grid", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14 }}>
+        <Panel title="Objectives"><div style={text}>{e.objectives?.trim() || none}</div></Panel>
+        <Panel title="Scope"><div style={text}>{e.scope?.trim() || none}</div></Panel>
+        <Panel title="Audit criteria"><div style={text}>{e.auditCriteria?.trim() || none}</div></Panel>
+      </div>
+      <Panel title="Materiality">
+        <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 16px", margin: 0, fontSize: 13 }}>
+          <dt style={label}>Overall</dt><dd style={{ margin: 0 }}>{rand(e.overallMateriality)}</dd>
+          <dt style={label}>Performance</dt><dd style={{ margin: 0 }}>{rand(e.performanceMateriality)}</dd>
+          <dt style={label}>Clearly trivial</dt><dd style={{ margin: 0 }}>{rand(e.clearlyTrivialThreshold)}</dd>
+        </dl>
+        {e.specificMateriality.length > 0 && (
+          <ul style={{ listStyle: "none", margin: "12px 0 0", padding: 0, display: "grid", gap: 4, fontSize: 13 }}>
+            {e.specificMateriality.map(m => <li key={m.id}><strong>{m.accountOrGlSegment}</strong>: {rand(m.threshold)}</li>)}
+          </ul>
+        )}
+      </Panel>
+    </div>
+  )
+}
+
+function TeamView({ e }: { e: Engagement }) {
+  return (
+    <Panel title={`Team (${e.assignments.length})`}>
+      {e.assignments.length === 0 ? <span style={{ fontSize: 13, color: MUTED }}>Nobody has been assigned to this engagement yet.</span> : (
+        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+          {e.assignments.map(a => (
+            <li key={a.id} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 13, paddingBottom: 8, borderBottom: "1px solid var(--hf-border-subtle)" }}>
+              <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{a.userName}</span><Pill label={roleLabel(a.role)} tone="info" />
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
   )
 }

@@ -21,4 +21,8 @@ public interface RiskAssessmentRepository extends JpaRepository<RiskAssessment, 
     // screen uses to show current risk without the full history.
     @Query("SELECT r FROM RiskAssessment r WHERE r.tenantId = :tenantId AND r.universeEntryId = :universeEntryId ORDER BY r.assessedAt DESC LIMIT 1")
     Optional<RiskAssessment> findLatestForUniverseEntry(@Param("tenantId") UUID tenantId, @Param("universeEntryId") UUID universeEntryId);
+
+    /** Every assessment the company has made, for working out how the risk picture looked on an earlier day. */
+    @Query("SELECT r FROM RiskAssessment r WHERE r.tenantId = :tenantId")
+    List<RiskAssessment> findAllForTenant(@Param("tenantId") UUID tenantId);
 }

@@ -15,7 +15,8 @@ export interface InternalDashboard {
 export type TrendKey = "engagements" | "openFindings" | "overdueActions" | "highRiskAreas"
 export interface TrendChange { key: TrendKey; now: number; before: number; delta: number }
 /** `since`, `daysAgo` null and `changes` empty when nothing saved is old enough to compare with. */
-export interface DashboardTrends { since: string | null; daysAgo: number | null; changes: TrendChange[] }
+/** SAVED: figures saved on that day. RECONSTRUCTED: worked out from recorded dates, so an estimate. */
+export interface DashboardTrends { since: string | null; daysAgo: number | null; changes: TrendChange[]; basis?: "SAVED" | "RECONSTRUCTED" | null }
 export interface ActivityItem { actor: string | null; action: string; itemType: string | null; itemId: string | null; subject: string | null; at: string }
 
 export interface ExternalDashboard {

@@ -20,18 +20,26 @@ import java.time.ZoneId;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/internal-audit/engagements/{id}/summary")
+@RequestMapping("/api/v1/internal-audit/engagements/{id}")
 @RequiredArgsConstructor
 @Tag(name = "Internal Audit - Engagement summary", description = "How far an engagement has got, by phase, with its milestones")
 public class AuditEngagementSummaryController {
     private final AuditEngagementSummaryService service;
     private final FeatureGuard featureGuard;
 
-    @GetMapping
+    @GetMapping("/summary")
     @PreAuthorize("hasAuthority('AUDIT_READ')")
     @Operation(summary = "Progress by phase (planning, fieldwork, testing, reporting), milestones, and counts of workpapers, findings and actions")
     public ResponseEntity<ApiResponse<Summary>> get(@PathVariable UUID id) {
         featureGuard.requireModule("internal-audit");
         return ResponseEntity.ok(ApiResponse.success(service.summary(TenantContext.getTenantIdAsObject(), id, LocalDate.now(ZoneId.of("Africa/Johannesburg")))));
+    }
+
+    @GetMapping("/workpapers")
+    @PreAuthorize("hasAuthority('AUDIT_READ')")
+    @Operation(summary = "Every current workpaper of the engagement in one call (no file contents)")
+    public ResponseEntity<ApiResponse<java.util.List<za.co.handyflow.platform.internalaudit.dto.WorkpaperFileResponse>>> workpapers(@PathVariable UUID id) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(service.workpapers(TenantContext.getTenantIdAsObject(), id)));
     }
 }

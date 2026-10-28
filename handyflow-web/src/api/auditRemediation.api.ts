@@ -18,5 +18,5 @@ export interface RemediationSummary {
 export interface RemediationBoard { summary: RemediationSummary; findings: RemediationFinding[]; actions: RemediationAction[] }
 
 export const auditRemediationApi = {
-  board: () => apiClient.get("/api/v1/internal-audit/remediation").then(r => (r.data?.data ?? r.data) as RemediationBoard),
+  board: (engagementId?: string) => apiClient.get("/api/v1/internal-audit/remediation", { params: engagementId ? { engagementId } : undefined }).then(r => (r.data?.data ?? r.data) as RemediationBoard),
 }

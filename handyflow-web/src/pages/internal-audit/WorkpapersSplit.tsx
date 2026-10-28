@@ -1,15 +1,17 @@
 // Workpapers of one engagement: the list on the left, the chosen workpaper on the right.
 
 import { useState } from "react"
-import { useQueries, useQuery } from "@tanstack/react-query"
-import { Download } from "lucide-react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Download, Upload } from "lucide-react"
+import { apiClient } from "../../api/client"
+import { usePermission } from "../../hooks/usePermission"
 import { auditEngagementApi } from "../../api/auditEngagementSummary.api"
 import type { UserOption } from "./auditShared"
 import ReviewNotesPanel from "./ReviewNotesPanel"
 import { FilterBar, Pill } from "./auditUi"
 import { filterField } from "./auditUi.styles"
 import { shortDate } from "./auditUi.logic"
-import { fileSize, filterWorkpapers, nameMap, personName, workpaperRows, workpaperStatus, WORKPAPER_STATUS, type WorkpaperRow } from "./engagementDetail.logic"
+import { fileSize, filterWorkpapers, nameMap, personName, uploadProblem, workpaperRows, workpaperStatus, WORKPAPER_STATUS, type WorkpaperRow } from "./engagementDetail.logic"
 
 const MUTED = "var(--hf-text-muted)"
 const label: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" }
@@ -17,7 +19,28 @@ const label: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "var(
 export function WorkpapersSplit({ engagementId, users }: { engagementId: string; users: UserOption[] }) {
   const folders = useQuery({ queryKey: ["ia-wp-folders", engagementId], queryFn: () => auditEngagementApi.folders(engagementId) })
   const list = folders.data ?? []
-  const fileQs = useQueries({ queries: list.map(f => ({ queryKey: ["ia-wp-files", engagementId, f.id], queryFn: () => auditEngagementApi.files(engagementId, f.id) })) })
+  // One call for every workpaper of the engagement (without file contents), however many folders it has.
+  const wpQ = useQuery({ queryKey: ["ia-wp-all", engagementId], queryFn: () => auditEngagementApi.workpapers(engagementId) })
+  const qc = useQueryClient()
+  const canUpload = usePermission("AUDIT_MANAGE")
+  const [uploadFolder, setUploadFolder] = useState("")
+  const [uploadError, setUploadError] = useState("")
+  const upload = useMutation({
+    mutationFn: (body: { folderId: string; fileName: string; mimeType: string; fileSizeBytes: number; fileContentBase64: string }) =>
+      apiClient.post(`/api/v1/internal-audit/engagements/${engagementId}/workpaper-files`, body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ia-wp-all", engagementId] }); qc.invalidateQueries({ queryKey: ["ia-engagement-summary", engagementId] }); setUploadError("") },
+    onError: (e) => setUploadError((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "The file could not be uploaded. Try again; if it keeps failing, contact support."),
+  })
+  const pick = (file: File) => {
+    setUploadError("")
+    const problem = uploadProblem(file)
+    if (problem) { setUploadError(problem); return }
+    const folderId = uploadFolder || list[0]?.id
+    if (!folderId) { setUploadError("There is no section to put it in yet. Add a folder in the Engagements list first."); return }
+    const reader = new FileReader()
+    reader.onload = () => upload.mutate({ folderId, fileName: file.name, mimeType: file.type || "application/octet-stream", fileSizeBytes: file.size, fileContentBase64: ((reader.result as string) || "").split(",")[1] ?? "" })
+    reader.readAsDataURL(file)
+  }
   const [filter, setFilter] = useState({ status: "all", folder: "all", q: "" })
   const [selected, setSelected] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState("")
@@ -26,13 +49,13 @@ export function WorkpapersSplit({ engagementId, users }: { engagementId: string;
   if (folders.isError) return <div role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 13 }}>Workpapers could not be loaded. Refresh the page; if it keeps failing, contact support.</div>
 
   const names = nameMap(users)
-  const byFolder: Record<string, NonNullable<(typeof fileQs)[number]["data"]>> = {}
-  list.forEach((f, i) => { byFolder[f.id] = fileQs[i]?.data ?? [] })
+  const byFolder: Record<string, NonNullable<typeof wpQ.data>> = {}
+  for (const w of wpQ.data ?? []) (byFolder[w.folderId] ??= []).push(w)
   const rows = workpaperRows(list, byFolder, names)
   const shown = filterWorkpapers(rows, filter)
   const chosen = rows.find(r => r.id === selected) ?? null
-  const loadingFiles = fileQs.some(q => q.isLoading)
-  const failedFiles = fileQs.some(q => q.isError)
+  const loadingFiles = wpQ.isLoading
+  const failedFiles = wpQ.isError
 
   async function download(r: WorkpaperRow) {
     setDownloadError("")
@@ -41,7 +64,7 @@ export function WorkpapersSplit({ engagementId, users }: { engagementId: string;
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      {failedFiles && <div role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 13 }}>Some folders could not be loaded, so this list may be incomplete.</div>}
+      {failedFiles && <div role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 13 }}>The workpapers could not be loaded. Refresh the page; if it keeps failing, contact support.</div>}
       <FilterBar>
         <input aria-label="Search workpapers" placeholder="Search workpapers…" value={filter.q} onChange={e => setFilter({ ...filter, q: e.target.value })} style={{ ...filterField, minWidth: 200 }} />
         <select aria-label="Filter by status" value={filter.status} onChange={e => setFilter({ ...filter, status: e.target.value })} style={filterField}>
@@ -53,6 +76,19 @@ export function WorkpapersSplit({ engagementId, users }: { engagementId: string;
           {list.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
         </select>
       </FilterBar>
+
+      {canUpload && (
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", fontSize: 13 }}>
+          <select aria-label="Section for the new workpaper" value={uploadFolder || list[0]?.id || ""} onChange={e => setUploadFolder(e.target.value)} style={filterField}>
+            {list.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600, color: "var(--hf-primary-text)", cursor: "pointer" }}>
+            <Upload size={14} /> {upload.isPending ? "Uploading…" : "Upload workpaper"}
+            <input type="file" aria-label="Upload workpaper" style={{ display: "none" }} onChange={ev => { const f = ev.target.files?.[0]; if (f) pick(f); ev.target.value = "" }} />
+          </label>
+          {uploadError && <span role="alert" style={{ color: "var(--hf-danger-text)" }}>{uploadError}</span>}
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14, alignItems: "start" }}>
         <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflow: "hidden" }}>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { filterWorkpapers, fileSize, nameMap, personName, phaseColor, workpaperRows, workpaperStatus } from "./engagementDetail.logic"
+import { filterWorkpapers, fileSize, nameMap, personName, phaseColor, rand, roleLabel, uploadProblem, workpaperRows, workpaperStatus } from "./engagementDetail.logic"
 import type { WorkpaperFileRow } from "../../api/auditEngagementSummary.api"
 
 const w = (o: Partial<WorkpaperFileRow>): WorkpaperFileRow => ({ id: "w", folderId: "f1", fileName: "Revenue schedule.xlsx", mimeType: null, fileSizeBytes: 2048, reviewStatus: "DRAFT", preparedBy: "u1", preparedAt: null, reviewedBy: null, reviewedAt: null, signedOffBy: null, signedOffAt: null, versionNumber: 1, supersededBy: null, createdAt: "2026-10-01T08:00:00Z", ...o })
@@ -51,5 +51,19 @@ describe("labels", () => {
     expect(phaseColor(p(0))).toContain("border-strong")
     expect(phaseColor(p(40))).toContain("primary")
     expect(phaseColor(p(100))).toContain("success")
+  })
+})
+
+describe("upload, roles and amounts", () => {
+  it("accepts documents within the size limit and says why it refuses others", () => {
+    expect(uploadProblem({ type: "application/pdf", size: 1000 })).toBeNull()
+    expect(uploadProblem({ type: "application/zip", size: 1000 })).toContain("Unsupported")
+    expect(uploadProblem({ type: "application/pdf", size: 11 * 1024 * 1024 })).toContain("too large")
+  })
+  it("words roles and amounts", () => {
+    expect(roleLabel("HEAD_OF_INTERNAL_AUDIT")).toBe("Head of internal audit")
+    expect(roleLabel("AUDITOR")).toBe("Auditor")
+    expect(rand(null)).toBe("Not set")
+    expect(rand(1250000)).toMatch(/^R 1.250.000$/)
   })
 })

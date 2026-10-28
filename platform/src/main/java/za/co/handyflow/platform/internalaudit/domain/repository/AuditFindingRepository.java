@@ -28,4 +28,7 @@ public interface AuditFindingRepository extends JpaRepository<AuditFinding, UUID
 
     @Query("SELECT f FROM AuditFinding f WHERE f.tenantId = :tenantId ORDER BY f.createdAt DESC")
     List<AuditFinding> findAllForTenant(@Param("tenantId") UUID tenantId);
+
+    @Query("SELECT f FROM AuditFinding f WHERE f.tenantId = :tenantId AND f.owner = :userId AND f.status IN ('OPEN', 'IN_PROGRESS') ORDER BY f.dueDate")
+    List<AuditFinding> findOpenOwnedBy(@Param("tenantId") UUID tenantId, @Param("userId") UUID userId);
 }

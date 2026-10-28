@@ -25,7 +25,9 @@ class DashboardTrendsTest {
     @Test
     void aSavedDayLessThanAWeekOldIsTooRecent() {
         assertTrue(DashboardTrends.compare(NOW, List.of(snap(6, 1, 1, 1, 1), snap(1, 1, 1, 1, 1)), TODAY).changes().isEmpty());
-        assertEquals(7, DashboardTrends.compare(NOW, List.of(snap(7, 1, 1, 1, 1)), TODAY).daysAgo().intValue());
+        Trends t = DashboardTrends.compare(NOW, List.of(snap(7, 1, 1, 1, 1)), TODAY);
+        assertEquals(7, t.daysAgo().intValue());
+        assertEquals(DashboardTrends.SAVED, t.basis());
     }
 
     @Test

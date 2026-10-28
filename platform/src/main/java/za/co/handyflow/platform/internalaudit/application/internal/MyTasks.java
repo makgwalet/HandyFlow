@@ -9,14 +9,15 @@ import java.util.UUID;
 
 /**
  * What one person has to do in internal audit: actions they own, findings they must answer,
- * review notes waiting for their answer, and answered notes waiting for them to clear. Pure; no database.
+ * review notes waiting for their answer, answered notes waiting for them to clear, and (for those allowed to validate)
+ * completed actions waiting for someone other than the owner and the person who completed them. Pure; no database.
  */
 public final class MyTasks {
     private MyTasks() {}
 
-    public enum Kind { ACTION, FINDING, NOTE_ANSWER, NOTE_CLEAR }
+    public enum Kind { ACTION, FINDING, NOTE_ANSWER, NOTE_CLEAR, ACTION_VALIDATE }
 
-    public record ActionIn(UUID id, UUID engagementId, String engagement, String finding, String description, UUID owner, LocalDate dueDate, String status) {}
+    public record ActionIn(UUID id, UUID engagementId, String engagement, String finding, String description, UUID owner, UUID completedBy, LocalDate dueDate, String status) {}
     public record FindingIn(UUID id, UUID engagementId, String engagement, String title, String severity, UUID owner, LocalDate dueDate, String status) {}
     public record NoteIn(UUID id, UUID engagementId, String engagement, String workpaper, String note, UUID raisedBy, UUID workpaperPreparedBy, String status) {}
 
@@ -25,11 +26,17 @@ public final class MyTasks {
     public record Result(Summary summary, List<Task> tasks) {}
 
     public static Result build(UUID me, List<ActionIn> actions, List<FindingIn> findings, List<NoteIn> notes, LocalDate today) {
+        return build(me, false, actions, findings, notes, today);
+    }
+
+    public static Result build(UUID me, boolean canValidate, List<ActionIn> actions, List<FindingIn> findings, List<NoteIn> notes, LocalDate today) {
         List<Task> out = new ArrayList<>();
         if (me != null) {
             for (ActionIn a : actions) {
-                if (!me.equals(a.owner()) || !"OPEN".equals(a.status())) continue;
-                out.add(task(Kind.ACTION, a.id(), a.engagementId(), a.description(), join(a.finding(), a.engagement()), null, a.dueDate(), today));
+                if (me.equals(a.owner()) && "OPEN".equals(a.status()))
+                    out.add(task(Kind.ACTION, a.id(), a.engagementId(), a.description(), join(a.finding(), a.engagement()), null, a.dueDate(), today));
+                else if (canValidate && "COMPLETED".equals(a.status()) && !me.equals(a.owner()) && !me.equals(a.completedBy()))
+                    out.add(task(Kind.ACTION_VALIDATE, a.id(), a.engagementId(), a.description(), join(a.finding(), a.engagement()), null, a.dueDate(), today));
             }
             for (FindingIn f : findings) {
                 if (!me.equals(f.owner()) || !("OPEN".equals(f.status()) || "IN_PROGRESS".equals(f.status()))) continue;

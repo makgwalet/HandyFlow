@@ -158,12 +158,13 @@ export interface TrendView { arrow: "▲" | "▼" | "▬"; text: string; tone: "
 export function trendView(t: DashboardTrends | null | undefined, key: TrendKey): TrendView | null {
   const c = t?.changes.find(x => x.key === key)
   if (!t || !c || t.daysAgo === null) return null
-  const since = t.daysAgo === 1 ? "1 day ago" : `${t.daysAgo} days ago`
+  const est = t.basis === "RECONSTRUCTED"
+  const since = (t.daysAgo === 1 ? "1 day ago" : `${t.daysAgo} days ago`) + (est ? " (est.)" : "")
   if (c.delta === 0) return { arrow: "▬", text: `No change vs ${since}`, tone: "flat", spoken: `No change since ${since}` }
   const up = c.delta > 0
   const better = BETTER[key]
   const tone = better === "neither" ? "flat" : (up ? "bad" : "good")
-  return { arrow: up ? "▲" : "▼", text: `${Math.abs(c.delta)} ${up ? "more" : "fewer"} vs ${since}`, tone, spoken: `${up ? "Up" : "Down"} ${Math.abs(c.delta)} since ${since}` }
+  return { arrow: up ? "▲" : "▼", text: `${Math.abs(c.delta)} ${up ? "more" : "fewer"} vs ${since}`, tone, spoken: `${up ? "Up" : "Down"} ${Math.abs(c.delta)} since ${since}${est ? ", estimated from recorded dates" : ""}` }
 }
 
 // ── Activity ──────────────────────────────────────────────────────────────────────────────────────

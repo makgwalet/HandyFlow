@@ -106,6 +106,9 @@ describe("trends", () => {
     expect(trendView(t(-3), "openFindings")).toMatchObject({ arrow: "▼", tone: "good", text: "3 fewer vs 85 days ago" })
     expect(trendView(t(4), "openFindings")).toMatchObject({ arrow: "▲", tone: "bad", text: "4 more vs 85 days ago" })
     expect(trendView(t(1, "overdueActions"), "overdueActions")?.tone).toBe("bad")
+    const est = { ...(t(-2) as object), basis: "RECONSTRUCTED" } as never
+    expect(trendView(est, "openFindings")).toMatchObject({ text: "2 fewer vs 85 days ago (est.)" })
+    expect(trendView(est, "openFindings")?.spoken).toContain("estimated")
     expect(trendView(t(-1, "highRiskAreas"), "highRiskAreas")?.tone).toBe("good")
   })
   it("calls a change in engagements neither good nor bad, and no change flat", () => {

@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,9 +28,10 @@ public class AuditMyTasksController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('AUDIT_READ')")
-    @Operation(summary = "Actions and findings owned by me, and review notes waiting on me, most urgent first")
-    public ResponseEntity<ApiResponse<Result>> mine() {
+    @Operation(summary = "Actions and findings owned by me, review notes waiting on me, and (for managers) completed actions waiting to be validated, most urgent first")
+    public ResponseEntity<ApiResponse<Result>> mine(Authentication auth) {
         featureGuard.requireModule("internal-audit");
-        return ResponseEntity.ok(ApiResponse.success(service.forUser(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), LocalDate.now(ZoneId.of("Africa/Johannesburg")))));
+        return ResponseEntity.ok(ApiResponse.success(service.forUser(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(),
+                auth != null && auth.getAuthorities().stream().anyMatch(a -> "AUDIT_MANAGE".equals(a.getAuthority())), LocalDate.now(ZoneId.of("Africa/Johannesburg")))));
     }
 }

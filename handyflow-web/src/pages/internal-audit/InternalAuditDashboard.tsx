@@ -54,7 +54,10 @@ export function InternalAuditDashboard({ engagements, onGo, today }: { engagemen
         <Stat label="Repeat findings" value={d.repeatFindingCount} tone={d.repeatFindingCount ? "warning" : undefined} sub="reopened or previously closed" />
       </div>
       {trends && trends.daysAgo === null && (
-        <div style={{ fontSize: 12, color: MUTED, marginTop: -6 }}>Trend arrows appear once the dashboard has figures saved from at least a week ago. Today's are saved now.</div>
+        <div style={{ fontSize: 12, color: MUTED, marginTop: -6 }}>Trend arrows appear once there are audit records at least a week old to compare with.</div>
+      )}
+      {trends?.basis === "RECONSTRUCTED" && (
+        <div style={{ fontSize: 12, color: MUTED, marginTop: -6 }}>Earlier figures are worked out from the dates recorded, so they are estimates. Once the dashboard has been visited for a week, saved figures are used instead.</div>
       )}
 
       <div style={grid(300)}>

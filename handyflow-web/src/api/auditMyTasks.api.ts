@@ -1,6 +1,6 @@
 import { apiClient } from "./client"
 
-export type MyTaskKind = "ACTION" | "FINDING" | "NOTE_ANSWER" | "NOTE_CLEAR"
+export type MyTaskKind = "ACTION" | "FINDING" | "NOTE_ANSWER" | "NOTE_CLEAR" | "ACTION_VALIDATE"
 export interface MyTask {
   kind: MyTaskKind; id: string; engagementId: string | null; title: string; context: string | null
   severity: string | null; dueDate: string | null; overdue: boolean; daysOverdue: number

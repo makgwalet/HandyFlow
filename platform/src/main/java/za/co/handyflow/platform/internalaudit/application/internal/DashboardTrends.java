@@ -6,8 +6,9 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * How the dashboard's headline figures have moved. The comparison is with the saved day nearest to a quarter ago that is at least a week old;
- * with nothing that old there is no comparison, and the screen says so rather than showing an arrow.
+ * How the dashboard's headline figures have moved. The comparison is with the saved day nearest to a quarter ago that is at least a week old.
+ * Where nothing was saved that long ago, the earlier figures are worked out from the dates already recorded (see {@link HistoricalMetrics}) and
+ * the result says so. With records less than a week old there is no comparison, and the screen says so rather than showing an arrow.
  */
 public final class DashboardTrends {
     private DashboardTrends() {}
@@ -21,7 +22,8 @@ public final class DashboardTrends {
     public record Snapshot(LocalDate day, Metrics metrics) {}
     public record Change(String key, int now, int before, int delta) {}
     /** `since` and `daysAgo` are null, and `changes` empty, when there is nothing old enough to compare with. */
-    public record Trends(LocalDate since, Integer daysAgo, List<Change> changes) {}
+    public record Trends(LocalDate since, Integer daysAgo, List<Change> changes, String basis) {}
+    public static final String SAVED = "SAVED", RECONSTRUCTED = "RECONSTRUCTED";
 
     public static Trends compare(Metrics now, List<Snapshot> history, LocalDate today) {
         Snapshot base = history.stream()
@@ -29,13 +31,19 @@ public final class DashboardTrends {
                 .min(Comparator.<Snapshot>comparingLong(s -> Math.abs(ChronoUnit.DAYS.between(s.day(), today) - TARGET_AGE_DAYS))
                         .thenComparing(Snapshot::day))
                 .orElse(null);
-        if (base == null) return new Trends(null, null, List.of());
-        Metrics b = base.metrics();
-        return new Trends(base.day(), (int) ChronoUnit.DAYS.between(base.day(), today), List.of(
-                change("engagements", now.engagements(), b.engagements()),
-                change("openFindings", now.openFindings(), b.openFindings()),
-                change("overdueActions", now.overdueActions(), b.overdueActions()),
-                change("highRiskAreas", now.highRiskAreas(), b.highRiskAreas())));
+        if (base == null) return none();
+        return against(now, base.day(), base.metrics(), today, SAVED);
+    }
+
+    public static Trends none() { return new Trends(null, null, List.of(), null); }
+
+    /** The comparison with figures for `day`, whichever way they were found. */
+    public static Trends against(Metrics now, LocalDate day, Metrics before, LocalDate today, String basis) {
+        return new Trends(day, (int) ChronoUnit.DAYS.between(day, today), List.of(
+                change("engagements", now.engagements(), before.engagements()),
+                change("openFindings", now.openFindings(), before.openFindings()),
+                change("overdueActions", now.overdueActions(), before.overdueActions()),
+                change("highRiskAreas", now.highRiskAreas(), before.highRiskAreas())), basis);
     }
 
     private static Change change(String key, int now, int before) { return new Change(key, now, before, now - before); }

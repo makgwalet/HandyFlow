@@ -11,7 +11,8 @@ export interface EngagementSummary { overallPct: number; phases: EngagementPhase
 export const auditEngagementApi = {
   summary: (id: string) => apiClient.get(`/api/v1/internal-audit/engagements/${id}/summary`).then(r => (r.data?.data ?? r.data) as EngagementSummary),
   folders: (id: string) => apiClient.get(`/api/v1/internal-audit/engagements/${id}/workpaper-folders`).then(r => (r.data?.data ?? r.data) as { id: string; name: string }[]),
-  files: (id: string, folderId: string) => apiClient.get(`/api/v1/internal-audit/engagements/${id}/workpaper-folders/${folderId}/files`).then(r => (r.data?.data ?? r.data) as WorkpaperFileRow[]),
+  /** Every current workpaper of the engagement in one call, without file contents. */
+  workpapers: (id: string) => apiClient.get(`/api/v1/internal-audit/engagements/${id}/workpapers`).then(r => (r.data?.data ?? r.data) as WorkpaperFileRow[]),
   /** Fetches the file and hands it to the browser as a download. */
   async download(fileId: string, fileName: string) {
     const r = await apiClient.get(`/api/v1/internal-audit/workpaper-files/${fileId}/content`, { responseType: "blob" })

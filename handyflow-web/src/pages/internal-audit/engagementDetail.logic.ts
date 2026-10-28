@@ -2,6 +2,7 @@
 
 import type { EngagementMilestone, EngagementPhase, WorkpaperFileRow } from "../../api/auditEngagementSummary.api"
 import type { Tone } from "./auditUi.logic"
+import { ALLOWED_WP_TYPES, MAX_WP_BYTES } from "./auditShared"
 
 export const MILESTONE_STYLE: Record<EngagementMilestone["status"], { label: string; tone: Tone }> = {
   DONE: { label: "Completed", tone: "success" },
@@ -57,4 +58,23 @@ export function nameMap(users: { id: string; firstName: string; lastName: string
   const m: Record<string, string> = {}
   for (const u of users) m[u.id] = `${u.firstName} ${u.lastName}`.trim()
   return m
+}
+
+/** Why a file cannot be uploaded as a workpaper, or null when it can. Same limits as the Engagements list. */
+export function uploadProblem(file: { type: string; size: number }): string | null {
+  if (!ALLOWED_WP_TYPES.includes(file.type)) return "Unsupported file type. Upload a PDF, JPG, PNG, Word or Excel document."
+  if (file.size > MAX_WP_BYTES) return `File is too large. The maximum is ${MAX_WP_BYTES / (1024 * 1024)} MB.`
+  return null
+}
+
+/** "HEAD_OF_INTERNAL_AUDIT" -> "Head of internal audit". */
+export function roleLabel(role: string): string {
+  const w = role.toLowerCase().split("_").join(" ")
+  return w.charAt(0).toUpperCase() + w.slice(1)
+}
+
+/** Rand amounts for materiality; empty for none. */
+export function rand(n: number | null | undefined): string {
+  if (n === null || n === undefined) return "Not set"
+  return `R ${Math.round(n).toLocaleString("en-ZA").replace(/\u00a0/g, " ")}`
 }

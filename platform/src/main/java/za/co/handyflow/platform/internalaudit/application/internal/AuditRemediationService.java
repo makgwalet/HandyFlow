@@ -24,14 +24,19 @@ public class AuditRemediationService {
 
     /** Every finding the company has, with its actions, as the findings and remediation screen needs them. */
     @Transactional(readOnly = true)
-    public Board board(TenantId tenant, LocalDate today) {
+    public Board board(TenantId tenant, LocalDate today) { return board(tenant, today, null); }
+
+    /** As above, limited to one engagement when `engagementId` is given; the database does the limiting, not the screen. */
+    @Transactional(readOnly = true)
+    public Board board(TenantId tenant, LocalDate today, UUID engagementId) {
         UUID t = tenant.getValue();
         Map<UUID, String> areas = new HashMap<>();
         universe.findAllActive(t).forEach(u -> areas.put(u.getId(), u.getName()));
-        List<EngagementIn> engs = engagements.findAllForTenant(t).stream()
+        List<EngagementIn> engs = engagements.findAllForTenant(t).stream().filter(e -> engagementId == null || engagementId.equals(e.getId()))
                 .map(e -> new EngagementIn(e.getId(), e.getName(), areas.get(e.getUniverseEntryId()))).toList();
-        List<AuditFinding> fs = findings.findAllForTenant(t);
-        List<AuditActionPlan> as = actions.findAllForTenant(t);
+        List<AuditFinding> fs = engagementId == null ? findings.findAllForTenant(t) : findings.findByEngagement(t, engagementId);
+        List<AuditActionPlan> as = engagementId == null ? actions.findAllForTenant(t)
+                : fs.isEmpty() ? List.of() : actions.findByFindingIds(t, fs.stream().map(AuditFinding::getId).toList());
 
         Set<UUID> people = new HashSet<>();
         fs.forEach(f -> { if (f.getOwner() != null) people.add(f.getOwner()); });

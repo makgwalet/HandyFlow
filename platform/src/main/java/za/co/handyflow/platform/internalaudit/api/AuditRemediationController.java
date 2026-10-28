@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import za.co.handyflow.platform.billing.FeatureGuard;
@@ -27,9 +28,9 @@ public class AuditRemediationController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('AUDIT_READ')")
-    @Operation(summary = "Every finding and every action plan, worst first, with totals")
-    public ResponseEntity<ApiResponse<Board>> board() {
+    @Operation(summary = "Every finding and every action plan, worst first, with totals; limited to one engagement when engagementId is given")
+    public ResponseEntity<ApiResponse<Board>> board(@RequestParam(required = false) java.util.UUID engagementId) {
         featureGuard.requireModule("internal-audit");
-        return ResponseEntity.ok(ApiResponse.success(service.board(TenantContext.getTenantIdAsObject(), LocalDate.now(ZoneId.of("Africa/Johannesburg")))));
+        return ResponseEntity.ok(ApiResponse.success(service.board(TenantContext.getTenantIdAsObject(), LocalDate.now(ZoneId.of("Africa/Johannesburg")), engagementId)));
     }
 }

@@ -22,4 +22,9 @@ public interface AuditReviewNoteRepository extends JpaRepository<AuditReviewNote
 
     @Query("SELECT n FROM AuditReviewNote n WHERE n.tenantId = :tenantId")
     List<AuditReviewNote> findAllForTenant(@Param("tenantId") UUID tenantId);
+
+    /** Notes waiting on this person: open ones on workpapers they prepared, and answered ones they raised. */
+    @Query("SELECT n FROM AuditReviewNote n WHERE n.tenantId = :tenantId AND ((n.status = 'OPEN' AND n.workpaperId IN "
+            + "(SELECT f.id FROM AuditWorkpaperFile f WHERE f.tenantId = :tenantId AND f.preparedBy = :userId)) OR (n.status = 'RESPONDED' AND n.raisedBy = :userId)) ORDER BY n.raisedAt")
+    List<AuditReviewNote> findWaitingOn(@Param("tenantId") UUID tenantId, @Param("userId") UUID userId);
 }

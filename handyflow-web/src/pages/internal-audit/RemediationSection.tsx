@@ -18,7 +18,7 @@ const todayJhb = () => new Date().toLocaleDateString("en-CA", { timeZone: "Afric
 
 export function RemediationSection({ today, engagementId }: { today?: string; engagementId?: string }) {
   const now = today ?? todayJhb()
-  const { data, isLoading, isError } = useQuery({ queryKey: ["ia-remediation"], queryFn: auditRemediationApi.board })
+  const { data, isLoading, isError } = useQuery({ queryKey: ["ia-remediation", engagementId ?? "all"], queryFn: () => auditRemediationApi.board(engagementId) })
   const [tab, setTab] = useState<"findings" | "actions">("findings")
   const [ff, setFf] = useState<FindingFilter>({ severity: "all", status: "open", q: "" })
   const [af, setAf] = useState<ActionFilter>({ status: "all", q: "" })

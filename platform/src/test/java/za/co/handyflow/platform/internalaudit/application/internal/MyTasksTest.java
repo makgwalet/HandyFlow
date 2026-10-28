@@ -13,7 +13,8 @@ class MyTasksTest {
     static final UUID ME = UUID.randomUUID(), OTHER = UUID.randomUUID(), ENG = UUID.randomUUID();
     static final LocalDate TODAY = LocalDate.of(2026, 10, 28);
 
-    static ActionIn action(UUID owner, String status, LocalDate due, String text) { return new ActionIn(UUID.randomUUID(), ENG, "Payroll audit", "Late approvals", text, owner, due, status); }
+    static ActionIn action(UUID owner, String status, LocalDate due, String text) { return new ActionIn(UUID.randomUUID(), ENG, "Payroll audit", "Late approvals", text, owner, null, due, status); }
+    static ActionIn done(UUID owner, UUID by, String text) { return new ActionIn(UUID.randomUUID(), ENG, "Payroll audit", "Late approvals", text, owner, by, TODAY, "COMPLETED"); }
     static FindingIn finding(UUID owner, String status, LocalDate due, String title) { return new FindingIn(UUID.randomUUID(), ENG, "Payroll audit", title, "HIGH", owner, due, status); }
     static NoteIn note(String status, UUID raisedBy, UUID preparedBy, String text) { return new NoteIn(UUID.randomUUID(), ENG, "Payroll audit", "Wage test.xlsx", text, raisedBy, preparedBy, status); }
 
@@ -54,5 +55,12 @@ class MyTasksTest {
     @Test void noUserMeansNoTasks() {
         Result r = MyTasks.build(null, List.of(action(null, "OPEN", TODAY, "orphan")), List.of(), List.of(), TODAY);
         assertEquals(0, r.summary().total());
+    }
+
+    @Test void completedActionsAreMineToValidateOnlyIfAllowedAndNotMyOwnWork() {
+        var list = List.of(done(OTHER, OTHER, "theirs, done by them"), done(ME, OTHER, "I own it"), done(OTHER, ME, "I completed it"), done(UUID.randomUUID(), UUID.randomUUID(), "someone else's"));
+        assertEquals(List.of("someone else's", "theirs, done by them"), MyTasks.build(ME, true, list, List.of(), List.of(), TODAY).tasks().stream().map(Task::title).sorted().toList());
+        assertEquals(Kind.ACTION_VALIDATE, MyTasks.build(ME, true, list, List.of(), List.of(), TODAY).tasks().get(0).kind());
+        assertEquals(0, MyTasks.build(ME, false, list, List.of(), List.of(), TODAY).summary().total());
     }
 }

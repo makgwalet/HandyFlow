@@ -31,6 +31,14 @@ public class AuditEngagementSummaryService {
     private final AuditFindingRepository findings;
     private final AuditActionPlanRepository actions;
 
+    /** Every current workpaper of the engagement in one query, for the workpapers list. */
+    @Transactional(readOnly = true)
+    public List<za.co.handyflow.platform.internalaudit.dto.WorkpaperFileResponse> workpapers(TenantId tenant, UUID engagementId) {
+        UUID t = tenant.getValue();
+        engagements.findByTenantAndId(t, engagementId).orElseThrow(() -> new ResourceNotFoundException("AuditEngagement", engagementId.toString()));
+        return files.currentForEngagement(t, engagementId);
+    }
+
     @Transactional(readOnly = true)
     public Summary summary(TenantId tenant, UUID engagementId, LocalDate today) {
         UUID t = tenant.getValue();
@@ -41,9 +49,8 @@ public class AuditEngagementSummaryService {
         PlanningIn planning = new PlanningIn(filled(e.getObjectives()), filled(e.getScope()), filled(e.getAuditCriteria()), e.getOverallMateriality() != null, team > 0);
 
         // Current versions only: a file replaced by a newer version no longer counts.
-        List<AuditWorkpaperFile> wps = folders.findByEngagement(t, engagementId).stream()
-                .flatMap(f -> files.findActiveByFolder(t, f.getId()).stream()).filter(f -> f.getSupersededBy() == null).toList();
-        int signedOff = (int) wps.stream().filter(f -> "SIGNED_OFF".equals(f.getReviewStatus())).count();
+        var wps = files.currentForEngagement(t, engagementId);
+        int signedOff = (int) wps.stream().filter(f -> "SIGNED_OFF".equals(f.reviewStatus())).count();
 
         List<AuditProgrammeStep> ps = steps.findByTenantIdAndEngagementIdOrderByControlCodeAsc(t, engagementId);
         int stepsDone = (int) ps.stream().filter(s -> "COMPLETED".equals(s.getStatus()) || "NOT_APPLICABLE".equals(s.getStatus())).count();
