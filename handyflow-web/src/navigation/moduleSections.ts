@@ -881,6 +881,7 @@ export const RECRUITER_SECTIONS: ModuleSections = {
       label: 'Settings',
       sections: [
         { id: 'settings', label: 'Approvals & privacy', icon: ShieldCheck },
+        { id: 'audit', label: 'Audit trail', icon: ShieldCheck, permission: 'RECRUITER_ADMIN' },
       ],
     },
   ],

@@ -20,6 +20,7 @@ import { ScreeningAnswers, ScreeningEditor } from './RecScreening'
 import RecPrivacy from './RecPrivacy'
 import RecPool from './RecPool'
 import RecReports from './RecReports'
+import RecAudit from './RecAudit'
 import VerificationPanel from './RecVerification'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -1730,6 +1731,7 @@ export function RecruiterPage() {
           )
           case 'talent-pool': return <RecPool />
           case 'reports': return <RecReports />
+          case 'audit': return <RecAudit />
           case 'settings': return <RecPrivacy />
           default: return null
         }
