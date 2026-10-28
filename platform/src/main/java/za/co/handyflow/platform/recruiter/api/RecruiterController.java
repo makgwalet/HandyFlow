@@ -104,6 +104,21 @@ public class RecruiterController {
                 recruiterService.updateJobStatus(TenantContext.getTenantIdAsObject(), id, action)));
     }
 
+    @GetMapping("/jobs/{id}/requisition")
+    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    @Operation(summary = "Vacancies, how many are filled, and the saved versions of the job wording")
+    public ResponseEntity<ApiResponse<RecruiterRequisitionDtos.RequisitionView>> getRequisition(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(recruiterService.getRequisition(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PutMapping("/jobs/{id}/requisition")
+    @PreAuthorize("hasAuthority('RECRUITER_MANAGE')")
+    @Operation(summary = "Set how many people the job will hire, and the company's requisition reference")
+    public ResponseEntity<ApiResponse<RecruiterRequisitionDtos.RequisitionView>> setRequisition(
+            @PathVariable UUID id, @RequestBody RecruiterRequisitionDtos.SetRequisitionRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Saved", recruiterService.setRequisition(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
     @DeleteMapping("/jobs/{id}")
     @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
     @Operation(summary = "Delete a job")

@@ -15,6 +15,7 @@ import { RECRUITER_SECTIONS } from '../../navigation/moduleSections'
 import { useParams } from 'react-router-dom'
 import ApprovalPanel from './RecApproval'
 import OfferPanel from './RecOffer'
+import RequisitionPanel from './RecRequisition'
 import RecPrivacy from './RecPrivacy'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -1565,6 +1566,7 @@ export function RecruiterPage() {
                             )}
                           </div>
                           {job.status === 'DRAFT' && <ApprovalPanel kind="job" id={job.id} />}
+                          <RequisitionPanel jobId={job.id} canEdit />
                         </div>
                         <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                           {job.status === 'DRAFT' && (

@@ -12,6 +12,7 @@ import za.co.handyflow.platform.hr.application.HrFacade;
 import za.co.handyflow.platform.recruiter.domain.model.*;
 import za.co.handyflow.platform.recruiter.domain.repository.*;
 import za.co.handyflow.platform.recruiter.dto.*;
+import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.shared.*;
 // CROSS-MODULE BOUNDARY NOTE: HrService lives in hr.application.internal —
 // the same "internal" convention this codebase uses elsewhere to keep
@@ -113,7 +114,8 @@ public class RecruiterService {
                 req.description(), req.requirements(), req.benefits(),
                 req.salaryMin(), req.salaryMax(), req.showSalary(),
                 req.closesAt(), createdBy);
-        jobRepo.save(job);
+        jobRepo.saveAndFlush(job);
+        saveJobVersion(job, createdBy);
         log.info("Created job={} title={}", job.getId(), req.title());
         return toJobResponse(job);
     }
@@ -121,6 +123,8 @@ public class RecruiterService {
     @Transactional
     public JobResponse updateJob(TenantId tenantId, UUID id, CreateJobRequest req) {
         RecJob job = findJob(tenantId, id);
+        String t0 = job.getTitle(), d0 = job.getDescription(), r0 = job.getRequirements(), b0 = job.getBenefits();
+        java.math.BigDecimal min0 = job.getSalaryMin(), max0 = job.getSalaryMax();
         // A draft changed after it was sent for approval, or approved, is a different job: the approval no longer covers it.
         if (RecruiterApprovalRules.editWithdrawsApproval(job.getStatus(), job.getApprovalStatus())) job.withdrawApproval();
         job.update(req.title(), req.department(), req.location(),
@@ -128,7 +132,71 @@ public class RecruiterService {
                 req.requirements(), req.benefits(),
                 req.salaryMin(), req.salaryMax(), req.showSalary(), req.closesAt());
         jobRepo.save(job);
+        if (RecruiterRequisitionRules.wordingChanged(t0, d0, r0, b0, min0, max0, job.getTitle(), job.getDescription(), job.getRequirements(),
+                job.getBenefits(), job.getSalaryMin(), job.getSalaryMax())) saveJobVersion(job, TenantContext.getCurrentUserId());
         return toJobResponse(job);
+    }
+
+    private void saveJobVersion(RecJob job, UUID by) {
+        Integer next = jdbc.queryForObject("SELECT COALESCE(MAX(version_no), 0) + 1 FROM rec_job_versions WHERE job_id = ?", Integer.class, job.getId());
+        jdbc.update("INSERT INTO rec_job_versions (id, tenant_id, job_id, version_no, title, description, requirements, benefits, salary_min, salary_max, changed_by) "
+                        + "VALUES (?,?,?,?,?,?,?,?,?,?,?)", UUID.randomUUID(), job.getTenantId().getValue(), job.getId(), next, job.getTitle(),
+                job.getDescription(), job.getRequirements(), job.getBenefits(), job.getSalaryMin(), job.getSalaryMax(), by);
+    }
+
+    private int hiredCount(UUID jobId) {
+        Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM rec_applications WHERE job_id = ? AND stage = 'HIRED'", Integer.class, jobId);
+        return n == null ? 0 : n;
+    }
+
+    @Transactional(readOnly = true)
+    public RecruiterRequisitionDtos.RequisitionView getRequisition(TenantId tenantId, UUID jobId) {
+        RecJob job = findJob(tenantId, jobId);
+        return toRequisitionView(job);
+    }
+
+    private RecruiterRequisitionDtos.RequisitionView toRequisitionView(RecJob job) {
+        int vacancies = jdbc.queryForObject("SELECT vacancies FROM rec_jobs WHERE id = ?", Integer.class, job.getId());
+        String ref = jdbc.queryForObject("SELECT requisition_ref FROM rec_jobs WHERE id = ?", String.class, job.getId());
+        int hired = hiredCount(job.getId());
+        List<RecruiterRequisitionDtos.JobVersion> versions = jdbc.query(
+                "SELECT version_no, title, description, requirements, benefits, salary_min, salary_max, changed_by, changed_at "
+                        + "FROM rec_job_versions WHERE job_id = ? ORDER BY version_no DESC",
+                (rs, i) -> new RecruiterRequisitionDtos.JobVersion(rs.getInt("version_no"), rs.getString("title"), rs.getString("description"),
+                        rs.getString("requirements"), rs.getString("benefits"), rs.getBigDecimal("salary_min"), rs.getBigDecimal("salary_max"),
+                        rs.getObject("changed_by", UUID.class), rs.getTimestamp("changed_at").toInstant()), job.getId());
+        return new RecruiterRequisitionDtos.RequisitionView(job.getId(), vacancies, ref, hired, Math.max(0, vacancies - hired), job.getStatus(), versions);
+    }
+
+    @Transactional
+    public RecruiterRequisitionDtos.RequisitionView setRequisition(TenantId tenantId, UUID jobId, RecruiterRequisitionDtos.SetRequisitionRequest req) {
+        RecJob job = findJob(tenantId, jobId);
+        String problem = RecruiterRequisitionRules.problem(req == null ? null : req.vacancies(), req == null ? null : req.requisitionRef(), hiredCount(jobId));
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.BAD_REQUEST, "INVALID_REQUISITION");
+        String ref = req.requisitionRef() == null || req.requisitionRef().isBlank() ? null : req.requisitionRef().trim();
+        jdbc.update("UPDATE rec_jobs SET vacancies = ?, requisition_ref = ? WHERE id = ? AND tenant_id = ?", req.vacancies(), ref, jobId, tenantId.getValue());
+        if ("FILLED".equals(job.getStatus()) && req.vacancies() > hiredCount(jobId)) {
+            job.publish();
+            jobRepo.save(job);
+        }
+        return toRequisitionView(job);
+    }
+
+    /** Called with the application locked, before a candidate is marked hired. */
+    private void requireVacancy(UUID jobId) {
+        Integer vacancies = jdbc.queryForObject("SELECT vacancies FROM rec_jobs WHERE id = ?", Integer.class, jobId);
+        String problem = RecruiterRequisitionRules.hireProblem(vacancies == null ? 1 : vacancies, hiredCount(jobId));
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.BAD_REQUEST, "NO_VACANCY");
+    }
+
+    private void fillJobIfComplete(UUID jobId) {
+        Integer vacancies = jdbc.queryForObject("SELECT vacancies FROM rec_jobs WHERE id = ?", Integer.class, jobId);
+        jobRepo.findById(jobId).ifPresent(j -> {
+            if (RecruiterRequisitionRules.fillsJob(vacancies == null ? 1 : vacancies, hiredCount(jobId), j.getStatus())) {
+                j.markFilled();
+                jobRepo.save(j);
+            }
+        });
     }
 
     @Transactional
@@ -470,6 +538,7 @@ public class RecruiterService {
         if ("HIRED".equalsIgnoreCase(req.stage().trim())) {
             String hire = RecruiterOfferRules.hireProblem(offerStatus(app));
             if (hire != null) throw new HandyFlowException(hire, HttpStatus.BAD_REQUEST, "OFFER_NOT_ACCEPTED");
+            requireVacancy(app.getJobId());
         }
         req = new MoveStageRequest(req.stage().trim().toUpperCase(), req.notes(), req.rejectionReason(), req.offeredSalary(),
                 req.offeredSalaryFrequency(), req.offeredStartDate(), req.offerBenefits());
@@ -490,6 +559,8 @@ public class RecruiterService {
             notifyApplicantStageChange(app, req.stage(), tenantId);
         }
         applicationRepo.save(app);
+        applicationRepo.flush();
+        if ("HIRED".equals(app.getStage())) fillJobIfComplete(app.getJobId());
 
         // Record history
         historyRepo.save(RecStageHistory.create(id, prevStage,
