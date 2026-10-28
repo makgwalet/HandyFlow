@@ -202,6 +202,9 @@ public enum NotificationType {
     PERF_PLAN_CHECKIN_DUE(WARNING, Set.of(IN_APP, EMAIL)),
     PERF_PLAN_ENDED(WARNING, Set.of(IN_APP, EMAIL)),
 
+    // Annual leave that would be lost at the coming rollover under the company's carry-over limit, or a summary for HR.
+    LEAVE_AT_RISK(WARNING, Set.of(IN_APP, EMAIL)),
+
     // An HR letter was issued to the employee. The message never says what the letter is about: letters can concern discipline
     // or health, and an email is not a private place.
     LETTER_ISSUED(INFO, Set.of(IN_APP, EMAIL)),

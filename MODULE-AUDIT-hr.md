@@ -996,3 +996,27 @@ I read the four training services, the entities and the session screen. The modu
 
 - Maven, Spring and the database have not run. The three year-to-date queries now have a subquery on pay runs; they have never run against PostgreSQL. The new `PayrollServiceTest` case uses real Mockito and has not been executed; the changed `TaxCertificateServiceTest` case likewise.
 - The code definitions come from SARS's published guide as read through a text fetch; the guide was truncated in the part I could read.
+
+## 35. Slice 19d: telling people their annual leave is at risk
+
+**What was there.** HR could see, on the Leave tab, who would lose annual leave at the coming rollover under the company's carry-over limit (section 27). Nobody else was told, so an employee found out on 1 January.
+
+**What changed**
+
+- **Reminders.** On 1 October, 1 November, 1 December and 15 December, every employee who would lose days if they took no more leave is told how many days, what the limit is, how many they have now, and to book leave while there is time. Only companies with a limit that applies to the coming rollover are looked at.
+- **HR.** The company's administrators get one message on the same days with the number of people told (no names; the list is on the Leave tab).
+- **Left out.** An employee with no email address, or who has left, is skipped without error. One company failing does not stop the others. The messages go out with the existing switch `app.notifications.enabled`, in a morning job (07:50 South African time) beside the performance reminders.
+- One new notification type, `LEAVE_AT_RISK`. No migration; no screen change.
+
+**Still not done**
+
+- The employee's manager is not told. Only the employee and the administrators are.
+- The job does not remember what it sent, so running it twice on a reminder day would send twice.
+- The reminder days are fixed; a company cannot change them or switch them off except through the whole notifications switch.
+- The list of who is at risk is worked out from the balance today and what is still to be earned this year; it does not know about leave already booked and approved for later in the year, so someone with leave booked can still be told.
+- Carried days still do not expire after a set number of months, and leave is still not cashed out during employment (section 27).
+
+**Not verified**
+
+- Maven, Spring and the database have not run. `LeaveReminderServiceTest` (4) uses real Mockito and has not been executed; it builds the real `PerfNotifier` over a mocked notification service. The scheduled job has not run.
+- In my harness `LeaveReminderRulesTest` (4) passes.
