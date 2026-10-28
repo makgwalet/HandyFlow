@@ -55,6 +55,8 @@ public final class RecruiterAuditRules {
         ACTIONS.put("PUT /jobs/{jobId}/client", "JOB_CLIENT_SET");
         ACTIONS.put("PUT /placements/{applicationId}/fee", "PLACEMENT_FEE_SET");
         ACTIONS.put("POST /cv/migrate-legacy", "CV_MIGRATED");
+        ACTIONS.put("POST /jobs/{jobId}/costs", "JOB_COST_ADDED");
+        ACTIONS.put("DELETE /jobs/{jobId}/costs/{costId}", "JOB_COST_REMOVED");
         ACTIONS.put("POST /pools", "POOL_CREATED");
         ACTIONS.put("DELETE /pools/{poolId}", "POOL_DELETED");
         ACTIONS.put("POST /pools/{poolId}/members", "POOL_MEMBER_ADDED");

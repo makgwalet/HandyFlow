@@ -19,6 +19,7 @@ import OfferPanel, { ReviseOfferForm } from './RecOffer'
 import RecDashboard from './RecDashboard'
 import RecCalendar from './RecCalendar'
 import RecClients from './RecClients'
+import RecJobCosts from './RecJobCosts'
 import RecPlacements from './RecPlacements'
 import RequisitionPanel from './RecRequisition'
 import { ScreeningAnswers, ScreeningEditor } from './RecScreening'
@@ -1730,6 +1731,7 @@ export function RecruiterPage() {
                                     {job.status === 'DRAFT' && <ApprovalPanel kind="job" id={job.id} />}
                                     <RequisitionPanel jobId={job.id} canEdit />
                                     <ScreeningEditor jobId={job.id} canEdit />
+                                    <RecJobCosts jobId={job.id} />
                                   </td>
                                 </tr>
                               )}

@@ -33,7 +33,9 @@ public class RecruiterReportService {
             new ReportInfo("sources", "Source effectiveness", "For applications received in the range, by source: how many were interviewed, reached the offer stage and were hired. Hire rate is hires over applications.", true),
             new ReportInfo("offers", "Offer performance", "Offer letters sent in the range and where they stand today. Acceptance rate is accepted over accepted plus declined; offers still waiting or lapsed are not counted either way.", true),
             new ReportInfo("interviews", "Interview outcomes", "Interviews scheduled in the range by outcome. Pass rate is passed over passed plus failed.", true),
-            new ReportInfo("drop-off", "Rejections and withdrawals", "Applications rejected in the range grouped by the reason recorded, and applications the candidate withdrew in the range.", true));
+            new ReportInfo("drop-off", "Rejections and withdrawals", "Applications rejected in the range grouped by the reason recorded, and applications the candidate withdrew in the range.", true),
+            new ReportInfo("recruiter-performance", "Recruiter activity", "For each person, the stage changes they made in the range: how many in total, and how many moved a candidate into Screening, Interview, Offer, Hired or Rejected. Average days to hire is from application to the moment that person marked the candidate hired.", true),
+            new ReportInfo("cost-per-hire", "Cost per hire", "Costs recorded against jobs, dated in the range, and people hired in the range, per job. Cost per hire is the job's costs divided by its hires, and is left empty when nobody was hired. The total line adds up every job.", true));
 
     public List<ReportInfo> catalogue() { return CATALOGUE; }
 
@@ -152,6 +154,52 @@ public class RecruiterReportService {
                         GROUP BY 1 ORDER BY n DESC, 1 LIMIT 200
                         """, rs -> { rows.add(List.of("Rejected: " + rs.getString("reason"), rs.getLong("n"))); }, t, a, b);
                 rows.add(List.of("Withdrawn by the candidate", count("SELECT COUNT(*) FROM rec_applications WHERE tenant_id = ? AND stage = 'WITHDRAWN' AND stage_changed_at >= ? AND stage_changed_at < ?", t, a, b)));
+            }
+            case "recruiter-performance" -> {
+                cols = List.of("Person", "Stage changes", "To screening", "To interview", "To offer", "Hired", "Rejected", "Average days to hire");
+                jdbc.query("""
+                        SELECT COALESCE(NULLIF(TRIM(h.changed_by_name), ''), 'Not recorded') AS who,
+                               COUNT(*) AS moves,
+                               COUNT(*) FILTER (WHERE h.to_stage = 'SCREENING') AS screening,
+                               COUNT(*) FILTER (WHERE h.to_stage = 'INTERVIEW') AS interview,
+                               COUNT(*) FILTER (WHERE h.to_stage = 'OFFER') AS offer,
+                               COUNT(*) FILTER (WHERE h.to_stage = 'HIRED') AS hired,
+                               COUNT(*) FILTER (WHERE h.to_stage = 'REJECTED') AS rejected,
+                               AVG(EXTRACT(EPOCH FROM (h.created_at - a.applied_at)) / 86400) FILTER (WHERE h.to_stage = 'HIRED') AS days_to_hire
+                        FROM rec_stage_history h JOIN rec_applications a ON a.id = h.application_id
+                        WHERE a.tenant_id = ? AND h.from_stage IS NOT NULL AND h.created_at >= ? AND h.created_at < ?
+                        GROUP BY 1 ORDER BY moves DESC, 1 LIMIT 100
+                        """, rs -> {
+                    double d = rs.getDouble("days_to_hire");
+                    boolean noHires = rs.wasNull();
+                    rows.add(List.of(rs.getString("who"), rs.getLong("moves"), rs.getLong("screening"), rs.getLong("interview"), rs.getLong("offer"),
+                            rs.getLong("hired"), rs.getLong("rejected"), noHires ? "" : (Object) round1(d)));
+                }, t, a, b);
+            }
+            case "cost-per-hire" -> {
+                cols = List.of("Job", "Hires", "Total cost (R)", "Cost per hire (R)");
+                java.math.BigDecimal all = java.math.BigDecimal.ZERO;
+                long allHires = 0;
+                List<Object[]> perJob = jdbc.query("""
+                        SELECT j.title,
+                               (SELECT COUNT(*) FROM rec_applications x WHERE x.job_id = j.id AND x.stage = 'HIRED' AND x.hired_at >= ? AND x.hired_at < ?) AS hires,
+                               (SELECT COALESCE(SUM(c.amount), 0) FROM rec_job_costs c WHERE c.job_id = j.id AND c.incurred_on >= ? AND c.incurred_on <= ?) AS cost
+                        FROM rec_jobs j WHERE j.tenant_id = ? AND j.deleted_at IS NULL
+                        ORDER BY j.title LIMIT 500
+                        """, (rs, i) -> new Object[]{rs.getString("title"), rs.getLong("hires"), rs.getBigDecimal("cost")}, a, b, java.sql.Date.valueOf(from), java.sql.Date.valueOf(to), t);
+                for (Object[] r : perJob) {
+                    long hires = (Long) r[1];
+                    java.math.BigDecimal cost = (java.math.BigDecimal) r[2];
+                    if (hires == 0 && cost.signum() == 0) continue;
+                    java.math.BigDecimal per = za.co.handyflow.platform.recruiter.domain.model.RecruiterCostRules.costPerHire(cost, hires);
+                    rows.add(List.of(r[0], hires, cost, per == null ? "" : (Object) per));
+                    all = all.add(cost);
+                    allHires += hires;
+                }
+                if (!rows.isEmpty()) {
+                    java.math.BigDecimal per = za.co.handyflow.platform.recruiter.domain.model.RecruiterCostRules.costPerHire(all, allHires);
+                    rows.add(List.of("All jobs", allHires, all, per == null ? "" : (Object) per));
+                }
             }
             default -> throw new HandyFlowException("There is no such report.", HttpStatus.NOT_FOUND, "NO_SUCH_REPORT");
         }
