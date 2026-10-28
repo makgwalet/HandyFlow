@@ -17,5 +17,11 @@ public record Emp201Response(
         BigDecimal totalPayable,
         String status,
         Instant submittedAt,
-        Instant createdAt
+        Instant createdAt,
+        String paymentRef,
+        LocalDate paidOn,
+        BigDecimal paidAmount,
+        boolean overdue,
+        boolean late,
+        boolean runIssued
 ) {}

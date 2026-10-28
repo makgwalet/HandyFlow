@@ -949,3 +949,30 @@ I read the four training services, the entities and the session screen. The modu
 - Maven, Spring and the database have not run. V527 has never run against PostgreSQL. `HrPayRunPaymentRepository`, the new `findAllByIds` query and `PayRunPaymentController` (the CSV download headers and the permission checks) have never run.
 - In my harness `PayrollPaymentRulesTest` (9) and `PayRunPaymentServiceTest` (11) pass. Removing the "file downloaded first" check and the "nothing paid yet" check is caught (4 failures).
 - Front end: lint is clean on the new files and the type check shows no new errors apart from vitest not being installed here. `PayRunPayments.test.tsx` (10 tests) has not run. `PayrollTab.tsx` still has its 19 existing lint errors for `any`; I added none.
+
+## 33. Slice 19c: filing and paying the EMP201 (V528)
+
+**What was there.** The EMP201 was made with each pay run and could be downloaded as a PDF, and that was all. Nothing could move it past DRAFT: the entity had `markSubmitted` and `markPaid` but no code called them. The screen looked for statuses (PENDING, OVERDUE) the server never sets, so "Pending this month" and the overdue alert could never show anything. The payroll report treated a line as overdue unless it was PAID, which never happened, so every past declaration was reported overdue. The due date was the period end plus seven days, which is only the 7th of the next month when the period ends on the last day of a month.
+
+**What changed**
+
+- **Due date (V528).** The 7th of the month after the period end, or the Friday before when the 7th is a Saturday or Sunday. Existing declarations that are not paid are recalculated by the migration. Public holidays are not allowed for.
+- **Filing.** Someone who may finalise a pay run records that the EMP201 was filed on SARS eFiling, with the payment reference SARS gave (6 to 30 letters or digits, spaces removed). Refused unless the pay run is finalised, and refused a second time.
+- **Paying.** After filing, the same people record the date it was paid and the amount. The amount must equal the total payable; part payments are not recorded. The date cannot be in the future or before the period ended. A payment after the due date is flagged late.
+- **History.** Both steps are written to the pay run's history with who and when.
+- **Screen.** The status now reads "Not filed", "Filed, not paid", "Paid" or "Overdue", with the payment reference or the payment date beneath. Rows have "Mark filed" and "Mark paid" buttons for people who may finalise a run. A declaration whose run is not finalised says so instead of offering to file. The "Not yet paid" total and the overdue alert use the real state.
+- Nothing is sent to SARS and nothing is paid from here; both are done on eFiling and recorded afterwards.
+
+**Still not done**
+
+- One EMP201 is still made per pay run. SARS wants one per month, so a business paying weekly, or running a bonus run, files several runs' figures as one. The screen lists them separately and each is marked on its own.
+- No penalty or interest calculation, and no part payments or corrections after a declaration is filed.
+- No public holiday calendar for the due date.
+- No link between the EMP201 payment and the bank. It is typed in, not matched to a statement.
+- The EMP501 reconciliation is still not produced.
+
+**Not verified**
+
+- Maven, Spring and the database have not run. V528 has never run against PostgreSQL, including the due date `CASE` expression. `Emp201Controller` and the changed `getEmp201s` (now also loads the pay runs) have never run under Spring. `HrEmp201.markSubmitted` and `markPaid` changed signature; nothing else called them. I did not run the existing `HrControllerTest` or `PayrollServiceTest` against the new response fields.
+- In my harness `Emp201RulesTest` (4) and `Emp201ServiceTest` (9) pass. Removing the weekend roll-back and the full-amount check is caught.
+- Front end: lint is clean on the new files, and the screen has 3 fewer lint errors than before (the other 4 are old `any`s). `Emp201.test.tsx` (8 tests) has not run; vitest is not installed here.

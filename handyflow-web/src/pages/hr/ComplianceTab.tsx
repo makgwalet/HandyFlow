@@ -5,24 +5,32 @@
 // 3. Date formatting — was raw ISO strings, now human-readable
 // 4. YTD totals added
 // 5. IRP5/EMP501 guidance added
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { useAuth } from "../../hooks/useAuth"
 import { FileText, AlertCircle, CheckCircle, Download, Clock } from "lucide-react"
+import Emp201ActionModal from "./Emp201ActionModal"
+import { canRecordEmp201, stateOf, STATE_LABEL, type Emp201, type Emp201State } from "./emp201.logic"
 
 // FIX: correct ApiResponse<List<Emp201>> unwrap
 const unwrapList = (r: any): any[] => { const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : (d?.content ?? []) }
 const fmtR    = (n: any) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
 const fmtDate = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
 
-const STATUS_CFG: Record<string, { color: string; bg: string; icon: React.ElementType; label: string }> = {
-  PENDING:   { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", icon: Clock,         label: "Pending"   },
-  SUBMITTED: { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", icon: CheckCircle,   label: "Submitted" },
-  OVERDUE:   { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", icon: AlertCircle,   label: "Overdue"   },
+const STATUS_CFG: Record<Emp201State | "OVERDUE", { color: string; bg: string; icon: React.ElementType; label: string }> = {
+  NOT_FILED: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", icon: Clock, label: STATE_LABEL.NOT_FILED },
+  FILED:     { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", icon: Clock, label: STATE_LABEL.FILED },
+  PAID:      { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", icon: CheckCircle, label: STATE_LABEL.PAID },
+  OVERDUE:   { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", icon: AlertCircle, label: "Overdue" },
 }
 
 export default function ComplianceTab() {
   // FIX: unwrapList — was r.data which missed the ApiResponse wrapper entirely
-  const { data: emp201s = [], isLoading } = useQuery<any[]>({
+  const { user } = useAuth()
+  const canRecord = canRecordEmp201(user?.permissions ?? [])
+  const [acting, setActing] = useState<{ emp: Emp201; mode: "file" | "pay" } | null>(null)
+  const { data: emp201s = [], isLoading } = useQuery<Emp201[]>({
     queryKey: ["emp201"],
     queryFn: async () => unwrapList(await apiClient.get("/api/v1/hr/emp201")),
   })
@@ -42,8 +50,8 @@ export default function ComplianceTab() {
   const totalUif      = emp201s.reduce((s, e) => s + Number(e.totalUif ?? 0), 0)
   const totalSdl      = emp201s.reduce((s, e) => s + Number(e.totalSdl ?? 0), 0)
   const totalPayable  = emp201s.reduce((s, e) => s + Number(e.totalPayable ?? 0), 0)
-  const pendingTotal  = emp201s.filter(e => e.status === "PENDING").reduce((s, e) => s + Number(e.totalPayable ?? 0), 0)
-  const overdueCount  = emp201s.filter(e => e.status === "OVERDUE").length
+  const pendingTotal  = emp201s.filter(e => e.status !== "PAID").reduce((s, e) => s + Number(e.totalPayable ?? 0), 0)
+  const overdueCount  = emp201s.filter(e => e.overdue).length
 
   if (isLoading) return <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading EMP201 records...</div>
 
@@ -57,7 +65,7 @@ export default function ComplianceTab() {
             { label: "Total UIF (YTD)",      value: fmtR(totalUif),     color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
             { label: "Total SDL (YTD)",      value: fmtR(totalSdl),     color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)" },
             { label: "Total Payable (YTD)",  value: fmtR(totalPayable), color: "var(--hf-primary-text)", bg: "var(--hf-info-soft)" },
-            { label: "Pending this month",   value: fmtR(pendingTotal), color: pendingTotal > 0 ? "var(--hf-warning-text)" : "var(--hf-success-text-strong)", bg: pendingTotal > 0 ? "var(--hf-warning-soft)" : "var(--hf-success-soft-strong)" },
+            { label: "Not yet paid",   value: fmtR(pendingTotal), color: pendingTotal > 0 ? "var(--hf-warning-text)" : "var(--hf-success-text-strong)", bg: pendingTotal > 0 ? "var(--hf-warning-soft)" : "var(--hf-success-soft-strong)" },
           ].map(s => (
             <div key={s.label} style={{ background: s.bg, borderRadius: 10, padding: "12px 16px", minWidth: 140 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: s.color }}>{s.value}</div>
@@ -83,7 +91,7 @@ export default function ComplianceTab() {
         <FileText size={16} style={{ color: 'var(--hf-info-text)', flexShrink: 0, marginTop: 1 }} />
         <div style={{ fontSize: 13, color: "var(--hf-info-text)" }}>
           <strong>EMP201</strong> — monthly employer declaration, due to SARS by the 7th of each following month.
-          Download the PDF, then submit and pay on SARS eFiling. Contains PAYE + UIF (employer + employee) + SDL.
+          Download the PDF, file and pay on SARS eFiling, then record the payment reference and the payment here. Contains PAYE + UIF (employer + employee) + SDL. Due dates fall back to the Friday when the 7th is a weekend; public holidays are not allowed for.
         </div>
       </div>
 
@@ -104,10 +112,10 @@ export default function ComplianceTab() {
               </tr>
             </thead>
             <tbody>
-              {emp201s.map((e: any, i) => {
-                const cfg    = STATUS_CFG[e.status] ?? STATUS_CFG.PENDING
+              {emp201s.map((e, i) => {
+                const isOvr  = e.overdue
+                const cfg    = STATUS_CFG[isOvr ? "OVERDUE" : stateOf(e)]
                 const Icon   = cfg.icon
-                const isOvr  = e.status === "OVERDUE"
                 return (
                   <tr key={e.id} style={{ background: i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)", borderBottom: i < emp201s.length - 1 ? "1px solid var(--hf-border-subtle)" : "none" }}>
                     {/* FIX: format dates, was showing raw ISO strings */}
@@ -125,6 +133,9 @@ export default function ComplianceTab() {
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: cfg.bg, color: cfg.color, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
                         <Icon size={10} />{cfg.label}
                       </span>
+                      {e.status === "SUBMITTED" && e.paymentRef && <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 2 }}>Ref {e.paymentRef}</div>}
+                      {e.status === "PAID" && <div style={{ fontSize: 11, color: e.late ? "var(--hf-danger-text)" : "var(--hf-text-faint)", marginTop: 2 }}>
+                        Paid {fmtDate(e.paidOn)}{e.late ? ", after the due date" : ""}</div>}
                     </td>
                     {/* FIX: PDF download button added — was missing entirely */}
                     <td style={{ padding: "12px 14px" }}>
@@ -132,6 +143,13 @@ export default function ComplianceTab() {
                         style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "none", borderRadius: 7, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                         <Download size={12} /> EMP201
                       </button>
+                      {canRecord && e.status === "DRAFT" && e.runIssued && (
+                        <button type="button" onClick={() => setActing({ emp: e, mode: "file" })} aria-label={`Record EMP201 for ${fmtDate(e.periodEnd)} as filed`}
+                          style={{ marginTop: 6, background: "var(--hf-surface)", color: "var(--hf-text-secondary)", border: "1px solid var(--hf-border)", borderRadius: 7, padding: "5px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Mark filed</button>)}
+                      {canRecord && e.status === "SUBMITTED" && (
+                        <button type="button" onClick={() => setActing({ emp: e, mode: "pay" })} aria-label={`Record EMP201 for ${fmtDate(e.periodEnd)} as paid`}
+                          style={{ marginTop: 6, background: "var(--hf-surface)", color: "var(--hf-text-secondary)", border: "1px solid var(--hf-border)", borderRadius: 7, padding: "5px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Mark paid</button>)}
+                      {e.status === "DRAFT" && !e.runIssued && <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>Finalise the pay run first</div>}
                     </td>
                   </tr>
                 )
@@ -161,6 +179,7 @@ export default function ComplianceTab() {
           can be used to manually prepare your EMP501 on SARS eFiling.
         </div>
       </div>
+      {acting && <Emp201ActionModal emp={acting.emp} mode={acting.mode} onClose={() => setActing(null)} />}
     </div>
   )
 }

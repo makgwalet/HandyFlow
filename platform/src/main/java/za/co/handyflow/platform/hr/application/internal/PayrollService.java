@@ -15,8 +15,10 @@ import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -300,8 +302,13 @@ public class PayrollService {
 
     @Transactional(readOnly = true)
     public List<Emp201Response> getEmp201s(TenantId tenantId) {
-        return emp201Repo.findAllByTenant(tenantId)
-                .stream().map(this::toEmp201Response).toList();
+        List<HrEmp201> all = emp201Repo.findAllByTenant(tenantId);
+        Set<UUID> issued = new HashSet<>();
+        Set<UUID> ids = new HashSet<>();
+        for (HrEmp201 e : all) if (e.getPayRunId() != null) ids.add(e.getPayRunId());
+        if (!ids.isEmpty()) for (HrPayRun r : payRunRepo.findAllById(ids)) if (PayRunWorkflowRules.isIssued(r.getStatus())) issued.add(r.getId());
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg"));
+        return all.stream().map(e -> toEmp201Response(e, today, e.getPayRunId() == null || issued.contains(e.getPayRunId()))).toList();
     }
 
     // ── Mappers ───────────────────────────────────────────────────────────────
@@ -334,10 +341,12 @@ public class PayrollService {
                 s.getEmployerMedical(), s.getEmployerRetirement(), s.getOtherFringe(), s.getBackPayAmount());
     }
 
-    private Emp201Response toEmp201Response(HrEmp201 e) {
+    private Emp201Response toEmp201Response(HrEmp201 e, LocalDate today, boolean runIssued) {
         return new Emp201Response(e.getId(), e.getPayRunId(),
                 e.getPeriodStart(), e.getPeriodEnd(), e.getDueDate(),
                 e.getTotalPaye(), e.getTotalUif(), e.getTotalSdl(),
-                e.getTotalPayable(), e.getStatus(), e.getSubmittedAt(), e.getCreatedAt());
+                e.getTotalPayable(), e.getStatus(), e.getSubmittedAt(), e.getCreatedAt(),
+                e.getPaymentRef(), e.getPaidOn(), e.getPaidAmount(),
+                Emp201Rules.overdue(e.getStatus(), e.getDueDate(), today), Emp201Rules.late(e.getPaidOn(), e.getDueDate()), runIssued);
     }
 }

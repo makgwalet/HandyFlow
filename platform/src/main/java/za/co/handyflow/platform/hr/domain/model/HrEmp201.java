@@ -29,6 +29,11 @@ public class HrEmp201 {
     String status = "DRAFT";
     @Column(name = "submitted_at") Instant submittedAt;
     @Column(name = "payment_ref")  String paymentRef;
+    @Column(name = "submitted_by") UUID submittedBy;
+    @Column(name = "paid_on")      LocalDate paidOn;
+    @Column(name = "paid_amount")  BigDecimal paidAmount;
+    @Column(name = "paid_by")      UUID paidBy;
+    @Column(name = "paid_at")      Instant paidAt;
     @Column(name = "created_at")   Instant createdAt;
     @Column(name = "updated_at")   Instant updatedAt;
 
@@ -42,7 +47,7 @@ public class HrEmp201 {
         e.payRunId     = payRunId;
         e.periodStart  = periodStart;
         e.periodEnd    = periodEnd;
-        e.dueDate      = periodEnd.plusDays(7); // EMP201 due 7th of following month
+        e.dueDate      = Emp201Rules.dueDate(periodEnd);
         e.totalPaye    = totalPaye;
         e.totalUif     = totalUif;
         e.totalSdl     = totalSdl;
@@ -53,15 +58,20 @@ public class HrEmp201 {
         return e;
     }
 
-    public void markSubmitted(String paymentRef) {
-        this.status      = "SUBMITTED";
-        this.paymentRef  = paymentRef;
+    public void markSubmitted(String paymentRef, UUID by) {
+        this.status      = Emp201Rules.SUBMITTED;
+        this.paymentRef  = Emp201Rules.cleanReference(paymentRef);
         this.submittedAt = Instant.now();
+        this.submittedBy = by;
         this.updatedAt   = Instant.now();
     }
 
-    public void markPaid() {
-        this.status    = "PAID";
-        this.updatedAt = Instant.now();
+    public void markPaid(LocalDate paidOn, BigDecimal amount, UUID by) {
+        this.status     = Emp201Rules.PAID;
+        this.paidOn     = paidOn;
+        this.paidAmount = amount.setScale(2, java.math.RoundingMode.HALF_UP);
+        this.paidBy     = by;
+        this.paidAt     = Instant.now();
+        this.updatedAt  = Instant.now();
     }
 }
