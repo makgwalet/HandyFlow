@@ -15,6 +15,7 @@ import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -240,15 +241,31 @@ public class PayrollService {
             slip.setYtdPaye(ytdPaye.add(result.payeAmount()));
             slip.setYtdUif(ytdUif.add(result.uifEmployee()));
 
+            // Overpayments are recovered from net pay, after tax, whole or not at all.
+            List<HrPayAdjustment> recoveries = items.stream().filter(a -> PayAdjustmentRules.RECOVERY.equals(a.getKind()))
+                    .sorted(java.util.Comparator.comparing(HrPayAdjustment::getCreatedAt)).toList();
+            List<HrPayAdjustment> taken = new ArrayList<>(items.stream().filter(a -> !PayAdjustmentRules.RECOVERY.equals(a.getKind())).toList());
+            BigDecimal recovered = BigDecimal.ZERO;
+            List<Boolean> fits = PayAdjustmentRules.affordable(recoveries.stream().map(HrPayAdjustment::getAmount).toList(), slip.getNetPay());
+            for (int i = 0; i < recoveries.size(); i++) {
+                if (fits.get(i)) { taken.add(recoveries.get(i)); recovered = recovered.add(recoveries.get(i).getAmount()); }
+                else warnings.add(who + ": the recovery of " + recoveries.get(i).getAmount() + " (" + recoveries.get(i).getDescription()
+                        + ") was not taken because net pay is not enough. It stays open for the next run.");
+            }
+            if (recovered.signum() > 0) {
+                slip.recover(recovered);
+                warnings.add(who + ": " + recovered + " recovered from net pay (overpayment, after tax).");
+            }
+
             payslipRepo.save(slip);
             overtimeService.markTaken(claims, run.getId());
-            payAdjustmentService.markTaken(items, run.getId());
+            payAdjustmentService.markTaken(taken, run.getId());
 
             runGross = runGross.add(result.totalEarnings());
             runPaye  = runPaye.add(result.payeAmount());
             runUif   = runUif.add(result.uifEmployee()).add(result.uifEmployer());
             runSdl   = runSdl.add(result.sdlAmount());
-            runNet   = runNet.add(result.netPay());
+            runNet   = runNet.add(slip.getNetPay());
         }
 
         run.prepared(runGross, runPaye, runUif, runSdl, runNet, employees.size(), actor);

@@ -100,4 +100,20 @@ class PayAdjustmentRulesTest {
         assertTrue(PayAdjustmentRules.cancelProblem("OPEN", true, "Entered twice").contains("pay run"));
         assertNotNull(PayAdjustmentRules.cancelProblem("CANCELLED", false, "Entered twice"));
     }
+
+    @Test
+    void aRecoveryIsEnteredLikeABonusWithNoPeriod() {
+        assertNull(PayAdjustmentRules.addProblem("RECOVERY", d("1500.00"), TODAY, "Overpaid in September", "Paid twice by mistake", null, null, TODAY, STARTED, false));
+        assertNotNull(PayAdjustmentRules.addProblem("RECOVERY", d("1500.00"), TODAY, "Overpaid in September", "Paid twice by mistake", TODAY, TODAY, TODAY, STARTED, false));
+        assertEquals("Recovery of overpayment", PayAdjustmentRules.label("RECOVERY"));
+    }
+
+    @Test
+    void recoveriesAreTakenWholeInOrderAndNeverTakeNetPayBelowZero() {
+        var r = PayAdjustmentRules.affordable(java.util.List.of(d("4000"), d("3000"), d("500")), d("5000"));
+        assertEquals(java.util.List.of(true, false, true), r);
+        assertEquals(java.util.List.of(false), PayAdjustmentRules.affordable(java.util.List.of(d("100")), d("99.99")));
+        assertEquals(java.util.List.of(true), PayAdjustmentRules.affordable(java.util.List.of(d("100")), d("100.00")));
+        assertEquals(java.util.List.of(false), PayAdjustmentRules.affordable(java.util.List.of(d("100")), null));
+    }
 }

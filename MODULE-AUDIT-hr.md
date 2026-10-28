@@ -1074,3 +1074,15 @@ I read the four training services, the entities and the session screen. The modu
 **Also.** The `any` types in `ComplianceTab.tsx` were replaced, so the file lints clean.
 
 **Still unrun.** The frontend tests cannot run in my environment (no vitest); not seen in a browser.
+
+## 39. Recovering an overpayment (Slice 20a, V529)
+
+**Decision taken.** You had not answered whether a finalised run is reopened or an overpayment is recovered later, so I took the second: a finalised run is never changed. An overpayment is entered as a pay item of kind "Recovery of an overpayment", dated from the pay month it should come off.
+
+**How it works.** The next run whose period ends on or after that date takes it **from net pay, after tax**. It changes neither PAYE nor the taxable income, and it is shown as "Other deductions" on the payslip and in the run's net total (so the bank file pays the reduced amount). A recovery is taken whole or not at all: if net pay cannot cover it, it stays open for the following run and the run says so in its warnings. Several recoveries are taken in the order entered, and a smaller later one may still fit. Cancelling and the self-entry block work as for bonuses.
+
+**Migration.** V529 widens the kind check on `hr_pay_adjustments` (it drops whatever check mentions `kind`, then adds the new one).
+
+**Not decided here.** The Basic Conditions of Employment Act lets an employer deduct an overpayment of pay, but the employee should be told and the reason recorded; the reason field is required. No 25% cap is applied. Tax already paid on the overpaid amount is not adjusted: if the overpayment was in an earlier tax year, the certificate for that year stands. Check both with a labour adviser.
+
+**Tests.** `PayAdjustmentRulesTest` (+2) and `HrPayslipRecoveryTest` (2) pass in my harness; the Mockito payroll service test was not extended and nothing here has run under Maven or the database.

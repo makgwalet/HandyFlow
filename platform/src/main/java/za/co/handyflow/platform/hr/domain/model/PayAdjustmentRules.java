@@ -5,7 +5,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * Bonuses and back pay: what may be entered, and who may take it back. Pure rules, no database.
+ * Bonuses, back pay and recoveries of overpayments: what may be entered, and who may take it back. Pure rules, no database.
  * <p>
  * A bonus is a lump sum. Back pay is money owed for an earlier period (for example a raise that was agreed late), so it must say
  * which period it covers. Both are taxed in the month they are paid, by the annual-payment method; that is a payroll-engine matter and
@@ -15,8 +15,8 @@ public final class PayAdjustmentRules {
 
     private PayAdjustmentRules() {}
 
-    public static final String BONUS = "BONUS", BACK_PAY = "BACK_PAY";
-    public static final List<String> KINDS = List.of(BONUS, BACK_PAY);
+    public static final String BONUS = "BONUS", BACK_PAY = "BACK_PAY", RECOVERY = "RECOVERY";
+    public static final List<String> KINDS = List.of(BONUS, BACK_PAY, RECOVERY);
     public static final String OPEN = "OPEN", CANCELLED = "CANCELLED";
     public static final BigDecimal MAX_AMOUNT = new BigDecimal("10000000");
     /** How far ahead an item may be dated: a year is far enough for a planned bonus, and catches a mistyped year. */
@@ -27,7 +27,7 @@ public final class PayAdjustmentRules {
                                     LocalDate relatesFrom, LocalDate relatesTo, LocalDate today, LocalDate employmentStart,
                                     boolean forSelf) {
         if (forSelf) return "You cannot enter a payment for yourself. Ask another payroll user.";
-        if (kind == null || !KINDS.contains(kind)) return "Choose bonus or back pay.";
+        if (kind == null || !KINDS.contains(kind)) return "Choose bonus, back pay or recovery of an overpayment.";
         if (amount == null || amount.signum() <= 0) return "Enter the amount.";
         if (amount.scale() > 2) return "Use at most two decimals for the amount.";
         if (amount.compareTo(MAX_AMOUNT) > 0) return "That amount is too large.";
@@ -44,7 +44,7 @@ public final class PayAdjustmentRules {
             if (employmentStart != null && relatesFrom.isBefore(employmentStart))
                 return "Back pay cannot start before the employee did (" + employmentStart + ").";
         } else if (relatesFrom != null || relatesTo != null) {
-            return "A bonus does not cover a period. Leave the dates out, or choose back pay.";
+            return "Only back pay covers a period. Leave the dates out, or choose back pay.";
         }
         return null;
     }
@@ -58,10 +58,26 @@ public final class PayAdjustmentRules {
         return null;
     }
 
+    /**
+     * Which recoveries a pay can bear. A recovery is taken from net pay after tax, in the order entered, and only whole: one that would
+     * take net pay below zero is left open for a later run instead of being taken in part. Later, smaller ones may still fit.
+     */
+    public static List<Boolean> affordable(List<BigDecimal> amounts, BigDecimal netPay) {
+        List<Boolean> out = new java.util.ArrayList<>();
+        BigDecimal left = netPay == null ? BigDecimal.ZERO : netPay;
+        for (BigDecimal a : amounts) {
+            boolean fits = a != null && a.signum() > 0 && left.compareTo(a) >= 0;
+            if (fits) left = left.subtract(a);
+            out.add(fits);
+        }
+        return out;
+    }
+
     public static String label(String kind) {
         return switch (kind == null ? "" : kind) {
             case BONUS -> "Bonus";
             case BACK_PAY -> "Back pay";
+            case RECOVERY -> "Recovery of overpayment";
             default -> String.valueOf(kind);
         };
     }

@@ -26,7 +26,7 @@ afterEach(cleanup)
 describe("pay item rules", () => {
   it("accepts a complete bonus and rejects each missing part", () => {
     expect(payProblem(form(), TODAY)).toBe("")
-    expect(payProblem(form({ kind: "" }), TODAY)).toMatch(/bonus or back pay/)
+    expect(payProblem(form({ kind: "" }), TODAY)).toMatch(/bonus, back pay or recovery/)
     expect(payProblem(form({ amount: "0" }), TODAY)).toMatch(/amount/)
     expect(payProblem(form({ amount: "10.123" }), TODAY)).toMatch(/amount/)
     expect(payProblem(form({ amount: "10000000.01" }), TODAY)).toMatch(/too large/)
@@ -47,7 +47,11 @@ describe("pay item rules", () => {
     expect(payProblem(back({ relatesFrom: "2023-12-01" }), TODAY, "2024-01-15")).toMatch(/before the employee did/)
   })
   it("does not let a bonus carry a period", () => {
-    expect(payProblem(form({ relatesFrom: "2026-07-01" }), TODAY)).toMatch(/does not cover a period/)
+    expect(payProblem(form({ relatesFrom: "2026-07-01" }), TODAY)).toMatch(/Only back pay covers a period/)
+  })
+  it("accepts a recovery with no period, and refuses one that names a period", () => {
+    expect(payProblem(form({ kind: "RECOVERY", description: "Overpaid in September", reason: "Paid twice" }), TODAY)).toBe("")
+    expect(payProblem(form({ kind: "RECOVERY", relatesTo: "2026-07-01" }), TODAY)).toMatch(/Only back pay covers a period/)
   })
   it("builds the request body, leaving the period out for a bonus", () => {
     expect(payBody(form({ amount: "1500.50", description: " Annual bonus ", relatesFrom: "2026-07-01" }))).toEqual({
@@ -79,7 +83,7 @@ describe("PayAdjustmentsModal", () => {
     get.mockResolvedValue({ data: { data: [] } })
     post.mockResolvedValue({ data: {} })
     wrap(<PayAdjustmentsModal employee={EMP} permissions={["PAYROLL_PREPARE"]} onClose={() => {}} />)
-    await screen.findByText(/No bonuses or back pay/)
+    await screen.findByText(/No bonuses, back pay or recoveries/)
     fireEvent.change(screen.getByLabelText(/^Kind/), { target: { value: "BONUS" } })
     fireEvent.change(screen.getByLabelText(/^Amount/), { target: { value: "5000" } })
     fireEvent.change(screen.getByLabelText(/^Pay from/), { target: { value: "2026-11-01" } })
@@ -93,7 +97,7 @@ describe("PayAdjustmentsModal", () => {
   it("asks for the period only when the payment is back pay", async () => {
     get.mockResolvedValue({ data: { data: [] } })
     wrap(<PayAdjustmentsModal employee={EMP} permissions={["PAYROLL_PREPARE"]} onClose={() => {}} />)
-    await screen.findByText(/No bonuses or back pay/)
+    await screen.findByText(/No bonuses, back pay or recoveries/)
     expect(screen.queryByLabelText(/Period covered: from/)).toBeNull()
     fireEvent.change(screen.getByLabelText(/^Kind/), { target: { value: "BACK_PAY" } })
     expect(screen.getByLabelText(/Period covered: from/)).toBeTruthy()
@@ -102,7 +106,7 @@ describe("PayAdjustmentsModal", () => {
   it("keeps Save off until the form is complete", async () => {
     get.mockResolvedValue({ data: { data: [] } })
     wrap(<PayAdjustmentsModal employee={EMP} permissions={["PAYROLL_PREPARE"]} onClose={() => {}} />)
-    await screen.findByText(/No bonuses or back pay/)
+    await screen.findByText(/No bonuses, back pay or recoveries/)
     expect((screen.getByRole("button", { name: "Save payment" }) as HTMLButtonElement).disabled).toBe(true)
   })
 
@@ -120,7 +124,7 @@ describe("PayAdjustmentsModal", () => {
     get.mockResolvedValue({ data: { data: [] } })
     post.mockRejectedValue({ response: { data: { message: "You cannot enter a payment for yourself. Ask another payroll user." } } })
     wrap(<PayAdjustmentsModal employee={EMP} permissions={["PAYROLL_PREPARE"]} onClose={() => {}} />)
-    await screen.findByText(/No bonuses or back pay/)
+    await screen.findByText(/No bonuses, back pay or recoveries/)
     fireEvent.change(screen.getByLabelText(/^Kind/), { target: { value: "BONUS" } })
     fireEvent.change(screen.getByLabelText(/^Amount/), { target: { value: "100" } })
     fireEvent.change(screen.getByLabelText(/^Pay from/), { target: { value: "2026-11-01" } })

@@ -1,7 +1,7 @@
 // src/pages/hr/payAdjustments.logic.ts
 //
-// Bonuses and back pay. Mirrors PayAdjustmentRules on the server, which has the last word.
-export type PayKind = "BONUS" | "BACK_PAY"
+// Bonuses, back pay and recoveries of overpayments. Mirrors PayAdjustmentRules on the server, which has the last word.
+export type PayKind = "BONUS" | "BACK_PAY" | "RECOVERY"
 
 export type PayAdjustment = {
   id: string; employeeId: string; employeeNumber: string; employeeName: string; kind: PayKind; kindLabel: string; amount: number
@@ -16,6 +16,7 @@ export const EMPTY_PAY_FORM: PayForm = { kind: "", amount: "", payFrom: "", desc
 export const PAY_KINDS: { value: PayKind; label: string }[] = [
   { value: "BONUS", label: "Bonus" },
   { value: "BACK_PAY", label: "Back pay (money owed for an earlier period)" },
+  { value: "RECOVERY", label: "Recovery of an overpayment (taken from net pay)" },
 ]
 
 export const MAX_PAY_AMOUNT = 10_000_000
@@ -27,7 +28,7 @@ export function canEnterPay(permissions: string[]): boolean {
 
 /** `today` is a yyyy-mm-dd date; passed in so the rule can be tested. */
 export function payProblem(f: PayForm, today: string, employmentStart?: string | null): string {
-  if (!f.kind) return "Choose bonus or back pay."
+  if (!f.kind) return "Choose bonus, back pay or recovery of an overpayment."
   if (!/^\d+(\.\d{1,2})?$/.test(f.amount.trim()) || Number(f.amount) <= 0) return "Enter the amount, in rand, with at most two decimals."
   if (Number(f.amount) > MAX_PAY_AMOUNT) return "That amount is too large."
   if (!f.payFrom) return "Say from which pay month it should be paid."
@@ -43,7 +44,7 @@ export function payProblem(f: PayForm, today: string, employmentStart?: string |
     if (f.relatesTo > today) return "Back pay covers a period that has already passed."
     if (employmentStart && f.relatesFrom < employmentStart) return `Back pay cannot start before the employee did (${employmentStart}).`
   } else if (f.relatesFrom || f.relatesTo) {
-    return "A bonus does not cover a period. Leave the dates out, or choose back pay."
+    return "Only back pay covers a period. Leave the dates out, or choose back pay."
   }
   return ""
 }

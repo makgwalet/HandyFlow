@@ -77,7 +77,7 @@ export default function PayAdjustmentsModal({ employee, permissions, onClose }: 
 
         {list.isLoading ? <div style={{ color: "var(--hf-text-faint)", padding: 12 }}>Loading…</div>
           : list.isError ? <div role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 13 }}>The payments could not be loaded.</div>
-          : items.length === 0 ? <div style={{ fontSize: 13, color: "var(--hf-text-muted)", padding: "8px 0 14px" }}>No bonuses or back pay are recorded.</div>
+          : items.length === 0 ? <div style={{ fontSize: 13, color: "var(--hf-text-muted)", padding: "8px 0 14px" }}>No bonuses, back pay or recoveries are recorded.</div>
           : (
             <div style={{ overflowX: "auto", marginBottom: 14 }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>

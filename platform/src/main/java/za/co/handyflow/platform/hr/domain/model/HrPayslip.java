@@ -122,6 +122,14 @@ public class HrPayslip {
         this.backPayAmount = backPay == null ? BigDecimal.ZERO : backPay;
     }
 
+    /** Overpayments recovered from this month's net pay, after tax. Called after the calculations; they change neither tax nor earnings. */
+    public void recover(BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0) return;
+        this.otherDeductions = otherDeductions.add(amount);
+        this.totalDeductions = totalDeductions.add(amount);
+        this.netPay = netPay.subtract(amount);
+    }
+
     /** Approved overtime for the month. Set before the calculations are applied, which add it to the earnings. */
     public void setOvertimeAmount(BigDecimal amount) { this.overtimeAmount = amount == null ? BigDecimal.ZERO : amount; }
 
