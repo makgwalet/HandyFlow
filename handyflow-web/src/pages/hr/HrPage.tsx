@@ -17,6 +17,7 @@ import TaxCertificatesTab from "./TaxCertificatesTab"
 import OnboardingTab from "./OnboardingTab"
 import AttendanceTab from "./AttendanceTab"
 import MyTraining from "./MyTraining"
+import TeamTraining from "./TeamTraining"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { HR_SECTIONS } from "../../navigation/moduleSections"
 
@@ -38,6 +39,7 @@ export function HrPage() {
           case "letters":      return <LettersTab />
           case "performance":  return <PerformanceTab />
           case "my-training":  return <MyTraining />
+          case "team-training": return <TeamTraining />
           case "hr-reports":   return <ReportsTab />
           case "compliance":   return <ComplianceTab />
           default:             return null

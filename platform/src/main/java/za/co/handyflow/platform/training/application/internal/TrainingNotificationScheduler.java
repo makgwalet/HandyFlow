@@ -12,6 +12,7 @@ import za.co.handyflow.platform.notifications.application.internal.NotificationS
 import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.hr.application.HrFacade;
 import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.training.domain.model.CertificateDigestRules;
 import za.co.handyflow.platform.training.domain.model.CertificateExpiryRules;
 import za.co.handyflow.platform.training.domain.model.TrainingCertificate;
 import za.co.handyflow.platform.training.domain.model.TrainingSession;
@@ -57,6 +58,7 @@ public class TrainingNotificationScheduler {
     private final NotificationService notificationService;
     private final TenantAdminRecipients tenantAdminRecipients;
     private final HrFacade hrFacade;
+    private final TrainingManagerAlerts managerAlerts;
 
     @org.springframework.beans.factory.annotation.Value("${app.notifications.enabled:true}")
     private boolean enabled = true;
@@ -103,8 +105,10 @@ public class TrainingNotificationScheduler {
                 .collect(Collectors.groupingBy(c -> TenantId.of(c.getTenantId())))
                 .forEach((tenantId, certificates) -> {
                     List<Recipient> admins = tenantAdminRecipients.resolveTenantAdmins(tenantId);
+                    List<TrainingManagerAlerts.Case> expiringCases = new java.util.ArrayList<>(), expiredCases = new java.util.ArrayList<>();
                     for (TrainingCertificate certificate : certificates) {
                         if (CertificateExpiryRules.lapsed(certificate.getExpiryDate(), today)) {
+                            expiredCases.add(managerCase(certificate, today));
                             certificate.markExpired();
                             certificateRepository.save(certificate);
                             tellHolder(tenantId, certificate, NotificationType.TRAINING_CERTIFICATE_EXPIRED,
@@ -123,6 +127,7 @@ public class TrainingNotificationScheduler {
                                     .sourceEntityId(certificate.getId().toString())
                                     .build());
                         } else if (CertificateExpiryRules.warnToday(certificate.getExpiryDate(), today)) {
+                            expiringCases.add(managerCase(certificate, today));
                             long left = CertificateExpiryRules.daysLeft(certificate.getExpiryDate(), today);
                             tellHolder(tenantId, certificate, NotificationType.TRAINING_CERTIFICATE_EXPIRING,
                                     CertificateExpiryRules.holderTitle(certificate.getCourseTitleSnapshot(), left),
@@ -142,7 +147,13 @@ public class TrainingNotificationScheduler {
                                     .build());
                         }
                     }
+                    managerAlerts.tell(tenantId, expiringCases, expiredCases);
                 });
+    }
+
+    private static TrainingManagerAlerts.Case managerCase(TrainingCertificate c, LocalDate today) {
+        return new TrainingManagerAlerts.Case(c.getEmployeeId(), new CertificateDigestRules.Item(
+                c.getEmployeeNameSnapshot(), c.getCourseTitleSnapshot(), c.getExpiryDate(), CertificateExpiryRules.daysLeft(c.getExpiryDate(), today)));
     }
 
     /** Best effort: the certificate holder, if the employee record has an email address. */

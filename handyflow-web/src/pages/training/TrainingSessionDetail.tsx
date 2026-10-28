@@ -23,7 +23,7 @@ import type { CourseResponse } from "./TrainingCoursesTab"
 
 interface SessionResponse {
   id: string; courseId: string; courseTitle: string; startDate: string; endDate: string
-  venue: string | null; trainerName: string | null; capacity: number | null; enrolledCount: number
+  venue: string | null; trainerName: string | null; capacity: number | null; enrolledCount: number; openBooking?: boolean
   status: "SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED"; notes: string | null; cancelReason: string | null; createdAt: string
 }
 interface EnrollmentResponse {
@@ -48,6 +48,7 @@ function EditSessionModal({ session, onClose }: { session: SessionResponse; onCl
   const [trainerName, setTrainerName] = useState(session.trainerName ?? "")
   const [capacity, setCapacity] = useState(session.capacity?.toString() ?? "")
   const [notes, setNotes] = useState(session.notes ?? "")
+  const [openBooking, setOpenBooking] = useState(!!session.openBooking)
   const [startDate, setStartDate] = useState(session.startDate)
   const [endDate, setEndDate] = useState(session.endDate)
 
@@ -55,7 +56,7 @@ function EditSessionModal({ session, onClose }: { session: SessionResponse; onCl
     mutationFn: async () => {
       await apiClient.put(`/api/v1/training/sessions/${session.id}`, {
         venue: venue || null, trainerName: trainerName || null,
-        capacity: capacity.trim() === "" ? null : parseInt(capacity, 10), notes: notes || null,
+        capacity: capacity.trim() === "" ? null : parseInt(capacity, 10), notes: notes || null, openBooking,
       })
       if (startDate !== session.startDate || endDate !== session.endDate) {
         await apiClient.post(`/api/v1/training/sessions/${session.id}/reschedule`, { startDate, endDate })
@@ -79,6 +80,10 @@ function EditSessionModal({ session, onClose }: { session: SessionResponse; onCl
             <div><label style={labelStyle}>Capacity</label><input type="number" style={inputStyle} value={capacity} onChange={e => setCapacity(e.target.value)} /></div>
           </div>
           <div><label style={labelStyle}>Notes</label><textarea style={{ ...inputStyle, minHeight: 50, resize: "vertical" }} value={notes} onChange={e => setNotes(e.target.value)} /></div>
+          <label style={{ fontSize: 13, display: "flex", gap: 8, alignItems: "center" }}>
+            <input type="checkbox" checked={openBooking} onChange={e => setOpenBooking(e.target.checked)} />
+            Let employees book themselves onto this session
+          </label>
         </div>
         {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not save"}</p>}
         <div style={{ display: "flex", gap: 10, marginTop: 18 }}>

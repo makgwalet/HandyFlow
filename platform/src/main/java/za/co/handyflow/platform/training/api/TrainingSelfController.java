@@ -5,10 +5,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
+import za.co.handyflow.platform.training.application.internal.TrainingSelfBookingService;
+import za.co.handyflow.platform.training.dto.TrainingRequirementDtos.BookRequest;
+import za.co.handyflow.platform.training.dto.TrainingRequirementDtos.OpenSession;
+import java.util.List;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -30,6 +33,7 @@ public class TrainingSelfController {
 
     private final TrainingSelfService selfService;
     private final TrainingPdfService pdfService;
+    private final TrainingSelfBookingService bookingService;
     private final JdbcTemplate jdbc;
     private final FeatureGuard featureGuard;
 
@@ -38,6 +42,30 @@ public class TrainingSelfController {
     public ResponseEntity<ApiResponse<MyTrainingResponse>> mine(Principal principal) {
         featureGuard.requireModule("training");
         return ResponseEntity.ok(ApiResponse.success(selfService.mine(TenantContext.getTenantIdAsObject(), user(principal))));
+    }
+
+    /** Sessions the caller may book themselves onto. */
+    @GetMapping("/sessions")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<OpenSession>>> openSessions(Principal principal) {
+        featureGuard.requireModule("training");
+        return ResponseEntity.ok(ApiResponse.success(bookingService.open(TenantContext.getTenantIdAsObject(), user(principal))));
+    }
+
+    @PostMapping("/bookings")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> book(@Valid @RequestBody BookRequest req, Principal principal) {
+        featureGuard.requireModule("training");
+        bookingService.book(TenantContext.getTenantIdAsObject(), user(principal), req.sessionId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("You are booked", null));
+    }
+
+    @DeleteMapping("/bookings/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> cancel(@PathVariable UUID id, Principal principal) {
+        featureGuard.requireModule("training");
+        bookingService.cancel(TenantContext.getTenantIdAsObject(), user(principal), id);
+        return ResponseEntity.ok(ApiResponse.success("Your booking was cancelled", null));
     }
 
     @GetMapping("/certificates/{id}/pdf")

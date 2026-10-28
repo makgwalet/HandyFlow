@@ -16,6 +16,7 @@ export interface SessionResponse {
   id: string; courseId: string; courseTitle: string; startDate: string; endDate: string
   venue: string | null; trainerName: string | null; capacity: number | null; enrolledCount: number
   status: "SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED"; notes: string | null; cancelReason: string | null; createdAt: string
+  openBooking?: boolean
 }
 interface SessionPage { content: SessionResponse[]; totalElements: number }
 interface CoursePage { content: CourseResponse[] }
@@ -33,13 +34,14 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
   })
   const courses = coursesData?.content ?? []
 
-  const [form, setForm] = useState({ courseId: "", startDate: "", endDate: "", venue: "", trainerName: "", capacity: "", notes: "" })
+  const [form, setForm] = useState({ courseId: "", startDate: "", endDate: "", venue: "", trainerName: "", capacity: "", notes: "", openBooking: false })
 
   const save = useMutation({
     mutationFn: async () => apiClient.post("/api/v1/training/sessions", {
       courseId: form.courseId, startDate: form.startDate, endDate: form.endDate,
       venue: form.venue || null, trainerName: form.trainerName || null,
       capacity: form.capacity.trim() === "" ? null : parseInt(form.capacity, 10), notes: form.notes || null,
+      openBooking: form.openBooking,
     }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["training-sessions"] }); onClose() },
   })
@@ -71,6 +73,10 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
             <div><label style={labelStyle}>Capacity (blank = unlimited)</label><input type="number" style={inputStyle} value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })} /></div>
           </div>
           <div><label style={labelStyle}>Notes</label><textarea style={{ ...inputStyle, minHeight: 50, resize: "vertical" }} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
+          <label style={{ fontSize: 13, display: "flex", gap: 8, alignItems: "center" }}>
+            <input type="checkbox" checked={form.openBooking} onChange={e => setForm({ ...form, openBooking: e.target.checked })} />
+            Let employees book themselves onto this session
+          </label>
         </div>
 
         {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not schedule this session"}</p>}
@@ -137,7 +143,7 @@ export default function TrainingSessionsTab() {
                     <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: `color-mix(in srgb, ${STATUS_COLORS[s.status]} 9%, transparent)`, color: STATUS_COLORS[s.status] }}>{s.status.replace("_", " ")}</span>
                   </div>
                   <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>
-                    {s.startDate} → {s.endDate} {s.venue ? `· ${s.venue}` : ""} {s.trainerName ? `· ${s.trainerName}` : ""}
+                    {s.startDate} → {s.endDate} {s.venue ? `· ${s.venue}` : ""} {s.trainerName ? `· ${s.trainerName}` : ""}{s.openBooking ? " · open for booking" : ""}
                   </p>
                 </div>
               </div>

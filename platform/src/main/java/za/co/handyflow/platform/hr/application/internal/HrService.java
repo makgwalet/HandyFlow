@@ -348,6 +348,18 @@ public class HrService {
         return employeeRepo.findByUserId(tenantId, userId).map(this::toEmployeeResponse);
     }
 
+    /** Everyone not yet terminated, as other modules may see them (with reporting line and login link). */
+    @Transactional(readOnly = true)
+    public java.util.List<za.co.handyflow.platform.hr.EmployeeSummary> notTerminatedSummaries(TenantId tenantId) {
+        return employeeRepo.findNotTerminated(tenantId).stream().map(za.co.handyflow.platform.hr.EmployeeSummary::of).toList();
+    }
+
+    /** One employee with reporting line and login link, if they still exist. */
+    @Transactional(readOnly = true)
+    public java.util.Optional<za.co.handyflow.platform.hr.EmployeeSummary> findSummary(TenantId tenantId, UUID id) {
+        return employeeRepo.findActiveById(tenantId, id).map(za.co.handyflow.platform.hr.EmployeeSummary::of);
+    }
+
     private EmployeeResponse toEmployeeResponse(HrEmployee e) {
         return new EmployeeResponse(e.getId(), e.getEmployeeNumber(),
                 e.getFirstName(), e.getLastName(), e.getFullName(),

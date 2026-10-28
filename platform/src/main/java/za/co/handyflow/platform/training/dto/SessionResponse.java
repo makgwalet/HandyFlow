@@ -17,5 +17,11 @@ public record SessionResponse(
         String status,
         String notes,
         String cancelReason,
-        Instant createdAt
-) {}
+        Instant createdAt,
+        boolean openBooking
+) {
+    public SessionResponse(UUID id, UUID courseId, String courseTitle, LocalDate startDate, LocalDate endDate, String venue, String trainerName,
+                           Integer capacity, long enrolledCount, String status, String notes, String cancelReason, Instant createdAt) {
+        this(id, courseId, courseTitle, startDate, endDate, venue, trainerName, capacity, enrolledCount, status, notes, cancelReason, createdAt, false);
+    }
+}

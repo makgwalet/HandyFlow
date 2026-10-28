@@ -77,7 +77,7 @@ public class TrainingSessionController {
         featureGuard.requireModule("training");
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         TrainingSession session = sessionService.create(tenantId, req.courseId(), req.startDate(), req.endDate(),
-                req.venue(), req.trainerName(), req.capacity(), req.notes());
+                req.venue(), req.trainerName(), req.capacity(), req.notes(), req.openBooking());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Session scheduled", toResponse(tenantId, session)));
     }
@@ -87,7 +87,7 @@ public class TrainingSessionController {
     public ResponseEntity<ApiResponse<SessionResponse>> update(@PathVariable UUID id, @Valid @RequestBody UpdateSessionRequest req) {
         featureGuard.requireModule("training");
         TenantId tenantId = TenantContext.getTenantIdAsObject();
-        TrainingSession session = sessionService.update(tenantId, id, req.venue(), req.trainerName(), req.capacity(), req.notes());
+        TrainingSession session = sessionService.update(tenantId, id, req.venue(), req.trainerName(), req.capacity(), req.notes(), req.openBooking());
         return ResponseEntity.ok(ApiResponse.success("Session updated", toResponse(tenantId, session)));
     }
 
@@ -180,6 +180,6 @@ public class TrainingSessionController {
         long enrolledCount = enrollmentRepository.countLiveBySession(tenantId, s.getId());
         return new SessionResponse(s.getId(), s.getCourseId(), course.getTitle(), s.getStartDate(), s.getEndDate(),
                 s.getVenue(), s.getTrainerName(), s.getCapacity(), enrolledCount, s.getStatus(), s.getNotes(),
-                s.getCancelReason(), s.getCreatedAt());
+                s.getCancelReason(), s.getCreatedAt(), s.isOpenBooking());
     }
 }

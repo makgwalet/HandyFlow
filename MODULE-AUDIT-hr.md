@@ -1373,3 +1373,36 @@ With the averaging method the payout stays out of the year to date, like the oth
 - Comparison is worked out in the browser from two report calls. Point-in-time figures (headcount) are compared as they stand at each end. A figure that is hidden or missing shows a dash, with no change.
 - The email link is only as good as `app.frontend.url`; set it in production.
 - Chart colours use `--hf-chart-2`/`--hf-chart-3` if the theme defines them, with fallbacks.
+
+## 60. Training: required-training matrix, manager alerts, team view, self-booking (Slice 26, V543)
+
+Closes the four "still not done" items left in §26, §41 and §42.
+
+**Required-training matrix.**
+- A *requirement* is a course plus an optional job title and an optional department (`training_requirements`). Both empty means everyone. Titles and departments are compared ignoring case, spaces at the ends and doubled spaces, because HR holds them as free text. Only a course that issues a certificate, and is in use, can be required; the same requirement cannot be set twice.
+- `GET/POST /api/v1/training/requirements`, `DELETE /requirements/{id}`, `GET /matrix` (TRAINING_READ to look; TRAINING_MANAGE or TRAINING_ADMIN to change).
+- A person's standing on a required course is one of: **valid**, **expiring** (30 days or fewer), **expired**, **not held**, or **booked** (nothing valid is held but they are enrolled on a session of the course that is not over). A certificate counts for the course of the session it was issued from. A lapsed certificate shows as expired even before the 08:15 sweep marks it. A withdrawn certificate never counts. The newest certificate decides, so a renewal covers an old one about to lapse.
+- Screen: Training → **Required training**: requirements list with add and remove, then the matrix with people who have something to put right first and a filter for only those.
+
+**Managers told when certificates are about to expire.** The existing 08:15 sweep now also sends each manager **one message per day** per kind (about to expire, expired) listing the people in their team, instead of one message per certificate. Warning days are the existing 30, 14, 7 and 1 before, and the day it lapses. A person with no manager, a manager who has left, or a manager with no login and no email gets nothing extra; administrators and the holder are told as before. Message text has no figures beyond names, course names and dates.
+
+**Manager team view.** `GET /api/v1/training/team` (any signed-in login). "My team" is the people whose manager on the HR record is the employee linked to the login; nothing takes a manager or employee id from the request. Each person shows what is required of them and where they stand, their certificates and their coming bookings. Screen: HR → **Team training**. A login with no linked employee record is told so; a login with no reports sees an empty team. **Direct reports only**, not their reports' reports.
+
+**Self-booking.** An administrator ticks "Let employees book themselves onto this session" when scheduling or editing (`training_sessions.open_booking`, default off, so nothing opens by itself). `GET /api/v1/training/mine/sessions` lists open sessions that are scheduled, not yet started, not full and not already booked, with required-for-your-role ones first. `POST /mine/bookings` books; `DELETE /mine/bookings/{id}` cancels, up to the day before the session starts. The person is always the one linked to the login. The booking goes through the same locked, capacity-checked step as an administrator's, the employee gets the usual confirmation, and the **manager is told** when a report books or cancels.
+
+**Plumbing.** `EmployeeSummary` gained `managerId` and `userId` (a 10-argument constructor is kept, so callers are unchanged); the summary still carries no ID number, tax number, pay or other sensitive field. `HrFacade` gained `activeEmployees`, `directReports` and `findLinkedEmployee`. `findEmployeeByUserId` still returns no reporting line, so the notifier looks it up again where it needs the manager. New session fields are optional in the API (`openBooking` left out keeps the setting).
+
+**Tests.**
+- Run offline and passing: `TrainingRequirementRulesTest` (15), `TrainingBookingRulesTest` (6), `CertificateDigestRulesTest` (3), and `TrainingTeamAndMatrixTest` (20, the real services, rules and notifier against in-memory repositories). Two deliberate breaks (ignoring the "open for booking" flag; treating a lapsed certificate as never held) were each caught.
+- Frontend: `trainingRequired.test.ts` (15) passes when run under Node with a stand-in for vitest. `TrainingRequired.test.tsx` (11 component tests) has not run: vitest is not installed here.
+- tsc and eslint are clean on the new files. `TrainingSessionDetail.tsx` and `TrainingSessionsTab.tsx` keep their existing `any` lint errors.
+
+**Limits and things I could not verify**
+- Nothing has run against Postgres, Spring or a browser. The new queries (`findAllForEmployees` on enrollments and certificates, `findAllForTenant`) and the expression-based unique index on requirements have never run on PostgreSQL.
+- Matching is on exact job-title and department text. "Fork-lift operator" and "Forklift operator" are different titles; there is no synonym list. HR has no department or job-title master list to link to.
+- The matrix reads every non-terminated employee, their enrolments and certificates in a handful of queries. That is fine for hundreds of people; it is not paged.
+- Booking needs no manager approval and has no waiting list; a full session simply refuses. Cost is not checked.
+- Only the holder's current course is considered: a certificate from a differently named course (for example a renamed or replaced one) does not count for a requirement on the new course.
+- A required course with no session scheduled shows people as "not held" with nothing to book; the matrix does not yet tell the administrator that no session exists.
+- Manager alerts reach the manager's login in the app and their email if they have an address. A manager with only an email is reached by email alone.
+- Training provider module (`trainingprovider`) is separate and untouched.

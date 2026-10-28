@@ -46,6 +46,9 @@ public class TrainingSession {
     String notes;
     @Column(name = "cancel_reason") String cancelReason;
 
+    /** Employees may book themselves onto this session only when an administrator has opened it for that. */
+    @Column(name = "open_booking") boolean openBooking;
+
     @Column(name = "created_at") Instant createdAt;
     @Column(name = "updated_at") Instant updatedAt;
     @Version long version;
@@ -69,6 +72,12 @@ public class TrainingSession {
         s.createdAt = Instant.now();
         s.updatedAt = Instant.now();
         return s;
+    }
+
+    public void setOpenBooking(boolean openBooking) {
+        requireNotTerminal();
+        this.openBooking = openBooking;
+        this.updatedAt = Instant.now();
     }
 
     public void reschedule(LocalDate newStart, LocalDate newEnd) {

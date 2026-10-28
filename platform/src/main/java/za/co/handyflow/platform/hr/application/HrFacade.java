@@ -135,4 +135,20 @@ public class HrFacade {
             return Optional.empty();
         }
     }
+
+    /** Everyone not yet terminated, with job title, department, manager and login link, for matrices and team views. */
+    public List<EmployeeSummary> activeEmployees(TenantId tenantId) {
+        return hrService.notTerminatedSummaries(tenantId);
+    }
+
+    /** The people who report directly to this manager and are not terminated. */
+    public List<EmployeeSummary> directReports(TenantId tenantId, UUID managerId) {
+        if (managerId == null) return List.of();
+        return hrService.notTerminatedSummaries(tenantId).stream().filter(e -> managerId.equals(e.managerId())).toList();
+    }
+
+    /** One employee including reporting line and login link, if they still exist. */
+    public Optional<EmployeeSummary> findLinkedEmployee(TenantId tenantId, UUID employeeId) {
+        return hrService.findSummary(tenantId, employeeId);
+    }
 }

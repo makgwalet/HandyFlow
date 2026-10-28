@@ -46,4 +46,7 @@ public interface TrainingEnrollmentRepository extends JpaRepository<TrainingEnro
 
     @Query("SELECT e FROM TrainingEnrollment e WHERE e.tenantId = :#{#tenantId.value} AND e.sessionId = :sessionId ORDER BY e.employeeNameSnapshot")
     List<TrainingEnrollment> findAllForSession(TenantId tenantId, UUID sessionId);
+
+    @Query("SELECT e FROM TrainingEnrollment e WHERE e.tenantId = :#{#tenantId.value} AND e.employeeId IN :employeeIds")
+    List<TrainingEnrollment> findAllForEmployees(TenantId tenantId, java.util.Collection<UUID> employeeIds);
 }

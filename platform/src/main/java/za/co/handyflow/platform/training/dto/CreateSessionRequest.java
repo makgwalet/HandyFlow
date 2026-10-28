@@ -12,5 +12,10 @@ public record CreateSessionRequest(
         String venue,
         String trainerName,
         Integer capacity,
-        String notes
-) {}
+        String notes,
+        Boolean openBooking
+) {
+    public CreateSessionRequest(UUID courseId, LocalDate startDate, LocalDate endDate, String venue, String trainerName, Integer capacity, String notes) {
+        this(courseId, startDate, endDate, venue, trainerName, capacity, notes, null);
+    }
+}

@@ -30,9 +30,14 @@ public class TrainingSessionService {
     private final TrainingEnrollmentRepository enrollmentRepository;
     private final TrainingNotifier notifier;
 
-    @Transactional
     public TrainingSession create(TenantId tenantId, UUID courseId, LocalDate startDate, LocalDate endDate,
                                    String venue, String trainerName, Integer capacity, String notes) {
+        return create(tenantId, courseId, startDate, endDate, venue, trainerName, capacity, notes, null);
+    }
+
+    @Transactional
+    public TrainingSession create(TenantId tenantId, UUID courseId, LocalDate startDate, LocalDate endDate,
+                                   String venue, String trainerName, Integer capacity, String notes, Boolean openBooking) {
         TrainingCourse course = courseRepository.findActiveById(tenantId, courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("TrainingCourse", courseId.toString()));
         if (!course.isActive()) {
@@ -41,15 +46,22 @@ public class TrainingSessionService {
         // Falls back to the course's own default trainer when the session doesn't name one.
         String effectiveTrainer = (trainerName != null && !trainerName.isBlank()) ? trainerName : course.getDefaultTrainerName();
         TrainingSession session = TrainingSession.create(tenantId, courseId, startDate, endDate, venue, effectiveTrainer, capacity, notes);
+        if (Boolean.TRUE.equals(openBooking)) session.setOpenBooking(true);
         return sessionRepository.save(session);
     }
 
-    @Transactional
     public TrainingSession update(TenantId tenantId, UUID id, String venue, String trainerName, Integer capacity, String notes) {
+        return update(tenantId, id, venue, trainerName, capacity, notes, null);
+    }
+
+    /** {@code openBooking} null leaves the setting as it is. */
+    @Transactional
+    public TrainingSession update(TenantId tenantId, UUID id, String venue, String trainerName, Integer capacity, String notes, Boolean openBooking) {
         TrainingSession session = get(tenantId, id);
         String problem = TrainingRules.capacityProblem(capacity, enrollmentRepository.countLiveBySession(tenantId, id));
         if (problem != null) throw new IllegalArgumentException(problem);
         session.update(venue, trainerName, capacity, notes);
+        if (openBooking != null) session.setOpenBooking(openBooking);
         return sessionRepository.save(session);
     }
 

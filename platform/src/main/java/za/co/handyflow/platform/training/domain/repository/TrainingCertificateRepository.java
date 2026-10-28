@@ -31,4 +31,7 @@ public interface TrainingCertificateRepository extends JpaRepository<TrainingCer
     /** Cross-tenant sweep for the daily expiry scan — see TrainingSessionRepository.findUpcomingAcrossTenants for the same convention. */
     @Query("SELECT c FROM TrainingCertificate c WHERE c.status = 'VALID' AND c.expiryDate IS NOT NULL")
     List<TrainingCertificate> findAllValidWithExpiryAcrossTenants();
+
+    @Query("SELECT c FROM TrainingCertificate c WHERE c.tenantId = :#{#tenantId.value} AND c.employeeId IN :employeeIds")
+    List<TrainingCertificate> findAllForEmployees(TenantId tenantId, java.util.Collection<UUID> employeeIds);
 }
