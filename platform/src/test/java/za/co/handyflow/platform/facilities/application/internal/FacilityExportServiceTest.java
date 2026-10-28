@@ -57,7 +57,7 @@ class FacilityExportServiceTest {
         }
     };
     private final FacilityComplianceCertificateRepository certRepo = fake(FacilityComplianceCertificateRepository.class, (n, a) ->
-            "findAllInScope".equals(n) ? new PageImpl<>(certs, null, reportedTotal >= 0 ? reportedTotal : certs.size()) : NOPE);
+            "findAllInScope".equals(n) ? new PageImpl<>(certs, org.springframework.data.domain.Pageable.unpaged(), reportedTotal >= 0 ? reportedTotal : certs.size()) : NOPE);
     private final FacilityCorrectiveActionRepository actionRepo = fake(FacilityCorrectiveActionRepository.class, (n, a) -> {
         if (!"findAllInScope".equals(n)) return NOPE;
         lastStatus = a[2];

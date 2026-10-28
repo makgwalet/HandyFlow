@@ -5,7 +5,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import jakarta.servlet.Filter;
 import za.co.handyflow.platform.config.SecurityConfig;
+import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.shared.RateLimiter;
 import za.co.handyflow.platform.security.application.internal.GuardAuthService;
 import za.co.handyflow.platform.security.application.internal.PublicApiService;
@@ -121,5 +123,32 @@ public class WebMvcTestSecuritySupport {
     @Primary
     public IdempotencyKeyService idempotencyKeyService() {
         return org.mockito.Mockito.mock(IdempotencyKeyService.class);
+    }
+
+    /** The company and user every slice test runs as, unless the test sets its own. */
+    public static final String TEST_TENANT_ID = "11111111-1111-4111-8111-111111111111";
+    public static final String TEST_USER_ID = "22222222-2222-4222-8222-222222222222";
+
+    /**
+     * In production the JWT filter puts the company and user into {@link TenantContext} before a controller runs. These slice tests
+     * replace that filter with mocks, so a controller that reads the tenant from {@link TenantContext} threw "No tenant in context",
+     * which the error handler turned into a 409: every test that expected a 2xx from such a controller failed. This filter supplies a
+     * fixed company and user for the request, and leaves alone any the test has already set (so a test that checks the tenant it set still
+     * works). It takes back only what it set.
+     */
+    @Bean
+    public Filter testTenantContextFilter() {
+        return (request, response, chain) -> {
+            boolean supplyTenant = !TenantContext.hasTenant();
+            boolean supplyUser = TenantContext.getUserId() == null;
+            if (supplyTenant) TenantContext.setTenantId(TEST_TENANT_ID);
+            if (supplyUser) TenantContext.setUserId(TEST_USER_ID);
+            try {
+                chain.doFilter(request, response);
+            } finally {
+                if (supplyTenant) TenantContext.setTenantId(null);   // put back what the test had: nothing
+                if (supplyUser) TenantContext.setUserId(null);
+            }
+        };
     }
 }

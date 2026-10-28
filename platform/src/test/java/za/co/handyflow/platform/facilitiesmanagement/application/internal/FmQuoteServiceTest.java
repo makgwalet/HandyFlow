@@ -104,7 +104,7 @@ class FmQuoteServiceTest {
         scope = FmAccessScope.restrictedToClients(List.of(UUID.randomUUID()), List.of());
         assertThrows(ResourceNotFoundException.class, () -> service.get(tenant, r.id()));
         scope = FmAccessScope.assignedJobs(List.of(site.getId()), List.of(UUID.randomUUID()));
-        assertTrue(service.list(tenant, null, null, null).isEmpty());
+        assertTrue(service.list(tenant, null, null, org.springframework.data.domain.Pageable.unpaged()).isEmpty());
     }
 
     @Test
