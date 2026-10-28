@@ -70,7 +70,7 @@ class AuditReminderSchedulerTest {
         when(finding.getEngagementId()).thenReturn(eng);
         when(findings.findByTenantAndId(tenant, findingId)).thenReturn(Optional.of(finding));
         when(assignments.findByEngagement(tenant, eng)).thenReturn(List.of());
-        when(admins.resolveTenantAdmins(any())).thenReturn(List.of(Recipient.user(head, "H", "h@x.test", null)));
+        when(admins.resolveTenantAdmins(any(TenantId.class))).thenReturn(List.of(Recipient.user(head, "H", "h@x.test", null)));
         when(actions.findOverdueAcrossTenants(today)).thenReturn(List.of(late(2)));
         assertEquals(2, scheduler.sweep(today));
     }
