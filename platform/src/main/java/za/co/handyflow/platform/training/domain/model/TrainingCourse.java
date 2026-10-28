@@ -58,6 +58,9 @@ public class TrainingCourse {
     /** Null = certificate (if offered) never expires. Non-null = a TrainingCertificate issued from a completion of this course gets expiryDate = issueDate + this many months. */
     @Column(name = "certificate_validity_months") Integer certificateValidityMonths;
 
+    /** Percentage a score must reach to pass; null when the person recording the result decides. */
+    @Column(name = "pass_mark") BigDecimal passMark;
+
     /** ACTIVE | ARCHIVED */
     String status;
 
@@ -101,6 +104,11 @@ public class TrainingCourse {
         this.cost = cost;
         this.certificationOffered = certificationOffered;
         this.certificateValidityMonths = certificateValidityMonths;
+        this.updatedAt = Instant.now();
+    }
+
+    public void changePassMark(BigDecimal passMark) {
+        this.passMark = passMark;
         this.updatedAt = Instant.now();
     }
 

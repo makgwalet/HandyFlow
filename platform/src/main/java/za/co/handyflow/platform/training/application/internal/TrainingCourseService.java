@@ -43,6 +43,15 @@ public class TrainingCourseService {
     }
 
     @Transactional
+    public TrainingCourse setPassMark(TenantId tenantId, UUID id, BigDecimal passMark) {
+        String problem = za.co.handyflow.platform.training.domain.model.TrainingCostRules.passMarkProblem(passMark);
+        if (problem != null) throw new za.co.handyflow.platform.shared.HandyFlowException(problem, org.springframework.http.HttpStatus.BAD_REQUEST, "INVALID_PASS_MARK");
+        TrainingCourse course = getActive(tenantId, id);
+        course.changePassMark(passMark);
+        return courseRepository.save(course);
+    }
+
+    @Transactional
     public TrainingCourse archive(TenantId tenantId, UUID id) {
         TrainingCourse course = getActive(tenantId, id);
         course.archive();

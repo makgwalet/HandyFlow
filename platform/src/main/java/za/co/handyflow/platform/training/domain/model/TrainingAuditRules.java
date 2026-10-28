@@ -23,6 +23,7 @@ public final class TrainingAuditRules {
     static {
         ACTIONS.put("POST /courses", "COURSE_CREATED");
         ACTIONS.put("PUT /courses/{id}", "COURSE_UPDATED");
+        ACTIONS.put("PUT /courses/{id}/pass-mark", "COURSE_PASS_MARK_SET");
         ACTIONS.put("POST /courses/{id}/archive", "COURSE_ARCHIVED");
         ACTIONS.put("POST /courses/{id}/reactivate", "COURSE_REACTIVATED");
         ACTIONS.put("DELETE /courses/{id}", "COURSE_DELETED");
@@ -32,6 +33,8 @@ public final class TrainingAuditRules {
         ACTIONS.put("POST /sessions/{id}/start", "SESSION_STARTED");
         ACTIONS.put("POST /sessions/{id}/complete", "SESSION_COMPLETED");
         ACTIONS.put("POST /sessions/{id}/cancel", "SESSION_CANCELLED");
+        ACTIONS.put("POST /sessions/{sessionId}/costs", "SESSION_COST_ADDED");
+        ACTIONS.put("DELETE /sessions/{sessionId}/costs/{costId}", "SESSION_COST_REMOVED");
         ACTIONS.put("POST /sessions/{id}/evidence", "EVIDENCE_ATTACHED");
         ACTIONS.put("GET /sessions/{id}/attendance-register/pdf", "REGISTER_DOWNLOADED");
         ACTIONS.put("POST /sessions/{sessionId}/enrollments", "EMPLOYEE_ENROLLED");

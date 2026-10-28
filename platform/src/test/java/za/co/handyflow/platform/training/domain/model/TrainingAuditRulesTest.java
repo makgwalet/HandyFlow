@@ -70,7 +70,7 @@ class TrainingAuditRulesTest {
     void everyEndpointThatChangesDataIsAudited() {
         List<String> missing = new ArrayList<>();
         for (Class<?> c : List.of(TrainingCourseController.class, TrainingSessionController.class, TrainingEnrollmentController.class, TrainingCertificateController.class,
-                TrainingRequirementController.class, TrainingSelfController.class, TrainingTeamController.class)) {
+                TrainingRequirementController.class, TrainingSelfController.class, TrainingTeamController.class, TrainingCostController.class)) {
             String base = c.getAnnotation(RequestMapping.class).value()[0].replace("/api/v1/training", "");
             for (Method m : c.getDeclaredMethods()) {
                 String verb = null; String path = "";
@@ -87,10 +87,10 @@ class TrainingAuditRulesTest {
     /** Every authority a Training endpoint asks for is one of the known ones, so a typo cannot lock everyone out. */
     @Test
     void everyAuthorityNamedByAnEndpointIsKnown() {
-        Set<String> known = Set.of("TRAINING_READ", "TRAINING_MANAGE", "TRAINING_ADMIN", "TRAINING_AUDIT");
+        Set<String> known = Set.of("TRAINING_READ", "TRAINING_MANAGE", "TRAINING_ADMIN", "TRAINING_AUDIT", "TRAINING_REPORTS");
         List<String> bad = new ArrayList<>();
         for (Class<?> c : List.of(TrainingCourseController.class, TrainingSessionController.class, TrainingEnrollmentController.class, TrainingCertificateController.class,
-                TrainingRequirementController.class, TrainingSelfController.class, TrainingTeamController.class, TrainingAuditController.class, TrainingSummaryController.class)) {
+                TrainingRequirementController.class, TrainingSelfController.class, TrainingTeamController.class, TrainingAuditController.class, TrainingSummaryController.class, TrainingCostController.class)) {
             for (Method m : c.getDeclaredMethods()) {
                 var pre = m.getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
                 if (pre == null) continue;

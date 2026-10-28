@@ -16,6 +16,7 @@ public record CourseResponse(
         BigDecimal cost,
         boolean certificationOffered,
         Integer certificateValidityMonths,
+        BigDecimal passMark,
         String status,
         Instant createdAt
 ) {}

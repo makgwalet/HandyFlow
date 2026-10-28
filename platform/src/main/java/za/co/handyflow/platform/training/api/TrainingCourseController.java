@@ -16,6 +16,7 @@ import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.training.application.internal.TrainingCourseService;
 import za.co.handyflow.platform.training.domain.model.TrainingCourse;
+import za.co.handyflow.platform.training.dto.TrainingCostDtos.PassMarkRequest;
 import za.co.handyflow.platform.training.dto.CourseResponse;
 import za.co.handyflow.platform.training.dto.UpsertCourseRequest;
 
@@ -71,6 +72,15 @@ public class TrainingCourseController {
         return ResponseEntity.ok(ApiResponse.success("Course updated", toResponse(course)));
     }
 
+    @PutMapping("/{id}/pass-mark")
+    @PreAuthorize("hasAnyAuthority('TRAINING_MANAGE','TRAINING_ADMIN')")
+    @Operation(summary = "Set or clear the pass mark (a percentage) for a course")
+    public ResponseEntity<ApiResponse<CourseResponse>> setPassMark(@PathVariable UUID id, @RequestBody PassMarkRequest req) {
+        featureGuard.requireModule("training");
+        return ResponseEntity.ok(ApiResponse.success("Pass mark saved",
+                toResponse(courseService.setPassMark(TenantContext.getTenantIdAsObject(), id, req.passMark()))));
+    }
+
     @PostMapping("/{id}/archive")
     @PreAuthorize("hasAnyAuthority('TRAINING_MANAGE','TRAINING_ADMIN')")
     public ResponseEntity<ApiResponse<CourseResponse>> archive(@PathVariable UUID id) {
@@ -99,6 +109,6 @@ public class TrainingCourseController {
     private CourseResponse toResponse(TrainingCourse c) {
         return new CourseResponse(c.getId(), c.getCourseCode(), c.getTitle(), c.getDescription(), c.getCategory(),
                 c.getDeliveryMode(), c.getDurationHours(), c.getDefaultTrainerName(), c.getCost(),
-                c.isCertificationOffered(), c.getCertificateValidityMonths(), c.getStatus(), c.getCreatedAt());
+                c.isCertificationOffered(), c.getCertificateValidityMonths(), c.getPassMark(), c.getStatus(), c.getCreatedAt());
     }
 }

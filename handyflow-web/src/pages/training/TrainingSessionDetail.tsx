@@ -20,6 +20,7 @@ import { TRAINING_ACCENT, TRAINING_ACCENT_TEXT } from "./constants"
 import { apiMessage } from "./training.logic"
 import EmployeePicker, { type EmployeeOption } from "./EmployeePicker"
 import type { CourseResponse } from "./TrainingCoursesTab"
+import TrainingSessionCosts from "./TrainingSessionCosts"
 
 interface SessionResponse {
   id: string; courseId: string; courseTitle: string; startDate: string; endDate: string
@@ -131,14 +132,16 @@ function EnrollModal({ sessionId, onClose }: { sessionId: string; onClose: () =>
   )
 }
 
-function CompleteEnrollmentModal({ enrollment, onClose }: { enrollment: EnrollmentResponse; onClose: () => void }) {
+function CompleteEnrollmentModal({ enrollment, passMark, onClose }: { enrollment: EnrollmentResponse; passMark: number | null; onClose: () => void }) {
   const qc = useQueryClient()
   const [score, setScore] = useState("")
   const [passed, setPassed] = useState(true)
 
+  const scoreNum = score.trim() === "" ? null : parseFloat(score)
+  const decided = passMark != null   // with a pass mark the score decides
   const save = useMutation({
     mutationFn: async () => apiClient.post(`/api/v1/training/enrollments/${enrollment.id}/complete`, {
-      score: score.trim() === "" ? null : parseFloat(score), passed,
+      score: scoreNum, passed: decided && scoreNum != null ? scoreNum >= passMark! : passed,
     }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["training-enrollments", enrollment.sessionId] }); onClose() },
   })
@@ -148,12 +151,15 @@ function CompleteEnrollmentModal({ enrollment, onClose }: { enrollment: Enrollme
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 380 }}>
         <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: "0 0 4px" }}>Record outcome</p>
         <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: "0 0 18px" }}>{enrollment.employeeNameSnapshot}</p>
-        <label style={labelStyle}>Score (optional)</label>
-        <input type="number" step="0.01" style={inputStyle} value={score} onChange={e => setScore(e.target.value)} />
-        <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+        <label style={labelStyle}>{decided ? `Score (required, pass mark ${passMark}%)` : "Score (optional)"}</label>
+        <input type="number" step="0.01" min={0} max={100} style={inputStyle} value={score} onChange={e => setScore(e.target.value)} />
+        {decided && <p style={{ fontSize: 12, margin: "10px 0 0", color: scoreNum == null ? "var(--hf-text-muted)" : scoreNum >= passMark! ? TRAINING_ACCENT_TEXT : "var(--hf-danger-text)" }}>
+          {scoreNum == null ? "The score decides pass or fail." : scoreNum >= passMark! ? "This is a pass." : "This is below the pass mark, so it will be recorded as failed."}
+        </p>}
+        {!decided && <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
           <button onClick={() => setPassed(true)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: passed ? `1.5px solid ${TRAINING_ACCENT}` : "1px solid var(--hf-border)", background: passed ? "var(--hf-success-soft)" : "var(--hf-surface)", color: passed ? TRAINING_ACCENT_TEXT : "var(--hf-text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Passed</button>
           <button onClick={() => setPassed(false)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: !passed ? "1.5px solid var(--hf-danger)" : "1px solid var(--hf-border)", background: !passed ? "var(--hf-danger-soft)" : "var(--hf-surface)", color: !passed ? "var(--hf-danger-text)" : "var(--hf-text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Failed</button>
-        </div>
+        </div>}
         {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not record outcome"}</p>}
         <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
           <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
@@ -332,6 +338,8 @@ export default function TrainingSessionDetail({ sessionId, onBack }: { sessionId
         </div>
       )}
 
+      <TrainingSessionCosts sessionId={sessionId} />
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 0 10px" }}>
         <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Evidence ({evidence.length})</p>
         <label style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, color: "var(--hf-text-muted)", cursor: "pointer" }}>
@@ -360,7 +368,7 @@ export default function TrainingSessionDetail({ sessionId, onBack }: { sessionId
 
       {showEdit && <EditSessionModal session={session} onClose={() => setShowEdit(false)} />}
       {showEnroll && <EnrollModal sessionId={sessionId} onClose={() => setShowEnroll(false)} />}
-      {completing && <CompleteEnrollmentModal enrollment={completing} onClose={() => setCompleting(null)} />}
+      {completing && <CompleteEnrollmentModal enrollment={completing} passMark={course?.passMark ?? null} onClose={() => setCompleting(null)} />}
     </div>
   )
 }

@@ -13,7 +13,7 @@ import { TRAINING_ACCENT, TRAINING_ACCENT_TEXT } from "./constants"
 export interface CourseResponse {
   id: string; courseCode: string; title: string; description: string | null; category: string | null
   deliveryMode: string; durationHours: number | null; defaultTrainerName: string | null; cost: number | null
-  certificationOffered: boolean; certificateValidityMonths: number | null; status: "ACTIVE" | "ARCHIVED"; createdAt: string
+  certificationOffered: boolean; certificateValidityMonths: number | null; passMark: number | null; status: "ACTIVE" | "ARCHIVED"; createdAt: string
 }
 interface CoursePage { content: CourseResponse[]; totalElements: number }
 
@@ -23,7 +23,7 @@ const fmtMoney = (n: number | null) => n == null ? "—" : new Intl.NumberFormat
 
 const emptyForm = {
   title: "", description: "", category: "", deliveryMode: "IN_PERSON", durationHours: "",
-  defaultTrainerName: "", cost: "", certificationOffered: false, certificateValidityMonths: "",
+  defaultTrainerName: "", cost: "", certificationOffered: false, certificateValidityMonths: "", passMark: "",
 }
 
 function CourseFormModal({ initial, onClose }: { initial?: CourseResponse; onClose: () => void }) {
@@ -32,7 +32,7 @@ function CourseFormModal({ initial, onClose }: { initial?: CourseResponse; onClo
     title: initial.title, description: initial.description ?? "", category: initial.category ?? "",
     deliveryMode: initial.deliveryMode, durationHours: initial.durationHours?.toString() ?? "",
     defaultTrainerName: initial.defaultTrainerName ?? "", cost: initial.cost?.toString() ?? "",
-    certificationOffered: initial.certificationOffered, certificateValidityMonths: initial.certificateValidityMonths?.toString() ?? "",
+    certificationOffered: initial.certificationOffered, certificateValidityMonths: initial.certificateValidityMonths?.toString() ?? "", passMark: initial.passMark?.toString() ?? "",
   } : emptyForm)
 
   const toNum = (v: string) => v.trim() === "" ? null : parseFloat(v)
@@ -46,9 +46,14 @@ function CourseFormModal({ initial, onClose }: { initial?: CourseResponse; onClo
         defaultTrainerName: form.defaultTrainerName || null, cost: toNum(form.cost),
         certificationOffered: form.certificationOffered, certificateValidityMonths: toInt(form.certificateValidityMonths),
       }
-      return initial
-        ? apiClient.put(`/api/v1/training/courses/${initial.id}`, body)
-        : apiClient.post("/api/v1/training/courses", body)
+      const res = initial
+        ? await apiClient.put(`/api/v1/training/courses/${initial.id}`, body)
+        : await apiClient.post("/api/v1/training/courses", body)
+      // The pass mark has its own call so the course form's existing request stays as it was.
+      const id = initial?.id ?? (res.data?.data ?? res.data)?.id
+      const mark = toNum(form.passMark)
+      if (id && mark !== (initial?.passMark ?? null)) await apiClient.put(`/api/v1/training/courses/${id}/pass-mark`, { passMark: mark })
+      return res
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["training-courses"] }); onClose() },
   })
@@ -86,6 +91,7 @@ function CourseFormModal({ initial, onClose }: { initial?: CourseResponse; onClo
           {form.certificationOffered && (
             <div><label style={labelStyle}>Certificate validity (months — blank = never expires)</label><input type="number" style={inputStyle} value={form.certificateValidityMonths} onChange={e => setForm({ ...form, certificateValidityMonths: e.target.value })} /></div>
           )}
+          <div><label style={labelStyle}>Pass mark (%) — blank = the person recording the result decides</label><input type="number" min={0} max={100} step="0.01" style={inputStyle} value={form.passMark} onChange={e => setForm({ ...form, passMark: e.target.value })} /></div>
         </div>
 
         {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not save this course"}</p>}

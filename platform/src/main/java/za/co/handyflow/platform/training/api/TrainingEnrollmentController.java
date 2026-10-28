@@ -15,6 +15,7 @@ import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.training.application.internal.TrainingEnrollmentService;
+import za.co.handyflow.platform.training.application.internal.TrainingResultService;
 import za.co.handyflow.platform.training.domain.model.TrainingEnrollment;
 import za.co.handyflow.platform.training.dto.CancelRequest;
 import za.co.handyflow.platform.training.dto.CompleteEnrollmentRequest;
@@ -30,6 +31,7 @@ import java.util.UUID;
 public class TrainingEnrollmentController {
 
     private final TrainingEnrollmentService enrollmentService;
+    private final TrainingResultService resultService;
     private final FeatureGuard featureGuard;
 
     @GetMapping("/enrollments")
@@ -88,7 +90,7 @@ public class TrainingEnrollmentController {
             @PathVariable UUID id, @RequestBody CompleteEnrollmentRequest req) {
         featureGuard.requireModule("training");
         return ResponseEntity.ok(ApiResponse.success("Outcome recorded", toResponse(
-                enrollmentService.complete(TenantContext.getTenantIdAsObject(), id, req.score(), req.passed()))));
+                resultService.complete(TenantContext.getTenantIdAsObject(), id, req.score(), req.passed()))));
     }
 
     @PostMapping("/enrollments/{id}/cancel")
