@@ -9,6 +9,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import za.co.handyflow.platform.hr.application.internal.EtiService;
 import za.co.handyflow.platform.hr.application.internal.LeaveAdvanceService;
 import za.co.handyflow.platform.hr.application.internal.NoticePayService;
 import za.co.handyflow.platform.hr.application.internal.PayCorrectionService;
@@ -33,6 +34,24 @@ public class PayAdjustmentController {
     private final LeaveAdvanceService leaveAdvance;
     private final NoticePayService noticePay;
     private final PayCorrectionService corrections;
+    private final EtiService eti;
+
+    @GetMapping("/employees/{id}/eti")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "An employee's employment tax incentive facts: months already used and any reason they cannot qualify")
+    public ResponseEntity<ApiResponse<EtiService.EmployeeEti>> etiFor(@PathVariable UUID id, Authentication authentication) {
+        if (!PayrollAccess.canReview(authentication)) throw new AccessDeniedException("You may not see this.");
+        return ResponseEntity.ok(ApiResponse.success(eti.get(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PutMapping("/employees/{id}/eti")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Record months of the incentive already used and any reason the employee cannot qualify")
+    public ResponseEntity<ApiResponse<EtiService.EmployeeEti>> etiUpdate(@PathVariable UUID id, @RequestBody EtiService.UpdateRequest req,
+                                                                         Authentication authentication, Principal principal) {
+        if (!PayrollAccess.canPrepare(authentication)) throw new AccessDeniedException("You may not change this.");
+        return ResponseEntity.ok(ApiResponse.success("Saved", eti.update(TenantContext.getTenantIdAsObject(), id, req, user(principal))));
+    }
 
     @GetMapping("/pay-adjustments")
     @PreAuthorize("isAuthenticated()")

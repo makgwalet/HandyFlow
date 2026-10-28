@@ -63,6 +63,25 @@ public interface HrPayslipRepository extends JpaRepository<HrPayslip, UUID> {
         """)
     java.math.BigDecimal sumRegularPaye(UUID employeeId, int taxYear, java.time.LocalDate before);
 
+    /** Qualifying ETI months already used by payslips of earlier pay runs. */
+    @Query("""
+        SELECT COUNT(p) FROM HrPayslip p
+        WHERE p.employeeId = :employeeId
+        AND p.etiMonth IS NOT NULL
+        AND p.payRunId IN (SELECT r.id FROM HrPayRun r WHERE r.status <> 'CANCELLED' AND r.payDate < :before)
+        """)
+    long etiMonthsBefore(UUID employeeId, java.time.LocalDate before);
+
+    /** ETI already claimed for the person in a run whose period ends within the given month, other than the run being calculated. */
+    @Query("""
+        SELECT COUNT(p) FROM HrPayslip p
+        WHERE p.employeeId = :employeeId
+        AND p.etiMonth IS NOT NULL
+        AND p.payRunId IN (SELECT r.id FROM HrPayRun r WHERE r.status <> 'CANCELLED' AND r.id <> :exceptRunId
+                           AND r.periodEnd >= :monthStart AND r.periodEnd <= :monthEnd)
+        """)
+    long etiClaimedInMonth(UUID employeeId, java.time.LocalDate monthStart, java.time.LocalDate monthEnd, UUID exceptRunId);
+
     @Query("SELECT p FROM HrPayslip p WHERE p.payRunId IN :runIds ORDER BY p.createdAt")
     List<HrPayslip> findByPayRuns(java.util.Collection<UUID> runIds);
 }

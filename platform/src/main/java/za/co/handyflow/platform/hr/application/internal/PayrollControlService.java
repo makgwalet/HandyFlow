@@ -189,7 +189,7 @@ public class PayrollControlService {
                 PayrollAccess.LEGACY_ACCESS_ENDS, PayrollAccess.legacyOpen(LocalDate.now()),
                 s != null && s.isBankFileSecondCheck(), s == null ? null : s.getBankNominatedBranch(), acct != null,
                 acct == null ? null : acct.substring(Math.max(0, acct.length() - 4)),
-                s == null ? PayeAveragingRules.PERIODIC : s.getTaxMethod());
+                s == null ? PayeAveragingRules.PERIODIC : s.getTaxMethod(), s != null && s.isEtiEnabled());
     }
 
     @Transactional
@@ -202,6 +202,17 @@ public class PayrollControlService {
     }
 
     /** The bank file choices. A null leaves that choice as it is; a blank branch or account clears it. */
+    @Transactional
+    public PayrollSettingsResponse updateEti(TenantId tenantId, boolean enabled, UUID actor) {
+        HrPayrollSettings s = settingsRepo.findById(tenantId.getValue()).orElseGet(() -> HrPayrollSettings.create(tenantId.getValue()));
+        if (s.isEtiEnabled() != enabled) {
+            s.setEtiEnabled(enabled, actor);
+            settingsRepo.save(s);
+            log.info("Employment tax incentive {} for tenant {} by {}", enabled ? "switched on" : "switched off", tenantId.getValue(), actor);
+        }
+        return settings(tenantId);
+    }
+
     /** PERIODIC or AVERAGING. A null leaves it as it is. */
     @Transactional
     public PayrollSettingsResponse updateTaxMethod(TenantId tenantId, String method, UUID actor) {

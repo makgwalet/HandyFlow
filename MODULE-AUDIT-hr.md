@@ -307,7 +307,7 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - The SARS import file for e@syFile, and a certificate PDF in SARS's layout for employees.
 - Recording payments made to SARS against each EMP201.
 - Bonus, overtime and back pay in payroll (the engine pays a regular monthly salary only).
-- ETI is not modelled.
+- ETI is modelled from section 55 (off by default).
 - Certificates for employees who left mid-year show the months they worked but not their reasons for leaving or directive numbers.
 
 ## 12. Slice 6 status: onboarding
@@ -1304,3 +1304,22 @@ No migration.
 **Limits.** The reminder scheduler is not locked across several app instances, so two instances would send twice. Reminders go to all administrators; there is still no named-approver permission. The consent text names the period but still links to no privacy notice. Race and relation are left to HR.
 
 **Not verified.** Rules, consent and scheduler date tests pass in my harness; the scheduler's SQL, the notification enum addition, the form and Spring wiring have not run. `hireDetails.test.ts` and the careers tests need vitest, which is not installed here; the logic was checked under node.
+
+## 55. Employment tax incentive (Slice 24a, V539)
+
+**Off by default.** Payroll checks has "Claim the employment tax incentive". When it is on, every pay run works the incentive out for each employee and the EMP201 takes it off the PAYE. The employee's pay, PAYE, UIF and SDL are unchanged.
+
+**Rules (`EtiRules`, table `hr_eti_rules`).** Age 18 to 29 at the end of the period, a valid South African ID number on record, no exclusion reason, fewer than 24 qualifying months used, and pay for a full month (a part month is grossed up to 160 hours by days paid over working days) of at least R2,500 and under R7,500. First 12 qualifying months: R1,500 up to R5,500 of pay, then less 75% of the pay above R5,500. Next 12: R750 and 37.5%. A part month's amount is scaled back down by the share paid. The amounts come from `hr_eti_rules` (seeded with SARS's 1 April 2025 figures from SARS's published page, which describes them as proposed amendments, so confirm they were enacted and are current); a change in the law is a new row with its own effective date. No table for the pay date: the run says so and works out nothing.
+
+**Months.** Counted per person: months entered on the employee ("Tax incentive" button: months already used by another employer or before payroll was kept here) plus earlier non-cancelled payslips here that claimed. A second run in the same month does not claim again.
+
+**EMP201.** `total_eti` is the incentive used against the PAYE of the return (never more than the PAYE); the rest is `eti_carried` and shown as carried forward. Total payable is PAYE less ETI plus UIF plus SDL. The EMP201 screen shows both under the PAYE figure; the pay run shows a line per employee and why someone aged 18 to 29 did not qualify.
+
+**For the payroll specialist, before relying on it.**
+- *Remuneration* is the payslip's total earnings (basic, overtime, bonus, back pay, notice and leave pay). SARS may exclude some of these from "monthly remuneration"; confirm.
+- *Minimum wage:* only the R2,500 floor is tested, not the national minimum wage per hour. A claim for someone below the minimum wage is penalised at 100% of the incentive; the business must check.
+- *ID:* a valid South African ID only; asylum-seeker and refugee permits are not recognised.
+- *Carry-forward and refund:* the excess is shown but not carried into the next return automatically; carrying it forward and claiming a refund are done on eFiling.
+- *Age:* taken at the end of the pay period.
+- *Other:* the disqualifications for displacing staff and for government and public-entity employers are the business's to judge. The incentive ends on 28 February 2029.
+- Payslip PDFs and tax certificates are unchanged. Not verified: Spring wiring, the JPQL counts, V539 and the screens have not run.

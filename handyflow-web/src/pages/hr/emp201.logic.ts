@@ -4,7 +4,7 @@
 
 export interface Emp201 {
   id: string; payRunId: string | null; periodStart: string; periodEnd: string; dueDate: string
-  totalPaye: number; totalUif: number; totalSdl: number; totalPayable: number
+  totalPaye: number; totalUif: number; totalSdl: number; totalPayable: number; totalEti?: number; etiCarried?: number
   status: "DRAFT" | "SUBMITTED" | "PAID"; submittedAt: string | null; paymentRef: string | null
   paidOn: string | null; paidAmount: number | null; overdue: boolean; late: boolean; runIssued: boolean
 }

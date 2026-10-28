@@ -247,3 +247,29 @@ describe("tax method", () => {
     expect(taxMethodBody(true, "AVERAGING")).toEqual({ allowSelfApproval: true, taxMethod: "AVERAGING" })
   })
 })
+
+import { emp201EtiNotes, etiBody, etiForm, etiProblem, etiSettingsBody, payslipEtiNote } from "./eti.logic"
+
+describe("employment tax incentive screens", () => {
+  it("checks the months and the reason", () => {
+    expect(etiProblem({ priorMonths: "0", excludedReason: "" })).toBeNull()
+    expect(etiProblem({ priorMonths: "24", excludedReason: "x" })).toBeNull()
+    expect(etiProblem({ priorMonths: "25", excludedReason: "" })).toMatch(/0 to 24/)
+    expect(etiProblem({ priorMonths: "", excludedReason: "" })).toMatch(/0 to 24/)
+    expect(etiProblem({ priorMonths: "1.5", excludedReason: "" })).toMatch(/whole number/)
+    expect(etiProblem({ priorMonths: "1", excludedReason: "x".repeat(201) })).toMatch(/under 200/)
+  })
+  it("builds the form from the server and the body from the form", () => {
+    expect(etiForm(undefined)).toEqual({ priorMonths: "0", excludedReason: "" })
+    expect(etiForm({ employeeId: "e", priorMonths: 5, excludedReason: "Domestic worker" })).toEqual({ priorMonths: "5", excludedReason: "Domestic worker" })
+    expect(etiBody({ priorMonths: "5", excludedReason: "  " })).toEqual({ priorMonths: 5, excludedReason: null })
+    expect(etiSettingsBody(true, true)).toEqual({ allowSelfApproval: true, etiEnabled: true })
+  })
+  it("says what the incentive did on an EMP201 and a payslip", () => {
+    expect(emp201EtiNotes({})).toEqual([])
+    expect(emp201EtiNotes({ totalEti: 1500, etiCarried: 0 })[0]).toMatch(/^less ETI R1\D?500\D00$/)
+    expect(emp201EtiNotes({ totalEti: 1200, etiCarried: 1800 })).toHaveLength(2)
+    expect(payslipEtiNote({ etiAmount: 0 })).toBeNull()
+    expect(payslipEtiNote({ etiAmount: 750, etiMonth: 13 })).toMatch(/month 13 of 24/)
+  })
+})

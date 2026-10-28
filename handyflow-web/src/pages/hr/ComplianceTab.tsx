@@ -6,6 +6,7 @@
 // 4. YTD totals added
 // 5. IRP5/EMP501 guidance added
 import { useState } from "react"
+import { emp201EtiNotes } from "./eti.logic"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useAuth } from "../../hooks/useAuth"
@@ -135,7 +136,10 @@ export default function ComplianceTab() {
                     <td style={{ padding: "12px 14px", color: isOvr ? "var(--hf-danger-text)" : "var(--hf-text-tertiary)", fontWeight: isOvr ? 700 : 400, whiteSpace: "nowrap" as const }}>
                       {fmtDate(e.dueDate)}
                     </td>
-                    <td style={{ padding: "12px 14px", color: "var(--hf-danger-text)", fontWeight: 600 }}>{fmtR(e.totalPaye)}</td>
+                    <td style={{ padding: "12px 14px", color: "var(--hf-danger-text)", fontWeight: 600 }}>
+                      {fmtR(e.totalPaye)}
+                      {emp201EtiNotes(e).map(n => <div key={n} style={{ fontSize: 11, fontWeight: 400, color: "var(--hf-text-muted)" }}>{n}</div>)}
+                    </td>
                     <td style={{ padding: "12px 14px", color: "var(--hf-warning-text)" }}>{fmtR(e.totalUif)}</td>
                     <td style={{ padding: "12px 14px", color: "var(--hf-violet-text)" }}>{fmtR(e.totalSdl)}</td>
                     <td style={{ padding: "12px 14px", fontWeight: 800, fontSize: 14, color: "var(--hf-text)" }}>{fmtR(e.totalPayable)}</td>

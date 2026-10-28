@@ -26,6 +26,8 @@ public class HrEmp201 {
     @Column(name = "total_uif")     BigDecimal totalUif;
     @Column(name = "total_sdl")     BigDecimal totalSdl;
     @Column(name = "total_payable") BigDecimal totalPayable;
+    @Column(name = "total_eti")     BigDecimal totalEti = BigDecimal.ZERO;
+    @Column(name = "eti_carried")   BigDecimal etiCarried = BigDecimal.ZERO;
     String status = "DRAFT";
     @Column(name = "submitted_at") Instant submittedAt;
     @Column(name = "payment_ref")  String paymentRef;
@@ -55,6 +57,17 @@ public class HrEmp201 {
         e.status       = "DRAFT";
         e.createdAt    = Instant.now();
         e.updatedAt    = Instant.now();
+        return e;
+    }
+
+    /** With the employment tax incentive: the part that reduces this return's PAYE comes off what is payable; the rest is carried forward. */
+    public static HrEmp201 create(TenantId tenantId, UUID payRunId, LocalDate periodStart, LocalDate periodEnd,
+                                  BigDecimal totalPaye, BigDecimal totalUif, BigDecimal totalSdl, BigDecimal etiWorkedOut) {
+        HrEmp201 e = create(tenantId, payRunId, periodStart, periodEnd, totalPaye, totalUif, totalSdl);
+        BigDecimal[] split = EtiRules.split(etiWorkedOut == null ? BigDecimal.ZERO : etiWorkedOut, totalPaye);
+        e.totalEti = split[0];
+        e.etiCarried = split[1];
+        e.totalPayable = totalPaye.subtract(split[0]).add(totalUif).add(totalSdl);
         return e;
     }
 

@@ -70,6 +70,8 @@ public class HrEmployee {
     @Column(name = "notice_given_on")    LocalDate noticeGivenOn;
 
     String notes;
+    @Column(name = "eti_prior_months")   int etiPriorMonths;
+    @Column(name = "eti_excluded_reason") String etiExcludedReason;
     @Column(name = "created_at") Instant createdAt;
     @Column(name = "updated_at") Instant updatedAt;
     @Column(name = "deleted_at") Instant deletedAt;
@@ -166,6 +168,11 @@ public class HrEmployee {
     public void setPayFrequency(String v)                         { this.payFrequency = v; }
     public void setEmergencyContactName(String v)                 { this.emergencyContactName = v; }
     public void setEmergencyContactPhone(String v)                { this.emergencyContactPhone = v; }
+    public void setEti(int priorMonths, String excludedReason) {
+        this.etiPriorMonths = priorMonths;
+        this.etiExcludedReason = excludedReason == null || excludedReason.isBlank() ? null : excludedReason.trim();
+        this.updatedAt = Instant.now();
+    }
     public void setNotes(String notes)                            { this.notes = notes; }
     public void setEmergencyContactRelation(String v)             { this.emergencyContactRelation = v; }
     public void setManagerId(UUID managerId)                      { this.managerId = managerId; this.updatedAt = Instant.now(); }

@@ -70,7 +70,8 @@ public class Emp201Service {
         LocalDate today = LocalDate.now(ZONE);
         return new Emp201Response(e.getId(), e.getPayRunId(), e.getPeriodStart(), e.getPeriodEnd(), e.getDueDate(), e.getTotalPaye(), e.getTotalUif(),
                 e.getTotalSdl(), e.getTotalPayable(), e.getStatus(), e.getSubmittedAt(), e.getCreatedAt(), e.getPaymentRef(), e.getPaidOn(),
-                e.getPaidAmount(), Emp201Rules.overdue(e.getStatus(), e.getDueDate(), today), Emp201Rules.late(e.getPaidOn(), e.getDueDate()), runIssued);
+                e.getPaidAmount(), Emp201Rules.overdue(e.getStatus(), e.getDueDate(), today), Emp201Rules.late(e.getPaidOn(), e.getDueDate()), runIssued,
+                e.getTotalEti(), e.getEtiCarried());
     }
 
     private HrEmp201 find(TenantId tenantId, UUID id) {

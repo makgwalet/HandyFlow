@@ -46,6 +46,8 @@ public class PayrollService {
     /** Optional so older constructions still work; no settings means the periodic method. */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     HrPayrollSettingsRepository settingsRepo;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    EtiService etiService;
 
     // ── Pay runs ──────────────────────────────────────────────────────────────
 
@@ -172,6 +174,11 @@ public class PayrollService {
         BigDecimal runNet   = BigDecimal.ZERO;
 
         boolean averaging = settingsRepo != null && settingsRepo.findById(tenantId.getValue()).map(HrPayrollSettings::averaging).orElse(false);
+        HrPayrollSettings settings = settingsRepo == null ? null : settingsRepo.findById(tenantId.getValue()).orElse(null);
+        EtiRules.Table etiTable = settings != null && settings.isEtiEnabled() && etiService != null ? etiService.tableFor(run.getPayDate()).orElse(null) : null;
+        if (settings != null && settings.isEtiEnabled() && etiTable == null)
+            warnings.add("The employment tax incentive is switched on, but there is no ETI table for the pay date " + run.getPayDate() + ", so none was worked out.");
+        BigDecimal runEti = BigDecimal.ZERO;
         if (averaging)
             warnings.add("PAYE on regular pay is worked out by the averaging method: the year to date is annualised and what was already paid is taken off. "
                     + "Bonuses, back pay and notice pay are taxed as annual payments on top.");
@@ -255,6 +262,25 @@ public class PayrollService {
             slip.setBonusAndBackPay(bonus, backPay);
             slip.setNoticePay(noticePay);
             slip.setRegular(calc.regularTaxable(), calc.regularPaye());
+            if (etiTable != null) {
+                boolean idValid = emp.getIdNumber() != null && !emp.getIdNumber().isBlank()
+                        && EmployeeRules.idProblem(EmployeeRules.normaliseId(emp.getIdNumber()), run.getPayDate()) == null;
+                long sameMonth = payslipRepo.etiClaimedInMonth(emp.getId(), run.getPeriodEnd().withDayOfMonth(1),
+                        run.getPeriodEnd().withDayOfMonth(run.getPeriodEnd().lengthOfMonth()), run.getId());
+                int used = emp.getEtiPriorMonths() + (int) payslipRepo.etiMonthsBefore(emp.getId(), run.getPayDate());
+                EtiRules.Result eti = sameMonth > 0
+                        ? new EtiRules.Result(BigDecimal.ZERO, null, "incentive already claimed for this month in another run")
+                        : EtiRules.calculate(etiTable, emp.getDateOfBirth(), run.getPeriodEnd(), idValid, emp.getEtiExcludedReason(), used,
+                                result.totalEarnings(), EtiRules.paidShare(pay.daysPaid(), pay.workingDays()));
+                if (eti.qualifies()) {
+                    slip.setEti(eti.amount(), eti.month());
+                    runEti = runEti.add(eti.amount());
+                    warnings.add(who + ": employment tax incentive " + eti.amount() + " (qualifying month " + eti.month() + " of 24). It reduces the PAYE on the EMP201, not the employee's pay.");
+                } else if (emp.getDateOfBirth() != null && EtiRules.ageOn(emp.getDateOfBirth(), run.getPeriodEnd()) >= EtiRules.MIN_AGE
+                        && EtiRules.ageOn(emp.getDateOfBirth(), run.getPeriodEnd()) <= EtiRules.MAX_AGE) {
+                    warnings.add(who + ": no employment tax incentive this month: " + eti.why() + ".");
+                }
+            }
             slip.setPeriodPay(pay.workingDays(), pay.daysPaid(), pay.proration(), pay.unpaidDays(), pay.unpaidAmount());
             if (finalPay) { slip.setLeavePayout(payoutDays, payout); slip.markFinalPay(); }
 
@@ -312,8 +338,11 @@ public class PayrollService {
                 employees.size() + " payslips" + (warnings.isEmpty() ? "" : ", " + warnings.size() + " warnings")));
 
         HrEmp201 emp201 = HrEmp201.create(tenantId, run.getId(),
-                run.getPeriodStart(), run.getPeriodEnd(), runPaye, runUif, runSdl);
+                run.getPeriodStart(), run.getPeriodEnd(), runPaye, runUif, runSdl, runEti);
         emp201Repo.save(emp201);
+        if (emp201.getEtiCarried().signum() > 0)
+            warnings.add("The employment tax incentive worked out (" + runEti + ") is more than the PAYE of this return, so " + emp201.getEtiCarried()
+                    + " is carried forward, not claimed now.");
 
         log.info("Processed pay run={} taxYear={} employees={} gross={} paye={} uif={} sdl={} net={} warnings={}",
                 run.getPayRunNumber(), taxYear, employees.size(), runGross, runPaye, runUif, runSdl, runNet, warnings.size());
@@ -397,7 +426,8 @@ public class PayrollService {
                 s.getTaxableIncome(), s.getTaxYear() != null ? s.getTaxYear() : 0,
                 s.getCreatedAt(), s.getDaysInPeriod(), s.getDaysPaid(), s.getProrationAmount(), s.getUnpaidLeaveDays(), s.getUnpaidLeaveAmount(),
                 s.getLeavePayoutDays(), s.getLeavePayoutAmount(), s.isFinalPay(),
-                s.getEmployerMedical(), s.getEmployerRetirement(), s.getOtherFringe(), s.getBackPayAmount(), s.getNoticePayAmount());
+                s.getEmployerMedical(), s.getEmployerRetirement(), s.getOtherFringe(), s.getBackPayAmount(), s.getNoticePayAmount(),
+                s.getEtiAmount(), s.getEtiMonth());
     }
 
     private Emp201Response toEmp201Response(HrEmp201 e, LocalDate today, boolean runIssued) {
@@ -406,6 +436,7 @@ public class PayrollService {
                 e.getTotalPaye(), e.getTotalUif(), e.getTotalSdl(),
                 e.getTotalPayable(), e.getStatus(), e.getSubmittedAt(), e.getCreatedAt(),
                 e.getPaymentRef(), e.getPaidOn(), e.getPaidAmount(),
-                Emp201Rules.overdue(e.getStatus(), e.getDueDate(), today), Emp201Rules.late(e.getPaidOn(), e.getDueDate()), runIssued);
+                Emp201Rules.overdue(e.getStatus(), e.getDueDate(), today), Emp201Rules.late(e.getPaidOn(), e.getDueDate()), runIssued,
+                e.getTotalEti(), e.getEtiCarried());
     }
 }

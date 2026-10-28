@@ -20,6 +20,7 @@ public class HrPayrollSettings {
     @Column(name = "bank_nominated_account") String bankNominatedAccount;
     @Column(name = "bank_file_second_check") boolean bankFileSecondCheck;
     @Column(name = "tax_method") String taxMethod = "PERIODIC";
+    @Column(name = "eti_enabled") boolean etiEnabled;
     @Column(name = "updated_by") UUID updatedBy;
     @Column(name = "updated_at") Instant updatedAt;
 
@@ -33,6 +34,12 @@ public class HrPayrollSettings {
         this.bankFileSecondCheck = secondCheck;
         this.bankNominatedBranch = branch == null || branch.isBlank() ? null : branch;
         this.bankNominatedAccount = account == null || account.isBlank() ? null : account;
+        this.updatedBy = actor;
+        this.updatedAt = Instant.now();
+    }
+
+    public void setEtiEnabled(boolean enabled, UUID actor) {
+        this.etiEnabled = enabled;
         this.updatedBy = actor;
         this.updatedAt = Instant.now();
     }

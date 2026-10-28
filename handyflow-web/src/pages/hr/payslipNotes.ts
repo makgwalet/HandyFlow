@@ -13,6 +13,8 @@ export interface PayslipPeriodFields {
   bonusAmount?: number | string | null
   backPayAmount?: number | string | null
   noticePayAmount?: number | string | null
+  etiAmount?: number | string | null
+  etiMonth?: number | null
 }
 
 const num = (v: unknown): number => {
@@ -38,5 +40,7 @@ export function payslipNotes(p: PayslipPeriodFields): string[] {
   if (back > 0) out.push(`Back pay of ${money(back)} included`)
   const notice = num(p.noticePayAmount)
   if (notice > 0) out.push(`Pay in place of notice of ${money(notice)} included`)
+  const eti = num(p.etiAmount)
+  if (eti > 0) out.push(`Employment tax incentive of ${money(eti)} claimed (month ${p.etiMonth ?? '?'} of 24)`)
   return out
 }
