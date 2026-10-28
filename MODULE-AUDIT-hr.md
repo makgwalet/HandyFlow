@@ -1086,3 +1086,14 @@ I read the four training services, the entities and the session screen. The modu
 **Not decided here.** The Basic Conditions of Employment Act lets an employer deduct an overpayment of pay, but the employee should be told and the reason recorded; the reason field is required. No 25% cap is applied. Tax already paid on the overpaid amount is not adjusted: if the overpayment was in an earlier tax year, the certificate for that year stands. Check both with a labour adviser.
 
 **Tests.** `PayAdjustmentRulesTest` (+2) and `HrPayslipRecoveryTest` (2) pass in my harness; the Mockito payroll service test was not extended and nothing here has run under Maven or the database.
+
+## 40. Reminders for unacknowledged letters and goals (Slice 20b)
+
+**What goes out, every morning at 08:00 South African time** (with `app.notifications.enabled`):
+- **Letter not acknowledged.** An issued letter that asks for acknowledgement and has none a week after issue: the employee is told the day after the week is up, then every 7th day. The message gives only the letter's number and issue date, never its subject or type (letters can concern discipline or health). Links to "My letters".
+- **Goal past its date.** An approved goal whose due date has passed and which nobody has closed: the employee, the day after, then weekly.
+- **Goal waiting for approval.** A proposed goal not approved after 5 days: the employee's manager; the company's administrators when there is no manager or the manager has left.
+
+**Limits.** Weekly chasing stops 8 weeks after the date it started from; after that a person has to act. People who have left, or have no email address, are skipped. One failing item does not stop the others. The jobs still do not remember what they sent; the day arithmetic is what stops repeats.
+
+**Code.** `WorkReminderRules` (pure; 6 tests pass in my harness, and a deliberate break was caught), `WorkReminderService` and `WorkReminderScheduler`, three notification types (`LETTER_UNACKNOWLEDGED`, `PERF_GOAL_OVERDUE`, `PERF_GOAL_WAITING`), and two repository queries (`awaitingAcknowledgement`, `allOpen`). No migration, no screen change. `WorkReminderServiceTest` (Mockito, 6 tests) has not run; Spring and the database have not run this.

@@ -201,6 +201,8 @@ public enum NotificationType {
     PERF_GOAL_DECIDED(INFO, Set.of(IN_APP, EMAIL)),
     PERF_PLAN_CHECKIN_DUE(WARNING, Set.of(IN_APP, EMAIL)),
     PERF_PLAN_ENDED(WARNING, Set.of(IN_APP, EMAIL)),
+    PERF_GOAL_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
+    PERF_GOAL_WAITING(INFO, Set.of(IN_APP, EMAIL)),
 
     // Annual leave that would be lost at the coming rollover under the company's carry-over limit, or a summary for HR.
     LEAVE_AT_RISK(WARNING, Set.of(IN_APP, EMAIL)),
@@ -212,6 +214,8 @@ public enum NotificationType {
     // An HR letter was issued to the employee. The message never says what the letter is about: letters can concern discipline
     // or health, and an email is not a private place.
     LETTER_ISSUED(INFO, Set.of(IN_APP, EMAIL)),
+    // An issued letter that asks for acknowledgement has not been acknowledged. Never says what it is about.
+    LETTER_UNACKNOWLEDGED(WARNING, Set.of(IN_APP, EMAIL)),
 
     // Recruiter approvals: someone is asked to approve a job or an offer, and the person who asked is told the outcome.
     // The message names the role, never the candidate or the salary.

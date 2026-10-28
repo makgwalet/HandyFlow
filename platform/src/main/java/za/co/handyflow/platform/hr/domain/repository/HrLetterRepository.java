@@ -20,4 +20,8 @@ public interface HrLetterRepository extends JpaRepository<HrLetter, UUID> {
 
     @Query("SELECT l FROM HrLetter l WHERE l.tenantId = :#{#tenantId.value} AND l.employeeId = :employeeId ORDER BY l.createdAt DESC")
     List<HrLetter> forEmployee(TenantId tenantId, UUID employeeId);
+
+    /** Issued letters of every company that ask for acknowledgement and have not had it, for the daily reminders. */
+    @Query("SELECT l FROM HrLetter l WHERE l.status = 'ISSUED' AND l.requiresAck = true AND l.acknowledgedAt IS NULL")
+    List<HrLetter> awaitingAcknowledgement();
 }

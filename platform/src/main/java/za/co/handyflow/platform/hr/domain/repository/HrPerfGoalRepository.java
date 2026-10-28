@@ -19,4 +19,8 @@ public interface HrPerfGoalRepository extends JpaRepository<HrPerfGoal, UUID> {
 
     @Query("SELECT g FROM HrPerfGoal g WHERE g.tenantId = :#{#tenantId.value} ORDER BY g.dueDate, g.createdAt")
     List<HrPerfGoal> forTenant(TenantId tenantId);
+
+    /** Goals of every company that are proposed or running, for the daily reminders. */
+    @Query("SELECT g FROM HrPerfGoal g WHERE g.status IN ('PROPOSED', 'ACTIVE')")
+    List<HrPerfGoal> allOpen();
 }
