@@ -1,7 +1,7 @@
 // Look shared by the Internal Audit screens: stat tiles, the progress ring, severity bars, status pills, a filter bar and a pager.
 
 import type { ReactNode } from "react"
-import { donutArcs, groupTone, type Group, type Page, type Tone } from "./auditUi.logic"
+import { donutArcs, groupTone, type Group, type Page, type Tone, type TrendView } from "./auditUi.logic"
 import { GROUP_COLOR, filterField } from "./auditUi.styles"
 
 const TONE: Record<Tone, { color: string; bg: string }> = {
@@ -29,13 +29,18 @@ export function Panel({ title, action, children }: { title: string; action?: Rea
   )
 }
 
-export function Stat({ label, value, sub, tone, onClick }: { label: string; value: ReactNode; sub?: string; tone?: "danger" | "warning"; onClick?: () => void }) {
+export function Stat({ label, value, sub, tone, onClick, trend }: { label: string; value: ReactNode; sub?: string; tone?: "danger" | "warning"; onClick?: () => void; trend?: TrendView | null }) {
   const color = tone === "danger" ? "var(--hf-danger-text)" : tone === "warning" ? "var(--hf-warning-text)" : "var(--hf-text)"
   const body = (
     <>
       <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 28, fontWeight: 800, color, lineHeight: 1.1 }}>{value}</div>
       {sub && <div style={{ fontSize: 11.5, color: "var(--hf-text-muted)", marginTop: 6 }}>{sub}</div>}
+      {trend && (
+        <div title={trend.spoken} style={{ fontSize: 11.5, marginTop: 6, fontWeight: 600, color: trend.tone === "good" ? "var(--hf-success-text)" : trend.tone === "bad" ? "var(--hf-danger-text)" : "var(--hf-text-muted)" }}>
+          <span aria-hidden>{trend.arrow} </span>{trend.text}
+        </div>
+      )}
     </>
   )
   const box = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "14px 16px", textAlign: "left" as const, minWidth: 0 }

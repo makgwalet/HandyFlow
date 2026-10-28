@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/react"
 
-vi.mock("../../api/auditDashboards.api", () => ({ auditDashboardsApi: { internal: vi.fn(), external: vi.fn(), committee: vi.fn() } }))
+vi.mock("../../api/auditDashboards.api", () => ({ auditDashboardsApi: { internal: vi.fn(), external: vi.fn(), committee: vi.fn(), trends: vi.fn(), activity: vi.fn() } }))
 import { auditDashboardsApi } from "../../api/auditDashboards.api"
 import { InternalAuditDashboard } from "./InternalAuditDashboard"
 import type { Engagement } from "./auditShared"
@@ -9,7 +9,7 @@ import { ExternalAuditDashboard } from "../settings/ExternalAuditDashboard"
 
 const m = auditDashboardsApi as any
 afterEach(cleanup)
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => { vi.clearAllMocks(); m.trends.mockResolvedValue({ since: null, daysAgo: null, changes: [] }); m.activity.mockResolvedValue([]) })
 
 const internal = {
   plan: { year: 2026, status: "ACTIVE", total: 4, completed: 1, inProgress: 1, deferred: 1, planned: 1, completionPct: 33 },
@@ -126,5 +126,38 @@ describe("Internal audit dashboard: key dates and links", () => {
     render(<InternalAuditDashboard />)
     expect((await screen.findByLabelText("High open findings")).getAttribute("aria-valuenow")).toBe("100")
     expect(screen.getByLabelText("Critical open findings").getAttribute("aria-valuenow")).toBe("0")
+  })
+})
+
+describe("Internal audit dashboard: trends and activity", () => {
+  it("shows an arrow under a tile when there is something to compare with", async () => {
+    m.internal.mockResolvedValue(internal)
+    m.trends.mockResolvedValue({ since: "2026-08-04", daysAgo: 85, changes: [
+      { key: "openFindings", now: 3, before: 6, delta: -3 }, { key: "overdueActions", now: 2, before: 1, delta: 1 },
+      { key: "engagements", now: 12, before: 9, delta: 3 }, { key: "highRiskAreas", now: 5, before: 5, delta: 0 }] })
+    render(<InternalAuditDashboard />)
+    expect(await screen.findByText("3 fewer vs 85 days ago")).toBeTruthy()
+    expect(screen.getByText("1 more vs 85 days ago")).toBeTruthy()
+    expect(screen.getByText("High-risk areas")).toBeTruthy()
+  })
+  it("says why there is no arrow yet", async () => {
+    m.internal.mockResolvedValue(internal)
+    render(<InternalAuditDashboard />)
+    expect(await screen.findByText(/Trend arrows appear once/)).toBeTruthy()
+  })
+  it("lists recent activity with the thing it happened to", async () => {
+    m.internal.mockResolvedValue(internal)
+    m.activity.mockResolvedValue([{ actor: "Sarah Johnson", action: "FINDING_CREATED", itemType: "FINDING", itemId: "f1", subject: "Segregation of duties", at: new Date().toISOString() }])
+    render(<InternalAuditDashboard />)
+    expect(await screen.findByText("Finding raised")).toBeTruthy()
+    expect(screen.getByText(": Segregation of duties")).toBeTruthy()
+    expect(screen.getByText("Sarah Johnson")).toBeTruthy()
+  })
+  it("still shows the dashboard when trends and activity cannot be loaded", async () => {
+    m.internal.mockResolvedValue(internal)
+    m.trends.mockRejectedValue(new Error("x")); m.activity.mockRejectedValue(new Error("x"))
+    render(<InternalAuditDashboard />)
+    expect(await screen.findByText("33%")).toBeTruthy()
+    expect(screen.queryByText("Recent activity")).toBeNull()
   })
 })

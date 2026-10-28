@@ -56,6 +56,20 @@ public class AuditTrailService implements AuditTrailFacade {
                 tenantId.getValue(), itemType, itemType, itemId, itemId, cap);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<Activity> recent(TenantId tenantId, List<String> actionPatterns, int limit) {
+        if (actionPatterns == null || actionPatterns.isEmpty()) return List.of();
+        int cap = Math.max(1, Math.min(limit, 100));
+        return jdbc.query("""
+                SELECT actor_name, action, item_type, item_id, occurred_at
+                FROM audit_events
+                WHERE tenant_id = ? AND action LIKE ANY (?)
+                ORDER BY occurred_at DESC, id LIMIT ?
+                """, (rs, i) -> new Activity(rs.getString(1), rs.getString(2), rs.getString(3), (UUID) rs.getObject(4), rs.getTimestamp(5).toInstant()),
+                tenantId.getValue(), actionPatterns.toArray(new String[0]), cap);
+    }
+
     private String json(Map<String, ?> m) {
         if (m == null) return null;
         try { return mapper.writeValueAsString(m); } catch (JsonProcessingException e) { throw new IllegalStateException("Could not record audit event", e); }

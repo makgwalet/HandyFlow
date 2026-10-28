@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { donutArcs, engagementProgress, engagementStage, filterEngagements, filterEntries, paginate, planProgress, progressOf, quarterCounts, severityRows, shortDate, upcomingDates, daysBetween } from "./auditUi.logic"
+import { activityText, timeAgo, trendView, donutArcs, engagementProgress, engagementStage, filterEngagements, filterEntries, paginate, planProgress, progressOf, quarterCounts, severityRows, shortDate, upcomingDates, daysBetween } from "./auditUi.logic"
 import type { Engagement, PlanEntry } from "./auditShared"
 
 const eng = (o: Partial<Engagement>): Engagement => ({ id: "e", planEntryId: null, universeEntryId: "u", universeEntryName: "Finance", name: "Financial reporting audit", status: "PLANNING", startDate: null, endDate: null, createdBy: null, createdAt: "", assignments: [], objectives: null, scope: null, auditCriteria: null, overallMateriality: null, performanceMateriality: null, clearlyTrivialThreshold: null, specificMateriality: [], ...o })
@@ -93,4 +93,45 @@ describe("lists", () => {
     expect(paginate([], 1, 5)).toMatchObject({ pages: 1, from: 0, to: 0, items: [] })
   })
   it("writes short dates", () => { expect(shortDate("2026-04-05T00:00:00Z")).toBe("5 Apr 2026"); expect(shortDate(null)).toBe("—") })
+})
+
+describe("trends", () => {
+  const t = (delta: number, key = "openFindings", daysAgo = 85) => ({ since: "2026-08-04", daysAgo, changes: [{ key, now: 10, before: 10 - delta, delta }] }) as never
+  it("is nothing without a comparison", () => {
+    expect(trendView(null, "openFindings")).toBeNull()
+    expect(trendView({ since: null, daysAgo: null, changes: [] }, "openFindings")).toBeNull()
+    expect(trendView(t(2, "engagements"), "openFindings")).toBeNull()
+  })
+  it("calls fewer open findings good and more bad", () => {
+    expect(trendView(t(-3), "openFindings")).toMatchObject({ arrow: "▼", tone: "good", text: "3 fewer vs 85 days ago" })
+    expect(trendView(t(4), "openFindings")).toMatchObject({ arrow: "▲", tone: "bad", text: "4 more vs 85 days ago" })
+    expect(trendView(t(1, "overdueActions"), "overdueActions")?.tone).toBe("bad")
+    expect(trendView(t(-1, "highRiskAreas"), "highRiskAreas")?.tone).toBe("good")
+  })
+  it("calls a change in engagements neither good nor bad, and no change flat", () => {
+    expect(trendView(t(5, "engagements"), "engagements")).toMatchObject({ arrow: "▲", tone: "flat" })
+    expect(trendView(t(0), "openFindings")).toMatchObject({ arrow: "▬", tone: "flat", text: "No change vs 85 days ago" })
+    expect(trendView(t(0, "openFindings", 1), "openFindings")?.text).toBe("No change vs 1 day ago")
+    expect(trendView(t(2), "openFindings")?.spoken).toBe("Up 2 since 85 days ago")
+  })
+})
+
+describe("activity", () => {
+  it("words the codes it knows and tidies the rest", () => {
+    expect(activityText("FINDING_CREATED")).toBe("Finding raised")
+    expect(activityText("ACTION_PLAN_VALIDATED")).toBe("Action plan validated")
+    expect(activityText("WORKPAPER_SIGN_OFF")).toBe("Workpaper sign off")
+    expect(activityText("AUDIT_REPORT_PERSON_ADDED")).toBe("Report person added")
+    expect(activityText("")).toBe("Updated an audit record")
+  })
+  it("says how long ago", () => {
+    const now = new Date("2026-10-28T12:00:00Z")
+    expect(timeAgo("2026-10-28T11:59:40Z", now)).toBe("just now")
+    expect(timeAgo("2026-10-28T11:55:00Z", now)).toBe("5 min ago")
+    expect(timeAgo("2026-10-28T09:00:00Z", now)).toBe("3 h ago")
+    expect(timeAgo("2026-10-27T11:00:00Z", now)).toBe("1 day ago")
+    expect(timeAgo("2026-10-20T12:00:00Z", now)).toBe("20 Oct 2026")
+    expect(timeAgo("2026-10-28T12:05:00Z", now)).toBe("just now")
+    expect(timeAgo("garbage", now)).toBe("")
+  })
 })

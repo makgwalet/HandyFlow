@@ -3,6 +3,7 @@
 // server; every figure is worked out from rows the screens already load.
 
 import type { AnnualPlan, Engagement, PlanEntry } from "./auditShared"
+import type { DashboardTrends, TrendKey } from "../../api/auditDashboards.api"
 
 export type Group = "planned" | "inProgress" | "completed" | "deferred"
 export type Tone = "info" | "warning" | "success" | "muted"
@@ -144,4 +145,65 @@ export function shortDate(s: string | null | undefined): string {
   if (!s) return "—"
   const [y, m, d] = s.slice(0, 10).split("-").map(Number)
   return `${d} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m - 1]} ${y}`
+}
+
+// ── Trends ────────────────────────────────────────────────────────────────────────────────────────
+
+/** Which way is better for each figure. More engagements is neither good nor bad. */
+const BETTER: Record<TrendKey, "up" | "down" | "neither"> = { engagements: "neither", openFindings: "down", overdueActions: "down", highRiskAreas: "down" }
+
+export interface TrendView { arrow: "▲" | "▼" | "▬"; text: string; tone: "good" | "bad" | "flat"; spoken: string }
+
+/** The arrow and words under a tile, or null when there is nothing old enough to compare with. */
+export function trendView(t: DashboardTrends | null | undefined, key: TrendKey): TrendView | null {
+  const c = t?.changes.find(x => x.key === key)
+  if (!t || !c || t.daysAgo === null) return null
+  const since = t.daysAgo === 1 ? "1 day ago" : `${t.daysAgo} days ago`
+  if (c.delta === 0) return { arrow: "▬", text: `No change vs ${since}`, tone: "flat", spoken: `No change since ${since}` }
+  const up = c.delta > 0
+  const better = BETTER[key]
+  const tone = better === "neither" ? "flat" : (up ? "bad" : "good")
+  return { arrow: up ? "▲" : "▼", text: `${Math.abs(c.delta)} ${up ? "more" : "fewer"} vs ${since}`, tone, spoken: `${up ? "Up" : "Down"} ${Math.abs(c.delta)} since ${since}` }
+}
+
+// ── Activity ──────────────────────────────────────────────────────────────────────────────────────
+
+const ACTIVITY: Record<string, string> = {
+  FINDING_CREATED: "Finding raised", FINDING_RESPONSE_RECORDED: "Management response recorded", FINDING_RESOLVED: "Finding resolved",
+  FINDING_CLOSED: "Finding closed", FINDING_REOPENED: "Finding reopened", FINDING_SHARED_EXTERNALLY: "Finding shared with the external auditor",
+  FINDING_SHARING_WITHDRAWN: "Finding withdrawn from the external auditor",
+  WORKPAPER_UPLOADED: "Workpaper uploaded", WORKPAPER_DELETED: "Workpaper deleted",
+  REPORT_SUBMITTED: "Report submitted for sign-off", REPORT_REOPENED: "Report reopened for amendment",
+  AUDIT_REPORT_CREATED: "Report drafted", AUDIT_REPORT_EDITED: "Report edited", AUDIT_REPORT_ISSUED: "Report issued", AUDIT_REPORT_REOPENED: "Report reopened",
+  AUDIT_REPORT_REVIEW_STARTED: "Factual review started", AUDIT_REPORT_REVIEW_CLOSED: "Factual review closed",
+  AUDIT_REPORT_FACT_RAISED: "Factual comment raised", AUDIT_REPORT_FACT_ANSWERED: "Factual comment answered",
+  AUDIT_FOLLOWUP_STARTED: "Follow-up started", AUDIT_FOLLOWUP_ASSESSED: "Follow-up assessed",
+  AUDIT_PROGRAMME_APPLIED: "Programme applied", AUDIT_PROGRAMME_RECORDED: "Programme step recorded", AUDIT_PROGRAMME_LINKED: "Programme step linked to a finding",
+  AUDIT_MONITOR_REVIEWED: "Monitoring alert reviewed",
+  AUDIT_QR_REQUESTED: "Quality review requested", AUDIT_QR_ANSWERED: "Quality review item answered", AUDIT_QR_COMPLETED: "Quality review completed", AUDIT_QR_CANCELLED: "Quality review cancelled",
+  REVIEW_NOTE_RAISED: "Review note raised",
+  ACTION_PLAN_CREATED: "Action plan added", ACTION_PLAN_COMPLETED: "Action plan completed", ACTION_PLAN_VALIDATED: "Action plan validated",
+  ACTION_PLAN_RETURNED: "Action plan returned for rework", ACTION_PLAN_CANCELLED: "Action plan cancelled",
+}
+
+/** What an action code means in words. A code not listed is made readable ("WORKPAPER_SIGN_OFF" becomes "Workpaper sign off"). */
+export function activityText(action: string): string {
+  const known = ACTIVITY[action]
+  if (known) return known
+  const w = action.replace(/^AUDIT_/, "").toLowerCase().replace(/_/g, " ").trim()
+  return w ? w.charAt(0).toUpperCase() + w.slice(1) : "Updated an audit record"
+}
+
+/** "just now", "5 min ago", "3 h ago", "2 days ago", then the date. A time in the future counts as now. */
+export function timeAgo(iso: string, now: Date = new Date()): string {
+  const t = Date.parse(iso)
+  if (Number.isNaN(t)) return ""
+  const mins = Math.floor((now.getTime() - t) / 60000)
+  if (mins < 1) return "just now"
+  if (mins < 60) return `${mins} min ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours} h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days} ${days === 1 ? "day" : "days"} ago`
+  return shortDate(new Date(t).toISOString())
 }

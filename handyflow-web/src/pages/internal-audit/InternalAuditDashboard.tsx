@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react"
-import { auditDashboardsApi, type InternalDashboard } from "../../api/auditDashboards.api"
+import { auditDashboardsApi, type ActivityItem, type DashboardTrends, type InternalDashboard } from "../../api/auditDashboards.api"
 import type { Engagement } from "./auditShared"
 import { Legend, Meter, Panel, Pill, Ring, Stat } from "./auditUi"
 import { GROUP_COLOR, SEVERITY_COLOR, grid } from "./auditUi.styles"
-import { severityRows, shortDate, upcomingDates } from "./auditUi.logic"
+import { activityText, severityRows, shortDate, timeAgo, trendView, upcomingDates } from "./auditUi.logic"
 
 const MUTED = "var(--hf-text-muted)"
 const QUICK: { id: string; label: string; hint: string }[] = [
@@ -20,7 +20,12 @@ const QUICK: { id: string; label: string; hint: string }[] = [
 export function InternalAuditDashboard({ engagements, onGo, today }: { engagements?: Engagement[]; onGo?: (section: string) => void; today?: string }) {
   const [d, setD] = useState<InternalDashboard | null>(null)
   const [error, setError] = useState("")
+  const [trends, setTrends] = useState<DashboardTrends | null>(null)
+  const [activity, setActivity] = useState<ActivityItem[] | null>(null)
   useEffect(() => {
+    // Trends and activity are extras: if either cannot be loaded the rest of the dashboard still shows.
+    Promise.resolve().then(() => auditDashboardsApi.trends()).then(t => setTrends(t ?? null)).catch(() => setTrends(null))
+    Promise.resolve().then(() => auditDashboardsApi.activity(8)).then(a => setActivity(Array.isArray(a) ? a : null)).catch(() => setActivity(null))
     auditDashboardsApi.internal().then(setD).catch((e: { response?: { data?: { message?: string } } }) => setError(e?.response?.data?.message ?? "Failed to load the dashboard"))
   }, [])
 
@@ -37,11 +42,20 @@ export function InternalAuditDashboard({ engagements, onGo, today }: { engagemen
       <div style={grid(170)}>
         <Stat label={plan.year ? `Audits in the ${plan.year} plan` : "Annual plan"} value={plan.year ? live : "No plan"}
           sub={plan.year ? `${plan.inProgress} in progress, ${plan.planned} not started` : undefined} />
-        <Stat label="Open findings" value={d.openFindings} sub={d.findingsPastDue ? `${d.findingsPastDue} past due` : undefined} tone={d.findingsPastDue ? "danger" : undefined} />
-        <Stat label="Overdue actions" value={d.overdueActionCount} tone={d.overdueActionCount ? "danger" : undefined}
+        {(engagements || trends?.changes.length) && (
+          <Stat label="Engagements" value={engagements ? engagements.length : trends?.changes.find(c => c.key === "engagements")?.now ?? 0} trend={trendView(trends, "engagements")} />
+        )}
+        <Stat label="Open findings" value={d.openFindings} sub={d.findingsPastDue ? `${d.findingsPastDue} past due` : undefined} tone={d.findingsPastDue ? "danger" : undefined} trend={trendView(trends, "openFindings")} />
+        <Stat label="Overdue actions" value={d.overdueActionCount} tone={d.overdueActionCount ? "danger" : undefined} trend={trendView(trends, "overdueActions")}
           onClick={onGo && d.overdueActionCount ? () => onGo("follow-ups") : undefined} />
+        {trends?.changes.find(c => c.key === "highRiskAreas") && (
+          <Stat label="High-risk areas" value={trends.changes.find(c => c.key === "highRiskAreas")!.now} trend={trendView(trends, "highRiskAreas")} sub="rated high or critical" />
+        )}
         <Stat label="Repeat findings" value={d.repeatFindingCount} tone={d.repeatFindingCount ? "warning" : undefined} sub="reopened or previously closed" />
       </div>
+      {trends && trends.daysAgo === null && (
+        <div style={{ fontSize: 12, color: MUTED, marginTop: -6 }}>Trend arrows appear once the dashboard has figures saved from at least a week ago. Today's are saved now.</div>
+      )}
 
       <div style={grid(300)}>
         <Panel title="Audit progress">
@@ -117,6 +131,25 @@ export function InternalAuditDashboard({ engagements, onGo, today }: { engagemen
           )}
         </Panel>
       </div>
+
+      {activity && (
+        <Panel title="Recent activity">
+          {activity.length === 0 ? <span style={{ fontSize: 13, color: MUTED }}>Nothing has happened yet.</span> : (
+            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
+              {activity.map((a, i) => (
+                <li key={`${a.at}-${i}`} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, fontSize: 13 }}>
+                  <span>
+                    <strong style={{ color: "var(--hf-text)" }}>{activityText(a.action)}</strong>
+                    {a.subject && <span style={{ color: "var(--hf-text-secondary)" }}>: {a.subject}</span>}
+                    {a.actor && <span style={{ display: "block", fontSize: 12, color: MUTED }}>{a.actor}</span>}
+                  </span>
+                  <span style={{ fontSize: 12, color: MUTED, whiteSpace: "nowrap" }}>{timeAgo(a.at)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      )}
 
       {(engagements || onGo) && (
         <div style={grid(320)}>

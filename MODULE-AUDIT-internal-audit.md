@@ -22,3 +22,15 @@ The screens already covered the whole audit cycle; this slice changes how they r
 - *Workpapers split view.* The workpaper list inside an engagement is unchanged.
 
 **Tests.** Run under Node: `auditUi.test.ts` (13 cases). The new components were also server-rendered once as a smoke check. Written but not run (vitest is not installed here): `PlanEntries.test.tsx` and three new cases in `AuditDashboards.test.tsx`. `tsc` is clean; the new files lint clean and `EngagementsSection.tsx` keeps its 16 existing lint errors. Nothing was viewed in a browser, so spacing and dark mode are unchecked.
+
+## 2. Dashboard trends and recent activity (Slice 2, V549)
+
+**Trend arrows.** The headline figures (engagements, open findings, overdue actions, high-risk areas) are now saved once a day, at the first look at the dashboard (`audit_dashboard_snapshots`, V549). `GET /internal-audit/dashboard/trends` counts them, saves today's, and compares with the saved day nearest to 90 days ago that is at least 7 days old. Fewer open findings, overdue actions or high-risk areas shows green; more shows red; engagements are neutral. With nothing old enough saved, there is no arrow and the screen says so.
+
+**Recent activity.** `GET /internal-audit/dashboard/activity` reads the audit trail (`audit_events`) for the action codes internal audit writes (findings, workpapers, reports, follow-ups, programme, quality reviews, review notes, action plans) and names the finding, engagement or workpaper it happened to. New method `AuditTrailFacade.recent`. Both endpoints need `AUDIT_READ`; the dashboard shows neither if its call fails.
+
+**Limits**
+- Nothing is back-filled, and a day no one opened the dashboard has no row, so the first arrows appear a week after install and compare with whatever the oldest suitable day is, not always a full quarter. The text says how many days ago.
+- High-risk areas counts universe entries whose latest assessment's final risk is HIGH or CRITICAL.
+- Activity covers only actions that already write to the audit trail; plan approvals, universe edits and engagement creation do not, so they do not appear.
+- Not compiled or run: the Spring classes (`AuditSnapshotStore`, `InternalAuditTrendService`, `AuditActivityService`, the controller, `AuditTrailService.recent`) and the SQL, including `LIKE ANY (?)` with an array parameter. Run: `DashboardTrendsTest` (6, offline) and `auditUi.test.ts` (18, under Node). Frontend dashboard cases written, not run.

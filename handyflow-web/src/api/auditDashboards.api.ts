@@ -12,6 +12,12 @@ export interface InternalDashboard {
   repeatFindings: { id: string; title: string; severity: string | null; status: string }[]
 }
 
+export type TrendKey = "engagements" | "openFindings" | "overdueActions" | "highRiskAreas"
+export interface TrendChange { key: TrendKey; now: number; before: number; delta: number }
+/** `since`, `daysAgo` null and `changes` empty when nothing saved is old enough to compare with. */
+export interface DashboardTrends { since: string | null; daysAgo: number | null; changes: TrendChange[] }
+export interface ActivityItem { actor: string | null; action: string; itemType: string | null; itemId: string | null; subject: string | null; at: string }
+
 export interface ExternalDashboard {
   requests: { awaitingBusiness: number; overdue: number; dueSoon: number; awaitingAuditor: number; rejectedBefore: number; approved: number; notAvailable: number }
   queries: { awaitingBusiness: number; overdue: number; awaitingAuditor: number; reopenedBefore: number; resolved: number }
@@ -36,6 +42,8 @@ const unwrap = <T,>(d: any): T => (d && typeof d === "object" && "data" in d && 
 
 export const auditDashboardsApi = {
   internal: () => apiClient.get("/api/v1/internal-audit/dashboard").then(r => unwrap<InternalDashboard>(r.data)),
+  trends: () => apiClient.get("/api/v1/internal-audit/dashboard/trends").then(r => (r.data?.data ?? r.data) as DashboardTrends),
+  activity: (limit = 8) => apiClient.get("/api/v1/internal-audit/dashboard/activity", { params: { limit } }).then(r => (r.data?.data ?? r.data) as ActivityItem[]),
   committee: () => apiClient.get("/api/v1/internal-audit/committee-report").then(r => unwrap<CommitteeReport>(r.data)),
   external: (engagementId?: string) =>
     apiClient.get("/api/v1/auditors/dashboard", { params: engagementId ? { engagementId } : {} }).then(r => unwrap<ExternalDashboard>(r.data)),

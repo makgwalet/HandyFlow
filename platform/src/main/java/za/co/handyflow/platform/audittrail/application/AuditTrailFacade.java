@@ -2,6 +2,8 @@ package za.co.handyflow.platform.audittrail.application;
 
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -17,4 +19,10 @@ public interface AuditTrailFacade {
     /** Recorded as someone who is not the signed-in staff member, such as an external auditor in the portal. */
     void recordAs(TenantId tenantId, String actorType, UUID actorId, String actorName,
                   String action, String itemType, UUID itemId, Map<String, ?> before, Map<String, ?> after);
+
+    /** One recorded action, as a feed shows it. */
+    record Activity(String actorName, String action, String itemType, UUID itemId, Instant at) {}
+
+    /** The newest actions whose code matches any of the SQL LIKE patterns (such as "FINDING_%"), newest first, at most `limit` (capped at 100). */
+    List<Activity> recent(TenantId tenantId, List<String> actionPatterns, int limit);
 }
