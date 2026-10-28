@@ -13,6 +13,7 @@ import za.co.handyflow.platform.recruiter.application.internal.RecruiterPdfGener
 import za.co.handyflow.platform.recruiter.application.internal.RecruiterApprovalService;
 import za.co.handyflow.platform.recruiter.application.internal.RecruiterRetentionService;
 import za.co.handyflow.platform.recruiter.application.internal.RecruiterService;
+import za.co.handyflow.platform.recruiter.application.internal.RecruiterVerificationService;
 import za.co.handyflow.platform.recruiter.dto.RecruiterApprovalDtos.*;
 import za.co.handyflow.platform.recruiter.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -44,6 +45,7 @@ public class RecruiterController {
     private final RecruiterPdfGenerator recruiterPdfGenerator;
     private final RecruiterApprovalService approvalService;
     private final RecruiterRetentionService retentionService;
+    private final RecruiterVerificationService verificationService;
 
     // ── Summary ───────────────────────────────────────────────────────────────
 
@@ -510,5 +512,40 @@ public class RecruiterController {
     public ResponseEntity<ApiResponse<RemovalResult>> retentionRemove(@RequestBody RemovalRequest req) {
         return ResponseEntity.ok(ApiResponse.success(
                 retentionService.remove(TenantContext.getTenantIdAsObject(), req.applicantIds(), TenantContext.getCurrentUserId())));
+    }
+
+    // ── Pre-hire checks ─────────────────────────────────────────────────────────
+
+    @GetMapping("/applications/{id}/verification")
+    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    @Operation(summary = "The checks on an application and whether they allow a hire")
+    public ResponseEntity<ApiResponse<RecruiterVerificationDtos.VerificationView>> verification(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(verificationService.view(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/applications/{id}/verification")
+    @PreAuthorize("hasAuthority('RECRUITER_MANAGE')")
+    @Operation(summary = "Ask for a check (identity, right to work, qualification, reference, background)")
+    public ResponseEntity<ApiResponse<RecruiterVerificationDtos.VerificationView>> addCheck(
+            @PathVariable UUID id, @RequestBody RecruiterVerificationDtos.AddCheckRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Added", verificationService.add(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/applications/{id}/verification/{checkId}/decision")
+    @PreAuthorize("hasAuthority('RECRUITER_MANAGE')")
+    @Operation(summary = "Record the result of a check. Waiving one needs the approver permission")
+    public ResponseEntity<ApiResponse<RecruiterVerificationDtos.VerificationView>> decideCheck(
+            @PathVariable UUID id, @PathVariable UUID checkId, @RequestBody RecruiterVerificationDtos.DecisionRequest req,
+            org.springframework.security.core.Authentication auth) {
+        boolean canApprove = auth != null && auth.getAuthorities().stream().anyMatch(a -> "RECRUITER_APPROVE".equals(a.getAuthority()));
+        return ResponseEntity.ok(ApiResponse.success("Recorded", verificationService.decide(TenantContext.getTenantIdAsObject(), id, checkId, req,
+                TenantContext.getCurrentUserId(), canApprove)));
+    }
+
+    @DeleteMapping("/applications/{id}/verification/{checkId}")
+    @PreAuthorize("hasAuthority('RECRUITER_MANAGE')")
+    @Operation(summary = "Remove a check that has not been decided")
+    public ResponseEntity<ApiResponse<RecruiterVerificationDtos.VerificationView>> removeCheck(@PathVariable UUID id, @PathVariable UUID checkId) {
+        return ResponseEntity.ok(ApiResponse.success("Removed", verificationService.remove(TenantContext.getTenantIdAsObject(), id, checkId)));
     }
 }

@@ -553,6 +553,9 @@ public class RecruiterService {
             String hire = RecruiterOfferRules.hireProblem(offerStatus(app));
             if (hire != null) throw new HandyFlowException(hire, HttpStatus.BAD_REQUEST, "OFFER_NOT_ACCEPTED");
             requireVacancy(app.getJobId());
+            String checks = RecruiterVerificationRules.hireProblem(jdbc.query("SELECT required, status FROM rec_verifications WHERE application_id = ?",
+                    (rs, i) -> new RecruiterVerificationRules.Check(rs.getBoolean(1), rs.getString(2)), id));
+            if (checks != null) throw new HandyFlowException(checks, HttpStatus.BAD_REQUEST, "CHECKS_OUTSTANDING");
         }
         req = new MoveStageRequest(req.stage().trim().toUpperCase(), req.notes(), req.rejectionReason(), req.offeredSalary(),
                 req.offeredSalaryFrequency(), req.offeredStartDate(), req.offerBenefits());

@@ -20,6 +20,7 @@ import { ScreeningAnswers, ScreeningEditor } from './RecScreening'
 import RecPrivacy from './RecPrivacy'
 import RecPool from './RecPool'
 import RecReports from './RecReports'
+import VerificationPanel from './RecVerification'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Job {
@@ -621,6 +622,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
           {app?.stage === 'OFFER' && app?.offeredSalary != null && !app?.offerLetterSentAt && <ApprovalPanel kind="offer" id={app.id} />}
           {app?.stage === 'OFFER' && app?.offerLetterSentAt && <OfferPanel id={app.id} onChanged={invalidate} />}
           {app && <ScreeningAnswers applicationId={app.id} />}
+          {app && <VerificationPanel applicationId={app.id} closed={app.stage === 'HIRED' || app.stage === 'REJECTED' || app.stage === 'WITHDRAWN'} />}
 
           {/* Tabs */}
           <div style={{ display: 'flex' }}>
