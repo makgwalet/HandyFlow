@@ -130,6 +130,17 @@ public class RateLimitFilter extends OncePerRequestFilter {
             new Limit("crm:lead-capture", "/api/v1/public/crm/leads", 60, 60 * 1_000L),
     };
 
+    // Public endpoints whose path carries an id or token, so an exact path cannot name them.
+    private record PatternLimit(String scope, java.util.regex.Pattern path, int maxRequests, long windowMs) {}
+
+    private static final PatternLimit[] PATTERN_LIMITS = {
+            // Careers page: submitting an application (a CV upload and an email to staff each time). A candidate may apply to several
+            // vacancies, and an office may share one address, so this is generous; it stops scripted floods.
+            new PatternLimit("recruiter:apply", java.util.regex.Pattern.compile("^/api/v1/recruiter/careers/[^/]+/jobs/[^/]+/apply$"), 20, 60 * 60 * 1_000L),
+            // Candidate tracking link: reading, updating the profile and CV, withdrawing.
+            new PatternLimit("recruiter:portal", java.util.regex.Pattern.compile("^/api/v1/recruiter/portal/[^/]+(/.*)?$"), 60, 10 * 60 * 1_000L),
+    };
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
@@ -146,6 +157,18 @@ public class RateLimitFilter extends OncePerRequestFilter {
                     response.getWriter().write(
                             "{\"success\":false,\"message\":\"Too many requests — please try again shortly.\"}");
                     return; // don't call filterChain.doFilter — request stops here
+                }
+                break;
+            }
+        }
+
+        for (PatternLimit limit : PATTERN_LIMITS) {
+            if (limit.path().matcher(path).matches()) {
+                if (!rateLimiter.tryConsume(limit.scope() + ":" + request.getRemoteAddr(), limit.maxRequests(), limit.windowMs())) {
+                    response.setStatus(429);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"success\":false,\"message\":\"Too many requests — please try again shortly.\"}");
+                    return;
                 }
                 break;
             }

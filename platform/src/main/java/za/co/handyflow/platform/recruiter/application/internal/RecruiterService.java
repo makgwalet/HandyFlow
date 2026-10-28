@@ -210,7 +210,10 @@ public class RecruiterService {
     @Transactional(readOnly = true)
     public List<JobResponse> getPublicJobs(TenantId tenantId) {
         String companyName = fetchTenantName(tenantId);
-        return jobRepo.findOpenJobs(tenantId).stream().map(j -> {
+        LocalDate today = today();
+        return jobRepo.findOpenJobs(tenantId).stream()
+                .filter(j -> RecruiterPublicRules.closedProblem(j.getClosesAt(), today) == null)
+                .map(j -> {
             // Don't expose salary if show_salary = false
             if (!j.isShowSalary()) {
                 return new JobResponse(j.getId(), j.getTitle(), j.getDepartment(),
@@ -232,6 +235,9 @@ public class RecruiterService {
             throw new HandyFlowException("This position is no longer accepting applications",
                     HttpStatus.GONE, "JOB_CLOSED");
         }
+        if (RecruiterPublicRules.closedProblem(job.getClosesAt(), today()) != null) {
+            throw new HandyFlowException("This position is no longer accepting applications", HttpStatus.GONE, "JOB_CLOSED");
+        }
         JobResponse out = toJobResponse(job, fetchTenantName(tenantId));
         // The salary range is shown only when the company chose to show it, here as on the list.
         if (!job.isShowSalary()) out = withoutSalary(out);
@@ -248,33 +254,33 @@ public class RecruiterService {
             throw new HandyFlowException("This position is no longer accepting applications",
                     HttpStatus.BAD_REQUEST, "JOB_CLOSED");
         }
+        String closed = RecruiterPublicRules.closedProblem(job.getClosesAt(), today());
+        if (closed != null) throw new HandyFlowException(closed, HttpStatus.BAD_REQUEST, "JOB_CLOSED");
+        String formProblem = RecruiterPublicRules.applicationProblem(req.firstName(), req.lastName(), req.email(), req.phone(), req.location(),
+                req.linkedinUrl(), req.portfolioUrl(), req.source(), req.referrerName());
+        if (formProblem != null) throw new HandyFlowException(formProblem, HttpStatus.BAD_REQUEST, "INVALID_APPLICATION");
         String consentProblem = RecruiterConsentRules.problem(req.consent());
         if (consentProblem != null) throw new HandyFlowException(consentProblem, HttpStatus.BAD_REQUEST, "CONSENT_REQUIRED");
 
-        // Store the CV via CvStorage (local disk for now, dev phase — see
-        // CvStorage's own Javadoc) rather than the raw base64 string.
-        // Computed once, reused for both the create() and updateCv() paths
-        // below, so a brand-new applicant doesn't get the same file
-        // written to disk twice under two different UUIDs.
+        // The same person is found by email (any capitalisation). A repeat application is refused before the CV is stored, so a refused
+        // application leaves no file behind.
+        String email = RecruiterPublicRules.normaliseEmail(req.email());
+        java.util.Optional<RecApplicant> existing = applicantRepo.findByTenantIdAndEmail(tenantId, email);
+        if (existing.isPresent() && applicationRepo.findByJobIdAndApplicantId(jobId, existing.get().getId()).isPresent()) {
+            throw new HandyFlowException("You have already applied for this position",
+                    HttpStatus.BAD_REQUEST, "DUPLICATE_APPLICATION");
+        }
+
         String cvReference = req.cvBase64() != null ? storeCv(req.cvBase64(), req.cvFileName()) : null;
 
-        // Upsert applicant — same person may apply to multiple jobs
-        RecApplicant applicant = applicantRepo
-                .findByTenantIdAndEmail(tenantId, req.email().toLowerCase())
-                .orElseGet(() -> RecApplicant.create(tenantId,
-                        req.firstName(), req.lastName(), req.email(),
-                        req.phone(), req.location(), req.linkedinUrl(),
-                        req.portfolioUrl(), cvReference, req.cvFileName()));
+        RecApplicant applicant = existing.orElseGet(() -> RecApplicant.create(tenantId,
+                req.firstName().trim(), req.lastName().trim(), email,
+                req.phone(), req.location(), req.linkedinUrl(),
+                req.portfolioUrl(), cvReference, req.cvFileName()));
 
         // Update CV if provided
         if (cvReference != null) applicant.updateCv(cvReference, req.cvFileName());
         applicantRepo.save(applicant);
-
-        // Check for duplicate application
-        if (applicationRepo.findByJobIdAndApplicantId(jobId, applicant.getId()).isPresent()) {
-            throw new HandyFlowException("You have already applied for this position",
-                    HttpStatus.BAD_REQUEST, "DUPLICATE_APPLICATION");
-        }
 
         RecApplication application = RecApplication.create(tenantId, jobId,
                 applicant.getId(), req.source(), req.referrerName());
@@ -319,6 +325,8 @@ public class RecruiterService {
     @Transactional
     public void updateApplicantProfile(String token, UpdateApplicantRequest req) {
         RecApplicant applicant = findByToken(token);
+        String profileProblem = RecruiterPublicRules.profileProblem(req.phone(), req.location(), req.linkedinUrl(), req.portfolioUrl());
+        if (profileProblem != null) throw new HandyFlowException(profileProblem, HttpStatus.BAD_REQUEST, "INVALID_PROFILE");
         applicant.updateProfile(req.phone(), req.location(),
                 req.linkedinUrl(), req.portfolioUrl());
         if (req.cvBase64() != null) applicant.updateCv(storeCv(req.cvBase64(), req.cvFileName()), req.cvFileName());
@@ -333,6 +341,8 @@ public class RecruiterService {
         if (!app.getApplicantId().equals(applicant.getId())) {
             throw new HandyFlowException("Not authorised", HttpStatus.FORBIDDEN, "FORBIDDEN");
         }
+        String withdrawProblem = RecruiterPublicRules.withdrawProblem(app.getStage());
+        if (withdrawProblem != null) throw new HandyFlowException(withdrawProblem, HttpStatus.BAD_REQUEST, "CANNOT_WITHDRAW");
         String prevStage = app.getStage();
         app.withdraw();
         applicationRepo.save(app);
@@ -766,6 +776,9 @@ public class RecruiterService {
         if (name == null || name.isBlank()) name = "Recruiter";
         return moveStage(tenantId, id, req, name);
     }
+
+    /** Today in South Africa, where a closing date is a calendar day. */
+    private static LocalDate today() { return LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg")); }
 
     private TenantId resolveTenantBySlug(String slug) {
         try {
