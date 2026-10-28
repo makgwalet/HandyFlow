@@ -1,7 +1,8 @@
 // Internal Audit: routes each section of the module to its screen. Shared lists are loaded once here.
 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
+import { EngagementDetail } from "./EngagementDetail"
 import { apiClient } from "../../api/client"
 import { InternalAuditDashboard } from "./InternalAuditDashboard"
 import { CommitteeReport } from "./CommitteeReport"
@@ -28,6 +29,7 @@ function LoadFailed({ show }: { show: boolean }) {
 export default function InternalAuditPage() {
   const qc = useQueryClient()
   const navigate = useNavigate()
+  const { engagementId } = useParams<{ engagementId?: string }>()
 
   const { data: universe = [], isLoading: universeLoading, isError: universeError } = useQuery<UniverseEntry[]>({
     queryKey: ["ia-universe"],
@@ -49,10 +51,13 @@ export default function InternalAuditPage() {
   // Sections are routes (/internal-audit/:section) with navigation in the sidebar
   // (see navigation/moduleSections.ts). The shared data above is loaded once for
   // all three sections, as before.
+  const current = engagementId ? engagements.find(e => e.id === engagementId) : undefined
+  const detail = engagementId ? { label: current?.name ?? "Engagement", subtitle: current?.universeEntryName } : undefined
   return (
-    <SectionedModulePage config={INTERNAL_AUDIT_SECTIONS}
+    <SectionedModulePage config={INTERNAL_AUDIT_SECTIONS} detail={detail}
       subtitle="Risk-based audit planning and delivery: universe, plans, engagements, reporting, quality and monitoring"
       render={id => {
+        if (engagementId) return engagementsLoading ? null : current ? <EngagementDetail engagement={current} users={users} onBack={() => navigate("/internal-audit/engagements")} /> : <LoadFailed show />
         switch (id) {
           case "reports":     return <ReportsSection />
           case "findings":    return <RemediationSection />

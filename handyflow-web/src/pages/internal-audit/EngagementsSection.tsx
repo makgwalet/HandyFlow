@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useNavigate } from "react-router-dom"
 import { apiClient } from "../../api/client"
 import ActionPlansPanel from "./ActionPlansPanel"
 import ReviewNotesPanel from "./ReviewNotesPanel"
@@ -17,6 +18,7 @@ export function EngagementsSection({ engagements, universe, plans, users, isLoad
   engagements: Engagement[]; universe: UniverseEntry[]; plans: AnnualPlan[]; users: UserOption[]
   isLoading: boolean; qc: ReturnType<typeof useQueryClient>
 }) {
+  const navigate = useNavigate()
   const [error, setError] = useState("")
   const [expanded, setExpanded] = useState<string | null>(null)
   const [stage, setStage] = useState<Group | "all">("all")
@@ -302,6 +304,8 @@ export function EngagementsSection({ engagements, universe, plans, users, isLoad
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{shortDate(e.startDate)} – {shortDate(e.endDate)}</span>
                   <StagePill label={engagementStage(e.status).label} group={engagementStage(e.status).group} />
+                  <button type="button" onClick={ev => { ev.stopPropagation(); navigate(`/internal-audit/engagements/${e.id}`) }}
+                    style={{ background: "none", border: "none", padding: 0, color: "var(--hf-primary-text)", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>Details</button>
                 </div>
               </div>
 

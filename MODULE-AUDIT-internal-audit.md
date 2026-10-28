@@ -63,3 +63,18 @@ New section **Risk Heat Map** (needs `AUDIT_READ`), backed by `GET /internal-aud
 - The square colours are a standard 5 by 5 convention, not the assessment's own formula, which adds five inputs (inherent, control, past findings, time since last audit, business impact) and can put an area in a different level than its square. The screen says so.
 - Process areas are grouped by the universe entry's free-text process area, case-insensitively; spellings that differ other than in case are separate rows.
 - Not compiled or run: `AuditHeatMapService`, the controller (Spring). Run: `RiskHeatMapTest` (7, offline), `heatMap.test.ts` (4, under Node); the screen was server-rendered once with data. `HeatMap.test.tsx` is written but not run.
+
+## 5. Engagement detail page and workpapers split view (patch 0515)
+
+Each row in the Engagements list now has a **Details** link to `/internal-audit/engagements/{id}`, a page with three tabs. It is backed by `GET /internal-audit/engagements/{id}/summary` (needs `AUDIT_READ`).
+
+- **Overview:** overall progress, signed-off workpapers, open findings, overdue actions, team size; progress by phase (Planning, Fieldwork, Testing, Reporting); and milestones (done, in progress, pending, late).
+- **Workpapers:** the current version of every workpaper on the left (search, status and section filters), the chosen one on the right with who prepared, reviewed and signed it off, its review comments (the existing panel) and a **Download** button. Download is new: `GET /internal-audit/workpaper-files/{id}/content` (needs `AUDIT_READ`), and each download is recorded in the audit trail as `AUDIT_WORKPAPER_DOWNLOADED`.
+- **Findings & actions:** the Findings & Remediation screen limited to this engagement.
+
+**How progress is worked out (not stored):** Planning is five items set (objectives, scope, criteria and the materiality figures); Fieldwork is signed-off workpapers over all workpapers; Testing is programme steps done, or sampled items tested when there is no programme; Reporting follows the report stage (25, 50, 75, 100). Overall is the plain average of the four.
+
+**Limits**
+- Planning, sampling and testing, team changes and uploading workpapers are still done in the Engagements list; the detail page links back to it.
+- Workpapers are loaded one folder at a time (existing endpoints), so an engagement with many folders makes one call per folder.
+- Not compiled or run: `AuditEngagementSummaryService`, `AuditWorkpaperDownloadService` and both controllers (Spring). Run: `EngagementSummaryBuilderTest` (10) and `DownloadNamesTest` (3) offline, and `engagementDetail.test.ts` (6, under Node). tsc and eslint are clean on the new files. Nothing was viewed in a browser, and no component test was written for the two new screens.

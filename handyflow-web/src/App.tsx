@@ -309,6 +309,7 @@ export default function App() {
             <Route path="/security/:section?" element={<SecurityPage />} />
             <Route path="/fuel/:section?" element={<FuelPage />} />
             <Route path="/facilities/:section?" element={<FacilitiesPage />} />
+            <Route path="/internal-audit/:section/:engagementId" element={<InternalAuditPage />} />
             <Route path="/internal-audit/:section?" element={<InternalAuditPage />} />
             <Route path="/earthmoving/:section?" element={<EarthMovingPage />} />
             <Route path="/property/:section?" element={<PropertyPage />} />

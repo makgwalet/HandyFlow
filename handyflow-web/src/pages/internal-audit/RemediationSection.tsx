@@ -16,7 +16,7 @@ const link: React.CSSProperties = { background: "none", border: "none", padding:
 
 const todayJhb = () => new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" })
 
-export function RemediationSection({ today }: { today?: string }) {
+export function RemediationSection({ today, engagementId }: { today?: string; engagementId?: string }) {
   const now = today ?? todayJhb()
   const { data, isLoading, isError } = useQuery({ queryKey: ["ia-remediation"], queryFn: auditRemediationApi.board })
   const [tab, setTab] = useState<"findings" | "actions">("findings")
@@ -29,8 +29,12 @@ export function RemediationSection({ today }: { today?: string }) {
   if (isError || !data) return <div role="alert" style={{ padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, color: "var(--hf-danger-text)", fontSize: 13 }}>Findings could not be loaded. Refresh the page; if it keeps failing, contact support.</div>
 
   const s = data.summary
-  const findings = filterFindings(data.findings, ff)
-  const actions = filterActions(data.actions, af)
+  // Inside an engagement, only that engagement's findings and the actions that answer them.
+  const scopedFindings = engagementId ? data.findings.filter(f => f.engagementId === engagementId) : data.findings
+  const scopedIds = new Set(scopedFindings.map(f => f.id))
+  const scopedActions = engagementId ? data.actions.filter(a => scopedIds.has(a.findingId)) : data.actions
+  const findings = filterFindings(scopedFindings, ff)
+  const actions = filterActions(scopedActions, af)
   const pf = paginate(findings, page, PAGE_SIZE)
   const pa = paginate(actions, page, PAGE_SIZE)
   const setFind = (patch: Partial<FindingFilter>) => { setFf({ ...ff, ...patch }); setPage(1) }
@@ -38,19 +42,19 @@ export function RemediationSection({ today }: { today?: string }) {
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <div style={grid(170)}>
+      {!engagementId && <div style={grid(170)}>
         <Stat label="Open findings" value={s.open + s.inProgress} sub={`${s.openCritical} critical, ${s.openHigh} high`} />
         <Stat label="Past due" value={s.pastDue} tone={s.pastDue ? "danger" : undefined} sub="open findings past their date" />
         <Stat label="Open with no action" value={s.openWithoutAction} tone={s.openWithoutAction ? "warning" : undefined} sub="nothing agreed yet" />
         <Stat label="Actions overdue" value={s.actionsOverdue} tone={s.actionsOverdue ? "danger" : undefined} sub={`${s.actionsAwaiting} awaiting validation`} />
         <Stat label="Actions validated" value={`${s.remediationPct}%`} sub={`${s.actionsValidated} of ${s.actions}`} />
-      </div>
+      </div>}
 
       <div role="tablist" aria-label="Findings or actions" style={{ display: "flex", gap: 6 }}>
         {(["findings", "actions"] as const).map(t => (
           <button key={t} role="tab" aria-selected={tab === t} onClick={() => { setTab(t); setPage(1) }}
             style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--hf-border)", background: tab === t ? "var(--hf-info-soft)" : "var(--hf-surface)", color: tab === t ? "var(--hf-primary-text)" : "var(--hf-text-secondary)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-            {t === "findings" ? `Findings (${s.findings})` : `Actions (${data.actions.length})`}
+            {t === "findings" ? `Findings (${scopedFindings.length})` : `Actions (${scopedActions.length})`}
           </button>
         ))}
       </div>
@@ -71,7 +75,7 @@ export function RemediationSection({ today }: { today?: string }) {
               <option value="settled">Resolved or closed</option>
             </select>
           </FilterBar>
-          {findings.length === 0 ? <p style={{ fontSize: 13, color: MUTED }}>{data.findings.length === 0 ? "No findings have been raised yet." : "No findings match these filters."}</p> : (
+          {findings.length === 0 ? <p style={{ fontSize: 13, color: MUTED }}>{scopedFindings.length === 0 ? "No findings have been raised yet." : "No findings match these filters."}</p> : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
                 <thead><tr><th style={th}>Finding</th><th style={th}>Severity</th><th style={th}>Status</th><th style={th}>Owner</th><th style={th}>Due</th><th style={th}>Remediation</th><th style={th} aria-label="Open" /></tr></thead>
@@ -115,7 +119,7 @@ export function RemediationSection({ today }: { today?: string }) {
               <option value="validated">Validated</option>
             </select>
           </FilterBar>
-          {actions.length === 0 ? <p style={{ fontSize: 13, color: MUTED }}>{data.actions.length === 0 ? "No action plans have been agreed yet." : "No actions match these filters."}</p> : (
+          {actions.length === 0 ? <p style={{ fontSize: 13, color: MUTED }}>{scopedActions.length === 0 ? "No action plans have been agreed yet." : "No actions match these filters."}</p> : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 680 }}>
                 <thead><tr><th style={th}>Action</th><th style={th}>Finding</th><th style={th}>Owner</th><th style={th}>Due</th><th style={th}>Status</th></tr></thead>
@@ -137,7 +141,7 @@ export function RemediationSection({ today }: { today?: string }) {
         </div>
       )}
 
-      {open && <FindingPanel finding={open} actions={data.actions.filter(a => a.findingId === open.id)} today={now} onClose={() => setOpen(null)} />}
+      {open && <FindingPanel finding={open} actions={scopedActions.filter(a => a.findingId === open.id)} today={now} onClose={() => setOpen(null)} />}
     </div>
   )
 }
