@@ -140,7 +140,7 @@ class EasyFileRulesTest {
         Person noId = new Person("712345678920270200000000000001", "IT3A", "Dlamini", "Jane", null, null, LocalDate.of(1990, 5, 17), "EMP-2", null, null,
                 new Address(null, null, null, null), LocalDate.of(2026, 3, 1), LocalDate.of(2027, 2, 28), d("12"), d("12"), LINES);
         List<String> m = EasyFileRules.problems(employer, List.of(noId));
-        assertTrue(m.stream().anyMatch(x -> x.contains("IT3(a)")));
+        assertTrue(m.stream().noneMatch(x -> x.contains("IT3(a)")));
         assertTrue(m.stream().anyMatch(x -> x.contains("13-digit ID")));
         assertTrue(m.stream().anyMatch(x -> x.contains("residential street address")));
     }
@@ -193,5 +193,81 @@ class EasyFileRulesTest {
     void aPassportWithoutItsCountryOrNeitherIsReported() {
         assertTrue(EasyFileRules.problems(employer, List.of(passportHolder("AB123456", null))).stream().anyMatch(m -> m.contains("passport number with its country")));
         assertTrue(EasyFileRules.problems(employer, List.of(passportHolder(null, null))).stream().anyMatch(m -> m.contains("13-digit ID number, or a passport")));
+    }
+
+    @Test
+    void anIt3aCarriesItsReasonCodeAndNoTax() {
+        List<TaxCertificateRules.Line> lines = List.of(new TaxCertificateRules.Line("3601", "Income", d("5000.00")),
+                new TaxCertificateRules.Line("4102", "PAYE", d("0.00")), new TaxCertificateRules.Line("4141", "UIF", d("100.00")),
+                new TaxCertificateRules.Line("4142", "SDL", d("50.00")));
+        Person p = person("9005175800083", "IT3A", lines);
+        assertTrue(EasyFileRules.problems(employer, List.of(p)).isEmpty(), EasyFileRules.problems(employer, List.of(p)).toString());
+        String row = EasyFileRules.file(employer, List.of(p)).split("\r\n")[1];
+        assertTrue(row.contains(",3015,\"IT3(a)\","), row);
+        assertTrue(row.contains(",4150,2,"), row);
+        List<TaxCertificateRules.Line> withCredit = new ArrayList<>(lines);
+        withCredit.add(new TaxCertificateRules.Line("4116", "Medical credit", d("376.00")));
+        assertTrue(EasyFileRules.file(employer, List.of(person("9005175800083", "IT3A", withCredit))).split("\r\n")[1].contains(",4150,8,"));
+        assertFalse(EasyFileRules.file(employer, List.of(ok())).contains(",4150,"));
+    }
+
+    @Test
+    void totalsAlreadyOnTheCertificateAreWorkedOutAgainNotWrittenTwice() {
+        List<TaxCertificateRules.Line> lines = new ArrayList<>(LINES);
+        lines.add(new TaxCertificateRules.Line("3699", "Total", d("999999.99")));
+        lines.add(new TaxCertificateRules.Line("4149", "Total", d("1.00")));
+        String row = EasyFileRules.file(employer, List.of(person("9005175800083", "IRP5", lines))).split("\r\n")[1];
+        assertEquals(1, row.split(",3699,", -1).length - 1);
+        assertEquals(1, row.split(",4149,", -1).length - 1);
+        assertTrue(row.contains(",3699,385000,"), row);
+        assertTrue(row.contains(",4149,94287.68,"), row);
+    }
+
+    private Person withEti(List<EtiRules.Month> months) {
+        return new Person("712345678920270200000000000001", "IRP5", "Dlamini", "Jane Mary Ann", "9005175800083", "1234567890", LocalDate.of(1990, 5, 17), "EMP-1",
+                "jane@acme.test", "082 555 0101", new Address("5 Oak Street", "Bedfordview", "Johannesburg", "2007"),
+                LocalDate.of(2026, 3, 1), LocalDate.of(2027, 2, 28), d("12"), d("12"), LINES, null, null, LocalDate.of(2026, 3, 1), months);
+    }
+
+    private static EtiRules.Month month(int m, String eti, int cycle, int hours) {
+        return new EtiRules.Month(m, d("4500.00"), d("4838.40"), d(eti), cycle, hours, d("4500.00"));
+    }
+
+    @Test
+    void theEtiIndicatorStartDateAndMonthlySetsAreWritten() {
+        String row = EasyFileRules.file(employer, List.of(withEti(List.of(month(3, "1000.00", 1, 160), month(4, "0", 0, 160))))).split("\r\n")[1];
+        assertTrue(row.contains(",3026,\"Y\","), row);
+        assertTrue(row.contains(",3190,20260301,"), row);
+        int first = row.indexOf(",7002,");
+        assertTrue(first > 0);
+        String sets = row.substring(first);
+        assertTrue(sets.startsWith(",7002,4500.00,7003,4838.40,7004,1000.00,7005,1,7006,03,7007,160,7008,4500.00,7002,4500.00,7003,4838.40,7004,0.00,7005,0,7006,04,7007,160,7008,4500.00,9999"), sets);
+        assertTrue(EasyFileRules.problems(employer, List.of(withEti(List.of(month(3, "1000.00", 1, 160))))).isEmpty());
+    }
+
+    @Test
+    void noEtiMeansTheIndicatorIsNAndNoEtiCodes() {
+        String row = EasyFileRules.file(employer, List.of(ok())).split("\r\n")[1];
+        assertTrue(row.contains(",3026,\"N\","), row);
+        assertFalse(row.contains(",7002,") || row.contains(",3190,"), row);
+    }
+
+    @Test
+    void etiNeedsHoursAndAStartDate() {
+        assertTrue(EasyFileRules.problems(employer, List.of(withEti(List.of(month(3, "1000.00", 1, 0))))).stream().anyMatch(m -> m.contains("no hours")));
+        Person noStart = new Person("712345678920270200000000000001", "IRP5", "Dlamini", "Jane Mary Ann", "9005175800083", "1234567890", LocalDate.of(1990, 5, 17), "EMP-1",
+                "jane@acme.test", "082 555 0101", new Address("5 Oak Street", "Bedfordview", "Johannesburg", "2007"),
+                LocalDate.of(2026, 3, 1), LocalDate.of(2027, 2, 28), d("12"), d("12"), LINES, null, null, null, List.of(month(3, "1000.00", 1, 160)));
+        assertTrue(EasyFileRules.problems(employer, List.of(noStart)).stream().anyMatch(m -> m.contains("started work")));
+    }
+
+    @Test
+    void theReasonCodeIsNotAnAmountInTheTotalsRecord() {
+        List<TaxCertificateRules.Line> lines = List.of(new TaxCertificateRules.Line("3601", "Income", d("5000.00")), new TaxCertificateRules.Line("4102", "PAYE", d("0.00")),
+                new TaxCertificateRules.Line("4141", "UIF", d("100.00")), new TaxCertificateRules.Line("4142", "SDL", d("50.00")));
+        String[] rows = EasyFileRules.file(employer, List.of(person("9005175800083", "IT3A", lines))).split("\r\n");
+        String[] t = rows[rows.length - 1].split(",");
+        // 5 000 income + 5 000 3699 + 0 + 100 + 50 + 150 (4149) = 10 300
+        assertEquals("10300.00", t[5]);
     }
 }

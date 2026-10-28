@@ -177,6 +177,8 @@ public class TaxCertificateService {
         return new Prepared(taxYear, period, window, issued.size(), settings, general, recon, drafts);
     }
 
+    private static BigDecimal nz(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
+
     private static BigDecimal sum(List<HrPayslip> l, java.util.function.Function<HrPayslip, BigDecimal> f) {
         return l.stream().map(p -> f.apply(p) == null ? BigDecimal.ZERO : f.apply(p)).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
@@ -194,7 +196,13 @@ public class TaxCertificateService {
                 sum(l, HrPayslip::getSeveranceAmount), sum(l, HrPayslip::getSeveranceTax));
     }
 
-    private static boolean sameLines(List<TaxCertificateRules.Line> lines, List<HrTaxCertificateLine> stored) {
+    /**
+     * Whether a draft says what an issued certificate says. The totals and the reason code follow from the other codes, so a certificate
+     * issued before they were shown is not "changed" for lacking them.
+     */
+    private static boolean sameLines(List<TaxCertificateRules.Line> all, List<HrTaxCertificateLine> storedAll) {
+        List<TaxCertificateRules.Line> lines = all.stream().filter(l -> !TaxCertificateRules.DERIVED.contains(l.code())).toList();
+        List<HrTaxCertificateLine> stored = storedAll.stream().filter(l -> !TaxCertificateRules.DERIVED.contains(l.getCode())).toList();
         if (lines.size() != stored.size()) return false;
         Map<String, BigDecimal> have = stored.stream().collect(Collectors.toMap(HrTaxCertificateLine::getCode, HrTaxCertificateLine::getAmount, (a, b) -> a));
         for (var l : lines) {
@@ -418,6 +426,12 @@ public class TaxCertificateService {
                 .filter(e -> tenantId.getValue().equals(e.getTenantId())).collect(Collectors.toMap(HrEmployee::getId, e -> e));
 
         List<String> extra = new ArrayList<>();
+        // The payslips of the included runs, for the employment tax incentive information of each month.
+        Map<UUID, LocalDate> runEnds = new HashMap<>();
+        for (HrPayRun r : payRunRepo.paidBetween(tenantId, window.start(), window.end()))
+            if (!PayRunWorkflowRules.CANCELLED.equals(r.getStatus()) && PayRunWorkflowRules.isIssued(r.getStatus())) runEnds.put(r.getId(), r.getPeriodEnd());
+        Map<UUID, List<HrPayslip>> slipsOf = runEnds.isEmpty() ? Map.of() : payslipRepo.findByPayRuns(runEnds.keySet()).stream()
+                .collect(Collectors.groupingBy(HrPayslip::getEmployeeId));
         List<EasyFileRules.Person> people = new ArrayList<>();
         for (HrTaxCertificate c : certs) {
             HrEmployee emp = employees.get(c.getEmployeeId());
@@ -428,14 +442,17 @@ public class TaxCertificateService {
                 default -> BigDecimal.valueOf(12);
             };
             String who = (c.getFirstNames() + " " + c.getSurname()).trim() + " (" + c.getEmployeeNumber() + ")";
-            if (emp != null && payslipRepo.etiMonthsBefore(emp.getId(), window.end().plusDays(1)) - payslipRepo.etiMonthsBefore(emp.getId(), window.start()) > 0)
-                extra.add(who + ": the employment tax incentive was claimed in this period, and the monthly incentive records are not in the file yet.");
+            List<EtiRules.Slip> etiSlips = new ArrayList<>();
+            for (HrPayslip s : slipsOf.getOrDefault(c.getEmployeeId(), List.of()))
+                etiSlips.add(new EtiRules.Slip(runEnds.get(s.getPayRunId()), nz(s.getTotalEarnings()).subtract(nz(s.getSeveranceAmount())), s.getEtiAmount(), s.getEtiMonth(),
+                        s.getDaysPaid(), s.getDaysInPeriod() == null ? 0 : s.getDaysInPeriod()));
+            List<EtiRules.Month> etiMonths = EtiRules.months(etiSlips, taxYear);
             people.add(new EasyFileRules.Person(c.getCertificateNumber(), c.getCertificateType(), c.getSurname(), c.getFirstNames(), c.getIdNumber(), c.getTaxNumber(),
                     c.getDateOfBirth(), c.getEmployeeNumber(), emp == null ? null : emp.getEmail(), emp == null ? null : emp.getPhone(),
                     new EasyFileRules.Address(a.get("street"), a.get("suburb"), a.get("city"), a.get("postalCode")), c.getPeriodFrom(), c.getPeriodTo(),
                     periods, BigDecimal.valueOf(c.getPayslipCount()),
                     lines.getOrDefault(c.getId(), List.of()).stream().map(l -> new TaxCertificateRules.Line(l.getCode(), l.getDescription(), l.getAmount())).toList(),
-                    c.getPassportNumber(), c.getPassportCountry()));
+                    c.getPassportNumber(), c.getPassportCountry(), emp == null ? null : emp.getStartDate(), etiMonths));
         }
         List<String> problems = new ArrayList<>(EasyFileRules.problems(employer, people));
         problems.addAll(extra);

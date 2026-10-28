@@ -27,17 +27,27 @@ public final class EasyFileRules {
     public record Person(String certificateNumber, String type, String surname, String firstNames, String idNumber, String taxNumber, LocalDate dateOfBirth,
                          String employeeNumber, String email, String phone, Address address, LocalDate from, LocalDate to,
                          BigDecimal payPeriods, BigDecimal periodsWorked, List<TaxCertificateRules.Line> lines,
-                         String passportNumber, String passportCountry) {
+                         String passportNumber, String passportCountry, LocalDate employedFrom, List<EtiRules.Month> eti) {
+        /** Without employment tax incentive information, as the person was before it was written. */
+        public Person(String certificateNumber, String type, String surname, String firstNames, String idNumber, String taxNumber, LocalDate dateOfBirth,
+                      String employeeNumber, String email, String phone, Address address, LocalDate from, LocalDate to,
+                      BigDecimal payPeriods, BigDecimal periodsWorked, List<TaxCertificateRules.Line> lines,
+                      String passportNumber, String passportCountry) {
+            this(certificateNumber, type, surname, firstNames, idNumber, taxNumber, dateOfBirth, employeeNumber, email, phone, address, from, to,
+                    payPeriods, periodsWorked, lines, passportNumber, passportCountry, null, List.of());
+        }
+
         /** Without a passport, as the person was before passports were kept. */
         public Person(String certificateNumber, String type, String surname, String firstNames, String idNumber, String taxNumber, LocalDate dateOfBirth,
                       String employeeNumber, String email, String phone, Address address, LocalDate from, LocalDate to,
                       BigDecimal payPeriods, BigDecimal periodsWorked, List<TaxCertificateRules.Line> lines) {
             this(certificateNumber, type, surname, firstNames, idNumber, taxNumber, dateOfBirth, employeeNumber, email, phone, address, from, to,
-                    payPeriods, periodsWorked, lines, null, null);
+                    payPeriods, periodsWorked, lines, null, null, null, List.of());
         }
 
         /** The 13-digit ID goes in the file when there is one; otherwise the passport does. */
         boolean usesId() { return idNumber != null && idNumber.matches("\\d{13}"); }
+        boolean hasEti() { return eti != null && !eti.isEmpty(); }
         boolean hasPassport() { return !blank(passportNumber) && !blank(passportCountry); }
         String label() { return (firstNames == null ? "" : firstNames + " ") + (surname == null ? "" : surname) + (employeeNumber == null ? "" : " (" + employeeNumber + ")"); }
     }
@@ -45,7 +55,8 @@ public final class EasyFileRules {
     public static final String SOFTWARE_PROVIDER = "HandyFlow", SOFTWARE_PACKAGE = "HandyFlow HR";
 
     /** Codes whose amount keeps its cents; every other Rand amount is whole Rand rounded down. */
-    private static final java.util.Set<String> WITH_CENTS = java.util.Set.of("4101", "4102", "4115", "4116", "4118", "4120", "4141", "4142", "4149");
+    private static final java.util.Set<String> WITH_CENTS = java.util.Set.of("4101", "4102", "4115", "4116", "4118", "4120", "4141", "4142", "4149",
+            "7002", "7003", "7004", "7008");
 
     /** The codes that make up 4149, total tax, SDL and UIF. */
     private static final java.util.Set<String> TOTALLED = java.util.Set.of("4101", "4102", "4115", "4141", "4142");
@@ -68,8 +79,9 @@ public final class EasyFileRules {
         if (people.isEmpty()) out.add("There are no issued certificates for this period.");
         for (Person p : people) {
             String who = p.label() + ": ";
-            if (isIt3a(p.type()))
-                out.add(who + "this is an IT3(a) certificate, which needs a SARS reason code that HandyFlow does not hold yet, so the file cannot include it.");
+            for (EtiRules.Month m : p.eti() == null ? List.<EtiRules.Month>of() : p.eti())
+                if (m.cycle() > 0 && m.hours() < 1) out.add(who + "the employment tax incentive for month " + m.calendarMonth() + " has no hours.");
+            if (p.hasEti() && p.employedFrom() == null) out.add(who + "the employment tax incentive needs the date the person started work.");
             if (!p.usesId() && !p.hasPassport())
                 out.add(who + "a 13-digit ID number, or a passport number with its country, is needed.");
             else if (p.usesId() && p.dateOfBirth() != null && !p.idNumber().startsWith(String.format("%02d%02d%02d", p.dateOfBirth().getYear() % 100, p.dateOfBirth().getMonthValue(), p.dateOfBirth().getDayOfMonth())))
@@ -96,7 +108,7 @@ public final class EasyFileRules {
             for (String[] pair : r) {
                 codeTotal += Integer.parseInt(pair[0]);
                 int c = Integer.parseInt(pair[0]);
-                if (c >= 3601 && c <= 4497 || c >= 7002 && c <= 7004) amountTotal = amountTotal.add(new BigDecimal(pair[1]));
+                if (c >= 3601 && c <= 4497 && c != 4150 || c >= 7002 && c <= 7004) amountTotal = amountTotal.add(new BigDecimal(pair[1]));
             }
         }
         List<String[]> trailer = new ArrayList<>();
@@ -150,7 +162,7 @@ public final class EasyFileRules {
         p.text("3015", isIt3a(x.type()) ? "IT3(a)" : "IRP5", 6);
         p.text("3020", "A", 1);
         p.num("3025", String.valueOf(e.taxYear()));
-        p.text("3026", "N", 1);
+        p.text("3026", x.hasEti() ? "Y" : "N", 1);
         p.text("3030", x.surname(), 120);
         p.text("3040", firstTwo(x.firstNames()), 90);
         p.text("3050", initials(x.firstNames()), 5);
@@ -172,6 +184,7 @@ public final class EasyFileRules {
         if (!blank(x.employeeNumber())) p.text("3160", x.employeeNumber(), 25);
         p.num("3170", x.from().format(DAY));
         p.num("3180", x.to().format(DAY));
+        if (x.hasEti() && x.employedFrom() != null) p.num("3190", x.employedFrom().format(DAY));
         p.text("3195", "N", 1);
         p.num("3200", x.payPeriods().setScale(4, RoundingMode.HALF_UP).toPlainString());
         p.num("3210", x.periodsWorked().setScale(4, RoundingMode.HALF_UP).toPlainString());
@@ -192,6 +205,8 @@ public final class EasyFileRules {
         BigDecimal income = BigDecimal.ZERO, tax = BigDecimal.ZERO;
         java.util.Set<String> have = new java.util.HashSet<>();
         for (TaxCertificateRules.Line l : lines) {
+            // The totals and the reason are worked out here, from the whole-Rand amounts the file carries.
+            if (TaxCertificateRules.DERIVED.contains(l.code())) continue;
             String amount = amount(l.code(), l.amount());
             if (isIncome(l.code())) income = income.add(new BigDecimal(amount));
             if (TOTALLED.contains(l.code())) tax = tax.add(new BigDecimal(amount));
@@ -206,17 +221,30 @@ public final class EasyFileRules {
         if (have.contains("4475") && !have.contains("4006")) p.num("4006", "0");
         if (income.signum() > 0) p.num("3699", income.toPlainString());
         p.num("4149", tax.setScale(2, RoundingMode.DOWN).toPlainString());
+        if (isIt3a(x.type()))
+            p.num("4150", String.valueOf(TaxCertificateRules.reasonCode(lines.stream().filter(l -> "4116".equals(l.code())).map(TaxCertificateRules.Line::amount).findFirst().orElse(null))));
+        // Employment tax incentive: one set of codes for each month, in code order, after the certificate's own codes.
+        if (x.hasEti()) {
+            for (EtiRules.Month m : x.eti()) {
+                p.repeated("7002", cents(m.remuneration()));
+                p.repeated("7003", cents(m.minimumWage()));
+                p.repeated("7004", cents(m.eti()));
+                p.repeated("7005", String.valueOf(m.cycle()));
+                p.repeated("7006", String.format("%02d", m.calendarMonth()));
+                p.repeated("7007", String.valueOf(m.hours()));
+                p.repeated("7008", cents(m.wagePaid()));
+            }
+        }
         return p.done();
     }
 
     // ── Pieces ──────────────────────────────────────────────────────────────────────────────────
 
+    private static String cents(BigDecimal v) { return (v == null ? BigDecimal.ZERO : v).setScale(2, RoundingMode.DOWN).toPlainString(); }
+
     private static boolean isIt3a(String type) { return "IT3A".equals(type) || "IT3(a)".equals(type); }
 
-    private static boolean isIncome(String code) {
-        int c = Integer.parseInt(code);
-        return c >= 3601 && c <= 3957 && c != 3695 && c != 3696 && c != 3697 && c != 3698 && c != 3699;
-    }
+    private static boolean isIncome(String code) { return TaxCertificateRules.isIncomeCode(code); }
 
     static String amount(String code, BigDecimal v) {
         BigDecimal a = v == null ? BigDecimal.ZERO : v;
@@ -259,8 +287,12 @@ public final class EasyFileRules {
         private final List<String[]> out = new ArrayList<>();
         void text(String code, String v, int max) { out.add(new String[]{code, "\"" + clean(v, max) + "\""}); }
         void num(String code, String v) { out.add(new String[]{code, v}); }
+        /** Pairs that repeat (one set for each month) keep the order they are given in, after the sorted ones. */
+        private final List<String[]> tail = new ArrayList<>();
+        void repeated(String code, String v) { tail.add(new String[]{code, v}); }
         List<String[]> done() {
             out.sort(Comparator.comparingInt(a -> Integer.parseInt(a[0])));
+            out.addAll(tail);
             out.add(new String[]{"9999", "9999"});
             return out;
         }

@@ -16,9 +16,8 @@ import java.util.List;
  *       March to February. SARS: interim certificates are sent to SARS only and are not given to employees.</li>
  *   <li>Only the codes that map one-to-one to what a payslip holds are produced: 3601, 3605, 3607, 3713 and 3701 for
  *       income, 4001/4003/4006 and 4005 for the employee's contributions, and 4102, 4116, 4141 and 4142 for tax; severance adds 3901 with the directed tax under 4115. The totals
- *       SARS also requires (3695 to 3699, 4149, 4582 and others) are not produced, because their definitions could not be
- *       confirmed from SARS's own documents; see {@link #NOT_PRODUCED}. A certificate from here is therefore a workpaper to
- *       complete in e@syFile, not a submission.</li>
+ *       3699 and 4149 are produced; 4150 gives the reason when an IT3(a) has no tax; the rest (3695, 3696, 4582 and others) are not,
+ *       see {@link #NOT_PRODUCED}. A certificate from here is therefore a workpaper to complete in e@syFile, not a submission.</li>
  *   <li>Amounts are rounded to cents; zero amounts are left out (SARS: income and deduction fields with a zero value are not
  *       reported), except the tax codes 4102, 4141 and 4142, which are reported to the cent even when zero.</li>
  * </ul>
@@ -31,9 +30,9 @@ public final class TaxCertificateRules {
 
     /** Codes SARS requires that this class does not produce, and why. Shown to the person preparing the submission. */
     public static final List<String> NOT_PRODUCED = List.of(
-            "3695, 3696 (gross non-taxable income), 3699 (gross employment income, taxable; the amounts in 3696 are not part of it) and 4149 (statutory total): SARS's 2027 code guide describes them, but the full list of codes each one adds up could not be read, so they are not shown on the certificate. The e@syFile file does carry 3699 (the sum of the income codes) and 4149 (the sum of 4102, 4141 and 4142), worked out when it is made, because SARS's file layout lists them as mandatory. 3697 and 3698 have not applied since the 2017 year of assessment and are correctly left out.",
+            "3695 and 3696 (gross non-taxable income): not produced. 3695 is not in SARS's 2027 code guide, and there is no non-taxable income code here, so 3696 would always be nil. 3697 and 3698 have not applied since the 2017 year of assessment and are correctly left out. 3699 (gross taxable employment income) is the sum of the income codes and 4149 the sum of the tax codes, SDL and UIF; the e@syFile file works them out again from its whole-Rand amounts.",
             "4582 and the taxable portion of the travel allowance: how SARS wants it reported could not be confirmed.",
-            "Employer contributions and other fringe benefits are reported under 3801, 3810, 3817, 3825, 3828 and 4472 to 4475, taken from a payroll vendor's code list rather than from SARS itself, and only what payroll recorded. Payslips made before benefits were recorded carry none, and the totals codes (3695, 3696 and 3699) are not produced, so check a certificate for an employee with benefits against SARS's own code list before submitting it.");
+            "Employer contributions and other fringe benefits are reported under 3801, 3810, 3817, 3825, 3828 and 4472 to 4475, taken from a payroll vendor's code list rather than from SARS itself, and only what payroll recorded. Payslips made before benefits were recorded carry none, and 3699 and 4149 are totals of what the certificate holds, so check a certificate for an employee with benefits against SARS's own code list before submitting it.");
 
     private TaxCertificateRules() {}
 
@@ -134,13 +133,54 @@ public final class TaxCertificateRules {
         add(out, "4116", "Medical tax credit applied against PAYE", t.medicalCredit());
         out.add(new Line("4141", "UIF contributions (employee and employer)", cents(t.uif())));
         out.add(new Line("4142", "Skills development levy", cents(t.sdl())));
+        // The totals SARS asks for beside the codes they add up. 3699 is the gross taxable employment income (every income code; there is
+        // no non-taxable income here, so 3696 is nil and left out); 4149 is the total of the tax codes, SDL and UIF.
+        BigDecimal income = ZERO, tax = ZERO;
+        for (Line l : out) {
+            if (isIncomeCode(l.code())) income = income.add(l.amount());
+            if (TAX_TOTALLED.contains(l.code())) tax = tax.add(l.amount());
+        }
+        add(out, "3699", "Gross employment income (taxable)", income);
+        out.add(new Line("4149", "Total tax, SDL and UIF", cents(tax)));
+        // An IT3(a) says why no tax was deducted.
+        if (IT3A.equals(certificateType(t))) {
+            int reason = reasonCode(t.medicalCredit());
+            out.add(new Line("4150", "Reason for no tax deducted: " + reasonText(reason), BigDecimal.valueOf(reason).setScale(2)));
+        }
         out.sort(java.util.Comparator.comparing(Line::code));
         return out;
     }
 
+    /** The codes that add up to 4149. */
+    public static final java.util.Set<String> TAX_TOTALLED = java.util.Set.of("4101", "4102", "4115", "4141", "4142");
+
+    /** Codes that follow from the others and are worked out again, not compared, when two certificates are checked for a change. */
+    public static final java.util.Set<String> DERIVED = java.util.Set.of("3699", "4149", "4150");
+
+    /** An income code: 3601 to 3957, without the totals 3695 to 3699. */
+    public static boolean isIncomeCode(String code) {
+        int c = Integer.parseInt(code);
+        return c >= 3601 && c <= 3957 && c != 3695 && c != 3696 && c != 3697 && c != 3698 && c != 3699;
+    }
+
+    /**
+     * SARS's reason for not deducting tax (code 4150): 8 when the medical scheme fees tax credit took the tax to nil, otherwise 2, earnings
+     * below the tax threshold. The other reasons (contractors, directors, nil directives, exempt foreign income, labour brokers) do not
+     * arise from a payslip made here.
+     */
+    public static int reasonCode(BigDecimal medicalCredit) { return medicalCredit != null && medicalCredit.signum() > 0 ? 8 : 2; }
+
+    public static String reasonText(int reason) {
+        return switch (reason) {
+            case 2 -> "earnings below the tax threshold";
+            case 8 -> "a medical scheme fees tax credit applies";
+            default -> "see SARS code " + reason;
+        };
+    }
+
     /** True when something is reported as income. SARS: at least one income code with a value above zero. */
     public static boolean hasIncome(List<Line> lines) {
-        return lines.stream().anyMatch(l -> l.code().startsWith("36") || l.code().startsWith("37"));
+        return lines.stream().anyMatch(l -> isIncomeCode(l.code()) && !"3699".equals(l.code()) && l.amount().signum() > 0);
     }
 
     /** IRP5 when tax was deducted, IT3(a) when none was. */

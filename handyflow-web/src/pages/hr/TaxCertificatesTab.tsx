@@ -9,7 +9,7 @@ import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Download } from "luc
 import { apiClient } from "../../api/client"
 import { useAuth } from "../../hooks/useAuth"
 import {
-  countBySeverity, defaultSelection, FUND_LABEL, issueSummary, needsReason, periodLabel, rand, reasonProblem, SEVERITY_STYLE,
+  countBySeverity, defaultSelection, FUND_LABEL, issueSummary, lineAmount, needsReason, periodLabel, rand, reasonProblem, SEVERITY_STYLE,
   settingsProblem, sic7Problem, taxRights, TYPE_LABEL, yearOptions, type Period, type Problem,
 } from "./taxCertificates.logic"
 
@@ -276,7 +276,7 @@ export default function TaxCertificatesTab() {
               <div style={{ fontWeight: 700, marginBottom: 4 }}>File for SARS e@syFile Employer</div>
               <p style={{ margin: "0 0 8px", fontSize: 12, color: "var(--hf-text-muted)" }}>
                 Made from the issued certificates. Import the test file first: e@syFile shows an error report on upload, and rejects the whole file if there is one.
-                Certificates of employees who claimed the employment tax incentive, IT3(a) certificates and employees without a 13-digit ID number cannot be included yet.
+                An IT3(a) carries its reason code (4150), and employees who claimed the employment tax incentive carry a set of incentive codes (7002 to 7008) for each month, worked out from their payslips; check both on the e@syFile error report. An employee needs a 13-digit ID number, or a passport with its country.
               </p>
               {easyCheck.isLoading && <div style={{ color: "var(--hf-text-faint)" }}>Checking…</div>}
               {easyCheck.isError && <div role="alert" style={{ color: "var(--hf-danger-text)" }}>{errorText(easyCheck.error, "The file could not be checked")}</div>}
@@ -349,7 +349,7 @@ function CertRow({ c, isOpen, errs, onToggle, canCancel, cancelReason, setCancel
         {c.problems.map((p, i) => { const sv = SEVERITY_STYLE[p.severity] ?? SEVERITY_STYLE.INFO; return <div key={i} style={{ fontSize: 12, color: sv.color, marginBottom: 4 }}>{sv.label}: {p.message}</div> })}
         <table style={{ borderCollapse: "collapse", marginTop: 6 }}>
           <thead><tr><th style={th}>Code</th><th style={th}>Description</th><th style={{ ...th, textAlign: "right" }}>Amount</th></tr></thead>
-          <tbody>{c.lines.map(l => <tr key={l.code}><td style={td}>{l.code}</td><td style={td}>{l.description}</td><td style={{ ...td, textAlign: "right" }}>{rand(l.amount)}</td></tr>)}</tbody>
+          <tbody>{c.lines.map(l => <tr key={l.code}><td style={td}>{l.code}</td><td style={td}>{l.description}</td><td style={{ ...td, textAlign: "right" }}>{lineAmount(l.code, l.amount)}</td></tr>)}</tbody>
         </table>
         {c.id && c.certificateNumber && (
           <div style={{ marginTop: 10 }}>

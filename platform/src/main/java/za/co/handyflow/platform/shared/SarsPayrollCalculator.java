@@ -66,12 +66,29 @@ public class SarsPayrollCalculator {
     // records are kept (80% is taxable — ITA s.8(1)(b)).
     private static final BigDecimal TRAVEL_TAXABLE_FRACTION = new BigDecimal("0.80");
 
-    // Medical Tax Credit rates 2025/26 — a credit against tax, not a
-    // deduction from income. R364/month for the taxpayer, R364 for a first
-    // dependant, R246 for each additional. Simplified to taxpayer-only
-    // here — no dependant data is captured anywhere upstream of this
-    // calculator yet, matching both prior engines' identical simplification.
-    private static final BigDecimal MTC_PRIMARY = new BigDecimal("364.00");
+    /**
+     * The figures that change with the tax year and that the tax tables do not carry: the monthly medical scheme fees tax credit for the
+     * taxpayer, the cap on the retirement deduction, and the rebates (used only when hr_tax_rebates has no row for the year). These are the
+     * values approved in migration V485 from SARS's own pages; the HR module reads them from hr_statutory_tax_years, which the bureau cannot
+     * (it may not depend on hr), so a new year must be added here as well until the bureau reads the same rows.
+     * A year is named by the year it ends: 2027 is 1 March 2026 to 28 February 2027.
+     */
+    record YearFigures(BigDecimal mtcTaxpayer, BigDecimal retirementCap, BigDecimal primary, BigDecimal secondary, BigDecimal tertiary) {}
+
+    private static final java.util.NavigableMap<Integer, YearFigures> YEARS = new java.util.TreeMap<>(java.util.Map.of(
+            2025, new YearFigures(new BigDecimal("364.00"), new BigDecimal("350000.00"), new BigDecimal("17235.00"), new BigDecimal("9444.00"), new BigDecimal("3145.00")),
+            2026, new YearFigures(new BigDecimal("364.00"), new BigDecimal("350000.00"), new BigDecimal("17235.00"), new BigDecimal("9444.00"), new BigDecimal("3145.00")),
+            2027, new YearFigures(new BigDecimal("376.00"), new BigDecimal("430000.00"), new BigDecimal("17820.00"), new BigDecimal("9765.00"), new BigDecimal("3249.00"))));
+
+    /** The figures for the year, or the latest year before it when it is not known yet (logged), or the earliest known for an older year. */
+    static YearFigures figuresFor(int taxYear) {
+        YearFigures exact = YEARS.get(taxYear);
+        if (exact != null) return exact;
+        java.util.Map.Entry<Integer, YearFigures> earlier = YEARS.floorEntry(taxYear);
+        java.util.Map.Entry<Integer, YearFigures> use = earlier != null ? earlier : YEARS.firstEntry();
+        log.warn("No statutory figures for tax year {} in the payroll bureau calculator; using those of {}. Add the year.", taxYear, use.getKey());
+        return use.getValue();
+    }
 
     /**
      * @param monthlySalary          required, never null (both HrEmployee and
@@ -102,11 +119,12 @@ public class SarsPayrollCalculator {
                 .multiply(BigDecimal.valueOf(12));
         BigDecimal annualPension = pension.multiply(BigDecimal.valueOf(12));
 
-        // Pension deduction: Section 11(k) — capped at 27.5% of income or R350,000
+        // Pension deduction: Section 11(k) — capped at 27.5% of income or the year's cap (R350,000, R430,000 from 2027)
+        YearFigures fig = figuresFor(taxYear);
         BigDecimal maxPensionDeduction = annualGross
                 .add(annualTravel)
                 .multiply(new BigDecimal("0.275"))
-                .min(new BigDecimal("350000.00"));
+                .min(fig.retirementCap());
         BigDecimal pensionDeduction = annualPension.min(maxPensionDeduction);
 
         BigDecimal taxableIncome = annualGross
@@ -143,25 +161,27 @@ public class SarsPayrollCalculator {
                 .filter(r -> "PRIMARY".equals(r.getRebateType()))
                 .map(SarsTaxRebate::getAmount)
                 .findFirst()
-                .orElse(new BigDecimal("17235.00")); // 2025/26 default
+                .orElse(fig.primary());
 
         BigDecimal secondaryRebate = BigDecimal.ZERO;
         BigDecimal tertiaryRebate  = BigDecimal.ZERO;
         if (dateOfBirth != null) {
-            int age = LocalDate.now().getYear() - dateOfBirth.getYear();
+            // Age at the last day of the tax year, as SARS takes it: someone who turns 65 during the year has the rebate for all of it.
+            // (It used to take the calendar year of the clock, so an old period gave a different answer when recalculated.)
+            int age = java.time.Period.between(dateOfBirth, LocalDate.of(taxYear, 3, 1).minusDays(1)).getYears();
             if (age >= 65) {
                 secondaryRebate = rebates.stream()
                         .filter(r -> "SECONDARY".equals(r.getRebateType()))
                         .map(SarsTaxRebate::getAmount)
                         .findFirst()
-                        .orElse(new BigDecimal("9444.00")); // 2025/26 default
+                        .orElse(fig.secondary());
             }
             if (age >= 75) {
                 tertiaryRebate = rebates.stream()
                         .filter(r -> "TERTIARY".equals(r.getRebateType()))
                         .map(SarsTaxRebate::getAmount)
                         .findFirst()
-                        .orElse(new BigDecimal("3145.00")); // 2025/26 default
+                        .orElse(fig.tertiary());
             }
         }
 
@@ -170,8 +190,9 @@ public class SarsPayrollCalculator {
                 .subtract(totalRebates)
                 .max(BigDecimal.ZERO);
 
-        // Medical Tax Credit — CREDIT against tax, not deduction from income
-        BigDecimal annualMtc = MTC_PRIMARY.multiply(BigDecimal.valueOf(12));
+        // Medical scheme fees tax credit — a CREDIT against tax, not a deduction from income, and only for someone who pays a medical scheme
+        // contribution. No dependant data reaches this calculator, so the taxpayer's credit is all it can give.
+        BigDecimal annualMtc = medicalAid.signum() > 0 ? fig.mtcTaxpayer().multiply(BigDecimal.valueOf(12)) : BigDecimal.ZERO;
         BigDecimal annualTaxAfterMtc = annualTaxAfterRebates
                 .subtract(annualMtc)
                 .max(BigDecimal.ZERO);

@@ -3,7 +3,7 @@ import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import TaxCertificatesTab from "./TaxCertificatesTab"
 import {
-  countBySeverity, defaultSelection, issueSummary, needsReason, periodLabel, settingsProblem, sic7Problem, taxRights, taxYearOf, yearOptions,
+  countBySeverity, defaultSelection, issueSummary, needsReason, periodLabel, settingsProblem, sic7Problem, taxRights, taxYearOf, yearOptions, lineAmount, rand,
 } from "./taxCertificates.logic"
 
 const get = vi.fn()
@@ -87,6 +87,15 @@ function mockApi(r: unknown) {
     return ok([])
   })
 }
+
+describe("certificate line amounts", () => {
+  it("shows the reason code for no tax as a plain number and every other code as money", () => {
+    expect(lineAmount("4150", 2)).toBe("2")
+    expect(lineAmount("4150", "8.00")).toBe("8")
+    expect(lineAmount("4102", 1234.5)).toBe(rand(1234.5))
+    expect(lineAmount("3699", null)).toBe("—")
+  })
+})
 
 describe("TaxCertificatesTab", () => {
   beforeEach(() => { get.mockReset(); post.mockReset(); put.mockReset(); perms = ["PAYROLL_STATUTORY_EXPORT"] })

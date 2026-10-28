@@ -95,4 +95,49 @@ class EtiRulesTest {
         assertThat(b[1]).isEqualByComparingTo("1800.00");
         assertThat(EtiRules.split(d("3000"), BigDecimal.ZERO)[1]).isEqualByComparingTo("3000.00");
     }
+
+    // ── The information written on the certificate ─────────────────────────
+
+    private static EtiRules.Slip slip(int y, int m, String eti, Integer etiMonth, String days, int working) {
+        return new EtiRules.Slip(java.time.LocalDate.of(y, m, 1).withDayOfMonth(java.time.LocalDate.of(y, m, 1).lengthOfMonth()), new BigDecimal("4500.00"),
+                new BigDecimal(eti), etiMonth, new BigDecimal(days), working);
+    }
+
+    @Test
+    void nothingIsReportedWhenNoIncentiveWasClaimed() {
+        assertThat(EtiRules.months(java.util.List.of(slip(2026, 3, "0", null, "22", 22)), 2027)).isEmpty();
+        assertThat(EtiRules.months(java.util.List.of(), 2027)).isEmpty();
+    }
+
+    @Test
+    void everyMonthWithAPayslipIsReportedOnceOneWasClaimed() {
+        var months = EtiRules.months(java.util.List.of(slip(2026, 3, "1000.00", 1, "22", 22), slip(2026, 4, "0", null, "22", 22),
+                slip(2026, 5, "800.00", 13, "11", 22)), 2027);
+        assertThat(months.size()).isEqualTo(3);
+        assertThat(months.get(0).calendarMonth()).isEqualTo(3);
+        assertThat(months.get(0).cycle()).isEqualTo(1);
+        assertThat(months.get(0).hours()).isEqualTo(160);
+        assertThat(months.get(0).minimumWage()).isEqualTo(new BigDecimal("4836.80"));      // 160 x R30.23
+        assertThat(months.get(1).cycle()).isEqualTo(0);
+        assertThat(months.get(1).eti()).isEqualTo(new BigDecimal("0.00"));
+        assertThat(months.get(2).cycle()).isEqualTo(2);                                      // the 13th qualifying month
+        assertThat(months.get(2).hours()).isEqualTo(80);                                     // half the days paid
+    }
+
+    @Test
+    void twoPayslipsInOneMonthAreOneMonthOfInformation() {
+        var months = EtiRules.months(java.util.List.of(slip(2026, 3, "500.00", 1, "11", 22), slip(2026, 3, "0", null, "11", 22)), 2027);
+        assertThat(months.size()).isEqualTo(1);
+        assertThat(months.get(0).remuneration()).isEqualTo(new BigDecimal("9000.00"));
+        assertThat(months.get(0).hours()).isEqualTo(160);
+    }
+
+    @Test
+    void theHourlyMinimumWageFollowsTheTaxYear() {
+        assertThat(EtiRules.nationalMinimumWage(2024)).isEqualTo(new BigDecimal("25.42"));
+        assertThat(EtiRules.nationalMinimumWage(2025)).isEqualTo(new BigDecimal("27.58"));
+        assertThat(EtiRules.nationalMinimumWage(2026)).isEqualTo(new BigDecimal("28.79"));
+        assertThat(EtiRules.nationalMinimumWage(2027)).isEqualTo(new BigDecimal("30.23"));
+        assertThat(EtiRules.nationalMinimumWage(2030)).isEqualTo(new BigDecimal("30.23"));
+    }
 }

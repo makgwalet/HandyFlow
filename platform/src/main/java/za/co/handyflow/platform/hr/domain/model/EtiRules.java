@@ -80,4 +80,61 @@ public final class EtiRules {
         BigDecimal used = etiWorkedOut.min(payeOfReturn.max(BigDecimal.ZERO)).max(BigDecimal.ZERO);
         return new BigDecimal[]{used.setScale(2, RoundingMode.HALF_UP), etiWorkedOut.subtract(used).setScale(2, RoundingMode.HALF_UP)};
     }
+
+    // ── Reporting on the tax certificate ────────────────────────────────────────────────────────────
+
+    /** The hours a full month counts as, and the most SARS takes in a month. */
+    public static final int FULL_MONTH_HOURS = 160;
+
+    /**
+     * The national minimum wage per hour in the tax year (named by the year it ends), from 1 March of the year before: R25.42 from March
+     * 2023, R27.58 from March 2024, R28.79 from March 2025 and R30.23 from March 2026. A year not known yet takes the latest known.
+     */
+    public static BigDecimal nationalMinimumWage(int taxYear) {
+        if (taxYear <= 2024) return new BigDecimal("25.42");
+        if (taxYear == 2025) return new BigDecimal("27.58");
+        if (taxYear == 2026) return new BigDecimal("28.79");
+        return new BigDecimal("30.23");
+    }
+
+    /** What a payslip says about the month, for the ETI information on the certificate. */
+    public record Slip(LocalDate periodEnd, BigDecimal remuneration, BigDecimal eti, Integer etiMonth, BigDecimal daysPaid, int workingDays) {}
+
+    /** One month of ETI information (SARS codes 7002 to 7008). {@code cycle}: 0 not qualifying, 1 first 12 months, 2 second 12 months. */
+    public record Month(int calendarMonth, BigDecimal remuneration, BigDecimal minimumWage, BigDecimal eti, int cycle, int hours, BigDecimal wagePaid) {}
+
+    /**
+     * The ETI information to report for a person over a certificate's payslips, oldest month first. Nothing when ETI was not claimed in
+     * any month (the certificate's ETI indicator is then N and no ETI codes are written). When it was, every month with a payslip is
+     * reported, those without a claim with a nil amount and cycle 0.
+     * <p>
+     * Hours are the share of a full month paid out of 160, and the minimum wage is the national hourly minimum for those hours: the
+     * payslip holds no hours, so both follow from the days paid. The wage paid is the month's remuneration.
+     */
+    public static java.util.List<Month> months(java.util.List<Slip> slips, int taxYear) {
+        boolean any = slips.stream().anyMatch(s -> s.eti() != null && s.eti().signum() > 0);
+        if (!any) return java.util.List.of();
+        java.util.TreeMap<java.time.YearMonth, java.util.List<Slip>> byMonth = new java.util.TreeMap<>();
+        for (Slip s : slips) byMonth.computeIfAbsent(java.time.YearMonth.from(s.periodEnd()), k -> new java.util.ArrayList<>()).add(s);
+        BigDecimal wage = nationalMinimumWage(taxYear);
+        java.util.List<Month> out = new java.util.ArrayList<>();
+        for (var e : byMonth.entrySet()) {
+            BigDecimal remuneration = BigDecimal.ZERO, eti = BigDecimal.ZERO, share = BigDecimal.ZERO;
+            int cycle = 0;
+            for (Slip s : e.getValue()) {
+                remuneration = remuneration.add(s.remuneration() == null ? BigDecimal.ZERO : s.remuneration());
+                if (s.eti() != null && s.eti().signum() > 0) {
+                    eti = eti.add(s.eti());
+                    cycle = s.etiMonth() != null && s.etiMonth() > FIRST_PERIOD_MONTHS ? 2 : 1;
+                }
+                share = share.add(paidShare(s.daysPaid(), s.workingDays()));
+            }
+            int hours = Math.min(FULL_MONTH_HOURS, share.multiply(BigDecimal.valueOf(FULL_MONTH_HOURS)).setScale(0, RoundingMode.HALF_UP).intValue());
+            if (cycle > 0 && hours < 1) hours = 1;
+            BigDecimal minimum = wage.multiply(BigDecimal.valueOf(hours)).setScale(2, RoundingMode.HALF_UP);
+            out.add(new Month(e.getKey().getMonthValue(), remuneration.setScale(2, RoundingMode.HALF_UP), minimum, eti.setScale(2, RoundingMode.HALF_UP),
+                    cycle, hours, remuneration.setScale(2, RoundingMode.HALF_UP)));
+        }
+        return out;
+    }
 }

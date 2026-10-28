@@ -50,7 +50,7 @@ class TaxCertificateRulesTest {
         var lines = TaxCertificateRules.lines(t, TaxCertificateRules.PENSION);
 
         assertThat(lines).extracting(TaxCertificateRules.Line::code)
-                .containsExactly("3601", "4001", "4005", "4102", "4116", "4141", "4142");
+                .containsExactly("3601", "3699", "4001", "4005", "4102", "4116", "4141", "4142", "4149");
         assertThat(amount(lines, "4102")).isEqualByComparingTo("21000.50");
         assertThat(amount(lines, "4141")).isEqualByComparingTo("2120.40");
     }
@@ -68,14 +68,14 @@ class TaxCertificateRulesTest {
         var t = totals("50000", "0", "0", "0", "0", "0", "0", "0", "0", 3, 0);
         var lines = TaxCertificateRules.lines(t, TaxCertificateRules.PENSION);
 
-        assertThat(codes(lines)).containsExactly("3601", "4102", "4141", "4142");
+        assertThat(codes(lines)).containsExactly("3601", "3699", "4102", "4141", "4142", "4149", "4150");
         assertThat(amount(lines, "4102")).isEqualByComparingTo("0.00");
     }
 
     @Test
     void anAllowanceAndOtherIncomeUseTheirOwnCodes() {
         var t = new TaxCertificateRules.Totals(d("1000"), d("200"), d("300"), d("50"), d("400"), d("0"), d("0"), d("10"), d("1"), d("1"), d("0"), d("0"), 1, 1);
-        assertThat(codes(TaxCertificateRules.lines(t, "PENSION"))).containsExactly("3601", "3605", "3607", "3701", "3713", "4102", "4141", "4142");
+        assertThat(codes(TaxCertificateRules.lines(t, "PENSION"))).containsExactly("3601", "3605", "3607", "3699", "3701", "3713", "4102", "4141", "4142", "4149");
     }
 
     @Test
@@ -223,5 +223,40 @@ class TaxCertificateRulesTest {
         var t = new TaxCertificateRules.Totals(d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), 1, 0,
                 d("0"), d("0"), d("0"), d("60000"), d("4500"));
         assertThat(TaxCertificateRules.certificateType(t)).isEqualTo("IRP5");
+    }
+
+    @Test
+    void theCertificateShowsTheTotalsOfTheCodesItHolds() {
+        var t = new TaxCertificateRules.Totals(d("30000"), d("0"), d("5000"), d("0"), d("0"), d("0"), d("0"), d("2000.10"), d("300"), d("300"), d("300.20"), d("0"), 1, 0,
+                d("1000"), d("0"), d("0"), d("60000"), d("4500.50"));
+        var lines = TaxCertificateRules.lines(t, null);
+        assertThat(amount(lines, "3699")).isEqualByComparingTo("96000.00");        // 30 000 + 5 000 + 1 000 (benefit) + 60 000 severance
+        assertThat(amount(lines, "4149")).isEqualByComparingTo("7400.80");         // 2 000.10 + 4 500.50 + 600 UIF + 300.20 SDL
+        assertThat(codes(lines)).doesNotContain("4150");
+    }
+
+    @Test
+    void anIt3aSaysWhyNoTaxWasDeducted() {
+        var low = totals("5000", "0", "0", "0", "0", "0", "0", "0", "0", 3, 0);
+        assertThat(amount(TaxCertificateRules.lines(low, null), "4150")).isEqualByComparingTo("2");
+        var credit = new TaxCertificateRules.Totals(d("30000"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("4512"), 12, 0);
+        var lines = TaxCertificateRules.lines(credit, null);
+        assertThat(amount(lines, "4150")).isEqualByComparingTo("8");
+        assertThat(lines.stream().filter(l -> l.code().equals("4150")).findFirst().get().description()).contains("medical");
+        assertThat(TaxCertificateRules.reasonCode(null)).isEqualTo(2);
+        assertThat(TaxCertificateRules.reasonCode(d("0"))).isEqualTo(2);
+    }
+
+    @Test
+    void aCertificateWithOnlySeveranceHasIncome() {
+        var t = new TaxCertificateRules.Totals(d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), d("0"), 1, 0,
+                d("0"), d("0"), d("0"), d("60000"), d("4500"));
+        assertThat(TaxCertificateRules.hasIncome(TaxCertificateRules.lines(t, null))).isTrue();
+        assertThat(TaxCertificateRules.hasIncome(List.of(new TaxCertificateRules.Line("3699", "Total", d("10"))))).isFalse();
+    }
+
+    @Test
+    void theTotalsAndTheReasonAreNotCountedAsChanges() {
+        assertThat(TaxCertificateRules.DERIVED.equals(java.util.Set.of("3699", "4149", "4150"))).isTrue();
     }
 }

@@ -97,6 +97,10 @@ export function sic7Problem(code: string): string | null {
 
 export const FUND_LABEL: Record<string, string> = { PENSION: "Pension fund", PROVIDENT: "Provident fund", RETIREMENT_ANNUITY: "Retirement annuity" }
 
+/** A certificate line's amount as shown: money for every code except 4150, the reason for no tax, which is a whole number (2, 8). */
+export const lineAmount = (code: string, amount: number | string | null | undefined): string =>
+  code === "4150" ? String(Math.round(Number(amount ?? 0))) : rand(amount)
+
 export const TYPE_LABEL: Record<string, string> = { IRP5: "IRP5", IT3A: "IT3(a)" }
 
 /** Years offered in the selector: the current tax year and the five before it. */
