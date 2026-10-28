@@ -28,14 +28,14 @@ public class RecruiterReportController {
     private static LocalDate today() { return LocalDate.now(RecruiterReportRules.ZONE); }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    @PreAuthorize("hasAuthority('RECRUITER_REPORTS')")
     @Operation(summary = "The reports and how each figure is defined")
     public ResponseEntity<ApiResponse<List<ReportInfo>>> catalogue() {
         return ResponseEntity.ok(ApiResponse.success(reports.catalogue()));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    @PreAuthorize("hasAuthority('RECRUITER_REPORTS')")
     @Operation(summary = "Run a report for a date range (default: the last 90 days)")
     public ResponseEntity<ApiResponse<ReportTable>> run(@PathVariable String id,
                                                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -44,7 +44,7 @@ public class RecruiterReportController {
     }
 
     @GetMapping("/{id}/export.csv")
-    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    @PreAuthorize("hasAuthority('RECRUITER_REPORTS')")
     @Operation(summary = "The same report as a CSV file")
     public ResponseEntity<byte[]> export(@PathVariable String id,
                                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

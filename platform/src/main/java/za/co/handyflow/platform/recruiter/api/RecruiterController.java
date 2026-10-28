@@ -220,7 +220,11 @@ public class RecruiterController {
     @Operation(summary = "Move application to a new pipeline stage")
     public ResponseEntity<ApiResponse<ApplicationResponse>> moveStage(
             @PathVariable UUID id,
-            @Valid @RequestBody MoveStageRequest req) {
+            @Valid @RequestBody MoveStageRequest req,
+            org.springframework.security.core.Authentication auth) {
+        boolean mayHire = auth != null && auth.getAuthorities().stream().anyMatch(a -> "RECRUITER_HIRE".equals(a.getAuthority()));
+        String denied = za.co.handyflow.platform.recruiter.domain.model.RecruiterPermissions.stageProblem(req.stage(), mayHire);
+        if (denied != null) throw new org.springframework.security.access.AccessDeniedException(denied);
         // FIX: was hardcoded "Recruiter" — now resolves actual user name in service.
         return ResponseEntity.ok(ApiResponse.success("Stage updated",
                 recruiterService.moveStage(TenantContext.getTenantIdAsObject(), id, req,
@@ -269,7 +273,7 @@ public class RecruiterController {
     }
 
     @PostMapping("/applications/{id}/convert-to-employee")
-    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @PreAuthorize("hasAuthority('RECRUITER_ADMIN') and hasAuthority('RECRUITER_HIRE')")
     @Operation(summary = "Convert hired applicant to HR employee, or mark as placed externally — application must already be HIRED")
     public ResponseEntity<ApiResponse<UUID>> convertToEmployee(
             @PathVariable UUID id,
@@ -299,7 +303,7 @@ public class RecruiterController {
     }
 
     @PostMapping("/applications/{id}/offer-letter/send")
-    @PreAuthorize("hasAuthority('RECRUITER_MANAGE')")
+    @PreAuthorize("hasAuthority('RECRUITER_OFFER')")
     @Operation(summary = "Generate the offer letter PDF and email it to the applicant as an attachment")
     public ResponseEntity<ApiResponse<Void>> sendOfferLetter(@PathVariable UUID id,
                                                              @RequestBody(required = false) RecruiterOfferDtos.SendOfferRequest req) {
@@ -315,7 +319,7 @@ public class RecruiterController {
     }
 
     @PostMapping("/applications/{id}/offer/response")
-    @PreAuthorize("hasAuthority('RECRUITER_MANAGE')")
+    @PreAuthorize("hasAuthority('RECRUITER_OFFER')")
     @Operation(summary = "Record that the candidate accepted or declined the offer, or that it was withdrawn")
     public ResponseEntity<ApiResponse<RecruiterOfferDtos.OfferView>> respondToOffer(@PathVariable UUID id,
                                                                                     @RequestBody RecruiterOfferDtos.OfferResponseRequest req) {
@@ -324,7 +328,7 @@ public class RecruiterController {
     }
 
     @PostMapping("/applications/{id}/offer/revise")
-    @PreAuthorize("hasAuthority('RECRUITER_MANAGE')")
+    @PreAuthorize("hasAuthority('RECRUITER_OFFER')")
     @Operation(summary = "Change the terms of an offer, keeping the old terms and the reason")
     public ResponseEntity<ApiResponse<RecruiterOfferDtos.OfferView>> reviseOffer(@PathVariable UUID id,
                                                                                  @RequestBody RecruiterOfferDtos.ReviseOfferRequest req) {
@@ -344,7 +348,7 @@ public class RecruiterController {
     }
 
     @GetMapping("/applications/{id}/scorecard")
-    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    @PreAuthorize("hasAuthority('RECRUITER_CV')")
     @Operation(summary = "Download a one-page candidate scorecard PDF (interviews, scores, notes) for hiring-committee review")
     public ResponseEntity<byte[]> downloadScorecard(@PathVariable UUID id) {
         byte[] pdf = recruiterPdfGenerator.generateScorecard(TenantContext.getTenantIdAsObject(), id);
@@ -355,7 +359,7 @@ public class RecruiterController {
     }
 
     @GetMapping("/applications/{id}/cv")
-    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    @PreAuthorize("hasAuthority('RECRUITER_CV')")
     @Operation(summary = "View the candidate's uploaded CV — 404 if none was uploaded")
     public ResponseEntity<byte[]> viewCv(@PathVariable UUID id) {
         byte[] pdf = recruiterService.getCvBytes(TenantContext.getTenantIdAsObject(), id);
@@ -486,7 +490,7 @@ public class RecruiterController {
     }
 
     @PostMapping("/applications/{id}/offer-approval/submit")
-    @PreAuthorize("hasAuthority('RECRUITER_MANAGE')")
+    @PreAuthorize("hasAuthority('RECRUITER_OFFER')")
     @Operation(summary = "Send the offer terms for approval before the letter is sent")
     public ResponseEntity<ApiResponse<ApprovalView>> submitOffer(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Sent for approval",
@@ -554,14 +558,14 @@ public class RecruiterController {
     // ── Candidate email delivery ────────────────────────────────────────────────
 
     @GetMapping("/outbox")
-    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @PreAuthorize("hasAuthority('RECRUITER_AUDIT')")
     @Operation(summary = "Candidate emails: how many are waiting, sent and given up on, with the ones that failed")
     public ResponseEntity<ApiResponse<RecruiterOutboxDtos.OutboxView>> outbox() {
         return ResponseEntity.ok(ApiResponse.success(outboxService.view(TenantContext.getTenantIdAsObject())));
     }
 
     @PostMapping("/outbox/{id}/retry")
-    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @PreAuthorize("hasAuthority('RECRUITER_AUDIT')")
     @Operation(summary = "Try an email that could not be sent again")
     public ResponseEntity<ApiResponse<RecruiterOutboxDtos.OutboxView>> retryEmail(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Queued", outboxService.retry(TenantContext.getTenantIdAsObject(), id)));

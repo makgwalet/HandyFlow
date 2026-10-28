@@ -3,6 +3,7 @@ import { EMPTY_HIRE_DETAILS, GENDERS, RACES, hireDetailsBody, hireDetailsProblem
 import { useEffect, useState } from 'react'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
+import { usePermission } from '../../hooks/usePermission'
 import {
   Plus, X, Search, Download, ChevronRight, Briefcase, Users, Calendar, UserCheck, AlertTriangle,
   CheckCircle, Clock, MapPin, Building2, ExternalLink,
@@ -144,6 +145,7 @@ function ConfirmModal({ title, message, danger = false, confirmLabel, loading, o
 }
 
 function CompareModal({ applicationIds, onClose }: { applicationIds: string[]; onClose: () => void }) {
+  const mayCv = usePermission('RECRUITER_CV')
   const results = useQueries({
     queries: applicationIds.map(id => ({
       queryKey: ['rec-application', id],
@@ -279,7 +281,7 @@ function CompareModal({ applicationIds, onClose }: { applicationIds: string[]; o
                   <td style={{ ...labelStyle, borderBottom: 'none' }}>CV</td>
                   {candidates.map(c => (
                     <td key={c.id} style={{ ...rowStyle, borderBottom: 'none' }}>
-                      {c.hasCv ? (
+                      {c.hasCv && mayCv ? (
                         <button onClick={() => viewCv(c.id)}
                           style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: 'var(--hf-violet-soft)', color: 'var(--hf-violet-text)', border: '1px solid var(--hf-violet-border)', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                           <FileText size={11} /> View CV
@@ -307,6 +309,10 @@ function CompareModal({ applicationIds, onClose }: { applicationIds: string[]; o
 function ApplicationDetail({ app: initial, onClose, onUpdated }: {
   app: Application; onClose: () => void; onUpdated: () => void
 }) {
+  const mayCv = usePermission('RECRUITER_CV')
+  const mayOffer = usePermission('RECRUITER_OFFER')
+  const mayHire = usePermission('RECRUITER_HIRE')
+  const isAdmin = usePermission('RECRUITER_ADMIN')
   const qc = useQueryClient()
   const [tab, setTab]             = useState<'overview'|'interviews'|'history'>('overview')
   const [showMoveModal, setShowMoveModal] = useState(false)
@@ -520,7 +526,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
 
   const sc   = STAGE[app?.stage ?? 'APPLIED'] ?? STAGE.APPLIED
   // Mirrors RecruiterWorkflowRules on the server: a hire can only follow the Offer stage.
-  const availableStages = PIPELINE_STAGES.filter(s => s !== app?.stage && (s !== 'HIRED' || app?.stage === 'OFFER'))
+  const availableStages = PIPELINE_STAGES.filter(s => s !== app?.stage && (s !== 'HIRED' || (app?.stage === 'OFFER' && mayHire)))
   // Mirrors RecApplication.isActive() on the backend — HIRED/REJECTED/WITHDRAWN
   // are terminal. Backend now rejects moveStage/scheduleInterview on these
   // with a 400 (APPLICATION_TERMINAL); this just keeps the buttons from
@@ -584,22 +590,22 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                 <Calendar size={10} /> Schedule interview
               </button>
             )}
-            {app?.stage === 'HIRED' && !app?.hrEmployeeId && (
+            {app?.stage === 'HIRED' && !app?.hrEmployeeId && mayHire && isAdmin && (
               <button onClick={() => setShowConvert(true)}
                 style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', border: '1px solid var(--hf-success-border)', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                 <UserPlus size={10} /> Convert to employee
               </button>
             )}
-            {app?.hasCv && (
+            {app?.hasCv && mayCv && (
               <button onClick={() => viewCv.mutate()} disabled={viewCv.isPending}
                 style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: 'var(--hf-violet-soft)', color: 'var(--hf-violet-text)', border: '1px solid var(--hf-violet-border)', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                 <FileText size={10} /> {viewCv.isPending ? 'Loading...' : 'View CV'}
               </button>
             )}
-            <button onClick={() => downloadScorecard.mutate()} disabled={downloadScorecard.isPending}
+            {mayCv && <button onClick={() => downloadScorecard.mutate()} disabled={downloadScorecard.isPending}
               style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: 'var(--hf-surface-muted)', color: 'var(--hf-text-secondary)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
               <FileText size={10} /> {downloadScorecard.isPending ? 'Preparing...' : 'Scorecard PDF'}
-            </button>
+            </button>}
             {app?.offeredSalary != null && (
               <>
                 <button onClick={() => downloadOfferLetter.mutate()} disabled={downloadOfferLetter.isPending}
@@ -610,7 +616,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', border: '1px solid var(--hf-success-border)', borderRadius: 7, fontSize: 11, fontWeight: 700 }}>
                     <CheckCircle size={10} /> Sent {fmtDate(app.offerLetterSentAt)}
                   </span>
-                ) : (
+                ) : mayOffer && (
                   <button onClick={() => sendOfferLetter.mutate()} disabled={sendOfferLetter.isPending}
                     style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', border: '1px solid var(--hf-success-border)', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                     <Calendar size={10} /> {sendOfferLetter.isPending ? 'Sending...' : 'Send offer letter'}

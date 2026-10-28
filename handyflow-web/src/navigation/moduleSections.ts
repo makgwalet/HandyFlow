@@ -874,14 +874,14 @@ export const RECRUITER_SECTIONS: ModuleSections = {
         { id: 'pipeline', label: 'Pipeline', icon: BarChart2 },
         { id: 'applications', label: 'Applications', icon: Users },
         { id: 'talent-pool', label: 'Talent Pool', icon: Users },
-        { id: 'reports', label: 'Reports', icon: BarChart2 },
+        { id: 'reports', label: 'Reports', icon: BarChart2, permission: 'RECRUITER_REPORTS' },
       ],
     },
     {
       label: 'Settings',
       sections: [
         { id: 'settings', label: 'Approvals & privacy', icon: ShieldCheck },
-        { id: 'audit', label: 'Audit trail', icon: ShieldCheck, permission: 'RECRUITER_ADMIN' },
+        { id: 'audit', label: 'Audit trail', icon: ShieldCheck, permission: 'RECRUITER_AUDIT' },
       ],
     },
   ],

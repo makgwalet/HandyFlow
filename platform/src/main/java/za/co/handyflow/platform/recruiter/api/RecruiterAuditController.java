@@ -28,14 +28,14 @@ public class RecruiterAuditController {
     private final RecruiterAuditService audit;
 
     @GetMapping("/actions")
-    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @PreAuthorize("hasAuthority('RECRUITER_AUDIT')")
     @Operation(summary = "The actions that appear in the audit trail")
     public ResponseEntity<ApiResponse<List<String>>> actions() {
         return ResponseEntity.ok(ApiResponse.success(RecruiterAuditRules.actions().stream().sorted().toList()));
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @PreAuthorize("hasAuthority('RECRUITER_AUDIT')")
     @Operation(summary = "The audit trail, newest first, for a date range (default: the last 90 days)")
     public ResponseEntity<ApiResponse<AuditPage>> page(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -47,14 +47,14 @@ public class RecruiterAuditController {
     }
 
     @GetMapping("/cv-access")
-    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @PreAuthorize("hasAuthority('RECRUITER_AUDIT')")
     @Operation(summary = "Who has opened candidates' CVs, with anyone who opened an unusual number in an hour flagged")
     public ResponseEntity<ApiResponse<List<CvAccessRow>>> cvAccess(@RequestParam(required = false) Integer days) {
         return ResponseEntity.ok(ApiResponse.success(audit.cvAccess(TenantContext.getTenantIdAsObject(), days)));
     }
 
     @GetMapping("/export.csv")
-    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @PreAuthorize("hasAuthority('RECRUITER_AUDIT')")
     @Operation(summary = "The same trail as a CSV file. The export is itself recorded")
     public ResponseEntity<byte[]> export(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

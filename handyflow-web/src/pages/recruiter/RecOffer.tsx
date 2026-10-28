@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
+import { usePermission } from '../../hooks/usePermission'
 
 const BASE = '/api/v1/recruiter/applications'
 type Revision = { oldSalary: number | null; oldFrequency: string | null; oldStartDate: string | null; reason: string; revisedAt: string }
@@ -26,6 +27,7 @@ const btn = { padding: '5px 12px', background: 'var(--hf-surface-muted)', color:
 export function offerNeedsAnswer(s?: OfferView['status']) { return s === 'AWAITING' || s === 'EXPIRED' || s === 'DRAFT' }
 
 export default function OfferPanel({ id, onChanged }: { id: string; onChanged: () => void }) {
+  const mayOffer = usePermission('RECRUITER_OFFER')
   const qc = useQueryClient()
   const key = ['rec-offer', id]
   const [note, setNote] = useState('')
@@ -57,7 +59,7 @@ export default function OfferPanel({ id, onChanged }: { id: string; onChanged: (
         {v.respondedAt && <span style={{ color: 'var(--hf-text-muted)' }}>on {v.respondedAt.slice(0, 10)}</span>}
       </div>
       {v.responseNote && <div style={{ marginTop: 6, color: 'var(--hf-text-secondary)' }}>{v.responseNote}</div>}
-      {open && (
+      {open && mayOffer && (
         <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           {v.status === 'AWAITING' && <button style={btn} disabled={respond.isPending} onClick={() => respond.mutate({ response: 'ACCEPTED', note: null })}>Candidate accepted</button>}
           <button style={btn} onClick={() => setMode('DECLINED')}>Candidate declined</button>
