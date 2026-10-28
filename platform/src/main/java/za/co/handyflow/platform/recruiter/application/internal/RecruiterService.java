@@ -524,11 +524,15 @@ public class RecruiterService {
                 .anyMatch(i -> "PENDING".equals(i.getOutcome()) && req.scheduledAt().equals(i.getScheduledAt()));
         String scheduleProblem = RecruiterWorkflowRules.scheduleProblem(req.scheduledAt(), java.time.Instant.now(), samePending);
         if (scheduleProblem != null) throw new HandyFlowException(scheduleProblem, HttpStatus.BAD_REQUEST, "INVALID_INTERVIEW");
+        String durationProblem = InterviewConflictRules.durationProblem(req.durationMinutes());
+        if (durationProblem != null) throw new HandyFlowException(durationProblem, HttpStatus.BAD_REQUEST, "INVALID_INTERVIEW");
+        int minutes = InterviewConflictRules.minutesOrDefault(req.durationMinutes());
+        requireNoInterviewClash(tenantId, applicationId, null, req.scheduledAt(), minutes, req.interviewerId(), req.interviewerName(), req.panelists());
 
         RecInterview interview = RecInterview.create(applicationId, tenantId.getValue(),
                 req.interviewType(), req.scheduledAt(),
                 req.interviewerId(), req.interviewerName(), req.location(),
-                req.roundTemplateId());
+                req.roundTemplateId(), null, minutes);
         interviewRepo.save(interview);
 
         if (req.panelists() != null) {
@@ -572,9 +576,6 @@ public class RecruiterService {
             throw new ResourceNotFoundException("Interview", interviewId.toString());
         }
 
-        old.markRescheduled(req.reason());
-        interviewRepo.save(old);
-
         // Merge: anything not explicitly overridden carries over from the
         // interview being replaced — a reschedule is usually "same plan,
         // different time," not a whole new interview.
@@ -584,16 +585,27 @@ public class RecruiterService {
         String location        = req.location()        != null ? req.location()        : old.getLocation();
         UUID   roundTemplateId = req.roundTemplateId()  != null ? req.roundTemplateId() : old.getRoundTemplateId();
 
-        RecInterview replacement = RecInterview.create(applicationId, tenantId.getValue(),
-                interviewType, req.scheduledAt(), interviewerId, interviewerName,
-                location, roundTemplateId, old.getId());
-        interviewRepo.save(replacement);
-
         List<PanelistRequest> panelists = req.panelists() != null
                 ? req.panelists()
                 : panelistRepo.findByInterviewId(old.getId()).stream()
                 .map(p -> new PanelistRequest(p.getUserId(), p.getUserName()))
                 .toList();
+
+        String rescheduleProblem = RecruiterWorkflowRules.scheduleProblem(req.scheduledAt(), java.time.Instant.now(), false);
+        if (rescheduleProblem != null) throw new HandyFlowException(rescheduleProblem, HttpStatus.BAD_REQUEST, "INVALID_INTERVIEW");
+        String durationProblem = InterviewConflictRules.durationProblem(req.durationMinutes());
+        if (durationProblem != null) throw new HandyFlowException(durationProblem, HttpStatus.BAD_REQUEST, "INVALID_INTERVIEW");
+        int minutes = req.durationMinutes() != null ? req.durationMinutes() : old.getDurationMinutes();
+        requireNoInterviewClash(tenantId, applicationId, old.getId(), req.scheduledAt(), minutes, interviewerId, interviewerName, panelists);
+
+        old.markRescheduled(req.reason());
+        interviewRepo.save(old);
+
+        RecInterview replacement = RecInterview.create(applicationId, tenantId.getValue(),
+                interviewType, req.scheduledAt(), interviewerId, interviewerName,
+                location, roundTemplateId, old.getId(), minutes);
+        interviewRepo.save(replacement);
+
         for (PanelistRequest p : panelists) {
             if (p.userId() == null) continue;
             panelistRepo.save(RecInterviewPanelist.create(replacement.getId(), p.userId(), p.userName()));
@@ -609,6 +621,37 @@ public class RecruiterService {
         notifyApplicantInterviewRescheduled(app, replacement, req.reason());
 
         return toInterviewResponse(replacement);
+    }
+
+    /**
+     * Refuses a booking that puts the interviewer, a panelist or the candidate in two interviews at once. Looks at this company's pending
+     * interviews that start within the longest possible interview before the new one, up to its end.
+     */
+    private void requireNoInterviewClash(TenantId tenantId, UUID applicationId, UUID replacing, java.time.Instant start, int minutes,
+                                         UUID interviewerId, String interviewerName, List<PanelistRequest> panelists) {
+        if (start == null) return;
+        java.util.Set<UUID> people = new java.util.HashSet<>();
+        java.util.Map<UUID, String> names = new java.util.HashMap<>();
+        if (interviewerId != null) { people.add(interviewerId); names.put(interviewerId, interviewerName); }
+        if (panelists != null) for (PanelistRequest p : panelists) if (p.userId() != null) { people.add(p.userId()); names.put(p.userId(), p.userName()); }
+
+        List<RecInterview> nearby = interviewRepo.findPendingStartingBetween(tenantId.getValue(),
+                start.minusSeconds(InterviewConflictRules.MAX_MINUTES * 60L), start.plusSeconds(minutes * 60L));
+        List<UUID> ids = nearby.stream().map(RecInterview::getId).toList();
+        Map<UUID, java.util.Set<UUID>> panel = new java.util.HashMap<>();
+        if (!ids.isEmpty()) for (RecInterviewPanelist p : panelistRepo.findByInterviewIdIn(ids)) {
+            panel.computeIfAbsent(p.getInterviewId(), k -> new java.util.HashSet<>()).add(p.getUserId());
+            names.putIfAbsent(p.getUserId(), p.getUserName());
+        }
+        List<InterviewConflictRules.Slot> booked = nearby.stream().map(i -> {
+            java.util.Set<UUID> who = new java.util.HashSet<>(panel.getOrDefault(i.getId(), java.util.Set.of()));
+            if (i.getInterviewerId() != null) { who.add(i.getInterviewerId()); names.putIfAbsent(i.getInterviewerId(), i.getInterviewerName()); }
+            return new InterviewConflictRules.Slot(i.getId(), i.getApplicationId(), i.getScheduledAt(), i.getDurationMinutes(), who);
+        }).toList();
+
+        String problem = InterviewConflictRules.conflictProblem(
+                new InterviewConflictRules.Slot(replacing, applicationId, start, minutes, people), booked, names);
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.CONFLICT, "INTERVIEW_CONFLICT");
     }
 
     @Transactional
@@ -1150,6 +1193,6 @@ public class RecruiterService {
                 i.getScore(), i.getLocation(), panelists,
                 i.getRoundTemplateId(), roundName, roundSequence,
                 i.getReminderSentAt(), i.getRescheduleReason(), i.getRescheduledFromInterviewId(),
-                i.getCreatedAt());
+                i.getCreatedAt(), i.getDurationMinutes());
     }
 }

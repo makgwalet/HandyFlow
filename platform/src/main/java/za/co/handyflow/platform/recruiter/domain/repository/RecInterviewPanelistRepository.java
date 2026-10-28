@@ -8,4 +8,6 @@ import java.util.UUID;
 
 public interface RecInterviewPanelistRepository extends JpaRepository<RecInterviewPanelist, UUID> {
     List<RecInterviewPanelist> findByInterviewId(UUID interviewId);
+
+    List<RecInterviewPanelist> findByInterviewIdIn(java.util.Collection<UUID> interviewIds);
 }

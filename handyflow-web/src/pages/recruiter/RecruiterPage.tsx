@@ -46,6 +46,7 @@ interface Interview {
   notes: string | null; score: number | null; location: string | null
   panelists: { userId: string; userName: string | null }[]
   roundTemplateId: string | null; roundName: string | null; roundSequence: number | null
+  durationMinutes?: number | null
   createdAt: string
 }
 interface StageHistory {
@@ -320,6 +321,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
   const [notes,       setNotes]           = useState(initial.notes ?? '')
   const [ivType,      setIvType]          = useState('VIDEO')
   const [ivScheduled, setIvScheduled]     = useState('')
+  const [ivDuration, setIvDuration]       = useState('60')
   const [ivInterviewer, setIvInterviewer] = useState('')
   const [ivInterviewerId, setIvInterviewerId] = useState('')
   const [ivMode, setIvMode]               = useState<'team' | 'external'>('team')
@@ -467,6 +469,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
     mutationFn: () => apiClient.post(`/api/v1/recruiter/applications/${app!.id}/interviews`, {
       interviewType: ivType,
       scheduledAt: ivScheduled ? new Date(ivScheduled).toISOString() : null,
+      durationMinutes: Number(ivDuration),
       interviewerId: ivMode === 'team' && ivInterviewerId !== '' ? ivInterviewerId : null,
       interviewerName: ivInterviewer || null,
       location: ivLocation || null,
@@ -477,7 +480,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
       roundTemplateId: ivRoundId || null,
     }),
     onSuccess: () => {
-      invalidate(); setShowInterview(false); setIvScheduled('')
+      invalidate(); setShowInterview(false); setIvScheduled(''); setIvDuration('60')
       setIvInterviewer(''); setIvInterviewerId(''); setIvMode('team'); setIvLocation('')
       setIvPanelistIds([]); setIvRoundId('')
     },
@@ -908,6 +911,16 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
               <div>
                 <label style={lbl}>Date & time</label>
                 <input type="datetime-local" value={ivScheduled} onChange={e => setIvScheduled(e.target.value)} style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>How long</label>
+                <select value={ivDuration} onChange={e => setIvDuration(e.target.value)} style={inp}>
+                  {[[30, '30 minutes'], [45, '45 minutes'], [60, '1 hour'], [90, '1 hour 30 minutes'], [120, '2 hours'], [180, '3 hours'], [240, '4 hours']].map(([m, label]) =>
+                    <option key={m} value={m}>{label}</option>)}
+                </select>
+                <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 5 }}>
+                  Used to stop an interviewer, panelist or candidate being booked into two interviews at once.
+                </div>
               </div>
               {(jobRounds ?? []).length > 0 && (
                 <div>

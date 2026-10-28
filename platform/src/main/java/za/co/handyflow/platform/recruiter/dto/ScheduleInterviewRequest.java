@@ -10,5 +10,6 @@ public record ScheduleInterviewRequest(
         String  interviewerName,
         String  location,          // venue address (IN_PERSON) or meeting link (VIDEO) — optional
         List<PanelistRequest> panelists,  // additional interviewers, alongside the primary — optional
-        UUID    roundTemplateId    // links to a RecJobInterviewRound — optional, null for ad-hoc interviews
+        UUID    roundTemplateId,   // links to a RecJobInterviewRound — optional, null for ad-hoc interviews
+        Integer durationMinutes    // 15 minutes to 8 hours; blank means one hour
 ) {}

@@ -20,5 +20,6 @@ public record RescheduleInterviewRequest(
         String  interviewerName,
         String  location,
         List<PanelistRequest> panelists,
-        UUID    roundTemplateId
+        UUID    roundTemplateId,
+        Integer durationMinutes    // blank keeps the length of the interview being replaced
 ) {}

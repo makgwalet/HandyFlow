@@ -9,5 +9,5 @@ public record InterviewResponse(
         List<PanelistResponse> panelists,
         UUID roundTemplateId, String roundName, Integer roundSequence,
         Instant reminderSentAt, String rescheduleReason, UUID rescheduledFromInterviewId,
-        Instant createdAt
+        Instant createdAt, Integer durationMinutes
 ) {}

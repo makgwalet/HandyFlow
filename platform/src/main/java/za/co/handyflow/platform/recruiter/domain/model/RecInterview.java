@@ -39,6 +39,7 @@ public class RecInterview {
     // Set on the NEW row, pointing back to what it replaced — lets the
     // full reschedule chain be traced from either end.
     @Column(name = "rescheduled_from_interview_id") private UUID rescheduledFromInterviewId;
+    @Column(name = "duration_minutes", nullable = false) private int durationMinutes = 60;
     @Column(name = "created_at") private Instant createdAt;
 
     public static RecInterview create(UUID applicationId, UUID tenantId,
@@ -54,7 +55,17 @@ public class RecInterview {
                                       UUID interviewerId, String interviewerName,
                                       String location, UUID roundTemplateId,
                                       UUID rescheduledFromInterviewId) {
+        return create(applicationId, tenantId, interviewType, scheduledAt, interviewerId, interviewerName, location, roundTemplateId,
+                rescheduledFromInterviewId, null);
+    }
+
+    public static RecInterview create(UUID applicationId, UUID tenantId,
+                                      String interviewType, Instant scheduledAt,
+                                      UUID interviewerId, String interviewerName,
+                                      String location, UUID roundTemplateId,
+                                      UUID rescheduledFromInterviewId, Integer durationMinutes) {
         RecInterview i      = new RecInterview();
+        i.durationMinutes   = durationMinutes != null ? durationMinutes : 60;
         i.applicationId     = applicationId;
         i.tenantId          = tenantId;
         i.interviewType     = interviewType != null ? interviewType : "VIDEO";
