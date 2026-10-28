@@ -25,6 +25,8 @@ public final class SavedReportRules {
     public static final int MAX_NAME = 80;
     /** Enough for anyone's real use, and it stops a loop in a script filling the table. */
     public static final int MAX_PER_PERSON = 20;
+    /** How many colleagues one report can be shared with. */
+    public static final int MAX_SHARES = 20;
 
     /** Null when the settings are acceptable, otherwise a sentence to show the person. */
     public static String problem(String name, String kind, String period, String schedule, Integer runDay) {

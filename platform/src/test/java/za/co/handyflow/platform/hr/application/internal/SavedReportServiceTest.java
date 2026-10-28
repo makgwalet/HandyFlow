@@ -10,7 +10,12 @@ import org.springframework.security.access.AccessDeniedException;
 import za.co.handyflow.platform.hr.domain.model.HrSavedReport;
 import za.co.handyflow.platform.hr.domain.repository.HrSavedReportRepository;
 import za.co.handyflow.platform.hr.dto.SavedReportDtos.SaveRequest;
+import za.co.handyflow.platform.hr.domain.model.HrSavedReportShare;
+import za.co.handyflow.platform.hr.domain.repository.HrSavedReportShareRepository;
 import za.co.handyflow.platform.notifications.application.NotificationRequest;
+import za.co.handyflow.platform.notifications.application.Recipient;
+import za.co.handyflow.platform.notifications.application.UserRecipientResolver;
+import za.co.handyflow.platform.notifications.domain.model.NotificationChannel;
 import za.co.handyflow.platform.notifications.application.internal.NotificationService;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
@@ -32,13 +37,16 @@ class SavedReportServiceTest {
 
     @Mock HrSavedReportRepository repo;
     @Mock NotificationService notifications;
+    @Mock HrSavedReportShareRepository shares;
+    @Mock ReportAudience audience;
+    @Mock UserRecipientResolver recipients;
 
     SavedReportService service;
     final TenantId tenant = TenantId.generate();
     final UUID me = UUID.randomUUID();
 
     @BeforeEach
-    void setUp() { service = new SavedReportService(repo, notifications); }
+    void setUp() { service = new SavedReportService(repo, notifications, shares, audience, recipients); }
 
     @Test
     void savingAPayrollReportNeedsThePayrollRight() {
@@ -82,6 +90,9 @@ class SavedReportServiceTest {
     void aDueReportIsRemindedOnceAndRemembered() {
         HrSavedReport r = HrSavedReport.of(tenant.getValue(), me, "Weekly", "WORKFORCE", "THIS_MONTH", "WEEKLY", 3);
         when(repo.scheduled()).thenReturn(List.of(r));
+        when(shares.forReport(r.getId())).thenReturn(List.of());
+        when(audience.held(tenant, me)).thenReturn(Set.of("HR_REPORT_READ"));
+        when(recipients.resolveUser(tenant, me)).thenReturn(Optional.empty());
         assertEquals(1, service.remindAll(TODAY));
         ArgumentCaptor<NotificationRequest> sent = ArgumentCaptor.forClass(NotificationRequest.class);
         verify(notifications).send(sent.capture());
@@ -103,8 +114,89 @@ class SavedReportServiceTest {
     void aFailedSendIsNotRememberedSoItIsTriedAgain() {
         HrSavedReport r = HrSavedReport.of(tenant.getValue(), me, "Weekly", "WORKFORCE", "THIS_MONTH", "WEEKLY", 3);
         when(repo.scheduled()).thenReturn(List.of(r));
+        when(shares.forReport(r.getId())).thenReturn(List.of());
+        when(audience.held(tenant, me)).thenReturn(Set.of("HR_REPORT_READ"));
+        when(recipients.resolveUser(tenant, me)).thenReturn(Optional.empty());
         doThrow(new RuntimeException("down")).when(notifications).send(any(NotificationRequest.class));
         assertEquals(0, service.remindAll(TODAY));
         assertNull(r.getLastNotifiedOn());
+    }
+
+    private HrSavedReport weekly(String kind, boolean email) {
+        return HrSavedReport.of(tenant.getValue(), me, "Weekly", kind, "THIS_MONTH", "WEEKLY", 3, email);
+    }
+
+    @Test
+    void aSharedReportRemindsTheColleagueToo() {
+        UUID ben = UUID.randomUUID();
+        HrSavedReport r = weekly("WORKFORCE", false);
+        when(repo.scheduled()).thenReturn(List.of(r));
+        when(shares.forReport(r.getId())).thenReturn(List.of(HrSavedReportShare.of(tenant.getValue(), r.getId(), ben, me)));
+        when(audience.held(tenant, me)).thenReturn(Set.of("HR_REPORT_READ"));
+        when(audience.held(tenant, ben)).thenReturn(Set.of("HR_REPORT_READ"));
+        when(recipients.resolveUser(any(), any())).thenReturn(Optional.empty());
+        assertEquals(1, service.remindAll(TODAY));
+        ArgumentCaptor<NotificationRequest> sent = ArgumentCaptor.forClass(NotificationRequest.class);
+        verify(notifications, times(1)).send(sent.capture());
+        assertEquals(2, sent.getValue().recipients().size());
+    }
+
+    @Test
+    void someoneWhoLostTheRightIsNotReminded() {
+        UUID ben = UUID.randomUUID();
+        HrSavedReport r = weekly("WORKFORCE", false);
+        when(repo.scheduled()).thenReturn(List.of(r));
+        when(shares.forReport(r.getId())).thenReturn(List.of(HrSavedReportShare.of(tenant.getValue(), r.getId(), ben, me)));
+        when(audience.held(tenant, me)).thenReturn(Set.of("HR_REPORT_READ"));
+        when(audience.held(tenant, ben)).thenReturn(Set.of());
+        when(recipients.resolveUser(any(), any())).thenReturn(Optional.empty());
+        service.remindAll(TODAY);
+        ArgumentCaptor<NotificationRequest> sent = ArgumentCaptor.forClass(NotificationRequest.class);
+        verify(notifications).send(sent.capture());
+        assertEquals(1, sent.getValue().recipients().size());
+    }
+
+    @Test
+    void aPayrollReminderSkipsSomeoneWhoMayNotSeePay() {
+        UUID ben = UUID.randomUUID();
+        HrSavedReport r = weekly("PAYROLL", false);
+        when(repo.scheduled()).thenReturn(List.of(r));
+        when(shares.forReport(r.getId())).thenReturn(List.of(HrSavedReportShare.of(tenant.getValue(), r.getId(), ben, me)));
+        when(audience.held(tenant, me)).thenReturn(Set.of("HR_REPORT_READ", "HR_COMPENSATION_READ"));
+        when(audience.held(tenant, ben)).thenReturn(Set.of("HR_REPORT_READ"));
+        when(recipients.resolveUser(any(), any())).thenReturn(Optional.empty());
+        service.remindAll(TODAY);
+        ArgumentCaptor<NotificationRequest> sent = ArgumentCaptor.forClass(NotificationRequest.class);
+        verify(notifications).send(sent.capture());
+        assertEquals(List.of(me), sent.getValue().recipients().stream().map(Recipient::userId).toList());
+    }
+
+    @Test
+    void theEmailGoesSeparatelyWithAWorkingLinkAndOnlyToPeopleWithAnAddress() {
+        UUID ben = UUID.randomUUID();
+        HrSavedReport r = weekly("WORKFORCE", true);
+        when(repo.scheduled()).thenReturn(List.of(r));
+        when(shares.forReport(r.getId())).thenReturn(List.of(HrSavedReportShare.of(tenant.getValue(), r.getId(), ben, me)));
+        when(audience.held(any(), any())).thenReturn(Set.of("HR_REPORT_READ"));
+        when(recipients.resolveUser(tenant, me)).thenReturn(Optional.of(Recipient.user(me, "Ann", "ann@acme.test", null)));
+        when(recipients.resolveUser(tenant, ben)).thenReturn(Optional.of(Recipient.user(ben, "Ben", null, null)));
+        service.remindAll(TODAY);
+        ArgumentCaptor<NotificationRequest> sent = ArgumentCaptor.forClass(NotificationRequest.class);
+        verify(notifications, times(2)).send(sent.capture());
+        NotificationRequest mail = sent.getAllValues().get(1);
+        assertEquals(java.util.Set.of(NotificationChannel.EMAIL), mail.channels());
+        assertTrue(mail.actionUrl().startsWith("http"));
+        assertEquals(1, mail.recipients().size());
+    }
+
+    @Test
+    void noEmailUnlessAskedFor() {
+        HrSavedReport r = weekly("WORKFORCE", false);
+        when(repo.scheduled()).thenReturn(List.of(r));
+        when(shares.forReport(r.getId())).thenReturn(List.of());
+        when(audience.held(any(), any())).thenReturn(Set.of("HR_REPORT_READ"));
+        when(recipients.resolveUser(any(), any())).thenReturn(Optional.of(Recipient.user(me, "Ann", "ann@acme.test", null)));
+        service.remindAll(TODAY);
+        verify(notifications, times(1)).send(any(NotificationRequest.class));
     }
 }
