@@ -171,6 +171,13 @@ public class RecApplication {
         this.offerSubmittedBy = null; this.offerSubmittedAt = null; this.offerApprovedBy = null; this.offerApprovedAt = null; this.offerApprovalNote = null;
     }
 
+    /** A candidate reused from an earlier application keeps the agreement they gave then, with its original date and wording. */
+    public void inheritConsent(Instant givenAt, String statementVersion, String privacyUrl) {
+        this.consentGivenAt = givenAt;
+        this.consentStatementVer = statementVersion;
+        this.consentPrivacyUrl = privacyUrl;
+    }
+
     public void markOfferLetterSent() {
         this.offerLetterSentAt = Instant.now();
         touch();
