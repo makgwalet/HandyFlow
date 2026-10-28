@@ -6,7 +6,9 @@ import { complianceRows, payrollRows, workforceRows } from "./reports.csv"
 import { defaultPeriod, groupText, pct, periodProblem, presets, rand, reportFileName, reportRights, toCsv } from "./reports.logic"
 
 const get = vi.fn()
-vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a) } }))
+const post = vi.fn()
+const del = vi.fn()
+vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a), delete: (...a: unknown[]) => del(...a) } }))
 
 let perms: string[] = []
 vi.mock("../../hooks/useAuth", () => ({ useAuth: () => ({ user: { userId: "u-me", permissions: perms } }) }))
@@ -38,13 +40,14 @@ const compliance = (o: object = {}) => ({
 })
 
 function routes(map: Record<string, unknown>) {
+  const all = { "/api/v1/hr/saved-reports": [], ...map }
   get.mockImplementation((url: string) => {
-    for (const [k, v] of Object.entries(map)) if (url.startsWith(k)) return v instanceof Error ? Promise.reject(v) : ok(v)
+    for (const [k, v] of Object.entries(all)) if (url.startsWith(k)) return v instanceof Error ? Promise.reject(v) : ok(v)
     return Promise.reject(new Error(`unmocked ${url}`))
   })
 }
 
-beforeEach(() => { get.mockReset(); perms = ["HR_REPORT_READ"] })
+beforeEach(() => { get.mockReset(); post.mockReset(); del.mockReset(); perms = ["HR_REPORT_READ"] })
 afterEach(cleanup)
 
 describe("report rules in the browser", () => {
@@ -183,5 +186,41 @@ describe("report screens", () => {
     routes({ [`${BASE}/workforce`]: Object.assign(new Error("denied"), { response: { data: { message: "You do not have access to payroll figures." } } }) })
     wrap(<ReportsTab />)
     expect((await screen.findByRole("alert")).textContent).toMatch(/payroll figures|could not be produced/)
+  })
+})
+
+const saved = (o: object = {}) => ({
+  id: "s1", name: "Last month cost", kind: "TIME", kindLabel: "Leave and attendance", period: "LAST_MONTH", periodLabel: "last month", schedule: "MONTHLY", runDay: 3,
+  from: "2026-09-01", to: "2026-09-30", lastNotifiedOn: null, createdAt: "2026-10-01T05:00:00Z", ...o,
+})
+
+describe("saved reports", () => {
+  it("opens a saved report for the dates it means today", async () => {
+    routes({ "/api/v1/hr/saved-reports": [saved()], [`${BASE}/time`]: { from: "2026-09-01", to: "2026-09-30", leave: [], leavePending: 0, leavePendingStale: 0, sickDays: 0, sickEmployees: 0, attendance: null, attendanceNote: null, overtimeByKind: [], overtimeByDepartment: [], overtimePending: 0, notes: [] }, [BASE]: workforce() })
+    wrap(<ReportsTab />)
+    fireEvent.click(await screen.findByRole("button", { name: "Open Last month cost" }))
+    await waitFor(() => expect(get).toHaveBeenCalledWith(`${BASE}/time?from=2026-09-01&to=2026-09-30`))
+    expect(screen.getByText(/Reminder on day 3 of each month/)).toBeTruthy()
+  })
+
+  it("hides a saved payroll report from someone without the payroll right", async () => {
+    routes({ "/api/v1/hr/saved-reports": [saved({ id: "s2", name: "Payroll cost", kind: "PAYROLL", kindLabel: "Payroll" })], [BASE]: workforce() })
+    wrap(<ReportsTab />)
+    await screen.findByRole("region", { name: "Saved reports" })
+    await waitFor(() => expect(get).toHaveBeenCalledWith("/api/v1/hr/saved-reports"))
+    expect(screen.queryByText("Payroll cost")).toBeNull()
+  })
+
+  it("saves the report on screen with a monthly reminder", async () => {
+    routes({ [BASE]: workforce() })
+    post.mockResolvedValue(ok(saved()))
+    wrap(<ReportsTab />)
+    fireEvent.click(await screen.findByRole("button", { name: "Save this report…" }))
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: " Headcount " } })
+    fireEvent.change(screen.getByLabelText("Reminder"), { target: { value: "MONTHLY" } })
+    expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText("Reminder day"), { target: { value: "5" } })
+    fireEvent.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/hr/saved-reports", { name: "Headcount", kind: "WORKFORCE", period: "LAST_MONTH", schedule: "MONTHLY", runDay: 5 }))
   })
 })

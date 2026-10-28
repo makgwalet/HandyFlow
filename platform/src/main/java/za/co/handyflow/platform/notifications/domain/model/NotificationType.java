@@ -217,6 +217,9 @@ public enum NotificationType {
     // An issued letter that asks for acknowledgement has not been acknowledged. Never says what it is about.
     LETTER_UNACKNOWLEDGED(WARNING, Set.of(IN_APP, EMAIL)),
 
+    // A saved HR report the person asked to be reminded about is due. Carries no figures, only the report's name and period.
+    HR_REPORT_DUE(INFO, Set.of(IN_APP)),
+
     // Recruiter approvals: someone is asked to approve a job or an offer, and the person who asked is told the outcome.
     // The message names the role, never the candidate or the salary.
     REC_APPROVAL_REQUESTED(INFO, Set.of(IN_APP, EMAIL)),

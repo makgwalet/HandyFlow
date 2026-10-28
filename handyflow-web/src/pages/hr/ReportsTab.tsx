@@ -10,6 +10,9 @@ import { complianceRows, payrollRows, timeRows, workforceRows } from "./reports.
 import { defaultPeriod, periodProblem, presets, reportFileName, reportRights, toCsv, type Cell, type Period } from "./reports.logic"
 import { errorText, input, plain, primary, type Compliance, type PayrollReport, type TimeReport, type Workforce } from "./reports.shared"
 import { Notice } from "./AttendanceParts"
+import SavedReports from "./SavedReports"
+import { useSavedReports } from "./savedReports.hooks"
+import { toReportKind, type SavedReport } from "./savedReports.logic"
 import { ComplianceView, PayrollView, TimeView, WorkforceView } from "./ReportViews"
 
 type Kind = "workforce" | "time" | "payroll" | "compliance"
@@ -28,6 +31,13 @@ export default function ReportsTab() {
   const [draft, setDraft] = useState<Period>(defaultPeriod())
   const [period, setPeriod] = useState<Period>(defaultPeriod())
   const problem = periodProblem(draft)
+  const saved = useSavedReports(rights.read)
+  const open = (s: SavedReport) => { const p = { from: s.from, to: s.to }; setKind(toReportKind(s.kind)); setDraft(p); setPeriod(p) }
+  // A reminder links here with ?saved=<id>: open that view once the list has loaded.
+  const wanted = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("saved")
+  const [applied, setApplied] = useState<string | null>(null)
+  const target = wanted ? saved.data?.find(x => x.id === wanted) : undefined
+  if (target && applied !== target.id && (target.kind !== "PAYROLL" || rights.payroll)) { setApplied(target.id); open(target) }
 
   const tabs: { id: Kind; label: string; show: boolean }[] = [
     { id: "workforce", label: "Workforce", show: true },
@@ -61,6 +71,8 @@ export default function ReportsTab() {
           </button>
         ))}
       </div>
+
+      <SavedReports kind={kind} payrollRight={rights.payroll} onOpen={open} />
 
       <form aria-label="Period" onSubmit={e => { e.preventDefault(); if (!problem) setPeriod(draft) }}
         style={{ display: "flex", gap: 10, alignItems: "end", flexWrap: "wrap", marginBottom: 14 }}>

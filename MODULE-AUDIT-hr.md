@@ -544,7 +544,7 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 
 **What is not done, or not what it may seem**
 
-- No saved, scheduled or emailed reports, no charts, and no comparison with an earlier period.
+- Saved and scheduled reports now exist (section 44); there is still nothing emailed with figures, no charts, and no comparison with an earlier period.
 - No cost-per-hire, time-to-fill or training reports, no pay equity or EEA-style workforce profile, and no sectoral or occupational-level breakdown.
 - Leave is counted in the period its first day falls in, using the days requested; a leave that crosses the end of the period is not split.
 - Departments are each employee's current department, not the one they had at the time. A person who has changed department appears under the new one in past periods.
@@ -1128,3 +1128,18 @@ I read the four training services, the entities and the session screen. The modu
 **Code.** `ConvertToEmployeeRequest` gained five optional fields (the old seven-field form still works); `RecruiterService.convertToEmployee` passes them on; `hireDetails.logic.ts` and the form. Checking the screen logic under node found a real fault in my first draft (an all-empty block was refused because HR's bank check treats empty as missing); it is fixed and the test file covers it.
 
 **Not done.** Date of birth, gender and emergency contact are still left to HR. Nothing here changes how an applicant gives these details; the recruiter types them in. `hireDetails.test.ts` (4 tests) has not run (no vitest); no backend test was added for the conversion, and Spring and the database have not run.
+
+## 44. Saved and scheduled reports (Slice 21a, V531)
+
+**What was missing.** Every visit to HR → Reports started from the default period, and nobody was reminded when a monthly figure was ready.
+
+**What was added.**
+- A person can **save a report** (workforce, time and leave, payroll cost or compliance) with a period that moves with the calendar: this month, last month, this quarter, last quarter, year to date, last 90 days, last 12 months. Opening it shows the report for the dates that period means today. Up to 20 per person.
+- Optionally a **reminder**, weekly (a chosen weekday) or monthly (a day from 1 to 28). At 07:00 South African time a notification goes to the owner in the app: "Your payroll report for last month (2026-09-01 to 2026-09-30) is ready to open." It opens the Reports screen on that view. It is sent once a day at most, and only if it went out is it remembered, so a failed send is tried again.
+- Table `hr_saved_reports` (V531) holds settings only. **No figures are stored or sent**, so a reminder cannot leak anything and a saved report cannot widen who sees what: the figures are still worked out by the existing report endpoints under the rights of whoever opens it.
+- Saved reports belong to one person. Listing, opening and deleting use the signed-in user only; another person's id answers "not found". A payroll report can only be kept by someone with the compensation right, and one saved before that right was taken away is hidden rather than failing.
+- Endpoints `GET/POST /api/v1/hr/saved-reports`, `DELETE /api/v1/hr/saved-reports/{id}` (all need `HR_REPORT_READ`). Screen: a **Saved reports** panel on the Reports tab. New notification type `HR_REPORT_DUE` (in-app only).
+
+**Tests.** `SavedReportRulesTest` (10) passes in my harness and a deliberate break of the once-a-day rule was caught. The screen's logic was checked under node. `SavedReportServiceTest` (8, Mockito) and the frontend tests (`savedReports.test.ts` and three added to `Reports.test.tsx`) have not run (no Mockito or vitest here). Spring, the migration and a browser have not been used.
+
+**Not done.** Reminders are in the app only: no email, because the owner's address is not held by this module and sending figures by email is not safe. No sharing a saved report with someone else, and no editing one (delete and save again). A person whose user is not linked cannot save reports.
