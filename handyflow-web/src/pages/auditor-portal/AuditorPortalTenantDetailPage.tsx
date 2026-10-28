@@ -6,6 +6,9 @@ import { EvidenceRequests } from "../../components/evidenceRequests/EvidenceRequ
 import { auditorEvidenceRequestApi } from "../../api/evidenceRequests.api"
 import { AuditQueries } from "../../components/auditQueries/AuditQueries"
 import { auditorAuditQueryApi } from "../../api/auditQueries.api"
+import { PortalCard, PortalShell } from "./PortalShell"
+import { Stat } from "../internal-audit/auditUi"
+import { grid } from "../internal-audit/auditUi.styles"
 
 const NAVY = "var(--hf-primary)"
 const NAVY_TEXT = "var(--hf-primary-text)";
@@ -41,20 +44,26 @@ export function AuditorPortalTenantDetailPage() {
       .finally(() => setLoading(false))
   }, [tenantId])
 
+  const openCount = exceptions.filter(e => e.status === "OPEN").length
+  const resolvedCount = exceptions.filter(e => e.status === "RESOLVED").length
   return (
-    <div style={{ minHeight: "100vh", background: CANVAS, fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 32px", background: "var(--hf-surface)", borderBottom: `1px solid ${BORDER}` }}>
-        <button onClick={() => navigate("/auditor/portal")} style={{ background: "none", border: "none", color: MUTED, fontSize: 13, cursor: "pointer" }}>← Back</button>
-        <span style={{ fontSize: 13, color: FAINT }}>Business Access #{tenantId?.slice(0, 8)}</span>
-      </div>
+    <PortalShell
+      left={<button onClick={() => navigate("/auditor/portal")} style={{ background: "none", border: "none", color: MUTED, fontSize: 13, cursor: "pointer", padding: 0 }}>← Back</button>}
+      right={<span style={{ fontSize: 13, color: FAINT }}>Business Access #{tenantId?.slice(0, 8)}</span>}>
+        <h1 style={{ fontSize: 18, fontWeight: 800, color: INK, margin: "0 0 14px" }}>Review</h1>
 
-      <div style={{ padding: "24px 32px", maxWidth: 800 }}>
-        <h1 style={{ fontSize: 18, fontWeight: 800, color: INK, marginBottom: 16 }}>Review</h1>
+        {!loading && !error && (
+          <div style={{ ...grid(150), marginBottom: 18 }}>
+            <Stat label="Open exceptions" value={openCount} tone={openCount ? "danger" : undefined} />
+            <Stat label="Resolved" value={resolvedCount} />
+            <Stat label="Evidence files" value={evidence.length} />
+          </div>
+        )}
 
-        <div role="tablist" aria-label="Review sections" style={{ display: "flex", gap: 4, borderBottom: `1px solid ${BORDER}`, marginBottom: 20 }}>
+        <div role="tablist" aria-label="Review sections" style={{ display: "flex", gap: 4, borderBottom: `1px solid ${BORDER}`, marginBottom: 20, overflowX: "auto" }}>
           {([["exceptions", "Control Exceptions"], ["evidence", "Evidence"], ["requests", "Requests"], ["queries", "Queries"]] as [Tab, string][]).map(([id, label]) => (
             <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)} style={{
-              padding: "8px 14px", background: "none", border: "none",
+              padding: "8px 14px", background: "none", border: "none", whiteSpace: "nowrap",
               borderBottom: tab === id ? `2px solid ${NAVY}` : "2px solid transparent",
               color: tab === id ? NAVY_TEXT : MUTED, fontWeight: tab === id ? 700 : 500, fontSize: 13, cursor: "pointer", marginBottom: -1,
             }}>{label}</button>
@@ -75,7 +84,7 @@ export function AuditorPortalTenantDetailPage() {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {exceptions.map(e => (
-                <div key={e.id} style={{ background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "14px 16px" }}>
+                <PortalCard key={e.id}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -95,7 +104,7 @@ export function AuditorPortalTenantDetailPage() {
                       )}
                     </div>
                   </div>
-                </div>
+                </PortalCard>
               ))}
             </div>
           )
@@ -105,7 +114,7 @@ export function AuditorPortalTenantDetailPage() {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {evidence.map(e => (
-                <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "10px 14px" }}>
+                <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "10px 14px" }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: INK }}>{e.fileName}</div>
                     <div style={{ fontSize: 11, color: FAINT, marginTop: 2 }}>
@@ -117,8 +126,7 @@ export function AuditorPortalTenantDetailPage() {
             </div>
           )
         )}
-      </div>
-    </div>
+    </PortalShell>
   )
 }
 

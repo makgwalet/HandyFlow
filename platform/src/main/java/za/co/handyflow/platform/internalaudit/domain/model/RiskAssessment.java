@@ -82,12 +82,15 @@ public class RiskAssessment {
      * its own named method (not inlined) so retuning the formula later
      * is a one-method change, not a schema migration.
      */
+    /** Highest total that still counts as each level; anything above {@link #HIGH_MAX} is CRITICAL. Shown on the Audit Settings screen. */
+    public static final int LOW_MAX = 10, MEDIUM_MAX = 15, HIGH_MAX = 20;
+
     private static String calculateLevel(int inherent, int control, int historical,
                                          int timeSinceAudit, int businessImpact) {
         int sum = inherent + control + historical + timeSinceAudit + businessImpact;
-        if (sum <= 10) return "LOW";
-        if (sum <= 15) return "MEDIUM";
-        if (sum <= 20) return "HIGH";
+        if (sum <= LOW_MAX) return "LOW";
+        if (sum <= MEDIUM_MAX) return "MEDIUM";
+        if (sum <= HIGH_MAX) return "HIGH";
         return "CRITICAL";
     }
 

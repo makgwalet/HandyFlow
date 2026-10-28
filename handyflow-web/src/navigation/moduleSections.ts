@@ -830,6 +830,7 @@ export const INTERNAL_AUDIT_SECTIONS: ModuleSections = {
         { id: 'reports', label: 'Reports', icon: FileText },
         { id: 'committee', label: 'Risk & Control Report', icon: ShieldCheck, anyPermission: ['AUDIT_COMMITTEE_READ', 'AUDIT_READ'] },
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'AUDIT_READ' },
+        { id: 'my-tasks', label: 'My Tasks', icon: ListChecks, permission: 'AUDIT_READ' },
       ],
     },
     {
@@ -845,6 +846,12 @@ export const INTERNAL_AUDIT_SECTIONS: ModuleSections = {
         { id: 'monitoring', label: 'Monitoring', icon: Radio, permission: 'AUDIT_READ' },
         { id: 'follow-ups', label: 'Follow-ups', icon: Repeat, permission: 'AUDIT_READ' },
         { id: 'investigations', label: 'Investigations', icon: Lock, permission: 'AUDIT_INVESTIGATE' },
+      ],
+    },
+    {
+      label: 'Setup',
+      sections: [
+        { id: 'settings', label: 'Audit Settings', icon: Settings, permission: 'AUDIT_READ' },
       ],
     },
   ],

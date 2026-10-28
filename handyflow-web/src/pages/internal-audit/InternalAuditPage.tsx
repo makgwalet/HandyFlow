@@ -10,6 +10,8 @@ import { ReportsSection } from "./ReportsSection"
 import { QualitySection } from "./QualitySection"
 import { RemediationSection } from "./RemediationSection"
 import { HeatMapSection } from "./HeatMapSection"
+import { MyTasksSection } from "./MyTasksSection"
+import { SettingsSection } from "./SettingsSection"
 import { ProgrammeSection } from "./ProgrammeSection"
 import { MonitoringSection } from "./MonitoringSection"
 import { FollowUpSection } from "./FollowUpSection"
@@ -61,6 +63,8 @@ export default function InternalAuditPage() {
         switch (id) {
           case "reports":     return <ReportsSection />
           case "findings":    return <RemediationSection />
+          case "settings":    return <SettingsSection />
+          case "my-tasks":    return <MyTasksSection />
           case "heat-map":    return <HeatMapSection onGo={section => navigate(`/internal-audit/${section}`)} />
           case "quality":     return <QualitySection />
           case "programme":   return <ProgrammeSection />

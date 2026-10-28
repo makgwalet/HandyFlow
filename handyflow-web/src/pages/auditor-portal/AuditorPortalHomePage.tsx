@@ -10,6 +10,7 @@ import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { auditorPortalApi, type AuditorTenantAccess } from "../../api/auditorPortal.api"
 import { usePortalAuthStore } from "../../store/portalAuth.store"
+import { Brand, PortalShell } from "./PortalShell"
 
 const NAVY = "var(--hf-primary)"
 const NAVY_TEXT = "var(--hf-primary-text)";
@@ -43,44 +44,36 @@ export function AuditorPortalHomePage() {
   }, [navigate])
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--hf-surface-muted)", fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 32px", background: "var(--hf-surface)", borderBottom: `1px solid ${BORDER}` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: NAVY, color: "var(--hf-text-on-solid)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13 }}>H</div>
-          <span style={{ fontSize: 14, fontWeight: 800, color: INK }}>Auditor Access</span>
-        </div>
+    <PortalShell
+      left={<Brand />}
+      right={
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 13, color: MUTED }}>{user?.fullName ?? user?.email}</span>
           <button onClick={logout} style={{ padding: "6px 12px", background: "var(--hf-surface)", color: NAVY_TEXT, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Log out</button>
         </div>
-      </div>
+      }>
+      <h1 style={{ fontSize: 20, fontWeight: 800, color: INK, margin: "0 0 4px" }}>Businesses you can review</h1>
+      <p style={{ fontSize: 13, color: MUTED, margin: "0 0 20px" }}>Everything you've been granted access to review.</p>
 
-      <div style={{ padding: "32px" }}>
-        <h1 style={{ fontSize: 20, fontWeight: 800, color: INK, marginBottom: 4 }}>Businesses you can review</h1>
-        <p style={{ fontSize: 13, color: MUTED, marginBottom: 24 }}>
-          Everything you've been granted access to review.
-        </p>
-
-        {loading ? (
-          <div style={{ color: FAINT, fontSize: 13 }}>Loading…</div>
-        ) : error ? (
-          <div role="alert" style={{ padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 12.5, color: "var(--hf-danger-text)" }}>{error}</div>
-        ) : tenants.length === 0 ? (
-          <div style={{ padding: 40, textAlign: "center" as const, color: FAINT, fontSize: 14, background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
-            No businesses have granted you access yet.
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 480 }}>
-            {tenants.map(t => (
-              <button key={t.tenantId} onClick={() => navigate(`/auditor/portal/tenants/${t.tenantId}`)}
-                style={{ textAlign: "left" as const, padding: "14px 16px", background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, cursor: "pointer" }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: INK }}>Business Access #{t.tenantId.slice(0, 8)}</div>
-                <div style={{ fontSize: 12, color: FAINT, marginTop: 2 }}>Access granted {fmtD(t.acceptedAt)}</div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+      {loading ? (
+        <div style={{ color: FAINT, fontSize: 13 }}>Loading…</div>
+      ) : error ? (
+        <div role="alert" style={{ padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 12.5, color: "var(--hf-danger-text)" }}>{error}</div>
+      ) : tenants.length === 0 ? (
+        <div style={{ padding: 40, textAlign: "center" as const, color: FAINT, fontSize: 14, background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 10 }}>
+          No businesses have granted you access yet.
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+          {tenants.map(t => (
+            <button key={t.tenantId} onClick={() => navigate(`/auditor/portal/tenants/${t.tenantId}`)}
+              style={{ textAlign: "left" as const, padding: "14px 16px", background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 10, cursor: "pointer" }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: INK }}>Business Access #{t.tenantId.slice(0, 8)}</div>
+              <div style={{ fontSize: 12, color: FAINT, marginTop: 2 }}>Access granted {fmtD(t.acceptedAt)}</div>
+            </button>
+          ))}
+        </div>
+      )}
+    </PortalShell>
   )
 }

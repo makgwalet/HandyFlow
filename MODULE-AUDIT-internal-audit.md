@@ -78,3 +78,17 @@ Each row in the Engagements list now has a **Details** link to `/internal-audit/
 - Planning, sampling and testing, team changes and uploading workpapers are still done in the Engagements list; the detail page links back to it.
 - Workpapers are loaded one folder at a time (existing endpoints), so an engagement with many folders makes one call per folder.
 - Not compiled or run: `AuditEngagementSummaryService`, `AuditWorkpaperDownloadService` and both controllers (Spring). Run: `EngagementSummaryBuilderTest` (10) and `DownloadNamesTest` (3) offline, and `engagementDetail.test.ts` (6, under Node). tsc and eslint are clean on the new files. Nothing was viewed in a browser, and no component test was written for the two new screens.
+
+## 6. My Tasks, Audit Settings and the External Audit Portal restyle (patch 0516)
+
+**My Tasks** (new section, `AUDIT_READ`, backed by `GET /internal-audit/my-tasks`): the signed-in person's own open work, most urgent first, grouped as overdue, due in 7 days, later and no date. It lists actions they own that are still open; findings they own that are open or in progress; review notes waiting for their answer (they prepared the workpaper); and answered notes waiting for them to clear (they raised it). Each row opens its engagement. It is a plain card list, so it reads on a phone.
+
+**Audit Settings** (new section under Setup, `AUDIT_READ`, backed by `GET /internal-audit/settings`): the risk score bands, reminder timing and engagement roles, read only. The band limits and reminder days are now named constants (`RiskAssessment.LOW_MAX`/`MEDIUM_MAX`/`HIGH_MAX`, `ReminderRules`) that the code itself uses, so the screen cannot disagree with it. No behaviour changed.
+
+**External Audit Portal:** the home and business pages share one frame (`PortalShell`) with page gutters that shrink on a phone, scrollable tabs, a tile row (open exceptions, resolved, evidence files) and rounded cards. Wording, tabs and data are unchanged.
+
+**Limits**
+- Audit Settings cannot be edited: there is no settings storage, and inventing one was out of scope. If the firm wants its own score bands or reminder days, that needs a settings table and a change to the scoring code.
+- My Tasks does not include evidence requests or audit queries (they belong to the other modules' screens), and it does not list actions waiting for the person to validate, because who may validate is decided when they try (never the owner or the person who completed it).
+- My Tasks reads every action, finding and open note for the company and filters in memory, and looks up one workpaper per open note. Fine at this size; it should be queried by owner if volumes grow.
+- Not compiled or run: `AuditMyTasksService`, `AuditSettingsController`, `AuditMyTasksController` (Spring), and the edit to `RiskAssessment`. Run offline: `MyTasksTest` (5, one mutation caught), `AuditSettingsTest` (3, against a stub of `RiskAssessment` holding the same three numbers) and the existing `ReminderRulesTest` (3) after the constants change; `myTasks.test.ts` (3, under Node). tsc is clean; the three new screens and the engagement page were server-rendered once with sample data. No component tests written, nothing viewed in a browser, and the portal was not rendered.
