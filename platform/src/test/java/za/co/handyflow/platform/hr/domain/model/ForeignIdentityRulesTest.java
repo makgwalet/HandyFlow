@@ -71,4 +71,18 @@ class ForeignIdentityRulesTest {
         for (int i = 0; i < 8; i++) many.add(new Expiring("P" + i, ForeignIdentityRules.PERMIT, TODAY.plusDays(30)));
         assertThat(ForeignIdentityRules.hrMessage(many, TODAY)).contains("and 3 more");
     }
+
+    @Test
+    void theFilterTakesZeroToAYearAndAFewDays() {
+        assertThat(ForeignIdentityRules.filterProblem(null)).isNotNull();
+        assertThat(ForeignIdentityRules.filterProblem(-1)).contains("between 0 and 366");
+        assertThat(ForeignIdentityRules.filterProblem(367)).contains("between 0 and 366");
+        for (int d : new int[]{0, 30, 90, 366}) assertThat(ForeignIdentityRules.filterProblem(d)).isNull();
+    }
+
+    @Test
+    void theFilterLimitIsTodayPlusTheDays() {
+        assertThat(ForeignIdentityRules.filterLimit(TODAY, 0)).isEqualTo(TODAY);
+        assertThat(ForeignIdentityRules.filterLimit(TODAY, 90)).isEqualTo(LocalDate.of(2027, 1, 26));
+    }
 }

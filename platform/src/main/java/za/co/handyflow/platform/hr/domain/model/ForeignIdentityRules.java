@@ -22,6 +22,19 @@ public final class ForeignIdentityRules {
     /** The furthest ahead the daily check needs to look. */
     public static final int LOOK_AHEAD_DAYS = 90;
 
+    /** The most days ahead the employee list can look for documents ending. */
+    public static final int MAX_FILTER_DAYS = 366;
+
+    /** Null when the number of days can be used for the employee-list filter. 0 means already ended or ending today. */
+    public static String filterProblem(Integer days) {
+        if (days == null) return "Say how many days ahead to look.";
+        if (days < 0 || days > MAX_FILTER_DAYS) return "Look between 0 and " + MAX_FILTER_DAYS + " days ahead.";
+        return null;
+    }
+
+    /** The last day a document may end on to be listed: today plus the days. Documents that have already ended are listed too. */
+    public static LocalDate filterLimit(LocalDate today, int days) { return today.plusDays(days); }
+
     /** One document that is running out. */
     public record Expiring(String employee, String kind, LocalDate on) {}
 

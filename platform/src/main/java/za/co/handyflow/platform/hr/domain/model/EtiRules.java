@@ -8,7 +8,8 @@ import java.time.Period;
 /**
  * The employment tax incentive for one employee for one month. Pure: the table of amounts is passed in.
  * <p>
- * A person qualifies when they are 18 to 29 (at the end of the month), have a valid South African ID, are not excluded (domestic worker,
+ * A person qualifies when they are 18 to 29 (at the end of the month), have a valid South African ID, an asylum seeker permit or a refugee ID
+ * (the ETI Act's three accepted documents; a passport with a work visa does not qualify), are not excluded (domestic worker,
  * connected person), have not had 24 qualifying months, and are paid at least the full-month minimum and less than the cap for 160 hours.
  * A part month is grossed up to 160 hours to find the band, and the amount found is grossed back down by the same share.
  * The first 12 qualifying months earn the first-year amounts; the next 12 the second-year amounts (half).
@@ -33,6 +34,29 @@ public final class EtiRules {
         return Period.between(dateOfBirth, date).getYears();
     }
 
+    public static final String ASYLUM_OR_REFUGEE = "ASYLUM_OR_REFUGEE";
+
+    /**
+     * Null when the person holds a document the incentive accepts: a valid South African ID number, or an asylum seeker permit or refugee ID
+     * that is on record with its number and has not ended by the month end. Otherwise why not, in terms the person reading the pay run
+     * can act on.
+     *
+     * @param permitType   the kind of work permit or status recorded, if any
+     * @param otherPapers  a passport or another kind of permit is on record instead
+     */
+    public static String identityProblem(boolean idValid, String permitType, String permitNumber, LocalDate permitExpiry, boolean otherPapers, LocalDate monthEnd) {
+        if (idValid) return null;
+        if (ASYLUM_OR_REFUGEE.equals(permitType)) {
+            if (permitNumber == null || permitNumber.isBlank()) return "the asylum seeker permit or refugee ID has no number on record";
+            if (permitExpiry == null) return "the asylum seeker permit or refugee ID has no end date on record, so it cannot be shown to be valid";
+            if (permitExpiry.isBefore(monthEnd)) return "the asylum seeker permit or refugee ID ended on " + permitExpiry + ", before the end of the month";
+            return null;
+        }
+        if (otherPapers || (permitType != null && !permitType.isBlank()))
+            return "a passport or work visa does not qualify: the incentive needs a valid South African ID, an asylum seeker permit or a refugee ID";
+        return "no valid South African ID number, asylum seeker permit or refugee ID on record";
+    }
+
     /**
      * @param monthEnd         last day of the pay period
      * @param idValid          a valid South African ID number is on record
@@ -42,11 +66,17 @@ public final class EtiRules {
      */
     public static Result calculate(Table t, LocalDate dateOfBirth, LocalDate monthEnd, boolean idValid, String excludedReason,
                                    int priorMonths, BigDecimal remuneration, BigDecimal paidShare) {
+        return calculate(t, dateOfBirth, monthEnd, idValid ? null : "no valid South African ID number on record", excludedReason, priorMonths, remuneration, paidShare);
+    }
+
+    /** As above, with the reason the person's identity does not qualify (see {@link #identityProblem}) instead of a yes or no; null when it does. */
+    public static Result calculate(Table t, LocalDate dateOfBirth, LocalDate monthEnd, String identityProblem, String excludedReason,
+                                   int priorMonths, BigDecimal remuneration, BigDecimal paidShare) {
         if (excludedReason != null && !excludedReason.isBlank()) return no("excluded: " + excludedReason.trim());
         if (dateOfBirth == null) return no("no date of birth on record");
         int age = ageOn(dateOfBirth, monthEnd);
         if (age < MIN_AGE || age > MAX_AGE) return no("age " + age + " is outside 18 to 29");
-        if (!idValid) return no("no valid South African ID number on record");
+        if (identityProblem != null) return no(identityProblem);
         if (priorMonths >= MAX_MONTHS) return no("the 24 months have been used");
         if (remuneration == null || remuneration.signum() <= 0) return no("no remuneration this month");
         if (paidShare == null || paidShare.signum() <= 0 || paidShare.compareTo(BigDecimal.ONE) > 0) return no("no hours worked this month");

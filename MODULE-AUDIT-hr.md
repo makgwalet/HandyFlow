@@ -1550,3 +1550,26 @@ Not changed, and still different from the HR engine: the bureau has no dependant
 - Hours and minimum wage are derived from days paid; payslips hold no hours worked. An hourly-paid employee needs real hours.
 - ETI 3190 is the employee's start date; SARS wants the date of the first qualifying employment, which can differ.
 - SARS limits a certificate to 20 income codes and 12 deduction codes; the codes produced here stay under both, so it is not checked.
+
+## 67. ETI eligibility for foreign employees, expiring-documents filter (Slice 33)
+
+**ETI and identity papers.** Until now the incentive needed only a valid South African ID number, which shut out every foreign employee with no distinction. The ETI Act accepts three kinds of identity: a valid South African ID, an asylum seeker permit, or an ID issued under the Refugees Act. A passport with a work visa does not qualify, whatever its date. `EtiRules.identityProblem` now judges this from what is on record and returns the reason, or null when the person qualifies:
+- a valid South African ID qualifies whatever else is on record;
+- a permit of type `ASYLUM_OR_REFUGEE` qualifies if it has a number and an end date on or after the last day of the pay month (a permit ending on that day is still valid); no number, no end date, or an earlier end date each give their own reason;
+- any other permit type, or a passport alone, gives "a passport or work visa does not qualify";
+- nothing on record gives "no valid South African ID number, asylum seeker permit or refugee ID on record".
+`EtiRules.calculate` takes the reason (a `String` overload); the old `boolean` overload still works and keeps its old wording. Age and exclusion reasons are still given first. `PayrollService` passes the employee's papers and the run's period end. The ETI settings screen (`EtiService`, `EtiModal`) shows the same line, so the answer is visible before a run, not only in its warnings.
+
+**Employee list filter.** `GET /hr/employees?expiringWithin=N` lists people whose work permit or passport ends on or before today plus N days, those already past included (N = 0 is "already ended or ending today"). It needs the personal-data right (`HR_SENSITIVE_READ`) because it exposes identity documents; the days must be 0 to 366. People who have left are left out unless the status filter asks for them. The query is `HrEmployeeRepository.findAllActiveExpiring`. The page offers Any, Ended, 30, 60 and 90 days, shown only to those with the right, and each row names its nearest document ("Passport expired 8 days ago").
+
+**Tests.**
+- Run offline, passing: `EtiRulesTest` (18, six new), `ForeignIdentityRulesTest` (9, two new); frontend `foreignIdentity.test.ts` (15, three new: filter values, row badge, papers line) run under Node because vitest is not installed.
+- Written, not run: three cases in `EmployeeViewServiceTest` (permission, days range, limit date), which need Mockito and Spring.
+- Types and lint clean for the changed frontend files; `EmployeesTab.tsx` keeps its 16 existing lint errors, none on changed lines.
+
+**Limits and things I could not verify**
+- The three accepted kinds of identity come from SARS's ETI guide; I did not read the Act's text.
+- Permit validity is judged from the recorded end date only. A permit renewed with a receipt, or one extended by a directive, will show as ended until the date is updated.
+- `findAllActiveExpiring` was not run against PostgreSQL (the `CAST(:search AS string)` form copies the existing queries).
+- An asylum seeker without an ID number or passport now passes ETI, but the e@syFile file still needs an ID or passport number for the person.
+- The filter reads the dates on the employee record, not the document store, so an uploaded copy with no date entered does not appear.

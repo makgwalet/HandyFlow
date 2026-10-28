@@ -16,7 +16,7 @@ import { apiClient } from "../../api/client"
 import { useAuth } from "../../hooks/useAuth"
 import ForeignIdentityFields from "./ForeignIdentityFields"
 import EmployeeProfileModal from "./EmployeeProfileModal"
-import { EMPTY_FOREIGN, anyForeign, expiryState, expiryText, foreignBody, foreignProblem, fromServer, permitLabel, type ForeignBody } from "./foreignIdentity.logic"
+import { EMPTY_FOREIGN, EXPIRING_FILTERS, anyForeign, endingBadge, expiringParam, expiryState, expiryText, foreignBody, foreignProblem, fromServer, permitLabel, type ForeignBody } from "./foreignIdentity.logic"
 import { END_TYPES, employeeRights, terminationProblem, terminationQuery, today } from "./employees.logic"
 import { ApprovalsModal, HistoryModal, ReportingModal, RequestChangeModal } from "./EmployeeChanges"
 import { Plus, X, Search, Users, AlertTriangle, AlertCircle, Edit2, UserX } from "lucide-react"
@@ -93,6 +93,7 @@ export default function EmployeesTab() {
   const qc = useQueryClient()
   const [search, setSearch]         = useState("")
   const [filterStatus, setFilter]   = useState("ALL")
+  const [ending, setEnding]         = useState("")
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing]       = useState<Employee | null>(null)
   const [selected, setSelected]     = useState<Employee | null>(null)
@@ -120,11 +121,13 @@ export default function EmployeesTab() {
 
   // FIX: correct unwrap — r.data?.data?.content (ApiResponse<Page<Employee>>)
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
-    queryKey: ["hr-employees", search, filterStatus],
+    queryKey: ["hr-employees", search, filterStatus, ending],
     queryFn: async () => {
       const params = new URLSearchParams({ size: "200" })
       if (search) params.set("search", search)
       if (filterStatus !== "ALL") params.set("status", filterStatus)
+      const within = rights.sensitive ? expiringParam(ending) : null
+      if (within !== null) params.set("expiringWithin", within)
       return unwrap(await apiClient.get(`/api/v1/hr/employees?${params}`))
     },
   })
@@ -401,6 +404,12 @@ export default function EmployeesTab() {
               {s === "ALL" ? "All" : STATUS_CFG[s]?.label ?? s}
             </button>
           ))}
+          {rights.sensitive && (
+            <select aria-label="Passport or work permit" value={ending} onChange={e => setEnding(e.target.value)}
+              style={{ padding: "6px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12, background: "var(--hf-surface)", color: "var(--hf-text-secondary)" }}>
+              {EXPIRING_FILTERS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          )}
           <div style={{ position: "relative" as const }}>
             <Search size={14} style={{ position: "absolute" as const, left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--hf-text-faint)" }} />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, number..."
@@ -451,6 +460,7 @@ export default function EmployeesTab() {
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 14, color: "var(--hf-text)" }}>{emp.fullName}</div>
                           <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{emp.employeeNumber}</div>
+                          {(() => { const b = endingBadge(emp.foreign); return b ? <div style={{ fontSize: 11, fontWeight: 600, color: b.state === "expired" ? "var(--hf-danger-text)" : "var(--hf-warning-text)" }}>{b.text}</div> : null })()}
                         </div>
                       </div>
                     </td>

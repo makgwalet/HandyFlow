@@ -1,7 +1,7 @@
 // src/pages/hr/eti.logic.ts
 //
 // The employment tax incentive on screen. The server works it out; these are the words and the checks for the two things a person enters.
-export interface EmployeeEti { employeeId: string; priorMonths: number; excludedReason: string | null }
+export interface EmployeeEti { employeeId: string; priorMonths: number; excludedReason: string | null; identityProblem?: string | null }
 export type EtiForm = { priorMonths: string; excludedReason: string }
 
 export const MAX_ETI_MONTHS = 24
@@ -34,3 +34,7 @@ export function emp201EtiNotes(e: { totalEti?: number | null; etiCarried?: numbe
 /** On a payslip row for payroll staff. */
 export const payslipEtiNote = (p: { etiAmount?: number | string | null; etiMonth?: number | null }): string | null =>
   Number(p.etiAmount ?? 0) > 0 ? `ETI ${rand(Number(p.etiAmount))} claimed (month ${p.etiMonth ?? "?"} of 24)` : null
+
+/** One line on whether the person's papers qualify for the incentive, from what the server found. Empty until it has answered. */
+export const identityLine = (e: EmployeeEti | undefined): string =>
+  !e || e.identityProblem === undefined ? "" : e.identityProblem ? `Papers on record: ${e.identityProblem}.` : "Papers on record: they qualify (a valid South African ID, asylum seeker permit or refugee ID)."

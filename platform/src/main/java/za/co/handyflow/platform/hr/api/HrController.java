@@ -59,12 +59,16 @@ public class HrController {
 
     @GetMapping("/employees")
     @PreAuthorize("hasAnyAuthority('HR_READ','HR_MANAGE','HR_TEAM_READ','PAYROLL_RUN','PAYROLL_PREPARE','PAYROLL_APPROVE','USER_READ')")
-    @Operation(summary = "List employees. Personal data and pay are left out unless the caller holds the permission")
+    @Operation(summary = "List employees. Personal data and pay are left out unless the caller holds the permission. expiringWithin (days) lists people whose work permit or passport ends within that many days, for callers who may see personal data")
     public ResponseEntity<ApiResponse<Page<EmployeeViewResponse>>> getEmployees(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) Integer expiringWithin,
             @PageableDefault(size = 50) Pageable pageable,
             Authentication authentication, Principal principal) {
+        if (expiringWithin != null)
+            return ResponseEntity.ok(ApiResponse.success(employeeViewService.listExpiring(TenantContext.getTenantIdAsObject(), status, search, expiringWithin,
+                    java.time.LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg")), pageable, HrAccess.held(authentication))));
         return ResponseEntity.ok(ApiResponse.success(employeeViewService.list(
                 TenantContext.getTenantIdAsObject(), status, search, pageable, HrAccess.held(authentication), resolveUserId(principal))));
     }

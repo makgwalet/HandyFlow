@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
-import { EMPTY_FOREIGN, anyForeign, expiryState, expiryText, foreignBody, foreignProblem, fromServer, permitLabel } from "./foreignIdentity.logic"
+import { EMPTY_FOREIGN, EXPIRING_FILTERS, anyForeign, endingBadge, expiringParam, expiryState, expiryText, foreignBody, foreignProblem, fromServer, permitLabel } from "./foreignIdentity.logic"
+import { identityLine } from "./eti.logic"
 import { certificateFileName, certificateTitle } from "./myCertificates.logic"
 
 const f = (o: Partial<typeof EMPTY_FOREIGN>) => ({ ...EMPTY_FOREIGN, ...o })
@@ -69,5 +70,37 @@ describe("certificate wording", () => {
     expect(certificateTitle({ certificateType: "IT3A", taxYear: 2027 })).toBe("IT3(a) for the 2027 tax year")
     expect(certificateTitle({ certificateType: "IRP5", taxYear: 2027 })).toBe("IRP5 for the 2027 tax year")
     expect(certificateFileName({ certificateType: "IRP5", taxYear: 2027, certificateNumber: "7123/2027 01" })).toBe("IRP5-2027-7123_2027_01.pdf")
+  })
+})
+
+describe("employee list filter", () => {
+  it("offers any, ended, 30, 60 and 90 days, and sends only values the server accepts", () => {
+    expect(EXPIRING_FILTERS.map(o => o.value)).toEqual(["", "0", "30", "60", "90"])
+    expect(expiringParam("")).toBeNull()
+    expect(expiringParam("0")).toBe("0")
+    expect(expiringParam("90")).toBe("90")
+    expect(expiringParam("367")).toBeNull()
+    expect(expiringParam("-1")).toBeNull()
+    expect(expiringParam("abc")).toBeNull()
+  })
+
+  it("shows the document nearest its end on a row", () => {
+    const today = "2026-10-28"
+    expect(endingBadge(null, today)).toBeNull()
+    expect(endingBadge({}, today)).toBeNull()
+    expect(endingBadge({ workPermitExpiry: "2027-06-01", passportExpiry: "2028-01-01" }, today)).toBeNull()
+    const b = endingBadge({ workPermitExpiry: "2026-11-10", passportExpiry: "2026-10-20" }, today)
+    expect(b?.state).toBe("expired")
+    expect(b?.text.startsWith("Passport")).toBe(true)
+    expect(endingBadge({ workPermitExpiry: "2026-11-10" }, today)?.state).toBe("soon")
+  })
+})
+
+describe("ETI papers line", () => {
+  it("is empty until the server says, then gives the reason or says they qualify", () => {
+    expect(identityLine(undefined)).toBe("")
+    expect(identityLine({ identityProblem: undefined } as never)).toBe("")
+    expect(identityLine({ identityProblem: null } as never)).toMatch(/they qualify/)
+    expect(identityLine({ identityProblem: "a passport or work visa does not qualify" } as never)).toBe("Papers on record: a passport or work visa does not qualify.")
   })
 })

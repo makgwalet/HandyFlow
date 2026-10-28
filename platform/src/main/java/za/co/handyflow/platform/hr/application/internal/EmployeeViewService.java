@@ -8,6 +8,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.hr.domain.model.EmployeeRules;
+import za.co.handyflow.platform.hr.domain.model.ForeignIdentityRules;
 import za.co.handyflow.platform.hr.domain.model.HrEmployee;
 import za.co.handyflow.platform.hr.domain.model.OrgRules;
 import za.co.handyflow.platform.hr.domain.repository.HrEmployeeRepository;
@@ -48,6 +49,20 @@ public class EmployeeViewService {
         }
         Map<UUID, String> names = names(tenantId);
         return employeeRepo.findAllActive(tenantId, status, search, pageable).map(e -> view(e, names, held));
+    }
+
+    /**
+     * The employees whose work permit or passport ends within the given number of days (those already ended included). Identity documents
+     * are personal data, so only a caller who may see personal data may ask; the rows carry the documents and their dates as they do in the list.
+     */
+    @Transactional(readOnly = true)
+    public Page<EmployeeViewResponse> listExpiring(TenantId tenantId, String status, String search, int withinDays, java.time.LocalDate today,
+                                                   Pageable pageable, Set<String> held) {
+        if (!HrAccess.sensitive(held)) throw new AccessDeniedException("You may not look at identity documents.");
+        String problem = ForeignIdentityRules.filterProblem(withinDays);
+        if (problem != null) throw new IllegalArgumentException(problem);
+        Map<UUID, String> names = names(tenantId);
+        return employeeRepo.findAllActiveExpiring(tenantId, status, search, ForeignIdentityRules.filterLimit(today, withinDays), pageable).map(e -> view(e, names, held));
     }
 
     @Transactional

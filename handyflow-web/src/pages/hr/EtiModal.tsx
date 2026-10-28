@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { X } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { etiBody, etiForm, etiProblem, MAX_ETI_REASON, type EmployeeEti, type EtiForm } from "./eti.logic"
+import { etiBody, etiForm, etiProblem, identityLine, MAX_ETI_REASON, type EmployeeEti, type EtiForm } from "./eti.logic"
 
 type ApiErr = { response?: { data?: { message?: string } } }
 const input: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box", background: "var(--hf-surface)", color: "var(--hf-text)" }
@@ -49,9 +49,10 @@ export default function EtiModal({ employee, canEdit, onClose }: { employee: { i
           <button aria-label="Close" onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-muted)" }}><X size={18} /></button>
         </div>
         <p style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 0 }}>
-          A pay run works the incentive out for people aged 18 to 29 with a valid South African ID, paid at least R2,500 and under R7,500 for a full month, for up to 24 months.
+          A pay run works the incentive out for people aged 18 to 29 with a valid South African ID, asylum seeker permit or refugee ID (a passport with a work visa does not qualify), paid at least R2,500 and under R7,500 for a full month, for up to 24 months.
           Enter what payroll cannot know.
         </p>
+        {identityLine(facts.data) && <p role="status" style={{ fontSize: 12, margin: "0 0 10px", color: facts.data?.identityProblem ? "var(--hf-danger-text)" : "var(--hf-text-secondary)" }}>{identityLine(facts.data)}</p>}
         {facts.isLoading ? <div style={{ color: "var(--hf-text-faint)" }}>Loading…</div> : (
           <div style={{ display: "grid", gap: 10 }}>
             <div>

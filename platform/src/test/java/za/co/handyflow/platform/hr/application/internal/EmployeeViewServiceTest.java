@@ -2,6 +2,7 @@ package za.co.handyflow.platform.hr.application.internal;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.AccessDeniedException;
 import za.co.handyflow.platform.hr.domain.model.HrEmployee;
@@ -138,5 +139,35 @@ class EmployeeViewServiceTest {
         EmployeeViewResponse v = service.get(tenant, outsider.getId(), Set.of("HR_READ", "HR_TEAM_READ"), actor);
 
         assertThat(v.fullName()).isEqualTo("Other Naidoo");
+    }
+
+    @Test
+    void theExpiringListIsForThoseWhoMaySeeIdentityDocumentsOnly() {
+        for (Set<String> held : List.of(Set.of("HR_READ"), Set.of("HR_TEAM_READ"), Set.<String>of())) {
+            assertThatThrownBy(() -> service.listExpiring(tenant, null, null, 30, LocalDate.of(2026, 10, 28), PageRequest.of(0, 20), held))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+        verify(repo, never()).findAllActiveExpiring(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void theExpiringListRefusesDaysOutsideZeroToAYear() {
+        Set<String> held = Set.of("HR_READ", "HR_SENSITIVE_READ");
+        assertThatThrownBy(() -> service.listExpiring(tenant, null, null, -1, LocalDate.of(2026, 10, 28), PageRequest.of(0, 20), held)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.listExpiring(tenant, null, null, 367, LocalDate.of(2026, 10, 28), PageRequest.of(0, 20), held)).isInstanceOf(IllegalArgumentException.class);
+        verify(repo, never()).findAllActiveExpiring(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void theExpiringListAsksForDocumentsEndingByTodayPlusTheDays() {
+        member.setWorkPermit("GENERAL_WORK", "W-1", LocalDate.of(2026, 11, 20));
+        PageRequest page = PageRequest.of(0, 20);
+        when(repo.findAllActiveExpiring(any(), any(), any(), eq(LocalDate.of(2026, 11, 27)), any())).thenReturn(new PageImpl<>(List.of(member), page, 1));
+
+        var out = service.listExpiring(tenant, null, null, 30, LocalDate.of(2026, 10, 28), page, Set.of("HR_READ", "HR_SENSITIVE_READ"));
+
+        assertThat(out.getTotalElements()).isEqualTo(1);
+        assertThat(out.getContent().get(0).fullName()).isEqualTo("Member Dlamini");
+        verify(repo).findAllActiveExpiring(any(), eq(null), eq(null), eq(LocalDate.of(2026, 11, 27)), eq(page));
     }
 }

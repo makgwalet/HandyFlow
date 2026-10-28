@@ -27,6 +27,25 @@ public interface HrEmployeeRepository extends JpaRepository<HrEmployee, UUID> {
     Page<HrEmployee> findAllActive(TenantId tenantId, String status,
                                    String search, Pageable pageable);
 
+    /**
+     * As {@link #findAllActive}, only people whose work permit or passport ends on or before the date (including those already past).
+     * Someone who has left is left out unless the status asks for them.
+     */
+    @Query("""
+    SELECT e FROM HrEmployee e
+    WHERE e.tenantId = :#{#tenantId.value} AND e.deletedAt IS NULL
+    AND (:status IS NULL OR e.status = :status)
+    AND (:status IS NOT NULL OR e.status <> 'TERMINATED')
+    AND ((e.workPermitExpiry IS NOT NULL AND e.workPermitExpiry <= :limit) OR (e.passportExpiry IS NOT NULL AND e.passportExpiry <= :limit))
+    AND (CAST(:search AS string) IS NULL
+         OR LOWER(e.firstName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+         OR LOWER(e.lastName)  LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+         OR LOWER(CONCAT(e.firstName, ' ', e.lastName)) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+         OR e.employeeNumber   LIKE CONCAT('%', CAST(:search AS string), '%'))
+    ORDER BY e.lastName, e.firstName
+    """)
+    Page<HrEmployee> findAllActiveExpiring(TenantId tenantId, String status, String search, java.time.LocalDate limit, Pageable pageable);
+
     @Query("SELECT e FROM HrEmployee e WHERE e.tenantId = :#{#tenantId.value} AND e.status = 'ACTIVE' AND e.deletedAt IS NULL ORDER BY e.lastName")
     List<HrEmployee> findAllActiveList(TenantId tenantId);
 

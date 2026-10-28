@@ -26,7 +26,10 @@ public class EtiService {
     private final HrEmployeeRepository employeeRepo;
     private final EmployeeAuditService audit;
 
-    public record EmployeeEti(UUID employeeId, int priorMonths, String excludedReason) {}
+    /** {@code identityProblem} is why the person's papers do not qualify as of this month's end, or null when they do. */
+    public record EmployeeEti(UUID employeeId, int priorMonths, String excludedReason, String identityProblem) {
+        public EmployeeEti(UUID employeeId, int priorMonths, String excludedReason) { this(employeeId, priorMonths, excludedReason, null); }
+    }
     public record UpdateRequest(Integer priorMonths, String excludedReason) {}
 
     /** The table in force on the date, or empty when none applies (before the first row, or after it ended). */
@@ -43,7 +46,16 @@ public class EtiService {
     @Transactional(readOnly = true)
     public EmployeeEti get(TenantId tenantId, UUID employeeId) {
         HrEmployee e = find(tenantId, employeeId);
-        return new EmployeeEti(e.getId(), e.getEtiPriorMonths(), e.getEtiExcludedReason());
+        return new EmployeeEti(e.getId(), e.getEtiPriorMonths(), e.getEtiExcludedReason(), identityProblem(e));
+    }
+
+    /** Whether the papers on record would qualify in the current month: a valid South African ID, or a current asylum seeker permit or refugee ID. */
+    static String identityProblem(HrEmployee e) {
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg"));
+        boolean idValid = e.getIdNumber() != null && !e.getIdNumber().isBlank()
+                && za.co.handyflow.platform.hr.domain.model.EmployeeRules.idProblem(za.co.handyflow.platform.hr.domain.model.EmployeeRules.normaliseId(e.getIdNumber()), today) == null;
+        return EtiRules.identityProblem(idValid, e.getWorkPermitType(), e.getWorkPermitNumber(), e.getWorkPermitExpiry(),
+                e.getPassportNumber() != null && !e.getPassportNumber().isBlank(), today.withDayOfMonth(today.lengthOfMonth()));
     }
 
     @Transactional
@@ -58,7 +70,7 @@ public class EtiService {
         e.setEti(months, reason);
         employeeRepo.save(e);
         audit.record(tenantId, e.getId(), "ETI_CHANGED", months + " months used" + (reason == null ? "" : ", cannot qualify: " + reason), actor);
-        return new EmployeeEti(e.getId(), months, reason);
+        return new EmployeeEti(e.getId(), months, reason, identityProblem(e));
     }
 
     private HrEmployee find(TenantId tenantId, UUID id) {

@@ -140,4 +140,53 @@ class EtiRulesTest {
         assertThat(EtiRules.nationalMinimumWage(2027)).isEqualTo(new BigDecimal("30.23"));
         assertThat(EtiRules.nationalMinimumWage(2030)).isEqualTo(new BigDecimal("30.23"));
     }
+
+    // ── identity papers ─────────────────────────────────────────────────────────────────────────
+
+    private static String id(boolean valid, String type, String no, LocalDate exp, boolean other) { return EtiRules.identityProblem(valid, type, no, exp, other, END); }
+
+    @Test
+    void aValidSouthAfricanIdQualifiesWhateverElseIsOnRecord() {
+        assertThat(id(true, null, null, null, false)).isNull();
+        assertThat(id(true, "GENERAL_WORK", "W1", END.minusDays(5), true)).isNull();
+    }
+
+    @Test
+    void anAsylumSeekerPermitOrRefugeeIdQualifiesWhileItRuns() {
+        assertThat(id(false, "ASYLUM_OR_REFUGEE", "AS-1", END, false)).isNull();            // ends on the last day: still valid
+        assertThat(id(false, "ASYLUM_OR_REFUGEE", "AS-1", END.plusYears(1), false)).isNull();
+        assertThat(id(false, "ASYLUM_OR_REFUGEE", "AS-1", END.minusDays(1), false)).contains("ended on").contains("before the end of the month");
+        assertThat(id(false, "ASYLUM_OR_REFUGEE", " ", END.plusDays(9), false)).contains("no number");
+        assertThat(id(false, "ASYLUM_OR_REFUGEE", null, END.plusDays(9), false)).contains("no number");
+        assertThat(id(false, "ASYLUM_OR_REFUGEE", "AS-1", null, false)).contains("no end date");
+    }
+
+    @Test
+    void aPassportOrWorkVisaDoesNotQualify() {
+        assertThat(id(false, "GENERAL_WORK", "W1", END.plusYears(2), false)).contains("passport or work visa does not qualify");
+        assertThat(id(false, null, null, null, true)).contains("passport or work visa does not qualify");
+        assertThat(id(false, "", null, null, true)).contains("passport or work visa does not qualify");
+    }
+
+    @Test
+    void withNothingOnRecordTheReasonSaysSo() {
+        assertThat(id(false, null, null, null, false)).contains("no valid South African ID");
+        assertThat(id(false, "", null, null, false)).contains("no valid South African ID");
+    }
+
+    @Test
+    void theReasonIsCarriedIntoTheResult() {
+        String why = id(false, "GENERAL_WORK", "W1", END.plusYears(1), false);
+        Result r = EtiRules.calculate(T, DOB_25, END, why, null, 0, d("5000"), BigDecimal.ONE);
+        assertThat(r.qualifies()).isFalse();
+        assertThat(r.why()).isEqualTo(why);
+        assertThat(EtiRules.calculate(T, DOB_25, END, (String) null, null, 0, d("5000"), BigDecimal.ONE).amount()).isEqualByComparingTo("1500.00");
+        assertThat(EtiRules.calculate(T, DOB_25, END, false, null, 0, d("5000"), BigDecimal.ONE).why()).contains("no valid South African ID");
+    }
+
+    @Test
+    void anAgeOrExclusionReasonComesBeforeTheIdentityReason() {
+        assertThat(EtiRules.calculate(T, LocalDate.of(1980, 1, 1), END, "x", null, 0, d("5000"), BigDecimal.ONE).why()).contains("age");
+        assertThat(EtiRules.calculate(T, DOB_25, END, "x", "domestic worker", 0, d("5000"), BigDecimal.ONE).why()).contains("excluded");
+    }
 }

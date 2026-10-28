@@ -98,3 +98,34 @@ export function expiryText(date: string | null | undefined, today: string = new 
   if (left === 0) return "Expires today"
   return `Expired ${-left} ${-left === 1 ? "day" : "days"} ago`
 }
+
+// ── Employee list: documents ending ───────────────────────────────────────────────────────────
+
+/** The choices for the "documents ending" filter on the employee list. The value is the days ahead the server looks; 0 is already ended or ending today. */
+export const EXPIRING_FILTERS: { value: string; label: string }[] = [
+  { value: "", label: "Any documents" },
+  { value: "0", label: "Passport or permit ended" },
+  { value: "30", label: "Ending within 30 days" },
+  { value: "60", label: "Ending within 60 days" },
+  { value: "90", label: "Ending within 90 days" },
+]
+
+/** The `expiringWithin` query value for a filter choice, or null for no filter (or a value the server would refuse). */
+export function expiringParam(choice: string): string | null {
+  if (choice.trim() === "") return null
+  const n = Number(choice)
+  return Number.isInteger(n) && n >= 0 && n <= 366 ? String(n) : null
+}
+
+/** The document on a row that is nearest its end, as "Work permit expired 3 days ago"; null when nothing is ended or ending within 90 days. */
+export function endingBadge(f: Partial<ForeignBody> | null | undefined, today: string = new Date().toISOString().slice(0, 10)): { text: string; state: "expired" | "soon" } | null {
+  if (!f) return null
+  const docs = [
+    { label: "Work permit", date: f.workPermitExpiry ?? null },
+    { label: "Passport", date: f.passportExpiry ?? null },
+  ].filter((d): d is { label: string; date: string } => !!d.date && expiryState(d.date, today) !== "ok")
+  if (docs.length === 0) return null
+  docs.sort((a, b) => a.date.localeCompare(b.date))
+  const first = docs[0]
+  return { text: `${first.label} ${expiryText(first.date, today).toLowerCase()}`, state: expiryState(first.date, today) as "expired" | "soon" }
+}

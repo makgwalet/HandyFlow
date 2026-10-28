@@ -275,7 +275,9 @@ public class PayrollService {
                 int used = emp.getEtiPriorMonths() + (int) payslipRepo.etiMonthsBefore(emp.getId(), run.getPayDate());
                 EtiRules.Result eti = sameMonth > 0
                         ? new EtiRules.Result(BigDecimal.ZERO, null, "incentive already claimed for this month in another run")
-                        : EtiRules.calculate(etiTable, emp.getDateOfBirth(), run.getPeriodEnd(), idValid, emp.getEtiExcludedReason(), used,
+                        : EtiRules.calculate(etiTable, emp.getDateOfBirth(), run.getPeriodEnd(), EtiRules.identityProblem(idValid, emp.getWorkPermitType(),
+                                emp.getWorkPermitNumber(), emp.getWorkPermitExpiry(), emp.getPassportNumber() != null && !emp.getPassportNumber().isBlank(), run.getPeriodEnd()),
+                                emp.getEtiExcludedReason(), used,
                                 result.totalEarnings(), EtiRules.paidShare(pay.daysPaid(), pay.workingDays()));
                 if (eti.qualifies()) {
                     slip.setEti(eti.amount(), eti.month());
