@@ -97,6 +97,7 @@ public class EmployeeViewService {
                 pay ? e.getTravelAllowance() : null, pay ? e.getBankName() : null,
                 pay ? EmployeeRules.maskAccount(e.getBankAccountNumber()) : null, pay ? e.getBankBranchCode() : null,
                 sensitive ? new ForeignIdentity(e.getPassportNumber(), e.getPassportCountry(), e.getPassportExpiry(),
-                        e.getWorkPermitType(), e.getWorkPermitNumber(), e.getWorkPermitExpiry()) : null);
+                        e.getWorkPermitType(), e.getWorkPermitNumber(), e.getWorkPermitExpiry()) : null,
+                pay ? e.getBankAccountType() : null);
     }
 }

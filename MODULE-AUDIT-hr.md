@@ -1479,3 +1479,23 @@ Sources: PaySpace, "e@syFile employer error: Passport number (3070), country of 
 - The existing single emergency contact on the employee record is unchanged and not linked to next of kin.
 - Beneficiary details are recorded only; nothing yet uses them (funeral and provident policies come in a later patch).
 - Dependants are not yet used for the medical tax credit; that still comes from the medical scheme membership.
+
+## 64. Bank files: account type, ABSA layout, bank return-file import (Slice 30, V547)
+
+**Account type.** `hr_employees.bank_account_type` and `hr_pay_run_payments.account_type` (current, savings, transmission, bond; everything already on file is current, which is what the file wrote before). The type travels with the bank-details change request (so it needs the same approval), shows in the change history, is copied onto each payment when the payments are made up, and is written into the BankServ file as the type code (1, 2, 3, 4). It is returned with the pay fields of the employee view.
+
+**Layouts.** Added ABSA Business Integrator CSV: account number, name, branch code, amount, description, no headings, as ABSA's own import maps them according to a payroll vendor's guide. The same guides list Nedbank and Capitec as accepting the BankServ (ACB) file we already write, so the layout label now says so. Standard Bank and Capitec's own CSV: I could not find a published specification, so I did not write them; the generic CSV remains for those.
+
+**Return-file import.** On a run's payments panel, "Import bank returns" reads the bank's unpaid or rejected items exported as CSV. There is no layout every bank shares, so the reader looks for headings by name (account, amount, reason or description, reference, name), in any order, separated by comma, semicolon or tab, with up to 20 lines of preamble before the headings, quoted cells, and amounts written as `1 234,56`, `1,234.56`, `-1234.56` or `(1234.56)`. Each row is matched to a payment of the run by account number (leading zeros ignored) and amount to the cent; when several fit, the reference and then the name decide, otherwise the row is shown as ambiguous and left for the person to mark by hand. A first screen shows every row and its result and changes nothing; the second call re-reads the same file and marks the matched payments returned with the bank's reason, one history line per payment and one for the import. A payment already returned, a row matching a payment an earlier row took, and an unreadable row are reported, never applied.
+
+**Tests.**
+- Run offline, passing: `BankReturnRulesTest` (14), `BankFileRulesTest` (15, new cases for type codes and the ABSA file), `PayrollPaymentRulesTest` (11), `PayRunPaymentServiceTest` (21, six new: type copied and written, ABSA file, preview changes nothing, apply, apply twice, unreadable file/no match/unidentified user). Two defects found by these tests were fixed before the patch (the ABSA layout demanded the company's own account; the shared fake). One mutation (type code ignored) was caught.
+- Frontend: `bankReturns.test.ts` (5) passes under Node; types and lint clean on the touched files.
+- Not run: `EmployeeChangeServiceTest` and the controller (no Mockito or Spring here).
+
+**Limits and things I could not verify**
+- The ABSA file follows a payroll vendor's description; ABSA's own field lengths and amount format are not published where I could read them. Import a small test file first. The BankServ acceptance by Nedbank and Capitec is also from vendor guides, not from the banks.
+- The return reader is a convenience for CSV exports, not a bank-format parser. A return file in a bank's own fixed-width format (for example an ACB unpaid file) is not understood and is refused with "the first row must have headings".
+- Matching uses the account number the file shows. A file that masks the account (for example "••••7890") cannot be matched; it is reported as unmatched.
+- The amount's sign is ignored, so a credit line for the same amount would match as readily as a debit. Check the preview.
+- The bank-change history shows the stored value (CURRENT, SAVINGS…) rather than the friendly name.

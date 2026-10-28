@@ -34,6 +34,7 @@ interface Employee {
   bankName: string | null; bankAccountMasked: string | null; bankBranchCode: string | null
   emergencyContactName: string | null; emergencyContactPhone: string | null; notes?: string | null
   managerId: string | null; managerName: string | null; userId: string | null; terminationReason: string | null
+  bankAccountType?: string | null
   foreign?: ForeignBody | null   // passport and work permit; null when the caller may not see personal data
 }
 

@@ -68,7 +68,7 @@ public class PayRunPaymentService {
             String bad = PayrollPaymentRules.bankProblem(e.getFullName(), e.getBankAccountNumber(), e.getBankBranchCode());
             if (bad != null) { skipped.add(new Skipped(e.getId(), e.getEmployeeNumber(), e.getFullName(), net, "Bank details: " + bad)); continue; }
             made.add(HrPayRunPayment.pending(tenantId.getValue(), runId, s.getId(), e.getId(), net, e.getFullName(), e.getBankName(),
-                    e.getBankBranchCode(), e.getBankAccountNumber(), PayrollPaymentRules.reference(run.getPayRunNumber(), e.getEmployeeNumber()), actor));
+                    e.getBankBranchCode(), e.getBankAccountNumber(), e.getBankAccountType(), PayrollPaymentRules.reference(run.getPayRunNumber(), e.getEmployeeNumber()), actor));
         }
         paymentRepo.saveAll(made);
         BigDecimal total = made.stream().map(HrPayRunPayment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -99,10 +99,13 @@ public class PayRunPaymentService {
                 .filter(p -> PayrollPaymentRules.PENDING.equals(p.getStatus())).toList();
         if (pending.isEmpty()) throw new IllegalStateException("There are no pending payments. Make up the payments first.");
         List<PayrollPaymentRules.Line> lines = pending.stream().map(p -> new PayrollPaymentRules.Line(p.getBeneficiaryName(), p.getBankName(),
-                p.getBranchCode(), p.getAccountNumber(), p.getAmount(), p.getReference())).toList();
-        String content = BankFileRules.BANKSERV_ACB.equals(layout)
-                ? BankFileRules.bankserv(lines, branch, account, BankFileRules.actionDate(run.getPayDate(), java.time.LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg"))))
-                : PayrollPaymentRules.csv(lines);
+                p.getBranchCode(), p.getAccountNumber(), p.getAmount(), p.getReference(), p.getAccountType())).toList();
+        String content = switch (layout) {
+            case BankFileRules.BANKSERV_ACB -> BankFileRules.bankserv(lines, branch, account,
+                    BankFileRules.actionDate(run.getPayDate(), java.time.LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg"))));
+            case BankFileRules.ABSA_BIO -> BankFileRules.absaBio(lines);
+            default -> PayrollPaymentRules.csv(lines);
+        };
         pending.forEach(p -> p.markExported(actor));
         paymentRepo.saveAll(pending);
         event(tenantId, run, "PAYMENT_FILE_DOWNLOADED", actor, pending.size() + " payments, R" + BankFileRules.total(lines).toPlainString() + ", " + layout);
@@ -142,6 +145,59 @@ public class PayRunPaymentService {
         event(tenantId, run, "PAYMENT_RETURNED", actor, p.getBeneficiaryName() + " R" + p.getAmount().toPlainString() + ": " + reason.trim());
         List<HrPayRunPayment> all = paymentRepo.forRun(tenantId, run.getId());
         return toSummary(run, all, employees(tenantId, all), List.of());
+    }
+
+    /** What the bank's file would change, without changing anything. */
+    @Transactional(readOnly = true)
+    public ReturnPreview previewReturns(TenantId tenantId, UUID runId, String content) {
+        load(tenantId, runId);
+        return preview(read(tenantId, runId, content));
+    }
+
+    /** Marks every payment the bank's file clearly names as returned, with the reason from the file. Rows that did not match are left alone. */
+    @Transactional
+    public Summary applyReturns(TenantId tenantId, UUID runId, String content, UUID actor) {
+        requireActor(actor);
+        HrPayRun run = load(tenantId, runId);
+        Reading reading = read(tenantId, runId, content);
+        List<BankReturnRules.Match> matched = reading.matches().stream().filter(m -> BankReturnRules.MATCHED.equals(m.outcome())).toList();
+        if (matched.isEmpty()) throw new IllegalStateException("No row of the file matched a payment of this run, so nothing was changed.");
+        Map<UUID, HrPayRunPayment> byId = reading.payments().stream().collect(Collectors.toMap(HrPayRunPayment::getId, Function.identity()));
+        BigDecimal total = BigDecimal.ZERO;
+        for (BankReturnRules.Match m : matched) {
+            HrPayRunPayment p = byId.get(m.paymentId());
+            String reason = BankReturnRules.reasonFor(m.row());
+            String problem = PayrollPaymentRules.returnProblem(p.getStatus(), reason);
+            if (problem != null) throw new IllegalStateException(p.getBeneficiaryName() + ": " + problem);
+            p.markReturned(actor, reason);
+            total = total.add(p.getAmount());
+            event(tenantId, run, "PAYMENT_RETURNED", actor, p.getBeneficiaryName() + " R" + p.getAmount().toPlainString() + ": " + reason.trim() + " (bank file)");
+        }
+        paymentRepo.saveAll(matched.stream().map(m -> byId.get(m.paymentId())).toList());
+        event(tenantId, run, "RETURNS_IMPORTED", actor, matched.size() + " of " + reading.matches().size() + " rows, R" + total.toPlainString());
+        List<HrPayRunPayment> all = paymentRepo.forRun(tenantId, runId);
+        return toSummary(run, all, employees(tenantId, all), List.of());
+    }
+
+    private record Reading(List<BankReturnRules.Match> matches, List<HrPayRunPayment> payments) {}
+
+    private Reading read(TenantId tenantId, UUID runId, String content) {
+        BankReturnRules.Parsed parsed = BankReturnRules.parse(content);
+        if (parsed.problem() != null) throw new IllegalArgumentException(parsed.problem());
+        List<HrPayRunPayment> payments = paymentRepo.forRun(tenantId, runId);
+        List<BankReturnRules.Candidate> candidates = payments.stream().map(p -> new BankReturnRules.Candidate(p.getId(), p.getAccountNumber(), p.getAmount(),
+                p.getReference(), p.getBeneficiaryName(), p.getStatus())).toList();
+        return new Reading(BankReturnRules.match(parsed.rows(), candidates), payments);
+    }
+
+    private static ReturnPreview preview(Reading r) {
+        Map<UUID, HrPayRunPayment> byId = r.payments().stream().collect(Collectors.toMap(HrPayRunPayment::getId, Function.identity()));
+        List<ReturnLine> lines = r.matches().stream().map(m -> {
+            HrPayRunPayment p = m.paymentId() == null ? null : byId.get(m.paymentId());
+            return new ReturnLine(m.row().line(), mask(m.row().account()), m.row().amount(), m.row().name(), BankReturnRules.reasonFor(m.row()), m.outcome(),
+                    BankReturnRules.MATCHED.equals(m.outcome()) ? m.paymentId() : null, p == null ? null : p.getBeneficiaryName());
+        }).toList();
+        return new ReturnPreview(lines.size(), (int) lines.stream().filter(l -> BankReturnRules.MATCHED.equals(l.outcome())).count(), lines);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────

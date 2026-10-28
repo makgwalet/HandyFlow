@@ -274,4 +274,84 @@ class PayRunPaymentServiceTest {
         service.confirmPaid(tenant, run.getId(), actor, null);
         assertEquals("PAID", payments.get(0).getStatus());
     }
+
+    // ── account type, ABSA layout and the bank's returned-items file ──
+
+    @Test
+    void theAccountTypeIsCopiedOntoThePaymentAndWrittenToTheBankServFile() {
+        finalised();
+        settings = HrPayrollSettings.create(tenant.getValue());
+        settings.setBankFile(false, "250655", "62011234567", actor);
+        HrEmployee e = person("E1", "Thandi", "1234567890", "250655");
+        e.setBankAccountType("SAVINGS");
+        pay(e, "100");
+        service.makeUp(tenant, run.getId(), actor);
+        assertEquals("SAVINGS", payments.get(0).getAccountType());
+        FileResult f = service.file(tenant, run.getId(), actor, BankFileRules.BANKSERV_ACB);
+        assertEquals("2", f.csv().split("\r\n")[2].substring(46, 47));
+    }
+
+    @Test
+    void absaFileNeedsNoCompanyAccountAndHoldsTheFiveColumns() {
+        finalised();
+        pay(person("E1", "Thandi", "1234567890", "250655"), "100");
+        service.makeUp(tenant, run.getId(), actor);
+        FileResult f = service.file(tenant, run.getId(), actor, BankFileRules.ABSA_BIO);
+        assertEquals("1234567890,THANDI NKOSI,250655,100.00,SAL PR00005 E1\r\n", f.csv());
+        assertEquals("salary-payments-PR00005.csv", f.filename());
+    }
+
+    private void paidRun() {
+        finalised();
+        pay(person("E1", "Thandi", "1234567890", "250655"), "21000.50");
+        pay(person("E2", "Sipho", "62011234568", "250655"), "15000");
+        service.makeUp(tenant, run.getId(), actor);
+        service.file(tenant, run.getId(), actor);
+        service.confirmPaid(tenant, run.getId(), actor, null);
+    }
+
+    private static final String BANK_FILE = "Account Number,Amount,Reason\n1234567890,21000.50,Account closed\n99999999,5.00,Not ours\n";
+
+    @Test
+    void previewShowsWhatMatchesAndChangesNothing() {
+        paidRun();
+        ReturnPreview p = service.previewReturns(tenant, run.getId(), BANK_FILE);
+        assertEquals(2, p.rows());
+        assertEquals(1, p.matched());
+        assertEquals("MATCHED", p.lines().get(0).outcome());
+        assertEquals("Thandi Nkosi", p.lines().get(0).beneficiary());
+        assertEquals("••••7890", p.lines().get(0).accountMasked());
+        assertEquals("UNMATCHED", p.lines().get(1).outcome());
+        assertTrue(payments.stream().allMatch(x -> "PAID".equals(x.getStatus())));
+    }
+
+    @Test
+    void applyMarksTheMatchedPaymentReturnedWithTheBanksReasonAndLeavesTheRest() {
+        paidRun();
+        Summary s = service.applyReturns(tenant, run.getId(), BANK_FILE, actor);
+        assertEquals(1, s.returned());
+        HrPayRunPayment thandi = payments.stream().filter(x -> x.getBeneficiaryName().startsWith("Thandi")).findFirst().orElseThrow();
+        assertEquals("RETURNED", thandi.getStatus());
+        assertEquals("Account closed", thandi.getReturnReason());
+        assertEquals("PAID", payments.stream().filter(x -> x.getBeneficiaryName().startsWith("Sipho")).findFirst().orElseThrow().getStatus());
+        assertTrue(events.stream().anyMatch(x -> x.startsWith("PAYMENT_RETURNED:Thandi Nkosi R21000.50: Account closed (bank file)")));
+        assertTrue(events.stream().anyMatch(x -> x.equals("RETURNS_IMPORTED:1 of 2 rows, R21000.50")));
+    }
+
+    @Test
+    void applyingTheSameFileAgainChangesNothingMore() {
+        paidRun();
+        service.applyReturns(tenant, run.getId(), BANK_FILE, actor);
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> service.applyReturns(tenant, run.getId(), BANK_FILE, actor));
+        assertTrue(e.getMessage().contains("nothing was changed"));
+    }
+
+    @Test
+    void anUnreadableFileOrNoMatchIsRefusedAndAnUnidentifiedUserCannotApply() {
+        paidRun();
+        assertThrows(IllegalArgumentException.class, () -> service.previewReturns(tenant, run.getId(), "no headings here"));
+        assertThrows(IllegalStateException.class, () -> service.applyReturns(tenant, run.getId(), "Account,Amount\n555555,1.00\n", actor));
+        assertThrows(AccessDeniedException.class, () -> service.applyReturns(tenant, run.getId(), BANK_FILE, null));
+        assertTrue(payments.stream().allMatch(x -> "PAID".equals(x.getStatus())));
+    }
 }

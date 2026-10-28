@@ -5,7 +5,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { BANK_LAYOUTS, STATUS_LABEL, blobMessage, layoutFilename, layoutMime, nextStep, rand, returnProblem, type BankLayout, type PaymentsSummary } from "./payRunPayments.logic"
+import { BANK_LAYOUTS, OUTCOME_TEXT, STATUS_LABEL, applyText, blobMessage, layoutFilename, layoutMime, nextStep, rand, returnFileProblem, returnProblem, type BankLayout, type PaymentsSummary, type ReturnPreview } from "./payRunPayments.logic"
 
 type ApiErr = { response?: { data?: { message?: string } } }
 const messageOf = (e: unknown, fallback: string) => (e as ApiErr)?.response?.data?.message ?? fallback
@@ -23,6 +23,9 @@ export default function PayRunPaymentsPanel({ runId, canAct }: { runId: string; 
   const [note, setNote] = useState("")
   const [layout, setLayout] = useState<BankLayout>("GENERIC_CSV")
   const [left, setLeft] = useState<PaymentsSummary["skipped"]>([])
+  const [importing, setImporting] = useState(false)
+  const [fileText, setFileText] = useState("")
+  const [preview, setPreview] = useState<ReturnPreview | null>(null)
 
   const q = useQuery<PaymentsSummary>({ queryKey: key, queryFn: async () => unwrap(await apiClient.get(`/api/v1/hr/pay-runs/${runId}/payments`)) })
   const s = q.data
@@ -48,6 +51,27 @@ export default function PayRunPaymentsPanel({ runId, canAct }: { runId: string; 
     onSuccess: res => { done(res); setReturning(null) },
     onError: e => setError(messageOf(e, "The payment could not be marked as returned.")),
   })
+  const readPreview = useMutation({
+    mutationFn: async (content: string) => {
+      const res = await apiClient.post(`/api/v1/hr/pay-runs/${runId}/payments/returns/preview`, { content })
+      return (res.data?.data ?? res.data) as ReturnPreview
+    },
+    onSuccess: p => { setPreview(p); setError("") },
+    onError: e => { setPreview(null); setError(messageOf(e, "That file could not be read.")) },
+  })
+  const applyReturns = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/hr/pay-runs/${runId}/payments/returns/apply`, { content: fileText }),
+    onSuccess: res => { done(res); setImporting(false); setPreview(null); setFileText("") },
+    onError: e => setError(messageOf(e, "The returned payments could not be recorded.")),
+  })
+  const chooseFile = async (file: File | undefined) => {
+    setPreview(null); setFileText("")
+    const problem = returnFileProblem(file ? { name: file.name, size: file.size } : null)
+    if (problem || !file) { setError(problem ?? ""); return }
+    const text = await file.text()
+    setFileText(text); setError("")
+    readPreview.mutate(text)
+  }
   const download = async () => {
     try {
       const res = await apiClient.get(`/api/v1/hr/pay-runs/${runId}/payments/file`, { responseType: "blob", params: { layout } })
@@ -82,6 +106,7 @@ export default function PayRunPaymentsPanel({ runId, canAct }: { runId: string; 
             )}
             {s.pending > 0 && <button type="button" style={btn} onClick={download}>Download bank file</button>}
             {s.pending > 0 && s.downloaded && !confirming && <button type="button" style={solid} onClick={() => setConfirming(true)}>Confirm paid</button>}
+            {s.count > 0 && !importing && <button type="button" style={btn} onClick={() => { setImporting(true); setError("") }}>Import bank returns</button>}
           </div>
         )}
       </div>
@@ -95,6 +120,38 @@ export default function PayRunPaymentsPanel({ runId, canAct }: { runId: string; 
           <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
             {left.map(l => <li key={l.employeeId}>{l.employeeName ?? "Unknown employee"} ({rand(l.amount)}): {l.reason}</li>)}
           </ul>
+        </div>
+      )}
+
+      {importing && (
+        <div style={{ marginTop: 10, border: "1px solid var(--hf-border)", borderRadius: 8, padding: 10 }}>
+          <label htmlFor="pay-return-file" style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4, color: "var(--hf-text-secondary)" }}>
+            The bank's unpaid or rejected items, exported as CSV (needs headings such as Account, Amount and Reason)</label>
+          <input id="pay-return-file" type="file" accept=".csv,.txt,.tsv,text/csv,text/plain" onChange={e => chooseFile(e.target.files?.[0])} />
+          {readPreview.isPending && <div style={{ marginTop: 6, fontSize: 13 }}>Reading…</div>}
+          {preview && (
+            <div style={{ marginTop: 8, overflowX: "auto" }}>
+              <div style={{ fontSize: 13, marginBottom: 4 }}>{preview.rows} rows read; {preview.matched} match a payment of this run. Nothing changes until you confirm.</div>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead><tr style={{ textAlign: "left", color: "var(--hf-text-faint)", fontSize: 11, textTransform: "uppercase" }}>
+                  <th style={{ padding: 4 }}>Line</th><th style={{ padding: 4 }}>Account</th><th style={{ padding: 4 }}>Amount</th><th style={{ padding: 4 }}>Reason given</th><th style={{ padding: 4 }}>Result</th></tr></thead>
+                <tbody>
+                  {preview.lines.map(l => (
+                    <tr key={l.line} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
+                      <td style={{ padding: 4 }}>{l.line}</td><td style={{ padding: 4 }}>{l.accountMasked}</td>
+                      <td style={{ padding: 4, whiteSpace: "nowrap" }}>{l.amount == null ? "—" : rand(l.amount)}</td><td style={{ padding: 4 }}>{l.reason}</td>
+                      <td style={{ padding: 4, color: l.outcome === "MATCHED" ? "var(--hf-success-text-strong)" : "var(--hf-text-muted)" }}>
+                        {l.outcome === "MATCHED" && l.beneficiary ? `${l.beneficiary}: ` : ""}{OUTCOME_TEXT[l.outcome]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+            <button type="button" style={btn} onClick={() => { setImporting(false); setPreview(null); setFileText(""); setError("") }}>Cancel</button>
+            {applyText(preview) && <button type="button" style={solid} disabled={applyReturns.isPending} onClick={() => applyReturns.mutate()}>{applyReturns.isPending ? "Saving…" : applyText(preview)}</button>}
+          </div>
         </div>
       )}
 

@@ -53,6 +53,7 @@ public class HrEmployee {
     @Column(name = "bank_name")           String bankName;
     @Column(name = "bank_account_number") String bankAccountNumber;
     @Column(name = "bank_branch_code")    String bankBranchCode;
+    @Column(name = "bank_account_type")   String bankAccountType = "CURRENT";
 
     @Column(name = "medical_aid_contribution") BigDecimal medicalAidContribution = BigDecimal.ZERO;
     @Column(name = "pension_contribution")     BigDecimal pensionContribution = BigDecimal.ZERO;
@@ -182,6 +183,7 @@ public class HrEmployee {
     public void setBankName(String bankName)                { this.bankName = bankName; }
     public void setBankAccountNumber(String acc)            { this.bankAccountNumber = acc; }
     public void setBankBranchCode(String code)              { this.bankBranchCode = code; }
+    public void setBankAccountType(String type)             { this.bankAccountType = type == null || type.isBlank() ? "CURRENT" : type; }
     public void setMedicalAidContribution(java.math.BigDecimal v) { this.medicalAidContribution = v; }
     public void setPensionContribution(java.math.BigDecimal v)    { this.pensionContribution = v; }
     public void setTravelAllowance(java.math.BigDecimal v)        { this.travelAllowance = v; }
@@ -210,6 +212,11 @@ public class HrEmployee {
     }
 
     /** Applies an approved change of bank details. */
+    public void applyBank(String bankName, String account, String branch, String accountType) {
+        applyBank(bankName, account, branch);
+        if (accountType != null && !accountType.isBlank()) this.bankAccountType = accountType;
+    }
+
     public void applyBank(String bankName, String account, String branch) {
         this.bankName = bankName;
         this.bankAccountNumber = account;

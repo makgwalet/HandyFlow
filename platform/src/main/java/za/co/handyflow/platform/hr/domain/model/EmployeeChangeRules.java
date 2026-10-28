@@ -21,7 +21,7 @@ public final class EmployeeChangeRules {
 
     public static final String GROSS = "grossSalary", TRAVEL = "travelAllowance", MEDICAL = "medicalAidContribution",
             PENSION = "pensionContribution", FREQUENCY = "payFrequency",
-            BANK_NAME = "bankName", ACCOUNT = "bankAccountNumber", BRANCH = "bankBranchCode";
+            BANK_NAME = "bankName", ACCOUNT = "bankAccountNumber", BRANCH = "bankBranchCode", ACCOUNT_TYPE = "bankAccountType";
 
     public static final BigDecimal MAX_GROSS = new BigDecimal("5000000");
 
@@ -31,7 +31,7 @@ public final class EmployeeChangeRules {
     static {
         LABELS.put(GROSS, "Gross salary"); LABELS.put(TRAVEL, "Travel allowance"); LABELS.put(MEDICAL, "Medical aid contribution");
         LABELS.put(PENSION, "Pension contribution"); LABELS.put(FREQUENCY, "Pay frequency");
-        LABELS.put(BANK_NAME, "Bank"); LABELS.put(ACCOUNT, "Account number"); LABELS.put(BRANCH, "Branch code");
+        LABELS.put(BANK_NAME, "Bank"); LABELS.put(ACCOUNT, "Account number"); LABELS.put(BRANCH, "Branch code"); LABELS.put(ACCOUNT_TYPE, "Account type");
     }
 
     public static String label(String field) { return LABELS.getOrDefault(field, field); }

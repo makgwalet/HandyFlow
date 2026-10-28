@@ -11,6 +11,13 @@ public final class PayRunPaymentDtos {
     public record ActionRequest(String note) {}
     public record ReturnRequest(String reason) {}
 
+    /** The text of the file the bank sent back (comma, semicolon or tab separated, with headings). */
+    public record ReturnImportRequest(String content) {}
+
+    public record ReturnLine(int line, String accountMasked, BigDecimal amount, String name, String reason, String outcome, UUID paymentId, String beneficiary) {}
+
+    public record ReturnPreview(int rows, int matched, List<ReturnLine> lines) {}
+
     public record Skipped(UUID employeeId, String employeeNumber, String employeeName, BigDecimal amount, String reason) {}
 
     public record Payment(UUID id, UUID employeeId, String employeeNumber, String beneficiaryName, String bankName, String branchCode,

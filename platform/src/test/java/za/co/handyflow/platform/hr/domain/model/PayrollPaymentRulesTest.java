@@ -85,4 +85,21 @@ class PayrollPaymentRulesTest {
         assertEquals("salary-payments-PR00005.csv", PayrollPaymentRules.filename("PR00005"));
         assertEquals("salary-payments-PR00005.csv", PayrollPaymentRules.filename("PR/00005\\.."));
     }
+
+    @Test
+    void accountTypesAreKnownAndBlankIsCurrent() {
+        assertNull(PayrollPaymentRules.accountTypeProblem(null));
+        assertNull(PayrollPaymentRules.accountTypeProblem(" "));
+        assertNull(PayrollPaymentRules.accountTypeProblem("savings"));
+        assertTrue(PayrollPaymentRules.accountTypeProblem("CREDIT").contains("current, savings"));
+        assertEquals("SAVINGS", PayrollPaymentRules.accountType(" savings "));
+        assertEquals("CURRENT", PayrollPaymentRules.accountType(null));
+        assertEquals("Bond", PayrollPaymentRules.accountTypeLabel("BOND"));
+        assertEquals("Current or cheque", PayrollPaymentRules.accountTypeLabel(null));
+    }
+
+    @Test
+    void aLineWithoutATypeIsCurrent() {
+        assertEquals("CURRENT", new PayrollPaymentRules.Line("A", "FNB", "632005", "1234567890", BigDecimal.TEN, "R").accountType());
+    }
 }

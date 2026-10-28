@@ -18,7 +18,33 @@ public final class PayrollPaymentRules {
     private PayrollPaymentRules() {}
 
     /** One line of the file. */
-    public record Line(String name, String bank, String branch, String account, BigDecimal amount, String reference) {}
+    public record Line(String name, String bank, String branch, String account, BigDecimal amount, String reference, String accountType) {
+        /** A current (cheque) account, as lines were before the type was kept. */
+        public Line(String name, String bank, String branch, String account, BigDecimal amount, String reference) {
+            this(name, bank, branch, account, amount, reference, CURRENT);
+        }
+    }
+
+    public static final String CURRENT = "CURRENT", SAVINGS = "SAVINGS", TRANSMISSION = "TRANSMISSION", BOND = "BOND";
+    public static final java.util.List<String> ACCOUNT_TYPES = java.util.List.of(CURRENT, SAVINGS, TRANSMISSION, BOND);
+
+    public static String accountTypeLabel(String type) {
+        return switch (type == null ? CURRENT : type) {
+            case SAVINGS -> "Savings"; case TRANSMISSION -> "Transmission"; case BOND -> "Bond";
+            default -> "Current or cheque";
+        };
+    }
+
+    /** Null when the type is one we know; blank means current. */
+    public static String accountTypeProblem(String type) {
+        return type == null || type.isBlank() || ACCOUNT_TYPES.contains(type.trim().toUpperCase(java.util.Locale.ROOT)) ? null
+                : "Choose current, savings, transmission or bond.";
+    }
+
+    /** The stored form of a type given by a person: blank is current. */
+    public static String accountType(String type) {
+        return type == null || type.isBlank() ? CURRENT : type.trim().toUpperCase(java.util.Locale.ROOT);
+    }
 
     /** Spaces and dashes are allowed when bank details are typed in; the file carries digits only. */
     public static String digits(String s) {

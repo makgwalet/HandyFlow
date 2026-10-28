@@ -5,7 +5,7 @@ import { apiClient } from "../../api/client"
 import { useAuth } from "../../hooks/useAuth"
 import { AlertCircle, X } from "lucide-react"
 import {
-  CHANGE_STATUS, TYPE_TEXT, auditText, bankProblem, cannotDecide, compensationProblem, effectiveProblem, reasonProblem, today,
+  ACCOUNT_TYPES, CHANGE_STATUS, TYPE_TEXT, auditText, bankProblem, cannotDecide, compensationProblem, effectiveProblem, reasonProblem, today,
   type EmployeeChange,
 } from "./employees.logic"
 
@@ -52,7 +52,7 @@ function Problem({ text }: { text: string }) {
   return <div role="alert" style={{ display: "flex", gap: 6, alignItems: "center", padding: "9px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text-strong)", margin: "12px 0" }}><AlertCircle size={14} />{text}</div>
 }
 
-interface Person { id: string; fullName: string; employeeNumber: string; startDate: string; grossSalary?: number | null; payFrequency?: string | null; travelAllowance?: number | null; medicalAidContribution?: number | null; pensionContribution?: number | null; bankName?: string | null; bankAccountMasked?: string | null; bankBranchCode?: string | null }
+interface Person { id: string; fullName: string; employeeNumber: string; startDate: string; grossSalary?: number | null; payFrequency?: string | null; travelAllowance?: number | null; medicalAidContribution?: number | null; pensionContribution?: number | null; bankName?: string | null; bankAccountMasked?: string | null; bankBranchCode?: string | null; bankAccountType?: string | null }
 
 /** Ask for a change to pay (kind "pay") or to bank details (kind "bank"). Nothing changes until someone else approves. */
 export function RequestChangeModal({ kind, employee, onClose }: { kind: "pay" | "bank"; employee: Person; onClose: () => void }) {
@@ -62,7 +62,7 @@ export function RequestChangeModal({ kind, employee, onClose }: { kind: "pay" | 
     medicalAidContribution: String(employee.medicalAidContribution ?? 0), pensionContribution: String(employee.pensionContribution ?? 0),
     payFrequency: employee.payFrequency ?? "MONTHLY",
   })
-  const [bank, setBank] = useState({ bankName: "", accountNumber: "", branchCode: "" })
+  const [bank, setBank] = useState({ bankName: "", accountNumber: "", branchCode: "", accountType: employee.bankAccountType ?? "CURRENT" })
   const [effectiveFrom, setEffective] = useState(today())
   const [reason, setReason] = useState("")
   const [error, setError] = useState("")
@@ -74,7 +74,7 @@ export function RequestChangeModal({ kind, employee, onClose }: { kind: "pay" | 
           medicalAidContribution: Number(pay.medicalAidContribution || 0), pensionContribution: Number(pay.pensionContribution || 0),
           payFrequency: pay.payFrequency, effectiveFrom, reason,
         })
-      : apiClient.post(`/api/v1/hr/employees/${employee.id}/changes/bank`, { bankName: bank.bankName, accountNumber: bank.accountNumber, branchCode: bank.branchCode, effectiveFrom, reason }),
+      : apiClient.post(`/api/v1/hr/employees/${employee.id}/changes/bank`, { bankName: bank.bankName, accountNumber: bank.accountNumber, branchCode: bank.branchCode, accountType: bank.accountType, effectiveFrom, reason }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["hr-employee-changes"] }); qc.invalidateQueries({ queryKey: ["hr-employees"] }); onClose() },
     onError: (e: unknown) => setError(msg(e, "The request could not be sent.")),
   })
@@ -112,6 +112,10 @@ export function RequestChangeModal({ kind, employee, onClose }: { kind: "pay" | 
             <select id="bank-name" value={bank.bankName} onChange={e => setBank(b => ({ ...b, bankName: e.target.value }))} style={inp}><option value="">Select...</option>{BANKS.map(b => <option key={b}>{b}</option>)}</select></div>
           <div><label style={lbl} htmlFor="bank-account">Account number</label><input id="bank-account" value={bank.accountNumber} onChange={e => setBank(b => ({ ...b, accountNumber: e.target.value }))} style={inp} /></div>
           <div><label style={lbl} htmlFor="bank-branch">Branch code</label><input id="bank-branch" value={bank.branchCode} onChange={e => setBank(b => ({ ...b, branchCode: e.target.value }))} style={inp} /></div>
+          <div><label style={lbl} htmlFor="bank-type">Account type</label>
+            <select id="bank-type" value={bank.accountType} onChange={e => setBank(b => ({ ...b, accountType: e.target.value }))} style={inp}>
+              {ACCOUNT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select></div>
         </div>
       )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginTop: 12 }}>

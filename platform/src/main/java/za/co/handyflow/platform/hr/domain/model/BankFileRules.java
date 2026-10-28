@@ -24,26 +24,32 @@ public final class BankFileRules {
 
     private BankFileRules() {}
 
-    public static final String GENERIC_CSV = "GENERIC_CSV", BANKSERV_ACB = "BANKSERV_ACB";
-    public static final List<String> LAYOUTS = List.of(GENERIC_CSV, BANKSERV_ACB);
+    public static final String GENERIC_CSV = "GENERIC_CSV", BANKSERV_ACB = "BANKSERV_ACB", ABSA_BIO = "ABSA_BIO";
+    public static final List<String> LAYOUTS = List.of(GENERIC_CSV, BANKSERV_ACB, ABSA_BIO);
     public static final int RECORD_LENGTH = 180, NAME_LENGTH = 15, REFERENCE_LENGTH = 20, STANDARD_ACCOUNT_LENGTH = 11;
-    /** Account type 1 (current/cheque). The employee record does not say which kind of account it is. */
-    public static final char ACCOUNT_TYPE = '1';
+    /** BankServ account type codes: 1 current or cheque, 2 savings, 3 transmission, 4 bond. */
+    public static char typeCode(String type) {
+        return switch (type == null ? "" : type) { case PayrollPaymentRules.SAVINGS -> '2'; case PayrollPaymentRules.TRANSMISSION -> '3'; case PayrollPaymentRules.BOND -> '4'; default -> '1'; };
+    }
     private static final DateTimeFormatter YYMMDD = DateTimeFormatter.ofPattern("yyMMdd");
 
     public static String label(String layout) {
-        return BANKSERV_ACB.equals(layout) ? "BankServ (ACB) fixed-width, as FNB Online Banking imports" : "Generic CSV (map the columns at your bank)";
+        return switch (layout == null ? "" : layout) {
+            case BANKSERV_ACB -> "BankServ (ACB) fixed-width, as FNB Online Banking imports (Nedbank and Capitec list it too)";
+            case ABSA_BIO -> "ABSA Business Integrator CSV (account, name, branch, amount, description; no headings)";
+            default -> "Generic CSV (map the columns at your bank)";
+        };
     }
 
     public static String filename(String layout, String payRunNumber) {
         String base = "salary-payments-" + (payRunNumber == null ? "run" : payRunNumber.replaceAll("[^A-Za-z0-9-]", ""));
-        return base + (BANKSERV_ACB.equals(layout) ? ".txt" : ".csv");
+        return base + (BANKSERV_ACB.equals(layout) ? ".txt" : ".csv");   // ABSA_BIO is a CSV too
     }
 
     /** Null when the layout can be used. BankServ needs the company's own account. */
     public static String layoutProblem(String layout, String nominatedBranch, String nominatedAccount) {
         if (layout == null || !LAYOUTS.contains(layout)) return "Choose a file layout.";
-        if (GENERIC_CSV.equals(layout)) return null;
+        if (!BANKSERV_ACB.equals(layout)) return null;           // only BankServ names the company's own account
         return nominatedProblem(nominatedBranch, nominatedAccount) == null ? null
                 : "The BankServ layout needs the company's own bank account. Enter it under Payroll settings. (" + nominatedProblem(nominatedBranch, nominatedAccount) + ")";
     }
@@ -88,13 +94,33 @@ public final class BankFileRules {
             if (cents <= 0 || cents > 99_999_999_999L) throw new IllegalArgumentException("The amount for " + plain(l.name(), 40) + " cannot be written to the file.");
             boolean standard = account.length() <= STANDARD_ACCOUNT_LENGTH;
             sb.append(rec("10" + ub + ua + "0000" + zeros(String.valueOf(seq), 6) + branch
-                    + (standard ? zeros(account, 11) : zeros("", 11)) + ACCOUNT_TYPE + zeros(String.valueOf(cents), 11)
+                    + (standard ? zeros(account, 11) : zeros("", 11)) + typeCode(l.accountType()) + zeros(String.valueOf(cents), 11)
                     + zeros("", 8) + "0" + "00" + "0" + pad(plain(l.reference(), REFERENCE_LENGTH), REFERENCE_LENGTH) + spaces(10)
                     + pad(plain(l.name(), NAME_LENGTH), NAME_LENGTH) + spaces(15) + (standard ? zeros("", 20) : zeros(account, 20)) + spaces(30)));
         }
         sb.append(rec("12" + ub + ua + spaces(39) + actionDate.format(YYMMDD) + spaces(116)));
         sb.append(rec("92" + spaces(178)));
         sb.append(rec("94" + spaces(178)));
+        return sb.toString();
+    }
+
+    /**
+     * The ABSA Business Integrator Online import: one line per payment, no headings, five columns in this order: to account number, to account
+     * name, to branch code, amount, beneficiary description (what the person sees on their statement). The layout is as ABSA's own import screen
+     * maps it according to payroll vendors' guides; the bank's field lengths are not published where I could read them, so names and descriptions
+     * are cut to the same lengths as the BankServ file. Amounts are rand with two decimals.
+     */
+    public static String absaBio(List<PayrollPaymentRules.Line> lines) {
+        if (lines.isEmpty()) throw new IllegalArgumentException("There are no payments to write.");
+        StringBuilder sb = new StringBuilder();
+        for (PayrollPaymentRules.Line l : lines) {
+            String branch = PayrollPaymentRules.digits(l.branch()), account = PayrollPaymentRules.digits(l.account());
+            if (!branch.matches("\\d{6}") || !account.matches("\\d{6,16}")) throw new IllegalArgumentException("Bad bank details for " + plain(l.name(), 40) + ".");
+            BigDecimal amount = PayrollPaymentRules.money(l.amount());
+            if (amount.signum() <= 0) throw new IllegalArgumentException("The amount for " + plain(l.name(), 40) + " cannot be written to the file.");
+            sb.append(account).append(',').append(plain(l.name(), 30)).append(',').append(branch).append(',').append(amount.toPlainString()).append(',')
+              .append(plain(l.reference(), REFERENCE_LENGTH)).append("\r\n");
+        }
         return sb.toString();
     }
 

@@ -95,6 +95,11 @@ export function compensationProblem(d: PayDraft): string | null {
   return null
 }
 
+export const ACCOUNT_TYPES: { value: string; label: string }[] = [
+  { value: "CURRENT", label: "Current or cheque" }, { value: "SAVINGS", label: "Savings" },
+  { value: "TRANSMISSION", label: "Transmission" }, { value: "BOND", label: "Bond" },
+]
+
 export function bankProblem(bankName: string, account: string, branch: string): string | null {
   if (!bankName.trim()) return "Enter the bank name."
   if (!account.trim()) return "Enter the account number."

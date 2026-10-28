@@ -126,4 +126,39 @@ class BankFileRulesTest {
         assertThat(PayrollPaymentRules.confirmerProblem(true, b, List.of(a))).isNull();
         assertThat(PayrollPaymentRules.confirmerProblem(false, a, List.of(a))).isNull();
     }
+
+    @Test
+    void theAccountTypeOfEachPaymentIsWrittenAsItsBankServCode() {
+        String[] r = file(List.of(
+                new PayrollPaymentRules.Line("A", "FNB", "632005", "1234567890", new BigDecimal("10"), "R1", "CURRENT"),
+                new PayrollPaymentRules.Line("B", "FNB", "632005", "1234567891", new BigDecimal("10"), "R2", "SAVINGS"),
+                new PayrollPaymentRules.Line("C", "FNB", "632005", "1234567892", new BigDecimal("10"), "R3", "TRANSMISSION"),
+                new PayrollPaymentRules.Line("D", "FNB", "632005", "1234567893", new BigDecimal("10"), "R4", "BOND"),
+                new PayrollPaymentRules.Line("E", "FNB", "632005", "1234567894", new BigDecimal("10"), "R5", null)));
+        assertThat(List.of(at(r[2], 47, 47), at(r[3], 47, 47), at(r[4], 47, 47), at(r[5], 47, 47), at(r[6], 47, 47))).containsExactly("1", "2", "3", "4", "1");
+    }
+
+    @Test
+    void absaIsFiveColumnsWithNoHeadingsInTheOrderTheBankMapsThem() {
+        String f = BankFileRules.absaBio(List.of(line("Thandi Nkosi", "632005", "1234 5678 90", "3728.68", "SAL PR00005 E1"), line("Sipho O'Neil", "250655", "62011234568", "100", "SAL E2")));
+        String[] rows = f.split("\r\n");
+        assertThat(rows.length).isEqualTo(2);
+        assertThat(rows[0]).isEqualTo("1234567890,THANDI NKOSI,632005,3728.68,SAL PR00005 E1");
+        assertThat(rows[1]).isEqualTo("62011234568,SIPHO O NEIL,250655,100.00,SAL E2");
+    }
+
+    @Test
+    void absaRefusesBadDetailsOrNothingToPay() {
+        assertThatThrownBy(() -> BankFileRules.absaBio(List.of(line("A", "63200", "1234567890", "10", "R")))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> BankFileRules.absaBio(List.of(line("A", "632005", "123", "10", "R")))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> BankFileRules.absaBio(List.of(line("A", "632005", "1234567890", "0", "R")))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> BankFileRules.absaBio(List.of())).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void absaNeedsNoCompanyAccountAndIsAKnownLayout() {
+        assertThat(BankFileRules.layoutProblem(BankFileRules.ABSA_BIO, null, null)).isNull();
+        assertThat(BankFileRules.LAYOUTS).contains("ABSA_BIO");
+        assertThat(BankFileRules.filename(BankFileRules.ABSA_BIO, "PR-00005").endsWith(".csv")).isTrue();
+    }
 }

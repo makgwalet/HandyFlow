@@ -56,11 +56,12 @@ public class EmployeeChangeService {
         HrEmployee emp = employee(tenantId, employeeId);
         refuseIfTerminated(emp);
         fail(EmployeeRules.bankProblem(req.bankName(), req.accountNumber(), req.branchCode()));
+        fail(PayrollPaymentRules.accountTypeProblem(req.accountType()));
         fail(EmployeeChangeRules.effectiveProblem(req.effectiveFrom(), emp.getStartDate(), LocalDate.now()));
         fail(EmployeeChangeRules.reasonProblem(req.reason()));
 
-        Map<String, String> before = bank(emp.getBankName(), emp.getBankAccountNumber(), emp.getBankBranchCode());
-        Map<String, String> after = bank(req.bankName().trim(), req.accountNumber().replaceAll("\\s", ""), req.branchCode().replaceAll("\\s", ""));
+        Map<String, String> before = bank(emp.getBankName(), emp.getBankAccountNumber(), emp.getBankBranchCode(), emp.getBankAccountType());
+        Map<String, String> after = bank(req.bankName().trim(), req.accountNumber().replaceAll("\\s", ""), req.branchCode().replaceAll("\\s", ""), PayrollPaymentRules.accountType(req.accountType()));
         return open(tenantId, emp, EmployeeChangeRules.BANK_DETAILS, before, after, req.effectiveFrom(), req.reason(), actor);
     }
 
@@ -135,7 +136,7 @@ public class EmployeeChangeService {
             emp.applyCompensation(dec(v.get(EmployeeChangeRules.GROSS)), dec(v.get(EmployeeChangeRules.TRAVEL)),
                     dec(v.get(EmployeeChangeRules.MEDICAL)), dec(v.get(EmployeeChangeRules.PENSION)), v.get(EmployeeChangeRules.FREQUENCY));
         } else {
-            emp.applyBank(v.get(EmployeeChangeRules.BANK_NAME), v.get(EmployeeChangeRules.ACCOUNT), v.get(EmployeeChangeRules.BRANCH));
+            emp.applyBank(v.get(EmployeeChangeRules.BANK_NAME), v.get(EmployeeChangeRules.ACCOUNT), v.get(EmployeeChangeRules.BRANCH), v.get(EmployeeChangeRules.ACCOUNT_TYPE));
         }
         employeeRepo.save(emp);
         if (EmployeeChangeRules.COMPENSATION.equals(c.getChangeType()) && emp.getGrossSalary() != null && wasGross != null
@@ -172,11 +173,12 @@ public class EmployeeChangeService {
         return m;
     }
 
-    private static Map<String, String> bank(String name, String account, String branch) {
+    private static Map<String, String> bank(String name, String account, String branch, String accountType) {
         Map<String, String> m = new LinkedHashMap<>();
         m.put(EmployeeChangeRules.BANK_NAME, name);
         m.put(EmployeeChangeRules.ACCOUNT, account);
         m.put(EmployeeChangeRules.BRANCH, branch);
+        m.put(EmployeeChangeRules.ACCOUNT_TYPE, PayrollPaymentRules.accountType(accountType));
         return m;
     }
 

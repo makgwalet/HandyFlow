@@ -52,7 +52,7 @@ public class PayRunPaymentController {
     public ResponseEntity<byte[]> file(@PathVariable UUID id, @RequestParam(name = "layout", defaultValue = "GENERIC_CSV") String layout, Authentication a, Principal p) {
         requireFinalise(a);
         FileResult f = service.file(TenantContext.getTenantIdAsObject(), id, user(p), layout);
-        boolean csv = BankFileRules.GENERIC_CSV.equals(f.layout());
+        boolean csv = !BankFileRules.BANKSERV_ACB.equals(f.layout());
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + f.filename() + "\"")
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
@@ -68,6 +68,23 @@ public class PayRunPaymentController {
         requireFinalise(a);
         return ResponseEntity.ok(ApiResponse.success("Payments confirmed",
                 service.confirmPaid(TenantContext.getTenantIdAsObject(), id, user(p), req == null ? null : req.note())));
+    }
+
+    @PostMapping("/pay-runs/{id}/payments/returns/preview")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Read the bank's returned-items file and show which payments of this run it names. Changes nothing")
+    public ResponseEntity<ApiResponse<ReturnPreview>> previewReturns(@PathVariable UUID id, @RequestBody ReturnImportRequest req, Authentication a) {
+        requireFinalise(a);
+        return ResponseEntity.ok(ApiResponse.success(service.previewReturns(TenantContext.getTenantIdAsObject(), id, req == null ? null : req.content())));
+    }
+
+    @PostMapping("/pay-runs/{id}/payments/returns/apply")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Mark the payments the bank's file names as returned, with the reasons it gives")
+    public ResponseEntity<ApiResponse<Summary>> applyReturns(@PathVariable UUID id, @RequestBody ReturnImportRequest req, Authentication a, Principal p) {
+        requireFinalise(a);
+        return ResponseEntity.ok(ApiResponse.success("Returned payments recorded",
+                service.applyReturns(TenantContext.getTenantIdAsObject(), id, req == null ? null : req.content(), user(p))));
     }
 
     @PostMapping("/pay-run-payments/{id}/return")

@@ -21,8 +21,25 @@ public record EmployeeViewResponse(
         BigDecimal grossSalary, String payFrequency, BigDecimal medicalAidContribution, BigDecimal pensionContribution,
         BigDecimal travelAllowance, String bankName, String bankAccountMasked, String bankBranchCode,
         // passport and work permit: personal data, so null without the sensitive permission
-        ForeignIdentity foreign
+        ForeignIdentity foreign,
+        // pay: the kind of bank account (CURRENT, SAVINGS, TRANSMISSION, BOND)
+        String bankAccountType
 ) {
+    /** Without the account type, as before it was kept. */
+    public EmployeeViewResponse(UUID id, String employeeNumber, String firstName, String lastName, String fullName,
+                                String email, String phone, String employmentType, String jobTitle, String department,
+                                LocalDate startDate, LocalDate endDate, String status, UUID managerId, String managerName, UUID userId,
+                                boolean canSeeSensitive, boolean canSeeCompensation,
+                                String idNumber, String taxNumber, LocalDate dateOfBirth, String gender, String race,
+                                String emergencyContactName, String emergencyContactPhone, String terminationReason,
+                                BigDecimal grossSalary, String payFrequency, BigDecimal medicalAidContribution, BigDecimal pensionContribution,
+                                BigDecimal travelAllowance, String bankName, String bankAccountMasked, String bankBranchCode, ForeignIdentity foreign) {
+        this(id, employeeNumber, firstName, lastName, fullName, email, phone, employmentType, jobTitle, department, startDate, endDate, status,
+                managerId, managerName, userId, canSeeSensitive, canSeeCompensation, idNumber, taxNumber, dateOfBirth, gender, race,
+                emergencyContactName, emergencyContactPhone, terminationReason, grossSalary, payFrequency, medicalAidContribution,
+                pensionContribution, travelAllowance, bankName, bankAccountMasked, bankBranchCode, foreign, null);
+    }
+
     /** Without the passport and permit block, as before they were kept. */
     public EmployeeViewResponse(UUID id, String employeeNumber, String firstName, String lastName, String fullName,
                                 String email, String phone, String employmentType, String jobTitle, String department,
@@ -35,6 +52,6 @@ public record EmployeeViewResponse(
         this(id, employeeNumber, firstName, lastName, fullName, email, phone, employmentType, jobTitle, department, startDate, endDate, status,
                 managerId, managerName, userId, canSeeSensitive, canSeeCompensation, idNumber, taxNumber, dateOfBirth, gender, race,
                 emergencyContactName, emergencyContactPhone, terminationReason, grossSalary, payFrequency, medicalAidContribution,
-                pensionContribution, travelAllowance, bankName, bankAccountMasked, bankBranchCode, null);
+                pensionContribution, travelAllowance, bankName, bankAccountMasked, bankBranchCode, null, null);
     }
 }

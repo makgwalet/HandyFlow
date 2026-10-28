@@ -28,6 +28,7 @@ public class HrPayRunPayment {
     @Column(name = "bank_name")        String bankName;
     @Column(name = "branch_code")      String branchCode;
     @Column(name = "account_number")   String accountNumber;
+    @Column(name = "account_type")     String accountType = "CURRENT";
     String reference;
     String status;
     @Column(name = "exported_at")      Instant exportedAt;
@@ -42,7 +43,13 @@ public class HrPayRunPayment {
 
     public static HrPayRunPayment pending(UUID tenantId, UUID payRunId, UUID payslipId, UUID employeeId, BigDecimal amount,
                                           String name, String bank, String branch, String account, String reference, UUID by) {
+        return pending(tenantId, payRunId, payslipId, employeeId, amount, name, bank, branch, account, "CURRENT", reference, by);
+    }
+
+    public static HrPayRunPayment pending(UUID tenantId, UUID payRunId, UUID payslipId, UUID employeeId, BigDecimal amount,
+                                          String name, String bank, String branch, String account, String accountType, String reference, UUID by) {
         HrPayRunPayment p = new HrPayRunPayment();
+        p.accountType = accountType == null || accountType.isBlank() ? "CURRENT" : accountType;
         p.id = UUID.randomUUID();
         p.tenantId = tenantId;
         p.payRunId = payRunId;
