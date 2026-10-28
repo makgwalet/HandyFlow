@@ -1,4 +1,5 @@
 // src/pages/recruiter/RecruiterPage.tsx
+import { EMPTY_HIRE_DETAILS, hireDetailsBody, hireDetailsProblem, missingCount, type HireDetails } from './hireDetails.logic'
 import { useState } from 'react'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
@@ -330,6 +331,9 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
   const [department,  setDepartment]      = useState('')
   const [createHrRecord, setCreateHrRecord] = useState(true)
   const [grossSalary, setGrossSalary]     = useState('')
+  const [hire, setHire]                   = useState<HireDetails>(EMPTY_HIRE_DETAILS)
+  const setHireField = (k: keyof HireDetails) => (e: React.ChangeEvent<HTMLInputElement>) => setHire(h => ({ ...h, [k]: e.target.value }))
+  const hireProblem = createHrRecord ? hireDetailsProblem(hire) : null
   const [error, setError]                 = useState('')
 
   // Load full detail
@@ -498,6 +502,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
       // send null (not empty string) when unset or when this is an external
       // placement, so it doesn't accidentally coerce to 0.
       grossSalary: createHrRecord && grossSalary !== '' ? Number(grossSalary) : null,
+      ...(createHrRecord ? hireDetailsBody(hire) : {}),
     }),
     onSuccess: () => { invalidate(); setShowConvert(false) },
     onError: (e: any) => setError(e.response?.data?.message || 'Failed to convert'),
@@ -1055,7 +1060,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
             ? `Create an HR employee record for ${app?.applicantName}? Their profile will be pre-filled from their application.`
             : `Mark ${app?.applicantName} as placed — no HR record will be created. Use this for candidates placed at a client company rather than hired internally.`}
           confirmLabel={createHrRecord ? 'Create employee record' : 'Mark as placed'} loading={convertToEmployee.isPending}
-          onConfirm={() => convertToEmployee.mutate()} onCancel={() => setShowConvert(false)}>
+          onConfirm={() => { if (hireProblem) { setError(hireProblem); return } setError(''); convertToEmployee.mutate() }} onCancel={() => setShowConvert(false)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 14 }}>
             <div>
               <label style={lbl}>Placement type</label>
@@ -1090,6 +1095,21 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                 <input type="number" min="0" step="0.01" value={grossSalary} onChange={e => setGrossSalary(e.target.value)}
                   placeholder="e.g. 32000" style={inp} />
               </div>
+            )}
+            {createHrRecord && (
+              <fieldset style={{ border: '1px solid var(--hf-border)', borderRadius: 8, padding: '10px 12px', margin: 0 }}>
+                <legend style={{ fontSize: 12, fontWeight: 700, padding: '0 6px', color: 'var(--hf-text-muted)' }}>Payroll details (optional)</legend>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+                  <div><label style={lbl} htmlFor="hire-id">ID number</label><input id="hire-id" inputMode="numeric" value={hire.idNumber} onChange={setHireField('idNumber')} style={inp} /></div>
+                  <div><label style={lbl} htmlFor="hire-tax">SARS tax number</label><input id="hire-tax" inputMode="numeric" value={hire.taxNumber} onChange={setHireField('taxNumber')} style={inp} /></div>
+                  <div><label style={lbl} htmlFor="hire-bank">Bank</label><input id="hire-bank" value={hire.bankName} onChange={setHireField('bankName')} style={inp} /></div>
+                  <div><label style={lbl} htmlFor="hire-acc">Account number</label><input id="hire-acc" inputMode="numeric" value={hire.bankAccountNumber} onChange={setHireField('bankAccountNumber')} style={inp} /></div>
+                  <div><label style={lbl} htmlFor="hire-branch">Branch code</label><input id="hire-branch" inputMode="numeric" value={hire.bankBranchCode} onChange={setHireField('bankBranchCode')} style={inp} /></div>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 8 }}>
+                  {missingCount(hire) === 0 ? 'All given.' : `${missingCount(hire)} of 5 left empty. HR can add them later; onboarding will keep asking for them, and payroll cannot pay or certify the employee without them.`}
+                </div>
+              </fieldset>
             )}
           </div>
           {error && <div style={{ padding: '8px 12px', background: 'var(--hf-danger-soft)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)', marginBottom: 10 }}>{error}</div>}

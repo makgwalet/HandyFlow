@@ -592,6 +592,8 @@ public class RecruiterService {
 
     // ── Convert to HR employee ────────────────────────────────────────────────
 
+    private static String blank(String s) { return s == null || s.isBlank() ? null : s.trim(); }
+
     @Transactional
     public UUID convertToEmployee(TenantId tenantId, UUID applicationId,
                                   ConvertToEmployeeRequest req, UUID convertedByUserId) {
@@ -649,12 +651,12 @@ public class RecruiterService {
         // started with zero leave on the books.
         CreateEmployeeRequest hrReq = new CreateEmployeeRequest(
                 applicant.getFirstName(), applicant.getLastName(),
-                null, null, null, null, null,                 // idNumber/taxNumber/dob/gender/race — not captured at application stage, completed later in HR
+                blank(req.idNumber()), blank(req.taxNumber()), null, null, null,   // dob/gender/race are not captured here; HR completes them
                 applicant.getEmail(), applicant.getPhone(),
                 req.startDate(), req.employmentType(),
                 jobTitle, department,
                 req.grossSalary(), req.payFrequency(),
-                null, null, null,                              // banking — completed later in HR
+                blank(req.bankName()), blank(req.bankAccountNumber()), blank(req.bankBranchCode()),   // banking, when the new hire gave it
                 null, null, null,                              // medical/pension/travel — completed later in HR
                 null, null,                                     // emergency contact — completed later in HR
                 "Converted from recruiter application " + applicationId

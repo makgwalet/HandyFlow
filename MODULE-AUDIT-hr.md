@@ -1118,3 +1118,13 @@ I read the four training services, the entities and the session screen. The modu
 **Tests.** `TrainingSelfRulesTest` (5) passes in my harness; the screen's logic was checked by running it under node (the frontend test file `MyTraining.test.ts`, 7 tests, has not run: no vitest here). `TrainingSelfServiceTest` (4, Mockito) has not run. No migration. Spring, the database and a browser have not been used.
 
 **Still not done.** A manager does not see their team's training or certificates; no required-training matrix; a person cannot book themselves onto a session.
+
+## 43. Recruiter hire to employee: payroll details come across (Slice 20e)
+
+**What was wrong.** Turning a hired applicant into an employee created the record with no ID number, tax number or bank details ("completed later in HR"). Payroll cannot pay, and certificates cannot be issued, without them, so every converted employee started with open tasks.
+
+**What changed.** The "Convert to HR employee" form (internal hires only) has an optional **Payroll details** block: ID number, SARS tax number, bank, account number and branch code. Whatever is filled in goes into the new employee. The server checks it with HR's own rules (a valid South African ID number, a 10-digit tax number, bank name with account and branch, and an ID number already used by another employee is refused), so a wrong entry stops the conversion with the reason, and nothing is created. What is left empty stays empty and onboarding keeps asking for it; the form says how many of the five are empty. Still only `RECRUITER_ADMIN` can convert, and the ID number is not stored in the recruiter's own tables.
+
+**Code.** `ConvertToEmployeeRequest` gained five optional fields (the old seven-field form still works); `RecruiterService.convertToEmployee` passes them on; `hireDetails.logic.ts` and the form. Checking the screen logic under node found a real fault in my first draft (an all-empty block was refused because HR's bank check treats empty as missing); it is fixed and the test file covers it.
+
+**Not done.** Date of birth, gender and emergency contact are still left to HR. Nothing here changes how an applicant gives these details; the recruiter types them in. `hireDetails.test.ts` (4 tests) has not run (no vitest); no backend test was added for the conversion, and Spring and the database have not run.
