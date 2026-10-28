@@ -52,6 +52,8 @@ public final class RecruiterAuditRules {
         ACTIONS.put("DELETE /pools/{poolId}/members/{applicantId}", "POOL_MEMBER_REMOVED");
         ACTIONS.put("PUT /candidates/{applicantId}/tags", "TAGS_CHANGED");
         ACTIONS.put("POST /candidates/{applicantId}/apply", "CANDIDATE_PUT_FORWARD");
+        ACTIONS.put("GET /applications/{id}/cv", "CV_VIEWED");
+        ACTIONS.put("GET /applications/{id}/scorecard", "SCORECARD_DOWNLOADED");
         ACTIONS.put("GET /reports/{id}/export.csv", "REPORT_EXPORTED");
         ACTIONS.put("GET /audit/export.csv", "AUDIT_EXPORTED");
     }

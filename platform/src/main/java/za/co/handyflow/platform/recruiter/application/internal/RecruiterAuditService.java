@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.recruiter.domain.model.RecruiterAuditRules;
+import za.co.handyflow.platform.recruiter.domain.model.RecruiterCvAccessRules;
 import za.co.handyflow.platform.recruiter.domain.model.RecruiterReportRules;
 import za.co.handyflow.platform.recruiter.dto.RecruiterAuditDtos.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
@@ -79,5 +80,20 @@ public class RecruiterAuditService {
         args.add(limit); args.add(offset);
         return jdbc.query(sql.toString(), (rs, i) -> new AuditEntry(rs.getObject("id", UUID.class), rs.getTimestamp("occurred_at").toInstant(), rs.getString("actor_name"),
                 rs.getString("action"), rs.getString("entity_type"), rs.getObject("entity_id", UUID.class), rs.getObject("application_id", UUID.class), rs.getString("detail")), args.toArray());
+    }
+
+    /** Who opened CVs in the last {@code days} days, and anyone who opened an unusual number in an hour. */
+    @Transactional(readOnly = true)
+    public List<CvAccessRow> cvAccess(TenantId tenantId, Integer days) {
+        String problem = RecruiterCvAccessRules.daysProblem(days);
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.BAD_REQUEST, "INVALID_RANGE");
+        Timestamp since = Timestamp.from(java.time.Instant.now().minus(RecruiterCvAccessRules.daysOrDefault(days), java.time.temporal.ChronoUnit.DAYS));
+        List<RecruiterCvAccessRules.View> views = jdbc.query(
+                "SELECT COALESCE(actor_id::text, actor_name) AS who, actor_name, application_id, occurred_at FROM rec_audit_log "
+                        + "WHERE tenant_id = ? AND action = 'CV_VIEWED' AND occurred_at >= ? ORDER BY occurred_at DESC LIMIT 50000",
+                (rs, i) -> new RecruiterCvAccessRules.View(rs.getString("who"), rs.getString("actor_name"), rs.getObject("application_id", UUID.class),
+                        rs.getTimestamp("occurred_at").toInstant()), tenantId.getValue(), since);
+        return RecruiterCvAccessRules.summarise(views).stream()
+                .map(r -> new CvAccessRow(r.actorName(), r.views(), r.candidates(), r.busiestHour(), r.busiestHourViews(), r.flagged())).toList();
     }
 }

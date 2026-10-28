@@ -46,6 +46,13 @@ public class RecruiterAuditController {
         return ResponseEntity.ok(ApiResponse.success(audit.page(TenantContext.getTenantIdAsObject(), from, to, action, applicationId, page)));
     }
 
+    @GetMapping("/cv-access")
+    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @Operation(summary = "Who has opened candidates' CVs, with anyone who opened an unusual number in an hour flagged")
+    public ResponseEntity<ApiResponse<List<CvAccessRow>>> cvAccess(@RequestParam(required = false) Integer days) {
+        return ResponseEntity.ok(ApiResponse.success(audit.cvAccess(TenantContext.getTenantIdAsObject(), days)));
+    }
+
     @GetMapping("/export.csv")
     @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
     @Operation(summary = "The same trail as a CSV file. The export is itself recorded")

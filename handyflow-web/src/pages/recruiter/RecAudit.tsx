@@ -5,6 +5,7 @@ import { apiClient } from '../../api/client'
 
 type Entry = { id: string; occurredAt: string; actorName: string | null; action: string; entityType: string; entityId: string | null; applicationId: string | null; detail: string | null }
 type Page = { entries: Entry[]; hasMore: boolean }
+type CvRow = { actorName: string; views: number; candidates: number; busiestHour: string; busiestHourViews: number; flagged: boolean }
 const BASE = '/api/v1/recruiter/audit'
 const data = <T,>(r: { data?: { data?: T } & T }): T => (r.data?.data ?? r.data) as T
 const field = { padding: '6px 9px', background: 'var(--hf-surface)', color: 'var(--hf-text-secondary)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 12 } as const
@@ -18,6 +19,7 @@ export default function RecAudit() {
   const [page, setPage] = useState(0)
   const [exportError, setExportError] = useState('')
   const actions = useQuery<string[]>({ queryKey: ['rec-audit-actions'], queryFn: async () => data(await apiClient.get(`${BASE}/actions`)) })
+  const cv = useQuery<CvRow[]>({ queryKey: ['rec-cv-access'], queryFn: async () => data(await apiClient.get(`${BASE}/cv-access?days=30`)), retry: false })
   const params = () => { const p = new URLSearchParams(); if (from) p.set('from', from); if (to) p.set('to', to); if (action) p.set('action', action); return p }
   const q = useQuery<Page>({
     queryKey: ['rec-audit', from, to, action, page],
@@ -37,6 +39,17 @@ export default function RecAudit() {
 
   return (
     <div style={{ fontSize: 12 }}>
+      {cv.data && cv.data.length > 0 && (
+        <div style={{ border: '1px solid var(--hf-border)', borderRadius: 8, padding: 12, marginBottom: 14 }}>
+          <strong>Who opened CVs in the last 30 days</strong>
+          {cv.data.map(r => (
+            <div key={r.actorName} style={{ marginTop: 6, color: r.flagged ? 'var(--hf-danger-text)' : undefined }}>
+              {r.actorName}: {r.views} view{r.views === 1 ? '' : 's'} of {r.candidates} candidate{r.candidates === 1 ? '' : 's'}
+              {r.flagged && `. ${r.busiestHourViews} in one hour on ${when(r.busiestHour)}. Worth asking why.`}
+            </div>
+          ))}
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
         <label>From <input type="date" value={from} max={to || undefined} onChange={e => reset(() => setFrom(e.target.value))} style={field} /></label>
         <label>To <input type="date" value={to} min={from || undefined} onChange={e => reset(() => setTo(e.target.value))} style={field} /></label>
