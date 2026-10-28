@@ -439,6 +439,8 @@ public class HrController {
         PayrollSettingsResponse saved = payrollControlService.updateSettings(TenantContext.getTenantIdAsObject(), req.allowSelfApproval(), actor);
         if (req.bankFileSecondCheck() != null || req.nominatedBranch() != null || req.nominatedAccount() != null)
             saved = payrollControlService.updateBankFileSettings(TenantContext.getTenantIdAsObject(), req.bankFileSecondCheck(), req.nominatedBranch(), req.nominatedAccount(), actor);
+        if (req.taxMethod() != null)
+            saved = payrollControlService.updateTaxMethod(TenantContext.getTenantIdAsObject(), req.taxMethod(), actor);
         return ResponseEntity.ok(ApiResponse.success("Payroll settings saved", saved));
     }
 

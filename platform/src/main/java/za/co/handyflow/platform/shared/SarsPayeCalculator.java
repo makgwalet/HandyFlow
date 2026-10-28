@@ -112,6 +112,12 @@ public final class SarsPayeCalculator {
         return taxBefore.subtract(primary).subtract(secondary).subtract(tertiary).max(BigDecimal.ZERO).subtract(credit).max(BigDecimal.ZERO);
     }
 
+    /** The year's PAYE on an annual taxable income, after the given rebates and medical credit; for the averaging method. */
+    public static BigDecimal annualPaye(BigDecimal annualTaxable, BigDecimal primary, BigDecimal secondary, BigDecimal tertiary,
+                                        BigDecimal annualCredit, StatutoryYearRules r) {
+        return annualPayeOf(tax(annualTaxable, r), primary, secondary, tertiary, annualCredit);
+    }
+
     /** Annual tax before rebates: the last line whose floor is below the income (the first line for nil income). */
     static BigDecimal tax(BigDecimal income, StatutoryYearRules r) {
         StatutoryYearRules.Bracket line = r.brackets().get(0);

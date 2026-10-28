@@ -3,6 +3,7 @@ package za.co.handyflow.platform.hr.application.internal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import za.co.handyflow.platform.hr.domain.model.HrEmployee;
+import za.co.handyflow.platform.hr.domain.model.PayeAveragingRules;
 import za.co.handyflow.platform.shared.SarsPayeCalculator;
 import za.co.handyflow.platform.shared.SarsPayrollResult;
 import za.co.handyflow.platform.shared.StatutoryYearRules;
@@ -87,6 +88,44 @@ public class PayrollEngine {
                 r.payeAmount(), r.uifEmployee(), r.uifEmployer(), r.sdlAmount(),
                 r.taxableIncome(), r.taxBeforeRebate(), r.primaryRebate(),
                 r.secondaryRebate(), r.tertiaryRebate(), r.medicalTaxCredit(), r.taxYear(), ot, payout, bonus, backPay, noticePay);
+    }
+
+    /** The year to date before this month, for the averaging method. */
+    public record Prior(BigDecimal taxable, BigDecimal paye, int months) {}
+
+    /**
+     * @param regularTaxable this month's regular taxable pay, kept on the payslip for the next month's year-to-date
+     * @param regularPaye    the PAYE on regular pay this month, as the method worked it
+     * @param periodicPaye   what the periodic method gives for regular pay, to show the difference
+     */
+    public record Calc(PayrollResult result, BigDecimal regularTaxable, BigDecimal regularPaye, BigDecimal periodicPaye) {}
+
+    /**
+     * As {@link #calculate(HrEmployee, StatutoryYearRules, BigDecimal, int, BigDecimal, Period)}, and with a {@code prior} also replaces the PAYE
+     * on regular pay by the averaging method. The tax on a bonus, back pay or notice pay is the same either way.
+     */
+    public Calc calculate(HrEmployee employee, StatutoryYearRules rules, BigDecimal annualPayroll, int medicalMembers, BigDecimal overtime,
+                          Period period, Prior prior) {
+        PayrollResult full = calculate(employee, rules, annualPayroll, medicalMembers, overtime, period);
+        BigDecimal ot = overtime == null ? BigDecimal.ZERO : overtime;
+        BigDecimal payout = period.leavePayout() == null ? BigDecimal.ZERO : period.leavePayout();
+        SarsPayrollResult regular = SarsPayeCalculator.calculate(new SarsPayeCalculator.Inputs(
+                period.basic().add(ot).add(payout), period.travel(), period.pension(),
+                employee.getMedicalAidContribution(), employee.getDateOfBirth(), medicalMembers, annualPayroll,
+                period.employerMedical(), period.employerRetirement(), period.otherFringe(), BigDecimal.ZERO), rules);
+        BigDecimal monthlyTaxable = regular.taxableIncome().divide(BigDecimal.valueOf(12), 2, java.math.RoundingMode.HALF_UP);
+        BigDecimal periodic = regular.payeAmount();
+        if (prior == null) return new Calc(full, monthlyTaxable, periodic, periodic);
+
+        BigDecimal averaged = PayeAveragingRules.paye(monthlyTaxable, prior.taxable(), prior.paye(), prior.months(),
+                regular.primaryRebate(), regular.secondaryRebate(), regular.tertiaryRebate(), regular.medicalTaxCredit(), rules);
+        BigDecimal annualPaymentTax = full.payeAmount().subtract(periodic);
+        BigDecimal paye = averaged.add(annualPaymentTax);
+        PayrollResult r = new PayrollResult(full.grossSalary(), full.travelAllowance(), full.medicalAid(), full.pension(),
+                paye, full.uifEmployee(), full.uifEmployer(), full.sdlAmount(), full.taxableIncome(), full.taxBeforeRebate(),
+                full.primaryRebate(), full.secondaryRebate(), full.tertiaryRebate(), full.medicalTaxCredit(), full.taxYear(),
+                full.overtime(), full.leavePayout(), full.bonus(), full.backPay(), full.noticePay());
+        return new Calc(r, monthlyTaxable, averaged, periodic);
     }
 
     public record PayrollResult(

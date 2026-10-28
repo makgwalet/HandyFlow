@@ -231,3 +231,19 @@ describe("PayrollControlsPanel", () => {
       { allowSelfApproval: false, bankFileSecondCheck: false, nominatedBranch: "250655", nominatedAccount: "62011234567" }))
   })
 })
+
+import { isTaxMethod, taxMethodBody, taxMethodHint, TAX_METHODS } from "./taxMethod.logic"
+
+describe("tax method", () => {
+  it("offers the two methods and explains each", () => {
+    expect(TAX_METHODS.map(t => t.value)).toEqual(["PERIODIC", "AVERAGING"])
+    expect(taxMethodHint("AVERAGING")).toMatch(/year to date/)
+    expect(taxMethodHint("PERIODIC")).toMatch(/each month/i)
+    expect(taxMethodHint("other")).toBe("")
+  })
+  it("accepts only the two names and sends the method with the current approval choice", () => {
+    expect(isTaxMethod("AVERAGING")).toBe(true)
+    expect(isTaxMethod("cumulative")).toBe(false)
+    expect(taxMethodBody(true, "AVERAGING")).toEqual({ allowSelfApproval: true, taxMethod: "AVERAGING" })
+  })
+})

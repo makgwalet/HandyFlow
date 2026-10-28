@@ -47,6 +47,9 @@ public class HrPayslip {
     @Column(name = "tax_before_rebate") BigDecimal taxBeforeRebate;
     @Column(name = "primary_rebate")    BigDecimal primaryRebate;
     @Column(name = "tax_year")          Integer taxYear;
+    /** The month's regular taxable pay and the PAYE on it, for the year-to-date of the averaging method. */
+    @Column(name = "regular_taxable")   BigDecimal regularTaxable;
+    @Column(name = "paye_regular")      BigDecimal payeRegular;
     /** The medical tax credit actually taken off the month's PAYE. Null on payslips made before it was recorded. */
     @Column(name = "medical_tax_credit") BigDecimal medicalTaxCredit;
     /** Working days in the pay period and the days paid. Empty on payslips made before part-period pay existed, which were paid in full. */
@@ -167,6 +170,7 @@ public class HrPayslip {
     // These replace the reflection-based field setting that was silently failing.
     // @Getter is class-level; setters must be explicit for the fields that need them.
 
+    public void setRegular(BigDecimal regularTaxable, BigDecimal payeRegular) { this.regularTaxable = regularTaxable; this.payeRegular = payeRegular; }
     public void setYtdGross(BigDecimal ytdGross) { this.ytdGross = ytdGross; }
     public void setYtdPaye(BigDecimal ytdPaye)   { this.ytdPaye  = ytdPaye;  }
     public void setYtdUif(BigDecimal ytdUif)     { this.ytdUif   = ytdUif;   }

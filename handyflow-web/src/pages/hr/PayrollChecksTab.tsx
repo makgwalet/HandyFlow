@@ -8,6 +8,7 @@ import { AlertCircle, CheckCircle2 } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { useAuth } from "../../hooks/useAuth"
 import { nominatedBody, nominatedProblem } from "./payRunPayments.logic"
+import { isTaxMethod, TAX_METHODS, taxMethodBody, taxMethodHint } from "./taxMethod.logic"
 import {
   impactSummary, rand, signedRand, taxYearName, VERDICT_STYLE, VERDICT_TEXT,
   type Impact, type ImpactRun, type TaxYear,
@@ -202,7 +203,7 @@ function RunRows({ run, open, onToggle }: { run: ImpactRun; open: boolean; onTog
 interface AccessReview { legacyAccessEnds: string; rolesNeedingReview: number; roles: { roleId: string; roleName: string; usersInRole: number; held: string; granted: string; needsReview: boolean; note: string }[] }
 interface PayrollSettings {
   allowSelfApproval: boolean; legacyAccessEnds: string; legacyAccessOpen: boolean
-  bankFileSecondCheck?: boolean; nominatedBranch?: string | null; nominatedAccountSet?: boolean; nominatedAccountLast4?: string | null
+  taxMethod?: string; bankFileSecondCheck?: boolean; nominatedBranch?: string | null; nominatedAccountSet?: boolean; nominatedAccountLast4?: string | null
 }
 
 /** Who can do what in payroll: the self-approval choice and what the permissions migration did to each role. */
@@ -224,6 +225,11 @@ export function PayrollControlsPanel() {
     mutationFn: (allow: boolean) => apiClient.put("/api/v1/hr/payroll/settings", { allowSelfApproval: allow }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["hr-payroll-settings"] }); setError("") },
     onError: e => setError(errorText(e, "The setting could not be saved.")),
+  })
+  const saveMethod = useMutation({
+    mutationFn: (method: "PERIODIC" | "AVERAGING") => apiClient.put("/api/v1/hr/payroll/settings", taxMethodBody(settings.data?.allowSelfApproval ?? false, method)),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["hr-payroll-settings"] }); setError("") },
+    onError: e => setError(errorText(e, "The tax method could not be saved.")),
   })
   const [branch, setBranch] = useState("")
   const [account, setAccount] = useState("")
@@ -257,6 +263,18 @@ export function PayrollControlsPanel() {
                 </span>
               </span>
             </label>
+            <div style={{ marginTop: 12 }}>
+              <label htmlFor="hr-tax-method" style={{ fontWeight: 600 }}>How PAYE is worked out</label>
+              <select id="hr-tax-method" value={settings.data.taxMethod ?? "PERIODIC"} disabled={!canConfigure || saveMethod.isPending}
+                onChange={e => { if (isTaxMethod(e.target.value)) saveMethod.mutate(e.target.value) }}
+                style={{ display: "block", marginTop: 4, padding: "7px 10px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text)" }}>
+                {TAX_METHODS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+              <span style={{ display: "block", fontSize: 12, color: "var(--hf-text-muted)", marginTop: 4 }}>
+                {taxMethodHint(settings.data.taxMethod ?? "PERIODIC")} Change it at the start of a tax year: earlier months are taken from what their payslips hold.
+                Have your payroll specialist confirm the method before you rely on it.
+              </span>
+            </div>
             <label style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 12, cursor: canConfigure ? "pointer" : "default" }}>
               <input type="checkbox" checked={!!settings.data.bankFileSecondCheck} disabled={!canConfigure || saveBank.isPending}
                 onChange={e => saveBank.mutate({ secondCheck: e.target.checked, branch: "", account: "" })} style={{ marginTop: 3 }} />

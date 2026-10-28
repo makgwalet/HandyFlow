@@ -909,7 +909,7 @@ I read the four training services, the entities and the session screen. The modu
 
 **Still not done**
 
-- No SARS averaging or year-to-date method. The method used is the simple annual-payment one, and for someone paid a different amount each month it can differ from what a bureau would calculate.
+- The averaging (year-to-date) method is available as an opt-in setting (section 53). The default stays periodic.
 - Back pay is taxed like a bonus, and is reported under the basic-pay code (3601) on the certificate. I have not checked that against the SARS IRP5 guide. A payroll specialist should check both.
 - The SDL threshold is tested against payroll without bonuses.
 - Taxable income and tax before rebate on the payslip include the bonus, so the payslip no longer shows regular pay on its own for those lines.
@@ -1280,3 +1280,15 @@ An issued payslip is never changed: it is the record behind the bank payment, th
 - API: `GET/POST /api/v1/hr/payslips/{id}/corrections`.
 
 Limits, for the payroll specialist: tax and UIF already paid on an overpayment are not reclaimed (the employee repays net); back-pay tax is the annual-payment approximation, not a re-run of the old month; a leaver's correction is settled outside payroll; no whole-run reversal, because of EMP201, certificates and bank payments already made.
+
+## 53. Averaging method for PAYE on regular pay (Slice 22d, V538)
+
+Setting `hr_payroll_settings.tax_method`: PERIODIC (default, unchanged) or AVERAGING, chosen under Payroll checks by someone with configuration access.
+
+**Method (`PayeAveragingRules`).** Each month: months gone n (from the later of the start of the tax year and the person's start month, to the pay-date month); year-to-date regular taxable pay (prior payslips of this tax year with an earlier pay date, plus this month); annual equivalent = YTD / n x 12; annual PAYE on it with the full annual rebates and medical credit; liability = annual PAYE / 12 x n; PAYE this month = liability less PAYE already charged on regular pay, never below nil. Steady pay gives the periodic answer (a cent can move between months). A big month is taxed on the year so far; an overpayment (a high month followed by low ones) is held until the year catches up, there is no refund inside payroll. Bonus, back pay and notice pay keep the annual-payment tax on top, unchanged. UIF, SDL and everything else on the payslip are unchanged.
+
+**Data.** `hr_payslips.regular_taxable` (month's regular taxable pay, annual taxable / 12) and `paye_regular` are stored on every payslip from now on, in either mode, so switching has history. Older payslips were filled from taxable income / 12 and their whole PAYE.
+
+**Screen.** Payroll checks: "How PAYE is worked out". A run in averaging mode says so, and each employee whose PAYE differs from the periodic figure gets a line with both.
+
+**For the payroll specialist, before relying on it:** the formula follows the published description of the averaging method, not a SARS rule I could cite; months are counted from the later of tax-year start and the start month (so a starter is annualised over the months employed); the retirement deduction cap is applied per month as the periodic method does; a second run in the same month counts that month's earlier payslips as prior months; switching in the middle of a year uses approximate history; leave payout and overtime count as regular pay; the bureau `SarsPayrollCalculator` is untouched.

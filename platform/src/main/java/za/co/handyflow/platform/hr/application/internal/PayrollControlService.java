@@ -188,7 +188,8 @@ public class PayrollControlService {
         return new PayrollSettingsResponse(s != null && s.isAllowSelfApproval(), s != null ? s.getUpdatedAt() : null,
                 PayrollAccess.LEGACY_ACCESS_ENDS, PayrollAccess.legacyOpen(LocalDate.now()),
                 s != null && s.isBankFileSecondCheck(), s == null ? null : s.getBankNominatedBranch(), acct != null,
-                acct == null ? null : acct.substring(Math.max(0, acct.length() - 4)));
+                acct == null ? null : acct.substring(Math.max(0, acct.length() - 4)),
+                s == null ? PayeAveragingRules.PERIODIC : s.getTaxMethod());
     }
 
     @Transactional
@@ -201,6 +202,19 @@ public class PayrollControlService {
     }
 
     /** The bank file choices. A null leaves that choice as it is; a blank branch or account clears it. */
+    /** PERIODIC or AVERAGING. A null leaves it as it is. */
+    @Transactional
+    public PayrollSettingsResponse updateTaxMethod(TenantId tenantId, String method, UUID actor) {
+        if (!PayeAveragingRules.valid(method)) throw new IllegalArgumentException("The tax method must be periodic or averaging.");
+        HrPayrollSettings s = settingsRepo.findById(tenantId.getValue()).orElseGet(() -> HrPayrollSettings.create(tenantId.getValue()));
+        if (!method.equals(s.getTaxMethod())) {
+            s.setTaxMethod(method, actor);
+            settingsRepo.save(s);
+            log.info("Tax method set to {} for tenant {} by {}", method, tenantId.getValue(), actor);
+        }
+        return settings(tenantId);
+    }
+
     @Transactional
     public PayrollSettingsResponse updateBankFileSettings(TenantId tenantId, Boolean secondCheck, String branch, String account, UUID actor) {
         HrPayrollSettings s = settingsRepo.findById(tenantId.getValue()).orElseGet(() -> HrPayrollSettings.create(tenantId.getValue()));

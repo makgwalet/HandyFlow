@@ -47,6 +47,22 @@ public interface HrPayslipRepository extends JpaRepository<HrPayslip, UUID> {
     """)
     java.math.BigDecimal sumYtdUif(UUID employeeId, int taxYear, UUID excludePayslipId);
 
+    @Query("""
+        SELECT COALESCE(SUM(p.regularTaxable), 0) FROM HrPayslip p
+        WHERE p.employeeId = :employeeId
+        AND p.taxYear = :taxYear
+        AND p.payRunId IN (SELECT r.id FROM HrPayRun r WHERE r.status <> 'CANCELLED' AND r.payDate < :before)
+        """)
+    java.math.BigDecimal sumRegularTaxable(UUID employeeId, int taxYear, java.time.LocalDate before);
+
+    @Query("""
+        SELECT COALESCE(SUM(p.payeRegular), 0) FROM HrPayslip p
+        WHERE p.employeeId = :employeeId
+        AND p.taxYear = :taxYear
+        AND p.payRunId IN (SELECT r.id FROM HrPayRun r WHERE r.status <> 'CANCELLED' AND r.payDate < :before)
+        """)
+    java.math.BigDecimal sumRegularPaye(UUID employeeId, int taxYear, java.time.LocalDate before);
+
     @Query("SELECT p FROM HrPayslip p WHERE p.payRunId IN :runIds ORDER BY p.createdAt")
     List<HrPayslip> findByPayRuns(java.util.Collection<UUID> runIds);
 }

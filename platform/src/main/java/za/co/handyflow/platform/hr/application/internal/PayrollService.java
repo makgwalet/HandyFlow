@@ -43,6 +43,9 @@ public class PayrollService {
     private final LeaveService          leaveService;
     private final BenefitService        benefitService;
     private final PayAdjustmentService  payAdjustmentService;
+    /** Optional so older constructions still work; no settings means the periodic method. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    HrPayrollSettingsRepository settingsRepo;
 
     // ── Pay runs ──────────────────────────────────────────────────────────────
 
@@ -168,6 +171,11 @@ public class PayrollService {
         BigDecimal runUif   = BigDecimal.ZERO, runSdl  = BigDecimal.ZERO;
         BigDecimal runNet   = BigDecimal.ZERO;
 
+        boolean averaging = settingsRepo != null && settingsRepo.findById(tenantId.getValue()).map(HrPayrollSettings::averaging).orElse(false);
+        if (averaging)
+            warnings.add("PAYE on regular pay is worked out by the averaging method: the year to date is annualised and what was already paid is taken off. "
+                    + "Bonuses, back pay and notice pay are taxed as annual payments on top.");
+
         for (HrEmployee emp : employees) {
             MedicalSchemeRules.Members m = members.get(emp.getId());
             if (m.assumed())
@@ -225,9 +233,19 @@ public class PayrollService {
             if (!lumps.isEmpty())
                 warnings.add(who + ": " + String.join(" and ", lumps)
                         + " included. Taxed by the annual-payment method: the extra tax the year bears once it is added to the annualised month.");
-            PayrollEngine.PayrollResult result = engine.calculate(emp, rules, annualPayroll, m.count(), overtimePay,
+            PayrollEngine.Prior prior = null;
+            if (averaging) {
+                prior = new PayrollEngine.Prior(payslipRepo.sumRegularTaxable(emp.getId(), taxYear, run.getPayDate()),
+                        payslipRepo.sumRegularPaye(emp.getId(), taxYear, run.getPayDate()),
+                        PayeAveragingRules.monthsElapsed(rules.effectiveFrom(), emp.getStartDate(), run.getPayDate()));
+            }
+            PayrollEngine.Calc calc = engine.calculate(emp, rules, annualPayroll, m.count(), overtimePay,
                     new PayrollEngine.Period(pay.paid(), travel, emp.getPensionContribution(), payout,
-                            benefit.medical(), benefit.retirement(), benefit.other(), bonus, backPay, noticePay));
+                            benefit.medical(), benefit.retirement(), benefit.other(), bonus, backPay, noticePay), prior);
+            PayrollEngine.PayrollResult result = calc.result();
+            if (averaging && calc.regularPaye().compareTo(calc.periodicPaye()) != 0)
+                warnings.add(who + ": PAYE on regular pay is " + calc.regularPaye() + " by the averaging method (the periodic method would give "
+                        + calc.periodicPaye() + ").");
 
             HrPayslip slip = HrPayslip.create(tenantId, run.getId(), emp.getId(),
                     result.grossSalary(), result.travelAllowance(),
@@ -236,6 +254,7 @@ public class PayrollService {
             slip.setBenefits(benefit.medical(), benefit.retirement(), benefit.other());
             slip.setBonusAndBackPay(bonus, backPay);
             slip.setNoticePay(noticePay);
+            slip.setRegular(calc.regularTaxable(), calc.regularPaye());
             slip.setPeriodPay(pay.workingDays(), pay.daysPaid(), pay.proration(), pay.unpaidDays(), pay.unpaidAmount());
             if (finalPay) { slip.setLeavePayout(payoutDays, payout); slip.markFinalPay(); }
 

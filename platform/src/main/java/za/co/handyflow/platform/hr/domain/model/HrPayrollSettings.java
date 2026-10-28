@@ -19,6 +19,7 @@ public class HrPayrollSettings {
     @Column(name = "bank_nominated_branch") String bankNominatedBranch;
     @Column(name = "bank_nominated_account") String bankNominatedAccount;
     @Column(name = "bank_file_second_check") boolean bankFileSecondCheck;
+    @Column(name = "tax_method") String taxMethod = "PERIODIC";
     @Column(name = "updated_by") UUID updatedBy;
     @Column(name = "updated_at") Instant updatedAt;
 
@@ -32,6 +33,14 @@ public class HrPayrollSettings {
         this.bankFileSecondCheck = secondCheck;
         this.bankNominatedBranch = branch == null || branch.isBlank() ? null : branch;
         this.bankNominatedAccount = account == null || account.isBlank() ? null : account;
+        this.updatedBy = actor;
+        this.updatedAt = Instant.now();
+    }
+
+    public boolean averaging() { return "AVERAGING".equals(taxMethod); }
+
+    public void setTaxMethod(String method, UUID actor) {
+        this.taxMethod = method;
         this.updatedBy = actor;
         this.updatedAt = Instant.now();
     }
