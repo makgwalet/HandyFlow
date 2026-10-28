@@ -40,5 +40,6 @@ public record PayslipResponse(
         BigDecimal employerMedical,
         BigDecimal employerRetirement,
         BigDecimal otherFringe,
-        BigDecimal backPayAmount
+        BigDecimal backPayAmount,
+        BigDecimal noticePayAmount
 ) {}

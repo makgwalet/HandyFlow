@@ -42,7 +42,14 @@ public class PayrollEngine {
     /** What is paid for the period when it is not a full month: the salary, travel allowance and pension for the days paid, and any leave paid out. */
     public record Period(BigDecimal basic, BigDecimal travel, BigDecimal pension, BigDecimal leavePayout,
                          BigDecimal employerMedical, BigDecimal employerRetirement, BigDecimal otherFringe,
-                         BigDecimal bonus, BigDecimal backPay) {
+                         BigDecimal bonus, BigDecimal backPay, BigDecimal noticePay) {
+        /** Without pay in place of notice. */
+        public Period(BigDecimal basic, BigDecimal travel, BigDecimal pension, BigDecimal leavePayout,
+                      BigDecimal employerMedical, BigDecimal employerRetirement, BigDecimal otherFringe,
+                      BigDecimal bonus, BigDecimal backPay) {
+            this(basic, travel, pension, leavePayout, employerMedical, employerRetirement, otherFringe, bonus, backPay, BigDecimal.ZERO);
+        }
+
         /** Without a bonus or back pay. */
         public Period(BigDecimal basic, BigDecimal travel, BigDecimal pension, BigDecimal leavePayout,
                       BigDecimal employerMedical, BigDecimal employerRetirement, BigDecimal otherFringe) {
@@ -65,11 +72,12 @@ public class PayrollEngine {
         BigDecimal payout = period.leavePayout() == null ? BigDecimal.ZERO : period.leavePayout();
         BigDecimal bonus = period.bonus() == null ? BigDecimal.ZERO : period.bonus();
         BigDecimal backPay = period.backPay() == null ? BigDecimal.ZERO : period.backPay();
+        BigDecimal noticePay = period.noticePay() == null ? BigDecimal.ZERO : period.noticePay();
         // A bonus and back pay are not part of the month that is annualised: they are taxed on top of it as annual payments.
         SarsPayrollResult r = SarsPayeCalculator.calculate(new SarsPayeCalculator.Inputs(
                 period.basic().add(ot).add(payout), period.travel(), period.pension(),
                 employee.getMedicalAidContribution(), employee.getDateOfBirth(), medicalMembers, annualPayroll,
-                period.employerMedical(), period.employerRetirement(), period.otherFringe(), bonus.add(backPay)), rules);
+                period.employerMedical(), period.employerRetirement(), period.otherFringe(), bonus.add(backPay).add(noticePay)), rules);
 
         log.debug("Payroll employee={} year={} taxable={} paye={} uif={} sdl={} medicalMembers={}",
                 employee.getId(), rules.taxYear(), r.taxableIncome(), r.payeAmount(), r.uifEmployee(), r.sdlAmount(), medicalMembers);
@@ -78,7 +86,7 @@ public class PayrollEngine {
                 r.grossSalary().subtract(ot).subtract(payout), r.travelAllowance(), r.medicalAid(), r.pension(),
                 r.payeAmount(), r.uifEmployee(), r.uifEmployer(), r.sdlAmount(),
                 r.taxableIncome(), r.taxBeforeRebate(), r.primaryRebate(),
-                r.secondaryRebate(), r.tertiaryRebate(), r.medicalTaxCredit(), r.taxYear(), ot, payout, bonus, backPay);
+                r.secondaryRebate(), r.tertiaryRebate(), r.medicalTaxCredit(), r.taxYear(), ot, payout, bonus, backPay, noticePay);
     }
 
     public record PayrollResult(
@@ -100,8 +108,20 @@ public class PayrollEngine {
             BigDecimal overtime,
             BigDecimal leavePayout,
             BigDecimal bonus,
-            BigDecimal backPay
+            BigDecimal backPay,
+            BigDecimal noticePay
     ) {
+        /** Without pay in place of notice. */
+        public PayrollResult(BigDecimal grossSalary, BigDecimal travelAllowance, BigDecimal medicalAid, BigDecimal pension,
+                             BigDecimal payeAmount, BigDecimal uifEmployee, BigDecimal uifEmployer, BigDecimal sdlAmount,
+                             BigDecimal taxableIncome, BigDecimal taxBeforeRebate, BigDecimal primaryRebate,
+                             BigDecimal secondaryRebate, BigDecimal tertiaryRebate, BigDecimal medicalTaxCredit, int taxYear,
+                             BigDecimal overtime, BigDecimal leavePayout, BigDecimal bonus, BigDecimal backPay) {
+            this(grossSalary, travelAllowance, medicalAid, pension, payeAmount, uifEmployee, uifEmployer, sdlAmount, taxableIncome,
+                    taxBeforeRebate, primaryRebate, secondaryRebate, tertiaryRebate, medicalTaxCredit, taxYear, overtime, leavePayout,
+                    bonus, backPay, BigDecimal.ZERO);
+        }
+
         /** Without a bonus or back pay. */
         public PayrollResult(BigDecimal grossSalary, BigDecimal travelAllowance, BigDecimal medicalAid, BigDecimal pension,
                              BigDecimal payeAmount, BigDecimal uifEmployee, BigDecimal uifEmployer, BigDecimal sdlAmount,
@@ -133,7 +153,7 @@ public class PayrollEngine {
                     BigDecimal.ZERO, BigDecimal.ZERO);
         }
 
-        public BigDecimal totalEarnings() { return grossSalary.add(overtime).add(travelAllowance).add(leavePayout).add(bonus).add(backPay); }
+        public BigDecimal totalEarnings() { return grossSalary.add(overtime).add(travelAllowance).add(leavePayout).add(bonus).add(backPay).add(noticePay); }
 
         public BigDecimal totalDeductions() {
             // the medical credit is already inside payeAmount

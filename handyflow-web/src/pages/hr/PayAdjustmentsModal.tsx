@@ -7,8 +7,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { X } from "lucide-react"
 import { apiClient } from "../../api/client"
 import {
-  EMPTY_ADVANCE_FORM, EMPTY_PAY_FORM, PAY_KINDS, advanceBody, advanceProblem, advanceShown, canEnterPay, cancelProblem, money, payBody, payProblem,
-  type AdvanceForm, type LeaveAdvance, type PayAdjustment, type PayForm,
+  EMPTY_ADVANCE_FORM, EMPTY_PAY_FORM, noticeBody, noticeProblem, noticeShown, PAY_KINDS, advanceBody, advanceProblem, advanceShown, canEnterPay, cancelProblem, money, payBody, payProblem,
+  type AdvanceForm, type LeaveAdvance, type NoticeForm, type NoticePay, type PayAdjustment, type PayForm,
 } from "./payAdjustments.logic"
 
 type ApiErr = { response?: { data?: { message?: string } } }
@@ -43,6 +43,13 @@ export default function PayAdjustmentsModal({ employee, permissions, onClose }: 
     queryKey: advanceKey, enabled: employee.status === "TERMINATED", retry: false,
     queryFn: async () => { const r = await apiClient.get(`/api/v1/hr/employees/${employee.id}/leave-advance`); return (r.data?.data ?? r.data) as LeaveAdvance },
   })
+  const noticeKey = ["hr-notice-pay", employee.id]
+  const notice = useQuery<NoticePay>({
+    queryKey: noticeKey, enabled: employee.status === "TERMINATED", retry: false,
+    queryFn: async () => { const r = await apiClient.get(`/api/v1/hr/employees/${employee.id}/notice-pay`); return (r.data?.data ?? r.data) as NoticePay },
+  })
+  const [nf, setNf] = useState<NoticeForm>({ amount: "", reason: "" })
+  const nProblem = noticeShown(notice.data) ? noticeProblem(nf, notice.data) : null
   const [adv, setAdv] = useState<AdvanceForm>(EMPTY_ADVANCE_FORM)
   const advProblem = advanceProblem(adv, today())
 
@@ -56,6 +63,11 @@ export default function PayAdjustmentsModal({ employee, permissions, onClose }: 
     mutationFn: () => apiClient.post(`/api/v1/hr/employees/${employee.id}/leave-advance/recover`, advanceBody(adv)),
     onSuccess: () => { qc.invalidateQueries({ queryKey: key }); qc.invalidateQueries({ queryKey: advanceKey }); setAdv(EMPTY_ADVANCE_FORM); setError("") },
     onError: onErr("The recovery could not be entered."),
+  })
+  const enterNotice = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/hr/employees/${employee.id}/notice-pay/enter`, noticeBody(nf)),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: key }); qc.invalidateQueries({ queryKey: noticeKey }); setNf({ amount: "", reason: "" }); setError("") },
+    onError: onErr("The notice pay could not be entered."),
   })
   const cancel = useMutation({
     mutationFn: (v: { id: string; reason: string }) => apiClient.post(`/api/v1/hr/pay-adjustments/${v.id}/cancel`, { reason: v.reason.trim() }),
@@ -140,6 +152,29 @@ export default function PayAdjustmentsModal({ employee, permissions, onClose }: 
                     {recover.isPending ? "Saving…" : "Take back from final pay"}
                   </button>
                   {(adv.ref || adv.date) && advProblem && <div role="alert" style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--hf-danger-text)" }}>{advProblem}</div>}
+                </form>
+              ) : null}
+          </section>
+        )}
+
+        {noticeShown(notice.data) && (
+          <section aria-label="Pay in place of notice" style={{ border: "1px solid var(--hf-border)", borderRadius: 10, padding: 12, marginBottom: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Pay in place of notice</div>
+            <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "4px 0 8px" }}>
+              Notice required: {notice.data.requiredDays} days. Given: {notice.data.givenDays} days. Short: {notice.data.shortfallDays} days, which comes to {money(notice.data.owed)} before tax.
+              It is paid and taxed with the final pay, like a bonus. Farm and domestic workers have longer notice after six months.
+            </p>
+            {notice.data.alreadyEntered ? <div style={{ fontSize: 13, color: "var(--hf-text-secondary)" }}>Notice pay is already entered; see the list above.</div>
+              : notice.data.owed <= 0 ? <div style={{ fontSize: 13, color: "var(--hf-text-secondary)" }}>The whole notice period was given, so no pay in place of it is owed.</div>
+              : canEdit ? (
+                <form onSubmit={e => { e.preventDefault(); if (!nProblem) enterNotice.mutate() }} noValidate style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10, alignItems: "end" }}>
+                  <div><label htmlFor="np-amount" style={label}>Amount (blank: {money(notice.data.owed)})</label><input id="np-amount" style={input} inputMode="decimal" value={nf.amount} onChange={e => setNf(f => ({ ...f, amount: e.target.value }))} /></div>
+                  <div><label htmlFor="np-reason" style={label}>Reason *</label><input id="np-reason" style={input} maxLength={300} value={nf.reason} onChange={e => setNf(f => ({ ...f, reason: e.target.value }))} /></div>
+                  <button type="submit" disabled={!!nProblem || enterNotice.isPending}
+                    style={{ padding: "9px 16px", background: nProblem || enterNotice.isPending ? "var(--hf-text-faint)" : "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: nProblem ? "not-allowed" : "pointer" }}>
+                    {enterNotice.isPending ? "Saving…" : "Enter notice pay"}
+                  </button>
+                  {(nf.amount || nf.reason) && nProblem && <div role="alert" style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--hf-danger-text)" }}>{nProblem}</div>}
                 </form>
               ) : null}
           </section>

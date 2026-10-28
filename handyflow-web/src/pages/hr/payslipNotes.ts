@@ -12,6 +12,7 @@ export interface PayslipPeriodFields {
   finalPay?: boolean | null
   bonusAmount?: number | string | null
   backPayAmount?: number | string | null
+  noticePayAmount?: number | string | null
 }
 
 const num = (v: unknown): number => {
@@ -35,5 +36,7 @@ export function payslipNotes(p: PayslipPeriodFields): string[] {
   if (bonus > 0) out.push(`Bonus of ${money(bonus)} included`)
   const back = num(p.backPayAmount)
   if (back > 0) out.push(`Back pay of ${money(back)} included`)
+  const notice = num(p.noticePayAmount)
+  if (notice > 0) out.push(`Pay in place of notice of ${money(notice)} included`)
   return out
 }

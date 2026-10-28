@@ -56,6 +56,17 @@ public final class NoticeRules {
         return monthlySalary.multiply(BigDecimal.valueOf(12L * shortfallDays)).divide(BigDecimal.valueOf(364), 2, RoundingMode.HALF_UP);
     }
 
+    /** The pay for the whole notice period: the most pay in place of notice can come to. */
+    public static BigDecimal fullPay(String endType, BigDecimal monthlySalary, LocalDate start, LocalDate noticeGivenOn, LocalDate lastDay) {
+        if (!EMPLOYER_NOTICE.equals(endType)) return BigDecimal.ZERO;
+        return pay(monthlySalary, requiredDays(start, noticeGivenOn, lastDay));
+    }
+
+    /** The pay for the days of notice not given: what is owed at least. */
+    public static BigDecimal owedPay(String endType, BigDecimal monthlySalary, LocalDate start, LocalDate noticeGivenOn, LocalDate lastDay) {
+        return pay(monthlySalary, shortfallDays(endType, start, noticeGivenOn, lastDay));
+    }
+
     public static String typeLabel(String endType) {
         if (endType == null) return "not recorded";
         return switch (endType) {

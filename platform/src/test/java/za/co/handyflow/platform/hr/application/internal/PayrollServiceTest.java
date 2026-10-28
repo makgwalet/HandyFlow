@@ -223,6 +223,25 @@ class PayrollServiceTest {
     }
 
     @Test
+    void noticePayIsTaxedLikeAnAnnualPaymentAndKeptApartOnThePayslip() {
+        draftRun(LocalDate.of(2026, 10, 31), 2027);
+        HrEmployee emp = employee("30003.00");
+        when(rulesService.rulesFor(2027)).thenReturn(rules2027());
+        when(employeeRepo.findAllActiveList(any())).thenReturn(List.of(emp));
+        when(medicalSchemeService.membersOn(any(), any(), any())).thenReturn(Map.of(emp.getId(), new MedicalSchemeRules.Members(0, false)));
+        HrPayAdjustment notice = payItem(emp, PayAdjustmentRules.NOTICE_PAY, "10000.00");
+        when(payAdjustmentService.takeFor(any(), any(), any())).thenReturn(Map.of(emp.getId(), List.of(notice)));
+
+        PayRunResponse r = service.processPayRun(tenant, UUID.randomUUID(), maker);
+
+        assertThat(r.totalPaye()).isEqualByComparingTo("7281.78");
+        HrPayslip slip = savedSlip().getValue();
+        assertThat(slip.getNoticePayAmount()).isEqualByComparingTo("10000.00");
+        assertThat(slip.getBackPayAmount()).isEqualByComparingTo("0");
+        assertThat(slip.getTotalEarnings()).isEqualByComparingTo("40003.00");
+    }
+
+    @Test
     void backPayIsKeptApartFromTheBonusOnThePayslip() {
         draftRun(LocalDate.of(2026, 10, 31), 2027);
         HrEmployee emp = employee("30003.00");

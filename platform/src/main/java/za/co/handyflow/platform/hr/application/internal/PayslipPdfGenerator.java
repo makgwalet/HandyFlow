@@ -161,6 +161,8 @@ public class PayslipPdfGenerator {
         rows.add(new String[]{ "Bonus",            fmt(p.getBonusAmount()) });
         if (p.getBackPayAmount() != null && p.getBackPayAmount().signum() > 0)
             rows.add(new String[]{ "Back pay (arrears)", fmt(p.getBackPayAmount()) });
+        if (p.getNoticePayAmount() != null && p.getNoticePayAmount().signum() > 0)
+            rows.add(new String[]{ "Pay in place of notice", fmt(p.getNoticePayAmount()) });
         rows.add(new String[]{ "Other earnings",   fmt(p.getOtherEarnings()) });
         earningsCell.add(buildAmountTable(rows.toArray(new String[0][]), "Total earnings", fmt(p.getTotalEarnings()), BRAND_TEAL));
         two.addCell(earningsCell);

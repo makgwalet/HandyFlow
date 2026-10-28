@@ -10,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.hr.application.internal.LeaveAdvanceService;
+import za.co.handyflow.platform.hr.application.internal.NoticePayService;
 import za.co.handyflow.platform.hr.application.internal.PayAdjustmentService;
 import za.co.handyflow.platform.hr.application.internal.PayrollAccess;
 import za.co.handyflow.platform.hr.dto.PayAdjustmentDtos.*;
@@ -29,6 +30,7 @@ public class PayAdjustmentController {
 
     private final PayAdjustmentService service;
     private final LeaveAdvanceService leaveAdvance;
+    private final NoticePayService noticePay;
 
     @GetMapping("/pay-adjustments")
     @PreAuthorize("isAuthenticated()")
@@ -71,6 +73,24 @@ public class PayAdjustmentController {
         if (!PayrollAccess.canPrepare(authentication)) throw new AccessDeniedException("You may not enter a recovery.");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Recovery entered",
                 leaveAdvance.recover(TenantContext.getTenantIdAsObject(), id, req, user(principal))));
+    }
+
+    @GetMapping("/employees/{id}/notice-pay")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Notice required, given and short for someone let go with notice, the pay owed for the days short, and whether it is already entered")
+    public ResponseEntity<ApiResponse<NoticePayService.Position>> noticePay(@PathVariable UUID id, Authentication authentication) {
+        if (!PayrollAccess.canReview(authentication)) throw new AccessDeniedException("You may not see this.");
+        return ResponseEntity.ok(ApiResponse.success(noticePay.position(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/employees/{id}/notice-pay/enter")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Enter pay in place of notice for the final run; the amount defaults to the pay owed for the days short")
+    public ResponseEntity<ApiResponse<View>> enterNoticePay(@PathVariable UUID id, @RequestBody NoticePayService.EnterRequest req,
+                                                            Authentication authentication, Principal principal) {
+        if (!PayrollAccess.canPrepare(authentication)) throw new AccessDeniedException("You may not enter a payment.");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Notice pay entered",
+                noticePay.enter(TenantContext.getTenantIdAsObject(), id, req, user(principal))));
     }
 
     @PostMapping("/pay-adjustments/{id}/cancel")

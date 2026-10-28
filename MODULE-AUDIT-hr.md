@@ -579,7 +579,7 @@ Your roadmap says to fix foundations before adding screens, and the findings abo
 - Pension and medical contributions are not prorated.
 - PAYE uses the periodic method on the month's pay, so a part month is taxed as if the person earned that little all year and a payout is taxed as if it recurred. The difference is settled on assessment.
 - ~~Leave taken in advance (a negative balance) is not recovered from the final pay.~~ Done in section 48. ~~Approved leave dated after the leaving date is not cancelled.~~ Done in section 46.
-- Notice pay, bonus and back pay are not handled; the final-pay warning on the run says so.
+- ~~Notice pay, bonus and back pay are not handled.~~ Bonus and back pay are pay items (section 31) and notice pay is too (section 50).
 - Whether SARS wants leave pay under code 3601 or a separate code is **not checked against the current IRP5 guide**. Confirm before issuing certificates for a leaver.
 - A leaver recorded more than 3 months late is not picked up by a run.
 
@@ -1176,7 +1176,7 @@ I read the four training services, the entities and the session screen. The modu
 **Tests.** `NoticeRulesTest` (7) passes in my harness and a deliberate break of the six-month boundary was caught. `TerminationFollowUpTest` (5) and two new cases in `LeaveServiceTest` are Mockito and have not run; the constructors in `HrServiceEmployeeTest` and `ErFollowUpServiceTest` were updated for the new dependency. The screen's logic was checked under node; the added cases in `Employees.test.tsx` have not run. Spring, the migration and a browser have not been used.
 
 **Not done.**
-- Notice pay is not put into the pay run. It is taxed as ordinary pay, and I did not want to guess which pay item to use; a "notice pay" item kind would be the next step.
+- ~~Notice pay is not put into the pay run.~~ Done in section 50.
 - ~~The dismissal route from a case does not ask how employment ended.~~ Done in section 49.
 - Farm and domestic workers have four weeks' notice after six months; not applied.
 - A leave request that runs past the last day is not shortened.
@@ -1232,3 +1232,21 @@ I read the four training services, the entities and the session screen. The modu
 - Training certificate, onboarding and saved-report reminders have their own senders and are not behind the ledger. Certificate and report reminders already avoid repeats by date or by a "last notified" column; onboarding does not.
 - A reminder is held back for the same words to the same person on the same day. If the numbers in a message change between two runs, both go.
 - The "other" end types (a dismissal for operational reasons, retrenchment) are not handled; a retrenchment has its own process (BCEA section 41 severance) that is not built.
+
+## 50. Pay in place of notice (Slice 22a, V535)
+
+**What was missing.** The system worked out the pay owed for notice not given (section 46) and said "enter it as a payment if it is owed", but there was nothing to enter it as.
+
+**What it does.**
+- A new pay item kind, **pay in place of notice**. On the pay-items window of someone who has left, a panel shows the notice required by the BCEA (7, 14 or 28 days by service), the notice given, the days short, and the pay owed for them. Leaving the amount blank takes the pay owed; a larger amount may be typed (an employer may be generous) **up to the pay for the whole notice period, and no more**, which catches typing errors. A reason is required.
+- It is refused unless employment has ended, was ended by the employer **with notice owed**, not all the notice was given, and none is entered yet. A resignation, a summary dismissal, the end of a contract and a mutual agreement owe none. The same rules apply whichever way the item is entered, because they live in the pay-item service. Cancelling works as for any item until a pay run has taken it.
+- The final run takes it (dated the last day), puts it on its own payslip line "Pay in place of notice" (new `notice_pay_amount`), includes it in total earnings, and shows it in the payslip notes and the PDF. The run's warning for the leaver says whether it is included or still has to be entered.
+- **Tax.** Taxed by the annual-payment method, exactly like a bonus: the extra tax once it is added to the annualised month. UIF is on regular pay plus the payment up to the ceiling, and SDL on both. For the same amount the tax is the same as for back pay (checked in a test).
+
+**Tests.** `NoticePayRulesTest` (3), the added cases in `NoticeRulesTest` (8) and `PayAdjustmentRulesTest` (14) and `PayAdjustmentServiceTest` (20, five new: still working, resigned, cap and amount, only once, all notice given) pass in my harness; removing the cap was caught. The new case in `PayrollServiceTest` (tax equal to back pay, own payslip line) is Mockito and has not run. On the screen, the logic was checked under node; the new tests in `PayAdjustments.test.tsx` and `payslipNotes.test.ts` have not run. Spring and the migration have not been used.
+
+**Not done / needs a specialist.**
+- Whether pay in place of notice is taxed as an annual payment, and under which income code it belongs on the tax certificate, is not checked against SARS. I put it with basic pay (3601) as I did back pay; a payroll specialist should confirm both.
+- Farm and domestic workers (four weeks' notice after six months) are not handled.
+- Pay for notice an employee was asked not to work but is still paid for as normal salary is not "pay in place of notice" and is just salary.
+- Retrenchment severance (BCEA section 41) is not built.

@@ -25,5 +25,6 @@ describe('payslipNotes', () => {
     expect(n).toHaveLength(1)
     expect(n[0]).toContain('Back pay of R')
     expect(payslipNotes({ bonusAmount: 0, backPayAmount: null })).toEqual([])
+    expect(payslipNotes({ noticePayAmount: 12000 })).toEqual([expect.stringContaining('Pay in place of notice of R')])
   })
 })

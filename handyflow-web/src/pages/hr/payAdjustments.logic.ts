@@ -1,7 +1,7 @@
 // src/pages/hr/payAdjustments.logic.ts
 //
 // Bonuses, back pay and recoveries of overpayments. Mirrors PayAdjustmentRules on the server, which has the last word.
-export type PayKind = "BONUS" | "BACK_PAY" | "RECOVERY"
+export type PayKind = "BONUS" | "BACK_PAY" | "RECOVERY" | "NOTICE_PAY"
 
 export type PayAdjustment = {
   id: string; employeeId: string; employeeNumber: string; employeeName: string; kind: PayKind; kindLabel: string; amount: number
@@ -83,3 +83,29 @@ export const advanceBody = (f: AdvanceForm) => ({ agreementRef: f.ref.trim(), ag
 
 /** Whether the panel has anything to show. */
 export const advanceShown = (a: LeaveAdvance | undefined): a is LeaveAdvance => !!a && a.terminated && a.days > 0
+
+// ── Pay in place of notice ────────────────────────────────────────────────────────────────────
+
+export type NoticePay = {
+  terminated: boolean; endType: string | null; endLabel: string | null; requiredDays: number; givenDays: number; shortfallDays: number
+  owed: number; cap: number; alreadyEntered: boolean
+}
+export type NoticeForm = { amount: string; reason: string }
+
+/** Only for someone the employer let go with notice owed and not all of it given; nothing to enter twice. */
+export const noticeShown = (n: NoticePay | undefined): n is NoticePay => !!n && n.terminated && n.endType === "EMPLOYER_NOTICE"
+
+/** Mirrors NoticePayRules: up to the pay for the whole notice period, never more. A blank amount means the pay owed. */
+export function noticeProblem(f: NoticeForm, n: NoticePay): string | null {
+  if (n.alreadyEntered) return "Notice pay is already entered for this employee."
+  if (n.owed <= 0) return "The whole notice period was given, so no pay in place of it is owed."
+  const amount = f.amount.trim() === "" ? n.owed : Number(f.amount)
+  if (!Number.isFinite(amount) || amount <= 0) return "Enter the amount."
+  if (Math.round(amount * 100) !== amount * 100 && Math.abs(Math.round(amount * 100) - amount * 100) > 1e-6) return "Use at most two decimals for the amount."
+  if (amount > n.cap) return "That is more than the pay for the whole notice period (" + money(n.cap) + ")."
+  if (!f.reason.trim()) return "Give the reason for the payment."
+  if (f.reason.trim().length > 300) return "The reason is too long (300 characters at most)."
+  return null
+}
+
+export const noticeBody = (f: NoticeForm) => ({ amount: f.amount.trim() === "" ? null : Number(f.amount), reason: f.reason.trim() })

@@ -76,4 +76,14 @@ class NoticeRulesTest {
         assertThat(s).contains("28 days").contains("14 days").contains("12000.00");
         assertThat(NoticeRules.summary("EMPLOYER_NOTICE", n("26000"), START, d(2026, 8, 1), last)).contains("No pay in place of notice is owed");
     }
+
+    @Test
+    void theOwedPayIsForTheDaysShortAndTheFullPayIsForTheWholePeriod() {
+        LocalDate last = d(2026, 9, 15);
+        assertThat(NoticeRules.owedPay("EMPLOYER_NOTICE", n("26000"), START, d(2026, 9, 1), last)).isEqualByComparingTo("12000.00");
+        assertThat(NoticeRules.fullPay("EMPLOYER_NOTICE", n("26000"), START, d(2026, 9, 1), last)).isEqualByComparingTo("24000.00");
+        assertThat(NoticeRules.owedPay("EMPLOYER_NOTICE", n("26000"), START, d(2026, 8, 1), last)).isEqualByComparingTo("0");
+        assertThat(NoticeRules.owedPay("SUMMARY_DISMISSAL", n("26000"), START, null, last)).isEqualByComparingTo("0");
+        assertThat(NoticeRules.fullPay("RESIGNATION", n("26000"), START, null, last)).isEqualByComparingTo("0");
+    }
 }

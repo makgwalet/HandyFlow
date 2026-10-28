@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import PayAdjustmentsModal from "./PayAdjustmentsModal"
-import { EMPTY_PAY_FORM, advanceBody, advanceProblem, advanceShown, cancelProblem, canEnterPay, payBody, payProblem, type PayAdjustment, type PayForm } from "./payAdjustments.logic"
+import { EMPTY_PAY_FORM, noticeBody, noticeProblem, noticeShown, type NoticePay, advanceBody, advanceProblem, advanceShown, cancelProblem, canEnterPay, payBody, payProblem, type PayAdjustment, type PayForm } from "./payAdjustments.logic"
 
 const get = vi.fn()
 const post = vi.fn()
@@ -181,5 +181,39 @@ describe("leave taken in advance", () => {
     wrap(<PayAdjustmentsModal employee={EMP} permissions={["PAYROLL_PREPARE"]} onClose={() => {}} />)
     await screen.findByText(/No bonuses, back pay or recoveries/)
     expect(get).not.toHaveBeenCalledWith("/api/v1/hr/employees/e1/leave-advance")
+  })
+})
+
+describe("pay in place of notice", () => {
+  const NP: NoticePay = { terminated: true, endType: "EMPLOYER_NOTICE", endLabel: "ended by the employer, with notice owed", requiredDays: 28, givenDays: 14, shortfallDays: 14, owed: 12000, cap: 24000, alreadyEntered: false }
+  const GONE = { ...EMP, status: "TERMINATED" }
+  it("is shown only when the employer ended employment with notice owed", () => {
+    expect(noticeShown(undefined)).toBe(false)
+    expect(noticeShown({ ...NP, endType: "RESIGNATION" })).toBe(false)
+    expect(noticeShown({ ...NP, terminated: false })).toBe(false)
+    expect(noticeShown(NP)).toBe(true)
+  })
+  it("takes the pay owed when the amount is blank, allows more up to the whole period, and needs a reason", () => {
+    expect(noticeProblem({ amount: "", reason: "" }, NP)).toMatch(/reason/)
+    expect(noticeProblem({ amount: "", reason: "Two weeks short" }, NP)).toBeNull()
+    expect(noticeProblem({ amount: "24000", reason: "Paid in full" }, NP)).toBeNull()
+    expect(noticeProblem({ amount: "24000.01", reason: "x" }, NP)).toMatch(/whole notice period/)
+    expect(noticeProblem({ amount: "0", reason: "x" }, NP)).toMatch(/amount/)
+    expect(noticeProblem({ amount: "10.123", reason: "x" }, NP)).toMatch(/two decimals/)
+    expect(noticeProblem({ amount: "", reason: "x" }, { ...NP, owed: 0 })).toMatch(/whole notice period was given/)
+    expect(noticeProblem({ amount: "", reason: "x" }, { ...NP, alreadyEntered: true })).toMatch(/already entered/)
+    expect(noticeBody({ amount: "", reason: " Two weeks short " })).toEqual({ amount: null, reason: "Two weeks short" })
+    expect(noticeBody({ amount: "12000.5", reason: "r" })).toEqual({ amount: 12000.5, reason: "r" })
+  })
+  it("enters the notice pay", async () => {
+    get.mockImplementation((url: string) => Promise.resolve({ data: { data: url.endsWith("notice-pay") ? NP : url.endsWith("leave-advance") ? { terminated: true, days: 0, amount: 0, alreadyEntered: false } : [] } }))
+    post.mockResolvedValue({ data: {} })
+    wrap(<PayAdjustmentsModal employee={GONE} permissions={["PAYROLL_PREPARE"]} onClose={() => {}} />)
+    await screen.findByText(/Notice required: 28 days\. Given: 14 days\. Short: 14 days/)
+    const btn = screen.getByRole("button", { name: "Enter notice pay" }) as HTMLButtonElement
+    expect(btn.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText(/^Reason/), { target: { value: "Two weeks short" } })
+    fireEvent.click(btn)
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/hr/employees/e1/notice-pay/enter", { amount: null, reason: "Two weeks short" }))
   })
 })

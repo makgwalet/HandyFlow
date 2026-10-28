@@ -179,9 +179,9 @@ public class TaxCertificateService {
 
     private static Totals totals(List<HrPayslip> l) {
         int withoutCredit = (int) l.stream().filter(p -> p.getMedicalTaxCredit() == null).count();
-        // Back pay for the current year is backdated salary, so it goes with the basic salary (3601). Leave paid out on the last pay is an
+        // Back pay for the current year is backdated salary, so it goes with the basic salary (3601); so does pay in place of notice (not checked against SARS). Leave paid out on the last pay is an
         // annual payment in SARS's code guide (3605), so it goes with the bonus.
-        return new Totals(sum(l, HrPayslip::getGrossSalary).add(sum(l, HrPayslip::getBackPayAmount)), sum(l, HrPayslip::getOvertimeAmount),
+        return new Totals(sum(l, HrPayslip::getGrossSalary).add(sum(l, HrPayslip::getBackPayAmount)).add(sum(l, HrPayslip::getNoticePayAmount)), sum(l, HrPayslip::getOvertimeAmount),
                 sum(l, HrPayslip::getBonusAmount).add(sum(l, HrPayslip::getLeavePayoutAmount)),
                 sum(l, HrPayslip::getOtherEarnings), sum(l, HrPayslip::getTravelAllowance), sum(l, HrPayslip::getPension),
                 sum(l, HrPayslip::getMedicalAid), sum(l, HrPayslip::getPayeAmount), sum(l, HrPayslip::getUifEmployee),

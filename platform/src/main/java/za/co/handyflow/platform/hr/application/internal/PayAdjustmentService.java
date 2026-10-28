@@ -8,6 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.hr.domain.model.HrEmployee;
 import za.co.handyflow.platform.hr.domain.model.HrPayAdjustment;
 import za.co.handyflow.platform.hr.domain.model.HrPayRun;
+import za.co.handyflow.platform.hr.domain.model.NoticePayRules;
+import za.co.handyflow.platform.hr.domain.model.NoticeRules;
 import za.co.handyflow.platform.hr.domain.model.PayAdjustmentRules;
 import za.co.handyflow.platform.hr.domain.repository.HrEmployeeRepository;
 import za.co.handyflow.platform.hr.domain.repository.HrPayAdjustmentRepository;
@@ -49,6 +51,13 @@ public class PayAdjustmentService {
         if (problem != null) {
             if (problem.startsWith("You cannot")) throw new AccessDeniedException(problem);
             throw new IllegalArgumentException(problem);
+        }
+        if (PayAdjustmentRules.NOTICE_PAY.equals(req.kind())) {
+            boolean already = repo.forEmployee(tenantId, employeeId).stream().anyMatch(i -> PayAdjustmentRules.NOTICE_PAY.equals(i.getKind()) && PayAdjustmentRules.OPEN.equals(i.getStatus()));
+            String notice = NoticePayRules.problem(emp.getStatus(), emp.getEndType(), req.amount(),
+                    NoticeRules.owedPay(emp.getEndType(), emp.getGrossSalary(), emp.getStartDate(), emp.getNoticeGivenOn(), emp.getEndDate()),
+                    NoticeRules.fullPay(emp.getEndType(), emp.getGrossSalary(), emp.getStartDate(), emp.getNoticeGivenOn(), emp.getEndDate()), already);
+            if (notice != null) throw new IllegalArgumentException(notice);
         }
         HrPayAdjustment saved = repo.save(HrPayAdjustment.of(tenantId.getValue(), employeeId, req.kind(), req.amount().setScale(2, RoundingMode.HALF_UP),
                 req.payFrom(), req.description(), req.relatesFrom(), req.relatesTo(), req.reason(), actor));

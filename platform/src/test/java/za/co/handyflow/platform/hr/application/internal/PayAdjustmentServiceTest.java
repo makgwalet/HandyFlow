@@ -201,4 +201,50 @@ class PayAdjustmentServiceTest {
         assertEquals("Jane Dlamini", open.get(0).employeeName());
         assertEquals(2, service.list(tenant, " ").size());
     }
+
+    // ── Pay in place of notice ─────────────────────────────────────────────
+
+    private AddRequest notice(String amount) {
+        return new AddRequest("NOTICE_PAY", new BigDecimal(amount), LocalDate.now(), "Pay in place of notice", null, null, "Two weeks short");
+    }
+
+    private void letGoWithNotice(LocalDate noticeGiven, LocalDate lastDay) {
+        jane.terminate(lastDay, "Retrenched", actor, "EMPLOYER_NOTICE", noticeGiven);
+    }
+
+    @Test
+    void noticePayIsRefusedForSomeoneStillWorking() {
+        assertThrows(IllegalArgumentException.class, () -> service.add(tenant, jane.getId(), notice("1000"), actor));
+        assertTrue(store.isEmpty());
+    }
+
+    @Test
+    void noticePayIsRefusedWhenEmploymentEndedAnyOtherWay() {
+        jane.terminate(LocalDate.of(2026, 9, 15), "Resigned", actor, "RESIGNATION", null);
+        assertThrows(IllegalArgumentException.class, () -> service.add(tenant, jane.getId(), notice("1000"), actor));
+    }
+
+    @Test
+    void noticePayIsAcceptedUpToTheWholeNoticePeriodAndNoMore() {
+        // 30 000 a month, started 2024-01-01, notice given 2026-09-01 for a last day of 2026-09-15: 28 days required, 14 given
+        letGoWithNotice(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 15));
+        assertThrows(IllegalArgumentException.class, () -> service.add(tenant, jane.getId(), notice("27692.32"), actor));
+        View v = service.add(tenant, jane.getId(), notice("13846.15"), actor);
+        assertEquals("Pay in place of notice", v.kindLabel());
+        assertEquals(1, store.size());
+    }
+
+    @Test
+    void noticePayCanBeEnteredOnlyOnce() {
+        letGoWithNotice(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 15));
+        service.add(tenant, jane.getId(), notice("13846.15"), actor);
+        assertThrows(IllegalArgumentException.class, () -> service.add(tenant, jane.getId(), notice("100"), actor));
+        assertEquals(1, store.size());
+    }
+
+    @Test
+    void noticePayIsRefusedWhenAllTheNoticeWasGiven() {
+        letGoWithNotice(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 9, 15));
+        assertThrows(IllegalArgumentException.class, () -> service.add(tenant, jane.getId(), notice("100"), actor));
+    }
 }

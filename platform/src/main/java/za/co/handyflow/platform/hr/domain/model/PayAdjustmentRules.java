@@ -15,8 +15,8 @@ public final class PayAdjustmentRules {
 
     private PayAdjustmentRules() {}
 
-    public static final String BONUS = "BONUS", BACK_PAY = "BACK_PAY", RECOVERY = "RECOVERY";
-    public static final List<String> KINDS = List.of(BONUS, BACK_PAY, RECOVERY);
+    public static final String BONUS = "BONUS", BACK_PAY = "BACK_PAY", RECOVERY = "RECOVERY", NOTICE_PAY = "NOTICE_PAY";
+    public static final List<String> KINDS = List.of(BONUS, BACK_PAY, RECOVERY, NOTICE_PAY);
     public static final String OPEN = "OPEN", CANCELLED = "CANCELLED";
     public static final BigDecimal MAX_AMOUNT = new BigDecimal("10000000");
     /** How far ahead an item may be dated: a year is far enough for a planned bonus, and catches a mistyped year. */
@@ -27,7 +27,7 @@ public final class PayAdjustmentRules {
                                     LocalDate relatesFrom, LocalDate relatesTo, LocalDate today, LocalDate employmentStart,
                                     boolean forSelf) {
         if (forSelf) return "You cannot enter a payment for yourself. Ask another payroll user.";
-        if (kind == null || !KINDS.contains(kind)) return "Choose bonus, back pay or recovery of an overpayment.";
+        if (kind == null || !KINDS.contains(kind)) return "Choose bonus, back pay, notice pay or recovery of an overpayment.";
         if (amount == null || amount.signum() <= 0) return "Enter the amount.";
         if (amount.scale() > 2) return "Use at most two decimals for the amount.";
         if (amount.compareTo(MAX_AMOUNT) > 0) return "That amount is too large.";
@@ -78,6 +78,7 @@ public final class PayAdjustmentRules {
             case BONUS -> "Bonus";
             case BACK_PAY -> "Back pay";
             case RECOVERY -> "Recovery of overpayment";
+            case NOTICE_PAY -> "Pay in place of notice";
             default -> String.valueOf(kind);
         };
     }

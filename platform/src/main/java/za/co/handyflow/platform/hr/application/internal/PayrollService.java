@@ -188,9 +188,13 @@ public class PayrollService {
                 payout = PayPeriodRules.leavePayout(emp.getGrossSalary(), payoutDays);
                 warnings.add(who + ": last pay (left " + emp.getEndDate() + ")"
                         + (payout.signum() > 0 ? ", including " + payoutDays + " day(s) of annual leave paid out at " + payout + "." : ", no annual leave owing.")
-                        + " Bonus and any leave taken in advance are not handled; check them by hand.");
+                        + " Any bonus must be entered under Pay items.");
                 String notice = NoticeRules.summary(emp.getEndType(), emp.getGrossSalary(), emp.getStartDate(), emp.getNoticeGivenOn(), emp.getEndDate());
-                warnings.add(who + ": " + (notice != null ? notice : "how employment ended was not recorded, so notice pay was not worked out; check it by hand."));
+                boolean noticeEntered = payItems.getOrDefault(emp.getId(), List.of()).stream().anyMatch(i -> PayAdjustmentRules.NOTICE_PAY.equals(i.getKind()));
+                BigDecimal noticeOwed = NoticeRules.owedPay(emp.getEndType(), emp.getGrossSalary(), emp.getStartDate(), emp.getNoticeGivenOn(), emp.getEndDate());
+                warnings.add(who + ": " + (notice != null ? notice : "how employment ended was not recorded, so notice pay was not worked out; check it by hand.")
+                        + (noticeEntered ? " Pay in place of notice is entered and included."
+                        : noticeOwed.signum() > 0 ? " It is not in this run: enter it under Pay items if it is owed." : ""));
                 BigDecimal advanceDays = leaveService.annualLeaveAdvance(tenantId, emp, emp.getEndDate());
                 if (advanceDays != null && advanceDays.signum() > 0) {
                     boolean recovered = payItems.getOrDefault(emp.getId(), List.of()).stream().anyMatch(i -> PayAdjustmentRules.RECOVERY.equals(i.getKind()) && LeaveAdvanceRules.DESCRIPTION.equals(i.getDescription()));
@@ -213,13 +217,17 @@ public class PayrollService {
             List<HrPayAdjustment> items = payItems.getOrDefault(emp.getId(), List.of());
             BigDecimal bonus = PayAdjustmentService.total(items, PayAdjustmentRules.BONUS);
             BigDecimal backPay = PayAdjustmentService.total(items, PayAdjustmentRules.BACK_PAY);
-            if (!items.isEmpty())
-                warnings.add(who + ": " + (bonus.signum() > 0 ? "bonus " + bonus : "") + (bonus.signum() > 0 && backPay.signum() > 0 ? " and " : "")
-                        + (backPay.signum() > 0 ? "back pay " + backPay : "")
+            BigDecimal noticePay = PayAdjustmentService.total(items, PayAdjustmentRules.NOTICE_PAY);
+            java.util.List<String> lumps = new ArrayList<>();
+            if (bonus.signum() > 0) lumps.add("bonus " + bonus);
+            if (backPay.signum() > 0) lumps.add("back pay " + backPay);
+            if (noticePay.signum() > 0) lumps.add("pay in place of notice " + noticePay);
+            if (!lumps.isEmpty())
+                warnings.add(who + ": " + String.join(" and ", lumps)
                         + " included. Taxed by the annual-payment method: the extra tax the year bears once it is added to the annualised month.");
             PayrollEngine.PayrollResult result = engine.calculate(emp, rules, annualPayroll, m.count(), overtimePay,
                     new PayrollEngine.Period(pay.paid(), travel, emp.getPensionContribution(), payout,
-                            benefit.medical(), benefit.retirement(), benefit.other(), bonus, backPay));
+                            benefit.medical(), benefit.retirement(), benefit.other(), bonus, backPay, noticePay));
 
             HrPayslip slip = HrPayslip.create(tenantId, run.getId(), emp.getId(),
                     result.grossSalary(), result.travelAllowance(),
@@ -227,6 +235,7 @@ public class PayrollService {
             slip.setOvertimeAmount(overtimePay);
             slip.setBenefits(benefit.medical(), benefit.retirement(), benefit.other());
             slip.setBonusAndBackPay(bonus, backPay);
+            slip.setNoticePay(noticePay);
             slip.setPeriodPay(pay.workingDays(), pay.daysPaid(), pay.proration(), pay.unpaidDays(), pay.unpaidAmount());
             if (finalPay) { slip.setLeavePayout(payoutDays, payout); slip.markFinalPay(); }
 
@@ -369,7 +378,7 @@ public class PayrollService {
                 s.getTaxableIncome(), s.getTaxYear() != null ? s.getTaxYear() : 0,
                 s.getCreatedAt(), s.getDaysInPeriod(), s.getDaysPaid(), s.getProrationAmount(), s.getUnpaidLeaveDays(), s.getUnpaidLeaveAmount(),
                 s.getLeavePayoutDays(), s.getLeavePayoutAmount(), s.isFinalPay(),
-                s.getEmployerMedical(), s.getEmployerRetirement(), s.getOtherFringe(), s.getBackPayAmount());
+                s.getEmployerMedical(), s.getEmployerRetirement(), s.getOtherFringe(), s.getBackPayAmount(), s.getNoticePayAmount());
     }
 
     private Emp201Response toEmp201Response(HrEmp201 e, LocalDate today, boolean runIssued) {

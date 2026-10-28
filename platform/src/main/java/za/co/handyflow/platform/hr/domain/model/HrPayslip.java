@@ -26,6 +26,8 @@ public class HrPayslip {
     @Column(name = "bonus_amount")      BigDecimal bonusAmount     = BigDecimal.ZERO;
     /** Money owed for an earlier period, paid this month. Part of the total earnings. */
     @Column(name = "back_pay_amount")   BigDecimal backPayAmount   = BigDecimal.ZERO;
+    /** Pay in place of notice, paid with the last pay. Part of the total earnings. */
+    @Column(name = "notice_pay_amount") BigDecimal noticePayAmount = BigDecimal.ZERO;
     @Column(name = "travel_allowance")  BigDecimal travelAllowance = BigDecimal.ZERO;
     @Column(name = "other_earnings")    BigDecimal otherEarnings   = BigDecimal.ZERO;
     @Column(name = "total_earnings")    BigDecimal totalEarnings;
@@ -78,6 +80,7 @@ public class HrPayslip {
         p.overtimeAmount  = BigDecimal.ZERO;
         p.bonusAmount     = BigDecimal.ZERO;
         p.backPayAmount   = BigDecimal.ZERO;
+        p.noticePayAmount = BigDecimal.ZERO;
         p.travelAllowance = travelAllowance != null ? travelAllowance : BigDecimal.ZERO;
         p.otherEarnings   = BigDecimal.ZERO;
         p.medicalAid      = medicalAid != null ? medicalAid : BigDecimal.ZERO;
@@ -122,6 +125,9 @@ public class HrPayslip {
         this.backPayAmount = backPay == null ? BigDecimal.ZERO : backPay;
     }
 
+    /** Pay in place of notice paid this month. Set before the calculations are applied, which add it to the earnings. */
+    public void setNoticePay(BigDecimal amount) { this.noticePayAmount = amount == null ? BigDecimal.ZERO : amount; }
+
     /** Overpayments recovered from this month's net pay, after tax. Called after the calculations; they change neither tax nor earnings. */
     public void recover(BigDecimal amount) {
         if (amount == null || amount.signum() <= 0) return;
@@ -147,7 +153,7 @@ public class HrPayslip {
         this.taxYear         = taxYear;
 
         this.totalEarnings = grossSalary
-                .add(overtimeAmount).add(bonusAmount).add(backPayAmount)
+                .add(overtimeAmount).add(bonusAmount).add(backPayAmount).add(noticePayAmount)
                 .add(travelAllowance).add(otherEarnings).add(leavePayoutAmount);
 
         this.totalDeductions = payeAmount

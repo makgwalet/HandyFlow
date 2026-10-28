@@ -116,4 +116,11 @@ class PayAdjustmentRulesTest {
         assertEquals(java.util.List.of(true), PayAdjustmentRules.affordable(java.util.List.of(d("100")), d("100.00")));
         assertEquals(java.util.List.of(false), PayAdjustmentRules.affordable(java.util.List.of(d("100")), null));
     }
+
+    @Test
+    void noticePayIsAKindOfItsOwnWithoutDates() {
+        assertNull(PayAdjustmentRules.addProblem("NOTICE_PAY", d("12000.00"), TODAY, "Pay in place of notice", "Two weeks short", null, null, TODAY, STARTED, false));
+        assertNotNull(PayAdjustmentRules.addProblem("NOTICE_PAY", d("12000.00"), TODAY, "Pay in place of notice", "Two weeks short", TODAY, TODAY, TODAY, STARTED, false));
+        assertEquals("Pay in place of notice", PayAdjustmentRules.label("NOTICE_PAY"));
+    }
 }
