@@ -12,6 +12,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import za.co.handyflow.platform.WebMvcTestSecuritySupport;
 import za.co.handyflow.platform.hr.application.internal.Emp201PdfGenerator;
+import za.co.handyflow.platform.hr.application.internal.HrEmployeePortalAuthService;
 import za.co.handyflow.platform.hr.application.internal.EmployeeAuditService;
 import za.co.handyflow.platform.hr.application.internal.EmployeeChangeService;
 import za.co.handyflow.platform.hr.application.internal.EmployeeViewService;
@@ -93,6 +94,7 @@ class HrControllerTest {
     @MockitoBean HrEmp201Repository     emp201Repo;
     @MockitoBean Emp201PdfGenerator     emp201PdfGenerator;
     @MockitoBean JdbcTemplate           jdbc;
+    @MockitoBean HrEmployeePortalAuthService hrEmployeePortalAuthService;
 
     static final String BASE = "/api/v1/hr";
 

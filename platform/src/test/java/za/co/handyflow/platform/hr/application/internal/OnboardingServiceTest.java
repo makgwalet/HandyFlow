@@ -53,6 +53,7 @@ class OnboardingServiceTest {
 
         when(templateRepo.forTenant(any())).thenAnswer(i -> new ArrayList<>(templates));
         when(templateRepo.activeForTenant(any())).thenAnswer(i -> templates.stream().filter(HrOnboardingTemplate::isActive).toList());
+        when(templateRepo.findByTenantAndId(any(), any())).thenAnswer(i -> templates.stream().filter(t -> t.getId().equals(i.getArgument(1))).findFirst());
         when(templateRepo.save(any())).thenAnswer(i -> { HrOnboardingTemplate t = i.getArgument(0); if (!templates.contains(t)) templates.add(t); return t; });
 
         when(onboardingRepo.save(any())).thenAnswer(i -> { HrOnboarding o = i.getArgument(0); if (!onboardings.contains(o)) onboardings.add(o); return o; });

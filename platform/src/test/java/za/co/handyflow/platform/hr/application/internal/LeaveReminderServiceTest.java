@@ -79,7 +79,8 @@ class LeaveReminderServiceTest {
         when(policyRepo.findAll()).thenReturn(List.of(policy(2027)));
         when(leaveService.atRisk(any())).thenReturn(new AtRiskReport(new BigDecimal("10"), 2027,
                 List.of(new AtRisk(emp, "Thandi Nkosi", new BigDecimal("14"), new BigDecimal("16"), new BigDecimal("6")))));
-        when(employeeRepo.findActiveById(any(), eq(emp))).thenReturn(Optional.of(person("thandi@example.com", "ACTIVE")));
+        HrEmployee mocked1 = person("thandi@example.com", "ACTIVE");
+        when(employeeRepo.findActiveById(any(), eq(emp))).thenReturn(Optional.of(mocked1));
         when(admins.resolveTenantAdmins(any(TenantId.class))).thenReturn(List.of(Recipient.external("HR", "hr@example.com", null)));
 
         assertThat(service.remindAll(firstOfNovember)).isEqualTo(2);
@@ -100,8 +101,10 @@ class LeaveReminderServiceTest {
         when(leaveService.atRisk(any())).thenReturn(new AtRiskReport(new BigDecimal("10"), 2027, List.of(
                 new AtRisk(noEmail, "A", new BigDecimal("14"), new BigDecimal("16"), new BigDecimal("6")),
                 new AtRisk(gone, "B", new BigDecimal("14"), new BigDecimal("16"), new BigDecimal("6")))));
-        when(employeeRepo.findActiveById(any(), eq(noEmail))).thenReturn(Optional.of(person(null, "ACTIVE")));
-        when(employeeRepo.findActiveById(any(), eq(gone))).thenReturn(Optional.of(person("b@example.com", "TERMINATED")));
+        HrEmployee mocked2 = person(null, "ACTIVE");
+        when(employeeRepo.findActiveById(any(), eq(noEmail))).thenReturn(Optional.of(mocked2));
+        HrEmployee mocked3 = person("b@example.com", "TERMINATED");
+        when(employeeRepo.findActiveById(any(), eq(gone))).thenReturn(Optional.of(mocked3));
         when(admins.resolveTenantAdmins(any(TenantId.class))).thenReturn(List.of());
 
         assertThat(service.remindAll(firstOfNovember)).isZero();
@@ -117,7 +120,8 @@ class LeaveReminderServiceTest {
         when(leaveService.atRisk(TenantId.of(broken.getTenantId()))).thenThrow(new IllegalStateException("boom"));
         when(leaveService.atRisk(TenantId.of(fine.getTenantId()))).thenReturn(new AtRiskReport(new BigDecimal("10"), 2027,
                 List.of(new AtRisk(emp, "C", new BigDecimal("14"), new BigDecimal("16"), new BigDecimal("6")))));
-        when(employeeRepo.findActiveById(any(), eq(emp))).thenReturn(Optional.of(person("c@example.com", "ACTIVE")));
+        HrEmployee mocked4 = person("c@example.com", "ACTIVE");
+        when(employeeRepo.findActiveById(any(), eq(emp))).thenReturn(Optional.of(mocked4));
         when(admins.resolveTenantAdmins(any(TenantId.class))).thenReturn(List.of());
 
         assertThat(service.remindAll(firstOfNovember)).isEqualTo(1);

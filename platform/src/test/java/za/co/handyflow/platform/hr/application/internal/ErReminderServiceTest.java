@@ -73,7 +73,8 @@ class ErReminderServiceTest {
     @Test
     void aMeetingTomorrowIsRemindedToTheOwnerWithoutNamingAnyone() {
         caseWith(aCase(owner), rowDue(today.plusDays(1), "Meeting"));
-        when(employeeRepo.findByUserId(any(), eq(owner))).thenReturn(Optional.of(ownerEmployee("olive@example.com", "ACTIVE")));
+        HrEmployee mocked1 = ownerEmployee("olive@example.com", "ACTIVE");
+        when(employeeRepo.findByUserId(any(), eq(owner))).thenReturn(Optional.of(mocked1));
 
         assertThat(service.remindAll(today)).isEqualTo(1);
 
@@ -96,7 +97,8 @@ class ErReminderServiceTest {
         HrErCase c = aCase(owner);
         c.decide("WRITTEN_WARNING", today.minusDays(1), "note", UUID.randomUUID(), 6, null);
         caseWith(c, rowDue(null, "Tell the employee"));
-        when(employeeRepo.findByUserId(any(), eq(owner))).thenReturn(Optional.of(ownerEmployee("olive@example.com", "ACTIVE")));
+        HrEmployee mocked2 = ownerEmployee("olive@example.com", "ACTIVE");
+        when(employeeRepo.findByUserId(any(), eq(owner))).thenReturn(Optional.of(mocked2));
 
         assertThat(service.remindAll(today)).isEqualTo(1);
         assertThat(sent().get(0).title()).isEqualTo("ER-2026-007: telling the employee the decision is late");
@@ -114,7 +116,8 @@ class ErReminderServiceTest {
     @Test
     void anOwnerWhoHasLeftIsReplacedByTheAdministrators() {
         caseWith(aCase(owner), rowDue(today.minusDays(1), "Response due"));
-        when(employeeRepo.findByUserId(any(), eq(owner))).thenReturn(Optional.of(ownerEmployee("olive@example.com", "TERMINATED")));
+        HrEmployee mocked3 = ownerEmployee("olive@example.com", "TERMINATED");
+        when(employeeRepo.findByUserId(any(), eq(owner))).thenReturn(Optional.of(mocked3));
         when(admins.resolveTenantAdmins(any(TenantId.class))).thenReturn(List.of(Recipient.external("HR", "hr@example.com", null)));
 
         assertThat(service.remindAll(today)).isEqualTo(1);
@@ -137,7 +140,8 @@ class ErReminderServiceTest {
         when(policyService.get(any())).thenReturn(ErPolicy.defaults());
         when(views.row(eq(broken), any(), any(), any())).thenThrow(new IllegalStateException("boom"));
         when(views.row(eq(fine), any(), any(), any())).thenReturn(rowDue(today.plusDays(1), "Meeting"));
-        when(employeeRepo.findByUserId(any(), eq(owner))).thenReturn(Optional.of(ownerEmployee("olive@example.com", "ACTIVE")));
+        HrEmployee mocked4 = ownerEmployee("olive@example.com", "ACTIVE");
+        when(employeeRepo.findByUserId(any(), eq(owner))).thenReturn(Optional.of(mocked4));
 
         assertThat(service.remindAll(today)).isEqualTo(1);
     }

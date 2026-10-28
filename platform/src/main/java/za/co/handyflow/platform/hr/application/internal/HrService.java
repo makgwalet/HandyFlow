@@ -180,7 +180,7 @@ public class HrService {
         Map<UUID, HrEmployee> byId = new HashMap<>();
         for (HrEmployee e : employeeRepo.findNotTerminated(tenantId)) {
             byId.put(e.getId(), e);
-            if (e.getManagerId() != null) managerOf.put(e.getId(), e.getManagerId());
+            managerOf.put(e.getId(), e.getManagerId());   // a person at the top maps to null but is still a valid manager
         }
         HrEmployee manager = managerId == null ? null : byId.get(managerId);
         if (managerId != null && manager == null) throw new IllegalArgumentException("The manager must be a current employee.");

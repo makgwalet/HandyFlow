@@ -1044,3 +1044,23 @@ I read the four training services, the entities and the session screen. The modu
 
 - Maven, Spring and the database have not run. `ErReminderServiceTest` (7) uses real Mockito and has not been executed, including mocking the package-private `ErCaseViews`. The new `allOpen` query has never run against PostgreSQL. The scheduled job has not run.
 - In my harness `ErReminderRulesTest` (5) passes.
+
+## 37. Verification log (first real run)
+
+**What ran.** `mvn clean spring-boot:run` and `mvn test` on the user's machine, after patch 0477.
+
+**Confirmed.** Main and test code compile. The app starts (about 133 s). All 664 JPA repositories load, so every `@Query` parses. Hibernate `validate` passes. V526, V527 and V528 applied. The new beans wire.
+
+**Test run.** 6024 tests: 92 failures and 144 errors. The ones in HR, and what they were:
+
+| Test | Cause | Whose |
+|---|---|---|
+| `LeaveReminderServiceTest` (3), `ErReminderServiceTest` (4) | A mock was built inside another `when(...)`, so Mockito saw unfinished stubbing | Slices 19d/19e. Fixed |
+| `HrServiceEmployeeTest.managerIsSetAndRecorded` | **Real bug.** Anyone with no manager of their own (the top of the tree) was refused as a manager: "must be an active employee". Fixed in `HrService.setManager` | Slice 3 |
+| `OnboardingServiceTest.anEditedTemplateAffectsOnlyFutureOnboardings` | Test never stubbed `findByTenantAndId` for templates. Fixed | Slice 6 |
+| `TaxCertificateServiceTest.onlyIssuedAnnualCertificatesCanBeReleased` | The test's repository fake ignored the period, so an interim certificate counted as annual. Fixed | Slice 5 |
+| `HrControllerTest` (all, context fails) | `HrEmployeePortalAuthService` was added to the controller without a mock in the test. Fixed | Earlier commit |
+
+**Not HR, not touched.** `PermissionConsistencyTest` lists 24 facilities and facilities-management permissions used in `@PreAuthorize` but never seeded. Plus legal-compliance, training, training-provider, warehousing, internal-audit, bookkeeping and clinic repository tests. These need their own pass.
+
+**Still unverified.** The frontend has not been run in a browser against the real backend. Flyway history holds a hand-added version 999, newer than the latest migration, so `outOfOrder` must stay on.

@@ -75,7 +75,7 @@ class TaxCertificateServiceTest {
                 new BigDecimal("3000.00"), new BigDecimal("600.00"), new BigDecimal("300.00"));
         when(emp201Repo.forPayRuns(any(), any())).thenReturn(List.of(emp201));
 
-        when(certRepo.forReconciliation(any(), any(Integer.class), any())).thenAnswer(i -> saved.stream().filter(c -> c.getTaxYear() == (int) i.getArgument(1)).toList());
+        when(certRepo.forReconciliation(any(), any(Integer.class), any())).thenAnswer(i -> saved.stream().filter(c -> c.getTaxYear() == (int) i.getArgument(1) && c.getPeriod().equals(i.getArgument(2))).toList());
         when(certRepo.nextSequence()).thenAnswer(i -> ++seq);
         when(certRepo.save(any())).thenAnswer(i -> { HrTaxCertificate c = i.getArgument(0); if (!saved.contains(c)) saved.add(c); return c; });
         when(certRepo.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
