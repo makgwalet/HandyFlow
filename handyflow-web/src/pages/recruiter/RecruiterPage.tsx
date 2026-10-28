@@ -11,7 +11,7 @@ import {
   Monitor, Mic, UserPlus, } from 'lucide-react'
 import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
 import { RECRUITER_SECTIONS } from '../../navigation/moduleSections'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import ApprovalPanel from './RecApproval'
 import OfferPanel, { ReviseOfferForm } from './RecOffer'
 import RecDashboard from './RecDashboard'
@@ -1430,6 +1430,9 @@ function JobModal({ job, onClose, onSaved }: { job?: Job; onClose: () => void; o
 export function RecruiterPage() {
   const qc = useQueryClient()
   const { section } = useParams<{ section?: string }>()
+  const navigate = useNavigate()
+  const mayManage = usePermission('RECRUITER_MANAGE')
+  const [boardStage, setBoardStage] = useState('')
   const tab: 'jobs' | 'pipeline' | 'applications' = section === 'pipeline' || section === 'applications' ? section : 'jobs'
   const [statusFilter,  setStatusFilter]  = useState('')
   const [stageFilter,   setStageFilter]   = useState('')
@@ -1720,59 +1723,88 @@ export function RecruiterPage() {
               )}
 
               {/* ── PIPELINE TAB (board) ── */}
-              {tab === 'pipeline' && (
-                <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 16, alignItems: 'flex-start' }}>
-                  {PIPELINE_STAGES.map(stage => {
-                    const cfg  = STAGE[stage]
-                    const col  = pipelineGroups[stage] ?? []
-                    return (
-                      <section key={stage} aria-label={`${cfg.label}, ${col.length}`}
-                        style={{ minWidth: 252, maxWidth: 252, flexShrink: 0, background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderTop: `3px solid ${cfg.dot}`, borderRadius: 12, padding: 10 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)' }}>{cfg.label}</span>
-                          <span style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`, borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>{col.length}</span>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          {col.map(a => {
-                            const days = Math.max(0, Math.floor((Date.now() - new Date(a.stageChangedAt).getTime()) / 86_400_000))
-                            const stale = days >= 14 && stage !== 'HIRED'
-                            const client = clientByJob[a.jobId]
-                            return (
-                              <div key={a.id} role="button" tabIndex={0} onClick={() => setSelectedApp(a)}
-                                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedApp(a) } }}
-                                style={{ border: '1px solid var(--hf-border)', borderRadius: 10, padding: '10px 12px', cursor: 'pointer', background: 'var(--hf-surface)', transition: 'box-shadow 0.15s' }}
-                                onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'}
-                                onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <div aria-hidden style={{ width: 28, height: 28, borderRadius: '50%', background: cfg.bg, color: cfg.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
-                                    {(a.applicantName ?? 'A').split(' ').map(w => w.charAt(0)).slice(0, 2).join('').toUpperCase()}
+              {tab === 'pipeline' && (() => {
+                const job = jobs.find(j => j.id === jobFilter)
+                const jst = job ? JOB_STATUS[job.status] : null
+                const shown = PIPELINE_STAGES.filter(st => !boardStage || st === boardStage)
+                const ago = (iso: string) => {
+                  const d = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000))
+                  return d === 0 ? 'today' : d === 1 ? '1 day ago' : `${d} days ago`
+                }
+                const chip = (on: boolean): React.CSSProperties => ({ padding: '5px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer', border: `1px solid ${on ? 'var(--hf-primary)' : 'var(--hf-border)'}`, background: on ? 'var(--hf-primary-soft, var(--hf-surface-muted))' : 'var(--hf-surface)', color: on ? 'var(--hf-primary)' : 'var(--hf-text-secondary)', fontWeight: on ? 700 : 500 })
+                return (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+                    <select aria-label="Job" value={jobFilter} onChange={e => setJobFilter(e.target.value)}
+                      style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 14, fontWeight: 700, background: 'var(--hf-surface)', color: 'var(--hf-text)' }}>
+                      <option value="">All jobs</option>
+                      {jobs.map(j => <option key={j.id} value={j.id}>{j.title}{clientByJob[j.id] ? ` – ${clientByJob[j.id]}` : ''}</option>)}
+                    </select>
+                    {jst && <span style={{ background: jst.bg, color: jst.color, border: `1px solid ${jst.border}`, borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700 }}>{jst.label}</span>}
+                    <button type="button" style={{ ...btnS, marginLeft: 'auto' }} onClick={() => navigate('/recruiter/jobs')}>Back to jobs</button>
+                  </div>
+                  <div role="tablist" aria-label="Stage" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+                    <button role="tab" aria-selected={!boardStage} style={chip(!boardStage)} onClick={() => setBoardStage('')}>All ({apps.filter(a => PIPELINE_STAGES.includes(a.stage)).length})</button>
+                    {PIPELINE_STAGES.map(st => (
+                      <button key={st} role="tab" aria-selected={boardStage === st} style={chip(boardStage === st)} onClick={() => setBoardStage(boardStage === st ? '' : st)}>
+                        {STAGE[st].label} ({(pipelineGroups[st] ?? []).length})
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ display: 'grid', gap: 12, alignItems: 'start', gridTemplateColumns: `repeat(${shown.length}, minmax(220px, 1fr))`, overflowX: 'auto', paddingBottom: 16 }}>
+                    {shown.map(stage => {
+                      const cfg  = STAGE[stage]
+                      const col  = pipelineGroups[stage] ?? []
+                      return (
+                        <section key={stage} aria-label={`${cfg.label}, ${col.length}`}
+                          style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, padding: 10 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10, fontSize: 12, fontWeight: 700, color: 'var(--hf-text)' }}>
+                            <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.dot }} />
+                            {cfg.label} ({col.length})
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {col.map(a => {
+                              const days = Math.max(0, Math.floor((Date.now() - new Date(a.stageChangedAt).getTime()) / 86_400_000))
+                              const stale = days >= 14 && stage !== 'HIRED'
+                              const client = clientByJob[a.jobId]
+                              return (
+                                <div key={a.id} role="button" tabIndex={0} onClick={() => setSelectedApp(a)}
+                                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedApp(a) } }}
+                                  style={{ border: '1px solid var(--hf-border)', borderRadius: 10, padding: '9px 11px', cursor: 'pointer', background: 'var(--hf-surface)', transition: 'box-shadow 0.15s' }}
+                                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'}
+                                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <div aria-hidden style={{ width: 28, height: 28, borderRadius: '50%', background: cfg.bg, color: cfg.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                                      {(a.applicantName ?? 'A').split(' ').map(w => w.charAt(0)).slice(0, 2).join('').toUpperCase()}
+                                    </div>
+                                    <div style={{ minWidth: 0, flex: 1 }}>
+                                      <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.applicantName}</div>
+                                      {!jobFilter && <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.jobTitle}{client ? ` · ${client}` : ''}</div>}
+                                    </div>
+                                    {a.score != null && <span title="Rating" style={{ background: 'var(--hf-warning-soft)', color: 'var(--hf-warning-text)', borderRadius: 20, padding: '0 6px', fontSize: 11, fontWeight: 700 }}>★ {a.score}</span>}
                                   </div>
-                                  <div style={{ minWidth: 0 }}>
-                                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.applicantName}</div>
-                                    <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.jobTitle}{client ? ` · ${client}` : ''}</div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginTop: 6, fontSize: 11, color: 'var(--hf-text-muted)' }}>
+                                    <span>Applied {ago(a.appliedAt)}</span>
+                                    <span style={{ color: stale ? 'var(--hf-warning-text)' : undefined, fontWeight: stale ? 700 : 400 }}>{days === 0 ? 'Moved today' : `${days}d in stage`}</span>
                                   </div>
                                 </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 11 }}>
-                                  <span style={{ color: stale ? 'var(--hf-warning-text)' : 'var(--hf-text-muted)', fontWeight: stale ? 700 : 400 }}>
-                                    {days === 0 ? 'Today' : `${days}d in stage`}
-                                  </span>
-                                  <span style={{ display: 'inline-flex', gap: 5, alignItems: 'center' }}>
-                                    {a.source && a.source !== 'CAREERS_PAGE' && <span style={{ background: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)', border: '1px solid var(--hf-border)', borderRadius: 20, padding: '0 6px' }}>{a.source.replace(/_/g, ' ').toLowerCase()}</span>}
-                                    {a.score != null && <span title="Rating" style={{ background: 'var(--hf-warning-soft)', color: 'var(--hf-warning-text)', borderRadius: 20, padding: '0 6px', fontWeight: 700 }}>★ {a.score}</span>}
-                                  </span>
-                                </div>
-                              </div>
-                            )
-                          })}
-                          {col.length === 0 && (
-                            <div style={{ padding: '16px', textAlign: 'center', fontSize: 12, color: 'var(--hf-text-muted)', border: '1.5px dashed var(--hf-border)', borderRadius: 9 }}>No candidates</div>
-                          )}
-                        </div>
-                      </section>
-                    )
-                  })}
-                </div>
-              )}
+                              )
+                            })}
+                            {col.length === 0 && (
+                              <div style={{ padding: '14px', textAlign: 'center', fontSize: 12, color: 'var(--hf-text-muted)', border: '1.5px dashed var(--hf-border)', borderRadius: 9 }}>No candidates</div>
+                            )}
+                            {stage === 'APPLIED' && mayManage && (
+                              <button type="button" onClick={() => navigate('/recruiter/jobs')} title="Open a job, then choose Import candidates from CSV"
+                                style={{ background: 'none', border: 'none', color: 'var(--hf-primary)', fontSize: 12, cursor: 'pointer', textAlign: 'center', padding: 4 }}>+ Add candidates</button>
+                            )}
+                          </div>
+                        </section>
+                      )
+                    })}
+                  </div>
+                </>
+                )
+              })()}
 
               {/* ── APPLICATIONS TAB ── */}
               {tab === 'applications' && (
