@@ -58,6 +58,9 @@
 
   /* Brand */
   --hf-primary: #1b3a6b;
+  /* Fleet buttons and tabs use these names. They were never defined, so Save/Add buttons rendered with no background. */
+  --hf-brand: var(--hf-primary);
+  --hf-on-brand: var(--hf-text-on-solid);
   --hf-primary-hover: #0f2a52;
   --hf-primary-text: #1b3a6b;
   --hf-primary-border: #e8edf5;

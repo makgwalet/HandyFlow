@@ -24,6 +24,12 @@ apiClient.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  // The client defaults to a JSON Content-Type. With that header set, axios turns a FormData body into JSON, and the server
+  // answers 415 "Content-Type 'application/json' is not supported" (vehicle and driver photos, document uploads).
+  // Dropping the header lets the browser send multipart/form-data with its boundary.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    config.headers.delete('Content-Type')
+  }
   return config
 })
 
