@@ -6,7 +6,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
-import { NEXT_STATUSES, STATUS_LABEL, ACCIDENT_STATUSES, blocksVehicle, emptyReport, reportBody, reportProblem } from "./accidents.logic"
+import { NEXT_STATUSES, ROAD_OPTIONS, STATUS_LABEL, ACCIDENT_STATUSES, WEATHER_OPTIONS, blocksVehicle, emptyReport, reportBody, reportProblem } from "./accidents.logic"
 import { fetchAllPages } from "./apiShape"
 import { Pager, SearchBox } from "./ListControls"
 import { useListView } from "./listKit"
@@ -14,9 +14,10 @@ import { useListView } from "./listKit"
 interface Accident {
   id: string; referenceNumber: string; vehicleId: string; registration: string; driverName: string | null; occurredAt: string; location: string | null
   description: string; injuriesCount: number; fatalitiesCount: number; estimatedDamage: number | null; vehicleDrivable: boolean; status: string
-  claimStatus: string | null; claimNumber: string | null; evidenceCount: number
+  claimStatus: string | null; claimNumber: string | null; evidenceCount: number; policeCaseNumber?: string | null
 }
 interface VehicleOption { id: string; registration: string }
+interface DriverOption { id: string; firstName?: string; lastName?: string }
 
 const errorOf = (e: unknown) => (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Something went wrong. Try again."
 const th: React.CSSProperties = { padding: "8px 10px", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, color: "var(--hf-text-faint)", textAlign: "left" }
@@ -26,7 +27,11 @@ const field: React.CSSProperties = { padding: "7px 9px", border: "1px solid var(
 const btn: React.CSSProperties = { padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--hf-brand)", color: "var(--hf-on-brand, #fff)", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }
 const chip = (bad: boolean): React.CSSProperties => ({ display: "inline-block", padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 700, background: bad ? "var(--hf-danger-bg, #fde8e8)" : "var(--hf-surface-2, #eef2f6)", color: bad ? "var(--hf-danger-text)" : "var(--hf-text-muted)" })
 
-function ReportForm({ vehicles, onDone }: { vehicles: VehicleOption[]; onDone: () => void }) {
+const row: React.CSSProperties = { display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }
+const Section = ({ title }: { title: string }) => <p style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--hf-text-faint)", margin: "14px 0 6px" }}>{title}</p>
+const Labelled = ({ label, children }: { label: string; children: React.ReactNode }) => <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11.5, color: "var(--hf-text-muted)", marginBottom: 2 }}><span>{label}</span>{children}</div>
+
+function ReportForm({ vehicles, drivers, onDone }: { vehicles: VehicleOption[]; drivers: DriverOption[]; onDone: () => void }) {
   const [f, setF] = useState(emptyReport())
   const [error, setError] = useState<string | null>(null)
   const set = (k: keyof typeof f, v: string | boolean) => { setF(p => ({ ...p, [k]: v })); setError(null) }
@@ -38,17 +43,44 @@ function ReportForm({ vehicles, onDone }: { vehicles: VehicleOption[]; onDone: (
   return (
     <div style={card}>
       <h3 style={{ marginTop: 0 }}>Report an accident</h3>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <select aria-label="Vehicle" style={field} value={f.vehicleId} onChange={e => set("vehicleId", e.target.value)}>
+      <Section title="What happened" />
+      <div style={row}>
+        <Labelled label="Vehicle *"><select aria-label="Vehicle" style={field} value={f.vehicleId} onChange={e => set("vehicleId", e.target.value)}>
           <option value="">Vehicle…</option>{vehicles.map(v => <option key={v.id} value={v.id}>{v.registration}</option>)}
-        </select>
-        <input aria-label="When it happened" type="datetime-local" style={field} value={f.occurredAt} onChange={e => set("occurredAt", e.target.value)} />
-        <input aria-label="Location" placeholder="Where" style={{ ...field, minWidth: 220 }} value={f.location} onChange={e => set("location", e.target.value)} />
-        <input aria-label="Injuries" type="number" min="0" style={{ ...field, width: 90 }} value={f.injuries} onChange={e => set("injuries", e.target.value)} />
-        <input aria-label="Fatalities" type="number" min="0" style={{ ...field, width: 90 }} value={f.fatalities} onChange={e => set("fatalities", e.target.value)} />
-        <input aria-label="Estimated damage" type="number" min="0" placeholder="Damage (R)" style={{ ...field, width: 130 }} value={f.estimatedDamage} onChange={e => set("estimatedDamage", e.target.value)} />
+        </select></Labelled>
+        <Labelled label="Driver"><select aria-label="Driver" style={field} value={f.driverId} onChange={e => set("driverId", e.target.value)}>
+          <option value="">Not on the driver register</option>{drivers.filter(d => d.firstName).map(d => <option key={d.id} value={d.id}>{d.firstName} {d.lastName}</option>)}
+        </select></Labelled>
+        {!f.driverId && <Labelled label="Driver's name"><input aria-label="Driver's name" placeholder="If not on the register" style={field} value={f.driverName} onChange={e => set("driverName", e.target.value)} /></Labelled>}
+        <Labelled label="When it happened *"><input aria-label="When it happened" type="datetime-local" style={field} value={f.occurredAt} onChange={e => set("occurredAt", e.target.value)} /></Labelled>
+        <Labelled label="Where"><input aria-label="Location" placeholder="Road, town, landmark" style={{ ...field, minWidth: 240 }} value={f.location} onChange={e => set("location", e.target.value)} /></Labelled>
+        <Labelled label="Weather"><select aria-label="Weather" style={field} value={f.weather} onChange={e => set("weather", e.target.value)}><option value="">Not recorded</option>{WEATHER_OPTIONS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Labelled>
+        <Labelled label="Road"><select aria-label="Road condition" style={field} value={f.roadCondition} onChange={e => set("roadCondition", e.target.value)}><option value="">Not recorded</option>{ROAD_OPTIONS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Labelled>
       </div>
-      <textarea aria-label="What happened" placeholder="What happened" rows={3} style={{ ...field, width: "100%", marginTop: 10 }} value={f.description} onChange={e => set("description", e.target.value)} />
+      <Labelled label="What happened *"><textarea aria-label="What happened" placeholder="Describe what happened" rows={3} style={{ ...field, width: "100%" }} value={f.description} onChange={e => set("description", e.target.value)} /></Labelled>
+      <Labelled label="Witnesses"><textarea aria-label="Witnesses" placeholder="Names and contact numbers" rows={2} style={{ ...field, width: "100%" }} value={f.witnesses} onChange={e => set("witnesses", e.target.value)} /></Labelled>
+
+      <Section title="People and damage" />
+      <div style={row}>
+        <Labelled label="Injuries"><input aria-label="Injuries" type="number" min="0" style={{ ...field, width: 90 }} value={f.injuries} onChange={e => set("injuries", e.target.value)} /></Labelled>
+        <Labelled label="Fatalities"><input aria-label="Fatalities" type="number" min="0" style={{ ...field, width: 90 }} value={f.fatalities} onChange={e => set("fatalities", e.target.value)} /></Labelled>
+        <Labelled label="Estimated damage to our vehicle (R)"><input aria-label="Estimated damage" type="number" min="0" placeholder="0.00" style={{ ...field, width: 150 }} value={f.estimatedDamage} onChange={e => set("estimatedDamage", e.target.value)} /></Labelled>
+        <Labelled label="Third-party damage (R)"><input aria-label="Third-party damage" type="number" min="0" placeholder="0.00" style={{ ...field, width: 150 }} value={f.thirdPartyDamage} onChange={e => set("thirdPartyDamage", e.target.value)} /></Labelled>
+      </div>
+
+      <Section title="Other party" />
+      <div style={row}>
+        <Labelled label="Vehicle registration"><input aria-label="Other vehicle registration" style={field} value={f.otherVehicleRegistration} onChange={e => set("otherVehicleRegistration", e.target.value)} /></Labelled>
+        <Labelled label="Driver's name"><input aria-label="Other driver's name" style={field} value={f.otherDriverName} onChange={e => set("otherDriverName", e.target.value)} /></Labelled>
+        <Labelled label="Driver's contact"><input aria-label="Other driver's contact" style={field} value={f.otherDriverContact} onChange={e => set("otherDriverContact", e.target.value)} /></Labelled>
+        <Labelled label="Their insurer"><input aria-label="Other insurer" style={field} value={f.otherInsurer} onChange={e => set("otherInsurer", e.target.value)} /></Labelled>
+      </div>
+
+      <Section title="Police" />
+      <div style={row}>
+        <Labelled label="Police case number"><input aria-label="Police case number" style={field} value={f.policeCaseNumber} onChange={e => set("policeCaseNumber", e.target.value)} /></Labelled>
+        <Labelled label="SAPS station"><input aria-label="SAPS station" style={field} value={f.sapsStation} onChange={e => set("sapsStation", e.target.value)} /></Labelled>
+      </div>
       <label style={{ display: "block", marginTop: 8, fontSize: 13 }}>
         <input type="checkbox" aria-label="The vehicle can still be driven" checked={f.vehicleDrivable} onChange={e => set("vehicleDrivable", e.target.checked)} /> The vehicle can still be driven
       </label>
@@ -90,6 +122,7 @@ export default function AccidentsTab() {
   })
   const view = useListView(accidents, a => [a.referenceNumber, a.claimNumber, a.registration, a.driverName, a.location, a.description].filter(Boolean).join(" "))
   const { data: vehicles = [] } = useQuery<VehicleOption[]>({ queryKey: ["fleet", "vehicle-options"], enabled: canManage, queryFn: async () => (await fetchAllPages<VehicleOption>(u => apiClient.get(u), "/api/v1/fleet/vehicles")).items })
+  const { data: drivers = [] } = useQuery<DriverOption[]>({ queryKey: ["fleet-drivers"], enabled: canManage, queryFn: async () => (await fetchAllPages<DriverOption>(u => apiClient.get(u), "/api/v1/fleet/drivers")).items })
   const offRoad = accidents.filter(blocksVehicle)
 
   return (
@@ -101,7 +134,7 @@ export default function AccidentsTab() {
         </select>
         {canManage && <button type="button" style={btn} onClick={() => setShowForm(s => !s)}>{showForm ? "Cancel" : "Report an accident"}</button>}
       </div>
-      {showForm && <ReportForm vehicles={vehicles} onDone={() => { setShowForm(false); qc.invalidateQueries({ queryKey: ["fleet", "accidents"] }) }} />}
+      {showForm && <ReportForm vehicles={vehicles} drivers={drivers} onDone={() => { setShowForm(false); qc.invalidateQueries({ queryKey: ["fleet", "accidents"] }) }} />}
       {offRoad.length > 0 && (
         <div role="status" style={{ ...card, borderColor: "var(--hf-danger-text)", fontSize: 13 }}>
           <strong>{offRoad.length} {offRoad.length === 1 ? "vehicle cannot" : "vehicles cannot"} be driven:</strong> {offRoad.map(a => a.registration).join(", ")}. They cannot start trips until the case is closed or corrected.
@@ -119,7 +152,7 @@ export default function AccidentsTab() {
               <td style={td}><strong>{a.referenceNumber}</strong>{a.claimNumber && <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>Claim {a.claimNumber}</div>}</td>
               <td style={td}>{a.registration}<div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{a.driverName}</div></td>
               <td style={td}>{new Date(a.occurredAt).toLocaleDateString("en-ZA")}<div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{a.location}</div></td>
-              <td style={td}>{a.description}{(a.injuriesCount > 0 || a.fatalitiesCount > 0) && <div style={{ fontSize: 11, color: "var(--hf-danger-text)" }}>{a.injuriesCount} injured, {a.fatalitiesCount} fatal</div>}</td>
+              <td style={td}>{a.description}{a.policeCaseNumber && <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>SAPS case {a.policeCaseNumber}</div>}{(a.injuriesCount > 0 || a.fatalitiesCount > 0) && <div style={{ fontSize: 11, color: "var(--hf-danger-text)" }}>{a.injuriesCount} injured, {a.fatalitiesCount} fatal</div>}</td>
               <td style={td}><span style={chip(false)}>{STATUS_LABEL[a.status] ?? a.status}</span></td>
               <td style={td}>{blocksVehicle(a) ? <span style={chip(true)}>Cannot be driven</span> : a.vehicleDrivable ? "Yes" : "—"}</td>
               <td style={td}>{a.evidenceCount}</td>
