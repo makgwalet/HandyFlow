@@ -138,7 +138,13 @@ public final class ImportRules {
                            long version, boolean hasVariants, boolean isVariant) {}
 
     /** What the importing user and the tenant allow. */
-    public record Options(boolean priceApprovalRequired, boolean canWriteCost, boolean newItemsMustStartAsDraft) {}
+    /**
+     * @param ignoreCost       a cost column from someone who may not set costs is dropped with a note instead of failing every row
+     * @param createCategories a category that does not exist yet is created by the import instead of failing the row
+     */
+    public record Options(boolean priceApprovalRequired, boolean canWriteCost, boolean newItemsMustStartAsDraft, boolean ignoreCost, boolean createCategories) {
+        public Options(boolean priceApprovalRequired, boolean canWriteCost, boolean newItemsMustStartAsDraft) { this(priceApprovalRequired, canWriteCost, newItemsMustStartAsDraft, false, false); }
+    }
 
     /** A row after reading: the values to apply (null = not given) and the problems found in the cells. */
     public record Parsed(int line, String sku, String name, String description, String category, String unit, String brand, String barcode,
@@ -262,9 +268,12 @@ public final class ImportRules {
 
             String category = null;
             if (r.category() != null) {
-                category = resolveCategory(r.category(), categoryByLower, categoryByLeaf, errors);
+                category = resolveCategory(r.category(), categoryByLower, categoryByLeaf, errors, notes, opt.createCategories());
             }
-            if (r.cost() != null && !opt.canWriteCost()) errors.add("You are not allowed to set cost prices; remove the cost column.");
+            if (r.cost() != null && !opt.canWriteCost()) {
+                if (opt.ignoreCost()) notes.add("You may not set cost prices, so the cost on this row is ignored.");
+                else errors.add("You are not allowed to set cost prices; remove the cost column, or choose to ignore it.");
+            }
 
             if (match == null) {
                 if (mode == Mode.UPDATE_ONLY) errors.add(r.sku() == null ? "Updates need a SKU." : "No item has the SKU '" + r.sku() + "'.");
@@ -328,13 +337,30 @@ public final class ImportRules {
 
     private static String normPath(String p) { return p.toLowerCase(Locale.ROOT).replaceAll("\\s*>\\s*", ">").trim(); }
 
-    private static String resolveCategory(String cell, Map<String, String> byPath, Map<String, List<String>> byLeaf, List<String> errors) {
+    private static String resolveCategory(String cell, Map<String, String> byPath, Map<String, List<String>> byLeaf, List<String> errors, List<String> notes, boolean create) {
         String full = byPath.get(normPath(cell.replace('/', '>')));
         if (full != null) return full;
         List<String> leaf = byLeaf.get(cell.trim().toLowerCase(Locale.ROOT));
-        if (leaf == null) { errors.add("The category '" + cell + "' does not exist. Create it first, or write its full path such as Hardware > Cement."); return null; }
+        if (leaf == null) {
+            if (create) {
+                String path = cleanPath(cell);
+                if (path.isEmpty()) { errors.add("The category '" + cell + "' is not a valid category path."); return null; }
+                if (path.split(">").length > StructureRules.MAX_DEPTH) { errors.add("The category '" + cell + "' is more than " + StructureRules.MAX_DEPTH + " levels deep."); return null; }
+                notes.add("The category '" + path.replace(">", " > ") + "' does not exist yet and will be created.");
+                return path.replace(">", " > ");
+            }
+            errors.add("The category '" + cell + "' does not exist. Create it first, write its full path such as Hardware > Cement, or choose to create missing categories.");
+            return null;
+        }
         if (leaf.size() > 1) { errors.add("More than one category is called '" + cell + "'. Write its full path, for example " + leaf.get(0) + "."); return null; }
         return leaf.get(0);
+    }
+
+    /** "A / b>C " becomes "A>b>C": segments trimmed, empty ones dropped. */
+    public static String cleanPath(String cell) {
+        List<String> parts = new ArrayList<>();
+        for (String seg : cell.replace('/', '>').split(">")) if (!seg.trim().isEmpty()) parts.add(seg.trim());
+        return String.join(">", parts);
     }
 
     // ── Writing a file ─────────────────────────────────────────────────────────

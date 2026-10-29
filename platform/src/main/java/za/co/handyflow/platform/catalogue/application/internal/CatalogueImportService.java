@@ -62,12 +62,13 @@ public class CatalogueImportService {
         return new Context(existing, idByPath, new ArrayList<>(pathById.values()), byId);
     }
 
-    private Options options(TenantId tenantId, Caller caller) {
-        return new Options(pricing.approvalRequired(tenantId), caller.canWritePrices(), !caller.canApproveItems() && pricing.itemApprovalRequired(tenantId));
+    private Options options(TenantId tenantId, Caller caller, ImportRequest r) {
+        return new Options(pricing.approvalRequired(tenantId), caller.canWritePrices(), !caller.canApproveItems() && pricing.itemApprovalRequired(tenantId),
+                Boolean.TRUE.equals(r.ignoreCost()), Boolean.TRUE.equals(r.createCategories()));
     }
 
-    private Plan plan(TenantId tenantId, Table table, Mode mode, Context ctx, Caller caller) {
-        return ImportRules.plan(table.rows().stream().map(ImportRules::parse).toList(), mode, ctx.existing(), ctx.categoryPaths(), options(tenantId, caller));
+    private Plan plan(TenantId tenantId, Table table, ImportRequest r, Context ctx, Caller caller) {
+        return ImportRules.plan(table.rows().stream().map(ImportRules::parse).toList(), r.mode(), ctx.existing(), ctx.categoryPaths(), options(tenantId, caller, r));
     }
 
     // ── Dry run ───────────────────────────────────────────────────────────────
@@ -76,7 +77,7 @@ public class CatalogueImportService {
         Table table = ImportRules.read(r.csv());
         if (!table.problems().isEmpty())
             return new ImportPreviewResponse(r.mode().name(), 0, 0, 0, 0, 0, table.problems(), table.unknownColumns(), List.of(), false);
-        Plan plan = plan(tenantId, table, r.mode(), context(tenantId), caller);
+        Plan plan = plan(tenantId, table, r, context(tenantId), caller);
         List<ImportPreviewResponse.RowResult> rows = new ArrayList<>();
         plan.rows().stream().filter(p -> p.action() == Action.ERROR).forEach(p -> rows.add(result(p)));
         plan.rows().stream().filter(p -> p.action() != Action.ERROR).forEach(p -> rows.add(result(p)));
@@ -95,7 +96,7 @@ public class CatalogueImportService {
         Table table = ImportRules.read(r.csv());
         if (!table.problems().isEmpty()) throw new IllegalArgumentException(table.problems().get(0));
         Context ctx = context(tenantId);
-        Plan plan = plan(tenantId, table, r.mode(), ctx, caller);
+        Plan plan = plan(tenantId, table, r, ctx, caller);
         boolean skipErrors = Boolean.TRUE.equals(r.skipErrors());
         if (plan.hasErrors() && !skipErrors)
             throw new IllegalArgumentException(plan.count(Action.ERROR) + " row(s) have problems. Fix them, or choose to leave those rows out.");
@@ -108,6 +109,7 @@ public class CatalogueImportService {
                 case UNCHANGED -> unchanged++;
                 case CREATE, UPDATE -> {
                     try {
+                        if (p.row().category() != null && Boolean.TRUE.equals(r.createCategories())) ensureCategory(tenantId, p.row().category(), ctx, caller);
                         if (p.action() == Action.CREATE) { create(tenantId, p.row(), ctx, caller); created++; }
                         else { update(tenantId, p, ctx, caller); updated++; }
                     } catch (RuntimeException e) {
@@ -130,7 +132,7 @@ public class CatalogueImportService {
         CatalogueItemStatus status = row.status();
         catalogueService.createItem(tenantId, new CreateItemRequest(row.name(), row.description(), categoryId(row.category(), ctx),
                 row.unit() == null ? "each" : row.unit(), row.price(), row.vatRate(), row.sku(), row.barcode(), row.brand(), row.type(),
-                row.cost(), row.vatExempt(), status, null), caller);
+                caller.canWritePrices() ? row.cost() : null, row.vatExempt(), status, null), caller);
     }
 
     private void update(TenantId tenantId, Planned p, Context ctx, Caller caller) {
@@ -149,9 +151,26 @@ public class CatalogueImportService {
                 row.barcode() != null ? row.barcode() : item.getBarcode(),
                 variant || row.brand() == null ? item.getBrand() : row.brand(),
                 variant || row.type() == null ? item.getItemType() : row.type(),
-                row.cost() != null ? row.cost() : item.getCostPrice(),
+                row.cost() != null && caller.canWritePrices() ? row.cost() : item.getCostPrice(),
                 variant || row.vatExempt() == null ? item.isVatExempt() : row.vatExempt(),
                 null, p.version(), null), caller);
+    }
+
+    /** Creates any part of a category path that does not exist yet, parents first, and remembers the ids for the rows that follow. */
+    private void ensureCategory(TenantId tenantId, String cell, Context ctx, Caller caller) {
+        if (categoryId(cell, ctx) != null) return;
+        UUID parent = null;
+        StringBuilder key = new StringBuilder();
+        for (String name : ImportRules.cleanPath(cell).split(">")) {
+            if (key.length() > 0) key.append('>');
+            key.append(name.toLowerCase(Locale.ROOT));
+            UUID id = ctx.categoryIds().get(key.toString());
+            if (id == null) {
+                id = catalogueService.createCategory(tenantId, new CreateCategoryRequest(name, null, parent), caller).id();
+                ctx.categoryIds().put(key.toString(), id);
+            }
+            parent = id;
+        }
     }
 
     private static UUID categoryOf(CatalogueItem i) { return i.getCategory() == null ? null : i.getCategory().getId(); }

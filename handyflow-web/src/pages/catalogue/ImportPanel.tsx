@@ -21,12 +21,14 @@ export default function ImportPanel() {
   const [file, setFile] = useState<{ name: string; text: string } | null>(null)
   const [mode, setMode] = useState<ImportMode>("CREATE_OR_UPDATE")
   const [skipErrors, setSkipErrors] = useState(false)
+  const [createCategories, setCreateCategories] = useState(false)
+  const [ignoreCost, setIgnoreCost] = useState(false)
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [result, setResult] = useState<ImportResult | null>(null)
   const [error, setError] = useState("")
 
   const jobs = useQuery<ImportJob[]>({ queryKey: ["catalogue", "import-jobs"], enabled: canImport, queryFn: async () => inner<ImportJob[]>(await apiClient.get("/api/v1/catalogue/import/jobs")) ?? [] })
-  const body = () => ({ fileName: file?.name, csv: file?.text, mode, skipErrors })
+  const body = () => ({ fileName: file?.name, csv: file?.text, mode, skipErrors, createCategories, ignoreCost })
   const check = useMutation({
     mutationFn: async () => inner<ImportPreview>(await apiClient.post("/api/v1/catalogue/import/preview", body())),
     onSuccess: p => { setPreview(p); setResult(null); setError("") }, onError: e => setError(errorMessage(e, "Couldn't check the file.")),
@@ -73,6 +75,12 @@ export default function ImportPanel() {
             </select>
             <div style={{ ...muted, marginTop: 4 }}>{IMPORT_MODES.find(m => m.id === mode)?.hint}</div>
           </Field>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, marginBottom: 6 }}>
+            <input type="checkbox" checked={createCategories} onChange={e => { setCreateCategories(e.target.checked); setPreview(null) }} /> Create categories that do not exist yet (write the path, for example Building Materials &gt; Cement)
+          </label>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, marginBottom: 12 }}>
+            <input type="checkbox" checked={ignoreCost} onChange={e => { setIgnoreCost(e.target.checked); setPreview(null) }} /> Ignore the cost column if I am not allowed to set cost prices
+          </label>
           <button type="button" style={primaryBtn} disabled={!file || check.isPending} onClick={() => check.mutate()}>{check.isPending ? "Checking…" : "Check file"}</button>
           <span style={{ ...muted, marginLeft: 10 }}>Nothing is saved until you import.</span>
 

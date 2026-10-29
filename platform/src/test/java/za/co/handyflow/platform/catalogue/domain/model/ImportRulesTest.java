@@ -116,6 +116,24 @@ class ImportRulesTest {
     }
 
     @Test
+    void costCanBeIgnoredForSomeoneWhoMayNotSetIt() {
+        var ignore = new Options(false, false, false, true, false);
+        var row = plan("sku,name,price,cost\nA,Thing,5,3\n", Mode.CREATE_ONLY, ignore).rows().get(0);
+        assertThat(row.action()).isEqualTo(Action.CREATE);
+        assertThat(row.notes()).anyMatch(n -> n.contains("cost"));
+    }
+
+    @Test
+    void missingCategoriesAreCreatedOnlyWhenAsked() {
+        String csv = "sku,name,price,category\nA,Thing,5,Building Materials / Cement & Concrete\n";
+        assertThat(plan(csv, Mode.CREATE_ONLY, OPEN).rows().get(0).action()).isEqualTo(Action.ERROR);
+        var row = plan(csv, Mode.CREATE_ONLY, new Options(false, true, false, false, true)).rows().get(0);
+        assertThat(row.action()).isEqualTo(Action.CREATE);
+        assertThat(row.notes()).anyMatch(n -> n.contains("will be created"));
+        assertThat(ImportRules.cleanPath(" A / b>>C ")).isEqualTo("A>b>C");
+    }
+
+    @Test
     void catchesRepeatsInsideTheFileAndAgainstExistingItems() {
         var cement = item("CEM-50", "Cement 50kg", "89.90");
         var p = plan("sku,name,price,barcode\nA,Bolt,1,111\nA,Nut,1,222\nB,Bolt,1,333\nC,Cement 50kg,1,444\nD,Washer,1,600\nE,Screw,1,111\n", Mode.CREATE_ONLY, OPEN, cement);
