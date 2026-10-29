@@ -14,7 +14,7 @@ import {
 } from "./tyres.logic"
 
 interface Tyre { id: string; serialNumber: string; brand: string; size: string; status: string; vehicleId: string | null; registration: string | null; position: string | null; lastTreadDepthMm: number | null; treadStatus: string; kmInService: number; retreadCount: number }
-interface Battery { id: string; serialNumber: string; brand: string; nominalVoltage: number; capacityAh: number | null; status: string; registration: string | null; position: string | null; warrantyExpiry: string | null; inWarranty: boolean; lastVoltage: number | null; lastTestResult: string | null; daysInService: number }
+interface Battery { id: string; serialNumber: string; brand: string; model?: string | null; nominalVoltage: number; capacityAh: number | null; status: string; registration: string | null; position: string | null; warrantyExpiry: string | null; inWarranty: boolean; lastVoltage: number | null; lastTestResult: string | null; daysInService: number }
 interface VehicleOption { id: string; registration: string }
 
 const errorOf = (e: unknown) => (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Something went wrong. Try again."
@@ -24,6 +24,8 @@ const btn: React.CSSProperties = { padding: "7px 14px", borderRadius: 8, border:
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 14, marginBottom: 12 }
 const th: React.CSSProperties = { textAlign: "left", padding: "8px 10px", fontSize: 11, textTransform: "uppercase", color: "var(--hf-text-faint)" }
 const td: React.CSSProperties = { padding: "9px 10px", fontSize: 12.5, verticalAlign: "top" }
+
+const L = ({ label, children }: { label: string; children: React.ReactNode }) => <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11.5, color: "var(--hf-text-muted)" }}><span>{label}</span>{children}</div>
 
 /** The small form under a row for the chosen action; `kind` picks tyre or battery endpoints. */
 function ActionForm({ kind, id, action, onDone, onCancel }: { kind: "tyres" | "batteries"; id: string; action: string; onDone: () => void; onCancel: () => void }) {
@@ -78,18 +80,24 @@ function RegisterForm({ kind, onDone }: { kind: "tyres" | "batteries"; onDone: (
   return (
     <div style={card}>
       <h3 style={{ marginTop: 0 }}>{kind === "tyres" ? "Register a tyre" : "Register a battery"}</h3>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
         {kind === "tyres" ? <>
-          <input aria-label="Serial number" placeholder="Serial number" style={field} value={t.serialNumber} onChange={e => setT({ ...t, serialNumber: e.target.value })} />
-          <input aria-label="Brand" placeholder="Brand" style={field} value={t.brand} onChange={e => setT({ ...t, brand: e.target.value })} />
-          <input aria-label="Size" placeholder="295/80R22.5" style={field} value={t.size} onChange={e => setT({ ...t, size: e.target.value })} />
-          <input aria-label="Price" type="number" min="0" placeholder="Price (R)" style={{ ...field, width: 110 }} value={t.purchasePrice} onChange={e => setT({ ...t, purchasePrice: e.target.value })} />
-          <input aria-label="Tread when new (mm)" type="number" min="0" placeholder="Tread new (mm)" style={{ ...field, width: 130 }} value={t.initialTreadDepthMm} onChange={e => setT({ ...t, initialTreadDepthMm: e.target.value })} /></> : <>
-          <input aria-label="Serial number" placeholder="Serial number" style={field} value={b.serialNumber} onChange={e => setB({ ...b, serialNumber: e.target.value })} />
-          <input aria-label="Brand" placeholder="Brand" style={field} value={b.brand} onChange={e => setB({ ...b, brand: e.target.value })} />
-          <select aria-label="Voltage" style={field} value={b.nominalVoltage} onChange={e => setB({ ...b, nominalVoltage: e.target.value })}><option value="12">12 V</option><option value="24">24 V</option></select>
-          <input aria-label="Purchase date" type="date" style={field} value={b.purchaseDate} onChange={e => setB({ ...b, purchaseDate: e.target.value })} />
-          <input aria-label="Warranty months" type="number" min="0" placeholder="Warranty (months)" style={{ ...field, width: 140 }} value={b.warrantyMonths} onChange={e => setB({ ...b, warrantyMonths: e.target.value })} /></>}
+          <L label="Serial number *"><input aria-label="Serial number" style={field} value={t.serialNumber} onChange={e => setT({ ...t, serialNumber: e.target.value })} /></L>
+          <L label="Brand *"><input aria-label="Brand" style={field} value={t.brand} onChange={e => setT({ ...t, brand: e.target.value })} /></L>
+          <L label="Pattern"><input aria-label="Pattern" style={field} value={t.pattern} onChange={e => setT({ ...t, pattern: e.target.value })} /></L>
+          <L label="Size *"><input aria-label="Size" placeholder="295/80R22.5" style={field} value={t.size} onChange={e => setT({ ...t, size: e.target.value })} /></L>
+          <L label="Price (R)"><input aria-label="Price" type="number" min="0" style={{ ...field, width: 110 }} value={t.purchasePrice} onChange={e => setT({ ...t, purchasePrice: e.target.value })} /></L>
+          <L label="Tread when new (mm)"><input aria-label="Tread when new (mm)" type="number" min="0" style={{ ...field, width: 130 }} value={t.initialTreadDepthMm} onChange={e => setT({ ...t, initialTreadDepthMm: e.target.value })} /></L></> : <>
+          <L label="Serial number *"><input aria-label="Serial number" style={field} value={b.serialNumber} onChange={e => setB({ ...b, serialNumber: e.target.value })} /></L>
+          <L label="Brand *"><input aria-label="Brand" style={field} value={b.brand} onChange={e => setB({ ...b, brand: e.target.value })} /></L>
+          <L label="Model"><input aria-label="Model" style={field} value={b.model} onChange={e => setB({ ...b, model: e.target.value })} /></L>
+          <L label="Voltage *"><select aria-label="Voltage" style={field} value={b.nominalVoltage} onChange={e => setB({ ...b, nominalVoltage: e.target.value })}><option value="12">12 V</option><option value="24">24 V</option></select></L>
+          <L label="Capacity (Ah)"><input aria-label="Capacity (Ah)" type="number" min="0" style={{ ...field, width: 110 }} value={b.capacityAh} onChange={e => setB({ ...b, capacityAh: e.target.value })} /></L>
+          <L label="Supplier"><input aria-label="Supplier" style={field} value={b.supplier} onChange={e => setB({ ...b, supplier: e.target.value })} /></L>
+          <L label="Purchase date"><input aria-label="Purchase date" type="date" style={field} value={b.purchaseDate} onChange={e => setB({ ...b, purchaseDate: e.target.value })} /></L>
+          <L label="Price (R)"><input aria-label="Price" type="number" min="0" style={{ ...field, width: 110 }} value={b.purchasePrice} onChange={e => setB({ ...b, purchasePrice: e.target.value })} /></L>
+          <L label="Warranty (months)"><input aria-label="Warranty months" type="number" min="0" style={{ ...field, width: 130 }} value={b.warrantyMonths} onChange={e => setB({ ...b, warrantyMonths: e.target.value })} /></L>
+          <L label="Notes"><input aria-label="Notes" style={{ ...field, minWidth: 220 }} value={b.notes} onChange={e => setB({ ...b, notes: e.target.value })} /></L></>}
         <button type="button" style={{ ...btn, opacity: problem || save.isPending ? 0.5 : 1 }} disabled={!!problem || save.isPending} onClick={() => save.mutate()}>Register</button>
       </div>
       {problem && <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 6 }}>{problem}</div>}
@@ -128,7 +136,7 @@ function Panel({ kind }: { kind: "tyres" | "batteries" }) {
               <Fragment key={row.id}>
                 <tr aria-label={row.serialNumber} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
                   <td style={td}><strong>{row.serialNumber}</strong></td>
-                  <td style={td}>{row.brand}{tyre ? ` · ${tyre.size}` : bat ? ` · ${bat.nominalVoltage} V` : ""}</td>
+                  <td style={td}>{row.brand}{tyre ? ` · ${tyre.size}` : bat ? ` ${bat.model ?? ""} · ${bat.nominalVoltage} V${bat.capacityAh ? ` · ${bat.capacityAh} Ah` : ""}` : ""}</td>
                   <td style={td}>{labels[row.status] ?? row.status}</td>
                   <td style={td}>{row.registration ? `${row.registration} · ${row.position}` : "Store"}</td>
                   {tyre && <td style={{ ...td, color: TONE[treadTone(tyre.treadStatus)], fontWeight: 700 }}>{tyre.lastTreadDepthMm != null ? `${tyre.lastTreadDepthMm} mm · ` : ""}{TREAD_LABEL[tyre.treadStatus]}</td>}

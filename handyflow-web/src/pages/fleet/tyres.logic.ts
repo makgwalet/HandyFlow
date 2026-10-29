@@ -33,16 +33,19 @@ export function tyreProblem(f: TyreForm) {
 }
 export const tyreBody = (f: TyreForm) => ({ serialNumber: f.serialNumber.trim(), brand: f.brand.trim(), pattern: blank(f.pattern), size: f.size.trim(), purchasePrice: num(f.purchasePrice), initialTreadDepthMm: num(f.initialTreadDepthMm) })
 
-export interface BatteryForm { serialNumber: string; brand: string; model: string; nominalVoltage: string; capacityAh: string; warrantyMonths: string; purchaseDate: string }
-export const emptyBattery = (): BatteryForm => ({ serialNumber: "", brand: "", model: "", nominalVoltage: "12", capacityAh: "", warrantyMonths: "", purchaseDate: "" })
+export interface BatteryForm { serialNumber: string; brand: string; model: string; nominalVoltage: string; capacityAh: string; warrantyMonths: string; purchaseDate: string; supplier: string; purchasePrice: string; notes: string }
+export const emptyBattery = (): BatteryForm => ({ serialNumber: "", brand: "", model: "", nominalVoltage: "12", capacityAh: "", warrantyMonths: "", purchaseDate: "", supplier: "", purchasePrice: "", notes: "" })
 export function batteryProblem(f: BatteryForm) {
   if (!f.serialNumber.trim()) return "Enter the serial number."
   if (!f.brand.trim()) return "Enter the brand."
   if (f.nominalVoltage !== "12" && f.nominalVoltage !== "24") return "Voltage must be 12 or 24."
+  if (f.capacityAh.trim() !== "" && !(Number(f.capacityAh) > 0)) return "Capacity must be more than zero (Ah)."
+  if (bad(f.purchasePrice)) return "The price must be zero or more."
+  if (f.warrantyMonths.trim() !== "" && !(Number(f.warrantyMonths) >= 1 && Number(f.warrantyMonths) <= 120)) return "Warranty must be 1 to 120 months."
   if (f.warrantyMonths.trim() !== "" && !f.purchaseDate) return "Give the purchase date so the warranty expiry can be worked out."
   return null
 }
-export const batteryBody = (f: BatteryForm) => ({ serialNumber: f.serialNumber.trim(), brand: f.brand.trim(), model: blank(f.model), nominalVoltage: Number(f.nominalVoltage), capacityAh: num(f.capacityAh), warrantyMonths: num(f.warrantyMonths), purchaseDate: f.purchaseDate || null })
+export const batteryBody = (f: BatteryForm) => ({ serialNumber: f.serialNumber.trim(), brand: f.brand.trim(), model: blank(f.model), nominalVoltage: Number(f.nominalVoltage), capacityAh: num(f.capacityAh), warrantyMonths: num(f.warrantyMonths), purchaseDate: f.purchaseDate || null, supplier: blank(f.supplier), purchasePrice: num(f.purchasePrice), notes: blank(f.notes) })
 
 /** Fit or install: a vehicle, and for tyres a position code. */
 export function fitProblem(vehicleId: string, position: string, needsPosition: boolean) {
