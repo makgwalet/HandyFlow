@@ -10,6 +10,7 @@ import { OUTCOME_LABEL, answeredCount, bySection, completionProblems, failedCoun
 import { fetchAllPages } from "./apiShape"
 import { Pager, SearchBox } from "./ListControls"
 import { useListView } from "./listKit"
+import InspectionTemplates from "./InspectionTemplates"
 
 interface Summary { id: string; registration: string; templateName: string; inspectorName: string | null; status: string; verdict: string | null; failedCount: number; startedAt: string }
 interface Full extends Detail { summary: Summary; signerName: string | null }
@@ -128,7 +129,7 @@ function StartForm({ onStarted }: { onStarted: (id: string) => void }) {
     <div style={card}>
       <h3 style={{ marginTop: 0 }}>Start an inspection</h3>
       {active.length === 0 ? (
-        <div style={{ fontSize: 13 }}>No inspection templates yet. <button type="button" style={btn} disabled={starter.isPending} onClick={() => starter.mutate()}>Create the daily vehicle inspection</button></div>
+        <div style={{ fontSize: 13 }}>No inspection templates yet. Use Templates to create one, or <button type="button" style={btn} disabled={starter.isPending} onClick={() => starter.mutate()}>Create the daily vehicle inspection</button></div>
       ) : (
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <select aria-label="Vehicle" style={field} value={f.vehicleId} onChange={e => set("vehicleId", e.target.value)}><option value="">Vehicle…</option>{vehicles.map(v => <option key={v.id} value={v.id}>{v.registration}</option>)}</select>
@@ -147,6 +148,7 @@ export default function InspectionsTab() {
   const [status, setStatus] = useState("")
   const [openId, setOpenId] = useState<string | null>(null)
   const [starting, setStarting] = useState(false)
+  const [templates, setTemplates] = useState(false)
   const qc = useQueryClient()
   const { data: rows = [], isLoading, isError } = useQuery<Summary[]>({
     queryKey: ["fleet", "inspections", status],
@@ -160,7 +162,9 @@ export default function InspectionsTab() {
         <select aria-label="Filter by status" style={field} value={status} onChange={e => { setStatus(e.target.value); view.setPage(0) }}>
           <option value="">All inspections</option><option value="IN_PROGRESS">In progress</option><option value="COMPLETED">Completed</option><option value="CANCELLED">Cancelled</option></select>
         {canManage && <button type="button" style={btn} onClick={() => setStarting(s => !s)}>{starting ? "Cancel" : "Start an inspection"}</button>}
+        <button type="button" style={{ ...field, cursor: "pointer" }} onClick={() => setTemplates(s => !s)}>{templates ? "Hide templates" : "Templates"}</button>
       </div>
+      {templates && <InspectionTemplates onClose={() => setTemplates(false)} />}
       {starting && <StartForm onStarted={id => { setStarting(false); setOpenId(id); qc.invalidateQueries({ queryKey: ["fleet", "inspections"] }) }} />}
       {openId && <Runner id={openId} onClose={() => setOpenId(null)} />}
       {isLoading && <p>Loading…</p>}
