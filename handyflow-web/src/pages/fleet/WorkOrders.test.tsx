@@ -81,8 +81,21 @@ describe("WorkOrdersTab", () => {
   })
   it("creates a work order and opens it", async () => {
     show(); fireEvent.click(await screen.findByText("New work order")); await screen.findByText("ABC123MP", { selector: "option" })
-    set("Vehicle", "v1"); set("Title", "Replace brake pads"); fireEvent.click(screen.getByText("Create"))
+    set("Vehicle", "v1"); set("Title", "Replace brake pads"); fireEvent.click(screen.getByText("Create work order"))
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fleet/work-orders", expect.objectContaining({ vehicleId: "v1", title: "Replace brake pads", type: "SERVICE" })))
+  })
+  it("sends the description, odometer and off-road start with a new work order", async () => {
+    show(); fireEvent.click(await screen.findByText("New work order")); await screen.findByText("ABC123MP", { selector: "option" })
+    set("Vehicle", "v1"); set("Title", "Gearbox noise"); set("Description", "Grinding in third gear"); set("Odometer in", "101500")
+    fireEvent.click(screen.getByLabelText("The vehicle is off the road now")); fireEvent.click(screen.getByText("Create work order"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fleet/work-orders", expect.objectContaining({ description: "Grinding in third gear", odometerIn: 101500, vehicleOffRoadFrom: expect.any(String) })))
+  })
+  it("edits and deactivates a technician with a full replace", async () => {
+    show(); fireEvent.click(await screen.findByText("Technicians")); await screen.findByText(/Sipho · 082/)
+    fireEvent.click(screen.getByLabelText("Edit Sipho")); set("Technician email", "sipho@example.co.za"); fireEvent.click(screen.getByText("Save technician"))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fleet/technicians/t1", { name: "Sipho", phone: "082", email: "sipho@example.co.za", hourlyRate: 350, active: true }))
+    fireEvent.click(screen.getByLabelText("Deactivate Sipho"))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fleet/technicians/t1", expect.objectContaining({ active: false })))
   })
   it("adds a technician", async () => {
     show(); fireEvent.click(await screen.findByText("Technicians")); await screen.findByText(/Sipho · 082/)

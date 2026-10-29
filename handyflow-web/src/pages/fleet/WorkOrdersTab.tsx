@@ -11,13 +11,13 @@ import { Pager, SearchBox } from "./ListControls"
 import { useListView } from "./listKit"
 import {
   LINE_LABEL, LINE_TYPES, PRIORITIES, STATUS_LABEL, TYPE_LABEL, canEditLines, completeBody, completeProblem, emptyComplete, emptyLine, emptyOrder, emptyQuote, vehicleFromQuery, emptyTech,
-  lineBody, lineProblem, orderBody, orderProblem, quoteBody, quoteProblem, stepsFor, techBody, techProblem, varianceText, type StepOption,
+  lineBody, lineProblem, orderBody, orderProblem, quoteBody, quoteProblem, stepsFor, techBody, techForm, techProblem, varianceText, type StepOption,
 } from "./workOrders.logic"
 
 interface Order { id: string; referenceNumber: string; vehicleId: string; registration: string; type: string; title: string; priority: string; status: string; assignedTechnicianName: string | null; quotedAmount: number | null; actualTotal: number | null; scheduledFor: string | null }
 interface Line { id: string; lineType: string; description: string; quantity: number; unitCost: number; lineTotal: number; technicianName: string | null }
 interface Detail { summary: Order; description: string | null; rejectionReason: string | null; holdReason: string | null; lines: Line[]; labourTotal: number; partsTotal: number; subletTotal: number; otherTotal: number; varianceToQuote: number | null; overQuote: boolean; downtimeHours: number | null; downtimeOngoing: boolean; attachments?: WorkOrderAttachment[] }
-interface Tech { id: string; name: string; phone: string | null; hourlyRate: number | null; active: boolean }
+interface Tech { id: string; name: string; phone: string | null; email?: string | null; hourlyRate: number | null; active: boolean }
 interface VehicleOption { id: string; registration: string }
 
 const unwrap = <T,>(r: { data: unknown }): T => { const o = r.data as { data?: unknown }; return (o && typeof o === "object" && "data" in o ? o.data : r.data) as T }
@@ -27,6 +27,8 @@ const R = (n: number | null | undefined) => (n == null ? "—" : `R ${Number(n).
 const field: React.CSSProperties = { padding: "7px 9px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13 }
 const btn: React.CSSProperties = { padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--hf-brand)", color: "var(--hf-on-brand, #fff)", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 14, marginBottom: 12 }
+
+const L = ({ label, children }: { label: string; children: React.ReactNode }) => <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11.5, color: "var(--hf-text-muted)" }}><span>{label}</span>{children}</div>
 
 function useTechnicians() { return useQuery<Tech[]>({ queryKey: ["fleet", "technicians"], queryFn: async () => list<Tech>(await apiClient.get("/api/v1/fleet/technicians")) }) }
 
@@ -135,16 +137,19 @@ function NewOrder({ onCreated, vehicleId = "" }: { onCreated: (id: string) => vo
   return (
     <div style={card}>
       <h3 style={{ marginTop: 0 }}>New work order</h3>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <select aria-label="Vehicle" style={field} value={f.vehicleId} onChange={e => set("vehicleId", e.target.value)}><option value="">Vehicle…</option>{vehicles.map(v => <option key={v.id} value={v.id}>{v.registration}</option>)}</select>
-        <select aria-label="Type" style={field} value={f.type} onChange={e => set("type", e.target.value)}>{Object.entries(TYPE_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
-        <input aria-label="Title" placeholder="What needs doing" style={{ ...field, minWidth: 240 }} value={f.title} onChange={e => set("title", e.target.value)} />
-        <select aria-label="Priority" style={field} value={f.priority} onChange={e => set("priority", e.target.value)}>{PRIORITIES.map(p => <option key={p} value={p}>{p.charAt(0) + p.slice(1).toLowerCase()}</option>)}</select>
-        <select aria-label="Assign technician" style={field} value={f.technicianId} onChange={e => set("technicianId", e.target.value)}><option value="">Technician…</option>{techs.filter(t => t.active).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
-        <input aria-label="Supplier" placeholder="Supplier" style={field} value={f.supplier} onChange={e => set("supplier", e.target.value)} />
-        <input aria-label="Scheduled for" type="date" style={field} value={f.scheduledFor} onChange={e => set("scheduledFor", e.target.value)} />
-        <button type="button" style={{ ...btn, opacity: problem || create.isPending ? 0.5 : 1 }} disabled={!!problem || create.isPending} onClick={() => create.mutate()}>Create</button>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <L label="Vehicle *"><select aria-label="Vehicle" style={field} value={f.vehicleId} onChange={e => set("vehicleId", e.target.value)}><option value="">Choose…</option>{vehicles.map(v => <option key={v.id} value={v.id}>{v.registration}</option>)}</select></L>
+        <L label="Type of work"><select aria-label="Type" style={field} value={f.type} onChange={e => set("type", e.target.value)}>{Object.entries(TYPE_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></L>
+        <L label="Title *"><input aria-label="Title" placeholder="What needs doing" style={{ ...field, minWidth: 260 }} value={f.title} onChange={e => set("title", e.target.value)} /></L>
+        <L label="Priority"><select aria-label="Priority" style={field} value={f.priority} onChange={e => set("priority", e.target.value)}>{PRIORITIES.map(p => <option key={p} value={p}>{p.charAt(0) + p.slice(1).toLowerCase()}</option>)}</select></L>
+        <L label="Technician"><select aria-label="Assign technician" style={field} value={f.technicianId} onChange={e => set("technicianId", e.target.value)}><option value="">Not assigned</option>{techs.filter(t => t.active).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></L>
+        <L label="Supplier or workshop"><input aria-label="Supplier" style={field} value={f.supplier} onChange={e => set("supplier", e.target.value)} /></L>
+        <L label="Scheduled for"><input aria-label="Scheduled for" type="date" style={field} value={f.scheduledFor} onChange={e => set("scheduledFor", e.target.value)} /></L>
+        <L label="Odometer in (km)"><input aria-label="Odometer in" type="number" min="0" style={{ ...field, width: 130 }} value={f.odometerIn} onChange={e => set("odometerIn", e.target.value)} /></L>
       </div>
+      <div style={{ marginTop: 10 }}><L label="Description"><textarea aria-label="Description" rows={2} placeholder="Fault, symptoms, parts expected" style={{ ...field, width: "100%" }} value={f.description} onChange={e => set("description", e.target.value)} /></L></div>
+      <label style={{ display: "block", marginTop: 8, fontSize: 13 }}><input type="checkbox" aria-label="The vehicle is off the road now" checked={f.offRoadNow} onChange={e => setF(p => ({ ...p, offRoadNow: e.target.checked }))} /> The vehicle is off the road now (starts the downtime clock)</label>
+      <div style={{ marginTop: 10 }}><button type="button" style={{ ...btn, opacity: problem || create.isPending ? 0.5 : 1 }} disabled={!!problem || create.isPending} onClick={() => create.mutate()}>{create.isPending ? "Creating…" : "Create work order"}</button></div>
       {problem && <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 6 }}>{problem}</div>}
       {error && <div role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)", marginTop: 6 }}>{error}</div>}
     </div>
@@ -156,19 +161,40 @@ function Technicians() {
   const canManage = usePermission("FLEET_MANAGE")
   const { data: techs = [] } = useTechnicians()
   const [f, setF] = useState(emptyTech())
+  const [editing, setEditing] = useState<Tech | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const add = useMutation({ mutationFn: () => apiClient.post("/api/v1/fleet/technicians", techBody(f)), onSuccess: () => { setF(emptyTech()); setError(null); qc.invalidateQueries({ queryKey: ["fleet", "technicians"] }) }, onError: e => setError(errorOf(e)) })
+  const done = () => { setF(emptyTech()); setEditing(null); setError(null); qc.invalidateQueries({ queryKey: ["fleet", "technicians"] }) }
+  const save = useMutation({
+    mutationFn: () => editing ? apiClient.put(`/api/v1/fleet/technicians/${editing.id}`, techBody(f, editing.active)) : apiClient.post("/api/v1/fleet/technicians", techBody(f)),
+    onSuccess: done, onError: e => setError(errorOf(e)),
+  })
+  const toggle = useMutation({
+    mutationFn: (t: Tech) => apiClient.put(`/api/v1/fleet/technicians/${t.id}`, techBody(techForm(t), !t.active)),
+    onSuccess: done, onError: e => setError(errorOf(e)),
+  })
   const problem = techProblem(f)
   return (
     <div style={card}>
       <h3 style={{ marginTop: 0 }}>Technicians</h3>
       {techs.length === 0 && <p style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No technicians yet.</p>}
-      <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: 13 }}>{techs.map(t => <li key={t.id} style={{ padding: "4px 0" }}>{t.name}{t.phone ? ` · ${t.phone}` : ""}{t.hourlyRate != null ? ` · ${R(t.hourlyRate)}/h` : ""}{!t.active && " · inactive"}</li>)}</ul>
-      {canManage && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-        <input aria-label="Technician name" placeholder="Name" style={field} value={f.name} onChange={e => setF({ ...f, name: e.target.value })} />
-        <input aria-label="Technician phone" placeholder="Phone" style={field} value={f.phone} onChange={e => setF({ ...f, phone: e.target.value })} />
-        <input aria-label="Hourly rate" type="number" min="0" placeholder="Rate per hour (R)" style={field} value={f.hourlyRate} onChange={e => setF({ ...f, hourlyRate: e.target.value })} />
-        <button type="button" style={{ ...btn, opacity: problem || add.isPending ? 0.5 : 1 }} disabled={!!problem || add.isPending} onClick={() => add.mutate()}>Add technician</button>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: 13 }}>{techs.map(t => (
+        <li key={t.id} style={{ padding: "4px 0", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span>{t.name}{t.phone ? ` · ${t.phone}` : ""}{t.email ? ` · ${t.email}` : ""}{t.hourlyRate != null ? ` · ${R(t.hourlyRate)}/h` : ""}{!t.active && " · inactive"}</span>
+          {canManage && <>
+            <button type="button" style={{ ...field, padding: "3px 8px", fontSize: 12, cursor: "pointer" }} aria-label={`Edit ${t.name}`} onClick={() => { setEditing(t); setF(techForm(t)); setError(null) }}>Edit</button>
+            <button type="button" style={{ ...field, padding: "3px 8px", fontSize: 12, cursor: "pointer" }} aria-label={`${t.active ? "Deactivate" : "Reactivate"} ${t.name}`} disabled={toggle.isPending} onClick={() => toggle.mutate(t)}>{t.active ? "Deactivate" : "Reactivate"}</button></>}
+        </li>))}</ul>
+      {canManage && <div style={{ marginTop: 10 }}>
+        <p style={{ fontSize: 12, fontWeight: 800, color: "var(--hf-text-faint)", textTransform: "uppercase", letterSpacing: 0.5, margin: "0 0 6px" }}>{editing ? `Edit ${editing.name}` : "Add a technician"}</p>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <L label="Name *"><input aria-label="Technician name" style={field} value={f.name} onChange={e => setF({ ...f, name: e.target.value })} /></L>
+          <L label="Phone"><input aria-label="Technician phone" style={field} value={f.phone} onChange={e => setF({ ...f, phone: e.target.value })} /></L>
+          <L label="Email"><input aria-label="Technician email" type="email" style={field} value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></L>
+          <L label="Rate per hour (R)"><input aria-label="Hourly rate" type="number" min="0" style={{ ...field, width: 130 }} value={f.hourlyRate} onChange={e => setF({ ...f, hourlyRate: e.target.value })} /></L>
+          <button type="button" style={{ ...btn, opacity: problem || save.isPending ? 0.5 : 1 }} disabled={!!problem || save.isPending} onClick={() => save.mutate()}>{editing ? "Save technician" : "Add technician"}</button>
+          {editing && <button type="button" style={{ ...field, cursor: "pointer" }} onClick={done}>Cancel</button>}
+        </div>
+        {problem && f.name !== "" && <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 4 }}>{problem}</div>}
       </div>}
       {error && <div role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)", marginTop: 6 }}>{error}</div>}
     </div>

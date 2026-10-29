@@ -26,12 +26,13 @@ export const canEditLines = (status: string) => ["OPEN", "QUOTED", "APPROVED", "
 const bad = (v: string) => v.trim() !== "" && !(Number(v) >= 0)
 const num = (v: string) => (v.trim() === "" ? null : Number(v))
 
-export interface NewOrderForm { vehicleId: string; type: string; title: string; priority: string; technicianId: string; supplier: string; scheduledFor: string }
-export const emptyOrder = (): NewOrderForm => ({ vehicleId: "", type: "SERVICE", title: "", priority: "NORMAL", technicianId: "", supplier: "", scheduledFor: "" })
+export interface NewOrderForm { vehicleId: string; type: string; title: string; priority: string; technicianId: string; supplier: string; scheduledFor: string; description: string; odometerIn: string; offRoadNow: boolean }
+export const emptyOrder = (): NewOrderForm => ({ vehicleId: "", type: "SERVICE", title: "", priority: "NORMAL", technicianId: "", supplier: "", scheduledFor: "", description: "", odometerIn: "", offRoadNow: false })
 /** The vehicle named in a link such as ?vehicleId=abc, or "" when there is none. */
 export const vehicleFromQuery = (search: string): string => new URLSearchParams(search).get("vehicleId")?.trim() ?? ""
-export function orderProblem(f: NewOrderForm) { if (!f.vehicleId) return "Choose the vehicle."; if (!f.title.trim()) return "Say what the work is."; return null }
-export const orderBody = (f: NewOrderForm) => ({ vehicleId: f.vehicleId, type: f.type, title: f.title.trim(), priority: f.priority, technicianId: f.technicianId || null, supplier: f.supplier.trim() || null, scheduledFor: f.scheduledFor || null })
+export function orderProblem(f: NewOrderForm) { if (!f.vehicleId) return "Choose the vehicle."; if (!f.title.trim()) return "Say what the work is."; if (f.odometerIn.trim() !== "" && !(Number(f.odometerIn) >= 0)) return "The odometer must be zero or more."; return null }
+export const orderBody = (f: NewOrderForm) => ({ vehicleId: f.vehicleId, type: f.type, title: f.title.trim(), priority: f.priority, technicianId: f.technicianId || null, supplier: f.supplier.trim() || null, scheduledFor: f.scheduledFor || null,
+  description: f.description.trim() || null, odometerIn: f.odometerIn.trim() === "" ? null : Number(f.odometerIn), vehicleOffRoadFrom: f.offRoadNow ? new Date().toISOString() : null })
 
 export interface QuoteForm { amount: string; supplier: string; quotationRef: string; validUntil: string }
 export const emptyQuote = (): QuoteForm => ({ amount: "", supplier: "", quotationRef: "", validUntil: "" })
@@ -70,7 +71,8 @@ export function varianceText(variance: number | null | undefined): string | null
 export interface TechForm { name: string; phone: string; email: string; hourlyRate: string }
 export const emptyTech = (): TechForm => ({ name: "", phone: "", email: "", hourlyRate: "" })
 export function techProblem(f: TechForm) { if (!f.name.trim()) return "Enter the technician's name."; if (bad(f.hourlyRate)) return "The hourly rate must be zero or more."; return null }
-export const techBody = (f: TechForm) => ({ name: f.name.trim(), phone: f.phone.trim() || null, email: f.email.trim() || null, hourlyRate: num(f.hourlyRate), active: true })
+export const techBody = (f: TechForm, active = true) => ({ name: f.name.trim(), phone: f.phone.trim() || null, email: f.email.trim() || null, hourlyRate: num(f.hourlyRate), active })
+export const techForm = (t: { name: string; phone: string | null; email?: string | null; hourlyRate: number | null }): TechForm => ({ name: t.name, phone: t.phone ?? "", email: t.email ?? "", hourlyRate: t.hourlyRate == null ? "" : String(t.hourlyRate) })
 
 // ── Attachments: quotations, invoices, job cards and photos ─────────────────────────────────────────────
 export const ATTACHMENT_TYPES = ["QUOTATION", "INVOICE", "JOB_CARD", "PHOTO", "OTHER"]
