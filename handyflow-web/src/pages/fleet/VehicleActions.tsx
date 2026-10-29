@@ -8,6 +8,7 @@ import { apiClient } from "../../api/client"
 import { errorMessage, fetchAllPages, fieldErrorsOf } from "./apiShape"
 import { X, AlertCircle, CheckCircle } from "lucide-react"
 import { STATUS_CFG } from "./vehicleStatus"
+import { ACQUISITION_METHODS, DRIVE_TYPES, TRANSMISSIONS, optionLabel } from "./vehicleEdit.logic"
 
 const plainInput: React.CSSProperties = { width: "100%", padding: "9px 12px", boxSizing: "border-box", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, background: "var(--hf-surface)", outline: "none" }
 
@@ -35,6 +36,25 @@ const EMPTY_FORM = {
   licenceDiscExpiry: "", roadworthyExpiry: "", insuranceExpiry: "",
   dailyRate: "", serviceIntervalKm: "10000", serviceIntervalDays: "",
   assignedDriverName: "", vin: "", notes: "",
+  tankCapacityLitres: "", engineNumber: "", variant: "", bodyType: "", transmission: "", driveType: "",
+  axleCount: "", gvmKg: "", tareKg: "", payloadKg: "", gcmKg: "",
+  acquisitionDate: "", acquisitionMethod: "", purchasePrice: "", currentBookValue: "", currentEstimatedValue: "", valuedAt: "",
+}
+type RegisterForm = typeof EMPTY_FORM
+const NUMBER_KEYS: (keyof RegisterForm)[] = ["tankCapacityLitres", "axleCount", "gvmKg", "tareKg", "payloadKg", "gcmKg", "purchasePrice", "currentBookValue", "currentEstimatedValue"]
+const IDENTITY_KEYS: (keyof RegisterForm)[] = ["engineNumber", "variant", "bodyType", "transmission", "driveType", "acquisitionDate", "acquisitionMethod", "valuedAt"]
+
+/** The identity, mass and value details, as the server expects them: blank means not recorded. */
+export function extraBody(f: RegisterForm): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const k of NUMBER_KEYS) out[k] = f[k] === "" ? null : Number(f[k])
+  for (const k of IDENTITY_KEYS) out[k] = f[k].trim() || null
+  return out
+}
+export function extraProblem(f: RegisterForm): string | null {
+  for (const k of NUMBER_KEYS) if (f[k] !== "" && !(Number(f[k]) >= 0)) return "Masses, capacity and values must be zero or more."
+  if (f.gvmKg !== "" && f.tareKg !== "" && Number(f.tareKg) > Number(f.gvmKg)) return "Tare cannot be more than the GVM."
+  return null
 }
 
 
@@ -56,6 +76,8 @@ export function RegisterVehicleModal({ onClose }: { onClose: () => void }) {
     if (!form.model.trim())        errs.model        = "Model is required"
     if (form.year && (isNaN(Number(form.year)) || Number(form.year) < 1950 || Number(form.year) > new Date().getFullYear() + 1))
       errs.year = "Enter a valid year"
+    const extra = extraProblem(form)
+    if (extra) errs.gvmKg = extra
     setFieldErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -114,6 +136,22 @@ export function RegisterVehicleModal({ onClose }: { onClose: () => void }) {
             </div>
           </Sect>
 
+          <Sect title="Identity and specification">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div><label style={lbl}>Engine number</label><input aria-label="Engine number" value={form.engineNumber} onChange={e => setForm(f => ({ ...f, engineNumber: e.target.value }))} style={inp("engineNumber")} /></div>
+              <div><label style={lbl}>Variant</label><input aria-label="Variant" value={form.variant} onChange={e => setForm(f => ({ ...f, variant: e.target.value }))} placeholder="2.8 GD-6 Raider" style={inp("variant")} /></div>
+              <div><label style={lbl}>Body type</label><input aria-label="Body type" value={form.bodyType} onChange={e => setForm(f => ({ ...f, bodyType: e.target.value }))} placeholder="Double cab, dropside…" style={inp("bodyType")} /></div>
+              <div><label style={lbl}>Tank capacity (L)</label><input aria-label="Tank capacity (L)" type="number" min="0" value={form.tankCapacityLitres} onChange={e => setForm(f => ({ ...f, tankCapacityLitres: e.target.value }))} style={inp("tankCapacityLitres")} /></div>
+              <div><label style={lbl}>Transmission</label><select aria-label="Transmission" value={form.transmission} onChange={e => setForm(f => ({ ...f, transmission: e.target.value }))} style={inp("transmission")}><option value="">Not recorded</option>{TRANSMISSIONS.map(t => <option key={t} value={t}>{optionLabel(t)}</option>)}</select></div>
+              <div><label style={lbl}>Drive type</label><select aria-label="Drive type" value={form.driveType} onChange={e => setForm(f => ({ ...f, driveType: e.target.value }))} style={inp("driveType")}><option value="">Not recorded</option>{DRIVE_TYPES.map(t => <option key={t} value={t}>{optionLabel(t)}</option>)}</select></div>
+              <div><label style={lbl}>Axles</label><input aria-label="Axles" type="number" min="0" value={form.axleCount} onChange={e => setForm(f => ({ ...f, axleCount: e.target.value }))} style={inp("axleCount")} /></div>
+              <div><label style={lbl}>GVM (kg)</label><input aria-label="GVM (kg)" type="number" min="0" value={form.gvmKg} onChange={e => setForm(f => ({ ...f, gvmKg: e.target.value }))} style={inp("gvmKg")} /><FErr message={fieldErrors.gvmKg} /></div>
+              <div><label style={lbl}>Tare (kg)</label><input aria-label="Tare (kg)" type="number" min="0" value={form.tareKg} onChange={e => setForm(f => ({ ...f, tareKg: e.target.value }))} style={inp("tareKg")} /></div>
+              <div><label style={lbl}>Payload (kg)</label><input aria-label="Payload (kg)" type="number" min="0" value={form.payloadKg} onChange={e => setForm(f => ({ ...f, payloadKg: e.target.value }))} style={inp("payloadKg")} /><div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 3 }}>Leave blank to work it out from GVM minus tare</div></div>
+              <div><label style={lbl}>Gross combination mass (kg)</label><input aria-label="Gross combination mass (kg)" type="number" min="0" value={form.gcmKg} onChange={e => setForm(f => ({ ...f, gcmKg: e.target.value }))} style={inp("gcmKg")} /></div>
+            </div>
+          </Sect>
+
           <Sect title="Compliance Dates">
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
               <div>
@@ -163,6 +201,17 @@ export function RegisterVehicleModal({ onClose }: { onClose: () => void }) {
             </div>
           </Sect>
 
+          <Sect title="Acquisition and value">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+              <div><label style={lbl}>Acquired on</label><input aria-label="Acquired on" type="date" value={form.acquisitionDate} onChange={e => setForm(f => ({ ...f, acquisitionDate: e.target.value }))} style={inp("acquisitionDate")} /></div>
+              <div><label style={lbl}>Acquired by</label><select aria-label="Acquired by" value={form.acquisitionMethod} onChange={e => setForm(f => ({ ...f, acquisitionMethod: e.target.value }))} style={inp("acquisitionMethod")}><option value="">Not recorded</option>{ACQUISITION_METHODS.map(t => <option key={t} value={t}>{optionLabel(t)}</option>)}</select></div>
+              <div><label style={lbl}>Purchase price (R)</label><input aria-label="Purchase price (R)" type="number" min="0" value={form.purchasePrice} onChange={e => setForm(f => ({ ...f, purchasePrice: e.target.value }))} style={inp("purchasePrice")} /></div>
+              <div><label style={lbl}>Book value (R)</label><input aria-label="Book value (R)" type="number" min="0" value={form.currentBookValue} onChange={e => setForm(f => ({ ...f, currentBookValue: e.target.value }))} style={inp("currentBookValue")} /></div>
+              <div><label style={lbl}>Estimated value (R)</label><input aria-label="Estimated value (R)" type="number" min="0" value={form.currentEstimatedValue} onChange={e => setForm(f => ({ ...f, currentEstimatedValue: e.target.value }))} style={inp("currentEstimatedValue")} /></div>
+              <div><label style={lbl}>Valued on</label><input aria-label="Valued on" type="date" value={form.valuedAt} onChange={e => setForm(f => ({ ...f, valuedAt: e.target.value }))} style={inp("valuedAt")} /></div>
+            </div>
+          </Sect>
+
           <div>
             <label style={lbl}>Notes</label>
             <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} style={{ ...inp("notes"), resize: "vertical" as const }} placeholder="Condition, known issues, history..." />
@@ -171,7 +220,7 @@ export function RegisterVehicleModal({ onClose }: { onClose: () => void }) {
           {apiError && <ErrBanner msg={apiError} />}
           <MFoot
             onCancel={() => onClose()}
-            onSubmit={() => { if (validate()) createVehicle.mutate({ registration: form.registration, make: form.make, model: form.model, year: form.year ? Number(form.year) : null, vehicleType: form.vehicleType, colour: form.colour || null, fuelType: form.fuelType || null, vin: form.vin || null, licenceDiscExpiry: form.licenceDiscExpiry || null, roadworthyExpiry: form.roadworthyExpiry || null, insuranceExpiry: form.insuranceExpiry || null, serviceIntervalKm: form.serviceIntervalKm ? Number(form.serviceIntervalKm) : 10000, serviceIntervalDays: form.serviceIntervalDays ? Number(form.serviceIntervalDays) : null, dailyRate: form.dailyRate ? Number(form.dailyRate) : null, assignedDriverName: form.assignedDriverName || null, notes: form.notes || null }) }}
+            onSubmit={() => { if (validate()) createVehicle.mutate({ registration: form.registration, make: form.make, model: form.model, year: form.year ? Number(form.year) : null, vehicleType: form.vehicleType, colour: form.colour || null, fuelType: form.fuelType || null, vin: form.vin || null, licenceDiscExpiry: form.licenceDiscExpiry || null, roadworthyExpiry: form.roadworthyExpiry || null, insuranceExpiry: form.insuranceExpiry || null, serviceIntervalKm: form.serviceIntervalKm ? Number(form.serviceIntervalKm) : 10000, serviceIntervalDays: form.serviceIntervalDays ? Number(form.serviceIntervalDays) : null, dailyRate: form.dailyRate ? Number(form.dailyRate) : null, assignedDriverName: form.assignedDriverName || null, notes: form.notes || null, ...extraBody(form) }) }}
             loading={createVehicle.isPending}
             label="Register Vehicle"
           />

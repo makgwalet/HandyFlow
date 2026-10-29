@@ -94,6 +94,22 @@ describe("VehiclesTab", () => {
     fireEvent.change(screen.getByPlaceholderText("GP 12 34 JHB"), { target: { value: "gp 99 jhb" } }); fireEvent.change(screen.getByPlaceholderText("Toyota"), { target: { value: "Ford" } }); fireEvent.change(screen.getByPlaceholderText("Hilux"), { target: { value: "Ranger" } })
     fireEvent.click(screen.getByRole("button", { name: "Register Vehicle" })); await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fleet/vehicles", expect.objectContaining({ registration: "GP 99 JHB", make: "Ford", model: "Ranger" })))
   })
+  it("registers a vehicle with its identity, masses and value", async () => {
+    wrap(); await screen.findByLabelText("AAA1"); fireEvent.click(screen.getByText("Register vehicle"))
+    const type = (l: string, v: string) => fireEvent.change(screen.getByLabelText(l), { target: { value: v } })
+    fireEvent.change(screen.getByPlaceholderText("GP 12 34 JHB"), { target: { value: "gp 99 jhb" } }); fireEvent.change(screen.getByPlaceholderText("Toyota"), { target: { value: "Isuzu" } }); fireEvent.change(screen.getByPlaceholderText("Hilux"), { target: { value: "FTR 850" } })
+    type("Engine number", "4HK1TEST001"); type("Transmission", "AUTOMATIC"); type("Drive type", "RWD"); type("GVM (kg)", "8500"); type("Tare (kg)", "4200")
+    type("Acquired by", "PURCHASED"); type("Purchase price (R)", "785000"); type("Tank capacity (L)", "200")
+    fireEvent.click(screen.getByRole("button", { name: "Register Vehicle" }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fleet/vehicles", expect.objectContaining({ engineNumber: "4HK1TEST001", transmission: "AUTOMATIC", driveType: "RWD", gvmKg: 8500, tareKg: 4200, acquisitionMethod: "PURCHASED", purchasePrice: 785000, tankCapacityLitres: 200, payloadKg: null })))
+  })
+  it("will not register a vehicle whose tare is more than its GVM", async () => {
+    wrap(); await screen.findByLabelText("AAA1"); fireEvent.click(screen.getByText("Register vehicle"))
+    fireEvent.change(screen.getByPlaceholderText("GP 12 34 JHB"), { target: { value: "gp 99 jhb" } }); fireEvent.change(screen.getByPlaceholderText("Toyota"), { target: { value: "Isuzu" } }); fireEvent.change(screen.getByPlaceholderText("Hilux"), { target: { value: "FTR" } })
+    fireEvent.change(screen.getByLabelText("GVM (kg)"), { target: { value: "3000" } }); fireEvent.change(screen.getByLabelText("Tare (kg)"), { target: { value: "4000" } })
+    fireEvent.click(screen.getByRole("button", { name: "Register Vehicle" }))
+    expect(await screen.findByText("Tare cannot be more than the GVM.")).toBeTruthy(); expect(post).not.toHaveBeenCalled()
+  })
   it("changes status and assigns a driver without opening the row", async () => {
     get.mockImplementation((url: string) => (url.includes("/fuel-analytics/vehicles") ? ok([]) : url.includes("/drivers") ? ok({ content: [{ id: "d1", firstName: "Sipho", lastName: "Dlamini", status: "ACTIVE" }] }) : url.includes("/vehicles") ? ok({ content: vehicles }) : ok([])))
     wrap(); await screen.findByLabelText("AAA1")
