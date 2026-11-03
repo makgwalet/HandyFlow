@@ -40,3 +40,5 @@ $env:MAIL_PASSWORD = "vvmqpuluhrxrecxh"
 .env.local
 !.env.example
 
+tools/sample-uploads/
+
