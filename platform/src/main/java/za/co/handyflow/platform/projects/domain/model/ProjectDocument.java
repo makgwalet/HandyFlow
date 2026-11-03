@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import za.co.handyflow.platform.projects.domain.enums.DocumentStatus;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -53,6 +54,15 @@ public class ProjectDocument {
     @Column(name = "voided_at")         Instant voidedAt;
     @Column(name = "voided_by")         UUID    voidedBy;
     @Column(name = "void_reason")       String  voidReason;
+
+    // ── Stored file (null evidenceId = a link-only entry) ─────────────────────
+    @Column(name = "evidence_id")                    UUID   evidenceId;
+    @Column(name = "file_sha256", length = 64)       String fileSha256;
+    @Column(name = "content_type", length = 150)     String contentType;
+
+    // ── Retention (stamped at project closure; nothing is auto-deleted) ───────
+    @Column(name = "retention_until")                LocalDate retentionUntil;
+    @Column(name = "legal_hold", nullable = false)   boolean   legalHold = false;
 
     @Column(name = "created_at", nullable = false) Instant createdAt;
 
@@ -115,6 +125,31 @@ public class ProjectDocument {
     }
 
     public DocumentStatus statusEnum() { return DocumentStatus.valueOf(status); }
+
+    // ── Stored file ───────────────────────────────────────────────────────────
+
+    /**
+     * Marks this revision as a stored file. fileUrl becomes the authenticated download path of THIS
+     * revision, so existing screens that render fileUrl as a link keep working. Called once, before
+     * the first save.
+     */
+    public void attachStoredFile(UUID evidenceId, String sha256, String contentType,
+                                 String fileName, Integer fileSizeKb) {
+        if (this.evidenceId != null) throw new IllegalStateException("This revision already has a stored file");
+        this.evidenceId  = evidenceId;
+        this.fileSha256  = sha256;
+        this.contentType = contentType;
+        this.fileName    = fileName;
+        this.fileSizeKb  = fileSizeKb;
+        this.fileUrl     = "/api/v1/projects/documents/" + id + "/download";
+    }
+
+    public boolean hasStoredFile() { return evidenceId != null; }
+
+    // ── Retention ─────────────────────────────────────────────────────────────
+
+    /** Legal hold can be placed or lifted at any status — a superseded revision can still be needed in a dispute. */
+    public void changeLegalHold(boolean hold) { this.legalHold = hold; }
 
     private void transition(DocumentStatus target) {
         DocumentStatus current = DocumentStatus.valueOf(status);

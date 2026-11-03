@@ -3,6 +3,7 @@ package za.co.handyflow.platform.projects.dto;
 import za.co.handyflow.platform.projects.domain.model.ProjectDocument;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 public record DocumentResponse(
@@ -24,7 +25,12 @@ public record DocumentResponse(
         Instant approvedAt,
         Instant voidedAt,
         String  voidReason,
-        Instant createdAt
+        Instant createdAt,
+        boolean storedFile,
+        String  fileSha256,
+        String  contentType,
+        LocalDate retentionUntil,
+        boolean legalHold
 ) {
     public static DocumentResponse of(ProjectDocument d) {
         return new DocumentResponse(
@@ -32,6 +38,8 @@ public record DocumentResponse(
                 d.getRevision(), d.getFileUrl(), d.getFileName(), d.getFileSizeKb(),
                 d.getStatus(), d.getVisibility(), d.getDescription(), d.getUploadedByName(),
                 d.getSupersededBy(), d.getApprovedByName(), d.getApprovedAt(),
-                d.getVoidedAt(), d.getVoidReason(), d.getCreatedAt());
+                d.getVoidedAt(), d.getVoidReason(), d.getCreatedAt(),
+                d.hasStoredFile(), d.getFileSha256(), d.getContentType(),
+                d.getRetentionUntil(), d.isLegalHold());
     }
 }

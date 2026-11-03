@@ -72,6 +72,19 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     Optional<Project> findByTenantAndId(@Param("tenantId") UUID tenantId,
                                         @Param("id")       UUID id);
 
+    /**
+     * Not-cancelled projects whose name equals the given one, ignoring case and surrounding spaces.
+     * Used by ProjectsFacade (Earthmoving site reconciliation). More than one row means ambiguous.
+     */
+    @Query("""
+            SELECT p FROM Project p
+            WHERE p.tenantId = :tenantId
+              AND p.status <> 'CANCELLED'
+              AND LOWER(TRIM(p.name)) = LOWER(TRIM(:name))
+            ORDER BY p.createdAt ASC
+            """)
+    List<Project> findActiveByExactName(@Param("tenantId") UUID tenantId, @Param("name") String name);
+
     @Query("SELECT p FROM Project p WHERE p.clientPortalToken = :token")
     Optional<Project> findByPortalToken(@Param("token") String token);
 

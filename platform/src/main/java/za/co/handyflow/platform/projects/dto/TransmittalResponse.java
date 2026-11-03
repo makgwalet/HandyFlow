@@ -13,7 +13,8 @@ public record TransmittalResponse(
         String purpose, String notes, String sentByName, Instant sentAt,
         Instant acknowledgedAt, String acknowledgedBy, List<Item> items
 ) {
-    public record Item(UUID documentId, String documentNumber, String title, String revision, String statusAtSend) {}
+    public record Item(UUID documentId, String documentNumber, String title, String revision, String statusAtSend,
+                       String fileName, String fileSha256) {}
 
     public static TransmittalResponse of(ProjectTransmittal t, List<ProjectTransmittalItem> items) {
         return new TransmittalResponse(t.getId(), t.getTransmittalNumber(), t.getSubject(),
@@ -21,6 +22,7 @@ public record TransmittalResponse(
                 t.getPurpose(), t.getNotes(), t.getSentByName(), t.getSentAt(),
                 t.getAcknowledgedAt(), t.getAcknowledgedBy(),
                 items.stream().map(i -> new Item(i.getDocumentId(), i.getDocumentNumber(),
-                        i.getTitle(), i.getRevision(), i.getStatusAtSend())).toList());
+                        i.getTitle(), i.getRevision(), i.getStatusAtSend(),
+                        i.getFileName(), i.getFileSha256())).toList());
     }
 }

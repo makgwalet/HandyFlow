@@ -66,6 +66,15 @@ public class ProjectClosureChecks {
                 count("SELECT COUNT(r) FROM ProjectRisk r WHERE r.projectId = :pid "
                         + "AND r.rating = 'RED' AND r.status = 'OPEN'", pid)));
 
+        // Document control: a closed project's register is frozen, so anything still open there is worth a last look.
+        checks.add(check("DOCUMENTS_AWAITING_REVIEW", "Documents submitted for review but not yet approved or rejected", false,
+                count("SELECT COUNT(d) FROM ProjectDocument d WHERE d.projectId = :pid "
+                        + "AND d.status = 'FOR_REVIEW'", pid)));
+
+        checks.add(check("UNACKNOWLEDGED_TRANSMITTALS", "Transmittals the recipient has not acknowledged", false,
+                count("SELECT COUNT(t) FROM ProjectTransmittal t WHERE t.projectId = :pid "
+                        + "AND t.acknowledgedAt IS NULL", pid)));
+
         boolean ready = checks.stream().noneMatch(c -> c.blocking() && !c.passed());
         return new ClosureReadinessResponse(ready, checks);
     }

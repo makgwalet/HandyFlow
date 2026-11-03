@@ -1,6 +1,8 @@
 package za.co.handyflow.platform.projects.domain.repository;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import za.co.handyflow.platform.projects.domain.model.ProjectTransmittal;
@@ -18,4 +20,11 @@ public interface ProjectTransmittalRepository extends JpaRepository<ProjectTrans
     Optional<ProjectTransmittal> findByProjectAndId(@Param("tenantId") UUID tenantId,
                                                     @Param("projectId") UUID projectId,
                                                     @Param("id") UUID id);
+
+    /** Locked variant for recording an acknowledgement, so two simultaneous acknowledgements cannot both succeed. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT t FROM ProjectTransmittal t WHERE t.tenantId = :tenantId AND t.projectId = :projectId AND t.id = :id")
+    Optional<ProjectTransmittal> findByProjectAndIdForUpdate(@Param("tenantId") UUID tenantId,
+                                                             @Param("projectId") UUID projectId,
+                                                             @Param("id") UUID id);
 }

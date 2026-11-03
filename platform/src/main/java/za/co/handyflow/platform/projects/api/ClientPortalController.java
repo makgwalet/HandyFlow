@@ -18,6 +18,7 @@ import za.co.handyflow.platform.shared.ApiResponse;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Public (unauthenticated) client portal endpoint.
@@ -89,5 +90,19 @@ public class ClientPortalController {
                 .header("X-Robots-Tag", "noindex, nofollow")
                 .header("Referrer-Policy", "no-referrer")
                 .body(ApiResponse.success("Success", body));
+    }
+
+    /**
+     * Downloads one stored file. The same token rules as the portal page apply (rate limit, enabled,
+     * not expired), and the document must be APPROVED, marked CLIENT and belong to THIS project —
+     * checked again on every request, so withdrawing a document from the client takes effect at once.
+     * Anything else is the same 404. Each download is written to the document's trail as "Client portal".
+     */
+    @GetMapping("/{token}/documents/{docId}/download")
+    @Operation(summary = "Download an approved, client-visible stored file — no authentication, the token is the credential")
+    public ResponseEntity<byte[]> downloadDocument(
+            @PathVariable String token, @PathVariable UUID docId, HttpServletRequest request) {
+        Project p = portalService.resolve(token, request.getRemoteAddr());
+        return DocumentDownloads.response(documentService.downloadForPortal(p, docId));
     }
 }

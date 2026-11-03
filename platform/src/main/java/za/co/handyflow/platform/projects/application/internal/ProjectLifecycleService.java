@@ -19,6 +19,8 @@ import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -51,6 +53,7 @@ public class ProjectLifecycleService {
     private final ScheduleBaselineService        baselineService;
     private final ProjectCostService             costService;
     private final ChangeApplicationService       changeApplicationService;
+    private final DocumentService                documentService;
 
     @Value("${app.projects.require-approval-gate:false}")
     private boolean requireApprovalGate;
@@ -141,6 +144,11 @@ public class ProjectLifecycleService {
             baselineService.snapshot(tenantId, projectId);
             costService.snapshotBaseline(tenantId, projectId);   // CHUNK 4: original budget
             changeApplicationService.recordInitialBaseline(tenantId, projectId, userId, userName);   // CHUNK 5: baseline v1
+        }
+
+        // Document retention starts the day the project is closed (nothing is deleted; see DocumentService).
+        if (action == ProjectAction.CLOSE) {
+            documentService.stampRetention(tenantId, projectId, LocalDate.now(ZoneId.of("Africa/Johannesburg")));
         }
 
         log.info("Project={} {} -> {} via {} by user={}",

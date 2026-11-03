@@ -1,10 +1,14 @@
 package za.co.handyflow.platform.projects.domain.repository;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import za.co.handyflow.platform.projects.domain.model.ProjectDocument;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -64,4 +68,33 @@ public interface ProjectDocumentRepository extends JpaRepository<ProjectDocument
 
     @Query("SELECT d FROM ProjectDocument d WHERE d.tenantId = :tenantId AND d.id = :id")
     Optional<ProjectDocument> findByTenantAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
+
+    /**
+     * Same row, locked until the transaction ends. Used for approve / reject / void / visibility /
+     * legal-hold so two people acting on the same revision at once are serialised instead of both
+     * passing the status check on stale data.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT d FROM ProjectDocument d WHERE d.tenantId = :tenantId AND d.id = :id")
+    Optional<ProjectDocument> findByTenantAndIdForUpdate(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
+
+    /** Stamps every document of a project that has no retention date yet. Returns how many were stamped. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE ProjectDocument d SET d.retentionUntil = :until
+            WHERE d.tenantId = :tenantId AND d.projectId = :projectId AND d.retentionUntil IS NULL
+            """)
+    int stampRetention(@Param("tenantId") UUID tenantId, @Param("projectId") UUID projectId,
+                       @Param("until") LocalDate until);
+
+    /** Past their retention date and not on legal hold: listed for a human to review, never deleted. */
+    @Query("""
+            SELECT d FROM ProjectDocument d
+            WHERE d.tenantId = :tenantId AND d.projectId = :projectId
+              AND d.legalHold = false AND d.retentionUntil IS NOT NULL AND d.retentionUntil < :today
+            ORDER BY d.retentionUntil, d.documentNumber, d.createdAt
+            """)
+    List<ProjectDocument> findDueForRetentionReview(@Param("tenantId") UUID tenantId,
+                                                    @Param("projectId") UUID projectId,
+                                                    @Param("today") LocalDate today);
 }

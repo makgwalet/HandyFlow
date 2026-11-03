@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.projects.application.internal.document.TransmittalRules;
 import za.co.handyflow.platform.projects.domain.enums.ProjectStatus;
 import za.co.handyflow.platform.projects.domain.model.Project;
 import za.co.handyflow.platform.projects.domain.model.ProjectDocument;
@@ -27,9 +28,13 @@ import java.util.stream.Collectors;
  * purpose. RECORD ONLY — nothing is emailed from here.
  *
  * Every document must belong to this project (and tenant) and be live (CURRENT, FOR_REVIEW or
- * APPROVED). If any are not, the WHOLE request is refused and the offenders are listed, so a
- * transmittal never silently goes out with a superseded drawing. Items snapshot number, title,
- * revision and status at the time of sending.
+ * APPROVED). Issued FOR_CONSTRUCTION or AS_BUILT, every document must be APPROVED (TransmittalRules).
+ * If any are not, the WHOLE request is refused and the offenders are listed, so a transmittal never
+ * silently goes out with a superseded drawing or a draft marked "for construction". Items snapshot
+ * number, title, revision, status, file name and file hash at the time of sending.
+ *
+ * NOT DONE (needs decisions): emailing the recipient, and per-recipient access to the files. See the
+ * Projects module backlog.
  */
 @Slf4j
 @Service
@@ -60,10 +65,10 @@ public class TransmittalService {
                     .filter(x -> projectId.equals(x.getProjectId()));
             if (d.isEmpty()) {
                 problems.add(id + " (not found in this project)");
-            } else if (!d.get().statusEnum().canBeTransmitted()) {
-                problems.add(label(d.get()) + " is " + d.get().getStatus());
             } else {
-                docs.add(d.get());
+                String why = TransmittalRules.problem(req.purpose(), d.get().statusEnum());
+                if (why != null) problems.add(label(d.get()) + " " + why);
+                else docs.add(d.get());
             }
         }
         if (!problems.isEmpty()) {
@@ -98,7 +103,10 @@ public class TransmittalService {
 
     @Transactional
     public TransmittalResponse acknowledge(TenantId tenantId, UUID projectId, UUID id, String acknowledgedBy) {
-        ProjectTransmittal t = find(tenantId, projectId, id);
+        verifyProject(tenantId, projectId);
+        // Locked, so two simultaneous acknowledgements cannot both succeed and overwrite each other.
+        ProjectTransmittal t = transmittalRepo.findByProjectAndIdForUpdate(tenantId.getValue(), projectId, id)
+                .orElseThrow(() -> new HandyFlowException("Transmittal not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
         t.acknowledge(acknowledgedBy.trim());
         transmittalRepo.save(t);
         return TransmittalResponse.of(t, itemRepo.findByTransmittal(t.getId()));

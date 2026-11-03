@@ -184,7 +184,11 @@ public class SecurityConfig {
                                 "/api/v1/fleet/telematics/ingest",
                                 // CRM lead capture: called by a website form or another system with no login. Authenticated by the X-Crm-Key header
                                 // inside the service (unknown, missing or revoked key gets 401); rate limited in RateLimitFilter.
-                                "/api/v1/public/crm/leads"
+                                "/api/v1/public/crm/leads",
+                                // Projects client portal: opened by a client from an emailed link, with no login. The opaque token IS the
+                                // credential and is checked (format, rate limit per IP, enabled, not expired) inside ProjectPortalService.resolve()
+                                // on every request, including the file download. Without this line the page answered 401 to every client.
+                                "/api/public/projects/portal/**"
                         ).permitAll()
                         // Everything else requires authentication
                         .anyRequest().authenticated()
