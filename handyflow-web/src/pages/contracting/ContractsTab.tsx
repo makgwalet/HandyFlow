@@ -25,6 +25,7 @@ import {
   Calendar, MessageSquare, RefreshCw, Eye, EyeOff,
 } from 'lucide-react'
 import { unwrap, fmtR } from './ContractingPage'
+import { ContractSharingSection } from './ContractSharingSection'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -541,6 +542,9 @@ export default function ContractsTab() {
                         />
                       )}
                     </div>
+
+                    {/* Secure sharing of the signed contract (executed copy) */}
+                    {['SIGNED', 'EXPIRED', 'TERMINATED', 'ARCHIVED'].includes(c.status) && <ContractSharingSection contractId={c.id} />}
 
                     {/* Parties */}
                     <div style={{ marginBottom: 14 }}>

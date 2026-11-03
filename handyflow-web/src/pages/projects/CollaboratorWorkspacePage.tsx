@@ -13,7 +13,7 @@ export function CollaboratorWorkspacePage() {
   if (a.phase === 'dead') return <PublicShell><DeadLink error={a.error} /></PublicShell>
   if (a.phase === 'gate') return (
     <PublicShell>
-      <CodeGate heading="Your project documents" notice={a.notice} error={a.error} sendCode={a.sendCode} verify={a.verify}
+      <CodeGate heading="Your shared documents" notice={a.notice} error={a.error} sendCode={a.sendCode} verify={a.verify}
         intro="This is your standing workspace. We first confirm your email address with a six-digit code." />
     </PublicShell>
   )
@@ -21,7 +21,7 @@ export function CollaboratorWorkspacePage() {
 
   const ws = a.data
   return (
-    <PublicShell title="Project documents">
+    <PublicShell title="Shared documents">
       <div style={{ marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, margin: 0 }}>Hello, {ws.name}</h1>
         <div style={{ fontSize: 13, color: 'var(--hf-text-muted)' }}>

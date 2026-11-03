@@ -75,6 +75,16 @@ public interface EvidenceFacade {
      */
     String dispose(TenantId tenantId, String sourceModule, String relatedEntityType, UUID relatedEntityId, UUID evidenceId, String reason);
 
+    /** An active file attached to a record, with the hash taken when it was attached. */
+    record EvidenceFile(UUID id, String fileName, String contentType, long sizeBytes, String sha256, String evidenceType,
+                        String uploadedByName, java.time.Instant createdAt) {}
+
+    /**
+     * The active files attached to exactly this record, with their hashes, for a module that shares them through the Secure Document
+     * Access Engine (the hash is frozen when the share is issued). Never returns restricted evidence.
+     */
+    List<EvidenceFile> filesFor(TenantId tenantId, String sourceModule, String relatedEntityType, UUID relatedEntityId);
+
     /** Not found unless the file is active and attached to exactly this entity. */
     void detachRestricted(TenantId tenantId, String sourceModule, String relatedEntityType, UUID relatedEntityId, UUID evidenceId);
 }

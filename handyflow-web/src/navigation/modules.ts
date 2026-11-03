@@ -45,6 +45,7 @@ export const MODULE_REGISTRY: Record<string, Omit<ModuleNavItem, 'key'>> = {
   security:     { icon: Shield,        label: 'Security',     route: '/security'     },
   fuel:         { icon: Fuel,          label: 'Fuel',         route: '/fuel'         },
   facilities:   { icon: Wrench,        label: 'Facilities',   route: '/facilities'   },
+  facilitiesmanagement: { icon: Wrench, label: 'Facilities Management', route: '/facilitiesmanagement' },
   earthmoving:  { icon: HardHat,       label: 'Earthmoving',  route: '/earthmoving'  },
   property:     { icon: Building2,     label: 'Property',     route: '/property'     },
   fleet:        { icon: Car,           label: 'Fleet',        route: '/fleet'        },

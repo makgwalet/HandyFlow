@@ -54,6 +54,16 @@ public interface EvidenceRepository extends JpaRepository<Evidence, UUID> {
             @Param("relatedEntityType") String relatedEntityType,
             @Param("relatedEntityId") UUID relatedEntityId);
 
+    /** The active rows attached to exactly this record, hash included (for secure sharing). */
+    @Query("""
+        SELECT e FROM Evidence e
+        WHERE e.tenantId = :tenantId AND e.sourceModule = :sourceModule AND e.relatedEntityType = :relatedEntityType
+          AND e.relatedEntityId = :relatedEntityId AND e.status = 'ACTIVE'
+        ORDER BY e.createdAt DESC
+    """)
+    List<Evidence> findActiveRowsForEntity(@Param("tenantId") UUID tenantId, @Param("sourceModule") String sourceModule,
+                                           @Param("relatedEntityType") String relatedEntityType, @Param("relatedEntityId") UUID relatedEntityId);
+
     // NEW: Stage 3 — everything for a tenant, across every module/entity,
     // not scoped to one specific record. An auditor browsing evidence
     // doesn't already know which specific record they want to look at.

@@ -37,7 +37,7 @@ interface Summary {
 
 type View = 'due' | 'upcoming' | 'held' | 'requests' | 'policies' | 'disposed' | 'all'
 
-const MODULES: Record<string, string> = { PROJECTS: 'Projects', DOCUMENTS: 'Document Service' }
+const MODULES: Record<string, string> = { PROJECTS: 'Projects', DOCUMENTS: 'Document Service', CONTRACTING: 'Contracts', FM: 'Facilities Management' }
 const moduleName = (m: string) => MODULES[m] ?? m
 const d = (iso?: string | null) => iso ? new Date(iso.length === 10 ? iso + 'T00:00:00' : iso).toLocaleDateString('en-ZA', { dateStyle: 'medium' }) : '—'
 const dt = (iso?: string | null) => iso ? new Date(iso).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : '—'

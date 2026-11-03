@@ -92,6 +92,18 @@ public class Contract {
     @Column(name = "reminder_7_sent_at")  Instant reminder7SentAt;
     @Column(name = "reminder_1_sent_at")  Instant reminder1SentAt;
 
+    // ── Executed copy, retention and disposal (V581) ──────────────────────────
+    /** The signed contract rendered once and kept in the document store. Written once; the database refuses a replacement. */
+    @Column(name = "executed_storage_key") String  executedStorageKey;
+    @Column(name = "executed_sha256")      String  executedSha256;
+    @Column(name = "executed_size_bytes")  Long    executedSizeBytes;
+    @Column(name = "executed_stored_at")   Instant executedStoredAt;
+    /** Set when the retention clock was started in the records retention engine. */
+    @Column(name = "retention_clock_at")   Instant retentionClockAt;
+    /** Set when a disposal approved by two people deleted the executed copy and cleared the text. Final. */
+    @Column(name = "disposed_at")          Instant disposedAt;
+    @Column(name = "disposal_batch_id")    UUID    disposalBatchId;
+
     @Version long version;
 
     @Transient
@@ -103,6 +115,50 @@ public class Contract {
     }
 
     // ── Factory ───────────────────────────────────────────────────────────────
+
+    /** Signed, whatever happened after: these have an executed version that can be shared and must be kept. */
+    public static final java.util.Set<String> EXECUTED = java.util.Set.of("SIGNED", "EXPIRED", "TERMINATED", "ARCHIVED");
+    /** No longer in force: the retention clock runs from the day it ended. */
+    public static final java.util.Set<String> ENDED = java.util.Set.of("EXPIRED", "TERMINATED", "ARCHIVED");
+
+    public boolean isExecuted() { return EXECUTED.contains(status) && deletedAt == null; }
+    public boolean isEnded() { return ENDED.contains(status) && deletedAt == null; }
+    public boolean isDisposed() { return disposedAt != null; }
+    public boolean hasExecutedCopy() { return executedStorageKey != null; }
+
+    /** The day the contract stopped being in force: termination, else its end date, else its last change (SAST). */
+    public java.time.LocalDate endedOn() {
+        java.time.ZoneId z = java.time.ZoneId.of("Africa/Johannesburg");
+        if (terminatedAt != null) return terminatedAt.atZone(z).toLocalDate();
+        if (endDate != null) return endDate;
+        return (updatedAt != null ? updatedAt : Instant.now()).atZone(z).toLocalDate();
+    }
+
+    public void recordExecutedCopy(String storageKey, String sha256, long sizeBytes) {
+        if (!isExecuted()) throw new IllegalStateException("Only a signed contract has an executed copy");
+        if (executedStorageKey != null) throw new IllegalStateException("The executed copy is already stored");
+        this.executedStorageKey = storageKey;
+        this.executedSha256 = sha256;
+        this.executedSizeBytes = sizeBytes;
+        this.executedStoredAt = Instant.now();
+    }
+
+    public void markRetentionClockStarted() { if (retentionClockAt == null) this.retentionClockAt = Instant.now(); }
+
+    /**
+     * Disposal approved under the records retention rules: the contract text is replaced by a note, the record (number, title,
+     * parties, dates, body hash, executed-copy hash) stays. Only for a contract that is no longer in force.
+     */
+    public void dispose(UUID batchId) {
+        if (!isEnded()) throw new IllegalStateException("Only a contract that has ended can be disposed of");
+        if (disposedAt != null) throw new IllegalStateException("This contract was already disposed of");
+        this.disposedAt = Instant.now();
+        this.disposalBatchId = batchId;
+        this.body = "[The text of this contract was disposed of under the records retention policy on "
+                + java.time.LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg"))
+                + ". The contract number, parties, dates and hashes are kept as the record.]";
+        this.updatedAt = this.disposedAt;
+    }
 
     public static Contract create(TenantId tenantId, String contractNumber,
                                   String title, String contractType,

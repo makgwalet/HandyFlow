@@ -59,4 +59,29 @@ public interface ContractRepository extends JpaRepository<Contract, UUID> {
     @Query("SELECT c FROM Contract c WHERE c.tenantId = :#{#tenantId.value} AND c.refType = :refType AND c.refId = :refId AND c.deletedAt IS NULL ORDER BY c.createdAt")
     List<Contract> findByReference(TenantId tenantId, String refType, UUID refId);
 
+
+    // ── Executed copy and records retention (V581) ───────────────────────────
+
+    /** Same row, locked until the transaction ends (executed copy, disposal). */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM Contract c WHERE c.tenantId = :tenantId AND c.id = :id AND c.deletedAt IS NULL")
+    Optional<Contract> findForUpdate(@org.springframework.data.repository.query.Param("tenantId") UUID tenantId,
+                                     @org.springframework.data.repository.query.Param("id") UUID id);
+
+    /** Contracts no longer in force whose retention clock has not been started yet (all tenants, for the nightly sync). */
+    @Query("""
+            SELECT c FROM Contract c
+            WHERE c.status IN ('EXPIRED', 'TERMINATED', 'ARCHIVED') AND c.retentionClockAt IS NULL AND c.deletedAt IS NULL
+            ORDER BY c.updatedAt
+            """)
+    List<Contract> findEndedWithoutRetentionClock(org.springframework.data.domain.Pageable page);
+
+    /** Signed contracts that have no stored executed copy yet (all tenants, for the nightly sync). */
+    @Query("""
+            SELECT c FROM Contract c
+            WHERE c.status IN ('SIGNED', 'EXPIRED', 'TERMINATED', 'ARCHIVED') AND c.executedStorageKey IS NULL
+              AND c.disposedAt IS NULL AND c.deletedAt IS NULL
+            ORDER BY c.signedAt
+            """)
+    List<Contract> findExecutedWithoutCopy(org.springframework.data.domain.Pageable page);
 }

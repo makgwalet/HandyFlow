@@ -38,6 +38,7 @@ class FmWorkOrderControllerTest {
     @MockitoBean FmPdfService pdfService;
     @MockitoBean FmWorkOrderCostService costService;
     @MockitoBean EvidenceFacade evidenceFacade;
+    @MockitoBean za.co.handyflow.platform.facilitiesmanagement.application.internal.FmRecordsService records;
     @MockitoBean FeatureGuard featureGuard;
 
     static final String BASE = "/api/v1/facilitiesmanagement/work-orders";

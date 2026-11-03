@@ -52,6 +52,7 @@ public class FmWorkOrderController {
     private final FmWorkOrderCostService costService;
     private final EvidenceFacade evidenceFacade;
     private final FeatureGuard featureGuard;
+    private final za.co.handyflow.platform.facilitiesmanagement.application.internal.FmRecordsService records;
 
     @GetMapping
     @PreAuthorize(CAN_VIEW)
@@ -199,9 +200,10 @@ public class FmWorkOrderController {
             @RequestParam(defaultValue = "PHOTO") String evidenceType) {
         featureGuard.requireModule("facilitiesmanagement");
         workOrderService.requireAccessible(TenantContext.getTenantIdAsObject(), id);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Evidence attached",
-                evidenceFacade.attach(TenantContext.getTenantIdAsObject(), file, evidenceType, "facilitiesmanagement",
-                        "FmWorkOrder", id, null, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
+        EvidenceResponse attached = evidenceFacade.attach(TenantContext.getTenantIdAsObject(), file, evidenceType, "facilitiesmanagement",
+                "FmWorkOrder", id, null, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName());
+        records.fileAttachedToWorkOrder(TenantContext.getTenantIdAsObject(), id);   // records retention (V581)
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Evidence attached", attached));
     }
 
     @GetMapping("/{id}/evidence")

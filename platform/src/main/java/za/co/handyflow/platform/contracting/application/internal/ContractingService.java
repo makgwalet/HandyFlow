@@ -46,6 +46,7 @@ public class ContractingService {
     private final EmailService                   emailService;
     private final SmsService                     smsService;    // FIX: SMS now wired
     private final OtpRateLimitRepository          otpRateLimitRepo;
+    private final ContractRecordsService         records;   // executed copy + records retention (V581)
 
     @Value("${contracting.signing.base-url:http://localhost:5173}")
     private String baseUrl;
@@ -389,6 +390,7 @@ public class ContractingService {
         c.terminate(reason);
         contractRepo.save(c);
         c.setParties(partyRepo.findByContract(id));
+        records.contractEnded(tenantId, c);   // the retention clock starts today
         log.info("Contract {} terminated: {}", c.getContractNumber(), reason);
         // FIX: nobody was previously notified of a termination at all — see
         // sendTerminationNotifications()'s Javadoc.
@@ -537,6 +539,7 @@ public class ContractingService {
             contractRepo.save(c);
             log.info("Contract {} fully signed", c.getContractNumber());
             sendFullyExecutedNotifications(c);
+            records.contractSigned(tenantId, c.getId());
         } else {
             // Notify next party it's their turn (enforced signing order)
             notifyNextParty(c, parties);
@@ -671,6 +674,7 @@ public class ContractingService {
             fullyExecuted = true;
             log.info("Contract {} fully executed via public signing", c.getContractNumber());
             sendFullyExecutedNotifications(c);
+            records.contractSigned(TenantId.of(c.getTenantId()), c.getId());
         } else {
             notifyNextParty(c, parties);
         }
@@ -823,6 +827,9 @@ public class ContractingService {
     @Transactional(readOnly = true)
     public byte[] generatePdf(TenantId tenantId, UUID contractId) {
         Contract contract = findActive(tenantId, contractId);
+        if (contract.isDisposed()) throw ContractRecordsService.disposed();
+        // A signed contract's PDF is the frozen executed copy once it is stored, so every download is the same document.
+        if (contract.hasExecutedCopy()) return records.executedCopy(tenantId, contract);
         if (!"SIGNED".equals(contract.getStatus()) && !"TERMINATED".equals(contract.getStatus()))
             throw new IllegalStateException(
                     "PDF is only available for SIGNED or TERMINATED contracts. Status: "

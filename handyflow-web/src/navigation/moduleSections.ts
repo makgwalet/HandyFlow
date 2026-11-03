@@ -1102,6 +1102,27 @@ export const CRM_SECTIONS: ModuleSections = {
   ],
 }
 
+/**
+ * Facilities Management (the FM provider module, /api/v1/facilitiesmanagement). Its first screen: sharing a completed work
+ * order's files securely with the client or a third party. The rest of the FM provider screens are still to be built.
+ */
+export const FM_SECTIONS: ModuleSections = {
+  moduleKey: 'facilitiesmanagement',
+  basePath: '/facilitiesmanagement',
+  title: 'Facilities Management',
+  icon: Wrench,
+  defaultSection: 'shared-documents',
+  groups: [
+    {
+      label: 'Clients',
+      sections: [
+        { id: 'shared-documents', label: 'Shared documents', icon: FileText,
+          anyPermission: ['FACILITIESMANAGEMENT_READ', 'FACILITIESMANAGEMENT_MANAGE', 'FACILITIESMANAGEMENT_ADMIN'] },
+      ],
+    },
+  ],
+}
+
 const REGISTRY: ModuleSections[] = [
   BOOKKEEPING_SECTIONS,
   SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS, FACILITIES_SECTIONS, FLEET_SECTIONS, ACCOUNTING_SECTIONS, ACCOUNTANT_SECTIONS,
@@ -1111,7 +1132,7 @@ const REGISTRY: ModuleSections[] = [
   DEBT_COLLECTION_SECTIONS, MARKETING_SECTIONS, TRAINING_SECTIONS, WAREHOUSING_SECTIONS, COLLECTIONS_AGENCY_SECTIONS,
   INTERNAL_AUDIT_SECTIONS,
   RECRUITER_SECTIONS, CREATIVE_SECTIONS, CATALOGUE_SECTIONS, COMPLIANCE_SERVICES_SECTIONS, DESK_SECTIONS,
-  EXPENSES_SECTIONS, POS_SECTIONS, PROJECTS_SECTIONS, TASKS_SECTIONS, CRM_SECTIONS,
+  EXPENSES_SECTIONS, POS_SECTIONS, PROJECTS_SECTIONS, TASKS_SECTIONS, CRM_SECTIONS, FM_SECTIONS,
 ]
 
 /** Groups with sections the user may not see removed (and empty groups dropped). */

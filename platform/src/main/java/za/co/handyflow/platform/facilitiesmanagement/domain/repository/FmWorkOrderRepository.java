@@ -227,4 +227,23 @@ public interface FmWorkOrderRepository extends JpaRepository<FmWorkOrder, UUID> 
                                               @Param("allClients") boolean allClients, @Param("clientIds") Collection<UUID> clientIds,
                                               @Param("allJobs") boolean allJobs, @Param("technicianIds") Collection<UUID> technicianIds,
                                               Pageable pageable);
+
+    // ── Records retention and secure sharing (V581) ──────────────────────────
+
+    /** Finished work orders whose retention clock has not been started yet (all tenants, for the nightly sync). */
+    @Query("""
+            SELECT w FROM FmWorkOrder w
+            WHERE w.status IN ('COMPLETED', 'CANCELLED', 'REJECTED') AND w.retentionClockAt IS NULL AND w.deletedAt IS NULL
+            ORDER BY w.updatedAt
+            """)
+    List<FmWorkOrder> findFinishedWithoutRetentionClock(Pageable page);
+
+    /** Completed work orders, most recently completed first, optionally matching a number or description (the sharing screen). */
+    @Query("""
+            SELECT w FROM FmWorkOrder w
+            WHERE w.tenantId = :tenantId AND w.status = 'COMPLETED' AND w.deletedAt IS NULL
+              AND (:q = '' OR LOWER(w.workOrderNumber) LIKE CONCAT('%', :q, '%') OR LOWER(w.description) LIKE CONCAT('%', :q, '%'))
+            ORDER BY w.completedAt DESC
+            """)
+    List<FmWorkOrder> findCompletedForSharing(@Param("tenantId") TenantId tenantId, @Param("q") String q, Pageable page);
 }

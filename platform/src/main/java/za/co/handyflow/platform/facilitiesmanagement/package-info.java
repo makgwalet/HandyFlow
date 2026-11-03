@@ -48,7 +48,7 @@
  * posting), {@code evidence} (photo attachments on work orders/assets),
  * {@code notifications} (daily compliance/overdue/invoice-overdue sweep).
  */
-@ApplicationModule(allowedDependencies = {"shared", "identity", "billing", "accounting", "evidence", "notifications"})
+@ApplicationModule(allowedDependencies = {"shared", "identity", "billing", "accounting", "evidence", "notifications", "documents", "secureaccess"})
 package za.co.handyflow.platform.facilitiesmanagement;
 
 import org.springframework.modulith.ApplicationModule;

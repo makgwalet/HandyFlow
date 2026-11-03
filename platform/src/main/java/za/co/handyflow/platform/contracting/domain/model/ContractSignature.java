@@ -52,4 +52,11 @@ public class ContractSignature {
         s.signedAt      = Instant.now();
         return s;
     }
+
+    /** Disposal under the records retention rules: the drawn signature and the device details go; when and how it was signed stays. */
+    public void scrubForDisposal() {
+        this.signatureData = null;
+        this.ipAddress = null;
+        this.userAgent = null;
+    }
 }

@@ -33,4 +33,12 @@ public interface FmAssetRepository extends JpaRepository<FmAsset, UUID> {
     /** Live assets with exactly this tag. Tags are not guaranteed unique, so the caller refuses an ambiguous match. */
     @Query("SELECT a FROM FmAsset a WHERE a.tenantId.value = :#{#tenantId.value} AND a.assetTag = :tag AND a.deletedAt IS NULL")
     List<FmAsset> findActiveByTag(@Param("tenantId") TenantId tenantId, @Param("tag") String tag);
+
+    /** Decommissioned assets whose retention clock has not been started yet (all tenants, for the nightly sync). */
+    @Query("""
+            SELECT a FROM FmAsset a
+            WHERE a.status = 'DECOMMISSIONED' AND a.retentionClockAt IS NULL AND a.deletedAt IS NULL
+            ORDER BY a.updatedAt
+            """)
+    List<FmAsset> findDecommissionedWithoutRetentionClock(org.springframework.data.domain.Pageable page);
 }

@@ -28,6 +28,7 @@ import { useAuthStore }                 from "./store/auth.store"
 import { usePortalAuthStore }           from "./store/portalAuth.store"
 import { FuelPage }                     from "./pages/fuel/FuelPage"
 import { FacilitiesPage }               from "./pages/facilities/FacilitiesPage"
+import { FmPage }                       from "./pages/facilitiesmanagement/FmPage"
 import InternalAuditPage                from "./pages/internal-audit/InternalAuditPage"
 import { PropertyPage }                 from "./pages/property/PropertyPage"
 import { FleetPage }                    from "./pages/fleet/FleetPage"
@@ -313,6 +314,7 @@ export default function App() {
             <Route path="/security/:section?" element={<SecurityPage />} />
             <Route path="/fuel/:section?" element={<FuelPage />} />
             <Route path="/facilities/:section?" element={<FacilitiesPage />} />
+            <Route path="/facilitiesmanagement/:section?" element={<FmPage />} />
             <Route path="/internal-audit/:section/:engagementId" element={<InternalAuditPage />} />
             <Route path="/internal-audit/:section?" element={<InternalAuditPage />} />
             <Route path="/earthmoving/:section?" element={<EarthMovingPage />} />

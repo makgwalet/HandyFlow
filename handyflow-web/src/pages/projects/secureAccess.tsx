@@ -172,7 +172,7 @@ export function TransmittalCard({ view, onDownload, onAcknowledge }: {
     <div style={{ ...card, marginBottom: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', fontWeight: 600 }}>{view.reference} · {view.contextName}</div>
+          <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', fontWeight: 600 }}>{view.reference}{view.contextName ? ` · ${view.contextName}` : ''}</div>
           <h2 style={{ fontSize: 18, margin: '2px 0 4px' }}>{view.subject}</h2>
         </div>
         <span style={{ alignSelf: 'flex-start', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'var(--hf-info-soft-strong)', color: 'var(--hf-info-text)' }}>

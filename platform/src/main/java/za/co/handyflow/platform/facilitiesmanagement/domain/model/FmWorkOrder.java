@@ -491,6 +491,28 @@ public class FmWorkOrder {
         return "COMPLETED".equals(status) && !invoiced && cost != null && cost.signum() > 0;
     }
 
+    // ── Records retention (V581) ──────────────────────────────────────────────
+    /** Set when the retention clock of this record's files was started in the records retention engine. */
+    @Column(name = "retention_clock_at")
+    private Instant retentionClockAt;
+
+    /** Set when a disposal approved by two people deleted the files attached to this record. The record stays. */
+    @Column(name = "files_disposed_at")
+    private Instant filesDisposedAt;
+
+    @Column(name = "disposal_batch_id")
+    private UUID disposalBatchId;
+
+    public void markRetentionClockStarted() { if (retentionClockAt == null) this.retentionClockAt = Instant.now(); }
+
+    public boolean isFilesDisposed() { return filesDisposedAt != null; }
+
+    public void markFilesDisposed(UUID batchId) {
+        if (filesDisposedAt != null) throw new IllegalStateException("The files of this record were already disposed of");
+        this.filesDisposedAt = Instant.now();
+        this.disposalBatchId = batchId;
+    }
+
     public boolean isTerminal() {
         return "COMPLETED".equals(status) || "CANCELLED".equals(status) || "REJECTED".equals(status);
     }

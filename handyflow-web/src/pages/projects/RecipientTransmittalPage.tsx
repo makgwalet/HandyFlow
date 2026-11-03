@@ -16,7 +16,7 @@ export function RecipientTransmittalPage() {
   if (a.phase === 'loading' || !a.data) return <PublicShell><div style={{ padding: 60, textAlign: 'center', color: 'var(--hf-text-faint)' }}>Loading…</div></PublicShell>
 
   return (
-    <PublicShell title="Document transmittal">
+    <PublicShell title="Shared documents">
       <TransmittalCard view={a.data}
         onDownload={async d => { await a.guard(() => a.api.download(`/documents/${d.documentId}/download`, d.fileName || `${d.documentNumber}-${d.revision}`)) }}
         onAcknowledge={async note => { const v = await a.guard(() => a.api.post<PortalView>('/acknowledge', { note: note || null })); if (v) a.setData(v) }} />

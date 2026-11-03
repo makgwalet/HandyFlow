@@ -220,6 +220,16 @@ public class EvidenceService implements EvidenceFacade {
         return evidence.getFileHash();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<EvidenceFile> filesFor(TenantId tenantId, String sourceModule, String relatedEntityType, UUID relatedEntityId) {
+        if (EvidenceFacade.isRestricted(sourceModule)) return List.of();
+        return evidenceRepo.findActiveRowsForEntity(tenantId.getValue(), sourceModule, relatedEntityType, relatedEntityId).stream()
+                .map(e -> new EvidenceFile(e.getId(), e.getFileName(), e.getContentType(), e.getFileSizeBytes(), e.getFileHash(),
+                        e.getEvidenceType(), e.getUploadedByName(), e.getCreatedAt()))
+                .toList();
+    }
+
     private DownloadedEvidence read(TenantId tenantId, Evidence evidence) {
         UUID evidenceId = evidence.getId();
         if (evidence.isDisposed())
