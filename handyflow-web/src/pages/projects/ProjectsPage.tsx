@@ -9,6 +9,7 @@ import { PROJECTS_SECTIONS, findSection } from "../../navigation/moduleSections"
 import { ProjectDashboard } from "./ProjectDashboard"
 import { ProjectListTab }   from "./ProjectListTab"
 import { ProjectDetailTab } from "./ProjectDetailTab"
+import { CollaboratorsPage } from "./CollaboratorsPage"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -37,6 +38,7 @@ export function ProjectsPage() {
           case "projects":  return projectId
             ? <ProjectDetailTab projectId={projectId} onBack={closeProject} />
             : <ProjectListTab onOpen={openProject} />
+          case "collaborators": return <CollaboratorsPage />
           default:          return null
         }
       }} />

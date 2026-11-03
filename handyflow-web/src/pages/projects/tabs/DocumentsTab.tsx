@@ -1,13 +1,15 @@
 // src/pages/projects/tabs/DocumentsTab.tsx
 import React, { useState, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, FileText, ExternalLink, Upload, X, Link2 } from 'lucide-react'
+import { Plus, FileText, ExternalLink, Upload, X, Link2, Download, Lock, Eye, EyeOff } from 'lucide-react'
 import { apiClient } from '../../../api/client'
+import { downloadStoredDocument, errorText, uploadStoredDocument } from '../../../api/projectDocs'
 
 interface Doc {
-  id:string; documentType:string; title:string; revision:string|null; fileUrl:string|null
+  id:string; documentNumber:string|null; documentType:string; title:string; revision:string|null; fileUrl:string|null
   fileName:string|null; fileSizeKb:number|null; status:string; description:string|null
   uploadedByName:string|null; createdAt:string
+  visibility:string; storedFile:boolean; legalHold:boolean; retentionUntil:string|null; fileSha256:string|null
 }
 
 function unwrap<T>(r:any):T[]{const d=r?.data?.data??r?.data??[];return Array.isArray(d)?d as T[]:d?.content??[]}
@@ -26,8 +28,6 @@ const STATUS_COLOR:Record<string,{bg:string;color:string}>={
 const MAX_FILE_MB = 10
 const ACCEPT = '.pdf,.dwg,.dxf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.csv,.zip'
 const fmtSize = (bytes:number) => bytes < 1024*1024 ? `${(bytes/1024).toFixed(1)} KB` : `${(bytes/(1024*1024)).toFixed(1)} MB`
-const readAsDataUrl = (file:File):Promise<string> =>
-  new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result as string); r.onerror=rej; r.readAsDataURL(file) })
 
 // Drop zone
 function DropZone({ file, onFile, onClear }:{ file:File|null; onFile:(f:File)=>void; onClear:()=>void }) {
@@ -98,7 +98,7 @@ export function DocumentsTab({projectId}:{projectId:string}) {
   const [uploading,setUploading] = useState(false)
   const [uploadMode,setUploadMode] = useState<'drop'|'url'>('drop')
   const [selectedFile,setSelectedFile] = useState<File|null>(null)
-  const initF = () => ({ documentType:'GENERAL', title:'', revision:'', description:'', manualUrl:'' })
+  const initF = () => ({ documentType:'GENERAL', documentNumber:'', title:'', revision:'', description:'', manualUrl:'', visibility:'INTERNAL' })
   const [form,setForm] = useState(initF())
   const sf = (k:string,v:string) => setForm(p=>({...p,[k]:v}))
 
@@ -109,9 +109,25 @@ export function DocumentsTab({projectId}:{projectId:string}) {
   })
 
   const statusMut = useMutation({
-    mutationFn:({docId,action}:{docId:string;action:string})=>apiClient.post(`/api/v1/projects/documents/${docId}/${action}`),
-    onSuccess:()=>qc.invalidateQueries({queryKey:['pm-docs',projectId]}),
+    mutationFn:({docId,action,comment}:{docId:string;action:string;comment?:string})=>apiClient.post(`/api/v1/projects/documents/${docId}/${action}`, comment?{comment}:{}),
+    onSuccess:()=>{ setActionErr(''); qc.invalidateQueries({queryKey:['pm-docs',projectId]}) },
+    onError:async(e)=>setActionErr(await errorText(e,'That action failed.')),
   })
+  const [actionErr,setActionErr] = useState('')
+  const visMut = useMutation({
+    mutationFn:({docId,visibility}:{docId:string;visibility:string})=>apiClient.put(`/api/v1/projects/documents/${docId}/visibility`,{visibility}),
+    onSuccess:()=>{ setActionErr(''); qc.invalidateQueries({queryKey:['pm-docs',projectId]}) },
+    onError:async(e)=>setActionErr(await errorText(e,'Could not change visibility.')),
+  })
+  const holdMut = useMutation({
+    mutationFn:({docId,hold,reason}:{docId:string;hold:boolean;reason:string})=>apiClient.put(`/api/v1/projects/documents/${docId}/legal-hold`,{hold,reason}),
+    onSuccess:()=>{ setActionErr(''); qc.invalidateQueries({queryKey:['pm-docs',projectId]}) },
+    onError:async(e)=>setActionErr(await errorText(e,'Only a document controller can change a legal hold.')),
+  })
+  const row = { onAction:(a:{docId:string;action:string;comment?:string})=>statusMut.mutate(a),
+    onVisibility:(a:{docId:string;visibility:string})=>visMut.mutate(a),
+    onHold:(a:{docId:string;hold:boolean;reason:string})=>holdMut.mutate(a),
+    onDownload:async(d:Doc)=>{ try{ await downloadStoredDocument(d.id, d.fileName||d.title) }catch(e){ setActionErr(await errorText(e,'Download failed.')) } } }
 
   const handleFileSelect = (f:File) => {
     if (f.size > MAX_FILE_MB * 1024 * 1024) {
@@ -135,22 +151,20 @@ export function DocumentsTab({projectId}:{projectId:string}) {
     if (uploadMode==='url' && !form.manualUrl.trim()) { setErr('Please enter a URL'); return }
     try {
       setUploading(true)
-      let fileUrl:string, fileName:string|null=null, fileSizeKb:number|null=null
+      const common = { documentType:form.documentType, documentNumber:form.documentNumber.trim()||null, title:form.title.trim(),
+        revision:form.revision.trim()||null, description:form.description.trim()||null, visibility:form.visibility }
       if (uploadMode==='drop' && selectedFile) {
-        fileUrl = await readAsDataUrl(selectedFile)
-        fileName = selectedFile.name
-        fileSizeKb = Math.round(selectedFile.size/1024)
+        // Stored file: multipart, with the details as a JSON part (see uploadStoredDocument).
+        await uploadStoredDocument(projectId, common, selectedFile)
       } else {
-        fileUrl = form.manualUrl.trim()
+        const fileUrl = form.manualUrl.trim()
+        let fileName:string|null=null
         try { fileName = new URL(fileUrl).pathname.split('/').pop()??null } catch {}
+        await apiClient.post(`/api/v1/projects/${projectId}/documents`, { ...common, fileUrl, fileName, fileSizeKb:null })
       }
-      await apiClient.post(`/api/v1/projects/${projectId}/documents`, {
-        documentType:form.documentType, title:form.title.trim(), revision:form.revision||null,
-        fileUrl, fileName, fileSizeKb, description:form.description||null,
-      })
-      qc.invalidateQueries({queryKey:['pm-docs',projectId]}); handleClose()
+      qc.invalidateQueries({queryKey:['pm-docs',projectId]}); qc.invalidateQueries({queryKey:['pm-docs-live',projectId]}); handleClose()
     } catch(e:any) {
-      setErr(e.response?.data?.message||'Upload failed. Please try again.')
+      setErr(await errorText(e,'Upload failed. Please try again.'))
     } finally {
       setUploading(false)
     }
@@ -176,6 +190,7 @@ export function DocumentsTab({projectId}:{projectId:string}) {
         </button>
       </div>
 
+      {actionErr && <div role="alert" style={{marginBottom:12,padding:'8px 12px',background:'var(--hf-danger-soft)',border:'1px solid var(--hf-danger-border)',borderRadius:8,color:'var(--hf-danger-text)',fontSize:13}}>{actionErr}</div>}
       {isLoading ? <div style={{padding:40,textAlign:'center' as const,color:'var(--hf-text-faint)'}}>Loading…</div>
         : docs.length===0
           ? <div style={{textAlign:'center' as const,padding:'50px 20px',color:'var(--hf-text-faint)'}}>
@@ -184,11 +199,11 @@ export function DocumentsTab({projectId}:{projectId:string}) {
               <div style={{fontSize:13}}>Upload drawings, RFIs and contracts to manage your document register</div>
             </div>
           : (typeFilter
-              ? <DocList docs={docs} onAction={statusMut.mutate}/>
+              ? <DocList docs={docs} {...row}/>
               : Object.entries(groups).map(([type,items])=>(
                   <div key={type} style={{marginBottom:20}}>
                     <div style={{fontSize:12,fontWeight:700,color:DOC_COLOR[type]?.color??'var(--hf-text-tertiary)',textTransform:'uppercase' as const,letterSpacing:'0.05em',marginBottom:8}}>{type} ({items.length})</div>
-                    <DocList docs={items} onAction={statusMut.mutate}/>
+                    <DocList docs={items} {...row}/>
                   </div>
                 ))
             )
@@ -215,6 +230,16 @@ export function DocumentsTab({projectId}:{projectId:string}) {
               <div>
                 <label style={{display:'block',fontSize:12,fontWeight:600,color:'var(--hf-text-secondary)',marginBottom:5}}>Revision</label>
                 <input value={form.revision} onChange={e=>sf('revision',e.target.value)} placeholder="Rev A" style={inp}/>
+              </div>
+              <div>
+                <label style={{display:'block',fontSize:12,fontWeight:600,color:'var(--hf-text-secondary)',marginBottom:5}}>Document number (new revision of…)</label>
+                <input value={form.documentNumber} onChange={e=>sf('documentNumber',e.target.value)} placeholder="Leave blank for a new document" style={inp}/>
+              </div>
+              <div>
+                <label style={{display:'block',fontSize:12,fontWeight:600,color:'var(--hf-text-secondary)',marginBottom:5}}>Visible to</label>
+                <select value={form.visibility} onChange={e=>sf('visibility',e.target.value)} style={inp}>
+                  <option value="INTERNAL">Internal only</option><option value="CLIENT">Client portal (once approved)</option>
+                </select>
               </div>
               <div style={{gridColumn:'span 2'}}>
                 <label style={{display:'block',fontSize:12,fontWeight:600,color:'var(--hf-text-secondary)',marginBottom:5}}>Title *</label>
@@ -275,7 +300,13 @@ export function DocumentsTab({projectId}:{projectId:string}) {
   )
 }
 
-function DocList({docs,onAction}:{docs:Doc[];onAction:(a:any)=>void}) {
+function DocList({docs,onAction,onVisibility,onHold,onDownload}:{
+  docs:Doc[]
+  onAction:(a:{docId:string;action:string;comment?:string})=>void
+  onVisibility:(a:{docId:string;visibility:string})=>void
+  onHold:(a:{docId:string;hold:boolean;reason:string})=>void
+  onDownload:(d:Doc)=>Promise<void>
+}) {
   return (
     <div style={{border:'1px solid var(--hf-border)',borderRadius:10,overflow:'hidden'}}>
       {docs.map((d,i)=>{
@@ -290,7 +321,7 @@ function DocList({docs,onAction}:{docs:Doc[];onAction:(a:any)=>void}) {
             </div>
             <div style={{flex:1,minWidth:0}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
-                <span style={{fontSize:13,fontWeight:600,color:'var(--hf-text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' as const}}>{d.title}</span>
+                {d.documentNumber&&<span style={{fontSize:11,fontWeight:700,color:'var(--hf-text-faint)',flexShrink:0}}>{d.documentNumber}</span>}<span style={{fontSize:13,fontWeight:600,color:'var(--hf-text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' as const}}>{d.title}</span>
                 {d.revision&&<span style={{fontSize:10,background:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)',padding:'1px 6px',borderRadius:12,fontWeight:600,flexShrink:0}}>{d.revision}</span>}
                 <span style={{background:sc.bg,color:sc.color,fontSize:10,fontWeight:700,padding:'1px 6px',borderRadius:12,flexShrink:0}}>{d.status}</span>
               </div>
@@ -301,19 +332,35 @@ function DocList({docs,onAction}:{docs:Doc[];onAction:(a:any)=>void}) {
               </div>
             </div>
             <div style={{display:'flex',gap:6,flexShrink:0,alignItems:'center'}}>
-              {d.fileUrl&&!d.fileUrl.startsWith('data:')&&(
-                <a href={d.fileUrl} target="_blank" rel="noreferrer"
+              {d.storedFile&&(
+                <button onClick={()=>onDownload(d)} style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:'var(--hf-violet-text)',fontWeight:600,padding:'4px 8px',borderRadius:6,background:'var(--hf-violet-soft-strong)',border:'none',cursor:'pointer'}}>
+                  <Download size={11}/> Download
+                </button>
+              )}
+              {!d.storedFile&&d.fileUrl&&/^https?:\/\//i.test(d.fileUrl)&&(
+                <a href={d.fileUrl} target="_blank" rel="noopener noreferrer"
                   style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:'var(--hf-info-text)',fontWeight:600,textDecoration:'none',padding:'4px 8px',borderRadius:6,background:'var(--hf-info-soft)'}}>
                   <ExternalLink size={11}/> Open
                 </a>
               )}
-              {d.fileUrl&&d.fileUrl.startsWith('data:')&&(
+              {!d.storedFile&&d.fileUrl&&d.fileUrl.startsWith('data:')&&(
                 <a href={d.fileUrl} download={d.fileName??'document'}
                   style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:'var(--hf-violet-text)',fontWeight:600,textDecoration:'none',padding:'4px 8px',borderRadius:6,background:'var(--hf-violet-soft-strong)'}}>
                   ↓ Download
                 </a>
               )}
+              <button title={d.visibility==='CLIENT'?'Visible on the client portal once approved — click to make internal':'Internal only — click to show on the client portal once approved'}
+                onClick={()=>onVisibility({docId:d.id,visibility:d.visibility==='CLIENT'?'INTERNAL':'CLIENT'})}
+                style={{display:'flex',alignItems:'center',gap:3,fontSize:11,padding:'4px 7px',background:'var(--hf-surface-sunken)',color:'var(--hf-text-muted)',border:'none',borderRadius:6,cursor:'pointer'}}>
+                {d.visibility==='CLIENT'?<Eye size={11}/>:<EyeOff size={11}/>}{d.visibility==='CLIENT'?'Client':'Internal'}
+              </button>
+              <button title={d.legalHold?'Legal hold — click to lift':'Place a legal hold (blocks deletion and retention)'}
+                onClick={()=>{ const reason=window.prompt(d.legalHold?'Reason for lifting the legal hold:':'Reason for the legal hold:'); if(reason&&reason.trim()) onHold({docId:d.id,hold:!d.legalHold,reason:reason.trim()}) }}
+                style={{display:'flex',alignItems:'center',gap:3,fontSize:11,padding:'4px 7px',background:d.legalHold?'var(--hf-danger-soft)':'var(--hf-surface-sunken)',color:d.legalHold?'var(--hf-danger-text)':'var(--hf-text-muted)',border:'none',borderRadius:6,cursor:'pointer'}}>
+                <Lock size={11}/>{d.legalHold?'On hold':'Hold'}
+              </button>
               {d.status==='FOR_REVIEW'&&<button onClick={()=>onAction({docId:d.id,action:'APPROVE'})} style={{fontSize:11,padding:'4px 8px',background:'var(--hf-success-soft-strong)',color:'var(--hf-success-text-strong)',border:'none',borderRadius:6,cursor:'pointer',fontWeight:600}}>Approve</button>}
+              {d.status!=='SUPERSEDED'&&d.status!=='VOID'&&<button onClick={()=>{ const c=window.prompt('Reason for voiding this document (required):'); if(c&&c.trim()) onAction({docId:d.id,action:'VOID',comment:c.trim()}) }} style={{fontSize:11,padding:'4px 8px',background:'var(--hf-surface-sunken)',color:'var(--hf-text-muted)',border:'none',borderRadius:6,cursor:'pointer',fontWeight:600}}>Void</button>}
               {d.status==='CURRENT'&&<button onClick={()=>onAction({docId:d.id,action:'SUBMIT_REVIEW'})} style={{fontSize:11,padding:'4px 8px',background:'var(--hf-warning-soft-strong)',color:'var(--hf-warning-text-deep)',border:'none',borderRadius:6,cursor:'pointer',fontWeight:600}}>Review</button>}
             </div>
           </div>

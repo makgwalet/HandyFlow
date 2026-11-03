@@ -77,6 +77,8 @@ import { PayrollBureauPortalClientDetailPage }  from "./pages/payroll-bureau-por
 // ── Projects module ────────────────────────────────────────────────────────────
 import { ProjectsPage }     from "./pages/projects/ProjectsPage"
 import { ClientPortalPage }  from "./pages/projects/ClientPortalPage"
+import { RecipientTransmittalPage }   from "./pages/projects/RecipientTransmittalPage"
+import { CollaboratorWorkspacePage }  from "./pages/projects/CollaboratorWorkspacePage"
 import { EarthMovingPage } from "./pages/earthmoving/EarthMovingPage"
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage"
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage"
@@ -224,6 +226,8 @@ export default function App() {
 
           <Route path="/projects/portal/:token" element={<ClientPortalPage />} />
           <Route path="/portal/:token" element={<ClientPortalPage />} />
+          <Route path="/transmittal/:token" element={<RecipientTransmittalPage />} />
+          <Route path="/collaborator/:token" element={<CollaboratorWorkspacePage />} />
 
           <Route path="/accountant/portal/login"              element={<PortalLoginPage />} />
           <Route path="/accountant/portal/auth/accept-invite" element={<PortalAcceptInvitePage />} />

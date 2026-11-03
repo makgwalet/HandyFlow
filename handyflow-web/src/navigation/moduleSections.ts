@@ -1003,6 +1003,12 @@ export const PROJECTS_SECTIONS: ModuleSections = {
         { id: 'projects', label: 'Projects', icon: FolderOpen },
       ],
     },
+    {
+      label: 'External access',
+      sections: [
+        { id: 'collaborators', label: 'Collaborators', icon: UserCheck, permission: 'PM_READ' },
+      ],
+    },
   ],
 }
 

@@ -7,7 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   HardHat, ChevronLeft, Play, Pause, CheckCircle,
   LayoutDashboard, GanttChart, ListTodo, Users, DollarSign,
-  AlertTriangle, FileText, Hammer, ExternalLink,
+  AlertTriangle, FileText, Hammer, ExternalLink, Send,
 } from 'lucide-react'
 import { apiClient } from '../../api/client'
 // Single source of truth for the Project type — re-exported from ProjectDetailTab
@@ -19,9 +19,10 @@ import { ResourcesTab }  from './tabs/ResourcesTab'
 import { BudgetTab }     from './tabs/BudgetTab'
 import { RisksTab }      from './tabs/RisksTab'
 import { DocumentsTab }  from './tabs/DocumentsTab'
+import { TransmittalsTab } from './tabs/TransmittalsTab'
 import { FieldTab }      from './tabs/FieldTab'
 
-type TabKey = 'overview'|'gantt'|'tasks'|'resources'|'budget'|'risks'|'documents'|'field'
+type TabKey = 'overview'|'gantt'|'tasks'|'resources'|'budget'|'risks'|'documents'|'transmittals'|'field'
 
 const HEALTH_DOT: Record<string, string> = { GREEN:'var(--hf-success)', AMBER:'var(--hf-warning)', RED:'var(--hf-danger)' }
 const STATUS_LABEL: Record<string, { bg:string; color:string }> = {
@@ -61,6 +62,7 @@ export function ProjectDetailPage() {
     { key: 'budget',     label: 'Budget',     icon: DollarSign },
     { key: 'risks',      label: 'Risks',      icon: AlertTriangle },
     { key: 'documents',  label: 'Documents',  icon: FileText },
+    { key: 'transmittals', label: 'Transmittals', icon: Send },
     { key: 'field',      label: 'Field',      icon: Hammer },
   ]
 
@@ -133,6 +135,7 @@ export function ProjectDetailPage() {
       {tab === 'budget'     && <BudgetTab     projectId={project.id} project={project} />}
       {tab === 'risks'      && <RisksTab      projectId={project.id} />}
       {tab === 'documents'  && <DocumentsTab  projectId={project.id} />}
+      {tab === 'transmittals' && <TransmittalsTab projectId={project.id} />}
       {tab === 'field'      && <FieldTab      projectId={project.id} />}
     </div>
   )
