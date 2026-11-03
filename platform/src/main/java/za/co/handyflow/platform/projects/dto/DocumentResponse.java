@@ -30,7 +30,8 @@ public record DocumentResponse(
         String  fileSha256,
         String  contentType,
         LocalDate retentionUntil,
-        boolean legalHold
+        boolean legalHold,
+        Instant disposedAt
 ) {
     public static DocumentResponse of(ProjectDocument d) {
         return new DocumentResponse(
@@ -40,6 +41,6 @@ public record DocumentResponse(
                 d.getSupersededBy(), d.getApprovedByName(), d.getApprovedAt(),
                 d.getVoidedAt(), d.getVoidReason(), d.getCreatedAt(),
                 d.hasStoredFile(), d.getFileSha256(), d.getContentType(),
-                d.getRetentionUntil(), d.isLegalHold());
+                d.getRetentionUntil(), d.isLegalHold(), d.getDisposedAt());
     }
 }

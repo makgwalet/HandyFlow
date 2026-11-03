@@ -63,6 +63,9 @@ public class ProjectDocument {
     // ── Retention (stamped at project closure; nothing is auto-deleted) ───────
     @Column(name = "retention_until")                LocalDate retentionUntil;
     @Column(name = "legal_hold", nullable = false)   boolean   legalHold = false;
+    /** Set when a disposal approved by two people (records retention) deleted the file. The register entry stays. */
+    @Column(name = "disposed_at")                    Instant   disposedAt;
+    @Column(name = "disposal_batch_id")              UUID      disposalBatchId;
 
     @Column(name = "created_at", nullable = false) Instant createdAt;
 
@@ -150,6 +153,17 @@ public class ProjectDocument {
 
     /** Legal hold can be placed or lifted at any status — a superseded revision can still be needed in a dispute. */
     public void changeLegalHold(boolean hold) { this.legalHold = hold; }
+
+    public boolean isDisposed() { return disposedAt != null; }
+
+    /** The stored file was deleted under an approved disposal. Never for a document under legal hold, and only once. */
+    public void markDisposed(UUID batchId) {
+        if (legalHold) throw new IllegalStateException("This document is under legal hold and cannot be disposed of");
+        if (disposedAt != null) throw new IllegalStateException("This document was already disposed of");
+        if (evidenceId == null) throw new IllegalStateException("This entry is a link, not a stored file");
+        this.disposedAt = Instant.now();
+        this.disposalBatchId = batchId;
+    }
 
     private void transition(DocumentStatus target) {
         DocumentStatus current = DocumentStatus.valueOf(status);

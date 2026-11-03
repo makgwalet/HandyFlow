@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Building2, Upload, Save, CreditCard, MapPin, Phone, X, Check, Users, Receipt } from "lucide-react"
+import { Building2, Upload, Save, CreditCard, MapPin, Phone, X, Check, Users, Receipt, Archive } from "lucide-react"
 import TeamTab from "./TeamTab"
 import VatSettingsSection from "./VatSettingsSection"
+import RecordsRetentionTab from "./RecordsRetentionTab"
+import { usePermission } from "../../hooks/usePermission"
 
 interface TenantProfile {
   id: string
@@ -30,12 +32,13 @@ interface TenantProfile {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-type Tab = "company" | "team"
+type Tab = "company" | "team" | "records"
 
 export function SettingsPage() {
   const qc = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
   const [activeTab, setActiveTab] = useState<Tab>("company")
+  const canSeeRecords = usePermission("RECORDS_READ")
   const [saved, setSaved] = useState<string | null>(null)
   const [error, setError] = useState("")
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
@@ -229,6 +232,7 @@ export function SettingsPage() {
         {[
           { id: "company" as Tab, label: "Company",      icon: Building2 },
           { id: "team"    as Tab, label: "Team & Roles", icon: Users     },
+          ...(canSeeRecords ? [{ id: "records" as Tab, label: "Records & retention", icon: Archive }] : []),
         ].map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setActiveTab(id)}
             style={{
@@ -384,6 +388,9 @@ export function SettingsPage() {
 
       {/* ── Team tab ──────────────────────────────────────────────── */}
       {activeTab === "team" && <TeamTab />}
+
+      {/* ── Records retention tab ───────────────────────────────── */}
+      {activeTab === "records" && canSeeRecords && <RecordsRetentionTab />}
     </div>
   )
 }

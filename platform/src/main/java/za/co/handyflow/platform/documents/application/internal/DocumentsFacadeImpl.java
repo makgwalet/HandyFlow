@@ -8,11 +8,14 @@ import za.co.handyflow.platform.audittrail.application.AuditTrailFacade;
 import za.co.handyflow.platform.documents.application.DocumentScanner;
 import za.co.handyflow.platform.documents.application.DocumentStore;
 import za.co.handyflow.platform.documents.application.DocumentsFacade;
+import za.co.handyflow.platform.documents.application.RetentionFacade;
 import za.co.handyflow.platform.documents.domain.model.Document;
 import za.co.handyflow.platform.documents.domain.model.DocumentRules;
 import za.co.handyflow.platform.documents.domain.model.DocumentVersion;
 import za.co.handyflow.platform.documents.domain.repository.DocumentRepository;
 import za.co.handyflow.platform.documents.domain.repository.DocumentVersionRepository;
+import org.springframework.http.HttpStatus;
+import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -34,15 +37,17 @@ class DocumentsFacadeImpl implements DocumentsFacade {
     private final DocumentStore storage;
     private final DocumentScanner scanner;
     private final AuditTrailFacade trail;
+    private final RetentionFacade retention;
     private final boolean scanRequired;
 
     DocumentsFacadeImpl(DocumentRepository documents, DocumentVersionRepository versions, DocumentStore storage, DocumentScanner scanner,
-                        AuditTrailFacade trail, @Value("${documents.scan.required:false}") boolean scanRequired) {
+                        AuditTrailFacade trail, RetentionFacade retention, @Value("${documents.scan.required:false}") boolean scanRequired) {
         this.documents = documents;
         this.versions = versions;
         this.storage = storage;
         this.scanner = scanner;
         this.trail = trail;
+        this.retention = retention;
         this.scanRequired = scanRequired;
     }
 
@@ -58,6 +63,7 @@ class DocumentsFacadeImpl implements DocumentsFacade {
         DocumentVersion v = storeVersion(tenantId, d, 1, file, null, actor);
         documents.save(d);
         versions.save(v);
+        retention.track(tenantId, DocumentsRetentionProvider.MODULE, DocumentsRetentionProvider.SOURCE, d.getId(), d.getCategory(), d.getOwnerType(), d.getTitle(), null);
         trail.record(tenantId, "DOCUMENT_UPLOADED", "DOCUMENT", d.getId(), null, summary(d, v));
         return info(d, v);
     }
@@ -91,6 +97,7 @@ class DocumentsFacadeImpl implements DocumentsFacade {
         Map<String, Object> before = summary(d, current);
         d.details(title, description, DocumentRules.expiry(expiresOn, today()));
         documents.save(d);
+        retention.track(tenantId, DocumentsRetentionProvider.MODULE, DocumentsRetentionProvider.SOURCE, d.getId(), d.getCategory(), d.getOwnerType(), d.getTitle(), null);
         trail.record(tenantId, "DOCUMENT_UPDATED", "DOCUMENT", d.getId(), before, summary(d, current));
         return info(d, current);
     }
@@ -103,6 +110,9 @@ class DocumentsFacadeImpl implements DocumentsFacade {
         Map<String, Object> before = summary(d, current);
         d.archive(reason, actor);
         documents.save(d);
+        // The retention clock starts on the day it is archived (records retention, V580).
+        retention.track(tenantId, DocumentsRetentionProvider.MODULE, DocumentsRetentionProvider.SOURCE, d.getId(), d.getCategory(), d.getOwnerType(), d.getTitle(), null);
+        retention.startClock(tenantId, DocumentsRetentionProvider.MODULE, DocumentsRetentionProvider.SOURCE, List.of(d.getId()), today());
         Map<String, Object> after = summary(d, current);
         after.put("reason", d.getArchivedReason());
         trail.record(tenantId, "DOCUMENT_ARCHIVED", "DOCUMENT", d.getId(), before, after);
@@ -132,6 +142,8 @@ class DocumentsFacadeImpl implements DocumentsFacade {
     @Transactional
     public Download download(TenantId tenantId, UUID documentId, Integer versionNo, UUID actor) {
         Document d = owned(tenantId, documentId);
+        if (d.isDisposed())
+            throw new HandyFlowException("This document's files were disposed of under the retention policy. The record of it is kept.", HttpStatus.GONE, "DISPOSED");
         int n = versionNo == null ? d.getCurrentVersion() : versionNo;
         DocumentVersion v = versions.findOne(tenantId, d.getId(), n).orElseThrow(() -> new ResourceNotFoundException("Document version", documentId + "/" + n));
         byte[] bytes;

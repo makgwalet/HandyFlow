@@ -10,6 +10,8 @@ interface Doc {
   fileName:string|null; fileSizeKb:number|null; status:string; description:string|null
   uploadedByName:string|null; createdAt:string
   visibility:string; storedFile:boolean; legalHold:boolean; retentionUntil:string|null; fileSha256:string|null
+  /** Set when the file was disposed of under the retention policy; the register entry stays. */
+  disposedAt?:string|null
 }
 
 function unwrap<T>(r:any):T[]{const d=r?.data?.data??r?.data??[];return Array.isArray(d)?d as T[]:d?.content??[]}
@@ -332,7 +334,13 @@ function DocList({docs,onAction,onVisibility,onHold,onDownload}:{
               </div>
             </div>
             <div style={{display:'flex',gap:6,flexShrink:0,alignItems:'center'}}>
-              {d.storedFile&&(
+              {d.storedFile&&d.disposedAt&&(
+                <span title={`File disposed of under the retention policy on ${new Date(d.disposedAt).toLocaleDateString('en-ZA')}. The register entry and its hash are kept.`}
+                  style={{fontSize:11,padding:'4px 8px',borderRadius:6,background:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)',fontWeight:600}}>
+                  File disposed
+                </span>
+              )}
+              {d.storedFile&&!d.disposedAt&&(
                 <button onClick={()=>onDownload(d)} style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:'var(--hf-violet-text)',fontWeight:600,padding:'4px 8px',borderRadius:6,background:'var(--hf-violet-soft-strong)',border:'none',cursor:'pointer'}}>
                   <Download size={11}/> Download
                 </button>
@@ -354,11 +362,11 @@ function DocList({docs,onAction,onVisibility,onHold,onDownload}:{
                 style={{display:'flex',alignItems:'center',gap:3,fontSize:11,padding:'4px 7px',background:'var(--hf-surface-sunken)',color:'var(--hf-text-muted)',border:'none',borderRadius:6,cursor:'pointer'}}>
                 {d.visibility==='CLIENT'?<Eye size={11}/>:<EyeOff size={11}/>}{d.visibility==='CLIENT'?'Client':'Internal'}
               </button>
-              <button title={d.legalHold?'Legal hold — click to lift':'Place a legal hold (blocks deletion and retention)'}
+              {!d.disposedAt&&<button title={d.legalHold?'Legal hold — click to lift':'Place a legal hold (blocks deletion and retention)'}
                 onClick={()=>{ const reason=window.prompt(d.legalHold?'Reason for lifting the legal hold:':'Reason for the legal hold:'); if(reason&&reason.trim()) onHold({docId:d.id,hold:!d.legalHold,reason:reason.trim()}) }}
                 style={{display:'flex',alignItems:'center',gap:3,fontSize:11,padding:'4px 7px',background:d.legalHold?'var(--hf-danger-soft)':'var(--hf-surface-sunken)',color:d.legalHold?'var(--hf-danger-text)':'var(--hf-text-muted)',border:'none',borderRadius:6,cursor:'pointer'}}>
                 <Lock size={11}/>{d.legalHold?'On hold':'Hold'}
-              </button>
+              </button>}
               {d.status==='FOR_REVIEW'&&<button onClick={()=>onAction({docId:d.id,action:'APPROVE'})} style={{fontSize:11,padding:'4px 8px',background:'var(--hf-success-soft-strong)',color:'var(--hf-success-text-strong)',border:'none',borderRadius:6,cursor:'pointer',fontWeight:600}}>Approve</button>}
               {d.status!=='SUPERSEDED'&&d.status!=='VOID'&&<button onClick={()=>{ const c=window.prompt('Reason for voiding this document (required):'); if(c&&c.trim()) onAction({docId:d.id,action:'VOID',comment:c.trim()}) }} style={{fontSize:11,padding:'4px 8px',background:'var(--hf-surface-sunken)',color:'var(--hf-text-muted)',border:'none',borderRadius:6,cursor:'pointer',fontWeight:600}}>Void</button>}
               {d.status==='CURRENT'&&<button onClick={()=>onAction({docId:d.id,action:'SUBMIT_REVIEW'})} style={{fontSize:11,padding:'4px 8px',background:'var(--hf-warning-soft-strong)',color:'var(--hf-warning-text-deep)',border:'none',borderRadius:6,cursor:'pointer',fontWeight:600}}>Review</button>}

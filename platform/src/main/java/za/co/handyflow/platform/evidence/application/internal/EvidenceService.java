@@ -197,8 +197,33 @@ public class EvidenceService implements EvidenceFacade {
                 .orElseThrow(() -> new ResourceNotFoundException("Evidence", evidenceId.toString()));
     }
 
+    @Override
+    @Transactional
+    public String dispose(TenantId tenantId, String sourceModule, String relatedEntityType, UUID relatedEntityId, UUID evidenceId, String reason) {
+        Evidence evidence = evidenceRepo.findByTenantAndId(tenantId.getValue(), evidenceId)
+                .filter(e -> sourceModule.equals(e.getSourceModule()) && relatedEntityType.equals(e.getRelatedEntityType())
+                        && relatedEntityId.equals(e.getRelatedEntityId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Evidence", evidenceId.toString()));
+        if (evidence.isDisposed()) return evidence.getFileHash();
+        try {
+            documentStore.delete(tenantId, evidence.getStorageKey(), reason == null ? "Disposed under the retention policy" : reason);
+        } catch (IOException e) {
+            log.error("Failed to delete evidence={} for disposal: {}", evidenceId, e.getMessage(), e);
+            throw new HandyFlowException("The file could not be removed from storage", HttpStatus.INTERNAL_SERVER_ERROR, "STORAGE_FAILED");
+        }
+        String before = evidence.getStatus();
+        evidence.dispose();
+        evidenceRepo.save(evidence);
+        trail.record(tenantId, "EVIDENCE_DISPOSED", "EVIDENCE", evidenceId, java.util.Map.of("status", before),
+                java.util.Map.of("status", Evidence.DISPOSED, "sourceModule", sourceModule, "sha256", evidence.getFileHash()));
+        log.info("Evidence disposed={} source={} entity={}:{} tenant={}", evidenceId, sourceModule, relatedEntityType, relatedEntityId, tenantId.getValue());
+        return evidence.getFileHash();
+    }
+
     private DownloadedEvidence read(TenantId tenantId, Evidence evidence) {
         UUID evidenceId = evidence.getId();
+        if (evidence.isDisposed())
+            throw new HandyFlowException("This file was disposed of under the retention policy. The record of it is kept.", HttpStatus.GONE, "DISPOSED");
         try {
             byte[] content = documentStore.get(tenantId, evidence.getStorageKey());
             trail.record(tenantId, "EVIDENCE_DOWNLOADED", "EVIDENCE", evidenceId, null, EvidenceFacade.isRestricted(evidence.getSourceModule())

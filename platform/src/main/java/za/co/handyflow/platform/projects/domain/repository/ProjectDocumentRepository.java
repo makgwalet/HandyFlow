@@ -87,11 +87,15 @@ public interface ProjectDocumentRepository extends JpaRepository<ProjectDocument
     int stampRetention(@Param("tenantId") UUID tenantId, @Param("projectId") UUID projectId,
                        @Param("until") LocalDate until);
 
-    /** Past their retention date and not on legal hold: listed for a human to review, never deleted. */
+    /** Register entries of a project that hold a stored file (the ones the records retention engine tracks). */
+    @Query("SELECT d.id FROM ProjectDocument d WHERE d.tenantId = :tenantId AND d.projectId = :projectId AND d.evidenceId IS NOT NULL")
+    List<UUID> findStoredFileIds(@Param("tenantId") UUID tenantId, @Param("projectId") UUID projectId);
+
+    /** Past their retention date, not on legal hold and not yet disposed: listed for a human to review, never deleted here. */
     @Query("""
             SELECT d FROM ProjectDocument d
             WHERE d.tenantId = :tenantId AND d.projectId = :projectId
-              AND d.legalHold = false AND d.retentionUntil IS NOT NULL AND d.retentionUntil < :today
+              AND d.legalHold = false AND d.disposedAt IS NULL AND d.retentionUntil IS NOT NULL AND d.retentionUntil < :today
             ORDER BY d.retentionUntil, d.documentNumber, d.createdAt
             """)
     List<ProjectDocument> findDueForRetentionReview(@Param("tenantId") UUID tenantId,

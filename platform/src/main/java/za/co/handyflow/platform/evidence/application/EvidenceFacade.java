@@ -68,6 +68,13 @@ public interface EvidenceFacade {
     /** Not found unless the file is active and attached to exactly this entity. */
     DownloadedEvidence downloadRestricted(TenantId tenantId, String sourceModule, String relatedEntityType, UUID relatedEntityId, UUID evidenceId);
 
+    /**
+     * Deletes the file of one piece of evidence attached to exactly this record, because a disposal was approved under the records
+     * retention rules. Only the module that owns the record calls this, from its retention provider. The evidence row stays (status
+     * DISPOSED) with its hash. Returns that hash. Not found unless the evidence is attached to exactly this record.
+     */
+    String dispose(TenantId tenantId, String sourceModule, String relatedEntityType, UUID relatedEntityId, UUID evidenceId, String reason);
+
     /** Not found unless the file is active and attached to exactly this entity. */
     void detachRestricted(TenantId tenantId, String sourceModule, String relatedEntityType, UUID relatedEntityId, UUID evidenceId);
 }

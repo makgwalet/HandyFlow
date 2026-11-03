@@ -68,6 +68,13 @@ public class Document {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 
+    /** Set when a disposal approved under the retention rules deleted the files. The document row stays as the record. */
+    @Column(name = "disposed_at")
+    private Instant disposedAt;
+
+    @Column(name = "disposal_batch_id")
+    private UUID disposalBatchId;
+
     public static Document create(TenantId tenantId, String ownerType, UUID ownerId, String category, String title, String description,
                                   LocalDate expiresOn, UUID by) {
         Document d = new Document();
@@ -112,6 +119,17 @@ public class Document {
         this.archivedAt = Instant.now();
         this.updatedAt = this.archivedAt;
     }
+
+    /** The files were deleted under an approved disposal. Only an archived document can be disposed of, and only once. */
+    public void markDisposed(UUID batchId) {
+        if (isActive()) throw new IllegalStateException("A document in use cannot be disposed of: archive it first.");
+        if (disposedAt != null) throw new IllegalStateException("This document was already disposed of.");
+        this.disposedAt = Instant.now();
+        this.disposalBatchId = batchId;
+        this.updatedAt = this.disposedAt;
+    }
+
+    public boolean isDisposed() { return disposedAt != null; }
 
     private void requireActive() { if (!isActive()) throw new IllegalStateException("This document is archived and cannot be changed."); }
 }

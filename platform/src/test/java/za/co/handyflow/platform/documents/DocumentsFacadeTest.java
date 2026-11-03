@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import za.co.handyflow.platform.audittrail.application.AuditTrailFacade;
 import za.co.handyflow.platform.documents.application.DocumentScanner;
 import za.co.handyflow.platform.documents.application.DocumentStore;
+import za.co.handyflow.platform.documents.application.RetentionFacade;
 import za.co.handyflow.platform.documents.application.DocumentsFacade;
 import za.co.handyflow.platform.documents.application.DocumentsFacade.DocumentInfo;
 import za.co.handyflow.platform.documents.application.DocumentsFacade.FileUpload;
@@ -32,6 +33,7 @@ class DocumentsFacadeTest {
     DocumentStore storage = mock(DocumentStore.class);
     DocumentScanner scanner = mock(DocumentScanner.class);
     AuditTrailFacade trail = mock(AuditTrailFacade.class);
+    RetentionFacade retention = mock(RetentionFacade.class);
     DocumentsFacade facade;
     TenantId tenant = TenantId.generate();
     UUID actor = UUID.randomUUID();
@@ -46,7 +48,7 @@ class DocumentsFacadeTest {
         Class<?> c = Class.forName("za.co.handyflow.platform.documents.application.internal.DocumentsFacadeImpl");
         Constructor<?> k = c.getDeclaredConstructors()[0];
         k.setAccessible(true);
-        return (DocumentsFacade) k.newInstance(documents, versions, storage, scanner, trail, scanRequired);
+        return (DocumentsFacade) k.newInstance(documents, versions, storage, scanner, trail, retention, scanRequired);
     }
 
     @BeforeEach
@@ -147,5 +149,23 @@ class DocumentsFacadeTest {
         assertEquals("Policy.pdf", dl.fileName());
         verify(trail).record(eq(tenant), eq("DOCUMENT_DOWNLOADED"), eq("DOCUMENT"), eq(d.id()), any(), anyMap());
         assertThrows(ResourceNotFoundException.class, () -> facade.download(tenant, d.id(), 9, actor));
+    }
+
+    @Test void anUploadIsTrackedForRetentionAndArchivingStartsTheClock() {
+        DocumentInfo d = uploaded();
+        verify(retention).track(eq(tenant), eq("DOCUMENTS"), eq("DOCUMENT"), eq(d.id()), eq("INSURANCE"), eq("EARTH_ASSET"), eq("Policy"), isNull());
+        verify(retention, never()).startClock(any(), any(), any(), any(), any());
+        facade.archive(tenant, d.id(), "Policy replaced by the new insurer", actor);
+        verify(retention).startClock(eq(tenant), eq("DOCUMENTS"), eq("DOCUMENT"), eq(List.of(d.id())), any());
+    }
+
+    @Test void aDisposedDocumentCannotBeDownloaded() throws Exception {
+        DocumentInfo d = uploaded();
+        facade.archive(tenant, d.id(), "Policy replaced by the new insurer", actor);
+        docs.get(d.id()).markDisposed(UUID.randomUUID());
+        za.co.handyflow.platform.shared.HandyFlowException e =
+                assertThrows(za.co.handyflow.platform.shared.HandyFlowException.class, () -> facade.download(tenant, d.id(), null, actor));
+        assertEquals("DISPOSED", e.getErrorCode());
+        verify(storage, never()).get(any(), any());
     }
 }

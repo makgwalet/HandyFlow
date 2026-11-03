@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import za.co.handyflow.platform.documents.application.DocumentScanner;
+import za.co.handyflow.platform.documents.application.RetentionFacade;
 import za.co.handyflow.platform.evidence.application.EvidenceFacade;
 import za.co.handyflow.platform.evidence.dto.EvidenceResponse;
 import za.co.handyflow.platform.projects.application.internal.document.DocumentAccessRules;
@@ -103,6 +104,7 @@ public class DocumentService {
     private final SequenceService                 sequenceService;
     private final EvidenceFacade                  evidenceFacade;
     private final DocumentScanner                 scanner;
+    private final RetentionFacade                 retention;
 
     @Value("${app.projects.documents.allow-self-approval:true}")
     private boolean allowSelfApproval;
@@ -288,6 +290,11 @@ public class DocumentService {
             doc.attachStoredFile(stored.id(), upload.sha256(), upload.contentType(), upload.fileName(), upload.sizeKb());
         }
         docRepo.save(doc);
+        if (upload != null) {
+            // Tracked for records retention; the clock starts when the project is closed.
+            retention.track(tenantId, ProjectsRetentionProvider.MODULE, ProjectsRetentionProvider.SOURCE, doc.getId(), type,
+                    ProjectsRetentionProvider.reference(doc), doc.getTitle(), project.getName());
+        }
         record(doc, "UPLOADED", revision != null ? "Revision " + revision : null, uploadedBy, uploadedByName);
 
         // Earlier UNREVIEWED revisions are replaced now; an APPROVED one waits for this one's approval.
@@ -394,9 +401,11 @@ public class DocumentService {
         }
         String note = blankToNull(reason);
         if (note == null) throw bad("A reason is required to " + (hold ? "place" : "lift") + " a legal hold", "REASON_REQUIRED");
+        if (doc.isDisposed()) throw new HandyFlowException("This document's file was disposed of under the retention policy", HttpStatus.CONFLICT, "DISPOSED");
         if (doc.isLegalHold() == hold) return doc;
         doc.changeLegalHold(hold);
         ProjectDocument saved = docRepo.save(doc);
+        retention.moduleHoldChanged(tenantId, ProjectsRetentionProvider.MODULE, ProjectsRetentionProvider.SOURCE, doc.getId(), hold, note, userId, userName);
         record(saved, "LEGAL_HOLD", (hold ? "Placed: " : "Lifted: ") + note, userId, userName);
         return saved;
     }
@@ -408,6 +417,8 @@ public class DocumentService {
     public int stampRetention(TenantId tenantId, UUID projectId, LocalDate closedOn) {
         LocalDate until = DocumentAccessRules.retentionUntil(closedOn, retentionYears);
         int n = docRepo.stampRetention(tenantId.getValue(), projectId, until);
+        retention.startClock(tenantId, ProjectsRetentionProvider.MODULE, ProjectsRetentionProvider.SOURCE,
+                docRepo.findStoredFileIds(tenantId.getValue(), projectId), closedOn);
         log.info("Retention stamped on {} document(s) of project={} until {}", n, projectId, until);
         return n;
     }
@@ -464,6 +475,10 @@ public class DocumentService {
     private FileDownload readStored(TenantId tenantId, ProjectDocument doc) {
         if (!doc.hasStoredFile()) {
             throw new HandyFlowException("This entry is a link, not a stored file", HttpStatus.CONFLICT, "NO_STORED_FILE");
+        }
+        if (doc.isDisposed()) {
+            throw new HandyFlowException("This document's file was disposed of under the retention policy. The register entry is kept.",
+                    HttpStatus.GONE, "DISPOSED");
         }
         EvidenceFacade.DownloadedEvidence stored = evidenceFacade.download(tenantId, doc.getEvidenceId());
         String expected = doc.getFileSha256();

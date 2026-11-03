@@ -89,6 +89,19 @@ public class Evidence {
         this.updatedAt = Instant.now();
     }
 
+    /**
+     * The file was deleted under a disposal approved by two people (records retention). The row stays as the record that the
+     * file existed, with its hash; it is no longer listed or downloadable.
+     */
+    public void dispose() {
+        this.status = DISPOSED;
+        this.updatedAt = Instant.now();
+    }
+
+    public static final String DISPOSED = "DISPOSED";
+
+    public boolean isDisposed() { return DISPOSED.equals(status); }
+
     public void markReviewed(UUID reviewedBy) {
         this.reviewedBy = reviewedBy;
         this.reviewedAt = Instant.now();
