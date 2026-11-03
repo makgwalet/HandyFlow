@@ -133,6 +133,21 @@ app:
   tax:
     vat-rate-pct: ${VAT_RATE_PCT:15.00}
 
+  projects:
+    require-approval-gate: false   # true = must be PROPOSED → APPROVED before ACTIVE
+    allow-self-approval: true      # false = creator can't approve their own project
+    portal:
+      token-ttl-days: 365        # new projects; 0 = never expires
+      rate-limit:
+        max-requests: 60
+        window-ms: 60000
+    attachments:
+      max-bytes: 20971520
+    schedule:
+      working-days: MON,TUE,WED,THU,FRI   # add SAT for sites that work Saturdays
+      nightly-recalc: true
+
+
 # ==================== ACTUATOR ====================
 management:
   endpoints:
@@ -223,6 +238,7 @@ notifications:
 # Permissions travel in the JWT (packed, see PermissionCodec); headroom for the token plus cookies.
 server:
   max-http-request-header-size: 16KB
+  forward-headers-strategy: framework     # needed behind a proxy, or all clients share one rate-limit bucket
 
 # Reading photos and scanned PDFs (receipts, supplier invoices). Runs Tesseract on this server, so the
 # document never leaves it. Needs `tesseract` (plus `pdftoppm` for scanned PDFs, from poppler-utils)

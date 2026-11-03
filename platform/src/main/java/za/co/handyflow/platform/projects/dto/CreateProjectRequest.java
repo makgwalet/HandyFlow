@@ -56,6 +56,21 @@ public record CreateProjectRequest(
         @Size(max = 255, message = "Project manager name must not exceed 255 characters")
         String projectManagerName,
 
+        // ── Governance (chunk 1) ──────────────────────────────────────────────
+        UUID sponsorId,
+
+        @Size(max = 255, message = "Sponsor name must not exceed 255 characters")
+        String sponsorName,
+
+        @Size(max = 4000, message = "Objectives must not exceed 4 000 characters")
+        String objectives,
+
+        @Size(max = 4000, message = "Scope statement must not exceed 4 000 characters")
+        String scopeStatement,
+
+        @Size(max = 4000, message = "Business case must not exceed 4 000 characters")
+        String businessCase,
+
         @Size(max = 2000, message = "Notes must not exceed 2 000 characters")
         String notes
 

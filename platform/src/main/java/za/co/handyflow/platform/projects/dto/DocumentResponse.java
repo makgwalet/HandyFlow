@@ -8,6 +8,7 @@ import java.util.UUID;
 public record DocumentResponse(
         UUID    id,
         UUID    projectId,
+        String  documentNumber,
         String  documentType,
         String  title,
         String  revision,
@@ -15,14 +16,22 @@ public record DocumentResponse(
         String  fileName,
         Integer fileSizeKb,
         String  status,
+        String  visibility,
         String  description,
         String  uploadedByName,
+        UUID    supersededBy,
+        String  approvedByName,
+        Instant approvedAt,
+        Instant voidedAt,
+        String  voidReason,
         Instant createdAt
 ) {
     public static DocumentResponse of(ProjectDocument d) {
         return new DocumentResponse(
-                d.getId(), d.getProjectId(), d.getDocumentType(), d.getTitle(),
+                d.getId(), d.getProjectId(), d.getDocumentNumber(), d.getDocumentType(), d.getTitle(),
                 d.getRevision(), d.getFileUrl(), d.getFileName(), d.getFileSizeKb(),
-                d.getStatus(), d.getDescription(), d.getUploadedByName(), d.getCreatedAt());
+                d.getStatus(), d.getVisibility(), d.getDescription(), d.getUploadedByName(),
+                d.getSupersededBy(), d.getApprovedByName(), d.getApprovedAt(),
+                d.getVoidedAt(), d.getVoidReason(), d.getCreatedAt());
     }
 }

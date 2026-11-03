@@ -2,10 +2,14 @@ package za.co.handyflow.platform.projects.api;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import za.co.handyflow.platform.projects.application.internal.DocumentService;
 import za.co.handyflow.platform.projects.application.internal.FieldService;
+import za.co.handyflow.platform.projects.application.internal.ProjectPortalService;
 import za.co.handyflow.platform.projects.application.internal.ProjectService;
 import za.co.handyflow.platform.projects.domain.model.Project;
 import za.co.handyflow.platform.projects.dto.*;
@@ -18,18 +22,18 @@ import java.util.List;
 /**
  * Public (unauthenticated) client portal endpoint.
  *
- * Security model: secured purely by the opaque token's secrecy.
- * The token is a 32-char hex string (UUID without dashes) generated at project
- * creation and stored in projects.client_portal_token (UNIQUE index).
+ * Security model: the opaque token IS the credential, so around it:
+ *  - ProjectPortalService.resolve(): per-IP rate limit, strict token format, and
+ *    enabled/expiry checks; every failure is the same 404.
+ *  - Staff can rotate, revoke and re-enable the token (ProjectPortalAdminController).
+ *  - The payload uses client-safe DTOs — no budget, cost, hours, assignee, mitigation.
+ *  - Responses are marked no-store / noindex / no-referrer: the token is in the URL
+ *    path, so caches, crawlers and Referer headers must never carry it elsewhere.
  *
- * No Spring Security filter on this controller — it is explicitly excluded in
- * SecurityConfig.  Add rate-limiting at the gateway/reverse-proxy level.
- *
- * Exposes: project name/status/health, milestones, open snags, red risks only.
- * Never exposes: budget lines, internal notes, change orders, or full risk register.
- *
- * CHANGE: portal-safe service calls now pass the resolved Project entity instead
- * of raw UUIDs, closing the tenant isolation gap in FieldService.
+ * DEPLOYMENT NOTE: rate limiting keys on request.getRemoteAddr(). Behind a load
+ * balancer or reverse proxy that is the proxy's address unless you configure
+ * server.forward-headers-strategy (native / framework) so Spring resolves the real
+ * client IP — otherwise every client shares one bucket.
  */
 @RestController
 @RequestMapping("/api/public/projects/portal")
@@ -37,49 +41,53 @@ import java.util.List;
 @Tag(name = "Client Portal", description = "Public read-only project view secured by opaque token")
 public class ClientPortalController {
 
-    private final ProjectService projectService;
-    private final FieldService   fieldService;
+    private final ProjectPortalService portalService;
+    private final ProjectService       projectService;
+    private final FieldService         fieldService;
+    private final DocumentService      documentService;
 
     @GetMapping("/{token}")
     @Operation(summary = "Retrieve project portal view by token — no authentication required")
     public ResponseEntity<ApiResponse<ProjectPortalResponse>> getPortal(
-            @PathVariable String token) {
+            @PathVariable String token, HttpServletRequest request) {
 
-        // 1. Resolve project by token — throws 404 if invalid or expired
-        Project p = projectService.getProjectByPortalToken(token);
+        Project p = portalService.resolve(token, request.getRemoteAddr());
 
-        // 2. Fetch portal-safe data passing the resolved entity (not raw UUIDs).
-        //    FieldService.getSnagsForPortal(Project) requires the entity, proving
-        //    the caller went through the authenticated token resolution path.
-        List<TaskResponse> milestones = projectService
-                .getMilestonesForPortal(p)              // FIX: pass entity, not p.getId()
-                .stream().map(TaskResponse::of).toList();
+        List<PortalMilestoneResponse> milestones = projectService
+                .getMilestonesForPortal(p)
+                .stream().map(PortalMilestoneResponse::of).toList();
 
-        List<SnagResponse> openSnags = fieldService
-                .getSnagsForPortal(p, true)             // FIX: entity-based, no tenant UUID
-                .stream().map(SnagResponse::of).toList();
+        List<PortalSnagResponse> openSnags = fieldService
+                .getSnagsForPortal(p, true)
+                .stream().map(PortalSnagResponse::of).toList();
 
-        List<RiskResponse> redRisks = projectService
-                .getRisksForPortal(p)                   // FIX: pass entity, not p.getId()
+        List<PortalRiskResponse> redRisks = projectService
+                .getRisksForPortal(p)
                 .stream()
                 .filter(r -> "RED".equals(r.getRating()) && "OPEN".equals(r.getStatus()))
-                .map(RiskResponse::of).toList();
+                .map(PortalRiskResponse::of).toList();
 
-        // 3. Compute overall completion from milestone task progress
         BigDecimal completionPct = milestones.isEmpty()
                 ? BigDecimal.ZERO
                 : milestones.stream()
-                .map(TaskResponse::progressPct)
+                .map(PortalMilestoneResponse::progressPct)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .divide(BigDecimal.valueOf(milestones.size()), 2, RoundingMode.HALF_UP);
 
-        return ResponseEntity.ok(ApiResponse.success("Success",
-                new ProjectPortalResponse(
-                        p.getProjectNumber(), p.getName(), p.getClientName(),
-                        p.getStatus().name(),   // enum → string for the response DTO
-                        p.getHealth().name(),
-                        p.getStartDate(), p.getEndDate(),
-                        p.getBudgetTotal(), completionPct,
-                        milestones, openSnags, redRisks)));
+        List<PortalDocumentResponse> documents = documentService
+                .getClientVisibleForPortal(p)
+                .stream().map(PortalDocumentResponse::of).toList();
+
+        ProjectPortalResponse body = new ProjectPortalResponse(
+                p.getProjectNumber(), p.getName(), p.getClientName(),
+                p.getStatus().name(), p.getHealth().name(),
+                p.getStartDate(), p.getEndDate(), completionPct,
+                milestones, openSnags, redRisks, documents);
+
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .header("X-Robots-Tag", "noindex, nofollow")
+                .header("Referrer-Policy", "no-referrer")
+                .body(ApiResponse.success("Success", body));
     }
 }

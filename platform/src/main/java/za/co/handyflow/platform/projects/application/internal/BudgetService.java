@@ -12,6 +12,7 @@ import za.co.handyflow.platform.projects.domain.repository.ProjectRepository;
 import za.co.handyflow.platform.projects.dto.BudgetSummaryResponse;
 import za.co.handyflow.platform.projects.dto.CreateBudgetLineRequest;
 import za.co.handyflow.platform.shared.HandyFlowException;
+import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
@@ -22,16 +23,19 @@ import java.util.UUID;
 /**
  * Budget line management and EVM (Earned Value Management) calculations.
  *
- * CHANGES FROM ORIGINAL
- * ──────────────────────
- * 1. getEvm() now auto-computes planPct from actual project schedule dates when
- *    the caller passes planPct = 0 (the new default).
- *    Previously the frontend hardcoded planPct=50, making SPI meaningless.
- *
- * 2. Added @Slf4j — service had no logger, so all errors were silent.
- *
- * 3. refreshProjectBudget() is now private and called internally — no change in
- *    behaviour, just making the encapsulation explicit.
+ * CHUNK 4 CHANGES
+ * ───────────────
+ * - All money bookkeeping (cached totals, revisions, ledger) now lives in ProjectCostService.
+ *   This class's private refreshProjectBudget() — the second writer of Project.budgetSpent —
+ *   is gone; it delegates to ProjectCostService.refreshTotals().
+ * - createBudgetLine(): needs an editable project; once the baseline is locked it needs a reason
+ *   and is recorded as an ADDITION revision.
+ * - updateBudgetLine(): delegates to ProjectCostService.reviseLine() — reason required after the
+ *   baseline locks, recorded as a revision, can't go below spent + committed.
+ * - deleteBudgetLine(): refused once the baseline is locked (revise the amount to zero instead),
+ *   and refused for any line that has ledger entries — deleting it would orphan real costs.
+ * - getEvm() is unchanged. For the fuller cost position (original vs revised, commitments, EAC,
+ *   contingency, margin) see GET /{projectId}/budget/cost-summary.
  */
 @Slf4j
 @Service
@@ -42,6 +46,8 @@ public class BudgetService {
     private final ProjectRepository           projectRepo;
     private final ProjectService              projectService;   // for computePlanPct()
     private final SequenceService             sequenceService;
+    private final ProjectReferenceValidator   referenceValidator;
+    private final ProjectCostService          costService;
 
     // ── Budget lines ──────────────────────────────────────────────────────────
 
@@ -54,62 +60,72 @@ public class BudgetService {
     @Transactional
     public ProjectBudgetLine createBudgetLine(TenantId tenantId, UUID projectId,
                                               CreateBudgetLineRequest req) {
-        verifyProject(tenantId, projectId);
-        // FIX: Use SequenceService for sort order (atomic, race-condition-free)
+        Project project = verifyProject(tenantId, projectId);
+        requireEditable(project);
+        referenceValidator.requirePhaseInProject(tenantId, projectId, req.phaseId());
+
+        boolean locked = project.getStatus().isBaselineLocked();
+        String reason = req.reason() == null || req.reason().isBlank() ? null : req.reason().trim();
+        if (locked && reason == null) {
+            throw new HandyFlowException(
+                    "A reason is required to add a budget line once the project baseline is approved",
+                    HttpStatus.BAD_REQUEST, "REASON_REQUIRED");
+        }
+
         int nextOrder = sequenceService.nextSortOrder(tenantId.getValue(), projectId, "BUDGET");
-        ProjectBudgetLine line = ProjectBudgetLine.create(
+        ProjectBudgetLine line = budgetRepo.save(ProjectBudgetLine.create(
                 tenantId.getValue(), projectId, req.phaseId(),
                 req.category(), req.description(), req.budgetedAmount(),
-                req.isProvisional(), req.isPrimeCost(), nextOrder);
-        line = budgetRepo.save(line);
-        refreshProjectBudget(tenantId, projectId);
+                req.isProvisional(), req.isPrimeCost(), nextOrder));
+
+        if (locked) {
+            costService.recordLineAdded(tenantId, project, line, reason, currentUserId(), TenantContext.getCurrentUserName());
+        }
+        costService.refreshTotals(tenantId, projectId);
         return line;
     }
 
     @Transactional
-    public ProjectBudgetLine updateBudgetLine(TenantId tenantId, UUID lineId,
-                                              BigDecimal budgetedAmount, String description) {
-        ProjectBudgetLine line = budgetRepo.findByTenantAndId(tenantId.getValue(), lineId)
-                .orElseThrow(() -> notFound("Budget line"));
-        if (budgetedAmount != null) line.setBudgetedAmount(budgetedAmount);
-        if (description    != null) line.setDescription(description);
-        line = budgetRepo.save(line);
-        refreshProjectBudget(tenantId, line.getProjectId());
-        return line;
+    public ProjectBudgetLine updateBudgetLine(TenantId tenantId, UUID lineId, BigDecimal budgetedAmount,
+                                              String description, String reason) {
+        return costService.reviseLine(tenantId, lineId, budgetedAmount, description, reason,
+                currentUserId(), TenantContext.getCurrentUserName());
     }
 
     @Transactional
     public void deleteBudgetLine(TenantId tenantId, UUID lineId) {
         ProjectBudgetLine line = budgetRepo.findByTenantAndId(tenantId.getValue(), lineId)
                 .orElseThrow(() -> notFound("Budget line"));
+        Project project = verifyProject(tenantId, line.getProjectId());
+        requireEditable(project);
+
+        if (project.getStatus().isBaselineLocked()) {
+            throw new HandyFlowException(
+                    "Budget lines cannot be deleted once the baseline is approved — revise the amount instead "
+                            + "(it must be unspent and uncommitted to reduce it to zero)",
+                    HttpStatus.CONFLICT, "BASELINE_LOCKED");
+        }
+        if (costService.lineHasEntries(lineId)) {
+            throw new HandyFlowException(
+                    "This line has cost entries and cannot be deleted — reverse them first or keep the line",
+                    HttpStatus.CONFLICT, "HAS_COST_ENTRIES");
+        }
         UUID projectId = line.getProjectId();
         budgetRepo.delete(line);
-        refreshProjectBudget(tenantId, projectId);
+        costService.refreshTotals(tenantId, projectId);
     }
 
     // ── EVM ───────────────────────────────────────────────────────────────────
 
     /**
      * Earned Value Management — SPI, CPI, EAC, ETC.
-     *
-     * planPct:   how far through the schedule we are (0–100).
-     *            Pass 0 (or null) to auto-compute from project dates.
-     *            Auto-computation: (today − startDate) / (endDate − startDate) × 100.
-     *
-     * earnedPct: weighted completion % of all tasks (0–100).
-     *            Typically the task completion % passed from the controller.
-     *
-     * FIX: When planPct == 0 (default), the SPI was always BAC × 0 = 0 which
-     *       divided to SPI = EV/0 → defaulted to 1.  The frontend hardcoded 50
-     *       which made SPI relative to 50% schedule completion regardless of dates.
-     *       Now we compute planPct from the real schedule if not provided.
+     * planPct 0/null auto-computes from project dates; earnedPct is the weighted task completion %.
      */
     @Transactional(readOnly = true)
     public BudgetSummaryResponse getEvm(TenantId tenantId, UUID projectId,
                                         BigDecimal planPct, BigDecimal earnedPct) {
         Project p = verifyProject(tenantId, projectId);
 
-        // Auto-compute planPct from schedule dates if not supplied
         BigDecimal effectivePlanPct = (planPct == null || planPct.compareTo(BigDecimal.ZERO) == 0)
                 ? projectService.computePlanPct(p)
                 : planPct;
@@ -119,26 +135,19 @@ public class BudgetService {
         BigDecimal committed = budgetRepo.sumCommittedByProject(projectId);
         BigDecimal variance  = bac.subtract(actual).subtract(committed);
 
-        // PV = BAC × planPct%
         BigDecimal pv = safeMultiply(bac, effectivePlanPct);
-        // EV = BAC × earnedPct%
         BigDecimal ev = safeMultiply(bac, earnedPct);
-        // SPI = EV / PV  (> 1 = ahead of schedule, < 1 = behind)
         BigDecimal spi = pv.compareTo(BigDecimal.ZERO) == 0
                 ? BigDecimal.ONE
                 : ev.divide(pv, 4, RoundingMode.HALF_UP);
-        // CPI = EV / AC  (> 1 = under budget, < 1 = over)
         BigDecimal cpi = actual.compareTo(BigDecimal.ZERO) == 0
                 ? BigDecimal.ONE
                 : ev.divide(actual, 4, RoundingMode.HALF_UP);
-        // EAC = BAC / CPI  (estimated final cost)
         BigDecimal eac = cpi.compareTo(BigDecimal.ZERO) == 0
                 ? bac
                 : bac.divide(cpi, 2, RoundingMode.HALF_UP);
-        // ETC = EAC - AC  (remaining cost to complete)
         BigDecimal etc = eac.subtract(actual);
 
-        // Completion % of budget already consumed
         BigDecimal completionPct = bac.compareTo(BigDecimal.ZERO) == 0
                 ? BigDecimal.ZERO
                 : actual.add(committed).multiply(BigDecimal.valueOf(100))
@@ -152,19 +161,21 @@ public class BudgetService {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private void refreshProjectBudget(TenantId tenantId, UUID projectId) {
-        projectRepo.findByTenantAndId(tenantId.getValue(), projectId).ifPresent(proj -> {
-            proj.setBudgetTotal(budgetRepo.sumBudgetedByProject(projectId));
-            proj.setBudgetSpent(budgetRepo.sumActualByProject(projectId));
-            proj.setBudgetCommitted(budgetRepo.sumCommittedByProject(projectId));
-            proj.updateHealth();
-            projectRepo.save(proj);
-        });
-    }
-
     private Project verifyProject(TenantId tenantId, UUID projectId) {
         return projectRepo.findByTenantAndId(tenantId.getValue(), projectId)
                 .orElseThrow(() -> notFound("Project"));
+    }
+
+    private static void requireEditable(Project p) {
+        if (!p.getStatus().isEditable()) {
+            throw new HandyFlowException("Project is " + p.getStatus() + " and its budget can no longer be changed",
+                    HttpStatus.CONFLICT, "PROJECT_NOT_EDITABLE");
+        }
+    }
+
+    private static UUID currentUserId() {
+        String id = TenantContext.getUserId();
+        return id != null ? UUID.fromString(id) : null;
     }
 
     private BigDecimal safeMultiply(BigDecimal base, BigDecimal pct) {

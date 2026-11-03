@@ -18,33 +18,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/**
- * Resource assignment and conflict detection.
- *
- * CHANGE FROM ORIGINAL — conflict detection now surfaces warnings
- * ───────────────────────────────────────────────────────────────
- * The original code detected HUMAN resource conflicts and then did nothing:
- *
- *   if (!conflicts.isEmpty()) {
- *       // Warn but don't block — let manager decide (business rule)
- *       // A future AI layer will suggest re-sequencing
- *   }
- *
- * The conflict check runs a real DB query, finds real overlapping assignments,
- * and silently discards them.  The API response gave no indication a conflict
- * existed.  Managers were never informed of double-bookings.
- *
- * FIX: assignResource() now returns AssignResourceResult — a record that contains
- * both the saved resource assignment AND a list of conflict descriptions.
- *
- * This keeps the "warn but don't block" business rule intact (managers can still
- * override) while making conflicts visible in the API response.  The controller
- * can surface these as a "warnings" field in the response body and the frontend
- * can show a toast notification.
- *
- * IMPORTANT: the return type of assignResource() changed from ProjectResource
- * to AssignResourceResult.  ResourceController must be updated accordingly.
- */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -52,6 +26,7 @@ public class ResourceService {
 
     private final ProjectResourceRepository resourceRepo;
     private final ProjectRepository         projectRepo;
+    private final ProjectReferenceValidator referenceValidator;
 
     @Transactional(readOnly = true)
     public List<ProjectResource> getResources(TenantId tenantId, UUID projectId) {
@@ -59,21 +34,14 @@ public class ResourceService {
         return resourceRepo.findByProject(projectId);
     }
 
-    /**
-     * Assigns a resource to a project and returns both the assignment and any
-     * double-booking warnings.
-     *
-     * Conflicts are WARNINGS, not errors — the assignment is saved regardless.
-     * The caller (controller) decides how to surface the warnings to the user.
-     */
     @Transactional
     public AssignResourceResult assignResource(TenantId tenantId, UUID projectId,
                                                CreateResourceRequest req) {
         verifyProject(tenantId, projectId);
+        referenceValidator.requireTaskInProject(tenantId, projectId, req.taskId());
 
         List<String> warnings = List.of();
 
-        // Detect HUMAN resource double-bookings
         if ("HUMAN".equals(req.resourceType())
                 && req.resourceId()  != null
                 && req.startDate()   != null
@@ -84,12 +52,10 @@ public class ResourceService {
                     req.startDate(), req.endDate());
 
             if (!conflicts.isEmpty()) {
-                // Build human-readable warning messages for each conflicting assignment
                 warnings = conflicts.stream()
                         .map(c -> String.format(
-                                "Resource '%s' is already assigned to project %s (%s → %s) at %d%% allocation.",
+                                "Resource '%s' already has an overlapping assignment (%s → %s) at %d%% allocation.",
                                 req.resourceName(),
-                                c.getProjectId(),
                                 c.getStartDate() != null ? c.getStartDate() : "open",
                                 c.getEndDate()   != null ? c.getEndDate()   : "open",
                                 c.getAllocationPct().intValue()))
@@ -118,17 +84,11 @@ public class ResourceService {
         resourceRepo.delete(r);
     }
 
-    /**
-     * Standalone conflict detection — used by the AI conflict resolver and
-     * by scheduling suggestions.
-     */
     @Transactional(readOnly = true)
     public List<ProjectResource> detectConflicts(TenantId tenantId, UUID resourceId,
                                                  LocalDate from, LocalDate to) {
         return resourceRepo.findByResourceAndDateRange(tenantId.getValue(), resourceId, from, to);
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private void verifyProject(TenantId tenantId, UUID projectId) {
         projectRepo.findByTenantAndId(tenantId.getValue(), projectId)

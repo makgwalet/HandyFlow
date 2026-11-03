@@ -14,9 +14,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * CHUNK 2b: added the *ForMember variants. They return only projects the given
+ * user is a member of, and are used when app.projects.restrict-to-members is on
+ * and the caller isn't a PM_ADMIN. The tenant-wide originals are unchanged.
+ */
 public interface ProjectRepository extends JpaRepository<Project, UUID> {
 
-    // ── Paginated queries ────────────────────────────────────────────────────
+    // ── Paginated queries (tenant-wide) ──────────────────────────────────────
 
     @Query("""
             SELECT p FROM Project p
@@ -36,20 +41,36 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
                                @Param("status")   ProjectStatus status,
                                Pageable pageable);
 
-    // ── Single-entity lookups ────────────────────────────────────────────────
-
-    @Query("SELECT p FROM Project p WHERE p.tenantId = :tenantId AND p.id = :id")
-    Optional<Project> findByTenantAndId(@Param("tenantId") UUID tenantId,
-                                        @Param("id")       UUID id);
+    // ── Paginated queries (member-scoped) ────────────────────────────────────
 
     @Query("""
             SELECT p FROM Project p
             WHERE p.tenantId = :tenantId
               AND p.status <> 'CANCELLED'
-              AND LOWER(TRIM(p.name)) = LOWER(TRIM(:name))
-            ORDER BY p.createdAt ASC
+              AND EXISTS (SELECT 1 FROM ProjectMember m WHERE m.projectId = p.id AND m.userId = :userId)
+            ORDER BY p.createdAt DESC
             """)
-    List<Project> findActiveByExactName(@Param("tenantId") UUID tenantId, @Param("name") String name);
+    Page<Project> findActiveForMember(@Param("tenantId") UUID tenantId,
+                                      @Param("userId")   UUID userId,
+                                      Pageable pageable);
+
+    @Query("""
+            SELECT p FROM Project p
+            WHERE p.tenantId = :tenantId
+              AND p.status = :status
+              AND EXISTS (SELECT 1 FROM ProjectMember m WHERE m.projectId = p.id AND m.userId = :userId)
+            ORDER BY p.createdAt DESC
+            """)
+    Page<Project> findByStatusForMember(@Param("tenantId") UUID tenantId,
+                                        @Param("userId")   UUID userId,
+                                        @Param("status")   ProjectStatus status,
+                                        Pageable pageable);
+
+    // ── Single-entity lookups ────────────────────────────────────────────────
+
+    @Query("SELECT p FROM Project p WHERE p.tenantId = :tenantId AND p.id = :id")
+    Optional<Project> findByTenantAndId(@Param("tenantId") UUID tenantId,
+                                        @Param("id")       UUID id);
 
     @Query("SELECT p FROM Project p WHERE p.clientPortalToken = :token")
     Optional<Project> findByPortalToken(@Param("token") String token);
@@ -74,7 +95,7 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     List<Project> findActiveByManager(@Param("tenantId")  UUID tenantId,
                                       @Param("managerId") UUID managerId);
 
-    // ── Dashboard KPI counts (use COUNT — never load entities just to call .size()) ──
+    // ── Dashboard KPI counts ─────────────────────────────────────────────────
 
     @Query("SELECT COUNT(p) FROM Project p WHERE p.tenantId = :tenantId AND p.status = 'ACTIVE'")
     long countActive(@Param("tenantId") UUID tenantId);
@@ -87,22 +108,25 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
             """)
     long countByHealth(@Param("tenantId") UUID tenantId, @Param("health") ProjectHealth health);
 
+    @Query("""
+            SELECT COUNT(p) FROM Project p
+            WHERE p.tenantId = :tenantId AND p.status = 'ACTIVE'
+              AND EXISTS (SELECT 1 FROM ProjectMember m WHERE m.projectId = p.id AND m.userId = :userId)
+            """)
+    long countActiveForMember(@Param("tenantId") UUID tenantId, @Param("userId") UUID userId);
+
+    @Query("""
+            SELECT COUNT(p) FROM Project p
+            WHERE p.tenantId = :tenantId
+              AND p.health  = :health
+              AND p.status  = 'ACTIVE'
+              AND EXISTS (SELECT 1 FROM ProjectMember m WHERE m.projectId = p.id AND m.userId = :userId)
+            """)
+    long countByHealthForMember(@Param("tenantId") UUID tenantId, @Param("userId") UUID userId,
+                                @Param("health") ProjectHealth health);
+
     // ── Batch stats query — fixes the N+1 problem ────────────────────────────
-    /**
-     * Returns task and risk counts for a LIST of project IDs in a single round-trip.
-     *
-     * WHY THIS EXISTS:
-     * The original ProjectController.getProjects() called getTasks() + getRisks()
-     * inside a page.map() loop.  With page size = 20 that was 41 DB round-trips.
-     * This one native query replaces those 40 extra calls.
-     *
-     * HOW IT WORKS:
-     * LEFT JOIN so projects with zero tasks / risks still appear in results.
-     * FILTER (WHERE ...) is PostgreSQL-specific aggregate filtering — cleaner than
-     * a nested CASE WHEN inside SUM.
-     * p.id = ANY(:projectIds) is the PostgreSQL idiom for WHERE id IN (:list)
-     * and avoids the "parameter limit" issues that IN (...) can hit on large arrays.
-     */
+
     @Query(nativeQuery = true, value = """
             SELECT
                 p.id::text                                                          AS projectId,

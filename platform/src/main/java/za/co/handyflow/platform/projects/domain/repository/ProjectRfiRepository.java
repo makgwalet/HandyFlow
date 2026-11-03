@@ -1,10 +1,12 @@
 package za.co.handyflow.platform.projects.domain.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import za.co.handyflow.platform.projects.domain.model.ProjectRfi;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,4 +23,30 @@ public interface ProjectRfiRepository extends JpaRepository<ProjectRfi, UUID> {
 
     @Query("SELECT COUNT(r) FROM ProjectRfi r WHERE r.projectId = :projectId AND r.tenantId = :tenantId AND r.status IN ('SUBMITTED','RESPONDED')")
     long countOpenByProject(@Param("projectId") UUID projectId, @Param("tenantId") UUID tenantId);
+
+    // ── CHUNK 7 ──────────────────────────────────────────────────────────────
+
+    /**
+     * Unanswered RFIs past their due date that still have escalation levels left, on projects that
+     * are still running. Across ALL tenants — used only by the nightly sweep.
+     */
+    @Query("""
+            SELECT r FROM ProjectRfi r
+            WHERE r.status = 'SUBMITTED'
+              AND r.dueDate < :today
+              AND r.escalationLevel < 3
+              AND r.projectId IN (SELECT p.id FROM Project p WHERE p.status IN ('ACTIVE','ON_HOLD'))
+            """)
+    List<ProjectRfi> findOverdueForEscalation(@Param("today") LocalDate today);
+
+    /**
+     * Atomically raises the escalation level. Returns 1 only for the caller that actually moved it, so
+     * if two application instances run the sweep at once, exactly one sends the notification.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            UPDATE ProjectRfi r SET r.escalationLevel = :level
+            WHERE r.id = :id AND r.status = 'SUBMITTED' AND r.escalationLevel < :level
+            """)
+    int raiseEscalationLevel(@Param("id") UUID id, @Param("level") int level);
 }

@@ -2,6 +2,7 @@ package za.co.handyflow.platform.projects.application.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -9,19 +10,61 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import za.co.handyflow.platform.projects.domain.enums.ProjectHealth;
+import za.co.handyflow.platform.projects.domain.enums.ProjectMemberRole;
 import za.co.handyflow.platform.projects.domain.enums.ProjectStatus;
 import za.co.handyflow.platform.projects.domain.model.*;
 import za.co.handyflow.platform.projects.domain.repository.*;
 import za.co.handyflow.platform.projects.domain.repository.projections.ProjectStatsSummary;
 import za.co.handyflow.platform.projects.dto.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
+import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Project CRUD, tasks, risks and time entries.
+ *
+ * CHUNK 1 CHANGES
+ * ───────────────
+ * 1. updateProjectStatus() REMOVED — every status change now goes through
+ *    ProjectLifecycleService so validation and audit history can't be bypassed.
+ * 2. createProject() now applies every field the request carries. Previously
+ *    cidbGrade, nhbrcNumber, contractType, retentionPct and notes were accepted
+ *    and silently discarded.
+ * 3. updateProject() now applies startDate and siteAddress (also previously
+ *    ignored), the new governance fields, validates date order, refuses edits on
+ *    COMPLETED / CLOSED / CANCELLED projects, and refuses start-date changes once
+ *    the baseline is locked.
+ * 4. createTask / createRisk / logTime / updateTaskStatus now refuse to modify a
+ *    project that is no longer editable.
+ * 5. logTime() verifies the task actually belongs to the project.
+ *
+ * CHUNK 2 CHANGES
+ * ───────────────
+ * - createTask() validates phaseId / parentTaskId belong to the same project.
+ * - New projects get a portal-token expiry (app.projects.portal.token-ttl-days, default 365; 0 = none).
+ * - getProjectByPortalToken() REMOVED: portal token resolution now lives only in
+ *   ProjectPortalService, so no code path can skip the enabled/expiry checks.
+ *
+ * CHUNK 2b CHANGES
+ * ────────────────
+ * - Project list, dashboard summary and the time-approval queue are member-scoped
+ *   when app.projects.restrict-to-members is on (PM_ADMIN sees everything).
+ * - createProject() adds the creator (MANAGER) and any named manager / sponsor as
+ *   members; updateProject() does the same when those are set.
+ *
+ * KNOWN, DELIBERATELY NOT CHANGED HERE (scheduled for later chunks):
+ *  - (resolved in chunk 4) budgetTotal / budgetSpent / budgetCommitted are now written only by
+ *    ProjectCostService from the cost ledger; a direct budgetTotal edit is refused once lines exist.
+ *  - endDate can still be edited directly after the baseline is locked; this
+ *    should go through change control (change-control chunk).
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -32,19 +75,30 @@ public class ProjectService {
     private final ProjectRiskRepository      riskRepo;
     private final ProjectTimeEntryRepository timeRepo;
     private final SequenceService            sequenceService;
+    private final ProjectReferenceValidator  referenceValidator;
+    private final ProjectAccessGuard         accessGuard;
+    private final ProjectScopedQueries       scopedQueries;
+    private final ProjectMemberService       memberService;
+    private final ProjectBudgetLineRepository budgetRepo;
+
+    /** Lifetime of a new project's client-portal token in days. 0 = never expires. */
+    @Value("${app.projects.portal.token-ttl-days:365}")
+    private int portalTokenTtlDays;
 
     // ── Summary (dashboard KPIs) ──────────────────────────────────────────────
 
-    /**
-     * Dashboard summary — active count, health breakdown, pending approvals, open red risks.
-     *
-     * FIX: Was calling findPendingApproval(tid).size() and findOpenRedRisks(tid).size()
-     *      which loaded FULL entity lists into the JVM to count them.
-     *      Now uses COUNT queries — returns a single number from the DB.
-     */
     @Transactional(readOnly = true)
     public ProjectSummaryResponse getSummary(TenantId tenantId) {
         UUID tid = tenantId.getValue();
+        UUID memberUser = accessGuard.memberScopeUserId();   // null = no scoping
+        if (memberUser != null) {
+            return new ProjectSummaryResponse(
+                    (int) projectRepo.countActiveForMember(tid, memberUser),
+                    (int) projectRepo.countByHealthForMember(tid, memberUser, ProjectHealth.RED),
+                    (int) projectRepo.countByHealthForMember(tid, memberUser, ProjectHealth.AMBER),
+                    (int) scopedQueries.countPendingTime(tid, memberUser),
+                    (int) scopedQueries.countOpenRedRisks(tid, memberUser));
+        }
         return new ProjectSummaryResponse(
                 (int) projectRepo.countActive(tid),
                 (int) projectRepo.countByHealth(tid, ProjectHealth.RED),
@@ -59,14 +113,18 @@ public class ProjectService {
     @Transactional(readOnly = true)
     public Page<Project> getProjects(TenantId tenantId, String status, Pageable pageable) {
         UUID tid = tenantId.getValue();
+        UUID memberUser = accessGuard.memberScopeUserId();   // null = no scoping
         if (StringUtils.hasText(status)) {
-            // Parse the incoming String to the enum Hibernate expects.
             // valueOf() throws IllegalArgumentException on unknown values —
             // the global exception handler maps that to HTTP 400.
             ProjectStatus statusEnum = ProjectStatus.valueOf(status.toUpperCase());
-            return projectRepo.findByStatus(tid, statusEnum, pageable);
+            return memberUser != null
+                    ? projectRepo.findByStatusForMember(tid, memberUser, statusEnum, pageable)
+                    : projectRepo.findByStatus(tid, statusEnum, pageable);
         }
-        return projectRepo.findActive(tid, pageable);
+        return memberUser != null
+                ? projectRepo.findActiveForMember(tid, memberUser, pageable)
+                : projectRepo.findActive(tid, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -75,17 +133,7 @@ public class ProjectService {
                 .orElseThrow(() -> notFound("Project"));
     }
 
-    /**
-     * Batch stats fetch for a list of projects — resolves the N+1 problem.
-     *
-     * WHY THIS EXISTS:
-     * ProjectController.getProjects() previously called getTasks() + getRisks()
-     * inside a page.map() loop — 40 DB round-trips for 20 projects.
-     * Now the controller calls this once with all page IDs → 1 query.
-     *
-     * Returns a Map<projectId, stats> so the controller can look up stats
-     * by project ID in O(1) per project.
-     */
+    /** Batch stats fetch for a list of projects — resolves the N+1 problem. */
     @Transactional(readOnly = true)
     public Map<UUID, ProjectStatsSummary> getProjectStats(List<UUID> projectIds) {
         if (projectIds == null || projectIds.isEmpty()) return Map.of();
@@ -94,9 +142,6 @@ public class ProjectService {
                 .collect(Collectors.toMap(ProjectStatsSummary::getProjectId, s -> s));
     }
 
-    /**
-     * Convenience: get stats for a single project (used after create/update).
-     */
     @Transactional(readOnly = true)
     public ProjectStatsSummary getProjectStats(UUID projectId) {
         UUID[] ids = { projectId };
@@ -107,34 +152,48 @@ public class ProjectService {
 
     @Transactional
     public Project createProject(TenantId tenantId, CreateProjectRequest req, UUID createdBy) {
-        /*
-         * FIX — Race condition in project number generation.
-         *
-         * Old code:
-         *   int seq = projectRepo.findMaxProjectSequence(tenantId) + 1;
-         *   String number = "PRJ" + format(seq);
-         *
-         * Two concurrent requests both read MAX=5, both compute "PRJ0006",
-         * the second insert fails the UNIQUE constraint → HTTP 500.
-         *
-         * New code delegates to SequenceService which uses PostgreSQL's atomic
-         * INSERT … ON CONFLICT DO UPDATE … RETURNING in a REQUIRES_NEW
-         * transaction — guaranteed unique, no retry needed.
-         */
+        validateDates(req.startDate(), req.endDate());
+
+        // Atomic, race-free number via SequenceService (see its Javadoc).
         String number = sequenceService.nextProjectNumber(tenantId.getValue());
 
         Project p = Project.create(tenantId.getValue(), number, req.name(),
                 req.projectType(), req.clientId(), req.clientName(),
                 req.startDate(), req.endDate(), req.budgetTotal(), createdBy);
 
-        if (req.description()        != null) p.setDescription(req.description());
+        // Every optional field the request carries is now actually applied.
+        if (req.description()        != null) p.setDescription(blankToNull(req.description()));
         if (req.contractValue()      != null) p.setContractValue(req.contractValue());
-        if (req.contractRef()        != null) p.setContractRef(req.contractRef());
+        if (req.contractRef()        != null) p.setContractRef(blankToNull(req.contractRef()));
+        if (req.contractType()       != null) p.setContractType(blankToNull(req.contractType()));
+        if (req.retentionPct()       != null) p.setRetentionPct(req.retentionPct());
+        if (req.cidbGrade()          != null) p.setCidbGrade(blankToNull(req.cidbGrade()));
+        if (req.nhbrcNumber()        != null) p.setNhbrcNumber(blankToNull(req.nhbrcNumber()));
         if (req.projectManagerId()   != null) p.setProjectManagerId(req.projectManagerId());
-        if (req.projectManagerName() != null) p.setProjectManagerName(req.projectManagerName());
-        if (req.siteAddress()        != null) p.setSiteAddress(req.siteAddress());
+        if (req.projectManagerName() != null) p.setProjectManagerName(blankToNull(req.projectManagerName()));
+        if (req.siteAddress()        != null) p.setSiteAddress(blankToNull(req.siteAddress()));
+        if (req.sponsorId()          != null) p.setSponsorId(req.sponsorId());
+        if (req.sponsorName()        != null) p.setSponsorName(blankToNull(req.sponsorName()));
+        if (req.objectives()         != null) p.setObjectives(blankToNull(req.objectives()));
+        if (req.scopeStatement()     != null) p.setScopeStatement(blankToNull(req.scopeStatement()));
+        if (req.businessCase()       != null) p.setBusinessCase(blankToNull(req.businessCase()));
+        if (req.notes()              != null) p.setNotes(blankToNull(req.notes()));
+
+        if (portalTokenTtlDays > 0) {
+            p.setPortalTokenExpiresAt(Instant.now().plus(Duration.ofDays(portalTokenTtlDays)));
+        }
 
         projectRepo.save(p);
+
+        // CHUNK 2b: membership is explicit — creator and any named manager/sponsor are added.
+        String actorName = TenantContext.getCurrentUserName();
+        memberService.ensureMember(tenantId, p.getId(), createdBy, actorName,
+                ProjectMemberRole.MANAGER, createdBy, actorName);
+        memberService.ensureMember(tenantId, p.getId(), req.projectManagerId(), req.projectManagerName(),
+                ProjectMemberRole.MANAGER, createdBy, actorName);
+        memberService.ensureMember(tenantId, p.getId(), req.sponsorId(), req.sponsorName(),
+                ProjectMemberRole.SPONSOR, createdBy, actorName);
+
         log.info("Created project={} number='{}' tenant={}", p.getId(), number, tenantId.getValue());
         return p;
     }
@@ -142,39 +201,63 @@ public class ProjectService {
     @Transactional
     public Project updateProject(TenantId tenantId, UUID id, UpdateProjectRequest req) {
         Project p = getProject(tenantId, id);
-        if (req.name()               != null) p.setName(req.name());
-        if (req.description()        != null) p.setDescription(req.description());
-        if (req.endDate()            != null) p.setEndDate(req.endDate());
-        if (req.budgetTotal()        != null) p.setBudgetTotal(req.budgetTotal());
-        if (req.projectManagerId()   != null) p.setProjectManagerId(req.projectManagerId());
-        if (req.projectManagerName() != null) p.setProjectManagerName(req.projectManagerName());
-        if (req.contractValue()      != null) p.setContractValue(req.contractValue());
-        if (req.contractRef()        != null) p.setContractRef(req.contractRef());
-        if (req.cidbGrade()          != null) p.setCidbGrade(req.cidbGrade());
-        if (req.nhbrcNumber()        != null) p.setNhbrcNumber(req.nhbrcNumber());
-        if (req.notes()              != null) p.setNotes(req.notes());
-        p.updateHealth();
-        return projectRepo.save(p);
-    }
+        requireEditable(p);
 
-    @Transactional
-    public Project updateProjectStatus(TenantId tenantId, UUID id, String action, String reason) {
-        Project p = getProject(tenantId, id);
-        /*
-         * FIX: switch now uses the enum's canTransitionTo() guard (inside
-         * each lifecycle method on Project) rather than bare strings.
-         * Illegal transitions throw IllegalStateException caught by the global
-         * exception handler → HTTP 409 Conflict.
-         */
-        switch (action.toUpperCase()) {
-            case "ACTIVATE"  -> p.activate();
-            case "HOLD"      -> p.hold();
-            case "COMPLETE"  -> { p.complete(); recalculateHealth(p); }
-            case "CANCEL"    -> p.cancel(reason);   // FIX: reason goes to cancellationReason, NOT notes
-            default -> throw new HandyFlowException(
-                    "Unknown action: " + action, HttpStatus.BAD_REQUEST, "BAD_REQUEST");
+        // Start date is part of the baseline: only changeable before approval.
+        if (req.startDate() != null && !req.startDate().equals(p.getStartDate())
+                && p.getStatus().isBaselineLocked()) {
+            throw new HandyFlowException(
+                    "Start date cannot be changed after the project is approved or active",
+                    HttpStatus.CONFLICT, "BASELINE_LOCKED");
         }
-        return projectRepo.save(p);
+
+        LocalDate newStart = req.startDate() != null ? req.startDate() : p.getStartDate();
+        LocalDate newEnd   = req.endDate()   != null ? req.endDate()   : p.getEndDate();
+        validateDates(newStart, newEnd);
+
+        if (req.name()               != null) p.setName(req.name());
+        if (req.description()        != null) p.setDescription(blankToNull(req.description()));
+        if (req.startDate()          != null) p.setStartDate(req.startDate());
+        if (req.endDate()            != null) p.setEndDate(req.endDate());
+        // CHUNK 4: once budget lines exist, the project budget IS their sum — a direct edit would be
+        // silently overwritten on the next line change. Unchanged values are ignored so a form that
+        // re-sends every field still works.
+        if (req.budgetTotal() != null && req.budgetTotal().compareTo(p.getBudgetTotal()) != 0) {
+            if (!budgetRepo.findByProject(id).isEmpty()) {
+                throw new HandyFlowException(
+                        "The project budget is the sum of its budget lines — change it by revising a line or transferring between lines",
+                        HttpStatus.CONFLICT, "BUDGET_MANAGED_BY_LINES");
+            }
+            p.setBudgetTotal(req.budgetTotal());
+        }
+        if (req.projectManagerId()   != null) p.setProjectManagerId(req.projectManagerId());
+        if (req.projectManagerName() != null) p.setProjectManagerName(blankToNull(req.projectManagerName()));
+        if (req.contractValue()      != null) p.setContractValue(req.contractValue());
+        if (req.contractRef()        != null) p.setContractRef(blankToNull(req.contractRef()));
+        if (req.contractType()       != null) p.setContractType(blankToNull(req.contractType()));
+        if (req.retentionPct()       != null) p.setRetentionPct(req.retentionPct());
+        if (req.cidbGrade()          != null) p.setCidbGrade(blankToNull(req.cidbGrade()));
+        if (req.nhbrcNumber()        != null) p.setNhbrcNumber(blankToNull(req.nhbrcNumber()));
+        if (req.siteAddress()        != null) p.setSiteAddress(blankToNull(req.siteAddress()));
+        if (req.sponsorId()          != null) p.setSponsorId(req.sponsorId());
+        if (req.sponsorName()        != null) p.setSponsorName(blankToNull(req.sponsorName()));
+        if (req.objectives()         != null) p.setObjectives(blankToNull(req.objectives()));
+        if (req.scopeStatement()     != null) p.setScopeStatement(blankToNull(req.scopeStatement()));
+        if (req.businessCase()       != null) p.setBusinessCase(blankToNull(req.businessCase()));
+        if (req.notes()              != null) p.setNotes(blankToNull(req.notes()));
+        p.updateHealth();
+        Project saved = projectRepo.save(p);
+
+        // CHUNK 2b: a newly named manager / sponsor becomes a member (existing members keep their role).
+        if (req.projectManagerId() != null || req.sponsorId() != null) {
+            UUID actorId = currentUserIdOrNull();
+            String actorName = TenantContext.getCurrentUserName();
+            memberService.ensureMember(tenantId, id, req.projectManagerId(), req.projectManagerName(),
+                    ProjectMemberRole.MANAGER, actorId, actorName);
+            memberService.ensureMember(tenantId, id, req.sponsorId(), req.sponsorName(),
+                    ProjectMemberRole.SPONSOR, actorId, actorName);
+        }
+        return saved;
     }
 
     // ── Tasks ─────────────────────────────────────────────────────────────────
@@ -194,9 +277,11 @@ public class ProjectService {
     @Transactional
     public ProjectTask createTask(TenantId tenantId, UUID projectId,
                                   CreateTaskRequest req, UUID createdBy) {
-        getProject(tenantId, projectId);
+        requireEditable(getProject(tenantId, projectId));
+        // CHUNK 2: referenced phase / parent task must belong to THIS project (and tenant).
+        referenceValidator.requirePhaseInProject(tenantId, projectId, req.phaseId());
+        referenceValidator.requireTaskInProject(tenantId, projectId, req.parentTaskId());
 
-        // FIX: Use SequenceService for both number AND sort order
         String number    = sequenceService.nextTaskNumber(tenantId.getValue(), projectId);
         int    sortOrder = taskRepo.findMaxSortOrder(projectId) + 1;
 
@@ -221,6 +306,10 @@ public class ProjectService {
                                         String action, BigDecimal progressPct) {
         ProjectTask t = taskRepo.findByTenantAndId(tenantId.getValue(), taskId)
                 .orElseThrow(() -> notFound("Task"));
+        Project project = projectRepo.findByTenantAndId(tenantId.getValue(), t.getProjectId())
+                .orElseThrow(() -> notFound("Project"));
+        requireEditable(project);
+
         switch (action.toUpperCase()) {
             case "START"    -> t.start();
             case "COMPLETE" -> t.complete();
@@ -231,9 +320,8 @@ public class ProjectService {
                     "Unknown action: " + action, HttpStatus.BAD_REQUEST, "BAD_REQUEST");
         }
         taskRepo.save(t);
-        // Recalculate project health after task update
-        projectRepo.findByTenantAndId(tenantId.getValue(), t.getProjectId())
-                .ifPresent(p -> { recalculateHealth(p); projectRepo.save(p); });
+        recalculateHealth(project);
+        projectRepo.save(project);
         return t;
     }
 
@@ -247,11 +335,11 @@ public class ProjectService {
 
     @Transactional
     public ProjectRisk createRisk(TenantId tenantId, UUID projectId, CreateRiskRequest req) {
-        getProject(tenantId, projectId);
+        requireEditable(getProject(tenantId, projectId));
         ProjectRisk r = ProjectRisk.create(tenantId.getValue(), projectId,
                 req.title(), req.probability(), req.impact(),
                 req.category(), req.mitigation(), req.ownerId(), req.ownerName());
-        r.setIsOhsa(Boolean.TRUE.equals(req.isOhsa()));
+        r.setIsOhsa(req.isOhsa());
         if (req.reviewDate() != null) r.setReviewDate(req.reviewDate());
         riskRepo.save(r);
         return r;
@@ -275,25 +363,25 @@ public class ProjectService {
     // ── Time Entries ──────────────────────────────────────────────────────────
 
     /**
-     * Logs a time entry and updates the task's actual_hours.
-     *
-     * FIXES THREE BUGS from the original:
-     *
-     * Bug 1: Wrong scope — sumHoursByProject(projectId) was called instead of
-     *         sumHoursByTask(taskId). A task's actual_hours should reflect only
-     *         time logged against that task, not the whole project.
-     *
-     * Bug 2: No-op setter — task.setNotes(task.getNotes()) set notes to itself.
-     *         No data changed; updated_at was never touched; actual_hours stayed 0.
-     *
-     * Bug 3: Missing setter — ProjectTask had no setActualHours() method.
-     *         Even a correct call would have failed with a compile error.
-     *         setActualHours() is now added to ProjectTask.
+     * Logs a time entry and refreshes the task's actual_hours (task-scoped SUM).
+     * Chunk 1: refuses a non-editable project and verifies the task belongs to it.
      */
     @Transactional
     public TimeEntry logTime(TenantId tenantId, UUID projectId, LogTimeRequest req,
                              UUID userId, String userName) {
-        getProject(tenantId, projectId);
+        requireEditable(getProject(tenantId, projectId));
+
+        ProjectTask task = null;
+        if (req.taskId() != null) {
+            task = taskRepo.findByTenantAndId(tenantId.getValue(), req.taskId())
+                    .orElseThrow(() -> notFound("Task"));
+            if (!projectId.equals(task.getProjectId())) {
+                throw new HandyFlowException(
+                        "Task does not belong to this project",
+                        HttpStatus.BAD_REQUEST, "TASK_PROJECT_MISMATCH");
+            }
+        }
+
         TimeEntry entry = TimeEntry.create(
                 tenantId.getValue(), projectId, req.taskId(),
                 userId, userName,
@@ -301,13 +389,9 @@ public class ProjectService {
                 req.hours(), req.description(), req.latitude(), req.longitude());
         timeRepo.save(entry);
 
-        // Update actual_hours on the task from the sum of ALL non-rejected entries
-        if (req.taskId() != null) {
-            taskRepo.findByTenantAndId(tenantId.getValue(), req.taskId()).ifPresent(task -> {
-                BigDecimal taskHours = timeRepo.sumHoursByTask(req.taskId()); // FIX: task scope, not project
-                task.setActualHours(taskHours);                               // FIX: correct setter
-                taskRepo.save(task);
-            });
+        if (task != null) {
+            task.setActualHours(timeRepo.sumHoursByTask(task.getId()));
+            taskRepo.save(task);
         }
         return entry;
     }
@@ -330,29 +414,19 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<TimeEntry> getPendingTimeApprovals(TenantId tenantId) {
-        return timeRepo.findPendingApproval(tenantId.getValue());
+        UUID memberUser = accessGuard.memberScopeUserId();   // null = no scoping
+        return memberUser != null
+                ? scopedQueries.pendingTimeEntries(tenantId.getValue(), memberUser)
+                : timeRepo.findPendingApproval(tenantId.getValue());
     }
 
     // ── Client Portal ─────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public Project getProjectByPortalToken(String token) {
-        return projectRepo.findByPortalToken(token)
-                .orElseThrow(() -> notFound("Project"));
-    }
-
-    /**
-     * Portal-safe milestone fetch — project already verified by token resolution.
-     * Accepts the resolved Project to guarantee tenant isolation without TenantContext.
-     */
-    @Transactional(readOnly = true)
     public List<ProjectTask> getMilestonesForPortal(Project resolvedProject) {
         return taskRepo.findMilestones(resolvedProject.getId());
     }
 
-    /**
-     * Portal-safe risk fetch — project already verified by token resolution.
-     */
     @Transactional(readOnly = true)
     public List<ProjectRisk> getRisksForPortal(Project resolvedProject) {
         return riskRepo.findByProject(resolvedProject.getId());
@@ -360,20 +434,7 @@ public class ProjectService {
 
     // ── EVM helper ────────────────────────────────────────────────────────────
 
-    /**
-     * Computes how far through the schedule we are as a percentage (0–100).
-     *
-     * FIX: The frontend and BudgetService previously received planPct=50 as a
-     * hardcoded literal from BudgetTab.tsx.  That made SPI meaningless because
-     * PV was always BAC × 50%, regardless of actual elapsed time.
-     *
-     * This method computes the real value:
-     *   planPct = (today − startDate) / (endDate − startDate) × 100
-     * clamped to [0, 100].
-     *
-     * Called by BudgetService.getEvm() when the caller does not supply planPct,
-     * and by the frontend via a new derived-planPct query param.
-     */
+    /** Planned % through the schedule: (today − start) / (end − start) × 100, clamped 0–100. */
     public BigDecimal computePlanPct(Project project) {
         if (project.getStartDate() == null || project.getEndDate() == null) {
             return BigDecimal.valueOf(50); // fallback when no dates set
@@ -394,27 +455,45 @@ public class ProjectService {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    private static UUID currentUserIdOrNull() {
+        String id = TenantContext.getUserId();
+        return id != null ? UUID.fromString(id) : null;
+    }
+
     /**
-     * Recalculates project health using a DB-side SUM aggregate.
-     *
-     * FIX: The original fetched ALL tasks into JVM and streamed + reduced them:
-     *   taskRepo.findByProject(p.getId()).stream()
-     *       .map(ProjectTask::getActualCost).reduce(BigDecimal.ZERO, BigDecimal::add)
-     *
-     * For a project with 300 tasks that's 300 entity hydrations for one addition.
-     * The new SUM() is computed in the database — no entities loaded into JVM.
+     * CHUNK 4: no longer touches budgetSpent. That figure comes from the cost ledger via
+     * ProjectCostService.refreshTotals() — this method used to overwrite it from task
+     * actual-cost, which nothing populates, so the two writers disagreed.
      */
     private void recalculateHealth(Project p) {
-        BigDecimal spent = taskRepo.sumActualCostByProject(p.getId()); // FIX: DB-side SUM
-        p.setBudgetSpent(spent);
         p.updateHealth();
+    }
+
+    /** COMPLETED / CLOSED / CANCELLED projects are read-only (reopen first if needed). */
+    private void requireEditable(Project p) {
+        if (!p.getStatus().isEditable()) {
+            throw new HandyFlowException(
+                    "Project is " + p.getStatus() + " and can no longer be modified",
+                    HttpStatus.CONFLICT, "PROJECT_NOT_EDITABLE");
+        }
+    }
+
+    private void validateDates(LocalDate start, LocalDate end) {
+        if (start != null && end != null && end.isBefore(start)) {
+            throw new HandyFlowException(
+                    "End date cannot be before start date",
+                    HttpStatus.BAD_REQUEST, "INVALID_DATES");
+        }
+    }
+
+    private static String blankToNull(String s) {
+        return (s == null || s.isBlank()) ? null : s.trim();
     }
 
     private HandyFlowException notFound(String entity) {
         return new HandyFlowException(entity + " not found", HttpStatus.NOT_FOUND, "NOT_FOUND");
     }
 
-    /** Null-safe empty stats implementation for projects with no tasks/risks yet. */
     private static final ProjectStatsSummary EMPTY_STATS = new ProjectStatsSummary() {
         @Override public UUID getProjectId()          { return null; }
         @Override public long getTaskCount()          { return 0; }

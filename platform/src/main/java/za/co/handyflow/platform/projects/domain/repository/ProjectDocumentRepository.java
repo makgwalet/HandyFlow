@@ -9,40 +9,59 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * CHUNK 6: the old findCurrentByProjectAndType() is REMOVED — it selected every CURRENT/APPROVED
+ * document of a TYPE, which is why one new revision used to supersede unrelated documents.
+ * Revisions are now found by document number (findSeries).
+ */
 public interface ProjectDocumentRepository extends JpaRepository<ProjectDocument, UUID> {
 
+    /** The working register: everything except voided documents. */
     @Query("""
             SELECT d FROM ProjectDocument d
-            WHERE d.projectId = :projectId
-            ORDER BY d.documentType, d.createdAt DESC
+            WHERE d.projectId = :projectId AND d.status <> 'VOIDED'
+            ORDER BY d.documentType, d.documentNumber, d.createdAt DESC
             """)
-    List<ProjectDocument> findByProject(@Param("projectId") UUID projectId);
+    List<ProjectDocument> findRegister(@Param("projectId") UUID projectId);
 
     @Query("""
             SELECT d FROM ProjectDocument d
-            WHERE d.projectId    = :projectId
-              AND d.documentType = :type
-            ORDER BY d.createdAt DESC
+            WHERE d.projectId = :projectId AND d.documentType = :type AND d.status <> 'VOIDED'
+            ORDER BY d.documentNumber, d.createdAt DESC
             """)
-    List<ProjectDocument> findByProjectAndType(@Param("projectId") UUID projectId,
-                                               @Param("type")      String type);
+    List<ProjectDocument> findRegisterByType(@Param("projectId") UUID projectId, @Param("type") String type);
 
-    /**
-     * Find documents of the same type that are currently CURRENT or APPROVED —
-     * used by DocumentService to supersede the previous revision when a new
-     * version is uploaded.
-     */
+    /** Only documents in force or in progress (CURRENT, FOR_REVIEW, APPROVED). */
     @Query("""
             SELECT d FROM ProjectDocument d
-            WHERE d.projectId    = :projectId
-              AND d.documentType = :type
-              AND d.status IN ('CURRENT', 'APPROVED')
+            WHERE d.projectId = :projectId AND d.status IN ('CURRENT','FOR_REVIEW','APPROVED')
+            ORDER BY d.documentType, d.documentNumber, d.createdAt DESC
+            """)
+    List<ProjectDocument> findLive(@Param("projectId") UUID projectId);
+
+    @Query("""
+            SELECT d FROM ProjectDocument d
+            WHERE d.projectId = :projectId AND d.documentType = :type AND d.status IN ('CURRENT','FOR_REVIEW','APPROVED')
+            ORDER BY d.documentNumber, d.createdAt DESC
+            """)
+    List<ProjectDocument> findLiveByType(@Param("projectId") UUID projectId, @Param("type") String type);
+
+    /** Every revision of one document, newest first, INCLUDING superseded and voided ones. */
+    @Query("""
+            SELECT d FROM ProjectDocument d
+            WHERE d.projectId = :projectId AND d.documentNumber = :number
             ORDER BY d.createdAt DESC
             """)
-    List<ProjectDocument> findCurrentByProjectAndType(@Param("projectId") UUID projectId,
-                                                      @Param("type")      String type);
+    List<ProjectDocument> findSeries(@Param("projectId") UUID projectId, @Param("number") String number);
+
+    /** What the client portal may list: marked CLIENT and APPROVED. */
+    @Query("""
+            SELECT d FROM ProjectDocument d
+            WHERE d.projectId = :projectId AND d.visibility = 'CLIENT' AND d.status = 'APPROVED'
+            ORDER BY d.documentType, d.documentNumber
+            """)
+    List<ProjectDocument> findClientVisible(@Param("projectId") UUID projectId);
 
     @Query("SELECT d FROM ProjectDocument d WHERE d.tenantId = :tenantId AND d.id = :id")
-    Optional<ProjectDocument> findByTenantAndId(@Param("tenantId") UUID tenantId,
-                                                @Param("id")       UUID id);
+    Optional<ProjectDocument> findByTenantAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
 }

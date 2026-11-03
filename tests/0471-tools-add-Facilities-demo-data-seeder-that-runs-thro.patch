@@ -1,0 +1,442 @@
+From a4a195cc96c5f20b47d2ba15cdcc7f99206f8a95 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 27 Oct 2026 23:58:15 +0200
+Subject: [PATCH] tools: add Facilities demo-data seeder that runs through the
+ REST API
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017YrVjoHqPq175dptiJquLF
+---
+ tools/seed-facilities.mjs | 420 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 420 insertions(+)
+ create mode 100644 tools/seed-facilities.mjs
+
+diff --git a/tools/seed-facilities.mjs b/tools/seed-facilities.mjs
+new file mode 100644
+index 00000000..548ff5dc
+--- /dev/null
++++ b/tools/seed-facilities.mjs
+@@ -0,0 +1,420 @@
++#!/usr/bin/env node
++// Seeds the internal Facilities module with realistic demo data through the real REST API, so every record
++// passes the same validation, numbering and audit trail as the frontend does. Needs Node 18+ (no packages).
++//
++//   API_URL=http://localhost:8080 TENANT_SLUG=acme EMAIL=admin@acme.co.za PASSWORD='...' node tools/seed-facilities.mjs
++//
++// Flags:  --again   also create the transactional data (work orders, inspections, POs ...) a second time
++// Safe to re-run: master data (sites, assets, vendors, technicians, stock, stores, templates, certificates) is
++// found by name/tag/sku/code and skipped when it exists; transactional data is skipped once any "[DEMO]" work
++// order exists. Log in as a user with FACILITIES_ADMIN (vendor approval, PO approval and verification of your
++// own work are only allowed for admins).
++
++const API = (process.env.API_URL || 'http://localhost:8080').replace(/\/$/, '')
++const B = `${API}/api/v1/facilities`
++const AGAIN = process.argv.includes('--again')
++const { TENANT_SLUG, EMAIL, PASSWORD } = process.env
++if (!TENANT_SLUG || !EMAIL || !PASSWORD) {
++  console.error('Set TENANT_SLUG, EMAIL and PASSWORD (and API_URL if not http://localhost:8080).')
++  process.exit(1)
++}
++
++// ── helpers ──────────────────────────────────────────────────────────────────────────────────
++let token = null
++const stats = { ok: 0, failed: 0, skipped: 0 }
++const failures = []
++
++const iso = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
++const day = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset); return iso(d) }
++
++async function login() {
++  const r = await fetch(`${API}/api/v1/auth/login`, {
++    method: 'POST', headers: { 'Content-Type': 'application/json' },
++    body: JSON.stringify({ email: EMAIL, password: PASSWORD, tenantSlug: TENANT_SLUG }),
++  })
++  const j = await r.json().catch(() => ({}))
++  token = j.accessToken ?? j.data?.accessToken
++  if (!r.ok || !token) throw new Error(`Login failed (${r.status}): ${j.message ?? JSON.stringify(j)}`)
++}
++
++async function call(method, path, body, params, retried = false) {
++  const url = new URL(path.startsWith('http') ? path : `${B}${path}`)
++  for (const [k, v] of Object.entries(params ?? {})) if (v !== undefined && v !== null) url.searchParams.set(k, v)
++  const isForm = typeof FormData !== 'undefined' && body instanceof FormData
++  const r = await fetch(url, {
++    method,
++    headers: { Authorization: `Bearer ${token}`, ...(body && !isForm ? { 'Content-Type': 'application/json' } : {}) },
++    body: body ? (isForm ? body : JSON.stringify(body)) : undefined,
++  })
++  if ((r.status === 401 || r.status === 403) && !retried) { await login(); return call(method, path, body, params, true) }
++  const text = await r.text()
++  let j = null
++  try { j = text ? JSON.parse(text) : null } catch { /* not json */ }
++  if (!r.ok) {
++    const e = new Error(`${r.status} ${j?.message ?? j?.error ?? text.slice(0, 200)}${j?.errorCode ? ` [${j.errorCode}]` : ''}`)
++    e.status = r.status
++    throw e
++  }
++  return j && typeof j === 'object' && 'data' in j ? j.data : j
++}
++const rows = (d) => (Array.isArray(d) ? d : d?.content ?? [])
++const get = (p, params) => call('GET', p, undefined, params)
++const post = (p, b, params) => call('POST', p, b ?? {}, params)
++const put = (p, b) => call('PUT', p, b)
++
++/** Run one step; a failure is reported and returns null so the rest of the seed carries on. */
++async function step(label, fn) {
++  try { const r = await fn(); stats.ok++; console.log(`  ✓ ${label}`); return r }
++  catch (e) { stats.failed++; failures.push(`${label}: ${e.message}`); console.log(`  ✗ ${label} — ${e.message}`); return null }
++}
++/** Find an existing record (by predicate) or create it. */
++async function ensure(label, existing, match, create) {
++  const found = existing.find(match)
++  if (found) { stats.skipped++; console.log(`  · ${label} (exists)`); return found }
++  return step(label, create)
++}
++const section = (t) => console.log(`\n== ${t}`)
++
++// A 1x1 PNG, used as a stand-in photo.
++const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
++async function attachPhoto(workOrderId, name) {
++  const f = new FormData()
++  f.append('file', new Blob([PNG], { type: 'image/png' }), name)
++  f.append('evidenceType', 'PHOTO')
++  return call('POST', `/work-orders/${workOrderId}/evidence`, f)
++}
++
++// ── master data ──────────────────────────────────────────────────────────────────────────────
++const SITES = [
++  { name: 'Sandton Head Office', siteType: 'OFFICE', address: { street: '12 Rivonia Road', city: 'Sandton', province: 'Gauteng', postalCode: '2196' }, notes: 'Floors 1-6, basement parking, rooftop plant room.' },
++  { name: 'Midrand Distribution Centre', siteType: 'WAREHOUSE', address: { street: '45 New Road', city: 'Midrand', province: 'Gauteng', postalCode: '1685' }, notes: '12,000 m2, 6 loading bays, racking to 9 m, cold room.' },
++  { name: 'Cape Town V&A Retail Store', siteType: 'RETAIL', address: { street: 'Shop 14, Victoria Wharf', city: 'Cape Town', province: 'Western Cape', postalCode: '8001' }, notes: 'Trading 09:00-21:00. After-hours work only.' },
++  { name: 'Durban Light Factory', siteType: 'FACTORY', address: { street: '8 Maydon Road', city: 'Durban', province: 'KwaZulu-Natal', postalCode: '4001' }, notes: 'Assembly line, gas-fired oven, compressed air.' },
++]
++
++// tag, name, type, siteIdx, location, manufacturer, model, serial, installYearsAgo, warrantyDays (offset), criticality
++const ASSETS = [
++  ['SAN-HVAC-01', 'Rooftop chiller', 'HVAC', 0, 'Roof plant room', 'Daikin', 'EWAQ-F', 'DK-88213', 6, 400, 'CRITICAL'],
++  ['SAN-LIFT-01', 'Passenger lift A', 'ELEVATOR', 0, 'Core north', 'Kone', 'MonoSpace 500', 'KN-55120', 9, -200, 'CRITICAL'],
++  ['SAN-GEN-01', 'Standby generator 500kVA', 'GENERATOR', 0, 'Basement 2', 'Cummins', 'C500D5', 'CM-77310', 4, 20, 'CRITICAL'],
++  ['SAN-DB-03', 'Distribution board DB-3', 'ELECTRICAL', 0, 'Floor 3 riser', 'Schneider', 'Prisma G', 'SE-30311', 8, -400, 'HIGH'],
++  ['SAN-FIRE-PUMP', 'Fire pump set', 'FIRE_SYSTEM', 0, 'Basement 1', 'Grundfos', 'NK 80-200', 'GF-22190', 7, -90, 'HIGH'],
++  ['MID-FORK-01', 'Forklift 2.5t electric', 'VEHICLE', 1, 'Bay 3 charging', 'Toyota', '8FBE25', 'TY-90442', 3, 300, 'HIGH'],
++  ['MID-CONV-02', 'Sortation conveyor line 2', 'MACHINERY', 1, 'Zone B', 'Interroll', 'MX-300', 'IR-41820', 5, 0, 'CRITICAL'],
++  ['MID-DOCK-04', 'Dock leveller bay 4', 'MACHINERY', 1, 'Loading bay 4', 'Stertil', 'SDL-60', 'ST-10442', 6, 150, 'MEDIUM'],
++  ['MID-COLD-01', 'Cold room compressor', 'HVAC', 1, 'Cold room plant', 'Bitzer', '4PES-15Y', 'BZ-66120', 5, 60, 'HIGH'],
++  ['CPT-AC-01', 'Split aircon (shop floor)', 'HVAC', 2, 'Ceiling void', 'LG', 'ABNW36', 'LG-12003', 2, 500, 'MEDIUM'],
++  ['CPT-SHUT-01', 'Security roller shutter', 'DOOR_GATE', 2, 'Front of store', 'Hormann', 'RollMatic', 'HR-70511', 4, -30, 'MEDIUM'],
++  ['DBN-OVEN-01', 'Gas-fired curing oven', 'MACHINERY', 3, 'Assembly hall', 'Elmo', 'GO-900', 'EL-30991', 7, -500, 'CRITICAL'],
++  ['DBN-COMP-01', 'Screw air compressor 37kW', 'MACHINERY', 3, 'Compressor room', 'Atlas Copco', 'GA37', 'AC-55021', 5, 90, 'HIGH'],
++  ['DBN-EXT-12', 'Fire extinguisher bank (hall)', 'FIRE_SYSTEM', 3, 'Assembly hall', 'Chubb', 'DCP-9', 'CH-120-12', 2, 700, 'MEDIUM'],
++]
++
++const VENDORS = [
++  { companyName: 'Voltex Electrical Services', serviceType: 'ELECTRICAL', contactName: 'Sipho Ndlovu', contactPhone: '011 555 0101', contactEmail: 'sipho@voltex.example', notes: 'Fully compliant - all documents in force.', docs: 'full', approve: true },
++  { companyName: 'Hydro-Flow Plumbing', serviceType: 'PLUMBING', contactName: 'Anita Pillay', contactPhone: '031 555 0102', contactEmail: 'anita@hydroflow.example', notes: 'Public liability insurance expires in 12 days.', docs: 'insurance-soon', approve: true },
++  { companyName: 'CoolAir HVAC Solutions', serviceType: 'HVAC', contactName: 'Johan Botha', contactPhone: '021 555 0103', contactEmail: 'johan@coolair.example', notes: 'Onboarding incomplete: only insurance on file, so approval is blocked.', docs: 'insurance-only', approve: false },
++  { companyName: 'SafeGuard Fire & Security', serviceType: 'FIRE_PROTECTION', contactName: 'Zanele Mthembu', contactPhone: '011 555 0104', contactEmail: 'zanele@safeguard.example', notes: 'Tax clearance expires in 3 days.', docs: 'tax-soon', approve: true },
++  { companyName: 'Kasi Cleaning Services', serviceType: 'CLEANING', contactName: 'Thandi Zulu', contactPhone: '011 555 0105', contactEmail: 'thandi@kasi.example', notes: 'Suspended after repeated missed visits.', docs: 'full', approve: true, suspend: 'Three missed scheduled visits in a month' },
++]
++
++const TECHS = [
++  { name: 'Thabo Mokoena', specialization: 'Electrical', contactPhone: '082 555 0201', contactEmail: 'thabo@example.co.za',
++    licences: [['ELECTRICAL_WIREMAN', 'EW-2231', 'ECSA', -700, 365], ['WORKING_AT_HEIGHTS', 'WH-884', 'SAQA', -300, 20], ['FIRST_AID', 'FA-1021', 'Red Cross', -800, -10]] },
++  { name: 'Lerato Dlamini', specialization: 'Plumbing', contactPhone: '082 555 0202', contactEmail: 'lerato@example.co.za',
++    licences: [['PLUMBING', 'PL-7712', 'PIRB', -500, 540], ['DRIVERS_LICENCE', 'DL-99120', 'RTMC', -900, 800]] },
++  { name: 'Pieter van der Merwe', specialization: 'HVAC & refrigeration', contactPhone: '082 555 0203', contactEmail: 'pieter@example.co.za',
++    licences: [['HVAC_REFRIGERATION', 'RF-5520', 'SAQCC', -400, 25], ['GAS_INSTALLER', 'GI-3301', 'SAQCC', -1000, 200, 'revoke']] },
++  { name: 'Naledi Khumalo', specialization: 'General maintenance', contactPhone: '082 555 0204', contactEmail: 'naledi@example.co.za', licences: [] },
++]
++
++const TEMPLATES = [
++  { name: 'Fire safety walk-through', description: 'Monthly fire equipment and escape route check.', assetCategory: 'FIRE_SYSTEM', items: [
++    ['Fire extinguishers present, charged and in date', true], ['Escape routes clear and signage lit', true], ['Fire doors close and latch properly', true],
++    ['Alarm panel shows no faults', false], ['Hose reels unobstructed', false] ] },
++  { name: 'Electrical DB board inspection', description: 'Visual and thermal check of distribution boards.', assetCategory: 'ELECTRICAL', items: [
++    ['Board cover secure, no exposed conductors', true], ['No signs of overheating or burn marks', true], ['Circuit labels legible', false], ['Earth leakage test button trips', true] ] },
++  { name: 'Warehouse safety and racking', description: 'Weekly racking, forklift and dock check.', assetCategory: 'MACHINERY', items: [
++    ['Racking free of visible damage', true], ['Aisles and bays unobstructed', false], ['Forklift pre-use checklist signed', true], ['Dock leveller operates smoothly', false] ] },
++]
++
++const ITEMS = [
++  ['ELEC-LED-18W', 'LED panel 18W 600x600', 'each', 'Rack A1', 20, 40, 40, 185],
++  ['ELEC-CBL-25', 'Cable 2.5mm twin & earth 100m', 'roll', 'Rack A2', 4, 6, 6, 1450],
++  ['ELEC-BRK-32', 'Circuit breaker 32A', 'each', 'Rack A3', 10, 20, 12, 145],
++  ['ELEC-CON-3P', 'Contactor 3-phase 40A', 'each', 'Rack A4', 2, 4, 3, 980],
++  ['PLM-PVC-110', 'PVC pipe 110mm x 6m', 'each', 'Yard', 5, 10, 8, 310],
++  ['PLM-VLV-22', 'Ball valve 22mm', 'each', 'Rack B1', 10, 20, 25, 78],
++  ['PLM-WSH-AS', 'Tap washer assortment', 'box', 'Rack B2', 3, 6, 5, 95],
++  ['HVAC-FLT-G4', 'Aircon filter G4 592x592', 'each', 'Rack C1', 15, 30, 30, 120],
++  ['HVAC-GAS-R410', 'Refrigerant R410A 11kg', 'cylinder', 'Cage', 2, 2, 2, 3200],
++  ['FIRE-EXT-9KG', 'Fire extinguisher DCP 9kg', 'each', 'Rack D1', 4, 10, 10, 690],
++  ['PPE-GLV-L', 'Safety gloves (large)', 'pair', 'Rack E1', 20, 50, 0, 0],
++]
++
++// ── main ─────────────────────────────────────────────────────────────────────────────────────
++await login()
++console.log(`Logged in to ${API} as ${EMAIL} (${TENANT_SLUG})`)
++const ctx = {}
++
++section('Sites')
++const existingSites = rows(await get('/sites', { size: 200 }))
++ctx.sites = []
++for (const s of SITES) ctx.sites.push(await ensure(`Site: ${s.name}`, existingSites, (x) => x.name === s.name, () => post('/sites', s)))
++const closedSite = await ensure('Site: Old Pretoria Depot (closed)', existingSites, (x) => x.name === 'Old Pretoria Depot', async () => {
++  const s = await post('/sites', { name: 'Old Pretoria Depot', siteType: 'WAREHOUSE', notes: 'Decommissioned - used to test closed-site rules.' })
++  return post(`/sites/${s.id}/close`)
++})
++
++section('Assets')
++const existingAssets = rows(await get('/assets', { size: 500 }))
++ctx.assets = {}
++for (const a of ASSETS) {
++  const [tag, name, type, siteIdx, location, manufacturer, model, serialNumber, yrs, warr, criticality] = a
++  const site = ctx.sites[siteIdx]; if (!site) continue
++  const asset = await ensure(`Asset: ${tag}`, existingAssets, (x) => x.assetTag === tag, () => post('/assets', {
++    siteId: site.id, assetTag: tag, name, assetType: type, location, manufacturer, model, serialNumber,
++    installDate: day(-365 * yrs), warrantyExpiryDate: day(warr), criticality, notes: 'Demo asset.' }))
++  if (asset) ctx.assets[tag] = asset
++}
++
++section('Compliance certificates')
++const existingCerts = rows(await get('/compliance', { size: 200 }))
++const certs = [
++  // site, asset, type, number, issuer, issue, expiry, note
++  [0, 'SAN-DB-03', 'ELECTRICAL_COC', 'COC-SAN-2025-114', 'SAQCC Electrical', -200, 530, 'valid'],
++  [0, 'SAN-LIFT-01', 'ELEVATOR', 'LFT-SAN-0087', 'Dept of Employment & Labour', -340, 25, 'expiring in 25 days'],
++  [0, 'SAN-FIRE-PUMP', 'FIRE_EQUIPMENT', 'FE-SAN-3321', 'Chubb', -355, 10, 'expiring in 10 days (high severity)'],
++  [1, null, 'ELECTRICAL_COC', 'COC-MID-2024-051', 'SAQCC Electrical', -600, 130, 'valid'],
++  [1, 'MID-COLD-01', 'OTHER', 'REF-MID-771', 'SAQCC Refrigeration', -300, 65, 'valid'],
++  [3, 'DBN-OVEN-01', 'GAS', 'GAS-DBN-4410', 'SAQCC Gas', -400, -1, 'EXPIRED yesterday (critical in the action centre)'],
++  [3, 'DBN-EXT-12', 'FIRE_EQUIPMENT', 'FE-DBN-1207', 'Chubb', -100, 265, 'valid'],
++  [2, null, 'ELECTRICAL_COC', 'COC-CPT-2023-009', 'SAQCC Electrical', -700, 30, 'expiring in 30 days'],
++  [2, 'CPT-SHUT-01', 'ELEVATOR', 'REVOKED-TEST-01', 'Dept of Employment & Labour', -300, 60, 'revoked'],
++]
++for (const [si, tag, type, num, by, iss, exp, note] of certs) {
++  const site = ctx.sites[si]; if (!site) continue
++  const c = await ensure(`Certificate ${num} (${note})`, existingCerts, (x) => x.certificateNumber === num, () => post('/compliance', {
++    siteId: site.id, assetId: tag ? ctx.assets[tag]?.id ?? null : null, certificateType: type, certificateNumber: num,
++    issuedBy: by, issueDate: day(iss), expiryDate: day(exp) }))
++  if (c && num === 'REVOKED-TEST-01' && c.status !== 'REVOKED')
++    await step('  revoke it', () => post(`/compliance/${c.id}/revoke`, { reason: 'Issued against the wrong shutter - to be reissued' }))
++}
++
++section('Vendors and their documents')
++const existingVendors = rows(await get('/vendors', { size: 200 }))
++ctx.vendors = {}
++for (const v of VENDORS) {
++  const { docs, approve, suspend, ...body } = v
++  const vendor = await ensure(`Vendor: ${v.companyName}`, existingVendors, (x) => x.companyName === v.companyName, () => post('/vendors', body))
++  if (!vendor) continue
++  ctx.vendors[v.companyName] = vendor
++  if (existingVendors.includes(vendor)) continue // already there: documents and approval were handled on the first run
++  const ins = (exp) => ({ docType: 'PUBLIC_LIABILITY_INSURANCE', reference: 'PL-' + Math.floor(100000 + Math.random() * 899999), issuedBy: 'Santam', issueDate: day(-300), expiryDate: day(exp), coverAmount: 5000000 })
++  const coida = { docType: 'COIDA_LETTER', reference: 'COIDA-' + Math.floor(1000 + Math.random() * 8999), issuedBy: 'Compensation Fund', issueDate: day(-200), expiryDate: day(165) }
++  const tax = (exp) => ({ docType: 'TAX_CLEARANCE', reference: 'TCS-' + Math.floor(1000 + Math.random() * 8999), issuedBy: 'SARS', issueDate: day(-100), expiryDate: day(exp) })
++  const plan = {
++    full: [ins(300), coida, tax(250)], 'insurance-soon': [ins(12), coida, tax(250)],
++    'insurance-only': [ins(300)], 'tax-soon': [ins(300), coida, tax(3)],
++  }[docs]
++  for (const d of plan) await step(`  document ${d.docType}`, () => post(`/vendors/${vendor.id}/documents`, d))
++  if (approve) await step(`  approve ${v.companyName}`, () => post(`/vendors/${vendor.id}/approve`))
++  if (suspend) await step(`  suspend ${v.companyName}`, () => post(`/vendors/${vendor.id}/suspend`, { reason: suspend }))
++}
++
++section('Technicians and licences')
++const existingTechs = rows(await get('/technicians', { size: 200 }))
++ctx.techs = {}
++for (const t of TECHS) {
++  const { licences, ...body } = t
++  const tech = await ensure(`Technician: ${t.name}`, existingTechs, (x) => x.name === t.name, async () => {
++    const created = await post('/technicians', body)
++    for (const [type, ref, by, issOff, expOff, flag] of licences) {
++      const l = await step(`  licence ${type} (expires ${expOff >= 0 ? 'in ' + expOff + ' days' : Math.abs(expOff) + ' days ago'})`, () =>
++        post(`/technicians/${created.id}/licences`, { licenceType: type, reference: ref, issuedBy: by, issueDate: day(issOff), expiryDate: day(expOff) }))
++      if (l && flag === 'revoke') await step('    revoke it', () => post(`/technicians/${created.id}/licences/${l.id}/revoke`, { reason: 'Registration withdrawn by SAQCC' }))
++    }
++    return created
++  })
++  if (tech) ctx.techs[t.name] = tech
++}
++
++section('Inspection templates')
++const existingTemplates = rows(await get('/inspection-templates', { includeInactive: true }))
++ctx.templates = {}
++for (const t of TEMPLATES) {
++  const tpl = await ensure(`Template: ${t.name}`, existingTemplates, (x) => x.name === t.name, () => post('/inspection-templates', {
++    name: t.name, description: t.description, assetCategory: t.assetCategory, items: t.items.map(([prompt, critical]) => ({ prompt, critical })) }))
++  if (tpl) ctx.templates[t.name] = tpl
++}
++
++section('Stock items')
++const existingItems = rows(await get('/stock', { includeInactive: true, size: 500 }))
++ctx.items = {}
++for (const [sku, name, unit, location, reorderLevel, reorderQty, qty, cost] of ITEMS) {
++  const body = { sku, name, unit, location, reorderLevel, reorderQty }
++  if (qty > 0) { body.openingQuantity = qty; body.openingUnitCost = cost }
++  const item = await ensure(`Item: ${sku} (opening ${qty})`, existingItems, (x) => x.sku === sku, () => post('/stock', body))
++  if (item) ctx.items[sku] = item
++}
++
++section('Stores')
++const existingStores = await get('/stores')
++const defaultStore = (Array.isArray(existingStores) ? existingStores : []).find((s) => s.defaultStore)
++const midStore = await ensure('Store: WH-MID Midrand warehouse', existingStores, (s) => s.code === 'WH-MID',
++  () => post('/stores', { code: 'WH-MID', name: 'Midrand warehouse', siteId: ctx.sites[1]?.id }))
++const vanStore = await ensure('Store: CT-VAN Cape Town service van', existingStores, (s) => s.code === 'CT-VAN',
++  () => post('/stores', { code: 'CT-VAN', name: 'Cape Town service van' }))
++
++// ── transactional data (skipped when already seeded) ────────────────────────────────────────
++const existingWos = rows(await get('/work-orders', { size: 200 }))
++const alreadySeeded = existingWos.some((w) => (w.description || '').startsWith('[DEMO]'))
++if (alreadySeeded && !AGAIN) {
++  console.log('\n[DEMO] work orders already exist - skipping transactional data (use --again to add another set).')
++} else {
++  const A = (tag) => ctx.assets[tag], T = (n) => ctx.techs[n], V = (n) => ctx.vendors[n]
++  const S = (i) => ctx.sites[i]
++
++  section('Work orders')
++  const wo = {}
++  const direct = (key, o) => step(`WO ${key}: ${o.description}`, async () => (wo[key] = await post('/work-orders', { ...o, description: '[DEMO] ' + o.description })))
++  const request = (key, o) => step(`Request ${key}: ${o.description}`, async () => (wo[key] = await post('/work-orders/requests', { ...o, description: '[DEMO] ' + o.description })))
++
++  await request('r1', { siteId: S(0).id, assetId: A('SAN-HVAC-01')?.id, description: 'Aircon dripping onto desks on floor 3', category: 'CORRECTIVE', reportedBy: 'Nomsa (Finance)' })
++  await request('r2', { siteId: S(1).id, assetId: A('MID-CONV-02')?.id, description: 'Exposed wiring behind conveyor control panel', category: 'CORRECTIVE', safetyImpact: true, reportedBy: 'Shift supervisor' })
++  await request('r3', { siteId: S(0).id, assetId: A('SAN-HVAC-01')?.id, description: 'Water leaking from aircon unit, floor 3', category: 'CORRECTIVE', reportedBy: 'Receptionist' })
++  await request('r4', { siteId: S(0).id, description: 'Please buy a new coffee machine for the kitchen', category: 'OTHER', reportedBy: 'Marketing' })
++  if (wo.r4) await step('Reject r4 (not a maintenance item)', () => post(`/work-orders/${wo.r4.id}/reject`, { reason: 'Not a maintenance item - raise a purchase request instead.' }))
++  if (wo.r1) await step('Approve r1 as HIGH priority', () => post(`/work-orders/${wo.r1.id}/approve`, { priority: 'HIGH', scheduledDate: day(2) }))
++
++  await direct('open', { siteId: S(1).id, category: 'CORRECTIVE', priority: 'NORMAL', description: 'Replace failed LED panels in aisle 4', reportedBy: 'Warehouse manager', scheduledDate: day(3) })
++  await direct('emerg', { siteId: S(0).id, assetId: A('SAN-GEN-01')?.id, category: 'EMERGENCY', priority: 'URGENT', description: 'Generator failed to start during load-shedding test', reportedBy: 'Facilities manager' })
++  await direct('assigned', { siteId: S(0).id, category: 'CORRECTIVE', priority: 'NORMAL', description: 'Unblock basement toilet', reportedBy: 'Security desk' })
++  await direct('prog', { siteId: S(0).id, assetId: A('SAN-DB-03')?.id, category: 'CORRECTIVE', priority: 'HIGH', description: 'DB-3 thermal scan shows hotspot on breaker 12', reportedBy: 'Inspection' })
++  await direct('hold', { siteId: S(3).id, assetId: A('DBN-EXT-12')?.id, category: 'CORRECTIVE', priority: 'NORMAL', description: 'Replace expired fire extinguishers in assembly hall' })
++  await direct('done1', { siteId: S(1).id, assetId: A('MID-CONV-02')?.id, category: 'CORRECTIVE', priority: 'HIGH', description: 'Replace failed 3-phase contactor on conveyor line 2' })
++  await direct('done2', { siteId: S(1).id, category: 'EMERGENCY', priority: 'URGENT', description: 'Burst pipe at loading bay 2' })
++  await direct('verify', { siteId: S(3).id, assetId: A('DBN-COMP-01')?.id, category: 'CORRECTIVE', priority: 'HIGH', description: 'Compressor oil leak repaired - needs independent verification', requiresVerification: true })
++  await direct('cancel', { siteId: S(2).id, category: 'OTHER', priority: 'LOW', description: 'Repaint parking bay lines' })
++
++  if (wo.assigned && T('Lerato Dlamini')) await step('Assign "Unblock toilet" to Lerato', () => post(`/work-orders/${wo.assigned.id}/assign`, { technicianId: T('Lerato Dlamini').id }))
++  if (wo.hold && V('SafeGuard Fire & Security')) {
++    await step('Assign fire extinguisher job to SafeGuard', () => post(`/work-orders/${wo.hold.id}/assign`, { vendorId: V('SafeGuard Fire & Security').id }))
++    await step('Start it', () => post(`/work-orders/${wo.hold.id}/start`))
++    await step('Put it on hold', () => post(`/work-orders/${wo.hold.id}/hold`, { reason: 'Waiting for replacement units from the supplier (ETA 5 days)' }))
++  }
++  if (wo.prog && T('Thabo Mokoena')) {
++    await step('Assign DB-3 job to Thabo', () => post(`/work-orders/${wo.prog.id}/assign`, { technicianId: T('Thabo Mokoena').id }))
++    await step('Start it', () => post(`/work-orders/${wo.prog.id}/start`))
++    await step('  labour cost line', () => post(`/work-orders/${wo.prog.id}/costs`, { costType: 'LABOUR', description: 'Electrician - thermal scan and re-termination', quantity: 3, unitCost: 450 }))
++    if (ctx.items['ELEC-BRK-32']) await step('  issue 2x 32A breakers from stock', () => post(`/stock/${ctx.items['ELEC-BRK-32'].id}/issue`, { workOrderId: wo.prog.id, quantity: 2, note: 'Replacing overheated breaker' }))
++  }
++  for (const [key, tech, vendor, notes, downtime, cause, cost] of [
++    ['done1', 'Pieter van der Merwe', null, 'Contactor replaced, line tested for 2 hours.', 180, 'Component wear', null],
++    ['done2', null, 'Hydro-Flow Plumbing', 'Section of pipe replaced and pressure tested.', 240, 'Corrosion', 4200]]) {
++    if (!wo[key]) continue
++    const assignee = tech ? { technicianId: T(tech)?.id } : { vendorId: V(vendor)?.id }
++    await step(`Assign ${key}`, () => post(`/work-orders/${wo[key].id}/assign`, assignee))
++    await step(`Start ${key}`, () => post(`/work-orders/${wo[key].id}/start`))
++    if (key === 'done1') {
++      await step('  labour cost line', () => post(`/work-orders/${wo[key].id}/costs`, { costType: 'LABOUR', description: 'Technician - 4 hours', quantity: 4, unitCost: 380 }))
++      if (ctx.items['ELEC-CON-3P']) await step('  issue contactor from stock', () => post(`/stock/${ctx.items['ELEC-CON-3P'].id}/issue`, { workOrderId: wo[key].id, quantity: 1, note: 'Replacement contactor' }))
++    }
++    await step(`Complete ${key}`, () => post(`/work-orders/${wo[key].id}/complete`, { completionNotes: notes, downtimeMinutes: downtime, failureCause: cause, ...(cost ? { cost } : {}) }))
++  }
++  if (wo.verify && T('Pieter van der Merwe')) {
++    await step('Assign compressor job', () => post(`/work-orders/${wo.verify.id}/assign`, { technicianId: T('Pieter van der Merwe').id }))
++    await step('Start it', () => post(`/work-orders/${wo.verify.id}/start`))
++    await step('  attach a photo as evidence', () => attachPhoto(wo.verify.id, 'compressor-repair.png'))
++    await step('Complete (goes to PENDING_VERIFICATION)', () => post(`/work-orders/${wo.verify.id}/complete`, { completionNotes: 'Seal replaced, no leaks after 1 hour run.', downtimeMinutes: 90, failureCause: 'Seal failure' }))
++  }
++  if (wo.cancel) await step('Cancel "Repaint parking bay lines"', () => post(`/work-orders/${wo.cancel.id}/cancel`, { reason: 'Deferred to next financial year' }))
++
++  section('Planned maintenance (PPM)')
++  for (const [tag, task, freq, start] of [['SAN-HVAC-01', 'Quarterly chiller service', 90, -5], ['MID-FORK-01', 'Forklift 250-hour service', 60, 14], ['DBN-COMP-01', 'Compressor oil and filter change', 180, 30], ['SAN-GEN-01', 'Monthly generator load test', 30, 3]]) {
++    if (!A(tag)) continue
++    await step(`PPM: ${task} (${tag}, every ${freq} days)`, () => post('/ppm-schedules', { assetId: A(tag).id, taskName: task, description: 'Demo schedule', frequencyDays: freq, startDate: day(start) }))
++  }
++
++  section('Inspections, schedules and corrective actions')
++  const answer = async (insp, plan) => post(`/inspections/${insp.id}/answers`, { answers: insp.results.map((r, i) => ({ itemId: r.itemId, outcome: plan[i] ?? 'PASS', ...(plan[i] === 'FAIL' ? { comment: 'Failed on inspection - see photos' } : {}) })) })
++  const fire = ctx.templates['Fire safety walk-through'], elec = ctx.templates['Electrical DB board inspection'], whs = ctx.templates['Warehouse safety and racking']
++  if (fire) {
++    const i1 = await step('Fire inspection, Sandton: all pass', async () => { const i = await post('/inspections', { templateId: fire.id, siteId: S(0).id }); await answer(i, []); return post(`/inspections/${i.id}/complete`, { notes: 'All clear.' }) })
++    const i2 = await step('Fire inspection, Durban: 2 failures (raises corrective actions)', async () => { const i = await post('/inspections', { templateId: fire.id, siteId: S(3).id }); await answer(i, ['FAIL', 'PASS', 'PASS', 'FAIL']); return post(`/inspections/${i.id}/complete`, { notes: 'Extinguishers out of date; alarm panel fault light on.' }) })
++    const i3 = await step('Fire inspection, Midrand: left in progress (2 of 5 answered)', async () => { const i = await post('/inspections', { templateId: fire.id, siteId: S(1).id }); await post(`/inspections/${i.id}/answers`, { answers: i.results.slice(0, 2).map((r) => ({ itemId: r.itemId, outcome: 'PASS' })) }); return i })
++    const i4 = await step('Fire inspection, Cape Town: started then cancelled', async () => { const i = await post('/inspections', { templateId: fire.id, siteId: S(2).id }); return post(`/inspections/${i.id}/cancel`, { reason: 'Store closed for stocktake - rescheduled' }) })
++  }
++  if (elec && A('SAN-DB-03')) await step('Electrical DB inspection on DB-3: critical failure', async () => { const i = await post('/inspections', { templateId: elec.id, siteId: S(0).id, assetId: A('SAN-DB-03').id }); await answer(i, ['PASS', 'FAIL', 'PASS', 'PASS']); return post(`/inspections/${i.id}/complete`, { notes: 'Burn marks around breaker 12.' }) })
++  if (whs && S(1)) await step('Warehouse inspection, Midrand: all pass', async () => { const i = await post('/inspections', { templateId: whs.id, siteId: S(1).id }); await answer(i, []); return post(`/inspections/${i.id}/complete`) })
++  if (fire && S(0)) await step('Schedule: fire walk-through at Sandton every 30 days (due in 5)', () => post('/inspection-schedules', { templateId: fire.id, siteId: S(0).id, frequencyDays: 30, firstDueDate: day(5) }))
++  if (whs && S(1)) await step('Schedule: warehouse safety at Midrand every 7 days (overdue)', () => post('/inspection-schedules', { templateId: whs.id, siteId: S(1).id, frequencyDays: 7, firstDueDate: day(-2) }))
++
++  const f1 = await step('Finding: cracked paving at main entrance (overdue)', () => post('/corrective-actions', { siteId: S(0).id, description: 'Cracked paving at main entrance is a trip hazard', priority: 'HIGH', dueDate: day(-4), sourceType: 'MANUAL' }))
++  const f2 = await step('Finding: dock leveller hydraulic seep', () => post('/corrective-actions', { siteId: S(1).id, assetId: A('MID-DOCK-04')?.id ?? null, description: 'Hydraulic oil seeping from dock leveller bay 4', priority: 'NORMAL', dueDate: day(10), sourceType: 'MANUAL' }))
++  const f3 = await step('Finding: missing signage', () => post('/corrective-actions', { siteId: S(2).id, description: 'Emergency exit signage missing above rear door', priority: 'LOW', dueDate: day(21), sourceType: 'MANUAL' }))
++  if (f2) await step('  raise a work order from the dock leveller finding', () => post(`/corrective-actions/${f2.id}/work-order`))
++  if (f3) await step('  close the signage finding', () => post(`/corrective-actions/${f3.id}/close`, { reason: 'Signage installed and photographed' }))
++  if (f1) await step('  reschedule the paving finding', () => post(`/corrective-actions/${f1.id}/reschedule`, { dueDate: day(7) }))
++
++  section('Stock movements, stores and transfers')
++  const it = (sku) => ctx.items[sku]
++  if (it('ELEC-LED-18W') && midStore) await step('Transfer 10 LED panels to Midrand warehouse', () => post(`/stock/${it('ELEC-LED-18W').id}/transfer`, { fromStoreId: defaultStore?.id ?? existingStores.find((s) => s.defaultStore)?.id, toStoreId: midStore.id, quantity: 10, reason: 'Stock for aisle 4 refit' }))
++  if (it('HVAC-FLT-G4') && vanStore) await step('Transfer 5 aircon filters to the Cape Town van', () => post(`/stock/${it('HVAC-FLT-G4').id}/transfer`, { fromStoreId: defaultStore?.id ?? existingStores.find((s) => s.defaultStore)?.id, toStoreId: vanStore.id, quantity: 5, reason: 'Van stock top-up' }))
++  if (it('PLM-WSH-AS')) await step('Stocktake: tap washers counted 4 (was 5)', () => post(`/stock/${it('PLM-WSH-AS').id}/adjust`, { countedQuantity: 4, reason: 'Stocktake - one box damaged' }))
++  if (it('ELEC-BRK-32')) await step('Receive 6 more breakers', () => post(`/stock/${it('ELEC-BRK-32').id}/receive`, { quantity: 6, unitCost: 150, reference: 'GRN-DEMO-001' }))
++  if (it('ELEC-BRK-32') && wo.prog) await step('Return 1 unused breaker from the DB-3 job', () => post(`/stock/${it('ELEC-BRK-32').id}/return`, { workOrderId: wo.prog.id, quantity: 1, reason: 'One breaker was not needed' }))
++
++  section('Purchase orders, receipts and supplier invoices')
++  const L = (sku, qty, cost) => ({ itemId: it(sku)?.id, quantity: qty, unitCost: cost })
++  const voltex = V('Voltex Electrical Services'), hydro = V('Hydro-Flow Plumbing'), safeg = V('SafeGuard Fire & Security')
++  if (voltex && it('ELEC-LED-18W') && it('ELEC-CBL-25')) {
++    const po = await step('PO A (Voltex): create', () => post('/purchase-orders', { vendorId: voltex.id, expectedDate: day(7), notes: 'DEMO - electrical restock', lines: [L('ELEC-LED-18W', 40, 185), L('ELEC-CBL-25', 4, 1450)] }))
++    if (po) {
++      await step('  approve', () => post(`/purchase-orders/${po.id}/approve`))
++      const full = await step('  receive in full into Midrand warehouse', () => post(`/purchase-orders/${po.id}/receipts`, { reference: 'DN-7781', lines: po.lines.map((l) => ({ lineId: l.id, quantity: l.orderedQty })) }, midStore ? { storeId: midStore.id } : undefined))
++      const inv = await step('  record matching supplier invoice', () => post('/vendor-invoices', { purchaseOrderId: po.id, invoiceNumber: 'VX-10234', invoiceDate: day(-1), subtotal: 13200, vatAmount: 1980 }))
++      if (inv) await step('  approve the invoice (three-way match OK)', () => post(`/vendor-invoices/${inv.id}/approve`, { note: 'Matches order and receipt' }))
++    }
++  }
++  if (hydro && it('PLM-PVC-110') && it('PLM-VLV-22')) {
++    const po = await step('PO B (Hydro-Flow): create', () => post('/purchase-orders', { vendorId: hydro.id, expectedDate: day(10), notes: 'DEMO - plumbing restock (partly received)', lines: [L('PLM-PVC-110', 10, 310), L('PLM-VLV-22', 20, 78)] }))
++    if (po) {
++      await step('  approve', () => post(`/purchase-orders/${po.id}/approve`))
++      await step('  receive only 6 of 10 pipes', () => post(`/purchase-orders/${po.id}/receipts`, { reference: 'DN-0032', lines: [{ lineId: po.lines[0].id, quantity: 6 }] }))
++    }
++  }
++  if (safeg && it('FIRE-EXT-9KG')) {
++    const po = await step('PO C (SafeGuard): create, over-invoiced', () => post('/purchase-orders', { vendorId: safeg.id, expectedDate: day(5), notes: 'DEMO - extinguishers', lines: [L('FIRE-EXT-9KG', 8, 690)] }))
++    if (po) {
++      await step('  approve', () => post(`/purchase-orders/${po.id}/approve`))
++      await step('  receive in full', () => post(`/purchase-orders/${po.id}/receipts`, { reference: 'DN-5521', lines: po.lines.map((l) => ({ lineId: l.id, quantity: l.orderedQty })) }))
++      const inv = await step('  record invoice 12% above the order (5,520 vs 6,180)', () => post('/vendor-invoices', { purchaseOrderId: po.id, invoiceNumber: 'SG-88021', invoiceDate: day(-2), subtotal: 6180, vatAmount: 927 }))
++      if (inv) await step('  dispute the invoice', () => post(`/vendor-invoices/${inv.id}/dispute`, { reason: 'Invoiced above the agreed unit price' }))
++    }
++  }
++  if (voltex && it('ELEC-BRK-32')) await step('PO D (Voltex): draft left unapproved', () => post('/purchase-orders', { vendorId: voltex.id, expectedDate: day(14), notes: 'DEMO - draft for editing/approval tests', lines: [L('ELEC-BRK-32', 20, 145)] }))
++  if (hydro && it('PLM-WSH-AS')) {
++    const po = await step('PO E (Hydro-Flow): create then cancel', () => post('/purchase-orders', { vendorId: hydro.id, notes: 'DEMO - to be cancelled', lines: [L('PLM-WSH-AS', 6, 95)] }))
++    if (po) await step('  cancel', () => post(`/purchase-orders/${po.id}/cancel`, { reason: 'Ordered by mistake' }))
++  }
++}
++
++// ── summary ──────────────────────────────────────────────────────────────────────────────────
++section('Done')
++console.log(`created/ok: ${stats.ok}   already existed: ${stats.skipped}   failed: ${stats.failed}`)
++if (failures.length) { console.log('\nFailures (the rest of the seed still ran):'); failures.forEach((f) => console.log('  - ' + f)) }
++console.log(`
++Things to try in the frontend (each should be refused with a clear message):
++  - Approve "CoolAir HVAC Solutions" (PENDING: it lacks COIDA and tax clearance)
++  - Assign a work order to the suspended "Kasi Cleaning Services", or to CoolAir (VENDOR_NOT_ELIGIBLE)
++  - Complete the compressor job as the same user who completed it: verify needs a different person unless you are admin
++  - Complete a work order with a negative cost, a future completion time, or negative downtime
++  - Create a site with a blank name, an asset with no site, a certificate that expires before it was issued
++  - Issue more stock than is on hand (try PPE-GLV-L: 0 on hand), or receive a PO over-quantity (409 OVER_RECEIPT)
++  - Cancel/close an action whose work order is not finished (WORK_ORDER_NOT_COMPLETE)
++  - Cancel an inspection or a work order without a reason
++Look at: Action centre (expired gas certificate, expiring lift/fire certificates, overdue paving finding),
++Stock (several items at or under reorder level), Vendors (expiring insurance/tax clearance), Technicians (licence attention banner),
++Inspection schedules (one overdue), Purchase orders (draft / partly received / received), Vendor invoices (approved and disputed).
++Note: everything is created "now", so trend charts and vendor-performance history will be thin until real days pass.`)
+-- 
+2.43.0
+

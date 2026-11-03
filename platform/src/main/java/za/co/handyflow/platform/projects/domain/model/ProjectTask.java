@@ -13,13 +13,14 @@ import java.util.UUID;
 /**
  * A work-breakdown-structure task inside a project.
  *
- * KEY FIX: setActualHours() was missing.
- * ─────────────────────────────────────
- * ProjectService.logTime() previously tried to update a task's actual hours
- * but there was NO setter for actualHours.  The code fell back to:
- *     task.setNotes(task.getNotes())  ← sets notes to itself — a no-op
- * So actual_hours was NEVER updated from time entries.
- * setActualHours() is now present and logTime() calls it correctly.
+ * CHUNK 3 CHANGES
+ * ───────────────
+ * - baselineStart / baselineEnd: per-task snapshot taken when the project baseline is
+ *   locked (approval or first activation). Null = the task was added after the baseline.
+ * - setPlannedDates(): the one way to change dates; validates order and keeps
+ *   durationDays consistent. setPlannedStart / setPlannedEnd now also keep it consistent.
+ * - create() now rejects an end date before the start date (previously it silently stored
+ *   a zero/negative duration).
  */
 @Entity
 @Table(name = "project_tasks")
@@ -50,6 +51,9 @@ public class ProjectTask {
     @Column(name = "actual_end")    LocalDate actualEnd;
     @Column(name = "duration_days") Integer   durationDays;
 
+    @Column(name = "baseline_start") LocalDate baselineStart;
+    @Column(name = "baseline_end")   LocalDate baselineEnd;
+
     @Column(name = "progress_pct",     nullable = false) BigDecimal progressPct    = BigDecimal.ZERO;
     @Column(name = "estimated_hours")                    BigDecimal estimatedHours;
     @Column(name = "actual_hours",     nullable = false) BigDecimal actualHours    = BigDecimal.ZERO;
@@ -75,6 +79,7 @@ public class ProjectTask {
                                      String title, String taskType, String priority,
                                      LocalDate plannedStart, LocalDate plannedEnd,
                                      UUID createdBy) {
+        requireValidRange(plannedStart, plannedEnd);
         ProjectTask t  = new ProjectTask();
         t.id           = UUID.randomUUID();
         t.tenantId     = tenantId;
@@ -87,8 +92,7 @@ public class ProjectTask {
         t.status       = "NOT_STARTED";
         t.plannedStart = plannedStart;
         t.plannedEnd   = plannedEnd;
-        if (plannedStart != null && plannedEnd != null)
-            t.durationDays = (int) ChronoUnit.DAYS.between(plannedStart, plannedEnd) + 1;
+        t.recomputeDuration();
         t.createdBy    = createdBy;
         t.createdAt    = Instant.now();
         t.updatedAt    = Instant.now();
@@ -118,10 +122,52 @@ public class ProjectTask {
         if (pct.compareTo(BigDecimal.ZERO) < 0 || pct.compareTo(ONE_HUNDRED) > 0)
             throw new IllegalArgumentException("Progress must be between 0 and 100, got: " + pct);
         this.progressPct = pct;
-        // Auto-drive status from progress
         if (pct.compareTo(ONE_HUNDRED) == 0)   this.status = "COMPLETED";
         else if (pct.compareTo(BigDecimal.ZERO) > 0) this.status = "IN_PROGRESS";
         touch();
+    }
+
+    // ── Scheduling ────────────────────────────────────────────────────────────
+
+    /** The single way to change both planned dates at once. */
+    public void setPlannedDates(LocalDate start, LocalDate end) {
+        requireValidRange(start, end);
+        this.plannedStart = start;
+        this.plannedEnd   = end;
+        recomputeDuration();
+        touch();
+    }
+
+    /** Captures the current planned dates as this task's baseline (only if it has none yet). */
+    public boolean snapshotBaseline() {
+        if (baselineStart != null || plannedStart == null || plannedEnd == null) return false;
+        this.baselineStart = plannedStart;
+        this.baselineEnd   = plannedEnd;
+        touch();
+        return true;
+    }
+
+    /**
+     * CHUNK 5: an approved change order moves this task's BASELINE dates. The before/after values
+     * are kept in project_baseline_revisions, so the earlier baseline is never lost.
+     */
+    public void applyBaselineChange(LocalDate start, LocalDate end) {
+        if (start != null && end != null && end.isBefore(start))
+            throw new IllegalArgumentException("Baseline end date cannot be before the baseline start date");
+        this.baselineStart = start;
+        this.baselineEnd   = end;
+        touch();
+    }
+
+    private static void requireValidRange(LocalDate start, LocalDate end) {
+        if (start != null && end != null && end.isBefore(start))
+            throw new IllegalArgumentException("Planned end date cannot be before the planned start date");
+    }
+
+    private void recomputeDuration() {
+        this.durationDays = (plannedStart != null && plannedEnd != null)
+                ? (int) ChronoUnit.DAYS.between(plannedStart, plannedEnd) + 1
+                : null;
     }
 
     // ── Setters ───────────────────────────────────────────────────────────────
@@ -130,22 +176,13 @@ public class ProjectTask {
     public void setAssigneeName(String v)     { this.assigneeName = v; touch(); }
     public void setPhaseId(UUID v)            { this.phaseId      = v; touch(); }
     public void setStatus(String v)           { this.status       = v; touch(); }
-    public void setPlannedStart(LocalDate v)  { this.plannedStart = v; touch(); }
-    public void setPlannedEnd(LocalDate v)    { this.plannedEnd   = v; touch(); }
+    public void setPlannedStart(LocalDate v)  { requireValidRange(v, plannedEnd); this.plannedStart = v; recomputeDuration(); touch(); }
+    public void setPlannedEnd(LocalDate v)    { requireValidRange(plannedStart, v); this.plannedEnd = v; recomputeDuration(); touch(); }
     public void setIsCritical(boolean v)      { this.isCritical   = v; touch(); }
     public void setBudgetAmount(BigDecimal v) { this.budgetAmount = v; touch(); }
     public void setNotes(String v)            { this.notes        = v; touch(); }
     public void setSortOrder(int v)           { this.sortOrder    = v; }
 
-    /**
-     * Sets the actual hours logged against this task.
-     *
-     * WHY THIS WAS CRITICAL TO ADD:
-     * logTime() in ProjectService tried to keep actual_hours current so the
-     * Gantt and resource views could show real utilisation vs planned.
-     * Without this setter, that update silently failed — actual_hours stayed 0
-     * forever regardless of how much time was logged.
-     */
     public void setActualHours(BigDecimal v) {
         if (v != null && v.compareTo(BigDecimal.ZERO) < 0)
             throw new IllegalArgumentException("Actual hours cannot be negative");
@@ -155,8 +192,6 @@ public class ProjectTask {
 
     public void setActualCost(BigDecimal v)  { this.actualCost  = v != null ? v : BigDecimal.ZERO; touch(); }
     public void setTaskNumber(String v)      { this.taskNumber  = v; }
-
-    // ── Internal ──────────────────────────────────────────────────────────────
 
     private void touch() { this.updatedAt = Instant.now(); }
 }

@@ -31,4 +31,11 @@ public record ResourceResponse(
                 r.getStartDate(), r.getEndDate(), r.getHourlyRate(), r.getDailyRate(),
                 r.getPlannedHours(), r.getActualHours(), r.getCreatedAt());
     }
+
+    /** CHUNK 2b: copy with pay rates removed, for roles without cost visibility. */
+    public ResourceResponse withoutRates() {
+        return new ResourceResponse(id, projectId, taskId, resourceType, resourceId, resourceName,
+                role, allocationPct, startDate, endDate, null, null,
+                plannedHours, actualHours, createdAt);
+    }
 }

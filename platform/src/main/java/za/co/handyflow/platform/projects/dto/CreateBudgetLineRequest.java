@@ -4,6 +4,10 @@ import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+/**
+ * CHUNK 4: reason — required once the project baseline is locked (approved or beyond),
+ * because adding a line then raises the approved budget and is recorded as a revision.
+ */
 public record CreateBudgetLineRequest(
 
         @NotBlank(message = "Category is required")
@@ -21,6 +25,9 @@ public record CreateBudgetLineRequest(
 
         boolean isProvisional,
 
-        boolean isPrimeCost
+        boolean isPrimeCost,
+
+        @Size(max = 2000, message = "Reason must not exceed 2 000 characters")
+        String reason
 
 ) {}

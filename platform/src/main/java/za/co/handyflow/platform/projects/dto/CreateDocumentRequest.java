@@ -5,54 +5,51 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
- * Request body for POST /{projectId}/documents.
+ * Registers a document revision. We store references (a URL or storage key), not file bytes.
  *
- * fileUrl is required — we store document references (links to S3 / storage),
- * not the file bytes themselves.  Actual uploads go through a separate
- * pre-signed URL flow; this endpoint registers the resulting URL in the
- * document register.
+ * documentNumber:
+ *   - omitted  → a NEW document: a number is assigned (DWG-001, SUB-014, …).
+ *   - supplied and it already exists → a NEW REVISION of that document: documentType must match
+ *     and revision is required. Earlier unreviewed revisions are superseded immediately; an
+ *     APPROVED one stays in force until this revision is approved.
+ *   - supplied and new → a new document under your own number (e.g. the architect's DWG-A-101).
  *
- * revision being non-null triggers the supersede flow in DocumentService:
- * any existing CURRENT / APPROVED doc of the same documentType is automatically
- * moved to SUPERSEDED before the new revision is saved as CURRENT.
+ * fileUrl / fileName must not be an executable or script (see DocumentRules), and the URL may not
+ * use javascript: / data: / vbscript: (stored-XSS guard, since it is rendered as a link).
  */
 public record CreateDocumentRequest(
 
-        /**
-         * Document category — must match the DB check constraint.
-         * Defaults to GENERAL if null (DocumentService / domain model handles default).
-         */
         @Pattern(
                 regexp = "DRAWING|RFI|SUBMITTAL|CONTRACT|REPORT|PHOTO|GENERAL",
                 message = "documentType must be one of: DRAWING, RFI, SUBMITTAL, CONTRACT, REPORT, PHOTO, GENERAL"
         )
         String documentType,
 
-        /** Human-readable document title — required, max 300 chars (matches DB column). */
+        @Size(max = 50, message = "Document number must be 50 characters or fewer")
+        String documentNumber,
+
         @NotBlank(message = "Document title is required")
         @Size(max = 300, message = "Title must be 300 characters or fewer")
         String title,
 
-        /** Revision label (e.g. "Rev A", "Rev B", "V2"). Null = no revision tracking. */
+        /** Revision label (e.g. "Rev A", "V2"). Required when adding a revision to an existing document. */
         @Size(max = 20, message = "Revision must be 20 characters or fewer")
         String revision,
 
-        /**
-         * URL to the stored file — required.
-         * This is typically an S3 / GCS URL returned by the storage service
-         * after the client uploads the file directly via pre-signed URL.
-         */
         @NotBlank(message = "File URL is required")
+        @Size(max = 2000, message = "File URL must be 2000 characters or fewer")
+        @Pattern(regexp = "^(?!\\s*(?i:javascript|data|vbscript):).+$",
+                message = "URL scheme is not allowed")
         String fileUrl,
 
-        /** Original file name for display (e.g. "foundation-rev-a.pdf"). */
         @Size(max = 300, message = "File name must be 300 characters or fewer")
         String fileName,
 
-        /** File size in kilobytes — for display and storage quota tracking. */
         Integer fileSizeKb,
 
-        /** Optional longer description of the document's scope or content. */
-        String description
+        String description,
+
+        @Pattern(regexp = "INTERNAL|CLIENT", message = "visibility must be INTERNAL or CLIENT")
+        String visibility
 ) {
 }

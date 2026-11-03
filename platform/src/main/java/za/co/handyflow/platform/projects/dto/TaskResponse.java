@@ -51,4 +51,15 @@ public record TaskResponse(
                 t.isRequiresInspection(), t.getInspectionPassed(),
                 t.getSortOrder(), t.getNotes(), t.getCreatedAt(), t.getUpdatedAt());
     }
+
+    /** CHUNK 2b: copy with cost fields removed, for roles without cost visibility. */
+    public TaskResponse withoutCost() {
+        return new TaskResponse(
+                id, projectId, phaseId, parentTaskId, taskNumber, title, description,
+                taskType, status, priority, assigneeName, assigneeId,
+                plannedStart, plannedEnd, actualStart, actualEnd,
+                durationDays, progressPct, estimatedHours, actualHours,
+                isCritical, isMilestone, null, null,
+                requiresInspection, inspectionPassed, sortOrder, notes, createdAt, updatedAt);
+    }
 }

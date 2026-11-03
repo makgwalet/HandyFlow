@@ -1,47 +1,55 @@
 package za.co.handyflow.platform.projects.domain.enums;
 
 /**
- * Type-safe project lifecycle statuses.
+ * Project lifecycle states.
  *
- * WHY AN ENUM INSTEAD OF STRING?
- * ───────────────────────────────
- * With plain strings, a typo like "CANCELD" compiles fine, passes every layer,
- * and silently does nothing at runtime.  With an enum, the compiler catches it
- * the moment you type it.  Editors also auto-complete enum values — no more
- * copy-pasting string literals across 15 files.
+ * <pre>
+ *  PLANNING ──► PROPOSED ──► APPROVED ──► ACTIVE ◄──► ON_HOLD
+ *     │  └────────────────────(fast track, unless gate enforced)──► ACTIVE
+ *     ▲            │
+ *     └── (return) ┘                        ACTIVE ──► COMPLETED ──► CLOSED
+ *                                           COMPLETED ──► ACTIVE   (reopen)
+ *  Any non-terminal state ──► CANCELLED
+ * </pre>
  *
- * canTransitionTo() encodes the state-machine in ONE place.  Previously the
- * "requireStatus" guard in Project.java was the only enforcer, and any new
- * action had to remember to call it.  Now the transition rules live here and
- * are trivially unit-testable without spinning up Spring.
+ * PLANNING doubles as the "draft" state so existing rows need no data migration.
+ * The PLANNING -> ACTIVE fast track is a structural possibility here; whether it is
+ * allowed for a deployment is decided by ProjectLifecycleService
+ * (app.projects.require-approval-gate).
  */
 public enum ProjectStatus {
     PLANNING,
+    PROPOSED,
+    APPROVED,
     ACTIVE,
     ON_HOLD,
     COMPLETED,
+    CLOSED,
     CANCELLED;
 
-    /**
-     * Returns true when a project in {@code this} status may move to {@code target}.
-     *
-     * <pre>
-     *  PLANNING  ──► ACTIVE  ──► ON_HOLD ──► ACTIVE
-     *                       └──► COMPLETED
-     *  Any non-terminal ──► CANCELLED
-     * </pre>
-     */
     public boolean canTransitionTo(ProjectStatus target) {
         return switch (this) {
-            case PLANNING  -> target == ACTIVE   || target == CANCELLED;
+            case PLANNING  -> target == PROPOSED || target == ACTIVE || target == CANCELLED;
+            case PROPOSED  -> target == APPROVED || target == PLANNING || target == CANCELLED;
+            case APPROVED  -> target == ACTIVE   || target == CANCELLED;
             case ACTIVE    -> target == ON_HOLD  || target == COMPLETED || target == CANCELLED;
             case ON_HOLD   -> target == ACTIVE   || target == CANCELLED;
-            case COMPLETED, CANCELLED -> false;   // terminal states — no exit
+            case COMPLETED -> target == CLOSED   || target == ACTIVE;
+            case CLOSED, CANCELLED -> false;
         };
     }
 
-    /** Convenience: is the project still editable (not in a terminal state)? */
+    public boolean isTerminal() {
+        return this == CLOSED || this == CANCELLED;
+    }
+
+    /** Can day-to-day content (tasks, risks, time, project details) still be changed? */
     public boolean isEditable() {
-        return this != COMPLETED && this != CANCELLED;
+        return this != COMPLETED && this != CLOSED && this != CANCELLED;
+    }
+
+    /** Has the schedule baseline been locked (approved or beyond)? */
+    public boolean isBaselineLocked() {
+        return this != PLANNING && this != PROPOSED;
     }
 }
