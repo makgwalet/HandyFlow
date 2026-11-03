@@ -180,7 +180,7 @@ public class ChangeOrderService {
 
     @Transactional
     public ChangeOrder submitChangeOrder(TenantId tenantId, UUID id, UUID userId, String userName) {
-        ChangeOrder co = find(tenantId, id);
+        ChangeOrder co = findForUpdate(tenantId, id);
         Project project = verifyProject(tenantId, co.getProjectId());
         requireEditable(project);
         throwIfProblems(validateForApplication(tenantId, co), "CHANGE_NOT_SUBMITTABLE", HttpStatus.UNPROCESSABLE_ENTITY);
@@ -195,7 +195,15 @@ public class ChangeOrderService {
 
     @Transactional
     public ChangeOrder approveChangeOrder(TenantId tenantId, UUID id, UUID approverId, String approverName) {
-        ChangeOrder co = find(tenantId, id);
+        ChangeOrder co = findForUpdate(tenantId, id);
+        // Approval changes the budget and schedule, so it is refused on a closed or cancelled project.
+        // Lock order is always change order, then project.
+        requireEditable(projectRepo.findByTenantAndIdForUpdate(tenantId.getValue(), co.getProjectId())
+                .orElseThrow(() -> notFound("Project")));
+        if (!"SUBMITTED".equals(co.getStatus())) {
+            throw new HandyFlowException("Only a submitted change order can be approved (this one is "
+                    + co.getStatus() + ")", HttpStatus.CONFLICT, "INVALID_STATE");
+        }
 
         if (!allowSelfApproval && approverId != null && approverId.equals(co.getSubmittedBy())) {
             throw new HandyFlowException("You cannot approve a change order you raised",
@@ -243,7 +251,7 @@ public class ChangeOrderService {
     @Transactional
     public ChangeOrder rejectChangeOrder(TenantId tenantId, UUID id, String reason) {
         String why = requireReason(reason);
-        ChangeOrder co = find(tenantId, id);
+        ChangeOrder co = findForUpdate(tenantId, id);
 
         var existing = approvalFacade.getLatestRequestForEntity(tenantId, APPROVALS_MODULE, APPROVALS_ENTITY_TYPE, id);
         if (existing.isPresent() && isOpen(existing.get())) {
@@ -263,7 +271,7 @@ public class ChangeOrderService {
     @Transactional
     public ChangeOrder withdraw(TenantId tenantId, UUID id, String reason) {
         String why = requireReason(reason);
-        ChangeOrder co = find(tenantId, id);
+        ChangeOrder co = findForUpdate(tenantId, id);
         co.withdraw(why);
         ChangeOrder saved = changeOrderRepo.save(co);
         recordOutcome(saved, "WITHDRAWN", why, currentUserId());   // no-op for a DRAFT that was never submitted
@@ -498,6 +506,12 @@ public class ChangeOrderService {
     }
 
     // ── Misc helpers ──────────────────────────────────────────────────────────
+
+    /** Locked read for every state change (see ChangeOrderRepository.findByTenantAndIdForUpdate). */
+    private ChangeOrder findForUpdate(TenantId tenantId, UUID id) {
+        return changeOrderRepo.findByTenantAndIdForUpdate(tenantId.getValue(), id)
+                .orElseThrow(() -> notFound("Change order"));
+    }
 
     private ChangeOrder find(TenantId tenantId, UUID id) {
         return changeOrderRepo.findByTenantAndId(tenantId.getValue(), id)

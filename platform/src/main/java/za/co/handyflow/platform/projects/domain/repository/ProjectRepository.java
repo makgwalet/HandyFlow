@@ -1,8 +1,10 @@
 package za.co.handyflow.platform.projects.domain.repository;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import za.co.handyflow.platform.projects.domain.model.Project;
@@ -71,6 +73,16 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     @Query("SELECT p FROM Project p WHERE p.tenantId = :tenantId AND p.id = :id")
     Optional<Project> findByTenantAndId(@Param("tenantId") UUID tenantId,
                                         @Param("id")       UUID id);
+
+    /**
+     * Same row, locked until the transaction ends. Approving a change order takes it so two change
+     * orders approved at once on one project are applied one after the other (each gets its own
+     * baseline version and sees the other's budget changes).
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Project p WHERE p.tenantId = :tenantId AND p.id = :id")
+    Optional<Project> findByTenantAndIdForUpdate(@Param("tenantId") UUID tenantId,
+                                                 @Param("id")       UUID id);
 
     /**
      * Not-cancelled projects whose name equals the given one, ignoring case and surrounding spaces.
