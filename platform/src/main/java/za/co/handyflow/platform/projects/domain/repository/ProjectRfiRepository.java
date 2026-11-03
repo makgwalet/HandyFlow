@@ -1,6 +1,8 @@
 package za.co.handyflow.platform.projects.domain.repository;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,6 +22,15 @@ public interface ProjectRfiRepository extends JpaRepository<ProjectRfi, UUID> {
     List<ProjectRfi> findByProjectAndStatus(@Param("projectId") UUID projectId, @Param("tenantId") UUID tenantId, @Param("status") String status);
 
     Optional<ProjectRfi> findByIdAndTenantId(UUID id, UUID tenantId);
+
+    /**
+     * Same row, locked until the transaction ends. Every RFI state change uses it, so two people
+     * responding, closing or cancelling at once are serialised instead of both passing the status
+     * check on stale data (which left two "responded" entries in the history).
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM ProjectRfi r WHERE r.id = :id AND r.tenantId = :tenantId")
+    Optional<ProjectRfi> findByIdAndTenantIdForUpdate(@Param("id") UUID id, @Param("tenantId") UUID tenantId);
 
     @Query("SELECT COUNT(r) FROM ProjectRfi r WHERE r.projectId = :projectId AND r.tenantId = :tenantId AND r.status IN ('SUBMITTED','RESPONDED')")
     long countOpenByProject(@Param("projectId") UUID projectId, @Param("tenantId") UUID tenantId);

@@ -88,7 +88,7 @@ public class RfiService {
         }
         UUID me = TenantContext.getCurrentUserId();
         return rfis.stream()
-                .filter(r -> !assignedToMe || me.equals(r.getAssignedToId()))
+                .filter(r -> !assignedToMe || (me != null && me.equals(r.getAssignedToId())))
                 .filter(r -> !overdueOnly || r.isOverdue())
                 .map(r -> toResponse(r, null))
                 .toList();
@@ -175,7 +175,7 @@ public class RfiService {
     @Transactional
     public RfiResponse submit(UUID rfiId) {
         UUID tenantId = tenantId();
-        ProjectRfi rfi = getVerified(rfiId, tenantId);
+        ProjectRfi rfi = getForUpdate(rfiId, tenantId);
         Project project = verifyOpenProject(rfi.getProjectId(), tenantId);
 
         rfi.submit();
@@ -190,7 +190,7 @@ public class RfiService {
     @Transactional
     public RfiResponse assign(UUID rfiId, AssignRfiRequest req) {
         UUID tenantId = tenantId();
-        ProjectRfi rfi = getVerified(rfiId, tenantId);
+        ProjectRfi rfi = getForUpdate(rfiId, tenantId);
         Project project = verifyOpenProject(rfi.getProjectId(), tenantId);
 
         String previous = rfi.getAssignedToName();
@@ -209,7 +209,7 @@ public class RfiService {
     @Transactional
     public RfiResponse respond(UUID rfiId, RespondRfiRequest req) {
         UUID tenantId = tenantId();
-        ProjectRfi rfi = getVerified(rfiId, tenantId);
+        ProjectRfi rfi = getForUpdate(rfiId, tenantId);
         Project project = verifyOpenProject(rfi.getProjectId(), tenantId);
 
         UUID userId = TenantContext.getCurrentUserId();
@@ -233,7 +233,7 @@ public class RfiService {
     @Transactional
     public RfiResponse requestClarification(UUID rfiId, String comment) {
         UUID tenantId = tenantId();
-        ProjectRfi rfi = getVerified(rfiId, tenantId);
+        ProjectRfi rfi = getForUpdate(rfiId, tenantId);
         Project project = verifyOpenProject(rfi.getProjectId(), tenantId);
 
         UUID responder = rfi.getAssignedToId() != null ? rfi.getAssignedToId() : rfi.getRespondedById();
@@ -250,7 +250,7 @@ public class RfiService {
     @Transactional
     public RfiResponse close(UUID rfiId, String noChangeNote) {
         UUID tenantId = tenantId();
-        ProjectRfi rfi = getVerified(rfiId, tenantId);
+        ProjectRfi rfi = getForUpdate(rfiId, tenantId);
         verifyOpenProject(rfi.getProjectId(), tenantId);
 
         String note = blankToNull(noChangeNote) != null ? noChangeNote.trim() : rfi.getNoChangeNote();
@@ -270,7 +270,7 @@ public class RfiService {
     @Transactional
     public RfiResponse reopen(UUID rfiId, String reason) {
         UUID tenantId = tenantId();
-        ProjectRfi rfi = getVerified(rfiId, tenantId);
+        ProjectRfi rfi = getForUpdate(rfiId, tenantId);
         verifyOpenProject(rfi.getProjectId(), tenantId);
         rfi.reopen();
         ProjectRfi saved = rfiRepo.save(rfi);
@@ -282,7 +282,7 @@ public class RfiService {
     @Transactional
     public RfiResponse cancel(UUID rfiId, String reason) {
         UUID tenantId = tenantId();
-        ProjectRfi rfi = getVerified(rfiId, tenantId);
+        ProjectRfi rfi = getForUpdate(rfiId, tenantId);
         verifyOpenProject(rfi.getProjectId(), tenantId);
         rfi.cancel(reason);
         ProjectRfi saved = rfiRepo.save(rfi);
@@ -296,7 +296,7 @@ public class RfiService {
     @Transactional
     public RfiResponse updateImpact(UUID rfiId, RfiImpactRequest req) {
         UUID tenantId = tenantId();
-        ProjectRfi rfi = getVerified(rfiId, tenantId);
+        ProjectRfi rfi = getForUpdate(rfiId, tenantId);
         verifyOpenProject(rfi.getProjectId(), tenantId);
         referenceValidator.requireTaskInProject(TenantId.of(tenantId), rfi.getProjectId(), req.taskId());
 
@@ -311,7 +311,7 @@ public class RfiService {
     @Transactional
     public RfiResponse linkChangeOrder(UUID rfiId, UUID changeOrderId) {
         UUID tenantId = tenantId();
-        ProjectRfi rfi = getVerified(rfiId, tenantId);
+        ProjectRfi rfi = getForUpdate(rfiId, tenantId);
         verifyOpenProject(rfi.getProjectId(), tenantId);
 
         ChangeOrder co = changeOrderRepo.findByTenantAndId(tenantId, changeOrderId)
@@ -368,6 +368,10 @@ public class RfiService {
     private String changeOrderStatus(UUID tenantId, ProjectRfi r) {
         if (r.getChangeOrderId() == null) return null;
         return changeOrderRepo.findByTenantAndId(tenantId, r.getChangeOrderId()).map(ChangeOrder::getStatus).orElse(null);
+    }
+
+    private ProjectRfi getForUpdate(UUID rfiId, UUID tenantId) {
+        return rfiRepo.findByIdAndTenantIdForUpdate(rfiId, tenantId).orElseThrow(() -> notFound("RFI"));
     }
 
     private ProjectRfi getVerified(UUID rfiId, UUID tenantId) {

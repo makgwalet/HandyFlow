@@ -197,7 +197,9 @@ public class ChangeOrderService {
     public ChangeOrder approveChangeOrder(TenantId tenantId, UUID id, UUID approverId, String approverName) {
         ChangeOrder co = findForUpdate(tenantId, id);
         // Approval changes the budget and schedule, so it is refused on a closed or cancelled project.
-        // Lock order is always change order, then project.
+        // Lock order is always: change order row, cost advisory lock, project row. Cost postings take the
+        // advisory lock and then update the project row, so taking the row first would deadlock with them.
+        costService.lockProject(co.getProjectId());
         requireEditable(projectRepo.findByTenantAndIdForUpdate(tenantId.getValue(), co.getProjectId())
                 .orElseThrow(() -> notFound("Project")));
         if (!"SUBMITTED".equals(co.getStatus())) {

@@ -173,6 +173,9 @@ public class ProjectCostService {
         Project project = loadProject(tenantId, line.getProjectId());
         requireEditable(project);
         lock(project.getId());
+        // The line was read BEFORE the lock, so another request may have posted spend or commitments in
+        // between; reload it so the "not below spent + committed" check below uses current figures.
+        em.refresh(line);
 
         if (newAmount != null && newAmount.compareTo(line.getBudgetedAmount()) != 0) {
             String why = blankToNull(reason);
@@ -397,6 +400,15 @@ public class ProjectCostService {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Takes the per-project cost lock for the rest of the transaction. Callers that will also lock the
+     * project ROW must call this FIRST: cost postings take this lock and then update the project row, so
+     * the opposite order would deadlock.
+     */
+    public void lockProject(UUID projectId) {
+        lock(projectId);
+    }
 
     private void lock(UUID projectId) {
         em.createNativeQuery("SELECT CAST(pg_advisory_xact_lock(hashtext(:k)) AS text)")
