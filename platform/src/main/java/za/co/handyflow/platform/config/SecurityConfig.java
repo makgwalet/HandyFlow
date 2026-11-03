@@ -188,7 +188,11 @@ public class SecurityConfig {
                                 // Projects client portal: opened by a client from an emailed link, with no login. The opaque token IS the
                                 // credential and is checked (format, rate limit per IP, enabled, not expired) inside ProjectPortalService.resolve()
                                 // on every request, including the file download. Without this line the page answered 401 to every client.
-                                "/api/public/projects/portal/**"
+                                "/api/public/projects/portal/**",
+                                // Projects transmittal recipients: opened from an emailed link with no login. The link token is the
+                                // credential but never enough alone: every call except the code request needs the session obtained by
+                                // confirming an emailed one-time code (TransmittalAccessService). Rate limited per IP and per link.
+                                "/api/public/projects/transmittals/**"
                         ).permitAll()
                         // Everything else requires authentication
                         .anyRequest().authenticated()

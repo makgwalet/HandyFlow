@@ -16,6 +16,8 @@ import za.co.handyflow.platform.projects.domain.repository.ProjectRepository;
 import za.co.handyflow.platform.projects.domain.repository.ProjectTransmittalItemRepository;
 import za.co.handyflow.platform.projects.domain.repository.ProjectTransmittalRepository;
 import za.co.handyflow.platform.projects.dto.CreateTransmittalRequest;
+import za.co.handyflow.platform.projects.dto.TransmittalRecipientRequest;
+import za.co.handyflow.platform.projects.dto.TransmittalRecipientResponse;
 import za.co.handyflow.platform.projects.dto.TransmittalResponse;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.TenantId;
@@ -25,7 +27,8 @@ import java.util.stream.Collectors;
 
 /**
  * Transmittal register: a permanent record of which document revisions went to whom, for what
- * purpose. RECORD ONLY — nothing is emailed from here.
+ * purpose. Each recipient with an email address is given their OWN secure, expiring link by
+ * TransmittalAccessService, which also emails it (links only, never attachments).
  *
  * Every document must belong to this project (and tenant) and be live (CURRENT, FOR_REVIEW or
  * APPROVED). Issued FOR_CONSTRUCTION or AS_BUILT, every document must be APPROVED (TransmittalRules).
@@ -33,8 +36,7 @@ import java.util.stream.Collectors;
  * silently goes out with a superseded drawing or a draft marked "for construction". Items snapshot
  * number, title, revision, status, file name and file hash at the time of sending.
  *
- * NOT DONE (needs decisions): emailing the recipient, and per-recipient access to the files. See the
- * Projects module backlog.
+ * See TransmittalAccessService for how recipients prove who they are and what they may open.
  */
 @Slf4j
 @Service
@@ -46,6 +48,7 @@ public class TransmittalService {
     private final ProjectTransmittalRepository     transmittalRepo;
     private final ProjectTransmittalItemRepository itemRepo;
     private final SequenceService                  sequenceService;
+    private final TransmittalAccessService         accessService;
 
     @Transactional
     public TransmittalResponse create(TenantId tenantId, UUID projectId, CreateTransmittalRequest req,
@@ -84,21 +87,33 @@ public class TransmittalService {
         List<ProjectTransmittalItem> items = itemRepo.saveAll(
                 docs.stream().map(d -> ProjectTransmittalItem.snapshot(t.getId(), d)).toList());
 
-        log.info("Transmittal {} to '{}' project={} documents={}", number, req.recipientName(), projectId, items.size());
-        return TransmittalResponse.of(t, items);
+        // Each recipient with an email address gets their OWN secure link; documents are never attached.
+        List<TransmittalRecipientRequest> specs = new ArrayList<>();
+        if (blankToNull(req.recipientEmail()) != null) {
+            specs.add(new TransmittalRecipientRequest(req.recipientName().trim(), blankToNull(req.recipientOrganisation()),
+                    req.recipientEmail().trim(), true, true, null));
+        }
+        if (req.additionalRecipients() != null) specs.addAll(req.additionalRecipients());
+        List<TransmittalRecipientResponse> recipients =
+                accessService.issue(tenantId, project, t, items, specs, req.expiryDays(), by, byName);
+
+        log.info("Transmittal {} to '{}' project={} documents={} recipients={}",
+                number, req.recipientName(), projectId, items.size(), recipients.size());
+        return TransmittalResponse.of(t, items, recipients);
     }
 
     @Transactional(readOnly = true)
     public List<TransmittalResponse> list(TenantId tenantId, UUID projectId) {
         verifyProject(tenantId, projectId);
         List<ProjectTransmittal> all = transmittalRepo.findByProject(tenantId.getValue(), projectId);
-        return all.stream().map(t -> TransmittalResponse.of(t, itemRepo.findByTransmittal(t.getId()))).toList();
+        return all.stream().map(t -> TransmittalResponse.of(t, itemRepo.findByTransmittal(t.getId()),
+                accessService.recipientViews(tenantId, t.getId()))).toList();
     }
 
     @Transactional(readOnly = true)
     public TransmittalResponse get(TenantId tenantId, UUID projectId, UUID id) {
         ProjectTransmittal t = find(tenantId, projectId, id);
-        return TransmittalResponse.of(t, itemRepo.findByTransmittal(t.getId()));
+        return TransmittalResponse.of(t, itemRepo.findByTransmittal(t.getId()), accessService.recipientViews(tenantId, t.getId()));
     }
 
     @Transactional
@@ -109,7 +124,7 @@ public class TransmittalService {
                 .orElseThrow(() -> new HandyFlowException("Transmittal not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
         t.acknowledge(acknowledgedBy.trim());
         transmittalRepo.save(t);
-        return TransmittalResponse.of(t, itemRepo.findByTransmittal(t.getId()));
+        return TransmittalResponse.of(t, itemRepo.findByTransmittal(t.getId()), accessService.recipientViews(tenantId, t.getId()));
     }
 
     private ProjectTransmittal find(TenantId tenantId, UUID projectId, UUID id) {

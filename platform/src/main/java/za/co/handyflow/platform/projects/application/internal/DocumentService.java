@@ -438,6 +438,29 @@ public class DocumentService {
         return file;
     }
 
+    /**
+     * Releases the exact revision that was issued on a transmittal. The caller (TransmittalAccessService)
+     * has already proved the recipient may have it; this checks the document still belongs to the project,
+     * is not voided, and still matches the hash recorded when it was issued, so a recipient never receives
+     * a different file from the one the transmittal lists. Written to the document's trail.
+     */
+    @Transactional(noRollbackFor = HandyFlowException.class)
+    public FileDownload downloadIssuedRevision(UUID tenantId, UUID projectId, UUID docId,
+                                               String issuedSha256, String recipientLabel) {
+        ProjectDocument doc = docRepo.findByTenantAndId(tenantId, docId)
+                .filter(d -> d.getProjectId().equals(projectId))
+                .filter(d -> d.statusEnum() != DocumentStatus.VOIDED)
+                .orElseThrow(() -> notFound("Document"));
+        if (issuedSha256 != null && doc.hasStoredFile() && !issuedSha256.equalsIgnoreCase(doc.getFileSha256())) {
+            log.error("Issued revision mismatch: document={} issued hash differs from the stored file", docId);
+            throw new HandyFlowException("This file no longer matches the revision that was issued, so it was not released",
+                    HttpStatus.CONFLICT, "FILE_INTEGRITY");
+        }
+        FileDownload file = readStored(TenantId.of(tenantId), doc);
+        record(doc, "DOWNLOADED", "Transmittal recipient", null, recipientLabel);
+        return file;
+    }
+
     private FileDownload readStored(TenantId tenantId, ProjectDocument doc) {
         if (!doc.hasStoredFile()) {
             throw new HandyFlowException("This entry is a link, not a stored file", HttpStatus.CONFLICT, "NO_STORED_FILE");
@@ -534,7 +557,7 @@ public class DocumentService {
     }
 
     /** PM_APPROVE or PM_ADMIN on the tenant, or MANAGER / DOCUMENT_CONTROLLER on this project. */
-    private boolean isDocumentController(TenantId tenantId, UUID projectId, UUID userId) {
+    public boolean isDocumentController(TenantId tenantId, UUID projectId, UUID userId) {
         if (hasAuthority("PM_APPROVE") || hasAuthority("PM_ADMIN")) return true;
         if (userId == null) return false;
         return memberRepo.findByProjectAndUser(tenantId.getValue(), projectId, userId)
