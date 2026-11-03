@@ -35,7 +35,9 @@ public class ProjectScopeResolver {
             Map.entry("change-orders","ChangeOrder"),
             Map.entry("rfis",         "ProjectRfi"),
             Map.entry("phases",       "ProjectPhase"),
-            Map.entry("time-entries", "TimeEntry"));
+            Map.entry("time-entries", "TimeEntry"),
+            Map.entry("issues",       "ProjectIssue"),
+            Map.entry("action-items", "ProjectActionItem"));
 
     @PersistenceContext
     private EntityManager em;

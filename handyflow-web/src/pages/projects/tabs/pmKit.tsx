@@ -1,6 +1,7 @@
 // src/pages/projects/tabs/pmKit.tsx
 // Small shared pieces for the project control screens (change orders, cost control, schedule, lifecycle, time, portal).
 import React, { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { apiClient } from '../../../api/client'
 import { errorText } from '../../../api/projectDocs'
@@ -145,3 +146,28 @@ export function SectionTitle({ children, right }: { children: React.ReactNode; r
     </div>
   )
 }
+
+export interface Member { userId: string; userName: string; role: string }
+/** People on the project — the only people tasks, issues and actions can be given to. */
+export function useMembers(projectId: string) {
+  return useQuery<Member[]>({
+    queryKey: ['pm-members', projectId], staleTime: 60_000,
+    queryFn: async () => list<Member>(await apiClient.get(`/api/v1/projects/${projectId}/members`)),
+  })
+}
+
+export function initials(name: string | null | undefined) {
+  if (!name) return '?'
+  const p = name.trim().split(/\s+/)
+  return ((p[0]?.[0] ?? '') + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase() || '?'
+}
+const AVATAR_TONES = ['var(--hf-info-soft-strong)', 'var(--hf-success-soft-strong)', 'var(--hf-warning-soft-strong)', 'var(--hf-violet-soft-strong)', 'var(--hf-danger-soft)']
+export function Avatar({ name, size = 22 }: { name: string | null | undefined; size?: number }) {
+  const n = name ?? ''
+  const tone = AVATAR_TONES[[...n].reduce((s, c) => s + c.charCodeAt(0), 0) % AVATAR_TONES.length]
+  return <span title={name ?? 'Unassigned'} aria-label={name ?? 'Unassigned'}
+    style={{ width: size, height: size, borderRadius: '50%', background: name ? tone : 'var(--hf-surface-sunken)', color: 'var(--hf-text)', display: 'inline-flex',
+      alignItems: 'center', justifyContent: 'center', fontSize: Math.round(size * 0.42), fontWeight: 700, flexShrink: 0 }}>{name ? initials(name) : '–'}</span>
+}
+
+export const PRIORITY_TONE = { LOW: 'neutral', MEDIUM: 'info', HIGH: 'warning', CRITICAL: 'danger' } as const

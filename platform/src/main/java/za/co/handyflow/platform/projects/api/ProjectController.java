@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.projects.application.internal.ProjectAccess;
 import za.co.handyflow.platform.projects.application.internal.ProjectAccessGuard;
 import za.co.handyflow.platform.projects.application.internal.ProjectLifecycleService;
+import za.co.handyflow.platform.projects.application.internal.ProjectPortfolioService;
 import za.co.handyflow.platform.projects.application.internal.ProjectService;
 import za.co.handyflow.platform.projects.domain.enums.ProjectAction;
 import za.co.handyflow.platform.projects.domain.model.Project;
@@ -57,6 +58,7 @@ public class ProjectController {
     private final ProjectService          projectService;
     private final ProjectLifecycleService lifecycleService;
     private final ProjectAccessGuard      accessGuard;
+    private final ProjectPortfolioService portfolioService;
 
     // ── Dashboard ─────────────────────────────────────────────────────────────
 
@@ -69,6 +71,13 @@ public class ProjectController {
     }
 
     // ── Project list ──────────────────────────────────────────────────────────
+
+    @GetMapping("/portfolio")
+    @PreAuthorize("hasAuthority('PM_READ')")
+    @Operation(summary = "Dashboard portfolio: counts, overdue, budget and spend (cost-visible projects), last month's figures, trend, upcoming milestones")
+    public ResponseEntity<ApiResponse<PortfolioResponse>> portfolio() {
+        return ResponseEntity.ok(ApiResponse.success("Success", portfolioService.portfolio(TenantContext.getTenantIdAsObject())));
+    }
 
     @GetMapping
     @PreAuthorize("hasAuthority('PM_READ')")

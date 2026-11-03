@@ -95,6 +95,11 @@ public class SequenceService {
         return "SN" + String.format("%04d", next(tenantId, "SNAG:" + projectId));
     }
 
+    /** Formats "ISS-004" — scoped per project */
+    public String nextIssueNumber(UUID tenantId, UUID projectId) {
+        return "ISS-" + String.format("%03d", next(tenantId, "ISSUE:" + projectId));
+    }
+
     /** Returns next sort-order integer for phases or budget lines */
     public int nextSortOrder(UUID tenantId, UUID projectId, String entityType) {
         return next(tenantId, entityType + ":" + projectId);

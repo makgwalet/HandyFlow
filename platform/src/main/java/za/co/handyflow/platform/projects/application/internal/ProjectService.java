@@ -314,6 +314,8 @@ public class ProjectService {
             case "START"    -> t.start();
             case "COMPLETE" -> t.complete();
             case "PROGRESS" -> { if (progressPct != null) t.updateProgress(progressPct); }
+            case "REVIEW"   -> t.submitForReview();
+            case "RETURN"   -> t.returnFromReview();
             case "BLOCK"    -> t.setStatus("BLOCKED");
             case "CANCEL"   -> t.setStatus("CANCELLED");
             default -> throw new HandyFlowException(
@@ -323,6 +325,33 @@ public class ProjectService {
         recalculateHealth(project);
         projectRepo.save(project);
         return t;
+    }
+
+    /** Title, priority, assignee (a project member), estimate and notes. */
+    @Transactional
+    public ProjectTask updateTaskDetails(TenantId tenantId, UUID taskId, UpdateTaskDetailsRequest req) {
+        ProjectTask t = taskRepo.findByTenantAndId(tenantId.getValue(), taskId)
+                .orElseThrow(() -> notFound("Task"));
+        requireEditable(projectRepo.findByTenantAndId(tenantId.getValue(), t.getProjectId())
+                .orElseThrow(() -> notFound("Project")));
+        if (req.title() != null) {
+            if (req.title().isBlank()) throw new HandyFlowException("Title is required", HttpStatus.BAD_REQUEST, "TITLE_REQUIRED");
+            t.setTitle(req.title().trim());
+        }
+        if (req.priority() != null) t.setPriority(req.priority());
+        if (Boolean.TRUE.equals(req.clearAssignee())) {
+            t.setAssigneeId(null);
+            t.setAssigneeName(null);
+        } else if (req.assigneeId() != null) {
+            ProjectMember m = memberService.find(tenantId, t.getProjectId(), req.assigneeId())
+                    .orElseThrow(() -> new HandyFlowException("Only a member of the project can be assigned",
+                            HttpStatus.BAD_REQUEST, "ASSIGNEE_NOT_MEMBER"));
+            t.setAssigneeId(m.getUserId());
+            t.setAssigneeName(m.getUserName());
+        }
+        if (req.estimatedHours() != null) t.setEstimatedHours(req.estimatedHours());
+        if (req.notes() != null) t.setNotes(req.notes().isBlank() ? null : req.notes().trim());
+        return taskRepo.save(t);
     }
 
     // ── Risks ─────────────────────────────────────────────────────────────────

@@ -1,11 +1,12 @@
 // src/pages/projects/ProjectDashboard.tsx
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { TrendingUp, AlertTriangle, Clock, CheckCircle, FolderOpen, Plus } from "lucide-react"
+import { FolderOpen, Plus } from "lucide-react"
+import { PortfolioPanel } from "./PortfolioPanel"
 import { useState } from "react"
 import { CreateProjectModal } from "./CreateProjectModal"
 
-interface Summary { activeProjects:number; redProjects:number; amberProjects:number; pendingTimeApprovals:number; openRedRisks:number }
+export interface Summary { activeProjects:number; redProjects:number; amberProjects:number; pendingTimeApprovals:number; openRedRisks:number }
 interface Project { id:string; projectNumber:string; name:string; status:string; health:string; clientName:string|null; budgetTotal:number; budgetSpent:number; endDate:string|null; taskCount:number; completedTaskCount:number; openRiskCount:number }
 
 function unwrap<T>(r:any):T[] { const d=r?.data?.data??r?.data??[]; return Array.isArray(d)?d as T[]:d?.content??[] }
@@ -41,28 +42,9 @@ export function ProjectDashboard({ onOpen, onList }: { onOpen:(id:string)=>void;
   })
   const redAmber = projects.filter(p => p.health === "RED" || p.health === "AMBER")
 
-  const KPIs = [
-    { label:"Active Projects",  value: summary?.activeProjects??0,       icon:FolderOpen,    color:"var(--hf-info-text)", bg:"var(--hf-info-soft)" },
-    { label:"At Risk (Red)",    value: summary?.redProjects??0,           icon:AlertTriangle, color:"var(--hf-danger-text)", bg:"var(--hf-danger-soft)" },
-    { label:"Watch (Amber)",    value: summary?.amberProjects??0,         icon:TrendingUp,    color:"var(--hf-warning-text)", bg:"var(--hf-warning-soft)" },
-    { label:"Time Approvals",   value: summary?.pendingTimeApprovals??0,  icon:Clock,         color:"var(--hf-violet-text)", bg:"var(--hf-violet-soft)" },
-    { label:"Open Red Risks",   value: summary?.openRedRisks??0,          icon:AlertTriangle, color:"var(--hf-danger-text)", bg:"var(--hf-danger-soft)" },
-  ]
-
   return (
     <div>
-      {/* KPI row */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:12, marginBottom:28 }}>
-        {KPIs.map(k => (
-          <div key={k.label} style={{ background:k.bg, borderRadius:12, padding:"14px 16px" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
-              <k.icon size={15} style={{ color: k.color }} />
-              <span style={{ fontSize:11, fontWeight:600, color:"var(--hf-text-faint)", textTransform:"uppercase", letterSpacing:"0.05em" }}>{k.label}</span>
-            </div>
-            <div style={{ fontSize:28, fontWeight:800, color:k.color }}>{k.value}</div>
-          </div>
-        ))}
-      </div>
+      <PortfolioPanel summary={summary} onOpen={onOpen} />
 
       {/* Actions */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>

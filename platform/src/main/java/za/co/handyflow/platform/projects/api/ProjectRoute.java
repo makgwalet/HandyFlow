@@ -26,12 +26,12 @@ record ProjectRoute(Kind kind, UUID projectId, String entityKeyword, UUID entity
 
     static final String PREFIX = "/api/v1/projects";
 
-    static final Set<String> SPECIAL = Set.of("summary", "time-approvals");
+    static final Set<String> SPECIAL = Set.of("summary", "time-approvals", "portfolio");
 
     /** Keep in sync with ProjectScopeResolver's map. */
     static final Set<String> ENTITY_KEYWORDS = Set.of(
             "tasks", "risks", "snags", "site-diaries", "documents", "budget",
-            "resources", "change-orders", "rfis", "phases", "time-entries");
+            "resources", "change-orders", "rfis", "phases", "time-entries", "issues", "action-items");
 
     /** Any URL segment in this set marks the route as cost-sensitive. */
     private static final Set<String> COST_SEGMENTS = Set.of("budget", "change-orders");

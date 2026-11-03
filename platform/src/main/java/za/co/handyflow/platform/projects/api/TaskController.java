@@ -70,7 +70,7 @@ public class TaskController {
      */
     @PostMapping("/tasks/{taskId}/status")
     @PreAuthorize("hasAuthority('PM_WRITE')")
-    @Operation(summary = "Transition task status: START | COMPLETE | BLOCK | CANCEL | PROGRESS")
+    @Operation(summary = "Transition task status: START | REVIEW | RETURN | COMPLETE | BLOCK | CANCEL | PROGRESS")
     public ResponseEntity<ApiResponse<TaskResponse>> updateStatus(
             @PathVariable UUID taskId, @RequestBody Map<String, Object> body) {
         String action = (String) body.get("action");
@@ -79,6 +79,15 @@ public class TaskController {
         ProjectTask t = projectService.updateTaskStatus(
                 TenantContext.getTenantIdAsObject(), taskId, action, pct);
         return ResponseEntity.ok(ApiResponse.success("Status updated", view(t, canViewCost(t.getProjectId()))));
+    }
+
+    @PutMapping("/tasks/{taskId}")
+    @PreAuthorize("hasAuthority('PM_WRITE')")
+    @Operation(summary = "Edit a task's title, priority, assignee (a project member), estimate or notes. Dates: PUT /tasks/{id}/dates")
+    public ResponseEntity<ApiResponse<TaskResponse>> updateTask(
+            @PathVariable UUID taskId, @Valid @RequestBody UpdateTaskDetailsRequest req) {
+        ProjectTask t = projectService.updateTaskDetails(TenantContext.getTenantIdAsObject(), taskId, req);
+        return ResponseEntity.ok(ApiResponse.success("Task updated", view(t, canViewCost(t.getProjectId()))));
     }
 
     // ── Time entries ──────────────────────────────────────────────────────────

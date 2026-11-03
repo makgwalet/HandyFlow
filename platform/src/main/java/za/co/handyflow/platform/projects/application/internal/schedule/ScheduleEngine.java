@@ -42,7 +42,7 @@ public final class ScheduleEngine {
         boolean completed() { return "COMPLETED".equals(status); }
         boolean cancelled() { return "CANCELLED".equals(status); }
         boolean started() {
-            return "IN_PROGRESS".equals(status)
+            return "IN_PROGRESS".equals(status) || "IN_REVIEW".equals(status)
                     || actualStart != null
                     || (progressPct != null && progressPct.signum() > 0);
         }

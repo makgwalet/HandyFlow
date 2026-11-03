@@ -53,7 +53,14 @@ public class ProjectClosureChecks {
                 count("SELECT COUNT(t) FROM TimeEntry t WHERE t.projectId = :pid "
                         + "AND t.status = 'SUBMITTED'", pid)));
 
+        checks.add(check("OPEN_ISSUES", "Issues that are not resolved", true,
+                count("SELECT COUNT(i) FROM ProjectIssue i WHERE i.projectId = :pid "
+                        + "AND i.status IN ('OPEN','IN_PROGRESS')", pid)));
+
         // ── Warnings (never block) ────────────────────────────────────────────
+        checks.add(check("OPEN_ACTIONS", "Action items still open on risks or issues", false,
+                count("SELECT COUNT(a) FROM ProjectActionItem a WHERE a.projectId = :pid "
+                        + "AND a.status = 'OPEN'", pid)));
         checks.add(check("DRAFT_CHANGE_ORDERS", "Change orders still in draft", false,
                 count("SELECT COUNT(c) FROM ChangeOrder c WHERE c.projectId = :pid "
                         + "AND c.status = 'DRAFT'", pid)));

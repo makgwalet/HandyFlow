@@ -3,6 +3,7 @@ import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, AlertTriangle } from 'lucide-react'
 import { apiClient } from '../../../api/client'
+import { IssuesRegister, ActionItems, RiskFollowUp } from './IssuesActions'
 
 interface Risk { id:string; riskNumber:string|null; title:string; description:string|null; category:string|null; probability:number; impact:number; riskScore:number; rating:string; status:string; mitigation:string|null; ownerName:string|null; reviewDate:string|null; isOhsa:boolean }
 
@@ -12,9 +13,31 @@ const RATING:{[k:string]:{bg:string;color:string}}={
   RED:{bg:'var(--hf-danger-soft)',color:'var(--hf-danger-text)'},AMBER:{bg:'var(--hf-warning-soft-strong)',color:'var(--hf-warning-text-deep)'},GREEN:{bg:'var(--hf-success-soft-strong)',color:'var(--hf-success-text-strong)'},
 }
 const CATS=['SAFETY','FINANCIAL','SCHEDULE','TECHNICAL','LEGAL','ENVIRONMENTAL']
-const SCORES=[[1,2,3,4,5],[6,8,10,12,15],[9,12,15,16,20],[12,16,20,20,25]] // impact rows, prob cols
 
+type RiskView='risks'|'issues'|'actions'
+
+/** Risks (might happen), issues (have happened) and the action items against either. */
 export function RisksTab({projectId}:{projectId:string}) {
+  const [view,setView]=useState<RiskView>('risks')
+  const tabs:{key:RiskView;label:string}[]=[{key:'risks',label:'Risks'},{key:'issues',label:'Issues'},{key:'actions',label:'Action items'}]
+  return (
+    <div>
+      <div role="tablist" style={{display:'inline-flex',gap:2,padding:3,background:'var(--hf-surface-sunken)',borderRadius:10,marginBottom:16}}>
+        {tabs.map(t=>(
+          <button key={t.key} role="tab" aria-selected={view===t.key} onClick={()=>setView(t.key)}
+            style={{padding:'6px 12px',border:'none',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,
+              background:view===t.key?'var(--hf-surface)':'transparent',color:view===t.key?'var(--hf-text)':'var(--hf-text-muted)',
+              boxShadow:view===t.key?'0 1px 2px rgba(0,0,0,.08)':'none'}}>{t.label}</button>
+        ))}
+      </div>
+      {view==='risks'&&<RiskRegister projectId={projectId}/>}
+      {view==='issues'&&<IssuesRegister projectId={projectId}/>}
+      {view==='actions'&&<ActionItems projectId={projectId}/>}
+    </div>
+  )
+}
+
+function RiskRegister({projectId}:{projectId:string}) {
   const qc=useQueryClient()
   const [showAdd,setShowAdd]=useState(false)
   const [selected,setSelected]=useState<Risk|null>(null)
@@ -96,7 +119,7 @@ export function RisksTab({projectId}:{projectId:string}) {
       {/* Risk detail / action modal */}
       {selected&&(
         <div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}>
-          <div style={{background:'var(--hf-surface)',borderRadius:14,padding:28,width:520,boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
+          <div style={{background:'var(--hf-surface)',borderRadius:14,padding:28,width:680,maxWidth:'calc(100vw - 32px)',maxHeight:'90vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
               <h3 style={{margin:0,fontSize:16,fontWeight:700}}>{selected.title}</h3>
               <button onClick={()=>setSelected(null)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--hf-text-faint)',fontSize:20}}>×</button>
@@ -114,6 +137,7 @@ export function RisksTab({projectId}:{projectId:string}) {
                 {action&&<><textarea value={actionNotes} onChange={e=>setActionNotes(e.target.value)} placeholder={`Notes for ${action.toLowerCase()} action…`} style={{...inp,minHeight:60,resize:'vertical' as const,marginBottom:10}}/><button onClick={()=>actionMut.mutate({riskId:selected.id,action,notes:actionNotes})} style={{padding:'8px 16px',background:'var(--hf-primary)',color:'var(--hf-text-on-solid)',border:'none',borderRadius:8,fontSize:13,fontWeight:600,cursor:'pointer'}}>Save Action</button></>}
               </div>
             )}
+            <RiskFollowUp projectId={projectId} risk={selected}/>
           </div>
         </div>
       )}

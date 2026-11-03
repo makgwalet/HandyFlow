@@ -1,243 +1,244 @@
 // src/pages/projects/tabs/TasksTab.tsx
-import React, { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Flag } from 'lucide-react'
+// Tasks as a list or a board (Not started · In progress · In review · Blocked · Completed). Cards can be dragged between columns;
+// a move the workflow does not allow is refused with the reason. Click a task to change its title, priority, assignee (a project
+// member), estimate or notes.
+import React, { useMemo, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Plus, Flag, GripVertical } from 'lucide-react'
 import { apiClient } from '../../../api/client'
+import { usePermission } from '../../../hooks/usePermission'
+import { toast } from '../../../store/toast.store'
+import { errorText } from '../../../api/projectDocs'
+import { Avatar, Btn, Dialog, Empty, ErrorLine, Field, PRIORITY_TONE, Pill, card, day, inp, list, muted, td, th, useMembers } from './pmKit'
 
 interface Task {
-  id:string; taskNumber:string; title:string; status:string; priority:string
-  taskType:string; assigneeName:string|null; plannedStart:string|null; plannedEnd:string|null
-  progressPct:number; estimatedHours:number|null; actualHours:number; isCritical:boolean; isMilestone:boolean
-  phaseId:string|null; notes:string|null
+  id: string; taskNumber: string; title: string; status: string; priority: keyof typeof PRIORITY_TONE
+  taskType: string; assigneeId: string | null; assigneeName: string | null; plannedStart: string | null; plannedEnd: string | null
+  progressPct: number; estimatedHours: number | null; actualHours: number; isCritical: boolean; isMilestone: boolean
+  phaseId: string | null; notes: string | null
 }
-interface Phase { id:string; name:string; status:string }
+interface Phase { id: string; name: string; status: string }
 
-function unwrap<T>(res:any):T[] { const d=res?.data?.data??res?.data??[]; return Array.isArray(d)?d as T[]:d?.content??[] }
-const fmtDate=(d:string|null)=>d?new Date(d).toLocaleDateString('en-ZA'):'—'
-const inp:React.CSSProperties={width:'100%',padding:'9px 12px',border:'1.5px solid var(--hf-border)',borderRadius:9,fontSize:14,boxSizing:'border-box' as const,outline:'none',background:'var(--hf-surface)'}
+const COLUMNS = ['NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'BLOCKED', 'COMPLETED'] as const
+type Col = typeof COLUMNS[number]
+const LABEL: Record<string, string> = { NOT_STARTED: 'Not started', IN_PROGRESS: 'In progress', IN_REVIEW: 'In review', BLOCKED: 'Blocked', COMPLETED: 'Completed', CANCELLED: 'Cancelled' }
+const TONE = { NOT_STARTED: 'neutral', IN_PROGRESS: 'info', IN_REVIEW: 'violet', BLOCKED: 'danger', COMPLETED: 'success', CANCELLED: 'neutral' } as const
 
-const PRIORITY_COLOR:Record<string,{bg:string;color:string}>={
-  LOW:{bg:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)'},MEDIUM:{bg:'var(--hf-info-soft-strong)',color:'var(--hf-info-text)'},
-  HIGH:{bg:'var(--hf-warning-soft-strong)',color:'var(--hf-warning-text-deep)'},CRITICAL:{bg:'var(--hf-danger-soft)',color:'var(--hf-danger-text)'},
+/** The server action that moves a task from one column to another, or why it cannot. */
+export function moveAction(from: string, to: Col): { action: string } | { refuse: string } {
+  if (from === to) return { refuse: '' }
+  if (from === 'COMPLETED' || from === 'CANCELLED') return { refuse: `A ${LABEL[from].toLowerCase()} task cannot be moved` }
+  switch (to) {
+    case 'NOT_STARTED': return { refuse: 'A task that has started cannot go back to Not started' }
+    case 'IN_PROGRESS': return from === 'IN_REVIEW' ? { action: 'RETURN' } : { action: 'START' }
+    case 'IN_REVIEW':   return { action: 'REVIEW' }
+    case 'BLOCKED':     return { action: 'BLOCK' }
+    case 'COMPLETED':   return { action: 'COMPLETE' }
+  }
 }
-const STATUS_COLS=['NOT_STARTED','IN_PROGRESS','BLOCKED','COMPLETED']
-const STATUS_LABELS:Record<string,{label:string;bg:string;color:string}>={
-  NOT_STARTED:{label:'Not Started',bg:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)'},
-  IN_PROGRESS:{label:'In Progress',bg:'var(--hf-info-soft-strong)',color:'var(--hf-info-text)'},
-  BLOCKED:{label:'Blocked',bg:'var(--hf-danger-soft)',color:'var(--hf-danger-text)'},
-  COMPLETED:{label:'Completed',bg:'var(--hf-success-soft-strong)',color:'var(--hf-success-text-strong)'},
-  CANCELLED:{label:'Cancelled',bg:'var(--hf-surface-sunken)',color:'var(--hf-text-faint)'},
-}
 
-export function TasksTab({projectId}:{projectId:string}) {
-  const qc=useQueryClient()
-  const [view,setView]=useState<'kanban'|'list'>('list')
-  const [showCreate,setShowCreate]=useState(false)
-  const [statusFilter,setFilter]=useState('')
-  const [err,setErr]=useState('')
+export function TasksTab({ projectId }: { projectId: string }) {
+  const qc = useQueryClient()
+  const canWrite = usePermission('PM_WRITE')
+  const [view, setView] = useState<'board' | 'list'>('board')
+  const [filter, setFilter] = useState('')
+  const [who, setWho] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [editing, setEditing] = useState<Task | null>(null)
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [over, setOver] = useState<Col | null>(null)
 
-  const initF=()=>({title:'',taskType:'TASK',priority:'MEDIUM',phaseId:'',assigneeName:'',plannedStart:'',plannedEnd:'',estimatedHours:'',notes:'',requiresInspection:false})
-  const [form,setForm]=useState(initF())
-  const sf=(k:string,v:any)=>setForm(p=>({...p,[k]:v}))
+  const { data: tasks = [], isLoading } = useQuery<Task[]>({ queryKey: ['pm-tasks', projectId], queryFn: async () => list<Task>(await apiClient.get(`/api/v1/projects/${projectId}/tasks`)) })
+  const { data: phases = [] } = useQuery<Phase[]>({ queryKey: ['pm-phases', projectId], staleTime: 60_000, queryFn: async () => list<Phase>(await apiClient.get(`/api/v1/projects/${projectId}/phases`)) })
+  const { data: members = [] } = useMembers(projectId)
+  const refresh = () => ['pm-tasks', 'pm-schedule', 'pm-project'].forEach(k => qc.invalidateQueries({ queryKey: [k, projectId] }))
 
-  const {data:tasks=[],isLoading}=useQuery<Task[]>({
-    queryKey:['pm-tasks',projectId],
-    queryFn:async()=>{const r=await apiClient.get(`/api/v1/projects/${projectId}/tasks`);return unwrap<Task>(r)},
-    staleTime:30_000,
-  })
-  const {data:phases=[]}=useQuery<Phase[]>({
-    queryKey:['pm-phases',projectId],
-    queryFn:async()=>{const r=await apiClient.get(`/api/v1/projects/${projectId}/phases`);return unwrap<Phase>(r)},
-    staleTime:60_000,
-  })
+  const act = async (t: Task, action: string) => {
+    try { await apiClient.post(`/api/v1/projects/tasks/${t.id}/status`, { action }); refresh() }
+    catch (e) { toast.error(await errorText(e, 'Could not change the task')) }
+  }
+  const drop = async (col: Col) => {
+    const t = tasks.find(x => x.id === dragId); setDragId(null); setOver(null)
+    if (!t) return
+    const m = moveAction(t.status, col)
+    if ('refuse' in m) { if (m.refuse) toast.info(m.refuse); return }
+    // optimistic: show it in the new column straight away, put it back if the server refuses
+    qc.setQueryData<Task[]>(['pm-tasks', projectId], old => old?.map(x => x.id === t.id ? { ...x, status: col } : x))
+    try { await apiClient.post(`/api/v1/projects/tasks/${t.id}/status`, { action: m.action }); toast.success(`${t.taskNumber} → ${LABEL[col]}`) }
+    catch (e) { toast.error(await errorText(e, 'Could not move the task')) }
+    finally { refresh() }
+  }
 
-  const createMut=useMutation({
-    mutationFn:(body:any)=>apiClient.post(`/api/v1/projects/${projectId}/tasks`,body),
-    onSuccess:()=>{qc.invalidateQueries({queryKey:['pm-tasks',projectId]});qc.invalidateQueries({queryKey:['pm-project']});setShowCreate(false);setForm(initF());setErr('')},
-    onError:(e:any)=>setErr(e.response?.data?.message||'Failed to create task'),
-  })
-
-  const statusMut=useMutation({
-    mutationFn:({taskId,action,pct}:{taskId:string;action:string;pct?:number})=>
-      apiClient.post(`/api/v1/projects/tasks/${taskId}/status`,{action,progressPct:pct??null}),
-    onSuccess:()=>qc.invalidateQueries({queryKey:['pm-tasks',projectId]}),
-  })
-
-  const filtered=statusFilter?tasks.filter(t=>t.status===statusFilter):tasks
+  const shown = useMemo(() => tasks.filter(t => (!filter || t.status === filter) && (!who || (who === 'none' ? !t.assigneeId && !t.assigneeName : t.assigneeId === who))), [tasks, filter, who])
+  const chip = (active: boolean): React.CSSProperties => ({ padding: '5px 11px', borderRadius: 20, fontSize: 12, cursor: 'pointer', fontWeight: active ? 700 : 500,
+    border: active ? '1.5px solid var(--hf-primary)' : '1px solid var(--hf-border)', background: active ? 'var(--hf-info-soft)' : 'var(--hf-surface)', color: active ? 'var(--hf-primary-text)' : 'var(--hf-text-muted)' })
 
   return (
     <div>
-      {/* Toolbar */}
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,gap:10,flexWrap:'wrap' as const}}>
-        <div style={{display:'flex',gap:6}}>
-          {['','NOT_STARTED','IN_PROGRESS','BLOCKED','COMPLETED'].map(s=>(
-            <button key={s} onClick={()=>setFilter(s)}
-              style={{padding:'6px 12px',borderRadius:20,border:statusFilter===s?'1.5px solid var(--hf-primary)':'1px solid var(--hf-border)',background:statusFilter===s?'var(--hf-info-soft)':'var(--hf-surface)',color:statusFilter===s?'var(--hf-primary-text)':'var(--hf-text-muted)',fontSize:12,fontWeight:statusFilter===s?700:400,cursor:'pointer'}}>
-              {s?s.replace('_',' '):'All'}
-            </button>
-          ))}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {view === 'list' && ['', ...COLUMNS, 'CANCELLED'].map(s => <button key={s} onClick={() => setFilter(s)} style={chip(filter === s)}>{s ? LABEL[s] : 'All'}</button>)}
+          <select value={who} onChange={e => setWho(e.target.value)} style={{ ...inp, width: 200 }} aria-label="Assignee">
+            <option value="">Everyone</option><option value="none">Unassigned</option>
+            {members.map(m => <option key={m.userId} value={m.userId}>{m.userName}</option>)}
+          </select>
         </div>
-        <div style={{display:'flex',gap:8}}>
-          {(['list','kanban'] as const).map(v=>(
-            <button key={v} onClick={()=>setView(v)}
-              style={{padding:'6px 12px',borderRadius:8,border:view===v?'1.5px solid var(--hf-primary)':'1px solid var(--hf-border)',background:view===v?'var(--hf-info-soft)':'var(--hf-surface)',color:view===v?'var(--hf-primary-text)':'var(--hf-text-muted)',fontSize:12,cursor:'pointer',fontWeight:view===v?700:400}}>
-              {v==='list'?'≡ List':'⊞ Kanban'}
-            </button>
-          ))}
-          <button onClick={()=>{setShowCreate(true);setErr('')}}
-            style={{display:'flex',alignItems:'center',gap:5,padding:'8px 14px',background:'var(--hf-primary)',color:'var(--hf-text-on-solid)',border:'none',borderRadius:9,fontSize:13,fontWeight:600,cursor:'pointer'}}>
-            <Plus size={14}/> Add Task
-          </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {(['board', 'list'] as const).map(v => <button key={v} onClick={() => setView(v)} style={chip(view === v)}>{v === 'board' ? 'Board' : 'List'}</button>)}
+          {canWrite && <Btn kind="primary" onClick={() => setCreating(true)}><Plus size={14} /> Add task</Btn>}
         </div>
       </div>
 
-      {isLoading ? <div style={{padding:40,textAlign:'center',color:'var(--hf-text-faint)'}}>Loading…</div>
-        : view==='kanban' ? <KanbanView tasks={filtered} onAction={statusMut.mutate}/>
-        : <ListView tasks={filtered} onAction={statusMut.mutate}/>
-      }
-
-      {/* Create Task Modal */}
-      {showCreate && (
-        <div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}>
-          <div style={{background:'var(--hf-surface)',borderRadius:14,padding:28,width:580,maxHeight:'90vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-              <h3 style={{margin:0,fontSize:16,fontWeight:700}}>Add Task</h3>
-              <button onClick={()=>setShowCreate(false)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--hf-text-faint)',fontSize:20}}>×</button>
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-              <Fld label="Title *" span={2}><input value={form.title} onChange={e=>sf('title',e.target.value)} placeholder="Task description" style={inp} autoFocus/></Fld>
-              <Fld label="Type">
-                <select value={form.taskType} onChange={e=>sf('taskType',e.target.value)} style={inp}>
-                  {['TASK','MILESTONE','SUMMARY'].map(t=><option key={t} value={t}>{t}</option>)}
-                </select>
-              </Fld>
-              <Fld label="Priority">
-                <select value={form.priority} onChange={e=>sf('priority',e.target.value)} style={inp}>
-                  {['LOW','MEDIUM','HIGH','CRITICAL'].map(p=><option key={p} value={p}>{p}</option>)}
-                </select>
-              </Fld>
-              {phases.length>0 && (
-                <Fld label="Phase" span={2}>
-                  <select value={form.phaseId} onChange={e=>sf('phaseId',e.target.value)} style={inp}>
-                    <option value="">No phase</option>
-                    {phases.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </Fld>
-              )}
-              <Fld label="Assignee"><input value={form.assigneeName} onChange={e=>sf('assigneeName',e.target.value)} placeholder="Name" style={inp}/></Fld>
-              <Fld label="Estimated Hours"><input type="number" value={form.estimatedHours} onChange={e=>sf('estimatedHours',e.target.value)} placeholder="0" style={inp}/></Fld>
-              <Fld label="Planned Start"><input type="date" value={form.plannedStart} onChange={e=>sf('plannedStart',e.target.value)} style={inp}/></Fld>
-              <Fld label="Planned End"><input type="date" value={form.plannedEnd} onChange={e=>sf('plannedEnd',e.target.value)} style={inp}/></Fld>
-              <Fld label="Notes" span={2}><textarea value={form.notes} onChange={e=>sf('notes',e.target.value)} style={{...inp,minHeight:50,resize:'vertical' as const}}/></Fld>
-            </div>
-            {err&&<div style={{marginTop:10,padding:'8px 12px',background:'var(--hf-danger-soft)',border:'1px solid var(--hf-danger-border)',borderRadius:8,color:'var(--hf-danger-text)',fontSize:13}}>{err}</div>}
-            <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:20}}>
-              <button onClick={()=>setShowCreate(false)} style={{padding:'9px 16px',border:'1px solid var(--hf-border)',borderRadius:9,background:'var(--hf-surface)',fontSize:13,cursor:'pointer'}}>Cancel</button>
-              <button onClick={()=>{
-                if(!form.title.trim()){setErr('Title is required');return}
-                createMut.mutate({title:form.title.trim(),taskType:form.taskType,priority:form.priority,phaseId:form.phaseId||null,assigneeName:form.assigneeName||null,plannedStart:form.plannedStart||null,plannedEnd:form.plannedEnd||null,estimatedHours:form.estimatedHours?parseFloat(form.estimatedHours):null,notes:form.notes||null,requiresInspection:form.requiresInspection})
-              }} disabled={createMut.isPending}
-                style={{padding:'9px 16px',background:'var(--hf-primary)',color:'var(--hf-text-on-solid)',border:'none',borderRadius:9,fontSize:13,fontWeight:600,cursor:'pointer',opacity:createMut.isPending?.6:1}}>
-                {createMut.isPending?'Saving…':'Add Task'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function ListView({tasks,onAction}:{tasks:Task[];onAction:(a:any)=>void}) {
-  if(!tasks.length) return <div style={{textAlign:'center',padding:'50px 20px',color:'var(--hf-text-faint)'}}><div style={{fontWeight:600,color:'var(--hf-text-tertiary)',marginBottom:4}}>No tasks</div><div style={{fontSize:13}}>Click "Add Task" to create your first task</div></div>
-  return (
-    <div style={{border:'1px solid var(--hf-border)',borderRadius:12,overflow:'hidden'}}>
-      <table style={{width:'100%',borderCollapse:'collapse'}}>
-        <thead><tr style={{background:'var(--hf-surface-muted)'}}>
-          {['#','Title','Assignee','Priority','Status','Dates','Progress',''].map(h=>(
-            <th key={h} style={{padding:'10px 14px',textAlign:'left' as const,fontSize:11,fontWeight:700,color:'var(--hf-text-faint)',textTransform:'uppercase' as const,letterSpacing:'0.05em'}}>{h}</th>
-          ))}
-        </tr></thead>
-        <tbody>
-          {tasks.map((t,i)=>{
-            const pr=PRIORITY_COLOR[t.priority]??PRIORITY_COLOR.MEDIUM
-            const st=STATUS_LABELS[t.status]??STATUS_LABELS.NOT_STARTED
+      {isLoading ? <Empty>Loading…</Empty> : view === 'board' ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(190px, 1fr))', gap: 10, overflowX: 'auto' }}>
+          {COLUMNS.map(col => {
+            const items = shown.filter(t => t.status === col)
             return (
-              <tr key={t.id} style={{borderTop:'1px solid var(--hf-border-subtle)',background:i%2===0?'var(--hf-surface)':'var(--hf-surface-muted)'}}>
-                <td style={{padding:'10px 14px',fontSize:12,color:'var(--hf-text-faint)',whiteSpace:'nowrap' as const}}>{t.taskNumber}{t.isCritical&&' 🔴'}{t.isMilestone&&' ◆'}</td>
-                <td style={{padding:'10px 14px',fontSize:13,fontWeight:600,color:'var(--hf-text)',maxWidth:220,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' as const}}>{t.title}</td>
-                <td style={{padding:'10px 14px',fontSize:12,color:'var(--hf-text-muted)'}}>{t.assigneeName??'—'}</td>
-                <td style={{padding:'10px 14px'}}><span style={{background:pr.bg,color:pr.color,fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:20}}>{t.priority}</span></td>
-                <td style={{padding:'10px 14px'}}><span style={{background:st.bg,color:st.color,fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:20}}>{st.label}</span></td>
-                <td style={{padding:'10px 14px',fontSize:11,color:'var(--hf-text-muted)',whiteSpace:'nowrap' as const}}>{fmtDate(t.plannedStart)} → {fmtDate(t.plannedEnd)}</td>
-                <td style={{padding:'10px 14px',minWidth:80}}>
-                  <div style={{height:6,background:'var(--hf-surface-sunken)',borderRadius:3}}>
-                    <div style={{height:'100%',width:`${t.progressPct??0}%`,background:'var(--hf-info)',borderRadius:3}}/>
-                  </div>
-                  <div style={{fontSize:10,color:'var(--hf-text-faint)',marginTop:2}}>{t.progressPct?.toFixed(0)??0}%</div>
-                </td>
-                <td style={{padding:'10px 14px'}}>
-                  <div style={{display:'flex',gap:4}}>
-                    {t.status==='NOT_STARTED'&&<TinyBtn onClick={()=>onAction({taskId:t.id,action:'START'})} color="var(--hf-info-text)" bg="var(--hf-info-soft-strong)">Start</TinyBtn>}
-                    {t.status==='IN_PROGRESS'&&<TinyBtn onClick={()=>onAction({taskId:t.id,action:'COMPLETE'})} color="var(--hf-success-text-strong)" bg="var(--hf-success-soft-strong)">Done</TinyBtn>}
-                    {t.status==='IN_PROGRESS'&&<TinyBtn onClick={()=>onAction({taskId:t.id,action:'BLOCK'})} color="var(--hf-danger-text)" bg="var(--hf-danger-soft)">Block</TinyBtn>}
-                    {t.status==='BLOCKED'&&<TinyBtn onClick={()=>onAction({taskId:t.id,action:'START'})} color="var(--hf-info-text)" bg="var(--hf-info-soft-strong)">Resume</TinyBtn>}
-                  </div>
-                </td>
-              </tr>
+              <div key={col} onDragOver={e => { if (dragId && canWrite) { e.preventDefault(); setOver(col) } }} onDragLeave={() => setOver(o => o === col ? null : o)}
+                onDrop={e => { e.preventDefault(); drop(col) }}
+                style={{ background: over === col ? 'var(--hf-info-soft)' : 'var(--hf-surface-muted)', border: `1px dashed ${over === col ? 'var(--hf-primary)' : 'transparent'}`,
+                  borderRadius: 10, padding: 10, minHeight: 220 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <Pill tone={TONE[col]}>{LABEL[col]}</Pill><span style={{ ...muted, fontWeight: 700 }}>{items.length}</span>
+                </div>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {items.map(t => (
+                    <div key={t.id} draggable={canWrite} onDragStart={e => { setDragId(t.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.id) }}
+                      onDragEnd={() => { setDragId(null); setOver(null) }} onClick={() => setEditing(t)}
+                      style={{ ...card, padding: '9px 10px', cursor: canWrite ? 'grab' : 'pointer', opacity: dragId === t.id ? 0.5 : 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                        <span style={{ ...muted, display: 'inline-flex', alignItems: 'center', gap: 3 }}>{canWrite && <GripVertical size={11} />}{t.taskNumber}
+                          {t.isCritical && <span title="On the critical path" style={{ color: 'var(--hf-danger-text)' }}> ●</span>}{t.isMilestone && <Flag size={10} />}</span>
+                        <Pill tone={PRIORITY_TONE[t.priority] ?? 'info'}>{t.priority}</Pill>
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, lineHeight: 1.35 }}>{t.title}</div>
+                      <div style={{ height: 4, background: 'var(--hf-surface-sunken)', borderRadius: 2, marginBottom: 7 }}>
+                        <div style={{ height: '100%', width: `${t.progressPct ?? 0}%`, background: 'var(--hf-info)', borderRadius: 2 }} /></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--hf-text-muted)' }}>
+                          <Avatar name={t.assigneeName} />{t.assigneeName ?? 'Unassigned'}</span>
+                        <span style={muted}>{t.plannedEnd ? day(t.plannedEnd) : ''}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {items.length === 0 && <div style={{ ...muted, textAlign: 'center', padding: '18px 0' }}>{dragId ? 'Drop here' : 'Nothing here'}</div>}
+                </div>
+              </div>
             )
           })}
-        </tbody>
-      </table>
+        </div>
+      ) : shown.length === 0 ? <Empty>{tasks.length ? 'No tasks match.' : 'No tasks yet. Add the first one.'}</Empty> : (
+        <div style={{ ...card, padding: 0, overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr>{['#', 'Title', 'Assignee', 'Priority', 'Status', 'Dates', 'Progress', ''].map(h => <th key={h} style={th}>{h}</th>)}</tr></thead>
+            <tbody>{shown.map(t => (
+              <tr key={t.id}>
+                <td style={{ ...td, whiteSpace: 'nowrap', color: 'var(--hf-text-muted)' }}>{t.taskNumber}{t.isCritical && <span style={{ color: 'var(--hf-danger-text)' }}> ●</span>}</td>
+                <td style={{ ...td, fontWeight: 600, cursor: 'pointer' }} onClick={() => setEditing(t)}>{t.title}</td>
+                <td style={td}><span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}><Avatar name={t.assigneeName} />{t.assigneeName ?? '—'}</span></td>
+                <td style={td}><Pill tone={PRIORITY_TONE[t.priority] ?? 'info'}>{t.priority}</Pill></td>
+                <td style={td}><Pill tone={TONE[t.status as Col] ?? 'neutral'}>{LABEL[t.status] ?? t.status}</Pill></td>
+                <td style={{ ...td, whiteSpace: 'nowrap', fontSize: 12 }}>{day(t.plannedStart)} → {day(t.plannedEnd)}</td>
+                <td style={{ ...td, minWidth: 80 }}><div style={{ height: 6, background: 'var(--hf-surface-sunken)', borderRadius: 3 }}>
+                  <div style={{ height: '100%', width: `${t.progressPct ?? 0}%`, background: 'var(--hf-info)', borderRadius: 3 }} /></div>
+                  <div style={muted}>{Number(t.progressPct ?? 0).toFixed(0)}%</div></td>
+                <td style={{ ...td, whiteSpace: 'nowrap' }}>{canWrite && <StatusButtons t={t} act={act} />}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
+      {view === 'board' && canWrite && <div style={{ ...muted, marginTop: 8 }}>Drag a card to another column to move it. Moving to Completed sets progress to 100%.</div>}
+
+      {creating && <CreateTask projectId={projectId} phases={phases} onClose={() => setCreating(false)} onDone={refresh} />}
+      {editing && <EditTask projectId={projectId} task={editing} canWrite={canWrite} act={act} onClose={() => setEditing(null)} onDone={refresh} />}
     </div>
   )
 }
 
-function KanbanView({tasks,onAction}:{tasks:Task[];onAction:(a:any)=>void}) {
-  const cols=STATUS_COLS
+function StatusButtons({ t, act }: { t: Task; act: (t: Task, a: string) => void }) {
+  return <span style={{ display: 'inline-flex', gap: 4 }}>
+    {(t.status === 'NOT_STARTED' || t.status === 'BLOCKED') && <Btn small onClick={() => act(t, 'START')}>{t.status === 'BLOCKED' ? 'Resume' : 'Start'}</Btn>}
+    {(t.status === 'IN_PROGRESS') && <Btn small onClick={() => act(t, 'REVIEW')}>Send for review</Btn>}
+    {t.status === 'IN_REVIEW' && <><Btn small kind="ghost" onClick={() => act(t, 'RETURN')}>Send back</Btn><Btn small onClick={() => act(t, 'COMPLETE')}>Sign off</Btn></>}
+    {t.status === 'IN_PROGRESS' && <Btn small kind="ghost" onClick={() => act(t, 'BLOCK')}>Block</Btn>}
+  </span>
+}
+
+function CreateTask({ projectId, phases, onClose, onDone }: { projectId: string; phases: Phase[]; onClose: () => void; onDone: () => void }) {
+  const { data: members = [] } = useMembers(projectId)
+  const [f, setF] = useState({ title: '', taskType: 'TASK', priority: 'MEDIUM', phaseId: '', assigneeId: '', plannedStart: '', plannedEnd: '', estimatedHours: '', notes: '' })
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const set = (k: keyof typeof f, v: string) => setF(p => ({ ...p, [k]: v }))
+  const save = async () => {
+    if (!f.title.trim()) { setErr('Title is required'); return }
+    if (f.plannedStart && f.plannedEnd && f.plannedEnd < f.plannedStart) { setErr('The end date is before the start date'); return }
+    const m = members.find(x => x.userId === f.assigneeId)
+    setBusy(true); setErr('')
+    try {
+      await apiClient.post(`/api/v1/projects/${projectId}/tasks`, { title: f.title.trim(), taskType: f.taskType, priority: f.priority, phaseId: f.phaseId || null,
+        assigneeId: m?.userId ?? null, assigneeName: m?.userName ?? null, plannedStart: f.plannedStart || null, plannedEnd: f.plannedEnd || null,
+        estimatedHours: f.estimatedHours ? Number(f.estimatedHours) : null, notes: f.notes.trim() || null, requiresInspection: false })
+      toast.success('Task added'); onDone(); onClose()
+    } catch (e) { setErr(await errorText(e, 'Could not add the task')) } finally { setBusy(false) }
+  }
+  const g2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }
   return (
-    <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12}}>
-      {cols.map(col=>{
-        const st=STATUS_LABELS[col]
-        const colTasks=tasks.filter(t=>t.status===col)
-        return (
-          <div key={col} style={{background:'var(--hf-surface-muted)',borderRadius:10,padding:12}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-              <span style={{fontSize:12,fontWeight:700,color:st.color}}>{st.label}</span>
-              <span style={{background:st.bg,color:st.color,borderRadius:20,fontSize:11,fontWeight:700,padding:'2px 8px'}}>{colTasks.length}</span>
-            </div>
-            <div style={{display:'flex',flexDirection:'column' as const,gap:8}}>
-              {colTasks.map(t=>{
-                const pr=PRIORITY_COLOR[t.priority]??PRIORITY_COLOR.MEDIUM
-                return (
-                  <div key={t.id} style={{background:'var(--hf-surface)',border:'1px solid var(--hf-border)',borderRadius:8,padding:'10px 12px'}}>
-                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
-                      <span style={{fontSize:10,color:'var(--hf-text-faint)'}}>{t.taskNumber}</span>
-                      <span style={{background:pr.bg,color:pr.color,fontSize:9,fontWeight:700,padding:'1px 6px',borderRadius:20}}>{t.priority}</span>
-                    </div>
-                    <div style={{fontSize:13,fontWeight:600,color:'var(--hf-text)',marginBottom:6}}>{t.title}</div>
-                    {t.assigneeName&&<div style={{fontSize:11,color:'var(--hf-text-muted)',marginBottom:6}}>👤 {t.assigneeName}</div>}
-                    <div style={{height:4,background:'var(--hf-surface-sunken)',borderRadius:2,marginBottom:8}}>
-                      <div style={{height:'100%',width:`${t.progressPct??0}%`,background:'var(--hf-info)',borderRadius:2}}/>
-                    </div>
-                    <div style={{display:'flex',gap:4}}>
-                      {t.status==='NOT_STARTED'&&<TinyBtn onClick={()=>onAction({taskId:t.id,action:'START'})} color="var(--hf-info-text)" bg="var(--hf-info-soft-strong)">Start</TinyBtn>}
-                      {t.status==='IN_PROGRESS'&&<TinyBtn onClick={()=>onAction({taskId:t.id,action:'COMPLETE'})} color="var(--hf-success-text-strong)" bg="var(--hf-success-soft-strong)">Done</TinyBtn>}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )
-      })}
-    </div>
+    <Dialog width={580} title="Add task" onClose={onClose} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Add task'}</Btn></>}>
+      <Field label="Title"><input autoFocus maxLength={500} value={f.title} onChange={e => set('title', e.target.value)} style={inp} /></Field>
+      <div style={g2}>
+        <Field label="Type"><select value={f.taskType} onChange={e => set('taskType', e.target.value)} style={inp}><option value="TASK">Task</option><option value="MILESTONE">Milestone</option><option value="SUMMARY">Summary</option></select></Field>
+        <Field label="Priority"><select value={f.priority} onChange={e => set('priority', e.target.value)} style={inp}>{Object.keys(PRIORITY_TONE).map(p => <option key={p}>{p}</option>)}</select></Field>
+        <Field label="Assignee" hint={members.length ? undefined : 'Add people under Members to assign tasks'}>
+          <select value={f.assigneeId} onChange={e => set('assigneeId', e.target.value)} style={inp}><option value="">Unassigned</option>{members.map(m => <option key={m.userId} value={m.userId}>{m.userName}</option>)}</select></Field>
+        {phases.length > 0 ? <Field label="Phase"><select value={f.phaseId} onChange={e => set('phaseId', e.target.value)} style={inp}><option value="">No phase</option>{phases.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field> : <span />}
+        <Field label="Planned start"><input type="date" value={f.plannedStart} onChange={e => set('plannedStart', e.target.value)} style={inp} /></Field>
+        <Field label="Planned end"><input type="date" value={f.plannedEnd} onChange={e => set('plannedEnd', e.target.value)} style={inp} /></Field>
+        <Field label="Estimated hours"><input type="number" min={0.25} step={0.25} value={f.estimatedHours} onChange={e => set('estimatedHours', e.target.value)} style={inp} /></Field>
+      </div>
+      <Field label="Notes"><textarea rows={2} maxLength={2000} value={f.notes} onChange={e => set('notes', e.target.value)} style={{ ...inp, resize: 'vertical' }} /></Field>
+      {err && <ErrorLine text={err} />}
+    </Dialog>
   )
 }
 
-function TinyBtn({onClick,color,bg,children}:any) {
-  return <button onClick={onClick} style={{padding:'3px 8px',fontSize:10,fontWeight:700,color,background:bg,border:'none',borderRadius:6,cursor:'pointer'}}>{children}</button>
-}
-function Fld({label,children,span}:{label:string;children:React.ReactNode;span?:number}) {
-  return <div style={span?{gridColumn:`span ${span}`}:undefined}><label style={{display:'block',fontSize:12,fontWeight:600,color:'var(--hf-text-secondary)',marginBottom:5}}>{label}</label>{children}</div>
+function EditTask({ projectId, task, canWrite, act, onClose, onDone }:
+  { projectId: string; task: Task; canWrite: boolean; act: (t: Task, a: string) => Promise<void> | void; onClose: () => void; onDone: () => void }) {
+  const { data: members = [] } = useMembers(projectId)
+  const [f, setF] = useState({ title: task.title, priority: task.priority as string, assigneeId: task.assigneeId ?? '', estimatedHours: task.estimatedHours == null ? '' : String(task.estimatedHours), notes: task.notes ?? '' })
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const set = (k: keyof typeof f, v: string) => setF(p => ({ ...p, [k]: v }))
+  const closed = task.status === 'COMPLETED' || task.status === 'CANCELLED'
+  const save = async () => {
+    if (!f.title.trim()) { setErr('Title is required'); return }
+    setBusy(true); setErr('')
+    try {
+      await apiClient.put(`/api/v1/projects/tasks/${task.id}`, {
+        title: f.title.trim() !== task.title ? f.title.trim() : null, priority: f.priority !== task.priority ? f.priority : null,
+        assigneeId: f.assigneeId && f.assigneeId !== task.assigneeId ? f.assigneeId : null, clearAssignee: !f.assigneeId && !!(task.assigneeId || task.assigneeName),
+        estimatedHours: f.estimatedHours !== '' ? Number(f.estimatedHours) : null, notes: f.notes !== (task.notes ?? '') ? f.notes : null })
+      toast.success('Task updated'); onDone(); onClose()
+    } catch (e) { setErr(await errorText(e, 'Could not update the task')) } finally { setBusy(false) }
+  }
+  // a name typed in before members existed: keep showing it until someone is chosen
+  const legacy = task.assigneeName && !task.assigneeId
+  return (
+    <Dialog width={560} title={<span>{task.taskNumber} <span style={{ marginLeft: 6 }}><Pill tone={TONE[task.status as Col] ?? 'neutral'}>{LABEL[task.status] ?? task.status}</Pill></span></span>} onClose={onClose}
+      footer={canWrite ? <><span style={{ marginRight: 'auto' }}>{!closed && <StatusButtons t={task} act={async (t, a) => { await act(t, a); onClose() }} />}</span>
+        <Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save'}</Btn></> : <Btn onClick={onClose}>Close</Btn>}>
+      <Field label="Title"><input disabled={!canWrite} maxLength={500} value={f.title} onChange={e => set('title', e.target.value)} style={inp} /></Field>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <Field label="Assignee" hint={legacy ? `Currently “${task.assigneeName}” (typed in, not a member)` : undefined}>
+          <select disabled={!canWrite} value={f.assigneeId} onChange={e => set('assigneeId', e.target.value)} style={inp}>
+            <option value="">Unassigned</option>{members.map(m => <option key={m.userId} value={m.userId}>{m.userName}</option>)}</select></Field>
+        <Field label="Priority"><select disabled={!canWrite} value={f.priority} onChange={e => set('priority', e.target.value)} style={inp}>{Object.keys(PRIORITY_TONE).map(p => <option key={p}>{p}</option>)}</select></Field>
+        <Field label="Estimated hours" hint={`${Number(task.actualHours ?? 0).toFixed(2)} h logged`}><input disabled={!canWrite} type="number" min={0} step={0.25} value={f.estimatedHours} onChange={e => set('estimatedHours', e.target.value)} style={inp} /></Field>
+        <Field label="Dates" hint="Change dates on the Schedule tab, where links are checked"><div style={{ fontSize: 13, paddingTop: 8 }}>{day(task.plannedStart)} → {day(task.plannedEnd)}</div></Field>
+      </div>
+      <Field label="Notes"><textarea disabled={!canWrite} rows={3} maxLength={4000} value={f.notes} onChange={e => set('notes', e.target.value)} style={{ ...inp, resize: 'vertical' }} /></Field>
+      {err && <ErrorLine text={err} />}
+    </Dialog>
+  )
 }

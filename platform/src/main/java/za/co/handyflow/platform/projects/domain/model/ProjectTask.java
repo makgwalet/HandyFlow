@@ -109,6 +109,23 @@ public class ProjectTask {
         touch();
     }
 
+    /** Work is done and handed to someone to check. */
+    public void submitForReview() {
+        if (!"IN_PROGRESS".equals(status) && !"NOT_STARTED".equals(status) && !"BLOCKED".equals(status))
+            throw new IllegalStateException("Only open work can be sent for review (status: " + status + ")");
+        if (actualStart == null) this.actualStart = LocalDate.now();
+        this.status = "IN_REVIEW";
+        touch();
+    }
+
+    /** The reviewer sends it back. */
+    public void returnFromReview() {
+        if (!"IN_REVIEW".equals(status))
+            throw new IllegalStateException("Task is not in review (status: " + status + ")");
+        this.status = "IN_PROGRESS";
+        touch();
+    }
+
     public void complete() {
         this.status      = "COMPLETED";
         this.actualEnd   = LocalDate.now();
@@ -123,7 +140,8 @@ public class ProjectTask {
             throw new IllegalArgumentException("Progress must be between 0 and 100, got: " + pct);
         this.progressPct = pct;
         if (pct.compareTo(ONE_HUNDRED) == 0)   this.status = "COMPLETED";
-        else if (pct.compareTo(BigDecimal.ZERO) > 0) this.status = "IN_PROGRESS";
+        // progress below 100% leaves a task in review where it is; otherwise it is in progress
+        else if (pct.compareTo(BigDecimal.ZERO) > 0 && !"IN_REVIEW".equals(status)) this.status = "IN_PROGRESS";
         touch();
     }
 
@@ -181,6 +199,12 @@ public class ProjectTask {
     public void setIsCritical(boolean v)      { this.isCritical   = v; touch(); }
     public void setBudgetAmount(BigDecimal v) { this.budgetAmount = v; touch(); }
     public void setNotes(String v)            { this.notes        = v; touch(); }
+    public void setTitle(String v)            { this.title        = v; touch(); }
+    public void setPriority(String v)         { this.priority     = v; touch(); }
+    public void setEstimatedHours(BigDecimal v) {
+        if (v != null && v.signum() < 0) throw new IllegalArgumentException("Estimated hours cannot be negative");
+        this.estimatedHours = v; touch();
+    }
     public void setSortOrder(int v)           { this.sortOrder    = v; }
 
     public void setActualHours(BigDecimal v) {

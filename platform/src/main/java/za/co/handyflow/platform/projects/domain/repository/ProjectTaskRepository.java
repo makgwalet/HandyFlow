@@ -56,6 +56,21 @@ public interface ProjectTaskRepository extends JpaRepository<ProjectTask, UUID> 
             """)
     List<ProjectTask> findMilestones(@Param("projectId") UUID projectId);
 
+    /** Milestones still to be reached in a date window, across the given projects. */
+    @Query("""
+            SELECT t FROM ProjectTask t
+            WHERE t.tenantId = :tenantId
+              AND t.projectId IN :projectIds
+              AND t.isMilestone = true
+              AND t.status NOT IN ('COMPLETED','CANCELLED')
+              AND t.plannedEnd BETWEEN :from AND :to
+            ORDER BY t.plannedEnd
+            """)
+    List<ProjectTask> findMilestonesDue(@Param("tenantId") UUID tenantId,
+                                        @Param("projectIds") java.util.Collection<UUID> projectIds,
+                                        @Param("from") java.time.LocalDate from,
+                                        @Param("to") java.time.LocalDate to);
+
     @Query("SELECT t FROM ProjectTask t WHERE t.tenantId = :tenantId AND t.id = :id")
     Optional<ProjectTask> findByTenantAndId(@Param("tenantId") UUID tenantId,
                                             @Param("id")       UUID id);
