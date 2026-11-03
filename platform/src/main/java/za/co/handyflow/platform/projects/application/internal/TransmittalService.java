@@ -95,7 +95,8 @@ public class TransmittalService {
         }
         if (req.additionalRecipients() != null) specs.addAll(req.additionalRecipients());
         List<TransmittalRecipientResponse> recipients =
-                accessService.issue(tenantId, project, t, items, specs, req.expiryDays(), by, byName);
+                accessService.issue(tenantId, project, t, items, specs, req.expiryDays(),
+                        Boolean.TRUE.equals(req.attachFiles()), by, byName);
 
         log.info("Transmittal {} to '{}' project={} documents={} recipients={}",
                 number, req.recipientName(), projectId, items.size(), recipients.size());

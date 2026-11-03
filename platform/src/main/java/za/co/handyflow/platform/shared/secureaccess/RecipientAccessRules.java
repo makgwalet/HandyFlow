@@ -1,4 +1,4 @@
-package za.co.handyflow.platform.projects.application.internal.document;
+package za.co.handyflow.platform.shared.secureaccess;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -11,8 +11,13 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
- * Pure rules for per-recipient access to transmitted documents — no Spring, no database, so the
+ * Pure rules for per-recipient access to shared documents — no Spring, no database, so the
  * security-relevant parts can be tested on their own.
+ *
+ * REUSE: this class lives in the shared package so Projects, Contracting, Facilities Management and any
+ * other module issue and check links the same way (same token strength, same code limits, same expiry
+ * bounds). A module plugs in by keeping its own recipient and access-log tables and calling these
+ * rules; see PROJECTS-MODULE-BACKLOG.md ("Reusing the access engine").
  *
  * TOKEN: 256 bits from SecureRandom, URL-safe base64 (43 characters). Only its SHA-256 is stored, so a
  * copy of the database does not give anyone a working link. A fast hash is right here because the
@@ -31,6 +36,10 @@ public final class RecipientAccessRules {
     public static final int DEFAULT_EXPIRY_DAYS = 14;
     public static final int MIN_EXPIRY_DAYS     = 1;
     public static final int MAX_EXPIRY_DAYS     = 90;
+
+    /** A registered collaborator's standing link lasts longer than a one-off transmittal link. */
+    public static final int DEFAULT_ACCOUNT_DAYS = 365;
+    public static final int MAX_ACCOUNT_DAYS     = 730;
 
     public static final int OTP_VALID_MINUTES   = 10;
     public static final int OTP_MAX_ATTEMPTS    = 5;
@@ -95,6 +104,11 @@ public final class RecipientAccessRules {
     public static int clampExpiryDays(Integer requested) {
         if (requested == null) return DEFAULT_EXPIRY_DAYS;
         return Math.max(MIN_EXPIRY_DAYS, Math.min(MAX_EXPIRY_DAYS, requested));
+    }
+
+    public static int clampAccountDays(Integer requested) {
+        if (requested == null) return DEFAULT_ACCOUNT_DAYS;
+        return Math.max(MIN_EXPIRY_DAYS, Math.min(MAX_ACCOUNT_DAYS, requested));
     }
 
     /** A link works only before it expires and while it has not been revoked. */

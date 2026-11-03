@@ -192,7 +192,10 @@ public class SecurityConfig {
                                 // Projects transmittal recipients: opened from an emailed link with no login. The link token is the
                                 // credential but never enough alone: every call except the code request needs the session obtained by
                                 // confirming an emailed one-time code (TransmittalAccessService). Rate limited per IP and per link.
-                                "/api/public/projects/transmittals/**"
+                                "/api/public/projects/transmittals/**",
+                                // Projects registered collaborators: a standing link, never enough alone — every call except the code
+                                // request needs the session from confirming an emailed one-time code (CollaboratorAccessService).
+                                "/api/public/projects/collaborators/**"
                         ).permitAll()
                         // Everything else requires authentication
                         .anyRequest().authenticated()

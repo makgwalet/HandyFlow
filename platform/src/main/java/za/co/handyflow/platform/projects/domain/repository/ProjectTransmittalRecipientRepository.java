@@ -3,6 +3,7 @@ package za.co.handyflow.platform.projects.domain.repository;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import za.co.handyflow.platform.projects.domain.model.ProjectTransmittalRecipient;
@@ -45,4 +46,32 @@ public interface ProjectTransmittalRecipientRepository extends JpaRepository<Pro
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM ProjectTransmittalRecipient r WHERE r.tokenHash = :hash")
     Optional<ProjectTransmittalRecipient> findByTokenHashForUpdate(@Param("hash") String hash);
+
+    /** Every recipient row issued to a registered collaborator, newest first (their workspace). */
+    @Query("""
+            SELECT r FROM ProjectTransmittalRecipient r
+            WHERE r.tenantId = :tenantId AND r.collaboratorId = :collaboratorId
+            ORDER BY r.createdAt DESC
+            """)
+    List<ProjectTransmittalRecipient> findByCollaborator(@Param("tenantId") UUID tenantId,
+                                                         @Param("collaboratorId") UUID collaboratorId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT r FROM ProjectTransmittalRecipient r
+            WHERE r.tenantId = :tenantId AND r.collaboratorId = :collaboratorId AND r.id = :id
+            """)
+    Optional<ProjectTransmittalRecipient> findByCollaboratorAndIdForUpdate(@Param("tenantId") UUID tenantId,
+                                                                           @Param("collaboratorId") UUID collaboratorId,
+                                                                           @Param("id") UUID id);
+
+    /** On registration: links the address's existing, not-revoked recipient rows to the new account. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE ProjectTransmittalRecipient r SET r.collaboratorId = :collaboratorId
+            WHERE r.tenantId = :tenantId AND LOWER(r.email) = LOWER(:email)
+              AND r.revokedAt IS NULL AND r.collaboratorId IS NULL
+            """)
+    int linkExisting(@Param("tenantId") UUID tenantId, @Param("email") String email,
+                     @Param("collaboratorId") UUID collaboratorId);
 }

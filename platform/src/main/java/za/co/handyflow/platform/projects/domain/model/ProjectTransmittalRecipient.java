@@ -46,6 +46,8 @@ public class ProjectTransmittalRecipient {
     @Column(name = "email_sent_at")                    private Instant emailSentAt;
     @Column(name = "acknowledged_at")                  private Instant acknowledgedAt;
     @Column(name = "acknowledged_note", length = 500)  private String acknowledgedNote;
+    /** Set when this address belongs to a registered collaborator account (see ProjectCollaborator). */
+    @Column(name = "collaborator_id")                  private UUID collaboratorId;
     @Column(name = "created_by")                       private UUID createdBy;
     @Column(name = "created_by_name")                  private String createdByName;
     @Column(name = "created_at", nullable = false)     private Instant createdAt;
@@ -73,6 +75,8 @@ public class ProjectTransmittalRecipient {
     }
 
     public boolean isRevoked() { return revokedAt != null; }
+
+    public void linkCollaborator(UUID collaboratorId) { this.collaboratorId = collaboratorId; }
 
     /** New link: the old one stops working, and so does any open session and any unused code. */
     public void rotateToken(String newTokenHash, Instant newExpiresAt) {

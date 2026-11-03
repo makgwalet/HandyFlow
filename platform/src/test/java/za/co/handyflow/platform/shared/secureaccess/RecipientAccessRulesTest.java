@@ -1,4 +1,4 @@
-package za.co.handyflow.platform.projects.application.internal.document;
+package za.co.handyflow.platform.shared.secureaccess;
 
 import org.junit.jupiter.api.Test;
 
@@ -102,6 +102,14 @@ class RecipientAccessRulesTest {
         assertEquals(1, RecipientAccessRules.clampExpiryDays(-5));
         assertEquals(30, RecipientAccessRules.clampExpiryDays(30));
         assertEquals(90, RecipientAccessRules.clampExpiryDays(500));
+    }
+
+    @Test
+    void accountDays_defaultAndClamped() {
+        assertEquals(365, RecipientAccessRules.clampAccountDays(null));
+        assertEquals(1, RecipientAccessRules.clampAccountDays(0));
+        assertEquals(400, RecipientAccessRules.clampAccountDays(400));
+        assertEquals(730, RecipientAccessRules.clampAccountDays(5000));
     }
 
     @Test

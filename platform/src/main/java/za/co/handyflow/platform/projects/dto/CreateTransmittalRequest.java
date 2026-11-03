@@ -40,11 +40,14 @@ public record CreateTransmittalRequest(
         @Max(value = 90, message = "Link expiry must not exceed 90 days") Integer expiryDays,
 
         @Size(max = 20, message = "At most 20 additional recipients")
-        List<@Valid TransmittalRecipientRequest> additionalRecipients
+        List<@Valid TransmittalRecipientRequest> additionalRecipients,
+
+        /** Also attach the files to the email. Refused unless an administrator enabled it, and only small files. */
+        Boolean attachFiles
 ) {
     /** Backwards compatible: the earlier shape without expiry or extra recipients. */
     public CreateTransmittalRequest(String subject, String recipientName, String recipientOrganisation,
                                     String recipientEmail, String purpose, String notes, List<UUID> documentIds) {
-        this(subject, recipientName, recipientOrganisation, recipientEmail, purpose, notes, documentIds, null, null);
+        this(subject, recipientName, recipientOrganisation, recipientEmail, purpose, notes, documentIds, null, null, null);
     }
 }

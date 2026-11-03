@@ -91,6 +91,33 @@ public class EmailService {
         }
     }
 
+    /** One file on an email: the name shown, the bytes and the content type. */
+    public record Attachment(String name, byte[] content, String contentType) {}
+
+    /**
+     * Several attachments with their own content types (the single-PDF method above cannot do this).
+     * Async and self-contained like {@link #sendWithAttachment}: a failure is logged, never thrown at a
+     * thread nobody is watching.
+     */
+    @Async("notificationExecutor")
+    public void sendWithAttachments(String to, String subject, String htmlBody, java.util.List<Attachment> attachments) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(htmlBody, true);
+            for (Attachment a : attachments) {
+                helper.addAttachment(a.name(), new ByteArrayResource(a.content()), a.contentType());
+            }
+            mailSender.send(message);
+            log.info("Sent email with {} attachment(s) to={} subject={}", attachments.size(), to, subject);
+        } catch (Exception e) {
+            log.error("Failed to send email with attachments to={}: {}", to, e.getMessage(), e);
+        }
+    }
+
     /**
      * Sends now, on the calling thread, and throws if it fails. For senders that keep their own record of delivery and retry (the recruiter
      * outbox); everyone else keeps using {@link #send} and {@link #sendWithAttachment}, which log a failure and carry on.

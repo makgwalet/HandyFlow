@@ -1,19 +1,23 @@
 package za.co.handyflow.platform.projects.application.internal;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import za.co.handyflow.platform.projects.application.internal.document.RecipientAccessRules;
+import za.co.handyflow.platform.shared.secureaccess.RecipientAccessRules;
+import za.co.handyflow.platform.projects.application.internal.document.DocumentRules;
 import za.co.handyflow.platform.projects.domain.enums.ProjectStatus;
 import za.co.handyflow.platform.projects.domain.model.*;
 import za.co.handyflow.platform.projects.domain.repository.*;
 import za.co.handyflow.platform.projects.dto.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
+import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.RateLimiter;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -64,6 +68,7 @@ public class TransmittalAccessService {
     private final ProjectTransmittalRecipientRepository   recipientRepo;
     private final ProjectTransmittalRecipientItemRepository scopeRepo;
     private final ProjectTransmittalAccessLogRepository   logRepo;
+    private final ProjectCollaboratorRepository           collaboratorRepo;
     private final DocumentService                         documentService;
     private final TransmittalNotificationService          notifications;
     private final RateLimiter                             rateLimiter;
@@ -71,12 +76,21 @@ public class TransmittalAccessService {
     /** For work done in afterCommit: it must NOT join the transaction that has just committed. */
     private final TransactionTemplate                     newTx;
 
+    /** Off by default: links are the standard. When on, small files may also be attached to the email. */
+    @Value("${app.projects.transmittals.attachments.enabled:false}")
+    private boolean attachmentsEnabled;
+    @Value("${app.projects.transmittals.attachments.max-file-bytes:2097152}")
+    private long attachMaxFileBytes;
+    @Value("${app.projects.transmittals.attachments.max-total-bytes:5242880}")
+    private long attachMaxTotalBytes;
+
     public TransmittalAccessService(ProjectRepository projectRepo,
                                     ProjectTransmittalRepository transmittalRepo,
                                     ProjectTransmittalItemRepository itemRepo,
                                     ProjectTransmittalRecipientRepository recipientRepo,
                                     ProjectTransmittalRecipientItemRepository scopeRepo,
                                     ProjectTransmittalAccessLogRepository logRepo,
+                                    ProjectCollaboratorRepository collaboratorRepo,
                                     DocumentService documentService,
                                     TransmittalNotificationService notifications,
                                     RateLimiter rateLimiter,
@@ -87,6 +101,7 @@ public class TransmittalAccessService {
         this.recipientRepo   = recipientRepo;
         this.scopeRepo       = scopeRepo;
         this.logRepo         = logRepo;
+        this.collaboratorRepo = collaboratorRepo;
         this.documentService = documentService;
         this.notifications   = notifications;
         this.rateLimiter     = rateLimiter;
@@ -105,7 +120,7 @@ public class TransmittalAccessService {
     public List<TransmittalRecipientResponse> issue(TenantId tenantId, Project project, ProjectTransmittal t,
                                                     List<ProjectTransmittalItem> items,
                                                     List<TransmittalRecipientRequest> specs,
-                                                    Integer expiryDays, UUID by, String byName) {
+                                                    Integer expiryDays, boolean attach, UUID by, String byName) {
         Set<String> emails = new HashSet<>();
         for (TransmittalRecipientRequest s : specs) {
             if (!emails.add(RecipientAccessRules.normaliseEmail(s.email()))) {
@@ -113,9 +128,10 @@ public class TransmittalAccessService {
                         HttpStatus.BAD_REQUEST, "DUPLICATE_RECIPIENT");
             }
         }
+        Map<UUID, DocumentService.FileDownload> files = attach ? loadAttachments(project, items) : Map.of();
         List<TransmittalRecipientResponse> out = new ArrayList<>();
         for (TransmittalRecipientRequest s : specs) {
-            out.add(createRecipient(tenantId, project, t, items, s, expiryDays, by, byName));
+            out.add(createRecipient(tenantId, project, t, items, s, expiryDays, files, by, byName));
         }
         return out;
     }
@@ -124,7 +140,7 @@ public class TransmittalAccessService {
     @Transactional
     public TransmittalRecipientResponse addRecipient(TenantId tenantId, UUID projectId, UUID transmittalId,
                                                      TransmittalRecipientRequest spec, Integer expiryDays,
-                                                     UUID by, String byName) {
+                                                     boolean attach, UUID by, String byName) {
         Project project = project(tenantId, projectId);
         if (project.getStatus() == ProjectStatus.CLOSED) {
             throw new HandyFlowException("Project is CLOSED — no further access can be granted",
@@ -138,7 +154,26 @@ public class TransmittalAccessService {
                         HttpStatus.CONFLICT, "DUPLICATE_RECIPIENT");
             }
         }
-        return createRecipient(tenantId, project, t, itemRepo.findByTransmittal(t.getId()), spec, expiryDays, by, byName);
+        List<ProjectTransmittalItem> items = itemRepo.findByTransmittal(t.getId());
+        Map<UUID, DocumentService.FileDownload> files = attach ? loadAttachments(project, items) : Map.of();
+        return createRecipient(tenantId, project, t, items, spec, expiryDays, files, by, byName);
+    }
+
+    /**
+     * Transmittals recorded before V577 have a single name and email but no link. This gives that person
+     * a link now (all documents on the transmittal), by the same rules as any other recipient.
+     */
+    @Transactional
+    public TransmittalRecipientResponse issueLegacyRecipient(TenantId tenantId, UUID projectId, UUID transmittalId,
+                                                             Integer expiryDays, UUID by, String byName) {
+        ProjectTransmittal t = transmittal(tenantId, projectId, transmittalId);
+        if (t.getRecipientEmail() == null || t.getRecipientEmail().isBlank()) {
+            throw new HandyFlowException("This transmittal has no email address on record. Add the recipient with their address.",
+                    HttpStatus.BAD_REQUEST, "NO_EMAIL_ON_RECORD");
+        }
+        TransmittalRecipientRequest spec = new TransmittalRecipientRequest(t.getRecipientName(),
+                t.getRecipientOrganisation(), t.getRecipientEmail().trim(), true, true, null);
+        return addRecipient(tenantId, projectId, transmittalId, spec, expiryDays, false, by, byName);
     }
 
     /** A new link for the recipient. The old link, any unused code and any open session stop working. */
@@ -157,7 +192,7 @@ public class TransmittalAccessService {
         r.rotateToken(RecipientAccessRules.hashSecret(token), expiry(expiryDays));
         recipientRepo.save(r);
         log(r, null, null, "LINK_REISSUED", "New link issued; the previous link no longer works", null, byName);
-        queueEmail(t, r, token, visibleItems(r), project.getName());
+        queueEmail(t, r, token, visibleItems(r), project.getName(), List.of());
         return view(r);
     }
 
@@ -216,12 +251,12 @@ public class TransmittalAccessService {
             throw tooMany("Too many codes requested. Please try again later.");
         }
         Object[] res = this.<Object[]>inTx(() -> {
-            Out<ProjectTransmittalRecipient> a = authoriseLink(hash, ctx, true);
-            if (a.error != null) return Out.fail(a.error);
+            AccessOutcome<ProjectTransmittalRecipient> a = authoriseLink(hash, ctx, true);
+            if (a.error != null) return AccessOutcome.fail(a.error);
             ProjectTransmittalRecipient r = a.value;
             Instant now = Instant.now();
             if (!RecipientAccessRules.mayResendOtp(r.getOtpLastSentAt(), now)) {
-                return Out.fail(tooMany("A code was sent a moment ago. Please wait a minute before asking for another."));
+                return AccessOutcome.fail(tooMany("A code was sent a moment ago. Please wait a minute before asking for another."));
             }
             String code = RecipientAccessRules.newOtp();
             r.issueOtp(RecipientAccessRules.hashOtp(r.getId(), code), now,
@@ -230,7 +265,7 @@ public class TransmittalAccessService {
             log(r, null, null, "OTP_REQUESTED", "Code emailed to " + RecipientAccessRules.maskEmail(r.getEmail()), ctx, r.getName());
             String number = transmittalRepo.findByProjectAndId(r.getTenantId(), r.getProjectId(), r.getTransmittalId())
                     .map(ProjectTransmittal::getTransmittalNumber).orElse("your transmittal");
-            return Out.ok(new Object[]{r, code, number});
+            return AccessOutcome.ok(new Object[]{r, code, number});
         });
         ProjectTransmittalRecipient r = (ProjectTransmittalRecipient) res[0];
         notifications.sendOtp(r, (String) res[1], (String) res[2]);          // after the commit
@@ -247,31 +282,31 @@ public class TransmittalAccessService {
         }
         String hash = RecipientAccessRules.hashSecret(token);
         return this.<RecipientPortalDtos.SessionGranted>inTx(() -> {
-            Out<ProjectTransmittalRecipient> a = authoriseLink(hash, ctx, true);
-            if (a.error != null) return Out.fail(a.error);
+            AccessOutcome<ProjectTransmittalRecipient> a = authoriseLink(hash, ctx, true);
+            if (a.error != null) return AccessOutcome.fail(a.error);
             ProjectTransmittalRecipient r = a.value;
             Instant now = Instant.now();
             if (r.getOtpHash() == null || r.getOtpExpiresAt() == null || !r.getOtpExpiresAt().isAfter(now)) {
                 log(r, null, null, "OTP_FAILED", "No valid code (expired or never requested)", ctx, r.getName());
-                return Out.fail(new HandyFlowException("That code has expired. Request a new one.",
+                return AccessOutcome.fail(new HandyFlowException("That code has expired. Request a new one.",
                         HttpStatus.UNPROCESSABLE_ENTITY, "CODE_EXPIRED"));
             }
             if (RecipientAccessRules.otpLocked(r.getOtpAttempts())) {
                 log(r, null, null, "OTP_LOCKED", "Too many wrong codes", ctx, r.getName());
-                return Out.fail(tooMany("Too many wrong codes. Request a new code."));
+                return AccessOutcome.fail(tooMany("Too many wrong codes. Request a new code."));
             }
             if (!RecipientAccessRules.hashesEqual(RecipientAccessRules.hashOtp(r.getId(), code), r.getOtpHash())) {
                 r.registerOtpFailure();
                 recipientRepo.save(r);
                 log(r, null, null, "OTP_FAILED", "Wrong code (attempt " + r.getOtpAttempts() + ")", ctx, r.getName());
-                return Out.fail(new HandyFlowException("That code is not correct", HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_CODE"));
+                return AccessOutcome.fail(new HandyFlowException("That code is not correct", HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_CODE"));
             }
             String session = RecipientAccessRules.newSecret();
             Instant until = now.plus(Duration.ofMinutes(RecipientAccessRules.SESSION_MINUTES));
             r.startSession(RecipientAccessRules.hashSecret(session), until, now);
             recipientRepo.save(r);
             log(r, null, null, "OTP_VERIFIED", "Email address confirmed", ctx, r.getName());
-            return Out.ok(new RecipientPortalDtos.SessionGranted(session, until));
+            return AccessOutcome.ok(new RecipientPortalDtos.SessionGranted(session, until));
         });
     }
 
@@ -279,101 +314,121 @@ public class TransmittalAccessService {
     public RecipientPortalDtos.View view(String token, String session, Ctx ctx) {
         throttleIp(ctx);
         return this.<RecipientPortalDtos.View>inTx(() -> {
-            Out<ProjectTransmittalRecipient> a = authorise(token, session, ctx, false);
-            if (a.error != null) return Out.fail(a.error);
-            ProjectTransmittalRecipient r = a.value;
-            r.touch(Instant.now());
-            recipientRepo.save(r);
-            ProjectTransmittal t = transmittalRepo.findByProjectAndId(r.getTenantId(), r.getProjectId(), r.getTransmittalId())
-                    .orElse(null);
-            if (t == null) return Out.fail(notFoundPublic());
-            String projectName = projectRepo.findByTenantAndId(r.getTenantId(), r.getProjectId())
-                    .map(Project::getName).orElse("");
-            List<RecipientPortalDtos.Document> docs = visibleItems(r).stream()
-                    .map(i -> new RecipientPortalDtos.Document(i.getDocumentId(), i.getDocumentNumber(), i.getTitle(),
-                            i.getRevision(), i.getStatusAtSend(), i.getFileName(), i.getFileSha256(),
-                            r.isCanDownload() && i.getFileSha256() != null))
-                    .toList();
-            log(r, null, null, "VIEWED", docs.size() + " document(s) listed", ctx, r.getName());
-            return Out.ok(new RecipientPortalDtos.View(t.getTransmittalNumber(), t.getSubject(), projectName,
-                    t.getPurpose(), t.getNotes(), t.getSentByName(), t.getSentAt(), r.getName(), r.getExpiresAt(),
-                    r.isCanDownload(), r.isCanAcknowledge(), r.getAcknowledgedAt(), docs));
+            AccessOutcome<ProjectTransmittalRecipient> a = authorise(token, session, ctx, false);
+            if (a.error != null) return AccessOutcome.fail(a.error);
+            return viewOf(a.value, ctx);
         });
+    }
+
+    /**
+     * The view for a recipient who has ALREADY been authorised (by their own link and session, or through a
+     * collaborator workspace). Must run inside a transaction. Reused by CollaboratorAccessService.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public AccessOutcome<RecipientPortalDtos.View> viewOf(ProjectTransmittalRecipient r, Ctx ctx) {
+        r.touch(Instant.now());
+        recipientRepo.save(r);
+        ProjectTransmittal t = transmittalRepo.findByProjectAndId(r.getTenantId(), r.getProjectId(), r.getTransmittalId())
+                .orElse(null);
+        if (t == null) return AccessOutcome.fail(notFoundPublic());
+        String projectName = projectRepo.findByTenantAndId(r.getTenantId(), r.getProjectId())
+                .map(Project::getName).orElse("");
+        List<RecipientPortalDtos.Document> docs = visibleItems(r).stream()
+                .map(i -> new RecipientPortalDtos.Document(i.getDocumentId(), i.getDocumentNumber(), i.getTitle(),
+                        i.getRevision(), i.getStatusAtSend(), i.getFileName(), i.getFileSha256(),
+                        r.isCanDownload() && i.getFileSha256() != null))
+                .toList();
+        log(r, null, null, "VIEWED", docs.size() + " document(s) listed", ctx, r.getName());
+        return AccessOutcome.ok(new RecipientPortalDtos.View(t.getTransmittalNumber(), t.getSubject(), projectName,
+                t.getPurpose(), t.getNotes(), t.getSentByName(), t.getSentAt(), r.getName(), r.getExpiresAt(),
+                r.isCanDownload(), r.isCanAcknowledge(), r.getAcknowledgedAt(), docs));
     }
 
     /** The exact revision that was issued, only if it is assigned to this recipient and they may download. */
     public DocumentService.FileDownload download(String token, String session, UUID documentId, Ctx ctx) {
         throttleIp(ctx);
         return this.<DocumentService.FileDownload>inTx(() -> {
-            Out<ProjectTransmittalRecipient> a = authorise(token, session, ctx, false);
-            if (a.error != null) return Out.fail(a.error);
-            ProjectTransmittalRecipient r = a.value;
-            if (!r.isCanDownload()) {
-                log(r, documentId, null, "ACCESS_REFUSED", "Download not permitted for this recipient", ctx, r.getName());
-                return Out.fail(new HandyFlowException("You can view this transmittal but not download its files",
-                        HttpStatus.FORBIDDEN, "DOWNLOAD_NOT_PERMITTED"));
-            }
-            ProjectTransmittalItem item = visibleItems(r).stream()
-                    .filter(i -> i.getDocumentId().equals(documentId)).findFirst().orElse(null);
-            if (item == null) {                                   // not on the transmittal, or not assigned to this recipient
-                log(r, documentId, null, "ACCESS_REFUSED", "Document not assigned to this recipient", ctx, r.getName());
-                return Out.fail(notFoundPublic());
-            }
-            try {
-                DocumentService.FileDownload file = documentService.downloadIssuedRevision(
-                        r.getTenantId(), r.getProjectId(), documentId, item.getFileSha256(),
-                        r.getName() + " <" + r.getEmail() + ">");
-                r.touch(Instant.now());
-                recipientRepo.save(r);
-                log(r, documentId, item.getRevision(), "DOWNLOADED", item.getFileName(), ctx, r.getName());
-                return Out.ok(file);
-            } catch (HandyFlowException e) {
-                log(r, documentId, item.getRevision(), "DOWNLOAD_FAILED", e.getMessage(), ctx, r.getName());
-                return Out.fail(e);
-            }
+            AccessOutcome<ProjectTransmittalRecipient> a = authorise(token, session, ctx, false);
+            if (a.error != null) return AccessOutcome.fail(a.error);
+            return downloadOf(a.value, documentId, ctx);
         });
+    }
+
+    /** As {@link #viewOf}: for a recipient who has already been authorised. Must run inside a transaction. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public AccessOutcome<DocumentService.FileDownload> downloadOf(ProjectTransmittalRecipient r, UUID documentId, Ctx ctx) {
+        if (!r.isCanDownload()) {
+            log(r, documentId, null, "ACCESS_REFUSED", "Download not permitted for this recipient", ctx, r.getName());
+            return AccessOutcome.fail(new HandyFlowException("You can view this transmittal but not download its files",
+                    HttpStatus.FORBIDDEN, "DOWNLOAD_NOT_PERMITTED"));
+        }
+        ProjectTransmittalItem item = visibleItems(r).stream()
+                .filter(i -> i.getDocumentId().equals(documentId)).findFirst().orElse(null);
+        if (item == null) {                                   // not on the transmittal, or not assigned to this recipient
+            log(r, documentId, null, "ACCESS_REFUSED", "Document not assigned to this recipient", ctx, r.getName());
+            return AccessOutcome.fail(notFoundPublic());
+        }
+        try {
+            DocumentService.FileDownload file = documentService.downloadIssuedRevision(
+                    r.getTenantId(), r.getProjectId(), documentId, item.getFileSha256(),
+                    r.getName() + " <" + r.getEmail() + ">");
+            r.touch(Instant.now());
+            recipientRepo.save(r);
+            log(r, documentId, item.getRevision(), "DOWNLOADED", item.getFileName(), ctx, r.getName());
+            return AccessOutcome.ok(file);
+        } catch (HandyFlowException e) {
+            log(r, documentId, item.getRevision(), "DOWNLOAD_FAILED", e.getMessage(), ctx, r.getName());
+            return AccessOutcome.fail(e);
+        }
     }
 
     /** Recorded once per recipient. When every active recipient has acknowledged, the transmittal itself is acknowledged. */
     public RecipientPortalDtos.View acknowledge(String token, String session, String note, Ctx ctx) {
         throttleIp(ctx);
         this.<Boolean>inTx(() -> {
-            Out<ProjectTransmittalRecipient> a = authorise(token, session, ctx, true);
-            if (a.error != null) return Out.fail(a.error);
-            ProjectTransmittalRecipient r = a.value;
-            if (!r.isCanAcknowledge()) {
-                log(r, null, null, "ACCESS_REFUSED", "Acknowledgement not permitted for this recipient", ctx, r.getName());
-                return Out.fail(new HandyFlowException("You are not able to acknowledge this transmittal",
-                        HttpStatus.FORBIDDEN, "ACK_NOT_PERMITTED"));
-            }
-            if (r.getAcknowledgedAt() != null) {
-                return Out.fail(new HandyFlowException("You have already acknowledged this transmittal",
-                        HttpStatus.CONFLICT, "ALREADY_ACKNOWLEDGED"));
-            }
-            r.acknowledge(note == null || note.isBlank() ? null : note.trim(), Instant.now());
-            recipientRepo.save(r);
-            log(r, null, null, "ACKNOWLEDGED", note, ctx, r.getName());
-
-            List<ProjectTransmittalRecipient> active = recipientRepo.findByTransmittal(r.getTenantId(), r.getTransmittalId())
-                    .stream().filter(x -> !x.isRevoked()).toList();
-            if (active.stream().allMatch(x -> x.getAcknowledgedAt() != null)) {
-                transmittalRepo.findByProjectAndIdForUpdate(r.getTenantId(), r.getProjectId(), r.getTransmittalId()).ifPresent(t -> {
-                    if (t.getAcknowledgedAt() == null) {
-                        t.acknowledge(active.size() == 1 ? r.getName() : "All " + active.size() + " recipients");
-                        transmittalRepo.save(t);
-                    }
-                });
-            }
-            return Out.ok(Boolean.TRUE);
+            AccessOutcome<ProjectTransmittalRecipient> a = authorise(token, session, ctx, true);
+            if (a.error != null) return AccessOutcome.fail(a.error);
+            return acknowledgeOf(a.value, note, ctx);
         });
         return view(token, session, ctx);
+    }
+
+    /** As {@link #viewOf}: for a recipient who has already been authorised. The caller must hold the recipient row lock. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public AccessOutcome<Boolean> acknowledgeOf(ProjectTransmittalRecipient r, String note, Ctx ctx) {
+        if (!r.isCanAcknowledge()) {
+            log(r, null, null, "ACCESS_REFUSED", "Acknowledgement not permitted for this recipient", ctx, r.getName());
+            return AccessOutcome.fail(new HandyFlowException("You are not able to acknowledge this transmittal",
+                    HttpStatus.FORBIDDEN, "ACK_NOT_PERMITTED"));
+        }
+        if (r.getAcknowledgedAt() != null) {
+            return AccessOutcome.fail(new HandyFlowException("You have already acknowledged this transmittal",
+                    HttpStatus.CONFLICT, "ALREADY_ACKNOWLEDGED"));
+        }
+        r.acknowledge(note == null || note.isBlank() ? null : note.trim(), Instant.now());
+        recipientRepo.save(r);
+        log(r, null, null, "ACKNOWLEDGED", note, ctx, r.getName());
+
+        List<ProjectTransmittalRecipient> active = recipientRepo.findByTransmittal(r.getTenantId(), r.getTransmittalId())
+                .stream().filter(x -> !x.isRevoked()).toList();
+        if (active.stream().allMatch(x -> x.getAcknowledgedAt() != null)) {
+            transmittalRepo.findByProjectAndIdForUpdate(r.getTenantId(), r.getProjectId(), r.getTransmittalId()).ifPresent(t -> {
+                if (t.getAcknowledgedAt() == null) {
+                    t.acknowledge(active.size() == 1 ? r.getName() : "All " + active.size() + " recipients");
+                    transmittalRepo.save(t);
+                }
+            });
+        }
+        return AccessOutcome.ok(Boolean.TRUE);
     }
 
     // ══ Internals ═════════════════════════════════════════════════════════════
 
     private TransmittalRecipientResponse createRecipient(TenantId tenantId, Project project, ProjectTransmittal t,
                                                          List<ProjectTransmittalItem> items, TransmittalRecipientRequest s,
-                                                         Integer expiryDays, UUID by, String byName) {
+                                                         Integer expiryDays,
+                                                         Map<UUID, DocumentService.FileDownload> files,
+                                                         UUID by, String byName) {
         Map<UUID, ProjectTransmittalItem> byDocument = items.stream()
                 .collect(Collectors.toMap(ProjectTransmittalItem::getDocumentId, i -> i, (a, b) -> a));
         List<ProjectTransmittalItem> scoped = new ArrayList<>();
@@ -398,23 +453,34 @@ public class TransmittalAccessService {
         if (!all) {
             scopeRepo.saveAll(scoped.stream().map(i -> ProjectTransmittalRecipientItem.of(r.getId(), i.getId())).toList());
         }
+        // A registered collaborator account with this address sees the transmittal in their workspace as well.
+        collaboratorRepo.findActiveByEmail(tenantId.getValue(), r.getEmail()).ifPresent(c -> {
+            r.linkCollaborator(c.getId());
+            recipientRepo.save(r);
+        });
         log(r, null, null, "LINK_ISSUED", "Link valid until " + r.getExpiresAt()
-                + (all ? ", all documents" : ", " + scoped.size() + " document(s)"), null, byName);
-        queueEmail(t, r, token, all ? items : scoped, project.getName());
+                + (all ? ", all documents" : ", " + scoped.size() + " document(s)")
+                + (r.getCollaboratorId() != null ? ", registered collaborator" : ""), null, byName);
+        List<ProjectTransmittalItem> visible = all ? items : scoped;
+        List<EmailService.Attachment> attachments = attachmentsFor(r, visible, files);
+        queueEmail(t, r, token, visible, project.getName(), attachments);
         return TransmittalRecipientResponse.of(r, all ? List.of() : scoped.stream().map(ProjectTransmittalItem::getId).toList(), Instant.now());
     }
 
     /** Sends only after the surrounding transaction commits, so a rolled-back transmittal never emails a dead link. */
     private void queueEmail(ProjectTransmittal t, ProjectTransmittalRecipient r, String token,
-                            List<ProjectTransmittalItem> items, String projectName) {
+                            List<ProjectTransmittalItem> items, String projectName,
+                            List<EmailService.Attachment> attachments) {
+        String attached = attachments.isEmpty() ? "" : "; " + attachments.size() + " file(s) attached: "
+                + attachments.stream().map(EmailService.Attachment::name).collect(Collectors.joining(", "));
         Runnable send = () -> {
             try {
-                boolean queued = notifications.sendTransmittal(t, r, token, items, projectName);
+                boolean queued = notifications.sendTransmittal(t, r, token, items, projectName, attachments);
                 newTx.executeWithoutResult(s -> {
                     recipientRepo.findById(r.getId()).ifPresent(x -> {
                         if (queued) { x.markEmailSent(Instant.now()); recipientRepo.save(x); }
                         log(x, null, null, queued ? "EMAIL_QUEUED" : "EMAIL_NOT_SENT",
-                                queued ? "Link emailed to " + RecipientAccessRules.maskEmail(x.getEmail())
+                                queued ? "Link emailed to " + RecipientAccessRules.maskEmail(x.getEmail()) + attached
                                        : "Notifications are switched off; no email was sent", null, "System");
                     });
                 });
@@ -431,6 +497,61 @@ public class TransmittalAccessService {
         }
     }
 
+    /**
+     * Reads the issued revision of every stored file ONCE (each read is written to the document's trail),
+     * checking the switch and the size caps. Nothing is attached unless an administrator turned
+     * app.projects.transmittals.attachments.enabled on AND the sender asked for it on this transmittal.
+     */
+    private Map<UUID, DocumentService.FileDownload> loadAttachments(Project project, List<ProjectTransmittalItem> items) {
+        if (!attachmentsEnabled) {
+            throw new HandyFlowException("Attaching files to the email is switched off. Recipients receive a secure link instead.",
+                    HttpStatus.BAD_REQUEST, "ATTACHMENTS_DISABLED");
+        }
+        Map<UUID, DocumentService.FileDownload> files = new LinkedHashMap<>();
+        for (ProjectTransmittalItem i : items) {
+            if (i.getFileSha256() == null) {
+                throw new HandyFlowException(label(i) + " is a link, not a stored file, so it cannot be attached",
+                        HttpStatus.BAD_REQUEST, "NOT_ATTACHABLE");
+            }
+            DocumentService.FileDownload f = documentService.downloadIssuedRevision(
+                    project.getTenantId(), project.getId(), i.getDocumentId(), i.getFileSha256(), "Emailed as attachment");
+            if (f.content().length > attachMaxFileBytes) {
+                throw new HandyFlowException(label(i) + " is " + (f.content().length / 1024) + " KB, over the "
+                        + (attachMaxFileBytes / 1024) + " KB limit for attachments. Send a secure link instead.",
+                        HttpStatus.BAD_REQUEST, "ATTACHMENT_TOO_LARGE");
+            }
+            files.put(i.getDocumentId(), f);
+        }
+        return files;
+    }
+
+    /** The files this recipient may receive: only their assigned documents, and only if they may download. */
+    private List<EmailService.Attachment> attachmentsFor(ProjectTransmittalRecipient r, List<ProjectTransmittalItem> visible,
+                                                         Map<UUID, DocumentService.FileDownload> files) {
+        if (files.isEmpty() || !r.isCanDownload()) return List.of();
+        List<EmailService.Attachment> out = new ArrayList<>();
+        long total = 0;
+        for (ProjectTransmittalItem i : visible) {
+            DocumentService.FileDownload f = files.get(i.getDocumentId());
+            if (f == null) continue;
+            total += f.content().length;
+            String prefix = (i.getDocumentNumber() != null ? i.getDocumentNumber() : "doc")
+                    + (i.getRevision() != null ? " rev " + i.getRevision() : "") + " - ";
+            out.add(new EmailService.Attachment(DocumentRules.safeFileName(prefix + f.fileName()), f.content(), f.contentType()));
+        }
+        if (total > attachMaxTotalBytes) {
+            throw new HandyFlowException("The files for " + r.getName() + " total " + (total / 1024) + " KB, over the "
+                    + (attachMaxTotalBytes / 1024) + " KB limit for one email. Send a secure link instead.",
+                    HttpStatus.BAD_REQUEST, "ATTACHMENT_TOO_LARGE");
+        }
+        return out;
+    }
+
+    private static String label(ProjectTransmittalItem i) {
+        return (i.getDocumentNumber() != null ? i.getDocumentNumber() : i.getTitle())
+                + (i.getRevision() != null ? " rev " + i.getRevision() : "");
+    }
+
     private List<ProjectTransmittalItem> visibleItems(ProjectTransmittalRecipient r) {
         List<ProjectTransmittalItem> all = itemRepo.findByTransmittal(r.getTransmittalId());
         Set<UUID> scope = new HashSet<>(scopeRepo.findItemIds(r.getId()));
@@ -438,22 +559,22 @@ public class TransmittalAccessService {
     }
 
     /** Link checks only: format, known, not expired, not revoked. Used before a session exists. */
-    private Out<ProjectTransmittalRecipient> authoriseLink(String hash, Ctx ctx, boolean lock) {
+    private AccessOutcome<ProjectTransmittalRecipient> authoriseLink(String hash, Ctx ctx, boolean lock) {
         Optional<ProjectTransmittalRecipient> o = lock ? recipientRepo.findByTokenHashForUpdate(hash) : recipientRepo.findByTokenHash(hash);
-        if (o.isEmpty()) return Out.fail(notFoundPublic());
+        if (o.isEmpty()) return AccessOutcome.fail(notFoundPublic());
         ProjectTransmittalRecipient r = o.get();
         if (!RecipientAccessRules.linkUsable(r.getExpiresAt(), r.getRevokedAt(), Instant.now())) {
             log(r, null, null, "ACCESS_REFUSED", r.isRevoked() ? "Link revoked" : "Link expired", ctx, r.getName());
-            return Out.fail(new HandyFlowException("This link has expired or was withdrawn. Ask the sender to issue a new one.",
+            return AccessOutcome.fail(new HandyFlowException("This link has expired or was withdrawn. Ask the sender to issue a new one.",
                     HttpStatus.GONE, "LINK_UNAVAILABLE"));
         }
-        return Out.ok(r);
+        return AccessOutcome.ok(r);
     }
 
     /** Link AND session. */
-    private Out<ProjectTransmittalRecipient> authorise(String token, String session, Ctx ctx, boolean lock) {
-        if (!RecipientAccessRules.secretFormatOk(token)) return Out.fail(notFoundPublic());
-        Out<ProjectTransmittalRecipient> a = authoriseLink(RecipientAccessRules.hashSecret(token), ctx, lock);
+    private AccessOutcome<ProjectTransmittalRecipient> authorise(String token, String session, Ctx ctx, boolean lock) {
+        if (!RecipientAccessRules.secretFormatOk(token)) return AccessOutcome.fail(notFoundPublic());
+        AccessOutcome<ProjectTransmittalRecipient> a = authoriseLink(RecipientAccessRules.hashSecret(token), ctx, lock);
         if (a.error != null) return a;
         ProjectTransmittalRecipient r = a.value;
         boolean ok = session != null && RecipientAccessRules.secretFormatOk(session)
@@ -461,10 +582,10 @@ public class TransmittalAccessService {
                 && RecipientAccessRules.hashesEqual(RecipientAccessRules.hashSecret(session), r.getSessionHash());
         if (!ok) {
             if (session != null) log(r, null, null, "ACCESS_REFUSED", "Session invalid or expired", ctx, r.getName());
-            return Out.fail(new HandyFlowException("Please confirm your email address to continue",
+            return AccessOutcome.fail(new HandyFlowException("Please confirm your email address to continue",
                     HttpStatus.UNAUTHORIZED, "VERIFICATION_REQUIRED"));
         }
-        return Out.ok(r);
+        return AccessOutcome.ok(r);
     }
 
     private void log(ProjectTransmittalRecipient r, UUID documentId, String revision, String action, String detail,
@@ -496,17 +617,8 @@ public class TransmittalAccessService {
         return transmittalRepo.findByProjectAndId(tenantId.getValue(), projectId, id).orElseThrow(() -> notFound("Transmittal"));
     }
 
-    // Outcome of a transaction body: a value, or the error to throw once the transaction has committed.
-    private static final class Out<T> {
-        final T value;
-        final HandyFlowException error;
-        private Out(T value, HandyFlowException error) { this.value = value; this.error = error; }
-        static <T> Out<T> ok(T v) { return new Out<>(v, null); }
-        static <T> Out<T> fail(HandyFlowException e) { return new Out<>(null, e); }
-    }
-
-    private <T> T inTx(Supplier<Out<T>> body) {
-        Out<T> out = tx.execute(status -> body.get());
+    private <T> T inTx(Supplier<AccessOutcome<T>> body) {
+        AccessOutcome<T> out = tx.execute(status -> body.get());
         if (out == null) throw new IllegalStateException("Transaction returned no outcome");
         if (out.error != null) throw out.error;                  // thrown AFTER the commit, so the log rows persist
         return out.value;

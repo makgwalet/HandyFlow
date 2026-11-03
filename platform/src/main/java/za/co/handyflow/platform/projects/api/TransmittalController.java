@@ -81,9 +81,20 @@ public class TransmittalController {
     @Operation(summary = "Give one more recipient their own secure link (emailed; never attached)")
     public ResponseEntity<ApiResponse<TransmittalRecipientResponse>> addRecipient(
             @PathVariable UUID projectId, @PathVariable UUID id,
-            @Valid @RequestBody TransmittalRecipientRequest req, @RequestParam(required = false) Integer expiryDays) {
+            @Valid @RequestBody TransmittalRecipientRequest req, @RequestParam(required = false) Integer expiryDays,
+            @RequestParam(defaultValue = "false") boolean attachFiles) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Recipient added",
-                accessService.addRecipient(TenantContext.getTenantIdAsObject(), projectId, id, req, expiryDays,
+                accessService.addRecipient(TenantContext.getTenantIdAsObject(), projectId, id, req, expiryDays, attachFiles,
+                        TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
+    }
+
+    @PostMapping("/{id}/legacy-link")
+    @PreAuthorize("hasAuthority('PM_WRITE')")
+    @Operation(summary = "For a transmittal recorded before secure links existed: send its recorded recipient a link now")
+    public ResponseEntity<ApiResponse<TransmittalRecipientResponse>> legacyLink(
+            @PathVariable UUID projectId, @PathVariable UUID id, @RequestParam(required = false) Integer expiryDays) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Link sent",
+                accessService.issueLegacyRecipient(TenantContext.getTenantIdAsObject(), projectId, id, expiryDays,
                         TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
     }
 
