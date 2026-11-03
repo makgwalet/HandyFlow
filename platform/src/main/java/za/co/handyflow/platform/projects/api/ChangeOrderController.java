@@ -4,12 +4,16 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import za.co.handyflow.platform.evidence.application.EvidenceFacade;
 import za.co.handyflow.platform.evidence.dto.EvidenceResponse;
 import za.co.handyflow.platform.projects.application.internal.ChangeApplicationService;
 import za.co.handyflow.platform.projects.application.internal.ChangeOrderService;
@@ -18,6 +22,7 @@ import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 
@@ -183,6 +188,17 @@ public class ChangeOrderController {
     @Operation(summary = "Supporting evidence attached to a change order")
     public ResponseEntity<ApiResponse<List<EvidenceResponse>>> attachments(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Success", changeOrderService.getAttachments(tenant(), id)));
+    }
+
+    @GetMapping("/change-orders/{id}/attachments/{evidenceId}/download")
+    @PreAuthorize("hasAuthority('PM_READ')")
+    @Operation(summary = "Download one file attached to a change order")
+    public ResponseEntity<byte[]> downloadAttachment(@PathVariable UUID id, @PathVariable UUID evidenceId) {
+        EvidenceFacade.DownloadedEvidence f = changeOrderService.downloadAttachment(tenant(), id, evidenceId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(f.fileName(), StandardCharsets.UTF_8).build().toString())
+                .contentType(MediaType.parseMediaType(f.contentType() == null ? "application/octet-stream" : f.contentType()))
+                .body(f.content());
     }
 
     private static TenantId tenant() { return TenantContext.getTenantIdAsObject(); }

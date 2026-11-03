@@ -20,7 +20,8 @@ public record TimeEntryResponse(
         String      status,
         String      approvedBy,
         Instant approvedAt,
-        Instant     createdAt
+        Instant     createdAt,
+        UUID        userId
 ) {
     public static TimeEntryResponse of(TimeEntry t) {
         return new TimeEntryResponse(
@@ -28,6 +29,6 @@ public record TimeEntryResponse(
                 t.getEntryDate(), t.getHours(), t.getDescription(),
                 t.getLatitude(), t.getLongitude(), t.getStatus(),
                 t.getApprovedBy() != null ? t.getApprovedBy().toString() : null,
-                t.getApprovedAt(), t.getCreatedAt());
+                t.getApprovedAt(), t.getCreatedAt(), t.getUserId());
     }
 }

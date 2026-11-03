@@ -274,7 +274,7 @@ public class ProjectController {
     public ResponseEntity<ApiResponse<TimeEntryResponse>> rejectTime(@PathVariable UUID entryId) {
         return ResponseEntity.ok(ApiResponse.success("Rejected",
                 TimeEntryResponse.of(projectService.approveTime(
-                        TenantContext.getTenantIdAsObject(), entryId, null, false))));
+                        TenantContext.getTenantIdAsObject(), entryId, TenantContext.getCurrentUserId(), false))));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

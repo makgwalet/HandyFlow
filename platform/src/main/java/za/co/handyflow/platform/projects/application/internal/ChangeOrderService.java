@@ -405,6 +405,16 @@ public class ChangeOrderService {
         return evidenceFacade.listFor(tenantId, "projects", "ChangeOrder", co.getId());
     }
 
+    /** One attached file, only if it is attached to THIS change order. */
+    @Transactional(readOnly = true)
+    public EvidenceFacade.DownloadedEvidence downloadAttachment(TenantId tenantId, UUID id, UUID evidenceId) {
+        ChangeOrder co = find(tenantId, id);
+        boolean attached = evidenceFacade.listFor(tenantId, "projects", "ChangeOrder", co.getId()).stream()
+                .anyMatch(e -> e.id().equals(evidenceId));
+        if (!attached) throw notFound("Attachment");
+        return evidenceFacade.download(tenantId, evidenceId);
+    }
+
     // ── Validation helpers ────────────────────────────────────────────────────
 
     private List<Problem> validateForApplication(TenantId tenantId, ChangeOrder co) {

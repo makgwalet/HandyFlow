@@ -3,7 +3,9 @@ import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, TrendingUp } from 'lucide-react'
 import { apiClient } from '../../../api/client'
+import { toast } from '../../../store/toast.store'
 import type { Project } from '../ProjectDetailTab'
+import { CostPosition, CostLedger, BudgetRevisions } from './CostControl'
 
 interface BudgetLine { id:string; category:string; description:string; budgetedAmount:number; committedAmount:number; actualAmount:number; variance:number; isProvisional:boolean; isPrimeCost:boolean }
 interface EVM { totalBudget:number; totalActual:number; totalCommitted:number; totalVariance:number; completionPct:number; plannedValue:number; earnedValue:number; actualCost:number; spi:number; cpi:number; eac:number; etc:number }
@@ -18,7 +20,30 @@ const CAT_COLOR:Record<string,{bg:string;color:string}>={
   OVERHEAD:{bg:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)'},CONTINGENCY:{bg:'var(--hf-danger-soft)',color:'var(--hf-danger-text)'},
 }
 
+type BudgetView='lines'|'position'|'ledger'|'history'
+const VIEWS:{key:BudgetView;label:string}[]=[{key:'lines',label:'Budget lines'},{key:'position',label:'Cost position'},{key:'ledger',label:'Ledger'},{key:'history',label:'Revisions & transfers'}]
+
 export function BudgetTab({projectId,project}:{projectId:string;project:Project}) {
+  const [view,setView]=useState<BudgetView>('lines')
+  return (
+    <div>
+      <div role="tablist" style={{display:'inline-flex',gap:2,padding:3,background:'var(--hf-surface-sunken)',borderRadius:10,marginBottom:16,flexWrap:'wrap'}}>
+        {VIEWS.map(v=>(
+          <button key={v.key} role="tab" aria-selected={view===v.key} onClick={()=>setView(v.key)}
+            style={{padding:'6px 12px',border:'none',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,
+              background:view===v.key?'var(--hf-surface)':'transparent',color:view===v.key?'var(--hf-text)':'var(--hf-text-muted)',
+              boxShadow:view===v.key?'var(--hf-shadow-sm, 0 1px 2px rgba(0,0,0,.08))':'none'}}>{v.label}</button>
+        ))}
+      </div>
+      {view==='lines'&&<BudgetLines projectId={projectId} project={project}/>}
+      {view==='position'&&<CostPosition projectId={projectId}/>}
+      {view==='ledger'&&<CostLedger projectId={projectId}/>}
+      {view==='history'&&<BudgetRevisions projectId={projectId}/>}
+    </div>
+  )
+}
+
+function BudgetLines({projectId,project}:{projectId:string;project:Project}) {
   const qc=useQueryClient()
   const [showAdd,setShowAdd]=useState(false)
   const [err,setErr]=useState('')
@@ -47,7 +72,8 @@ export function BudgetTab({projectId,project}:{projectId:string;project:Project}
   })
   const delMut=useMutation({
     mutationFn:(id:string)=>apiClient.delete(`/api/v1/projects/budget/${id}`),
-    onSuccess:()=>qc.invalidateQueries({queryKey:['pm-budget',projectId]}),
+    onSuccess:()=>{qc.invalidateQueries({queryKey:['pm-budget',projectId]});qc.invalidateQueries({queryKey:['pm-cost-summary',projectId]})},
+    onError:(e:any)=>toast.error(e?.response?.data?.message||'Could not remove the budget line'),
   })
 
   const totalBudget=lines.reduce((s,l)=>s+l.budgetedAmount,0)
@@ -103,7 +129,7 @@ export function BudgetTab({projectId,project}:{projectId:string;project:Project}
                       {l.isProvisional&&<span style={{background:'var(--hf-warning-soft-strong)',color:'var(--hf-warning-text-deep)',padding:'1px 6px',borderRadius:20,fontSize:10,fontWeight:700,marginRight:4}}>PS</span>}
                       {l.isPrimeCost&&<span style={{background:'var(--hf-violet-soft-strong)',color:'var(--hf-violet-text)',padding:'1px 6px',borderRadius:20,fontSize:10,fontWeight:700}}>PC</span>}
                     </td>
-                    <td style={{padding:'10px 14px'}}><button onClick={()=>delMut.mutate(l.id)} style={{fontSize:11,color:'var(--hf-danger-text)',background:'none',border:'none',cursor:'pointer'}}>×</button></td>
+                    <td style={{padding:'10px 14px'}}><button onClick={()=>{if(window.confirm(`Remove the budget line “${l.description}”?`))delMut.mutate(l.id)}} style={{fontSize:11,color:'var(--hf-danger-text)',background:'none',border:'none',cursor:'pointer'}}>×</button></td>
                   </tr>
                 )
               })}

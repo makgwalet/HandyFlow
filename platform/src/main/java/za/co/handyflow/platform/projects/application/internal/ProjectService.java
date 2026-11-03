@@ -401,9 +401,27 @@ public class ProjectService {
                                  UUID approverId, boolean approve) {
         TimeEntry t = timeRepo.findByTenantAndId(tenantId.getValue(), entryId)
                 .orElseThrow(() -> notFound("Time entry"));
+        // the interceptor already checks the entry's project; checked again so no other caller can skip it
+        accessGuard.requireView(tenantId.getValue(), t.getProjectId());
+        if (!"SUBMITTED".equals(t.getStatus())) {
+            throw new HandyFlowException("This time entry has already been " + t.getStatus().toLowerCase(),
+                    HttpStatus.CONFLICT, "TIME_ALREADY_DECIDED");
+        }
+        if (approverId != null && approverId.equals(t.getUserId())) {
+            throw new HandyFlowException("You cannot approve or reject your own time",
+                    HttpStatus.FORBIDDEN, "TIME_SELF_APPROVAL");
+        }
         if (approve) t.approve(approverId);
         else         t.reject();
-        return timeRepo.save(t);
+        TimeEntry saved = timeRepo.save(t);
+        if (!approve && t.getTaskId() != null) {
+            // rejected hours no longer count towards the task's actual hours
+            taskRepo.findByTenantAndId(tenantId.getValue(), t.getTaskId()).ifPresent(task -> {
+                task.setActualHours(timeRepo.sumHoursByTask(task.getId()));
+                taskRepo.save(task);
+            });
+        }
+        return saved;
     }
 
     @Transactional(readOnly = true)

@@ -1,9 +1,9 @@
 // src/pages/projects/ProjectDetailTab.tsx
-// 9-tab detail view. Added: RFI tab, PDF export links on Budget/Field/Risks tabs.
+// Project detail: overview, schedule, tasks, resources, budget & cost control, change orders, time, risks, documents, transmittals, field, RFI, client portal, lifecycle.
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
-import { ChevronLeft, Play, Pause, CheckCircle, ExternalLink, Download } from 'lucide-react'
+import { ChevronLeft, Download } from 'lucide-react'
 import { OverviewTab }      from './tabs/OverviewTab'
 import { GanttTab }         from './tabs/GanttTab'
 import { TasksTab }         from './tabs/TasksTab'
@@ -13,6 +13,11 @@ import { RisksTab }         from './tabs/RisksTab'
 import { DocumentsTab }     from './tabs/DocumentsTab'
 import { FieldTab }         from './tabs/FieldTab'
 import { RfiTab }           from './tabs/RfiTab'
+import { ChangeOrdersTab }  from './tabs/ChangeOrdersTab'
+import { TimeTab }          from './tabs/TimeTab'
+import { PortalAccessTab }  from './tabs/PortalAccessTab'
+import { TransmittalsTab }  from './tabs/TransmittalsTab'
+import { LifecycleActions, LifecycleTab } from './tabs/Lifecycle'
 import { TabErrorBoundary } from './TabErrorBoundary'
 
 export interface Project {
@@ -25,16 +30,19 @@ export interface Project {
   contractValue: number | null; contractRef: string | null; retentionPct: number
   cidbGrade: string | null; nhbrcNumber: string | null
   projectManagerName: string | null; clientPortalToken: string | null; notes: string | null
+  portalEnabled?: boolean; portalTokenExpiresAt?: string | null
   taskCount: number; completedTaskCount: number; openRiskCount: number
+  availableActions?: string[]
 }
 
-type TabKey = 'overview'|'gantt'|'tasks'|'resources'|'budget'|'risks'|'documents'|'field'|'rfi'
+type TabKey = 'overview'|'gantt'|'tasks'|'resources'|'budget'|'changes'|'time'|'risks'|'documents'|'transmittals'|'field'|'rfi'|'portal'|'lifecycle'
 
 const ACCENT = "var(--hf-primary)"
 const ACCENT_TEXT = "var(--hf-primary-text)";
 const HEALTH_DOT: Record<string,string> = { GREEN:'var(--hf-success)', AMBER:'var(--hf-warning)', RED:'var(--hf-danger)' }
 const STATUS_BADGE: Record<string,{bg:string;color:string}> = {
-  PLANNING:{bg:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)'}, ACTIVE:{bg:'var(--hf-info-soft-strong)',color:'var(--hf-info-text)'},
+  PLANNING:{bg:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)'}, PROPOSED:{bg:'var(--hf-violet-soft-strong)',color:'var(--hf-violet-text)'},
+  APPROVED:{bg:'var(--hf-info-soft)',color:'var(--hf-info-text)'}, CLOSED:{bg:'var(--hf-surface-sunken)',color:'var(--hf-text-muted)'}, ACTIVE:{bg:'var(--hf-info-soft-strong)',color:'var(--hf-info-text)'},
   ON_HOLD:{bg:'var(--hf-warning-soft-strong)',color:'var(--hf-warning-text-deep)'}, COMPLETED:{bg:'var(--hf-success-soft-strong)',color:'var(--hf-success-text-strong)'},
   CANCELLED:{bg:'var(--hf-danger-soft-strong)',color:'var(--hf-danger-text)'},
 }
@@ -44,11 +52,16 @@ const TABS: { key:TabKey; label:string }[] = [
   {key:'gantt',     label:'Schedule'},
   {key:'tasks',     label:'Tasks'},
   {key:'resources', label:'Resources'},
-  {key:'budget',    label:'Budget'},
+  {key:'budget',    label:'Budget & cost'},
+  {key:'changes',   label:'Change orders'},
+  {key:'time',      label:'Time'},
   {key:'risks',     label:'Risks'},
   {key:'documents', label:'Documents'},
+  {key:'transmittals', label:'Transmittals'},
   {key:'field',     label:'Field'},
   {key:'rfi',       label:'RFI'},
+  {key:'portal',    label:'Client portal'},
+  {key:'lifecycle', label:'Lifecycle'},
 ]
 
 // Download a PDF export from the given endpoint
@@ -61,18 +74,12 @@ const downloadPdf = async (url: string, filename: string) => {
 }
 
 export function ProjectDetailTab({ projectId, onBack }: { projectId:string; onBack:()=>void }) {
-  const qc = useQueryClient()
   const [tab, setTab] = useState<TabKey>('overview')
 
   const { data:project, isLoading } = useQuery<Project>({
     queryKey: ['pm-project', projectId],
     queryFn: async () => { const r = await apiClient.get(`/api/v1/projects/${projectId}`); return r.data?.data ?? r.data },
     staleTime: 30_000, enabled: !!projectId,
-  })
-
-  const actionMut = useMutation({
-    mutationFn: (action:string) => apiClient.post(`/api/v1/projects/${projectId}/${action}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey:['pm-project', projectId] }),
   })
 
   if (isLoading) return <div style={{padding:'40px 0',textAlign:'center',color:'var(--hf-text-faint)',fontSize:13}}>Loading project…</div>
@@ -93,7 +100,7 @@ export function ProjectDetailTab({ projectId, onBack }: { projectId:string; onBa
           <div style={{flex:1}}>
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
               <span style={{fontSize:11,color:'var(--hf-text-faint)',fontWeight:500}}>{project.projectNumber}</span>
-              <span style={{background:st.bg,color:st.color,fontSize:11,fontWeight:700,padding:'2px 9px',borderRadius:20}}>{project.status.replace('_',' ')}</span>
+              <span style={{background:st.bg,color:st.color,fontSize:11,fontWeight:700,padding:'2px 9px',borderRadius:20}}>{project.status.replace(/_/g,' ')}</span>
               <span style={{display:'flex',alignItems:'center',gap:4}}>
                 <span style={{width:7,height:7,borderRadius:'50%',background:hDot,display:'inline-block'}}/>
                 <span style={{fontSize:11,fontWeight:700,color:hDot}}>{project.health}</span>
@@ -107,24 +114,13 @@ export function ProjectDetailTab({ projectId, onBack }: { projectId:string; onBa
             </div>
           </div>
           <div style={{display:'flex',gap:8,flexShrink:0,flexWrap:'wrap',justifyContent:'flex-end'}}>
-            {project.status==='PLANNING' && <Btn onClick={()=>actionMut.mutate('activate')} color="var(--hf-success-text-strong)" bg="var(--hf-success-soft-strong)" border="var(--hf-success-border)" icon={Play}>Activate</Btn>}
-            {project.status==='ACTIVE'   && <Btn onClick={()=>actionMut.mutate('hold')}     color="var(--hf-warning-text-deep)" bg="var(--hf-warning-soft-strong)" border="var(--hf-warning-border-strong)" icon={Pause}>Hold</Btn>}
-            {project.status==='ON_HOLD'  && <Btn onClick={()=>actionMut.mutate('activate')} color="var(--hf-success-text-strong)" bg="var(--hf-success-soft-strong)" border="var(--hf-success-border)" icon={Play}>Resume</Btn>}
-            {['PLANNING','ACTIVE','ON_HOLD'].includes(project.status) && (
-              <Btn onClick={()=>actionMut.mutate('complete')} color="var(--hf-success-text-strong)" bg="var(--hf-success-soft)" border="var(--hf-success-border-subtle)" icon={CheckCircle}>Complete</Btn>
-            )}
-            {project.clientPortalToken && (
-              <button onClick={()=>window.open(`/projects/portal/${project.clientPortalToken}`,'_blank')}
-                style={{display:'flex',alignItems:'center',gap:5,padding:'6px 12px',background:'var(--hf-surface-muted)',border:'1px solid var(--hf-border)',borderRadius:8,fontSize:12,cursor:'pointer',color:'var(--hf-text-muted)'}}>
-                <ExternalLink size={13}/> Client Portal
-              </button>
-            )}
+            <LifecycleActions projectId={project.id} status={project.status} available={project.availableActions}/>
           </div>
         </div>
       </div>
 
       {/* Tab bar */}
-      <div style={{display:'flex',gap:2,borderBottom:'1px solid var(--hf-border)',marginBottom:16,overflowX:'auto'}}>
+      <div style={{display:'flex',flexWrap:'wrap',gap:2,borderBottom:'1px solid var(--hf-border)',marginBottom:16}}>
         {TABS.map(t=>(
           <button key={t.key} onClick={()=>setTab(t.key)}
             style={{
@@ -174,16 +170,12 @@ export function ProjectDetailTab({ projectId, onBack }: { projectId:string; onBa
         {tab==='documents'  && <DocumentsTab  projectId={project.id}/>}
         {tab==='field'      && <FieldTab      projectId={project.id}/>}
         {tab==='rfi'        && <RfiTab        projectId={project.id}/>}
+        {tab==='changes'    && <ChangeOrdersTab projectId={project.id}/>}
+        {tab==='time'       && <TimeTab       projectId={project.id} editable={!['CLOSED','CANCELLED','COMPLETED'].includes(project.status)}/>}
+        {tab==='transmittals' && <TransmittalsTab projectId={project.id}/>}
+        {tab==='portal'     && <PortalAccessTab projectId={project.id} clientName={project.clientName} currentToken={project.clientPortalToken}/>}
+        {tab==='lifecycle'  && <LifecycleTab  projectId={project.id} status={project.status}/>}
       </TabErrorBoundary>
     </div>
-  )
-}
-
-function Btn({ onClick, color, bg, border, icon:Icon, children }:any) {
-  return (
-    <button onClick={onClick}
-      style={{display:'flex',alignItems:'center',gap:5,padding:'6px 12px',background:bg,color,border:`1px solid ${border}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer'}}>
-      <Icon size={13}/>{children}
-    </button>
   )
 }

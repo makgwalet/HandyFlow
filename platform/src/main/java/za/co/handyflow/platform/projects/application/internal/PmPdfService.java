@@ -221,6 +221,8 @@ public class PmPdfService {
         Project     project  = getProject(projectId, tenantId);
         ChangeOrder co       = coRepo.findById(coId)
                 .filter(c -> tenantId.equals(c.getTenantId()))
+                // the route's project is the one access was checked for, so the change order must belong to it
+                .filter(c -> projectId.equals(c.getProjectId()))
                 .orElseThrow(() -> new IllegalArgumentException("Change order not found: " + coId));
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();

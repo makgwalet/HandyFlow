@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../../api/client'
+import { ScheduleSection } from './ScheduleSection'
 
 interface Task {
   id: string; taskNumber: string; title: string; status: string
@@ -23,6 +24,10 @@ const STATUS_COLOR: Record<string, string> = {
 }
 
 export function GanttTab({ projectId }: { projectId: string }) {
+  return <><ScheduleSection projectId={projectId} /><GanttChart projectId={projectId} /></>
+}
+
+function GanttChart({ projectId }: { projectId: string }) {
   const { data: tasks = [], isLoading } = useQuery<Task[]>({
     queryKey: ['pm-tasks', projectId],
     queryFn: async () => { const r = await apiClient.get(`/api/v1/projects/${projectId}/tasks`); return unwrap<Task>(r) },
