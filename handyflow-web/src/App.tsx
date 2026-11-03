@@ -226,8 +226,8 @@ export default function App() {
 
           <Route path="/projects/portal/:token" element={<ClientPortalPage />} />
           <Route path="/portal/:token" element={<ClientPortalPage />} />
-          <Route path="/transmittal/:token" element={<RecipientTransmittalPage />} />
-          <Route path="/collaborator/:token" element={<CollaboratorWorkspacePage />} />
+          <Route path="/secure/share/:token" element={<RecipientTransmittalPage />} />
+          <Route path="/secure/workspace/:token" element={<CollaboratorWorkspacePage />} />
 
           <Route path="/accountant/portal/login"              element={<PortalLoginPage />} />
           <Route path="/accountant/portal/auth/accept-invite" element={<PortalAcceptInvitePage />} />

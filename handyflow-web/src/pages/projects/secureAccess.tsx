@@ -1,6 +1,6 @@
 // src/pages/projects/secureAccess.tsx
 //
-// Shared pieces of the two public secure-link pages: the "confirm it's you" code gate, the state hook
+// Shared pieces of the two public secure-link pages (Secure Document Access Engine, used by every module): the "confirm it's you" code gate, the state hook
 // behind it, and a few small presentational helpers. Uses the standalone recipient client (never apiClient).
 import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { Lock, Mail, ShieldAlert, FileText, Download, Loader2 } from 'lucide-react'
@@ -148,14 +148,14 @@ export function CodeGate({ heading, intro, notice, error, sendCode, verify }: {
   )
 }
 
-export interface PortalDoc { documentId: string; documentNumber: string; title: string; revision: string; statusAtIssue: string; fileName: string | null; fileSha256: string | null; downloadable: boolean }
+export interface PortalDoc { documentId: string; documentNumber: string; title: string; revision: string; statusAtIssue: string; fileName: string | null; fileSha256: string | null; downloadable: boolean; unavailableReason: string | null }
 export interface PortalView {
-  transmittalNumber: string; subject: string; projectName: string; purpose: string; notes: string | null
+  reference: string; subject: string; contextName: string; purpose: string; notes: string | null
   sentBy: string; sentAt: string; recipientName: string; expiresAt: string
   canDownload: boolean; canAcknowledge: boolean; acknowledgedAt: string | null; documents: PortalDoc[]
 }
 
-/** One transmittal: details, document list with downloads, acknowledge. Shared by both pages. */
+/** One share (for Projects, a transmittal): details, document list with downloads, acknowledge. Shared by both pages. */
 export function TransmittalCard({ view, onDownload, onAcknowledge }: {
   view: PortalView
   onDownload: (d: PortalDoc) => Promise<void>
@@ -172,7 +172,7 @@ export function TransmittalCard({ view, onDownload, onAcknowledge }: {
     <div style={{ ...card, marginBottom: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', fontWeight: 600 }}>{view.transmittalNumber} · {view.projectName}</div>
+          <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', fontWeight: 600 }}>{view.reference} · {view.contextName}</div>
           <h2 style={{ fontSize: 18, margin: '2px 0 4px' }}>{view.subject}</h2>
         </div>
         <span style={{ alignSelf: 'flex-start', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'var(--hf-info-soft-strong)', color: 'var(--hf-info-text)' }}>
@@ -185,7 +185,7 @@ export function TransmittalCard({ view, onDownload, onAcknowledge }: {
       {view.notes && <div style={{ fontSize: 14, padding: '10px 12px', background: 'var(--hf-surface-muted)', borderRadius: 8, marginBottom: 12, whiteSpace: 'pre-wrap' }}>{view.notes}</div>}
 
       <div style={{ border: '1px solid var(--hf-border)', borderRadius: 10, overflow: 'hidden' }}>
-        {view.documents.length === 0 && <div style={{ padding: 16, fontSize: 13, color: 'var(--hf-text-faint)' }}>No documents are available to you on this transmittal.</div>}
+        {view.documents.length === 0 && <div style={{ padding: 16, fontSize: 13, color: 'var(--hf-text-faint)' }}>No documents are available to you here.</div>}
         {view.documents.map((d, i) => (
           <div key={d.documentId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderTop: i ? '1px solid var(--hf-border-subtle)' : 'none' }}>
             <FileText size={18} style={{ color: 'var(--hf-text-faint)', flexShrink: 0 }} />
@@ -200,7 +200,7 @@ export function TransmittalCard({ view, onDownload, onAcknowledge }: {
               ? <button onClick={() => dl(d)} disabled={busyDoc === d.documentId} style={{ ...ghostBtn, opacity: busyDoc === d.documentId ? .6 : 1 }}>
                   {busyDoc === d.documentId ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Download
                 </button>
-              : <span style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{view.canDownload ? 'No file' : 'View only'}</span>}
+              : <span style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{d.unavailableReason ?? (view.canDownload ? 'No file' : 'View only')}</span>}
           </div>
         ))}
       </div>

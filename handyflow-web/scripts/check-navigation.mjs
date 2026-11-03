@@ -103,7 +103,7 @@ for (const k of dashKeys) if (!navKeys.has(k)) problems.push(`registry: module '
 const NON_MODULE_ROUTES = new Set([
   '/login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/account-locked', // sign-in flow
   '/dashboard',                                                                                      // "All modules" home
-  '/portal', '/auditor', '/careers', '/sign', '/unsubscribe', '/invite', '/transmittal', '/collaborator',                          // client, auditor and public pages
+  '/portal', '/auditor', '/careers', '/sign', '/unsubscribe', '/invite', '/secure',                          // client, auditor and public pages
   '/profile',                                                                                        // user menu
 ])
 const owned = new Set([...registry.matchAll(/route:\s*'(\/[^']*)'/g)].map(m => m[1]))

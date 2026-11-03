@@ -56,7 +56,7 @@ export function CollaboratorsPage() {
 
   const { data = [], isLoading, isError } = useQuery<Collaborator[]>({
     queryKey: ['pm-collaborators'],
-    queryFn: async () => (await apiClient.get('/api/v1/project-collaborators')).data ?? [],
+    queryFn: async () => (await apiClient.get('/api/v1/secure-access/collaborators')).data ?? [],
     staleTime: 15_000,
   })
   const refresh = () => qc.invalidateQueries({ queryKey: ['pm-collaborators'] })
@@ -71,7 +71,7 @@ export function CollaboratorsPage() {
   const { data: trail = [], isFetching } = useQuery<Trail[]>({
     queryKey: ['pm-collaborator-trail', dlg && dlg.kind === 'trail' ? dlg.c.id : null],
     enabled: !!dlg && dlg.kind === 'trail',
-    queryFn: async () => (await apiClient.get(`/api/v1/project-collaborators/${(dlg as { c: Collaborator }).c.id}/trail`)).data ?? [],
+    queryFn: async () => (await apiClient.get(`/api/v1/secure-access/collaborators/${(dlg as { c: Collaborator }).c.id}/trail`)).data ?? [],
   })
 
   return (
@@ -128,7 +128,7 @@ export function CollaboratorsPage() {
             <button style={primary} onClick={() => {
               if (!form.name.trim() || !/^\S+@\S+\.\S+$/.test(form.email.trim())) return setErr('Name and a valid email are required')
               const d = days(); if (!d) return setErr('Link expiry must be 1 to 730 days')
-              run(() => apiClient.post('/api/v1/project-collaborators', { name: form.name.trim(), organisation: form.organisation.trim() || null, email: form.email.trim(), expiryDays: d }), 'Collaborator registered and emailed.')
+              run(() => apiClient.post('/api/v1/secure-access/collaborators', { name: form.name.trim(), organisation: form.organisation.trim() || null, email: form.email.trim(), expiryDays: d }), 'Collaborator registered and emailed.')
             }}>Register & email link</button>
           </div>
         </Modal>
@@ -145,7 +145,7 @@ export function CollaboratorsPage() {
             <button style={btn} onClick={() => setDlg(null)}>Cancel</button>
             <button style={primary} onClick={() => {
               const d = days(); if (!d) return setErr('Link expiry must be 1 to 730 days')
-              run(() => apiClient.post(`/api/v1/project-collaborators/${d0.c.id}/${d0.kind}`, { expiryDays: d }), 'New link sent.')
+              run(() => apiClient.post(`/api/v1/secure-access/collaborators/${d0.c.id}/${d0.kind}`, { expiryDays: d }), 'New link sent.')
             }}>{d0.kind === 'enable' ? 'Enable & email link' : 'Send new link'}</button>
           </div>
         </Modal>
@@ -161,7 +161,7 @@ export function CollaboratorsPage() {
             <button style={btn} onClick={() => setDlg(null)}>Cancel</button>
             <button style={{ ...primary, background: 'var(--hf-danger)' }} onClick={() => {
               if (!form.reason.trim()) return setErr('A reason is required')
-              run(() => apiClient.post(`/api/v1/project-collaborators/${c.id}/disable`, { reason: form.reason.trim(), revokeTransmittalLinks: form.revokeLinks }), 'Account disabled.')
+              run(() => apiClient.post(`/api/v1/secure-access/collaborators/${c.id}/disable`, { reason: form.reason.trim(), revokeLinks: form.revokeLinks }), 'Account disabled.')
             }}>Disable account</button>
           </div>
         </Modal>

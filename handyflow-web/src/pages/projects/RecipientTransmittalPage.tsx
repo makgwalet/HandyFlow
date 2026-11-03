@@ -1,10 +1,10 @@
-// src/pages/projects/RecipientTransmittalPage.tsx  —  public: /transmittal/:token
+// src/pages/projects/RecipientTransmittalPage.tsx  —  public: /secure/share/:token (Secure Document Access Engine)
 import { useParams } from 'react-router-dom'
 import { CodeGate, DeadLink, ErrorBox, PublicShell, TransmittalCard, useSecureAccess, type PortalView } from './secureAccess'
 
 export function RecipientTransmittalPage() {
   const { token = '' } = useParams<{ token: string }>()
-  const a = useSecureAccess<PortalView>(`/api/public/projects/transmittals/${encodeURIComponent(token)}`)
+  const a = useSecureAccess<PortalView>(`/api/public/access/shares/${encodeURIComponent(token)}`)
 
   if (a.phase === 'dead') return <PublicShell><DeadLink error={a.error} /></PublicShell>
   if (a.phase === 'gate') return (

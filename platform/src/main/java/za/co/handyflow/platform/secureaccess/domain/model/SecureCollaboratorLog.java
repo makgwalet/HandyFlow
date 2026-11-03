@@ -1,4 +1,4 @@
-package za.co.handyflow.platform.projects.domain.model;
+package za.co.handyflow.platform.secureaccess.domain.model;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -12,10 +12,10 @@ import java.util.UUID;
 /** Append-only trail of a collaborator ACCOUNT: registered, link sent, code, login, disabled, enabled. */
 @Entity
 @Immutable
-@Table(name = "project_collaborator_log")
+@Table(name = "sda_collaborator_log")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ProjectCollaboratorLog {
+public class SecureCollaboratorLog {
 
     @Id private UUID id;
     @Column(name = "tenant_id", nullable = false)       private UUID tenantId;
@@ -27,9 +27,9 @@ public class ProjectCollaboratorLog {
     @Column(name = "actor_name")                        private String actorName;
     @Column(name = "occurred_at", nullable = false)     private Instant occurredAt;
 
-    public static ProjectCollaboratorLog of(UUID tenantId, UUID collaboratorId, String action, String detail,
+    public static SecureCollaboratorLog of(UUID tenantId, UUID collaboratorId, String action, String detail,
                                             String ip, String userAgent, String actorName) {
-        ProjectCollaboratorLog l = new ProjectCollaboratorLog();
+        SecureCollaboratorLog l = new SecureCollaboratorLog();
         l.id             = UUID.randomUUID();
         l.tenantId       = tenantId;
         l.collaboratorId = collaboratorId;

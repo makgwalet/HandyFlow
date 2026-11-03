@@ -146,4 +146,16 @@ public final class RecipientAccessRules {
             throw new IllegalStateException("SHA-256 is not available", e);   // required on every JVM
         }
     }
+
+    /** Lower-case hex SHA-256 of the bytes (used to re-check a released file against the hash frozen at issue). */
+    public static String sha256Hex(byte[] content) {
+        try {
+            byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest(content);
+            StringBuilder sb = new StringBuilder(64);
+            for (byte b : d) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is not available", e);   // required on every JVM
+        }
+    }
 }

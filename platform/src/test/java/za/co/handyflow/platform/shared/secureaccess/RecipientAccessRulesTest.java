@@ -142,4 +142,13 @@ class RecipientAccessRulesTest {
         assertEquals("jane@example.com", RecipientAccessRules.normaliseEmail("  Jane@Example.COM "));
         assertNull(RecipientAccessRules.normaliseEmail(null));
     }
+
+    @Test
+    void sha256Hex_ofBytes_matchesKnownVector() {
+        // NIST test vector for "abc"
+        assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+                RecipientAccessRules.sha256Hex("abc".getBytes(java.nio.charset.StandardCharsets.US_ASCII)));
+        assertEquals("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                RecipientAccessRules.sha256Hex(new byte[0]));
+    }
 }

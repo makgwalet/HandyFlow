@@ -1,4 +1,4 @@
-package za.co.handyflow.platform.projects.domain.model;
+package za.co.handyflow.platform.secureaccess.domain.model;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -9,19 +9,19 @@ import lombok.NoArgsConstructor;
 import java.io.Serializable;
 import java.util.UUID;
 
-/** "This recipient may see this item." A recipient with no rows here may see every item on the transmittal. */
+/** "This recipient may see this item." A recipient with no rows here may see every item in the share. */
 @Entity
-@Table(name = "project_transmittal_recipient_items")
-@IdClass(ProjectTransmittalRecipientItem.Key.class)
+@Table(name = "sda_recipient_items")
+@IdClass(SecureRecipientItem.Key.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ProjectTransmittalRecipientItem {
+public class SecureRecipientItem {
 
     @Id @Column(name = "recipient_id") private UUID recipientId;
     @Id @Column(name = "item_id")      private UUID itemId;
 
-    public static ProjectTransmittalRecipientItem of(UUID recipientId, UUID itemId) {
-        ProjectTransmittalRecipientItem x = new ProjectTransmittalRecipientItem();
+    public static SecureRecipientItem of(UUID recipientId, UUID itemId) {
+        SecureRecipientItem x = new SecureRecipientItem();
         x.recipientId = recipientId;
         x.itemId      = itemId;
         return x;

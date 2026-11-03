@@ -1,6 +1,6 @@
 // src/api/recipientAccess.client.ts
 //
-// Client for the PUBLIC secure-link pages (/transmittal/:token and /collaborator/:token).
+// Client for the PUBLIC secure-link pages (/secure/share/:token and /secure/workspace/:token), used by every module.
 //
 // Deliberately NOT the shared apiClient: that one attaches the staff JWT and, on 401/403, refreshes the
 // token and then logs the user out. Here a 401 is a NORMAL answer ("enter your code first" or "your
@@ -44,7 +44,7 @@ export async function toAccessError(e: unknown): Promise<AccessError> {
   }
 }
 
-/** `base` is e.g. /api/public/projects/transmittals/<token>. The token only ever goes in the path. */
+/** `base` is e.g. /api/public/access/shares/<token>. The token only ever goes in the path. */
 export function accessApi(base: string, getSession: () => string | null) {
   const headers = () => { const s = getSession(); return s ? { [SESSION_HEADER]: s } : {} }
   const unwrap = <T,>(r: { data: any }): T => (r.data && typeof r.data === 'object' && 'data' in r.data ? r.data.data : r.data) as T

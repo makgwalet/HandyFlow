@@ -1,14 +1,14 @@
-// src/pages/projects/CollaboratorWorkspacePage.tsx  —  public: /collaborator/:token
-// A registered collaborator's standing workspace: every transmittal issued to them that is still active.
+// src/pages/projects/CollaboratorWorkspacePage.tsx  —  public: /secure/workspace/:token
+// A registered collaborator's standing workspace: every share issued to them that is still active.
 import { useParams } from 'react-router-dom'
 import { CodeGate, DeadLink, ErrorBox, PublicShell, TransmittalCard, fmtDate, useSecureAccess, type PortalView } from './secureAccess'
 
-interface Entry { recipientId: string; transmittal: PortalView }
-interface Workspace { name: string; organisation: string | null; expiresAt: string; transmittals: Entry[] }
+interface Entry { recipientId: string; share: PortalView }
+interface Workspace { name: string; organisation: string | null; expiresAt: string; shares: Entry[] }
 
 export function CollaboratorWorkspacePage() {
   const { token = '' } = useParams<{ token: string }>()
-  const a = useSecureAccess<Workspace>(`/api/public/projects/collaborators/${encodeURIComponent(token)}`)
+  const a = useSecureAccess<Workspace>(`/api/public/access/collaborators/${encodeURIComponent(token)}`)
 
   if (a.phase === 'dead') return <PublicShell><DeadLink error={a.error} /></PublicShell>
   if (a.phase === 'gate') return (
@@ -28,12 +28,12 @@ export function CollaboratorWorkspacePage() {
           {ws.organisation ? `${ws.organisation} · ` : ''}Your workspace link is valid until {fmtDate(ws.expiresAt)}
         </div>
       </div>
-      {ws.transmittals.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: 'var(--hf-text-faint)' }}>Nothing has been issued to you yet.</div>}
-      {ws.transmittals.map(e => (
-        <TransmittalCard key={e.recipientId} view={e.transmittal}
-          onDownload={async d => { await a.guard(() => a.api.download(`/transmittals/${e.recipientId}/documents/${d.documentId}/download`, d.fileName || `${d.documentNumber}-${d.revision}`)) }}
+      {ws.shares.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: 'var(--hf-text-faint)' }}>Nothing has been issued to you yet.</div>}
+      {ws.shares.map(e => (
+        <TransmittalCard key={e.recipientId} view={e.share}
+          onDownload={async d => { await a.guard(() => a.api.download(`/shares/${e.recipientId}/documents/${d.documentId}/download`, d.fileName || `${d.documentNumber}-${d.revision}`)) }}
           onAcknowledge={async note => {
-            const w = await a.guard(() => a.api.post<Workspace>(`/transmittals/${e.recipientId}/acknowledge`, { note: note || null }))
+            const w = await a.guard(() => a.api.post<Workspace>(`/shares/${e.recipientId}/acknowledge`, { note: note || null }))
             if (w) a.setData(w)
           }} />
       ))}

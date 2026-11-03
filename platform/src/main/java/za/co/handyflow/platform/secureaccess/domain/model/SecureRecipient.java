@@ -1,4 +1,4 @@
-package za.co.handyflow.platform.projects.domain.model;
+package za.co.handyflow.platform.secureaccess.domain.model;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -9,22 +9,21 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One external recipient of a transmittal, with their OWN access link.
+ * One external recipient of a share (a transmittal, a contract pack, ...), with their OWN access link.
  *
  * Only hashes are stored: of the link token, of the current one-time code and of the current session.
  * The link itself exists only in the email sent to the recipient. Sending a fresh link (rotateToken)
  * kills the old one and any open session, so a forwarded or leaked link can be shut down at once.
  */
 @Entity
-@Table(name = "project_transmittal_recipients")
+@Table(name = "sda_recipients")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ProjectTransmittalRecipient {
+public class SecureRecipient {
 
     @Id private UUID id;
     @Column(name = "tenant_id", nullable = false)      private UUID tenantId;
-    @Column(name = "project_id", nullable = false)     private UUID projectId;
-    @Column(name = "transmittal_id", nullable = false) private UUID transmittalId;
+    @Column(name = "share_id", nullable = false)       private UUID shareId;
     @Column(name = "name", nullable = false)           private String name;
     @Column(name = "organisation")                     private String organisation;
     @Column(name = "email", nullable = false)          private String email;
@@ -46,21 +45,20 @@ public class ProjectTransmittalRecipient {
     @Column(name = "email_sent_at")                    private Instant emailSentAt;
     @Column(name = "acknowledged_at")                  private Instant acknowledgedAt;
     @Column(name = "acknowledged_note", length = 500)  private String acknowledgedNote;
-    /** Set when this address belongs to a registered collaborator account (see ProjectCollaborator). */
+    /** Set when this address belongs to a registered collaborator account (see SecureCollaborator). */
     @Column(name = "collaborator_id")                  private UUID collaboratorId;
     @Column(name = "created_by")                       private UUID createdBy;
     @Column(name = "created_by_name")                  private String createdByName;
     @Column(name = "created_at", nullable = false)     private Instant createdAt;
 
-    public static ProjectTransmittalRecipient create(UUID tenantId, UUID projectId, UUID transmittalId,
+    public static SecureRecipient create(UUID tenantId, UUID shareId,
                                                      String name, String organisation, String email,
                                                      String tokenHash, boolean canDownload, boolean canAcknowledge,
                                                      Instant expiresAt, UUID createdBy, String createdByName) {
-        ProjectTransmittalRecipient r = new ProjectTransmittalRecipient();
+        SecureRecipient r = new SecureRecipient();
         r.id             = UUID.randomUUID();
         r.tenantId       = tenantId;
-        r.projectId      = projectId;
-        r.transmittalId  = transmittalId;
+        r.shareId        = shareId;
         r.name           = name;
         r.organisation   = organisation;
         r.email          = email;

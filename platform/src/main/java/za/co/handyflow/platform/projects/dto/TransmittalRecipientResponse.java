@@ -1,9 +1,10 @@
 package za.co.handyflow.platform.projects.dto;
 
-import za.co.handyflow.platform.projects.domain.model.ProjectTransmittalRecipient;
+import za.co.handyflow.platform.secureaccess.application.SecureAccessDtos.RecipientView;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /** Staff view of one recipient. Never carries the link or any secret. */
@@ -14,12 +15,15 @@ public record TransmittalRecipientResponse(
         Instant emailSentAt, Instant verifiedAt, Instant lastAccessAt, Instant acknowledgedAt,
         List<UUID> documentIds
 ) {
-    /** ACTIVE, EXPIRED or REVOKED. documentIds empty means every document on the transmittal. */
-    public static TransmittalRecipientResponse of(ProjectTransmittalRecipient r, List<UUID> scopedItemIds, Instant now) {
-        String status = r.isRevoked() ? "REVOKED" : r.getExpiresAt().isAfter(now) ? "ACTIVE" : "EXPIRED";
-        return new TransmittalRecipientResponse(r.getId(), r.getName(), r.getOrganisation(), r.getEmail(),
-                r.isCanDownload(), r.isCanAcknowledge(), status, r.getExpiresAt(), r.getRevokedAt(),
-                r.getRevokedByName(), r.getRevokeReason(), r.getEmailSentAt(), r.getVerifiedAt(),
-                r.getLastAccessAt(), r.getAcknowledgedAt(), scopedItemIds);
+    /**
+     * From the secure access engine's view. ACTIVE, EXPIRED or REVOKED. documentIds empty means every document
+     * on the transmittal; itemToDocument turns the engine's share-item ids back into project document ids.
+     */
+    public static TransmittalRecipientResponse of(RecipientView v, Map<UUID, UUID> itemToDocument) {
+        List<UUID> docs = v.itemIds() == null ? List.of()
+                : v.itemIds().stream().map(itemToDocument::get).filter(java.util.Objects::nonNull).toList();
+        return new TransmittalRecipientResponse(v.id(), v.name(), v.organisation(), v.email(), v.canDownload(),
+                v.canAcknowledge(), v.status(), v.expiresAt(), v.revokedAt(), v.revokedByName(), v.revokeReason(),
+                v.emailSentAt(), v.verifiedAt(), v.lastAccessAt(), v.acknowledgedAt(), docs);
     }
 }

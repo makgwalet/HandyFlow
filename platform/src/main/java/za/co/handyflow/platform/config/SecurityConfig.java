@@ -189,13 +189,11 @@ public class SecurityConfig {
                                 // credential and is checked (format, rate limit per IP, enabled, not expired) inside ProjectPortalService.resolve()
                                 // on every request, including the file download. Without this line the page answered 401 to every client.
                                 "/api/public/projects/portal/**",
-                                // Projects transmittal recipients: opened from an emailed link with no login. The link token is the
-                                // credential but never enough alone: every call except the code request needs the session obtained by
-                                // confirming an emailed one-time code (TransmittalAccessService). Rate limited per IP and per link.
-                                "/api/public/projects/transmittals/**",
-                                // Projects registered collaborators: a standing link, never enough alone — every call except the code
-                                // request needs the session from confirming an emailed one-time code (CollaboratorAccessService).
-                                "/api/public/projects/collaborators/**"
+                                // Secure Document Access Engine (secureaccess), used by every module: recipients and collaborators open
+                                // an emailed link with no login. The link token is the credential but never enough alone: every call
+                                // except the code request needs the session from confirming an emailed one-time code, and every document
+                                // request is re-checked with the owning module. Rate limited per IP and per link inside the services.
+                                "/api/public/access/**"
                         ).permitAll()
                         // Everything else requires authentication
                         .anyRequest().authenticated()

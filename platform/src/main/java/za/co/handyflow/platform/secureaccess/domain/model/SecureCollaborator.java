@@ -1,4 +1,4 @@
-package za.co.handyflow.platform.projects.domain.model;
+package za.co.handyflow.platform.secureaccess.domain.model;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -11,18 +11,18 @@ import java.util.UUID;
 /**
  * A registered external collaborator (consultant, contractor, client contact) who works with the tenant
  * repeatedly. They have ONE standing link instead of a new link for every transmittal. It opens a
- * workspace that lists only the transmittals issued to their email address (each with its own
- * document assignment and expiry) and nothing else: no project data, no other documents.
+ * workspace that lists only the shares issued to their email address (each with its own
+ * document assignment and expiry) and nothing else: nothing else.
  *
- * Same protections as a single transmittal link: only hashes are stored, the link alone is not enough
+ * Same protections as a single share link: only hashes are stored, the link alone is not enough
  * (an emailed one-time code starts a short session), and the account can be disabled at once.
  * Disabling is per tenant: the same person registered by another tenant is a separate account.
  */
 @Entity
-@Table(name = "project_collaborators")
+@Table(name = "sda_collaborators")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ProjectCollaborator {
+public class SecureCollaborator {
 
     @Id private UUID id;
     @Column(name = "tenant_id", nullable = false)      private UUID tenantId;
@@ -46,9 +46,9 @@ public class ProjectCollaborator {
     @Column(name = "created_by_name")                  private String createdByName;
     @Column(name = "created_at", nullable = false)     private Instant createdAt;
 
-    public static ProjectCollaborator create(UUID tenantId, String name, String organisation, String email,
+    public static SecureCollaborator create(UUID tenantId, String name, String organisation, String email,
                                              String tokenHash, Instant expiresAt, UUID createdBy, String createdByName) {
-        ProjectCollaborator c = new ProjectCollaborator();
+        SecureCollaborator c = new SecureCollaborator();
         c.id            = UUID.randomUUID();
         c.tenantId      = tenantId;
         c.name          = name;

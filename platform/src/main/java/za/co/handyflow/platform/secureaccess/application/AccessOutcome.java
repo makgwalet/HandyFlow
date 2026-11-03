@@ -1,4 +1,4 @@
-package za.co.handyflow.platform.projects.application.internal;
+package za.co.handyflow.platform.secureaccess.application;
 
 import za.co.handyflow.platform.shared.HandyFlowException;
 
