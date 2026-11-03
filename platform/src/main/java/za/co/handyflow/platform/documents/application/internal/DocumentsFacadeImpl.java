@@ -6,13 +6,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.audittrail.application.AuditTrailFacade;
 import za.co.handyflow.platform.documents.application.DocumentScanner;
+import za.co.handyflow.platform.documents.application.DocumentStore;
 import za.co.handyflow.platform.documents.application.DocumentsFacade;
 import za.co.handyflow.platform.documents.domain.model.Document;
 import za.co.handyflow.platform.documents.domain.model.DocumentRules;
 import za.co.handyflow.platform.documents.domain.model.DocumentVersion;
 import za.co.handyflow.platform.documents.domain.repository.DocumentRepository;
 import za.co.handyflow.platform.documents.domain.repository.DocumentVersionRepository;
-import za.co.handyflow.platform.shared.FileStorageService;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -31,12 +31,12 @@ class DocumentsFacadeImpl implements DocumentsFacade {
 
     private final DocumentRepository documents;
     private final DocumentVersionRepository versions;
-    private final FileStorageService storage;
+    private final DocumentStore storage;
     private final DocumentScanner scanner;
     private final AuditTrailFacade trail;
     private final boolean scanRequired;
 
-    DocumentsFacadeImpl(DocumentRepository documents, DocumentVersionRepository versions, FileStorageService storage, DocumentScanner scanner,
+    DocumentsFacadeImpl(DocumentRepository documents, DocumentVersionRepository versions, DocumentStore storage, DocumentScanner scanner,
                         AuditTrailFacade trail, @Value("${documents.scan.required:false}") boolean scanRequired) {
         this.documents = documents;
         this.versions = versions;
@@ -73,7 +73,7 @@ class DocumentsFacadeImpl implements DocumentsFacade {
         int next = d.getCurrentVersion() + 1;
         DocumentVersion v = storeVersion(tenantId, d, next, file, note, actor);
         if (current != null && current.getSha256().equals(v.getSha256())) {
-            deleteQuietly(v.getStorageKey());
+            deleteQuietly(tenantId, v.getStorageKey());
             throw new IllegalArgumentException("That is the same file as the current version.");
         }
         d.nextVersion(renewedExpiry);
@@ -135,7 +135,7 @@ class DocumentsFacadeImpl implements DocumentsFacade {
         int n = versionNo == null ? d.getCurrentVersion() : versionNo;
         DocumentVersion v = versions.findOne(tenantId, d.getId(), n).orElseThrow(() -> new ResourceNotFoundException("Document version", documentId + "/" + n));
         byte[] bytes;
-        try { bytes = storage.retrieve(v.getStorageKey()); }
+        try { bytes = storage.get(tenantId, v.getStorageKey()); }
         catch (IOException e) {
             log.error("Document {} version {} could not be read from storage: {}", documentId, n, e.getMessage());
             throw new IllegalStateException("The file could not be read from storage. Try again, or contact support.");
@@ -179,7 +179,7 @@ class DocumentsFacadeImpl implements DocumentsFacade {
         if (scanRequired && scan.status() != DocumentScanner.Status.CLEAN)
             throw new IllegalStateException("The file could not be scanned for malware, so it was not stored. Try again later.");
         String key;
-        try { key = storage.store("documents/" + tenantId.getValue() + "/" + d.getOwnerType() + "/" + d.getOwnerId(), checked.fileName(), checked.contentType(), file.content()); }
+        try { key = storage.put(tenantId, "DOCUMENTS", "documents/" + tenantId.getValue() + "/" + d.getOwnerType() + "/" + d.getOwnerId(), checked.fileName(), checked.contentType(), file.content()); }
         catch (IOException e) {
             log.error("Document file could not be stored: {}", e.getMessage());
             throw new IllegalStateException("The file could not be stored. Try again, or contact support.");
@@ -188,8 +188,8 @@ class DocumentsFacadeImpl implements DocumentsFacade {
                 scan.status() == DocumentScanner.Status.CLEAN ? "CLEAN" : "SKIPPED", scan.detail(), note, actor);
     }
 
-    private void deleteQuietly(String key) {
-        try { storage.delete(key); } catch (IOException e) { log.warn("Could not remove an unused stored file {}: {}", key, e.getMessage()); }
+    private void deleteQuietly(TenantId tenantId, String key) {
+        try { storage.delete(tenantId, key, "Same file as the current version; the new version was not kept"); } catch (IOException e) { log.warn("Could not remove an unused stored file {}: {}", key, e.getMessage()); }
     }
 
     private Document owned(TenantId tenantId, UUID id) {

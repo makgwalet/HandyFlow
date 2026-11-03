@@ -10,7 +10,7 @@ import za.co.handyflow.platform.evidence.application.EvidenceFacade;
 import za.co.handyflow.platform.evidence.domain.model.Evidence;
 import za.co.handyflow.platform.evidence.domain.repository.EvidenceRepository;
 import za.co.handyflow.platform.evidence.dto.EvidenceResponse;
-import za.co.handyflow.platform.shared.FileStorageService;
+import za.co.handyflow.platform.documents.application.DocumentStore;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
@@ -44,7 +44,7 @@ public class EvidenceService implements EvidenceFacade {
     private static final long MAX_EVIDENCE_BYTES = 20L * 1024 * 1024;
 
     private final EvidenceRepository evidenceRepo;
-    private final FileStorageService fileStorageService;
+    private final DocumentStore documentStore;
     private final za.co.handyflow.platform.audittrail.application.AuditTrailFacade trail;
 
     @Override
@@ -92,7 +92,7 @@ public class EvidenceService implements EvidenceFacade {
 
         String storageKey;
         try {
-            storageKey = fileStorageService.store(pathPrefix, file.getOriginalFilename(), file.getContentType(), content);
+            storageKey = documentStore.put(tenantId, "EVIDENCE", pathPrefix, file.getOriginalFilename(), file.getContentType(), content);
         } catch (IOException e) {
             log.error("Failed to store evidence for {}={}: {}", relatedEntityType, relatedEntityId, e.getMessage(), e);
             throw new HandyFlowException("Failed to store file", HttpStatus.INTERNAL_SERVER_ERROR, "STORAGE_FAILED");
@@ -200,7 +200,7 @@ public class EvidenceService implements EvidenceFacade {
     private DownloadedEvidence read(TenantId tenantId, Evidence evidence) {
         UUID evidenceId = evidence.getId();
         try {
-            byte[] content = fileStorageService.retrieve(evidence.getStorageKey());
+            byte[] content = documentStore.get(tenantId, evidence.getStorageKey());
             trail.record(tenantId, "EVIDENCE_DOWNLOADED", "EVIDENCE", evidenceId, null, EvidenceFacade.isRestricted(evidence.getSourceModule())
                     ? java.util.Map.of("sourceModule", evidence.getSourceModule())
                     : java.util.Map.of("fileName", evidence.getFileName()));
@@ -217,7 +217,7 @@ public class EvidenceService implements EvidenceFacade {
         Evidence evidence = evidenceRepo.findByTenantAndId(tenantId.getValue(), evidenceId)
                 .filter(e -> !EvidenceFacade.isRestricted(e.getSourceModule()))
                 .orElseThrow(() -> new ResourceNotFoundException("Evidence", evidenceId.toString()));
-        // Soft-detach only — never calls fileStorageService.delete() here.
+        // Soft-detach only — never deletes the stored file here.
         // Evidence that's been cited (an approved expense, a sent invoice)
         // should never have its underlying file silently vanish just
         // because someone detached it from one record; the row staying

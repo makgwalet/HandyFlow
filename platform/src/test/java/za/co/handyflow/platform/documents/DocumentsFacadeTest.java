@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import za.co.handyflow.platform.audittrail.application.AuditTrailFacade;
 import za.co.handyflow.platform.documents.application.DocumentScanner;
+import za.co.handyflow.platform.documents.application.DocumentStore;
 import za.co.handyflow.platform.documents.application.DocumentsFacade;
 import za.co.handyflow.platform.documents.application.DocumentsFacade.DocumentInfo;
 import za.co.handyflow.platform.documents.application.DocumentsFacade.FileUpload;
@@ -11,7 +12,6 @@ import za.co.handyflow.platform.documents.domain.model.Document;
 import za.co.handyflow.platform.documents.domain.model.DocumentVersion;
 import za.co.handyflow.platform.documents.domain.repository.DocumentRepository;
 import za.co.handyflow.platform.documents.domain.repository.DocumentVersionRepository;
-import za.co.handyflow.platform.shared.FileStorageService;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -29,7 +29,7 @@ import static org.mockito.Mockito.*;
 class DocumentsFacadeTest {
     DocumentRepository documents = mock(DocumentRepository.class);
     DocumentVersionRepository versions = mock(DocumentVersionRepository.class);
-    FileStorageService storage = mock(FileStorageService.class);
+    DocumentStore storage = mock(DocumentStore.class);
     DocumentScanner scanner = mock(DocumentScanner.class);
     AuditTrailFacade trail = mock(AuditTrailFacade.class);
     DocumentsFacade facade;
@@ -53,7 +53,7 @@ class DocumentsFacadeTest {
     void setUp() throws Exception {
         facade = build(false);
         when(scanner.scan(any(), any(), any())).thenReturn(DocumentScanner.Result.skipped("none"));
-        when(storage.store(any(), any(), any(), any())).thenAnswer(i -> i.getArgument(0) + "/key-" + UUID.randomUUID());
+        when(storage.put(any(), any(), any(), any(), any(), any())).thenAnswer(i -> i.getArgument(2) + "/key-" + UUID.randomUUID());
         when(documents.save(any())).thenAnswer(i -> { Document d = i.getArgument(0); docs.put(d.getId(), d); return d; });
         when(versions.save(any())).thenAnswer(i -> { stored.add(i.getArgument(0)); return i.getArgument(0); });
         when(documents.findOwned(eq(tenant), any())).thenAnswer(i -> Optional.ofNullable(docs.get(i.<UUID>getArgument(1))));
@@ -71,7 +71,7 @@ class DocumentsFacadeTest {
         assertEquals("application/pdf", d.current().contentType());
         assertEquals("SKIPPED", d.current().scanStatus());
         assertEquals(64, d.current().sha256().length());
-        verify(storage).store(startsWith("documents/" + tenant.getValue() + "/EARTH_ASSET/" + owner), eq("Policy.pdf"), eq("application/pdf"), any());
+        verify(storage).put(eq(tenant), eq("DOCUMENTS"), startsWith("documents/" + tenant.getValue() + "/EARTH_ASSET/" + owner), eq("Policy.pdf"), eq("application/pdf"), any());
         verify(trail).record(eq(tenant), eq("DOCUMENT_UPLOADED"), eq("DOCUMENT"), any(UUID.class), any(), anyMap());
     }
 
@@ -80,7 +80,7 @@ class DocumentsFacadeTest {
     @Test void anInfectedFileIsRefusedAndNeverStored() throws IOException {
         when(scanner.scan(any(), any(), any())).thenReturn(new DocumentScanner.Result(DocumentScanner.Status.INFECTED, "Eicar"));
         assertThrows(IllegalArgumentException.class, this::uploaded);
-        verify(storage, never()).store(any(), any(), any(), any());
+        verify(storage, never()).put(any(), any(), any(), any(), any(), any());
         verify(documents, never()).save(any());
         verify(trail).record(eq(tenant), eq("DOCUMENT_REJECTED_INFECTED"), eq("DOCUMENT"), any(UUID.class), any(), anyMap());
     }
@@ -102,7 +102,7 @@ class DocumentsFacadeTest {
     @Test void aDisguisedFileIsRefusedBeforeAnythingIsStored() throws IOException {
         assertThrows(IllegalArgumentException.class, () -> facade.upload(tenant, "EARTH_ASSET", owner, "INSURANCE", "x", null, null,
                 new FileUpload("a.pdf", "application/pdf", "MZ-an-exe-program-file".getBytes()), actor));
-        verify(storage, never()).store(any(), any(), any(), any());
+        verify(storage, never()).put(any(), any(), any(), any(), any(), any());
     }
 
     @Test void aNewVersionKeepsTheOldOneAndCanRenewTheExpiry() {
@@ -118,7 +118,7 @@ class DocumentsFacadeTest {
         DocumentInfo d = uploaded();
         assertThrows(IllegalArgumentException.class, () -> facade.addVersion(tenant, d.id(), file(0), null, null, actor));
         assertEquals(1, stored.size());
-        verify(storage).delete(any());
+        verify(storage).delete(eq(tenant), any(), any());
     }
 
     @Test void anArchivedDocumentCannotBeChangedAndNeedsAReason() {
@@ -142,7 +142,7 @@ class DocumentsFacadeTest {
 
     @Test void aDownloadReturnsTheStoredBytesAndIsAudited() throws IOException {
         DocumentInfo d = uploaded();
-        when(storage.retrieve(any())).thenReturn(pdf(0));
+        when(storage.get(eq(tenant), any())).thenReturn(pdf(0));
         DocumentsFacade.Download dl = facade.download(tenant, d.id(), null, actor);
         assertEquals("Policy.pdf", dl.fileName());
         verify(trail).record(eq(tenant), eq("DOCUMENT_DOWNLOADED"), eq("DOCUMENT"), eq(d.id()), any(), anyMap());

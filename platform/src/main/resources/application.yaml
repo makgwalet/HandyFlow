@@ -147,6 +147,18 @@ app:
       working-days: MON,TUE,WED,THU,FRI   # add SAT for sites that work Saturdays
       nightly-recalc: true
 
+  # Document store (documents module): every evidence and Document Service file is written through it.
+  documents:
+    store:
+      # Encrypt new files at rest with AES-256-GCM under app.security.encryption.key. Files already stored stay as they are and
+      # still read. Losing or changing that key makes encrypted files unreadable: back it up before switching this on.
+      encrypt: ${DOCUMENT_STORE_ENCRYPT:false}
+      max-bytes: 20971520            # ceiling for one file; modules keep their own lower limits
+      verify:
+        enabled: true
+        cron: "0 40 2 * * *"         # Africa/Johannesburg
+        batch-size: 1000             # files re-hashed per night, checked longest ago first
+
 
 # ==================== ACTUATOR ====================
 management:

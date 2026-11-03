@@ -6,7 +6,7 @@ import za.co.handyflow.platform.audittrail.application.AuditTrailFacade;
 import za.co.handyflow.platform.evidence.application.EvidenceFacade;
 import za.co.handyflow.platform.evidence.domain.model.Evidence;
 import za.co.handyflow.platform.evidence.domain.repository.EvidenceRepository;
-import za.co.handyflow.platform.shared.FileStorageService;
+import za.co.handyflow.platform.documents.application.DocumentStore;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
@@ -31,14 +31,14 @@ class RestrictedEvidenceTest {
     private static final String SOURCE = "restricted-hr-er";
 
     private final EvidenceRepository repo = mock(EvidenceRepository.class);
-    private final FileStorageService storage = mock(FileStorageService.class);
+    private final DocumentStore storage = mock(DocumentStore.class);
     private final AuditTrailFacade trail = mock(AuditTrailFacade.class);
     private final EvidenceService service = new EvidenceService(repo, storage, trail);
 
     private Evidence restrictedFile(UUID entity) {
         Evidence e = Evidence.attach(TENANT.getValue(), "grievance-j-smith.pdf", "application/pdf", 6, "k1", "STATEMENT", SOURCE, "ER_CASE", entity, null, "h", UUID.randomUUID(), "HR");
         when(repo.findByTenantAndId(TENANT.getValue(), e.getId())).thenReturn(Optional.of(e));
-        try { when(storage.retrieve("k1")).thenReturn(new byte[]{1}); } catch (java.io.IOException ex) { throw new IllegalStateException(ex); }
+        try { when(storage.get(any(), eq("k1"))).thenReturn(new byte[]{1}); } catch (java.io.IOException ex) { throw new IllegalStateException(ex); }
         return e;
     }
 
@@ -90,7 +90,7 @@ class RestrictedEvidenceTest {
         Evidence e = restrictedFile(entity);
         service.detachRestricted(TENANT, SOURCE, "ER_CASE", entity, e.getId());
         assertThat(e.getStatus()).isEqualTo("DETACHED");
-        verify(storage, never()).delete(anyString());
+        verify(storage, never()).delete(any(), anyString(), any());
         assertThatThrownBy(() -> service.detachRestricted(TENANT, SOURCE, "ER_CASE", entity, e.getId())).isInstanceOf(ResourceNotFoundException.class);
     }
 

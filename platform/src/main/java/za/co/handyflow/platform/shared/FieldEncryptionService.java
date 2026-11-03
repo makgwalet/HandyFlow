@@ -129,4 +129,23 @@ public class FieldEncryptionService {
                     org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR, "DECRYPTION_ERROR");
         }
     }
+
+    /**
+     * Identifies the key used by {@link #sealBytes}. There is one key today; the id is stored with every sealed file so a
+     * later rotation can tell which key opens which file.
+     */
+    public static final String BYTES_KEY_ID = "app-key-1";
+
+    /**
+     * Encrypts a whole file with the same key as the fields above (format in {@link SealedBytes}). {@code aad} is
+     * authenticated but not stored: pass the same value to {@link #openBytes}.
+     */
+    public byte[] sealBytes(byte[] plain, byte[] aad) {
+        return SealedBytes.seal(keySpec, plain, aad);
+    }
+
+    /** Opens a file sealed by {@link #sealBytes}. Throws {@link SealedBytes.OpenFailedException} if it was changed or the key or aad differ. */
+    public byte[] openBytes(byte[] sealed, byte[] aad) {
+        return SealedBytes.open(keySpec, sealed, aad);
+    }
 }
