@@ -10,10 +10,10 @@ export function Chip({ tone, children }: { tone: Tone; children: ReactNode }) {
   const [bg, fg] = TONES[tone]
   return <span style={{ background: bg, color: fg, fontSize: 11.5, fontWeight: 700, padding: "2px 9px", borderRadius: 20, whiteSpace: "nowrap" }}>{children}</span>
 }
-export const panel: React.CSSProperties = { background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.md, boxShadow: shadow.card, overflowX: "auto" }
+export const panel: React.CSSProperties = { background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.md, boxShadow: shadow.card, overflowX: "auto", overflowY: "hidden" }
 export const empty: React.CSSProperties = { color: color.muted, fontSize: 13.5, padding: `${space(6)} ${space(4)}`, textAlign: "center" }
-export const th: React.CSSProperties = { textAlign: "left", fontSize: 11, textTransform: "uppercase", color: color.muted, fontWeight: 700, padding: "10px 14px", borderBottom: `1px solid ${color.border}`, whiteSpace: "nowrap" }
-export const td: React.CSSProperties = { padding: "11px 14px", fontSize: 13.5, borderBottom: `1px solid ${color.border}`, verticalAlign: "top", color: color.ink }
+export const th: React.CSSProperties = { textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.04em", color: color.muted, fontWeight: 700, padding: "11px 16px", background: "var(--hf-surface-muted)", borderBottom: `1px solid ${color.border}`, whiteSpace: "nowrap" }
+export const td: React.CSSProperties = { padding: "14px 16px", fontSize: 13.5, borderBottom: `1px solid ${color.borderLight}`, verticalAlign: "top", color: color.ink }
 export const sub: React.CSSProperties = { fontSize: 12, color: color.muted }
 export const inputStyle: React.CSSProperties = { width: "100%", padding: "10px 12px", border: `1.5px solid ${color.border}`, borderRadius: 8, fontSize: 14, boxSizing: "border-box", color: color.ink, background: color.surface, fontFamily: "inherit" }
 export const btn = (primary = false, danger = false): React.CSSProperties => ({ padding: "8px 14px", border: primary ? "none" : `1px solid ${danger ? color.redText : color.border}`, borderRadius: 8, background: primary ? color.navy : color.surface, color: primary ? "var(--hf-text-on-solid)" : danger ? color.redText : color.slate, fontSize: 13, fontWeight: 700, cursor: "pointer" })
@@ -32,3 +32,13 @@ export function Modal({ title, onClose, children, footer }: { title: string; onC
   )
 }
 export const errText = (e: any, fallback: string): string => e?.response?.data?.message ?? fallback
+
+/** A first name to greet someone with. A login that only has an email gets the part that reads like a name ("a+naledi@x.com" gives "Naledi"). */
+export function greetingName(fullName: string | null | undefined): string {
+  const raw = (fullName ?? "").trim()
+  if (!raw) return ""
+  const name = raw.includes("@") ? (raw.split("@")[0].split("+").pop() ?? "") : raw.split(/\s+/)[0]
+  const clean = name.replace(/[^\p{L}\p{N}'-]+/gu, " ").trim().split(" ")[0]
+  return clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : ""
+}
+export const initialOf = (name: string | null | undefined) => (greetingName(name) || "?").charAt(0).toUpperCase()
