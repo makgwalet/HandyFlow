@@ -16,6 +16,7 @@ import StatusHistoryDialog from "./StatusHistoryDialog"
 import MeterDialog from "./MeterDialog"
 import AssetDetail from "./AssetDetail"
 import { searchAssets, sortAssets, pageOf, type SortKey, type SortDir } from "./shared/fleetTable"
+import { serviceStatus, toneColour } from "./shared/serviceStatus"
 import { useLatestInspections, useAssets, useCreateAsset, useUpdateAsset, useUpdateAssetStatus, useUpdateAssetHours } from "./shared/hooks"
 
 const EMPTY_FORM = {
@@ -283,8 +284,9 @@ export default function AssetsTab() {
         {view === "table" ? renderTable() : (<div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {pageItems.map(asset => {
             const isOpen = expanded === asset.id
-            const hoursUsed = (asset.currentHours ?? 0) - (asset.lastServiceHours ?? 0)
-            const svcPct = Math.min(100, (hoursUsed / (asset.serviceIntervalHours || 250)) * 100)
+            const svc = serviceStatus(asset)
+            const hoursUsed = svc.used
+            const svcPct = svc.pct
 
             return (
               <div key={asset.id} style={{ border: `1px solid ${asset.status === "BREAKDOWN" ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 12, overflow: "hidden" }}>
@@ -301,9 +303,9 @@ export default function AssetsTab() {
                           </span>
                         )}
                         <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{asset.name}</span>
-                        {asset.dueForService && (
+                        {(asset.dueForService || svc.state === "DUE" || svc.state === "OVERDUE") && (
                           <span style={{ display: "flex", alignItems: "center", gap: 3, background: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text)", padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700, border: "1px solid var(--hf-warning-border)", flexShrink: 0 }}>
-                            <AlertTriangle size={9} /> SVC DUE
+                            <AlertTriangle size={9} /> {svc.state === "OVERDUE" ? "SVC OVERDUE" : "SVC DUE"}
                           </span>
                         )}
                         {asset.ownershipType !== "OWN" && (
@@ -366,11 +368,11 @@ export default function AssetsTab() {
                 <div style={{ padding: "0 20px 12px", background: "var(--hf-surface)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--hf-text-faint)", marginBottom: 3 }}>
                     <span>Service interval</span>
-                    <span>{hoursUsed.toFixed(0)} / {asset.serviceIntervalHours || 250} {meterUnitOf(asset)} since last service</span>
+                    <span>{svc.state === "CHECK_METER" ? svc.label : `${hoursUsed.toFixed(0)} / ${svc.interval} ${meterUnitOf(asset)} since last service`}</span>
                   </div>
                   <div style={{ height: 5, background: "var(--hf-surface-sunken)", borderRadius: 99, overflow: "hidden" }}>
                     <div style={{ height: "100%", width: `${svcPct}%`, borderRadius: 99, transition: "width 0.4s",
-                      background: svcPct >= 100 ? "var(--hf-danger)" : svcPct >= 80 ? "var(--hf-warning)" : "var(--hf-accent)" }} />
+                      background: toneColour(svc.tone) }} />
                   </div>
                 </div>
 

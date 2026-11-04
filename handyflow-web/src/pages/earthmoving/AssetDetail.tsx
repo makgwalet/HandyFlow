@@ -2,6 +2,7 @@
 //
 // One machine on one page: overview, maintenance, inspections, hire history and recent activity. It shows what the rest of the
 // module already records; nothing here is edited except through the same dialogs the fleet list uses (the buttons on Overview).
+import { serviceStatus, toneColour } from "./shared/serviceStatus"
 import { useState } from "react"
 import { ArrowLeft } from "lucide-react"
 import type { Asset } from "./shared/types"
@@ -32,9 +33,8 @@ export default function AssetDetail({ asset, actions }: { asset: Asset; actions:
   const when = (iso: string | null) => (iso ? fmtDate(iso) : "—")
 
   const renderOverview = () => {
-    const used = Number(asset.currentHours ?? 0) - Number(asset.lastServiceHours ?? 0)
-    const interval = asset.serviceIntervalHours || 250
-    const pct = Math.min(100, (used / interval) * 100)
+    const svc = serviceStatus(asset)
+    const { used, interval, pct } = svc
     const mine = (plans.data ?? []).filter(p => p.assetId === asset.id && p.active && p.state !== "OK")
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -53,10 +53,10 @@ export default function AssetDetail({ asset, actions }: { asset: Asset; actions:
         </div>
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", ...muted, marginBottom: 6 }}>
-            <span>Service interval progress</span><span>{used.toFixed(0)} / {interval} {unit}</span>
+            <span><span>Service interval progress</span> · {svc.label}</span><span>{svc.state === "CHECK_METER" ? "—" : `${used.toFixed(0)} / ${interval} ${unit}`}</span>
           </div>
           <div style={{ height: 8, background: "var(--hf-surface-sunken)", borderRadius: 99, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${pct}%`, background: pct >= 100 ? "var(--hf-danger)" : pct >= 80 ? "var(--hf-warning)" : "var(--hf-accent)", borderRadius: 99 }} />
+            <div style={{ height: "100%", width: `${pct}%`, background: toneColour(svc.tone), borderRadius: 99 }} />
           </div>
         </div>
         {mine.length > 0 && (
