@@ -168,3 +168,47 @@ describe("portal access and documents", () => {
     expect(fileSize(5 * 1024 * 1024)).toBe("5 MB")
   })
 })
+
+import { dashboardStats, dateTone, groupByDay, gridRange, keyDateActions, monthGrid, shiftMonth, upcomingDates } from "./legal.logic"
+
+describe("calendar", () => {
+  it("lays November 2026 out Monday first", () => {
+    const g = monthGrid(2026, 10)
+    expect(g[0][0]).toEqual({ date: "2026-10-26", inMonth: false }); expect(g[0][6]).toEqual({ date: "2026-11-01", inMonth: true }); expect(g.every(w => w.length === 7)).toBe(true)
+  })
+  it("pads with the neighbouring months", () => {
+    const g = monthGrid(2026, 11) // December 2026 starts on a Tuesday
+    expect(g[0][0]).toEqual({ date: "2026-11-30", inMonth: false }); expect(g[0][1]).toEqual({ date: "2026-12-01", inMonth: true })
+    expect(g[g.length - 1][6].date >= "2026-12-31").toBe(true)
+  })
+  it("covers a whole month in four to six weeks", () => { for (let m = 0; m < 12; m++) { const g = monthGrid(2026, m); expect(g.length).toBeGreaterThanOrEqual(4); expect(g.length).toBeLessThanOrEqual(6); expect(g.flat().filter(c => c.inMonth).length).toBe(new Date(2026, m + 1, 0).getDate()) } })
+  it("gives the range the grid shows", () => { const r = gridRange(2026, 11); expect(r.from).toBe("2026-11-30"); expect(r.to >= "2026-12-31").toBe(true) })
+  it("moves between months across a year end", () => { expect(shiftMonth(2026, 11, 1)).toEqual({ year: 2027, month: 0 }); expect(shiftMonth(2026, 0, -1)).toEqual({ year: 2025, month: 11 }) })
+  it("groups by day", () => { const g = groupByDay([{ dueDate: "2026-11-02" }, { dueDate: "2026-11-02" }, { dueDate: "2026-11-05" }]); expect(g["2026-11-02"].length).toBe(2); expect(Object.keys(g).length).toBe(2) })
+  it("colours deadlines by how close they are", () => {
+    const now = new Date("2026-11-04T10:00:00")
+    expect(dateTone("COMPLETED", "2026-10-01", now)).toBe("success"); expect(dateTone("MISSED", "2026-10-01", now)).toBe("neutral"); expect(dateTone("PENDING", "2026-10-01", now)).toBe("danger")
+    expect(dateTone("PENDING", "2026-11-06", now)).toBe("danger"); expect(dateTone("PENDING", "2026-11-12", now)).toBe("warning"); expect(dateTone("PENDING", "2026-12-25", now)).toBe("info")
+  })
+  it("offers actions only on pending dates to people who may write", () => {
+    expect(keyDateActions("PENDING", false, true)).toEqual(["acknowledge", "complete", "mark-missed"]); expect(keyDateActions("PENDING", true, true)).toEqual(["complete", "mark-missed"])
+    expect(keyDateActions("COMPLETED", false, true)).toEqual([]); expect(keyDateActions("PENDING", false, false)).toEqual([])
+  })
+  it("lists the next pending dates, soonest first", () => {
+    const xs = [{ dueDate: "2026-12-01", status: "PENDING" }, { dueDate: "2026-11-05", status: "COMPLETED" }, { dueDate: "2026-11-10", status: "PENDING" }, { dueDate: "2026-11-02", status: "PENDING" }]
+    expect(upcomingDates(xs, 2).map(x => x.dueDate)).toEqual(["2026-11-02", "2026-11-10"])
+  })
+})
+
+describe("dashboard", () => {
+  const inv = (status: string, outstandingBalance: number, dueDate: string | null) => ({ status, outstandingBalance, dueDate })
+  it("counts matters by status", () => {
+    const s = dashboardStats([{ status: "OPEN" }, { status: "OPEN" }, { status: "ON_HOLD" }, { status: "CLOSED" }, { status: "ARCHIVED" }], [], [], "2026-11-04")
+    expect(s).toMatchObject({ total: 5, open: 2, onHold: 1, closed: 2 })
+  })
+  it("adds up what is owed and what is late, ignoring drafts and paid invoices", () => {
+    const s = dashboardStats([], [inv("SENT", 100.1, "2026-10-01"), inv("PARTIALLY_PAID", 50.2, "2026-12-01"), inv("PAID", 0, "2026-10-01"), inv("DRAFT", 999, null), inv("SENT", 0, "2026-10-01")], [], "2026-11-04")
+    expect(s).toMatchObject({ outstanding: 150.3, overdueCount: 1, overdue: 100.1, drafts: 1 })
+  })
+  it("adds up the trust money held", () => expect(dashboardStats([], [], [{ trustBalance: 1000.5, status: "ACTIVE" }, { trustBalance: 250.25, status: "ACTIVE" }], "2026-11-04").trustHeld).toBe(1250.75))
+})

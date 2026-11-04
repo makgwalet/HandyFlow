@@ -1195,8 +1195,12 @@ export const LEGAL_PRACTICE_SECTIONS: ModuleSections = {
   basePath: '/legal-practice',
   title: 'Legal Practice',
   icon: Scale,
-  defaultSection: 'matters',
+  defaultSection: 'dashboard',
   groups: [
+    { label: 'Overview', sections: [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
+      { id: 'calendar', label: 'Calendar', icon: CalendarClock, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
+    ] },
     { label: 'Work', sections: [
       { id: 'matters', label: 'Matters', icon: Gavel, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
       { id: 'clients', label: 'Clients', icon: Users, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },

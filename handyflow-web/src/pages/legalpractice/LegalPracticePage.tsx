@@ -6,11 +6,17 @@ import AttorneysTab from "./AttorneysTab"
 import RetainersTab from "./RetainersTab"
 import InvoicesTab from "./InvoicesTab"
 import ProfileTab from "./ProfileTab"
+import DashboardTab from "./DashboardTab"
+import CalendarTab from "./CalendarTab"
+import { useNavigate } from "react-router-dom"
 
 export function LegalPracticePage() {
+  const navigate = useNavigate()
   return (
     <SectionedModulePage config={LEGAL_PRACTICE_SECTIONS} render={id => {
       switch (id) {
+        case "dashboard": return <DashboardTab goTo={sec => navigate(`/legal-practice/${sec}`)} />
+        case "calendar":  return <CalendarTab />
         case "matters":   return <MattersTab />
         case "clients":   return <ClientsTab />
         case "attorneys": return <AttorneysTab />

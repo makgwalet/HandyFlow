@@ -236,3 +236,55 @@ export function evidenceProblem(file: { size: number } | null, evidenceType: str
   return null
 }
 export const fileSize = (b: number) => (b < 1024 ? `${b} B` : b < 1024 * 1024 ? `${Math.round(b / 102.4) / 10} KB` : `${Math.round(b / 104857.6) / 10} MB`)
+
+// ── Dashboard and calendar ───────────────────────────────────────────────────────────────────────────────────────────
+const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+export const isoDay = iso
+export const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+export const shiftMonth = (y: number, m: number, delta: number) => { const d = new Date(y, m + delta, 1); return { year: d.getFullYear(), month: d.getMonth() } }
+/** The weeks shown for a month, Monday first, padded with the neighbouring months' days. */
+export function monthGrid(year: number, month: number): { date: string; inMonth: boolean }[][] {
+  const first = new Date(year, month, 1), lead = (first.getDay() + 6) % 7
+  const start = new Date(year, month, 1 - lead), weeks: { date: string; inMonth: boolean }[][] = []
+  for (let w = 0; w < 6; w++) {
+    const row = [] as { date: string; inMonth: boolean }[]
+    for (let d = 0; d < 7; d++) { const x = new Date(start.getFullYear(), start.getMonth(), start.getDate() + w * 7 + d); row.push({ date: iso(x), inMonth: x.getMonth() === month }) }
+    weeks.push(row)
+  }
+  while (weeks.length > 4 && weeks[weeks.length - 1].every(c => !c.inMonth)) weeks.pop()
+  return weeks
+}
+export const gridRange = (year: number, month: number) => { const g = monthGrid(year, month); return { from: g[0][0].date, to: g[g.length - 1][6].date } }
+export function groupByDay<T extends { dueDate: string }>(items: T[]): Record<string, T[]> {
+  const out: Record<string, T[]> = {}
+  for (const i of items) (out[i.dueDate] ??= []).push(i)
+  return out
+}
+/** The tone of a key date on the calendar: finished ones are quiet, pending ones follow how close they are. */
+export function dateTone(status: string, due: string, today = new Date()): Tone {
+  if (status === "COMPLETED") return "success"
+  if (status === "MISSED") return "neutral"
+  const d = daysUntil(due, today)
+  return d == null ? "info" : d < 0 ? "danger" : d <= 3 ? "danger" : d <= 14 ? "warning" : "info"
+}
+export interface DashMatter { status: string }
+export interface DashInvoice { status: string; outstandingBalance: number; dueDate: string | null }
+export interface DashClient { trustBalance: number; status: string }
+export function dashboardStats(matters: DashMatter[], invoices: DashInvoice[], clients: DashClient[], today: string) {
+  const byStatus: Record<string, number> = {}
+  for (const m of matters) byStatus[m.status] = (byStatus[m.status] ?? 0) + 1
+  const owed = invoices.filter(i => ["SENT", "PARTIALLY_PAID"].includes(i.status) && i.outstandingBalance > 0.005)
+  const late = owed.filter(i => !!i.dueDate && i.dueDate < today)
+  const sum = (xs: DashInvoice[]) => Math.round(xs.reduce((s, i) => s + i.outstandingBalance, 0) * 100) / 100
+  return {
+    total: matters.length, open: byStatus.OPEN ?? 0, onHold: byStatus.ON_HOLD ?? 0, closed: (byStatus.CLOSED ?? 0) + (byStatus.ARCHIVED ?? 0), byStatus,
+    outstanding: sum(owed), overdueCount: late.length, overdue: sum(late), drafts: invoices.filter(i => i.status === "DRAFT").length,
+    trustHeld: Math.round(clients.reduce((s, c) => s + (c.trustBalance ?? 0), 0) * 100) / 100,
+  }
+}
+/** Pending deadlines from today on, soonest first, plus anything already overdue at the front. */
+export function upcomingDates<T extends { dueDate: string; status: string }>(items: T[], limit = 8): T[] {
+  return items.filter(i => i.status === "PENDING").sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, limit)
+}
+export const keyDateActions = (status: string, acknowledged: boolean, canWrite: boolean): ("acknowledge" | "complete" | "mark-missed")[] =>
+  !canWrite || status !== "PENDING" ? [] : [...(acknowledged ? [] : ["acknowledge" as const]), "complete", "mark-missed"]
