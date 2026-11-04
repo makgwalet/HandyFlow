@@ -2,6 +2,19 @@
 
 Status: **nothing here is started.** Phase 0 is the part I recommend approving first because it closes concrete findings from `USER_MANAGEMENT_AUDIT.md` without schema redesign. Sizes: S ≤ 3 days, M ≤ 2 weeks, L > 2 weeks of one developer, rough and unvalidated. Each phase ships behind per-tenant flags where behaviour changes, and has a rollback.
 
+## Update 2026-11-04: not yet in production
+
+Because there are no live tenants, these changes apply to the plan below:
+
+- **No shadow mode, dual write or report-only release.** Entitlement is enforced from the first release of Phase 1; `iam.v2` flags are unnecessary. Replace "dual write with `user_roles`" and "reconciliation report" by a single migration that converts data and drops the old table.
+- **Direct renames are allowed:** `USER_INVITE`, `USER_UPDATE`, `USER_DEACTIVATE`, `ROLE_MANAGE`, `SETTINGS_MANAGE` become the `TENANT_*` names (API contract section 13) in one migration, with the controllers updated together. No accepted-both transition.
+- **`ADMIN` becomes Owner** (first user of each tenant) **and Administrator** (others) in one migration; new permissions are never auto-granted to Administrators.
+- **Accounts and memberships (Phase 3) can be done first-class,** with no verified-email merge problem: there is no legacy duplicate data to protect. Phase 3 can move before Phase 2 if you prefer one UI built once on the final model.
+- **Test data:** reseed development and test tenants rather than backfilling. Keep one small script that creates a sole-user tenant, a two-person tenant and an enterprise-shaped tenant for tests.
+- **Still required even without production:** the grantor ceiling, audit table, hashed invitation tokens, the controller coverage test and the build rules. They are cheapest to add now.
+- **Free tier work (new):** express CRM, Invoicing and Catalogue entry tiers as plan data and build the missing quote/invoice cap (nothing limits them today). Needs your list of which features are "upgrades".
+- **Sole-user behaviour (new):** self-approval exception and flagging as described in `IAM_TARGET_ARCHITECTURE.md` section 15.3, built together with `SeparationOfDutiesPolicy` in Phase 1, tested with the sole-user and two-person tenants above.
+
 ## Dependency overview
 
 ```
@@ -98,8 +111,8 @@ No existing tenant, user, role or subscription is broken at any phase (reconcili
 
 ## Decisions needed before Phase 1
 
-1. Which modules are free for all tenants.
-2. Approval of the Owner/Administrator split and what existing `ADMIN` users become.
-3. Whether to ship simple-mode only first and hold the enterprise features.
+1. ~~Which modules are free for all tenants.~~ **Answered:** CRM, Invoicing (capped quotes and invoices) and Catalogue; upgrades and other modules paid. Still needed: the list of features that count as upgrades and the cap values.
+2. ~~Approval of the Owner/Administrator split.~~ **Approved.** `ADMIN` converts directly (no live data).
+3. Whether to ship simple-mode only first and hold the enterprise features (my suggestion: yes).
 4. Cache TTL acceptable for revocation (proposed 15 s) and whether a distributed cache or pub/sub exists in production.
 5. MFA ambitions (not covered by this plan except for owners/administrators in Phase 4).

@@ -392,5 +392,5 @@ These need the same exercise (three baseline permissions, extras only for approv
 
 ## Open questions for you
 
-1. Which modules are included free for every tenant (the README names `crm`, `invoicing`, `catalogue` as core)? This decides which unguarded modules in audit finding F2 are bugs and which are by design.
+1. ~~Which modules are free?~~ **Answered 2026-11-04:** CRM, Invoicing (capped) and Catalogue are the free entry tier; upgrades and all other modules are paid. Still needed: which features inside those three count as upgrades.
 2. Is `EXPENSES_APPROVE` meant to exist? The code only has `EXPENSES_READ/MANAGE/ADMIN`; `POST /expenses/{id}/approve` is guarded by `EXPENSES_MANAGE` (`expenses/api/ExpensesController.java`), so anyone who can manage claims can approve them. Also, several employee-facing expense endpoints in the same controller require `USER_CREATE` (an administrative permission); I did not check whether that blocks ordinary employees from submitting claims, but it looks wrong and should be tested.

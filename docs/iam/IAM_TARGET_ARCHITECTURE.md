@@ -273,3 +273,33 @@ Complexity: S small, M medium, L large. MVP = needed for the first release of th
 ## 14. What must not change
 
 Existing tenants, users, roles, and subscriptions keep working through every phase. No permission is renamed. No token format break. No data deleted. Each phase has a rollback (turn the per-tenant flag off).
+
+---
+
+# 15. Decisions confirmed on 2026-11-04
+
+## 15.1 Free entry tier and paid upgrades (answers "which modules are free")
+
+- **Free entry tier:** CRM, Invoicing (with a cap on quotes and invoices) and Catalogue are available to every tenant without a subscription row.
+- **Paid upgrades:** further features of those modules, and every other module, need an entitlement.
+- Consequence for the design: entitlement is **module + tier + usage limits**, not just module on/off. `billing` already has `FeatureGuard.requireFeature(featureKey)` and `EntitlementService.isFeatureEnabled`; the free tier is expressed as a plan whose included features and limits are explicit data (for example `invoicing.documents_per_month`, `crm.advanced_*`), and the permission-claim filter (section 7) uses the module key only; feature and limit checks stay in `billing` and are called by the module's service (`requireFeature`, `requireWithinLimit`).
+- **Gap found:** nothing in the code limits quotes or invoices today (I searched for per-tenant invoice or quote caps and found only seat limits, `plans.max_users`). The free-tier cap must be built; it is not an existing control. Which features of CRM, Invoicing and Catalogue count as "more features" is a product list I still need from you (for example: recurring invoices, credit notes, multi-currency, price lists, imports).
+- Core modules still appear in the controller coverage test as "free, allow-listed"; every other module without a guard is a bug.
+
+## 15.2 Owner/Administrator split: approved
+
+## 15.3 Sole-user and very small businesses
+
+Yes, they are accommodated by design, and nothing in the Owner/Administrator split adds steps for them.
+
+1. **One person is the Owner and everything else.** Registration creates one Owner membership. The Owner holds the administration permissions **and** all business permissions of the modules the tenant is entitled to (including approvals). There is no "invite yourself" step, no role choice, no matrix. *People & Access* shows one row and an *Invite someone* button.
+2. **Separation of duties applies only when there is someone to separate from.** The rule "a person cannot approve their own transaction" is enforced when **another active member holds the checking permission**. If nobody else could check it, the maker may approve it. The approval is stored with `self_approved = true` (reason "sole approver") and is listed in a report the Owner can hand to an accountant or auditor. Nothing is blocked, nothing is hidden.
+3. **It switches itself on as the business grows.** When a second active person is given an approval permission, the rule starts to apply for that permission from that moment; the Owner sees a one-time message explaining it. A two-person business (Owner plus a clerk without approval rights) works naturally: the clerk's items are approved by the Owner; the Owner's own items can still be self-approved and are flagged.
+4. **Optional strictness.** An advanced switch, *Always require a second approver*, turns the exception off for tenants that want it (needs at least two approvers to work, and warns if not).
+5. **Lock-out protection.** The only Owner cannot be suspended, removed or demoted; they can transfer ownership to another person. Account closure is a separate, deliberate flow.
+6. **Seats.** A sole user uses one seat. The free tier's seat limit is read from the plan (`plans.max_users`, default 5 today).
+7. **External helpers.** An outside accountant or bookkeeper is invited as an external (portal) user with a time-boxed grant; they never use a seat or become an Administrator.
+
+## 15.4 Not yet in production
+
+The project is in development with no live customers, so the compatibility machinery in section 4.4 is **not needed**. Changes below replace it (details in the roadmap): migrate directly instead of expand/dual-write/contract; rename tenant permissions to the new names in one go; convert today's `ADMIN` role straight into Owner (first user) and Administrator; enforce entitlement immediately; reseed development and test databases instead of backfilling. The target data model and the 18 decisions are unchanged.
