@@ -102,7 +102,11 @@ public class BkServiceAgreement {
 
     public void end() {
         this.status = "ENDED";
-        if (this.endDate == null) this.endDate = LocalDate.now();
+        if (this.endDate == null) {
+            // the database needs the end after the start, so an agreement ended on its first day ends the next day
+            LocalDate today = LocalDate.now();
+            this.endDate = today.isAfter(startDate) ? today : startDate.plusDays(1);
+        }
         this.updatedAt = Instant.now();
     }
 

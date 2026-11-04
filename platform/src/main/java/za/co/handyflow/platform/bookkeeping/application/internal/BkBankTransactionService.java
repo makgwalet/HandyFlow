@@ -11,6 +11,7 @@ import za.co.handyflow.platform.bookkeeping.domain.model.BkBankAccount;
 import za.co.handyflow.platform.bookkeeping.domain.model.BkBankTransaction;
 import za.co.handyflow.platform.bookkeeping.domain.model.BkJournalEntry;
 import za.co.handyflow.platform.bookkeeping.domain.model.BkJournalLine;
+import za.co.handyflow.platform.bookkeeping.domain.model.BkStatementParser;
 import za.co.handyflow.platform.bookkeeping.domain.repository.BkBankAccountRepository;
 import za.co.handyflow.platform.bookkeeping.domain.repository.BkBankTransactionRepository;
 import za.co.handyflow.platform.bookkeeping.domain.repository.BkJournalEntryRepository;
@@ -92,25 +93,20 @@ public class BkBankTransactionService {
             throw new HandyFlowException("csvBase64 is not valid base64", HttpStatus.BAD_REQUEST, "INVALID_CSV_ENCODING");
         }
 
-        String[] rows = csv.split("\\r?\\n");
-        int totalRows = 0, imported = 0, skippedDuplicates = 0;
+        List<BkStatementParser.Row> rows;
+        try {
+            rows = BkStatementParser.parse(csv);
+        } catch (BkStatementParser.StatementException e) {
+            throw new HandyFlowException(e.getMessage(), HttpStatus.BAD_REQUEST, "INVALID_STATEMENT");
+        }
+        int totalRows = rows.size(), imported = 0, skippedDuplicates = 0;
         BigDecimal runningBalance = bankAccount.getCurrentBalance();
 
-        for (int i = 1; i < rows.length; i++) { // skip header row
-            String row = rows[i].trim();
-            if (row.isEmpty()) continue;
-            totalRows++;
-
-            String[] cols = row.split(",", -1);
-            if (cols.length < 4) {
-                log.warn("Skipping malformed bank import row (expected Date,Description,Reference,Amount): {}", row);
-                continue;
-            }
-
-            LocalDate transactionDate = LocalDate.parse(cols[0].trim());
-            String description = cols[1].trim();
-            String reference = cols[2].trim();
-            BigDecimal signedAmount = new BigDecimal(cols[3].trim());
+        for (BkStatementParser.Row row : rows) {
+            LocalDate transactionDate = row.date();
+            String description = row.description();
+            String reference = row.reference();
+            BigDecimal signedAmount = row.amount();
 
             String transactionType = signedAmount.signum() >= 0 ? "CREDIT" : "DEBIT";
             BigDecimal amount = signedAmount.abs().setScale(2, RoundingMode.HALF_UP);

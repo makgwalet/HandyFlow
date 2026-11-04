@@ -64,4 +64,21 @@ class BkServiceAgreementTest {
                 "RETAINER", new BigDecimal("3000.00"), null, start, null);
         assertTrue(agreement.coversDate(LocalDate.now().plusYears(5)));
     }
+
+    @Test
+    void endingOnTheStartDayEndsTheNextDay() {
+        BkServiceAgreement agreement = BkServiceAgreement.create(TenantId.generate(), UUID.randomUUID(),
+                "RETAINER", new BigDecimal("500.00"), null, LocalDate.now(), null);
+        agreement.end();
+        assertEquals("ENDED", agreement.getStatus());
+        assertEquals(LocalDate.now().plusDays(1), agreement.getEndDate());
+    }
+
+    @Test
+    void endingAnOlderAgreementEndsToday() {
+        BkServiceAgreement agreement = BkServiceAgreement.create(TenantId.generate(), UUID.randomUUID(),
+                "RETAINER", new BigDecimal("500.00"), null, LocalDate.now().minusMonths(2), null);
+        agreement.end();
+        assertEquals(LocalDate.now(), agreement.getEndDate());
+    }
 }
