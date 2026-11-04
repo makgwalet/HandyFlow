@@ -1117,8 +1117,14 @@ export const FM_SECTIONS: ModuleSections = {
   basePath: '/facilitiesmanagement',
   title: 'Facilities Management',
   icon: Wrench,
-  defaultSection: 'work-orders',
+  defaultSection: 'dashboard',
   groups: [
+    {
+      label: 'Overview',
+      sections: [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, anyPermission: [...FM_VIEW, 'FACILITIESMANAGEMENT_TECHNICIAN', 'FACILITIESMANAGEMENT_WORKORDER_CREATE', 'FACILITIESMANAGEMENT_WORKORDER_ASSIGN'] },
+      ],
+    },
     {
       label: 'Work',
       sections: [

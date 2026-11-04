@@ -491,3 +491,49 @@ export const canWithdraw = (status: string) => status === "REQUESTED"
 export const declineProblem = (note: string): string | null => !note.trim() ? "Tell us why you are declining" : note.trim().length > 1000 ? "Keep it under 1000 characters" : null
 export const portalOwing = (s: { outstandingBalance: number | null; overdueBalance: number | null; overdueInvoices: number } | null | undefined) =>
   !s ? null : { owing: s.outstandingBalance ?? 0, overdue: s.overdueBalance ?? 0, overdueCount: s.overdueInvoices }
+
+// ── Dashboard ────────────────────────────────────────────────────────────────────────────────────────────────────────
+export interface DashJob {
+  id: string; workOrderNumber: string; status: string; priority: string; safetyImpact: boolean; technicianId: string | null; vendorId: string | null; scheduledDate: string | null
+  responseDueAt: string | null; resolutionDueAt: string | null; respondedAt: string | null; resolutionSla: string | null; slaPausedAt: string | null
+}
+export interface AttentionItem<J extends DashJob = DashJob> { job: J; reason: string; tone: Tone; rank: number }
+/** Work that is closed, or waiting for a check (the work is done), is no longer running against its resolution clock. */
+const clockStopped = (j: DashJob) => isTerminal(j.status) || j.status === "PENDING_VERIFICATION" || !!j.slaPausedAt || j.status === "ON_HOLD"
+/** The single most pressing reason a job needs someone, or null. Safety first, then missed targets, then queues waiting on a person. */
+export function attentionReason(j: DashJob, now: Date): { reason: string; tone: Tone; rank: number } | null {
+  if (isTerminal(j.status)) return null
+  const t = now.getTime(), pastDue = (d: string | null) => !!d && new Date(d).getTime() < t
+  if (j.safetyImpact) return { reason: "Safety risk", tone: "danger", rank: 1 }
+  if (!clockStopped(j) && j.resolutionSla !== "MET" && pastDue(j.resolutionDueAt)) return { reason: "Overdue", tone: "danger", rank: 2 }
+  if (!j.slaPausedAt && !j.respondedAt && j.status !== "REQUESTED" && pastDue(j.responseDueAt)) return { reason: "No response in time", tone: "danger", rank: 3 }
+  if (!clockStopped(j) && j.resolutionDueAt && !pastDue(j.resolutionDueAt) && new Date(j.resolutionDueAt).getTime() - t < 4 * 36e5) return { reason: "Due within 4 hours", tone: "warning", rank: 4 }
+  if (j.status === "OPEN" && !j.technicianId && !j.vendorId) return { reason: "Nobody assigned", tone: "warning", rank: 5 }
+  if (j.status === "REQUESTED") return { reason: "Waiting for approval", tone: "info", rank: 6 }
+  if (j.status === "PENDING_VERIFICATION") return { reason: "Waiting for a check", tone: "info", rank: 7 }
+  return null
+}
+/** Every job that needs someone, most pressing first, then soonest due. */
+export function attentionList<J extends DashJob>(jobs: J[], now: Date, limit = 12): AttentionItem<J>[] {
+  const seen = new Set<string>(), out: AttentionItem<J>[] = []
+  for (const job of jobs) {
+    if (seen.has(job.id)) continue
+    seen.add(job.id)
+    const r = attentionReason(job, now)
+    if (r) out.push({ job, ...r })
+  }
+  const due = (j: DashJob) => j.resolutionDueAt ?? "9999"
+  return out.sort((a, b) => a.rank - b.rank || due(a.job).localeCompare(due(b.job)) || a.job.workOrderNumber.localeCompare(b.job.workOrderNumber)).slice(0, limit)
+}
+/** Jobs booked for this calendar day that are still to be done, soonest first. */
+export function todaysJobs<J extends DashJob>(jobs: J[], today: string): J[] {
+  const seen = new Set<string>()
+  return jobs.filter(j => !isTerminal(j.status) && !!j.scheduledDate && j.scheduledDate.slice(0, 10) === today && !seen.has(j.id) && !!seen.add(j.id))
+    .sort((a, b) => (a.scheduledDate ?? "").localeCompare(b.scheduledDate ?? "") || a.workOrderNumber.localeCompare(b.workOrderNumber))
+}
+/** How many of each reason, for the little summary chips. */
+export function attentionCounts(items: { reason: string }[]): { reason: string; count: number }[] {
+  const m = new Map<string, number>()
+  for (const i of items) m.set(i.reason, (m.get(i.reason) ?? 0) + 1)
+  return [...m.entries()].map(([reason, count]) => ({ reason, count }))
+}

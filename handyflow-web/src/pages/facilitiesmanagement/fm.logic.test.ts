@@ -372,3 +372,43 @@ describe("client portal", () => {
   it("shows internal states as plain ones", () => { expect(PORTAL_STATUS.PENDING_VERIFICATION.label).toBe("In progress"); expect(PORTAL_STATUS.REQUESTED.label).toBe("Received") })
   it("reads the amounts owing", () => { expect(portalOwing(null)).toBeNull(); expect(portalOwing({ outstandingBalance: 100, overdueBalance: null, overdueInvoices: 0 })).toEqual({ owing: 100, overdue: 0, overdueCount: 0 }) })
 })
+
+import { attentionCounts, attentionList, attentionReason, todaysJobs, type DashJob } from "./fm.logic"
+describe("dashboard", () => {
+  const now = new Date("2026-11-04T10:00:00Z")
+  const job = (o: Partial<DashJob> & { id: string }): DashJob => ({ workOrderNumber: o.id, status: "ASSIGNED", priority: "NORMAL", safetyImpact: false, technicianId: "t", vendorId: null, scheduledDate: null, responseDueAt: null, resolutionDueAt: null, respondedAt: "x", resolutionSla: null, slaPausedAt: null, ...o })
+  it("flags safety first", () => expect(attentionReason(job({ id: "a", safetyImpact: true, resolutionDueAt: "2026-11-01T00:00:00Z" }), now)?.reason).toBe("Safety risk"))
+  it("flags a past resolution time", () => expect(attentionReason(job({ id: "a", resolutionDueAt: "2026-11-04T09:00:00Z" }), now)?.reason).toBe("Overdue"))
+  it("ignores overdue while paused, on hold, or already met", () => {
+    expect(attentionReason(job({ id: "a", resolutionDueAt: "2026-11-04T09:00:00Z", slaPausedAt: "2026-11-04T08:00:00Z" }), now)).toBeNull()
+    expect(attentionReason(job({ id: "a", status: "ON_HOLD", resolutionDueAt: "2026-11-04T09:00:00Z" }), now)).toBeNull()
+    expect(attentionReason(job({ id: "a", resolutionDueAt: "2026-11-04T09:00:00Z", resolutionSla: "MET" }), now)).toBeNull()
+  })
+  it("flags a missed response only before anyone responded", () => {
+    expect(attentionReason(job({ id: "a", respondedAt: null, responseDueAt: "2026-11-04T09:00:00Z", status: "OPEN" }), now)?.reason).toBe("No response in time")
+    expect(attentionReason(job({ id: "a", responseDueAt: "2026-11-04T09:00:00Z" }), now)).toBeNull()
+  })
+  it("flags jobs due within four hours", () => {
+    expect(attentionReason(job({ id: "a", resolutionDueAt: "2026-11-04T13:00:00Z" }), now)?.reason).toBe("Due within 4 hours")
+    expect(attentionReason(job({ id: "a", resolutionDueAt: "2026-11-04T15:00:00Z" }), now)).toBeNull()
+  })
+  it("flags open jobs nobody has", () => {
+    expect(attentionReason(job({ id: "a", status: "OPEN", technicianId: null }), now)?.reason).toBe("Nobody assigned")
+    expect(attentionReason(job({ id: "a", status: "OPEN", technicianId: null, vendorId: "v" }), now)).toBeNull()
+  })
+  it("flags the approval and check queues", () => {
+    expect(attentionReason(job({ id: "a", status: "REQUESTED", technicianId: null }), now)?.reason).toBe("Waiting for approval")
+    expect(attentionReason(job({ id: "a", status: "PENDING_VERIFICATION", resolutionDueAt: "2026-11-01T00:00:00Z" }), now)?.reason).toBe("Waiting for a check")
+  })
+  it("never flags finished work", () => expect(attentionReason(job({ id: "a", status: "COMPLETED", safetyImpact: true }), now)).toBeNull())
+  it("orders by urgency then due time, drops duplicates and respects the limit", () => {
+    const l = attentionList([job({ id: "q", status: "REQUESTED" }), job({ id: "o2", resolutionDueAt: "2026-11-04T09:30:00Z" }), job({ id: "o1", resolutionDueAt: "2026-11-04T08:00:00Z" }), job({ id: "o1", resolutionDueAt: "2026-11-04T08:00:00Z" }), job({ id: "s", safetyImpact: true })], now)
+    expect(l.map(i => i.job.id)).toEqual(["s", "o1", "o2", "q"])
+    expect(attentionList(l.map(i => i.job), now, 2)).toHaveLength(2)
+  })
+  it("lists today's unfinished bookings in time order", () => {
+    const l = todaysJobs([job({ id: "b", scheduledDate: "2026-11-04T13:00:00" }), job({ id: "a", scheduledDate: "2026-11-04T08:00:00" }), job({ id: "x", scheduledDate: "2026-11-05T08:00:00" }), job({ id: "d", scheduledDate: "2026-11-04", status: "COMPLETED" }), job({ id: "n" })], "2026-11-04")
+    expect(l.map(j => j.id)).toEqual(["a", "b"])
+  })
+  it("counts reasons", () => expect(attentionCounts([{ reason: "A" }, { reason: "B" }, { reason: "A" }])).toEqual([{ reason: "A", count: 2 }, { reason: "B", count: 1 }]))
+})
