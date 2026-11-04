@@ -10,8 +10,8 @@ import MedicalSchemeFields from "./MedicalSchemeFields"
 import ForeignIdentityFields from "./ForeignIdentityFields"
 import { employeeRights } from "./employees.logic"
 import {
-  EMPTY_REG, STEPS, WHY, allErrors, draftKey, enrolBody, firstBadStep, fromDraft, hasContent, regBody, serverErrors, stepErrors, toDraft, validateSaId,
-  type Errors, type RegForm,
+  EMPTY_REG, STEPS, WHY, allErrors, draftAge, draftKey, draftSaveBody, fromServerDraft, enrolBody, firstBadStep, fromDraft, hasContent, regBody, serverErrors, stepErrors, toDraft, validateSaId,
+  type DraftDetail, type DraftSummary, type Errors, type RegForm,
 } from "./registration.logic"
 import { schemeDependants } from "./payrollChecks.logic"
 
@@ -192,20 +192,50 @@ export default function EmployeeRegistrationPage() {
   const [f, setF] = useState<RegForm>(EMPTY_REG), [step, setStep] = useState(0), [shown, setShown] = useState<Errors>({})
   const [saved, setSaved] = useState<string>(""), [offer, setOffer] = useState<{ step: number; savedAt: string } | null>(null), [message, setMessage] = useState("")
   const topRef = useRef<HTMLHeadingElement>(null), restored = useRef(false)
+  const [drafts, setDrafts] = useState<DraftSummary[]>([]), draftId = useRef<string | null>(null), busy = useRef(false), again = useRef(false)
+  const [where, setWhere] = useState<"server" | "browser" | "">("")
 
   // Offer a saved draft once. Reading can fail (private window), so every storage call is guarded.
   useEffect(() => {
     if (restored.current) return
     restored.current = true
-    try { const d = fromDraft(localStorage.getItem(key)); if (d && hasContent(d.form)) setOffer({ step: d.step, savedAt: d.savedAt }) } catch { /* no draft */ }
+    let alive = true
+    ;(async () => {
+      let mine: DraftSummary[] = []
+      try { const r = await apiClient.get("/api/v1/hr/employee-drafts"); mine = ((r.data?.data ?? r.data) as DraftSummary[]) ?? [] } catch { /* the server list is unavailable: fall back to this browser */ }
+      if (!alive) return
+      if (mine.length) { setDrafts(mine); return }
+      try { const d = fromDraft(localStorage.getItem(key)); if (d && hasContent(d.form)) setOffer({ step: d.step, savedAt: d.savedAt }) } catch { /* no draft */ }
+    })()
+    return () => { alive = false }
   }, [key])
+
+  /** Saves to the server, one request at a time; a change made meanwhile is saved right after. Returns false when the server could not take it. */
+  const saveToServer = async (form: RegForm, atStep: number): Promise<boolean> => {
+    if (busy.current) { again.current = true; return true }
+    busy.current = true
+    try {
+      const body = draftSaveBody(form, atStep)
+      const r = draftId.current ? await apiClient.put(`/api/v1/hr/employee-drafts/${draftId.current}`, body) : await apiClient.post("/api/v1/hr/employee-drafts", body)
+      draftId.current = ((r.data?.data ?? r.data) as DraftDetail).id
+      return true
+    } catch { return false }
+    finally { busy.current = false; if (again.current) { again.current = false; void saveToServer(latest.current.f, latest.current.step) } }
+  }
+  const latest = useRef({ f, step })
+  latest.current = { f, step }
+  const mark = (ok: boolean) => { setWhere(ok ? "server" : "browser"); setSaved(new Date().toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })) }
 
   // Save the draft shortly after the last change.
   useEffect(() => {
-    if (offer || !hasContent(f)) return
-    const t = setTimeout(() => { try { localStorage.setItem(key, toDraft(f, step)); setSaved(new Date().toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })) } catch { /* cannot save */ } }, 600)
+    if (offer || drafts.length || !hasContent(f)) return
+    const t = setTimeout(async () => {
+      try { localStorage.setItem(key, toDraft(f, step)) } catch { /* cannot save in this browser */ }
+      mark(await saveToServer(f, step))
+    }, 1200)
     return () => clearTimeout(t)
-  }, [f, step, key, offer])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [f, step, key, offer, drafts.length])
 
   const set = (patch: Partial<RegForm>) => {
     setF(s => ({ ...s, ...patch }))
@@ -231,6 +261,7 @@ export default function EmployeeRegistrationPage() {
     },
     onSuccess: schemeFailed => {
       try { localStorage.removeItem(key) } catch { /* ignore */ }
+      if (draftId.current) void apiClient.delete(`/api/v1/hr/employee-drafts/${draftId.current}`).catch(() => undefined)
       qc.invalidateQueries({ queryKey: ["hr-employees"] })
       nav("/hr/employees", { state: { registered: `${f.firstName} ${f.lastName}`.trim(), schemeFailed } })
     },
@@ -253,6 +284,19 @@ export default function EmployeeRegistrationPage() {
           <li key={s.id}><button type="button" onClick={() => (i <= step || i === firstBadStep(f) + 0 ? goTo(i) : next())} aria-current={i === step ? "step" : undefined}
             style={{ ...btn, padding: "5px 10px", fontSize: 12, background: i === step ? "var(--hf-primary-soft, #dbeafe)" : "var(--hf-surface)", fontWeight: i === step ? 700 : 500 }}>{i + 1}. {s.title}</button></li>))}
       </ol>
+      {drafts.length > 0 && (
+        <div role="status" style={{ padding: "10px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>You have {drafts.length === 1 ? "an unfinished registration" : `${drafts.length} unfinished registrations`}</div>
+          {drafts.map(d => (
+            <div key={d.id} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "4px 0" }}>
+              <span style={{ flex: 1, minWidth: 160 }}>{d.label} <span style={{ color: "var(--hf-text-faint)" }}>· step {d.step + 1} · {draftAge(d.updatedAt)}</span></span>
+              <button type="button" style={primary} onClick={async () => {
+                try { const r = await apiClient.get(`/api/v1/hr/employee-drafts/${d.id}`); const x = fromServerDraft((r.data?.data ?? r.data) as DraftDetail); if (x) { setF(x.form); setStep(x.step); draftId.current = d.id; setDrafts([]) } } catch { setMessage("That draft could not be opened.") }
+              }}>Continue</button>
+              <button type="button" style={btn} onClick={async () => { try { await apiClient.delete(`/api/v1/hr/employee-drafts/${d.id}`); setDrafts(x => x.filter(y => y.id !== d.id)) } catch { setMessage("That draft could not be deleted.") } }}>Delete</button>
+            </div>))}
+          <button type="button" style={{ ...btn, marginTop: 6 }} onClick={() => setDrafts([])}>Start a new one</button>
+        </div>)}
       {offer && (
         <div role="status" style={{ padding: "10px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, marginBottom: 14, fontSize: 13, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           You have an unfinished draft{offer.savedAt ? ` from ${new Date(offer.savedAt).toLocaleString("en-ZA")}` : ""}.
@@ -273,7 +317,9 @@ export default function EmployeeRegistrationPage() {
       </section>
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 14, flexWrap: "wrap" }}>
         <button type="button" style={btn} onClick={() => nav("/hr/employees")}>Cancel</button>
-        <span style={{ fontSize: 12, color: "var(--hf-text-faint)", flex: 1 }}>{saved ? `Draft saved automatically at ${saved}` : hasContent(f) ? "Saving draft…" : ""}</span>
+        <span style={{ fontSize: 12, color: where === "browser" ? "var(--hf-warning-text)" : "var(--hf-text-faint)", flex: 1 }}>
+          {saved ? (where === "browser" ? `Saved in this browser only at ${saved}. The server could not be reached.` : `Draft saved automatically at ${saved}`) : hasContent(f) ? "Saving draft…" : ""}</span>
+        {hasContent(f) && <button type="button" style={btn} onClick={async () => { try { localStorage.setItem(key, toDraft(f, step)) } catch { /* ignore */ } mark(await saveToServer(f, step)) }}>Save draft</button>}
         {step > 0 && <button type="button" style={btn} onClick={() => goTo(step - 1)}>← Back</button>}
         {!last && <button type="button" style={primary} onClick={next}>Next step →</button>}
         {last && <button type="button" style={primary} disabled={create.isPending || Object.keys(all).length > 0} onClick={() => { setMessage(""); create.mutate() }}>{create.isPending ? "Registering…" : "Register employee"}</button>}

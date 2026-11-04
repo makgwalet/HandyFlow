@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { EMPTY_REG, allErrors, enrolBody, firstBadStep, fromDraft, hasContent, regBody, serverErrors, stepErrors, toDraft, validateSaId, type RegForm } from "./registration.logic"
+import { draftAge, draftSaveBody, fromServerDraft, EMPTY_REG, allErrors, enrolBody, firstBadStep, fromDraft, hasContent, regBody, serverErrors, stepErrors, toDraft, validateSaId, type RegForm } from "./registration.logic"
 
 const ok: RegForm = { ...EMPTY_REG, firstName: "Thandi", lastName: "Nkosi", startDate: "2026-11-01", grossSalary: "25000" }
 
@@ -57,5 +57,27 @@ describe("registration steps", () => {
     expect(fromDraft(null)).toBeNull(); expect(fromDraft("{nope")).toBeNull(); expect(fromDraft('{"v":2}')).toBeNull()
     expect(fromDraft('{"v":1,"step":99,"form":{"firstName":"A"}}')!.step).toBe(5)
     expect(fromDraft('{"v":1,"step":1,"form":{"firstName":"A"}}')!.form.employmentType).toBe("PERMANENT")
+  })
+})
+
+describe("drafts on the server", () => {
+  const ok2: RegForm = { ...EMPTY_REG, firstName: " Thandi ", lastName: "Nkosi", grossSalary: "100" }
+  it("sends the form as text with the name for the list", () => {
+    const b = draftSaveBody(ok2, 3)
+    expect(b).toMatchObject({ step: 3, firstName: "Thandi", lastName: "Nkosi" })
+    expect(JSON.parse(b.payload).grossSalary).toBe("100")
+    expect(draftSaveBody(EMPTY_REG, 0)).toMatchObject({ firstName: null, lastName: null })
+  })
+  it("reads a server draft back, and treats rubbish as none", () => {
+    const d = fromServerDraft({ payload: draftSaveBody(ok2, 3).payload, step: 3, updatedAt: "2026-11-04T10:00:00Z" })!
+    expect(d.step).toBe(3); expect(d.form.grossSalary).toBe("100"); expect(d.form.employmentType).toBe("PERMANENT")
+    expect(fromServerDraft({ payload: "{nope", step: 0, updatedAt: "" })).toBeNull()
+  })
+  it("says how old a draft is", () => {
+    const now = new Date("2026-11-04T12:00:00Z")
+    expect(draftAge("2026-11-04T11:59:40Z", now)).toBe("just now")
+    expect(draftAge("2026-11-04T11:30:00Z", now)).toBe("30 minutes ago")
+    expect(draftAge("2026-11-04T10:00:00Z", now)).toBe("2 hours ago")
+    expect(draftAge("2026-11-02T12:00:00Z", now)).toBe("2 days ago")
   })
 })

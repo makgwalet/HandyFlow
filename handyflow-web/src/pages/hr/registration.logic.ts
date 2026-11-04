@@ -157,3 +157,26 @@ export function fromDraft(raw: string | null): Draft | null {
     return { v: 1, step, savedAt: d.savedAt ?? "", form }
   } catch { return null }
 }
+
+// ── drafts kept on the server ──────────────────────────────────────────────────────────────
+export interface DraftSummary { id: string; label: string; step: number; updatedAt: string }
+export interface DraftDetail extends DraftSummary { payload: string }
+
+/** What is sent to save a draft: the form as JSON text, plus the name so the list can label it. */
+export const draftSaveBody = (form: RegForm, step: number) => ({ payload: JSON.stringify(form), step, firstName: form.firstName.trim() || null, lastName: form.lastName.trim() || null })
+
+/** A draft read from the server, as a form and step. Unreadable contents mean no draft. */
+export function fromServerDraft(d: Pick<DraftDetail, "payload" | "step" | "updatedAt">): Draft | null {
+  return fromDraft(JSON.stringify({ v: 1, step: d.step, savedAt: d.updatedAt, form: safeParse(d.payload) }))
+}
+function safeParse(text: string): unknown { try { return JSON.parse(text) } catch { return null } }
+
+export function draftAge(updatedAt: string, now = new Date()): string {
+  const mins = Math.floor((now.getTime() - new Date(updatedAt).getTime()) / 60000)
+  if (!Number.isFinite(mins) || mins < 1) return "just now"
+  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`
+  const days = Math.floor(hours / 24)
+  return `${days} day${days === 1 ? "" : "s"} ago`
+}
