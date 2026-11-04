@@ -16,10 +16,8 @@ import ApprovalPanel from './RecApproval'
 import OfferPanel, { ReviseOfferForm } from './RecOffer'
 import RecDashboard from './RecDashboard'
 import RecCalendar from './RecCalendar'
-import RecClients from './RecClients'
 import RecJobCosts from './RecJobCosts'
 import RecJobImport from './RecJobImport'
-import RecPlacements from './RecPlacements'
 import RequisitionPanel from './RecRequisition'
 import { ScreeningAnswers, ScreeningEditor } from './RecScreening'
 import RecPrivacy from './RecPrivacy'
@@ -1500,13 +1498,6 @@ export function RecruiterPage() {
     },
   })
 
-  const { data: jobClients } = useQuery<{ jobId: string; clientName: string }[]>({
-    queryKey: ['rec-job-clients'],
-    queryFn: async () => { const r = await apiClient.get('/api/v1/recruiter/job-clients'); return r.data?.data ?? r.data },
-    retry: false,
-  })
-  const clientByJob: Record<string, string> = Object.fromEntries((Array.isArray(jobClients) ? jobClients : []).map(c => [c.jobId, c.clientName]))
-
   const { data: appsPage } = useQuery({
     queryKey: ['rec-applications', stageFilter, jobFilter, serverSearch],
     queryFn: async () => {
@@ -1633,8 +1624,8 @@ export function RecruiterPage() {
                   <div style={{ border: '1px solid var(--hf-border)', borderRadius: 12, background: 'var(--hf-surface)', overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                       <thead>
-                        <tr>{['Job title', 'Client', 'Location', 'Status', 'Applications', 'Actions'].map((h, i) => (
-                          <th key={h} style={{ textAlign: i === 4 ? 'right' : i === 5 ? 'right' : 'left', padding: '10px 12px', borderBottom: '1px solid var(--hf-border)', color: 'var(--hf-text-muted)', fontWeight: 600 }}>{h}</th>
+                        <tr>{['Job title', 'Location', 'Status', 'Applications', 'Actions'].map((h, i) => (
+                          <th key={h} style={{ textAlign: i >= 3 ? 'right' : 'left', padding: '10px 12px', borderBottom: '1px solid var(--hf-border)', color: 'var(--hf-text-muted)', fontWeight: 600 }}>{h}</th>
                         ))}</tr>
                       </thead>
                       <tbody>
@@ -1657,7 +1648,6 @@ export function RecruiterPage() {
                                     {expanded ? 'Hide details' : 'Approval, requisition and screening'}
                                   </button>
                                 </td>
-                                <td style={cell}>{clientByJob[job.id] ?? <span style={{ color: 'var(--hf-text-faint)' }}>-</span>}</td>
                                 <td style={cell}>{job.location ?? <span style={{ color: 'var(--hf-text-faint)' }}>-</span>}</td>
                                 <td style={cell}>
                                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`, padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
@@ -1698,7 +1688,7 @@ export function RecruiterPage() {
                               </tr>
                               {expanded && (
                                 <tr>
-                                  <td colSpan={6} style={{ padding: '0 12px 14px', borderBottom: '1px solid var(--hf-border-subtle)' }}>
+                                  <td colSpan={5} style={{ padding: '0 12px 14px', borderBottom: '1px solid var(--hf-border-subtle)' }}>
                                     {job.slug && careersSlug && (
                                       <a href={`/careers/${careersSlug}/${job.slug}`} target="_blank" rel="noreferrer"
                                         style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--hf-primary-text)', fontWeight: 600, textDecoration: 'none', marginBottom: 6 }}>
@@ -1738,7 +1728,7 @@ export function RecruiterPage() {
                     <select aria-label="Job" value={jobFilter} onChange={e => setJobFilter(e.target.value)}
                       style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 14, fontWeight: 700, background: 'var(--hf-surface)', color: 'var(--hf-text)' }}>
                       <option value="">All jobs</option>
-                      {jobs.map(j => <option key={j.id} value={j.id}>{j.title}{clientByJob[j.id] ? ` – ${clientByJob[j.id]}` : ''}</option>)}
+                      {jobs.map(j => <option key={j.id} value={j.id}>{j.title}</option>)}
                     </select>
                     {jst && <span style={{ background: jst.bg, color: jst.color, border: `1px solid ${jst.border}`, borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700 }}>{jst.label}</span>}
                     <button type="button" style={{ ...btnS, marginLeft: 'auto' }} onClick={() => navigate('/recruiter/jobs')}>Back to jobs</button>
@@ -1766,7 +1756,6 @@ export function RecruiterPage() {
                             {col.map(a => {
                               const days = Math.max(0, Math.floor((Date.now() - new Date(a.stageChangedAt).getTime()) / 86_400_000))
                               const stale = days >= 14 && stage !== 'HIRED'
-                              const client = clientByJob[a.jobId]
                               return (
                                 <div key={a.id} role="button" tabIndex={0} onClick={() => setSelectedApp(a)}
                                   onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedApp(a) } }}
@@ -1779,7 +1768,7 @@ export function RecruiterPage() {
                                     </div>
                                     <div style={{ minWidth: 0, flex: 1 }}>
                                       <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.applicantName}</div>
-                                      {!jobFilter && <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.jobTitle}{client ? ` · ${client}` : ''}</div>}
+                                      {!jobFilter && <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.jobTitle}</div>}
                                     </div>
                                     {a.score != null && <span title="Rating" style={{ background: 'var(--hf-warning-soft)', color: 'var(--hf-warning-text)', borderRadius: 20, padding: '0 6px', fontSize: 11, fontWeight: 700 }}>★ {a.score}</span>}
                                   </div>
@@ -1875,8 +1864,6 @@ export function RecruiterPage() {
           )
           case 'dashboard': return <RecDashboard />
           case 'calendar': return <RecCalendar />
-          case 'clients': return <RecClients />
-          case 'placements': return <RecPlacements />
           case 'talent-pool': return <RecPool />
           case 'reports': return <RecReports />
           case 'audit': return <RecAudit />
