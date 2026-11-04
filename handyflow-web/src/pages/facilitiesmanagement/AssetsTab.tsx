@@ -8,6 +8,7 @@ import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pick, Pill, Row, SectionTi
 import { BASE, useLookups, type Lookups } from "./lookups"
 import { ASSET_STATUS, CRITICALITY, assetBody, assetMoves, assetProblem, canDecommission, emptyAsset, labelOf, warrantyNote, type AssetForm, type Tone } from "./fm.logic"
 import FmEvidencePanel from "./FmEvidencePanel"
+import PpmPanel from "./PpmPanel"
 
 interface Asset { id: string; siteId: string; assetTag: string | null; name: string; assetType: string; location: string | null; manufacturer: string | null; model: string | null; serialNumber: string | null; installDate: string | null; warrantyExpiryDate: string | null; criticality: string; status: string; notes: string | null }
 const MOVE_LABEL: Record<string, string> = { OPERATIONAL: "Mark working", DOWN: "Mark down", MAINTENANCE: "Send to maintenance" }
@@ -52,6 +53,7 @@ export default function AssetsTab() {
 
 function AssetDetail({ asset: a, lookups, canWrite, onClose, onEdit, onChanged }: { asset: Asset; lookups: Lookups; canWrite: boolean; onClose: () => void; onEdit: () => void; onChanged: (a: Asset) => void }) {
   const [confirm, setConfirm] = useState(false)
+  const ppmRole = usePermission("FACILITIESMANAGEMENT_PPM_MANAGE"), ppmWrite = canWrite || ppmRole
   const st = ASSET_STATUS[a.status] ?? { label: a.status, tone: "neutral" as Tone }, w = warrantyNote(a.warrantyExpiryDate, new Date())
   const move = useMutation({
     mutationFn: async (status: string) => (await apiClient.patch<Asset>(`${BASE}/assets/${a.id}/status`, { status })).data,
@@ -75,6 +77,7 @@ function AssetDetail({ asset: a, lookups, canWrite, onClose, onEdit, onChanged }
       <Row k="Warranty ends">{a.warrantyExpiryDate ? <>{day(a.warrantyExpiryDate)} {w && <Pill tone={w.tone}>{w.text}</Pill>}</> : ""}</Row>
       <Row k="Importance">{labelOf(CRITICALITY, a.criticality)}</Row>
       {a.notes && <Row k="Notes">{a.notes}</Row>}
+      <PpmPanel assetId={a.id} canWrite={ppmWrite && a.status !== "DECOMMISSIONED"} />
       <FmEvidencePanel owner="assets" id={a.id} canWrite={canWrite && a.status !== "DECOMMISSIONED"} />
       {confirm && (
         <Dialog title="Decommission this asset?" onClose={() => setConfirm(false)}

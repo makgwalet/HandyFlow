@@ -144,3 +144,58 @@ describe("clients, sites and assets", () => {
     expect(warrantyNote(null, NOW)).toBeNull()
   })
 })
+
+import { DOC_TYPES, docBody, docNote, docProblem, emptyDoc, emptyPpm, emptyTech, emptyVendor, everyText, ppmBody, ppmDueNote, ppmProblem, techBody, techProblem, vendorActions, vendorBody, vendorProblem } from "./fm.logic"
+describe("planned maintenance", () => {
+  it("needs a task name and a whole number of days", () => {
+    expect(ppmProblem(emptyPpm())).toMatch(/Name/)
+    expect(ppmProblem({ ...emptyPpm(), taskName: "Service", frequencyDays: "0" })).toMatch(/days/)
+    expect(ppmProblem({ ...emptyPpm(), taskName: "Service", frequencyDays: "2.5" })).toMatch(/days/)
+    expect(ppmProblem({ ...emptyPpm(), taskName: "Service", frequencyDays: "45" })).toBeNull()
+  })
+  it("sends the asset and start date only when creating", () => {
+    const f = { ...emptyPpm(), taskName: " Service ", startDate: "2026-12-01" }
+    expect(ppmBody(f, true, "a1")).toEqual({ assetId: "a1", taskName: "Service", description: null, frequencyDays: 30, startDate: "2026-12-01" })
+    expect(ppmBody(f, false)).toEqual({ taskName: "Service", description: null, frequencyDays: 30 })
+  })
+  it("words the interval and flags what is late or close", () => {
+    expect(everyText(30)).toBe("Monthly"); expect(everyText(45)).toBe("Every 45 days")
+    expect(ppmDueNote(true, "2026-11-01", NOW)).toEqual({ text: "3 d overdue", tone: "danger" })
+    expect(ppmDueNote(true, "2026-11-04", NOW)?.text).toBe("Due today")
+    expect(ppmDueNote(true, "2026-11-09", NOW)).toEqual({ text: "Due in 5 d", tone: "warning" })
+    expect(ppmDueNote(true, "2026-12-01", NOW)).toBeNull()
+    expect(ppmDueNote(false, "2026-11-01", NOW)).toBeNull()
+  })
+})
+describe("technicians and vendors", () => {
+  it("checks the forms", () => {
+    expect(techProblem(emptyTech())).toMatch(/name/)
+    expect(techProblem({ ...emptyTech(), name: "S", contactEmail: "x" })).toMatch(/email/)
+    expect(techProblem({ ...emptyTech(), name: "S" })).toBeNull()
+    expect(techBody({ ...emptyTech(), name: " S " })).toMatchObject({ name: "S", linkedUserId: null })
+    expect(vendorProblem(emptyVendor())).toMatch(/company/)
+    expect(vendorProblem({ ...emptyVendor(), companyName: "C", contactEmail: "x" })).toMatch(/email/)
+    expect(vendorBody({ ...emptyVendor(), companyName: " C " }).companyName).toBe("C")
+  })
+  it("offers approve or suspend to those who may", () => {
+    expect(vendorActions("PENDING", true)).toEqual(["approve", "suspend"])
+    expect(vendorActions("APPROVED", true)).toEqual(["suspend"])
+    expect(vendorActions("SUSPENDED", true)).toEqual(["approve"])
+    expect(vendorActions("APPROVED", false)).toEqual([])
+  })
+  it("needs an expiry date for every document but 'other'", () => {
+    expect(docProblem(emptyDoc())).toMatch(/expiry/)
+    expect(docProblem({ ...emptyDoc(), docType: "OTHER" })).toBeNull()
+    expect(docProblem({ ...emptyDoc(), issueDate: "2026-05-01", expiryDate: "2026-04-01" })).toMatch(/before/)
+    expect(docProblem({ ...emptyDoc(), expiryDate: "2027-01-01", coverAmount: "-1" })).toMatch(/cover/)
+    expect(docProblem({ ...emptyDoc(), expiryDate: "2027-01-01", coverAmount: "5000000" })).toBeNull()
+    expect(docBody({ ...emptyDoc(), expiryDate: "2027-01-01", coverAmount: "5000000" })).toMatchObject({ coverAmount: 5000000, reference: null })
+    expect(DOC_TYPES.length).toBe(6)
+  })
+  it("describes a document's standing", () => {
+    expect(docNote("REVOKED", false, "2027-01-01", NOW).text).toBe("Revoked")
+    expect(docNote("VALID", false, "2026-10-01", NOW).text).toBe("Expired")
+    expect(docNote("VALID", true, "2026-11-20", NOW)).toEqual({ text: "Expires in 16 d", tone: "warning" })
+    expect(docNote("VALID", true, "2027-06-01", NOW).text).toBe("In force")
+  })
+})

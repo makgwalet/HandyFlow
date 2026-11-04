@@ -9,6 +9,8 @@ import WorkOrdersTab from './WorkOrdersTab'
 import ClientsTab from './ClientsTab'
 import SitesTab from './SitesTab'
 import AssetsTab from './AssetsTab'
+import TechniciansTab from './TechniciansTab'
+import VendorsTab from './VendorsTab'
 
 export function FmPage() {
   return (
@@ -18,6 +20,8 @@ export function FmPage() {
         case 'clients':          return <ClientsTab />
         case 'sites':            return <SitesTab />
         case 'assets':           return <AssetsTab />
+        case 'technicians':      return <TechniciansTab />
+        case 'vendors':          return <VendorsTab />
         case 'shared-documents': return <FmSharedDocumentsTab />
         default:                 return null
       }

@@ -1108,8 +1108,8 @@ export const CRM_SECTIONS: ModuleSections = {
 
 /**
  * Facilities Management (the FM provider module, /api/v1/facilitiesmanagement). Work orders, then the clients, sites and assets
- * they are done for, and secure sharing of a completed job's files. Planned maintenance, technicians and vendors, quotes,
- * agreements, billing, reports and the client portal are still to come.
+ * they are done for, planned maintenance (on each asset), technicians, vendors, and secure sharing of a completed job's files.
+ * Quotes, agreements, billing, reports and the client portal are still to come.
  */
 const FM_VIEW = ['FACILITIESMANAGEMENT_READ', 'FACILITIESMANAGEMENT_MANAGE', 'FACILITIESMANAGEMENT_ADMIN']
 export const FM_SECTIONS: ModuleSections = {
@@ -1124,6 +1124,13 @@ export const FM_SECTIONS: ModuleSections = {
       sections: [
         { id: 'work-orders', label: 'Work orders', icon: ClipboardList,
           anyPermission: [...FM_VIEW, 'FACILITIESMANAGEMENT_TECHNICIAN', 'FACILITIESMANAGEMENT_WORKORDER_CREATE', 'FACILITIESMANAGEMENT_WORKORDER_ASSIGN'] },
+      ],
+    },
+    {
+      label: 'Team',
+      sections: [
+        { id: 'technicians', label: 'Technicians', icon: Wrench, anyPermission: FM_VIEW },
+        { id: 'vendors', label: 'Vendors', icon: Building2, anyPermission: FM_VIEW },
       ],
     },
     {

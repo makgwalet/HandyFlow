@@ -178,3 +178,72 @@ export function warrantyNote(end: string | null | undefined, now: Date): { text:
   if (days <= 60) return { text: `Warranty ends in ${days} d`, tone: "warning" }
   return null
 }
+
+// ── Planned maintenance ──────────────────────────────────────────────────────────────────────────────────────────────
+export const FREQUENCIES = [["7", "Weekly"], ["30", "Monthly"], ["90", "Every 3 months"], ["180", "Every 6 months"], ["365", "Yearly"]] as const
+export interface PpmForm { taskName: string; description: string; frequencyDays: string; startDate: string }
+export const emptyPpm = (): PpmForm => ({ taskName: "", description: "", frequencyDays: "30", startDate: "" })
+export function ppmProblem(f: PpmForm): string | null {
+  if (!f.taskName.trim()) return "Name the task"
+  const n = num(f.frequencyDays)
+  if (n == null || !Number.isInteger(n) || n <= 0) return "Say how many days between visits (a whole number above 0)"
+  return null
+}
+export const ppmBody = (f: PpmForm, creating: boolean, assetId?: string) => creating
+  ? { assetId, taskName: f.taskName.trim(), description: t(f.description), frequencyDays: Number(f.frequencyDays), startDate: t(f.startDate) }
+  : { taskName: f.taskName.trim(), description: t(f.description), frequencyDays: Number(f.frequencyDays) }
+/** "Every 30 days" in words, using the common names where they fit. */
+export const everyText = (days: number) => ({ 7: "Weekly", 30: "Monthly", 90: "Every 3 months", 180: "Every 6 months", 365: "Yearly" } as Record<number, string>)[days] ?? `Every ${days} days`
+/** When a schedule is next due, flagged when it is late or within a week. */
+export function ppmDueNote(active: boolean, nextDue: string | null | undefined, now: Date): { text: string; tone: Tone } | null {
+  if (!active || !nextDue) return null
+  const days = Math.round((new Date(nextDue + "T00:00:00").getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 864e5)
+  if (days < 0) return { text: `${-days} d overdue`, tone: "danger" }
+  if (days === 0) return { text: "Due today", tone: "warning" }
+  if (days <= 7) return { text: `Due in ${days} d`, tone: "warning" }
+  return null
+}
+
+// ── Technicians ──────────────────────────────────────────────────────────────────────────────────────────────────────
+export interface TechForm { name: string; contactPhone: string; contactEmail: string; specialization: string; linkedUserId: string }
+export const emptyTech = (): TechForm => ({ name: "", contactPhone: "", contactEmail: "", specialization: "", linkedUserId: "" })
+export function techProblem(f: TechForm): string | null {
+  if (!f.name.trim()) return "Enter the technician's name"
+  if (!looksLikeEmail(f.contactEmail)) return "That email address does not look right"
+  return null
+}
+export const techBody = (f: TechForm) => ({ name: f.name.trim(), contactPhone: t(f.contactPhone), contactEmail: t(f.contactEmail), specialization: t(f.specialization), linkedUserId: t(f.linkedUserId) })
+
+// ── Vendors ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+export interface VendorForm { companyName: string; serviceType: string; contactName: string; contactPhone: string; contactEmail: string; notes: string }
+export const emptyVendor = (): VendorForm => ({ companyName: "", serviceType: "", contactName: "", contactPhone: "", contactEmail: "", notes: "" })
+export function vendorProblem(f: VendorForm): string | null {
+  if (!f.companyName.trim()) return "Enter the company name"
+  if (!looksLikeEmail(f.contactEmail)) return "That email address does not look right"
+  return null
+}
+export const vendorBody = (f: VendorForm) => ({ companyName: f.companyName.trim(), serviceType: t(f.serviceType), contactName: t(f.contactName), contactPhone: t(f.contactPhone), contactEmail: t(f.contactEmail), notes: t(f.notes) })
+export const ONBOARDING: Record<string, { label: string; tone: Tone }> = { PENDING: { label: "Awaiting approval", tone: "warning" }, APPROVED: { label: "Approved", tone: "success" }, SUSPENDED: { label: "Suspended", tone: "danger" } }
+export type VendorAction = "approve" | "suspend"
+/** Approval is offered until approved; suspension once approved. People who may approve are the same who may suspend. */
+export const vendorActions = (status: string, canApprove: boolean): VendorAction[] => !canApprove ? [] : status === "APPROVED" ? ["suspend"] : status === "SUSPENDED" ? ["approve"] : ["approve", "suspend"]
+export const DOC_TYPES = [["PUBLIC_LIABILITY_INSURANCE", "Public liability insurance"], ["COIDA_LETTER", "COIDA letter of good standing"], ["TAX_CLEARANCE", "Tax clearance"], ["TRADE_LICENCE", "Trade licence"], ["BEE_CERTIFICATE", "B-BBEE certificate"], ["OTHER", "Other"]] as const
+export interface DocForm { docType: string; reference: string; issuedBy: string; issueDate: string; expiryDate: string; coverAmount: string; documentRef: string }
+export const emptyDoc = (): DocForm => ({ docType: "PUBLIC_LIABILITY_INSURANCE", reference: "", issuedBy: "", issueDate: "", expiryDate: "", coverAmount: "", documentRef: "" })
+/** Every kind of document except "other" needs an expiry date. */
+export function docProblem(f: DocForm): string | null {
+  if (f.docType !== "OTHER" && !f.expiryDate) return "An expiry date is needed for this kind of document"
+  if (f.issueDate && f.expiryDate && f.expiryDate < f.issueDate) return "The expiry date cannot be before the issue date"
+  const c = num(f.coverAmount); if (c != null && (!Number.isFinite(c) || c < 0)) return "The cover amount must be 0 or more"
+  return null
+}
+export const docBody = (f: DocForm) => ({ docType: f.docType, reference: t(f.reference), issuedBy: t(f.issuedBy), issueDate: t(f.issueDate), expiryDate: t(f.expiryDate), coverAmount: num(f.coverAmount), documentRef: t(f.documentRef) })
+export const docNote = (status: string, inForce: boolean, expiry: string | null, now: Date): { text: string; tone: Tone } => {
+  if (status === "REVOKED") return { text: "Revoked", tone: "neutral" }
+  if (!inForce) return { text: "Expired", tone: "danger" }
+  if (expiry) {
+    const days = Math.round((new Date(expiry + "T00:00:00").getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 864e5)
+    if (days <= 30) return { text: `Expires in ${days} d`, tone: "warning" }
+  }
+  return { text: "In force", tone: "success" }
+}
