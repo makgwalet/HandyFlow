@@ -20,6 +20,7 @@
 - [Database](#database)
 - [Test Tenant](#test-tenant)
 - [Module System](#module-system)
+- [Users, Roles & Access Control](#users-roles--access-control)
 - [Project Structure](#project-structure)
 - [API Reference](#api-reference)
 - [Frontend Architecture](#frontend-architecture)
@@ -620,6 +621,32 @@ docker compose up -d
 ### JWT token expired / 401 on all requests
 
 Tokens are in-memory — they're lost on page refresh or after 24 hours. Simply log in again. Full refresh token support is on the roadmap.
+
+---
+
+## Users, Roles & Access Control
+
+> **Status: audit complete, target architecture proposed and awaiting approval.** The design below is *not* built yet. Details live in [`docs/iam/`](docs/iam/).
+
+### How it works today (verified in code)
+
+- A person has **one account per tenant** (`users` unique on `(tenant_id, email)`); login needs the tenant slug.
+- Roles are per tenant and are flat bundles of permission names; two roles are created by code, `ADMIN` (every permission) and `EMPLOYEE`. A user is assigned one role through the UI.
+- Invitations carry one role and no module information. Module entitlement (what the tenant bought) is checked separately in controllers with `featureGuard.requireModule(...)`, and is **not** enforced in several modules (see audit finding F2).
+- Access tokens last 15 minutes and carry the permission list; permission changes reach a user at the next refresh.
+
+### Proposed target (hybrid)
+
+One central **People & Access** area inside the `identity` module owns accounts, tenant membership, module access, role assignment, lifecycle and audit. Each module declares its own permissions and role templates and enforces its own business rules. Administrative authority is separate from approval authority. External users stay portal identities with scoped, expiring grants.
+
+| Document | Contents |
+|---|---|
+| [`USER_MANAGEMENT_AUDIT.md`](docs/iam/USER_MANAGEMENT_AUDIT.md) | current architecture, evidence, findings F1–F15 |
+| [`IAM_TARGET_ARCHITECTURE.md`](docs/iam/IAM_TARGET_ARCHITECTURE.md) | hierarchy, model, permission standard, the 18 decisions |
+| [`USER_MANAGEMENT_UX_SPEC.md`](docs/iam/USER_MANAGEMENT_UX_SPEC.md) | 20 screens, journeys, simple vs advanced mode |
+| [`MODULE_ROLE_PERMISSION_MATRIX.md`](docs/iam/MODULE_ROLE_PERMISSION_MATRIX.md) | implemented permissions and proposed role templates per module |
+| [`IAM_API_CONTRACT.md`](docs/iam/IAM_API_CONTRACT.md) | proposed endpoints |
+| [`IAM_IMPLEMENTATION_ROADMAP.md`](docs/iam/IAM_IMPLEMENTATION_ROADMAP.md) | phases, acceptance criteria, test plan |
 
 ---
 
