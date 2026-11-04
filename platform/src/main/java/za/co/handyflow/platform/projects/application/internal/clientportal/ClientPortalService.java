@@ -43,7 +43,7 @@ import java.util.*;
  * in the project team's inbox to accept or decline.
  */
 @Slf4j
-@Service
+@Service("projectsClientPortalService")
 @RequiredArgsConstructor
 public class ClientPortalService {
 
