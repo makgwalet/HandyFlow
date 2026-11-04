@@ -279,11 +279,13 @@ public class ProjectController {
 
     @PostMapping("/time-entries/{entryId}/reject")
     @PreAuthorize("hasAuthority('PM_APPROVE')")
-    @Operation(summary = "Reject a submitted time entry")
-    public ResponseEntity<ApiResponse<TimeEntryResponse>> rejectTime(@PathVariable UUID entryId) {
+    @Operation(summary = "Reject a submitted time entry. Body: { \"reason\": \"...\" } (required)")
+    public ResponseEntity<ApiResponse<TimeEntryResponse>> rejectTime(@PathVariable UUID entryId,
+                                                                   @RequestBody(required = false) Map<String, String> body) {
+        String reason = body == null ? null : body.get("reason");
         return ResponseEntity.ok(ApiResponse.success("Rejected",
-                TimeEntryResponse.of(projectService.approveTime(
-                        TenantContext.getTenantIdAsObject(), entryId, TenantContext.getCurrentUserId(), false))));
+                TimeEntryResponse.of(projectService.decideTime(
+                        TenantContext.getTenantIdAsObject(), entryId, TenantContext.getCurrentUserId(), false, reason))));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

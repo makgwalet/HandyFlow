@@ -34,7 +34,7 @@ record ProjectRoute(Kind kind, UUID projectId, String entityKeyword, UUID entity
             "resources", "change-orders", "rfis", "phases", "time-entries", "issues", "action-items");
 
     /** Any URL segment in this set marks the route as cost-sensitive. */
-    private static final Set<String> COST_SEGMENTS = Set.of("budget", "change-orders");
+    private static final Set<String> COST_SEGMENTS = Set.of("budget", "change-orders", "contracts");
 
     private static final Pattern UUID_FORMAT = Pattern.compile(
             "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");

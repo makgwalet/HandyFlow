@@ -18,6 +18,7 @@ import { TimeTab }          from './tabs/TimeTab'
 import { PortalAccessTab }  from './tabs/PortalAccessTab'
 import { TransmittalsTab }  from './tabs/TransmittalsTab'
 import { LifecycleActions, LifecycleTab } from './tabs/Lifecycle'
+import { EditProjectButton, OverviewExtras } from './ProjectInfo'
 import { TabErrorBoundary } from './TabErrorBoundary'
 
 export interface Project {
@@ -31,6 +32,8 @@ export interface Project {
   cidbGrade: string | null; nhbrcNumber: string | null
   projectManagerName: string | null; clientPortalToken: string | null; notes: string | null
   portalEnabled?: boolean; portalTokenExpiresAt?: string | null
+  contractType?: string | null; projectManagerId?: string | null; sponsorId?: string | null; sponsorName?: string | null
+  objectives?: string | null; scopeStatement?: string | null; businessCase?: string | null
   taskCount: number; completedTaskCount: number; openRiskCount: number
   availableActions?: string[]
 }
@@ -114,6 +117,7 @@ export function ProjectDetailTab({ projectId, onBack }: { projectId:string; onBa
             </div>
           </div>
           <div style={{display:'flex',gap:8,flexShrink:0,flexWrap:'wrap',justifyContent:'flex-end'}}>
+            <EditProjectButton project={project}/>
             <LifecycleActions projectId={project.id} status={project.status} available={project.availableActions}/>
           </div>
         </div>
@@ -161,7 +165,7 @@ export function ProjectDetailTab({ projectId, onBack }: { projectId:string; onBa
 
       {/* Tab panels — each isolated in an error boundary */}
       <TabErrorBoundary tab={tab}>
-        {tab==='overview'   && <OverviewTab   project={project}/>}
+        {tab==='overview'   && <><OverviewTab project={project}/><OverviewExtras project={project}/></>}
         {tab==='gantt'      && <GanttTab      projectId={project.id}/>}
         {tab==='tasks'      && <TasksTab      projectId={project.id}/>}
         {tab==='resources'  && <ResourcesTab  projectId={project.id}/>}

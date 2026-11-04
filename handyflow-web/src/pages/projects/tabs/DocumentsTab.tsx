@@ -17,6 +17,7 @@ interface Doc {
 function unwrap<T>(r:any):T[]{const d=r?.data?.data??r?.data??[];return Array.isArray(d)?d as T[]:d?.content??[]}
 const inp:React.CSSProperties={width:'100%',padding:'9px 12px',border:'1.5px solid var(--hf-border)',borderRadius:9,fontSize:14,boxSizing:'border-box' as const,outline:'none',background:'var(--hf-surface)'}
 const DOC_TYPES=['DRAWING','RFI','SUBMITTAL','CONTRACT','REPORT','PHOTO','GENERAL']
+const DOC_TYPE_LABEL:Record<string,string>={DRAWING:'Drawings',RFI:'RFIs',SUBMITTAL:'Submittals',CONTRACT:'Contracts',REPORT:'Reports',PHOTO:'Photos',GENERAL:'General'}
 const DOC_COLOR:Record<string,{bg:string;color:string}>={
   DRAWING:{bg:'var(--hf-info-soft-strong)',color:'var(--hf-info-text)'},RFI:{bg:'var(--hf-warning-soft-strong)',color:'var(--hf-warning-text-deep)'},
   SUBMITTAL:{bg:'var(--hf-violet-soft-strong)',color:'var(--hf-violet-text)'},CONTRACT:{bg:'var(--hf-success-soft-strong)',color:'var(--hf-success-text-strong)'},
@@ -104,11 +105,15 @@ export function DocumentsTab({projectId}:{projectId:string}) {
   const [form,setForm] = useState(initF())
   const sf = (k:string,v:string) => setForm(p=>({...p,[k]:v}))
 
-  const {data:docs=[],isLoading} = useQuery<Doc[]>({
-    queryKey:['pm-docs',projectId,typeFilter],
-    queryFn:async()=>{ const url=typeFilter?`/api/v1/projects/${projectId}/documents?type=${typeFilter}`:`/api/v1/projects/${projectId}/documents`; const r=await apiClient.get(url); return unwrap<Doc>(r) },
+  const {data:allDocs=[],isLoading} = useQuery<Doc[]>({
+    queryKey:['pm-docs',projectId],
+    queryFn:async()=>{ const r=await apiClient.get(`/api/v1/projects/${projectId}/documents`); return unwrap<Doc>(r) },
     staleTime:30_000,
   })
+
+  // one fetch; the type tabs filter it here so each tab can show its count
+  const docs = typeFilter ? allDocs.filter(d=>d.documentType===typeFilter) : allDocs
+  const typeCount = (t:string) => t ? allDocs.filter(d=>d.documentType===t).length : allDocs.length
 
   const statusMut = useMutation({
     mutationFn:({docId,action,comment}:{docId:string;action:string;comment?:string})=>apiClient.post(`/api/v1/projects/documents/${docId}/${action}`, comment?{comment}:{}),
@@ -182,7 +187,7 @@ export function DocumentsTab({projectId}:{projectId:string}) {
           {['','DRAWING','RFI','SUBMITTAL','CONTRACT','REPORT','PHOTO','GENERAL'].map(t=>(
             <button key={t} onClick={()=>setTypeFilter(t)}
               style={{padding:'5px 12px',borderRadius:20,border:typeFilter===t?'1.5px solid var(--hf-primary)':'1px solid var(--hf-border)',background:typeFilter===t?'var(--hf-info-soft)':'var(--hf-surface)',color:typeFilter===t?'var(--hf-primary-text)':'var(--hf-text-muted)',fontSize:12,fontWeight:typeFilter===t?700:400,cursor:'pointer'}}>
-              {t||'All'}
+              {t ? DOC_TYPE_LABEL[t] ?? t : 'All'} <span style={{opacity:.7}}>({typeCount(t)})</span>
             </button>
           ))}
         </div>

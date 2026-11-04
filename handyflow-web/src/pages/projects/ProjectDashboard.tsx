@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { FolderOpen, Plus } from "lucide-react"
 import { PortfolioPanel } from "./PortfolioPanel"
+import { PortfolioGantt } from "./PortfolioGantt"
 import { useState } from "react"
 import { CreateProjectModal } from "./CreateProjectModal"
 
@@ -45,6 +46,7 @@ export function ProjectDashboard({ onOpen, onList }: { onOpen:(id:string)=>void;
   return (
     <div>
       <PortfolioPanel summary={summary} onOpen={onOpen} />
+      <PortfolioGantt onOpen={onOpen} />
 
       {/* Actions */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>

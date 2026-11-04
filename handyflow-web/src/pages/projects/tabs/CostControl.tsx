@@ -77,6 +77,8 @@ export function CostPosition({ projectId }: { projectId: string }) {
         </div>
       </div>
 
+      <CostCharts projectId={projectId} summary={s} lines={lines} />
+
       <div style={{ ...card, padding: 0, overflowX: 'auto' }}>
         <div style={{ padding: '12px 14px 0' }}><SectionTitle right={s.overBudgetLineCount > 0 && <Pill tone="danger">{s.overBudgetLineCount} over budget</Pill>}>By line</SectionTitle></div>
         {s.lines.length === 0 ? <Empty>No budget lines yet.</Empty> : (
@@ -292,5 +294,105 @@ function TransferDialog({ projectId, lines, onClose }: { projectId: string; line
       <Field label="Reason"><textarea rows={3} maxLength={2000} value={f.reason} onChange={e => set('reason', e.target.value)} style={{ ...inp, resize: 'vertical' }} /></Field>
       {err && <ErrorLine text={err} />}
     </Dialog>
+  )
+}
+
+// ── Charts ───────────────────────────────────────────────────────────────────
+
+/** Budget against cost by line, and cumulative spend over time from the ledger. */
+function CostCharts({ projectId, summary: s, lines }: { projectId: string; summary: Summary; lines: BudgetLine[] }) {
+  const { data: ledger = [] } = useQuery<CostEntry[]>({
+    queryKey: ['pm-ledger', projectId, ''],
+    queryFn: async () => list<CostEntry>(await apiClient.get(`/api/v1/projects/${projectId}/budget/ledger`, { params: { limit: 500 } })),
+  })
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(380px,1fr))', gap: 12 }}>
+      <div style={card}>
+        <SectionTitle>Budget against cost</SectionTitle>
+        <LineBars rows={s.lines.map(l => ({ id: l.id, label: lineName(lines, l.id), budget: Number(l.budgeted), actual: Number(l.actual), committed: Number(l.committed), eac: Number(l.eac) }))} />
+        <div style={{ ...muted, display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+          <span><Swatch c="var(--hf-info)" /> actual</span><span><Swatch c="var(--hf-warning)" /> committed</span>
+          <span><Swatch c="transparent" border /> budget</span><span><b style={{ color: 'var(--hf-text)' }}>|</b> forecast at completion</span>
+        </div>
+      </div>
+      <div style={card}>
+        <SectionTitle>Spend over time</SectionTitle>
+        <SpendLine entries={ledger} budget={Number(s.revisedBudget)} />
+      </div>
+    </div>
+  )
+}
+
+function Swatch({ c, border }: { c: string; border?: boolean }) {
+  return <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: c, border: border ? '1.5px solid var(--hf-text-muted)' : 'none', marginRight: 4, verticalAlign: -1 }} />
+}
+
+function LineBars({ rows }: { rows: { id: string; label: string; budget: number; actual: number; committed: number; eac: number }[] }) {
+  if (!rows.length) return <Empty>No budget lines yet.</Empty>
+  const max = Math.max(1, ...rows.flatMap(r => [r.budget, r.actual + r.committed, r.eac]))
+  const pc = (v: number) => `${Math.max(0, v) / max * 100}%`
+  return (
+    <div style={{ display: 'grid', gap: 9 }} role="img" aria-label="Budget, actual, committed and forecast by budget line">
+      {rows.map(r => {
+        const over = r.eac > r.budget
+        return (
+          <div key={r.id} title={`${r.label}: budget ${money(r.budget)}, actual ${money(r.actual)}, committed ${money(r.committed)}, forecast ${money(r.eac)}`}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, marginBottom: 3 }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>{r.label}</span>
+              <span style={{ color: over ? 'var(--hf-danger-text)' : 'var(--hf-text-muted)', fontWeight: over ? 700 : 500 }}>{money(r.eac)} of {money(r.budget)}</span>
+            </div>
+            <div style={{ position: 'relative', height: 14, background: 'var(--hf-surface-sunken)', borderRadius: 3 }}>
+              <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: pc(r.actual), background: 'var(--hf-info)', borderRadius: 3 }} />
+              <div style={{ position: 'absolute', left: pc(r.actual), top: 0, bottom: 0, width: pc(r.committed), background: 'var(--hf-warning)', opacity: 0.8 }} />
+              <div style={{ position: 'absolute', left: 0, top: -2, bottom: -2, width: pc(r.budget), border: '1.5px solid var(--hf-text-muted)', borderRadius: 3, pointerEvents: 'none' }} />
+              <div style={{ position: 'absolute', left: pc(r.eac), top: -4, bottom: -4, width: 2, background: over ? 'var(--hf-danger)' : 'var(--hf-text)' }} />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Cumulative actual cost by entry date (reversals included), with commitments on top, against the revised budget. */
+export function spendSeries(entries: { type: string; amount: number; entryDate: string }[]) {
+  const byDay = new Map<string, { actual: number; committed: number }>()
+  for (const e of entries) {
+    const d = byDay.get(e.entryDate) ?? { actual: 0, committed: 0 }
+    if (e.type === 'ACTUAL') d.actual += Number(e.amount); else d.committed += Number(e.amount)
+    byDay.set(e.entryDate, d)
+  }
+  let a = 0, c = 0
+  return [...byDay.keys()].sort().map(k => { a += byDay.get(k)!.actual; c += byDay.get(k)!.committed; return { date: k, actual: a, withCommitted: a + c } })
+}
+
+function SpendLine({ entries, budget }: { entries: CostEntry[]; budget: number }) {
+  const pts = spendSeries(entries)
+  if (pts.length < 2) return <Empty>The chart appears once two or more days of costs are posted.</Empty>
+  const W = 520, H = 200, L = 64, B = 24, T = 10, R = 10
+  const t0 = new Date(pts[0].date).getTime(), t1 = new Date(pts[pts.length - 1].date).getTime() || t0 + 1
+  const maxY = Math.max(budget, ...pts.map(p => p.withCommitted)) * 1.05 || 1
+  const x = (d: string) => L + (new Date(d).getTime() - t0) / Math.max(1, t1 - t0) * (W - L - R)
+  const y = (v: number) => T + (1 - v / maxY) * (H - T - B)
+  const path = (k: 'actual' | 'withCommitted') => pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.date).toFixed(1)},${y(p[k]).toFixed(1)}`).join(' ')
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => maxY * f)
+  const last = pts[pts.length - 1]
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }} role="img" aria-label={`Spend over time: ${money(last.actual)} actual, ${money(last.withCommitted)} with commitments, against a budget of ${money(budget)}`}>
+        {ticks.map((v, i) => <g key={i}><line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke="var(--hf-border)" strokeWidth={0.6} />
+          <text x={L - 6} y={y(v) + 3} fontSize={9} textAnchor="end" fill="var(--hf-text-faint)">{v >= 1e6 ? `R${(v / 1e6).toFixed(1)}m` : `R${Math.round(v / 1000)}k`}</text></g>)}
+        {budget > 0 && <g><line x1={L} x2={W - R} y1={y(budget)} y2={y(budget)} stroke="var(--hf-danger)" strokeDasharray="5 3" strokeWidth={1.2} />
+          <text x={W - R} y={y(budget) - 4} fontSize={9} textAnchor="end" fill="var(--hf-danger-text)">budget {money(budget)}</text></g>}
+        <path d={path('withCommitted')} fill="none" stroke="var(--hf-warning)" strokeWidth={1.6} strokeDasharray="4 2" />
+        <path d={path('actual')} fill="none" stroke="var(--hf-info)" strokeWidth={2.2} />
+        <text x={L} y={H - 6} fontSize={9} fill="var(--hf-text-faint)">{day(pts[0].date)}</text>
+        <text x={W - R} y={H - 6} fontSize={9} textAnchor="end" fill="var(--hf-text-faint)">{day(last.date)}</text>
+      </svg>
+      <div style={{ ...muted, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <span><Swatch c="var(--hf-info)" /> actual {money(last.actual)}</span><span><Swatch c="var(--hf-warning)" /> with commitments {money(last.withCommitted)}</span>
+        {entries.length >= 500 && <span>Only the latest 500 entries are drawn.</span>}
+      </div>
+    </div>
   )
 }

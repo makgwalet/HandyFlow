@@ -80,6 +80,36 @@ public class ContractingFacadeImpl implements ContractingFacade {
         return contractRepo.findByReference(tenantId, refType, refId).stream().map(ContractingFacadeImpl::toSummary).toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<ContractSummary> listUnlinked(TenantId tenantId) {
+        return contractRepo.findUnlinked(tenantId, org.springframework.data.domain.PageRequest.of(0, 200)).stream()
+                .map(ContractingFacadeImpl::toSummary).toList();
+    }
+
+    @Override
+    @Transactional
+    public ContractSummary linkToReference(TenantId tenantId, UUID contractId, String refType, UUID refId) {
+        Contract c = contractRepo.findActiveById(tenantId, contractId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contract", String.valueOf(contractId)));
+        if (c.getRefId() != null && !(refId.equals(c.getRefId()) && refType.equals(c.getRefType())))
+            throw new IllegalStateException("Contract " + c.getContractNumber() + " is already linked to another record");
+        c.linkReference(refType, refId, c.getParentContractId());
+        contractRepo.save(c);
+        return toSummary(c);
+    }
+
+    @Override
+    @Transactional
+    public void unlinkFromReference(TenantId tenantId, UUID contractId, String refType, UUID refId) {
+        Contract c = contractRepo.findActiveById(tenantId, contractId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contract", String.valueOf(contractId)));
+        if (!refId.equals(c.getRefId()) || !refType.equals(c.getRefType()))
+            throw new IllegalStateException("Contract " + c.getContractNumber() + " is not linked to this record");
+        c.linkReference(null, null, c.getParentContractId());
+        contractRepo.save(c);
+    }
+
     private static ContractSummary toSummary(Contract c) {
         return new ContractSummary(
                 c.getId(), c.getContractNumber(), c.getTitle(), c.getContractType(), c.getStatus(),

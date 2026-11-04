@@ -2,11 +2,12 @@
 // Schedule tab: schedule control (ScheduleSection) on top, then the plan as a Gantt chart (day / week / month zoom, dependency
 // arrows, broken links in red, today line), a list, or a month calendar. The chart exports as PNG and the plan as CSV.
 import React, { useMemo, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Download, Image as ImageIcon } from 'lucide-react'
 import { apiClient } from '../../../api/client'
 import { toast } from '../../../store/toast.store'
-import { ScheduleSection } from './ScheduleSection'
+import { ScheduleSection, MoveDialog } from './ScheduleSection'
+import { usePermission } from '../../../hooks/usePermission'
 import { Btn, Empty, Pill, card, day, list, muted, one, td, th } from './pmKit'
 
 interface Task {
@@ -46,6 +47,9 @@ export function GanttTab({ projectId }: { projectId: string }) {
   const [view, setView] = useState<'gantt' | 'list' | 'calendar'>('gantt')
   const [zoom, setZoom] = useState<Zoom>('week')
   const svgRef = useRef<SVGSVGElement>(null)
+  const qc = useQueryClient()
+  const canWrite = usePermission('PM_WRITE')
+  const [moving, setMoving] = useState<{ task: Task; start: string; end: string } | null>(null)
 
   const { data: tasks = [], isLoading } = useQuery<Task[]>({ queryKey: ['pm-tasks', projectId], queryFn: async () => list<Task>(await apiClient.get(`/api/v1/projects/${projectId}/tasks`)) })
   const { data: phases = [] } = useQuery<Phase[]>({ queryKey: ['pm-phases', projectId], staleTime: 60_000, queryFn: async () => list<Phase>(await apiClient.get(`/api/v1/projects/${projectId}/phases`)) })
@@ -114,9 +118,13 @@ export function GanttTab({ projectId }: { projectId: string }) {
       </div>
 
       {isLoading ? <Empty>Loading schedule…</Empty> : !tasks.length ? <Empty>No tasks yet. Add tasks in the Tasks tab to build the plan.</Empty>
-        : view === 'gantt' ? <GanttChart svgRef={svgRef} rows={rows} deps={deps} broken={new Set(report?.violations?.map(v => v.dependencyId) ?? [])} zoom={zoom} />
+        : view === 'gantt' ? <GanttChart svgRef={svgRef} rows={rows} deps={deps} broken={new Set(report?.violations?.map(v => v.dependencyId) ?? [])} zoom={zoom}
+            onMove={canWrite ? (t, start, end) => setMoving({ task: t, start, end }) : undefined} />
         : view === 'list' ? <PlanList rows={rows} predecessorsOf={predecessorsOf} />
         : <PlanCalendar tasks={tasks} />}
+      {view === 'gantt' && canWrite && tasks.length > 0 && <div style={{ ...muted, marginTop: 6 }}>Drag a bar to move a task, or drag its edge to change its start or end. You confirm the dates before anything changes.</div>}
+      {moving && <MoveDialog task={moving.task} initialStart={moving.start} initialEnd={moving.end} onClose={() => setMoving(null)}
+        onDone={() => ['pm-tasks', 'pm-schedule', 'pm-dependencies'].forEach(k => qc.invalidateQueries({ queryKey: [k, projectId] }))} />}
     </>
   )
 }
@@ -130,8 +138,12 @@ function save(blob: Blob, name: string) {
 
 type Row = { kind: 'phase'; phase: Phase } | { kind: 'task'; task: Task }
 
-function GanttChart({ rows, deps, broken, zoom, svgRef }: { rows: Row[]; deps: Dependency[]; broken: Set<string>; zoom: Zoom; svgRef: React.RefObject<SVGSVGElement | null> }) {
+type Drag = { id: string; mode: 'move' | 'end' | 'start'; x0: number; days: number }
+
+function GanttChart({ rows, deps, broken, zoom, svgRef, onMove }: { rows: Row[]; deps: Dependency[]; broken: Set<string>; zoom: Zoom
+  svgRef: React.RefObject<SVGSVGElement | null>; onMove?: (t: Task, start: string, end: string) => void }) {
   const c = useMemo(palette, [])
+  const [drag, setDrag] = useState<Drag | null>(null)
   const ppd = PX_PER_DAY[zoom]
   const labelW = 280, headH = 44, rowH = 30
 
@@ -164,11 +176,36 @@ function GanttChart({ rows, deps, broken, zoom, svgRef }: { rows: Row[]; deps: D
   const today = new Date(); const todayX = x(new Date(today.getFullYear(), today.getMonth(), today.getDate()))
 
   const barColour = (t: Task) => t.status === 'COMPLETED' ? c.done : t.status === 'BLOCKED' ? c.blocked : t.status === 'IN_REVIEW' ? c.review : c.progress
-  const edge = (t: Task, side: 'start' | 'end') => side === 'start' ? x(t.plannedStart!) : x(t.plannedEnd!) + ppd
+  const shift = (t: Task, side: 'start' | 'end') => !drag || drag.id !== t.id ? 0
+    : drag.mode === 'move' || drag.mode === side ? drag.days * ppd : 0
+  const edge = (t: Task, side: 'start' | 'end') => (side === 'start' ? x(t.plannedStart!) : x(t.plannedEnd!) + ppd) + shift(t, side)
+  const movable = (t: Task) => !!onMove && !!t.plannedStart && !!t.plannedEnd && t.status !== 'COMPLETED' && t.status !== 'CANCELLED'
+
+  // drag a bar to move it, or its left/right edge to change the start/end; dropping opens the dates dialog (links are checked there)
+  const begin = (e: React.PointerEvent, t: Task, mode: Drag['mode']) => {
+    if (!movable(t) || e.button !== 0) return
+    e.preventDefault(); e.stopPropagation()
+    ;(e.currentTarget as Element).setPointerCapture?.(e.pointerId)
+    setDrag({ id: t.id, mode, x0: e.clientX, days: 0 })
+  }
+  const moveDrag = (e: React.PointerEvent) => { if (drag) setDrag({ ...drag, days: Math.round((e.clientX - drag.x0) / ppd) }) }
+  const endDrag = () => {
+    if (!drag) return
+    const r = rows.find(r => r.kind === 'task' && r.task.id === drag.id) as { task: Task } | undefined
+    const d = drag; setDrag(null)
+    if (!r || d.days === 0 || !onMove) return
+    const t = r.task
+    let s0 = parse(t.plannedStart!), e0 = parse(t.plannedEnd!)
+    if (d.mode !== 'end') s0 = addDays(s0, d.days)
+    if (d.mode !== 'start') e0 = addDays(e0, d.days)
+    if (e0 < s0) { if (d.mode === 'end') e0 = s0; else s0 = e0 }
+    onMove(t, iso(s0), iso(e0))
+  }
 
   return (
     <div style={{ ...card, padding: 0, overflow: 'auto', maxHeight: 640 }}>
-      <svg ref={svgRef} xmlns="http://www.w3.org/2000/svg" width={W} height={H} style={{ display: 'block', fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <svg ref={svgRef} xmlns="http://www.w3.org/2000/svg" width={W} height={H} style={{ display: 'block', fontFamily: 'Inter, system-ui, sans-serif', userSelect: 'none', cursor: drag ? (drag.mode === 'move' ? 'grabbing' : 'ew-resize') : undefined, touchAction: drag ? 'none' : undefined }}
+        onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={() => setDrag(null)}>
         <defs>
           <marker id="gantt-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" fill={c.arrow} /></marker>
           <marker id="gantt-arrow-bad" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" fill={c.danger} /></marker>
@@ -203,14 +240,21 @@ function GanttChart({ rows, deps, broken, zoom, svgRef }: { rows: Row[]; deps: D
               <text x={24} y={y + 19} fontSize={12} fill={c.text}>{label.length > 40 ? label.slice(0, 39) + '…' : label}<title>{label}</title></text>
               {t.plannedStart && t.plannedEnd && (t.isMilestone ? (() => {
                 const cx = edge(t, 'end') - ppd / 2, cy = y + rowH / 2, s = 7
-                return <polygon points={`${cx},${cy - s} ${cx + s},${cy} ${cx},${cy + s} ${cx - s},${cy}`} fill={t.status === 'COMPLETED' ? c.done : c.progress}><title>{label} — {day(t.plannedEnd)}</title></polygon>
+                return <polygon points={`${cx},${cy - s} ${cx + s},${cy} ${cx},${cy + s} ${cx - s},${cy}`} fill={t.status === 'COMPLETED' ? c.done : c.progress}
+                  style={{ cursor: movable(t) ? 'grab' : undefined }} onPointerDown={e => begin(e, t, 'move')}><title>{label} — {day(t.plannedEnd)}{movable(t) ? ' · drag to move' : ''}</title></polygon>
               })() : (() => {
                 const bx = edge(t, 'start'), bw = Math.max(edge(t, 'end') - bx, 4), by = y + 7, bh = rowH - 14
                 return <g>
                   <rect x={bx} y={by} width={bw} height={bh} rx={3} fill={t.isCritical ? c.barCritical : c.bar} stroke={t.isCritical ? c.danger : 'none'} strokeWidth={t.isCritical ? 1 : 0} />
                   <rect x={bx} y={by} width={bw * Math.min(100, Number(t.progressPct ?? 0)) / 100} height={bh} rx={3} fill={barColour(t)} />
                   {bw > 34 && <text x={bx + 5} y={by + bh - 4} fontSize={9} fontWeight={700} fill={Number(t.progressPct) > 25 ? c.onSolid : c.text}>{Number(t.progressPct ?? 0).toFixed(0)}%</text>}
-                  <title>{label}: {day(t.plannedStart)} – {day(t.plannedEnd)} · {STATUS_LABEL[t.status] ?? t.status}{t.assigneeName ? ' · ' + t.assigneeName : ''}</title>
+                  <title>{label}: {day(t.plannedStart)} – {day(t.plannedEnd)} · {STATUS_LABEL[t.status] ?? t.status}{t.assigneeName ? ' · ' + t.assigneeName : ''}{movable(t) ? ' · drag to move, drag an edge to change a date' : ''}</title>
+                  {movable(t) && <>
+                    <rect x={bx} y={by} width={bw} height={bh} fill="transparent" style={{ cursor: 'grab' }} onPointerDown={e => begin(e, t, 'move')} />
+                    <rect x={bx - 3} y={by} width={7} height={bh} fill="transparent" style={{ cursor: 'ew-resize' }} onPointerDown={e => begin(e, t, 'start')} />
+                    <rect x={bx + bw - 4} y={by} width={7} height={bh} fill="transparent" style={{ cursor: 'ew-resize' }} onPointerDown={e => begin(e, t, 'end')} />
+                  </>}
+                  {drag?.id === t.id && drag.days !== 0 && <text x={bx + bw + 6} y={by + bh - 3} fontSize={10} fontWeight={700} fill={c.text}>{drag.days > 0 ? '+' : ''}{drag.days} d</text>}
                 </g>
               })())}
             </g>

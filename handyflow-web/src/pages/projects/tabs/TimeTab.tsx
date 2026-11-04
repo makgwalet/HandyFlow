@@ -9,11 +9,12 @@ import { usePermission } from '../../../hooks/usePermission'
 import { useAuthStore } from '../../../store/auth.store'
 import { toast } from '../../../store/toast.store'
 import { errorText } from '../../../api/projectDocs'
-import { Btn, Dialog, Empty, ErrorLine, Field, Pill, SectionTitle, Stat, card, day, fail, inp, list, muted, td, th, today } from './pmKit'
+import { Btn, Dialog, Empty, ErrorLine, Field, Pill, ReasonDialog, SectionTitle, Stat, card, day, fail, inp, list, muted, td, th, today } from './pmKit'
 import type { TaskLite } from './ChangeOrdersTab'
 
 interface TimeEntry { id: string; projectId: string; taskId: string | null; userId: string | null; userName: string; entryDate: string; hours: number
-  description: string | null; status: 'SUBMITTED' | 'APPROVED' | 'REJECTED'; approvedAt: string | null; createdAt: string }
+  description: string | null; status: 'SUBMITTED' | 'APPROVED' | 'REJECTED'; approvedAt: string | null; createdAt: string
+  rejectionReason?: string | null; rejectedAt?: string | null }
 interface ProjectLite { id: string; projectNumber: string; name: string }
 
 const TONE = { SUBMITTED: 'warning', APPROVED: 'success', REJECTED: 'danger' } as const
@@ -27,6 +28,7 @@ export function TimeTab({ projectId, editable }: { projectId: string; editable: 
   const [scope, setScope] = useState<'project' | 'queue'>('project')
   const [mine, setMine] = useState(false)
   const [logging, setLogging] = useState(false)
+  const [rejecting, setRejecting] = useState<TimeEntry | null>(null)
 
   const { data: tasks = [] } = useQuery<TaskLite[]>({ queryKey: ['pm-tasks', projectId], queryFn: async () => list<TaskLite>(await apiClient.get(`/api/v1/projects/${projectId}/tasks`)) })
   const { data: entries = [], isLoading, isError } = useQuery<TimeEntry[]>({
@@ -54,9 +56,10 @@ export function TimeTab({ projectId, editable }: { projectId: string; editable: 
   }, [entries, me])
 
   const decide = async (e: TimeEntry, approve: boolean) => {
+    if (!approve) { setRejecting(e); return }
     try {
-      await apiClient.post(`/api/v1/projects/time-entries/${e.id}/${approve ? 'approve' : 'reject'}`)
-      toast.success(approve ? 'Time approved' : 'Time rejected'); refresh()
+      await apiClient.post(`/api/v1/projects/time-entries/${e.id}/approve`)
+      toast.success('Time approved'); refresh()
     } catch (err) { await fail(err, 'Could not record the decision') }
   }
 
@@ -91,7 +94,8 @@ export function TimeTab({ projectId, editable }: { projectId: string; editable: 
                   <td style={td}>{scope === 'queue' ? projectName(e.projectId) : taskName(e.taskId)}</td>
                   <td style={td}>{e.description ?? '—'}</td>
                   <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{Number(e.hours).toFixed(2)}</td>
-                  <td style={td}><Pill tone={TONE[e.status] ?? 'neutral'}>{LABEL[e.status] ?? e.status}</Pill></td>
+                  <td style={td}><Pill tone={TONE[e.status] ?? 'neutral'}>{LABEL[e.status] ?? e.status}</Pill>
+                    {e.status === 'REJECTED' && e.rejectionReason && <div style={{ ...muted, maxWidth: 220 }}>{e.rejectionReason}</div>}</td>
                   <td style={{ ...td, whiteSpace: 'nowrap', textAlign: 'right' }}>
                     {canApprove && e.status === 'SUBMITTED' && (own ? <span style={muted} title="Someone else must approve your time">not yours to approve</span> : <>
                       <Btn small kind="ghost" onClick={() => decide(e, false)}><X size={12} /> Reject</Btn>
@@ -104,6 +108,9 @@ export function TimeTab({ projectId, editable }: { projectId: string; editable: 
         )}
       </div>
       {!editable && <div style={{ ...muted, marginTop: 6 }}>Time can no longer be logged on this project.</div>}
+      {rejecting && <ReasonDialog title="Reject time" confirm="Reject" danger max={500} onClose={() => setRejecting(null)}
+        intro={<>{rejecting.userName} · {day(rejecting.entryDate)} · {Number(rejecting.hours).toFixed(2)} h. They are told why, so they can correct it and log it again.</>}
+        onSubmit={async reason => { await apiClient.post(`/api/v1/projects/time-entries/${rejecting.id}/reject`, { reason }); toast.success('Time rejected'); refresh() }} />}
       {logging && <LogTimeDialog projectId={projectId} tasks={tasks} onClose={() => setLogging(false)} onDone={refresh} />}
     </div>
   )

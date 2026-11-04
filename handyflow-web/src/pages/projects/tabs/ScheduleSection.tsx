@@ -172,9 +172,10 @@ function LinkDialog({ projectId, tasks, onClose, onDone }: { projectId: string; 
   )
 }
 
-function MoveDialog({ task, onClose, onDone }: { task: TaskView; onClose: () => void; onDone: () => void }) {
-  const [start, setStart] = useState(task.plannedStart ?? '')
-  const [end, setEnd] = useState(task.plannedEnd ?? '')
+export function MoveDialog({ task, initialStart, initialEnd, onClose, onDone }:
+  { task: Pick<TaskView, 'id' | 'taskNumber' | 'title' | 'plannedStart' | 'plannedEnd'>; initialStart?: string; initialEnd?: string; onClose: () => void; onDone: () => void }) {
+  const [start, setStart] = useState(initialStart ?? task.plannedStart ?? '')
+  const [end, setEnd] = useState(initialEnd ?? task.plannedEnd ?? '')
   const [push, setPush] = useState(true)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -193,7 +194,7 @@ function MoveDialog({ task, onClose, onDone }: { task: TaskView; onClose: () => 
     <Dialog title={`Move ${task.taskNumber}`} onClose={onClose}
       footer={result ? <Btn kind="primary" onClick={onClose}>Done</Btn> : <><Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save dates'}</Btn></>}>
       {!result ? <>
-        <div style={{ ...muted, marginBottom: 12 }}>{task.title}</div>
+        <div style={{ ...muted, marginBottom: 12 }}>{task.title}{(initialStart || initialEnd) && <> — was {day(task.plannedStart)} – {day(task.plannedEnd)}</>}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <Field label="Planned start"><input type="date" value={start} onChange={e => setStart(e.target.value)} style={inp} /></Field>
           <Field label="Planned end"><input type="date" value={end} onChange={e => setEnd(e.target.value)} style={inp} /></Field>

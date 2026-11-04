@@ -59,6 +59,10 @@ public interface ContractRepository extends JpaRepository<Contract, UUID> {
     @Query("SELECT c FROM Contract c WHERE c.tenantId = :#{#tenantId.value} AND c.refType = :refType AND c.refId = :refId AND c.deletedAt IS NULL ORDER BY c.createdAt")
     List<Contract> findByReference(TenantId tenantId, String refType, UUID refId);
 
+    /** Contracts not linked to any record yet, newest first. */
+    @Query("SELECT c FROM Contract c WHERE c.tenantId = :#{#tenantId.value} AND c.refId IS NULL AND c.deletedAt IS NULL ORDER BY c.createdAt DESC")
+    List<Contract> findUnlinked(TenantId tenantId, org.springframework.data.domain.Pageable page);
+
 
     // ── Executed copy and records retention (V581) ───────────────────────────
 

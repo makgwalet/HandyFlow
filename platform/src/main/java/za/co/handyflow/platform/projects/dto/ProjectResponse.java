@@ -59,7 +59,8 @@ public record ProjectResponse(
         int         completedTaskCount,
         int         openRiskCount,
         BigDecimal  budgetVariance,       // budgetTotal - budgetSpent - budgetCommitted
-        List<String> availableActions     // lifecycle actions valid right now (drives UI buttons)
+        List<String> availableActions,    // lifecycle actions valid right now (drives UI buttons)
+        UUID        projectManagerId
 ) {
     public static ProjectResponse of(Project p, int taskCount, int completedTaskCount,
                                      int openRiskCount, List<String> availableActions) {
@@ -82,7 +83,7 @@ public record ProjectResponse(
                 p.getCancellationReason(), p.getVersion(),
                 p.getCreatedAt(), p.getUpdatedAt(),
                 taskCount, completedTaskCount, openRiskCount, variance,
-                availableActions != null ? availableActions : List.of());
+                availableActions != null ? availableActions : List.of(), p.getProjectManagerId());
     }
     /**
      * CHUNK 2b: copy for roles without cost visibility — removes budget, contract
@@ -102,6 +103,6 @@ public record ProjectResponse(
                 proposedAt, approvedAt, approvedByName, completedAt, closedAt,
                 closureNotes, lessonsLearned, cancellationReason, version,
                 createdAt, updatedAt,
-                taskCount, completedTaskCount, openRiskCount, null, availableActions);
+                taskCount, completedTaskCount, openRiskCount, null, availableActions, projectManagerId);
     }
 }

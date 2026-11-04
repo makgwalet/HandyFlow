@@ -15,6 +15,12 @@ function unwrap<T>(r:any):T[]{const d=r?.data?.data??r?.data??[];return Array.is
 const fmtDate = (d:string|null) => d ? new Date(d).toLocaleDateString('en-ZA') : '—'
 const inp:React.CSSProperties = {width:'100%',padding:'9px 12px',border:'1.5px solid var(--hf-border)',borderRadius:9,fontSize:14,boxSizing:'border-box' as const,outline:'none',background:'var(--hf-surface)'}
 
+interface RfiSummary { total:number; byStatus:Record<string,number>; awaitingResponse:number; awaitingClosure:number; overdue:number; withUnresolvedImpact:number; avgResponseDays:number|null; ageing:Record<string,number>|null }
+const RFI_TAB_LABEL:Record<string,string>={OPEN:'Open',DRAFT:'Draft',SUBMITTED:'Awaiting answer',RESPONDED:'Answered',CLOSED:'Closed',CANCELLED:'Cancelled',ALL:'All'}
+function RfiStat({label,value,tone}:{label:string;value:React.ReactNode;tone?:string}) {
+  return <div><div style={{fontSize:11,fontWeight:600,color:'var(--hf-text-muted)',textTransform:'uppercase',letterSpacing:'.03em',marginBottom:3}}>{label}</div>
+    <div style={{fontSize:18,fontWeight:800,color:tone??'var(--hf-text)'}}>{value}</div></div>
+}
 const STATUS_CONFIG: Record<string,{bg:string;color:string;icon:React.ElementType;label:string}> = {
   DRAFT:     {bg:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)',   icon:Clock,        label:'Draft'},
   SUBMITTED: {bg:'var(--hf-info-soft-strong)',color:'var(--hf-info-text)',   icon:Send,         label:'Submitted'},
@@ -68,20 +74,39 @@ export function RfiTab({ projectId }: { projectId: string }) {
     onSuccess: () => { qc.invalidateQueries({queryKey:['pm-rfis',projectId]}); setSelected(null) },
   })
 
-  const open    = rfis.filter(r => r.status === 'SUBMITTED' || r.status === 'RESPONDED').length
-  const pending = rfis.filter(r => r.status === 'SUBMITTED').length
+  const [statusTab, setStatusTab] = useState('OPEN')
+  const { data: summary } = useQuery<RfiSummary>({
+    queryKey: ['pm-rfi-summary', projectId, rfis.length, rfis.map(r => r.status).join()],
+    queryFn: async () => { const r = await apiClient.get(`/api/v1/projects/${projectId}/rfis/summary`); return r.data?.data ?? r.data },
+    staleTime: 30_000,
+  })
+  const shownRfis = rfis.filter(r => statusTab === 'ALL' ? true : statusTab === 'OPEN' ? ['DRAFT', 'SUBMITTED', 'RESPONDED'].includes(r.status) : r.status === statusTab)
+  const countOf = (k: string) => k === 'ALL' ? rfis.length : k === 'OPEN' ? rfis.filter(r => ['DRAFT', 'SUBMITTED', 'RESPONDED'].includes(r.status)).length : rfis.filter(r => r.status === k).length
 
   return (
     <div>
-      {/* Summary + toolbar */}
+      {/* Summary */}
+      {summary && (
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:14,marginBottom:14,padding:'14px 16px',border:'1px solid var(--hf-border)',borderRadius:12,background:'var(--hf-surface)'}}>
+          <RfiStat label="Awaiting an answer" value={summary.awaitingResponse} tone={summary.awaitingResponse?'var(--hf-info-text)':undefined}/>
+          <RfiStat label="Answered, not closed" value={summary.awaitingClosure} tone={summary.awaitingClosure?'var(--hf-warning-text)':undefined}/>
+          <RfiStat label="Overdue" value={summary.overdue} tone={summary.overdue?'var(--hf-danger-text)':undefined}/>
+          <RfiStat label="Average answer time" value={summary.avgResponseDays==null?'—':`${summary.avgResponseDays.toFixed(1)} days`}/>
+          <RfiStat label="Unresolved impact" value={summary.withUnresolvedImpact} tone={summary.withUnresolvedImpact?'var(--hf-danger-text)':undefined}/>
+          {summary.ageing && <div>
+            <div style={{fontSize:11,fontWeight:600,color:'var(--hf-text-muted)',textTransform:'uppercase',letterSpacing:'.03em',marginBottom:4}}>Open for (days)</div>
+            <div style={{display:'flex',gap:6,fontSize:12}}>{Object.entries(summary.ageing).map(([k,v])=><span key={k} title={`${v} open ${k} days`} style={{whiteSpace:'nowrap'}}><b>{v}</b> <span style={{color:'var(--hf-text-faint)'}}>{k}</span></span>)}</div>
+          </div>}
+        </div>
+      )}
+      {/* Status tabs + toolbar */}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:10}}>
-        <div style={{display:'flex',gap:8}}>
-          {[
-            {label:`${pending} Pending Response`, bg:'var(--hf-info-soft-strong)', color:'var(--hf-info-text)'},
-            {label:`${open} Open`, bg:'var(--hf-warning-soft-strong)', color:'var(--hf-warning-text-deep)'},
-            {label:`${rfis.length} Total`, bg:'var(--hf-surface-sunken)', color:'var(--hf-text-tertiary)'},
-          ].map(s=>(
-            <div key={s.label} style={{background:s.bg,color:s.color,fontSize:12,fontWeight:700,padding:'5px 12px',borderRadius:20}}>{s.label}</div>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          {['OPEN','DRAFT','SUBMITTED','RESPONDED','CLOSED','CANCELLED','ALL'].map(k=>(
+            <button key={k} onClick={()=>setStatusTab(k)}
+              style={{padding:'5px 12px',borderRadius:20,border:statusTab===k?'1.5px solid var(--hf-primary)':'1px solid var(--hf-border)',background:statusTab===k?'var(--hf-info-soft)':'var(--hf-surface)',color:statusTab===k?'var(--hf-primary-text)':'var(--hf-text-muted)',fontSize:12,fontWeight:statusTab===k?700:500,cursor:'pointer'}}>
+              {RFI_TAB_LABEL[k]} ({countOf(k)})
+            </button>
           ))}
         </div>
         <button onClick={()=>{setShowCreate(true);setErr('')}}
@@ -107,7 +132,8 @@ export function RfiTab({ projectId }: { projectId: string }) {
                   ))}
                 </tr></thead>
                 <tbody>
-                  {rfis.map((r,i) => {
+                  {shownRfis.length===0 && <tr><td colSpan={8} style={{padding:'28px',textAlign:'center',color:'var(--hf-text-faint)',fontSize:13}}>No RFIs with this status.</td></tr>}
+                  {shownRfis.map((r,i) => {
                     const sc = STATUS_CONFIG[r.status] ?? STATUS_CONFIG.DRAFT
                     const Icon = sc.icon
                     return (

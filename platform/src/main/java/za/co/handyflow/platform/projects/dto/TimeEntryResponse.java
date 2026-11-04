@@ -21,7 +21,9 @@ public record TimeEntryResponse(
         String      approvedBy,
         Instant approvedAt,
         Instant     createdAt,
-        UUID        userId
+        UUID        userId,
+        String      rejectionReason,
+        Instant     rejectedAt
 ) {
     public static TimeEntryResponse of(TimeEntry t) {
         return new TimeEntryResponse(
@@ -29,6 +31,6 @@ public record TimeEntryResponse(
                 t.getEntryDate(), t.getHours(), t.getDescription(),
                 t.getLatitude(), t.getLongitude(), t.getStatus(),
                 t.getApprovedBy() != null ? t.getApprovedBy().toString() : null,
-                t.getApprovedAt(), t.getCreatedAt(), t.getUserId());
+                t.getApprovedAt(), t.getCreatedAt(), t.getUserId(), t.getRejectionReason(), t.getRejectedAt());
     }
 }

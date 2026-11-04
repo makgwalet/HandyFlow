@@ -82,6 +82,7 @@ public class ProjectService {
     private final ProjectMemberService       memberService;
     private final ProjectBudgetLineRepository budgetRepo;
     private final ProjectNotifier            notifier;
+    private final ProjectActivityService     activity;
 
     /** Lifetime of a new project's client-portal token in days. 0 = never expires. */
     @Value("${app.projects.portal.token-ttl-days:365}")
@@ -216,6 +217,7 @@ public class ProjectService {
         LocalDate newStart = req.startDate() != null ? req.startDate() : p.getStartDate();
         LocalDate newEnd   = req.endDate()   != null ? req.endDate()   : p.getEndDate();
         validateDates(newStart, newEnd);
+        List<String> changed = changedFields(p, req);
 
         if (req.name()               != null) p.setName(req.name());
         if (req.description()        != null) p.setDescription(blankToNull(req.description()));
@@ -249,6 +251,10 @@ public class ProjectService {
         if (req.notes()              != null) p.setNotes(blankToNull(req.notes()));
         p.updateHealth();
         Project saved = projectRepo.save(p);
+        if (!changed.isEmpty() && activity != null) {
+            activity.record(tenantId.getValue(), id, "DETAILS_EDITED", "Project details edited: " + String.join(", ", changed), null,
+                    currentUserIdOrNull(), TenantContext.getCurrentUserName());
+        }
 
         // CHUNK 2b: a newly named manager / sponsor becomes a member (existing members keep their role).
         if (req.projectManagerId() != null || req.sponsorId() != null) {
@@ -369,6 +375,36 @@ public class ProjectService {
         return taskRepo.save(t);
     }
 
+    /** Plain names of the fields this edit really changes (a form that re-sends every field changes nothing). */
+    static List<String> changedFields(Project p, UpdateProjectRequest r) {
+        List<String> out = new ArrayList<>();
+        diff(out, "name", r.name(), p.getName());
+        diff(out, "description", r.description(), p.getDescription());
+        diff(out, "start date", r.startDate(), p.getStartDate());
+        diff(out, "end date", r.endDate(), p.getEndDate());
+        if (r.budgetTotal() != null && (p.getBudgetTotal() == null || r.budgetTotal().compareTo(p.getBudgetTotal()) != 0)) out.add("budget");
+        if (r.contractValue() != null && (p.getContractValue() == null || r.contractValue().compareTo(p.getContractValue()) != 0)) out.add("contract value");
+        diff(out, "contract reference", r.contractRef(), p.getContractRef());
+        diff(out, "contract type", r.contractType(), p.getContractType());
+        if (r.retentionPct() != null && (p.getRetentionPct() == null || r.retentionPct().compareTo(p.getRetentionPct()) != 0)) out.add("retention");
+        diff(out, "CIDB grade", r.cidbGrade(), p.getCidbGrade());
+        diff(out, "NHBRC number", r.nhbrcNumber(), p.getNhbrcNumber());
+        diff(out, "site address", r.siteAddress(), p.getSiteAddress());
+        diff(out, "project manager", r.projectManagerId(), p.getProjectManagerId());
+        diff(out, "sponsor", r.sponsorId(), p.getSponsorId());
+        diff(out, "objectives", r.objectives(), p.getObjectives());
+        diff(out, "scope", r.scopeStatement(), p.getScopeStatement());
+        diff(out, "business case", r.businessCase(), p.getBusinessCase());
+        diff(out, "notes", r.notes(), p.getNotes());
+        return out;
+    }
+
+    private static void diff(List<String> out, String label, Object requested, Object current) {
+        if (requested == null) return;
+        Object req = requested instanceof String s ? (s.isBlank() ? null : s.trim()) : requested;
+        if (!java.util.Objects.equals(req, current)) out.add(label);
+    }
+
     private void notifyAssigned(ProjectTask t, UUID actor) {
         String projectName = projectRepo.findByTenantAndId(t.getTenantId(), t.getProjectId()).map(Project::getName).orElse("a project");
         notifier.publish(ProjectEvent.to(t.getTenantId(), t.getProjectId(), PmEvent.TASK_ASSIGNED,
@@ -450,6 +486,13 @@ public class ProjectService {
     @Transactional
     public TimeEntry approveTime(TenantId tenantId, UUID entryId,
                                  UUID approverId, boolean approve) {
+        return decideTime(tenantId, entryId, approverId, approve, null);
+    }
+
+    /** Approve, or reject with a reason (required). Never your own time; decided once. */
+    @Transactional
+    public TimeEntry decideTime(TenantId tenantId, UUID entryId,
+                                UUID approverId, boolean approve, String reason) {
         TimeEntry t = timeRepo.findByTenantAndId(tenantId.getValue(), entryId)
                 .orElseThrow(() -> notFound("Time entry"));
         // the interceptor already checks the entry's project; checked again so no other caller can skip it
@@ -463,12 +506,12 @@ public class ProjectService {
                     HttpStatus.FORBIDDEN, "TIME_SELF_APPROVAL");
         }
         if (approve) t.approve(approverId);
-        else         t.reject();
+        else         t.reject(reason);
         TimeEntry saved = timeRepo.save(t);
         if (!approve) {
             notifier.publish(ProjectEvent.to(tenantId.getValue(), t.getProjectId(), PmEvent.TIME_REJECTED,
                     "Your time for " + t.getEntryDate() + " was rejected",
-                    t.getHours() + " h" + (t.getDescription() == null ? "" : " — " + t.getDescription()) + ". Speak to the approver and log it again if needed.",
+                    t.getHours() + " h" + (t.getDescription() == null ? "" : " — " + t.getDescription()) + ". Reason: " + t.getRejectionReason(),
                     t.getId(), t.getUserId(), approverId));
         }
         if (!approve && t.getTaskId() != null) {

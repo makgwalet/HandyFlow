@@ -30,7 +30,7 @@ class TimeApprovalTest {
 
     ProjectService service() {
         return new ProjectService(mock(ProjectRepository.class), tasks, mock(ProjectRiskRepository.class), time,
-                null, null, guard, null, null, mock(ProjectBudgetLineRepository.class), notifier);
+                null, null, guard, null, null, mock(ProjectBudgetLineRepository.class), notifier, null);
     }
 
     TimeEntry entry() {
@@ -47,7 +47,7 @@ class TimeApprovalTest {
         assertEquals("APPROVED", out.getStatus());
         assertEquals(approver, out.getApprovedBy());
         verify(guard).requireView(tenant.getValue(), project);
-        HandyFlowException again = assertThrows(HandyFlowException.class, () -> service().approveTime(tenant, t.getId(), approver, false));
+        HandyFlowException again = assertThrows(HandyFlowException.class, () -> service().decideTime(tenant, t.getId(), approver, false, "Wrong task"));
         assertEquals("TIME_ALREADY_DECIDED", again.getErrorCode());
     }
 
@@ -56,7 +56,7 @@ class TimeApprovalTest {
         TimeEntry t = entry();
         HandyFlowException e = assertThrows(HandyFlowException.class, () -> service().approveTime(tenant, t.getId(), worker, true));
         assertEquals("TIME_SELF_APPROVAL", e.getErrorCode());
-        assertThrows(HandyFlowException.class, () -> service().approveTime(tenant, t.getId(), worker, false));
+        assertThrows(HandyFlowException.class, () -> service().decideTime(tenant, t.getId(), worker, false, "x"));
         assertEquals("SUBMITTED", t.getStatus());
     }
 
@@ -67,8 +67,10 @@ class TimeApprovalTest {
         when(task.getId()).thenReturn(taskId);
         when(tasks.findByTenantAndId(tenant.getValue(), taskId)).thenReturn(Optional.of(task));
         when(time.sumHoursByTask(taskId)).thenReturn(new BigDecimal("1.0"));
-        service().approveTime(tenant, t.getId(), approver, false);
+        service().decideTime(tenant, t.getId(), approver, false, "Wrong task");
         assertEquals("REJECTED", t.getStatus());
+        assertEquals("Wrong task", t.getRejectionReason());
+        assertNotNull(t.getRejectedAt());
         verify(task).setActualHours(new BigDecimal("1.0"));
         verify(tasks).save(task);
         var sent = org.mockito.ArgumentCaptor.forClass(za.co.handyflow.platform.projects.application.internal.notify.ProjectEvent.class);
@@ -76,6 +78,13 @@ class TimeApprovalTest {
         assertEquals(za.co.handyflow.platform.projects.application.internal.notify.PmEvent.TIME_REJECTED, sent.getValue().event());
         assertEquals(java.util.Set.of(worker), sent.getValue().users(), "the person who logged it hears about it");
         assertEquals(approver, sent.getValue().actor());
+    }
+
+    @Test
+    void rejectingNeedsAReason() {
+        TimeEntry t = entry();
+        assertThrows(IllegalArgumentException.class, () -> service().decideTime(tenant, t.getId(), approver, false, "  "));
+        assertEquals("SUBMITTED", t.getStatus());
     }
 
     @Test

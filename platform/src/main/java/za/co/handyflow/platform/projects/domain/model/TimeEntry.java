@@ -31,6 +31,8 @@ public class TimeEntry {
     @Column(name = "approved_by")   UUID    approvedBy;
     @Column(name = "approved_at")   Instant approvedAt;
     @Column(name = "payroll_run_id") UUID   payrollRunId;
+    @Column(name = "rejection_reason") String rejectionReason;
+    @Column(name = "rejected_at")      Instant rejectedAt;
     @Column(name = "created_at", nullable = false) Instant createdAt;
     @Column(name = "updated_at", nullable = false) Instant updatedAt;
 
@@ -63,7 +65,13 @@ public class TimeEntry {
         this.updatedAt  = Instant.now();
     }
 
-    public void reject() { this.status = "REJECTED"; this.updatedAt = Instant.now(); }
+    public void reject(String reason) {
+        if (reason == null || reason.isBlank()) throw new IllegalArgumentException("Say why the time is rejected");
+        this.status = "REJECTED";
+        this.rejectionReason = reason.trim().length() > 500 ? reason.trim().substring(0, 500) : reason.trim();
+        this.rejectedAt = Instant.now();
+        this.updatedAt = this.rejectedAt;
+    }
 
     public void setPayrollRunId(UUID v) { this.payrollRunId = v; }
 }

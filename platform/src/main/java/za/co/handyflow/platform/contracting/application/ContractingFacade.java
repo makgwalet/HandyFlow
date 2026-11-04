@@ -79,6 +79,18 @@ public interface ContractingFacade {
     /** The contracts made for one record, oldest first. */
     List<ContractSummary> findByReference(TenantId tenantId, String refType, UUID refId);
 
+    /** Contracts not yet linked to any record (candidates to link to one), newest first, at most 200. */
+    List<ContractSummary> listUnlinked(TenantId tenantId);
+
+    /**
+     * Link an existing contract to a record of another module. Refused if the contract is already linked to a different record
+     * (IllegalStateException) or does not exist in the tenant (ResourceNotFoundException).
+     */
+    ContractSummary linkToReference(TenantId tenantId, UUID contractId, String refType, UUID refId);
+
+    /** Remove the link, only if the contract is linked to exactly this record. */
+    void unlinkFromReference(TenantId tenantId, UUID contractId, String refType, UUID refId);
+
     record DraftContract(String title, String contractType, java.util.Map<String, String> variables, String body,
                          java.math.BigDecimal valueAmount, java.time.LocalDate startDate, java.time.LocalDate endDate, String notes,
                          String refType, UUID refId, UUID parentContractId) {}
