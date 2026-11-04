@@ -120,6 +120,23 @@ public class UserController {
                 userService.getInvitations(TenantContext.getTenantIdAsObject())));
     }
 
+    @PostMapping("/invitations/{id}/resend")
+    @PreAuthorize("hasAuthority('USER_INVITE')")
+    @Operation(summary = "Send a pending or expired invitation again with a new link")
+    public ResponseEntity<ApiResponse<InvitationResponse>> resendInvitation(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Invitation re-sent",
+                userService.resendInvitation(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @GetMapping("/access-audit")
+    @PreAuthorize("hasAuthority('ROLE_MANAGE')")
+    @Operation(summary = "Recent access changes: invitations, role changes, deactivations")
+    public ResponseEntity<ApiResponse<List<AccessAuditEventResponse>>> getAccessAudit(
+            @RequestParam(defaultValue = "100") int limit) {
+        return ResponseEntity.ok(ApiResponse.success(
+                userService.getAccessAudit(TenantContext.getTenantIdAsObject(), limit)));
+    }
+
     @DeleteMapping("/invitations/{id}")
     @PreAuthorize("hasAuthority('USER_INVITE')")
     @Operation(summary = "Cancel a pending invitation")

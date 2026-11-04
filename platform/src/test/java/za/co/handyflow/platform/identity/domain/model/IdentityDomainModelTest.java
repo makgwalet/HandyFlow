@@ -198,7 +198,25 @@ class IdentityDomainModelTest {
             assertThat(inv.isPending()).isTrue();
             assertThat(inv.isExpired()).isFalse();
             assertThat(inv.getEmail()).isEqualTo("new@zeta.co.za"); // lowercased
-            assertThat(inv.getToken()).hasSize(64); // two UUIDs with dashes stripped, concatenated
+            assertThat(inv.getRawToken()).hasSize(64); // two UUIDs with dashes stripped, concatenated
+            assertThat(inv.getTokenHash()).hasSize(64).isEqualTo(UserInvitation.hashToken(inv.getRawToken()));
+            assertThat(inv.getTokenHash()).isNotEqualTo(inv.getRawToken());
+        }
+
+        @Test
+        @DisplayName("renew() issues a new token and makes an expired invitation pending again; accepted ones cannot be renewed")
+        void renewIssuesNewToken() {
+            UserInvitation inv = UserInvitation.create(TENANT, "new@zeta.co.za", "New", "Hire",
+                    null, null, Role.create(TENANT, "EMPLOYEE", "Employee"), UUID.randomUUID());
+            String oldHash = inv.getTokenHash();
+
+            inv.renew();
+
+            assertThat(inv.getTokenHash()).isNotEqualTo(oldHash);
+            assertThat(inv.isLive()).isTrue();
+
+            inv.accept();
+            org.assertj.core.api.Assertions.assertThatThrownBy(inv::renew).isInstanceOf(IllegalStateException.class);
         }
 
         @Test

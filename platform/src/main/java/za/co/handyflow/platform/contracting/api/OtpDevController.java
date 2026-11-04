@@ -18,8 +18,10 @@ import java.util.UUID;
  * Changed to matchIfMissing = false — the endpoint is now DISABLED unless you
  * explicitly set sms.enabled=false in application.yaml or an env var.
  *
- * Production config must have: sms.enabled=true
- * Dev/test config must have:   sms.enabled=false   (to enable this endpoint)
+ * IAM Phase 0.2: it used to switch on whenever sms.enabled=false, which is the default, so a deployment
+ * that forgot SMS_ENABLED=true exposed one-time codes to the internet. It now needs its own switch:
+ *   handyflow.dev.otp-endpoint.enabled=true   (environment variable DEV_OTP_ENDPOINT=true)
+ * and is off everywhere else, whatever sms.enabled is.
  *
  * Usage: GET /api/v1/dev/otp/{partyId}
  */
@@ -27,10 +29,16 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/dev")
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "sms.enabled", havingValue = "false", matchIfMissing = false)
+@ConditionalOnProperty(name = "handyflow.dev.otp-endpoint.enabled", havingValue = "true", matchIfMissing = false)
 public class OtpDevController {
 
     private final OtpService otpService;
+
+    @jakarta.annotation.PostConstruct
+    void warnEnabled() {
+        log.warn("DEV OTP endpoint (/api/v1/dev/otp/{partyId}) is ENABLED. It returns signing codes to anyone "
+                + "who can reach the API. Never enable handyflow.dev.otp-endpoint.enabled in production.");
+    }
 
     @GetMapping("/otp/{partyId}")
     public ResponseEntity<ApiResponse<String>> getOtp(@PathVariable UUID partyId) {

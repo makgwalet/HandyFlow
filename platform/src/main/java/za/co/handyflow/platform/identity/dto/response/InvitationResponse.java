@@ -13,5 +13,6 @@ public record InvitationResponse(
         String  roleName,
         String  status,       // PENDING | ACCEPTED | EXPIRED | CANCELLED
         Instant expiresAt,
-        Instant createdAt
+        Instant createdAt,
+        Boolean emailSent     // set on invite and resend; null elsewhere. false = email failed, share the link another way
 ) {}

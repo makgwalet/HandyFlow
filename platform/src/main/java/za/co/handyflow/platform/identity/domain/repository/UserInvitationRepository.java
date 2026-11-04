@@ -12,7 +12,15 @@ public interface UserInvitationRepository extends JpaRepository<UserInvitation, 
 
     List<UserInvitation> findByTenantIdOrderByCreatedAtDesc(TenantId tenantId);
 
-    Optional<UserInvitation> findByToken(String token);
+    Optional<UserInvitation> findByTokenHash(String tokenHash);
+
+    /** Marks every pending invitation past its expiry as EXPIRED; returns the number changed. */
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query(
+            "update UserInvitation i set i.status = :expired where i.status = :pending and i.expiresAt < :now")
+    int markExpired(@org.springframework.data.repository.query.Param("now") java.time.Instant now,
+                    @org.springframework.data.repository.query.Param("pending") UserInvitation.InvitationStatus pending,
+                    @org.springframework.data.repository.query.Param("expired") UserInvitation.InvitationStatus expired);
 
     boolean existsByTenantIdAndEmailAndStatus(
             TenantId tenantId, String email,

@@ -226,8 +226,14 @@ contracting:
 
 # ── SMS provider ──────────────────────────────────────────────────────────────
 # FIX §14: Changed matchIfMissing to false — sms.enabled must be explicitly set.
-# - sms.enabled=false  → StubSmsService active (logs to console), OtpDevController enabled
-# - sms.enabled=true   → BulkSmsSaService active, OtpDevController disabled
+# - sms.enabled=false  → StubSmsService active (logs to console)
+# - sms.enabled=true   → BulkSmsSaService active
+# The dev OTP endpoint has its own switch (below) and is OFF unless DEV_OTP_ENDPOINT=true.
+
+handyflow:
+  dev:
+    otp-endpoint:
+      enabled: ${DEV_OTP_ENDPOINT:false}   # local development only; never true in production
 
 sms:
   enabled: ${SMS_ENABLED:false}          # set to true in production

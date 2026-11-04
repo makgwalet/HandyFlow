@@ -16,7 +16,9 @@ import za.co.handyflow.platform.identity.dto.request.*;
 import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.JwtService;
+import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.identity.dto.response.InvitationResponse;
 
 import java.util.List;
 import java.util.Optional;
@@ -26,6 +28,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -62,11 +65,37 @@ class UserManagementServiceTest {
     @Mock DisposableEmailChecker disposableEmailChecker;
     @Mock SubscriptionQueryFacade subscriptionQueryFacade;
     @Mock JdbcTemplate jdbc;
+    @Mock AccessAuditService auditService;
+    @Mock RefreshTokenSecuritySweep securitySweep;
 
     @InjectMocks UserManagementService service;
 
     static final UUID TENANT_UUID = UUID.fromString("9ecb3dc7-75d4-4e56-b0a2-c95d3c7c584f");
     static final TenantId TENANT = TenantId.of(TENANT_UUID);
+
+    @org.junit.jupiter.api.AfterEach
+    void clearSecurity() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        TenantContext.clear();
+    }
+
+    /** Makes the current request look like a user holding exactly these authorities. */
+    private static void callerHolds(String... authorities) {
+        var list = java.util.Arrays.stream(authorities)
+                .map(org.springframework.security.core.authority.SimpleGrantedAuthority::new).toList();
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("caller", null, list));
+    }
+
+    private static Role roleWith(String name, Permission... perms) {
+        Role r = role(name);
+        for (Permission p : perms) r.addPermission(p);
+        return r;
+    }
+
+    private static Permission perm(String name) {
+        return Permission.of(name, name);
+    }
 
     private static Role role(String name) {
         return Role.create(TENANT, name, name + " role");
@@ -292,6 +321,280 @@ class UserManagementServiceTest {
 
             verify(invitationRepository).save(pending);
             assertThat(pending.isPending()).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("grantor ceiling (IAM Phase 0.1)")
+    class GrantorCeiling {
+
+        @Test
+        @DisplayName("a caller with only USER_INVITE cannot invite into a role that carries more")
+        void inviteAboveAuthority() {
+            callerHolds("USER_INVITE");
+            Role admin = roleWith("ADMIN", perm("USER_INVITE"), perm("ROLE_MANAGE"), perm("PAYROLL_APPROVE"));
+            InviteUserRequest req = new InviteUserRequest("new@zeta.co.za", "New", "Hire", null, null, admin.getId());
+            when(disposableEmailChecker.isDisposable(req.email())).thenReturn(false);
+            when(subscriptionQueryFacade.getMaxUsers(TENANT)).thenReturn(-1);
+            when(userRepository.existsByTenantIdAndEmail(TENANT, "new@zeta.co.za")).thenReturn(false);
+            when(invitationRepository.findByTenantIdOrderByCreatedAtDesc(TENANT)).thenReturn(List.of());
+            when(roleRepository.findByIdAndTenantId(admin.getId(), TENANT)).thenReturn(Optional.of(admin));
+
+            assertThatThrownBy(() -> service.inviteUser(TENANT, UUID.randomUUID(), req))
+                    .isInstanceOf(HandyFlowException.class)
+                    .hasMessageContaining("ROLE_MANAGE")
+                    .hasMessageContaining("PAYROLL_APPROVE");
+
+            verify(invitationRepository, never()).save(any());
+            verify(emailService, never()).send(anyString(), anyString(), anyString());
+        }
+
+        @Test
+        @DisplayName("a caller can invite into a role whose permissions they all hold")
+        void inviteWithinAuthority() {
+            callerHolds("USER_INVITE", "CUSTOMER_READ");
+            Role sales = roleWith("SALES", perm("CUSTOMER_READ"));
+            InviteUserRequest req = new InviteUserRequest("new@zeta.co.za", "New", "Hire", null, null, sales.getId());
+            when(disposableEmailChecker.isDisposable(req.email())).thenReturn(false);
+            when(subscriptionQueryFacade.getMaxUsers(TENANT)).thenReturn(-1);
+            when(userRepository.existsByTenantIdAndEmail(TENANT, "new@zeta.co.za")).thenReturn(false);
+            when(invitationRepository.findByTenantIdOrderByCreatedAtDesc(TENANT)).thenReturn(List.of());
+            when(roleRepository.findByIdAndTenantId(sales.getId(), TENANT)).thenReturn(Optional.of(sales));
+
+            service.inviteUser(TENANT, UUID.randomUUID(), req);
+
+            verify(invitationRepository).save(any());
+            verify(auditService).record(eq(TENANT), eq("INVITATION_CREATED"), eq("INVITATION"), any(), eq("new@zeta.co.za"), any(), any());
+        }
+
+        @Test
+        @DisplayName("nobody can change their own role")
+        void cannotChangeOwnRole() {
+            UUID me = UUID.randomUUID();
+            TenantContext.setUserId(me.toString());
+            callerHolds("USER_UPDATE");
+            Role employee = role("EMPLOYEE");
+            when(userRepository.findByIdAndTenantId(me, TENANT)).thenReturn(Optional.of(activeUser(role("EMPLOYEE"))));
+            when(roleRepository.findByIdAndTenantId(employee.getId(), TENANT)).thenReturn(Optional.of(employee));
+
+            UpdateUserRequest req = new UpdateUserRequest(null, null, null, null, null, employee.getId());
+
+            assertThatThrownBy(() -> service.updateUser(TENANT, me, req))
+                    .isInstanceOf(HandyFlowException.class)
+                    .hasMessageContaining("cannot change your own role");
+            verify(userRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("cannot assign a role above own authority, even to someone else")
+        void cannotAssignRoleAboveAuthority() {
+            callerHolds("USER_UPDATE");
+            UUID target = UUID.randomUUID();
+            Role admin = roleWith("ADMIN", perm("ROLE_MANAGE"));
+            when(userRepository.findByIdAndTenantId(target, TENANT)).thenReturn(Optional.of(activeUser(role("EMPLOYEE"))));
+            when(roleRepository.findByIdAndTenantId(admin.getId(), TENANT)).thenReturn(Optional.of(admin));
+
+            UpdateUserRequest req = new UpdateUserRequest(null, null, null, null, null, admin.getId());
+
+            assertThatThrownBy(() -> service.updateUser(TENANT, target, req))
+                    .isInstanceOf(HandyFlowException.class)
+                    .hasMessageContaining("ROLE_MANAGE");
+        }
+
+        @Test
+        @DisplayName("cannot change the role of someone who holds more access than the caller")
+        void cannotEditMorePowerfulUser() {
+            callerHolds("USER_UPDATE");
+            UUID target = UUID.randomUUID();
+            User boss = activeUser(roleWith("ADMIN", perm("ROLE_MANAGE")));
+            Role employee = role("EMPLOYEE");
+            when(userRepository.findByIdAndTenantId(target, TENANT)).thenReturn(Optional.of(boss));
+            when(roleRepository.findByIdAndTenantId(employee.getId(), TENANT)).thenReturn(Optional.of(employee));
+
+            UpdateUserRequest req = new UpdateUserRequest(null, null, null, null, null, employee.getId());
+
+            assertThatThrownBy(() -> service.updateUser(TENANT, target, req))
+                    .isInstanceOf(HandyFlowException.class)
+                    .hasMessageContaining("more access than you");
+        }
+
+        @Test
+        @DisplayName("createRole refuses permissions the creator lacks, and records an audit event when allowed")
+        void createRoleCeiling() {
+            callerHolds("ROLE_MANAGE", "CUSTOMER_READ");
+            Permission customerRead = perm("CUSTOMER_READ");
+            Permission payrollApprove = perm("PAYROLL_APPROVE");
+            when(roleRepository.existsByNameAndTenantId(anyString(), eq(TENANT))).thenReturn(false);
+            when(permissionRepository.findAllById(any())).thenReturn(List.of(customerRead, payrollApprove));
+
+            assertThatThrownBy(() -> service.createRole(TENANT,
+                    new CreateRoleRequest("CLERK", "d", Set.of(customerRead.getId(), payrollApprove.getId()))))
+                    .isInstanceOf(HandyFlowException.class)
+                    .hasMessageContaining("PAYROLL_APPROVE");
+            verify(roleRepository, never()).save(any());
+
+            when(permissionRepository.findAllById(any())).thenReturn(List.of(customerRead));
+            service.createRole(TENANT, new CreateRoleRequest("CLERK", "d", Set.of(customerRead.getId())));
+            verify(roleRepository).save(any());
+            verify(auditService).record(eq(TENANT), eq("ROLE_CREATED"), eq("ROLE"), any(), eq("CLERK"), any(), any());
+        }
+
+        @Test
+        @DisplayName("updateRolePermissions: adding a permission the caller lacks is refused; removing is allowed")
+        void updateRoleCeiling() {
+            callerHolds("ROLE_MANAGE", "CUSTOMER_READ");
+            Permission customerRead = perm("CUSTOMER_READ");
+            Permission payrollApprove = perm("PAYROLL_APPROVE");
+            Role clerk = roleWith("CLERK", customerRead);
+            when(roleRepository.findByIdAndTenantId(clerk.getId(), TENANT)).thenReturn(Optional.of(clerk));
+            when(permissionRepository.findAllById(any())).thenReturn(List.of(customerRead, payrollApprove));
+
+            assertThatThrownBy(() -> service.updateRolePermissions(TENANT, clerk.getId(),
+                    Set.of(customerRead.getId(), payrollApprove.getId())))
+                    .isInstanceOf(HandyFlowException.class)
+                    .hasMessageContaining("PAYROLL_APPROVE");
+
+            when(permissionRepository.findAllById(any())).thenReturn(List.of());
+            service.updateRolePermissions(TENANT, clerk.getId(), Set.of());
+            assertThat(clerk.getPermissions()).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("sessions and audit on status change (IAM Phase 0.3 / 0.4)")
+    class StatusChangeSessions {
+
+        @Test
+        @DisplayName("deactivating a user revokes their sessions and writes an audit event")
+        void deactivateRevokesSessions() {
+            UUID targetId = UUID.randomUUID();
+            User employee = activeUser(role("EMPLOYEE"));
+            when(userRepository.findByIdAndTenantId(targetId, TENANT)).thenReturn(Optional.of(employee));
+
+            service.setUserStatus(TENANT, targetId, false, UUID.randomUUID());
+
+            verify(securitySweep).revokeAllActiveSessionsForUser(employee.getId());
+            verify(auditService).record(eq(TENANT), eq("USER_DEACTIVATED"), eq("USER"), any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("reactivating does not touch sessions")
+        void reactivateLeavesSessionsAlone() {
+            UUID targetId = UUID.randomUUID();
+            User employee = activeUser(role("EMPLOYEE"));
+            employee.deactivate();
+            when(userRepository.findByIdAndTenantId(targetId, TENANT)).thenReturn(Optional.of(employee));
+
+            service.setUserStatus(TENANT, targetId, true, UUID.randomUUID());
+
+            verifyNoInteractions(securitySweep);
+            verify(auditService).record(eq(TENANT), eq("USER_REACTIVATED"), eq("USER"), any(), any(), any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("invitations: expiry, resend, email failure (IAM Phase 0.5)")
+    class InvitationLifecycle {
+
+        @Test
+        @DisplayName("an invitation past its expiry no longer holds a seat")
+        void expiredInviteFreesSeat() throws Exception {
+            InviteUserRequest req = new InviteUserRequest("new@zeta.co.za", "New", "Hire", null, null, null);
+            when(disposableEmailChecker.isDisposable(req.email())).thenReturn(false);
+            when(subscriptionQueryFacade.getMaxUsers(TENANT)).thenReturn(2);
+            when(jdbc.queryForObject(anyString(), eq(Integer.class), eq(TENANT_UUID))).thenReturn(1);
+            UserInvitation stale = UserInvitation.create(TENANT, "old@zeta.co.za", "O", "L", null, null, role("EMPLOYEE"), UUID.randomUUID());
+            var f = UserInvitation.class.getDeclaredField("expiresAt");
+            f.setAccessible(true);
+            f.set(stale, java.time.Instant.now().minusSeconds(60));
+            when(invitationRepository.findByTenantIdOrderByCreatedAtDesc(TENANT)).thenReturn(List.of(stale));
+            when(userRepository.existsByTenantIdAndEmail(TENANT, "new@zeta.co.za")).thenReturn(false);
+            when(roleRepository.findByNameAndTenantId("EMPLOYEE", TENANT)).thenReturn(Optional.of(role("EMPLOYEE")));
+
+            service.inviteUser(TENANT, UUID.randomUUID(), req);   // 1 active + 0 live pending < 2
+
+            verify(invitationRepository).save(argThat(i -> "new@zeta.co.za".equals(i.getEmail())));
+        }
+
+        @Test
+        @DisplayName("the invitation response says when the email could not be sent")
+        void reportsEmailFailure() {
+            InviteUserRequest req = new InviteUserRequest("new@zeta.co.za", "New", "Hire", null, null, null);
+            when(disposableEmailChecker.isDisposable(req.email())).thenReturn(false);
+            when(subscriptionQueryFacade.getMaxUsers(TENANT)).thenReturn(-1);
+            when(userRepository.existsByTenantIdAndEmail(TENANT, "new@zeta.co.za")).thenReturn(false);
+            when(invitationRepository.findByTenantIdOrderByCreatedAtDesc(TENANT)).thenReturn(List.of());
+            when(roleRepository.findByNameAndTenantId("EMPLOYEE", TENANT)).thenReturn(Optional.of(role("EMPLOYEE")));
+            doThrow(new RuntimeException("smtp down")).when(emailService).send(anyString(), anyString(), anyString());
+
+            InvitationResponse res = service.inviteUser(TENANT, UUID.randomUUID(), req);
+
+            assertThat(res.emailSent()).isFalse();
+        }
+
+        @Test
+        @DisplayName("resend rotates the token so the old link stops working")
+        void resendRotatesToken() {
+            UserInvitation inv = UserInvitation.create(TENANT, "a@zeta.co.za", "A", "B", null, null, role("EMPLOYEE"), UUID.randomUUID());
+            String oldHash = inv.getTokenHash();
+            when(invitationRepository.findById(inv.getId())).thenReturn(Optional.of(inv));
+            when(userRepository.existsByTenantIdAndEmail(TENANT, "a@zeta.co.za")).thenReturn(false);
+
+            InvitationResponse res = service.resendInvitation(TENANT, inv.getId());
+
+            assertThat(inv.getTokenHash()).isNotEqualTo(oldHash);
+            assertThat(res.emailSent()).isTrue();
+            verify(emailService).send(eq("a@zeta.co.za"), anyString(), argThat(html -> html.contains(inv.getRawToken())));
+        }
+
+        @Test
+        @DisplayName("an accepted invitation cannot be re-sent")
+        void acceptedCannotBeResent() {
+            UserInvitation inv = UserInvitation.create(TENANT, "a@zeta.co.za", "A", "B", null, null, role("EMPLOYEE"), UUID.randomUUID());
+            inv.accept();
+            when(invitationRepository.findById(inv.getId())).thenReturn(Optional.of(inv));
+            when(userRepository.existsByTenantIdAndEmail(TENANT, "a@zeta.co.za")).thenReturn(false);
+
+            assertThatThrownBy(() -> service.resendInvitation(TENANT, inv.getId()))
+                    .isInstanceOf(HandyFlowException.class)
+                    .hasMessageContaining("pending or expired");
+        }
+    }
+
+    @Nested
+    @DisplayName("directory visibility (IAM Phase 0.6)")
+    class DirectoryVisibility {
+
+        @Test
+        @DisplayName("without ROLE_READ the user list carries no permission sets")
+        void listHidesPermissions() {
+            callerHolds("USER_READ");
+            User u = activeUser(roleWith("ADMIN", perm("ROLE_MANAGE")));
+            when(userRepository.findByTenantIdOrderByLastNameAscFirstNameAsc(TENANT)).thenReturn(List.of(u));
+
+            assertThat(service.getUsers(TENANT).get(0).permissions()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("with ROLE_READ the list carries permission sets")
+        void listShowsPermissionsToRoleReaders() {
+            callerHolds("USER_READ", "ROLE_READ");
+            User u = activeUser(roleWith("ADMIN", perm("ROLE_MANAGE")));
+            when(userRepository.findByTenantIdOrderByLastNameAscFirstNameAsc(TENANT)).thenReturn(List.of(u));
+
+            assertThat(service.getUsers(TENANT).get(0).permissions()).containsExactly("ROLE_MANAGE");
+        }
+
+        @Test
+        @DisplayName("a user always sees their own permissions")
+        void ownPermissionsVisible() {
+            UUID me = UUID.randomUUID();
+            TenantContext.setUserId(me.toString());
+            callerHolds("USER_READ");
+            User u = activeUser(roleWith("EMPLOYEE", perm("CUSTOMER_READ")));
+            when(userRepository.findByIdAndTenantId(me, TENANT)).thenReturn(Optional.of(u));
+
+            assertThat(service.getUser(TENANT, me).permissions()).containsExactly("CUSTOMER_READ");
         }
     }
 

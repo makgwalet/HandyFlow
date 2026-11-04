@@ -17,11 +17,13 @@ interface Role {
   id: string; name: string; description: string
   permissions: string[]; userCount: number
 }
-interface Permission { id: string; name: string; description: string }
+interface Permission { id: string; name: string; description: string; group?: string }
 interface Invitation {
   id: string; email: string; firstName: string; lastName: string
   jobTitle: string | null; roleName: string; status: string
   expiresAt: string; createdAt: string
+  /** false when the invitation email could not be sent (set on invite and resend only) */
+  emailSent?: boolean | null
 }
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
@@ -34,13 +36,24 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }>
   CANCELLED:{ bg: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', label: 'Cancelled'   },
 }
 
-const PERMISSION_GROUPS: Record<string, string[]> = {
-  'User Management': ['USER_READ','USER_CREATE','USER_UPDATE','USER_DELETE','USER_INVITE','USER_DEACTIVATE'],
-  'Role Management': ['ROLE_READ','ROLE_MANAGE'],
-  'CRM':            ['CUSTOMER_READ','CUSTOMER_CREATE','CUSTOMER_UPDATE','CUSTOMER_DELETE'],
-  'Invoicing':      ['INVOICE_READ','INVOICE_CREATE','INVOICE_SEND','INVOICE_DELETE'],
-  'Billing':        ['BILLING_READ','BILLING_MANAGE'],
-  'System':         ['REPORT_VIEW','SETTINGS_MANAGE'],
+/** Display name for a permission-name prefix as sent by the API ("group"). Unknown prefixes show as-is. */
+const GROUP_LABELS: Record<string, string> = {
+  USER: 'User Management', ROLE: 'Role Management', CUSTOMER: 'CRM', INVOICE: 'Invoicing',
+  BILLING: 'Billing', REPORT: 'Reports', SETTINGS: 'Settings', HR: 'HR', FLEET: 'Fleet',
+}
+export function groupLabel(group: string): string {
+  return GROUP_LABELS[group] ?? group.charAt(0) + group.slice(1).toLowerCase().replace(/_/g, ' ')
+}
+/** Groups the full permission catalogue by the API's group, sorted by label. Nothing is dropped. */
+export function groupPermissions(permissions: Permission[]): [string, Permission[]][] {
+  const byGroup = new Map<string, Permission[]>()
+  for (const p of permissions) {
+    const g = p.group || p.name.split('_')[0] || 'OTHER'
+    byGroup.set(g, [...(byGroup.get(g) ?? []), p])
+  }
+  return [...byGroup.entries()]
+    .map(([g, list]) => [g, list.sort((a, b) => a.name.localeCompare(b.name))] as [string, Permission[]])
+    .sort((a, b) => groupLabel(a[0]).localeCompare(groupLabel(b[0])))
 }
 
 export default function TeamTab() {
@@ -51,6 +64,7 @@ export default function TeamTab() {
   const [editUser, setEditUser]       = useState<User | null>(null)
   const [editRole, setEditRole]       = useState<Role | null>(null)
   const [error, setError]             = useState('')
+  const [notice, setNotice]           = useState('')
   const [expandedRole, setExpandedRole] = useState<string | null>(null)
   // NEW: replaces the two raw window.confirm() calls (deactivate user,
   // cancel invitation) with a styled modal matching this file's own
@@ -111,7 +125,11 @@ export default function TeamTab() {
   // ── Mutations ─────────────────────────────────────────────────────────────
   const inviteMutation = useMutation({
     mutationFn: (body: any) => apiClient.post('/api/v1/identity/users/invite', body),
-    onSuccess: () => { invalidate(); setShowInvite(false); setInviteForm({ email: '', firstName: '', lastName: '', jobTitle: '', department: '', roleId: '' }); setError('') },
+    onSuccess: (res: any) => {
+      invalidate(); setShowInvite(false)
+      setInviteForm({ email: '', firstName: '', lastName: '', jobTitle: '', department: '', roleId: '' }); setError('')
+      if (res?.data?.emailSent === false) setNotice('The invitation was saved but the email could not be sent. Use Resend to try again.')
+    },
     onError: (e: any) => setError(e.response?.data?.message || 'Failed to send invitation'),
   })
   const updateUserMutation = useMutation({
@@ -139,6 +157,16 @@ export default function TeamTab() {
   const reactivateMutation = useMutation({
     mutationFn: (id: string) => apiClient.post(`/api/v1/identity/users/${id}/reactivate`),
     onSuccess: () => invalidate(),
+  })
+  const resendInviteMutation = useMutation({
+    mutationFn: (id: string) => apiClient.post(`/api/v1/identity/invitations/${id}/resend`),
+    onSuccess: (res: any) => {
+      invalidate()
+      setNotice(res?.data?.emailSent === false
+        ? 'A new link was created but the email could not be sent. Try again shortly.'
+        : 'Invitation sent again with a new link. The old link no longer works.')
+    },
+    onError: (e: any) => setNotice(e.response?.data?.message || 'Failed to resend invitation'),
   })
   const cancelInviteMutation = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/api/v1/identity/invitations/${id}`),
@@ -173,7 +201,7 @@ export default function TeamTab() {
     setError('')
   }
 
-  const pendingInvites = invitations.filter(i => i.status === 'PENDING').length
+  const pendingInvites = invitations.filter(i => i.status === 'PENDING' && new Date(i.expiresAt).getTime() > Date.now()).length
 
   return (
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -345,6 +373,12 @@ export default function TeamTab() {
       )}
 
       {/* ── INVITATIONS ────────────────────────────────────────────────── */}
+      {notice && (
+        <div role="status" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, margin: '0 0 14px', padding: '10px 14px', background: 'var(--hf-warning-soft-strong)', color: 'var(--hf-warning-text-deep)', borderRadius: 8, fontSize: 13 }}>
+          <span>{notice}</span>
+          <button onClick={() => setNotice('')} aria-label="Dismiss" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}>×</button>
+        </div>
+      )}
       {activeView === 'invites' && (
         <div>
           {invitations.length === 0 ? (
@@ -385,6 +419,13 @@ export default function TeamTab() {
                           <span style={{ background: ss.bg, color: ss.color, padding: '3px 9px', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>{ss.label}</span>
                         </td>
                         <td style={{ padding: '14px 16px' }}>
+                          {(inv.status === 'PENDING' || inv.status === 'EXPIRED') && (
+                            <button onClick={() => resendInviteMutation.mutate(inv.id)}
+                              disabled={resendInviteMutation.isPending}
+                              style={{ padding: '5px 10px', marginRight: 6, background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 12, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
+                              Resend
+                            </button>
+                          )}
                           {inv.status === 'PENDING' && (
                             <button onClick={() => { setConfirmError(''); setConfirmAction({
                               title: 'Cancel invitation',
@@ -591,12 +632,10 @@ function PermissionPicker({ permissions, selected, onToggle }: {
       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', marginBottom: 12 }}>
         Permissions — {selected.size} selected
       </div>
-      {Object.entries(PERMISSION_GROUPS).map(([group, permNames]) => {
-        const groupPerms = permissions.filter(p => permNames.includes(p.name))
-        if (groupPerms.length === 0) return null
+      {groupPermissions(permissions).map(([group, groupPerms]) => {
         return (
           <div key={group} style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', letterSpacing: '0.06em', marginBottom: 8 }}>{group.toUpperCase()}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', letterSpacing: '0.06em', marginBottom: 8 }}>{groupLabel(group).toUpperCase()}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               {groupPerms.map(p => {
                 const checked = selected.has(p.id)

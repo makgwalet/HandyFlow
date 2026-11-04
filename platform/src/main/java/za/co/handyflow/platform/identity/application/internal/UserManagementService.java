@@ -37,6 +37,12 @@ public class UserManagementService {
      */
     private final za.co.handyflow.platform.billing.application.SubscriptionQueryFacade subscriptionQueryFacade;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final AccessAuditService       auditService;
+    private final RefreshTokenSecuritySweep securitySweep;
+
+    /** Base URL of the web app used in emailed links (property app.frontend.url, same as the other modules). */
+    @org.springframework.beans.factory.annotation.Value("${app.frontend.url:https://app.handyflow.co.za}")
+    private String frontendUrl = "https://app.handyflow.co.za";
 
     // ── Helper: throw with 400 BAD_REQUEST ───────────────────────────────────
     private static HandyFlowException bad(String message) {
@@ -53,13 +59,18 @@ public class UserManagementService {
 
     @Transactional(readOnly = true)
     public List<UserResponse> getUsers(TenantId tenantId) {
+        boolean showPermissions = GrantCeiling.callerAuthorities().contains("ROLE_READ");
         return userRepository.findByTenantIdOrderByLastNameAscFirstNameAsc(tenantId)
-                .stream().map(this::toUserResponse).collect(Collectors.toList());
+                .stream().map(u -> toUserResponse(u, showPermissions)).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public UserResponse getUser(TenantId tenantId, UUID userId) {
-        return toUserResponse(findUserInTenant(tenantId, userId));
+        // Another person's permission set is access-review data (audit F6): only role readers
+        // see it. A user always sees their own.
+        boolean own = userId.equals(currentUserIdOrNull());
+        boolean showPermissions = own || GrantCeiling.callerAuthorities().contains("ROLE_READ");
+        return toUserResponse(findUserInTenant(tenantId, userId), showPermissions);
     }
 
 
@@ -79,6 +90,16 @@ public class UserManagementService {
         if (req.roleId() != null) {
             Role role = roleRepository.findByIdAndTenantId(req.roleId(), tenantId)
                     .orElseThrow(() -> bad("Role not found"));
+
+            // IAM Phase 0.1: grantor ceiling. Nobody changes their own role, nobody grants a role
+            // above their own authority, and nobody edits someone who holds more than they do.
+            Set<String> callerAuth = GrantCeiling.callerAuthorities();
+            if (userId.equals(currentUserIdOrNull()))
+                throw new HandyFlowException("You cannot change your own role. Ask another administrator.",
+                        HttpStatus.FORBIDDEN, GrantCeiling.CODE);
+            GrantCeiling.assertWithin(callerAuth, permissionNames(role), "assign the role " + role.getName());
+            GrantCeiling.assertWithin(callerAuth, user.getPermissionNames(),
+                    "change the role of a user who has more access than you");
 
             // FIX (identity module modernization): nothing previously
             // stopped a tenant's only ADMIN from being reassigned to a
@@ -105,8 +126,11 @@ public class UserManagementService {
                 }
             }
 
+            Set<String> before = user.getRoles().stream().map(Role::getName).collect(Collectors.toCollection(TreeSet::new));
             user.clearRoles();
             user.assignRole(role);
+            auditService.record(tenantId, "USER_ROLE_CHANGED", "USER", user.getId(), user.getEmail(),
+                    Map.of("roles", before), Map.of("roles", Set.of(role.getName())));
         }
 
         userRepository.save(user);
@@ -145,6 +169,15 @@ public class UserManagementService {
 
         if (active) user.activate(); else user.deactivate();
         userRepository.save(user);
+        auditService.record(tenantId, active ? "USER_REACTIVATED" : "USER_DEACTIVATED", "USER",
+                user.getId(), user.getEmail(), null, null);
+        if (!active) {
+            // IAM Phase 0.4: end the user's sessions now instead of when the refresh token next expires.
+            // Their current access token can still work until it expires (at most the access-token lifetime);
+            // closing that gap needs the access-version claim planned for Phase 3.
+            int revoked = securitySweep.revokeAllActiveSessionsForUser(user.getId());
+            log.info("Deactivated user={}: revoked {} active session(s)", userId, revoked);
+        }
         log.info("Set user={} active={} in tenant={}", userId, active, tenantId);
         return toUserResponse(user);
     }
@@ -172,13 +205,15 @@ public class UserManagementService {
         // still represents a seat that's about to be consumed, and
         // ignoring it would let someone send five simultaneous invites
         // to dodge a four-user limit.
+        invitationRepository.markExpired(java.time.Instant.now(),
+                UserInvitation.InvitationStatus.PENDING, UserInvitation.InvitationStatus.EXPIRED);
         int maxUsers = subscriptionQueryFacade.getMaxUsers(tenantId);
         if (maxUsers >= 0) { // -1 = unlimited, matching the same sentinel convention used elsewhere in this schema
             Integer activeUserCount = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM users WHERE tenant_id = ? AND status = 'ACTIVE'",
                     Integer.class, tenantId.getValue());
             long pendingInviteCount = invitationRepository.findByTenantIdOrderByCreatedAtDesc(tenantId).stream()
-                    .filter(UserInvitation::isPending)
+                    .filter(UserInvitation::isLive)   // expired invitations no longer hold a seat (audit F8)
                     .count();
             int currentTotal = (activeUserCount != null ? activeUserCount : 0) + (int) pendingInviteCount;
 
@@ -222,18 +257,30 @@ public class UserManagementService {
                 : roleRepository.findByNameAndTenantId("EMPLOYEE", tenantId)
                 .orElseGet(() -> createDefaultEmployeeRole(tenantId));
 
+        // IAM Phase 0.1: cannot invite someone into a role that carries access the inviter lacks.
+        GrantCeiling.assertWithin(GrantCeiling.callerAuthorities(), permissionNames(role),
+                "invite someone as " + role.getName());
+
         UserInvitation inv = UserInvitation.create(
                 tenantId, email, req.firstName(), req.lastName(),
                 req.jobTitle(), req.department(), role, invitedBy);
         invitationRepository.save(inv);
+        auditService.record(tenantId, "INVITATION_CREATED", "INVITATION", inv.getId(), email,
+                null, Map.of("role", role.getName()));
 
-        // FIX: was bare inline HTML with no company name, inviter name,
-        // or role name — role.getName() was sitting right here unused.
-        // invitedByName and companyName need their own lookups since
-        // this method only had UUIDs/TenantId to work with, not the
-        // actual names.
-        String link    = "https://app.handyflow.co.za/invite/accept?token=" + inv.getToken();
-        String subject = "You've been invited to HandyFlow";
+        boolean emailSent = sendInvitationEmail(inv, tenantId, invitedBy);
+
+        log.info("Invited {} to tenant={}", email, tenantId);
+        return toInvitationResponse(inv, emailSent);
+    }
+
+    /**
+     * Sends the invitation email. Returns false when sending failed, so the caller can tell the
+     * administrator instead of leaving a pending invitation nobody received (audit F9).
+     */
+    private boolean sendInvitationEmail(UserInvitation inv, TenantId tenantId, UUID invitedBy) {
+        String base = frontendUrl == null ? "https://app.handyflow.co.za" : frontendUrl.replaceAll("/+$", "");
+        String link = base + "/invite/accept?token=" + inv.getRawToken();
         String invitedByName = userRepository.findByIdAndTenantId(invitedBy, tenantId)
                 .map(u -> u.getFirstName() + " " + u.getLastName())
                 .orElse("A team member");
@@ -241,20 +288,43 @@ public class UserManagementService {
                 .map(Tenant::getName)
                 .orElse("your company");
         String html = EmailTemplates.userInvitation(
-                req.firstName(), invitedByName, companyName, role.getName(), link);
-
+                inv.getFirstName(), invitedByName, companyName, inv.getRole().getName(), link);
         try {
-            emailService.send(email, subject, html);
+            emailService.send(inv.getEmail(), "You've been invited to HandyFlow", html);
+            return true;
         } catch (Exception e) {
-            log.error("Failed to send invitation email to {}: {}", email, e.getMessage());
+            log.error("Failed to send invitation email to {}: {}", inv.getEmail(), e.getMessage());
+            return false;
         }
-
-        log.info("Invited {} to tenant={}", email, tenantId);
-        return toInvitationResponse(inv);
     }
 
-    @Transactional(readOnly = true)
+    /** New link and a fresh 72 hours for a pending or expired invitation; the old link stops working. */
+    @Transactional
+    public InvitationResponse resendInvitation(TenantId tenantId, UUID invitationId) {
+        UserInvitation inv = invitationRepository.findById(invitationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Invitation", invitationId.toString()));
+        if (!inv.getTenantId().equals(tenantId))
+            throw notFound("Invitation not found");
+        if (userRepository.existsByTenantIdAndEmail(tenantId, inv.getEmail()))
+            throw bad("A user with email " + inv.getEmail() + " already exists in this company");
+        try {
+            inv.renew();
+        } catch (IllegalStateException e) {
+            throw bad("Only pending or expired invitations can be re-sent — this one is "
+                    + inv.getStatus().name().toLowerCase() + ".");
+        }
+        invitationRepository.save(inv);
+        UUID actor = currentUserIdOrNull();
+        boolean emailSent = sendInvitationEmail(inv, tenantId, actor != null ? actor : inv.getInvitedBy());
+        auditService.record(tenantId, "INVITATION_RESENT", "INVITATION", inv.getId(), inv.getEmail(), null, null);
+        return toInvitationResponse(inv, emailSent);
+    }
+
+    @Transactional
     public List<InvitationResponse> getInvitations(TenantId tenantId) {
+        // Report expiry as a status, not just a date (audit F8). Not read-only because it updates rows.
+        invitationRepository.markExpired(java.time.Instant.now(),
+                UserInvitation.InvitationStatus.PENDING, UserInvitation.InvitationStatus.EXPIRED);
         return invitationRepository.findByTenantIdOrderByCreatedAtDesc(tenantId)
                 .stream().map(this::toInvitationResponse).collect(Collectors.toList());
     }
@@ -277,12 +347,13 @@ public class UserManagementService {
                     inv.getStatus().name().toLowerCase() + ".");
         inv.cancel();
         invitationRepository.save(inv);
+        auditService.record(tenantId, "INVITATION_CANCELLED", "INVITATION", inv.getId(), inv.getEmail(), null, null);
     }
 
     /** Validate a token for the accept-invite page — returns invitation details if valid. */
     @Transactional(readOnly = true)
     public InvitationResponse validateInvitationToken(String token) {
-        UserInvitation inv = invitationRepository.findByToken(token)
+        UserInvitation inv = invitationRepository.findByTokenHash(UserInvitation.hashToken(token))
                 .orElseThrow(() -> bad("Invalid or expired invitation link"));
         if (!inv.isPending())
             throw bad("This invitation has already been used or cancelled");
@@ -293,7 +364,7 @@ public class UserManagementService {
 
     @Transactional
     public AuthResponse acceptInvitation(AcceptInvitationRequest req) {
-        UserInvitation inv = invitationRepository.findByToken(req.token())
+        UserInvitation inv = invitationRepository.findByTokenHash(UserInvitation.hashToken(req.token()))
                 .orElseThrow(() -> bad("Invalid or expired invitation link"));
 
         if (!inv.isPending())
@@ -315,6 +386,9 @@ public class UserManagementService {
 
         inv.accept();
         invitationRepository.save(inv);
+        auditService.recordAs(inv.getTenantId(), user.getId(), user.getFirstName() + " " + user.getLastName(),
+                "INVITATION_ACCEPTED", "USER", user.getId(), user.getEmail(),
+                null, Map.of("role", inv.getRole().getName()));
 
         log.info("Invitation accepted: user={} tenant={}", user.getId(), inv.getTenantId());
 
@@ -369,10 +443,18 @@ public class UserManagementService {
             throw bad("A role named '" + req.name() + "' already exists");
 
         Role role = Role.create(tenantId, req.name(), req.description());
-        if (req.permissionIds() != null && !req.permissionIds().isEmpty())
-            permissionRepository.findAllById(req.permissionIds()).forEach(role::addPermission);
+        if (req.permissionIds() != null && !req.permissionIds().isEmpty()) {
+            List<Permission> requested = permissionRepository.findAllById(req.permissionIds());
+            // IAM Phase 0.1: a role cannot carry access its creator does not hold.
+            GrantCeiling.assertWithin(GrantCeiling.callerAuthorities(),
+                    requested.stream().map(Permission::getName).collect(Collectors.toSet()),
+                    "create this role");
+            requested.forEach(role::addPermission);
+        }
 
         roleRepository.save(role);
+        auditService.record(tenantId, "ROLE_CREATED", "ROLE", role.getId(), role.getName(), null,
+                Map.of("permissions", permissionNames(role)));
         log.info("Created role={} in tenant={}", role.getName(), tenantId);
         return toRoleResponse(role, 0);
     }
@@ -386,11 +468,21 @@ public class UserManagementService {
         if ("ADMIN".equals(role.getName()))
             throw forbidden("The ADMIN role permissions cannot be modified");
 
+        Set<String> before = permissionNames(role);
+        List<Permission> requested = (permissionIds != null && !permissionIds.isEmpty())
+                ? permissionRepository.findAllById(permissionIds) : List.of();
+        Set<String> after = requested.stream().map(Permission::getName).collect(Collectors.toCollection(TreeSet::new));
+        // IAM Phase 0.1: only permissions the caller holds can be ADDED. Removing is always allowed.
+        Set<String> added = new TreeSet<>(after);
+        added.removeAll(before);
+        GrantCeiling.assertWithin(GrantCeiling.callerAuthorities(), added, "add these permissions to the role");
+
         role.clearPermissions();
-        if (permissionIds != null && !permissionIds.isEmpty())
-            permissionRepository.findAllById(permissionIds).forEach(role::addPermission);
+        requested.forEach(role::addPermission);
 
         roleRepository.save(role);
+        auditService.record(tenantId, "ROLE_PERMISSIONS_CHANGED", "ROLE", role.getId(), role.getName(),
+                Map.of("permissions", new TreeSet<>(before)), Map.of("permissions", after));
         log.info("Updated permissions for role={} in tenant={}", roleId, tenantId);
         return toRoleResponse(role,
                 userRepository.countByTenantIdAndRoleName(tenantId, role.getName()));
@@ -399,7 +491,7 @@ public class UserManagementService {
     @Transactional(readOnly = true)
     public List<PermissionResponse> getAllPermissions() {
         return permissionRepository.findAll().stream()
-                .map(p -> new PermissionResponse(p.getId(), p.getName(), p.getDescription()))
+                .map(p -> new PermissionResponse(p.getId(), p.getName(), p.getDescription(), PermissionResponse.groupOf(p.getName())))
                 .collect(Collectors.toList());
     }
 
@@ -419,14 +511,32 @@ public class UserManagementService {
         return roleRepository.save(employee);
     }
 
+    private static Set<String> permissionNames(Role r) {
+        return r.getPermissions().stream().map(Permission::getName).collect(Collectors.toCollection(TreeSet::new));
+    }
+
+    private static UUID currentUserIdOrNull() {
+        try { return TenantContext.getCurrentUserId(); } catch (RuntimeException e) { return null; }
+    }
+
+    /** Recent access changes for the tenant (newest first). */
+    @Transactional(readOnly = true)
+    public List<AccessAuditEventResponse> getAccessAudit(TenantId tenantId, int limit) {
+        return auditService.recent(tenantId, limit);
+    }
+
     private UserResponse toUserResponse(User u) {
+        return toUserResponse(u, true);
+    }
+
+    private UserResponse toUserResponse(User u, boolean includePermissions) {
         return new UserResponse(
                 u.getId(), u.getEmail(),
                 u.getFirstName(), u.getLastName(),
                 u.getPhone(), u.getJobTitle(), u.getDepartment(),
                 u.getStatus().name(),
                 u.getRoles().stream().map(Role::getName).collect(Collectors.toSet()),
-                u.getPermissionNames(),
+                includePermissions ? u.getPermissionNames() : Set.of(),
                 u.getCreatedAt()
         );
     }
@@ -441,13 +551,17 @@ public class UserManagementService {
     }
 
     private InvitationResponse toInvitationResponse(UserInvitation inv) {
+        return toInvitationResponse(inv, null);
+    }
+
+    private InvitationResponse toInvitationResponse(UserInvitation inv, Boolean emailSent) {
         return new InvitationResponse(
                 inv.getId(), inv.getEmail(),
                 inv.getFirstName(), inv.getLastName(),
                 inv.getJobTitle(), inv.getDepartment(),
                 inv.getRole().getName(),
                 inv.getStatus().name(),
-                inv.getExpiresAt(), inv.getCreatedAt()
+                inv.getExpiresAt(), inv.getCreatedAt(), emailSent
         );
     }
 
