@@ -102,7 +102,7 @@ public class OvertimeService {
     @Transactional(readOnly = true)
     public List<Claim> mine(TenantId tenantId, UUID userId, LocalDate from, LocalDate to) {
         if (userId == null) throw new AccessDeniedException("Your user could not be identified.");
-        HrEmployee emp = employeeRepo.findByUserId(tenantId, userId).orElseThrow(() -> new IllegalStateException("Your login is not linked to an employee record. Ask HR to link it."));
+        HrEmployee emp = employeeRepo.findByUserId(tenantId, userId).orElseThrow(() -> new za.co.handyflow.platform.shared.LoginNotLinkedException());
         return claimRepo.forEmployee(tenantId, emp.getId(), from, to).stream()
                 .sorted(Comparator.comparing(HrOvertimeClaim::getWorkDate).reversed()).map(c -> view(c, emp, false)).toList();
     }

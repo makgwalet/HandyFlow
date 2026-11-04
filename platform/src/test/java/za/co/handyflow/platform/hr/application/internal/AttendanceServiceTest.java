@@ -127,7 +127,7 @@ class AttendanceServiceTest {
 
     @Test
     void aLoginWithNoEmployeeCannotClockIn() {
-        assertThatThrownBy(() -> service.clockIn(tenant, UUID.randomUUID())).isInstanceOf(IllegalStateException.class).hasMessageContaining("not linked");
+        assertThatThrownBy(() -> service.clockIn(tenant, UUID.randomUUID())).isInstanceOf(za.co.handyflow.platform.shared.LoginNotLinkedException.class).hasMessageContaining("not linked");
     }
 
     @Test

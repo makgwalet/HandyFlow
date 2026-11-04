@@ -397,7 +397,7 @@ public class AttendanceService implements AttendanceRegister {
 
     private HrEmployee me(TenantId tenantId, UUID userId) {
         if (userId == null) throw new AccessDeniedException("Your user could not be identified.");
-        return employeeRepo.findByUserId(tenantId, userId).orElseThrow(() -> new IllegalStateException("Your login is not linked to an employee record. Ask HR to link it."));
+        return employeeRepo.findByUserId(tenantId, userId).orElseThrow(() -> new za.co.handyflow.platform.shared.LoginNotLinkedException());
     }
 
     private HrEmployee employee(TenantId tenantId, UUID id) {

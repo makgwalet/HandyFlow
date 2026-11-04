@@ -138,7 +138,7 @@ public class ProfileController {
 
     private UUID me(Principal principal) {
         return relatives.employeeOf(TenantContext.getTenantIdAsObject(), user(principal))
-                .orElseThrow(() -> new ResourceNotFoundException("Employee", "your login is not linked to an employee record"));
+                .orElseThrow(() -> new za.co.handyflow.platform.shared.LoginNotLinkedException());
     }
 
     private static void requireSensitive(Authentication authentication) {

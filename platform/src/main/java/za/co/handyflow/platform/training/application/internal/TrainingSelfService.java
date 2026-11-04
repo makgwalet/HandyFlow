@@ -83,6 +83,6 @@ public class TrainingSelfService {
 
     private EmployeeSummary me(TenantId tenantId, UUID userId) {
         return hrFacade.findEmployeeByUserId(tenantId, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee record for your login", String.valueOf(userId)));
+                .orElseThrow(() -> new za.co.handyflow.platform.shared.LoginNotLinkedException());
     }
 }
