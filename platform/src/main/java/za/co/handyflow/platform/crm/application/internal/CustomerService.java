@@ -5,6 +5,7 @@ import za.co.handyflow.platform.crm.domain.model.AuditEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -96,9 +97,12 @@ public class CustomerService {
                     .findAllActiveForOwnerOrUnassigned(tenantId, currentUserId(), pageable)
                     .map(this::toResponse);
         }
-        var page = (search == null || search.isBlank())
+        String prefix = CustomerSearchTerms.prefixQuery(search);
+        var page = prefix == null
                 ? customerRepository.findAllActive(tenantId, pageable)
-                : customerRepository.searchActive(tenantId, search.strip(), pageable);
+                // searchActive sorts by relevance itself; the page's own sort must not be added
+                : customerRepository.searchActive(tenantId, prefix, search.strip(),
+                        PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()));
         return page.map(this::toResponse);
     }
 

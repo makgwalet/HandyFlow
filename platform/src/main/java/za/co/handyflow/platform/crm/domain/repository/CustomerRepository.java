@@ -160,18 +160,23 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
             SELECT * FROM customers c
             WHERE c.tenant_id = :#{#tenantId.value}
               AND c.deleted_at IS NULL
-              AND c.search_vector @@ plainto_tsquery('simple', :term)
-            ORDER BY ts_rank(c.search_vector, plainto_tsquery('simple', :term)) DESC,
+              AND (c.search_vector @@ to_tsquery('simple', :prefix)
+                   OR c.search_vector @@ plainto_tsquery('simple', :term))
+            ORDER BY ts_rank(c.search_vector, to_tsquery('simple', :prefix)) DESC,
                      c.name ASC
             """,
             countQuery = """
             SELECT count(*) FROM customers c
             WHERE c.tenant_id = :#{#tenantId.value}
               AND c.deleted_at IS NULL
-              AND c.search_vector @@ plainto_tsquery('simple', :term)
+              AND (c.search_vector @@ to_tsquery('simple', :prefix)
+                   OR c.search_vector @@ plainto_tsquery('simple', :term))
             """,
             nativeQuery = true)
+    // The query orders its own results. Callers must pass an UNSORTED Pageable: a sort on the
+    // Pageable is appended as a second ORDER BY and Postgres rejects it (found in testing, 22 Oct).
     Page<Customer> searchActive(@Param("tenantId") TenantId tenantId,
+                                @Param("prefix") String prefix,
                                 @Param("term") String term,
                                 Pageable pageable);
 
