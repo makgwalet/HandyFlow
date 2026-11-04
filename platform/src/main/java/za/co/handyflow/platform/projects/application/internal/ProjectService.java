@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.projects.application.internal;
 
+import za.co.handyflow.platform.projects.application.internal.notify.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -80,6 +81,7 @@ public class ProjectService {
     private final ProjectScopedQueries       scopedQueries;
     private final ProjectMemberService       memberService;
     private final ProjectBudgetLineRepository budgetRepo;
+    private final ProjectNotifier            notifier;
 
     /** Lifetime of a new project's client-portal token in days. 0 = never expires. */
     @Value("${app.projects.portal.token-ttl-days:365}")
@@ -298,6 +300,7 @@ public class ProjectService {
 
         taskRepo.save(t);
         log.info("Created task={} number='{}' project={}", t.getId(), number, projectId);
+        if (t.getAssigneeId() != null) notifyAssigned(t, createdBy);
         return t;
     }
 
@@ -314,8 +317,18 @@ public class ProjectService {
             case "START"    -> t.start();
             case "COMPLETE" -> t.complete();
             case "PROGRESS" -> { if (progressPct != null) t.updateProgress(progressPct); }
-            case "REVIEW"   -> t.submitForReview();
-            case "RETURN"   -> t.returnFromReview();
+            case "REVIEW"   -> {
+                t.submitForReview();
+                notifier.publish(ProjectEvent.toRoles(tenantId.getValue(), t.getProjectId(), PmEvent.TASK_REVIEW_REQUESTED,
+                        t.getTaskNumber() + " is ready for review — " + project.getName(), t.getTitle(), t.getId(),
+                        java.util.Set.of(ProjectMemberRole.MANAGER), TenantContext.getCurrentUserId()));
+            }
+            case "RETURN"   -> {
+                t.returnFromReview();
+                notifier.publish(ProjectEvent.to(tenantId.getValue(), t.getProjectId(), PmEvent.TASK_RETURNED,
+                        t.getTaskNumber() + " was sent back from review — " + project.getName(), t.getTitle(), t.getId(),
+                        t.getAssigneeId(), TenantContext.getCurrentUserId()));
+            }
             case "BLOCK"    -> t.setStatus("BLOCKED");
             case "CANCEL"   -> t.setStatus("CANCELLED");
             default -> throw new HandyFlowException(
@@ -346,12 +359,21 @@ public class ProjectService {
             ProjectMember m = memberService.find(tenantId, t.getProjectId(), req.assigneeId())
                     .orElseThrow(() -> new HandyFlowException("Only a member of the project can be assigned",
                             HttpStatus.BAD_REQUEST, "ASSIGNEE_NOT_MEMBER"));
+            boolean changed = !m.getUserId().equals(t.getAssigneeId());
             t.setAssigneeId(m.getUserId());
             t.setAssigneeName(m.getUserName());
+            if (changed) notifyAssigned(t, TenantContext.getCurrentUserId());
         }
         if (req.estimatedHours() != null) t.setEstimatedHours(req.estimatedHours());
         if (req.notes() != null) t.setNotes(req.notes().isBlank() ? null : req.notes().trim());
         return taskRepo.save(t);
+    }
+
+    private void notifyAssigned(ProjectTask t, UUID actor) {
+        String projectName = projectRepo.findByTenantAndId(t.getTenantId(), t.getProjectId()).map(Project::getName).orElse("a project");
+        notifier.publish(ProjectEvent.to(t.getTenantId(), t.getProjectId(), PmEvent.TASK_ASSIGNED,
+                t.getTaskNumber() + " is assigned to you — " + projectName,
+                t.getTitle() + (t.getPlannedEnd() == null ? "" : " (due " + t.getPlannedEnd() + ")"), t.getId(), t.getAssigneeId(), actor));
     }
 
     // ── Risks ─────────────────────────────────────────────────────────────────
@@ -443,6 +465,12 @@ public class ProjectService {
         if (approve) t.approve(approverId);
         else         t.reject();
         TimeEntry saved = timeRepo.save(t);
+        if (!approve) {
+            notifier.publish(ProjectEvent.to(tenantId.getValue(), t.getProjectId(), PmEvent.TIME_REJECTED,
+                    "Your time for " + t.getEntryDate() + " was rejected",
+                    t.getHours() + " h" + (t.getDescription() == null ? "" : " — " + t.getDescription()) + ". Speak to the approver and log it again if needed.",
+                    t.getId(), t.getUserId(), approverId));
+        }
         if (!approve && t.getTaskId() != null) {
             // rejected hours no longer count towards the task's actual hours
             taskRepo.findByTenantAndId(tenantId.getValue(), t.getTaskId()).ifPresent(task -> {

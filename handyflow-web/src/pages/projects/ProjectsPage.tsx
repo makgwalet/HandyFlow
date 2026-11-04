@@ -10,6 +10,8 @@ import { ProjectDashboard } from "./ProjectDashboard"
 import { ProjectListTab }   from "./ProjectListTab"
 import { ProjectDetailTab } from "./ProjectDetailTab"
 import { CollaboratorsPage } from "./CollaboratorsPage"
+import { ProjectReportsPage } from "./ProjectReportsPage"
+import { NotificationSettingsPage } from "./NotificationSettingsPage"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -39,6 +41,8 @@ export function ProjectsPage() {
             ? <ProjectDetailTab projectId={projectId} onBack={closeProject} />
             : <ProjectListTab onOpen={openProject} />
           case "collaborators": return <CollaboratorsPage />
+          case "reports":       return <ProjectReportsPage onOpen={openProject} />
+          case "notifications": return <NotificationSettingsPage />
           default:          return null
         }
       }} />

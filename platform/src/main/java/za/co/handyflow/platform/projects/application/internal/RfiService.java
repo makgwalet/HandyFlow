@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.projects.application.internal;
 
+import za.co.handyflow.platform.projects.application.internal.notify.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -66,6 +67,7 @@ public class RfiService {
     private final RfiNotificationService    rfiNotifications;
     private final EvidenceFacade            evidenceFacade;
     private final ProjectReferenceValidator referenceValidator;
+    private final ProjectNotifier           notifier;
 
     @Value("${app.projects.attachments.max-bytes:20971520}")
     private long maxAttachmentBytes;
@@ -225,6 +227,10 @@ public class RfiService {
         ProjectRfi saved = rfiRepo.save(rfi);
         record(saved, "RESPONDED", req.response());              // full text kept in the history
         notificationService.notifyRfiResponded(tenantId, project.getName(), rfi.getRfiNumber(), rfi.getTitle(), userName);
+        notifier.publish(ProjectEvent.to(tenantId, rfi.getProjectId(), PmEvent.RFI_ANSWERED,
+                rfi.getRfiNumber() + " was answered — " + project.getName(),
+                rfi.getTitle() + ". Answered by " + userName + ". Close it if the answer is enough, or ask for clarification.",
+                rfi.getId(), rfi.getRequestedById(), userId));
         log.info("Responded to RFI={} by={}", rfiId, userName);
         return toResponse(saved, blockerOf(tenantId, saved));
     }

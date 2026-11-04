@@ -25,10 +25,12 @@ class TimeApprovalTest {
     ProjectTaskRepository tasks = mock(ProjectTaskRepository.class);
     ProjectTimeEntryRepository time = mock(ProjectTimeEntryRepository.class);
     ProjectAccessGuard guard = mock(ProjectAccessGuard.class);
+    za.co.handyflow.platform.projects.application.internal.notify.ProjectNotifier notifier =
+            mock(za.co.handyflow.platform.projects.application.internal.notify.ProjectNotifier.class);
 
     ProjectService service() {
         return new ProjectService(mock(ProjectRepository.class), tasks, mock(ProjectRiskRepository.class), time,
-                null, null, guard, null, null, mock(ProjectBudgetLineRepository.class));
+                null, null, guard, null, null, mock(ProjectBudgetLineRepository.class), notifier);
     }
 
     TimeEntry entry() {
@@ -69,6 +71,11 @@ class TimeApprovalTest {
         assertEquals("REJECTED", t.getStatus());
         verify(task).setActualHours(new BigDecimal("1.0"));
         verify(tasks).save(task);
+        var sent = org.mockito.ArgumentCaptor.forClass(za.co.handyflow.platform.projects.application.internal.notify.ProjectEvent.class);
+        verify(notifier).publish(sent.capture());
+        assertEquals(za.co.handyflow.platform.projects.application.internal.notify.PmEvent.TIME_REJECTED, sent.getValue().event());
+        assertEquals(java.util.Set.of(worker), sent.getValue().users(), "the person who logged it hears about it");
+        assertEquals(approver, sent.getValue().actor());
     }
 
     @Test
@@ -76,5 +83,6 @@ class TimeApprovalTest {
         TimeEntry t = entry();
         service().approveTime(tenant, t.getId(), approver, true);
         verifyNoInteractions(tasks);
+        verifyNoInteractions(notifier);
     }
 }

@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.projects.application.internal;
 
+import za.co.handyflow.platform.projects.application.internal.notify.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -39,6 +40,7 @@ public class ProjectIssueService {
     private final ProjectRiskRepository risks;
     private final ProjectMemberService members;
     private final SequenceService sequences;
+    private final ProjectNotifier notifier;
 
     static LocalDate today() { return LocalDate.now(SAST); }
 
@@ -65,7 +67,9 @@ public class ProjectIssueService {
         ProjectIssue i = ProjectIssue.raise(t.getValue(), projectId, sequences.nextIssueNumber(t.getValue(), projectId), req.title().trim(),
                 blankToNull(req.description()), req.priority(), req.riskId(), req.dueDate(), by, byName);
         if (req.ownerId() != null) { ProjectMember m = member(t, projectId, req.ownerId()); i.assign(m.getUserId(), m.getUserName()); }
-        return IssueResponse.of(issues.save(i), today(), 0);
+        ProjectIssue saved = issues.save(i);
+        if (saved.getOwnerId() != null) notifyIssueOwner(saved, by);
+        return IssueResponse.of(saved, today(), 0);
     }
 
     @Transactional
@@ -74,7 +78,11 @@ public class ProjectIssueService {
         editable(project(t, i.getProjectId()));
         i.edit(req.title(), req.description(), req.priority(), req.dueDate());
         if (Boolean.TRUE.equals(req.clearOwner())) i.assign(null, null);
-        else if (req.ownerId() != null) { ProjectMember m = member(t, i.getProjectId(), req.ownerId()); i.assign(m.getUserId(), m.getUserName()); }
+        else if (req.ownerId() != null && !req.ownerId().equals(i.getOwnerId())) {
+            ProjectMember m = member(t, i.getProjectId(), req.ownerId());
+            i.assign(m.getUserId(), m.getUserName());
+            notifyIssueOwner(i, za.co.handyflow.platform.shared.TenantContext.getCurrentUserId());
+        }
         return IssueResponse.of(issues.save(i), today(), openActions(t, i));
     }
 
@@ -112,7 +120,9 @@ public class ProjectIssueService {
         if (req.ownerId() != null) { ProjectMember m = member(t, projectId, req.ownerId()); ownerId = m.getUserId(); ownerName = m.getUserName(); }
         ProjectActionItem a = ProjectActionItem.create(t.getValue(), projectId, req.parentType(), req.parentId(), req.title(),
                 ownerId, ownerName, req.dueDate(), by, byName);
-        return ActionItemResponse.of(actions.save(a), today());
+        ProjectActionItem saved = actions.save(a);
+        if (ownerId != null) notifyActionOwner(saved, by);
+        return ActionItemResponse.of(saved, today());
     }
 
     @Transactional
@@ -121,7 +131,11 @@ public class ProjectIssueService {
         editable(project(t, a.getProjectId()));
         a.edit(req.title(), req.dueDate());
         if (Boolean.TRUE.equals(req.clearOwner())) a.assign(null, null);
-        else if (req.ownerId() != null) { ProjectMember m = member(t, a.getProjectId(), req.ownerId()); a.assign(m.getUserId(), m.getUserName()); }
+        else if (req.ownerId() != null && !req.ownerId().equals(a.getOwnerId())) {
+            ProjectMember m = member(t, a.getProjectId(), req.ownerId());
+            a.assign(m.getUserId(), m.getUserName());
+            notifyActionOwner(a, za.co.handyflow.platform.shared.TenantContext.getCurrentUserId());
+        }
         return ActionItemResponse.of(actions.save(a), today());
     }
 
@@ -139,6 +153,21 @@ public class ProjectIssueService {
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private void notifyIssueOwner(ProjectIssue i, UUID actor) {
+        String project = projects.findByTenantAndId(i.getTenantId(), i.getProjectId()).map(Project::getName).orElse("a project");
+        notifier.publish(ProjectEvent.to(i.getTenantId(), i.getProjectId(), PmEvent.ISSUE_ASSIGNED,
+                i.getIssueNumber() + " is yours to resolve — " + project,
+                i.getTitle() + " · " + i.getPriority().toLowerCase() + " priority" + (i.getDueDate() == null ? "" : " · resolve by " + i.getDueDate()),
+                i.getId(), i.getOwnerId(), actor));
+    }
+
+    private void notifyActionOwner(ProjectActionItem a, UUID actor) {
+        String project = projects.findByTenantAndId(a.getTenantId(), a.getProjectId()).map(Project::getName).orElse("a project");
+        notifier.publish(ProjectEvent.to(a.getTenantId(), a.getProjectId(), PmEvent.ACTION_ASSIGNED,
+                "An action is assigned to you — " + project, a.getTitle() + (a.getDueDate() == null ? "" : " (by " + a.getDueDate() + ")"),
+                a.getId(), a.getOwnerId(), actor));
+    }
 
     private int openActions(TenantId t, ProjectIssue i) {
         return (int) actions.findByProject(t.getValue(), i.getProjectId()).stream()

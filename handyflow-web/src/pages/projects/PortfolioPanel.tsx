@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, CalendarClock, CheckCircle2, Clock, FolderOpen, PauseCircle, Timer, Wallet } from 'lucide-react'
 import { apiClient } from '../../api/client'
 import { card, day, money, muted, one } from './tabs/pmKit'
+import { RiskHeatmap } from './RiskHeatmap'
 import type { Summary } from './ProjectDashboard'
 
 interface Counts { total: number; active: number; onTrack: number; atRisk: number; overdue: number; onHold: number; green: number; amber: number; red: number
@@ -127,6 +128,10 @@ export function PortfolioPanel({ summary, onOpen }: { summary: Summary | undefin
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: summary.openRedRisks ? 'var(--hf-danger-text)' : undefined }}><AlertTriangle size={11} /> {summary.openRedRisks} open red risk{summary.openRedRisks === 1 ? '' : 's'}</span>
           </div>}
         </div>
+      </div>
+      <div style={{ ...card, marginTop: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Open risks across your projects</div>
+        <RiskHeatmap onOpenProject={onOpen} compact />
       </div>
     </div>
   )

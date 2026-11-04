@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.projects.application.internal;
 
+import za.co.handyflow.platform.projects.application.internal.notify.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,6 +55,7 @@ public class ProjectLifecycleService {
     private final ProjectCostService             costService;
     private final ChangeApplicationService       changeApplicationService;
     private final DocumentService                documentService;
+    private final ProjectNotifier                notifier;
 
     @Value("${app.projects.require-approval-gate:false}")
     private boolean requireApprovalGate;
@@ -133,6 +135,7 @@ public class ProjectLifecycleService {
         }
 
         Project saved = projectRepo.save(p);
+        notifyTransition(tenantId.getValue(), saved, action, reason, userId, userName);
         historyRepo.save(ProjectStatusHistory.record(
                 tenantId.getValue(), projectId, from, saved.getStatus(),
                 action.name(), reason != null ? reason : lessonsLearned, userId, userName));
@@ -183,6 +186,22 @@ public class ProjectLifecycleService {
             case CLOSED, CANCELLED -> List.<ProjectAction>of();
         };
         return actions.stream().map(Enum::name).toList();
+    }
+
+    private void notifyTransition(UUID tenantId, Project p, ProjectAction action, String reason, UUID actor, String actorName) {
+        var sponsorAndManagers = java.util.Set.of(za.co.handyflow.platform.projects.domain.enums.ProjectMemberRole.SPONSOR);
+        var managers = java.util.Set.of(za.co.handyflow.platform.projects.domain.enums.ProjectMemberRole.MANAGER);
+        String who = p.getProjectNumber() + " " + p.getName();
+        switch (action) {
+            case PROPOSE -> notifier.publish(new ProjectEvent(tenantId, p.getId(), PmEvent.PROJECT_PROPOSED, who + " is waiting for approval",
+                    "Submitted by " + actorName + ". Approving locks the baseline dates and budget.", p.getId(),
+                    p.getSponsorId() == null ? java.util.Set.of() : java.util.Set.of(p.getSponsorId()), sponsorAndManagers, actor));
+            case APPROVE, RETURN -> notifier.publish(new ProjectEvent(tenantId, p.getId(), PmEvent.PROJECT_DECIDED,
+                    who + (action == ProjectAction.APPROVE ? " was approved" : " was returned to planning"),
+                    action == ProjectAction.APPROVE ? "Approved by " + actorName + ". The baseline is now locked." : "Returned by " + actorName + ". Reason: " + reason,
+                    p.getId(), p.getProjectManagerId() == null ? java.util.Set.of() : java.util.Set.of(p.getProjectManagerId()), managers, actor));
+            default -> { }
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

@@ -1001,6 +1001,8 @@ export const PROJECTS_SECTIONS: ModuleSections = {
       sections: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'projects', label: 'Projects', icon: FolderOpen },
+        { id: 'reports', label: 'Reports', icon: FileBarChart, permission: 'PM_READ' },
+        { id: 'notifications', label: 'My notifications', icon: Bell, permission: 'PM_READ' },
       ],
     },
     {

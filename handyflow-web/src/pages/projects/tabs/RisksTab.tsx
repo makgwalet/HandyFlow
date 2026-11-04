@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, AlertTriangle } from 'lucide-react'
 import { apiClient } from '../../../api/client'
 import { IssuesRegister, ActionItems, RiskFollowUp } from './IssuesActions'
+import { RiskHeatmap } from '../RiskHeatmap'
 
 interface Risk { id:string; riskNumber:string|null; title:string; description:string|null; category:string|null; probability:number; impact:number; riskScore:number; rating:string; status:string; mitigation:string|null; ownerName:string|null; reviewDate:string|null; isOhsa:boolean }
 
@@ -56,13 +57,13 @@ function RiskRegister({projectId}:{projectId:string}) {
 
   const addMut=useMutation({
     mutationFn:(body:any)=>apiClient.post(`/api/v1/projects/${projectId}/risks`,body),
-    onSuccess:()=>{qc.invalidateQueries({queryKey:['pm-risks',projectId]});setShowAdd(false);setForm(initF());setErr('')},
+    onSuccess:()=>{qc.invalidateQueries({queryKey:['pm-risks',projectId]});qc.invalidateQueries({queryKey:['pm-heatmap']});setShowAdd(false);setForm(initF());setErr('')},
     onError:(e:any)=>setErr(e.response?.data?.message||'Failed to log risk'),
   })
   const actionMut=useMutation({
     mutationFn:({riskId,action,notes}:{riskId:string;action:string;notes:string})=>
       apiClient.post(`/api/v1/projects/risks/${riskId}/action`,{action,notes}),
-    onSuccess:()=>{qc.invalidateQueries({queryKey:['pm-risks',projectId]});setSelected(null);setAction('');setActionNotes('')},
+    onSuccess:()=>{qc.invalidateQueries({queryKey:['pm-risks',projectId]});qc.invalidateQueries({queryKey:['pm-heatmap']});setSelected(null);setAction('');setActionNotes('')},
   })
 
   const openRisks=risks.filter(r=>r.status==='OPEN')
@@ -71,6 +72,10 @@ function RiskRegister({projectId}:{projectId:string}) {
 
   return (
     <div>
+      <div style={{border:'1px solid var(--hf-border)',borderRadius:12,padding:16,marginBottom:16,background:'var(--hf-surface)'}}>
+        <div style={{fontSize:13,fontWeight:700,marginBottom:10}}>Heat map of open risks</div>
+        <RiskHeatmap projectId={projectId}/>
+      </div>
       {/* Summary pills */}
       <div style={{display:'flex',gap:10,marginBottom:16}}>
         {[{label:`${redCount} Red`,bg:'var(--hf-danger-soft)',color:'var(--hf-danger-text)'},{label:`${amberCount} Amber`,bg:'var(--hf-warning-soft-strong)',color:'var(--hf-warning-text-deep)'},{label:`${openRisks.length} Open`,bg:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)'}].map(s=>(

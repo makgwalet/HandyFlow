@@ -26,7 +26,7 @@ record ProjectRoute(Kind kind, UUID projectId, String entityKeyword, UUID entity
 
     static final String PREFIX = "/api/v1/projects";
 
-    static final Set<String> SPECIAL = Set.of("summary", "time-approvals", "portfolio");
+    static final Set<String> SPECIAL = Set.of("summary", "time-approvals", "portfolio", "notification-settings", "reports", "risk-heatmap");
 
     /** Keep in sync with ProjectScopeResolver's map. */
     static final Set<String> ENTITY_KEYWORDS = Set.of(

@@ -451,7 +451,23 @@ public enum NotificationType {
     AUDIT_REPORT_REVIEW_REQUESTED(INFO, Set.of(IN_APP, EMAIL)),
     AUDIT_REPORT_ISSUED(INFO, Set.of(IN_APP, EMAIL)),
     AUDIT_ACTION_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
-    AUDIT_ACTION_ESCALATED(CRITICAL, Set.of(IN_APP, EMAIL));
+    AUDIT_ACTION_ESCALATED(CRITICAL, Set.of(IN_APP, EMAIL)),
+
+    // ── Projects (patch 0571). Email is decided per person by the Projects module (see projects PmEvent). ──
+    PM_TASK_ASSIGNED(INFO, Set.of(IN_APP, EMAIL)),
+    PM_TASK_REVIEW_REQUESTED(INFO, Set.of(IN_APP, EMAIL)),
+    PM_TASK_RETURNED(WARNING, Set.of(IN_APP, EMAIL)),
+    PM_TASK_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
+    PM_MILESTONE_DUE_SOON(INFO, Set.of(IN_APP, EMAIL)),
+    PM_CHANGE_ORDER_SUBMITTED(INFO, Set.of(IN_APP, EMAIL)),
+    PM_CHANGE_ORDER_DECIDED(INFO, Set.of(IN_APP, EMAIL)),
+    PM_RFI_ANSWERED(INFO, Set.of(IN_APP, EMAIL)),
+    PM_TIME_REJECTED(WARNING, Set.of(IN_APP, EMAIL)),
+    PM_ISSUE_ASSIGNED(WARNING, Set.of(IN_APP, EMAIL)),
+    PM_ACTION_ASSIGNED(INFO, Set.of(IN_APP, EMAIL)),
+    PM_ACTION_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
+    PM_PROJECT_PROPOSED(INFO, Set.of(IN_APP, EMAIL)),
+    PM_PROJECT_DECIDED(INFO, Set.of(IN_APP, EMAIL));
 
     private final NotificationSeverity defaultSeverity;
     private final Set<NotificationChannel> defaultChannels;

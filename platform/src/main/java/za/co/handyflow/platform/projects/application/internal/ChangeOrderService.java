@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.projects.application.internal;
 
+import za.co.handyflow.platform.projects.application.internal.notify.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
@@ -95,6 +96,7 @@ public class ChangeOrderService {
     private final ProjectCostService            costService;
     private final EvidenceFacade                evidenceFacade;
     private final ObjectMapper                  objectMapper;
+    private final ProjectNotifier               notifier;
 
     @PersistenceContext
     private EntityManager em;
@@ -190,6 +192,11 @@ public class ChangeOrderService {
         revisionRepo.save(ChangeOrderRevision.open(co, snapshotJson(co), userId, userName));
         approvalFacade.submit(tenantId, APPROVALS_MODULE, APPROVALS_ENTITY_TYPE, id, null, Map.of());
         log.info("Submitted change order={} revision={} project={}", id, co.getRevision(), co.getProjectId());
+        notifier.publish(ProjectEvent.toRoles(tenantId.getValue(), co.getProjectId(), PmEvent.CHANGE_ORDER_SUBMITTED,
+                co.getChangeNumber() + " needs approval — " + project.getName(),
+                co.getTitle() + " · cost " + co.getCostImpact() + " · " + co.getScheduleImpact() + " day(s). Submitted by " + userName + ".",
+                co.getId(), java.util.Set.of(za.co.handyflow.platform.projects.domain.enums.ProjectMemberRole.SPONSOR,
+                        za.co.handyflow.platform.projects.domain.enums.ProjectMemberRole.MANAGER), userId));
         return co;
     }
 
@@ -245,6 +252,9 @@ public class ChangeOrderService {
 
         ChangeOrder saved = changeOrderRepo.save(co);
         recordOutcome(saved, "APPROVED", null, approverId);
+        notifier.publish(ProjectEvent.to(tenantId.getValue(), co.getProjectId(), PmEvent.CHANGE_ORDER_DECIDED,
+                co.getChangeNumber() + " was approved — " + project.getName(),
+                co.getTitle() + ". Approved by " + approverName + "; the budget and schedule are updated.", co.getId(), co.getSubmittedBy(), approverId));
         notificationService.notifyChangeOrderApproved(
                 co.getTenantId(), project.getName(), co.getChangeNumber(), approverName);
         return saved;
@@ -266,6 +276,9 @@ public class ChangeOrderService {
         co.reject(why);
         ChangeOrder saved = changeOrderRepo.save(co);
         recordOutcome(saved, "REJECTED", why, currentUserId());
+        notifier.publish(ProjectEvent.to(tenantId.getValue(), co.getProjectId(), PmEvent.CHANGE_ORDER_DECIDED,
+                co.getChangeNumber() + " was rejected", co.getTitle() + ". Reason: " + why + " You can revise and resubmit it.",
+                co.getId(), co.getSubmittedBy(), currentUserId()));
         log.info("Rejected change order={} project={}", id, co.getProjectId());
         return saved;
     }
