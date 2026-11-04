@@ -125,4 +125,33 @@ class MeterRulesTest {
         assertEquals(replaced, r.getCorrectsId());
         assertEquals(replaced, r.point().correctsId());
     }
+
+    @Test
+    void startingNumbersDefaultSensibly() {
+        BigDecimal[] r = MeterRules.checkStarting("HOURS", null, null, null);
+        assertEquals(0, r[0].compareTo(n("0")));
+        assertEquals(0, r[1].compareTo(n("0")));
+        assertEquals(0, r[2].compareTo(n("250")));
+    }
+
+    @Test
+    void aMachineAlreadyInUseStartsCountingFromItsLastService() {
+        BigDecimal[] r = MeterRules.checkStarting("HOURS", n("1100"), n("1000"), n("500"));
+        assertEquals(0, r[0].compareTo(n("1100")));
+        assertEquals(0, r[1].compareTo(n("1000")));
+        assertEquals(0, r[2].compareTo(n("500")));
+        // no last service given: the interval starts counting from today's reading
+        assertEquals(0, MeterRules.checkStarting("HOURS", n("1100"), null, null)[1].compareTo(n("1100")));
+    }
+
+    @Test
+    void badStartingNumbersAreRefused() {
+        assertThrows(IllegalArgumentException.class, () -> MeterRules.checkStarting("HOURS", n("-1"), null, null));
+        assertThrows(IllegalArgumentException.class, () -> MeterRules.checkStarting("HOURS", n("100"), n("150"), null));
+        assertThrows(IllegalArgumentException.class, () -> MeterRules.checkStarting("HOURS", n("100"), n("-5"), null));
+        assertThrows(IllegalArgumentException.class, () -> MeterRules.checkStarting("HOURS", n("100"), null, n("0")));
+        assertThrows(IllegalArgumentException.class, () -> MeterRules.checkStarting("HOURS", n("784445"), null, null));
+        assertThrows(IllegalArgumentException.class, () -> MeterRules.checkStarting("KILOMETRES", n("5000001"), null, null));
+        assertDoesNotThrow(() -> MeterRules.checkStarting("KILOMETRES", n("784445"), null, null));
+    }
 }

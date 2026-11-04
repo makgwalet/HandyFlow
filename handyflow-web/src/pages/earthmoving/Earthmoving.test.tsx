@@ -111,6 +111,24 @@ describe("Fleet screen", () => {
     expect(body.serviceIntervalHours).toBe(250)
   })
 
+  it("registering a machine sends its starting reading and service interval", async () => {
+    perms = ["EARTHMOVING_READ", "EARTHMOVING_WRITE"]
+    post.mockResolvedValue({ data: { data: asset({ id: "a9" }) } })
+    mount(<AssetsTab />)
+    fireEvent.click((await screen.findAllByText(/Register Equipment/))[0])
+    fireEvent.change(screen.getByPlaceholderText("CAT D9T Dozer"), { target: { value: "Dozer 2" } })
+    fireEvent.change(screen.getByLabelText(/Current reading/), { target: { value: "1100" } })
+    fireEvent.change(screen.getByLabelText(/Reading at last service/), { target: { value: "1000" } })
+    fireEvent.change(screen.getByLabelText(/Service interval/), { target: { value: "500" } })
+    const buttons = screen.getAllByText("Register Equipment")
+    fireEvent.click(buttons[buttons.length - 1])
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    const [, body] = post.mock.calls[0]
+    expect(body.currentReading).toBe(1100)
+    expect(body.lastServiceReading).toBe(1000)
+    expect(body.serviceInterval).toBe(500)
+  })
+
   it("never offers Deployed in the status dialog", async () => {
     perms = ["EARTHMOVING_WRITE", "EARTHMOVING_DEPLOY", "EARTHMOVING_MAINTAIN", "EARTHMOVING_ADMIN"]
     mount(<AssetsTab />)

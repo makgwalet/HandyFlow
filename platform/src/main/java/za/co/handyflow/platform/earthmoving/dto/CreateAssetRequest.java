@@ -19,13 +19,25 @@ public record CreateAssetRequest(
         BigDecimal dailyRate,
         BigDecimal hourlyRate,
         String notes,
-        String meterType             // HOURS | KILOMETRES (defaults to HOURS)
+        String meterType,            // HOURS | KILOMETRES (defaults to HOURS)
+        BigDecimal currentReading,   // optional: what the meter shows today (defaults to 0)
+        BigDecimal lastServiceReading, // optional: meter reading at the last service (defaults to currentReading)
+        BigDecimal serviceInterval   // optional: service every this many hours or km (defaults to 250)
 ) {
+    /** The form without starting meter numbers. */
+    public CreateAssetRequest(String name, String assetType, String fleetNumber, String make, String model, Integer year,
+                              String serialNumber, String registration, String ownershipType, String hireSupplier,
+                              LocalDate hireStartDate, LocalDate hireEndDate, BigDecimal dailyRate, BigDecimal hourlyRate,
+                              String notes, String meterType) {
+        this(name, assetType, fleetNumber, make, model, year, serialNumber, registration, ownershipType, hireSupplier,
+                hireStartDate, hireEndDate, dailyRate, hourlyRate, notes, meterType, null, null, null);
+    }
+
     /** The form without a meter type: hours. */
     public CreateAssetRequest(String name, String assetType, String fleetNumber, String make, String model, Integer year,
                               String serialNumber, String registration, String ownershipType, String hireSupplier,
                               LocalDate hireStartDate, LocalDate hireEndDate, BigDecimal dailyRate, BigDecimal hourlyRate, String notes) {
         this(name, assetType, fleetNumber, make, model, year, serialNumber, registration, ownershipType, hireSupplier,
-                hireStartDate, hireEndDate, dailyRate, hourlyRate, notes, null);
+                hireStartDate, hireEndDate, dailyRate, hourlyRate, notes, null, null, null, null);
     }
 }

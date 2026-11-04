@@ -238,6 +238,24 @@ class EarthAssetServiceTest {
     }
 
     @Test
+    void aNewMachineCanBeRegisteredWithItsServiceInterval() {
+        granted.add("EARTHMOVING_WRITE");
+        var r = service.createAsset(tenant, new CreateAssetRequest("Dozer", "DOZER", "D-02", null, null, null, null, null,
+                "OWN", null, null, null, null, null, null, "HOURS", new BigDecimal("1100"), new BigDecimal("1000"), new BigDecimal("500")));
+        assertEquals(0, r.currentHours().compareTo(new BigDecimal("1100")));
+        assertEquals(0, r.lastServiceHours().compareTo(new BigDecimal("1000")));
+        assertEquals(0, r.serviceIntervalHours().compareTo(new BigDecimal("500")));
+    }
+
+    @Test
+    void aMachineWithAMistypedStartingReadingIsRefused() {
+        granted.add("EARTHMOVING_WRITE");
+        assertThrows(IllegalArgumentException.class, () -> service.createAsset(tenant, new CreateAssetRequest("Dozer", "DOZER", "D-03",
+                null, null, null, null, null, "OWN", null, null, null, null, null, null, "HOURS",
+                new BigDecimal("784445"), null, null)));
+    }
+
+    @Test
     void aMachineWithoutAMeterTypeCountsHours() {
         granted.add("EARTHMOVING_WRITE");
         var r = service.createAsset(tenant, new CreateAssetRequest("Dozer", "DOZER", "D-01", null, null, null, null, null,

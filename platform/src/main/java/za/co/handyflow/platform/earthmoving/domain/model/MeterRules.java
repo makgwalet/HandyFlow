@@ -56,6 +56,31 @@ public final class MeterRules {
         return EarthmovingRules.requireReason(reason, "changing the meter");
     }
 
+    /** Most hours a machine can plausibly have on its meter; above this a reading is almost certainly mistyped. */
+    public static final BigDecimal MAX_HOURS = new BigDecimal("200000");
+    /** Same for a kilometre meter. */
+    public static final BigDecimal MAX_KILOMETRES = new BigDecimal("5000000");
+
+    /**
+     * The numbers given when a machine is registered. All three are optional: no current reading means zero, no last
+     * service means the machine starts counting from its current reading, no interval means the usual 250 hours.
+     * Returns {current, lastService, interval} filled in.
+     */
+    public static BigDecimal[] checkStarting(String type, BigDecimal current, BigDecimal lastService, BigDecimal interval) {
+        BigDecimal cap = KILOMETRES.equals(type) ? MAX_KILOMETRES : MAX_HOURS;
+        BigDecimal cur = current == null ? BigDecimal.ZERO : current;
+        if (cur.signum() < 0) throw new IllegalArgumentException("The current reading cannot be negative.");
+        if (cur.compareTo(cap) > 0)
+            throw new IllegalArgumentException("A current reading above " + cap.toPlainString() + " " + word(type) + " looks like a typing mistake. Check it.");
+        BigDecimal last = lastService == null ? cur : lastService;
+        if (last.signum() < 0 || last.compareTo(cur) > 0)
+            throw new IllegalArgumentException("The last service reading must be between 0 and the current reading.");
+        BigDecimal every = interval == null ? new BigDecimal("250") : interval;
+        if (every.signum() <= 0) throw new IllegalArgumentException("The service interval must be more than zero " + word(type) + ".");
+        if (every.compareTo(cap) > 0) throw new IllegalArgumentException("That service interval is too large. Check it.");
+        return new BigDecimal[]{cur, last, every};
+    }
+
     public static final int MIN_DISPUTE_REASON = 5;
 
     /** A reading reduced to what billing needs. */

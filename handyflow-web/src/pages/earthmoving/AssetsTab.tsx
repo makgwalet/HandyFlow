@@ -23,6 +23,7 @@ const EMPTY_FORM = {
   year: "", serialNumber: "", registration: "",
   ownershipType: "OWN", hireSupplier: "", hireStartDate: "", hireEndDate: "",
   dailyRate: "", hourlyRate: "", serviceIntervalHours: "", notes: "", meterType: "HOURS",
+  currentReading: "", lastServiceReading: "",
 }
 
 const formFromAsset = (a: Asset) => ({
@@ -33,6 +34,7 @@ const formFromAsset = (a: Asset) => ({
   dailyRate: a.dailyRate != null ? String(a.dailyRate) : "", hourlyRate: a.hourlyRate != null ? String(a.hourlyRate) : "",
   serviceIntervalHours: a.serviceIntervalHours != null ? String(a.serviceIntervalHours) : "", notes: a.notes ?? "",
   meterType: a.meterType ?? "HOURS",
+  currentReading: "", lastServiceReading: "",
 })
 
 const omit = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
@@ -523,12 +525,24 @@ export default function AssetsTab() {
                 <label style={lbl}>Hourly Rate (R)</label>
                 <input type="number" value={form.hourlyRate} onChange={e => setForm(f => ({ ...f, hourlyRate: e.target.value }))} placeholder="2200" style={inputStyle()} />
               </div>
-              {editing && (
-                <div>
-                  <label style={lbl}>Service interval ({editing ? meterWordOf(editing) : form.meterType === "KILOMETRES" ? "kilometres" : "hours"})</label>
-                  <input type="number" value={form.serviceIntervalHours} onChange={e => setForm(f => ({ ...f, serviceIntervalHours: e.target.value }))} placeholder="250" style={inputStyle()} />
-                </div>
+              {!editing && (
+                <>
+                  <div>
+                    <label htmlFor="asset-current" style={lbl}>Current reading ({form.meterType === "KILOMETRES" ? "km" : "hrs"})</label>
+                    <input id="asset-current" type="number" min="0" value={form.currentReading}
+                      onChange={e => setForm(f => ({ ...f, currentReading: e.target.value }))} placeholder="What the meter shows today" style={inputStyle()} />
+                  </div>
+                  <div>
+                    <label htmlFor="asset-lastsvc" style={lbl}>Reading at last service</label>
+                    <input id="asset-lastsvc" type="number" min="0" value={form.lastServiceReading}
+                      onChange={e => setForm(f => ({ ...f, lastServiceReading: e.target.value }))} placeholder="Leave empty if new" style={inputStyle()} />
+                  </div>
+                </>
               )}
+              <div>
+                <label htmlFor="asset-interval" style={lbl}>Service interval ({editing ? meterWordOf(editing) : form.meterType === "KILOMETRES" ? "kilometres" : "hours"})</label>
+                <input id="asset-interval" type="number" min="1" value={form.serviceIntervalHours} onChange={e => setForm(f => ({ ...f, serviceIntervalHours: e.target.value }))} placeholder={form.meterType === "KILOMETRES" ? "10000" : "250"} style={inputStyle()} />
+              </div>
             </div>
           </Sect>
 
@@ -563,7 +577,12 @@ export default function AssetsTab() {
               if (editing) {
                 updateAsset.mutate({ id: editing.id, body: { ...body, serviceIntervalHours: form.serviceIntervalHours ? Number(form.serviceIntervalHours) : null } }, { onError })
               } else {
-                createAsset.mutate({ ...body, meterType: form.meterType }, { onError })
+                createAsset.mutate({
+                  ...body, meterType: form.meterType,
+                  currentReading: form.currentReading ? Number(form.currentReading) : null,
+                  lastServiceReading: form.lastServiceReading ? Number(form.lastServiceReading) : null,
+                  serviceInterval: form.serviceIntervalHours ? Number(form.serviceIntervalHours) : null,
+                }, { onError })
               }
             }}
             loading={createAsset.isPending || updateAsset.isPending}

@@ -250,6 +250,13 @@ public class EarthAsset {
         this.meterType = MeterRules.normalizeType(type);
     }
 
+    /** Sets the three numbers a machine starts with; the caller has checked MeterRules.checkStarting. */
+    public void startMeter(BigDecimal current, BigDecimal lastService, BigDecimal interval) {
+        this.currentHours = current;
+        this.lastServiceHours = lastService;
+        this.serviceIntervalHours = interval;
+    }
+
     /** Fixes a wrong reading. The only way a reading goes down; the caller has checked the rules (MeterRules.checkCorrection). */
     public void correctReading(BigDecimal corrected) {
         this.currentHours = corrected;

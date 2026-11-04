@@ -109,6 +109,8 @@ public class EarthAssetService {
                 req.dailyRate(), req.hourlyRate(), req.notes()
         );
         asset.useMeter(req.meterType());
+        BigDecimal[] start = MeterRules.checkStarting(asset.getMeterType(), req.currentReading(), req.lastServiceReading(), req.serviceInterval());
+        asset.startMeter(start[0], start[1], start[2]);
         saveAssetOrExplain(asset);
         trail.record(tenantId, "EARTHMOVING_ASSET_CREATED", "EARTHMOVING_ASSET", asset.getId(), null, snapshot(asset));
         log.info("Registered earthmoving asset={} fleet={} tenant={}",
