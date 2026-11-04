@@ -6,7 +6,7 @@ import { usePermission } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pick, Pill, SectionTitle, card, errorText, fail, inp, muted, pageOf, td, th } from "./kit"
 import { BASE, useLookups, type FSite } from "./lookups"
-import { SITE_TYPES, addressLine, emptySite, labelOf, siteBody, siteProblem, type SiteForm } from "./fm.logic"
+import { PROVINCES, SITE_TYPES, postalDigits, addressLine, emptySite, labelOf, siteBody, siteProblem, type SiteForm } from "./fm.logic"
 
 export default function SitesTab() {
   const qc = useQueryClient(), lookups = useLookups()
@@ -61,17 +61,17 @@ function SiteDialog({ site, clients, onClose, onSaved }: { site: FSite | null; c
   return (
     <Dialog title={site ? `Edit ${site.name}` : "Add a site"} onClose={onClose} width={600}
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" disabled={!!problem || save.isPending} onClick={() => { setErr(""); save.mutate() }}>{save.isPending ? "Saving…" : "Save"}</Btn></>}>
-      {creating && <Pick label="Client" value={f.clientId} onChange={set("clientId")} options={clients} blank="Choose a client" />}
+      {creating && <Pick label="Client *" value={f.clientId} onChange={set("clientId")} options={clients} blank="Choose a client" />}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
-        <Input label="Site name" value={f.name} onChange={set("name")} autoFocus maxLength={255} />
+        <Input label="Site name *" value={f.name} onChange={set("name")} autoFocus maxLength={255} />
         <Pick label="Type" value={f.siteType} onChange={set("siteType")} options={SITE_TYPES} />
         <Input label="Street" value={f.street} onChange={set("street")} />
         <Input label="City" value={f.city} onChange={set("city")} />
-        <Input label="Province" value={f.province} onChange={set("province")} />
-        <Input label="Postal code" value={f.postalCode} onChange={set("postalCode")} />
+        <Pick label="Province" value={f.province} onChange={set("province")} options={[...(f.province && !(PROVINCES as readonly string[]).includes(f.province) ? [f.province] : []), ...PROVINCES].map(p => [p, p] as const)} blank="Choose a province" />
+        <Input label="Postal code" value={f.postalCode} onChange={v => set("postalCode")(postalDigits(v))} inputMode="numeric" maxLength={4} hint="Four digits" />
       </div>
       <Input label="Notes" value={f.notes} onChange={set("notes")} />
-      {problem && f.name.trim() && <div style={muted}>{problem}</div>}
+      {problem && (f.name.trim() || f.postalCode) && <div style={muted}>{problem}</div>}
       {err && <ErrorLine text={err} />}
     </Dialog>
   )

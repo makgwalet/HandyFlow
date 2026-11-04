@@ -144,8 +144,12 @@ export const emptySite = (): SiteForm => ({ clientId: "", name: "", siteType: "O
 export function siteProblem(f: SiteForm, creating: boolean): string | null {
   if (creating && !f.clientId) return "Choose the client"
   if (!f.name.trim()) return "Enter the site name"
+  if (f.postalCode.trim() && !/^\d{4}$/.test(f.postalCode.trim())) return "The postal code must be four digits, like 2196"
   return null
 }
+export const PROVINCES = ["Eastern Cape", "Free State", "Gauteng", "KwaZulu-Natal", "Limpopo", "Mpumalanga", "North West", "Northern Cape", "Western Cape"] as const
+/** Keep only digits, at most four, as someone types a postal code. */
+export const postalDigits = (v: string) => v.replace(/\D/g, "").slice(0, 4)
 export function siteAddress(f: SiteForm): Record<string, string> {
   const a: Record<string, string> = {}
   for (const k of ["street", "city", "province", "postalCode"] as const) if (f[k].trim()) a[k] = f[k].trim()

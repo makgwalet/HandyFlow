@@ -23,8 +23,8 @@ export function Where({ lookups, f, set }: { lookups: Lookups; f: { clientId: st
   const assets = useSiteAssets(f.siteId)
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
-      <Pick label="Client" value={f.clientId} onChange={v => { set("clientId")(v); set("siteId")(""); set("assetId")("") }} options={lookups.clients.filter(c => c.status === "ACTIVE").map(c => [c.id, c.tradingName] as const)} blank="Choose a client" />
-      <Pick label="Site" value={f.siteId} onChange={v => { set("siteId")(v); set("assetId")("") }} options={sites.map(s => [s.id, s.name] as const)} blank={f.clientId ? "Choose a site" : "Choose a client first"} />
+      <Pick label="Client *" value={f.clientId} onChange={v => { set("clientId")(v); set("siteId")(""); set("assetId")("") }} options={lookups.clients.filter(c => c.status === "ACTIVE").map(c => [c.id, c.tradingName] as const)} blank="Choose a client" />
+      <Pick label="Site *" value={f.siteId} onChange={v => { set("siteId")(v); set("assetId")("") }} options={sites.map(s => [s.id, s.name] as const)} blank={f.clientId ? "Choose a site" : "Choose a client first"} />
       <Pick label="Asset (optional)" value={f.assetId} onChange={set("assetId")} options={(assets.data ?? []).map(a => [a.id, a.assetTag ? `${a.assetTag} · ${a.name}` : a.name] as const)} blank="Not for one asset" />
     </div>
   )
@@ -45,7 +45,7 @@ export function RaiseDialog({ lookups, onClose, onDone }: { lookups: Lookups; on
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" disabled={!!problem || save.isPending} onClick={() => { setErr(""); save.mutate() }}>{save.isPending ? "Saving…" : "Log request"}</Btn></>}>
       <div style={{ ...muted, marginBottom: 10 }}>A request has to be approved before it can be assigned.</div>
       <Where lookups={lookups} f={f} set={set} />
-      <Input label="What is wrong?" value={f.description} onChange={set("description")} autoFocus />
+      <Input label="What is wrong? *" value={f.description} onChange={set("description")} autoFocus />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
         <Pick label="Kind" value={f.category} onChange={set("category")} options={REQUEST_CATEGORIES} />
         <Pick label="Priority" value={f.priority} onChange={set("priority")} options={PRIORITIES} />
@@ -74,7 +74,7 @@ export function CreateDialog({ lookups, onClose, onDone }: { lookups: Lookups; o
     <Dialog title="New work order" onClose={onClose} width={640}
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" disabled={!!problem || save.isPending} onClick={() => { setErr(""); save.mutate() }}>{save.isPending ? "Saving…" : "Create"}</Btn></>}>
       <Where lookups={lookups} f={f} set={set} />
-      <Input label="What needs doing?" value={f.description} onChange={set("description")} autoFocus />
+      <Input label="What needs doing? *" value={f.description} onChange={set("description")} autoFocus />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
         <Pick label="Kind" value={f.category} onChange={set("category")} options={CATEGORIES} />
         <Pick label="Priority" value={f.priority} onChange={set("priority")} options={PRIORITIES} />
@@ -184,7 +184,7 @@ export function CompleteDialog({ id, createdAt, needsCheck, onClose }: { id: str
     <Dialog title="Complete this work" onClose={onClose} width={600}
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" disabled={!!problem || save.isPending} onClick={() => { setErr(""); save.mutate() }}>{save.isPending ? "Saving…" : needsCheck ? "Send for checking" : "Complete"}</Btn></>}>
       {needsCheck && <div style={{ ...muted, marginBottom: 10 }}>This work must be checked before it can be billed.</div>}
-      <Input label="What was done?" value={f.completionNotes} onChange={set("completionNotes")} autoFocus />
+      <Input label="What was done? *" value={f.completionNotes} onChange={set("completionNotes")} autoFocus />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
         <Input label="Cost charged (R)" type="number" min="0" step="0.01" value={f.cost} onChange={set("cost")} hint="Leave empty if the cost lines cover it" />
         <Input label="Finished at" type="datetime-local" value={f.completedAt} onChange={set("completedAt")} hint="Leave empty for now" />
@@ -212,7 +212,7 @@ export function CostDialog({ id, onClose }: { id: string; onClose: () => void })
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" disabled={!!problem || save.isPending} onClick={() => { setErr(""); save.mutate() }}>{save.isPending ? "Adding…" : "Add"}</Btn></>}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
         <Pick label="Kind" value={f.costType} onChange={set("costType")} options={COST_TYPES} />
-        <Input label="Description" value={f.description} onChange={set("description")} autoFocus />
+        <Input label="Description *" value={f.description} onChange={set("description")} autoFocus />
         <Input label="Quantity" type="number" min="0" step="any" value={f.quantity} onChange={set("quantity")} />
         <Input label="Cost each (R)" type="number" min="0" step="0.01" value={f.unitCost} onChange={set("unitCost")} />
         <Input label="Charge each (R)" type="number" min="0" step="0.01" value={f.unitCharge} onChange={set("unitCharge")} hint="Leave empty to charge what it cost" />

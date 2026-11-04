@@ -108,7 +108,7 @@ function QuoteDialog({ quote, lookups, onClose, onSaved }: { quote: Quote | null
     <Dialog title={creating ? "New quote" : `Edit ${quote.quoteNumber}`} onClose={onClose} width={720}
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" disabled={!!problem || save.isPending} onClick={() => { setErr(""); save.mutate() }}>{save.isPending ? "Saving…" : "Save draft"}</Btn></>}>
       {creating ? <Where lookups={lookups} f={f} set={setWhere} /> : <div style={{ ...muted, marginBottom: 10 }}>{lookups.clientName(f.clientId)} · {lookups.siteName(f.siteId)} (fixed once the quote exists)</div>}
-      <Input label="Title" value={f.title} onChange={set("title")} maxLength={200} />
+      <Input label="Title *" value={f.title} onChange={set("title")} maxLength={200} />
       <Input label="Description" value={f.description} onChange={set("description")} maxLength={2000} hint="What the client sees under the title" />
       <div style={{ fontSize: 13, fontWeight: 700, margin: "6px 0" }}>Lines</div>
       {f.lines.map((l, i) => (

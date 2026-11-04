@@ -36,4 +36,9 @@ public interface FmSiteRepository extends JpaRepository<FmSite, UUID> {
     /** Ids of every non-deleted site belonging to any of the given clients — resolves a client-restricted user's site scope. */
     @Query("SELECT s.id FROM FmSite s WHERE s.tenantId.value = :#{#tenantId.value} AND s.clientId IN :clientIds AND s.deletedAt IS NULL")
     List<UUID> findSiteIdsForClients(@Param("tenantId") TenantId tenantId, @Param("clientIds") Collection<UUID> clientIds);
+
+    /** Ids of live sites of this client with this name, ignoring case and surrounding spaces. */
+    @Query("SELECT s.id FROM FmSite s WHERE s.tenantId.value = :#{#tenantId.value} AND s.clientId = :clientId AND s.deletedAt IS NULL " +
+            "AND lower(trim(s.name)) = :lowerName")
+    java.util.List<UUID> findActiveIdsByClientAndLowerName(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId, @Param("lowerName") String lowerName);
 }

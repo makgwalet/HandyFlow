@@ -102,10 +102,10 @@ function AssetDialog({ asset, lookups, onClose, onSaved }: { asset: Asset | null
   return (
     <Dialog title={asset ? `Edit ${asset.name}` : "Add an asset"} onClose={onClose} width={640}
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" disabled={!!problem || save.isPending} onClick={() => { setErr(""); save.mutate() }}>{save.isPending ? "Saving…" : "Save"}</Btn></>}>
-      {creating && <Pick label="Site" value={f.siteId} onChange={set("siteId")} options={lookups.sites.filter(s => s.status !== "CLOSED").map(s => [s.id, `${lookups.clientName(s.clientId)} · ${s.name}`] as const)} blank="Choose a site" />}
+      {creating && <Pick label="Site *" value={f.siteId} onChange={set("siteId")} options={lookups.sites.filter(s => s.status !== "CLOSED").map(s => [s.id, `${lookups.clientName(s.clientId)} · ${s.name}`] as const)} blank="Choose a site" />}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
-        <Input label="Name" value={f.name} onChange={set("name")} autoFocus maxLength={255} />
-        {creating ? <Input label="Kind of asset" value={f.assetType} onChange={set("assetType")} hint="For example HVAC, generator, lift" /> : <div />}
+        <Input label="Name *" value={f.name} onChange={set("name")} autoFocus maxLength={255} />
+        {creating ? <Input label="Kind of asset *" value={f.assetType} onChange={set("assetType")} hint="For example HVAC, generator, lift" /> : <div />}
         {creating && <Input label="Asset tag" value={f.assetTag} onChange={set("assetTag")} hint="Leave empty to skip" />}
         <Input label="Where on site" value={f.location} onChange={set("location")} />
         <Input label="Manufacturer" value={f.manufacturer} onChange={set("manufacturer")} />

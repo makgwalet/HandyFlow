@@ -58,7 +58,7 @@ function ClientDialog({ client, onClose, onSaved }: { client: FClient | null; on
   return (
     <Dialog title={client ? `Edit ${client.tradingName}` : "Add a client"} onClose={onClose} width={600}
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" disabled={!!problem || save.isPending} onClick={() => { setErr(""); save.mutate() }}>{save.isPending ? "Saving…" : "Save"}</Btn></>}>
-      <Input label="Trading name" value={f.tradingName} onChange={set("tradingName")} autoFocus maxLength={255} />
+      <Input label="Trading name *" value={f.tradingName} onChange={set("tradingName")} autoFocus maxLength={255} />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
         <Input label="Registration number" value={f.registrationNumber} onChange={set("registrationNumber")} />
         <Input label="VAT number" value={f.vatNumber} onChange={set("vatNumber")} hint="10 digits" />

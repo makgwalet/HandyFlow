@@ -64,7 +64,7 @@ function TechDialog({ tech, users, usersFailed, onClose, onSaved }: { tech: Tech
   return (
     <Dialog title={tech ? `Edit ${tech.name}` : "Add a technician"} onClose={onClose}
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" disabled={!!problem || save.isPending} onClick={() => { setErr(""); save.mutate() }}>{save.isPending ? "Saving…" : "Save"}</Btn></>}>
-      <Input label="Name" value={f.name} onChange={set("name")} autoFocus maxLength={255} />
+      <Input label="Name *" value={f.name} onChange={set("name")} autoFocus maxLength={255} />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
         <Input label="Speciality" value={f.specialization} onChange={set("specialization")} />
         <Input label="Phone" value={f.contactPhone} onChange={set("contactPhone")} />

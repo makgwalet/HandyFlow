@@ -4,9 +4,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmSite;
+import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmSiteAddressRules;
 import za.co.handyflow.platform.facilitiesmanagement.domain.repository.FmClientRepository;
 import za.co.handyflow.platform.facilitiesmanagement.domain.repository.FmSiteRepository;
 import za.co.handyflow.platform.facilitiesmanagement.dto.CreateFmSiteRequest;
@@ -53,7 +56,8 @@ public class FmSiteService {
         clientRepository.findActiveById(tenantId, req.clientId())
                 .orElseThrow(() -> new ResourceNotFoundException("FmClient", req.clientId().toString()));
 
-        FmSite site = FmSite.create(tenantId, req.clientId(), req.name(), req.siteType(), req.address(), req.notes());
+        refuseDuplicateName(tenantId, req.clientId(), req.name(), null);
+        FmSite site = FmSite.create(tenantId, req.clientId(), req.name(), req.siteType(), FmSiteAddressRules.check(req.address()), req.notes());
         siteRepository.save(site);
         log.info("FM site created id={} client={} tenant={}", site.getId(), req.clientId(), tenantId);
         return toResponse(site);
@@ -62,7 +66,8 @@ public class FmSiteService {
     @Transactional
     public FmSiteResponse updateSite(TenantId tenantId, UUID id, UpdateFmSiteRequest req) {
         FmSite site = findActive(tenantId, id, accessPolicy.scope(tenantId));
-        site.update(req.name(), req.siteType(), req.address(), req.notes());
+        refuseDuplicateName(tenantId, site.getClientId(), req.name(), id);
+        site.update(req.name(), req.siteType(), FmSiteAddressRules.check(req.address()), req.notes());
         siteRepository.save(site);
         return toResponse(site);
     }
@@ -91,6 +96,14 @@ public class FmSiteService {
         site.softDelete();
         siteRepository.save(site);
         auditService.record(tenantId, "SITE_DELETED", "SITE", id, "name=" + site.getName() + " client=" + site.getClientId());
+    }
+
+    private void refuseDuplicateName(TenantId tenantId, UUID clientId, String name, UUID ownId) {
+        if (name == null) return;
+        boolean taken = siteRepository.findActiveIdsByClientAndLowerName(tenantId, clientId, name.strip().toLowerCase()).stream()
+                .anyMatch(other -> !other.equals(ownId));
+        if (taken) throw new HandyFlowException("This client already has a site called \"" + name.strip() + "\". Use a different name.",
+                HttpStatus.CONFLICT, "SITE_NAME_TAKEN");
     }
 
     private FmSite findActive(TenantId tenantId, UUID id, FmAccessScope scope) {

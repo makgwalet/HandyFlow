@@ -75,14 +75,14 @@ function AgreementDialog({ agreement, clientId, lookups, onClose, onSaved }: { a
   return (
     <Dialog title={creating ? "New service agreement" : `Edit ${agreement.name || "agreement"}`} onClose={onClose} width={680}
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" disabled={!!problem || save.isPending} onClick={() => { setErr(""); save.mutate() }}>{save.isPending ? "Saving…" : "Save"}</Btn></>}>
-      {creating && <Pick label="Client" value={f.clientId} onChange={v => setF(s => ({ ...s, clientId: v, siteIds: [] }))} blank="Choose a client…" options={lookups.clients.filter(c => c.status === "ACTIVE").map(c => [c.id, c.tradingName] as const)} />}
-      <Input label="Name" value={f.name} onChange={set("name")} maxLength={200} hint="For example “Head office – maintenance”" autoFocus />
+      {creating && <Pick label="Client *" value={f.clientId} onChange={v => setF(s => ({ ...s, clientId: v, siteIds: [] }))} blank="Choose a client…" options={lookups.clients.filter(c => c.status === "ACTIVE").map(c => [c.id, c.tradingName] as const)} />}
+      <Input label="Name *" value={f.name} onChange={set("name")} maxLength={200} hint="For example “Head office – maintenance”" autoFocus />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0 12px" }}>
         {creating ? <Pick label="How it is billed" value={f.billingType} onChange={set("billingType")} options={BILLING_TYPES} /> : <Input label="How it is billed" value={labelOf(BILLING_TYPES, f.billingType)} onChange={() => undefined} readOnly />}
         <Input label="Monthly fee (R)" type="number" min="0" step="0.01" value={f.monthlyFee} onChange={set("monthlyFee")} hint={f.billingType === "RETAINER" ? "Required for a retainer" : "Only used by retainers"} />
         <Input label="Hourly rate (R)" type="number" min="0" step="0.01" value={f.hourlyRate} onChange={set("hourlyRate")} />
         <Input label="Mark-up on parts (%)" type="number" min="0" max="1000" step="0.1" value={f.partsMarkupPercent} onChange={set("partsMarkupPercent")} />
-        {creating ? <Input label="Starts" type="date" value={f.startDate} onChange={set("startDate")} /> : <Input label="Starts" value={f.startDate} onChange={() => undefined} readOnly />}
+        {creating ? <Input label="Starts *" type="date" value={f.startDate} onChange={set("startDate")} /> : <Input label="Starts" value={f.startDate} onChange={() => undefined} readOnly />}
         <Input label="Ends" type="date" value={f.endDate} onChange={set("endDate")} hint="Leave empty for no end date" />
       </div>
       <Checks title="Sites covered" note="Tick none to cover every site of this client." options={sites.map(s => [s.id, s.name] as const)} picked={f.siteIds} onToggle={v => toggle("siteIds", v)} empty={f.clientId ? "This client has no active sites." : "Choose a client first."} />

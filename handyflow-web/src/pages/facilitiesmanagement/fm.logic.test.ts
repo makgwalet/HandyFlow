@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { addressLine, emptyProfile, missingLedgerCodes, needsBillingSetup, profileBody, profileForm, profileProblem, assetBody, assetMoves, assetProblem, assignBody, assignProblem, canCostLines, clientBody, clientProblem, completeBody, completeProblem, costBody, costProblem, costTotals, emptyAsset, emptyClient, emptyComplete, emptyCost, emptyOrder, emptyRequest, emptySite, orderProblem, requestBody, requestProblem, siteBody, siteProblem, slaNote, warrantyNote, whoFrom, woActions, type Who } from "./fm.logic"
+import { PROVINCES, postalDigits, addressLine, emptyProfile, missingLedgerCodes, needsBillingSetup, profileBody, profileForm, profileProblem, assetBody, assetMoves, assetProblem, assignBody, assignProblem, canCostLines, clientBody, clientProblem, completeBody, completeProblem, costBody, costProblem, costTotals, emptyAsset, emptyClient, emptyComplete, emptyCost, emptyOrder, emptyRequest, emptySite, orderProblem, requestBody, requestProblem, siteBody, siteProblem, slaNote, warrantyNote, whoFrom, woActions, type Who } from "./fm.logic"
 
 const MANAGER: Who = { manage: true, assign: true, execute: true }
 const TECH: Who = { manage: false, assign: false, execute: true }
@@ -444,5 +444,16 @@ describe("company and billing settings", () => {
     expect(needsBillingSetup("No bank account code is configured in the billing settings")).toBe(true)
     expect(needsBillingSetup("Account 4000 not found")).toBe(false)
     expect(needsBillingSetup(null)).toBe(false)
+  })
+})
+
+describe("site address rules", () => {
+  it("wants a four-digit postal code and offers the nine provinces", () => {
+    const f = { ...emptySite(), name: "HQ" }
+    expect(siteProblem({ ...f, postalCode: "21" }, false)).toMatch(/four digits/)
+    expect(siteProblem({ ...f, postalCode: "2196" }, false)).toBeNull()
+    expect(siteProblem(f, false)).toBeNull()
+    expect(PROVINCES).toHaveLength(9)
+    expect(postalDigits("21a96-77")).toBe("2196")
   })
 })

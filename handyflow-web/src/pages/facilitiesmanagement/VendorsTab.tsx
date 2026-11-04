@@ -146,7 +146,7 @@ function VendorDialog({ vendor, onClose, onSaved }: { vendor: Vendor | null; onC
     <Dialog title={vendor ? `Edit ${vendor.companyName}` : "Add a vendor"} onClose={onClose}
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" disabled={!!problem || save.isPending} onClick={() => { setErr(""); save.mutate() }}>{save.isPending ? "Saving…" : "Save"}</Btn></>}>
       {!vendor && <div style={{ ...muted, marginBottom: 10 }}>A new vendor has to be approved before it can be given work.</div>}
-      <Input label="Company name" value={f.companyName} onChange={set("companyName")} autoFocus maxLength={255} />
+      <Input label="Company name *" value={f.companyName} onChange={set("companyName")} autoFocus maxLength={255} />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
         <Input label="Kind of service" value={f.serviceType} onChange={set("serviceType")} />
         <Input label="Contact person" value={f.contactName} onChange={set("contactName")} />
