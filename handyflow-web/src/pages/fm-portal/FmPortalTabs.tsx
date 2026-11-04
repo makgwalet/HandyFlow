@@ -4,26 +4,36 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { fmPortalApi, type FmPortalQuote, type FmPortalWo } from "../../api/fmPortal.api"
 import { color, space } from "../accountant-portal/portal-theme"
 import { PORTAL_CATEGORIES, PORTAL_STATUS, QUOTE_STATUS, INVOICE_STATUS, addressLine, canWithdraw, declineProblem, dueNote, emptyRaise, labelOf, raiseBody, raiseProblem, slaNote, type RaiseForm } from "../facilitiesmanagement/fm.logic"
+import { Search } from "lucide-react"
 import { Chip, Field, Modal, btn, day, empty, errText, inputStyle, money, panel, sub, td, th } from "./portalKit"
+import { REQUEST_STATUS_FILTERS, filterRequests, nextInvoiceDue, owingInvoices } from "./portalStats"
 
 const today = () => new Date().toISOString().slice(0, 10)
 const useSites = (cid: string) => useQuery({ queryKey: ["fm-portal-sites", cid], queryFn: () => fmPortalApi.sites(cid) })
 const Err = ({ text }: { text: string }) => text ? <div role="alert" style={{ margin: `${space(2)} 0`, padding: "8px 12px", background: color.redBg, color: color.redText, borderRadius: 8, fontSize: 13 }}>{text}</div> : null
 
 export function RequestsPanel({ cid }: { cid: string }) {
-  const qc = useQueryClient(), [page, setPage] = useState(0), [raising, setRaising] = useState(false), [withdrawing, setWithdrawing] = useState<FmPortalWo | null>(null), [err, setErr] = useState("")
+  const qc = useQueryClient(), [page, setPage] = useState(0), [search, setSearch] = useState(""), [siteF, setSiteF] = useState(""), [groupF, setGroupF] = useState(""), [raising, setRaising] = useState(false), [withdrawing, setWithdrawing] = useState<FmPortalWo | null>(null), [err, setErr] = useState("")
   const sites = useSites(cid)
   const q = useQuery({ queryKey: ["fm-portal-orders", cid, page], queryFn: () => fmPortalApi.orders(cid, page) })
   const refresh = () => { qc.invalidateQueries({ queryKey: ["fm-portal-orders", cid] }); qc.invalidateQueries({ queryKey: ["fm-portal-summary", cid] }) }
   const withdraw = useMutation({ mutationFn: (w: FmPortalWo) => fmPortalApi.withdraw(cid, w.id), onSuccess: () => { setWithdrawing(null); refresh() }, onError: e => { setErr(errText(e, "Could not withdraw the request")); setWithdrawing(null) } })
   const siteName = (id: string) => sites.data?.content.find(s => s.id === id)?.name ?? ""
-  const rows = q.data?.content ?? [], now = new Date()
+  const all = q.data?.content ?? [], now = new Date()
+  const rows = filterRequests(all, { search, siteId: siteF, group: groupF }), filtered = !!(search.trim() || siteF || groupF)
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: space(3) }}><b style={{ color: color.ink }}>Your service requests</b><button style={btn(true)} onClick={() => setRaising(true)}>Report a problem</button></div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: space(3), marginBottom: space(3), flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: space(2), flexWrap: "wrap", flex: 1 }}>
+          <label style={{ position: "relative", flex: "1 1 220px", maxWidth: 320 }}><Search size={15} style={{ position: "absolute", left: 10, top: 11, color: "var(--hf-text-faint)" }} /><input aria-label="Search requests" placeholder="Search requests…" value={search} onChange={e => setSearch(e.target.value)} style={{ ...inputStyle, paddingLeft: 32 }} /></label>
+          <select aria-label="Site" value={siteF} onChange={e => setSiteF(e.target.value)} style={{ ...inputStyle, width: "auto" }}><option value="">All sites</option>{(sites.data?.content ?? []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+          <select aria-label="Status" value={groupF} onChange={e => setGroupF(e.target.value)} style={{ ...inputStyle, width: "auto" }}><option value="">All statuses</option>{REQUEST_STATUS_FILTERS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}</select>
+        </div>
+        <button style={btn(true)} onClick={() => setRaising(true)}>New request</button>
+      </div>
       <Err text={err} />
       <div style={panel}>
-        {q.isError ? <p style={empty}>We could not load your requests.</p> : q.isLoading ? <p style={empty}>Loading…</p> : rows.length === 0 ? <p style={empty}>You have not reported anything yet.</p> : (
+        {q.isError ? <p style={empty}>We could not load your requests.</p> : q.isLoading ? <p style={empty}>Loading…</p> : rows.length === 0 ? <p style={empty}>{filtered ? "No requests match. Clear the search or filters to see them all." : "You have not reported anything yet."}</p> : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr><th style={th}>Reference</th><th style={th}>Problem</th><th style={th}>Site</th><th style={th}>Status</th><th style={th} /></tr></thead>
             <tbody>{rows.map(w => {
@@ -48,18 +58,41 @@ export function RequestsPanel({ cid }: { cid: string }) {
 }
 
 function RaiseModal({ cid, onClose, onDone }: { cid: string; onClose: () => void; onDone: () => void }) {
-  const sites = useSites(cid), [f, setF] = useState<RaiseForm>(emptyRaise), [err, setErr] = useState("")
+  const sites = useSites(cid), [f, setF] = useState<RaiseForm>(emptyRaise), [err, setErr] = useState(""), [step, setStep] = useState(0)
   const problem = raiseProblem(f)
+  const descBad = f.description.trim().length < 10, siteBad = !f.siteId
   const go = useMutation({ mutationFn: () => fmPortalApi.raise(cid, raiseBody(f)), onSuccess: () => { onDone(); onClose() }, onError: e => setErr(errText(e, "Could not send your request")) })
+  const siteName = (sites.data?.content ?? []).find(s => s.id === f.siteId)?.name ?? ""
+  const STEPS = ["Details", "Location", "Review"]
+  const stepper = (
+    <div aria-label={`Step ${step + 1} of 3`} style={{ display: "flex", gap: space(2), marginBottom: space(4) }}>
+      {STEPS.map((l, i) => <div key={l} style={{ flex: 1 }}><div style={{ height: 4, borderRadius: 4, background: i <= step ? color.navy : color.border }} /><div style={{ fontSize: 12, marginTop: 5, fontWeight: i === step ? 800 : 600, color: i === step ? color.ink : color.muted }}>{i + 1}. {l}</div></div>)}
+    </div>)
+  const next = () => { if (step === 0 && descBad) return; if (step === 1 && siteBad) return; setStep(step + 1) }
   return (
-    <Modal title="Report a problem" onClose={onClose} footer={<><button style={btn()} onClick={onClose}>Cancel</button><button style={btn(true)} disabled={!!problem || go.isPending} onClick={() => { setErr(""); go.mutate() }}>{go.isPending ? "Sending…" : "Send request"}</button></>}>
-      <Field label="Where is it?"><select value={f.siteId} onChange={e => setF(s => ({ ...s, siteId: e.target.value }))} style={inputStyle}><option value="">Choose a site…</option>{(sites.data?.content ?? []).filter(s => s.status === "ACTIVE").map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
-      <Field label="What kind of problem?"><select value={f.category} onChange={e => setF(s => ({ ...s, category: e.target.value }))} style={inputStyle}>{PORTAL_CATEGORIES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
-      <Field label="Describe it" hint="Say what is wrong and where, in at least 10 characters."><textarea rows={4} value={f.description} onChange={e => setF(s => ({ ...s, description: e.target.value }))} maxLength={2000} style={inputStyle} /></Field>
-      <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13.5, marginBottom: space(3) }}><input type="checkbox" checked={f.safetyImpact} onChange={e => setF(s => ({ ...s, safetyImpact: e.target.checked }))} />Someone could get hurt, or it is a safety risk</label>
-      <Field label="Who should we call? (optional)"><input value={f.contactName} onChange={e => setF(s => ({ ...s, contactName: e.target.value }))} maxLength={100} style={inputStyle} /></Field>
-      <div style={sub}>The team reviews every request and sets its priority. For something dangerous right now, phone them as well.</div>
-      {problem && (f.siteId || f.description) && <div style={sub}>{problem}</div>}
+    <Modal title="New service request" onClose={onClose} footer={<>
+      <button style={btn()} onClick={step === 0 ? onClose : () => { setStep(step - 1); setErr("") }}>{step === 0 ? "Cancel" : "Back"}</button>
+      {step < 2 ? <button style={btn(true)} disabled={(step === 0 && descBad) || (step === 1 && siteBad)} onClick={next}>Next</button>
+        : <button style={btn(true)} disabled={!!problem || go.isPending} onClick={() => { setErr(""); go.mutate() }}>{go.isPending ? "Sending…" : "Send request"}</button>}</>}>
+      {stepper}
+      {step === 0 && <>
+        <Field label="What kind of problem?"><select value={f.category} onChange={e => setF(s => ({ ...s, category: e.target.value }))} style={inputStyle}>{PORTAL_CATEGORIES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
+        <Field label="Describe it *" hint="Say what is wrong and where, in at least 10 characters."><textarea rows={4} value={f.description} onChange={e => setF(s => ({ ...s, description: e.target.value }))} maxLength={2000} style={inputStyle} /></Field>
+        {f.description !== "" && descBad && <div role="alert" style={{ ...sub, color: color.redText, marginBottom: space(2) }}>Please describe the problem in a little more detail.</div>}
+        <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13.5 }}><input type="checkbox" checked={f.safetyImpact} onChange={e => setF(s => ({ ...s, safetyImpact: e.target.checked }))} />Someone could get hurt, or it is a safety risk</label>
+      </>}
+      {step === 1 && <>
+        <Field label="Where is it? *"><select value={f.siteId} onChange={e => setF(s => ({ ...s, siteId: e.target.value }))} style={inputStyle}><option value="">Choose a site…</option>{(sites.data?.content ?? []).filter(s => s.status === "ACTIVE").map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
+        <Field label="Who should we call? (optional)"><input value={f.contactName} onChange={e => setF(s => ({ ...s, contactName: e.target.value }))} maxLength={100} style={inputStyle} /></Field>
+      </>}
+      {step === 2 && <div style={{ display: "grid", gap: space(3), fontSize: 14 }}>
+        <div><div style={sub}>Kind of problem</div><b>{PORTAL_CATEGORIES.find(c => c[0] === f.category)?.[1]}</b></div>
+        <div><div style={sub}>Description</div><div style={{ whiteSpace: "pre-wrap" }}>{f.description.trim()}</div></div>
+        <div><div style={sub}>Site</div><b>{siteName || "—"}</b></div>
+        {f.contactName.trim() && <div><div style={sub}>Contact</div><b>{f.contactName.trim()}</b></div>}
+        {f.safetyImpact && <div><Chip tone="danger">Safety risk</Chip></div>}
+        <div style={sub}>The team reviews every request and sets its priority. For something dangerous right now, phone them as well.</div>
+      </div>}
       <Err text={err} />
     </Modal>
   )
@@ -112,9 +145,15 @@ export function InvoicesPanel({ cid }: { cid: string }) {
   const [err, setErr] = useState("")
   const dl = async (f: () => Promise<void>) => { setErr(""); try { await f() } catch (e) { setErr(errText(e, "Could not download the file")) } }
   const rows = inv.data ?? [], credits = cn.data ?? [], t = today()
+  const owing = owingInvoices(rows), next = nextInvoiceDue(rows), totalOwing = owing.reduce((n, i) => n + i.balance, 0), latest = rows[0]
   return (
     <div>
       <Err text={err} />
+      {rows.length > 0 && <div style={{ ...panel, padding: `${space(4)} ${space(5)}`, marginBottom: space(4), display: "flex", gap: space(6), alignItems: "center", flexWrap: "wrap" }}>
+        <div><div style={{ ...sub, textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.04em", fontSize: 11 }}>Outstanding</div><div style={{ fontSize: 26, fontWeight: 800, color: owing.some(i => (i.dueDate ?? "9") < t) ? color.redText : color.ink }}>{money(totalOwing)}</div><div style={sub}>{owing.length === 0 ? "You are up to date" : `${owing.length} invoice${owing.length === 1 ? "" : "s"} owing`}</div></div>
+        {next && <div><div style={{ ...sub, textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.04em", fontSize: 11 }}>Next due</div><div style={{ fontSize: 17, fontWeight: 800 }}>{day(next.dueDate)}</div><div style={sub}>{next.invoiceNumber} · {money(next.balance)}</div></div>}
+        {latest && <button style={{ ...btn(), marginLeft: "auto" }} onClick={() => dl(() => fmPortalApi.invoicePdf(cid, latest.id, `${latest.invoiceNumber}.pdf`))}>Download latest invoice (PDF)</button>}
+      </div>}
       <div style={panel}>
         {inv.isError ? <p style={empty}>We could not load your invoices.</p> : inv.isLoading ? <p style={empty}>Loading…</p> : rows.length === 0 ? <p style={empty}>No invoices yet.</p> : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>

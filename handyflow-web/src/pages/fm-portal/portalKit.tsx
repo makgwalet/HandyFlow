@@ -42,3 +42,7 @@ export function greetingName(fullName: string | null | undefined): string {
   return clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : ""
 }
 export const initialOf = (name: string | null | undefined) => (greetingName(name) || "?").charAt(0).toUpperCase()
+
+export const Title = ({ text, note }: { text: string; note?: string }) => (
+  <div style={{ marginBottom: space(5) }}><h1 style={{ fontSize: 24, fontWeight: 800, color: color.ink, margin: 0, letterSpacing: "-0.02em" }}>{text}</h1>{note && <div style={{ fontSize: 14, color: color.muted, marginTop: 4 }}>{note}</div>}</div>
+)
