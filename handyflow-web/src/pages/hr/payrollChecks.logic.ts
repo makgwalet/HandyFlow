@@ -45,6 +45,7 @@ export interface Impact { generatedAt: string; runs: ImpactRun[]; runsWithDiffer
 export interface MedicalScheme {
   id: string; schemeName: string; memberNumber: string | null; dependants: number; peopleCovered: number
   effectiveFrom: string; effectiveTo: string | null; current: boolean; notes: string | null
+  spouses?: number; children?: number; otherDependants?: number; employeeContribution?: number | null; employerContribution?: number | null
 }
 
 /** The tax year is named by the year it ends, as SARS names it: 2027 is 2026/27. */
@@ -70,15 +71,41 @@ export function impactSummary(i: Pick<Impact, "runs" | "runsWithDifferences">): 
   return `${i.runsWithDifferences} of ${i.runs.length} processed ${i.runs.length === 1 ? "run differs" : "runs differ"} from the recalculation. Nothing has been changed.`
 }
 
-export interface SchemeForm { schemeName: string; memberNumber: string; dependants: string; effectiveFrom: string; notes: string }
-export const EMPTY_SCHEME_FORM: SchemeForm = { schemeName: "", memberNumber: "", dependants: "0", effectiveFrom: "", notes: "" }
+/**
+ * A scheme membership as typed. Cover is a spouse (0 or 1), children and other dependants; the contributions are monthly
+ * amounts. {@code dependants} is the older single count: it is used only when none of the three split fields is filled.
+ */
+export interface SchemeForm {
+  schemeName: string; memberNumber: string; dependants: string; effectiveFrom: string; notes: string
+  spouses: string; children: string; other: string; employeeContribution: string; employerContribution: string
+}
+export const EMPTY_SCHEME_FORM: SchemeForm = {
+  schemeName: "", memberNumber: "", dependants: "0", effectiveFrom: "", notes: "",
+  spouses: "", children: "", other: "", employeeContribution: "", employerContribution: "",
+}
+/** What a person sees when starting a new membership: the split shown as zeros. */
+export const NEW_SCHEME_FORM: SchemeForm = { ...EMPTY_SCHEME_FORM, spouses: "0", children: "0", other: "0" }
+
+const usesSplit = (f: SchemeForm) => [f.spouses, f.children, f.other].some(v => v.trim() !== "")
+const whole = (v: string) => (v.trim() === "" ? 0 : /^\d+$/.test(v.trim()) ? Number(v) : NaN)
+const money = (v: string) => v.trim() === "" || (Number.isFinite(Number(v)) && Number(v) >= 0 && /^\d+(\.\d{1,2})?$/.test(v.trim()))
+
+/** People covered besides the employee, from the split when it is used, otherwise from the single count. */
+export function schemeDependants(f: SchemeForm): number {
+  return usesSplit(f) ? whole(f.spouses) + whole(f.children) + whole(f.other) : whole(f.dependants)
+}
 
 /** First thing wrong with the form, in words for the user, or "" when it can be sent. The server checks again. */
 export function schemeProblem(f: SchemeForm): string {
   if (!f.schemeName.trim()) return "Enter the scheme name."
   if (f.schemeName.trim().length > 120) return "The scheme name can be at most 120 characters."
-  if (!/^\d+$/.test(f.dependants.trim())) return "Dependants must be a whole number, 0 or more."
-  if (Number(f.dependants) > 20) return "Dependants can be at most 20."
+  if (usesSplit(f)) {
+    if (Number.isNaN(whole(f.spouses)) || whole(f.spouses) > 1) return "A member can cover one spouse or partner, or none."
+    if (Number.isNaN(whole(f.children)) || Number.isNaN(whole(f.other))) return "Children and other dependants must be whole numbers, 0 or more."
+  } else if (!/^\d+$/.test(f.dependants.trim())) return "Dependants must be a whole number, 0 or more."
+  if (schemeDependants(f) > 20) return "Dependants can be at most 20."
+  if (!money(f.employeeContribution)) return "The employee contribution must be an amount of 0 or more, with at most two decimals."
+  if (!money(f.employerContribution)) return "The employer contribution must be an amount of 0 or more, with at most two decimals."
   if (!f.effectiveFrom) return "Choose the date the membership starts."
   return ""
 }
@@ -87,8 +114,11 @@ export function schemeBody(f: SchemeForm) {
   return {
     schemeName: f.schemeName.trim(),
     memberNumber: f.memberNumber.trim() || null,
-    dependants: Number(f.dependants),
+    dependants: schemeDependants(f),
     effectiveFrom: f.effectiveFrom,
     notes: f.notes.trim() || null,
+    ...(usesSplit(f) ? { spouses: whole(f.spouses), children: whole(f.children), otherDependants: whole(f.other) } : {}),
+    ...(f.employeeContribution.trim() ? { employeeContribution: Number(f.employeeContribution) } : {}),
+    ...(f.employerContribution.trim() ? { employerContribution: Number(f.employerContribution) } : {}),
   }
 }

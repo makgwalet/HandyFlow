@@ -101,4 +101,24 @@ class MedicalSchemeServiceTest {
         assertThat(service.membersOn(tenant, List.of(), LocalDate.of(2026, 10, 31))).isEmpty();
         verify(memberships, never()).forEmployees(any(), any());
     }
+
+    @Test
+    void theSplitAndTheContributionsAreStoredOnTheNewRow() {
+        var r = service.add(tenant, jane.getId(), new MedicalSchemeRequest("Discovery", "M1", null, LocalDate.parse("2026-03-01"), null,
+                1, 2, 0, new BigDecimal("1850.50"), new BigDecimal("2400")), null);
+        assertThat(r.dependants()).isEqualTo(3);
+        assertThat(r.peopleCovered()).isEqualTo(4);
+        assertThat(r.spouses()).isEqualTo(1);
+        assertThat(r.children()).isEqualTo(2);
+        assertThat(r.employeeContribution()).isEqualByComparingTo("1850.50");
+        assertThat(r.employerContribution()).isEqualByComparingTo("2400");
+    }
+
+    @Test
+    void aNegativeContributionIsRefusedBeforeAnythingIsSaved() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.add(tenant, jane.getId(),
+                new MedicalSchemeRequest("Discovery", null, 0, LocalDate.parse("2026-03-01"), null, null, null, null, new BigDecimal("-5"), null), null))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.mockito.Mockito.verify(memberships, org.mockito.Mockito.never()).save(any());
+    }
 }

@@ -6,16 +6,26 @@ import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { X } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { EMPTY_SCHEME_FORM, schemeBody, schemeProblem, type MedicalScheme, type SchemeForm } from "./payrollChecks.logic"
+import MedicalSchemeFields from "./MedicalSchemeFields"
+import { NEW_SCHEME_FORM, schemeBody, schemeProblem, type MedicalScheme, type SchemeForm } from "./payrollChecks.logic"
 
 type ApiErr = { response?: { data?: { message?: string } } }
 const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
 const input: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box", background: "var(--hf-surface)", color: "var(--hf-text)" }
 const label: React.CSSProperties = { display: "block", fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }
 
+const rand = (n: number) => `R ${n.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
+/** ", 1 spouse, 2 children" for a membership that has the split; nothing for older ones that recorded only a count. */
+const splitText = (m: MedicalScheme) => {
+  if ((m.spouses ?? 0) + (m.children ?? 0) === 0) return ""
+  const parts = [m.spouses ? `${m.spouses} spouse` : "", m.children ? `${m.children} ${m.children === 1 ? "child" : "children"}` : "", m.otherDependants ? `${m.otherDependants} other` : ""].filter(Boolean)
+  return `: ${parts.join(", ")}`
+}
+const contribText = (m: MedicalScheme) => [m.employeeContribution != null ? `Employee ${rand(m.employeeContribution)}` : "", m.employerContribution != null ? `Employer ${rand(m.employerContribution)}` : ""].filter(Boolean).join(" · ")
+
 export default function MedicalSchemeModal({ employee, onClose }: { employee: { id: string; fullName: string; employeeNumber: string }; onClose: () => void }) {
   const qc = useQueryClient()
-  const [form, setForm] = useState<SchemeForm>(EMPTY_SCHEME_FORM)
+  const [form, setForm] = useState<SchemeForm>(NEW_SCHEME_FORM)
   const [error, setError] = useState("")
   const key = ["hr-medical-scheme", employee.id]
 
@@ -32,7 +42,7 @@ export default function MedicalSchemeModal({ employee, onClose }: { employee: { 
 
   const add = useMutation({
     mutationFn: () => apiClient.post(`/api/v1/hr/employees/${employee.id}/medical-scheme`, schemeBody(form)),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: key }); setForm(EMPTY_SCHEME_FORM); setError("") },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: key }); setForm(NEW_SCHEME_FORM); setError("") },
     onError: (e: unknown) => setError((e as ApiErr)?.response?.data?.message ?? "The membership could not be saved."),
   })
 
@@ -69,7 +79,7 @@ export default function MedicalSchemeModal({ employee, onClose }: { employee: { 
                   {(list.data ?? []).map(m => (
                     <tr key={m.id} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
                       <td style={{ padding: 6 }}>{m.schemeName}{m.memberNumber && <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>No. {m.memberNumber}</div>}</td>
-                      <td style={{ padding: 6 }}>{m.peopleCovered} <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>({m.dependants} {m.dependants === 1 ? "dependant" : "dependants"})</span></td>
+                      <td style={{ padding: 6 }}>{m.peopleCovered} <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>({m.dependants} {m.dependants === 1 ? "dependant" : "dependants"}{splitText(m)})</span>{contribText(m) && <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{contribText(m)}</div>}</td>
                       <td style={{ padding: 6 }}>{fmtDate(m.effectiveFrom)}</td>
                       <td style={{ padding: 6 }}>{fmtDate(m.effectiveTo)}</td>
                       <td style={{ padding: 6 }}>{m.current && <span style={{ background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>Current</span>}</td>
@@ -82,12 +92,7 @@ export default function MedicalSchemeModal({ employee, onClose }: { employee: { 
 
         <form onSubmit={e => { e.preventDefault(); if (!problem) add.mutate() }} noValidate>
           <h4 style={{ margin: "0 0 8px", fontSize: 14, color: "var(--hf-text)" }}>Record a new membership</h4>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
-            <div><label htmlFor="ms-name" style={label}>Scheme name *</label><input id="ms-name" style={input} value={form.schemeName} onChange={set("schemeName")} maxLength={120} /></div>
-            <div><label htmlFor="ms-no" style={label}>Member number</label><input id="ms-no" style={input} value={form.memberNumber} onChange={set("memberNumber")} maxLength={60} /></div>
-            <div><label htmlFor="ms-dep" style={label}>Dependants *</label><input id="ms-dep" style={input} type="number" min={0} max={20} step={1} inputMode="numeric" value={form.dependants} onChange={set("dependants")} /></div>
-            <div><label htmlFor="ms-from" style={label}>Starts on *</label><input id="ms-from" style={input} type="date" value={form.effectiveFrom} onChange={set("effectiveFrom")} /></div>
-          </div>
+          <MedicalSchemeFields value={form} onChange={patch => setForm(f => ({ ...f, ...patch }))} prefix="ms" />
           <div style={{ marginTop: 10 }}><label htmlFor="ms-notes" style={label}>Notes</label><input id="ms-notes" style={input} value={form.notes} onChange={set("notes")} maxLength={500} /></div>
           {(error || (problem && form.schemeName)) && <div role="alert" style={{ marginTop: 10, fontSize: 13, color: "var(--hf-danger-text)" }}>{error || problem}</div>}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>

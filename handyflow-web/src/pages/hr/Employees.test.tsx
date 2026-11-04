@@ -201,6 +201,20 @@ describe("EmployeesTab", () => {
   })
 })
 
+describe("edit form does not remount while typing", () => {
+  it("keeps the same input on the page after each keystroke", async () => {
+    perms = ["HR_READ", "HR_MANAGE"]
+    serve([person()])
+    wrap(<EmployeesTab />)
+    fireEvent.click(await screen.findByLabelText("Edit Jane Dlamini"))
+    const before = await screen.findByPlaceholderText("Operations Manager")
+    fireEvent.change(before, { target: { value: "S" } })
+    fireEvent.change(before, { target: { value: "Se" } })
+    expect(screen.getByPlaceholderText("Operations Manager")).toBe(before)   // a remount would have replaced the element
+    expect((before as HTMLInputElement).value).toBe("Se")
+  })
+})
+
 describe("RequestChangeModal", () => {
   const emp = { id: "e1", fullName: "Jane Dlamini", employeeNumber: "EMP001", startDate: "2024-01-01", grossSalary: 30000, payFrequency: "MONTHLY", travelAllowance: 0, medicalAidContribution: 0, pensionContribution: 0 }
 

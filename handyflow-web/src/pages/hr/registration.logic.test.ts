@@ -29,9 +29,9 @@ describe("registration steps", () => {
   it("a medical scheme only counts when enrolled, and never blocks when not", () => {
     expect(stepErrors(3, { ...ok, enrolled: false })).toEqual({})
     expect(stepErrors(3, { ...ok, enrolled: true }).scheme).toBeTruthy()
-    const f = { ...ok, enrolled: true, scheme: { schemeName: "Discovery", memberNumber: "1", dependants: "2", effectiveFrom: "2026-11-01", notes: "" } }
+    const f = { ...ok, enrolled: true, scheme: { ...EMPTY_REG.scheme, schemeName: "Discovery", memberNumber: "1", children: "2", effectiveFrom: "2026-11-01" } }
     expect(stepErrors(3, f)).toEqual({})
-    expect(enrolBody(f)).toMatchObject({ schemeName: "Discovery", dependants: 2 })
+    expect(enrolBody(f)).toMatchObject({ schemeName: "Discovery", dependants: 2, children: 2, spouses: 0 })
     expect(enrolBody(ok)).toBeNull()
   })
   it("sends medical aid as 0 on the employee and numbers as numbers", () => {
@@ -43,6 +43,11 @@ describe("registration steps", () => {
     expect(serverErrors({ errors: { startDate: "bad", firstName: "x" } }).step).toBe(0)
     expect(serverErrors({ message: "Another employee already has this ID number." })).toMatchObject({ step: 0, errors: { idNumber: expect.any(String) } })
     expect(serverErrors({ message: "Something else" }).step).toBe(-1)
+  })
+  it("an old draft keeps its single dependants count as other dependants", () => {
+    const d = fromDraft('{"v":1,"step":3,"form":{"enrolled":true,"scheme":{"schemeName":"Bonitas","memberNumber":"","dependants":"2","effectiveFrom":"2026-11-01","notes":""}}}')!
+    expect(d.form.scheme.other).toBe("2")
+    expect(enrolBody(d.form)).toMatchObject({ dependants: 2, otherDependants: 2 })
   })
   it("keeps a draft and survives rubbish", () => {
     expect(hasContent(EMPTY_REG)).toBe(false)

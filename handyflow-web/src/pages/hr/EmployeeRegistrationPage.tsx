@@ -6,12 +6,14 @@ import { useNavigate } from "react-router-dom"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useAuth } from "../../hooks/useAuth"
+import MedicalSchemeFields from "./MedicalSchemeFields"
 import ForeignIdentityFields from "./ForeignIdentityFields"
 import { employeeRights } from "./employees.logic"
 import {
   EMPTY_REG, STEPS, WHY, allErrors, draftKey, enrolBody, firstBadStep, fromDraft, hasContent, regBody, serverErrors, stepErrors, toDraft, validateSaId,
   type Errors, type RegForm,
 } from "./registration.logic"
+import { schemeDependants } from "./payrollChecks.logic"
 
 const EMP_TYPES = ["PERMANENT", "FIXED_TERM", "PART_TIME", "CASUAL", "CONTRACTOR"]
 const GENDERS = ["MALE", "FEMALE", "NON_BINARY", "PREFER_NOT_TO_SAY"]
@@ -136,14 +138,9 @@ function Pay({ f, set, e }: StepProps) {
           ? <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>Not enrolled? Skip this. You can add a scheme later from the employee's Medical scheme button.</div>
           : (
             <>
-              <div style={grid}>
-                <Field id="schemeName" label="Medical scheme" required><input id="reg-schemeName" value={f.scheme.schemeName} onChange={ev => setScheme({ schemeName: ev.target.value })} style={inp} /></Field>
-                <Field id="memberNumber" label="Membership number"><input id="reg-memberNumber" value={f.scheme.memberNumber} onChange={ev => setScheme({ memberNumber: ev.target.value })} style={inp} /></Field>
-                <Field id="dependants" label="Dependants covered" hint="People on the scheme besides the employee"><input id="reg-dependants" type="number" min={0} max={20} value={f.scheme.dependants} onChange={ev => setScheme({ dependants: ev.target.value })} style={inp} /></Field>
-                <Field id="effectiveFrom" label="Membership starts" required><input id="reg-effectiveFrom" type="date" value={f.scheme.effectiveFrom} onChange={ev => setScheme({ effectiveFrom: ev.target.value })} style={inp} /></Field>
-              </div>
+              <MedicalSchemeFields value={f.scheme} onChange={setScheme} prefix="reg-ms" />
               {e.scheme && <div role="alert" style={{ fontSize: 12, color: "var(--hf-danger-text)" }}>{e.scheme}</div>}
-              <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 6 }}>Payroll works out the medical tax credit from the scheme and dependants. A later change is added as a new dated entry, so the history stays.</div>
+              <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 6 }}>A later change is added as a new dated entry, so the history stays.</div>
             </>)}
       </fieldset>
     </div>
@@ -177,7 +174,7 @@ function Review({ f, goTo, problems }: { f: RegForm; goTo: (s: number) => void; 
         <Row k="Email" v={f.email} /><Row k="Contact number" v={f.phone} />
         <Row k="Start date" v={f.startDate} /><Row k="Role" v={[f.jobTitle, nice(f.employmentType)].filter(Boolean).join(", ")} />
         <Row k="Gross salary" v={f.grossSalary ? `${R(Number(f.grossSalary))} (${nice(f.payFrequency)})` : ""} />
-        <Row k="Medical scheme" v={f.enrolled ? `${f.scheme.schemeName}, ${f.scheme.dependants} dependants, from ${f.scheme.effectiveFrom}` : "Not enrolled"} />
+        <Row k="Medical scheme" v={f.enrolled ? `${f.scheme.schemeName}, ${schemeDependants(f.scheme)} dependants, from ${f.scheme.effectiveFrom}` : "Not enrolled"} />
         <Row k="Bank" v={f.bankName ? `${f.bankName} ${f.bankAccountNumber ? "••••" + f.bankAccountNumber.slice(-4) : ""}` : ""} />
         <Row k="Tax number" v={f.taxNumber} />
       </div>

@@ -233,6 +233,8 @@ export default function EmployeesTab() {
 
   const isEdit = !!editing
   const personal = !isEdit || rights.sensitive
+  // Called as a function, not rendered as {EmployeeForm()}: a component defined inside this one is a new type on every
+  // keystroke, so React threw the whole form away and the page jumped. As plain markup the inputs keep their place.
   const EmployeeForm = () => (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <Sect title="Personal Details">
@@ -535,7 +537,7 @@ export default function EmployeesTab() {
       {editing && (
         <Overlay onClose={() => setEditing(null)}>
           <MHead title={`Edit — ${editing.fullName}`} onClose={() => setEditing(null)} />
-          <EmployeeForm />
+          {EmployeeForm()}
           {error && <ErrBanner msg={error} />}
           <MFoot onCancel={() => setEditing(null)} onSubmit={() => { setError(""); updateEmployee.mutate({ id: editing.id, body: toEditBody(form, rights.sensitive) }) }} loading={updateEmployee.isPending} label="Save Changes" />
         </Overlay>

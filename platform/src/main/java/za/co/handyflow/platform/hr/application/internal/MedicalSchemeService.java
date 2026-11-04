@@ -39,15 +39,18 @@ public class MedicalSchemeService {
     @Transactional
     public MedicalSchemeResponse add(TenantId tenantId, UUID employeeId, MedicalSchemeRequest req, UUID userId) {
         requireEmployee(tenantId, employeeId);
+        MedicalSchemeRules.Dependants who = MedicalSchemeRules.dependantsOf(req.dependants(), req.spouses(), req.children(), req.otherDependants());
+        var employeePays = MedicalSchemeRules.contribution(req.employeeContribution(), "employee");
+        var employerPays = MedicalSchemeRules.contribution(req.employerContribution(), "employer");
         List<HrMedicalSchemeMembership> existing = memberships.forEmployee(tenantId, employeeId);
         LocalDate openFrom = MedicalSchemeRules.checkNew(
-                existing.stream().map(HrMedicalSchemeMembership::toCover).toList(), req.effectiveFrom(), req.dependants());
+                existing.stream().map(HrMedicalSchemeMembership::toCover).toList(), req.effectiveFrom(), who.total());
         if (openFrom != null) {
             existing.stream().filter(m -> m.getEffectiveTo() == null && m.getEffectiveFrom().equals(openFrom))
                     .forEach(m -> { m.closeOn(req.effectiveFrom().minusDays(1)); memberships.save(m); });
         }
         HrMedicalSchemeMembership created = memberships.save(HrMedicalSchemeMembership.create(tenantId, employeeId,
-                req.schemeName().trim(), blankToNull(req.memberNumber()), req.dependants(), req.effectiveFrom(),
+                req.schemeName().trim(), blankToNull(req.memberNumber()), who, employeePays, employerPays, req.effectiveFrom(),
                 blankToNull(req.notes()), userId));
         return toResponse(created, LocalDate.now());
     }
@@ -75,7 +78,8 @@ public class MedicalSchemeService {
     private MedicalSchemeResponse toResponse(HrMedicalSchemeMembership m, LocalDate today) {
         boolean current = !m.getEffectiveFrom().isAfter(today) && (m.getEffectiveTo() == null || !m.getEffectiveTo().isBefore(today));
         return new MedicalSchemeResponse(m.getId(), m.getEmployeeId(), m.getSchemeName(), m.getMemberNumber(), m.getDependants(),
-                1 + m.getDependants(), m.getEffectiveFrom(), m.getEffectiveTo(), current, m.getNotes(), m.getCreatedAt());
+                1 + m.getDependants(), m.getEffectiveFrom(), m.getEffectiveTo(), current, m.getNotes(), m.getCreatedAt(),
+                m.getSpouses(), m.getChildren(), m.getOtherDependants(), m.getEmployeeContribution(), m.getEmployerContribution());
     }
 
     private static String blankToNull(String s) { return s == null || s.isBlank() ? null : s.trim(); }

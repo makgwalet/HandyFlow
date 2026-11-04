@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -25,6 +26,11 @@ public class HrMedicalSchemeMembership {
     @Column(name = "scheme_name")    String schemeName;
     @Column(name = "member_number")  String memberNumber;
     @Column(name = "dependants")     int dependants;
+    @Column(name = "employee_contribution") BigDecimal employeeContribution;
+    @Column(name = "employer_contribution") BigDecimal employerContribution;
+    @Column(name = "spouses")          int spouses;
+    @Column(name = "children")         int children;
+    @Column(name = "other_dependants") int otherDependants;
     @Column(name = "effective_from") LocalDate effectiveFrom;
     @Column(name = "effective_to")   LocalDate effectiveTo;
     @Column(name = "notes")          String notes;
@@ -32,19 +38,31 @@ public class HrMedicalSchemeMembership {
     @Column(name = "created_at")     Instant createdAt;
 
     public static HrMedicalSchemeMembership create(TenantId tenantId, UUID employeeId, String schemeName, String memberNumber,
-                                                   int dependants, LocalDate from, String notes, UUID createdBy) {
+                                                   MedicalSchemeRules.Dependants who, BigDecimal employeeContribution, BigDecimal employerContribution,
+                                                   LocalDate from, String notes, UUID createdBy) {
         HrMedicalSchemeMembership m = new HrMedicalSchemeMembership();
         m.id = UUID.randomUUID();
         m.tenantId = tenantId.getValue();
         m.employeeId = employeeId;
         m.schemeName = schemeName;
         m.memberNumber = memberNumber;
-        m.dependants = dependants;
+        m.dependants = who.total();
+        m.spouses = who.spouses();
+        m.children = who.children();
+        m.otherDependants = who.other();
+        m.employeeContribution = employeeContribution;
+        m.employerContribution = employerContribution;
         m.effectiveFrom = from;
         m.notes = notes;
         m.createdBy = createdBy;
         m.createdAt = Instant.now();
         return m;
+    }
+
+    /** Without the split or the contributions, as a membership was recorded before they existed. */
+    public static HrMedicalSchemeMembership create(TenantId tenantId, UUID employeeId, String schemeName, String memberNumber,
+                                                   int dependants, LocalDate from, String notes, UUID createdBy) {
+        return create(tenantId, employeeId, schemeName, memberNumber, new MedicalSchemeRules.Dependants(0, 0, dependants), null, null, from, notes, createdBy);
     }
 
     public void closeOn(LocalDate lastDay) { this.effectiveTo = lastDay; }

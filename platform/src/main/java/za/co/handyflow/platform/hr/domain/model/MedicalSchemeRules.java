@@ -17,6 +17,41 @@ public final class MedicalSchemeRules {
 
     private MedicalSchemeRules() {}
 
+    /** Who is covered besides the employee. {@code total} is what the tax credit counts. */
+    public record Dependants(int spouses, int children, int other) {
+        public int total() { return spouses + children + other; }
+    }
+
+    /**
+     * Works out who is covered from what was sent: either the three counts, or only a total (older callers), which is
+     * then recorded as "other" because the split is not known.
+     *
+     * @throws IllegalArgumentException with a message fit to show the user
+     */
+    public static Dependants dependantsOf(Integer total, Integer spouses, Integer children, Integer other) {
+        boolean split = spouses != null || children != null || other != null;
+        if (!split) {
+            if (total == null) throw new IllegalArgumentException("Say how many dependants are covered, 0 if none.");
+            if (total < 0 || total > MAX_DEPENDANTS) throw new IllegalArgumentException("Dependants must be from 0 to " + MAX_DEPENDANTS + ".");
+            return new Dependants(0, 0, total);
+        }
+        int s = spouses == null ? 0 : spouses, c = children == null ? 0 : children, o = other == null ? 0 : other;
+        if (s < 0 || s > 1) throw new IllegalArgumentException("A member can cover one spouse or partner, or none.");
+        if (c < 0 || c > MAX_DEPENDANTS || o < 0 || o > MAX_DEPENDANTS) throw new IllegalArgumentException("Children and other dependants must each be from 0 to " + MAX_DEPENDANTS + ".");
+        Dependants d = new Dependants(s, c, o);
+        if (d.total() > MAX_DEPENDANTS) throw new IllegalArgumentException("At most " + MAX_DEPENDANTS + " dependants can be covered in all.");
+        if (total != null && total != d.total()) throw new IllegalArgumentException("The dependants do not add up: " + s + " + " + c + " + " + o + " is " + d.total() + ", not " + total + ".");
+        return d;
+    }
+
+    /** A contribution is an amount of 0 or more, or not given. */
+    public static java.math.BigDecimal contribution(java.math.BigDecimal amount, String who) {
+        if (amount == null) return null;
+        if (amount.signum() < 0) throw new IllegalArgumentException("The " + who + " contribution cannot be negative.");
+        if (amount.scale() > 2) throw new IllegalArgumentException("The " + who + " contribution can have at most two decimals.");
+        return amount;
+    }
+
     /** One stretch of membership. {@code to} is null while it is still running. */
     public record Cover(LocalDate from, LocalDate to, int dependants) {
         boolean includes(LocalDate day) {

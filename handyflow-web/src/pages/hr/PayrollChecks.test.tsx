@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import PayrollChecksTab from "./PayrollChecksTab"
 import MedicalSchemeModal from "./MedicalSchemeModal"
 import {
-  EMPTY_SCHEME_FORM, impactSummary, schemeBody, schemeProblem, signedRand, taxYearName,
+  EMPTY_SCHEME_FORM, NEW_SCHEME_FORM, impactSummary, schemeBody, schemeDependants, schemeProblem, signedRand, taxYearName,
 } from "./payrollChecks.logic"
 
 const get = vi.fn()
@@ -98,12 +98,13 @@ describe("MedicalSchemeModal", () => {
     expect(save.disabled).toBe(true)
     fireEvent.change(screen.getByLabelText(/Scheme name/), { target: { value: "Discovery" } })
     fireEvent.change(screen.getByLabelText(/Starts on/), { target: { value: "2026-06-01" } })
-    fireEvent.change(screen.getByLabelText(/Dependants/), { target: { value: "1" } })
+    fireEvent.change(screen.getByLabelText("Children"), { target: { value: "1" } })
+    fireEvent.change(screen.getByLabelText(/Employee pays/), { target: { value: "1850.50" } })
     expect(save.disabled).toBe(false)
     fireEvent.click(save)
     await waitFor(() => expect(post).toHaveBeenCalled())
     expect(post.mock.calls[0][0]).toBe("/api/v1/hr/employees/e1/medical-scheme")
-    expect(post.mock.calls[0][1]).toMatchObject({ schemeName: "Discovery", dependants: 1, effectiveFrom: "2026-06-01" })
+    expect(post.mock.calls[0][1]).toMatchObject({ schemeName: "Discovery", dependants: 1, children: 1, spouses: 0, otherDependants: 0, employeeContribution: 1850.5, effectiveFrom: "2026-06-01" })
   })
 
   it("shows the server's reason and closes on Escape", async () => {
@@ -119,5 +120,21 @@ describe("MedicalSchemeModal", () => {
     expect(screen.getByRole("dialog")).toBeTruthy()
     fireEvent.keyDown(document, { key: "Escape" })
     expect(onClose).toHaveBeenCalled()
+  })
+})
+
+describe("scheme form with contributions and the split", () => {
+  const base = { ...NEW_SCHEME_FORM, schemeName: "Discovery", effectiveFrom: "2026-03-01" }
+  it("adds the split into the count payroll uses and checks the amounts", () => {
+    expect(schemeDependants({ ...base, spouses: "1", children: "2", other: "1" })).toBe(4)
+    expect(schemeProblem({ ...base, spouses: "2" })).toMatch(/one spouse/)
+    expect(schemeProblem({ ...base, children: "15", other: "10" })).toMatch(/at most 20/)
+    expect(schemeProblem({ ...base, employeeContribution: "-5" })).toMatch(/employee contribution/)
+    expect(schemeProblem({ ...base, employerContribution: "10.123" })).toMatch(/employer contribution/)
+    expect(schemeProblem({ ...base, employeeContribution: "1850.50", employerContribution: "2400" })).toBe("")
+  })
+  it("sends the split and the amounts only when they were given", () => {
+    expect(schemeBody({ ...base, spouses: "1", children: "2", employeeContribution: "1850.5" })).toEqual({
+      schemeName: "Discovery", memberNumber: null, dependants: 3, effectiveFrom: "2026-03-01", notes: null, spouses: 1, children: 2, otherDependants: 0, employeeContribution: 1850.5 })
   })
 })

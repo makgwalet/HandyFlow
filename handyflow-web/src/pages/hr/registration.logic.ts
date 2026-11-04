@@ -1,6 +1,6 @@
 // Pure rules for the six-step employee registration page. The server checks everything again.
 import { EMPTY_FOREIGN, anyForeign, foreignBody, foreignProblem, type ForeignForm } from "./foreignIdentity.logic"
-import { EMPTY_SCHEME_FORM, schemeBody, schemeProblem, type SchemeForm } from "./payrollChecks.logic"
+import { NEW_SCHEME_FORM, schemeBody, schemeProblem, type SchemeForm } from "./payrollChecks.logic"
 
 export const STEPS = [
   { id: "personal", title: "Personal information", blurb: "Capture the employee's identity and personal details." },
@@ -25,7 +25,7 @@ export const EMPTY_REG: RegForm = {
   email: "", phone: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelation: "",
   startDate: "", employmentType: "PERMANENT", jobTitle: "", department: "", notes: "",
   grossSalary: "", payFrequency: "MONTHLY", travelAllowance: "", pensionContribution: "",
-  scheme: EMPTY_SCHEME_FORM, enrolled: false,
+  scheme: NEW_SCHEME_FORM, enrolled: false,
   bankName: "", bankAccountNumber: "", bankBranchCode: "", taxNumber: "",
 }
 
@@ -140,13 +140,19 @@ export interface Draft { v: 1; step: number; savedAt: string; form: RegForm }
 export const draftKey = (userId: string | undefined | null) => `hf-hr-employee-draft:${userId ?? "anon"}`
 export const hasContent = (f: RegForm) => JSON.stringify(f) !== JSON.stringify(EMPTY_REG)
 export const toDraft = (form: RegForm, step: number, now = new Date()): string => JSON.stringify({ v: 1, step, savedAt: now.toISOString(), form } satisfies Draft)
+/** A scheme from a draft saved before the split existed keeps its single count, as other dependants. */
+function oldScheme(saved: Partial<RegForm["scheme"]> | undefined): RegForm["scheme"] {
+  const s = { ...NEW_SCHEME_FORM, ...(saved ?? {}) }
+  const hadSplit = saved && (saved.spouses !== undefined || saved.children !== undefined || saved.other !== undefined)
+  return hadSplit ? s : { ...s, other: saved?.dependants ?? "0" }
+}
 /** A draft read back; anything unreadable is treated as no draft. Missing fields fall back to empty so an old draft still opens. */
 export function fromDraft(raw: string | null): Draft | null {
   if (!raw) return null
   try {
     const d = JSON.parse(raw) as Partial<Draft>
     if (d.v !== 1 || !d.form || typeof d.form !== "object") return null
-    const form = { ...EMPTY_REG, ...d.form, foreign: { ...EMPTY_FOREIGN, ...(d.form.foreign ?? {}) }, scheme: { ...EMPTY_SCHEME_FORM, ...(d.form.scheme ?? {}) } }
+    const form = { ...EMPTY_REG, ...d.form, foreign: { ...EMPTY_FOREIGN, ...(d.form.foreign ?? {}) }, scheme: oldScheme(d.form.scheme) }
     const step = Number.isInteger(d.step) ? Math.min(Math.max(d.step as number, 0), STEPS.length - 1) : 0
     return { v: 1, step, savedAt: d.savedAt ?? "", form }
   } catch { return null }
