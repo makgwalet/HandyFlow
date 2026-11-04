@@ -20,6 +20,7 @@ import ReportsTab from './ReportsTab'
 import DashboardTab from './DashboardTab'
 import AuditTab from './AuditTab'
 import ClientAccessTab from './ClientAccessTab'
+import ProfileTab from './ProfileTab'
 
 export function FmPage() {
   const navigate = useNavigate()
@@ -35,6 +36,7 @@ export function FmPage() {
         case 'reports':          return <ReportsTab />
         case 'audit':            return <AuditTab />
         case 'client-access':    return <ClientAccessTab />
+        case 'settings':         return <ProfileTab />
         case 'clients':          return <ClientsTab />
         case 'sites':            return <SitesTab />
         case 'assets':           return <AssetsTab />

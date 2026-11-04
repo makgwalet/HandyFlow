@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { addressLine, assetBody, assetMoves, assetProblem, assignBody, assignProblem, canCostLines, clientBody, clientProblem, completeBody, completeProblem, costBody, costProblem, costTotals, emptyAsset, emptyClient, emptyComplete, emptyCost, emptyOrder, emptyRequest, emptySite, orderProblem, requestBody, requestProblem, siteBody, siteProblem, slaNote, warrantyNote, whoFrom, woActions, type Who } from "./fm.logic"
+import { addressLine, emptyProfile, missingLedgerCodes, needsBillingSetup, profileBody, profileForm, profileProblem, assetBody, assetMoves, assetProblem, assignBody, assignProblem, canCostLines, clientBody, clientProblem, completeBody, completeProblem, costBody, costProblem, costTotals, emptyAsset, emptyClient, emptyComplete, emptyCost, emptyOrder, emptyRequest, emptySite, orderProblem, requestBody, requestProblem, siteBody, siteProblem, slaNote, warrantyNote, whoFrom, woActions, type Who } from "./fm.logic"
 
 const MANAGER: Who = { manage: true, assign: true, execute: true }
 const TECH: Who = { manage: false, assign: false, execute: true }
@@ -411,4 +411,38 @@ describe("dashboard", () => {
     expect(l.map(j => j.id)).toEqual(["a", "b"])
   })
   it("counts reasons", () => expect(attentionCounts([{ reason: "A" }, { reason: "B" }, { reason: "A" }])).toEqual([{ reason: "A", count: 2 }, { reason: "B", count: 1 }]))
+})
+
+describe("company and billing settings", () => {
+  const ok = { ...emptyProfile(), companyName: "Zeta Facilities" }
+  it("needs a company name, a sensible rate and terms", () => {
+    expect(profileProblem(emptyProfile())).toMatch(/company name/)
+    expect(profileProblem(ok)).toBeNull()
+    expect(profileProblem({ ...ok, vatRate: "150" })).toMatch(/between 0 and 100/)
+    expect(profileProblem({ ...ok, vatRate: "" })).toMatch(/between 0 and 100/)
+    expect(profileProblem({ ...ok, paymentTermsDays: "30.5" })).toMatch(/whole number/)
+    expect(profileProblem({ ...ok, paymentTermsDays: "400" })).toMatch(/0 to 365/)
+    expect(profileProblem({ ...ok, contactEmail: "nope" })).toMatch(/email/)
+  })
+  it("asks for the VAT number and VAT account only when VAT registered", () => {
+    expect(profileProblem({ ...ok, vatRegistered: true })).toMatch(/10 digits/)
+    expect(profileProblem({ ...ok, vatRegistered: true, vatNumber: "4123 456 789" })).toMatch(/output VAT/)
+    expect(profileProblem({ ...ok, vatRegistered: true, vatNumber: "4123456789", vatAccountCode: "2300" })).toBeNull()
+    expect(profileProblem({ ...ok, vatRegistered: true, vatNumber: "5123456789", vatAccountCode: "2300" })).toMatch(/starting with 4/)
+  })
+  it("sends clean numbers and keeps blank account codes blank", () => {
+    const b = profileBody({ ...ok, vatRegistered: true, vatNumber: "4123 456-789", vatAccountCode: " 2300 ", bankAccountCode: " 1000 ", vatRate: "15", paymentTermsDays: "30" })
+    expect(b).toMatchObject({ vatNumber: "4123456789", vatAccountCode: "2300", bankAccountCode: "1000", vatRate: 15, paymentTermsDays: 30, registrationNumber: null })
+  })
+  it("reads a saved profile into the form and names missing ledger codes", () => {
+    const f = profileForm({ companyName: "Zeta", registrationNumber: null, contactEmail: null, contactPhone: null, address: null, notes: null, vatRegistered: false, vatNumber: null, vatRate: 15, paymentTermsDays: 30, arAccountCode: "1100", revenueAccountCode: "4000", vatAccountCode: null, bankAccountCode: null })
+    expect(f.arAccountCode).toBe("1100"); expect(f.vatRate).toBe("15")
+    expect(missingLedgerCodes(f)).toEqual(["bank"])
+    expect(missingLedgerCodes(emptyProfile())).toEqual(["debtors (receivables)", "income (revenue)", "bank"])
+  })
+  it("recognises the ledger refusing for a missing setting", () => {
+    expect(needsBillingSetup("No bank account code is configured in the billing settings")).toBe(true)
+    expect(needsBillingSetup("Account 4000 not found")).toBe(false)
+    expect(needsBillingSetup(null)).toBe(false)
+  })
 })

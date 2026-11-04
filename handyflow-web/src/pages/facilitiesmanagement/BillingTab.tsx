@@ -7,7 +7,7 @@ import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pick, Pill, ReasonDialog, Row, SectionTitle, card, day, downloadFile, errorText, fail, money, muted, pageOf, td, th } from "./kit"
 import { BASE, useLookups } from "./lookups"
 import type { Agreement } from "./AgreementsTab"
-import { BILL_BASES, CREDIT_STATUS, INVOICE_STATUS, PAY_METHODS, billWho, creditActions, creditBody, creditProblem, dueNote, emptyCredit, emptyGenerate, emptyPay, generateBody, generateProblem, glNote, invoiceActions, labelOf, payBody, payProblem, type BillWho, type CreditForm, type GenerateForm, type PayForm } from "./fm.logic"
+import { BILL_BASES, needsBillingSetup, CREDIT_STATUS, INVOICE_STATUS, PAY_METHODS, billWho, creditActions, creditBody, creditProblem, dueNote, emptyCredit, emptyGenerate, emptyPay, generateBody, generateProblem, glNote, invoiceActions, labelOf, payBody, payProblem, type BillWho, type CreditForm, type GenerateForm, type PayForm } from "./fm.logic"
 
 interface Invoice { id: string; clientId: string; invoiceNumber: string; periodStart: string; periodEnd: string; issueDate: string | null; dueDate: string | null; subtotal: number; vatAmount: number; total: number; amountPaid: number; balance: number; status: string; vatRate: number | null; glStatus: string | null; glLastError: string | null; agreementId: string | null; creditedAmount: number | null; taxInvoice: boolean; clientName: string | null }
 interface Payment { id: string; amount: number; paymentDate: string; method: string | null; reference: string | null; createdAt: string; glStatus: string | null }
@@ -74,7 +74,7 @@ function GlExceptions({ who, onRetried }: { who: BillWho; onRetried: () => void 
         {who.approve && <Btn small disabled={retry.isPending} onClick={() => retry.mutate()}>{retry.isPending ? "Retrying…" : "Retry them all"}</Btn>}
       </div>
       <div style={{ ...muted, margin: "4px 0 8px" }}>This is usually a missing account in the chart of accounts. Fix that first, then retry.</div>
-      {rows.map(r => <div key={r.type + r.id} style={{ fontSize: 12, padding: "4px 0", borderTop: "1px solid var(--hf-border-subtle, #e5e5e5)" }}><b>{r.reference}</b> · {labelOf([["INVOICE", "Invoice"], ["PAYMENT", "Payment"], ["CREDIT_NOTE", "Credit note"]], r.type)} · {money(r.amount)} · tried {r.attempts}×{r.lastError ? ` — ${r.lastError}` : ""}</div>)}
+      {rows.map(r => <div key={r.type + r.id} style={{ fontSize: 12, padding: "4px 0", borderTop: "1px solid var(--hf-border-subtle, #e5e5e5)" }}><b>{r.reference}</b> · {labelOf([["INVOICE", "Invoice"], ["PAYMENT", "Payment"], ["CREDIT_NOTE", "Credit note"]], r.type)} · {money(r.amount)} · tried {r.attempts}×{r.lastError ? ` — ${r.lastError}` : ""}{needsBillingSetup(r.lastError) && <> · <a href="/facilitiesmanagement/settings" style={{ fontWeight: 700 }}>Open Company &amp; billing</a></>}</div>)}
     </div>
   )
 }

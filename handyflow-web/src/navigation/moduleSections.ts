@@ -1163,6 +1163,7 @@ export const FM_SECTIONS: ModuleSections = {
         { id: 'reports', label: 'Reports', icon: FileBarChart, anyPermission: [...FM_VIEW, 'FACILITIESMANAGEMENT_TECHNICIAN', 'FACILITIESMANAGEMENT_BILLING_MANAGE', 'FACILITIESMANAGEMENT_BILLING_APPROVE', 'FACILITIESMANAGEMENT_SLA_MANAGE', 'FACILITIESMANAGEMENT_CONTRACT_MANAGE'] },
         { id: 'audit', label: 'Activity log', icon: ClipboardCheck, anyPermission: ['FACILITIESMANAGEMENT_ADMIN', 'FACILITIESMANAGEMENT_AUDIT_READ'] },
         { id: 'client-access', label: 'Client access', icon: UserCheck, permission: 'FACILITIESMANAGEMENT_ADMIN' },
+        { id: 'settings', label: 'Company & billing', icon: Settings, anyPermission: ['FACILITIESMANAGEMENT_ADMIN', 'FACILITIESMANAGEMENT_MANAGE'] },
       ],
     },
   ],

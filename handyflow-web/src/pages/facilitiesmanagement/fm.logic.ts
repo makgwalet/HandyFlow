@@ -537,3 +537,47 @@ export function attentionCounts(items: { reason: string }[]): { reason: string; 
   for (const i of items) m.set(i.reason, (m.get(i.reason) ?? 0) + 1)
   return [...m.entries()].map(([reason, count]) => ({ reason, count }))
 }
+
+// ── Company and billing settings ─────────────────────────────────────────────────────────────────────────────────────
+export interface ProfileForm {
+  companyName: string; registrationNumber: string; contactEmail: string; contactPhone: string; address: string; notes: string
+  vatRegistered: boolean; vatNumber: string; vatRate: string; paymentTermsDays: string
+  arAccountCode: string; revenueAccountCode: string; vatAccountCode: string; bankAccountCode: string
+}
+export const emptyProfile = (): ProfileForm => ({ companyName: "", registrationNumber: "", contactEmail: "", contactPhone: "", address: "", notes: "", vatRegistered: false, vatNumber: "", vatRate: "15", paymentTermsDays: "30", arAccountCode: "", revenueAccountCode: "", vatAccountCode: "", bankAccountCode: "" })
+export interface ProfileData {
+  companyName: string; registrationNumber: string | null; contactEmail: string | null; contactPhone: string | null; address: string | null; notes: string | null
+  vatRegistered: boolean; vatNumber: string | null; vatRate: number | null; paymentTermsDays: number | null
+  arAccountCode: string | null; revenueAccountCode: string | null; vatAccountCode: string | null; bankAccountCode: string | null
+}
+export const profileForm = (p: ProfileData): ProfileForm => ({
+  companyName: p.companyName ?? "", registrationNumber: p.registrationNumber ?? "", contactEmail: p.contactEmail ?? "", contactPhone: p.contactPhone ?? "", address: p.address ?? "", notes: p.notes ?? "",
+  vatRegistered: !!p.vatRegistered, vatNumber: p.vatNumber ?? "", vatRate: p.vatRate == null ? "15" : String(p.vatRate), paymentTermsDays: p.paymentTermsDays == null ? "30" : String(p.paymentTermsDays),
+  arAccountCode: p.arAccountCode ?? "", revenueAccountCode: p.revenueAccountCode ?? "", vatAccountCode: p.vatAccountCode ?? "", bankAccountCode: p.bankAccountCode ?? "",
+})
+export function profileProblem(f: ProfileForm): string | null {
+  if (!f.companyName.trim()) return "Enter the company name"
+  if (f.contactEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.contactEmail.trim())) return "That email address does not look right"
+  const rate = Number(f.vatRate), terms = Number(f.paymentTermsDays)
+  if (f.vatRate.trim() === "" || !Number.isFinite(rate) || rate < 0 || rate > 100) return "The VAT rate must be between 0 and 100"
+  if (f.paymentTermsDays.trim() === "" || !Number.isInteger(terms) || terms < 0 || terms > 365) return "Payment terms must be a whole number of days from 0 to 365"
+  if (f.vatRegistered) {
+    if (!/^4\d{9}$/.test(f.vatNumber.replace(/[\s-]/g, ""))) return "A South African VAT number is 10 digits starting with 4"
+    if (!f.vatAccountCode.trim()) return "Choose the ledger account where output VAT is posted"
+  }
+  return null
+}
+export const profileBody = (f: ProfileForm) => ({
+  companyName: f.companyName.trim(), registrationNumber: t(f.registrationNumber), contactEmail: t(f.contactEmail), contactPhone: t(f.contactPhone), notes: t(f.notes), address: f.address.trim(),
+  vatRegistered: f.vatRegistered, vatNumber: f.vatRegistered ? f.vatNumber.replace(/[\s-]/g, "") : f.vatNumber.trim(), vatRate: Number(f.vatRate), paymentTermsDays: Number(f.paymentTermsDays),
+  arAccountCode: f.arAccountCode.trim(), revenueAccountCode: f.revenueAccountCode.trim(), vatAccountCode: f.vatAccountCode.trim(), bankAccountCode: f.bankAccountCode.trim(),
+})
+/** Account codes the ledger postings need that are still empty, in plain words. */
+export function missingLedgerCodes(f: Pick<ProfileForm, "arAccountCode" | "revenueAccountCode" | "bankAccountCode">): string[] {
+  const out: string[] = []
+  if (!f.arAccountCode.trim()) out.push("debtors (receivables)")
+  if (!f.revenueAccountCode.trim()) out.push("income (revenue)")
+  if (!f.bankAccountCode.trim()) out.push("bank")
+  return out
+}
+export const needsBillingSetup = (lastError: string | null | undefined) => !!lastError && /configured in the billing settings/i.test(lastError)
