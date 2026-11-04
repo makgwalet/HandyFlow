@@ -337,3 +337,38 @@ describe("billing", () => {
   })
   it("words ledger state", () => { expect(glNote("FAILED")?.tone).toBe("danger"); expect(glNote(null)).toBeNull(); expect(glNote("WEIRD_THING")?.label).toBe("weird thing") })
 })
+
+import { PORTAL_STATUS, accessSummary, accessWarning, auditLabel, barShare, canWithdraw, complianceTone, declineProblem, defaultRange, emptyRaise, grantCanRevoke, hoursText, inviteProblem, marginTone, minutesToHours, pct, portalOwing, priorityRows, raiseBody, raiseProblem, rangeProblem, statusRows } from "./fm.logic"
+
+describe("reports", () => {
+  it("ends the default range today and counts days inclusively", () => { expect(defaultRange("2026-11-04", 90)).toEqual({ from: "2026-08-07", to: "2026-11-04" }); expect(defaultRange("2026-03-01", 30).from).toBe("2026-01-31") })
+  it("checks the range", () => { expect(rangeProblem("", "2026-01-01")).toMatch(/both/); expect(rangeProblem("2026-02-01", "2026-01-01")).toMatch(/before/); expect(rangeProblem("2026-01-01", "2026-01-01")).toBeNull() })
+  it("words percentages and hours", () => { expect(pct(92.345)).toBe("92.3%"); expect(pct(null)).toBe("—"); expect(hoursText(1.84)).toBe("1.8 h"); expect(hoursText(72)).toBe("3 d"); expect(minutesToHours(90)).toBe("1.5 h"); expect(hoursText(null)).toBe("—") })
+  it("reads compliance and margin", () => { expect(complianceTone(95)).toBe("success"); expect(complianceTone(80)).toBe("warning"); expect(complianceTone(60)).toBe("danger"); expect(complianceTone(null)).toBe("neutral"); expect(marginTone(-1)).toBe("danger"); expect(marginTone(0)).toBe("success") })
+  it("sizes bars", () => { expect(barShare(0, 10)).toBe(0); expect(barShare(1, 1000)).toBe(3); expect(barShare(5, 10)).toBe(50); expect(barShare(5, 0)).toBe(0) })
+  it("orders statuses by the job's journey and hides empty ones", () => {
+    expect(statusRows({ COMPLETED: 4, OPEN: 2, IN_PROGRESS: 0, ON_HOLD: 1 }).map(r => r.key)).toEqual(["OPEN", "ON_HOLD", "COMPLETED"]); expect(statusRows(null)).toEqual([])
+  })
+  it("lists priorities most urgent first", () => expect(priorityRows({ LOW: 1, URGENT: 2, NORMAL: 0 }).map(r => r.key)).toEqual(["URGENT", "LOW"]))
+})
+
+describe("audit, access and portal users", () => {
+  it("words actions", () => expect(auditLabel("WORK_ORDER_ASSIGNED")).toBe("Work order assigned"))
+  it("summarises access and warns about widening it", () => {
+    expect(accessSummary(false, 0)).toBe("Sees every client"); expect(accessSummary(true, 1)).toBe("Restricted to 1 client"); expect(accessSummary(true, 3)).toBe("Restricted to 3 clients")
+    expect(accessWarning(0, true)).toMatch(/every client/); expect(accessWarning(0, false)).toBeNull(); expect(accessWarning(2, true)).toBeNull()
+  })
+  it("checks invites and revocation", () => { expect(inviteProblem(" ")).toMatch(/Enter/); expect(inviteProblem("nope")).toMatch(/look right/); expect(inviteProblem("a@b.co")).toBeNull(); expect(grantCanRevoke("ACTIVE", true)).toBe(true); expect(grantCanRevoke("REVOKED", true)).toBe(false); expect(grantCanRevoke("PENDING", false)).toBe(false) })
+})
+
+describe("client portal", () => {
+  it("checks a fault report", () => {
+    const f = { ...emptyRaise(), siteId: "s1", description: "The lift is stuck on level 2" }
+    expect(raiseProblem(f)).toBeNull(); expect(raiseProblem({ ...f, siteId: "" })).toMatch(/site/); expect(raiseProblem({ ...f, description: "too short" })).toMatch(/10 characters/); expect(raiseProblem({ ...f, description: "x".repeat(2001) })).toMatch(/2000/)
+    expect(raiseBody({ ...f, assetId: " ", contactName: "Thabo" })).toMatchObject({ assetId: null, contactName: "Thabo", category: "CORRECTIVE", safetyImpact: false })
+  })
+  it("lets a client withdraw only a request nobody has picked up", () => { expect(canWithdraw("REQUESTED")).toBe(true); expect(canWithdraw("OPEN")).toBe(false); expect(canWithdraw("COMPLETED")).toBe(false) })
+  it("needs a reason to decline", () => { expect(declineProblem(" ")).toMatch(/why/); expect(declineProblem("Too dear")).toBeNull(); expect(declineProblem("x".repeat(1001))).toMatch(/1000/) })
+  it("shows internal states as plain ones", () => { expect(PORTAL_STATUS.PENDING_VERIFICATION.label).toBe("In progress"); expect(PORTAL_STATUS.REQUESTED.label).toBe("Received") })
+  it("reads the amounts owing", () => { expect(portalOwing(null)).toBeNull(); expect(portalOwing({ outstandingBalance: 100, overdueBalance: null, overdueInvoices: 0 })).toEqual({ owing: 100, overdue: 0, overdueCount: 0 }) })
+})

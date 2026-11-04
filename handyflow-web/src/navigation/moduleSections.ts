@@ -1109,7 +1109,7 @@ export const CRM_SECTIONS: ModuleSections = {
 /**
  * Facilities Management (the FM provider module, /api/v1/facilitiesmanagement). Work orders, then the clients, sites and assets
  * they are done for, planned maintenance (on each asset), technicians, vendors, and secure sharing of a completed job's files.
- * Quotes, service agreements, the SLA calendar and invoicing sit alongside. Reports and the client portal are still to come.
+ * Quotes, service agreements, the SLA calendar and invoicing sit alongside. Reports, the activity log and per-user client access follow; clients can sign in to their own portal.
  */
 const FM_VIEW = ['FACILITIESMANAGEMENT_READ', 'FACILITIESMANAGEMENT_MANAGE', 'FACILITIESMANAGEMENT_ADMIN']
 export const FM_SECTIONS: ModuleSections = {
@@ -1149,6 +1149,14 @@ export const FM_SECTIONS: ModuleSections = {
         { id: 'sites', label: 'Sites', icon: MapPin, anyPermission: FM_VIEW },
         { id: 'assets', label: 'Assets', icon: Package, anyPermission: FM_VIEW },
         { id: 'shared-documents', label: 'Shared documents', icon: FileText, anyPermission: FM_VIEW },
+      ],
+    },
+    {
+      label: 'Insight and admin',
+      sections: [
+        { id: 'reports', label: 'Reports', icon: FileBarChart, anyPermission: [...FM_VIEW, 'FACILITIESMANAGEMENT_TECHNICIAN', 'FACILITIESMANAGEMENT_BILLING_MANAGE', 'FACILITIESMANAGEMENT_BILLING_APPROVE', 'FACILITIESMANAGEMENT_SLA_MANAGE', 'FACILITIESMANAGEMENT_CONTRACT_MANAGE'] },
+        { id: 'audit', label: 'Activity log', icon: ClipboardCheck, anyPermission: ['FACILITIESMANAGEMENT_ADMIN', 'FACILITIESMANAGEMENT_AUDIT_READ'] },
+        { id: 'client-access', label: 'Client access', icon: UserCheck, permission: 'FACILITIESMANAGEMENT_ADMIN' },
       ],
     },
   ],

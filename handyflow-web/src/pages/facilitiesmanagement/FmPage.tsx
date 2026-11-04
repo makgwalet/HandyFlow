@@ -15,6 +15,9 @@ import QuotesTab from './QuotesTab'
 import AgreementsTab from './AgreementsTab'
 import SlaCalendarTab from './SlaCalendarTab'
 import BillingTab from './BillingTab'
+import ReportsTab from './ReportsTab'
+import AuditTab from './AuditTab'
+import ClientAccessTab from './ClientAccessTab'
 
 export function FmPage() {
   return (
@@ -25,6 +28,9 @@ export function FmPage() {
         case 'agreements':       return <AgreementsTab />
         case 'sla-calendar':     return <SlaCalendarTab />
         case 'invoices':         return <BillingTab />
+        case 'reports':          return <ReportsTab />
+        case 'audit':            return <AuditTab />
+        case 'client-access':    return <ClientAccessTab />
         case 'clients':          return <ClientsTab />
         case 'sites':            return <SitesTab />
         case 'assets':           return <AssetsTab />

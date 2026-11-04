@@ -6,12 +6,14 @@ import { usePermission } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pill, SectionTitle, card, errorText, fail, muted, pageOf, td, th } from "./kit"
 import { BASE, type FClient } from "./lookups"
+import PortalUsersDialog from "./PortalUsersDialog"
 import { clientBody, clientProblem, emptyClient, type ClientForm } from "./fm.logic"
 
 export default function ClientsTab() {
   const qc = useQueryClient()
   const canWrite = usePermission("FACILITIESMANAGEMENT_MANAGE") || usePermission("FACILITIESMANAGEMENT_ADMIN")
-  const [page, setPage] = useState(0), [editing, setEditing] = useState<FClient | "new" | null>(null)
+  const canInvite = canWrite || usePermission("FACILITIESMANAGEMENT_PORTAL_MANAGE"), canRevoke = usePermission("FACILITIESMANAGEMENT_ADMIN") || usePermission("FACILITIESMANAGEMENT_PORTAL_MANAGE")
+  const [page, setPage] = useState(0), [editing, setEditing] = useState<FClient | "new" | null>(null), [portal, setPortal] = useState<FClient | null>(null)
   const { data, isLoading, isError } = useQuery({ queryKey: ["fm-clients", page], queryFn: async () => pageOf<FClient>(await apiClient.get(`${BASE}/clients`, { params: { page, size: 25 } })) })
   const refresh = () => { qc.invalidateQueries({ queryKey: ["fm-clients"] }); qc.invalidateQueries({ queryKey: ["fm-clients-all"] }) }
   const toggle = useMutation({
@@ -32,11 +34,12 @@ export default function ClientsTab() {
                 <td style={td}>{c.contactName ?? "—"}<div style={muted}>{[c.contactEmail, c.contactPhone].filter(Boolean).join(" · ")}</div></td>
                 <td style={td}>{c.vatNumber ?? "—"}</td>
                 <td style={td}><Pill tone={c.status === "ACTIVE" ? "success" : "neutral"}>{c.status === "ACTIVE" ? "Active" : "Inactive"}</Pill></td>
-                <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>{canWrite && <><Btn small onClick={() => setEditing(c)}>Edit</Btn>{" "}<Btn small disabled={toggle.isPending} onClick={() => toggle.mutate(c)}>{c.status === "ACTIVE" ? "Deactivate" : "Reactivate"}</Btn></>}</td>
+                <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}><Btn small onClick={() => setPortal(c)}>Portal</Btn>{" "}{canWrite && <><Btn small onClick={() => setEditing(c)}>Edit</Btn>{" "}<Btn small disabled={toggle.isPending} onClick={() => toggle.mutate(c)}>{c.status === "ACTIVE" ? "Deactivate" : "Reactivate"}</Btn></>}</td>
               </tr>))}</tbody>
           </table>)}
       </div>
       <Pager page={page} pages={data?.totalPages ?? 0} onPage={setPage} />
+      {portal && <PortalUsersDialog clientId={portal.id} clientName={portal.tradingName} canInvite={canInvite} canRevoke={canRevoke} onClose={() => setPortal(null)} />}
       {editing && <ClientDialog client={editing === "new" ? null : editing} onClose={() => setEditing(null)} onSaved={refresh} />}
     </div>
   )

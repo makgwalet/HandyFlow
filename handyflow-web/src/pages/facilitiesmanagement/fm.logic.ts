@@ -432,3 +432,62 @@ export function dueNote(status: string, balance: number, due: string | null | un
   if (due < today) return { text: `${Math.round((new Date(today).getTime() - new Date(due).getTime()) / 864e5)} d overdue`, tone: "danger" }
   return null
 }
+
+// ── Reports ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+const isoDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+/** The last `days` days up to and including `today` (both as yyyy-mm-dd). */
+export function defaultRange(today: string, days = 90): { from: string; to: string } {
+  const d = new Date(today + "T00:00:00"); d.setDate(d.getDate() - (days - 1))
+  return { from: isoDate(d), to: today }
+}
+export const rangeProblem = (from: string, to: string): string | null => !from || !to ? "Pick both dates" : to < from ? "The end date cannot be before the start date" : null
+export const pct = (n: number | null | undefined) => n == null ? "—" : `${Math.round(n * 10) / 10}%`
+/** Compliance is good at 90 % and above, worth a look from 75 %, and poor below that. No jobs with a target means no verdict. */
+export const complianceTone = (p: number | null | undefined): Tone => p == null ? "neutral" : p >= 90 ? "success" : p >= 75 ? "warning" : "danger"
+export const marginTone = (p: number | null | undefined): Tone => p == null ? "neutral" : p < 0 ? "danger" : "success"
+export function hoursText(h: number | null | undefined): string {
+  if (h == null) return "—"
+  if (h >= 48) return `${Math.round(h / 24 * 10) / 10} d`
+  return `${Math.round(h * 10) / 10} h`
+}
+export function minutesToHours(m: number | null | undefined): string { return m == null ? "—" : hoursText(m / 60) }
+/** A bar's width as a share of the biggest value, never so thin it vanishes. */
+export const barShare = (n: number, max: number) => max <= 0 || n <= 0 ? 0 : Math.max(3, Math.round(n / max * 100))
+const WO_ORDER = ["REQUESTED", "OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD", "PENDING_VERIFICATION", "COMPLETED", "CANCELLED", "REJECTED"]
+export const statusRows = (m: Record<string, number> | null | undefined) => Object.entries(m ?? {}).filter(([, n]) => n > 0)
+  .sort((a, b) => (WO_ORDER.indexOf(a[0]) + 100) % 100 - (WO_ORDER.indexOf(b[0]) + 100) % 100)
+  .map(([k, n]) => ({ key: k, label: WO_STATUS[k]?.label ?? labelOf([], k), count: n, tone: WO_STATUS[k]?.tone ?? "neutral" as Tone }))
+export const priorityRows = (m: Record<string, number> | null | undefined) => PRIORITIES.map(([k, l]) => ({ key: k as string, label: l as string, count: (m ?? {})[k] ?? 0 })).filter(r => r.count > 0).reverse()
+
+// ── Audit log and access ─────────────────────────────────────────────────────────────────────────────────────────────
+export const AUDIT_ENTITIES = [["WORK_ORDER", "Work orders"], ["QUOTE", "Quotes"], ["INVOICE", "Invoices"], ["CREDIT_NOTE", "Credit notes"], ["AGREEMENT", "Agreements"], ["VENDOR", "Vendors"], ["TECHNICIAN", "Technicians"], ["CLIENT", "Clients"], ["SITE", "Sites"], ["ASSET", "Assets"], ["USER", "Users"], ["CALENDAR", "Working hours"], ["BILLING", "Billing"]] as const
+/** "WORK_ORDER_ASSIGNED" → "Work order assigned". */
+export const auditLabel = (a: string) => a.replace(/_/g, " ").toLowerCase().replace(/^./, c => c.toUpperCase())
+export const accessSummary = (restricted: boolean, count: number) => !restricted ? "Sees every client" : count === 1 ? "Restricted to 1 client" : `Restricted to ${count} clients`
+/** An empty set removes the restriction, so saving with nothing ticked widens access; the screen says so. */
+export const accessWarning = (picked: number, wasRestricted: boolean) => picked === 0 && wasRestricted ? "With no client ticked this person will see every client." : null
+export const GRANT_STATUS: Record<string, { label: string; tone: Tone }> = { PENDING: { label: "Invited", tone: "warning" }, ACTIVE: { label: "Has access", tone: "success" }, REVOKED: { label: "Revoked", tone: "neutral" } }
+export const inviteProblem = (email: string): string | null => !email.trim() ? "Enter the contact's email address" : !looksLikeEmail(email) ? "That email address does not look right" : null
+export const grantCanRevoke = (status: string, canRevoke: boolean) => canRevoke && status !== "REVOKED"
+
+// ── Client portal ────────────────────────────────────────────────────────────────────────────────────────────────────
+export const PORTAL_CATEGORIES = [["CORRECTIVE", "Something is broken"], ["EMERGENCY", "Emergency"], ["OTHER", "Something else"]] as const
+export const PORTAL_STATUS: Record<string, { label: string; tone: Tone }> = {
+  REQUESTED: { label: "Received", tone: "info" }, REJECTED: { label: "Declined", tone: "neutral" }, OPEN: { label: "Accepted", tone: "info" }, ASSIGNED: { label: "Scheduled", tone: "info" },
+  IN_PROGRESS: { label: "In progress", tone: "warning" }, ON_HOLD: { label: "On hold", tone: "warning" }, PENDING_VERIFICATION: { label: "In progress", tone: "warning" }, COMPLETED: { label: "Completed", tone: "success" }, CANCELLED: { label: "Cancelled", tone: "neutral" },
+}
+export interface RaiseForm { siteId: string; assetId: string; category: string; description: string; safetyImpact: boolean; contactName: string }
+export const emptyRaise = (): RaiseForm => ({ siteId: "", assetId: "", category: "CORRECTIVE", description: "", safetyImpact: false, contactName: "" })
+export function raiseProblem(f: RaiseForm): string | null {
+  if (!f.siteId) return "Choose the site"
+  const n = f.description.trim().length
+  if (n < 10) return "Please describe the problem in a little more detail (at least 10 characters)"
+  if (n > 2000) return "Keep the description under 2000 characters"
+  return null
+}
+export const raiseBody = (f: RaiseForm) => ({ siteId: f.siteId, assetId: t(f.assetId), category: f.category, description: f.description.trim(), safetyImpact: f.safetyImpact, contactName: t(f.contactName) })
+/** Only a request still waiting for staff can be withdrawn. The server also checks that you submitted it. */
+export const canWithdraw = (status: string) => status === "REQUESTED"
+export const declineProblem = (note: string): string | null => !note.trim() ? "Tell us why you are declining" : note.trim().length > 1000 ? "Keep it under 1000 characters" : null
+export const portalOwing = (s: { outstandingBalance: number | null; overdueBalance: number | null; overdueInvoices: number } | null | undefined) =>
+  !s ? null : { owing: s.outstandingBalance ?? 0, overdue: s.overdueBalance ?? 0, overdueCount: s.overdueInvoices }
