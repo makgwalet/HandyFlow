@@ -9,7 +9,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.evidence.application.EvidenceFacade;
+import za.co.handyflow.platform.evidence.dto.EvidenceResponse;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmVendorService;
 import za.co.handyflow.platform.facilitiesmanagement.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -25,6 +28,7 @@ public class FmVendorController {
 
     private final FmVendorService vendorService;
     private final FeatureGuard featureGuard;
+    private final EvidenceFacade evidenceFacade;
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_READ','FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
@@ -102,6 +106,29 @@ public class FmVendorController {
         featureGuard.requireModule("facilitiesmanagement");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Document added",
                 vendorService.addDocument(TenantContext.getTenantIdAsObject(), id, request)));
+    }
+
+    /** The file behind a compliance document (the certificate, the insurance schedule). Downloaded through the shared evidence endpoint. */
+    @PostMapping("/{id}/documents/{documentId}/evidence")
+    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    public ResponseEntity<ApiResponse<EvidenceResponse>> attachDocumentFile(
+            @PathVariable UUID id, @PathVariable UUID documentId, @RequestParam MultipartFile file,
+            @RequestParam(defaultValue = "DOCUMENT") String evidenceType) {
+        featureGuard.requireModule("facilitiesmanagement");
+        vendorService.requireDocument(TenantContext.getTenantIdAsObject(), id, documentId);
+        EvidenceResponse attached = evidenceFacade.attach(TenantContext.getTenantIdAsObject(), file, evidenceType, "facilitiesmanagement",
+                "FmVendorDocument", documentId, null, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName());
+        vendorService.recordFileAttached(TenantContext.getTenantIdAsObject(), id, documentId, attached.fileName());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("File attached", attached));
+    }
+
+    @GetMapping("/{id}/documents/{documentId}/evidence")
+    @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_READ','FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
+    public ResponseEntity<ApiResponse<List<EvidenceResponse>>> documentFiles(@PathVariable UUID id, @PathVariable UUID documentId) {
+        featureGuard.requireModule("facilitiesmanagement");
+        vendorService.requireDocument(TenantContext.getTenantIdAsObject(), id, documentId);
+        return ResponseEntity.ok(ApiResponse.success(
+                evidenceFacade.listFor(TenantContext.getTenantIdAsObject(), "facilitiesmanagement", "FmVendorDocument", documentId)));
     }
 
     @PostMapping("/{id}/documents/{documentId}/revoke")

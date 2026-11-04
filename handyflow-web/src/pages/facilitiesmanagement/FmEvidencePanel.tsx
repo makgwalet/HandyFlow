@@ -15,8 +15,12 @@ const MAX = 10 * 1024 * 1024
 export const fileSize = (b: number) => (b < 1024 ? `${b} B` : b < 1024 * 1024 ? `${Math.round(b / 102.4) / 10} KB` : `${Math.round(b / 104857.6) / 10} MB`)
 export const fileProblem = (file: { size: number } | null) => !file ? "Choose a file" : file.size <= 0 ? "That file is empty" : file.size > MAX ? "That file is over 10 MB" : null
 
-export default function FmEvidencePanel({ owner, id, canWrite, title = "Photos and files" }: { owner: "work-orders" | "assets"; id: string; canWrite: boolean; title?: string }) {
-  const qc = useQueryClient(), key = ["fm-evidence", owner, id], url = `${BASE}/${owner}/${id}/evidence`
+export const DOC_KINDS = [["DOCUMENT", "Document"], ["CERTIFICATE", "Certificate"], ["OTHER", "Other"]] as const
+
+/** {@code path} replaces the usual address for owners that are not a work order or an asset (a vendor's document, say). */
+export default function FmEvidencePanel({ owner, id, canWrite, title = "Photos and files", path, kinds = KINDS, defaultKind = "PHOTO" }:
+  { owner: string; id: string; canWrite: boolean; title?: string; path?: string; kinds?: readonly (readonly [string, string])[]; defaultKind?: string }) {
+  const qc = useQueryClient(), key = ["fm-evidence", owner, id], url = path ?? `${BASE}/${owner}/${id}/evidence`
   const [adding, setAdding] = useState(false)
   const { data, isLoading, isError } = useQuery({ queryKey: key, queryFn: async () => (await apiClient.get<Evidence[]>(url)).data })
   const rows = Array.isArray(data) ? data : []
@@ -40,20 +44,20 @@ export default function FmEvidencePanel({ owner, id, canWrite, title = "Photos a
             <tbody>{rows.map(e => (
               <tr key={e.id}>
                 <td style={td}><b style={{ wordBreak: "break-word" }}>{e.fileName}</b><div style={muted}>{fileSize(e.fileSizeBytes)}</div></td>
-                <td style={td}>{labelOf(KINDS, e.evidenceType)}</td>
+                <td style={td}>{labelOf(KINDS, e.evidenceType) || labelOf(DOC_KINDS, e.evidenceType)}</td>
                 <td style={td}>{day(e.createdAt)}{e.uploadedByName ? <div style={muted}>{e.uploadedByName}</div> : null}</td>
                 <td style={{ ...td, textAlign: "right" }}><Btn small disabled={download.isPending} onClick={() => download.mutate(e)}>Download</Btn></td>
               </tr>))}</tbody>
           </table>)}
       </div>
-      {adding && <AddDialog url={url} onClose={() => setAdding(false)} onDone={() => qc.invalidateQueries({ queryKey: key })} />}
+      {adding && <AddDialog url={url} kinds={kinds} defaultKind={defaultKind} onClose={() => setAdding(false)} onDone={() => qc.invalidateQueries({ queryKey: key })} />}
     </div>
   )
 }
 
-function AddDialog({ url, onClose, onDone }: { url: string; onClose: () => void; onDone: () => void }) {
+function AddDialog({ url, kinds, defaultKind, onClose, onDone }: { url: string; kinds: readonly (readonly [string, string])[]; defaultKind: string; onClose: () => void; onDone: () => void }) {
   const input = useRef<HTMLInputElement>(null)
-  const [file, setFile] = useState<File | null>(null), [kind, setKind] = useState("PHOTO"), [err, setErr] = useState("")
+  const [file, setFile] = useState<File | null>(null), [kind, setKind] = useState(defaultKind), [err, setErr] = useState("")
   const problem = fileProblem(file)
   const upload = useMutation({
     mutationFn: () => { const fd = new FormData(); fd.append("file", file!, file!.name); fd.append("evidenceType", kind); return apiClient.post(url, fd) },
@@ -67,7 +71,7 @@ function AddDialog({ url, onClose, onDone }: { url: string; onClose: () => void;
         <input ref={input} type="file" aria-label="File" onChange={e => setFile(e.target.files?.[0] ?? null)} style={{ fontSize: 13 }} />
         {file && <div style={muted}>{file.name} · {fileSize(file.size)}</div>}
       </div>
-      <Pick label="What is it?" value={kind} onChange={setKind} options={KINDS} />
+      <Pick label="What is it?" value={kind} onChange={setKind} options={kinds} />
       {problem && file && <div style={muted}>{problem}</div>}
       {err && <ErrorLine text={err} />}
     </Dialog>

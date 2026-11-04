@@ -1,10 +1,11 @@
 // Outside contractors: who they are, whether they are approved, and whether their paperwork lets them be given work.
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pick, Pill, ReasonDialog, Row, SectionTitle, card, day, errorText, fail, money, muted, pageOf, td, th } from "./kit"
+import FmEvidencePanel, { DOC_KINDS, fileProblem, fileSize } from "./FmEvidencePanel"
 import { BASE, type FVendor } from "./lookups"
 import { DOC_TYPES, ONBOARDING, docBody, docNote, docProblem, emptyDoc, emptyVendor, labelOf, vendorActions, vendorBody, vendorProblem, type DocForm, type VendorForm } from "./fm.logic"
 
@@ -51,7 +52,7 @@ export default function VendorsTab() {
 
 function VendorDetail({ vendor, canWrite, onClose, onChanged }: { vendor: Vendor; canWrite: boolean; onClose: () => void; onChanged: (v: Vendor) => void }) {
   const qc = useQueryClient(), approver = usePermission("FACILITIESMANAGEMENT_VENDOR_APPROVE"), canApprove = canWrite || approver
-  const [suspending, setSuspending] = useState(false), [adding, setAdding] = useState(false), [revoking, setRevoking] = useState<Doc | null>(null)
+  const [suspending, setSuspending] = useState(false), [adding, setAdding] = useState(false), [revoking, setRevoking] = useState<Doc | null>(null), [filesOf, setFilesOf] = useState<Doc | null>(null)
   const key = ["fm-vendor-compliance", vendor.id]
   const comp = useQuery({ queryKey: key, queryFn: async () => (await apiClient.get<Compliance>(`${BASE}/vendors/${vendor.id}/compliance`)).data })
   const ob = ONBOARDING[vendor.onboardingStatus ?? ""] ?? { label: vendor.onboardingStatus ?? "", tone: "neutral" as const }
@@ -92,7 +93,7 @@ function VendorDetail({ vendor, canWrite, onClose, onChanged }: { vendor: Vendor
                   <td style={td}><b>{labelOf(DOC_TYPES, d.docType)}</b><div style={muted}>{[d.reference, d.issuedBy, d.coverAmount != null ? `Cover ${money(d.coverAmount)}` : null].filter(Boolean).join(" · ")}</div>{d.revokedReason && <div style={muted}>Revoked: {d.revokedReason}</div>}</td>
                   <td style={td}>{day(d.expiryDate)}</td>
                   <td style={td}><Pill tone={n.tone}>{n.text}</Pill></td>
-                  <td style={{ ...td, textAlign: "right" }}>{canWrite && d.status !== "REVOKED" && <Btn small onClick={() => setRevoking(d)}>Revoke</Btn>}</td>
+                  <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}><Btn small onClick={() => setFilesOf(d)}>Files</Btn>{canWrite && d.status !== "REVOKED" && <>{" "}<Btn small onClick={() => setRevoking(d)}>Revoke</Btn></>}</td>
                 </tr>)})}</tbody>
           </table>)}
       </div>
@@ -100,23 +101,37 @@ function VendorDetail({ vendor, canWrite, onClose, onChanged }: { vendor: Vendor
         onClose={() => setSuspending(false)} onSubmit={async t => { await apiClient.post(`${BASE}/vendors/${vendor.id}/suspend`, { reason: t }); toast.success("Vendor suspended"); onChanged({ ...vendor, onboardingStatus: "SUSPENDED" }); qc.invalidateQueries({ queryKey: key }) }} />}
       {revoking && <ReasonDialog title="Revoke this document?" label="Why?" confirm="Revoke" danger onClose={() => setRevoking(null)}
         onSubmit={async t => { await apiClient.post(`${BASE}/vendors/${vendor.id}/documents/${revoking.id}/revoke`, { reason: t }); toast.success("Document revoked"); qc.invalidateQueries({ queryKey: key }) }} />}
+      {filesOf && (
+        <Dialog title={`${labelOf(DOC_TYPES, filesOf.docType)} · files`} onClose={() => setFilesOf(null)} width={640}>
+          <FmEvidencePanel owner="vendor-documents" id={filesOf.id} canWrite={canWrite} title="Files for this document" kinds={DOC_KINDS} defaultKind="DOCUMENT"
+            path={`${BASE}/vendors/${vendor.id}/documents/${filesOf.id}/evidence`} />
+        </Dialog>)}
       {adding && <DocDialog vendorId={vendor.id} onClose={() => setAdding(false)} onSaved={() => qc.invalidateQueries({ queryKey: key })} />}
     </Dialog>
   )
 }
 
 function DocDialog({ vendorId, onClose, onSaved }: { vendorId: string; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState<DocForm>(emptyDoc()), [err, setErr] = useState("")
+  const [f, setF] = useState<DocForm>(emptyDoc()), [err, setErr] = useState(""), [file, setFile] = useState<File | null>(null), input = useRef<HTMLInputElement>(null)
   const set = (k: keyof DocForm) => (v: string) => setF(s => ({ ...s, [k]: v }))
-  const problem = docProblem(f)
+  const problem = docProblem(f), fileBad = file ? fileProblem(file) : null
   const save = useMutation({
-    mutationFn: () => apiClient.post(`${BASE}/vendors/${vendorId}/documents`, docBody(f)),
-    onSuccess: () => { toast.success("Document recorded"); onSaved(); onClose() },
+    mutationFn: async () => {
+      const created = (await apiClient.post<{ id: string }>(`${BASE}/vendors/${vendorId}/documents`, docBody(f))).data
+      if (!file) return true
+      // The record exists now. If the file fails, say so plainly: the record stays, and Files on the document can try again.
+      try {
+        const fd = new FormData(); fd.append("file", file, file.name); fd.append("evidenceType", f.docType === "OTHER" ? "DOCUMENT" : "CERTIFICATE")
+        await apiClient.post(`${BASE}/vendors/${vendorId}/documents/${created.id}/evidence`, fd)
+        return true
+      } catch { return false }
+    },
+    onSuccess: attached => { attached ? toast.success(file ? "Document recorded with its file" : "Document recorded") : toast.error("The document was recorded, but its file was not attached. Open Files on the document to try again."); onSaved(); onClose() },
     onError: async e => setErr(await errorText(e, "Could not record the document")),
   })
   return (
     <Dialog title="Record a document" onClose={onClose} width={600}
-      footer={<><Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" disabled={!!problem || save.isPending} onClick={() => { setErr(""); save.mutate() }}>{save.isPending ? "Saving…" : "Record"}</Btn></>}>
+      footer={<><Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" disabled={!!problem || !!fileBad || save.isPending} onClick={() => { setErr(""); save.mutate() }}>{save.isPending ? "Saving…" : "Record"}</Btn></>}>
       <Pick label="Kind" value={f.docType} onChange={set("docType")} options={DOC_TYPES} />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
         <Input label="Reference number" value={f.reference} onChange={set("reference")} maxLength={120} />
@@ -125,7 +140,12 @@ function DocDialog({ vendorId, onClose, onSaved }: { vendorId: string; onClose: 
         <Input label="Expires" type="date" value={f.expiryDate} onChange={set("expiryDate")} hint={f.docType === "OTHER" ? "Optional for this kind" : "Needed"} />
         {f.docType === "PUBLIC_LIABILITY_INSURANCE" && <Input label="Cover amount (R)" type="number" min="0" step="0.01" value={f.coverAmount} onChange={set("coverAmount")} />}
       </div>
-      <Input label="Where the document is kept" hint="A note, folder or link; the file itself is not uploaded here" value={f.documentRef} onChange={set("documentRef")} maxLength={500} />
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>The file (optional)</div>
+        <input ref={input} type="file" aria-label="Document file" onChange={e => setFile(e.target.files?.[0] ?? null)} style={{ fontSize: 13 }} />
+        {file && <div style={muted}>{file.name} · {fileSize(file.size)}{fileBad ? ` · ${fileBad}` : ""}</div>}
+      </div>
+      <Input label="Where else it is kept" hint="A note, folder or link, if you also keep it elsewhere" value={f.documentRef} onChange={set("documentRef")} maxLength={500} />
       {problem && (f.expiryDate || f.docType === "OTHER") && <div style={muted}>{problem}</div>}
       {err && <ErrorLine text={err} />}
     </Dialog>

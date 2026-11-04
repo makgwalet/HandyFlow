@@ -188,6 +188,22 @@ public class FmVendorService {
         return toResponse(d, FmTime.today());
     }
 
+    /** Checks the caller may work with this vendor's documents and that the document is this vendor's. Used before a file is attached or listed. */
+    @Transactional(readOnly = true)
+    public void requireDocument(TenantId tenantId, UUID vendorId, UUID documentId) {
+        requireCompanyWide(tenantId);
+        findActive(tenantId, vendorId);
+        documentRepository.findByIdForTenant(tenantId, documentId)
+                .filter(x -> x.getVendorId().equals(vendorId))
+                .orElseThrow(() -> new ResourceNotFoundException("FmVendorDocument", documentId.toString()));
+    }
+
+    /** Leaves a line in the activity log that a file was attached to a vendor document. */
+    @Transactional
+    public void recordFileAttached(TenantId tenantId, UUID vendorId, UUID documentId, String fileName) {
+        auditService.record(tenantId, "VENDOR_DOCUMENT_FILE_ATTACHED", "VENDOR", vendorId, "document=" + documentId + " file=" + fileName);
+    }
+
     private FmVendorDocumentResponse toResponse(FmVendorDocument d, LocalDate today) {
         return new FmVendorDocumentResponse(d.getId(), d.getVendorId(), d.getDocType(), d.getReference(), d.getIssuedBy(),
                 d.getIssueDate(), d.getExpiryDate(), d.getCoverAmount(), d.getDocumentRef(), d.getStatus(), d.isInForce(today),
