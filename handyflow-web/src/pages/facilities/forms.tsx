@@ -18,6 +18,7 @@ const SITE_TYPES = ['OFFICE', 'WAREHOUSE', 'RETAIL', 'FACTORY', 'OTHER']
 const CRITICALITY = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
 const ASSET_STATUS = ['OPERATIONAL', 'DOWN', 'MAINTENANCE', 'DECOMMISSIONED']
 const ADDRESS_FIELDS: [string, string][] = [['street', 'Street'], ['suburb', 'Suburb'], ['city', 'City'], ['province', 'Province'], ['postalCode', 'Postal code']]
+const PROVINCES = ['Eastern Cape', 'Free State', 'Gauteng', 'KwaZulu-Natal', 'Limpopo', 'Mpumalanga', 'North West', 'Northern Cape', 'Western Cape']
 const two: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }
 const blank = (v: string) => (v.trim() === '' ? undefined : v.trim())
 
@@ -48,16 +49,31 @@ export function SiteFormDialog({ site, onClose }: { site?: Site; onClose: () => 
   const [notes, setNotes] = useState(site?.notes ?? '')
   const [address, setAddress] = useState<Record<string, string>>(site?.address ?? {})
   const save = useSave((b: SiteBody) => (site ? facilitiesApi.updateSite(site.id, b) : facilitiesApi.createSite(b)), site ? 'Site updated' : 'Site created', onClose)
+  const postalBad = !!address.postalCode && address.postalCode.length !== 4
   const body = (): SiteBody => ({
     name: name.trim(), siteType, notes: blank(notes),
     address: Object.fromEntries(Object.entries(address).filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()])),
   })
   return (
-    <FormDialog title={site ? `Edit ${site.name}` : 'New site'} onClose={onClose} busy={save.isPending} valid={name.trim().length > 0} onSave={() => save.mutate(body())}>
+    <FormDialog title={site ? `Edit ${site.name}` : 'New site'} onClose={onClose} busy={save.isPending} valid={name.trim().length > 0 && !postalBad} onSave={() => save.mutate(body())}>
       <Field label="Name *"><input value={name} onChange={e => setName(e.target.value)} maxLength={200} style={inputStyle} autoFocus /></Field>
       <Field label="Type"><select value={siteType} onChange={e => setSiteType(e.target.value)} style={inputStyle}>{SITE_TYPES.map(t => <option key={t} value={t}>{titleCase(t)}</option>)}</select></Field>
       <div style={two}>
-        {ADDRESS_FIELDS.map(([k, label]) => (
+        {ADDRESS_FIELDS.map(([k, label]) => k === 'province' ? (
+          <Field key={k} label={label}>
+            <select aria-label="Province" value={address[k] ?? ''} onChange={e => setAddress(a => ({ ...a, [k]: e.target.value }))} style={inputStyle}>
+              <option value="">Choose…</option>
+              {address[k] && !PROVINCES.includes(address[k]) && <option value={address[k]}>{address[k]} (please change)</option>}
+              {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </Field>
+        ) : k === 'postalCode' ? (
+          <Field key={k} label={label}>
+            <input aria-label="Postal code" inputMode="numeric" value={address[k] ?? ''} maxLength={4} placeholder="2196" style={inputStyle}
+              onChange={e => setAddress(a => ({ ...a, [k]: e.target.value.replace(/\D/g, '') }))} />
+            {postalBad && <div role="alert" style={{ fontSize: 12, color: 'var(--hf-danger-text)', marginTop: 3 }}>The postal code must be four digits.</div>}
+          </Field>
+        ) : (
           <Field key={k} label={label}><input value={address[k] ?? ''} onChange={e => setAddress(a => ({ ...a, [k]: e.target.value }))} maxLength={120} style={inputStyle} /></Field>
         ))}
       </div>

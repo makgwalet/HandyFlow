@@ -25,4 +25,9 @@ public interface FacilitySiteRepository extends JpaRepository<FacilitySite, UUID
             "AND (:allSites = true OR s.id IN :siteIds)")
     Page<FacilitySite> findAllActiveInScope(@Param("tenantId") TenantId tenantId, @Param("allSites") boolean allSites,
                                             @Param("siteIds") Collection<UUID> siteIds, Pageable pageable);
+
+    /** Ids of live sites with this name, ignoring case and surrounding spaces. */
+    @Query("SELECT s.id FROM FacilitySite s WHERE s.tenantId.value = :#{#tenantId.value} AND s.deletedAt IS NULL " +
+            "AND lower(trim(s.name)) = :lowerName")
+    java.util.List<UUID> findActiveIdsByLowerName(@Param("tenantId") TenantId tenantId, @Param("lowerName") String lowerName);
 }

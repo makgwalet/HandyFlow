@@ -79,7 +79,15 @@ public class GlobalExceptionHandler {
         }
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(new ApiResponse<>(false, "Validation failed", errors));
+                .body(new ApiResponse<>(false, validationSummary(errors), errors));
+    }
+
+    /** What a screen that only shows the top message should say: the first problem, not just "Validation failed". */
+    static String validationSummary(Map<String, String> errors) {
+        if (errors.isEmpty()) return "Validation failed";
+        String first = errors.values().iterator().next();
+        int more = errors.size() - 1;
+        return more == 0 ? first : first + " (and " + more + " more)";
     }
 
     @ExceptionHandler(ConstraintViolationException.class)

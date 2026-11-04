@@ -5,5 +5,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
 public record CreateAnnualPlanRequest(
-        @NotNull @Min(2020) @Max(2100) Integer planYear
+        @NotNull(message = "Enter the plan year.")
+        @Min(value = 2020, message = "The plan year must be 2020 or later.")
+        @Max(value = 2100, message = "The plan year must be 2100 or earlier.") Integer planYear
 ) {}

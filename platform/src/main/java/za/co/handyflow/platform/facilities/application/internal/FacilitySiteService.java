@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.facilities.domain.model.FacilitySite;
+import za.co.handyflow.platform.facilities.domain.model.SiteAddressRules;
 import za.co.handyflow.platform.facilities.domain.repository.FacilitySiteRepository;
 import za.co.handyflow.platform.facilities.dto.SiteResponse;
 import za.co.handyflow.platform.facilities.dto.UpsertSiteRequest;
@@ -49,7 +50,8 @@ public class FacilitySiteService {
             throw new HandyFlowException("Site-restricted users cannot create new sites",
                     HttpStatus.FORBIDDEN, "SITE_SCOPE_RESTRICTED");
         }
-        FacilitySite site = FacilitySite.create(tenantId, req.name(), req.siteType(), req.address(), req.notes());
+        refuseDuplicateName(tenantId, req.name(), null);
+        FacilitySite site = FacilitySite.create(tenantId, req.name(), req.siteType(), SiteAddressRules.check(req.address()), req.notes());
         siteRepository.save(site);
         log.info("Facility site created id={} tenant={}", site.getId(), tenantId);
         return toResponse(site);
@@ -58,7 +60,8 @@ public class FacilitySiteService {
     @Transactional
     public SiteResponse updateSite(TenantId tenantId, UUID id, UpsertSiteRequest req) {
         FacilitySite site = findActive(tenantId, id, accessPolicy.scope(tenantId));
-        site.update(req.name(), req.siteType(), req.address(), req.notes());
+        refuseDuplicateName(tenantId, req.name(), id);
+        site.update(req.name(), req.siteType(), SiteAddressRules.check(req.address()), req.notes());
         siteRepository.save(site);
         return toResponse(site);
     }
@@ -87,6 +90,14 @@ public class FacilitySiteService {
         site.softDelete(deletedByUserId);
         siteRepository.save(site);
         auditService.record(tenantId, "SITE_DELETED", "SITE", id, "name=" + site.getName());
+    }
+
+    private void refuseDuplicateName(TenantId tenantId, String name, UUID ownId) {
+        if (name == null) return;
+        boolean taken = siteRepository.findActiveIdsByLowerName(tenantId, name.strip().toLowerCase()).stream()
+                .anyMatch(other -> !other.equals(ownId));
+        if (taken) throw new HandyFlowException("A site called \"" + name.strip() + "\" already exists. Use a different name.",
+                HttpStatus.CONFLICT, "SITE_NAME_TAKEN");
     }
 
     private FacilitySite findActive(TenantId tenantId, UUID id, AccessScope scope) {
