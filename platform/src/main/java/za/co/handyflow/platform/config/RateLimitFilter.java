@@ -100,6 +100,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
             new Limit("recagencyportal:login", "/api/v1/recruitment-agency/portal/auth/login", 10, 10 * 60 * 1_000L),
             new Limit("propportal:register", "/api/v1/property/portal/auth/register", 5, 60 * 60 * 1_000L),
             new Limit("propportal:login", "/api/v1/property/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("pmportal:register", "/api/v1/project-client/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("pmportal:login", "/api/v1/project-client/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("pmportal:invite", "/api/v1/project-client/portal/auth/invite-info", 30, 10 * 60 * 1_000L),
 
             // FIX (guard device lockdown): a 6-digit code (1,000,000
             // possibilities) is the sole scoping mechanism on this public

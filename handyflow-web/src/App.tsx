@@ -78,6 +78,10 @@ import { PayrollBureauPortalClientDetailPage }  from "./pages/payroll-bureau-por
 // ── Projects module ────────────────────────────────────────────────────────────
 import { ProjectsPage }     from "./pages/projects/ProjectsPage"
 import { ClientPortalPage }  from "./pages/projects/ClientPortalPage"
+import { ClientPortalLoginPage }        from "./pages/projects/client-portal/ClientPortalLoginPage"
+import { ClientPortalAcceptInvitePage } from "./pages/projects/client-portal/ClientPortalAcceptInvitePage"
+import { ClientPortalHomePage }         from "./pages/projects/client-portal/ClientPortalHomePage"
+import { ClientPortalProjectPage }      from "./pages/projects/client-portal/ClientPortalProjectPage"
 import { RecipientTransmittalPage }   from "./pages/projects/RecipientTransmittalPage"
 import { CollaboratorWorkspacePage }  from "./pages/projects/CollaboratorWorkspacePage"
 import { EarthMovingPage } from "./pages/earthmoving/EarthMovingPage"
@@ -166,6 +170,12 @@ function BookingAgencyPortalProtectedRoute({ children }: { children: React.React
   return <>{children}</>
 }
 
+function ProjectClientPortalProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = usePortalAuthStore(s => s.token)
+  if (!token) return <Navigate to="/projects/client-portal/login" replace />
+  return <>{children}</>
+}
+
 function PortalProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = usePortalAuthStore(s => s.token)
   if (!token) return <Navigate to="/accountant/portal/login" replace />
@@ -225,6 +235,10 @@ export default function App() {
           <Route path="/verify-document"           element={<VerifyDocumentPage />} />
           <Route path="/account-locked"            element={<AccountLockedPage />} />
 
+          <Route path="/projects/client-portal/login" element={<ClientPortalLoginPage />} />
+          <Route path="/projects/client-portal/accept-invite" element={<ClientPortalAcceptInvitePage />} />
+          <Route path="/projects/client-portal" element={<ProjectClientPortalProtectedRoute><ClientPortalHomePage /></ProjectClientPortalProtectedRoute>} />
+          <Route path="/projects/client-portal/projects/:projectId" element={<ProjectClientPortalProtectedRoute><ClientPortalProjectPage /></ProjectClientPortalProtectedRoute>} />
           <Route path="/projects/portal/:token" element={<ClientPortalPage />} />
           <Route path="/portal/:token" element={<ClientPortalPage />} />
           <Route path="/secure/share/:token" element={<RecipientTransmittalPage />} />

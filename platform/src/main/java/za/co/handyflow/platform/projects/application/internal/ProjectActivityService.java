@@ -65,7 +65,7 @@ public class ProjectActivityService {
               SELECT 'ISSUE', i.issue_number || ' resolved', LEFT(i.resolution, 300), i.resolved_by_name, i.resolved_at, i.id
                 FROM project_issues i WHERE i.tenant_id = ? AND i.project_id = ? AND i.resolved_at IS NOT NULL
               UNION ALL
-              SELECT CASE a.kind WHEN 'DETAILS_EDITED' THEN 'DETAILS' ELSE 'CONTRACT' END, a.summary, a.detail, a.actor_name, a.occurred_at, a.id
+              SELECT CASE WHEN a.kind = 'DETAILS_EDITED' THEN 'DETAILS' WHEN a.kind LIKE 'CLIENT%' THEN 'CLIENT' ELSE 'CONTRACT' END, a.summary, a.detail, a.actor_name, a.occurred_at, a.id
                 FROM project_activity a WHERE a.tenant_id = ? AND a.project_id = ?
             ) x
             WHERE x.at IS NOT NULL AND (?::timestamptz IS NULL OR x.at < ?::timestamptz)

@@ -65,8 +65,8 @@ public class ProjectNotificationListener {
         notifications.send(NotificationRequest.builder()
                 .tenantId(tenant).type(e.event().type()).channels(channels)
                 .title(e.title()).message(e.message())
-                .actionUrl("/projects/projects?project=" + e.projectId())
-                .sourceModule("projects").sourceEntityId(e.entityId() == null ? e.projectId().toString() : e.entityId().toString())
+                .actionUrl(e.projectId() == null ? "/projects/client-access" : "/projects/projects?project=" + e.projectId())
+                .sourceModule("projects").sourceEntityId(e.entityId() != null ? e.entityId().toString() : String.valueOf(e.projectId()))
                 .recipients(to).build());
     }
 }

@@ -16,6 +16,7 @@ import { RfiTab }           from './tabs/RfiTab'
 import { ChangeOrdersTab }  from './tabs/ChangeOrdersTab'
 import { TimeTab }          from './tabs/TimeTab'
 import { PortalAccessTab }  from './tabs/PortalAccessTab'
+import { ClientInbox }      from './tabs/ClientInbox'
 import { TransmittalsTab }  from './tabs/TransmittalsTab'
 import { LifecycleActions, LifecycleTab } from './tabs/Lifecycle'
 import { EditProjectButton, OverviewExtras } from './ProjectInfo'
@@ -177,7 +178,7 @@ export function ProjectDetailTab({ projectId, onBack }: { projectId:string; onBa
         {tab==='changes'    && <ChangeOrdersTab projectId={project.id}/>}
         {tab==='time'       && <TimeTab       projectId={project.id} editable={!['CLOSED','CANCELLED','COMPLETED'].includes(project.status)}/>}
         {tab==='transmittals' && <TransmittalsTab projectId={project.id}/>}
-        {tab==='portal'     && <PortalAccessTab projectId={project.id} clientName={project.clientName} currentToken={project.clientPortalToken}/>}
+        {tab==='portal'     && <><ClientInbox projectId={project.id}/><PortalAccessTab projectId={project.id} clientName={project.clientName} currentToken={project.clientPortalToken}/></>}
         {tab==='lifecycle'  && <LifecycleTab  projectId={project.id} status={project.status}/>}
       </TabErrorBoundary>
     </div>

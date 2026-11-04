@@ -42,7 +42,7 @@ export function PortalAccessTab({ projectId, clientName, currentToken }: { proje
     <div style={{ display: 'grid', gap: 14, maxWidth: 820 }}>
       <div style={card}>
         <SectionTitle right={s.accessible ? <Pill tone="success">Link works</Pill> : expired ? <Pill tone="danger">Link expired</Pill> : <Pill tone="neutral">Switched off</Pill>}>
-          Client portal{clientName ? ` for ${clientName}` : ''}</SectionTitle>
+          Read-only link{clientName ? ` for ${clientName}` : ''}</SectionTitle>
         <div style={{ fontSize: 13, lineHeight: 1.6 }}>
           {s.enabled ? <>Access is <b>on</b>. </> : <>Access is <b>off</b> — the link shows nothing. </>}
           {s.expiresAt ? <>The link {expired ? 'expired' : 'expires'} {when(s.expiresAt)}{!expired && days != null && days <= 30 ? <b> ({days} day{days === 1 ? '' : 's'} left)</b> : null}.</> : <>The link never expires.</>}
@@ -71,14 +71,15 @@ export function PortalAccessTab({ projectId, clientName, currentToken }: { proje
       )}
 
       <div style={card}>
-        <SectionTitle><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><ShieldCheck size={15} /> What the client sees</span></SectionTitle>
+        <SectionTitle><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><ShieldCheck size={15} /> What the link shows</span></SectionTitle>
         <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.7 }}>
           <li>Project name, status, health, start and end dates and overall progress</li>
           <li>Milestones and their dates</li>
           <li>Open snags and red-rated risks</li>
           <li>Documents that are approved and marked visible to the client, with a download where a file is stored</li>
         </ul>
-        <div style={{ ...muted, marginTop: 8 }}>Budgets, costs, change order values, internal tasks and team members are never shown.</div>
+        <div style={{ ...muted, marginTop: 8 }}>Budgets, costs, change order values, internal tasks and team members are never shown on the link.
+          Named client logins (Projects › Client logins) also see approved change orders with their value and time effect, so they can approve or dispute them, and can send questions and files. Costs stay hidden there too.</div>
       </div>
 
       {rotating && <RotateDialog projectId={projectId} onClose={() => setRotating(false)} onIssued={t => { setIssued(t); refresh() }} />}

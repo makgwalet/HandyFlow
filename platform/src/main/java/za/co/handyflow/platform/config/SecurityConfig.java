@@ -151,6 +151,9 @@ public class SecurityConfig {
                                 // the fact — same narrow /portal/auth/**
                                 // convention as every entry above.
                                 "/api/v1/property/portal/auth/**",
+                                // Projects client portal (patch 0573): named client logins on the shared portal_users
+                                // identity. Only /auth/** is public; /portal/me/** needs the portal JWT.
+                                "/api/v1/project-client/portal/auth/**",
                                 // FIX (identity module modernization): the
                                 // main-app team-invitation flow was
                                 // completely unreachable. UserController's

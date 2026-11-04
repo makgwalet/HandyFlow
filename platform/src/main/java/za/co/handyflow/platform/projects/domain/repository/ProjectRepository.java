@@ -110,6 +110,27 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     List<Project> findByClient(@Param("tenantId") UUID tenantId,
                                @Param("clientId") UUID clientId);
 
+    /** Projects whose typed client name matches (pass the name trimmed and lower-cased). Cancelled ones excluded. */
+    @Query("""
+            SELECT p FROM Project p
+            WHERE p.tenantId = :tenantId
+              AND LOWER(TRIM(p.clientName)) = :name
+              AND p.status <> 'CANCELLED'
+            ORDER BY p.createdAt DESC
+            """)
+    List<Project> findByClientNameNormalised(@Param("tenantId") UUID tenantId,
+                                             @Param("name") String normalisedName);
+
+    /** Every non-cancelled project that names a client, for choosing whom to give portal access. */
+    @Query("""
+            SELECT p FROM Project p
+            WHERE p.tenantId = :tenantId
+              AND (p.clientId IS NOT NULL OR (p.clientName IS NOT NULL AND TRIM(p.clientName) <> ''))
+              AND p.status <> 'CANCELLED'
+            ORDER BY p.clientName, p.createdAt DESC
+            """)
+    List<Project> findWithClient(@Param("tenantId") UUID tenantId);
+
     @Query("""
             SELECT p FROM Project p
             WHERE p.tenantId = :tenantId

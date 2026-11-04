@@ -24,7 +24,7 @@ import {
   Database, CalendarRange, MessageSquare, Send, BookOpen as BookIcon,
   UserCheck, Palette, Headphones, Wallet, Receipt, CheckSquare, LayoutGrid, ListChecks, Sprout, FlaskConical,
   Columns3, Zap, History, Plug, Filter, Copy, SlidersHorizontal, Tags, Target, Ruler,
-  UserPlus, Mail,
+  UserPlus, Mail, KeyRound,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -1009,6 +1009,7 @@ export const PROJECTS_SECTIONS: ModuleSections = {
       label: 'External access',
       sections: [
         { id: 'collaborators', label: 'Collaborators', icon: UserCheck, permission: 'PM_READ' },
+        { id: 'client-access', label: 'Client logins', icon: KeyRound, permission: 'PM_WRITE' },
       ],
     },
   ],

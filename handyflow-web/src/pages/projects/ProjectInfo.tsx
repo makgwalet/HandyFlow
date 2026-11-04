@@ -2,7 +2,7 @@
 // Editing a project's details, its recent activity, and the contracts linked to it (shown under the Overview tab).
 import { useState } from 'react'
 import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
-import { Activity, FileSignature, Link2, Plus, Unlink, ExternalLink, Flag, GitPullRequest, MessageSquare, FileText, Users, Wallet, AlertTriangle, Pencil } from 'lucide-react'
+import { Activity, FileSignature, Link2, Plus, Unlink, ExternalLink, Flag, GitPullRequest, MessageSquare, FileText, Users, Wallet, AlertTriangle, Pencil, UserRound } from 'lucide-react'
 import { apiClient } from '../../api/client'
 import { usePermission, usePermissions } from '../../hooks/usePermission'
 import { toast } from '../../store/toast.store'
@@ -115,9 +115,9 @@ export function EditProjectButton({ project }: { project: Project }) {
 
 interface ActivityItem { kind: string; summary: string; detail: string | null; actorName: string | null; at: string; refId: string | null }
 const KIND_ICON: Record<string, typeof Activity> = { STATUS: Flag, CHANGE_ORDER: GitPullRequest, RFI: MessageSquare, DOCUMENT: FileText, MEMBER: Users,
-  BUDGET: Wallet, ISSUE: AlertTriangle, DETAILS: Pencil, CONTRACT: FileSignature }
+  BUDGET: Wallet, ISSUE: AlertTriangle, DETAILS: Pencil, CONTRACT: FileSignature, CLIENT: UserRound }
 const KIND_LABEL: Record<string, string> = { STATUS: 'Status', CHANGE_ORDER: 'Change orders', RFI: 'RFIs', DOCUMENT: 'Documents', MEMBER: 'Members',
-  BUDGET: 'Budget', ISSUE: 'Issues', DETAILS: 'Details', CONTRACT: 'Contracts' }
+  BUDGET: 'Budget', ISSUE: 'Issues', DETAILS: 'Details', CONTRACT: 'Contracts', CLIENT: 'Client portal' }
 
 export function ActivityFeed({ projectId }: { projectId: string }) {
   const [kind, setKind] = useState('')

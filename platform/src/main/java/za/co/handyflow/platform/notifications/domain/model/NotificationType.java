@@ -467,7 +467,11 @@ public enum NotificationType {
     PM_ACTION_ASSIGNED(INFO, Set.of(IN_APP, EMAIL)),
     PM_ACTION_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
     PM_PROJECT_PROPOSED(INFO, Set.of(IN_APP, EMAIL)),
-    PM_PROJECT_DECIDED(INFO, Set.of(IN_APP, EMAIL));
+    PM_PROJECT_DECIDED(INFO, Set.of(IN_APP, EMAIL)),
+    // Projects client portal (patch 0573)
+    PM_CLIENT_REQUEST(INFO, Set.of(IN_APP, EMAIL)),
+    PM_CLIENT_CO_DECISION(WARNING, Set.of(IN_APP, EMAIL)),
+    PM_CLIENT_UPLOAD(INFO, Set.of(IN_APP, EMAIL));
 
     private final NotificationSeverity defaultSeverity;
     private final Set<NotificationChannel> defaultChannels;

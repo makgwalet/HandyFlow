@@ -12,6 +12,7 @@ import { ProjectDetailTab } from "./ProjectDetailTab"
 import { CollaboratorsPage } from "./CollaboratorsPage"
 import { ProjectReportsPage } from "./ProjectReportsPage"
 import { NotificationSettingsPage } from "./NotificationSettingsPage"
+import { ClientAccessPage } from "./ClientAccessPage"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -43,6 +44,7 @@ export function ProjectsPage() {
           case "collaborators": return <CollaboratorsPage />
           case "reports":       return <ProjectReportsPage onOpen={openProject} />
           case "notifications": return <NotificationSettingsPage />
+          case "client-access": return <ClientAccessPage />
           default:          return null
         }
       }} />

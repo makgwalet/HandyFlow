@@ -20,7 +20,10 @@ public enum PmEvent {
     ACTION_ASSIGNED("An action item is assigned to you", false, NotificationType.PM_ACTION_ASSIGNED),
     ACTION_OVERDUE("Your action item is overdue", true, NotificationType.PM_ACTION_OVERDUE),
     PROJECT_PROPOSED("A project is submitted for approval (sponsor)", true, NotificationType.PM_PROJECT_PROPOSED),
-    PROJECT_DECIDED("A project you manage was approved or returned", true, NotificationType.PM_PROJECT_DECIDED);
+    PROJECT_DECIDED("A project you manage was approved or returned", true, NotificationType.PM_PROJECT_DECIDED),
+    CLIENT_REQUEST("A client sent a question, change request or new-project request (project managers)", true, NotificationType.PM_CLIENT_REQUEST),
+    CLIENT_CO_DECISION("A client approved or disputed a change order (project managers and its originator)", true, NotificationType.PM_CLIENT_CO_DECISION),
+    CLIENT_UPLOAD("A client sent a file for review (project managers and document controllers)", false, NotificationType.PM_CLIENT_UPLOAD);
 
     private final String label;
     private final boolean emailByDefault;

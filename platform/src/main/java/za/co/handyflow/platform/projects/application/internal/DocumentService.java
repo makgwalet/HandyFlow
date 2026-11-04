@@ -194,6 +194,26 @@ public class DocumentService {
     @Transactional
     public ProjectDocument registerFile(TenantId tenantId, UUID projectId, RegisterFileRequest meta,
                                         MultipartFile file, UUID uploadedBy, String uploadedByName) {
+        byte[] bytes = screen(file);
+        String name = DocumentRules.safeFileName(file.getOriginalFilename());
+
+        String declared = file.getContentType();
+        String contentType = (declared == null || declared.isBlank()) ? null
+                : (declared.length() > 150 ? declared.substring(0, 150) : declared.trim());
+        int sizeKb = (int) Math.max(1L, (bytes.length + 1023L) / 1024L);
+        StoredUpload upload = new StoredUpload(file, name, DocumentRules.sha256(bytes), contentType, sizeKb);
+
+        Registration reg = new Registration(meta.documentType(), meta.documentNumber(), meta.title(), meta.revision(),
+                null, name, sizeKb, meta.description(), meta.visibility());
+        return register(tenantId, projectId, reg, upload, uploadedBy, uploadedByName);
+    }
+
+    /**
+     * The checks every incoming file passes before it is stored anywhere: present, within the size limit, not an executable or
+     * script (by name and by content), and not rejected by the malware scan (nor unscanned when scanning is required).
+     * Returns the bytes. Also used for files clients send through the portal, so they are screened on arrival.
+     */
+    public byte[] screen(MultipartFile file) {
         if (file == null || file.isEmpty()) throw bad("A file is required", "FILE_REQUIRED");
         if (file.getSize() > maxFileBytes) {
             throw new HandyFlowException(
@@ -225,16 +245,7 @@ public class DocumentService {
             throw new HandyFlowException("The file could not be scanned, so it was not stored. Try again shortly.",
                     HttpStatus.SERVICE_UNAVAILABLE, "SCAN_UNAVAILABLE");
         }
-
-        String declared = file.getContentType();
-        String contentType = (declared == null || declared.isBlank()) ? null
-                : (declared.length() > 150 ? declared.substring(0, 150) : declared.trim());
-        int sizeKb = (int) Math.max(1L, (bytes.length + 1023L) / 1024L);
-        StoredUpload upload = new StoredUpload(file, name, DocumentRules.sha256(bytes), contentType, sizeKb);
-
-        Registration reg = new Registration(meta.documentType(), meta.documentNumber(), meta.title(), meta.revision(),
-                null, name, sizeKb, meta.description(), meta.visibility());
-        return register(tenantId, projectId, reg, upload, uploadedBy, uploadedByName);
+        return bytes;
     }
 
     /** The one place a revision enters the register. All checks run BEFORE any file is stored. */
