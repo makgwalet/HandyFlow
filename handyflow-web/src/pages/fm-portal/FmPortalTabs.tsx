@@ -6,6 +6,7 @@ import { color, space } from "../accountant-portal/portal-theme"
 import { PORTAL_CATEGORIES, PORTAL_STATUS, QUOTE_STATUS, INVOICE_STATUS, addressLine, canWithdraw, declineProblem, dueNote, emptyRaise, labelOf, raiseBody, raiseProblem, slaNote, type RaiseForm } from "../facilitiesmanagement/fm.logic"
 import { Search } from "lucide-react"
 import { Chip, Field, Modal, btn, day, empty, errText, inputStyle, money, panel, sub, td, th } from "./portalKit"
+import { MapLink, TrackModal } from "./FmPortalExtras"
 import { REQUEST_STATUS_FILTERS, filterRequests, nextInvoiceDue, owingInvoices } from "./portalStats"
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -13,7 +14,7 @@ const useSites = (cid: string) => useQuery({ queryKey: ["fm-portal-sites", cid],
 const Err = ({ text }: { text: string }) => text ? <div role="alert" style={{ margin: `${space(2)} 0`, padding: "8px 12px", background: color.redBg, color: color.redText, borderRadius: 8, fontSize: 13 }}>{text}</div> : null
 
 export function RequestsPanel({ cid }: { cid: string }) {
-  const qc = useQueryClient(), [page, setPage] = useState(0), [search, setSearch] = useState(""), [siteF, setSiteF] = useState(""), [groupF, setGroupF] = useState(""), [raising, setRaising] = useState(false), [withdrawing, setWithdrawing] = useState<FmPortalWo | null>(null), [err, setErr] = useState("")
+  const qc = useQueryClient(), [page, setPage] = useState(0), [search, setSearch] = useState(""), [siteF, setSiteF] = useState(""), [groupF, setGroupF] = useState(""), [raising, setRaising] = useState(false), [withdrawing, setWithdrawing] = useState<FmPortalWo | null>(null), [tracking, setTracking] = useState<FmPortalWo | null>(null), [err, setErr] = useState("")
   const sites = useSites(cid)
   const q = useQuery({ queryKey: ["fm-portal-orders", cid, page], queryFn: () => fmPortalApi.orders(cid, page) })
   const refresh = () => { qc.invalidateQueries({ queryKey: ["fm-portal-orders", cid] }); qc.invalidateQueries({ queryKey: ["fm-portal-summary", cid] }) }
@@ -44,12 +45,13 @@ export function RequestsPanel({ cid }: { cid: string }) {
                   <td style={{ ...td, maxWidth: 320 }}>{w.description}{w.declineMessage && <div style={{ ...sub, color: color.redText }}>Declined: {w.declineMessage}</div>}</td>
                   <td style={td}>{siteName(w.siteId) || "—"}<div style={sub}>{labelOf(PORTAL_CATEGORIES, w.category)}{w.scheduledDate ? ` · booked ${day(w.scheduledDate)}` : ""}</div></td>
                   <td style={td}><Chip tone={s.tone}>{s.label}</Chip>{w.status !== "COMPLETED" && w.status !== "CANCELLED" && w.status !== "REJECTED" && sl && <div style={{ marginTop: 4 }}><Chip tone={sl.tone}>{sl.text}</Chip></div>}</td>
-                  <td style={{ ...td, textAlign: "right" }}>{canWithdraw(w.status) && <button style={btn(false, true)} onClick={() => setWithdrawing(w)}>Withdraw</button>}</td>
+                  <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}><button style={btn()} aria-label={`Track ${w.workOrderNumber}`} onClick={() => setTracking(w)}>Track</button>{canWithdraw(w.status) && <button style={{ ...btn(false, true), marginLeft: 6 }} onClick={() => setWithdrawing(w)}>Withdraw</button>}</td>
                 </tr>)
             })}</tbody>
           </table>)}
       </div>
       {(q.data?.totalPages ?? 0) > 1 && <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}><button style={btn()} disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</button><button style={btn()} disabled={page + 1 >= (q.data?.totalPages ?? 0)} onClick={() => setPage(page + 1)}>Next</button></div>}
+      {tracking && <TrackModal cid={cid} woId={tracking.id} title={`${tracking.workOrderNumber} · progress`} onClose={() => setTracking(null)} />}
       {raising && <RaiseModal cid={cid} onClose={() => setRaising(false)} onDone={refresh} />}
       {withdrawing && <Modal title="Withdraw this request?" onClose={() => setWithdrawing(null)} footer={<><button style={btn()} onClick={() => setWithdrawing(null)}>Keep it</button><button style={btn(true)} disabled={withdraw.isPending} onClick={() => withdraw.mutate(withdrawing)}>{withdraw.isPending ? "Working…" : "Withdraw"}</button></>}>
         <p style={{ margin: 0, lineHeight: 1.5 }}>{withdrawing.workOrderNumber} will be cancelled. You can only do this while the team has not yet picked it up.</p></Modal>}
@@ -178,7 +180,7 @@ export function SitesPanel({ cid }: { cid: string }) {
     <div style={panel}>
       {q.isError ? <p style={empty}>We could not load your sites.</p> : q.isLoading ? <p style={empty}>Loading…</p> : rows.length === 0 ? <p style={empty}>No sites yet.</p> : (
         <table style={{ width: "100%", borderCollapse: "collapse" }}><thead><tr><th style={th}>Site</th><th style={th}>Address</th><th style={th}>Status</th></tr></thead>
-          <tbody>{rows.map(s => <tr key={s.id}><td style={td}><b>{s.name}</b><div style={sub}>{labelOf([], s.siteType)}</div></td><td style={td}>{addressLine(s.address) || "—"}</td><td style={td}><Chip tone={s.status === "ACTIVE" ? "success" : "neutral"}>{s.status === "ACTIVE" ? "Active" : "Inactive"}</Chip></td></tr>)}</tbody></table>)}
+          <tbody>{rows.map(s => <tr key={s.id}><td style={td}><b>{s.name}</b><div style={sub}>{labelOf([], s.siteType)}</div></td><td style={td}>{addressLine(s.address) || "—"}<div><MapLink address={s.address} /></div></td><td style={td}><Chip tone={s.status === "ACTIVE" ? "success" : "neutral"}>{s.status === "ACTIVE" ? "Active" : "Inactive"}</Chip></td></tr>)}</tbody></table>)}
     </div>
   )
 }

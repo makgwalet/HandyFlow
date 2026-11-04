@@ -41,4 +41,9 @@ public interface FmAssetRepository extends JpaRepository<FmAsset, UUID> {
             ORDER BY a.updatedAt
             """)
     List<FmAsset> findDecommissionedWithoutRetentionClock(org.springframework.data.domain.Pageable page);
+
+    /** Live assets at these sites, for the client portal. {@code siteIds} must never be empty. */
+    @Query("SELECT a FROM FmAsset a WHERE a.tenantId.value = :#{#tenantId.value} AND a.deletedAt IS NULL AND a.siteId IN :siteIds " +
+            "ORDER BY a.name")
+    List<FmAsset> findActiveInSites(@Param("tenantId") TenantId tenantId, @Param("siteIds") Collection<UUID> siteIds);
 }

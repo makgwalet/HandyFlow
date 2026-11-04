@@ -14,6 +14,7 @@ import { FmPortalShell, type Section } from "./FmPortalShell"
 import { Donut } from "./Donut"
 import { activityFeed, nextInvoiceDue, owingInvoices, statusSlices } from "./portalStats"
 import { InvoicesPanel, QuotesPanel, RequestsPanel, SitesPanel } from "./FmPortalTabs"
+import { AssetsPanel, ReportsPanel } from "./FmPortalExtras"
 import { ProfilePanel, SupportPanel } from "./FmPortalHelp"
 
 export function FmPortalHomePage() {
@@ -40,6 +41,8 @@ export function FmPortalHomePage() {
           {section === "quotes" && <><Title text="Quotes" note="Quotes the team has sent you to accept or decline." /><QuotesPanel cid={cid!} /></>}
           {section === "invoices" && <><Title text="Invoices & payments" note="What you have been billed and what is still owing." /><InvoicesPanel cid={cid!} /></>}
           {section === "sites" && <><Title text="Sites" note="The places we look after for you." /><SitesPanel cid={cid!} /></>}
+          {section === "assets" && <><Title text="Equipment" note="The equipment we look after at your sites." /><AssetsPanel cid={cid!} /></>}
+          {section === "reports" && <><Title text="Reports & documents" note="How the service is going, and your invoices and credit notes." /><ReportsPanel cid={cid!} /></>}
           {section === "profile" && <ProfilePanel name={user?.fullName ?? ""} email={user?.email ?? ""} clients={list} onSignOut={signOut} />}
           {section === "support" && <SupportPanel go={setSection} />}
         </>}

@@ -10,6 +10,10 @@ export interface FmPortalSummary { workOrders: Record<string, number>; openWork:
 export interface FmPortalQuote { id: string; quoteNumber: string; siteId: string | null; title: string; description: string | null; status: string; canRespond: boolean; validUntil: string | null; subtotal: number; vatRate: number | null; vatAmount: number; total: number; sentAt: string | null; decidedAt: string | null; decisionNote: string | null; lines: { lineNo: number; description: string; quantity: number; unitPrice: number; lineTotal: number }[] }
 export interface FmPortalInvoice { id: string; invoiceNumber: string; periodStart: string; periodEnd: string; issueDate: string | null; dueDate: string | null; subtotal: number; vatAmount: number; total: number; amountPaid: number; creditedAmount: number | null; balance: number; status: string }
 export interface FmPortalCredit { id: string; creditNoteNumber: string; invoiceId: string; invoiceNumber: string; issueDate: string; reason: string; subtotal: number; vatAmount: number; total: number }
+export interface FmPortalAsset { id: string; siteId: string; assetTag: string | null; name: string; assetType: string | null; location: string | null; manufacturer: string | null; model: string | null; status: string; installDate: string | null; warrantyExpiryDate: string | null }
+export interface FmPortalStep { key: string; label: string; state: 'DONE' | 'CURRENT' | 'PENDING'; at: string | null; note: string | null }
+export interface FmPortalProgress { status: string; steps: FmPortalStep[] }
+export interface FmPortalPhoto { id: string; fileName: string; kind: 'PHOTO' | 'BEFORE_PHOTO' | 'AFTER_PHOTO'; createdAt: string }
 export interface Paged<T> { content: T[]; totalElements: number; totalPages: number; number: number }
 export interface RaiseBody { siteId: string; assetId: string | null; category: string; description: string; safetyImpact: boolean; contactName: string | null }
 
@@ -26,6 +30,11 @@ export const fmPortalApi = {
   summary: (id: string) => c.get<FmPortalSummary>(`${M}/summary`, p(id)).then(r => r.data),
   sites: (id: string) => c.get<Paged<FmPortalSite>>(`${M}/sites`, p(id, { size: 100 })).then(r => r.data),
   orders: (id: string, page: number) => c.get<Paged<FmPortalWo>>(`${M}/work-orders`, p(id, { page, size: 20 })).then(r => r.data),
+  ordersAll: (id: string) => c.get<Paged<FmPortalWo>>(`${M}/work-orders`, p(id, { page: 0, size: 200 })).then(r => r.data),
+  assets: (id: string) => c.get<FmPortalAsset[]>(`${M}/assets`, p(id)).then(r => r.data),
+  progress: (id: string, wo: string) => c.get<FmPortalProgress>(`${M}/work-orders/${wo}/progress`, p(id)).then(r => r.data),
+  photos: (id: string, wo: string) => c.get<FmPortalPhoto[]>(`${M}/work-orders/${wo}/photos`, p(id)).then(r => r.data),
+  photoBlob: (id: string, wo: string, photo: string) => c.get(`${M}/work-orders/${wo}/photos/${photo}`, { ...p(id), responseType: 'blob' }).then(r => r.data as Blob),
   raise: (id: string, b: RaiseBody) => c.post<FmPortalWo>(`${M}/work-orders`, b, p(id)).then(r => r.data),
   withdraw: (id: string, woId: string) => c.delete(`${M}/work-orders/${woId}`, p(id)),
   quotes: (id: string) => c.get<FmPortalQuote[]>(`${M}/quotes`, p(id)).then(r => r.data),

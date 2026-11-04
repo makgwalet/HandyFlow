@@ -63,3 +63,40 @@ export const owingInvoices = (invoices: FmPortalInvoice[]) =>
   invoices.filter(i => i.balance > 0 && !UNPAYABLE.includes(i.status)).sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"))
 /** The unpaid invoice that falls due first, if any. */
 export const nextInvoiceDue = (invoices: FmPortalInvoice[]): FmPortalInvoice | null => owingInvoices(invoices)[0] ?? null
+
+/** A link that opens the address in a map. Sites have no coordinates, so the address is searched instead. */
+export function mapsUrl(address: Record<string, string> | null | undefined): string | null {
+  const text = Object.values(address ?? {}).map(v => (v ?? "").trim()).filter(Boolean).join(", ")
+  return text ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(text)}` : null
+}
+
+export interface ServiceReport {
+  total: number; open: number; completed: number; completedLast90: number
+  avgDaysToFix: number | null; slaMetPct: number | null; byCategory: { category: string; count: number }[]
+}
+const DAY = 86_400_000
+/** Plain numbers for the client's service report, from the work orders the portal already lists. */
+export function serviceReport(rows: FmPortalWo[], now: Date): ServiceReport {
+  const live = rows.filter(w => w.status !== "CANCELLED" && w.status !== "REJECTED")
+  const done = live.filter(w => w.status === "COMPLETED")
+  const days = done.filter(w => w.completedAt).map(w => (Date.parse(w.completedAt!) - Date.parse(w.createdAt)) / DAY).filter(d => d >= 0)
+  const judged = live.filter(w => w.resolutionSla === "MET" || w.resolutionSla === "BREACHED")
+  const cats = new Map<string, number>()
+  live.forEach(w => cats.set(w.category, (cats.get(w.category) ?? 0) + 1))
+  return {
+    total: live.length,
+    open: live.length - done.length,
+    completed: done.length,
+    completedLast90: done.filter(w => w.completedAt && now.getTime() - Date.parse(w.completedAt) <= 90 * DAY).length,
+    avgDaysToFix: days.length ? Math.round((days.reduce((n, d) => n + d, 0) / days.length) * 10) / 10 : null,
+    slaMetPct: judged.length ? Math.round((judged.filter(w => w.resolutionSla === "MET").length / judged.length) * 100) : null,
+    byCategory: [...cats.entries()].map(([category, count]) => ({ category, count })).sort((a, b) => b.count - a.count),
+  }
+}
+
+export const PHOTO_KIND: Record<string, string> = { BEFORE_PHOTO: "Before", AFTER_PHOTO: "After", PHOTO: "Photo" }
+/** Photos in the order a person reads a job: before, then general, then after. */
+export function orderPhotos<T extends { kind: string }>(photos: T[]): T[] {
+  const rank = (k: string) => (k === "BEFORE_PHOTO" ? 0 : k === "PHOTO" ? 1 : 2)
+  return [...photos].sort((a, b) => rank(a.kind) - rank(b.kind))
+}

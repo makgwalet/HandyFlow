@@ -16,6 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPdfService;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPortalDataService;
+import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPortalProgressService;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPortalQuoteService;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPortalRequestService;
 import za.co.handyflow.platform.facilitiesmanagement.application.internal.FmPortalSla;
@@ -52,6 +53,7 @@ public class FmPortalDataController {
     private final FmPortalRequestService portalRequestService;
     private final FmPortalQuoteService portalQuoteService;
     private final FmPdfService pdfService;
+    private final FmPortalProgressService progressService;
 
     @GetMapping("/clients")
     @PreAuthorize("hasAuthority('PORTAL_USER')")
@@ -95,6 +97,39 @@ public class FmPortalDataController {
             @PathVariable UUID id, @RequestParam(required = false) UUID clientId) {
         return ResponseEntity.ok(ApiResponse.success("Request withdrawn",
                 toResponse(portalRequestService.withdraw(getPortalUserId(), clientId, id))));
+    }
+
+    @GetMapping("/assets")
+    @PreAuthorize("hasAuthority('PORTAL_USER')")
+    @Operation(summary = "Equipment at this client's sites (no criticality, serial numbers or staff notes)")
+    public ResponseEntity<ApiResponse<List<FmPortalAssetResponse>>> getMyAssets(@RequestParam(required = false) UUID clientId) {
+        return ResponseEntity.ok(ApiResponse.success(progressService.assets(getPortalUserId(), clientId)));
+    }
+
+    @GetMapping("/work-orders/{id}/progress")
+    @PreAuthorize("hasAuthority('PORTAL_USER')")
+    @Operation(summary = "Step-by-step progress of one of this client's jobs")
+    public ResponseEntity<ApiResponse<FmPortalProgressResponse>> getProgress(@PathVariable UUID id, @RequestParam(required = false) UUID clientId) {
+        return ResponseEntity.ok(ApiResponse.success(progressService.progress(getPortalUserId(), clientId, id)));
+    }
+
+    @GetMapping("/work-orders/{id}/photos")
+    @PreAuthorize("hasAuthority('PORTAL_USER')")
+    @Operation(summary = "Photos of a job: general and before photos, and after photos once the job is done")
+    public ResponseEntity<ApiResponse<List<FmPortalPhotoResponse>>> getPhotos(@PathVariable UUID id, @RequestParam(required = false) UUID clientId) {
+        return ResponseEntity.ok(ApiResponse.success(progressService.photos(getPortalUserId(), clientId, id)));
+    }
+
+    @GetMapping("/work-orders/{id}/photos/{photoId}")
+    @PreAuthorize("hasAuthority('PORTAL_USER')")
+    @Operation(summary = "Download one job photo")
+    public ResponseEntity<byte[]> downloadPhoto(@PathVariable UUID id, @PathVariable UUID photoId, @RequestParam(required = false) UUID clientId) {
+        var file = progressService.photo(getPortalUserId(), clientId, id, photoId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + file.fileName().replace("\"", "") + "\"")
+                .header("X-Content-Type-Options", "nosniff")
+                .contentType(MediaType.parseMediaType(file.contentType()))
+                .body(file.content());
     }
 
     @GetMapping("/summary")

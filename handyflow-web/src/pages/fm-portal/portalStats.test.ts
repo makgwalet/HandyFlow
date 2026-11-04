@@ -53,3 +53,24 @@ describe("invoices owing", () => {
     expect(nextInvoiceDue([])).toBeNull()
   })
 })
+
+import { mapsUrl, orderPhotos, serviceReport } from "./portalStats"
+describe("map link, service report, photo order", () => {
+  it("builds a search link from the address and none when empty", () => {
+    expect(mapsUrl({ street: "1 Main Rd", city: "Pretoria", postalCode: "" })).toBe("https://www.google.com/maps/search/?api=1&query=1%20Main%20Rd%2C%20Pretoria")
+    expect(mapsUrl({})).toBeNull()
+    expect(mapsUrl(null)).toBeNull()
+  })
+  it("summarises work done, speed and SLA", () => {
+    const wo = (o: Record<string, unknown>) => ({ id: "x", workOrderNumber: "W", siteId: "s", assetId: null, category: "PLUMBING", priority: "HIGH", status: "COMPLETED", description: "d", reportedBy: null, scheduledDate: null, completedAt: "2026-10-12T00:00:00Z", createdAt: "2026-10-10T00:00:00Z", declineMessage: null, resolutionDueAt: null, resolutionSla: "MET", ...o }) as never
+    const r = serviceReport([wo({}), wo({ completedAt: "2026-10-14T00:00:00Z", resolutionSla: "BREACHED", category: "ELECTRICAL" }), wo({ status: "OPEN", completedAt: null, resolutionSla: "ON_TRACK" }), wo({ status: "CANCELLED" })], new Date("2026-11-04T00:00:00Z"))
+    expect(r.total).toBe(3); expect(r.open).toBe(1); expect(r.completed).toBe(2); expect(r.completedLast90).toBe(2)
+    expect(r.avgDaysToFix).toBe(3); expect(r.slaMetPct).toBe(50); expect(r.byCategory[0]).toEqual({ category: "PLUMBING", count: 2 })
+  })
+  it("gives null averages with nothing to average", () => {
+    const r = serviceReport([], new Date()); expect(r.avgDaysToFix).toBeNull(); expect(r.slaMetPct).toBeNull(); expect(r.total).toBe(0)
+  })
+  it("orders photos before, general, after", () => {
+    expect(orderPhotos([{ kind: "AFTER_PHOTO" }, { kind: "PHOTO" }, { kind: "BEFORE_PHOTO" }]).map(p => p.kind)).toEqual(["BEFORE_PHOTO", "PHOTO", "AFTER_PHOTO"])
+  })
+})

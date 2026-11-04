@@ -1,17 +1,20 @@
 // The portal frame: a dark sidebar on a computer, a bottom bar on a phone, and a top strip with who is signed in.
-import type { ReactNode } from "react"
-import { Building2, FileText, HelpCircle, LayoutDashboard, LogOut, MapPin, Receipt, User, Wrench } from "lucide-react"
+import { useState, type ReactNode } from "react"
+import { Building2, FileText, HelpCircle, LayoutDashboard, BarChart3, LogOut, MapPin, MoreHorizontal, Cog, Receipt, User, Wrench } from "lucide-react"
 import { color, space, type } from "../accountant-portal/portal-theme"
 import { initialOf } from "./portalKit"
 
-export type Section = "dashboard" | "requests" | "quotes" | "invoices" | "sites" | "profile" | "support"
+export type Section = "dashboard" | "requests" | "quotes" | "invoices" | "sites" | "assets" | "reports" | "profile" | "support"
 const NAV: { key: Section; label: string; short: string; Icon: typeof Wrench }[] = [
   { key: "dashboard", label: "Dashboard", short: "Home", Icon: LayoutDashboard },
   { key: "requests", label: "Service Requests", short: "Requests", Icon: Wrench },
   { key: "quotes", label: "Quotes", short: "Quotes", Icon: FileText },
   { key: "invoices", label: "Invoices & Payments", short: "Invoices", Icon: Receipt },
   { key: "sites", label: "Sites", short: "Sites", Icon: MapPin },
+  { key: "assets", label: "Equipment", short: "Equipment", Icon: Cog },
+  { key: "reports", label: "Reports & Documents", short: "Reports", Icon: BarChart3 },
 ]
+const MOBILE_MAIN: Section[] = ["dashboard", "requests", "quotes", "invoices"]
 const LOWER: { key: Section; label: string; Icon: typeof Wrench }[] = [
   { key: "profile", label: "Profile", Icon: User },
   { key: "support", label: "Help & Support", Icon: HelpCircle },
@@ -38,6 +41,7 @@ export function FmPortalShell({ section, go, userName, clientName, clients, clie
   clients: { id: string; name: string }[]; clientId: string; onClient: (id: string) => void
   onLogout: () => void; badges: Partial<Record<Section, number>>; children: ReactNode
 }) {
+  const [more, setMore] = useState(false)
   const item = (key: Section, label: string, Icon: typeof Wrench) => (
     <button key={key} className="fmp-item" aria-current={section === key ? "page" : undefined} onClick={() => go(key)}>
       <Icon size={18} /><span style={{ flex: 1 }}>{label}</span>
@@ -77,8 +81,12 @@ export function FmPortalShell({ section, go, userName, clientName, clients, clie
       </div>
 
       <nav className="fmp-bottom" aria-label="Portal menu">
-        {NAV.map(n => <button key={n.key} aria-current={section === n.key ? "page" : undefined} onClick={() => go(n.key)}><n.Icon size={20} />{n.short}</button>)}
-        <button aria-current={section === "profile" || section === "support" ? "page" : undefined} onClick={() => go("support")}><HelpCircle size={20} />Help</button>
+        {NAV.filter(n => MOBILE_MAIN.includes(n.key)).map(n => <button key={n.key} aria-current={section === n.key ? "page" : undefined} onClick={() => go(n.key)}><n.Icon size={20} />{n.short}</button>)}
+        <button aria-expanded={more} aria-current={!MOBILE_MAIN.includes(section) ? "page" : undefined} onClick={() => setMore(!more)}><MoreHorizontal size={20} />More</button>
+        {more && <div role="menu" aria-label="More" style={{ position: "absolute", right: 8, bottom: "calc(100% + 6px)", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 6, minWidth: 190, boxShadow: "0 8px 24px rgba(0,0,0,.18)" }}>
+          {[...NAV.filter(n => !MOBILE_MAIN.includes(n.key)), { key: "profile" as Section, label: "Profile", Icon: User }, { key: "support" as Section, label: "Help & Support", Icon: HelpCircle }].map(n =>
+            <button role="menuitem" key={n.key} onClick={() => { setMore(false); go(n.key) }} style={{ display: "flex", flexDirection: "row", gap: 10, width: "100%", fontSize: 14, padding: "10px 12px", justifyContent: "flex-start" }}><n.Icon size={18} />{n.label}</button>)}
+        </div>}
       </nav>
     </div>
   )
