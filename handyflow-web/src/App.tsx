@@ -49,6 +49,7 @@ import { LegalPracticePage } from "./pages/legalpractice/LegalPracticePage"
 import { InsuranceBrokeragePage } from "./pages/insurance-brokerage/InsuranceBrokeragePage"
 import { BookingsPage }                 from './pages/bookings/BookingsPage'
 import { HrPage }                       from './pages/hr/HrPage'
+import EmployeeRegistrationPage         from './pages/hr/EmployeeRegistrationPage'
 import { ClinicPage }                   from './pages/clinic/ClinicPage'
 import ConsultationWorkspacePage        from './pages/clinic/ConsultationWorkspacePage'
 import VideoDockProvider                from './pages/clinic/VideoDockProvider'
@@ -380,6 +381,7 @@ export default function App() {
             <Route path="/insurance/:section?" element={<InsurancePage />} />
             <Route path="/insurance-brokerage/:section?" element={<InsuranceBrokeragePage />} />
             <Route path="/settings"    element={<SettingsPage />} />
+            <Route path="/hr/employees/new" element={<EmployeeRegistrationPage />} />
             <Route path="/hr/:section?" element={<HrPage />} />
             <Route path="/clinic/consult/:appointmentId" element={<ConsultationWorkspacePage />} />
             <Route path="/clinic/:section?" element={<ClinicPage />} />

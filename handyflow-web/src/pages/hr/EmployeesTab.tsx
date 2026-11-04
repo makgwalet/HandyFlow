@@ -6,7 +6,8 @@
 // 4. Edit employee modal
 // 5. Status SUSPENDED added
 // 6. Rejection reason on terminate
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
 import MedicalSchemeModal from "./MedicalSchemeModal"
 import EmployeeBenefitsModal from "./EmployeeBenefitsModal"
 import PayAdjustmentsModal from "./PayAdjustmentsModal"
@@ -16,7 +17,7 @@ import { apiClient } from "../../api/client"
 import { useAuth } from "../../hooks/useAuth"
 import ForeignIdentityFields from "./ForeignIdentityFields"
 import EmployeeProfileModal from "./EmployeeProfileModal"
-import { EMPTY_FOREIGN, EXPIRING_FILTERS, anyForeign, endingBadge, expiringParam, expiryState, expiryText, foreignBody, foreignProblem, fromServer, permitLabel, type ForeignBody } from "./foreignIdentity.logic"
+import { EMPTY_FOREIGN, EXPIRING_FILTERS, endingBadge, expiringParam, expiryState, expiryText, foreignBody, fromServer, permitLabel, type ForeignBody } from "./foreignIdentity.logic"
 import { END_TYPES, employeeRights, terminationProblem, terminationQuery, today } from "./employees.logic"
 import { ApprovalsModal, HistoryModal, ReportingModal, RequestChangeModal } from "./EmployeeChanges"
 import { Plus, X, Search, Users, AlertTriangle, AlertCircle, Edit2, UserX } from "lucide-react"
@@ -91,10 +92,10 @@ const EMPTY_FORM = {
 
 export default function EmployeesTab() {
   const qc = useQueryClient()
+  const nav = useNavigate(), location = useLocation()
   const [search, setSearch]         = useState("")
   const [filterStatus, setFilter]   = useState("ALL")
   const [ending, setEnding]         = useState("")
-  const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing]       = useState<Employee | null>(null)
   const [selected, setSelected]     = useState<Employee | null>(null)
   const [profileOf, setProfileOf]     = useState<Employee | null>(null)
@@ -108,6 +109,10 @@ export default function EmployeesTab() {
   const [endType, setEndType]       = useState("")
   const [noticeOn, setNoticeOn]       = useState("")
   const [outcome, setOutcome]         = useState("")
+  useEffect(() => {
+    const st = location.state as { registered?: string; schemeFailed?: string } | null
+    if (st?.registered) { setOutcome(`${st.registered} was registered.${st.schemeFailed ? ` The medical scheme was not saved (${st.schemeFailed}). Add it from the employee's Medical scheme button.` : ""}`); nav(location.pathname, { replace: true, state: null }) }
+  }, [location, nav])
   const { user } = useAuth() as { user?: { permissions?: string[] } }
   const rights = employeeRights(user?.permissions ?? [])
   const [changeFor, setChangeFor]   = useState<{ kind: "pay" | "bank"; emp: Employee } | null>(null)
@@ -138,12 +143,6 @@ export default function EmployeesTab() {
     queryFn: async () => unwrapList(await apiClient.get("/api/v1/hr/employee-changes/pending")),
   })
 
-  const createEmployee = useMutation({
-    mutationFn: (body: any) => apiClient.post("/api/v1/hr/employees", body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["hr-employees"] }); setShowCreate(false); setForm(EMPTY_FORM); setError(""); setIdState({ valid: null, msg: "" }) },
-    onError: (e: any) => { const d = e.response?.data; if (d?.errors) setFieldErrors(d.errors); else setError(d?.message ?? "Failed to register employee") },
-  })
-
   const updateEmployee = useMutation({
     mutationFn: ({ id, body }: { id: string; body: any }) => apiClient.put(`/api/v1/hr/employees/${id}`, body),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["hr-employees"] }); setEditing(null); setForm(EMPTY_FORM); setError("") },
@@ -172,36 +171,6 @@ export default function EmployeesTab() {
       }
     } else { setIdState({ valid: null, msg: "" }) }
   }
-
-  const validate = () => {
-    const errs: Record<string, string> = {}
-    if (!form.firstName.trim()) errs.firstName = "Required"
-    if (!form.lastName.trim())  errs.lastName  = "Required"
-    if (!form.startDate)        errs.startDate = "Required"
-    if (!form.grossSalary || isNaN(Number(form.grossSalary))) errs.grossSalary = "Valid amount required"
-    if (form.idNumber?.length === 13 && !validateSaId(form.idNumber).valid) errs.idNumber = "Invalid SA ID"
-    const fp = foreignProblem(form.foreign, editing ? undefined : form.startDate)
-    if (fp) errs.foreign = fp
-    setFieldErrors(errs); return Object.keys(errs).length === 0
-  }
-
-  const toBody = (f: typeof EMPTY_FORM) => ({
-    firstName: f.firstName, lastName: f.lastName,
-    idNumber: f.idNumber || null, taxNumber: f.taxNumber || null,
-    dateOfBirth: f.dateOfBirth || null, gender: f.gender || null, race: f.race || null,
-    email: f.email || null, phone: f.phone || null,
-    startDate: f.startDate, employmentType: f.employmentType,
-    jobTitle: f.jobTitle || null, department: f.department || null,
-    grossSalary: Number(f.grossSalary), payFrequency: f.payFrequency,
-    bankName: f.bankName || null, bankAccountNumber: f.bankAccountNumber || null, bankBranchCode: f.bankBranchCode || null,
-    medicalAidContribution: f.medicalAidContribution ? Number(f.medicalAidContribution) : 0,
-    pensionContribution:    f.pensionContribution    ? Number(f.pensionContribution)    : 0,
-    travelAllowance:        f.travelAllowance        ? Number(f.travelAllowance)        : 0,
-    emergencyContactName:  f.emergencyContactName  || null,
-    emergencyContactPhone: f.emergencyContactPhone || null,
-    notes: f.notes || null,
-    ...(anyForeign(f.foreign) ? { foreign: foreignBody(f.foreign) } : {}),
-  })
 
   // Editing sends working details only. Pay and bank details change through a request that someone else approves.
   const toEditBody = (f: typeof EMPTY_FORM, withPersonal: boolean) => ({
@@ -423,7 +392,7 @@ export default function EmployeesTab() {
             Pay & bank changes{(waiting as unknown[]).length ? ` (${(waiting as unknown[]).length} waiting)` : ""}
           </button>
         )}
-        {rights.manage && <button onClick={() => { setShowCreate(true); setForm(EMPTY_FORM); setFieldErrors({}); setError(""); setIdState({ valid: null, msg: "" }) }}
+        {rights.manage && <button onClick={() => nav("/hr/employees/new")}
           style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Add Employee
         </button>}
@@ -560,16 +529,6 @@ export default function EmployeesTab() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Create modal */}
-      {showCreate && (
-        <Overlay onClose={() => setShowCreate(false)}>
-          <MHead title="Register Employee" onClose={() => setShowCreate(false)} />
-          <EmployeeForm />
-          {error && <ErrBanner msg={error} />}
-          <MFoot onCancel={() => setShowCreate(false)} onSubmit={() => { if (validate()) createEmployee.mutate(toBody(form)) }} loading={createEmployee.isPending} label="Register Employee" />
-        </Overlay>
       )}
 
       {/* Edit modal */}
