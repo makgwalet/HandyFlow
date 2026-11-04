@@ -1,4 +1,5 @@
 // src/pages/hr/HrDashboard.tsx
+import { payrollCard } from "./hrDashboard.logic"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Users, Calendar, DollarSign, AlertOctagon, ArrowRight, AlertTriangle, CheckCircle, Clock } from "lucide-react"
@@ -32,7 +33,8 @@ export default function HrDashboard({ onNavigate }: { onNavigate: (section: stri
 
   const active      = emps.filter(e => e.status === "ACTIVE")
   const pendingLeave = leaves.filter(l => l.status === "PENDING")
-  const lastPayRun  = prs[0]
+  const card        = payrollCard(prs)
+  const lastPayRun  = card.run
 
   // Department breakdown
   const deptMap: Record<string, number> = {}
@@ -46,7 +48,7 @@ export default function HrDashboard({ onNavigate }: { onNavigate: (section: stri
   const kpis = [
     { label: "Active employees",   value: active.length,          color: "var(--hf-primary-text)", bg: "var(--hf-info-soft)",  icon: Users,        tab: "employees" },
     { label: "Pending leave",      value: pendingLeave.length,    color: pendingLeave.length > 0 ? "var(--hf-warning-text)" : "var(--hf-success-text-strong)", bg: pendingLeave.length > 0 ? "var(--hf-warning-soft)" : "var(--hf-success-soft-strong)", icon: Calendar, tab: "leave" },
-    { label: "Payroll this month", value: lastPayRun ? fmtR(lastPayRun.totalNet) : "—", color: "var(--hf-accent-text)", bg: "var(--hf-success-soft)", icon: DollarSign, tab: "payroll" },
+    { label: card.label, value: lastPayRun ? fmtR(lastPayRun.totalNet) : "—", color: "var(--hf-accent-text)", bg: "var(--hf-success-soft)", icon: DollarSign, tab: "payroll" },
     { label: "Employees on leave", value: leaves.filter(l => l.status === "APPROVED" && new Date(l.startDate) <= new Date() && new Date(l.endDate) >= new Date()).length, color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", icon: Calendar, tab: "leave" },
   ]
 
@@ -152,7 +154,7 @@ export default function HrDashboard({ onNavigate }: { onNavigate: (section: stri
           {/* Last pay run summary */}
           <div style={{ background: "var(--hf-primary)", borderRadius: 12, padding: 20, color: "var(--hf-text-on-solid)" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginBottom: 14, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>
-              {lastPayRun ? `Last Pay Run · ${lastPayRun.payRunNumber}` : "No Pay Runs Yet"}
+              {lastPayRun ? `${card.label} · ${lastPayRun.payRunNumber}` : "No Pay Runs Yet"}
             </div>
             {lastPayRun ? [
               { label: "Total gross",     value: fmtR(lastPayRun.totalGross) },
@@ -168,6 +170,7 @@ export default function HrDashboard({ onNavigate }: { onNavigate: (section: stri
             )) : (
               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>Process your first pay run to see payroll summaries here.</div>
             )}
+            {card.note && <div style={{ marginTop: 10, fontSize: 12, color: "rgba(255,255,255,0.75)" }}>{card.note}</div>}
             <button onClick={() => onNavigate("payroll")} style={{ marginTop: 14, width: "100%", padding: "8px", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 7, fontSize: 12, fontWeight: 600, color: "var(--hf-text-on-solid)", cursor: "pointer" }}>
               {lastPayRun ? "View payroll →" : "Start payroll →"}
             </button>
