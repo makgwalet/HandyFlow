@@ -39,6 +39,7 @@ import { BkPortalLoginPage } from "./pages/bookkeeping-portal/BkPortalLoginPage"
 import { BkPortalAcceptInvitePage } from "./pages/bookkeeping-portal/BkPortalAcceptInvitePage"
 import { BkPortalHomePage } from "./pages/bookkeeping-portal/BkPortalHomePage"
 import { InsurancePage } from "./pages/insurance/InsurancePage"
+import { LegalPracticePage } from "./pages/legalpractice/LegalPracticePage"
 import { InsuranceBrokeragePage } from "./pages/insurance-brokerage/InsuranceBrokeragePage"
 import { BookingsPage }                 from './pages/bookings/BookingsPage'
 import { HrPage }                       from './pages/hr/HrPage'
@@ -351,6 +352,7 @@ export default function App() {
             <Route path="/bookings/:section?" element={<BookingsPage />} />
             <Route path="/accounting/:section?" element={<AccountingPage />} />
             <Route path="/bookkeeping/:section?" element={<BookkeepingPage />} />
+            <Route path="/legal-practice/:section?" element={<LegalPracticePage />} />
             <Route path="/insurance/:section?" element={<InsurancePage />} />
             <Route path="/insurance-brokerage/:section?" element={<InsuranceBrokeragePage />} />
             <Route path="/settings"    element={<SettingsPage />} />

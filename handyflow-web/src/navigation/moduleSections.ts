@@ -1154,6 +1154,29 @@ export const INSURANCE_BROKERAGE_SECTIONS: ModuleSections = {
   ],
 }
 
+export const LEGAL_PRACTICE_SECTIONS: ModuleSections = {
+  moduleKey: 'legalpractice',
+  // /legal-practice/portal/* is the client portal, routed separately.
+  basePath: '/legal-practice',
+  title: 'Legal Practice',
+  icon: Scale,
+  defaultSection: 'matters',
+  groups: [
+    { label: 'Work', sections: [
+      { id: 'matters', label: 'Matters', icon: Gavel, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
+      { id: 'clients', label: 'Clients', icon: Users, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
+    ] },
+    { label: 'Billing', sections: [
+      { id: 'invoices', label: 'Invoices', icon: Receipt, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
+      { id: 'retainers', label: 'Retainers', icon: Repeat, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
+    ] },
+    { label: 'Firm', sections: [
+      { id: 'attorneys', label: 'Attorneys', icon: UserCheck, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
+      { id: 'profile', label: 'Firm details', icon: Settings, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
+    ] },
+  ],
+}
+
 const REGISTRY: ModuleSections[] = [
   BOOKKEEPING_SECTIONS,
   SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS, FACILITIES_SECTIONS, FLEET_SECTIONS, ACCOUNTING_SECTIONS, ACCOUNTANT_SECTIONS,
@@ -1164,7 +1187,7 @@ const REGISTRY: ModuleSections[] = [
   INTERNAL_AUDIT_SECTIONS,
   RECRUITER_SECTIONS, CREATIVE_SECTIONS, CATALOGUE_SECTIONS, COMPLIANCE_SERVICES_SECTIONS, DESK_SECTIONS,
   EXPENSES_SECTIONS, POS_SECTIONS, PROJECTS_SECTIONS, TASKS_SECTIONS, CRM_SECTIONS, FM_SECTIONS,
-  INSURANCE_SECTIONS, INSURANCE_BROKERAGE_SECTIONS,
+  INSURANCE_SECTIONS, INSURANCE_BROKERAGE_SECTIONS, LEGAL_PRACTICE_SECTIONS,
 ]
 
 /** Groups with sections the user may not see removed (and empty groups dropped). */

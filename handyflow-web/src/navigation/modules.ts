@@ -66,6 +66,7 @@ export const MODULE_REGISTRY: Record<string, Omit<ModuleNavItem, 'key'>> = {
   ap:           { icon: Receipt,       label: 'Payables',     route: '/ap'           },
   accountant:   { icon: UserCog,       label: 'Accountant',   route: '/accountant'   },
   bookkeeping:  { icon: BookOpen,      label: 'Bookkeeping',  route: '/bookkeeping'  },
+  legalpractice: { icon: Scale,        label: 'Legal Practice', route: '/legal-practice' },
   insurance:    { icon: ShieldCheck,   label: 'Insurance',    route: '/insurance'    },
   insurancebrokerage: { icon: Handshake, label: 'Insurance Brokerage', route: '/insurance-brokerage' },
   'internal-audit': { icon: ShieldCheck, label: 'Internal Audit', route: '/internal-audit' },
