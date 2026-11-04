@@ -51,9 +51,9 @@ public class FmController {
 
     @GetMapping("/clients")
     @PreAuthorize("hasAnyAuthority('FACILITIESMANAGEMENT_READ','FACILITIESMANAGEMENT_MANAGE','FACILITIESMANAGEMENT_ADMIN')")
-    public ResponseEntity<ApiResponse<Page<FmClientResponse>>> getClients(@PageableDefault(size = 20) Pageable pageable) {
+    public ResponseEntity<ApiResponse<Page<FmClientResponse>>> getClients(@RequestParam(required = false) String search, @PageableDefault(size = 20) Pageable pageable) {
         featureGuard.requireModule("facilitiesmanagement");
-        return ResponseEntity.ok(ApiResponse.success(clientService.getClients(TenantContext.getTenantIdAsObject(), pageable)));
+        return ResponseEntity.ok(ApiResponse.success(clientService.getClients(TenantContext.getTenantIdAsObject(), search, pageable)));
     }
 
     @GetMapping("/clients/{id}")

@@ -25,4 +25,13 @@ public interface FmClientRepository extends JpaRepository<FmClient, UUID> {
             "AND (:allClients = true OR c.id IN :clientIds)")
     Page<FmClient> findAllActiveInScope(@Param("tenantId") TenantId tenantId, @Param("allClients") boolean allClients,
                                         @Param("clientIds") Collection<UUID> clientIds, Pageable pageable);
+
+    /** Scope-aware search: the pattern (see FmSearch.likePattern) is matched against the name, code, contact, email, phone and registration number. */
+    @Query("SELECT c FROM FmClient c WHERE c.tenantId.value = :#{#tenantId.value} AND c.deletedAt IS NULL " +
+            "AND (:allClients = true OR c.id IN :clientIds) " +
+            "AND (lower(c.tradingName) LIKE :pattern ESCAPE '\\' OR lower(coalesce(c.clientCode, '')) LIKE :pattern ESCAPE '\\' " +
+            "OR lower(coalesce(c.contactName, '')) LIKE :pattern ESCAPE '\\' OR lower(coalesce(c.contactEmail, '')) LIKE :pattern ESCAPE '\\' " +
+            "OR lower(coalesce(c.contactPhone, '')) LIKE :pattern ESCAPE '\\' OR lower(coalesce(c.registrationNumber, '')) LIKE :pattern ESCAPE '\\')")
+    Page<FmClient> searchInScope(@Param("tenantId") TenantId tenantId, @Param("allClients") boolean allClients,
+                                 @Param("clientIds") Collection<UUID> clientIds, @Param("pattern") String pattern, Pageable pageable);
 }

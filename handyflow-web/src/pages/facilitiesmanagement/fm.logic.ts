@@ -585,3 +585,44 @@ export function missingLedgerCodes(f: Pick<ProfileForm, "arAccountCode" | "reven
   return out
 }
 export const needsBillingSetup = (lastError: string | null | undefined) => !!lastError && /configured in the billing settings/i.test(lastError)
+
+// ── South African public holidays ───────────────────────────────────────────────────────────────────────────────────
+export interface PublicHoliday { date: string; name: string }
+const pad2 = (n: number) => String(n).padStart(2, "0")
+const isoOf = (d: Date) => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`
+const addDays = (d: Date, n: number) => new Date(d.getTime() + n * 86_400_000)
+
+/** Easter Sunday (the anonymous Gregorian algorithm), as a UTC date. */
+export function easterSunday(year: number): Date {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100, d = Math.floor(b / 4), e = b % 4
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451)
+  const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1
+  return new Date(Date.UTC(year, month - 1, day))
+}
+
+/**
+ * The public holidays of a year under the Public Holidays Act: the fixed days, Good Friday and Family Day (the Monday after
+ * Easter), and the Monday after any fixed day that falls on a Sunday. One-off days the President declares (an election day, say)
+ * are not included: add those by hand.
+ */
+export function saPublicHolidays(year: number): PublicHoliday[] {
+  const fixed: [number, number, string][] = [
+    [1, 1, "New Year's Day"], [3, 21, "Human Rights Day"], [4, 27, "Freedom Day"], [5, 1, "Workers' Day"], [6, 16, "Youth Day"],
+    [8, 9, "National Women's Day"], [9, 24, "Heritage Day"], [12, 16, "Day of Reconciliation"], [12, 25, "Christmas Day"], [12, 26, "Day of Goodwill"],
+  ]
+  const out: PublicHoliday[] = []
+  for (const [m, d, name] of fixed) {
+    const day = new Date(Date.UTC(year, m - 1, d))
+    out.push({ date: isoOf(day), name })
+    if (day.getUTCDay() === 0) out.push({ date: isoOf(addDays(day, 1)), name: `${name} (observed)` })
+  }
+  const easter = easterSunday(year)
+  out.push({ date: isoOf(addDays(easter, -2)), name: "Good Friday" }, { date: isoOf(addDays(easter, 1)), name: "Family Day" })
+  // A Sunday holiday observed on Monday can land on another holiday (Family Day, say); keep one entry per date.
+  const seen = new Set<string>()
+  return out.sort((x, y) => x.date.localeCompare(y.date)).filter(h => !seen.has(h.date) && !!seen.add(h.date))
+}
+
+/** The holidays of a year that are not on the list yet, so adding them twice does nothing. */
+export const missingHolidays = (year: number, have: string[]): PublicHoliday[] => saPublicHolidays(year).filter(h => !have.includes(h.date))

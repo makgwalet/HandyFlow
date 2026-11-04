@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { PROVINCES, postalDigits, addressLine, emptyProfile, missingLedgerCodes, needsBillingSetup, profileBody, profileForm, profileProblem, assetBody, assetMoves, assetProblem, assignBody, assignProblem, canCostLines, clientBody, clientProblem, completeBody, completeProblem, costBody, costProblem, costTotals, emptyAsset, emptyClient, emptyComplete, emptyCost, emptyOrder, emptyRequest, emptySite, orderProblem, requestBody, requestProblem, siteBody, siteProblem, slaNote, warrantyNote, whoFrom, woActions, type Who } from "./fm.logic"
+import { easterSunday, missingHolidays, saPublicHolidays, PROVINCES, postalDigits, addressLine, emptyProfile, missingLedgerCodes, needsBillingSetup, profileBody, profileForm, profileProblem, assetBody, assetMoves, assetProblem, assignBody, assignProblem, canCostLines, clientBody, clientProblem, completeBody, completeProblem, costBody, costProblem, costTotals, emptyAsset, emptyClient, emptyComplete, emptyCost, emptyOrder, emptyRequest, emptySite, orderProblem, requestBody, requestProblem, siteBody, siteProblem, slaNote, warrantyNote, whoFrom, woActions, type Who } from "./fm.logic"
 
 const MANAGER: Who = { manage: true, assign: true, execute: true }
 const TECH: Who = { manage: false, assign: false, execute: true }
@@ -455,5 +455,28 @@ describe("site address rules", () => {
     expect(siteProblem(f, false)).toBeNull()
     expect(PROVINCES).toHaveLength(9)
     expect(postalDigits("21a96-77")).toBe("2196")
+  })
+})
+
+describe("South African public holidays", () => {
+  const dates = (y: number) => saPublicHolidays(y).map(h => h.date)
+  it("finds Easter", () => {
+    expect(easterSunday(2025).toISOString().slice(0, 10)).toBe("2025-04-20")
+    expect(easterSunday(2026).toISOString().slice(0, 10)).toBe("2026-04-05")
+    expect(easterSunday(2027).toISOString().slice(0, 10)).toBe("2027-03-28")
+  })
+  it("lists 2026 with Good Friday, Family Day and Women's Day moved off its Sunday", () => {
+    const d = dates(2026)
+    expect(d).toEqual(["2026-01-01", "2026-03-21", "2026-04-03", "2026-04-06", "2026-04-27", "2026-05-01", "2026-06-16", "2026-08-09", "2026-08-10", "2026-09-24", "2026-12-16", "2026-12-25", "2026-12-26"])
+    expect(saPublicHolidays(2026).find(h => h.date === "2026-08-10")?.name).toBe("National Women's Day (observed)")
+  })
+  it("moves Human Rights Day in 2027 and keeps one entry per date", () => {
+    const d = dates(2027)
+    expect(d).toContain("2027-03-21"); expect(d).toContain("2027-03-22"); expect(d).toContain("2027-03-26"); expect(d).toContain("2027-03-29")
+    expect(new Set(d).size).toBe(d.length)
+  })
+  it("adds only what is missing", () => {
+    expect(missingHolidays(2026, ["2026-01-01", "2026-12-25"])).toHaveLength(11)
+    expect(missingHolidays(2026, dates(2026))).toEqual([])
   })
 })

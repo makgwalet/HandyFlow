@@ -6,7 +6,7 @@ import { usePermission } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Empty, ErrorLine, Input, Pill, SectionTitle, card, day, errorText, fail, muted, td, th } from "./kit"
 import { BASE } from "./lookups"
-import { WEEKDAYS, calendarBody, calendarProblem, daysText, holidayProblem, trimTime, type CalendarForm } from "./fm.logic"
+import { WEEKDAYS, missingHolidays, calendarBody, calendarProblem, daysText, holidayProblem, trimTime, type CalendarForm } from "./fm.logic"
 
 interface Calendar { configured: boolean; startTime: string | null; endTime: string | null; workingDays: string[]; timeZone: string | null; holidays: { date: string; name: string | null }[] }
 const URL = `${BASE}/sla/calendar`
@@ -30,6 +30,16 @@ export default function SlaCalendarTab() {
   const delH = useMutation({
     mutationFn: (d: string) => apiClient.delete(`${URL}/holidays/${d}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: key }), onError: e => { void fail(e, "Could not remove the holiday") },
+  })
+  const thisYear = new Date().getFullYear(), [year, setYear] = useState(thisYear)
+  const bulk = useMutation({
+    mutationFn: async () => {
+      const todo = missingHolidays(year, holidays.map(h => h.date)); let added = 0
+      for (const h of todo) { await apiClient.post(`${URL}/holidays`, { date: h.date, name: h.name }); added++ }
+      return { added }
+    },
+    onSuccess: r => { toast.success(r.added ? `${r.added} public holiday${r.added === 1 ? "" : "s"} added for ${year}` : `All the ${year} public holidays are already on the list`); qc.invalidateQueries({ queryKey: key }) },
+    onError: async e => { setHErr(await errorText(e, "Could not add the public holidays")); qc.invalidateQueries({ queryKey: key }) },
   })
   if (isError) return <Empty>Could not load the working hours. Please try again.</Empty>
   if (isLoading) return <Empty>Loading…</Empty>
@@ -62,6 +72,14 @@ export default function SlaCalendarTab() {
               <td style={{ ...td, textAlign: "right" }}>{canEdit && <Btn small disabled={delH.isPending} onClick={() => delH.mutate(h.date)}>Remove</Btn>}</td></tr>)}</tbody>
           </table>)}
       </div>
+      {canEdit && (
+        <div style={{ ...card, marginTop: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 13, flex: 1, minWidth: 220 }}>Add the South African public holidays, including Good Friday, Family Day and the Monday after a Sunday holiday. Days declared for one year only, such as an election day, are added by hand.</span>
+          <select aria-label="Year" value={year} onChange={e => setYear(Number(e.target.value))} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--hf-border)" }}>
+            {[thisYear, thisYear + 1].map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <Btn kind="primary" disabled={bulk.isPending} onClick={() => { setHErr(""); bulk.mutate() }}>{bulk.isPending ? "Adding…" : `Add ${year} public holidays`}</Btn>
+        </div>)}
       {canEdit && (
         <div style={{ ...card, marginTop: 12, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr)) auto", gap: "0 12px", alignItems: "end" }}>
           <Input label="Date" type="date" value={hDate} onChange={v => { setHDate(v); setHErr("") }} />

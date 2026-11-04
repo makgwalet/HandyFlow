@@ -1,10 +1,10 @@
 // The firm's clients (the companies whose sites it maintains).
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
-import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pill, SectionTitle, card, errorText, fail, muted, pageOf, td, th } from "./kit"
+import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pill, SectionTitle, card, errorText, fail, inp, muted, pageOf, td, th } from "./kit"
 import { BASE, type FClient } from "./lookups"
 import PortalUsersDialog from "./PortalUsersDialog"
 import { clientBody, clientProblem, emptyClient, type ClientForm } from "./fm.logic"
@@ -14,7 +14,9 @@ export default function ClientsTab() {
   const canWrite = usePermission("FACILITIESMANAGEMENT_MANAGE") || usePermission("FACILITIESMANAGEMENT_ADMIN")
   const canInvite = canWrite || usePermission("FACILITIESMANAGEMENT_PORTAL_MANAGE"), canRevoke = usePermission("FACILITIESMANAGEMENT_ADMIN") || usePermission("FACILITIESMANAGEMENT_PORTAL_MANAGE")
   const [page, setPage] = useState(0), [editing, setEditing] = useState<FClient | "new" | null>(null), [portal, setPortal] = useState<FClient | null>(null)
-  const { data, isLoading, isError } = useQuery({ queryKey: ["fm-clients", page], queryFn: async () => pageOf<FClient>(await apiClient.get(`${BASE}/clients`, { params: { page, size: 25 } })) })
+  const [typed, setTyped] = useState(""), [search, setSearch] = useState("")
+  useEffect(() => { const t = setTimeout(() => { setSearch(typed.trim()); setPage(0) }, 300); return () => clearTimeout(t) }, [typed])
+  const { data, isLoading, isError } = useQuery({ queryKey: ["fm-clients", page, search], queryFn: async () => pageOf<FClient>(await apiClient.get(`${BASE}/clients`, { params: { page, size: 25, ...(search ? { search } : {}) } })) })
   const refresh = () => { qc.invalidateQueries({ queryKey: ["fm-clients"] }); qc.invalidateQueries({ queryKey: ["fm-clients-all"] }) }
   const toggle = useMutation({
     mutationFn: (c: FClient) => apiClient.post(`${BASE}/clients/${c.id}/${c.status === "ACTIVE" ? "deactivate" : "reactivate"}`),
@@ -24,8 +26,12 @@ export default function ClientsTab() {
   return (
     <div>
       <SectionTitle right={canWrite && <Btn kind="primary" onClick={() => setEditing("new")}>Add client</Btn>}>Clients</SectionTitle>
+      <div style={{ marginBottom: 10 }}>
+        <input aria-label="Search clients" placeholder="Search by name, code, contact, email, phone or registration number" value={typed} onChange={e => setTyped(e.target.value)} maxLength={100}
+          style={{ ...inp, maxWidth: 520 }} autoComplete="off" />
+      </div>
       <div style={{ ...card, padding: 0, overflowX: "auto" }}>
-        {isError ? <Empty>Could not load the clients. Please try again.</Empty> : isLoading ? <Empty>Loading…</Empty> : rows.length === 0 ? <Empty>No clients yet.</Empty> : (
+        {isError ? <Empty>Could not load the clients. Please try again.</Empty> : isLoading ? <Empty>Loading…</Empty> : rows.length === 0 ? <Empty>{search ? `No client matches "${search}".` : "No clients yet."}</Empty> : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr><th style={th}>Client</th><th style={th}>Contact</th><th style={th}>VAT</th><th style={th}>Status</th><th /></tr></thead>
             <tbody>{rows.map(c => (

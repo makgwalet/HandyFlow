@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmClient;
+import za.co.handyflow.platform.facilitiesmanagement.domain.model.FmSearch;
 import za.co.handyflow.platform.facilitiesmanagement.domain.repository.FmClientRepository;
 import za.co.handyflow.platform.facilitiesmanagement.dto.CreateFmClientRequest;
 import za.co.handyflow.platform.facilitiesmanagement.dto.FmClientResponse;
@@ -35,8 +36,14 @@ public class FmClientService {
 
     @Transactional(readOnly = true)
     public Page<FmClientResponse> getClients(TenantId tenantId, Pageable pageable) {
+        return getClients(tenantId, null, pageable);
+    }
+
+    /** The clients the caller may see, narrowed by what was typed (name, code, contact, email, phone, registration number). */
+    @Transactional(readOnly = true)
+    public Page<FmClientResponse> getClients(TenantId tenantId, String search, Pageable pageable) {
         FmAccessScope scope = accessPolicy.scope(tenantId);
-        return clientRepository.findAllActiveInScope(tenantId, scope.unrestricted(), scope.clientIds(), pageable)
+        return clientRepository.searchInScope(tenantId, scope.unrestricted(), scope.clientIds(), FmSearch.likePattern(search), pageable)
                 .map(this::toResponse);
     }
 
