@@ -13,6 +13,7 @@ import TimeTab from "./TimeTab"
 import AgreementsTab from "./AgreementsTab"
 import InvoicesTab from "./InvoicesTab"
 import PortalUsersTab from "./PortalUsersTab"
+import ProfileTab from "./ProfileTab"
 
 export function BookkeepingPage() {
   return (
@@ -31,6 +32,7 @@ export function BookkeepingPage() {
         case "agreements": return <AgreementsTab />
         case "invoices": return <InvoicesTab />
         case "portal":   return <PortalUsersTab />
+        case "profile":  return <ProfileTab />
         default:         return null
       }
     }} />

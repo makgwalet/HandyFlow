@@ -35,6 +35,11 @@ import { FleetPage }                    from "./pages/fleet/FleetPage"
 import { SettingsPage }                 from './pages/settings/SettingsPage'
 import { AccountingPage }               from './pages/accounting/AccountingPage'
 import { BookkeepingPage }              from "./pages/bookkeeping/BookkeepingPage"
+import { BkPortalLoginPage } from "./pages/bookkeeping-portal/BkPortalLoginPage"
+import { BkPortalAcceptInvitePage } from "./pages/bookkeeping-portal/BkPortalAcceptInvitePage"
+import { BkPortalHomePage } from "./pages/bookkeeping-portal/BkPortalHomePage"
+import { InsurancePage } from "./pages/insurance/InsurancePage"
+import { InsuranceBrokeragePage } from "./pages/insurance-brokerage/InsuranceBrokeragePage"
 import { BookingsPage }                 from './pages/bookings/BookingsPage'
 import { HrPage }                       from './pages/hr/HrPage'
 import { ClinicPage }                   from './pages/clinic/ClinicPage'
@@ -164,6 +169,12 @@ function RecruitmentAgencyPortalProtectedRoute({ children }: { children: React.R
       return <>{children}</>
     }
 
+function BkPortalProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = usePortalAuthStore(s => s.token)
+  if (!token) return <Navigate to="/bookkeeping/portal/login" replace />
+  return <>{children}</>
+}
+
 function BookingAgencyPortalProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = usePortalAuthStore(s => s.token)
   if (!token) return <Navigate to="/booking-agency/portal/login" replace />
@@ -249,6 +260,9 @@ export default function App() {
           <Route path="/accountant/portal" element={<PortalProtectedRoute><PortalHomePage /></PortalProtectedRoute>} />
           <Route path="/accountant/portal/clients/:clientId" element={<PortalProtectedRoute><PortalClientDetailPage /></PortalProtectedRoute>} />
 
+          <Route path="/bookkeeping/portal/login" element={<BkPortalLoginPage />} />
+          <Route path="/bookkeeping/portal/auth/accept-invite" element={<BkPortalAcceptInvitePage />} />
+          <Route path="/bookkeeping/portal/home" element={<BkPortalProtectedRoute><BkPortalHomePage /></BkPortalProtectedRoute>} />
           <Route path="/recruitment-agency/portal/login"              element={<RecruitmentAgencyPortalLoginPage />} />
             <Route path="/recruitment-agency/portal/auth/accept-invite" element={<RecruitmentAgencyPortalAcceptInvitePage />} />
             <Route path="/recruitment-agency/portal" element={<RecruitmentAgencyPortalProtectedRoute><RecruitmentAgencyPortalHomePage /></RecruitmentAgencyPortalProtectedRoute>} />
@@ -337,6 +351,8 @@ export default function App() {
             <Route path="/bookings/:section?" element={<BookingsPage />} />
             <Route path="/accounting/:section?" element={<AccountingPage />} />
             <Route path="/bookkeeping/:section?" element={<BookkeepingPage />} />
+            <Route path="/insurance/:section?" element={<InsurancePage />} />
+            <Route path="/insurance-brokerage/:section?" element={<InsuranceBrokeragePage />} />
             <Route path="/settings"    element={<SettingsPage />} />
             <Route path="/hr/:section?" element={<HrPage />} />
             <Route path="/clinic/consult/:appointmentId" element={<ConsultationWorkspacePage />} />

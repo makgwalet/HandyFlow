@@ -1062,6 +1062,7 @@ export const BOOKKEEPING_SECTIONS: ModuleSections = {
         { id: 'portal', label: 'Client portal', icon: Users, anyPermission: ['BOOKKEEPING_READ', 'BOOKKEEPING_MANAGE', 'BOOKKEEPING_ADMIN'] },
       ],
     },
+    { label: 'Practice', sections: [{ id: 'profile', label: 'Practice details', icon: Settings, anyPermission: ['BOOKKEEPING_READ', 'BOOKKEEPING_MANAGE', 'BOOKKEEPING_ADMIN'] }] },
   ],
 }
 
@@ -1126,6 +1127,33 @@ export const FM_SECTIONS: ModuleSections = {
   ],
 }
 
+export const INSURANCE_SECTIONS: ModuleSections = {
+  moduleKey: 'insurance',
+  basePath: '/insurance',
+  title: 'Insurance',
+  icon: ShieldCheck,
+  defaultSection: 'policies',
+  groups: [
+    { label: 'Cover', sections: [{ id: 'policies', label: 'Policies', icon: FileText, anyPermission: ['INSURANCE_READ', 'INSURANCE_MANAGE', 'INSURANCE_ADMIN'] }] },
+  ],
+}
+
+export const INSURANCE_BROKERAGE_SECTIONS: ModuleSections = {
+  moduleKey: 'insurancebrokerage',
+  basePath: '/insurance-brokerage',
+  title: 'Insurance Brokerage',
+  icon: Handshake,
+  defaultSection: 'policies',
+  groups: [
+    { label: 'Business', sections: [
+      { id: 'policies', label: 'Policies', icon: FileText, anyPermission: ['INSURANCEBROKERAGE_READ', 'INSURANCEBROKERAGE_MANAGE', 'INSURANCEBROKERAGE_ADMIN'] },
+      { id: 'clients', label: 'Clients', icon: Users, anyPermission: ['INSURANCEBROKERAGE_READ', 'INSURANCEBROKERAGE_MANAGE', 'INSURANCEBROKERAGE_ADMIN'] },
+      { id: 'insurers', label: 'Insurers', icon: Landmark, anyPermission: ['INSURANCEBROKERAGE_READ', 'INSURANCEBROKERAGE_MANAGE', 'INSURANCEBROKERAGE_ADMIN'] },
+    ] },
+    { label: 'Money', sections: [{ id: 'commission', label: 'Commission', icon: Receipt, anyPermission: ['INSURANCEBROKERAGE_READ', 'INSURANCEBROKERAGE_MANAGE', 'INSURANCEBROKERAGE_ADMIN'] }] },
+  ],
+}
+
 const REGISTRY: ModuleSections[] = [
   BOOKKEEPING_SECTIONS,
   SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS, FACILITIES_SECTIONS, FLEET_SECTIONS, ACCOUNTING_SECTIONS, ACCOUNTANT_SECTIONS,
@@ -1136,6 +1164,7 @@ const REGISTRY: ModuleSections[] = [
   INTERNAL_AUDIT_SECTIONS,
   RECRUITER_SECTIONS, CREATIVE_SECTIONS, CATALOGUE_SECTIONS, COMPLIANCE_SERVICES_SECTIONS, DESK_SECTIONS,
   EXPENSES_SECTIONS, POS_SECTIONS, PROJECTS_SECTIONS, TASKS_SECTIONS, CRM_SECTIONS, FM_SECTIONS,
+  INSURANCE_SECTIONS, INSURANCE_BROKERAGE_SECTIONS,
 ]
 
 /** Groups with sections the user may not see removed (and empty groups dropped). */
