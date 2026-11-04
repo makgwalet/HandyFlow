@@ -38,6 +38,9 @@ import { BookkeepingPage }              from "./pages/bookkeeping/BookkeepingPag
 import { BkPortalLoginPage } from "./pages/bookkeeping-portal/BkPortalLoginPage"
 import { BkPortalAcceptInvitePage } from "./pages/bookkeeping-portal/BkPortalAcceptInvitePage"
 import { BkPortalHomePage } from "./pages/bookkeeping-portal/BkPortalHomePage"
+import { LpPortalLoginPage } from "./pages/legal-portal/LpPortalLoginPage"
+import { LpPortalAcceptInvitePage } from "./pages/legal-portal/LpPortalAcceptInvitePage"
+import { LpPortalHomePage } from "./pages/legal-portal/LpPortalHomePage"
 import { InsurancePage } from "./pages/insurance/InsurancePage"
 import { LegalPracticePage } from "./pages/legalpractice/LegalPracticePage"
 import { InsuranceBrokeragePage } from "./pages/insurance-brokerage/InsuranceBrokeragePage"
@@ -176,6 +179,12 @@ function BkPortalProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function LpPortalProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = usePortalAuthStore(s => s.token)
+  if (!token) return <Navigate to="/legal-practice/portal/login" replace />
+  return <>{children}</>
+}
+
 function BookingAgencyPortalProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = usePortalAuthStore(s => s.token)
   if (!token) return <Navigate to="/booking-agency/portal/login" replace />
@@ -264,6 +273,9 @@ export default function App() {
           <Route path="/bookkeeping/portal/login" element={<BkPortalLoginPage />} />
           <Route path="/bookkeeping/portal/auth/accept-invite" element={<BkPortalAcceptInvitePage />} />
           <Route path="/bookkeeping/portal/home" element={<BkPortalProtectedRoute><BkPortalHomePage /></BkPortalProtectedRoute>} />
+          <Route path="/legal-practice/portal/login" element={<LpPortalLoginPage />} />
+          <Route path="/legal-practice/portal/auth/accept-invite" element={<LpPortalAcceptInvitePage />} />
+          <Route path="/legal-practice/portal/home" element={<LpPortalProtectedRoute><LpPortalHomePage /></LpPortalProtectedRoute>} />
           <Route path="/recruitment-agency/portal/login"              element={<RecruitmentAgencyPortalLoginPage />} />
             <Route path="/recruitment-agency/portal/auth/accept-invite" element={<RecruitmentAgencyPortalAcceptInvitePage />} />
             <Route path="/recruitment-agency/portal" element={<RecruitmentAgencyPortalProtectedRoute><RecruitmentAgencyPortalHomePage /></RecruitmentAgencyPortalProtectedRoute>} />

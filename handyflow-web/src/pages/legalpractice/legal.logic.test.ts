@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { attorneyProblem, billable, canChangeWork, canLogWork, clientProblem, disbProblem, emptyAttorney, emptyClient, emptyDisb, emptyKeyDate, emptyMatter, emptyProfile, emptyRetainer, emptyTime, generateProblem, invoiceActions, keyDateNote, keyDateProblem, matterActions, matterProblem, matterRequest, paymentProblem, profileProblem, retainerProblem, timeProblem, timeRequest } from "./legal.logic"
+import { type TrustForm, canRevokeGrant, emptyTrust, evidenceProblem, fileSize, inviteProblem, payableByTrust, trustKindsFor, trustProblem, trustRequest, attorneyProblem, billable, canChangeWork, canLogWork, clientProblem, disbProblem, emptyAttorney, emptyClient, emptyDisb, emptyKeyDate, emptyMatter, emptyProfile, emptyRetainer, emptyTime, generateProblem, invoiceActions, keyDateNote, keyDateProblem, matterActions, matterProblem, matterRequest, paymentProblem, profileProblem, retainerProblem, timeProblem, timeRequest } from "./legal.logic"
 
 const at = (s: string) => new Date(s + "T09:30:00")
 describe("matter lifecycle", () => {
@@ -99,5 +99,72 @@ describe("invoices", () => {
   })
   it("refuses a payment above what is outstanding", () => {
     expect(paymentProblem(500, "")).toMatch(/above 0/); expect(paymentProblem(500, "500.01")).toMatch(/more than/); expect(paymentProblem(500, "500")).toBeNull()
+  })
+})
+
+describe("trust account", () => {
+  const f = (o: Partial<TrustForm> = {}): TrustForm => ({ ...emptyTrust(), amount: "100", ...o })
+  it("lets managers receive money but keeps withdrawals for admins", () => {
+    expect(trustKindsFor(false, true)).toEqual(["receipt"])
+    expect(trustKindsFor(true, true)).toEqual(["receipt", "transfer", "disbursement", "refund"])
+    expect(trustKindsFor(false, false)).toEqual([])
+  })
+  it("accepts a receipt of any size but needs a sensible amount", () => {
+    expect(trustProblem("receipt", f({ amount: "1000000" }), 0)).toBeNull()
+    expect(trustProblem("receipt", f({ amount: "" }), 0)).toMatch(/amount/)
+    expect(trustProblem("receipt", f({ amount: "-5" }), 0)).toMatch(/amount/)
+    expect(trustProblem("receipt", f({ amount: "10.505" }), 0)).toMatch(/decimal/)
+  })
+  it("never lets a withdrawal exceed what the client has in trust", () => {
+    expect(trustProblem("refund", f({ amount: "500.01", payee: "A" }), 500)).toMatch(/in trust/)
+    expect(trustProblem("refund", f({ amount: "500", payee: "A" }), 500)).toBeNull()
+    expect(trustProblem("disbursement", f({ payee: "Sheriff" }), 0)).toMatch(/in trust/)
+  })
+  it("needs an invoice for a transfer and a payee for payouts", () => {
+    expect(trustProblem("transfer", f(), 500)).toMatch(/invoice/)
+    expect(trustProblem("transfer", f({ invoiceId: "i", amount: "300" }), 500, 250)).toMatch(/still owes/)
+    expect(trustProblem("transfer", f({ invoiceId: "i", amount: "250" }), 500, 250)).toBeNull()
+    expect(trustProblem("disbursement", f(), 500)).toMatch(/who is being paid/)
+    expect(trustProblem("refund", f(), 500)).toMatch(/refund is paid to/)
+  })
+  it("builds the request each endpoint expects", () => {
+    expect(trustRequest("receipt", f({ reference: " R1 " }))).toEqual({ amount: 100, transactionDate: null, reference: "R1", notes: null, matterId: null })
+    expect(trustRequest("transfer", f({ invoiceId: "i" }))).toMatchObject({ invoiceId: "i", amount: 100 })
+    expect(trustRequest("refund", f({ payee: " Mr A " }))).toMatchObject({ payee: "Mr A" })
+  })
+  it("only offers sent invoices that still owe money", () => {
+    expect(payableByTrust("SENT", 10)).toBe(true)
+    expect(payableByTrust("PARTIALLY_PAID", 10)).toBe(true)
+    expect(payableByTrust("PAID", 0)).toBe(false)
+    expect(payableByTrust("DRAFT", 10)).toBe(false)
+    expect(payableByTrust("SENT", 0)).toBe(false)
+  })
+})
+
+describe("portal access and documents", () => {
+  const grants = [{ inviteEmail: "Jo@x.co", status: "PENDING" }, { inviteEmail: "old@x.co", status: "REVOKED" }]
+  it("checks an invite", () => {
+    expect(inviteProblem("", grants)).toMatch(/Enter/)
+    expect(inviteProblem("nope", grants)).toMatch(/look right/)
+    expect(inviteProblem("jo@x.co", grants)).toMatch(/already/)
+    expect(inviteProblem("old@x.co", grants)).toBeNull()
+    expect(inviteProblem("new@x.co", grants)).toBeNull()
+  })
+  it("lets only pending or active grants be revoked", () => {
+    expect(canRevokeGrant("PENDING")).toBe(true)
+    expect(canRevokeGrant("ACTIVE")).toBe(true)
+    expect(canRevokeGrant("REVOKED")).toBe(false)
+  })
+  it("checks a document before it is sent", () => {
+    expect(evidenceProblem(null, "DOCUMENT")).toMatch(/Choose a file/)
+    expect(evidenceProblem({ size: 0 }, "DOCUMENT")).toMatch(/empty/)
+    expect(evidenceProblem({ size: 11 * 1024 * 1024 }, "DOCUMENT")).toMatch(/10 MB/)
+    expect(evidenceProblem({ size: 1000 }, "")).toMatch(/kind/)
+    expect(evidenceProblem({ size: 1000 }, "CONTRACT")).toBeNull()
+  })
+  it("writes file sizes plainly", () => {
+    expect(fileSize(512)).toBe("512 B")
+    expect(fileSize(2048)).toBe("2 KB")
+    expect(fileSize(5 * 1024 * 1024)).toBe("5 MB")
   })
 })

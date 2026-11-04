@@ -6,6 +6,9 @@ import { usePermission } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pick, Pill, Row, SectionTitle, card, day, errorText, fail, money, muted, pageOf, td, th } from "./kit"
 import { BASE, type LClient } from "./lookups"
+import EvidencePanel from "./EvidencePanel"
+import PortalAccessPanel from "./PortalAccessPanel"
+import TrustPanel from "./TrustPanel"
 import { CLIENT_TYPES, INVOICE_STATUS, MATTER_STATUS, clientProblem, clientRequest, emptyClient, labelOf, type ClientForm } from "./legal.logic"
 
 export default function ClientsTab() {
@@ -45,16 +48,22 @@ export default function ClientsTab() {
 
 interface M { id: string; matterNumber: string; matterName: string; status: string; openedDate: string | null }
 interface Inv { id: string; invoiceNumber: string; issueDate: string | null; totalAmount: number; outstandingBalance: number; status: string }
-function ClientDetail({ client: c, onClose }: { client: LClient; onClose: () => void }) {
+function ClientDetail({ client: listed, onClose }: { client: LClient; onClose: () => void }) {
+  const isAdmin = usePermission("LEGALPRACTICE_ADMIN")
+  const canWrite = usePermission("LEGALPRACTICE_MANAGE") || isAdmin
+  // The list row can be out of date once money moves, so the balance is read fresh while the dialog is open.
+  const live = useQuery({ queryKey: ["lp-client", listed.id], initialData: listed, queryFn: async () => (await apiClient.get<LClient>(`${BASE}/clients/${listed.id}`)).data })
+  const c = live.data ?? listed
   const matters = useQuery({ queryKey: ["lp-client-matters", c.id], queryFn: async () => pageOf<M>(await apiClient.get(`${BASE}/matters`, { params: { clientId: c.id, size: 100 } })) })
   const invoices = useQuery({ queryKey: ["lp-client-invoices", c.id], queryFn: async () => pageOf<Inv>(await apiClient.get(`${BASE}/invoices`, { params: { clientId: c.id, size: 100 } })) })
   return (
-    <Dialog title={c.name} onClose={onClose} width={680}>
+    <Dialog title={c.name} onClose={onClose} width={780}>
       <Row k="Type">{labelOf(CLIENT_TYPES, c.clientType)}</Row>
       <Row k="ID / registration">{c.idOrRegistrationNumber ?? ""}</Row>
       <Row k="Contact">{[c.email, c.phone].filter(Boolean).join(" · ")}</Row>
       <Row k="Trust balance"><b>{money(c.trustBalance)}</b></Row>
       {c.notes && <Row k="Notes">{c.notes}</Row>}
+      <TrustPanel clientId={c.id} balance={c.trustBalance} isAdmin={isAdmin} canWrite={canWrite} />
       <div style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 6px" }}>Matters</div>
       {matters.isError ? <div style={muted}>Could not load the matters.</div> : (matters.data?.content ?? []).length === 0 ? <div style={muted}>{matters.isLoading ? "Loading…" : "No matters yet."}</div> : (
         <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}><tbody>{matters.data!.content.map(m => (
@@ -63,6 +72,8 @@ function ClientDetail({ client: c, onClose }: { client: LClient; onClose: () => 
       {invoices.isError ? <div style={muted}>Could not load the invoices.</div> : (invoices.data?.content ?? []).length === 0 ? <div style={muted}>{invoices.isLoading ? "Loading…" : "No invoices yet."}</div> : (
         <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}><tbody>{invoices.data!.content.map(i => (
           <tr key={i.id}><td style={td}><b>{i.invoiceNumber}</b></td><td style={td}>{day(i.issueDate)}</td><td style={{ ...td, textAlign: "right" }}>{money(i.totalAmount)}</td><td style={{ ...td, textAlign: "right" }}>{money(i.outstandingBalance)} owing</td><td style={td}><Pill tone={(INVOICE_STATUS[i.status] ?? { tone: "neutral" }).tone}>{(INVOICE_STATUS[i.status] ?? { label: i.status }).label}</Pill></td></tr>))}</tbody></table></div>)}
+      <EvidencePanel owner="clients" id={c.id} canWrite={canWrite} />
+      <PortalAccessPanel clientId={c.id} canWrite={canWrite} />
     </Dialog>
   )
 }

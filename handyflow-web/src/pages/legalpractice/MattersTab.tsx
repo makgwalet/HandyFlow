@@ -5,6 +5,7 @@ import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pick, Pill, SectionTitle, card, day, errorText, fail, inp, money, muted, pageOf, td, th } from "./kit"
+import EvidencePanel from "./EvidencePanel"
 import { BASE, useLookups, type Lookups } from "./lookups"
 import { BILLING_TYPES, MATTER_STATUS, MATTER_TYPES, canLogWork, emptyMatter, labelOf, matterActions, matterProblem, matterRequest, type MatterForm } from "./legal.logic"
 import MatterWork from "./MatterWork"
@@ -92,6 +93,7 @@ function MatterView({ matter: m, lookups, canWrite, onBack, onEdit, editing, onC
         {m.notes && <Fact k="Notes" v={m.notes} />}
       </div>
       <MatterWork matter={m} lookups={lookups} canWrite={canWrite && canLogWork(m.status)} canInvoice={canWrite} />
+      <EvidencePanel owner="matters" id={m.id} canWrite={canWrite && m.status !== "ARCHIVED"} />
       {editing && editing !== "new" && <MatterDialog matter={editing} lookups={lookups} onClose={onCloseEdit} />}
       {confirm && (
         <Dialog title={confirm === "close" ? "Close this matter?" : "Archive this matter?"} onClose={() => setConfirm(null)}

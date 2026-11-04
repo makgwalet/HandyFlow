@@ -14,6 +14,7 @@ import za.co.handyflow.platform.legalpractice.dto.LpMatterResponse;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -34,6 +35,14 @@ public class LpPortalDataService {
     private final LpClientService clientService;
     private final LpMatterService matterService;
     private final LpBillingService billingService;
+
+    /** Every client record this portal user currently has active access to, so the portal knows which clientId to ask about. */
+    @Transactional(readOnly = true)
+    public List<LpClientResponse> listMyClients(UUID portalUserId) {
+        return grantRepo.findAllActiveForPortalUser(portalUserId).stream()
+                .map(g -> clientService.getClient(g.getTenantId(), g.getClientId()))
+                .toList();
+    }
 
     @Transactional(readOnly = true)
     public LpClientResponse getMyClient(UUID portalUserId, UUID clientId) {

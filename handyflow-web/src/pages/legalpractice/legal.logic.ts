@@ -174,3 +174,65 @@ export function profileProblem(f: ProfileForm): string | null {
   return null
 }
 export const profileRequest = (f: ProfileForm) => Object.fromEntries(Object.entries(f).map(([k, v]) => [k, k === "firmName" ? v.trim() : t(v)]))
+
+// ── Trust account ────────────────────────────────────────────────────────────────────────────────────────────────────
+// Money held for a client. A receipt adds to the balance; the other three take money out and can never take more than is held.
+export type TrustKind = "receipt" | "transfer" | "disbursement" | "refund"
+export const TRUST_KINDS: Record<TrustKind, { label: string; path: string; adminOnly: boolean; takesOut: boolean }> = {
+  receipt: { label: "Money received", path: "trust-transactions/receipt", adminOnly: false, takesOut: false },
+  transfer: { label: "Move to the firm's account", path: "transfer-to-business", adminOnly: true, takesOut: true },
+  disbursement: { label: "Pay out on the client's behalf", path: "pay-disbursement", adminOnly: true, takesOut: true },
+  refund: { label: "Refund to the client", path: "refund", adminOnly: true, takesOut: true },
+}
+export const TRUST_TYPE: Record<string, { label: string; tone: Tone }> = {
+  RECEIPT: { label: "Received", tone: "success" }, TRANSFER_TO_BUSINESS: { label: "Moved to firm", tone: "info" },
+  DISBURSEMENT_PAYMENT: { label: "Paid out", tone: "warning" }, REFUND: { label: "Refunded", tone: "neutral" },
+}
+/** Which trust actions this person is allowed to see: receipts for managers and admins, withdrawals for admins only. */
+export const trustKindsFor = (isAdmin: boolean, canWrite: boolean): TrustKind[] =>
+  (Object.keys(TRUST_KINDS) as TrustKind[]).filter(k => (TRUST_KINDS[k].adminOnly ? isAdmin : canWrite))
+export interface TrustForm { amount: string; transactionDate: string; reference: string; notes: string; payee: string; invoiceId: string; matterId: string }
+export const emptyTrust = (): TrustForm => ({ amount: "", transactionDate: "", reference: "", notes: "", payee: "", invoiceId: "", matterId: "" })
+/** Invoices a trust transfer can pay: only those that are sent and still owe something. */
+export const payableByTrust = (status: string, outstanding: number) => (status === "SENT" || status === "PARTIALLY_PAID") && outstanding > 0.005
+export function trustProblem(kind: TrustKind, f: TrustForm, balance: number, invoiceOutstanding?: number): string | null {
+  const n = num(f.amount)
+  if (n == null || !Number.isFinite(n) || n <= 0) return "Enter an amount above 0"
+  if (Math.round(n * 100) / 100 !== n) return "Use at most two decimal places"
+  if (TRUST_KINDS[kind].takesOut && n > balance + 0.005) return "That is more than the client has in trust"
+  if (kind === "transfer") {
+    if (!f.invoiceId) return "Choose the invoice this pays"
+    if (invoiceOutstanding != null && n > invoiceOutstanding + 0.005) return "That is more than the invoice still owes"
+  }
+  if ((kind === "disbursement" || kind === "refund") && !f.payee.trim()) return kind === "refund" ? "Say who the refund is paid to" : "Say who is being paid"
+  return null
+}
+export function trustRequest(kind: TrustKind, f: TrustForm) {
+  const base = { amount: Number(f.amount), transactionDate: t(f.transactionDate), reference: t(f.reference), notes: t(f.notes), matterId: t(f.matterId) }
+  if (kind === "transfer") return { ...base, invoiceId: f.invoiceId }
+  if (kind === "disbursement" || kind === "refund") return { ...base, payee: f.payee.trim() }
+  return base
+}
+
+// ── Client portal access ─────────────────────────────────────────────────────────────────────────────────────────────
+export const GRANT_STATUS: Record<string, { label: string; tone: Tone }> = { PENDING: { label: "Invite sent", tone: "info" }, ACTIVE: { label: "Has access", tone: "success" }, REVOKED: { label: "Revoked", tone: "neutral" } }
+export const canRevokeGrant = (status: string) => status === "PENDING" || status === "ACTIVE"
+export function inviteProblem(email: string, existing: { inviteEmail: string; status: string }[]): string | null {
+  const e = email.trim().toLowerCase()
+  if (!e) return "Enter the email address to invite"
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return "That email address does not look right"
+  if (existing.some(g => g.inviteEmail.toLowerCase() === e && canRevokeGrant(g.status))) return "That person has already been invited"
+  return null
+}
+
+// ── Evidence ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+export const EVIDENCE_TYPES = [["DOCUMENT", "Document"], ["CONTRACT", "Contract"], ["CORRESPONDENCE", "Correspondence"], ["COURT_PAPER", "Court paper"], ["ID_DOCUMENT", "ID document"], ["PROOF_OF_PAYMENT", "Proof of payment"], ["OTHER", "Other"]] as const
+export const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024
+export function evidenceProblem(file: { size: number } | null, evidenceType: string): string | null {
+  if (!file) return "Choose a file"
+  if (file.size <= 0) return "That file is empty"
+  if (file.size > MAX_EVIDENCE_BYTES) return "That file is over 10 MB"
+  if (!evidenceType) return "Choose what kind of document it is"
+  return null
+}
+export const fileSize = (b: number) => (b < 1024 ? `${b} B` : b < 1024 * 1024 ? `${Math.round(b / 102.4) / 10} KB` : `${Math.round(b / 104857.6) / 10} MB`)

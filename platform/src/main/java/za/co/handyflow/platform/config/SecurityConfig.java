@@ -154,6 +154,11 @@ public class SecurityConfig {
                                 // Projects client portal (patch 0573): named client logins on the shared portal_users
                                 // identity. Only /auth/** is public; /portal/me/** needs the portal JWT.
                                 "/api/v1/project-client/portal/auth/**",
+                                // Bookkeeping and Legal Practice client portals (patches 0574, 0576): their sign-in and invite
+                                // endpoints were not public, so a client could never log in. Only /auth/** is open; the data
+                                // endpoints still need the portal JWT.
+                                "/api/v1/bookkeeping/portal/auth/**",
+                                "/api/v1/legal-practice/portal/auth/**",
                                 // FIX (identity module modernization): the
                                 // main-app team-invitation flow was
                                 // completely unreachable. UserController's
