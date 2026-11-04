@@ -116,4 +116,10 @@ public class HrPayRun {
         this.status    = "CANCELLED";
         this.updatedAt = Instant.now();
     }
+
+    /** Corrects only the tax-year label. Amounts, status and payslips are never touched here. */
+    public void correctTaxYearLabel(int taxYear) {
+        this.taxYear   = taxYear;
+        this.updatedAt = Instant.now();
+    }
 }

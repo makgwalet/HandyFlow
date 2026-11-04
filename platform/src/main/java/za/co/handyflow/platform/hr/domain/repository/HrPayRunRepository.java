@@ -32,4 +32,7 @@ public interface HrPayRunRepository extends JpaRepository<HrPayRun, UUID> {
     /** Runs paid inside the window, whatever their status (cancelled ones are left out by the caller). */
     @Query("SELECT r FROM HrPayRun r WHERE r.tenantId = :#{#tenantId.value} AND r.payDate BETWEEN :from AND :to ORDER BY r.payDate")
     List<HrPayRun> paidBetween(TenantId tenantId, LocalDate from, LocalDate to);
+
+    @Query("SELECT r FROM HrPayRun r WHERE r.tenantId = :#{#tenantId.value} ORDER BY r.payDate, r.payRunNumber")
+    List<HrPayRun> findEveryRun(TenantId tenantId);
 }

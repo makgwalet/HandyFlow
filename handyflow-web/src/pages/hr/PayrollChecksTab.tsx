@@ -1,12 +1,13 @@
 // src/pages/hr/PayrollChecksTab.tsx
 //
 // Read-only checks for payroll: the statutory rules each tax year uses, and what a recalculation under those rules
-// would change in payslips already issued. Nothing on this screen changes payroll data.
+// would change in payslips already issued. Nothing on this screen changes payroll amounts; the last panel can only correct a pay run's tax-year label.
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AlertCircle, CheckCircle2 } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { useAuth } from "../../hooks/useAuth"
+import TaxYearLabelsPanel from "./TaxYearLabelsPanel"
 import { nominatedBody, nominatedProblem } from "./payRunPayments.logic"
 import { isTaxMethod, TAX_METHODS, taxMethodBody, taxMethodHint } from "./taxMethod.logic"
 import { etiSettingsBody } from "./eti.logic"
@@ -366,6 +367,7 @@ export default function PayrollChecksTab() {
       <PayrollControlsPanel />
       <StatutoryRulesPanel />
       <ImpactReportPanel />
+      <TaxYearLabelsPanel />
     </div>
   )
 }
