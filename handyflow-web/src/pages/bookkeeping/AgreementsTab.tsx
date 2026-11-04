@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { useSubmitGuard } from "../../hooks/useSubmitGuard"
 import { usePermission } from "../../hooks/usePermission"
 import { dateText, errorOf, rowsOf } from "./bookkeeping.logic"
 import { BILLING_TYPES, agreementProblem, agreementTerms, billingLabel, type Agreement } from "./practice.logic"
@@ -23,6 +24,7 @@ function Agreements({ clientId }: { clientId: string }) {
   })
   const end = useMutation({ mutationFn: (id: string) => apiClient.post(`/api/v1/bookkeeping/service-agreements/${id}/end`), onSuccess: refresh, onError: e => setError(errorOf(e)) })
   const problem = agreementProblem(f.type, f.fee, f.rate, f.start, f.end)
+  const submitGuard = useSubmitGuard(problem)
   return (
     <div>
       {canManage && (
@@ -35,7 +37,8 @@ function Agreements({ clientId }: { clientId: string }) {
               : <input aria-label="Hourly rate" placeholder="Rate per hour" value={f.rate} onChange={e => setF({ ...f, rate: e.target.value })} style={{ ...field, width: 120 }} />}
             <label style={muted}>From <input aria-label="Start date" type="date" value={f.start} onChange={e => setF({ ...f, start: e.target.value })} style={field} /></label>
             <label style={muted}>To (optional) <input aria-label="End date" type="date" value={f.end} onChange={e => setF({ ...f, end: e.target.value })} style={field} /></label>
-            <button style={primary} disabled={!!problem || add.isPending} onClick={() => add.mutate()}>Add</button>
+            <button style={primary} disabled={add.isPending} onClick={submitGuard.guard(() => add.mutate())}>Add</button>
+            {submitGuard.shown && <span role="alert" style={danger}>{submitGuard.shown}</span>}
           </div>
           {problem && (f.fee || f.rate || f.end) && <div style={{ ...muted, marginTop: 6 }}>{problem}</div>}
         </div>

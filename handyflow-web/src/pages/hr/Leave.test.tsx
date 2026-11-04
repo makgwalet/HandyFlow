@@ -97,6 +97,18 @@ describe("LeaveTab", () => {
     expect(screen.queryByRole("button", { name: /^reject$/i })).toBeNull()
   })
 
+  it("an empty leave request says what is missing instead of doing nothing", async () => {
+    perms = ["LEAVE_CREATE", "LEAVE_APPROVE", "LEAVE_ADMIN"]
+    mockApi([req()])
+    wrap(<LeaveTab />)
+    await screen.findByText("2.0 working days")
+    fireEvent.click(screen.getByRole("button", { name: /submit request/i }))
+    const submit = await screen.findAllByRole("button", { name: /submit request/i })
+    fireEvent.click(submit[submit.length - 1])
+    expect((await screen.findByRole("alert")).textContent).toMatch(/choose the employee/i)
+    expect(post).not.toHaveBeenCalled()
+  })
+
   it("approves with the right", async () => {
     perms = ["LEAVE_APPROVE"]
     mockApi([req()])

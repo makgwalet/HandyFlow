@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { useSubmitGuard } from "../../hooks/useSubmitGuard"
 import { usePermission } from "../../hooks/usePermission"
 import { dateText, errorOf, handoverProblem, returnProblem, rowsOf, type Handover, type WorkRow } from "./bookkeeping.logic"
 import ClientScope from "./ClientScope"
@@ -26,6 +27,7 @@ function Handovers({ clientId }: { clientId: string }) {
   const work = queue.find(r => r.clientId === clientId)
   const openOne = list.some(h => h.status === "SENT")
   const problem = handoverProblem(periodEnd, today, work, openOne)
+  const submitGuard = useSubmitGuard(problem)
   const changed = (r: any) => { setError(null); qc.setQueryData(["bk-handovers", clientId], rowsOf<Handover>(r)); qc.invalidateQueries({ queryKey: ["bk-work-queue"] }); qc.invalidateQueries({ queryKey: ["bk-periods"] }) }
   const fail = (e: any) => { setMessage(null); setError(errorOf(e)) }
   const send = useMutation({ mutationFn: () => apiClient.post(`/api/v1/bookkeeping/clients/${clientId}/handovers`, { periodEnd, note: note.trim() || null }),
@@ -44,7 +46,8 @@ function Handovers({ clientId }: { clientId: string }) {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <label style={{ fontSize: 12 }}>Up to <input aria-label="Handover date" type="date" max={today} value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} style={field} /></label>
             <input aria-label="Note" placeholder="Note for the accountant (optional)" value={note} onChange={e => setNote(e.target.value)} style={{ ...field, width: 320 }} />
-            <button style={primary} disabled={!!problem || send.isPending} onClick={() => send.mutate()}>Send</button>
+            <button style={primary} disabled={send.isPending} onClick={submitGuard.guard(() => send.mutate())}>Send</button>
+            {submitGuard.shown && <span role="alert" style={danger}>{submitGuard.shown}</span>}
           </div>
           {problem && periodEnd && <div style={{ ...muted, marginTop: 6 }}>{problem}</div>}
         </div>

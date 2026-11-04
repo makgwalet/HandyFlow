@@ -1,4 +1,5 @@
 // A client's bank: accounts, imported lines, the lines that rules can categorise in one go, and one-by-one booking or matching.
+import { useSubmitGuard } from "../../hooks/useSubmitGuard"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -128,6 +129,7 @@ function BankAccountsBar({ clientId, banks, accounts, selected, onSelect, canMan
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ bankName: "", accountName: "", accountNumber: "", branchCode: "", accountType: "CURRENT" })
   const [err, setErr] = useState<string | null>(null)
+  const submitGuard = useSubmitGuard(!form.bankName.trim() ? "Enter the bank name." : !form.accountName.trim() ? "Enter the account name." : !form.accountNumber.trim() ? "Enter the account number." : null)
   const bank = banks.find(b => b.id === selected)
   const created = () => { setAdding(false); setErr(null); setForm({ bankName: "", accountName: "", accountNumber: "", branchCode: "", accountType: "CURRENT" }); qc.invalidateQueries({ queryKey: ["bk-banks"] }) }
   const add = useMutation({ mutationFn: () => apiClient.post("/api/v1/bookkeeping/bank-accounts", { clientId, ...form, branchCode: form.branchCode || null }), onSuccess: created, onError: e => setErr(errorOf(e)) })
@@ -160,7 +162,8 @@ function BankAccountsBar({ clientId, banks, accounts, selected, onSelect, canMan
           <input aria-label="Branch code" placeholder="Branch code" value={form.branchCode} onChange={e => setForm({ ...form, branchCode: e.target.value })} style={{ ...field, width: 100 }} />
           <select aria-label="Account type" value={form.accountType} onChange={e => setForm({ ...form, accountType: e.target.value })} style={field}>
             <option value="CURRENT">Current</option><option value="SAVINGS">Savings</option><option value="CREDIT_CARD">Credit card</option></select>
-          <button style={primary} disabled={!form.bankName.trim() || !form.accountName.trim() || !form.accountNumber.trim() || add.isPending} onClick={() => add.mutate()}>Save</button>
+          <button style={primary} disabled={add.isPending} onClick={submitGuard.guard(() => add.mutate())}>Save</button>
+          {submitGuard.shown && <span role="alert" style={danger}>{submitGuard.shown}</span>}
         </div>
       )}
       {err && <div role="alert" style={{ ...danger, marginTop: 6 }}>{err}</div>}

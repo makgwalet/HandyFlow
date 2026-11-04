@@ -5,6 +5,7 @@
 // 3. leaveBalances unwrap fixed
 // 4. Working days preview added
 // 5. Leave type colour badges
+import { useSubmitGuard } from "../../hooks/useSubmitGuard"
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -123,6 +124,8 @@ export default function LeaveTab() {
   // Preview only: the server also removes public holidays and has the final say.
   const workingCount = workingDays(form.startDate, form.endDate, form.halfDay)
   const formProblem = form.startDate && form.endDate ? requestProblem(form, workingCount) : null
+  const missingProblem = !form.employeeId ? "Choose the employee." : !form.startDate ? "Choose the first day of leave." : !form.endDate ? "Choose the last day of leave." : formProblem
+  const submitGuard = useSubmitGuard(missingProblem)
   const needsCertificate = certificateExpected(form.leaveType, workingCount)
 
   const filtered = (requests as any[]).filter(r => typeFilter === "ALL" || r.leaveType === typeFilter)
@@ -309,7 +312,7 @@ export default function LeaveTab() {
                   {workingCount} working day{workingCount === 1 ? "" : "s"} (weekends excluded; the server also removes public holidays)
                 </div>
               )}
-              {formProblem && <div style={{ fontSize: 12, color: "var(--hf-danger-text)" }}>{formProblem}</div>}
+              {(formProblem || submitGuard.shown) && <div role="alert" style={{ fontSize: 12, color: "var(--hf-danger-text)" }}>{formProblem || submitGuard.shown}</div>}
               <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--hf-text-secondary)" }}>
                 <input type="checkbox" checked={form.halfDay} onChange={e => setForm(f => ({ ...f, halfDay: e.target.checked }))} /> Half day
               </label>
@@ -327,8 +330,8 @@ export default function LeaveTab() {
             {error && <div style={{ marginTop: 12, padding: "9px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 7 }}><AlertCircle size={13} />{error}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setShowCreate(false)} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
-              <button onClick={() => submitLeave.mutate({ empId: form.employeeId, body: { leaveType: form.leaveType, startDate: form.startDate, endDate: form.endDate, reason: form.reason || null, halfDay: form.halfDay, medicalCertificate: form.medicalCertificate } })}
-                disabled={!form.employeeId || !form.startDate || !form.endDate || !!formProblem || submitLeave.isPending}
+              <button onClick={submitGuard.guard(() => submitLeave.mutate({ empId: form.employeeId, body: { leaveType: form.leaveType, startDate: form.startDate, endDate: form.endDate, reason: form.reason || null, halfDay: form.halfDay, medicalCertificate: form.medicalCertificate } }))}
+                disabled={submitLeave.isPending}
                 style={{ padding: "9px 22px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {submitLeave.isPending ? "Submitting..." : "Submit Request"}
               </button>

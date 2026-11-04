@@ -1,4 +1,5 @@
 // The practice's bookkeeping clients: add, edit, switch off and back on.
+import { useSubmitGuard } from "../../hooks/useSubmitGuard"
 import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
@@ -30,6 +31,7 @@ export default function ClientsTab() {
     mutationFn: (c: Client) => apiClient.post(`/api/v1/bookkeeping/clients/${c.id}/${c.status === "ACTIVE" ? "deactivate" : "reactivate"}`),
     onSuccess: done, onError: e => setError(errorOf(e)),
   })
+  const submitGuard = useSubmitGuard(form.tradingName.trim() ? null : "Enter the client's trading name.")
   const edit = (c: Client) => { setEditing(c.id); setForm({ tradingName: c.tradingName, registrationNumber: c.registrationNumber ?? "", vatNumber: c.vatNumber ?? "", contactName: c.contactName ?? "", contactEmail: c.contactEmail ?? "", contactPhone: c.contactPhone ?? "", address: c.address ?? "" }) }
   const shown = clients.filter(c => !search.trim() || `${c.tradingName} ${c.clientCode} ${c.vatNumber ?? ""}`.toLowerCase().includes(search.trim().toLowerCase()))
 
@@ -46,7 +48,8 @@ export default function ClientsTab() {
             <input aria-label="Contact email" placeholder="Contact email" value={form.contactEmail} onChange={e => set("contactEmail", e.target.value)} style={{ ...field, width: 190 }} />
             <input aria-label="Contact phone" placeholder="Contact phone" value={form.contactPhone} onChange={e => set("contactPhone", e.target.value)} style={{ ...field, width: 130 }} />
             <input aria-label="Address" placeholder="Address" value={form.address} onChange={e => set("address", e.target.value)} style={{ ...field, width: 260 }} />
-            <button style={primary} disabled={!form.tradingName.trim() || save.isPending} onClick={() => save.mutate()}>{editing ? "Save" : "Add client"}</button>
+            <button style={primary} disabled={save.isPending} onClick={submitGuard.guard(() => save.mutate())}>{editing ? "Save" : "Add client"}</button>
+            {submitGuard.shown && <span role="alert" style={danger}>{submitGuard.shown}</span>}
             {editing && <button style={btn} onClick={() => { setEditing(null); setForm(blank) }}>Cancel</button>}
           </div>
           {error && <div role="alert" style={{ ...danger, marginTop: 6 }}>{error}</div>}

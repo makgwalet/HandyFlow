@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { useSubmitGuard } from "../../hooks/useSubmitGuard"
 import { usePermission } from "../../hooks/usePermission"
 import { QUERY_KINDS, answerProblem, dateText, errorOf, kindText, queryProblem, rowsOf, type Query } from "./bookkeeping.logic"
 import ClientScope from "./ClientScope"
@@ -28,6 +29,7 @@ function Queries({ clientId }: { clientId: string }) {
     onSuccess: r => { changed(r); setAnswering(null); setAnswer(""); setDocRef("") }, onError: fail })
   const close = useMutation({ mutationFn: (id: string) => apiClient.post(`${base}/${id}/close`), onSuccess: changed, onError: fail })
   const askProblem = queryProblem(kind, text)
+  const submitGuard = useSubmitGuard(askProblem)
   return (
     <div>
       {canManage && (
@@ -36,7 +38,8 @@ function Queries({ clientId }: { clientId: string }) {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <select aria-label="Kind" value={kind} onChange={e => setKind(e.target.value)} style={field}>{QUERY_KINDS.map(k => <option key={k.value} value={k.value}>{k.label}</option>)}</select>
             <input aria-label="What do you need" placeholder="What do you need?" value={text} onChange={e => setText(e.target.value)} style={{ ...field, width: 380 }} />
-            <button style={primary} disabled={!!askProblem || ask.isPending} onClick={() => ask.mutate()}>Ask</button>
+            <button style={primary} disabled={ask.isPending} onClick={submitGuard.guard(() => ask.mutate())}>Ask</button>
+            {submitGuard.shown && <span role="alert" style={danger}>{submitGuard.shown}</span>}
           </div>
           {askProblem && text && <div style={{ ...muted, marginTop: 6 }}>{askProblem}</div>}
         </div>

@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { useSubmitGuard } from "../../hooks/useSubmitGuard"
 import { usePermission } from "../../hooks/usePermission"
 import { dateText, errorOf, money, rowsOf } from "./bookkeeping.logic"
 import { ACTIVITIES, activityLabel, timeProblem, timeValue, unbilledTotal, type TimeEntry } from "./practice.logic"
@@ -28,6 +29,7 @@ function Time({ clientId }: { clientId: string }) {
   const writeOff = useMutation({ mutationFn: (id: string) => apiClient.post(`${base}/time-entries/${id}/write-off`), onSuccess: refresh, onError: fail })
   const remove = useMutation({ mutationFn: (id: string) => apiClient.delete(`${base}/time-entries/${id}`), onSuccess: refresh, onError: fail })
   const problem = timeProblem(f, today)
+  const submitGuard = useSubmitGuard(problem)
   const statusText = (t: TimeEntry) => t.invoiceId ? "Billed" : t.status === "WRITTEN_OFF" ? "Written off" : t.status === "NON_BILLABLE" || !t.billable ? "Not billable" : "To bill"
   return (
     <div>
@@ -44,7 +46,8 @@ function Time({ clientId }: { clientId: string }) {
             <input aria-label="Done by" placeholder="Done by" value={f.who} onChange={e => setF({ ...f, who: e.target.value })} style={{ ...field, width: 120 }} />
             <label style={muted}><input type="checkbox" aria-label="Billable" checked={f.billable} onChange={e => setF({ ...f, billable: e.target.checked })} /> Billable</label>
             {timeValue(f) > 0 && <span style={muted}>{money(timeValue(f))}</span>}
-            <button style={primary} disabled={!!problem || log.isPending} onClick={() => log.mutate()}>Log</button>
+            <button style={primary} disabled={log.isPending} onClick={submitGuard.guard(() => log.mutate())}>Log</button>
+            {submitGuard.shown && <span role="alert" style={danger}>{submitGuard.shown}</span>}
           </div>
           {problem && f.hours && <div style={{ ...muted, marginTop: 6 }}>{problem}</div>}
         </div>

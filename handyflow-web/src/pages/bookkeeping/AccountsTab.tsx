@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { useSubmitGuard } from "../../hooks/useSubmitGuard"
 import { usePermission } from "../../hooks/usePermission"
 import { errorOf, money, rowsOf } from "./bookkeeping.logic"
 import { ACCOUNT_TYPES, accountProblem, typeLabel } from "./practice.logic"
@@ -21,6 +22,7 @@ function Accounts({ clientId }: { clientId: string }) {
     onSuccess: () => { setError(null); setForm({ code: "", name: "", type: "EXPENSE", description: "" }); qc.invalidateQueries({ queryKey: ["bk-accounts"] }) }, onError: e => setError(errorOf(e)),
   })
   const problem = accountProblem(form.code, form.name, form.type)
+  const submitGuard = useSubmitGuard(problem)
   return (
     <div>
       {canManage && (
@@ -30,7 +32,8 @@ function Accounts({ clientId }: { clientId: string }) {
             <input aria-label="Account code" placeholder="Code" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} style={{ ...field, width: 90 }} />
             <input aria-label="Account name" placeholder="Name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={{ ...field, width: 220 }} />
             <select aria-label="Account type" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} style={field}>{ACCOUNT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select>
-            <button style={primary} disabled={!!problem || add.isPending} onClick={() => add.mutate()}>Add</button>
+            <button style={primary} disabled={add.isPending} onClick={submitGuard.guard(() => add.mutate())}>Add</button>
+            {submitGuard.shown && <span role="alert" style={danger}>{submitGuard.shown}</span>}
           </div>
           {error && <div role="alert" style={{ ...danger, marginTop: 6 }}>{error}</div>}
         </div>

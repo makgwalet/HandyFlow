@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { useSubmitGuard } from "../../hooks/useSubmitGuard"
 import { usePermission } from "../../hooks/usePermission"
 import { DIRECTIONS, FIELDS, emptyRule, errorOf, rowsOf, ruleProblem, ruleRequest, ruleSummary, type Account, type BankAccount, type Rule } from "./bookkeeping.logic"
 import ClientScope from "./ClientScope"
@@ -27,6 +28,7 @@ function Rules({ clientId }: { clientId: string }) {
   const toggle = useMutation({ mutationFn: (r: Rule) => apiClient.post(`${base}/bank-rules/${r.id}/active?active=${!r.active}`), onSuccess: changed, onError: fail })
   const remove = useMutation({ mutationFn: (id: string) => apiClient.delete(`${base}/bank-rules/${id}`), onSuccess: changed, onError: fail })
   const problem = ruleProblem(form)
+  const submitGuard = useSubmitGuard(problem)
   const nameOf = (id: string) => { const a = accounts.find(x => x.id === id); return a ? `${a.accountCode} ${a.accountName}` : "—" }
   return (
     <div>
@@ -61,7 +63,8 @@ function Rules({ clientId }: { clientId: string }) {
             <select aria-label="Book to account" value={form.contraAccountId} onChange={e => set("contraAccountId", e.target.value)} style={{ ...field, minWidth: 200 }}>
               <option value="">Book to…</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.accountCode} {a.accountName}</option>)}</select>
             <input aria-label="Priority" type="number" title="Lower numbers are tried first" value={form.priority} onChange={e => set("priority", e.target.value)} style={{ ...field, width: 80 }} />
-            <button style={primary} disabled={!!problem || add.isPending} onClick={() => add.mutate()}>Add rule</button>
+            <button style={primary} disabled={add.isPending} onClick={submitGuard.guard(() => add.mutate())}>Add rule</button>
+            {submitGuard.shown && <span role="alert" style={danger}>{submitGuard.shown}</span>}
           </div>
           {problem && form.name && <div style={{ ...muted, marginTop: 6 }}>{problem}</div>}
           {error && <div role="alert" style={{ ...danger, marginTop: 6 }}>{error}</div>}

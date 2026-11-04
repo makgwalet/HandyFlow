@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { useSubmitGuard } from "../../hooks/useSubmitGuard"
 import { usePermission } from "../../hooks/usePermission"
 import { dateText, errorOf, money, rowsOf, type Account } from "./bookkeeping.logic"
 import { emptyLine, journalProblem, journalRequest, journalTotals, type Journal } from "./practice.logic"
@@ -26,6 +27,7 @@ function Journals({ clientId }: { clientId: string }) {
   const post = useMutation({ mutationFn: (id: string) => apiClient.post(`${base}/journal-entries/${id}/post`), onSuccess: () => { setError(null); refresh() }, onError: e => setError(errorOf(e)) })
   const setLine = (i: number, k: string, v: string) => setLines(ls => ls.map((l, j) => (j === i ? { ...l, [k]: v } : l)))
   const problem = journalProblem(date, lines)
+  const submitGuard = useSubmitGuard(problem)
   const totals = journalTotals(lines)
   const nameOf = (id: string) => { const a = accounts.find(x => x.id === id); return a ? `${a.accountCode} ${a.accountName}` : "—" }
   return (
@@ -53,7 +55,8 @@ function Journals({ clientId }: { clientId: string }) {
             </tbody>
           </table>
           <div style={{ marginTop: 8, display: "flex", gap: 10, alignItems: "center" }}>
-            <button style={primary} disabled={!!problem || create.isPending} onClick={() => create.mutate()}>Save as draft</button>
+            <button style={primary} disabled={create.isPending} onClick={submitGuard.guard(() => create.mutate())}>Save as draft</button>
+            {submitGuard.shown && <span role="alert" style={danger}>{submitGuard.shown}</span>}
             {problem && lines.some(l => l.accountId || l.debit || l.credit) && <span style={muted}>{problem}</span>}
           </div>
         </div>
