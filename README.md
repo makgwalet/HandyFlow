@@ -626,7 +626,7 @@ Tokens are in-memory — they're lost on page refresh or after 24 hours. Simply 
 
 ## Users, Roles & Access Control
 
-> **Status: audit complete, target architecture proposed and awaiting approval.** The design below is *not* built yet. Details live in [`docs/iam/`](docs/iam/).
+> **Status: audit complete; Owner/Administrator split and free entry tier approved; Phase 0 hardening delivered (patch 0606, not yet run against a database). The rest of the design below is *not* built yet; see [`ENTITLEMENT_TIERS_AND_GAPS.md`](docs/iam/ENTITLEMENT_TIERS_AND_GAPS.md).** Details live in [`docs/iam/`](docs/iam/).
 
 ### How it works today (verified in code)
 

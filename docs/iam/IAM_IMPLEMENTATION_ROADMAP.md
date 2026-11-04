@@ -1,6 +1,6 @@
 # IAM Implementation Roadmap (proposal)
 
-Status: **nothing here is started.** Phase 0 is the part I recommend approving first because it closes concrete findings from `USER_MANAGEMENT_AUDIT.md` without schema redesign. Sizes: S ≤ 3 days, M ≤ 2 weeks, L > 2 weeks of one developer, rough and unvalidated. Each phase ships behind per-tenant flags where behaviour changes, and has a rollback.
+Status: **Phase 0 items 0.1 to 0.8 delivered in patch 0606 (untested on a database; see ENTITLEMENT_TIERS_AND_GAPS.md section 1 and 5). Later phases not started.** Phase 0 is the part I recommend approving first because it closes concrete findings from `USER_MANAGEMENT_AUDIT.md` without schema redesign. Sizes: S ≤ 3 days, M ≤ 2 weeks, L > 2 weeks of one developer, rough and unvalidated. Each phase ships behind per-tenant flags where behaviour changes, and has a rollback.
 
 ## Update 2026-11-04: not yet in production
 
