@@ -1109,7 +1109,7 @@ export const CRM_SECTIONS: ModuleSections = {
 /**
  * Facilities Management (the FM provider module, /api/v1/facilitiesmanagement). Work orders, then the clients, sites and assets
  * they are done for, planned maintenance (on each asset), technicians, vendors, and secure sharing of a completed job's files.
- * Quotes, agreements, billing, reports and the client portal are still to come.
+ * Quotes, service agreements, the SLA calendar and invoicing sit alongside. Reports and the client portal are still to come.
  */
 const FM_VIEW = ['FACILITIESMANAGEMENT_READ', 'FACILITIESMANAGEMENT_MANAGE', 'FACILITIESMANAGEMENT_ADMIN']
 export const FM_SECTIONS: ModuleSections = {
@@ -1124,6 +1124,15 @@ export const FM_SECTIONS: ModuleSections = {
       sections: [
         { id: 'work-orders', label: 'Work orders', icon: ClipboardList,
           anyPermission: [...FM_VIEW, 'FACILITIESMANAGEMENT_TECHNICIAN', 'FACILITIESMANAGEMENT_WORKORDER_CREATE', 'FACILITIESMANAGEMENT_WORKORDER_ASSIGN'] },
+        { id: 'quotes', label: 'Quotes', icon: FileText, anyPermission: FM_VIEW },
+      ],
+    },
+    {
+      label: 'Contracts and billing',
+      sections: [
+        { id: 'agreements', label: 'Service agreements', icon: FileText, anyPermission: [...FM_VIEW, 'FACILITIESMANAGEMENT_CONTRACT_MANAGE'] },
+        { id: 'sla-calendar', label: 'Working hours', icon: Clock, anyPermission: FM_VIEW },
+        { id: 'invoices', label: 'Invoices', icon: Receipt, anyPermission: [...FM_VIEW, 'FACILITIESMANAGEMENT_BILLING_MANAGE', 'FACILITIESMANAGEMENT_BILLING_APPROVE'] },
       ],
     },
     {

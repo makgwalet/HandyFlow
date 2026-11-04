@@ -1,7 +1,7 @@
 // src/pages/facilitiesmanagement/FmPage.tsx
 //
 // Facilities Management (FM provider module, /api/v1/facilitiesmanagement). Sections are routes (/facilitiesmanagement/:section),
-// registered in navigation/moduleSections.ts (FM_SECTIONS): work orders, clients, sites, assets and secure sharing of completed work's files.
+// registered in navigation/moduleSections.ts (FM_SECTIONS): work orders, quotes, clients, sites, assets, technicians, vendors, agreements, the SLA calendar, invoicing and secure sharing of completed work's files.
 import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
 import { FM_SECTIONS } from '../../navigation/moduleSections'
 import FmSharedDocumentsTab from './FmSharedDocumentsTab'
@@ -11,12 +11,20 @@ import SitesTab from './SitesTab'
 import AssetsTab from './AssetsTab'
 import TechniciansTab from './TechniciansTab'
 import VendorsTab from './VendorsTab'
+import QuotesTab from './QuotesTab'
+import AgreementsTab from './AgreementsTab'
+import SlaCalendarTab from './SlaCalendarTab'
+import BillingTab from './BillingTab'
 
 export function FmPage() {
   return (
     <SectionedModulePage config={FM_SECTIONS} render={(id) => {
       switch (id) {
         case 'work-orders':      return <WorkOrdersTab />
+        case 'quotes':           return <QuotesTab />
+        case 'agreements':       return <AgreementsTab />
+        case 'sla-calendar':     return <SlaCalendarTab />
+        case 'invoices':         return <BillingTab />
         case 'clients':          return <ClientsTab />
         case 'sites':            return <SitesTab />
         case 'assets':           return <AssetsTab />

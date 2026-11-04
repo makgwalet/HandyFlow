@@ -199,3 +199,141 @@ describe("technicians and vendors", () => {
     expect(docNote("VALID", true, "2027-06-01", NOW).text).toBe("In force")
   })
 })
+
+import { agreementBody, agreementProblem, agreementState, billWho, calendarBody, calendarProblem, coverageText, creditActions, creditBody, creditProblem, daysText, dueNote, emptyAgreement, emptyCredit, emptyGenerate, emptyPay, emptyQuote, emptyQuoteLine, emptyTarget, generateBody, generateProblem, glNote, holidayProblem, invoiceActions, lineTotal, minutesText, payBody, payProblem, quoteActions, quoteBody, quoteProblem, quoteSubtotal, quoteValidity, sendProblem, trimTime, type AgreementForm, type QuoteForm } from "./fm.logic"
+
+describe("service agreements", () => {
+  const ok = (): AgreementForm => ({ ...emptyAgreement(), clientId: "c1", name: "Head office", startDate: "2026-01-01" })
+  it("accepts a plain time-and-materials agreement", () => expect(agreementProblem(ok(), true)).toBeNull())
+  it("needs a client, name and start when created", () => {
+    expect(agreementProblem({ ...ok(), clientId: "" }, true)).toMatch(/client/)
+    expect(agreementProblem({ ...ok(), name: " " }, true)).toMatch(/name/)
+    expect(agreementProblem({ ...ok(), startDate: "" }, true)).toMatch(/start/)
+    expect(agreementProblem({ ...ok(), clientId: "", startDate: "" }, false)).toBeNull()
+  })
+  it("requires the end date to be after the start", () => {
+    expect(agreementProblem({ ...ok(), endDate: "2026-01-01" }, true)).toMatch(/after/)
+    expect(agreementProblem({ ...ok(), endDate: "2026-12-31" }, true)).toBeNull()
+  })
+  it("needs a positive fee for a retainer only", () => {
+    expect(agreementProblem({ ...ok(), billingType: "RETAINER" }, true)).toMatch(/retainer/)
+    expect(agreementProblem({ ...ok(), billingType: "RETAINER", monthlyFee: "0" }, true)).toMatch(/retainer/)
+    expect(agreementProblem({ ...ok(), billingType: "RETAINER", monthlyFee: "12000" }, true)).toBeNull()
+  })
+  it("keeps the mark-up between 0 and 1000", () => {
+    expect(agreementProblem({ ...ok(), partsMarkupPercent: "1001" }, true)).toMatch(/mark-up/)
+    expect(agreementProblem({ ...ok(), partsMarkupPercent: "-1" }, true)).toMatch(/mark-up/)
+    expect(agreementProblem({ ...ok(), partsMarkupPercent: "15" }, true)).toBeNull()
+  })
+  it("checks service targets", () => {
+    const tg = (p: string, r: string, s: string) => ({ priority: p, responseMinutes: r, resolutionMinutes: s, clock: "24X7" })
+    expect(agreementProblem({ ...ok(), targets: [tg("HIGH", "30", "240")] }, true)).toBeNull()
+    expect(agreementProblem({ ...ok(), targets: [tg("HIGH", "0", "240")] }, true)).toMatch(/response/)
+    expect(agreementProblem({ ...ok(), targets: [tg("HIGH", "60", "30")] }, true)).toMatch(/shorter/)
+    expect(agreementProblem({ ...ok(), targets: [tg("HIGH", "30", "240"), tg("HIGH", "60", "300")] }, true)).toMatch(/two targets/)
+  })
+  it("picks an unused priority for a new target", () => expect(emptyTarget(["LOW", "NORMAL"]).priority).toBe("HIGH"))
+  it("sends only editable fields when updating", () => {
+    const b = agreementBody({ ...ok(), monthlyFee: "500", hourlyRate: "", endDate: "" }, false) as Record<string, unknown>
+    expect(b.clientId).toBeUndefined(); expect(b.startDate).toBeUndefined(); expect(b.monthlyFee).toBe(500); expect(b.hourlyRate).toBeNull(); expect(b.endDate).toBeNull()
+    expect((agreementBody(ok(), true) as Record<string, unknown>).clientId).toBe("c1")
+  })
+  it("words coverage", () => {
+    expect(coverageText([], [], () => "")).toBe("All sites · all kinds of work")
+    expect(coverageText(["s1"], ["PPM", "EMERGENCY"], () => "Depot")).toBe("Depot · Planned maintenance, Emergency")
+  })
+  it("words minutes", () => { expect(minutesText(45)).toBe("45 min"); expect(minutesText(240)).toBe("4 h"); expect(minutesText(90)).toBe("1 h 30 min"); expect(minutesText(1560)).toBe("1 d 2 h"); expect(minutesText(null)).toBe("—") })
+  it("flags agreements near or past their end", () => {
+    const now = new Date("2026-11-04T10:00:00")
+    expect(agreementState("ENDED", null, now).text).toBe("Ended")
+    expect(agreementState("ACTIVE", "2026-11-20", now)).toEqual({ text: "Ends in 16 d", tone: "warning" })
+    expect(agreementState("ACTIVE", "2026-10-01", now).text).toBe("Past its end date")
+    expect(agreementState("ACTIVE", null, now).tone).toBe("success")
+  })
+})
+
+describe("SLA calendar", () => {
+  const f = { startTime: "08:00", endTime: "17:00", workingDays: ["MON", "FRI"], timeZone: "Africa/Johannesburg" }
+  it("checks hours, days and zone", () => {
+    expect(calendarProblem(f)).toBeNull()
+    expect(calendarProblem({ ...f, endTime: "08:00" })).toMatch(/after/)
+    expect(calendarProblem({ ...f, workingDays: [] })).toMatch(/day/)
+    expect(calendarProblem({ ...f, timeZone: " " })).toMatch(/zone/)
+  })
+  it("sends days in week order", () => expect(calendarBody({ ...f, workingDays: ["FRI", "MON", "WED"] }).workingDays).toEqual(["MON", "WED", "FRI"]))
+  it("trims seconds off times", () => expect(trimTime("08:00:00")).toBe("08:00"))
+  it("rejects missing or repeated holidays", () => {
+    expect(holidayProblem("", [])).toMatch(/date/); expect(holidayProblem("2026-12-25", ["2026-12-25"])).toMatch(/already/); expect(holidayProblem("2026-12-26", ["2026-12-25"])).toBeNull()
+  })
+  it("words working days", () => { expect(daysText(["FRI", "MON", "TUE", "WED", "THU"])).toBe("Mon – Fri"); expect(daysText(["SAT", "MON"])).toBe("Mon, Sat"); expect(daysText(["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"])).toBe("Every day") })
+})
+
+describe("quotes", () => {
+  const ok = (): QuoteForm => ({ ...emptyQuote(), clientId: "c", siteId: "s", title: "Replace pump", lines: [{ description: "Pump", quantity: "2", unitPrice: "1500.50" }] })
+  it("totals lines in cents", () => {
+    expect(lineTotal({ description: "x", quantity: "3", unitPrice: "0.1" })).toBe(0.3)
+    expect(quoteSubtotal([{ description: "a", quantity: "2", unitPrice: "10.005" }, { description: "b", quantity: "1", unitPrice: "5" }])).toBeCloseTo(25.01, 2)
+    expect(lineTotal(emptyQuoteLine())).toBe(0)
+  })
+  it("accepts a complete quote", () => expect(quoteProblem(ok(), true)).toBeNull())
+  it("names the line that is wrong", () => {
+    expect(quoteProblem({ ...ok(), lines: [{ description: "", quantity: "1", unitPrice: "5" }] }, true)).toMatch(/Line 1 needs/)
+    expect(quoteProblem({ ...ok(), lines: [ok().lines[0], { description: "x", quantity: "0", unitPrice: "5" }] }, true)).toMatch(/Line 2: the quantity/)
+    expect(quoteProblem({ ...ok(), lines: [{ description: "x", quantity: "1", unitPrice: "" }] }, true)).toMatch(/Line 1: enter the price/)
+    expect(quoteProblem({ ...ok(), lines: [] }, true)).toMatch(/at least one/)
+  })
+  it("fixes the client and site after creation", () => {
+    expect(quoteProblem({ ...ok(), clientId: "", siteId: "" }, false)).toBeNull()
+    expect(quoteProblem({ ...ok(), clientId: "" }, true)).toMatch(/client/)
+    expect((quoteBody(ok(), false) as Record<string, unknown>).clientId).toBeUndefined()
+    expect((quoteBody(ok(), true) as Record<string, unknown>).siteId).toBe("s")
+  })
+  it("sends numbers, not text", () => expect((quoteBody(ok(), true) as { lines: { quantity: number; unitPrice: number }[] }).lines[0]).toMatchObject({ quantity: 2, unitPrice: 1500.5 }))
+  it("offers actions by status", () => {
+    expect(quoteActions("DRAFT", true)).toEqual(["edit", "send"]); expect(quoteActions("SENT", true)).toEqual(["withdraw"])
+    expect(quoteActions("ACCEPTED", true)).toEqual([]); expect(quoteActions("DRAFT", false)).toEqual([])
+  })
+  it("explains why a draft cannot be sent", () => {
+    expect(sendProblem(null, 0, "2026-11-04")).toMatch(/above 0/); expect(sendProblem("2026-11-01", 10, "2026-11-04")).toMatch(/passed/)
+    expect(sendProblem("2026-11-04", 10, "2026-11-04")).toBeNull(); expect(sendProblem(null, 10, "2026-11-04")).toBeNull()
+  })
+  it("flags a sent quote past its date", () => {
+    expect(quoteValidity("SENT", "2026-11-01", "2026-11-04")?.tone).toBe("warning"); expect(quoteValidity("SENT", "2026-11-10", "2026-11-04")).toBeNull(); expect(quoteValidity("ACCEPTED", "2026-11-01", "2026-11-04")).toBeNull()
+  })
+})
+
+describe("billing", () => {
+  const has = (...ps: string[]) => (p: string) => ps.includes(p)
+  const prep = billWho(has("FACILITIESMANAGEMENT_BILLING_MANAGE")), appr = billWho(has("FACILITIESMANAGEMENT_BILLING_APPROVE")), admin = billWho(has("FACILITIESMANAGEMENT_ADMIN")), none = billWho(has())
+  it("reads who may prepare and approve", () => { expect(prep).toEqual({ prepare: true, approve: false }); expect(appr).toEqual({ prepare: false, approve: true }); expect(admin).toEqual({ prepare: true, approve: true }); expect(none).toEqual({ prepare: false, approve: false }) })
+  it("follows the invoice lifecycle", () => {
+    expect(invoiceActions("DRAFT", 0, admin)).toEqual(["approve", "cancel"]); expect(invoiceActions("DRAFT", 0, prep)).toEqual(["cancel"]); expect(invoiceActions("DRAFT", 0, appr)).toEqual(["approve"])
+    expect(invoiceActions("APPROVED", 100, admin)).toEqual(["send", "credit"])
+    expect(invoiceActions("SENT", 100, prep)).toEqual(["pay", "credit"]); expect(invoiceActions("PARTIAL", 40, prep)).toEqual(["pay", "credit"])
+    expect(invoiceActions("PAID", 0, admin)).toEqual([]); expect(invoiceActions("CANCELLED", 0, admin)).toEqual([]); expect(invoiceActions("SENT", 100, none)).toEqual([])
+  })
+  it("defaults the period to last month", () => expect(emptyGenerate("2026-11-04")).toMatchObject({ periodStart: "2026-10-01", periodEnd: "2026-10-31", basis: "WORK_ORDERS" }))
+  it("rolls the default period over a year end", () => expect(emptyGenerate("2026-01-15")).toMatchObject({ periodStart: "2025-12-01", periodEnd: "2025-12-31" }))
+  it("checks the period and sends the agreement only for a retainer", () => {
+    expect(generateProblem({ ...emptyGenerate("2026-11-04"), periodEnd: "2026-09-30" })).toMatch(/cannot end/); expect(generateProblem(emptyGenerate("2026-11-04"))).toBeNull()
+    expect(generateBody({ basis: "WORK_ORDERS", periodStart: "a", periodEnd: "b", agreementId: "x" }).agreementId).toBeNull()
+    expect(generateBody({ basis: "RETAINER", periodStart: "a", periodEnd: "b", agreementId: "x" }).agreementId).toBe("x")
+  })
+  it("limits a payment to what is owed", () => {
+    const f = emptyPay(250, "2026-11-04"); expect(f.amount).toBe("250.00"); expect(payProblem(f, 250)).toBeNull()
+    expect(payProblem({ ...f, amount: "250.01" }, 250)).toMatch(/more than/); expect(payProblem({ ...f, amount: "0" }, 250)).toMatch(/at least/); expect(payProblem({ ...f, amount: "" }, 250)).toMatch(/amount/)
+    expect(payBody({ ...f, reference: " " })).toMatchObject({ amount: 250, method: "EFT", reference: null })
+  })
+  it("asks for a reason and, for a part credit, an amount", () => {
+    expect(creditProblem(emptyCredit())).toMatch(/why/); expect(creditProblem({ mode: "full", subtotal: "", reason: "Wrong site" })).toBeNull()
+    expect(creditProblem({ mode: "part", subtotal: "", reason: "r" })).toMatch(/amount/); expect(creditProblem({ mode: "part", subtotal: "50", reason: "r" })).toBeNull()
+    expect(creditBody({ mode: "full", subtotal: "9", reason: " r " })).toEqual({ creditFullBalance: true, reason: "r" })
+    expect(creditBody({ mode: "part", subtotal: "50", reason: "r" })).toEqual({ subtotal: 50, creditFullBalance: false, reason: "r" })
+  })
+  it("offers credit note actions on drafts only", () => { expect(creditActions("DRAFT", admin)).toEqual(["approve", "cancel"]); expect(creditActions("APPROVED", admin)).toEqual([]); expect(creditActions("DRAFT", prep)).toEqual(["cancel"]) })
+  it("flags what is overdue", () => {
+    expect(dueNote("SENT", 100, "2026-11-01", "2026-11-04")).toEqual({ text: "3 d overdue", tone: "danger" }); expect(dueNote("SENT", 100, "2026-11-10", "2026-11-04")).toBeNull()
+    expect(dueNote("PAID", 0, "2026-11-01", "2026-11-04")).toBeNull(); expect(dueNote("DRAFT", 100, "2026-11-01", "2026-11-04")).toBeNull()
+  })
+  it("words ledger state", () => { expect(glNote("FAILED")?.tone).toBe("danger"); expect(glNote(null)).toBeNull(); expect(glNote("WEIRD_THING")?.label).toBe("weird thing") })
+})

@@ -18,7 +18,7 @@ function useSiteAssets(siteId: string) {
   return useQuery({ enabled: !!siteId, queryKey: ["fm-assets-site", siteId], queryFn: async () => pageOf<AssetRow>(await apiClient.get(`${BASE}/assets`, { params: { siteId, size: 200 } })).content })
 }
 /** Client, site and (optionally) asset pickers that narrow each other. */
-function Where({ lookups, f, set }: { lookups: Lookups; f: { clientId: string; siteId: string; assetId: string }; set: (k: "clientId" | "siteId" | "assetId") => (v: string) => void }) {
+export function Where({ lookups, f, set }: { lookups: Lookups; f: { clientId: string; siteId: string; assetId: string }; set: (k: "clientId" | "siteId" | "assetId") => (v: string) => void }) {
   const sites = useMemo(() => lookups.sites.filter(s => s.clientId === f.clientId && s.status !== "CLOSED"), [lookups.sites, f.clientId])
   const assets = useSiteAssets(f.siteId)
   return (

@@ -247,3 +247,188 @@ export const docNote = (status: string, inForce: boolean, expiry: string | null,
   }
   return { text: "In force", tone: "success" }
 }
+
+// ── Service agreements ───────────────────────────────────────────────────────────────────────────────────────────────
+export const BILLING_TYPES = [["TIME_AND_MATERIALS", "Time and materials"], ["RETAINER", "Monthly retainer"]] as const
+export const AGREEMENT_CATEGORIES = [["PPM", "Planned maintenance"], ["CORRECTIVE", "Repair"], ["EMERGENCY", "Emergency"], ["INSPECTION", "Inspection"], ["OTHER", "Other"]] as const
+export const CLOCKS = [["24X7", "Round the clock"], ["BUSINESS_HOURS", "Business hours only"]] as const
+export interface TargetForm { priority: string; responseMinutes: string; resolutionMinutes: string; clock: string }
+export interface AgreementForm { clientId: string; name: string; billingType: string; monthlyFee: string; hourlyRate: string; partsMarkupPercent: string; startDate: string; endDate: string; siteIds: string[]; categories: string[]; targets: TargetForm[] }
+export const emptyAgreement = (): AgreementForm => ({ clientId: "", name: "", billingType: "TIME_AND_MATERIALS", monthlyFee: "", hourlyRate: "", partsMarkupPercent: "", startDate: "", endDate: "", siteIds: [], categories: [], targets: [] })
+export const emptyTarget = (used: string[]): TargetForm => ({ priority: PRIORITIES.map(p => p[0]).find(p => !used.includes(p)) ?? "NORMAL", responseMinutes: "60", resolutionMinutes: "480", clock: "BUSINESS_HOURS" })
+/** Minutes in words: "45 min", "4 h", "1 d 2 h" (a day is 24 hours, as the round-the-clock clock counts it). */
+export function minutesText(m: number | null | undefined): string {
+  if (m == null) return "—"
+  if (m < 60) return `${m} min`
+  const h = Math.floor(m / 60), r = m % 60
+  if (h < 24) return r ? `${h} h ${r} min` : `${h} h`
+  const d = Math.floor(h / 24), hh = h % 24
+  return hh ? `${d} d ${hh} h` : `${d} d`
+}
+export function agreementProblem(f: AgreementForm, creating: boolean): string | null {
+  if (creating && !f.clientId) return "Choose the client"
+  if (!f.name.trim()) return "Give the agreement a name"
+  if (creating && !f.startDate) return "Enter the start date"
+  if (f.startDate && f.endDate && f.endDate <= f.startDate) return "The end date must be after the start date"
+  const fee = num(f.monthlyFee)
+  if (f.billingType === "RETAINER" && (fee == null || !(fee > 0))) return "A retainer needs a monthly fee above 0"
+  if (fee != null && (!Number.isFinite(fee) || fee < 0)) return "The monthly fee cannot be negative"
+  const rate = num(f.hourlyRate); if (rate != null && (!Number.isFinite(rate) || rate < 0)) return "The hourly rate cannot be negative"
+  const mk = num(f.partsMarkupPercent); if (mk != null && (!Number.isFinite(mk) || mk < 0 || mk > 1000)) return "The parts mark-up must be between 0 and 1000 %"
+  const seen = new Set<string>()
+  for (const x of f.targets) {
+    if (seen.has(x.priority)) return `There are two targets for ${labelOf(PRIORITIES, x.priority).toLowerCase()} priority`
+    seen.add(x.priority)
+    const r = num(x.responseMinutes), s = num(x.resolutionMinutes)
+    if (r == null || !Number.isInteger(r) || r < 1) return "Each target needs a response time of at least 1 minute"
+    if (s == null || !Number.isInteger(s) || s < r) return "A fix time cannot be shorter than the response time"
+  }
+  return null
+}
+const targetsBody = (ts: TargetForm[]) => ts.map(x => ({ priority: x.priority, responseMinutes: Number(x.responseMinutes), resolutionMinutes: Number(x.resolutionMinutes), clock: x.clock }))
+export const agreementBody = (f: AgreementForm, creating: boolean) => creating
+  ? { clientId: f.clientId, name: f.name.trim(), billingType: f.billingType, monthlyFee: num(f.monthlyFee), hourlyRate: num(f.hourlyRate), partsMarkupPercent: num(f.partsMarkupPercent), startDate: f.startDate, endDate: t(f.endDate), siteIds: f.siteIds, categories: f.categories, slaTargets: targetsBody(f.targets) }
+  : { name: f.name.trim(), monthlyFee: num(f.monthlyFee), hourlyRate: num(f.hourlyRate), partsMarkupPercent: num(f.partsMarkupPercent), endDate: t(f.endDate), siteIds: f.siteIds, categories: f.categories, slaTargets: targetsBody(f.targets) }
+/** What an agreement covers, in words: every site and kind of work when the lists are empty. */
+export const coverageText = (siteIds: string[], categories: string[], siteName: (id: string) => string) =>
+  `${siteIds.length === 0 ? "All sites" : siteIds.map(siteName).filter(Boolean).join(", ") || `${siteIds.length} sites`} · ${categories.length === 0 ? "all kinds of work" : categories.map(c => labelOf(AGREEMENT_CATEGORIES, c)).join(", ")}`
+export function agreementState(status: string, endDate: string | null | undefined, now: Date): { text: string; tone: Tone } {
+  if (status === "ENDED") return { text: "Ended", tone: "neutral" }
+  if (endDate) {
+    const days = Math.round((new Date(endDate + "T00:00:00").getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 864e5)
+    if (days < 0) return { text: "Past its end date", tone: "warning" }
+    if (days <= 30) return { text: `Ends in ${days} d`, tone: "warning" }
+  }
+  return { text: "Active", tone: "success" }
+}
+
+// ── SLA business calendar ────────────────────────────────────────────────────────────────────────────────────────────
+export const WEEKDAYS = [["MON", "Mon"], ["TUE", "Tue"], ["WED", "Wed"], ["THU", "Thu"], ["FRI", "Fri"], ["SAT", "Sat"], ["SUN", "Sun"]] as const
+export interface CalendarForm { startTime: string; endTime: string; workingDays: string[]; timeZone: string }
+export const trimTime = (s: string | null | undefined) => (s ?? "").slice(0, 5)
+export function calendarProblem(f: CalendarForm): string | null {
+  if (!f.startTime || !f.endTime) return "Enter the opening and closing times"
+  if (f.endTime <= f.startTime) return "Closing time must be after the opening time"
+  if (f.workingDays.length === 0) return "Pick at least one working day"
+  if (!f.timeZone.trim()) return "Enter the time zone"
+  return null
+}
+export const calendarBody = (f: CalendarForm) => ({ startTime: f.startTime, endTime: f.endTime, workingDays: WEEKDAYS.map(d => d[0]).filter(d => f.workingDays.includes(d)), timeZone: f.timeZone.trim() })
+export function holidayProblem(date: string, existing: string[]): string | null {
+  if (!date) return "Pick the date"
+  if (existing.includes(date)) return "That date is already a holiday"
+  return null
+}
+export const daysText = (days: string[]) => {
+  const on = WEEKDAYS.map(d => d[0]).filter(d => days.includes(d))
+  if (on.length === 7) return "Every day"
+  if (on.join() === "MON,TUE,WED,THU,FRI") return "Mon – Fri"
+  return on.map(d => labelOf(WEEKDAYS, d)).join(", ")
+}
+
+// ── Quotes ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+export const QUOTE_STATUS: Record<string, { label: string; tone: Tone }> = {
+  DRAFT: { label: "Draft", tone: "neutral" }, SENT: { label: "Sent", tone: "info" }, ACCEPTED: { label: "Accepted", tone: "success" },
+  DECLINED: { label: "Declined", tone: "danger" }, EXPIRED: { label: "Expired", tone: "warning" }, WITHDRAWN: { label: "Withdrawn", tone: "neutral" },
+}
+export interface QuoteLineForm { description: string; quantity: string; unitPrice: string }
+export interface QuoteForm { clientId: string; siteId: string; assetId: string; title: string; description: string; validUntil: string; internalNote: string; lines: QuoteLineForm[] }
+export const emptyQuoteLine = (): QuoteLineForm => ({ description: "", quantity: "1", unitPrice: "" })
+export const emptyQuote = (): QuoteForm => ({ clientId: "", siteId: "", assetId: "", title: "", description: "", validUntil: "", internalNote: "", lines: [emptyQuoteLine()] })
+const cents = (n: number) => Math.round(n * 100) / 100
+export const lineTotal = (l: QuoteLineForm) => { const q = num(l.quantity), p = num(l.unitPrice); return q == null || p == null || !Number.isFinite(q) || !Number.isFinite(p) ? 0 : cents(q * p) }
+export const quoteSubtotal = (ls: QuoteLineForm[]) => cents(ls.reduce((s, l) => s + lineTotal(l), 0))
+export function quoteProblem(f: QuoteForm, creating: boolean): string | null {
+  if (creating && !f.clientId) return "Choose the client"
+  if (creating && !f.siteId) return "Choose the site"
+  if (!f.title.trim()) return "Give the quote a title"
+  if (f.lines.length === 0) return "Add at least one line"
+  if (f.lines.length > 50) return "A quote can have at most 50 lines"
+  for (const [i, l] of f.lines.entries()) {
+    const n = i + 1, q = num(l.quantity), p = num(l.unitPrice)
+    if (!l.description.trim()) return `Line ${n} needs a description`
+    if (q == null || !Number.isFinite(q) || q < 0.001 || q > 1_000_000) return `Line ${n}: the quantity must be between 0.001 and 1,000,000`
+    if (p == null || !Number.isFinite(p) || p < 0 || p > 100_000_000) return `Line ${n}: enter the price (0 or more)`
+  }
+  return null
+}
+export const quoteBody = (f: QuoteForm, creating: boolean) => ({
+  ...(creating ? { clientId: f.clientId, siteId: f.siteId, assetId: t(f.assetId) } : {}),
+  title: f.title.trim(), description: t(f.description), validUntil: t(f.validUntil), internalNote: t(f.internalNote),
+  lines: f.lines.map(l => ({ description: l.description.trim(), quantity: Number(l.quantity), unitPrice: Number(l.unitPrice) })),
+})
+/** What may be done to a quote: only a draft is edited or sent, and only a sent one is withdrawn. The client decides in their portal. */
+export const quoteActions = (status: string, canWrite: boolean): ("edit" | "send" | "withdraw")[] => !canWrite ? [] : status === "DRAFT" ? ["edit", "send"] : status === "SENT" ? ["withdraw"] : []
+/** Why a draft cannot be sent yet, from what the server checks. */
+export function sendProblem(validUntil: string | null | undefined, total: number, today: string): string | null {
+  if (!(total > 0)) return "The total must be above 0 before it can be sent"
+  if (validUntil && validUntil < today) return "The valid-until date has passed"
+  return null
+}
+export const quoteValidity = (status: string, validUntil: string | null | undefined, today: string): { text: string; tone: Tone } | null =>
+  status === "SENT" && validUntil ? (validUntil < today ? { text: "Past its valid-until date", tone: "warning" } : null) : null
+
+// ── Billing ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+export const INVOICE_STATUS: Record<string, { label: string; tone: Tone }> = {
+  DRAFT: { label: "Draft", tone: "neutral" }, APPROVED: { label: "Approved", tone: "info" }, SENT: { label: "Sent", tone: "info" }, PARTIAL: { label: "Part paid", tone: "warning" },
+  PAID: { label: "Paid", tone: "success" }, CREDITED: { label: "Credited", tone: "neutral" }, CANCELLED: { label: "Cancelled", tone: "neutral" }, OVERDUE: { label: "Overdue", tone: "danger" },
+}
+export const CREDIT_STATUS: Record<string, { label: string; tone: Tone }> = { DRAFT: { label: "Draft", tone: "neutral" }, APPROVED: { label: "Approved", tone: "success" }, CANCELLED: { label: "Cancelled", tone: "neutral" } }
+export const GL_STATUS: Record<string, { label: string; tone: Tone }> = { POSTED: { label: "In the ledger", tone: "success" }, PENDING: { label: "Waiting to post", tone: "warning" }, FAILED: { label: "Not posted", tone: "danger" } }
+export const glNote = (s: string | null | undefined): { label: string; tone: Tone } | null => s ? (GL_STATUS[s] ?? { label: s.replace(/_/g, " ").toLowerCase(), tone: "neutral" }) : null
+export const PAY_METHODS = [["EFT", "EFT"], ["CASH", "Cash"], ["CARD", "Card"], ["CHEQUE", "Cheque"], ["OTHER", "Other"]] as const
+export const BILL_BASES = [["WORK_ORDERS", "Completed chargeable work"], ["RETAINER", "A retainer's monthly fee"]] as const
+export type InvoiceAction = "approve" | "send" | "cancel" | "pay" | "credit"
+export interface BillWho { prepare: boolean; approve: boolean }
+/** Preparing is for billing managers; approving for billing approvers (each includes admin). */
+export function billWho(has: (p: string) => boolean): BillWho {
+  const admin = has("FACILITIESMANAGEMENT_ADMIN")
+  return { prepare: admin || has("FACILITIESMANAGEMENT_BILLING_MANAGE"), approve: admin || has("FACILITIESMANAGEMENT_BILLING_APPROVE") }
+}
+/** The server's lifecycle: draft → approve → send → payments; credit notes apply once approved; a draft can be cancelled, an approved invoice cannot. */
+export function invoiceActions(status: string, balance: number, w: BillWho): InvoiceAction[] {
+  const out: InvoiceAction[] = []
+  switch (status) {
+    case "DRAFT": if (w.approve) out.push("approve"); if (w.prepare) out.push("cancel"); break
+    case "APPROVED": if (w.prepare) out.push("send", "credit"); break
+    case "SENT": case "PARTIAL": case "OVERDUE": if (w.prepare) { if (balance > 0) out.push("pay"); out.push("credit") } break
+  }
+  return out
+}
+export interface GenerateForm { basis: string; periodStart: string; periodEnd: string; agreementId: string }
+export const emptyGenerate = (today: string): GenerateForm => {
+  const d = new Date(today + "T00:00:00"), a = new Date(d.getFullYear(), d.getMonth() - 1, 1), b = new Date(d.getFullYear(), d.getMonth(), 0)
+  const iso = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`
+  return { basis: "WORK_ORDERS", periodStart: iso(a), periodEnd: iso(b), agreementId: "" }
+}
+export function generateProblem(f: GenerateForm): string | null {
+  if (!f.periodStart || !f.periodEnd) return "Enter both ends of the period"
+  if (f.periodEnd < f.periodStart) return "The period cannot end before it starts"
+  return null
+}
+export const generateBody = (f: GenerateForm) => ({ periodStart: f.periodStart, periodEnd: f.periodEnd, basis: f.basis, agreementId: f.basis === "RETAINER" ? t(f.agreementId) : null })
+export interface PayForm { amount: string; paymentDate: string; method: string; reference: string }
+export const emptyPay = (balance: number, today: string): PayForm => ({ amount: balance > 0 ? balance.toFixed(2) : "", paymentDate: today, method: "EFT", reference: "" })
+export function payProblem(f: PayForm, balance: number): string | null {
+  const a = num(f.amount)
+  if (a == null || !Number.isFinite(a) || a < 0.01) return "Enter the amount paid (at least 0.01)"
+  if (cents(a) > cents(balance)) return `That is more than the ${balance.toFixed(2)} still owing`
+  return null
+}
+export const payBody = (f: PayForm) => ({ amount: Number(f.amount), paymentDate: t(f.paymentDate), method: t(f.method), reference: t(f.reference) })
+export interface CreditForm { mode: "full" | "part"; subtotal: string; reason: string }
+export const emptyCredit = (): CreditForm => ({ mode: "full", subtotal: "", reason: "" })
+export function creditProblem(f: CreditForm): string | null {
+  if (!f.reason.trim()) return "Say why the credit is being given"
+  if (f.reason.trim().length > 500) return "Keep the reason under 500 characters"
+  if (f.mode === "part") { const s = num(f.subtotal); if (s == null || !Number.isFinite(s) || s < 0.01) return "Enter the amount to credit before VAT (at least 0.01)" }
+  return null
+}
+export const creditBody = (f: CreditForm) => f.mode === "full" ? { creditFullBalance: true, reason: f.reason.trim() } : { subtotal: Number(f.subtotal), creditFullBalance: false, reason: f.reason.trim() }
+export const creditActions = (status: string, w: BillWho): ("approve" | "cancel")[] => status !== "DRAFT" ? [] : [...(w.approve ? ["approve" as const] : []), ...(w.prepare ? ["cancel" as const] : [])]
+/** Due-date note on an invoice that is still owed. */
+export function dueNote(status: string, balance: number, due: string | null | undefined, today: string): { text: string; tone: Tone } | null {
+  if (!due || balance <= 0 || !["SENT", "PARTIAL", "OVERDUE"].includes(status)) return null
+  if (due < today) return { text: `${Math.round((new Date(today).getTime() - new Date(due).getTime()) / 864e5)} d overdue`, tone: "danger" }
+  return null
+}
