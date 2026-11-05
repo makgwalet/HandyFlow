@@ -199,19 +199,29 @@ public class AccountingController {
 
     @GetMapping("/invoice-ledger-repair")
     @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
-    @Operation(summary = "Issued invoices that have no issuance journal (INV-01), and whether their original date is still open. Changes nothing")
+    @Operation(summary = "Issued invoices that have no issuance journal (INV-01), how many fall into each date category, and where each would be posted. Changes nothing")
     public ResponseEntity<ApiResponse<za.co.handyflow.platform.accounting.application.internal.InvoiceLedgerRepairService.Preview>> invoiceRepairPreview() {
         return ResponseEntity.ok(ApiResponse.success(invoiceRepair.preview(TenantContext.getTenantIdAsObject())));
     }
 
-    @PostMapping("/invoice-ledger-repair")
+    public record RepairApprovalRequest(String reason) {}
+
+    @PostMapping("/invoice-ledger-repair/approve")
     @PreAuthorize("hasAuthority('ACCOUNTING_ADMIN')")
-    @Operation(summary = "Post the missing issuance journals. policy is ORIGINAL (the issue date, refused where the books are locked) or TODAY; confirm must be true; invoiceIds limits the repair")
-    public ResponseEntity<ApiResponse<za.co.handyflow.platform.accounting.application.internal.InvoiceLedgerRepairService.Result>> invoiceRepair(
-            @RequestParam String policy, @RequestParam boolean confirm, @RequestBody(required = false) java.util.Set<UUID> invoiceIds) {
-        if (!confirm) throw new za.co.handyflow.platform.shared.HandyFlowException("Preview first, then repeat with confirm=true.",
-                org.springframework.http.HttpStatus.BAD_REQUEST, "CONFIRM_REQUIRED");
-        return ResponseEntity.ok(ApiResponse.success("Done", invoiceRepair.repair(TenantContext.getTenantIdAsObject(), policy, invoiceIds)));
+    @Operation(summary = "Sign off the previewed list of invoices for the INV-01 repair, with a reason. Valid for 24 hours and only for that exact list")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.accounting.application.internal.InvoiceLedgerRepairService.Approval>> approveInvoiceRepair(
+            @RequestBody RepairApprovalRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Approved", invoiceRepair.approve(TenantContext.getTenantIdAsObject(),
+                req == null ? null : req.reason(), TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/invoice-ledger-repair/{approvalId}/run")
+    @PreAuthorize("hasAuthority('ACCOUNTING_ADMIN')")
+    @Operation(summary = "Post the approved INV-01 repair. Locked periods are never bypassed; the person who approved cannot also run it where another administrator exists")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.accounting.application.internal.InvoiceLedgerRepairService.Result>> runInvoiceRepair(
+            @PathVariable UUID approvalId) {
+        return ResponseEntity.ok(ApiResponse.success("Done", invoiceRepair.repair(TenantContext.getTenantIdAsObject(), approvalId,
+                TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/posting-failures/{id}/retry")
