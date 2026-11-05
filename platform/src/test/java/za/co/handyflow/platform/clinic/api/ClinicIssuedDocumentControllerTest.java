@@ -39,11 +39,21 @@ class ClinicIssuedDocumentControllerTest {
         verifyNoInteractions(service);
     }
 
-    // the controller reads the user id from the security principal, so the mock user is named by a UUID
-    @Test @WithMockUser(username = "22222222-2222-4222-8222-222222222222", authorities = "CLINIC_DOCUMENT_VOID")
+    // the controller reads the user id from the principal, which must be a UUID string
+    // (@WithMockUser builds a Spring User object, which UserContext does not recognise)
+    private static org.springframework.test.web.servlet.request.RequestPostProcessor asUser(String... authorities) {
+        return org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        "22222222-2222-4222-8222-222222222222", "n",
+                        java.util.Arrays.stream(authorities)
+                                .map(org.springframework.security.core.authority.SimpleGrantedAuthority::new).toList()));
+    }
+
+    @Test
     void theVoidPermissionListsAndWithdraws() throws Exception {
-        mvc.perform(get("/api/v1/clinic/issued-documents").param("type", "SICK_NOTE")).andExpect(status().isOk());
-        mvc.perform(post("/api/v1/clinic/issued-documents/" + id + "/void").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Wrong patient\"}"))
+        mvc.perform(get("/api/v1/clinic/issued-documents").param("type", "SICK_NOTE").with(asUser("CLINIC_DOCUMENT_VOID"))).andExpect(status().isOk());
+        mvc.perform(post("/api/v1/clinic/issued-documents/" + id + "/void").with(csrf()).with(asUser("CLINIC_DOCUMENT_VOID"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Wrong patient\"}"))
                 .andExpect(status().isOk());
         verify(service).list(any(), org.mockito.ArgumentMatchers.eq("SICK_NOTE"), any(), any(), anyInt());
         verify(service).voidIt(any(), org.mockito.ArgumentMatchers.eq(id), any(), org.mockito.ArgumentMatchers.eq("Wrong patient"));
