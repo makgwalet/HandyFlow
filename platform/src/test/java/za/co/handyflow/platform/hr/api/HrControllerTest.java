@@ -87,6 +87,7 @@ class HrControllerTest {
     @MockitoBean EmployeeViewService    employeeViewService;
     @MockitoBean EmployeeChangeService  employeeChangeService;
     @MockitoBean EmployeeAuditService   employeeAuditService;
+    @MockitoBean za.co.handyflow.platform.hr.application.internal.EmployeeStatusChangeService employeeStatusChangeService;
     @MockitoBean LeaveService           leaveService;
     @MockitoBean za.co.handyflow.platform.hr.application.internal.TerminationApprovalService terminationApproval;
     @MockitoBean PayslipPdfGenerator    payslipPdfGenerator;
