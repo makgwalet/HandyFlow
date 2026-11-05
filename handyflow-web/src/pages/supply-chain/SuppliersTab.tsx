@@ -2,7 +2,7 @@
 import React, { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, Search, Users, Star, Phone, Mail, ChevronDown, ChevronUp } from "lucide-react"
+import { Plus, Search, Users, Phone, Mail, ChevronDown, ChevronUp } from "lucide-react"
 import { Modal, ErrBox, ModalFooter, Field } from "./scm.shared"
 
 interface Supplier {

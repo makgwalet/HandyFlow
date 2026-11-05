@@ -5,7 +5,7 @@ import { portalApi } from "../../api/portal.api"
 import { usePortalAuthStore } from "../../store/portalAuth.store"
 import type { PortalClientSummary } from "../../types/portal.types"
 import { PortalShell } from "./PortalShell"
-import { color, radius, shadow, space, type } from "./portal-theme"
+import { color, radius, shadow, space } from "./portal-theme"
 
 const fmtR = (n: any) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
 

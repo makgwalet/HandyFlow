@@ -25,11 +25,7 @@ import CollectorSelect from "./CollectorSelect"
 import { useAuth } from "../../hooks/useAuth"
 import { QUEUES, inQueue, queueCounts, searchCases, type Queue } from "./collections.logic"
 import { pill } from "./ui"
-import {
-  Plus, Landmark, ChevronDown, ChevronUp, X, UserPlus, CalendarClock,
-  ArrowRightCircle, Flag, AlertOctagon, Trash2, Download, FileDown,
-  Phone, Wallet, Paperclip, FileText, AlertCircle, Link2, Search,
-} from "lucide-react"
+import { Plus, Landmark, ChevronDown, ChevronUp, X, UserPlus, CalendarClock, ArrowRightCircle, Flag, AlertOctagon, Trash2, Download, FileDown, Phone, Wallet, Paperclip, FileText, AlertCircle, Search } from "lucide-react"
 
 interface Case {
   id: string; caseNumber: string; customerId: string | null; debtorName: string
@@ -99,7 +95,7 @@ async function downloadDemandLetter(caseId: string, caseNumber: string) {
   URL.revokeObjectURL(url)
 }
 
-function CaseDetailPanel({ c, canManage, canAdmin, invalidate }: { c: Case; canManage: boolean; canAdmin: boolean; invalidate: () => void }) {
+function CaseDetailPanel({ c, canManage, canAdmin: _canAdmin, invalidate }: { c: Case; canManage: boolean; canAdmin: boolean; invalidate: () => void }) {
   const qc = useQueryClient()
   const [showContactForm, setShowContactForm] = useState(false)
   const [contactForm, setContactForm] = useState({ contactDate: new Date().toISOString().split("T")[0], contactMethod: "PHONE_CALL", outcome: "NO_ANSWER", notes: "", promisedPaymentDate: "", promisedPaymentAmount: "" })
@@ -341,10 +337,6 @@ export default function CasesTab() {
 
   const invalidate = () => { qc.invalidateQueries({ queryKey: ["dc-cases"] }); qc.invalidateQueries({ queryKey: ["dc-cases-all"] }) }
 
-  const refreshOutstanding = useMutation({
-    mutationFn: (id: string) => apiClient.post(`/api/v1/debtcollection/cases/${id}/refresh-outstanding`),
-    onSuccess: () => invalidate(),
-  })
   const assign = useMutation({
     mutationFn: ({ id, userId, userName }: { id: string; userId: string; userName: string }) =>
       apiClient.post(`/api/v1/debtcollection/cases/${id}/assign`, { userId, userName }),
@@ -575,7 +567,7 @@ export default function CasesTab() {
   )
 }
 
-function Overlay({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+function Overlay({ onClose: _onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 640, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>

@@ -1,7 +1,7 @@
 // src/pages/projects/tabs/FieldTab.tsx
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, BookOpen, AlertTriangle, CheckCircle, Camera } from 'lucide-react'
+import { Plus, BookOpen, AlertTriangle } from 'lucide-react'
 import { apiClient } from '../../../api/client'
 
 interface SiteDiary { id:string; diaryDate:string; weather:string|null; tempCelsius:number|null; workersPresent:number; workersPlanned:number|null; workDescription:string|null; progressNotes:string|null; issues:string|null; toolboxTopic:string|null; incidents:string|null; submittedByName:string|null }

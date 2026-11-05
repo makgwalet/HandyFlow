@@ -1,10 +1,9 @@
 // src/pages/fuel/FuelDashboard.tsx
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Droplets, AlertTriangle, ArrowDownToLine, Fuel, Truck, ArrowRight, TrendingDown } from "lucide-react"
+import { Droplets, AlertTriangle, Fuel, Truck, ArrowRight, TrendingDown } from "lucide-react"
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
-const fmtR = (n: any) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })
 
 const FUEL_COLORS: Record<string, string> = {

@@ -1,7 +1,7 @@
 // src/pages/accountant/AccountantDashboard.tsx
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { AlertTriangle, Calendar, Clock, ArrowRight, Users, TrendingUp, FileText } from "lucide-react"
+import { AlertTriangle, Calendar, ArrowRight, TrendingUp, FileText } from "lucide-react"
 
 const fmtR = (n: any) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
 const fmtD = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"

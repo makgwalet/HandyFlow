@@ -24,7 +24,7 @@ export function RecentActivity({ driverId, createdAt, accidents }: { driverId: s
       <h4 style={{ margin: "0 0 6px" }}>Recent activity</h4>
       {t.isError && <p role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)", margin: 0 }}>Couldn't load the activity.</p>}
       {!t.isLoading && !t.isError && t.items.length === 0 && <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: 0 }}>Nothing recorded yet.</p>}
-      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>{t.items.slice(0, 5).map(i => <Line key={i.key} {...i} />)}</ul>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>{t.items.slice(0, 5).map(i => <Line {...i} key={i.key} />)}</ul>
     </div>)
 }
 
@@ -35,7 +35,7 @@ export default function DriverHistory({ driverId, createdAt, accidents }: { driv
     <div>
       {t.isLoading && <p style={{ fontSize: 13 }}>Loading…</p>}
       {t.isError && <p role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>Couldn't load the history.</p>}
-      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>{view.paged.rows.map(i => <Line key={i.key} {...i} />)}</ul>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>{view.paged.rows.map(i => <Line {...i} key={i.key} />)}</ul>
       <Pager paged={view.paged} onPage={view.setPage} />
       <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", marginBottom: 0 }}>Shows registration, documents added or replaced, and accidents. Trips and inspections are on the Performance tab.</p>
     </div>)

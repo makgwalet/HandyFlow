@@ -8,7 +8,7 @@
 // 5. cancellationReason shown in detail modal
 // 6. Rescheduled badge shown when booking has rescheduled history
 import { useState, useEffect } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import {
   Plus, X, Calendar, Clock, User, Phone, Mail,
@@ -95,7 +95,7 @@ export default function BookingsTab() {
       const res = await apiClient.get(`/api/v1/bookings?${params}`)
       return res.data?.data ?? res.data
     },
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   })
 
   const { data: services = [] } = useQuery<Service[]>({
@@ -276,7 +276,6 @@ export default function BookingsTab() {
         {["PENDING", "CONFIRMED", "COMPLETED"].map(s => {
           const ss    = STATUS_STYLE[s]
           // We use total from the page when the filter matches, else show "—"
-          const count = statusFilter === s ? (totalElements ?? "—") : "—"
           return (
             <div key={s} onClick={() => setStatusFilter(s)}
               style={{ background: ss.bg, borderRadius: 9, padding: "10px 18px", cursor: "pointer" }}>

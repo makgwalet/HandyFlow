@@ -2,7 +2,7 @@
 import { payrollCard } from "./hrDashboard.logic"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Users, Calendar, DollarSign, AlertOctagon, ArrowRight, AlertTriangle, CheckCircle, Clock } from "lucide-react"
+import { Users, Calendar, DollarSign, ArrowRight, AlertTriangle } from "lucide-react"
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
 const fmtR   = (n: any) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"

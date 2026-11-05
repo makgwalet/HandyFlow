@@ -1,5 +1,5 @@
 // src/pages/pos/PosPage.tsx
-import React, { useState, useCallback, useRef, useEffect } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import {
@@ -493,7 +493,7 @@ export function PosPage() {
     enabled: tab === 'orders',
   })
 
-  const { data: openSession, isLoading: sessionLoading } = useQuery<CashSession | null | undefined>({
+  const { data: openSession } = useQuery<CashSession | null | undefined>({
     queryKey: ['pos-session'],
     queryFn: async () => {
       try {

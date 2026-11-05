@@ -14,7 +14,7 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { CalendarDays, ClipboardList, Gavel, FileText, CheckCircle } from "lucide-react"
+import { ClipboardList, Gavel, FileText, CheckCircle } from "lucide-react"
 
 interface CalendarEntry { date: string; sourceType: string; sourceId: string; title: string; detail: string }
 

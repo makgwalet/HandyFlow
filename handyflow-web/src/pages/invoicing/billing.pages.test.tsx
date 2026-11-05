@@ -42,7 +42,7 @@ function route(map: Record<string, any>) {
 }
 const customers = page([{ id: 'c1', name: 'Acme Mining' }])
 
-function renderAt(path: string, pattern: string, element: JSX.Element) {
+function renderAt(path: string, pattern: string, element: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   function Where() { return <div data-testid="where">{useLocation().pathname}</div> }
   return render(<QueryClientProvider client={qc}><MemoryRouter initialEntries={[path]}><Where />

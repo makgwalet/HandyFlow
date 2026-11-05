@@ -1,6 +1,6 @@
 // src/pages/supply-chain/scm.shared.tsx
 // Shared types, helpers and UI components for all SCM tabs
-import { X, AlertTriangle, CheckCircle, AlertCircle, Info } from "lucide-react"
+import { X, AlertTriangle, AlertCircle, Info } from "lucide-react"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

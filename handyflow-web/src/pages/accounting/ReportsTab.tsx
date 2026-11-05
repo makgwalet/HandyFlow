@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { BarChart2, TrendingUp, TrendingDown, Scale, X, ChevronRight } from "lucide-react"
+import { BarChart2, TrendingUp, Scale, X, ChevronRight } from "lucide-react"
 import { apiClient } from "../../api/client"
 
 type ReportType = "profit-and-loss" | "balance-sheet" | "trial-balance"

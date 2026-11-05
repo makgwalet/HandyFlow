@@ -1,10 +1,7 @@
 // src/pages/marketing/AnalyticsTab.tsx
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
-import {
-  Send, Eye, MousePointer, XCircle, AlertTriangle,
-  TrendingUp, BarChart2, Users, CheckCircle,
-} from 'lucide-react'
+import { Send, Eye, MousePointer, AlertTriangle, BarChart2, CheckCircle } from 'lucide-react'
 
 const pct = (n: number, d: number) => d > 0 ? `${Math.round((n / d) * 100)}%` : '—'
 const fmtDate = (d: any) => d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
@@ -15,7 +12,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 interface Props { summary: any }
 
-export default function AnalyticsTab({ summary }: Props) {
+export default function AnalyticsTab({ summary: _summary }: Props) {
   const { data: campaigns = [] } = useQuery<any[]>({
     queryKey: ['marketing-campaigns'],
     queryFn: async () => {

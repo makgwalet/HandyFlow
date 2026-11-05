@@ -8,7 +8,7 @@
 //   realistic cases without being an infinite list.
 // - CSS Modules replaced with inline styles consistent with the rest of the module
 import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useMutation } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Plus, X, AlertCircle, CheckCircle } from "lucide-react"
 
@@ -34,7 +34,6 @@ const TIME_SLOTS = Array.from({ length: 35 }, (_, i) => {
 })
 
 export default function AvailabilityTab() {
-  const qc = useQueryClient()
 
   const [showBlockModal, setShowBlockModal]   = useState(false)
   const [availForm, setAvailForm]             = useState({ staffId: "", dayOfWeek: 1, startTime: "08:00", endTime: "17:00" })

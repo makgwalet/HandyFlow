@@ -1,6 +1,9 @@
 // What the HR dashboard may call payroll. A draft or waiting-for-approval run is a projection, not an actual.
 
-export interface DashRun { payRunNumber: string; status: string; totalNet?: number | string | null; payDate?: string | null }
+export interface DashRun {
+  payRunNumber: string; status: string; totalNet?: number | string | null; payDate?: string | null
+  totalGross?: number | string | null; totalPaye?: number | string | null; totalUif?: number | string | null; employeeCount?: number | null
+}
 
 /** Runs whose figures have been approved or issued: the only ones that count as actual payroll. */
 export const ACTUAL_STATUSES = ["APPROVED", "FINALISED", "COMPLETED"]

@@ -1,7 +1,7 @@
 // src/pages/property/PropertyDashboard.tsx
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Building2, TrendingUp, AlertTriangle, Calendar, ArrowRight, Users } from "lucide-react"
+import { Building2, AlertTriangle, Calendar, ArrowRight } from "lucide-react"
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
 const fmtR   = (n: any) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"

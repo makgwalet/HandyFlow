@@ -109,7 +109,6 @@ export default function SarsTab() {
               {(emp201s as any[]).map((e: any, i) => {
                 const cfg    = EMP201_STATUS[e.status] ?? EMP201_STATUS.PENDING
                 const Icon   = cfg.icon
-                const period = e.periodEnd ? new Date(e.periodEnd).toLocaleDateString("en-ZA", { month: "short", year: "numeric" }) : "—"
                 const periodKey = e.periodEnd ? new Date(e.periodEnd).toISOString().slice(0, 7) : "period"
                 return (
                   <tr key={e.id} style={{ borderBottom: i < emp201s.length - 1 ? "1px solid var(--hf-border-subtle)" : "none" }}>

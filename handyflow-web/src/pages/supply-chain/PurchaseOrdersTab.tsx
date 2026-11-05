@@ -2,7 +2,7 @@
 import React, { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, ChevronLeft, Send, CheckCircle, XCircle, Package, AlertTriangle, Download } from "lucide-react"
+import { Plus, ChevronLeft, Send, CheckCircle, XCircle, Package, Download } from "lucide-react"
 import { Modal, ErrBox, ModalFooter, Field } from "./scm.shared"
 
 interface Supplier { id: string; name: string; paymentTermsDays: number }

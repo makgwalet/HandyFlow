@@ -4,7 +4,7 @@
 // src/pages/accounting/BankAccountsTab.tsx
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Plus, X, AlertCircle, TrendingUp, TrendingDown, ChevronDown, ChevronUp, Upload, Link2, CheckCircle, FilePlus2, BellRing } from "lucide-react"
+import { Plus, X, TrendingUp, TrendingDown, Upload, Link2, CheckCircle, FilePlus2, BellRing } from "lucide-react"
 import { apiClient } from "../../api/client"
 
 interface BankAccount { id: string; bankName: string; accountName: string; accountNumber: string

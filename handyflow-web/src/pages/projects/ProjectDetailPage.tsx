@@ -4,11 +4,7 @@
 import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  HardHat, ChevronLeft, Play, Pause, CheckCircle,
-  LayoutDashboard, GanttChart, ListTodo, Users, DollarSign,
-  AlertTriangle, FileText, Hammer, ExternalLink, Send,
-} from 'lucide-react'
+import { ChevronLeft, Play, Pause, CheckCircle, LayoutDashboard, GanttChart, ListTodo, Users, DollarSign, AlertTriangle, FileText, Hammer, ExternalLink, Send } from 'lucide-react'
 import { apiClient } from '../../api/client'
 // Single source of truth for the Project type — re-exported from ProjectDetailTab
 import type { Project } from './ProjectDetailTab'

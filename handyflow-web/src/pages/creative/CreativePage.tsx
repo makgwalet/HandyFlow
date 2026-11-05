@@ -2,14 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
-import {
-  Plus, Palette, X, CheckCircle, Clock, AlertTriangle,
-  Send, Upload, FileText, Eye, MessageSquare, ChevronRight,
-  BarChart2, Search, RefreshCw, Archive, Flag, User,
-  Package, Image, Video, Camera, Layers, Globe, Film,
-  PenTool, Box, Monitor, MoreHorizontal, Trash2, Edit3,
-  Link2, Star,
-} from 'lucide-react'
+import { Plus, Palette, X, CheckCircle, AlertTriangle, Send, Upload, FileText, Eye, MessageSquare, ChevronRight, BarChart2, Search, Package, Image, Video, Camera, Layers, Globe, Film, PenTool, Box, Monitor, Trash2, Link2, Star } from 'lucide-react'
 import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
 import { CREATIVE_SECTIONS } from '../../navigation/moduleSections'
 
@@ -921,7 +914,7 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
               <div>
                 <label style={lbl}>Final file *</label>
                 <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '28px 20px', border: `2px dashed ${delFile ? 'var(--hf-accent)' : 'var(--hf-border)'}`, borderRadius: 10, cursor: 'pointer', background: delFile ? 'var(--hf-accent-soft)' : 'var(--hf-surface-muted)' }}>
-                  <input type="file" style={{ display: 'none' }} onChange={e => handleFileInput(e, (b64, name, type) => { setDelFile(b64); setDelName(name) })} />
+                  <input type="file" style={{ display: 'none' }} onChange={e => handleFileInput(e, (b64, name) => { setDelFile(b64); setDelName(name) })} />
                   {delFile ? <><CheckCircle size={24} style={{ color: 'var(--hf-accent-text)' }} /><span style={{ fontSize: 13, color: 'var(--hf-accent-text)', fontWeight: 600 }}>{delName}</span></> : <><Package size={24} style={{ color: 'var(--hf-text-faint)' }} /><span style={{ fontSize: 13, color: 'var(--hf-text-muted)' }}>Click to select final file</span></>}
                 </label>
               </div>

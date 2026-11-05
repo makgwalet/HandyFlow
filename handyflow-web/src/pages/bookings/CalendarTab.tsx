@@ -9,7 +9,7 @@
 //    positioning relative to the full day column height, not per-hour cells.
 // 2. Time range extended to 07:00–21:00 matching realistic SA business hours.
 // 3. Fetch uses date range instead of size=200 + client-side filter.
-import { useState, useRef } from "react"
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { ChevronLeft, ChevronRight } from "lucide-react"
@@ -71,7 +71,7 @@ export default function CalendarTab() {
   // the visible week, and silently drops bookings once the tenant exceeds 200/week.
   // The backend now accepts dateFrom+dateTo (BETWEEN inclusive) so we fetch
   // only the 7 days visible in the current week view — bounded and correct.
-  const { data: bookings = [], isLoading } = useQuery({
+  const { data: bookings = [] } = useQuery({
     queryKey: ["bookings-week", from, to],
     queryFn: async () => {
       const params = new URLSearchParams({

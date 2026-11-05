@@ -14,7 +14,7 @@
 // trip to fail.
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { ArrowLeft, Download, Plus, X, ShieldAlert } from "lucide-react"
+import { ArrowLeft, Download, Plus, ShieldAlert } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { CA_ACCENT, CA_ACCENT_TEXT } from "./constants"
 import { STATUSES, STATUS_COLORS, fmtMoney, type DebtorAccountResponse } from "./CollAgencyDebtorAccountsTab"
@@ -165,7 +165,7 @@ function PaymentPlanForm({ accountId, onDone }: { accountId: string; onDone: () 
   )
 }
 
-export default function CollAgencyDebtorAccountDetail({ accountId, clientId, onBack }: { accountId: string; clientId: string; onBack: () => void }) {
+export default function CollAgencyDebtorAccountDetail({ accountId, clientId: _clientId, onBack }: { accountId: string; clientId: string; onBack: () => void }) {
   const qc = useQueryClient()
   const [showContactForm, setShowContactForm] = useState(false)
   const [showPlanForm, setShowPlanForm] = useState(false)

@@ -3,11 +3,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
-import {
-  Plus, X, CheckCircle, XCircle, AlertTriangle,
-  Download, Upload, FileText, ChevronDown, ChevronUp,
-  Loader2, CreditCard, Send,
-} from "lucide-react"
+import { Plus, X, CheckCircle, XCircle, AlertTriangle, Download, Upload, ChevronDown, ChevronUp, Loader2, CreditCard, Send } from "lucide-react"
 
 interface Bill {
   id: string; supplierName: string; billNumber: string
@@ -34,7 +30,6 @@ const STATUS: Record<string, { color: string; bg: string; border: string; dot: s
 
 const fmtR    = (n: any) => n != null ? `R\u00A0${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
 const fmtDate = (d: any) => d ? new Date(d + (String(d).includes("T") ? "" : "T00:00:00")).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
-const fmtDT   = (d: any) => d ? new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"
 
 const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "var(--hf-surface)", outline: "none" }
 const lbl: React.CSSProperties = { display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }

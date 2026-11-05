@@ -116,15 +116,7 @@ function BureauProfileModal({ onClose }: { onClose: () => void }) {
             <textarea value={physicalAddress} onChange={e => setPhysicalAddress(e.target.value)}
               style={{ ...inputStyle, minHeight: 50, resize: "vertical" as const, fontFamily: "inherit" }} />
           </Field>
-          <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 14, marginTop: 4 }}>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 8 }}>Logo</label>
-            {hasLogo && <div style={{ marginBottom: 8 }}><ProfileLogoImage refreshKey={logoRefreshKey} /></div>}
-            <label style={{ ...btnSecondary, display: "inline-block", opacity: uploadingLogo ? 0.6 : 1 }}>
-              {uploadingLogo ? "Uploading…" : hasLogo ? "Replace Logo" : "Upload Logo"}
-              <input type="file" accept="image/*" style={{ display: "none" }} disabled={uploadingLogo}
-                onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f) }} />
-            </label>
-          </div>
+          <Field label="Logo address (optional)"><input value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder="https://" style={inputStyle} /></Field>
           {error && <ErrorBox text={error} />}
           <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Save Profile" />
         </>

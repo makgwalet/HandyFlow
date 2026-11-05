@@ -8,8 +8,9 @@ import { errorMessage, unwrapList } from "./crmApi"
 import {
   ACTIONS, EMPTY_CAMPAIGN, EMPTY_STEP, MAX_CAMPAIGNS, MAX_STEPS, MEMBER_LABEL, MEMBER_STATUSES, NEXT_STATUS, STATUS_LABEL,
   addBody, addProblem, addedText, campaignBody, campaignProblem, canPickUser, peopleLocked, progressText, rate, runSummary, stepsBody, stepsLocked, stepsProblem, textLabel, toCampaignForm, toStepForm,
-  type Action, type Campaign, type CampaignForm, type CampaignStatus, type JourneyRun, type JourneyStep, type MemberStatus, type Person, type StepForm,
+  type Campaign, type CampaignForm, type CampaignStatus, type JourneyRun, type JourneyStep, type MemberStatus, type Person, type StepForm,
 } from "./campaigns.logic"
+import type { Action } from "./workflows.logic"
 import { Loading, ErrorNote } from "./CrmKit"
 
 const field: React.CSSProperties = { padding: "6px 9px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 13 }

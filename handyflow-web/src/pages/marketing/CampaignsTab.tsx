@@ -2,11 +2,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
-import {
-  Plus, Send, X, Play, Pause, XCircle, Clock, Eye,
-  BarChart2, ChevronRight, AlertTriangle, Megaphone,
-  MousePointer, CheckCircle, Users,
-} from 'lucide-react'
+import { Plus, Send, X, Play, Pause, XCircle, Eye, AlertTriangle, Megaphone, MousePointer, CheckCircle, Users } from 'lucide-react'
 
 const fmtDate = (d: any) => d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
 const fmtDT   = (d: any) => d ? new Date(d).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'
@@ -24,7 +20,6 @@ const STATUS: Record<string, { color: string; bg: string; border: string; label:
   CANCELLED: { color: 'var(--hf-text-faint)', bg: 'var(--hf-surface-sunken)', border: 'var(--hf-border)', label: 'Cancelled', dot: 'var(--hf-border-strong)' },
   FAILED:    { color: 'var(--hf-danger-text)', bg: 'var(--hf-danger-soft)', border: 'var(--hf-danger-border)', label: 'Failed',    dot: 'var(--hf-danger)' },
 }
-const AUDIENCE_TYPES = ['ALL_OPTED_IN', 'SEGMENT', 'MANUAL']
 
 export default function CampaignsTab() {
   const qc = useQueryClient()

@@ -116,7 +116,6 @@ export function BillingPage() {
 
   // Active module keys set
   const activeKeys = new Set(tenantModules.map(m => m.moduleKey))
-  const tenantModuleMap = Object.fromEntries(tenantModules.map(m => [m.moduleKey, m]))
 
   // Catalogue grouped by category, excluding core
   const availableToAdd = catalogue.filter(m => !activeKeys.has(m.key) && !CORE_KEYS.includes(m.key))

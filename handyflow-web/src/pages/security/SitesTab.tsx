@@ -18,10 +18,7 @@ import { useState } from "react"
 import { Link } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import {
-  Plus, MapPin, QrCode, X, AlertCircle, ChevronDown, ChevronRight,
-  Trash2, Radio, Bluetooth, Edit2, AlertTriangle, Printer, RefreshCw,
-} from "lucide-react"
+import { Plus, MapPin, QrCode, X, AlertCircle, ChevronDown, ChevronRight, Trash2, Radio, AlertTriangle, Printer, RefreshCw } from "lucide-react"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 

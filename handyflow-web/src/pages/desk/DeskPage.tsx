@@ -2,12 +2,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
-import {
-  Plus, X, MessageSquare, AlertTriangle, CheckCircle,
-  Clock, Search, ChevronRight, User, Tag, Calendar,
-  Shield, Link2, Send, Lock, Inbox, BarChart2,
-  RefreshCw, UserCheck, Filter, Download, Edit3,
-} from 'lucide-react'
+import { Plus, X, MessageSquare, AlertTriangle, CheckCircle, Clock, Search, ChevronRight, User, Tag, Shield, Link2, Send, Lock, Inbox, BarChart2, RefreshCw, UserCheck, Download } from 'lucide-react'
 import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
 import { DESK_SECTIONS } from '../../navigation/moduleSections'
 
@@ -31,7 +26,6 @@ interface Comment {
   internal: boolean; body: string; createdAt: string
 }
 interface Category { id: string; name: string; color: string | null }
-interface SlaPolicy { id: string; priority: string; firstResponseHours: number; resolutionHours: number }
 interface Summary {
   openCount: number; inProgressCount: number; waitingCount: number
   resolvedCount: number; urgentOpen: number; slaBreachedCount: number

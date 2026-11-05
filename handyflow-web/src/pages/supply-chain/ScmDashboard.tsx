@@ -2,10 +2,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useThemeColors } from "../../theme/ThemeContext"
-import {
-  Users, ShoppingCart, FileText, Package, AlertTriangle,
-  Clock, TrendingUp, ArrowRight, CheckCircle
-} from "lucide-react"
+import { Users, ShoppingCart, FileText, Package, AlertTriangle, TrendingUp, ArrowRight, CheckCircle } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts"
 
 interface Summary {
@@ -217,7 +214,7 @@ export function ScmDashboard({ onNav }: { onNav: (tab: ScmTab) => void }) {
                       tick={{ fontSize: 11, fill: c("warning-text-deep") }} axisLine={false} tickLine={false} />
                     <Tooltip
                       contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid var(--hf-warning-border-strong)", background: "var(--hf-surface)", color: "var(--hf-text)" }}
-                      formatter={(value: number, key: string) => [value.toFixed(1), key === "onHand" ? "On Hand" : "Reorder Point"]}
+                      formatter={(value, key) => [Number(value).toFixed(1), key === "onHand" ? "On Hand" : "Reorder Point"]}
                     />
                     <Bar dataKey="reorderPoint" fill={c("warning-border")} radius={[0, 4, 4, 0]} barSize={8} name="Reorder Point" />
                     <Bar dataKey="onHand" radius={[0, 4, 4, 0]} barSize={8} name="On Hand">

@@ -1,7 +1,7 @@
 // src/pages/events/EventAnalytics.tsx
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { BarChart2, Users, DollarSign, TrendingUp, Calendar, ChevronLeft } from "lucide-react"
+import { BarChart2, TrendingUp, Calendar } from "lucide-react"
 
 const fmtR  = (n: any) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
 const fmtDT = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
@@ -18,7 +18,7 @@ export default function EventAnalytics({ eventId }: Props) {
     },
   })
 
-  const { data: stats } = useQuery<any>({
+  useQuery<any>({
     queryKey: ["event-stats", eventId],
     queryFn: async () => {
       if (!eventId) return null

@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { FileText, Plus, X, CheckCircle, AlertCircle } from "lucide-react"
+import { Plus, X, CheckCircle } from "lucide-react"
 import { apiClient } from "../../api/client"
 
 interface VatPeriod { id: string; periodStart: string; periodEnd: string; status: string
@@ -24,7 +24,7 @@ const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
 export default function VatReturnsTab() {
   const qc = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
-  const [selectedPeriod, setSelectedPeriod] = useState<VatPeriod | null>(null)
+  const [, setSelectedPeriod] = useState<VatPeriod | null>(null)
   const [form, setForm] = useState({ periodStart: "", periodEnd: "" })
   const [vatFrom, setVatFrom] = useState("")
   const [vatTo,   setVatTo]   = useState("")

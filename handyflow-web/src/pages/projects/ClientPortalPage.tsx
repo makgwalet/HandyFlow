@@ -3,7 +3,7 @@
 import React from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { CheckCircle, AlertTriangle, Calendar } from 'lucide-react'
+import { CheckCircle, AlertTriangle } from 'lucide-react'
 import { apiClient } from '../../api/client'
 
 interface Portal {

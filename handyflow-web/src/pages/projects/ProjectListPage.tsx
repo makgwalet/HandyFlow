@@ -2,10 +2,7 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import {
-  HardHat, Plus, Search, AlertTriangle, CheckCircle,
-  Clock, Building2, Calendar, TrendingUp, ChevronRight,
-} from 'lucide-react'
+import { HardHat, Plus, Search, Calendar, ChevronRight } from 'lucide-react'
 import { apiClient } from '../../api/client'
 
 // ── Types ─────────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 // src/pages/supply-chain/scm.shared.tsx
 // Shared types, helpers and UI components for all SCM tabs
-import { X, AlertTriangle, CheckCircle, AlertCircle, Info } from "lucide-react"
+import { X, AlertTriangle, AlertCircle, Info } from "lucide-react"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -85,7 +85,7 @@ export const TD: React.CSSProperties = {
 
 // ── Reusable components ───────────────────────────────────────────────────────
 
-export function Modal({ title, children, onClose, wide }: { title: string; children: React.ReactNode; onClose: () => void; wide?: boolean }) {
+export function Modal({ title, children, onClose, wide }: { title: React.ReactNode; children: React.ReactNode; onClose: () => void; wide?: boolean }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
       <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 28, width: wide ? 720 : 600, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}>
@@ -99,11 +99,11 @@ export function Modal({ title, children, onClose, wide }: { title: string; child
   )
 }
 
-export function ModalFooter({ onCancel, onConfirm, label, loading }: { onCancel: () => void; onConfirm: () => void; label: string; loading?: boolean }) {
+export function ModalFooter({ onCancel, onConfirm, label, loading, accent }: { onCancel: () => void; onConfirm: () => void; label: string; loading?: boolean; accent?: string }) {
   return (
     <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24 }}>
       <button onClick={onCancel} style={{ padding: "8px 16px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
-      <button onClick={onConfirm} disabled={loading} style={{ padding: "8px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? .6 : 1 }}>{label}</button>
+      <button onClick={onConfirm} disabled={loading} style={{ padding: "8px 16px", background: accent ?? "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? .6 : 1 }}>{label}</button>
     </div>
   )
 }

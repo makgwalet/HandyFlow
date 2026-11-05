@@ -68,7 +68,7 @@ function SpeciesForm({ initial, onCancel, onSave, saving }: {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
         <div>
           <label style={lbl}>Tracking mode</label>
-          <select value={trackingMode} onChange={e => setTrackingMode(e.target.value)} style={inp}>
+          <select value={trackingMode} onChange={e => setTrackingMode(e.target.value as "INDIVIDUAL" | "BOTH" | "GROUP")} style={inp}>
             {TRACKING_MODES.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
         </div>

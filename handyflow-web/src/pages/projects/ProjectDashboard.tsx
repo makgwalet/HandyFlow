@@ -77,7 +77,6 @@ export function ProjectDashboard({ onOpen, onList }: { onOpen:(id:string)=>void;
           {projects.map(p => {
             const h = HEALTH[p.health] ?? HEALTH.GREEN
             const st = STATUS_BADGE[p.status] ?? STATUS_BADGE.PLANNING
-            const spentPct = p.budgetTotal > 0 ? Math.min(100,(p.budgetSpent/p.budgetTotal)*100) : 0
             const taskPct  = p.taskCount  > 0 ? Math.round((p.completedTaskCount/p.taskCount)*100) : 0
             return (
               <div key={p.id} onClick={() => onOpen(p.id)}

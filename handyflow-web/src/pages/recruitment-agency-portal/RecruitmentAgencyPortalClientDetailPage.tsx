@@ -4,10 +4,9 @@ import { useParams } from "react-router-dom"
 import { recruitmentAgencyPortalApi } from "../../api/recruitmentAgencyPortal.api"
 import type { Requisition, Placement, AgencyInvoice, PortalClientSummary } from "../../types/recruitmentAgencyPortal.types"
 import { PortalShell } from "../accountant-portal/PortalShell"
-import { color, radius, space, statusTone, type } from "../accountant-portal/portal-theme"
+import { color, radius, space, statusTone } from "../accountant-portal/portal-theme"
 
 const fmtR = (n: any) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
-const fmtD = (d: any) => (d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—")
 
 type TabId = "requisitions" | "invoices"
 

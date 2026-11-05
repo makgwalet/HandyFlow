@@ -1,22 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import {
-  Users, FileText, Package, Clock, Bell, Settings,
-  ChevronDown, Search, ExternalLink, User, Lock,
-  CreditCard, LogOut, UserPlus, FilePlus, Plus,
-  TrendingUp, ChevronRight, Building2, CheckCircle,
-  AlertCircle, Shield, Fuel, HardHat, Car, Briefcase,
-  BookOpen, Calculator, Calendar, HeartPulse, PartyPopper, FilePen, Wallet,
-  Palette, Headphones, CheckSquare, Megaphone, UserCheck, ShoppingCart,
-  Truck, Receipt,
-  Scale,
-  Landmark,
-  Handshake,
-  Warehouse,
-  ClipboardCheck,
-  ShieldCheck, Wheat, GraduationCap, CalendarClock, Banknote, UserSearch, Wrench,
-} from 'lucide-react'
+import { Users, FileText, Package, Clock, Bell, Settings, ChevronDown, Search, ExternalLink, User, Lock, CreditCard, LogOut, TrendingUp, ChevronRight, Building2, Shield, Fuel, HardHat, Car, Briefcase, BookOpen, Calculator, Calendar, HeartPulse, PartyPopper, FilePen, Wallet, Palette, Headphones, CheckSquare, Megaphone, UserCheck, ShoppingCart, Truck, Receipt, Scale, Landmark, Handshake, Warehouse, ClipboardCheck, ShieldCheck, Wheat, GraduationCap, CalendarClock, Banknote, UserSearch, Wrench } from 'lucide-react'
 import { apiClient } from '../../api/client'
 import { useAuthStore } from '../../store/auth.store'
 import type { Subscription } from '../../types/billing.types'
@@ -95,12 +80,6 @@ const MODULE_REGISTRY: Record<string, AppTile> = {
   // JWT has AP_MANAGE, AP_READ → ap
   ap:          { key: 'ap',          name: 'Accounts Payable', description: 'Supplier invoices & payments', icon: Receipt,      bg: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text)', route: '/ap'           },
 }
-
-const QUICK_ACTIONS = [
-  { label: 'Add customer',        sub: 'CRM',       icon: UserPlus, bg: 'var(--hf-info-soft-strong)', color: 'var(--hf-info-text)', route: '/customers' },
-  { label: 'New quote',           sub: 'Invoicing', icon: FilePlus, bg: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', route: '/quotes'    },
-  { label: 'Add catalogue item',  sub: 'Catalogue', icon: Plus,     bg: 'var(--hf-violet-soft-strong)', color: 'var(--hf-violet-text)', route: '/catalogue' },
-]
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 

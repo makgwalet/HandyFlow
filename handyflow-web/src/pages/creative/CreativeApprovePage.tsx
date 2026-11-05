@@ -112,7 +112,6 @@ export function CreativeApprovePage() {
   if (loadError || !proof) {
     const msg = (loadError as any)?.response?.data?.message ?? ''
     const isExpired  = msg.includes('expired')
-    const isInvalid  = msg.includes('Invalid') || msg.includes('not found')
     const alreadyDone = msg.includes('already been approved')
     return (
       <Page>
