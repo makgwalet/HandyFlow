@@ -126,6 +126,7 @@ public class PayrollControlService {
         payRunRepo.save(run);
         eventRepo.save(HrPayRunEvent.of(tenantId.getValue(), runId, self ? "APPROVED_OWN_RUN" : "APPROVED", from, run.getStatus(), actor,
                 self ? "Approved by the person who calculated it, allowed by this business's payroll setting. " + nz(note) : note));
+        if (self) recordOwnRun(tenantId, actor, runId, "approved the pay run they calculated");
         log.info("Pay run {} approved by {} self={}", run.getPayRunNumber(), actor, self);
         return toResponse(run);
     }
@@ -169,6 +170,7 @@ public class PayrollControlService {
         run.finalise(actor);
         payRunRepo.save(run);
         eventRepo.save(HrPayRunEvent.of(tenantId.getValue(), runId, self ? "FINALISED_OWN_RUN" : "FINALISED", from, run.getStatus(), actor, note));
+        if (self) recordOwnRun(tenantId, actor, runId, "finalised the pay run they calculated");
         log.info("Pay run {} finalised by {}", run.getPayRunNumber(), actor);
         return toResponse(run);
     }
@@ -257,6 +259,20 @@ public class PayrollControlService {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * The business has chosen to let one person calculate and approve. The pay run event already says so;
+     * this also writes the audit event the Owner's sole-approver report reads. A failure here never blocks payroll.
+     */
+    private void recordOwnRun(TenantId tenantId, UUID actor, UUID runId, String what) {
+        try {
+            new za.co.handyflow.platform.shared.SeparationOfDutiesChecker(jdbc)
+                    .recordSoleException(tenantId, actor, "PAYROLL_APPROVE", "PAY_RUN", runId,
+                            what + " (allowed by the business's payroll setting)");
+        } catch (RuntimeException e) {
+            log.warn("Could not write the sole-approver audit event for pay run {}: {}", runId, e.getMessage());
+        }
+    }
 
     private boolean allowSelfApproval(TenantId tenantId) {
         return settingsRepo.findById(tenantId.getValue()).map(HrPayrollSettings::isAllowSelfApproval).orElse(false);
