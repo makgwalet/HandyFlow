@@ -121,7 +121,8 @@ class InvoicingAccountingEventHandlerTest {
 
     @Test
     void aMissingReceivablesAccountIsQueuedForAPersonAndNothingIsPosted() {
-        when(accounts.findAllActive(any())).thenReturn(List.of(account(revenue, "4000")));
+        List<AccAccount> onlyRevenue = List.of(account(revenue, "4000"));   // built first: a mock created inside thenReturn(...) is an UnfinishedStubbingException
+        when(accounts.findAllActive(any())).thenReturn(onlyRevenue);
         UUID id = UUID.randomUUID();
 
         handler.onInvoiceIssued(issued(id, "100.00", "15.00", "115.00"));
