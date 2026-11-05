@@ -1,0 +1,12 @@
+# Optional quicker local start:  mvn spring-boot:run "-Dspring-boot.run.profiles=dev"
+# Beans are created when first used, so startup is much shorter. The catch:
+#  - a wiring mistake shows up on first use, not at startup (CI and real runs keep the default, which checks everything);
+#  - @Scheduled jobs in beans nothing has used yet do not start. Do not use this profile to test schedulers.
+spring:
+  main:
+    lazy-initialization: true
+
+logging:
+  level:
+    org.springframework.modulith: INFO
+    org.springframework.security: INFO

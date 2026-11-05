@@ -11,7 +11,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class HandyFlowApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(HandyFlowApplication.class, args);
+		SpringApplication app = new SpringApplication(HandyFlowApplication.class);
+		// Set HANDYFLOW_STARTUP_PROFILE=true to log where startup time goes (see StartupProfileReporter).
+		if ("true".equalsIgnoreCase(System.getenv("HANDYFLOW_STARTUP_PROFILE"))) {
+			app.setApplicationStartup(new org.springframework.boot.context.metrics.buffering.BufferingApplicationStartup(100_000));
+		}
+		app.run(args);
 	}
 
 }
