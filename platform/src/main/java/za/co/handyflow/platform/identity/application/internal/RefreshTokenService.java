@@ -47,6 +47,7 @@ public class RefreshTokenService {
     private final UserRepository         userRepository;
     private final JwtService jwtService;
     private final RefreshTokenSecuritySweep securitySweep;
+    private final TokenPermissions tokenPermissions;
 
     // FIX: was reading app.security.refresh-token.expiration-days (a key
     // that doesn't exist anywhere in application.yaml, silently falling
@@ -161,14 +162,15 @@ public class RefreshTokenService {
         existing.revoke(newHash);
         refreshTokenRepository.save(existing);
 
+        java.util.Set<String> permissions = tokenPermissions.forToken(existing.getTenantId(), user.getPermissionNames());
         String newAccessToken = jwtService.generateToken(
                 user.getId(), existing.getTenantId(), user.getEmail(),
-                user.getFirstName(), user.getLastName(), user.getPermissionNames());
+                user.getFirstName(), user.getLastName(), permissions);
 
         return new RefreshResult(
                 newAccessToken, jwtService.getExpirationSeconds(),
                 user.getId(), existing.getTenantId(), user.getEmail(),
-                user.getFirstName(), user.getLastName(), user.getPermissionNames(),
+                user.getFirstName(), user.getLastName(), permissions,
                 newRawToken, newToken.getExpiresAt());
     }
 

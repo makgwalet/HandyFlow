@@ -73,7 +73,8 @@ class AuthServiceTest {
         return new AuthService(
                 tenantRepository, userRepository, subscriptionQueryFacade,
                 passwordEncoder, jwtService, roleService, emailService,
-                emailVerificationService, disposableEmailChecker);
+                emailVerificationService, disposableEmailChecker,
+                new TokenPermissions(null, null, false));
     }
 
     private static RegisterRequest registerRequest(String email) {

@@ -39,6 +39,7 @@ public class UserManagementService {
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private final AccessAuditService       auditService;
     private final RefreshTokenSecuritySweep securitySweep;
+    private final TokenPermissions tokenPermissions;
 
     /** Base URL of the web app used in emailed links (property app.frontend.url, same as the other modules). */
     @org.springframework.beans.factory.annotation.Value("${app.frontend.url:https://app.handyflow.co.za}")
@@ -406,12 +407,13 @@ public class UserManagementService {
                         "Tenant", inv.getTenantId().getValue().toString()));
 
         // Return an AuthResponse so the user is logged in immediately after accepting
+        java.util.Set<String> permissions = tokenPermissions.forToken(inv.getTenantId().getValue(), user.getPermissionNames());
         String token = jwtService.generateToken(
                 user.getId(),
                 inv.getTenantId().getValue(),   // UUID from TenantId
                 user.getEmail(),
                 user.getFirstName(), user.getLastName(),
-                user.getPermissionNames()
+                permissions
         );
         return new AuthResponse(
                 token, "Bearer", jwtService.getExpirationSeconds(),
@@ -420,7 +422,7 @@ public class UserManagementService {
                 user.getEmail(),
                 user.getFirstName(),
                 user.getLastName(),
-                user.getPermissionNames(),
+                permissions,
                 tenant.getStatus().name()
         );
     }

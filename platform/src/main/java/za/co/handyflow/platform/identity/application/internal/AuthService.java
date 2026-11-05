@@ -54,6 +54,7 @@ public class AuthService {
     private final EmailService emailService;
     private final EmailVerificationService emailVerificationService;
     private final DisposableEmailChecker disposableEmailChecker;
+    private final TokenPermissions tokenPermissions;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -163,12 +164,13 @@ public class AuthService {
     }
 
     private AuthResponse buildAuthResponse(User user, Tenant tenant) {
+        java.util.Set<String> permissions = tokenPermissions.forToken(tenant.getId(), user.getPermissionNames());
         String token = jwtService.generateToken(
                 user.getId(),
                 tenant.getId(),
                 user.getEmail(),
                 user.getFirstName(), user.getLastName(),
-                user.getPermissionNames()
+                permissions
         );
 
         // FIX: expiresIn was hardcoded to 86400L, completely independent
@@ -215,7 +217,7 @@ public class AuthService {
                 user.getEmail(),
                 user.getFirstName(),
                 user.getLastName(),
-                user.getPermissionNames(),
+                permissions,
                 subscriptionStatus
         );
     }
