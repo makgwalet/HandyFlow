@@ -49,6 +49,8 @@ Dependencies: none. Risks: 0.6 can break screens that call `/identity/users` for
 4. **`SeparationOfDutiesPolicy.assertDifferentActor`** and toxic-pair table; wire into AP pay, payroll approve/run, journal review, credit-note approval, refunds first; then the rest. Build rule: methods guarded by `*_APPROVE`, `PAY`, `ISSUE`, `SIGN` call it.
 5. **Reclassify approval permissions out of administrative templates** (matrix doc).
 
+**Status 2026-11-05:** the build rule in item 1 ("every `hasAuthority` name exists in the catalogue") is in place as `AuthorityCatalogueCoverageTest` (patch 0628). On the current source all 4,185 guard uses resolve to the 404 catalogue names; the only exception is `PORTAL_USER`, issued by `PortalJwtFilter`. Still to do in item 1: the metadata columns (`module_key`, `resource`, `verb`, `sensitivity`, `requires_second_person`, `grantable_by`) and the reviewed prefix map that fills them.
+
 Acceptance: a tenant without HR cannot call any HR endpoint even as `ADMIN` (integration test per module); no controller uses an unregistered authority; approving one's own AP bill, payroll run, journal, credit note, expense is refused for every role including `ADMIN`. Risks: tenants that today use a module without a subscription row (trials, internal tenants, demo tenant) lose access → run in **report mode** for one release (log what would have been blocked) before enforcing; data from `tenant_modules` must be verified clean first. Dependencies: product decision on which modules are free.
 
 ## Phase 2 – Invitations v2, templates, People & Access UI (L)
