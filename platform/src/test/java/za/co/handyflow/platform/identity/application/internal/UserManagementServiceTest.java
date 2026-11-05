@@ -454,7 +454,7 @@ class UserManagementServiceTest {
                     .isInstanceOf(HandyFlowException.class)
                     .hasMessageContaining("PAYROLL_APPROVE");
 
-            when(permissionRepository.findAllById(any())).thenReturn(List.of());
+            // removing everything: no lookup is needed, so nothing is stubbed here
             service.updateRolePermissions(TENANT, clerk.getId(), Set.of());
             assertThat(clerk.getPermissions()).isEmpty();
         }
