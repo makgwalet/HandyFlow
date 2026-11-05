@@ -40,7 +40,7 @@ public class AgSupplierController {
     @Operation(summary = "Active suppliers from Supply Chain that stock can be bought from (id and name only)")
     public ResponseEntity<ApiResponse<List<SupplierOption>>> suppliers() {
         featureGuard.requireModule("agriculture");
-        featureGuard.requireModule("supplychain");
+        featureGuard.requireModule("supply_chain");
         return ResponseEntity.ok(ApiResponse.success(purchasesService.suppliers(TenantContext.getTenantIdAsObject())));
     }
 
@@ -49,7 +49,7 @@ public class AgSupplierController {
     @Operation(summary = "Set an item's usual supplier (a Supply Chain supplier that is ACTIVE); null clears it")
     public ResponseEntity<ApiResponse<InventoryItemResponse>> setUsualSupplier(@PathVariable UUID id, @RequestBody SetSupplierRequest request) {
         featureGuard.requireModule("agriculture");
-        if (request.supplierId() != null) featureGuard.requireModule("supplychain");
+        if (request.supplierId() != null) featureGuard.requireModule("supply_chain");
         return ResponseEntity.ok(ApiResponse.success("Supplier updated", inventoryService.setUsualSupplier(TenantContext.getTenantIdAsObject(), id, request.supplierId())));
     }
 
@@ -61,7 +61,7 @@ public class AgSupplierController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         featureGuard.requireModule("agriculture");
-        featureGuard.requireModule("supplychain");
+        featureGuard.requireModule("supply_chain");
         return ResponseEntity.ok(ApiResponse.success(purchasesService.bySupplier(TenantContext.getTenantIdAsObject(), farmId, from, to)));
     }
 }

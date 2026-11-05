@@ -60,7 +60,7 @@ class AgSupplierControllerTest {
         TenantRequests.asTenant(mvc, get(BASE + "/suppliers")).andExpect(status().isOk()).andExpect(jsonPath("$.data[0].name").value("AgriSupplies"));
 
         verify(featureGuard, atLeastOnce()).requireModule("agriculture");
-        verify(featureGuard, atLeastOnce()).requireModule("supplychain");
+        verify(featureGuard, atLeastOnce()).requireModule("supply_chain");
     }
 
     @Test
@@ -88,7 +88,7 @@ class AgSupplierControllerTest {
         TenantRequests.asTenant(mvc, patch(BASE + "/inventory-items/" + itemId + "/supplier").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"supplierId\":\"" + supplierId + "\"}")).andExpect(status().isOk());
 
         verify(inventoryService).setUsualSupplier(any(), eq(itemId), eq(supplierId));
-        verify(featureGuard, atLeastOnce()).requireModule("supplychain");
+        verify(featureGuard, atLeastOnce()).requireModule("supply_chain");
     }
 
     @Test
@@ -98,7 +98,7 @@ class AgSupplierControllerTest {
         TenantRequests.asTenant(mvc, patch(BASE + "/inventory-items/" + itemId + "/supplier").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"supplierId\":null}")).andExpect(status().isOk());
 
         verify(inventoryService).setUsualSupplier(any(), eq(itemId), isNull());
-        verify(featureGuard, never()).requireModule("supplychain");
+        verify(featureGuard, never()).requireModule("supply_chain");
     }
 
     @Test
@@ -121,7 +121,7 @@ class AgSupplierControllerTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.notes[0]").value("note"));
 
         verify(featureGuard, atLeastOnce()).requireModule("agriculture");
-        verify(featureGuard, atLeastOnce()).requireModule("supplychain");
+        verify(featureGuard, atLeastOnce()).requireModule("supply_chain");
     }
 
     @Test

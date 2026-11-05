@@ -17,8 +17,8 @@ import java.util.Set;
  *    ap), so enforcing would lock out every tenant. These are logged but never refused until a row exists;
  *  - deliberately unmapped: platform services shared by all modules (approvals, capture, notifications, audit-trail,
  *    documents, secure-access) and external portals, pending decision D-05.
- * Supply chain is mapped to the catalogue spelling "supply_chain". Agriculture still guards "supplychain" in code,
- * which no tenant holds; that mismatch is recorded as gap G-02 and is not changed here.
+ * Supply chain is mapped to the catalogue spelling "supply_chain", the same key Agriculture's supplier endpoints now
+ * guard (they used "supplychain", which no tenant holds; gap G-02, fixed).
  */
 public final class ModuleEntitlementPaths {
 
