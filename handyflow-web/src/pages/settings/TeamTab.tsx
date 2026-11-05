@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
+import SeatUsage from './SeatUsage'
 import {
   Plus, X, Mail, Shield, UserCheck, UserX,
   ChevronDown, ChevronUp, Check, Pencil, Clock, AlertTriangle,
@@ -120,6 +121,7 @@ export default function TeamTab() {
     qc.invalidateQueries({ queryKey: ['team-users'] })
     qc.invalidateQueries({ queryKey: ['team-invitations'] })
     qc.invalidateQueries({ queryKey: ['team-roles'] })
+    qc.invalidateQueries({ queryKey: ['team-seat-usage'] })
   }
 
   // ── Mutations ─────────────────────────────────────────────────────────────
@@ -205,6 +207,8 @@ export default function TeamTab() {
 
   return (
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+
+      <SeatUsage />
 
       {/* Sub-nav */}
       <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--hf-border)', marginBottom: 24 }}>
