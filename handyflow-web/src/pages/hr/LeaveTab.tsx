@@ -55,6 +55,9 @@ export default function LeaveTab() {
   const [expandedEmp, setExpandedEmp] = useState<string | null>(null)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState("")
+  // Set when the server says nobody else can approve this and asks for a written reason (the one-person exception).
+  const [ownReasonFor, setOwnReasonFor] = useState<string | null>(null)
+  const [ownReason, setOwnReason] = useState("")
   const [error, setError]           = useState("")
   const [form, setForm]             = useState(EMPTY_FORM)
 
@@ -108,9 +111,14 @@ export default function LeaveTab() {
   })
 
   const approveLeave = useMutation({
-    mutationFn: (id: string) => apiClient.post(`/api/v1/hr/leave-requests/${id}/approve`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["leave-requests"] }); qc.invalidateQueries({ queryKey: ["leave-balances"] }) },
-    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to approve"),
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      apiClient.post(`/api/v1/hr/leave-requests/${id}/approve${reason ? `?reason=${encodeURIComponent(reason)}` : ""}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["leave-requests"] }); qc.invalidateQueries({ queryKey: ["leave-balances"] }); setOwnReasonFor(null); setOwnReason(""); setError("") },
+    onError: (e: any, vars) => {
+      const msg: string = e.response?.data?.message ?? "Failed to approve"
+      setError(msg)
+      if (/give the reason you are approving/i.test(msg)) setOwnReasonFor(vars.id)
+    },
   })
 
   // FIX: was firing immediately with no reason — now sends reason via query param
@@ -257,7 +265,7 @@ export default function LeaveTab() {
                 {(req.status === "PENDING" && rights.decide || canCancel(req, rights, today)) && (
                   <div style={{ display: "flex", gap: 8, flexShrink: 0, marginLeft: 12 }}>
                     {req.status === "PENDING" && rights.decide && <>
-                    <button onClick={() => approveLeave.mutate(req.id)}
+                    <button onClick={() => approveLeave.mutate({ id: req.id })}
                       style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                       <CheckCircle size={12} /> Approve
                     </button>
@@ -335,6 +343,22 @@ export default function LeaveTab() {
                 style={{ padding: "9px 22px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {submitLeave.isPending ? "Submitting..." : "Submit Request"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approving your own leave where nobody else can: a written reason is required and recorded */}
+      {ownReasonFor && (
+        <div role="dialog" aria-label="Reason for approving your own leave" style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1001 }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Approving your own leave</h3>
+            <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--hf-text-muted)" }}>Nobody else can approve this. The reason is kept in the audit trail the Owner and auditors can see.</p>
+            <textarea aria-label="Reason" value={ownReason} autoFocus onChange={e => setOwnReason(e.target.value)} rows={3} style={{ ...inp, resize: "vertical" as const }} />
+            {error && <div style={{ margin: "12px 0", padding: "9px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 12 }}>
+              <button onClick={() => { setOwnReasonFor(null); setOwnReason(""); setError("") }}>Cancel</button>
+              <button disabled={ownReason.trim().length < 10 || approveLeave.isPending} onClick={() => approveLeave.mutate({ id: ownReasonFor, reason: ownReason.trim() })}>Approve with this reason</button>
             </div>
           </div>
         </div>

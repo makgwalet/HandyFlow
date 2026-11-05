@@ -259,6 +259,16 @@ describe("ApprovalsModal", () => {
     expect(screen.getAllByRole("button", { name: "Cancel request" }).length).toBe(1)
   })
 
+  it("sends the reason with an approval of your own request", async () => {
+    get.mockImplementation(() => ok([change({ id: "c2", requestedBy: "u-me" })]))
+    post.mockResolvedValue({ data: { data: change() } })
+    wrap(<ApprovalsModal canDecide onClose={() => {}} />)
+    await screen.findByText(/Jane Dlamini · Pay change/)
+    fireEvent.change(screen.getByLabelText("Reason for approving your own request"), { target: { value: "  Sole director, agreed in writing  " } })
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/hr/employee-changes/c2/approve", { note: "Sole director, agreed in writing" }))
+  })
+
   it("needs a reason to reject", async () => {
     get.mockImplementation(() => ok([change()]))
     wrap(<ApprovalsModal canDecide onClose={() => {}} />)

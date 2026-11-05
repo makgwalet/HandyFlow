@@ -36,6 +36,36 @@ public final class EmployeeChangeRules {
 
     public static String label(String field) { return LABELS.getOrDefault(field, field); }
 
+    /** Where nobody else can approve, a change may be approved by its own asker only for a written reason. */
+    public static final int MIN_EXCEPTION_REASON = 10;
+    /** A bank-detail change approved by its own asker waits this long, a pause in which a fraud attempt can be noticed. */
+    public static final java.time.Duration BANK_SELF_APPROVAL_WAIT = java.time.Duration.ofHours(24);
+
+    public static String exceptionReasonProblem(String reason) {
+        if (reason == null || reason.trim().length() < MIN_EXCEPTION_REASON)
+            return "Nobody else can approve this, so give the reason you are approving it yourself (at least " + MIN_EXCEPTION_REASON + " characters).";
+        return reason.trim().length() > 500 ? "The reason can be at most 500 characters." : null;
+    }
+
+    /** What stops an asker approving their own change where nobody else could: a missing reason, or the wait on bank details. Null when allowed. */
+    public static String selfApprovalProblem(String changeType, String reason, java.time.Instant requestedAt, java.time.Instant now) {
+        String problem = exceptionReasonProblem(reason);
+        if (problem != null) return problem;
+        if (BANK_DETAILS.equals(changeType) && requestedAt != null && now.isBefore(requestedAt.plus(BANK_SELF_APPROVAL_WAIT)))
+            return "Bank details cannot be approved by the person who asked for them until 24 hours after the request. Try again after "
+                    + java.time.ZonedDateTime.ofInstant(requestedAt.plus(BANK_SELF_APPROVAL_WAIT), java.time.ZoneId.of("Africa/Johannesburg"))
+                    .format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy HH:mm")) + ".";
+        return null;
+    }
+
+    /** Values as the audit trail keeps them: account numbers show only their last four digits. */
+    public static Map<String, String> auditValues(Map<String, String> values) {
+        Map<String, String> out = new LinkedHashMap<>();
+        if (values == null) return out;
+        values.forEach((k, v) -> out.put(k, ACCOUNT.equals(k) && v != null && v.length() > 4 ? "****" + v.substring(v.length() - 4) : v));
+        return out;
+    }
+
     public static String compensationProblem(BigDecimal gross, BigDecimal travel, BigDecimal medical, BigDecimal pension, String frequency) {
         if (gross == null || gross.signum() <= 0) return "Gross salary must be more than zero.";
         if (gross.compareTo(MAX_GROSS) > 0) return "Gross salary looks too high. Check the amount.";

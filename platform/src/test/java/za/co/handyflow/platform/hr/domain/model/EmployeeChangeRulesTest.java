@@ -121,4 +121,40 @@ class EmployeeChangeRulesTest {
         assertThat(label(ACCOUNT)).isEqualTo("Account number");
         assertThat(label("other")).isEqualTo("other");
     }
+
+    // ── Approving your own change where nobody else can ───────────────────────
+
+    private static final java.time.Instant NOW = java.time.Instant.parse("2026-11-05T10:00:00Z");
+
+    @Test
+    void ownApprovalNeedsAWrittenReason() {
+        assertThat(exceptionReasonProblem(null)).contains("reason");
+        assertThat(exceptionReasonProblem("   ")).contains("reason");
+        assertThat(exceptionReasonProblem("too short")).contains("reason");
+        assertThat(exceptionReasonProblem("Sole director, agreed in writing")).isNull();
+        assertThat(exceptionReasonProblem("x".repeat(501))).contains("500");
+    }
+
+    @Test
+    void aPayChangeNeedsOnlyTheReason() {
+        assertThat(selfApprovalProblem(COMPENSATION, "Sole director, agreed in writing", NOW.minusSeconds(60), NOW)).isNull();
+    }
+
+    @Test
+    void aBankChangeAlsoWaits24HoursFromTheRequest() {
+        assertThat(selfApprovalProblem(BANK_DETAILS, "Sole director, new account", NOW.minusSeconds(23 * 3600), NOW)).contains("24 hours");
+        assertThat(selfApprovalProblem(BANK_DETAILS, "Sole director, new account", NOW.minusSeconds(24 * 3600), NOW)).isNull();
+        assertThat(selfApprovalProblem(BANK_DETAILS, "short", NOW.minusSeconds(48 * 3600), NOW)).contains("reason");
+    }
+
+    @Test
+    void auditValuesShowOnlyTheLastFourDigitsOfAnAccountNumber() {
+        Map<String, String> v = new LinkedHashMap<>();
+        v.put(BANK_NAME, "FNB"); v.put(ACCOUNT, "62000011112222"); v.put(GROSS, "35000");
+        Map<String, String> shown = auditValues(v);
+        assertThat(shown.get(ACCOUNT)).isEqualTo("****2222");
+        assertThat(shown.get(BANK_NAME)).isEqualTo("FNB");
+        assertThat(shown.get(GROSS)).isEqualTo("35000");
+        assertThat(auditValues(null)).isEmpty();
+    }
 }

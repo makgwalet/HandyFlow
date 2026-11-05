@@ -56,6 +56,27 @@ public class SeparationOfDutiesChecker {
         require(tenantId, permission, actor, actor, message, itemType, itemId, what);
     }
 
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
+
+    /**
+     * As above, also keeping {@code details} (who asked, the reason, when, before and after values) in the audit event,
+     * so the Owner's report can show what the one person approved and why.
+     */
+    public void recordSoleException(TenantId tenantId, UUID actor, String permission, String itemType, UUID itemId, String what,
+                                    java.util.Map<String, ?> details) {
+        log.warn("[SOD] Separation of duties not possible, allowed: {} tenant={} user={} (nobody else holds {})",
+                what, tenantId, actor, permission);
+        String name = null;
+        try { name = TenantContext.getCurrentUserName(); } catch (RuntimeException ignored) { /* no named user in context */ }
+        String extra;
+        try { extra = JSON.writeValueAsString(details == null ? java.util.Map.of() : details); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException e) { extra = "{}"; }
+        jdbc.update("""
+                INSERT INTO audit_events (tenant_id, actor_type, actor_id, actor_name, action, item_type, item_id, after_json)
+                VALUES (?, 'STAFF', ?, ?, ?, ?, ?, jsonb_build_object('permission', ?::text, 'detail', ?::text) || ?::jsonb)""",
+                tenantId.getValue(), actor, name, SOLE_APPROVER_ACTION, itemType, itemId, permission, what, extra);
+    }
+
     /** Logs and records (append-only audit event) that {@code actor} did a step nobody else could check. */
     public void recordSoleException(TenantId tenantId, UUID actor, String permission, String itemType, UUID itemId, String what) {
         log.warn("[SOD] Separation of duties not possible, allowed: {} tenant={} user={} (nobody else holds {})",

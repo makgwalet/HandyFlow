@@ -156,12 +156,14 @@ export function ApprovalsModal({ canDecide, onClose }: { canDecide: boolean; onC
   const me = user?.userId
   const [rejecting, setRejecting] = useState<string | null>(null)
   const [note, setNote] = useState("")
+  // Where nobody else can approve, the asker approves their own request only with a written reason.
+  const [ownWhy, setOwnWhy] = useState("")
   const [error, setError] = useState("")
   const { data = [], isLoading } = useQuery<EmployeeChange[]>({
     queryKey: ["hr-employee-changes", "pending"],
     queryFn: async () => list<EmployeeChange>(await apiClient.get("/api/v1/hr/employee-changes/pending")),
   })
-  const done = () => { qc.invalidateQueries({ queryKey: ["hr-employee-changes"] }); qc.invalidateQueries({ queryKey: ["hr-employees"] }); setRejecting(null); setNote(""); setError("") }
+  const done = () => { qc.invalidateQueries({ queryKey: ["hr-employee-changes"] }); qc.invalidateQueries({ queryKey: ["hr-employees"] }); setRejecting(null); setNote(""); setOwnWhy(""); setError("") }
   const act = useMutation({
     mutationFn: ({ id, action, body }: { id: string; action: "approve" | "reject" | "cancel"; body?: { note: string } }) =>
       apiClient.post(`/api/v1/hr/employee-changes/${id}/${action}`, body ?? {}),
@@ -190,10 +192,15 @@ export function ApprovalsModal({ canDecide, onClose }: { canDecide: boolean; onC
                   </div>
                 ) : (
                   <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center", marginTop: 8 }}>
-                    {canDecide && mine && <span style={{ fontSize: 12, color: "var(--hf-text-muted)", marginRight: "auto" }}>You asked for this one. Someone else has to approve it, unless the business has allowed approving your own requests.</span>}
+                    {canDecide && mine && (
+                      <div style={{ marginRight: "auto", flex: 1 }}>
+                        <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>You asked for this one. Someone else has to approve it. Only where nobody else can, and the business has allowed it, may you approve it yourself, with a reason that is kept in the audit trail{c.changeType === "BANK_DETAILS" ? " (bank details also wait 24 hours)" : ""}.</div>
+                        <input aria-label="Reason for approving your own request" placeholder="Reason (at least 10 characters)" value={ownWhy} onChange={e => setOwnWhy(e.target.value)} style={{ ...inp, marginTop: 6 }} />
+                      </div>
+                    )}
                     {mine && <button onClick={() => act.mutate({ id: c.id, action: "cancel" })} style={btn(false)}>Cancel request</button>}
                     {canDecide && <button onClick={() => { setRejecting(c.id); setNote("") }} style={btn(false)}>Reject</button>}
-                    {canDecide && <button disabled={!!why || act.isPending} onClick={() => act.mutate({ id: c.id, action: "approve", body: { note: "" } })} style={btn(true, !!why || act.isPending)}>Approve</button>}
+                    {canDecide && <button disabled={!!why || act.isPending} onClick={() => act.mutate({ id: c.id, action: "approve", body: { note: mine ? ownWhy.trim() : "" } })} style={btn(true, !!why || act.isPending)}>Approve</button>}
                   </div>
                 )}
               </ChangeCard>

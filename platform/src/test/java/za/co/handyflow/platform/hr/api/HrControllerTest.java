@@ -441,14 +441,14 @@ class HrControllerTest {
     @DisplayName("REGRESSION: POST /leave-requests/{id}/approve records the real approver id, not null")
     void approveLeaveRecordsRealApproverId() throws Exception {
         var id = UUID.randomUUID();
-        when(leaveService.approve(any(), eq(id), any(), any()))
+        when(leaveService.approve(any(), eq(id), any(), any(), any()))
                 .thenReturn(leaveResponse(id));
 
         mvc.perform(post(BASE + "/leave-requests/" + id + "/approve").with(csrf()))
                 .andExpect(status().isOk());
 
         var approverIdCaptor = org.mockito.ArgumentCaptor.forClass(UUID.class);
-        verify(leaveService).approve(any(), eq(id), approverIdCaptor.capture(), any());
+        verify(leaveService).approve(any(), eq(id), approverIdCaptor.capture(), any(), any());
 
         // The original bug hard-coded this argument to null, silently
         // breaking the approval audit trail. This is the assertion that

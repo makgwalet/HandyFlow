@@ -120,11 +120,28 @@ public class LeaveService {
 
     @Transactional
     public LeaveRequestResponse approve(TenantId tenantId, UUID requestId, UUID actor, Set<String> held) {
+        return approve(tenantId, requestId, actor, held, null);
+    }
+
+    /** @param exceptionReason required only when the approver is the employee and nobody else can approve */
+    @Transactional
+    public LeaveRequestResponse approve(TenantId tenantId, UUID requestId, UUID actor, Set<String> held, String exceptionReason) {
         HrLeaveRequest req = request(tenantId, requestId);
         if (!"PENDING".equals(req.getStatus())) throw new IllegalStateException("Only a request that is waiting can be approved.");
-        if (checkMayDecide(tenantId, req, actor, held))
+        if (checkMayDecide(tenantId, req, actor, held)) {
+            String problem = EmployeeChangeRules.exceptionReasonProblem(exceptionReason);
+            if (problem != null) throw new AccessDeniedException(problem);
+            java.util.Map<String, Object> details = new java.util.LinkedHashMap<>();
+            details.put("initiator", actor);
+            details.put("approver", actor);
+            details.put("reason", exceptionReason.trim());
+            details.put("requestedAt", String.valueOf(req.getCreatedAt()));
+            details.put("approvedAt", java.time.Instant.now().toString());
+            details.put("after", java.util.Map.of("leaveType", String.valueOf(req.getLeaveType()),
+                    "from", String.valueOf(req.getStartDate()), "to", String.valueOf(req.getEndDate())));
             duties.recordSoleException(tenantId, actor, "LEAVE_APPROVE", "LEAVE_REQUEST", requestId,
-                    "approved their own leave request (nobody else can approve)");
+                    "approved their own leave request (nobody else can approve)", details);
+        }
 
         req.approve(actor);
         requestRepo.save(req);

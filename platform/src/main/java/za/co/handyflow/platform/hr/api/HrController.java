@@ -326,11 +326,11 @@ public class HrController {
     @PreAuthorize("hasAnyAuthority('LEAVE_APPROVE','HR_MANAGE')")
     @Operation(summary = "Approve a leave request. The days held for it become days taken")
     public ResponseEntity<ApiResponse<LeaveRequestResponse>> approveLeave(
-            @PathVariable UUID id, Principal principal, Authentication authentication) {
+            @PathVariable UUID id, @RequestParam(required = false) String reason, Principal principal, Authentication authentication) {
         // FIX: was passing null as approverId — approval audit trail was broken
         UUID approverId = resolveUserId(principal);
         return ResponseEntity.ok(ApiResponse.success("Leave approved",
-                leaveService.approve(TenantContext.getTenantIdAsObject(), id, approverId, HrAccess.held(authentication))));
+                leaveService.approve(TenantContext.getTenantIdAsObject(), id, approverId, HrAccess.held(authentication), reason)));
     }
 
     @PostMapping("/leave-requests/{id}/reject")

@@ -40,6 +40,7 @@ class LeaveServiceTest {
     PublicHolidayRepository holidays;
     EmployeeViewService viewService;
     LeaveService service;
+    za.co.handyflow.platform.shared.SeparationOfDutiesChecker duties;
     HrLeavePolicyRepository policyRepo;
     HrEmployee emp;
 
@@ -54,9 +55,9 @@ class LeaveServiceTest {
         payrollSettings = mock(HrPayrollSettingsRepository.class);
         holidays = mock(PublicHolidayRepository.class);
         viewService = mock(EmployeeViewService.class);
+        duties = mock(za.co.handyflow.platform.shared.SeparationOfDutiesChecker.class);
         service = new LeaveService(ledgerRepo, requestRepo, settingsRepo, employeeRepo, payrollSettings, holidays, viewService,
-                mock(NotificationService.class), mock(TenantAdminRecipients.class), policyRepo,
-                mock(za.co.handyflow.platform.shared.SeparationOfDutiesChecker.class));
+                mock(NotificationService.class), mock(TenantAdminRecipients.class), policyRepo, duties);
 
         emp = HrEmployee.create(tenant, "EMP-1", "Jane", "Dlamini", today.minusYears(3), "PERMANENT", new BigDecimal("30000"), "MONTHLY");
         when(employeeRepo.findActiveById(any(), eq(emp.getId()))).thenReturn(Optional.of(emp));
@@ -260,6 +261,49 @@ class LeaveServiceTest {
         when(employeeRepo.findByUserId(any(), eq(employeeLogin))).thenReturn(Optional.of(emp));
 
         assertThatThrownBy(() -> service.approve(tenant, r.id(), employeeLogin, Set.of("LEAVE_APPROVE"))).isInstanceOf(AccessDeniedException.class);
+    }
+
+    private LeaveRequestResponse ownRequestWithSelfApprovalAllowed() {
+        LocalDate d = weekday(7);
+        LeaveRequestResponse r = service.submit(tenant, emp.getId(), annual(d, d));
+        emp.setUserId(employeeLogin);
+        when(employeeRepo.findByUserId(any(), eq(employeeLogin))).thenReturn(Optional.of(emp));
+        HrPayrollSettings s = HrPayrollSettings.create(tenant.getValue());
+        s.setAllowSelfApproval(true, approver);
+        when(payrollSettings.findById(any())).thenReturn(Optional.of(s));
+        return r;
+    }
+
+    @Test
+    void settingDoesNotLetAnEmployeeApproveOwnLeaveWhileAnotherApproverExists() {
+        LeaveRequestResponse r = ownRequestWithSelfApprovalAllowed();
+        when(duties.otherHolders(any(), eq("LEAVE_APPROVE"), eq(employeeLogin))).thenReturn(1L);
+
+        assertThatThrownBy(() -> service.approve(tenant, r.id(), employeeLogin, Set.of("LEAVE_APPROVE"), "I am the only one here today"))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(duties, never()).recordSoleException(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void aSoleApproverNeedsAWrittenReasonToApproveOwnLeave() {
+        LeaveRequestResponse r = ownRequestWithSelfApprovalAllowed();
+
+        assertThatThrownBy(() -> service.approve(tenant, r.id(), employeeLogin, Set.of("LEAVE_APPROVE"), " "))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("reason");
+        verify(duties, never()).recordSoleException(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void aSoleApproverWithAReasonApprovesOwnLeaveAndItIsAuditedInFull() {
+        LeaveRequestResponse r = ownRequestWithSelfApprovalAllowed();
+
+        assertThat(service.approve(tenant, r.id(), employeeLogin, Set.of("LEAVE_APPROVE"), "Sole owner, taking the Friday off").status())
+                .isEqualTo("APPROVED");
+
+        @SuppressWarnings("unchecked") org.mockito.ArgumentCaptor<Map<String, ?>> details = org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(duties).recordSoleException(eq(tenant), eq(employeeLogin), eq("LEAVE_APPROVE"), eq("LEAVE_REQUEST"), eq(r.id()), any(), details.capture());
+        assertThat(details.getValue()).containsEntry("reason", "Sole owner, taking the Friday off")
+                .containsKeys("initiator", "approver", "requestedAt", "approvedAt", "after");
     }
 
     @Test

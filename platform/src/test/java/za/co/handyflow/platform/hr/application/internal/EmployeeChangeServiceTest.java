@@ -143,33 +143,85 @@ class EmployeeChangeServiceTest {
         assertThat(c.getStatus()).isEqualTo("PENDING");
     }
 
-    @Test
-    void askerMayApproveOwnRequestOnlyWhenTheBusinessAllowedIt() {
+    private void businessAllowsSelfApproval() {
         HrPayrollSettings s = HrPayrollSettings.create(tenant.getValue());
         s.setAllowSelfApproval(true, approver);
         when(settingsRepo.findById(any())).thenReturn(Optional.of(s));
+    }
+
+    private HrEmployeeChange pendingBank(java.time.Instant requestedAt) {
+        HrEmployeeChange c = HrEmployeeChange.request(tenant.getValue(), emp.getId(), EmployeeChangeRules.BANK_DETAILS,
+                Map.of("bankName", "FNB", "bankAccountNumber", "62000011112222", "bankBranchCode", "250655", "bankAccountType", "CHEQUE"),
+                Map.of("bankName", "Capitec", "bankAccountNumber", "1234567890", "bankBranchCode", "470010", "bankAccountType", "SAVINGS"),
+                LocalDate.now().plusDays(3), "Changed bank", asker);
+        org.springframework.test.util.ReflectionTestUtils.setField(c, "requestedAt", requestedAt);
+        return c;
+    }
+
+    @Test
+    void soleApproverMayApproveOwnPayChangeWithAReasonAndItIsAuditedInFull() {
+        businessAllowsSelfApproval();
         HrEmployeeChange c = pending(LocalDate.now().plusDays(10));
         when(changeRepo.findByTenantAndId(any(), eq(c.getId()))).thenReturn(Optional.of(c));
 
-        EmployeeChangeResponse r = service.approve(tenant, c.getId(), null, asker);
+        EmployeeChangeResponse r = service.approve(tenant, c.getId(), "Sole director, annual increase agreed in writing", asker);
 
         assertThat(r.selfApproved()).isTrue();
         verify(audit).record(eq(tenant), eq(emp.getId()), eq("CHANGE_APPROVED_OWN"), any(), eq(asker));
-        verify(duties).recordSoleException(eq(tenant), eq(asker), eq("HR_COMPENSATION_APPROVE"), eq("EMPLOYEE_CHANGE"), eq(c.getId()), any());
+        @SuppressWarnings("unchecked") org.mockito.ArgumentCaptor<Map<String, ?>> details = org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(duties).recordSoleException(eq(tenant), eq(asker), eq("HR_COMPENSATION_APPROVE"), eq("EMPLOYEE_CHANGE"), eq(c.getId()), any(), details.capture());
+        assertThat(details.getValue()).containsEntry("reason", "Sole director, annual increase agreed in writing")
+                .containsEntry("initiator", asker).containsEntry("approver", asker).containsKeys("requestedAt", "approvedAt", "before", "after");
+    }
+
+    @Test
+    void soleApproverCannotApproveOwnChangeWithoutAReason() {
+        businessAllowsSelfApproval();
+        HrEmployeeChange c = pending(LocalDate.now().plusDays(10));
+        when(changeRepo.findByTenantAndId(any(), eq(c.getId()))).thenReturn(Optional.of(c));
+
+        assertThatThrownBy(() -> service.approve(tenant, c.getId(), "  ", asker)).isInstanceOf(AccessDeniedException.class).hasMessageContaining("reason");
+        assertThatThrownBy(() -> service.approve(tenant, c.getId(), "short", asker)).isInstanceOf(AccessDeniedException.class);
+        assertThat(c.getStatus()).isEqualTo("PENDING");
+        verify(duties, never()).recordSoleException(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
     void settingDoesNotLetAskerApproveWhileAnotherApproverExists() {
-        HrPayrollSettings s = HrPayrollSettings.create(tenant.getValue());
-        s.setAllowSelfApproval(true, approver);
-        when(settingsRepo.findById(any())).thenReturn(Optional.of(s));
+        businessAllowsSelfApproval();
         when(duties.otherHolders(any(), eq("HR_COMPENSATION_APPROVE"), eq(asker))).thenReturn(1L);
         HrEmployeeChange c = pending(LocalDate.now().plusDays(10));
         when(changeRepo.findByTenantAndId(any(), eq(c.getId()))).thenReturn(Optional.of(c));
 
-        assertThatThrownBy(() -> service.approve(tenant, c.getId(), null, asker)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> service.approve(tenant, c.getId(), "Sole director, annual increase agreed", asker)).isInstanceOf(AccessDeniedException.class);
         assertThat(c.getStatus()).isEqualTo("PENDING");
-        verify(duties, never()).recordSoleException(any(), any(), any(), any(), any(), any());
+        verify(duties, never()).recordSoleException(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void ownBankChangeCannotBeApprovedUntil24HoursAfterTheRequest() {
+        businessAllowsSelfApproval();
+        HrEmployeeChange c = pendingBank(java.time.Instant.now().minus(java.time.Duration.ofHours(2)));
+        when(changeRepo.findByTenantAndId(any(), eq(c.getId()))).thenReturn(Optional.of(c));
+
+        assertThatThrownBy(() -> service.approve(tenant, c.getId(), "Sole director, new business account", asker))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("24 hours");
+        assertThat(c.getStatus()).isEqualTo("PENDING");
+        verify(duties, never()).recordSoleException(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void ownBankChangeIsApprovedAfter24HoursWithAReasonAndTheAccountNumberIsMaskedInTheAudit() {
+        businessAllowsSelfApproval();
+        HrEmployeeChange c = pendingBank(java.time.Instant.now().minus(java.time.Duration.ofHours(25)));
+        when(changeRepo.findByTenantAndId(any(), eq(c.getId()))).thenReturn(Optional.of(c));
+
+        service.approve(tenant, c.getId(), "Sole director, new business account", asker);
+
+        @SuppressWarnings("unchecked") org.mockito.ArgumentCaptor<Map<String, ?>> details = org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(duties).recordSoleException(any(), eq(asker), any(), eq("EMPLOYEE_CHANGE"), eq(c.getId()), any(), details.capture());
+        assertThat(String.valueOf(details.getValue().get("after"))).contains("****7890").doesNotContain("1234567890");
+        assertThat(String.valueOf(details.getValue().get("before"))).contains("****2222").doesNotContain("62000011112222");
     }
 
     @Test

@@ -71,13 +71,26 @@ public class EmployeeChangeService {
     @Transactional
     public EmployeeChangeResponse approve(TenantId tenantId, UUID changeId, String note, UUID actor) {
         HrEmployeeChange c = change(tenantId, changeId);
-        // The business setting alone is not enough: while another person can approve, the asker may not.
-        // Where nobody else can, the setting lets them, and that is recorded for the Owner's report.
-        boolean mayApproveOwn = allowSelfApproval(tenantId) && actor != null && c.getRequestedBy() != null
-                && c.getRequestedBy().equals(actor) && duties.otherHolders(tenantId, APPROVE_PERMISSION, actor) == 0;
-        boolean self = EmployeeChangeRules.checkCanDecide(c.getStatus(), c.getRequestedBy(), actor, mayApproveOwn);
-        if (self) duties.recordSoleException(tenantId, actor, APPROVE_PERMISSION, "EMPLOYEE_CHANGE", c.getId(),
-                "approved their own " + c.getChangeType().toLowerCase().replace('_', ' ') + " change (nobody else can approve)");
+        boolean asker = actor != null && c.getRequestedBy() != null && c.getRequestedBy().equals(actor);
+        // While another approver exists the asker may never approve. Where nobody else can, the business setting must be
+        // on, a written reason is required, and bank details also wait 24 hours. Each such approval is audited in full.
+        boolean soleApprover = asker && allowSelfApproval(tenantId) && duties.otherHolders(tenantId, APPROVE_PERMISSION, actor) == 0;
+        boolean self = EmployeeChangeRules.checkCanDecide(c.getStatus(), c.getRequestedBy(), actor, soleApprover);
+        if (self) {
+            java.time.Instant now = java.time.Instant.now();
+            String problem = EmployeeChangeRules.selfApprovalProblem(c.getChangeType(), note, c.getRequestedAt(), now);
+            if (problem != null) throw new org.springframework.security.access.AccessDeniedException(problem);
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("initiator", c.getRequestedBy());
+            details.put("approver", actor);
+            details.put("reason", note.trim());
+            details.put("requestedAt", String.valueOf(c.getRequestedAt()));
+            details.put("approvedAt", now.toString());
+            details.put("before", EmployeeChangeRules.auditValues(c.getOldValues()));
+            details.put("after", EmployeeChangeRules.auditValues(c.getNewValues()));
+            duties.recordSoleException(tenantId, actor, APPROVE_PERMISSION, "EMPLOYEE_CHANGE", c.getId(),
+                    "approved their own " + c.getChangeType().toLowerCase().replace('_', ' ') + " change (nobody else can approve)", details);
+        }
         c.approve(actor, note, self);
         changeRepo.save(c);
         audit.record(tenantId, c.getEmployeeId(), self ? "CHANGE_APPROVED_OWN" : "CHANGE_APPROVED", summary(c), actor);

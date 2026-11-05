@@ -118,6 +118,21 @@ describe("LeaveTab", () => {
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/hr/leave-requests/r1/approve"))
   })
 
+  it("asks for a reason when the server says nobody else can approve, then sends it", async () => {
+    perms = ["LEAVE_APPROVE"]
+    mockApi([req()])
+    post.mockRejectedValueOnce({ response: { data: { message: "Nobody else can approve this, so give the reason you are approving it yourself (at least 10 characters)." } } })
+    post.mockReturnValue(ok({}))
+    wrap(<LeaveTab />)
+    fireEvent.click(await screen.findByRole("button", { name: /^approve$/i }))
+    const reason = await screen.findByLabelText("Reason")
+    const send = screen.getByRole("button", { name: "Approve with this reason" }) as HTMLButtonElement
+    expect(send.disabled).toBe(true)
+    fireEvent.change(reason, { target: { value: "Sole owner, taking Friday off" } })
+    fireEvent.click(send)
+    await waitFor(() => expect(post).toHaveBeenLastCalledWith("/api/v1/hr/leave-requests/r1/approve?reason=Sole%20owner%2C%20taking%20Friday%20off"))
+  })
+
   it("will not reject without a reason, then sends it", async () => {
     perms = ["LEAVE_APPROVE"]
     mockApi([req()])
