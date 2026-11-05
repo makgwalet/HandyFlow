@@ -227,3 +227,4 @@ za/co/handyflow/platform/trainingprovider/api/TrainProvPortalAuthController.java
 za/co/handyflow/platform/trainingprovider/api/TrainProvPortalDataController.java
 za/co/handyflow/platform/warehousing/api/WhsePortalAuthController.java
 za/co/handyflow/platform/warehousing/api/WhsePortalDataController.java
+za/co/handyflow/platform/usage/api/UsageController.java

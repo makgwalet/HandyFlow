@@ -23,9 +23,11 @@ class StartupProfileTest {
         var rows = StartupProfile.rank(steps, 10);
         assertThat(rows.get(0).label()).isEqualTo("dependency");
         assertThat(rows.get(0).own()).isEqualTo(Duration.ofMillis(6_000));
-        assertThat(rows.get(1).label()).isEqualTo("slowBean");
-        assertThat(rows.get(1).own()).isEqualTo(Duration.ofMillis(1_000));
-        assertThat(rows.get(2).own()).isEqualTo(Duration.ofMillis(3_000));
+        // the refresh itself has no label; it owns 10s minus its child's 7s
+        assertThat(rows.get(1).name()).isEqualTo("spring.context.refresh");
+        assertThat(rows.get(1).own()).isEqualTo(Duration.ofMillis(3_000));
+        assertThat(rows.get(2).label()).isEqualTo("slowBean");
+        assertThat(rows.get(2).own()).isEqualTo(Duration.ofMillis(1_000));
     }
 
     @Test

@@ -89,7 +89,8 @@ class RefundApprovalTest {
         when(rs.getString(9)).thenReturn("ref");
         when(rs.getObject(10, UUID.class)).thenReturn(maker);
         when(rs.getString(11)).thenReturn(status);
-        doAnswer(inv -> List.of(inv.<RowMapper<Object[]>>getArgument(1).mapRow(rs, 0)))
+        // singletonList, not List.of: List.of(Object[]) would spread the row into two elements
+        doAnswer(inv -> java.util.Collections.singletonList(inv.<RowMapper<Object[]>>getArgument(1).mapRow(rs, 0)))
                 .when(jdbc).query(contains("FROM customer_refunds f JOIN customer_receipts"), ArgumentMatchers.<RowMapper<Object[]>>any(), any(Object[].class));
     }
 
