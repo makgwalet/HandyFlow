@@ -176,8 +176,10 @@ public class UserManagementService {
                 user.getId(), user.getEmail(), null, null);
         if (!active) {
             // IAM Phase 0.4: end the user's sessions now instead of when the refresh token next expires.
-            // Their current access token can still work until it expires (at most the access-token lifetime);
-            // closing that gap needs the access-version claim planned for Phase 3.
+            // Their current access token can still work until it expires (at most the access-token lifetime) unless
+            // token-version enforcement is on: bumping the tenant's version makes every earlier token stale, and a
+            // refresh for this user is refused because the account is no longer active.
+            tokenVersions.bump(tenantId.getValue());
             int revoked = securitySweep.revokeAllActiveSessionsForUser(user.getId());
             log.info("Deactivated user={}: revoked {} active session(s)", userId, revoked);
         }
