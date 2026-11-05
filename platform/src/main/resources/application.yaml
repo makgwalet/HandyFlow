@@ -231,6 +231,8 @@ contracting:
 # The dev OTP endpoint has its own switch (below) and is OFF unless DEV_OTP_ENDPOINT=true.
 
 handyflow:
+  entitlement:
+    enforce: ${ENTITLEMENT_ENFORCE:false}   # false = log ENTITLEMENT-REPORT lines only; true = refuse with 402/403
   dev:
     otp-endpoint:
       enabled: ${DEV_OTP_ENDPOINT:false}   # local development only; never true in production

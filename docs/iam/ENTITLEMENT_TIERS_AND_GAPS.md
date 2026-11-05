@@ -76,3 +76,16 @@ scopes by branch or department; delegation and expiry; access reviews; support s
 * **Audit events are written in the same transaction**; refused attempts (403) are not recorded yet.
 * **Not compiled or run:** all Java in patch 0606 and V589. Run `mvn test` and start the app once against a database
   (Flyway applies V589).
+
+## 6. Module entitlement, first step (patch 0608)
+
+`ModuleEntitlementInterceptorConfig` checks module entitlement by URL prefix for `hr`, `accounting`, `expenses`,
+`contracting`, `bookings`, `events`, `fleet/telematics` and `security` (plus `guard`), the way Clinic already does. It starts
+in **report mode** (`ENTITLEMENT_ENFORCE=false`): it logs `ENTITLEMENT-REPORT` lines for tenants that would be refused and
+allows the request. Review the log, fix any tenant that should have the module, then set `ENTITLEMENT_ENFORCE=true`.
+
+Not covered yet, because the module key or the free/paid decision is open: projects, recruiter, auditor, accountant,
+pos, desk, creative, marketing, ap, approvals, capture, catalogue, notifications, audit-trail, documents, secure-access.
+CRM and Invoicing are free core and are left out until the tier model exists. The 229-name debt list is unchanged
+because the coverage test reads controller source, not this interceptor.
+Not compiled or run here; only the path-matching class was run (javac).
