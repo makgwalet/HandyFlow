@@ -1,7 +1,7 @@
 # Entitlement, free tier and what does not exist yet
 
 Date: 2026-11-04. Status: **record of gaps, nothing in sections 2 to 4 is built.** Section 1 says what Phase 0 changed.
-Decisions from the product owner: CRM, Invoicing (with capped quotations and invoices) and Catalogue are the free core;
+**Update 5 Nov:** Free Core is now *conditional* on at least one paid module (see `docs/commercial/`). Earlier decision (4 Nov): CRM, Invoicing (with capped quotations and invoices) and Catalogue are the free core;
 upgrades inside them and every other module are paid; Owner/Administrator split approved; sole-user businesses must
 work; the product is not in production, so no compatibility layers are needed.
 
