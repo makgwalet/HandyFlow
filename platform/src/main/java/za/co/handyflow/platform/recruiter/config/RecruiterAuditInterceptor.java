@@ -22,7 +22,8 @@ import java.util.UUID;
 public class RecruiterAuditInterceptor implements HandlerInterceptor {
 
     static final String PREFIX = "/api/v1/recruiter";
-    private final RecruiterAuditService audit;
+    /** Through an ObjectProvider so a @WebMvcTest slice, which includes this interceptor but not the service, still loads. */
+    private final org.springframework.beans.factory.ObjectProvider<RecruiterAuditService> audit;
 
     @Override
     @SuppressWarnings("unchecked")
@@ -44,7 +45,9 @@ public class RecruiterAuditInterceptor implements HandlerInterceptor {
         boolean support = TenantContext.isImpersonation();
         UUID actor = support ? null : uuid(TenantContext.getUserId());
         String name = support ? "Support session" : TenantContext.getCurrentUserName();
-        audit.record(TenantContext.getTenantIdAsObject(), actor, name, action, entityType, entityId, applicationId, detail);
+        RecruiterAuditService service = audit.getIfAvailable();
+        if (service == null) return;
+        service.record(TenantContext.getTenantIdAsObject(), actor, name, action, entityType, entityId, applicationId, detail);
     }
 
     /** Route parts other than the main id (an action name, a check id) and the date range of an export. */
