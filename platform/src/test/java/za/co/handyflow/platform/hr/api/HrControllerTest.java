@@ -233,6 +233,9 @@ class HrControllerTest {
     void terminateEmployeeWithHrManageReturns200() throws Exception {
         var id = UUID.randomUUID();
         when(employeeViewService.get(any(), eq(id), any(), any())).thenReturn(viewResponse(id, "TERMINATED"));
+        // the controller calls the seven-argument form, which reports what followed the termination
+        when(hrService.terminateEmployee(any(), eq(id), any(), any(), any(), any(), any()))
+                .thenReturn(new za.co.handyflow.platform.hr.application.internal.HrService.Terminated(null, java.util.List.of()));
 
         mvc.perform(post(BASE + "/employees/" + id + "/terminate")
                         .param("endDate", "2026-08-20")
@@ -241,7 +244,7 @@ class HrControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("TERMINATED"));
 
-        verify(hrService).terminateEmployee(any(), eq(id), eq(LocalDate.of(2026, 8, 20)), eq("Resigned"), any());
+        verify(hrService).terminateEmployee(any(), eq(id), eq(LocalDate.of(2026, 8, 20)), eq("Resigned"), any(), any(), any());
     }
 
     @Test
