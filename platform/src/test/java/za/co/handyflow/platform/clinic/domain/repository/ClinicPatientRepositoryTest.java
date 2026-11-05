@@ -3,9 +3,15 @@ package za.co.handyflow.platform.clinic.domain.repository;
 import org.junit.jupiter.api.*;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.springframework.test.context.jdbc.Sql;
 import za.co.handyflow.platform.clinic.domain.model.ClinicPatient;
 import za.co.handyflow.platform.shared.TenantId;
@@ -16,7 +22,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.*;
 
 /**
- * JPA slice test — spins up an in-memory H2 DB (or Testcontainers PostgreSQL).
+ * JPA slice test against a real PostgreSQL started by Testcontainers (needs Docker;
+ * the class is skipped, not failed, when Docker is unavailable).
  * Tests the JPQL queries in ClinicPatientRepository are syntactically correct
  * and return the expected data.
  *
@@ -24,13 +31,26 @@ import static org.assertj.core.api.Assertions.*;
  * Loads only the JPA layer (entities, repositories, Flyway migrations).
  * No web layer, no services — fast (~2s) and focused.
  *
- * NOTE: If you use PostgreSQL-specific features (text[], JSONB) that H2
- * doesn't support, switch to @Testcontainers with a real PostgreSQL image.
- * The Testcontainers variant is shown in comments below.
+ * The schema is generated from the entities (ddl-auto=create-drop, Flyway off), so
+ * the repository queries run on the same database engine as production.
  */
 @DataJpaTest
 @ActiveProfiles("test")
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Testcontainers(disabledWithoutDocker = true)
 class ClinicPatientRepositoryTest {
+
+    @Container
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
+
+    // overrides the H2 settings in application-test.properties
+    @DynamicPropertySource
+    static void database(DynamicPropertyRegistry r) {
+        r.add("spring.datasource.url", POSTGRES::getJdbcUrl);
+        r.add("spring.datasource.username", POSTGRES::getUsername);
+        r.add("spring.datasource.password", POSTGRES::getPassword);
+        r.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
+    }
 
     @Autowired ClinicPatientRepository repo;
 

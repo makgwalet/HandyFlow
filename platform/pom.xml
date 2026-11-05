@@ -102,6 +102,19 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Real PostgreSQL for @DataJpaTest slices (versions managed by the Spring Boot BOM).
+             Tests using it skip themselves when Docker is not available. -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- ==================== DATABASE ==================== -->
         <dependency>
             <groupId>org.postgresql</groupId>
