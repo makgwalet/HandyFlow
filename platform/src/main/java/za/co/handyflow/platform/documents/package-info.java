@@ -5,5 +5,5 @@
  * every change and download is audited. Callers (modules) decide who may see or change their own owners' documents; this module
  * guarantees tenant isolation and the rules above.
  */
-@org.springframework.modulith.ApplicationModule(allowedDependencies = {"shared", "audittrail"})
+@org.springframework.modulith.ApplicationModule(allowedDependencies = {"shared", "audittrail", "audittrail::*"})
 package za.co.handyflow.platform.documents;

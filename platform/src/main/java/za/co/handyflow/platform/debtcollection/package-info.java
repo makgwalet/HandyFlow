@@ -68,6 +68,6 @@
  * so it's flagged as a follow-up, not built speculatively into MVP.
  */
 @org.springframework.modulith.ApplicationModule(
-        allowedDependencies = {"shared", "billing", "invoicing", "crm", "evidence", "notifications"}
+        allowedDependencies = {"shared", "billing", "invoicing", "invoicing::*", "crm", "evidence", "evidence::*", "notifications", "notifications::*"}
 )
 package za.co.handyflow.platform.debtcollection;

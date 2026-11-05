@@ -79,7 +79,7 @@
  * (daily sweep — unreconciled transactions ageing, period not closed,
  * agreement expiring, invoice overdue).
  */
-@ApplicationModule(allowedDependencies = {"shared", "identity", "billing", "accounting", "notifications"})
+@ApplicationModule(allowedDependencies = {"shared", "identity", "billing", "accounting", "accounting::*", "notifications", "notifications::*"})
 package za.co.handyflow.platform.bookkeeping;
 
 import org.springframework.modulith.ApplicationModule;

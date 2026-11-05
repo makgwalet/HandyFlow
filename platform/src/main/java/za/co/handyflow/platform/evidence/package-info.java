@@ -4,5 +4,5 @@
  * depend on via EvidenceFacade, without evidence depending back on any
  * of them.
  */
-@org.springframework.modulith.ApplicationModule(allowedDependencies = {"shared", "audittrail", "documents"})
+@org.springframework.modulith.ApplicationModule(allowedDependencies = {"shared", "audittrail", "audittrail::*", "documents", "documents::*"})
 package za.co.handyflow.platform.evidence;

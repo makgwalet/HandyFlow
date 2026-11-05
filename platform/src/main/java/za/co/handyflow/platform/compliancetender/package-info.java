@@ -72,7 +72,7 @@
  *
  * <p>{@code tenderpricing} (ADR-004) is a PURE arithmetic module: the shared price calculator. Both this module and its client-side counterpart call it, so the price of a tender for the company and for the other side is worked out by the same tested rules.
  */
-@ApplicationModule(allowedDependencies = {"shared", "identity", "evidence", "billing", "notifications", "hr", "businessreadiness", "tenderpricing"})
+@ApplicationModule(allowedDependencies = {"shared", "identity", "evidence", "evidence::*", "billing", "notifications", "notifications::*", "hr", "hr::*", "businessreadiness", "tenderpricing"})
 package za.co.handyflow.platform.compliancetender;
 
 import org.springframework.modulith.ApplicationModule;

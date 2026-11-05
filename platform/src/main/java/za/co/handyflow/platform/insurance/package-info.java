@@ -65,6 +65,6 @@
  * asset-registry linkage in this increment, for the reasons above.
  */
 @org.springframework.modulith.ApplicationModule(
-        allowedDependencies = {"shared", "billing", "notifications"}
+        allowedDependencies = {"shared", "billing", "notifications", "notifications::*"}
 )
 package za.co.handyflow.platform.insurance;

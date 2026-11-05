@@ -56,7 +56,7 @@
  * materials, and external invoices to sessions. `notifications` for
  * the daily upcoming-session / expiring-certificate sweep.
  */
-@ApplicationModule(allowedDependencies = {"shared", "hr", "billing", "notifications", "evidence"})
+@ApplicationModule(allowedDependencies = {"shared", "hr", "hr::*", "billing", "notifications", "notifications::*", "evidence", "evidence::*"})
 package za.co.handyflow.platform.training;
 
 import org.springframework.modulith.ApplicationModule;

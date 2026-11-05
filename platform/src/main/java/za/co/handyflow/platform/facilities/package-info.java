@@ -74,7 +74,7 @@
  * FacilityNumberGenerator's own Javadoc and the strategic roadmap
  * backlog, Part 0, Decision 2).
  */
-@ApplicationModule(allowedDependencies = {"shared", "identity", "billing", "evidence", "notifications"})
+@ApplicationModule(allowedDependencies = {"shared", "identity", "billing", "evidence", "evidence::*", "notifications", "notifications::*"})
 package za.co.handyflow.platform.facilities;
 
 import org.springframework.modulith.ApplicationModule;

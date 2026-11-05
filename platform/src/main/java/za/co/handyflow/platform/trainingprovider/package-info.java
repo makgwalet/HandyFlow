@@ -44,7 +44,7 @@
  * daily sweep (accreditation expiry, upcoming sessions, certificate
  * expiry, overdue invoices).
  */
-@ApplicationModule(allowedDependencies = {"shared", "identity", "billing", "accounting", "evidence", "notifications"})
+@ApplicationModule(allowedDependencies = {"shared", "identity", "billing", "accounting", "accounting::*", "evidence", "evidence::*", "notifications", "notifications::*"})
 package za.co.handyflow.platform.trainingprovider;
 
 import org.springframework.modulith.ApplicationModule;

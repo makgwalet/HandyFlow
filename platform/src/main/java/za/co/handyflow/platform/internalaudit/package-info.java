@@ -11,7 +11,7 @@
 // report sign-off via ApprovalFacade) will each need their own
 // dependency added deliberately, not declared upfront for
 // not-yet-written code.
-@ApplicationModule(allowedDependencies = {"shared", "identity", "accounting", "approvals", "audittrail", "controls", "notifications", "billing"})
+@ApplicationModule(allowedDependencies = {"shared", "identity", "identity::*", "accounting", "accounting::*", "approvals", "approvals::*", "audittrail", "audittrail::*", "controls", "controls::*", "notifications", "notifications::*", "billing"})
 package za.co.handyflow.platform.internalaudit;
 
 import org.springframework.modulith.ApplicationModule;

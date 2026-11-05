@@ -7,7 +7,7 @@
 // module previously couldn't do this at all, and defaulting to no
 // branding (rather than incorrectly defaulting to HandyFlow branding)
 // was the safer choice until this decision was made.
-@ApplicationModule(allowedDependencies = {"shared", "identity", "notifications", "accounting", "approvals"})
+@ApplicationModule(allowedDependencies = {"shared", "identity", "notifications", "notifications::*", "accounting", "accounting::*", "approvals", "approvals::*"})
 package za.co.handyflow.platform.ap;
 
 import org.springframework.modulith.ApplicationModule;

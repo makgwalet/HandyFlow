@@ -53,6 +53,6 @@
  * {@code legalcompliance} dependency.
  */
 @org.springframework.modulith.ApplicationModule(
-        allowedDependencies = {"shared", "billing", "accounting", "evidence", "notifications", "hr"}
+        allowedDependencies = {"shared", "billing", "accounting", "accounting::*", "evidence", "evidence::*", "notifications", "notifications::*", "hr", "hr::*"}
 )
 package za.co.handyflow.platform.legalpractice;

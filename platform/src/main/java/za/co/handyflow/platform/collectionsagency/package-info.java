@@ -90,6 +90,6 @@
  * agency's display name, so that dependency wasn't needed here).
  */
 @org.springframework.modulith.ApplicationModule(
-        allowedDependencies = {"shared", "billing", "accounting", "evidence", "notifications"}
+        allowedDependencies = {"shared", "billing", "accounting", "accounting::*", "evidence", "evidence::*", "notifications", "notifications::*"}
 )
 package za.co.handyflow.platform.collectionsagency;

@@ -6,5 +6,5 @@
  * scope line — never enforces or blocks anything, only records what
  * another module already decided to flag.
  */
-@org.springframework.modulith.ApplicationModule(allowedDependencies = {"shared", "audittrail", "evidence", "identity"})
+@org.springframework.modulith.ApplicationModule(allowedDependencies = {"shared", "audittrail", "audittrail::*", "evidence", "evidence::*", "identity", "identity::*"})
 package za.co.handyflow.platform.controls;

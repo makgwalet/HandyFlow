@@ -12,7 +12,7 @@
  *
  * Package: za.co.handyflow.platform.accountant
  */
-@ApplicationModule(allowedDependencies = {"shared", "accounting"})
+@ApplicationModule(allowedDependencies = {"shared", "accounting", "accounting::*"})
 @NonNullApi
 package za.co.handyflow.platform.accountant;
 

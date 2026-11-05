@@ -9,5 +9,5 @@
  *
  * Depends only on shared. Modules depend on it, never the other way round.
  */
-@org.springframework.modulith.ApplicationModule(allowedDependencies = {"shared"})
+@org.springframework.modulith.ApplicationModule(allowedDependencies = {"shared", "shared::*"})
 package za.co.handyflow.platform.secureaccess;

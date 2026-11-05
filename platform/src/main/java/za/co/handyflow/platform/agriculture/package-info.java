@@ -93,7 +93,7 @@
  * (InvoicingFacade, read-only sale lines: ADR-001 W2 attributes revenue
  * to production without owning any sales data).
  */
-@ApplicationModule(allowedDependencies = {"shared", "billing", "hr", "evidence", "notifications", "invoicing", "fleet", "fuel", "supplychain"})
+@ApplicationModule(allowedDependencies = {"shared", "billing", "hr", "hr::*", "evidence", "evidence::*", "notifications", "notifications::*", "invoicing", "invoicing::*", "fleet", "fleet::*", "fuel", "fuel::*", "supplychain", "supplychain::*"})
 package za.co.handyflow.platform.agriculture;
 
 import org.springframework.modulith.ApplicationModule;

@@ -35,6 +35,6 @@
  *                   interfaces — so there is no cycle.
  */
 @org.springframework.modulith.ApplicationModule(
-        allowedDependencies = {"shared", "billing", "evidence", "notifications", "contracting", "debtcollection"}
+        allowedDependencies = {"shared", "billing", "evidence", "evidence::*", "notifications", "notifications::*", "contracting", "contracting::*", "debtcollection", "debtcollection::*"}
 )
 package za.co.handyflow.platform.legalcompliance;

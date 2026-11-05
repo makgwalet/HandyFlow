@@ -3,7 +3,7 @@
  * documents (only its DocumentScanner hook, so one malware scanner covers project files too) and
  * secureaccess (the platform Secure Document Access Engine that issues and checks recipient links).
  */
-@ApplicationModule(allowedDependencies = {"shared", "approvals", "notifications", "evidence", "documents", "secureaccess", "contracting"})
+@ApplicationModule(allowedDependencies = {"shared", "approvals", "approvals::*", "notifications", "notifications::*", "evidence", "evidence::*", "documents", "documents::*", "secureaccess", "secureaccess::*", "contracting", "contracting::*"})
 package za.co.handyflow.platform.projects;
 
 import org.springframework.modulith.ApplicationModule;
