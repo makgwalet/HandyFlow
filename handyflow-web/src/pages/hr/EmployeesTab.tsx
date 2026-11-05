@@ -19,6 +19,7 @@ import ForeignIdentityFields from "./ForeignIdentityFields"
 import EmployeeProfileModal from "./EmployeeProfileModal"
 import { EMPTY_FOREIGN, EXPIRING_FILTERS, endingBadge, expiringParam, expiryState, expiryText, foreignBody, fromServer, permitLabel, type ForeignBody } from "./foreignIdentity.logic"
 import { END_TYPES, employeeRights, terminationProblem, terminationQuery, today } from "./employees.logic"
+import TerminationApprovals from "./TerminationApprovals"
 import { ApprovalsModal, HistoryModal, ReportingModal, RequestChangeModal } from "./EmployeeChanges"
 import { Plus, X, Search, Users, AlertTriangle, AlertCircle, Edit2, UserX } from "lucide-react"
 
@@ -355,6 +356,7 @@ export default function EmployeesTab() {
           <button type="button" aria-label="Dismiss" onClick={() => setOutcome("")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-muted)" }}>×</button>
         </div>
       )}
+      <TerminationApprovals />
       {/* Stats */}
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {Object.entries(STATUS_CFG).filter(([k]) => k !== "TERMINATED").map(([k, cfg]) => (

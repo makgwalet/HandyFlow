@@ -54,6 +54,7 @@ public class HrController {
     private final EmployeeChangeService employeeChangeService;
     private final EmployeeAuditService  employeeAuditService;
     private final LeaveService          leaveService;
+    private final za.co.handyflow.platform.hr.application.internal.TerminationApprovalService terminationApproval;
 
     // ── Employees ─────────────────────────────────────────────────────────────
 
@@ -116,9 +117,44 @@ public class HrController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate noticeGivenOn,
             Authentication authentication, Principal principal) {
         UUID actor = resolveUserId(principal);
-        var done = hrService.terminateEmployee(TenantContext.getTenantIdAsObject(), id, endDate, reason, endType, noticeGivenOn, actor);
-        return ResponseEntity.ok(ApiResponse.success(String.join(" ", java.util.stream.Stream.concat(java.util.stream.Stream.of("Employee terminated."), done.followUp().stream()).toList()),
-                employeeViewService.get(TenantContext.getTenantIdAsObject(), id, HrAccess.held(authentication), actor)));
+        var outcome = terminationApproval.request(TenantContext.getTenantIdAsObject(), id, endDate, reason, endType, noticeGivenOn, actor);
+        var view = employeeViewService.get(TenantContext.getTenantIdAsObject(), id, HrAccess.held(authentication), actor);
+        if (outcome.pending())
+            return ResponseEntity.ok(ApiResponse.success("Sent for approval. The employee stays active until another HR manager approves the termination.", view));
+        return ResponseEntity.ok(ApiResponse.success(String.join(" ", java.util.stream.Stream.concat(java.util.stream.Stream.of("Employee terminated."), outcome.done().followUp().stream()).toList()), view));
+    }
+
+    @GetMapping("/terminations/pending")
+    @PreAuthorize("hasAuthority('HR_MANAGE')")
+    @Operation(summary = "Terminations waiting for a second HR manager")
+    public ResponseEntity<ApiResponse<List<za.co.handyflow.platform.hr.application.internal.TerminationApprovalService.Pending>>> pendingTerminations() {
+        return ResponseEntity.ok(ApiResponse.success(terminationApproval.pending(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/terminations/{requestId}/approve")
+    @PreAuthorize("hasAuthority('HR_MANAGE')")
+    @Operation(summary = "Approve a termination someone else asked for. It takes effect now")
+    public ResponseEntity<ApiResponse<String>> approveTermination(
+            @PathVariable UUID requestId, @RequestBody(required = false) ChangeDecisionRequest req, Principal principal) {
+        var done = terminationApproval.approve(TenantContext.getTenantIdAsObject(), requestId, req == null ? null : req.note(), resolveUserId(principal));
+        return ResponseEntity.ok(ApiResponse.success(String.join(" ", java.util.stream.Stream.concat(java.util.stream.Stream.of("Employee terminated."), done.followUp().stream()).toList()), "APPROVED"));
+    }
+
+    @PostMapping("/terminations/{requestId}/reject")
+    @PreAuthorize("hasAuthority('HR_MANAGE')")
+    @Operation(summary = "Decline a termination request. A reason is required")
+    public ResponseEntity<ApiResponse<String>> rejectTermination(
+            @PathVariable UUID requestId, @RequestBody(required = false) ChangeDecisionRequest req, Principal principal) {
+        terminationApproval.reject(TenantContext.getTenantIdAsObject(), requestId, req == null ? null : req.note(), resolveUserId(principal));
+        return ResponseEntity.ok(ApiResponse.success("Termination declined", "REJECTED"));
+    }
+
+    @PostMapping("/terminations/{requestId}/cancel")
+    @PreAuthorize("hasAnyAuthority('HR_MANAGE','USER_UPDATE')")
+    @Operation(summary = "Withdraw a termination request you made")
+    public ResponseEntity<ApiResponse<String>> cancelTermination(@PathVariable UUID requestId, Principal principal) {
+        terminationApproval.cancel(TenantContext.getTenantIdAsObject(), requestId, resolveUserId(principal));
+        return ResponseEntity.ok(ApiResponse.success("Termination request withdrawn", "CANCELLED"));
     }
 
     @PutMapping("/employees/{id}/manager")

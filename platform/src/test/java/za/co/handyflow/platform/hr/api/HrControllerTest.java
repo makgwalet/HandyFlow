@@ -88,6 +88,7 @@ class HrControllerTest {
     @MockitoBean EmployeeChangeService  employeeChangeService;
     @MockitoBean EmployeeAuditService   employeeAuditService;
     @MockitoBean LeaveService           leaveService;
+    @MockitoBean za.co.handyflow.platform.hr.application.internal.TerminationApprovalService terminationApproval;
     @MockitoBean PayslipPdfGenerator    payslipPdfGenerator;
     @MockitoBean HrPayslipRepository    payslipRepo;
     @MockitoBean HrEmployeeRepository   employeeRepo;
@@ -233,9 +234,9 @@ class HrControllerTest {
     void terminateEmployeeWithHrManageReturns200() throws Exception {
         var id = UUID.randomUUID();
         when(employeeViewService.get(any(), eq(id), any(), any())).thenReturn(viewResponse(id, "TERMINATED"));
-        // the controller calls the seven-argument form, which reports what followed the termination
-        when(hrService.terminateEmployee(any(), eq(id), any(), any(), any(), any(), any()))
-                .thenReturn(new za.co.handyflow.platform.hr.application.internal.HrService.Terminated(null, java.util.List.of()));
+        when(terminationApproval.request(any(), eq(id), any(), any(), any(), any(), any()))
+                .thenReturn(new za.co.handyflow.platform.hr.application.internal.TerminationApprovalService.Outcome(false, null,
+                        new za.co.handyflow.platform.hr.application.internal.HrService.Terminated(null, java.util.List.of())));
 
         mvc.perform(post(BASE + "/employees/" + id + "/terminate")
                         .param("endDate", "2026-08-20")
@@ -244,7 +245,25 @@ class HrControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("TERMINATED"));
 
-        verify(hrService).terminateEmployee(any(), eq(id), eq(LocalDate.of(2026, 8, 20)), eq("Resigned"), any(), any(), any());
+        verify(terminationApproval).request(any(), eq(id), eq(LocalDate.of(2026, 8, 20)), eq("Resigned"), any(), any(), any());
+    }
+
+    @Test
+    @WithMockUser(authorities = "HR_MANAGE")
+    @DisplayName("POST /employees/{id}/terminate says so when the termination was sent for approval")
+    void terminateSentForApproval() throws Exception {
+        var id = UUID.randomUUID();
+        when(employeeViewService.get(any(), eq(id), any(), any())).thenReturn(viewResponse(id, "ACTIVE"));
+        when(terminationApproval.request(any(), eq(id), any(), any(), any(), any(), any()))
+                .thenReturn(new za.co.handyflow.platform.hr.application.internal.TerminationApprovalService.Outcome(true, UUID.randomUUID(), null));
+
+        mvc.perform(post(BASE + "/employees/" + id + "/terminate")
+                        .param("endDate", "2026-08-20")
+                        .param("reason", "Resigned")
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Sent for approval")))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"));
     }
 
     @Test
