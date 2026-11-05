@@ -54,7 +54,7 @@ class CollAgencyCommissionInvoiceTest {
         CollAgencyCommissionInvoice inv = newInvoice();
         inv.recordPayment(new BigDecimal("200.00"));
         assertEquals("PAID", inv.getStatus());
-        assertEquals(BigDecimal.ZERO, inv.balance());
+        assertEquals(0, BigDecimal.ZERO.compareTo(inv.balance()));
         assertNotNull(inv.getPaidAt());
     }
 }

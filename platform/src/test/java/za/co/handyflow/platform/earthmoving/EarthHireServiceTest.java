@@ -279,7 +279,7 @@ class EarthHireServiceTest {
         assertEquals("Plant hire", request.getValue().title());
         assertEquals(2, request.getValue().lines().size());
         assertEquals("day", request.getValue().lines().get(0).unit());
-        assertEquals(n("1000"), request.getValue().lines().get(0).unitPrice());
+        assertEquals(0, n("1000").compareTo(request.getValue().lines().get(0).unitPrice()));
         assertEquals(n("15.00"), request.getValue().lines().get(0).vatRate());
         assertEquals("FPS-INV-00012", r.invoiceNumber());
         assertEquals(2, r.charges());
@@ -572,12 +572,14 @@ class EarthHireServiceTest {
     }
 
     @Test void aChargeUsesTheCompanysVatRateWhenNoneIsGiven() {
+        granted.add("EARTHMOVING_ADMIN");
         vat(true, "16.00");
         HireChargeResponse r = service.preview(tenant, daily("2026-10-01", "2026-10-03"), TODAY);
         assertEquals(n("16.00"), r.vatRate());
     }
 
     @Test void aCompanyNotRegisteredForVatChargesNoVat() {
+        granted.add("EARTHMOVING_ADMIN");
         vat(false, "0.00");
         HireChargeResponse r = service.preview(tenant, daily("2026-10-01", "2026-10-03"), TODAY);
         assertEquals(n("0.00"), r.vatRate());
@@ -585,12 +587,14 @@ class EarthHireServiceTest {
     }
 
     @Test void aCompanyNotRegisteredForVatCannotPutVatOnACharge() {
+        granted.add("EARTHMOVING_ADMIN");
         vat(false, "0.00");
         HireChargeRequest withVat = new HireChargeRequest(deployment.getId(), "DAILY", LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"), n("15"), null, null);
         assertThrows(IllegalArgumentException.class, () -> service.preview(tenant, withVat, TODAY));
     }
 
     @Test void aRegisteredCompanyMayStillGiveAnotherRateForOneCharge() {
+        granted.add("EARTHMOVING_ADMIN");
         vat(true, "15.00");
         HireChargeRequest zero = new HireChargeRequest(deployment.getId(), "DAILY", LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"), n("0"), null, null);
         assertEquals(n("0.00"), service.preview(tenant, zero, TODAY).vatRate());

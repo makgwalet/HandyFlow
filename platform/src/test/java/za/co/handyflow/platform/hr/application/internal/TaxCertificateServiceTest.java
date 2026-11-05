@@ -112,7 +112,7 @@ class TaxCertificateServiceTest {
     void theCertificateCarriesTheCodesOfItsPayslips() {
         Certificate c = service.reconciliation(tenant, YEAR, INTERIM).certificates().get(0);
 
-        assertThat(c.lines().stream().map(Line::code).toList()).containsExactly("3601", "4001", "4005", "4102", "4116", "4141", "4142");
+        assertThat(c.lines().stream().map(Line::code).toList()).containsExactly("3601", "3699", "4001", "4005", "4102", "4116", "4141", "4142", "4149");
         assertThat(c.lines().stream().filter(l -> l.code().equals("4141")).findFirst().orElseThrow().amount()).isEqualByComparingTo("600.00");
     }
 
@@ -200,7 +200,7 @@ class TaxCertificateServiceTest {
         assertThat(c.getCertificateType()).isEqualTo("IRP5");
         assertThat(c.getVersion()).isEqualTo(1);
         assertThat(c.getIdNumber()).isEqualTo("8001015009087");
-        assertThat(savedLines.size()).isEqualTo(7);
+        assertThat(savedLines.size()).isEqualTo(9);   // seven payslip codes plus the totals 3699 and 4149
     }
 
     @Test
@@ -286,16 +286,16 @@ class TaxCertificateServiceTest {
         String csv = service.csv(tenant, YEAR, INTERIM);
 
         assertThat(csv).contains("\"'=HYPERLINK(\"\"http://evil\"\")\"");
-        assertThat(csv.split("\r\n").length).isEqualTo(1 + 7);
+        assertThat(csv.split("\r\n").length).isEqualTo(1 + 9);
     }
 
     @Test
-    void previewingIssuesNothingAndLeavesOutTotalsThatWereNotVerified() {
+    void previewingIssuesNothingAndCarriesTheVerifiedTotals() {
         Reconciliation r = service.reconciliation(tenant, YEAR, INTERIM);
 
         assertThat(r.notProduced().isEmpty()).isFalse();
         for (Certificate c : r.certificates())
-            assertThat(c.lines().stream().noneMatch(l -> l.code().equals("3699") || l.code().equals("4149"))).isTrue();
+            assertThat(c.lines().stream().filter(l -> l.code().equals("3699") || l.code().equals("4149")).count()).isEqualTo(2);
         ArgumentCaptor<HrTaxCertificate> none = ArgumentCaptor.forClass(HrTaxCertificate.class);
         verify(certRepo, never()).save(none.capture());
     }
@@ -337,6 +337,7 @@ class TaxCertificateServiceTest {
     void aCertificateIsMadeIntoAPdf() {
         issueCertificates();
         UUID id = saved.get(0).getId();
+        when(certRepo.findByTenantAndId(any(), any())).thenReturn(Optional.of(saved.get(0)));
         byte[] pdf = service.pdf(tenant, id);
         assertThat(new String(pdf, 0, 4, java.nio.charset.StandardCharsets.US_ASCII)).isEqualTo("%PDF");
     }

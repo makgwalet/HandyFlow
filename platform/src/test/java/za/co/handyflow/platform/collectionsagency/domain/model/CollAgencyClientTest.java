@@ -54,7 +54,7 @@ class CollAgencyClientTest {
         CollAgencyClient c = newClient();
         c.increaseTrustBalance(new BigDecimal("500.00"));
         c.decreaseTrustBalance(new BigDecimal("500.00"));
-        assertEquals(BigDecimal.ZERO, c.getTrustBalance());
+        assertEquals(0, BigDecimal.ZERO.compareTo(c.getTrustBalance()));
     }
 
     @Test

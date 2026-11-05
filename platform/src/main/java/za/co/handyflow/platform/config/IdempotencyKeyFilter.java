@@ -62,7 +62,7 @@ public class IdempotencyKeyFilter extends OncePerRequestFilter {
         String idempotencyKey = request.getHeader(HEADER);
         if (idempotencyKey == null || idempotencyKey.isBlank()
                 || !MUTATING_METHODS.contains(request.getMethod())
-                || TenantContext.getTenantIdAsObject() == null) {
+                || !TenantContext.hasTenant()) {
             filterChain.doFilter(request, response);
             return;
         }

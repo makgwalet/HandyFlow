@@ -61,7 +61,7 @@ class BkInvoiceTest {
         assertEquals("PAID", invoice.getStatus());
         assertTrue(invoice.isPaid());
         assertNotNull(invoice.getPaidAt());
-        assertEquals(BigDecimal.ZERO, invoice.balance());
+        assertEquals(0, BigDecimal.ZERO.compareTo(invoice.balance()));
     }
 
     @Test

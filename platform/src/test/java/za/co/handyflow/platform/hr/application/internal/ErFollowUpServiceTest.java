@@ -47,7 +47,7 @@ class ErFollowUpServiceTest {
         HrEmployee e = realEmployee();
         HrErCase c = dismissed(e, true);
 
-        termination.endEmployment(TENANT, c.getId(), new EndEmploymentRequest(today().minusDays(1)), HR_USER, DECIDE);
+        termination.endEmployment(TENANT, c.getId(), ending(today().minusDays(1)), HR_USER, DECIDE);
 
         assertThat(e.getStatus()).isEqualTo("TERMINATED");
         assertThat(e.getEndDate()).isEqualTo(today().minusDays(1));
@@ -129,7 +129,7 @@ class ErFollowUpServiceTest {
         assertThatThrownBy(() -> termination.endEmployment(TENANT, warning.getId(), ending(today()), HR_USER, DECIDE))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("dismissal");
         HrErCase c = dismissed(e, true);
-        assertThatThrownBy(() -> termination.endEmployment(TENANT, c.getId(), new EndEmploymentRequest(today().plusDays(5)), HR_USER, DECIDE))
+        assertThatThrownBy(() -> termination.endEmployment(TENANT, c.getId(), ending(today().plusDays(5)), HR_USER, DECIDE))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("future");
         assertThat(e.getStatus()).isEqualTo("ACTIVE");
     }
@@ -138,8 +138,8 @@ class ErFollowUpServiceTest {
     void ItCannotBeDoneTwice() {
         HrEmployee e = realEmployee();
         HrErCase c = dismissed(e, true);
-        termination.endEmployment(TENANT, c.getId(), new EndEmploymentRequest(today().minusDays(1)), HR_USER, DECIDE);
-        assertThatThrownBy(() -> termination.endEmployment(TENANT, c.getId(), new EndEmploymentRequest(today().minusDays(1)), HR_USER, DECIDE))
+        termination.endEmployment(TENANT, c.getId(), ending(today().minusDays(1)), HR_USER, DECIDE);
+        assertThatThrownBy(() -> termination.endEmployment(TENANT, c.getId(), ending(today().minusDays(1)), HR_USER, DECIDE))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("already ended");
     }
 
