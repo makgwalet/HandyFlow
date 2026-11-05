@@ -107,6 +107,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
             new Limit("bkportal:login", "/api/v1/bookkeeping/portal/auth/login", 10, 10 * 60 * 1_000L),
             new Limit("lpportal:register", "/api/v1/legal-practice/portal/auth/register-via-invite", 5, 60 * 60 * 1_000L),
             new Limit("lpportal:login", "/api/v1/legal-practice/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("hrportal:register", "/api/v1/hr/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("hrportal:login", "/api/v1/hr/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("auditorportal:register", "/api/v1/auditor/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("auditorportal:login", "/api/v1/auditor/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("collagencyportal:register", "/api/v1/collections-agency/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("collagencyportal:login", "/api/v1/collections-agency/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("bookingagencyportal:register", "/api/v1/booking-agency/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("bookingagencyportal:login", "/api/v1/booking-agency/portal/auth/login", 10, 10 * 60 * 1_000L),
 
             // FIX (guard device lockdown): a 6-digit code (1,000,000
             // possibilities) is the sole scoping mechanism on this public

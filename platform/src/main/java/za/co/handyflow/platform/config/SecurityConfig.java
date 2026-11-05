@@ -159,6 +159,12 @@ public class SecurityConfig {
                                 // endpoints still need the portal JWT.
                                 "/api/v1/bookkeeping/portal/auth/**",
                                 "/api/v1/legal-practice/portal/auth/**",
+                                // External auditor portal: register (via invite token) and login were not public, so no auditor could
+                                // ever sign in. Only /auth/** is open; the data endpoints still need the portal JWT.
+                                "/api/v1/auditor/portal/auth/**",
+                                // Collections Agency and Booking Agency client portals: same gap as the auditor portal above.
+                                "/api/v1/collections-agency/portal/auth/**",
+                                "/api/v1/booking-agency/portal/auth/**",
                                 // FIX (identity module modernization): the
                                 // main-app team-invitation flow was
                                 // completely unreachable. UserController's
