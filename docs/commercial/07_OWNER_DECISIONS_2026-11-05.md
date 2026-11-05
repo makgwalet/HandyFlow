@@ -55,8 +55,8 @@ Other items touched by your answers:
 
 | Item | State | Next step |
 |---|---|---|
-| HR approval step | Not built | Survey which of the listed changes already have an approval flow (leave, overtime, pay adjustments, employee changes exist in some form). Build only the gaps, with self-approval blocked and an audit trail. |
-| Invoice and seat metering (Phase C) | Not built. The register says it depends on the entitlement engine (Phase B) and the INV-01 fix. | First slice: count issued invoices per tenant per month and active-plus-invited seats, in **report mode only**. No blocking until the limits are confirmed. |
+| HR approval step | Built for pay/bank changes, leave (patch 0644: self-approval only when nobody else can approve) and terminations (patch 0645). Employee status changes not covered. Disciplinary dismissal left to the case process. | Survey which of the listed changes already have an approval flow (leave, overtime, pay adjustments, employee changes exist in some form). Build only the gaps, with self-approval blocked and an audit trail. |
+| Invoice and seat metering (Phase C) | First slice built in **report mode only** (patch 0646, V594): issued invoices counted per month by a trigger into an append-only table; seats = active users plus pending invitations; `GET /api/v1/usage`; `USAGE-REPORT` log lines at 80% and over. A tenant has no limits until `tenants.usage_tier` is set. Nothing blocks. | Blocking (the hard cap) waits for final approval of the limits and for the recurring-invoice rule. Fix INV-01 before relying on the counts. |
 | Downgrade transition (Phase D) | Not built | Needs the payment-failure and suspension rules (item 2 above). |
 
 ## 5. Unresolved items
