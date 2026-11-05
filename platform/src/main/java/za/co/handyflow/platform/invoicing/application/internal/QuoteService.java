@@ -165,6 +165,7 @@ public class QuoteService {
     @Transactional
     public QuoteResponse sendQuote(TenantId tenantId, UUID quoteId) {
         Quote quote = findActiveQuote(tenantId, quoteId);
+        if (quote.getStatus() == QuoteStatus.DRAFT) usageCap.requireQuoteCapacity(tenantId);   // quote cap (off until rollout is approved)
         quote.send();
         quoteRepository.save(quote);
         log.info("Sent quote={} expires={}", quoteId, quote.getExpiresAt());

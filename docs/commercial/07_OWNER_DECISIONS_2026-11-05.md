@@ -1,5 +1,7 @@
 # Owner decisions, 5 November 2026 (16:12)
 
+> Superseded in part by `08_FINAL_DECISIONS_2026-11-05.md` (18:07): tier limits approved, D-01, D-02 and D-05 confirmed, D-23 decided, payment-failure and employee-status rules decided. Enforcement stays off.
+
 Status words used below:
 - **DECIDED**: the owner gave a specific answer. Still reversible until built and released.
 - **PROVISIONAL**: approved as a working default only. Not final. The owner has asked to see the exact decision, the recommended value and the consequence before any irreversible or commercially significant item is treated as final.

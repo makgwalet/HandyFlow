@@ -20,4 +20,7 @@ public interface UsageCapFacade {
 
     /** As {@link #checkAndLock}, but refuses with 409 INVOICE_CAP_REACHED when the cap does not allow another invoice. */
     void requireCapacity(TenantId tenantId);
+
+    /** Same for quotes (sending a quote is what uses one). Refuses with 409 QUOTE_CAP_REACHED. */
+    void requireQuoteCapacity(TenantId tenantId);
 }

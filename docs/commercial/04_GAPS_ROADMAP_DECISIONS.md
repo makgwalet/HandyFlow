@@ -44,19 +44,19 @@ Rollback: each phase ships behind a configuration flag where behaviour changes (
 ## 3. Decision register
 | ID | Question | Options | Recommendation | Blocks |
 |---|---|---|---|---|
-| D-01 | Free Core conditional on a paid module (today's brief) or unconditional (4 Nov)? | conditional / unconditional / free tier with low caps | **Conditional**, with a visible read-only transition | Phase B |
-| D-02 | Is a workspace plan priced? | Option 1 / 2 / 3 | **Hybrid**: Starter included with first paid module; Growth/Business priced | Phase B |
+| D-01 | Free Core conditional on a paid module (today's brief) or unconditional (4 Nov)? | conditional / unconditional / free tier with low caps | **Conditional**, with a visible read-only transition | Phase B | **[5 Nov 18:07: CONFIRMED conditional]**
+| D-02 | Is a workspace plan priced? | Option 1 / 2 / 3 | **Hybrid**: Starter included with first paid module; Growth/Business priced | Phase B | **[5 Nov 18:07: CONFIRMED]**
 | D-03 | Trial length | 14 / 30 / 60 days | 30 days, extendable by platform admin | A config only |
 | D-04 | Transition period after last paid module ends | 0 / 30 / 60 days | 30 days read-only | Phase D |
-| D-05 | Which of the 16 uncovered modules are paid vs shared services | per module | Paid: projects, recruiter, pos, desk, creative, marketing, accountant, auditor, ap, supplychain, tasks (R149 in the catalogue). Shared services needing no module check: notifications, approvals, audittrail, documents, secureaccess, capture | Phase A |
+| D-05 | Which of the 16 uncovered modules are paid vs shared services | per module | Paid: projects, recruiter, pos, desk, creative, marketing, accountant, auditor, ap, supplychain, tasks (R149 in the catalogue). Shared services needing no module check: notifications, approvals, audittrail, documents, secureaccess, capture | Phase A | **[5 Nov 18:07: CONFIRMED, all specialist modules paid]**
 | D-06 | R0 modules | price now / hide / bundle | Hide until priced; do not let R0 qualify for Free Core | Phase A |
 | D-07 | Module keys | rename to canonical | Canonical lower-case, no separators | Phase A |
 | D-08 | Marketing: sell or retire | | Decide with owner | none |
 | D-09 | Discount schedule | live ladder / proposal / bundles only | Bundles plus a modest ladder after margin model | Phase E |
-| D-10 | Quote cap type | hard / soft | Hard | Phase C |
-| D-11 | Invoice cap type | hard / soft / none for paid | **Soft** (110%) and lifted by Finance bundle | Phase C |
+| D-10 | Quote cap type | hard / soft | Hard | Phase C | **[5 Nov 18:07: hard; 100 / 500 / 2,000 per month]**
+| D-11 | Invoice cap type | hard / soft / none for paid | **Soft** (110%) and lifted by Finance bundle | Phase C | **[5 Nov 16:12: owner chose HARD; 18:07: 50 / 250 / 1,000, enforcement OFF]**
 | D-12 | Full feature matrix for 38 modules | per-module audits | Scripted draft then review | none |
-| D-13 | Seat definition and limits per tier | section 5 of `02` | Approve | Phase C |
+| D-13 | Seat definition and limits per tier | section 5 of `02` | Approve | Phase C | **[5 Nov 18:07: 5 / 20 / 50 approved]**
 | D-14 | Withdraw Payroll Bureau from sale | yes/no | Yes until rebuilt | none |
 | D-15 | Payment gateway | PayFast / Peach / Paystack / Netcash / Ozow | Evaluate fees and recurring support | Phase E |
 | D-16 | Invoicing posting to Accounting without a subscription | allow / gate | Allow (accounting engine is the system of record), but show a paywall to *view* ledger reports | Phase B |
@@ -66,7 +66,7 @@ Rollback: each phase ships behind a configuration flag where behaviour changes (
 | D-20 | Enterprise future modules | auto-include / contract | Contract | none |
 | D-21 | Sole-user self-approval policy | per IAM doc | As approved (flag `self_approved`) | IAM Phase 1 |
 | D-22 | Bundle composition | seven June packs / four families; price includes base plan or not | Start from the seven June packs; validate with pilot customers | Phase E |
-| D-23 | Professional free-module credit | keep (one module, cap R499, no Clinic) / replace by Free Core and bundles | Decide; if kept, meter it and enforce `included_module_count` | Phase B |
+| D-23 | Professional free-module credit | keep (one module, cap R499, no Clinic) / replace by Free Core and bundles | Decide; if kept, meter it and enforce `included_module_count` | Phase B | **[5 Nov 18:07: DECIDED: retire for new model, honour existing]**
 | D-24 | Annual contract terms | June 2026 terms / revise | Legal review (auto-renew, no refund, early-termination fee, Consumer Protection Act) before any use | Phase E |
 | D-25 | Pause clause for seasonal tenants | yes / no | Defer | none |
 | D-26 | Difficult-tenant playbook | adopt / revise | Correct the CCMA reference, legal review, then use as an operations document | none |
@@ -87,3 +87,6 @@ Exists: `BillingPage` (subscription, My Modules, add and cancel with cancel prev
 
 ## 6. Mapping of the 16 required test scenarios
 None of the 16 exist today (no billing tests besides the path test from 0608). They map to phases A (9, 16), B (1-4, 13, 15), C (11), D (5-8, 12), E (13, 14), and tenant isolation (10) to the IAM integration tests.
+
+
+See `08_FINAL_DECISIONS_2026-11-05.md` for the owner's final decisions of 5 November 2026, 18:07.

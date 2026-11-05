@@ -71,4 +71,25 @@ class UsageServiceTest {
         assertThat(s.invoices().percent()).isEqualTo(80);
         assertThat(s.seats().level()).isEqualTo(UsageRules.AT_LIMIT);
     }
+
+    @Test
+    void quotesAreMeteredAgainstTheirOwnApprovedLimit() {
+        answer("SELECT usage_tier", String.class, "STARTER");
+        when(jdbc.queryForList(org.mockito.ArgumentMatchers.startsWith("SELECT limit_value"), eq(Integer.class), eq("STARTER"), eq("INVOICES_ISSUED"))).thenReturn(List.of(50));
+        when(jdbc.queryForList(org.mockito.ArgumentMatchers.startsWith("SELECT limit_value"), eq(Integer.class), eq("STARTER"), eq("QUOTES_ISSUED"))).thenReturn(List.of(100));
+        when(jdbc.queryForList(org.mockito.ArgumentMatchers.startsWith("SELECT limit_value"), eq(Integer.class), eq("STARTER"), eq("SEATS"))).thenReturn(List.of(5));
+        answer("SELECT bool_or", Boolean.class, false);
+        when(jdbc.queryForList(org.mockito.ArgumentMatchers.startsWith("SELECT count(*) FROM usage_events"), eq(Long.class), any(Object[].class)))
+                .thenAnswer(inv -> List.of(java.util.Arrays.asList(inv.getArguments()).contains("QUOTES_ISSUED") ? 90L : 10L));
+        answer("SELECT count(*) FROM users", Long.class, 1L);
+        answer("SELECT count(*) FROM user_invitations", Long.class, 0L);
+
+        var s = service.snapshot(tenant, LocalDate.of(2026, 11, 5));
+
+        assertThat(s.limitsProvisional()).isFalse();
+        assertThat(s.quotes().limit()).isEqualTo(100);
+        assertThat(s.quotes().used()).isEqualTo(90);
+        assertThat(s.quotes().level()).isEqualTo(UsageRules.CLOSE);
+        assertThat(s.invoices().level()).isEqualTo(UsageRules.NONE);
+    }
 }
