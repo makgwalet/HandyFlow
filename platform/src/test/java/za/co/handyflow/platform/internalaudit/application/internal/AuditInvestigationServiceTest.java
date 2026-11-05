@@ -165,6 +165,7 @@ class AuditInvestigationServiceTest {
         service.addMember(tid, as(lead), caseId, fresh, "observer");
         verify(members).save(argThat(m -> m.getRole().equals("OBSERVER") && m.getUserName().equals("New Person")));
         assertThrows(ResourceNotFoundException.class, () -> service.addMember(tid, as(lead), caseId, UUID.randomUUID(), "OBSERVER"));
+        when(users.findByIdAndTenantId(inv, tid)).thenReturn(Optional.of(u));   // the person must exist before the duplicate check is reached
         assertEquals("INV_MEMBER_EXISTS", assertThrows(HandyFlowException.class, () -> service.addMember(tid, as(lead), caseId, inv, "OBSERVER")).getErrorCode());
     }
 }

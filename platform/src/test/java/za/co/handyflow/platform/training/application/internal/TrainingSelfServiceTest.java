@@ -75,6 +75,6 @@ class TrainingSelfServiceTest {
     void aLoginWithNoEmployeeRecordGetsNothing() {
         when(hrFacade.findEmployeeByUserId(tenant, userId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.mine(tenant, userId)).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> service.mine(tenant, userId)).isInstanceOf(za.co.handyflow.platform.shared.LoginNotLinkedException.class);
     }
 }

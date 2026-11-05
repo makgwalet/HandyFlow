@@ -330,7 +330,7 @@ class TrainingTeamAndMatrixTest {
     @Test
     void aLoginWithNoEmployeeRecordCannotBook() {
         TrainingSession s = session(firstAid, 10, 5, true);
-        assertThrows(ResourceNotFoundException.class, () -> booking.book(tenant, outsiderUser, s.getId()));
+        assertThrows(za.co.handyflow.platform.shared.LoginNotLinkedException.class, () -> booking.book(tenant, outsiderUser, s.getId()));
     }
 
     @Test

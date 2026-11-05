@@ -29,8 +29,8 @@ class LetterTemplateRulesTest {
         assertThrows(IllegalArgumentException.class, () -> LetterTemplateRules.clean("MEMO", "x", null, "y", null, null, null));
         assertThrows(IllegalArgumentException.class, () -> LetterTemplateRules.clean("GENERAL_LETTER", " ", "T", "y", null, null, null));
         assertThrows(IllegalArgumentException.class, () -> LetterTemplateRules.clean("GENERAL_LETTER", "x", "T", " ", null, null, null));
-        var e = assertThrows(IllegalArgumentException.class, () -> LetterTemplateRules.clean("GENERAL_LETTER", "x", "T", "Hello {{patient.age}}", null, null, null));
-        assertTrue(e.getMessage().contains("{{patient.age}}") && e.getMessage().contains("{{patient.name}}"));
+        var e = assertThrows(IllegalArgumentException.class, () -> LetterTemplateRules.clean("GENERAL_LETTER", "x", "T", "Hello {{patient.shoeSize}}", null, null, null));   // patient.age is a known field now
+        assertTrue(e.getMessage().contains("{{patient.shoeSize}}") && e.getMessage().contains("{{patient.name}}"));
         assertThrows(IllegalArgumentException.class, () -> LetterTemplateRules.clean("GENERAL_LETTER", "x".repeat(101), "T", "y", null, null, null));
         assertThrows(IllegalArgumentException.class, () -> LetterTemplateRules.clean("GENERAL_LETTER", "x", "T", "y".repeat(4001), null, null, null));
         assertThrows(IllegalArgumentException.class, () -> LetterTemplateRules.clean("SICK_NOTE", "x", null, "y", null, null, 0));

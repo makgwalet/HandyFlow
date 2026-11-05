@@ -89,7 +89,7 @@ class CatalogueImportServiceTest {
         verify(catalogue).createItem(eq(TENANT), created.capture(), eq(ADMIN));
         assertThat(created.getValue().name()).isEqualTo("Brick");
         assertThat(created.getValue().unit()).isEqualTo("each");
-        assertThat(created.getValue().status()).isEqualTo(CatalogueItemStatus.ACTIVE);
+        assertThat(created.getValue().status()).isNull();   // no status in the file: the item service decides (draft when approval is on)
         var updated = ArgumentCaptor.forClass(CreateItemRequest.class);
         verify(catalogue).updateItem(eq(TENANT), eq(cement.getId()), updated.capture(), eq(ADMIN));
         assertThat(updated.getValue().brand()).isEqualTo("Sephaku");

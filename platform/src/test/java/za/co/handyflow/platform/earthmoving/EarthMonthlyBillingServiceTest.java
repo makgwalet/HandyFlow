@@ -93,7 +93,9 @@ class EarthMonthlyBillingServiceTest {
         granted.add("EARTHMOVING_READ");
         assertThrows(HandyFlowException.class, () -> service.preview(tenant, "2026-09"));
         granted.add("EARTHMOVING_ADMIN");
-        assertThrows(IllegalArgumentException.class, () -> service.preview(tenant, "2026-10"));
+        // the current month is never finished (a fixed month goes stale as the calendar moves)
+        String thisMonth = java.time.YearMonth.now(java.time.ZoneId.of("Africa/Johannesburg")).toString();
+        assertThrows(IllegalArgumentException.class, () -> service.preview(tenant, thisMonth));
         assertThrows(IllegalArgumentException.class, () -> service.preview(tenant, "soon"));
     }
     @Test void aDeploymentOnTheRunShowsAsReadyWithItsAmountForTheWholeMonth() {

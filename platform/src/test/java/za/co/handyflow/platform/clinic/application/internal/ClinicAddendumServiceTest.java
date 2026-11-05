@@ -41,7 +41,7 @@ class ClinicAddendumServiceTest {
     private ClinicConsultation signed() {
         ClinicConsultation c = ClinicConsultation.createDraft(TENANT, UUID.randomUUID(), null, null, "Cough");
         c.sign();
-        when(consultationRepo.findActiveById(TENANT, c.getId())).thenReturn(Optional.of(c));
+        org.mockito.Mockito.lenient().when(consultationRepo.findActiveById(TENANT, c.getId())).thenReturn(Optional.of(c));
         return c;
     }
 
@@ -74,7 +74,7 @@ class ClinicAddendumServiceTest {
     @DisplayName("drafts and handoff states refuse addenda: edit the draft instead")
     void refusesUnsigned() {
         ClinicConsultation c = ClinicConsultation.createDraft(TENANT, UUID.randomUUID(), null, null, "Cough");
-        when(consultationRepo.findActiveById(TENANT, c.getId())).thenReturn(Optional.of(c));
+        org.mockito.Mockito.lenient().when(consultationRepo.findActiveById(TENANT, c.getId())).thenReturn(Optional.of(c));
 
         assertThatThrownBy(() -> service.add(TENANT, c.getId(), "note"))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("DRAFT");
@@ -125,7 +125,7 @@ class ClinicAddendumServiceTest {
         UUID signer = UUID.randomUUID();
         ClinicConsultation c = ClinicConsultation.createDraft(TENANT, UUID.randomUUID(), null, null, "Cough");
         c.sign(signer);
-        when(consultationRepo.findActiveById(TENANT, c.getId())).thenReturn(Optional.of(c));
+        org.mockito.Mockito.lenient().when(consultationRepo.findActiveById(TENANT, c.getId())).thenReturn(Optional.of(c));
 
         service.add(TENANT, c.getId(), "Result received", "RESULT");
 
@@ -137,7 +137,7 @@ class ClinicAddendumServiceTest {
     void taskFailureKeepsTheAddendum() {
         ClinicConsultation c = ClinicConsultation.createDraft(TENANT, UUID.randomUUID(), null, null, "Cough");
         c.sign(UUID.randomUUID());
-        when(consultationRepo.findActiveById(TENANT, c.getId())).thenReturn(Optional.of(c));
+        org.mockito.Mockito.lenient().when(consultationRepo.findActiveById(TENANT, c.getId())).thenReturn(Optional.of(c));
         when(tasks.create(any(), any(), any())).thenThrow(new RuntimeException("down"));
 
         var out = service.add(TENANT, c.getId(), "Note", null);

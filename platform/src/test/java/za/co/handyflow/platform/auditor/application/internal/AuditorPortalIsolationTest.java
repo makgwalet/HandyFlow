@@ -51,6 +51,7 @@ class AuditorPortalIsolationTest {
         AuditorAccessGrant g = AuditorAccessGrant.createInvite(tenant, "a@firm.test", UUID.randomUUID());
         g.acceptInvite(auditor);
         when(grants.findByTenantId(tenant)).thenReturn(List.of(g));
+        org.mockito.Mockito.lenient().when(grants.findByPortalUserId(auditor)).thenReturn(List.of(g));   // getMyTenants reads by portal user
         return g;
     }
 

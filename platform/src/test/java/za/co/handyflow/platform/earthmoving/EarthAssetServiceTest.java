@@ -232,7 +232,7 @@ class EarthAssetServiceTest {
     @Test
     void aNewMachineCanBeRegisteredWithAKilometreMeter() {
         granted.add("EARTHMOVING_WRITE");
-        var r = service.createAsset(tenant, new CreateAssetRequest("Tipper", "TRUCK", "T-01", null, null, null, null, null,
+        var r = service.createAsset(tenant, new CreateAssetRequest("Tipper", "DUMPER", "T-01", null, null, null, null, null,
                 "OWN", null, null, null, null, null, null, "kilometres"));
         assertEquals("KILOMETRES", r.meterType());
         assertEquals("km", r.meterUnit());
@@ -378,7 +378,8 @@ class EarthAssetServiceTest {
         EarthAsset a = machine(AssetStatus.AVAILABLE);
         granted.add("EARTHMOVING_DEPLOY");
         UUID site = UUID.randomUUID(), customer = UUID.randomUUID(), project = UUID.randomUUID();
-        when(sites.resolveForDeploy(any(), any())).thenReturn(new EarthSiteService.DeployTarget(site, "Mine A", customer, "Anglo American", project));
+        // doReturn: calling the stand-in resolver from setUp with matcher nulls would throw
+        doReturn(new EarthSiteService.DeployTarget(site, "Mine A", customer, "Anglo American", project)).when(sites).resolveForDeploy(any(), any());
         service.deploy(tenant, a.getId(), new DeployAssetRequest("typed", "typed client", null, null, null, null, null, site, customer, project), actor);
         var captor = org.mockito.ArgumentCaptor.forClass(EarthDeployment.class);
         verify(deployments).save(captor.capture());
@@ -394,7 +395,7 @@ class EarthAssetServiceTest {
     void aRefusedSiteStopsTheDeploymentBeforeAnythingIsWritten() {
         EarthAsset a = machine(AssetStatus.AVAILABLE);
         granted.add("EARTHMOVING_DEPLOY");
-        when(sites.resolveForDeploy(any(), any())).thenThrow(new IllegalArgumentException("That site was not found."));
+        doThrow(new IllegalArgumentException("That site was not found.")).when(sites).resolveForDeploy(any(), any());
         assertThrows(IllegalArgumentException.class, () -> service.deploy(tenant, a.getId(),
                 new DeployAssetRequest(null, null, null, null, null, null, null, UUID.randomUUID(), null, null), actor));
         verify(deployments, never()).save(any());

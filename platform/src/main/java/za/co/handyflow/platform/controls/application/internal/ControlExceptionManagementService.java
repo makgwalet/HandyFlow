@@ -40,13 +40,15 @@ public class ControlExceptionManagementService {
     @Transactional(readOnly = true)
     public List<ControlExceptionDetail> list(TenantId tenant, String scope, LocalDate today) {
         String s = scope == null ? "open" : scope.toLowerCase();
+        // Chosen before reading, so an unknown scope is refused even when there is nothing to list.
+        java.util.function.Predicate<ControlException> keep = switch (s) {
+            case "all" -> e -> true;
+            case "follow-ups" -> e -> e.followUpDueOn(today) || ("RESOLVED".equals(e.getStatus()) && e.getFollowUpDate() != null && e.getFollowUpAt() == null);
+            case "open" -> e -> "OPEN".equals(e.getStatus());
+            default -> throw new HandyFlowException("Scope must be open, follow-ups or all", HttpStatus.BAD_REQUEST, "CONTROL_EXCEPTION_SCOPE");
+        };
         return repo.findAllByTenant(tenant.getValue()).stream()
-                .filter(e -> switch (s) {
-                    case "all" -> true;
-                    case "follow-ups" -> e.followUpDueOn(today) || ("RESOLVED".equals(e.getStatus()) && e.getFollowUpDate() != null && e.getFollowUpAt() == null);
-                    case "open" -> "OPEN".equals(e.getStatus());
-                    default -> throw new HandyFlowException("Scope must be open, follow-ups or all", HttpStatus.BAD_REQUEST, "CONTROL_EXCEPTION_SCOPE");
-                })
+                .filter(keep)
                 .map(e -> toDetail(tenant, e, today)).toList();
     }
 

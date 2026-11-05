@@ -117,6 +117,8 @@ class ExternalAuditEngagementTest {
         var e = stored(planned());
         e.start(); e.complete(user);
         var during = AuditShare.share(tenant, AuditShare.EVIDENCE, UUID.randomUUID(), "bank statements", user, "Owner");
+        // created after the engagement completed in the same instant, so pin it inside the engagement window
+        org.springframework.test.util.ReflectionTestUtils.setField(during, "sharedAt", e.getStartedAt());
         var later = AuditShare.share(tenant, AuditShare.EVIDENCE, UUID.randomUUID(), "next year", user, "Owner");
         org.springframework.test.util.ReflectionTestUtils.setField(later, "sharedAt", Instant.now().plusSeconds(3600));
         var before = AuditShare.share(tenant, AuditShare.EVIDENCE, UUID.randomUUID(), "old", user, "Owner");

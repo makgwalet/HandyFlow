@@ -67,7 +67,7 @@ public final class GuardScoreCalculator {
 
         c.add(f.ratingCount() > 0
                 ? comp("RATINGS", "Client and supervisor ratings", 15, Math.min(1.0, f.ratingAverage() / 5.0),
-                        String.format("%.1f out of 5 across %d rating%s", f.ratingAverage(), f.ratingCount(), f.ratingCount() == 1 ? "" : "s"))
+                        String.format(java.util.Locale.ROOT, "%.1f out of 5 across %d rating%s", f.ratingAverage(), f.ratingCount(), f.ratingCount() == 1 ? "" : "s"))
                 : none("RATINGS", "Client and supervisor ratings", 15, "no ratings in the period"));
 
         int coverage = c.stream().filter(Component::hasData).mapToInt(Component::weight).sum();

@@ -99,7 +99,8 @@ class AuditFollowUpServiceTest {
 
         service.assess(tid, actor, now, f.getId(), "IMPLEMENTED", "Checked the live approval step.");
         assertEquals("IMPLEMENTED", item.getOutcome());
-        verify(trail).record(eq(tid), eq("AUDIT_FOLLOWUP_ASSESSED"), eq("AUDIT_FINDING"), eq(f.getId()), any(), any());
+        var findingId = f.getId();   // read before the matchers start: f may be a mock
+        verify(trail).record(eq(tid), eq("AUDIT_FOLLOWUP_ASSESSED"), eq("AUDIT_FINDING"), eq(findingId), any(), any());
     }
 
     @Test

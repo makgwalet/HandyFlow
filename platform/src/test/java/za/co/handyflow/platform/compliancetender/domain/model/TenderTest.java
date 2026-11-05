@@ -72,6 +72,7 @@ class TenderTest {
         t.transitionTo("INTERNAL_REVIEW", USER);
         t.transitionTo("READY_TO_SUBMIT", USER);
         t.transitionTo("SUBMITTED", USER);
+        t.transitionTo("SHORTLISTED", USER);   // SUBMITTED cannot be awarded directly
         t.recordOutcome("AWARDED", null, new BigDecimal("1000"), USER);
 
         assertThatThrownBy(() -> t.transitionTo("IN_PREPARATION", USER))

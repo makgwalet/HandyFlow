@@ -85,8 +85,9 @@ public final class PdfPackageMerger {
                 pagesPerInput.add(pages);
                 total += pages;
             }
-            merger.close();
+            // Stamp before closing: PdfMerger.close() closes the target document, and stamping a closed document fails.
             if (options.pageNumbers()) stampPageNumbers(target);
+            merger.close();
         } catch (PackageMergeException e) {
             throw e;
         } catch (Exception e) {

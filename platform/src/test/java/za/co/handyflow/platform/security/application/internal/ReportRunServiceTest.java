@@ -55,10 +55,10 @@ class ReportRunServiceTest {
     @Test
     void aFailureWritingHistoryDoesNotFailTheReport() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        doThrow(new RuntimeException("db down")).when(jdbc).update(anyString(), (Object[]) any());
+        doThrow(new RuntimeException("db down")).when(jdbc).update(anyString(), any(Object[].class));
         ReportRunService service = new ReportRunService(jdbc);
         service.record(TenantId.of(java.util.UUID.randomUUID()), "monthly-summary", "2026-09", null, "VIEW");
-        verify(jdbc).update(anyString(), (Object[]) any());
+        verify(jdbc).update(anyString(), any(Object[].class));
     }
 
     @Test

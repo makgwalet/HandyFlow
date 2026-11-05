@@ -130,7 +130,7 @@ class CatalogueApprovalServiceTest {
     @Test
     void aDecidedRequestCannotBeDecidedAgain() {
         var a = pending();
-        service.reject(TENANT, a.getId(), "No", CHECKER);
+        service.reject(TENANT, a.getId(), "Not needed", CHECKER);
         assertThatThrownBy(() -> service.approve(TENANT, a.getId(), null, CHECKER)).isInstanceOf(IllegalStateException.class);
     }
 

@@ -65,8 +65,11 @@ class ContractRecordsTest {
 
     @Test
     void theRetentionClockStartsFromTerminationThenEndDate() {
-        Contract c = signed();
+        // dates can only be set while the contract is a draft, so set them before it is sent and signed
+        Contract c = Contract.create(tenant, "CT-008", "Cleaning services", "SERVICE_AGREEMENT", "<p>Terms</p>", null, UUID.randomUUID());
         c.setDates(LocalDate.of(2025, 1, 1), LocalDate.of(2027, 12, 31));
+        c.send();
+        c.markSigned();
         assertEquals(LocalDate.of(2027, 12, 31), c.endedOn(), "the end date until it is terminated");
         c.terminate("Mutual agreement");
         assertEquals(LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg")), c.endedOn());

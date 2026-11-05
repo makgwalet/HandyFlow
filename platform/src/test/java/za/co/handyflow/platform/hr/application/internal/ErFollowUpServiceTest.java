@@ -55,7 +55,7 @@ class ErFollowUpServiceTest {
         assertThat(e.getTerminatedBy()).isEqualTo(HR_USER);
         verify(h.employees).save(e);
         verify(audit).record(eq(TENANT), eq(e.getId()), eq("TERMINATED"), any(), eq(HR_USER));
-        verify(h.events).save(any());
+        verify(h.events, atLeastOnce()).save(any());   // the dismissal and the termination each leave an event
     }
 
     @Test
