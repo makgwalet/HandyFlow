@@ -47,7 +47,9 @@ class InvoicingAccountingEventHandlerTest {
         accounts = mock(AccAccountRepository.class);
         posting = mock(LedgerPostingService.class);
         handler = new InvoicingAccountingEventHandler(accounts, mock(AccBankAccountRepository.class), posting);
-        when(accounts.findAllActive(any())).thenReturn(List.of(account(ar, "1100"), account(revenue, "4000"), account(vat, "2100")));
+        // Built first: creating a mock inside the argument of thenReturn(...) is an UnfinishedStubbingException.
+        List<AccAccount> chart = List.of(account(ar, "1100"), account(revenue, "4000"), account(vat, "2100"));
+        when(accounts.findAllActive(any())).thenReturn(chart);
     }
 
     private InvoiceIssuedEvent issued(UUID invoiceId, String subtotal, String vatTotal, String total) {
