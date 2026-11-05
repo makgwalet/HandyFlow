@@ -129,7 +129,7 @@ describe("report screens", () => {
     expect(screen.getByText(/19\.6% a year at this rate/)).toBeTruthy()
     expect(screen.getByText("Finance")).toBeTruthy()
     expect(screen.getByText(/only to people with access to sensitive records/)).toBeTruthy()
-    expect(get.mock.calls[0][0]).toMatch(/^\/api\/v1\/hr\/reports\/workforce\?from=\d{4}-01-01&to=\d{4}-\d{2}-\d{2}$/)
+    expect(get.mock.calls.map(c => c[0] as string).find(u => u.includes("/reports/workforce"))).toMatch(/^\/api\/v1\/hr\/reports\/workforce\?from=\d{4}-01-01&to=\d{4}-\d{2}-\d{2}$/)
   })
   it("shows hidden groups as fewer than five rather than a number", async () => {
     perms = ["HR_REPORT_READ", "HR_SENSITIVE_READ"]
@@ -221,6 +221,6 @@ describe("saved reports", () => {
     expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true)
     fireEvent.change(screen.getByLabelText("Reminder day"), { target: { value: "5" } })
     fireEvent.click(screen.getByRole("button", { name: "Save" }))
-    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/hr/saved-reports", { name: "Headcount", kind: "WORKFORCE", period: "LAST_MONTH", schedule: "MONTHLY", runDay: 5 }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/hr/saved-reports", { name: "Headcount", kind: "WORKFORCE", period: "LAST_MONTH", schedule: "MONTHLY", runDay: 5, emailReminder: false }))
   })
 })

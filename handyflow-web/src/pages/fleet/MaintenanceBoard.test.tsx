@@ -26,8 +26,8 @@ const tyres = [
 ]
 const batteries = [{ id: "b1", registration: "AAA1", position: "ENGINE", brand: "Exide", status: "INSTALLED", lastTestResult: "WEAK", lastVoltage: 11.8 }, { id: "b2", registration: "BBB2", position: "ENGINE", brand: "Willard", status: "INSTALLED", lastTestResult: "FAILED", lastVoltage: 9.4 }, { id: "b3", registration: "CCC3", position: "ENGINE", brand: "Exide", status: "INSTALLED", lastTestResult: "GOOD", lastVoltage: 12.6 }]
 const wrap = (go?: (s: string) => void) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MaintenanceBoard onNavigate={go} /></QueryClientProvider>)
-beforeEach(() => { get.mockReset(); get.mockImplementation((url: string) => (url.includes("/work-orders") ? ok({ content: orders }) : url.includes("/tyres") ? ok(tyres) : url.includes("/batteries") ? ok(batteries) : url.includes("/vehicles") ? ok({ content: vehicles }) : ok([]))) })
-afterEach(cleanup)
+beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW); get.mockReset(); get.mockImplementation((url: string) => (url.includes("/work-orders") ? ok({ content: orders }) : url.includes("/tyres") ? ok(tyres) : url.includes("/batteries") ? ok(batteries) : url.includes("/vehicles") ? ok({ content: vehicles }) : ok([]))) })
+afterEach(() => { cleanup(); vi.useRealTimers() })
 
 describe("maintenance board rules", () => {
   it("summarises work in flight", () => {

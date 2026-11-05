@@ -15,8 +15,8 @@ const opp = (id: string, stage: Opportunity["stage"], amount: number, close: str
   ({ id, customerId: "c1", customerName: "Acme", name: id, stage, chance: 0, amount, weightedAmount: 0, expectedCloseDate: close, ownerId: null, lostReason: null, lostNote: null, notes: null, ...extra })
 const list = [opp("Rollout", "PROPOSAL", 100000, "2026-10-01", { weightedAmount: 50000 }), opp("Support", "QUALIFIED", 40000, "2026-12-01", { weightedAmount: 10000 }), opp("Old deal", "WON", 30000), opp("Gone", "LOST", 5000, null, { lostReason: "PRICE" })]
 const wrap = (ui: React.ReactElement) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>)
-beforeEach(() => { perms = new Set(["CUSTOMER_READ", "CUSTOMER_UPDATE"]); get.mockReset(); post.mockReset(); put.mockReset(); patch.mockReset(); del.mockReset(); for (const m of [post, put, patch, del]) m.mockResolvedValue({ data: { data: {} } }) })
-afterEach(cleanup)
+beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date(2026, 9, 21, 12)); perms = new Set(["CUSTOMER_READ", "CUSTOMER_UPDATE"]); get.mockReset(); post.mockReset(); put.mockReset(); patch.mockReset(); del.mockReset(); for (const m of [post, put, patch, del]) m.mockResolvedValue({ data: { data: {} } }) })
+afterEach(() => { cleanup(); vi.useRealTimers() })
 
 describe("opportunity rules", () => {
   it("moves: closed ones are reopened before the other outcome", () => {

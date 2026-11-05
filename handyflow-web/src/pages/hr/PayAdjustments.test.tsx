@@ -213,7 +213,7 @@ describe("pay in place of notice", () => {
     await screen.findByText(/Notice required: 28 days\. Given: 14 days\. Short: 14 days/)
     const btn = screen.getByRole("button", { name: "Enter notice pay" }) as HTMLButtonElement
     expect(btn.disabled).toBe(true)
-    fireEvent.change(screen.getByLabelText(/^Reason/), { target: { value: "Two weeks short" } })
+    fireEvent.change(screen.getByLabelText(/^Reason/, { selector: "#np-reason" }), { target: { value: "Two weeks short" } })
     fireEvent.click(btn)
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/hr/employees/e1/notice-pay/enter", { amount: null, reason: "Two weeks short" }))
   })
@@ -259,7 +259,7 @@ describe("severance on retrenchment", () => {
     fireEvent.change(screen.getByLabelText(/^Severance amount/), { target: { value: "20000" } })
     fireEvent.change(screen.getByLabelText(/^SARS directive number/), { target: { value: "IRP3-1" } })
     fireEvent.change(screen.getByLabelText(/^Tax the directive asks for/), { target: { value: "1500.50" } })
-    fireEvent.change(screen.getByLabelText(/^Reason/), { target: { value: "Position made redundant" } })
+    fireEvent.change(screen.getByLabelText(/^Reason/, { selector: "#sv-reason" }), { target: { value: "Position made redundant" } })
     expect(btn.disabled).toBe(false)
     fireEvent.click(btn)
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/hr/employees/" + EMP.id + "/severance/enter",

@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test": "vitest run --environment jsdom",
     "preview": "vite preview",
     "audit:data-colors": "node scripts/theme-codemod/audit-data-colors.mjs",
     "check:navigation": "node scripts/check-navigation.mjs"
@@ -25,6 +26,7 @@
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-hook-form": "^7.75.0",
+    "react-is": "^19.2.7",
     "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.14.2",
     "recharts": "^3.8.1",
@@ -34,6 +36,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.1",
     "@types/leaflet": "^1.9.22",
     "@types/node": "^24.12.2",
     "@types/qrcode": "^1.5.5",
@@ -45,11 +50,13 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
+    "jsdom": "^30.1.3",
     "postcss": "^8.5.14",
     "tailwindcss": "^3.4.19",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
-    "vite": "^8.0.10"
+    "vite": "^8.0.10",
+    "vitest": "^2.1.9"
   },
   "description": "This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.",
   "main": "eslint.config.js",

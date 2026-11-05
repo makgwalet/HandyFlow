@@ -27,7 +27,7 @@ function fill() {
   fireEvent.change(boxes[2], { target: { value: "t@x.co.za" } })
 }
 
-beforeEach(() => { get.mockReset(); post.mockReset(); get.mockResolvedValue({ data: { data: job } }) })
+beforeEach(() => { get.mockReset(); post.mockReset(); get.mockImplementation((url: string) => Promise.resolve({ data: { data: url.endsWith('/screening') ? [] : job } })) })
 afterEach(cleanup)
 
 describe("careers apply form consent", () => {

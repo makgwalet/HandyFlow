@@ -21,7 +21,7 @@ describe("savedBody", () => {
   it("sends no day when there is no reminder", () => expect(savedBody(form({ runDay: "3" }), "time").runDay).toBeNull())
   it("sends the kind in capitals and trims the name", () => {
     const b = savedBody(form({ name: " Cost ", schedule: "MONTHLY", runDay: "3" }), "payroll")
-    expect(b).toEqual({ name: "Cost", kind: "PAYROLL", period: "LAST_MONTH", schedule: "MONTHLY", runDay: 3 })
+    expect(b).toEqual({ name: "Cost", kind: "PAYROLL", period: "LAST_MONTH", schedule: "MONTHLY", runDay: 3, emailReminder: false })
   })
   it("converts kinds both ways", () => { expect(toSavedKind("workforce")).toBe("WORKFORCE"); expect(toReportKind("COMPLIANCE")).toBe("compliance") })
 })

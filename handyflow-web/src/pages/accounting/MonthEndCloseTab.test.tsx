@@ -15,10 +15,11 @@ const list = (items: any[], over: any = {}) => ({ data: { data: { periodEnd: "20
 const show = (c: any) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{c}</QueryClientProvider>)
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date(2026, 9, 10, 12)) // the fixtures describe September, so "today" is early October
   perms = new Set(["ACCOUNTING_READ", "ACCOUNTING_MANAGE", "ACCOUNTING_ADMIN"])
   get.mockReset(); post.mockReset(); del.mockReset(); post.mockResolvedValue({ data: {} }); del.mockResolvedValue({ data: {} })
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.useRealTimers() })
 
 describe("MonthEndCloseTab", () => {
   it("shows what is left and keeps Close disabled", async () => {

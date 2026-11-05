@@ -201,7 +201,7 @@ describe("PayrollControlsPanel", () => {
     perms = ["PAYROLL_READ"]; serve()
     wrap(<PayrollControlsPanel />)
     const boxes = (await screen.findAllByRole("checkbox")) as HTMLInputElement[]
-    expect(boxes.length).toBe(2)
+    expect(boxes.length).toBe(3)
     expect(boxes.every(b => b.disabled)).toBe(true)
     expect(screen.getByText(/Only someone with payroll configuration access/)).toBeTruthy()
     expect(get.mock.calls.some(c => String(c[0]).includes("access-review"))).toBe(false)

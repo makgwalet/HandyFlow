@@ -135,7 +135,7 @@ describe("required training", () => {
   it("lists people with something to put right first and can hide the rest", async () => {
     wrap(<RequiredTrainingTab />)
     await screen.findByText(/required certificates/)
-    const names = () => screen.getAllByRole("row").slice(2).map(r => r.textContent ?? "")
+    const names = () => screen.getAllByRole("row").map(r => r.textContent ?? "").filter(t => /Anele Dube|Zodwa Ndlovu/.test(t))
     expect(names()[0]).toContain("Anele Dube")
     fireEvent.click(screen.getByLabelText("Only people with something to put right"))
     expect(screen.queryByText("Zodwa Ndlovu")).toBeNull()
