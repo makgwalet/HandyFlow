@@ -16,7 +16,7 @@ const emp = (over: Partial<Emp201> = {}): Emp201 => ({
   runIssued: true, ...over,
 })
 
-beforeEach(() => post.mockReset())
+beforeEach(() => { post.mockReset() })   // braces matter: returning the mock makes vitest call it again after the test
 afterEach(cleanup)
 
 describe("several returns in one month", () => {
