@@ -48,6 +48,30 @@ public class ReceiptController {
                 receiptService.refund(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
     }
 
+    @GetMapping("/refunds/pending")
+    @PreAuthorize("hasAuthority('INVOICE_REFUND')")
+    @Operation(summary = "Refunds waiting for a second person to approve them")
+    public ResponseEntity<ApiResponse<List<PendingRefundResponse>>> pendingRefunds() {
+        return ResponseEntity.ok(ApiResponse.success("Success", receiptService.pendingRefunds(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/refunds/{refundId}/approve")
+    @PreAuthorize("hasAuthority('INVOICE_REFUND')")
+    @Operation(summary = "Approve a refund a colleague asked for; it is paid and posted now. Not the person who asked for it, unless nobody else can.")
+    public ResponseEntity<ApiResponse<ReceiptResponse>> approveRefund(@PathVariable UUID refundId) {
+        return ResponseEntity.ok(ApiResponse.success("Refund approved",
+                receiptService.approveRefund(TenantContext.getTenantIdAsObject(), refundId, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/refunds/{refundId}/reject")
+    @PreAuthorize("hasAuthority('INVOICE_REFUND')")
+    @Operation(summary = "Decline a refund that is waiting for approval, with a reason; the credit is released")
+    public ResponseEntity<ApiResponse<ReceiptResponse>> rejectRefund(@PathVariable UUID refundId, @RequestBody RefundRejectRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Refund declined",
+                receiptService.rejectRefund(TenantContext.getTenantIdAsObject(), refundId, TenantContext.getCurrentUserId(),
+                        req != null ? req.reason() : null)));
+    }
+
     @GetMapping("/invoices/{invoiceId}/credit")
     @PreAuthorize("hasAuthority('INVOICE_READ')")
     @Operation(summary = "Credit that came from this invoice's credit notes (a walk-in client's credit is found here)")

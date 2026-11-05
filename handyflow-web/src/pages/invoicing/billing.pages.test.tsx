@@ -245,6 +245,20 @@ describe('InvoiceDetailPage', () => {
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/v1/invoicing/receipts/r9/refunds',
       { amount: 40, bankAccountId: 'b1', reference: undefined, reason: 'Returned the goods' }))
   })
+  it("tells the person when a refund is waiting for a second approver instead of paid", async () => {
+    perms.add('INVOICE_REFUND')
+    api.post.mockResolvedValue({ data: { data: { refunds: [{ id: 'f1', status: 'ISSUED' }, { id: 'f2', status: 'PENDING' }] } } })
+    open(invoice({ customerId: null, walkinClientName: 'Sipho', status: 'PAID', amountPaid: 115 }), {
+      '/invoices/i1/credit': { data: { data: [{ id: 'r9', receiptNumber: 'RC-0009', available: 40 }] } },
+      '/accounting/bank-accounts': { data: { data: [{ id: 'b1', bankName: 'FNB', accountName: 'Cheque', accountNumber: '62001234', active: true, accountId: 'gl1' }] } } })
+    fireEvent.click(await screen.findByRole('button', { name: /Refund credit \(R 40,00\)/ }))
+    const d = screen.getByRole('dialog')
+    await within(d).findByRole('option', { name: /FNB/ })
+    fireEvent.change(within(d).getByLabelText('Reason'), { target: { value: 'Returned the goods' } })
+    fireEvent.click(within(d).getByRole('button', { name: 'Record refund' }))
+    expect(await screen.findByText(/someone else with refund permission has to approve it/)).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'Refund sent for approval' })).toBeTruthy()
+  })
   it('shows retainer hours with an overage warning and offers Log hours', async () => {
     perms.add('INVOICE_CREATE')
     open(invoice({ invoiceType: 'RETAINER', committedHours: 100, hoursConsumed: 112.5, ratePerHour: 500 }))

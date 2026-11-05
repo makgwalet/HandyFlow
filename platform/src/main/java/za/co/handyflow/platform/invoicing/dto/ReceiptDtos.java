@@ -34,8 +34,16 @@ public final class ReceiptDtos {
     /** Finance patch F9: money paid back to a customer out of a receipt's credit. */
     public record RefundRequest(BigDecimal amount, LocalDate refundedOn, UUID bankAccountId, String reference, String reason) {}
 
+    /** status: PENDING (waiting for a second person), ISSUED or REJECTED. */
     public record RefundResponse(UUID id, String refundNumber, BigDecimal amount, LocalDate refundedOn, UUID bankAccountId,
-                                 String reference, String reason, Instant createdAt) {}
+                                 String reference, String reason, Instant createdAt,
+                                 String status, UUID requestedBy, UUID decidedBy, String rejectionReason) {}
+
+    public record RefundRejectRequest(String reason) {}
+
+    /** A refund waiting for a second person, for the approvals list. */
+    public record PendingRefundResponse(UUID id, String refundNumber, UUID receiptId, String receiptNumber, BigDecimal amount,
+                                        String reason, UUID requestedBy, String requestedByName, Instant createdAt) {}
 
     public record OpenInvoice(UUID id, String invoiceNumber, LocalDate dueDate, BigDecimal total, BigDecimal amountPaid,
                               BigDecimal creditedAmount, BigDecimal balanceDue, String status) {}

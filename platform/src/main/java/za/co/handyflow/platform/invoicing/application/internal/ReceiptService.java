@@ -14,6 +14,7 @@ import za.co.handyflow.platform.invoicing.domain.repository.InvoiceRepository;
 import za.co.handyflow.platform.invoicing.dto.ReceiptDtos.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
+import za.co.handyflow.platform.shared.SeparationOfDutiesChecker;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
@@ -41,6 +42,10 @@ public class ReceiptService {
     private final InvoiceRepository invoiceRepo;
     private final TenantNumberingFacade numbering;
     private final ApplicationEventPublisher events;
+    private final SeparationOfDutiesChecker duties;
+
+    /** Whoever holds this can ask for a refund and can approve one a colleague asked for. */
+    static final String REFUND_PERMISSION = "INVOICE_REFUND";
 
     // ── Recording money ───────────────────────────────────────────────────────
 
@@ -128,11 +133,13 @@ public class ReceiptService {
                 (rs, n) -> new AllocationResponse(rs.getObject(1, UUID.class), rs.getString(2), rs.getBigDecimal(3),
                         rs.getTimestamp(4).toInstant()), id, tenantId.getValue());
         List<RefundResponse> refunds = jdbc.query("""
-                SELECT id, refund_number, amount, refunded_on, bank_account_id, reference, reason, created_at
+                SELECT id, refund_number, amount, refunded_on, bank_account_id, reference, reason, created_at,
+                       status, created_by, decided_by, rejection_reason
                   FROM customer_refunds WHERE receipt_id = ? AND tenant_id = ? ORDER BY created_at""",
                 (rs, n) -> new RefundResponse(rs.getObject(1, UUID.class), rs.getString(2), rs.getBigDecimal(3),
                         rs.getDate(4).toLocalDate(), rs.getObject(5, UUID.class), rs.getString(6), rs.getString(7),
-                        rs.getTimestamp(8).toInstant()), id, tenantId.getValue());
+                        rs.getTimestamp(8).toInstant(), rs.getString(9), rs.getObject(10, UUID.class),
+                        rs.getObject(11, UUID.class), rs.getString(12)), id, tenantId.getValue());
         return r.toResponse(allocations, refunds);
     }
 
@@ -151,20 +158,109 @@ public class ReceiptService {
         BigDecimal amount = ReceiptRules.money(req.amount());
         UUID id = UUID.randomUUID();
         String number = numbering.next(tenantId, "REFUND", "RF");
+        // Maker/checker: money going out needs a second authorised person. When nobody else could approve it
+        // (a one-person business), it is issued now and the exception is written to the audit trail.
+        boolean needsSecondPerson = by != null && duties.otherHolders(tenantId, REFUND_PERMISSION, by) > 0;
         jdbc.update("""
                 INSERT INTO customer_refunds (id, tenant_id, refund_number, receipt_id, customer_id, amount, refunded_on,
-                                              bank_account_id, reference, reason, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                              bank_account_id, reference, reason, created_by, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 id, tenantId.getValue(), number, receiptId, r.customerId, amount, Date.valueOf(on), req.bankAccountId(),
-                trim(req.reference(), 100), trim(req.reason(), 500), by);
+                trim(req.reference(), 100), trim(req.reason(), 500), by, needsSecondPerson ? "PENDING" : "ISSUED");
         int updated = jdbc.update("UPDATE customer_receipts SET allocated = allocated + ? WHERE id = ? AND tenant_id = ? AND allocated + ? <= amount",
                 amount, receiptId, tenantId.getValue(), amount);
         if (updated != 1) throw bad("This credit has already been used or refunded", "OVER_ALLOCATED");
+        if (needsSecondPerson) {
+            // The credit is held back (allocated above) so it cannot be refunded or used twice; nothing is posted yet.
+            log.warn("[Invoicing] Refund {} R {} from receipt {} customer={} tenant={} asked for by={} waits for a second approver",
+                    number, amount, r.number, r.customerId, tenantId, by);
+            return get(tenantId, receiptId);
+        }
+        if (by != null) {
+            duties.recordSoleException(tenantId, by, REFUND_PERMISSION, "REFUND", id,
+                    "issued a refund with no second person able to approve it");
+        }
         events.publishEvent(za.co.handyflow.platform.invoicing.RefundIssuedEvent.of(tenantId, id, number, r.number,
                 r.customerId, amount, req.bankAccountId(), on, trim(req.reference(), 100)));
         log.warn("[Invoicing] Refund {} R {} from receipt {} customer={} tenant={} by={} reason={}",
                 number, amount, r.number, r.customerId, tenantId, by, req.reason());
         return get(tenantId, receiptId);
+    }
+
+    /** Refunds waiting for a second person, oldest first. */
+    @Transactional(readOnly = true)
+    public List<PendingRefundResponse> pendingRefunds(TenantId tenantId) {
+        return jdbc.query("""
+                SELECT f.id, f.refund_number, f.receipt_id, r.receipt_number, f.amount, f.reason, f.created_by,
+                       trim(coalesce(u.first_name, '') || ' ' || coalesce(u.last_name, '')), f.created_at
+                  FROM customer_refunds f
+                  JOIN customer_receipts r ON r.id = f.receipt_id
+                  LEFT JOIN users u ON u.id = f.created_by
+                 WHERE f.tenant_id = ? AND f.status = 'PENDING' ORDER BY f.created_at""",
+                (rs, n) -> new PendingRefundResponse(rs.getObject(1, UUID.class), rs.getString(2), rs.getObject(3, UUID.class),
+                        rs.getString(4), rs.getBigDecimal(5), rs.getString(6), rs.getObject(7, UUID.class), rs.getString(8),
+                        rs.getTimestamp(9).toInstant()), tenantId.getValue());
+    }
+
+    /** A refund waiting for its second person. */
+    private record PendingRefund(UUID id, String number, UUID receiptId, String receiptNumber, UUID customerId, BigDecimal amount,
+                                 LocalDate refundedOn, UUID bankAccountId, String reference, UUID requestedBy) {}
+
+    private PendingRefund pendingRefund(TenantId tenantId, UUID refundId) {
+        PendingRefund f = jdbc.query("""
+                SELECT f.id, f.refund_number, f.receipt_id, r.receipt_number, f.customer_id, f.amount, f.refunded_on,
+                       f.bank_account_id, f.reference, f.created_by, f.status
+                  FROM customer_refunds f JOIN customer_receipts r ON r.id = f.receipt_id
+                 WHERE f.id = ? AND f.tenant_id = ? FOR UPDATE OF f""",
+                (rs, n) -> new Object[] {
+                        new PendingRefund(rs.getObject(1, UUID.class), rs.getString(2), rs.getObject(3, UUID.class), rs.getString(4),
+                                rs.getObject(5, UUID.class), rs.getBigDecimal(6), rs.getDate(7).toLocalDate(),
+                                rs.getObject(8, UUID.class), rs.getString(9), rs.getObject(10, UUID.class)),
+                        rs.getString(11) },
+                refundId, tenantId.getValue()).stream().findFirst()
+                .map(o -> {
+                    if (!"PENDING".equals(o[1])) throw bad("This refund has already been decided", "REFUND_DECIDED");
+                    return (PendingRefund) o[0];
+                })
+                .orElseThrow(() -> new ResourceNotFoundException("Refund", refundId.toString()));
+        return f;
+    }
+
+    /**
+     * The second person approves: the refund is issued and posted (Dr Accounts Receivable, Cr the bank). Refused when
+     * the approver is the person who asked for it and someone else could have approved; when nobody else holds the
+     * permission any more, it is allowed and written to the audit trail.
+     */
+    @Transactional
+    public ReceiptResponse approveRefund(TenantId tenantId, UUID refundId, UUID by) {
+        PendingRefund f = pendingRefund(tenantId, refundId);
+        duties.require(tenantId, REFUND_PERMISSION, f.requestedBy(), by,
+                "A refund has to be approved by someone other than the person who asked for it",
+                "REFUND", refundId, "approved a refund they asked for themselves");
+        int updated = jdbc.update("""
+                UPDATE customer_refunds SET status = 'ISSUED', decided_by = ?, decided_at = now()
+                 WHERE id = ? AND tenant_id = ? AND status = 'PENDING'""", by, refundId, tenantId.getValue());
+        if (updated != 1) throw bad("This refund has already been decided", "REFUND_DECIDED");
+        events.publishEvent(za.co.handyflow.platform.invoicing.RefundIssuedEvent.of(tenantId, f.id(), f.number(), f.receiptNumber(),
+                f.customerId(), f.amount(), f.bankAccountId(), f.refundedOn(), f.reference()));
+        log.warn("[Invoicing] Refund {} R {} approved by={} (asked for by={}) tenant={}", f.number(), f.amount(), by, f.requestedBy(), tenantId);
+        return get(tenantId, f.receiptId());
+    }
+
+    /** Declines a refund (any holder may, including the person who asked, to withdraw it); the held credit is released. */
+    @Transactional
+    public ReceiptResponse rejectRefund(TenantId tenantId, UUID refundId, UUID by, String reason) {
+        PendingRefund f = pendingRefund(tenantId, refundId);
+        String why = reason == null ? "" : reason.trim();
+        if (why.isEmpty()) throw bad("Say why the refund is not being paid", "REASON_REQUIRED");
+        int updated = jdbc.update("""
+                UPDATE customer_refunds SET status = 'REJECTED', decided_by = ?, decided_at = now(), rejection_reason = ?
+                 WHERE id = ? AND tenant_id = ? AND status = 'PENDING'""", by, trim(why, 500), refundId, tenantId.getValue());
+        if (updated != 1) throw bad("This refund has already been decided", "REFUND_DECIDED");
+        jdbc.update("UPDATE customer_receipts SET allocated = allocated - ? WHERE id = ? AND tenant_id = ? AND allocated >= ?",
+                f.amount(), f.receiptId(), tenantId.getValue(), f.amount());
+        log.warn("[Invoicing] Refund {} R {} rejected by={} tenant={} reason={}", f.number(), f.amount(), by, tenantId, why);
+        return get(tenantId, f.receiptId());
     }
 
     /** Credit that came from this invoice's credit notes (finance patch F9): where a walk-in client's credit is found. */

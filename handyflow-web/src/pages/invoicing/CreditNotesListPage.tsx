@@ -8,6 +8,7 @@ import { Download, FileMinus } from "lucide-react"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { fmtDate, fmtR, fmtRShort, isTruncated, LIST_LIMIT, matches, paginate, sortBy, type CreditNote, type SortDir } from "./billing.logic"
 import { downloadPdf, useAllCreditNotes } from "./queries"
+import RefundApprovals from "./RefundApprovals"
 import { BillingNav, Btn, Kpis, Loading, LoadError, Notice, Pager, SearchBox, StateBox, TableShell, Th, td, trStyle } from "./ui"
 
 export default function CreditNotesListPage() {
@@ -35,6 +36,7 @@ export default function CreditNotesListPage() {
     <div>
       <PageHeader title="Credit notes" icon={FileMinus} subtitle="Quotes, invoices, recurring billing and retainers" />
       <BillingNav />
+      <RefundApprovals />
       <Kpis items={[
         { label: "Credit notes issued", value: notes.length, icon: FileMinus, tone: "neutral" },
         { label: "Total credited", value: fmtRShort(notes.reduce((s, n) => s + Number(n.total || 0), 0)), hint: "including VAT", icon: FileMinus, tone: "warn" },

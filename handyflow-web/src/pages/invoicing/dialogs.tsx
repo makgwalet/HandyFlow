@@ -274,14 +274,18 @@ export function RefundDialog({ credits, onClose, onDone }: { credits: CreditSour
   const usable = credits.filter(c => Number(c.available) > 0)
   const [f, setF] = useState({ receiptId: usable[0]?.id ?? "", amount: String(usable[0]?.available ?? ""), bank: "", reference: "", reason: "" })
   const [err, setErr] = useState("")
+  const [sentForApproval, setSentForApproval] = useState(false)
   const chosen = usable.find(c => c.id === f.receiptId)
   const bank = f.bank || (accounts.length === 1 ? accounts[0].id : "")
   const save = useMutation({
     mutationFn: () => apiClient.post(`/api/v1/invoicing/receipts/${f.receiptId}/refunds`, {
       amount: Number(f.amount), bankAccountId: bank, reference: f.reference.trim() || undefined, reason: f.reason.trim() }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["customer-account"] }); qc.invalidateQueries({ queryKey: ["invoice-credit"] })
-      onDone?.(); onClose()
+    onSuccess: (res: any) => {
+      qc.invalidateQueries({ queryKey: ["customer-account"] }); qc.invalidateQueries({ queryKey: ["invoice-credit"] }); qc.invalidateQueries({ queryKey: ["pending-refunds"] })
+      onDone?.()
+      // The newest refund on the receipt tells us whether it was paid at once or is waiting for a second person.
+      const refunds: { status?: string }[] = res?.data?.data?.refunds ?? []
+      if (refunds.length > 0 && refunds[refunds.length - 1].status === "PENDING") setSentForApproval(true); else onClose()
     },
     onError: (e: any) => setErr(apiMessage(e, "The refund could not be recorded.")),
   })
@@ -294,6 +298,13 @@ export function RefundDialog({ credits, onClose, onDone }: { credits: CreditSour
       : f.reason.trim().length < 5 ? "Say why the money is refunded."
       : null
     if (m) setErr(m); else { setErr(""); save.mutate() }
+  }
+  if (sentForApproval) {
+    return (
+      <Dialog title="Refund sent for approval" onClose={onClose} footer={<Btn variant="primary" onClick={onClose}>Close</Btn>}>
+        <Notice tone="info">A refund pays money out of the business, so someone else with refund permission has to approve it before it is paid. The credit is held back until then.</Notice>
+      </Dialog>
+    )
   }
   return (
     <Dialog title="Refund credit" onClose={onClose} subtitle="Pay customer credit back. It is posted from the bank account you choose."
