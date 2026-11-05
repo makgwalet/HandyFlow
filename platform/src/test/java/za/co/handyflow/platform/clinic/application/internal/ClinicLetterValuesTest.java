@@ -48,6 +48,8 @@ class ClinicLetterValuesTest {
     void theChosenPractitionerSignsAVisitlessLetter() {
         var p = ClinicPatient.create(t, "Liam", "Botha", null, LocalDate.of(2019, 3, 12), null, null, null, null, null);
         var dr = ClinicPractitioner.create(t, "Priya", "Govender", "GP", "MP0123456", "PR998", null, null);
+        // full_name is a database-generated column, so an in-memory entity has none
+        org.springframework.test.util.ReflectionTestUtils.setField(dr, "fullName", "Priya Govender");
         when(patientRepo.findActiveById(t, p.getId())).thenReturn(Optional.of(p));
         when(profileRepo.findOne(t, p.getId())).thenReturn(Optional.empty());
         when(tenantFacade.findTenantDetails(t)).thenReturn(Optional.empty());

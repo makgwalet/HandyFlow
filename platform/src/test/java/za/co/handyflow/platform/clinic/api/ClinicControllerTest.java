@@ -294,7 +294,7 @@ class ClinicControllerTest {
                         .content("{\"overrideReason\":\"Patient left before diagnosis\"}"))
                 .andExpect(status().isOk());
 
-        verify(clinicService).signConsultation(any(TenantId.class), eq(id), eq("Patient left before diagnosis"));
+        verify(clinicService).signConsultation(any(TenantId.class), eq(id), eq("Patient left before diagnosis"), isNull());
     }
 
     @Test
@@ -305,7 +305,7 @@ class ClinicControllerTest {
         mvc.perform(post(BASE + "/consultations/" + id + "/sign").with(csrf()))
                 .andExpect(status().isOk());
 
-        verify(clinicService).signConsultation(any(TenantId.class), eq(id), isNull());
+        verify(clinicService).signConsultation(any(TenantId.class), eq(id), isNull(), isNull());
     }
 
     @Test

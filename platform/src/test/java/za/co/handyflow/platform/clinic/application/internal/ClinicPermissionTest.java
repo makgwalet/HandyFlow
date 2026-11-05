@@ -165,7 +165,8 @@ class ClinicPermissionTest {
                         && p != ClinicPermission.CLINIC_CLOSURE_MANAGE && p != ClinicPermission.CLINIC_CLAIM_PROGRESS
                         // granted to named people, never by a role template
                         && p != ClinicPermission.CLINIC_RESTRICTED_RECORD_ACCESS && p != ClinicPermission.CLINIC_BREAK_GLASS_PRINT
-                        && p != ClinicPermission.CLINIC_BREAK_GLASS_EXPORT)
+                        && p != ClinicPermission.CLINIC_BREAK_GLASS_EXPORT
+                        && p != ClinicPermission.CLINIC_DOCUMENT_SIGN_AS_OTHER)
                 .forEach(p -> assertTrue(inAny.contains(p), p + " is enforced on an endpoint but no role template can do it"));
     }
 

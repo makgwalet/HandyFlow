@@ -39,7 +39,8 @@ class ClinicIssuedDocumentControllerTest {
         verifyNoInteractions(service);
     }
 
-    @Test @WithMockUser(authorities = "CLINIC_DOCUMENT_VOID")
+    // the controller reads the user id from the security principal, so the mock user is named by a UUID
+    @Test @WithMockUser(username = "22222222-2222-4222-8222-222222222222", authorities = "CLINIC_DOCUMENT_VOID")
     void theVoidPermissionListsAndWithdraws() throws Exception {
         mvc.perform(get("/api/v1/clinic/issued-documents").param("type", "SICK_NOTE")).andExpect(status().isOk());
         mvc.perform(post("/api/v1/clinic/issued-documents/" + id + "/void").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Wrong patient\"}"))
