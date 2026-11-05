@@ -60,12 +60,16 @@ Rollback: each phase ships behind a configuration flag where behaviour changes (
 | D-14 | Withdraw Payroll Bureau from sale | yes/no | Yes until rebuilt | none |
 | D-15 | Payment gateway | PayFast / Peach / Paystack / Netcash / Ozow | Evaluate fees and recurring support | Phase E |
 | D-16 | Invoicing posting to Accounting without a subscription | allow / gate | Allow (accounting engine is the system of record), but show a paywall to *view* ledger reports | Phase B |
-| D-17 | Annual billing | now / later | Later | none |
+| D-17 | Annual billing | now / later | Later (June 2026: 17% base, 15% add-ons) | none |
 | D-18 | Retention and closure policy | | Needs tax/legal advice | Phase D |
 | D-19 | Top-up packs for usage | yes/no | No at launch | none |
 | D-20 | Enterprise future modules | auto-include / contract | Contract | none |
 | D-21 | Sole-user self-approval policy | per IAM doc | As approved (flag `self_approved`) | IAM Phase 1 |
-| D-22 | Bundle composition | per proposal | Validate with pilot customers | Phase E |
+| D-22 | Bundle composition | seven June packs / four families; price includes base plan or not | Start from the seven June packs; validate with pilot customers | Phase E |
+| D-23 | Professional free-module credit | keep (one module, cap R499, no Clinic) / replace by Free Core and bundles | Decide; if kept, meter it and enforce `included_module_count` | Phase B |
+| D-24 | Annual contract terms | June 2026 terms / revise | Legal review (auto-renew, no refund, early-termination fee, Consumer Protection Act) before any use | Phase E |
+| D-25 | Pause clause for seasonal tenants | yes / no | Defer | none |
+| D-26 | Difficult-tenant playbook | adopt / revise | Correct the CCMA reference, legal review, then use as an operations document | none |
 
 ## 4. Verification query for the live catalogue (read-only)
 Run against your database and send me the output:

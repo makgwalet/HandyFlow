@@ -7,7 +7,7 @@ Companion documents: `01_MODULE_CATALOGUE.md`, `02_PRICING_ARCHITECTURE.md`, `03
 
 | Item | Position |
 |---|---|
-| `HandyFlow Pricing Model Strategy - June 2026.docx` and `HandyFlow Platform Analysis.docx` | **Not available to me.** They are not in the repository, the claude.ai Project or the uploads. The repository holds only a 0-byte Word lock file (`~$NDYFLOW PRICING.docx`) and the 22 Oct audit already recorded the pricing document as missing. "Historical approach" below is therefore reconstructed from the seeded data, the code and the 22 Oct and 29 Oct audits. **Please upload both documents; section 2 must be checked against them before any decision is taken.** |
+| `HandyFlow_Pricing_Model_Strategy.docx` and `HandyFlow_Platform_Analysis_2026.docx` (June 2026) | **Received 5 Nov and read in full for pricing, plans, bundles, contracts, trials and enforcement.** Section 2 now compares them with the live code. Parts of the Platform Analysis that are not commercial (bug list, integration map, admin portal plan) were only skimmed. These are strategy documents, not specifications: they contain internal inconsistencies (section 2.1). |
 | Backend behaviour | Read from source on branch `feat/theme-token-phase0`. Compiled and unit-tested on your machine on 5 Nov (7,036 tests; 484 failures in other modules, see the test review), and the application starts against PostgreSQL 16. No billing scenario below was executed. |
 | Catalogue prices and keys | From Flyway migrations. The live `module_catalogue` table may differ (admin screens can edit prices in place). **Run the query in `04` section 4 and compare.** |
 | 22 Oct and 29 Oct audit findings | Inherited, not re-verified in this session unless marked "verified now". |
@@ -28,16 +28,30 @@ Companion documents: `01_MODULE_CATALOGUE.md`, `02_PRICING_ARCHITECTURE.md`, `03
 
 ## 2. Three positions
 
-| Topic | Historical (reconstructed) | Current direction (your brief) | Recommended |
-|---|---|---|---|
-| Base plan | Paid base plan (R599 / R1,299 / R2,999) plus paid modules | Platform plan governs seats and platform limits; price undecided | **Hybrid, with the entry tier included in the first paid module** (section 4) |
-| Free modules | Bookings, Events, Expenses free in the Essential plan JSON, yet priced R299 / R299 / R199 in the catalogue | CRM + Invoicing + Catalogue are a **conditional** Free Core | Conditional Free Core as a **derived** entitlement. Retire the plan-JSON module flags |
-| Professional free-module credit | Existed as an idea ("included_module_count") | Question raised | **Retire.** Free Core now serves the same purpose; a credit on top double-discounts |
-| Trial | 60 days, every module the tenant picks | 30 days, configured per tenant | **30 days** (needs approval, D-03); no all-module trial; extensions audited |
-| Volume discounts | 5 / 10 / 15 / 20% at 3 / 5 / 8 / 12 modules (live) | 10 / 15 / 20% at 2 / 3-4 / 5+ (proposal) | Keep the engine. Choose one schedule. **Prefer bundles over a volume ladder** (section 6 of `02`) |
-| Usage caps | Plan JSON only, unenforced | Quote and invoice caps; earlier proposal 25/15 free, 100/50, 500/250 | Build the meter first, set numbers after 90 days of data. Starting values in `02` |
-| Seats | 5 / 20 / unlimited, enforced on invite; expired pending invitations used to hold a seat (fixed in patch 0606) | 5 / 20 / 50 / negotiated | Count active users only; see `02` section 5 |
-| 29 Oct audit position | Business Core free with any paid module; Starter cap 50 invoices/quotes; band pricing for Finance, HR per employee, Accountant per client | (same direction) | The 29 Oct audit **already recommended conditional Core**; this assessment confirms it and adds the meter/entitlement design |
+| Topic | June 2026 strategy (actual) | Live code | Current brief | Recommended |
+|---|---|---|---|---|
+| Base plan | Essential R599 (5 users), Professional R1,299 (20), Enterprise R2,999 (unlimited). Annual: R499 / R1,082 / R2,499 per month (17% off). CRM and Invoicing in every plan | Seeded as written | Platform plan governs seats and limits; price open; Free Core **conditional** on one paid module | **Hybrid**: Starter included with the first paid module; Growth and Business carry a platform fee. The June plans are the natural Growth/Business starting prices, to be checked against cost (D-02) |
+| Free modules | Essential 0, Professional 1 credit (capped at R499 so Clinic at R749 is excluded), Enterprise all | Plan JSON also flags Bookings, Events and Expenses as free while they are priced R299 / R299 / R199; `included_module_count` is never enforced (the Platform Analysis itself asks whether it means "included in price" or "maximum allowed") | Not mentioned | Credit is a legitimate June design, not an accident. Replace the credit by Free Core plus bundles **or keep it as an explicit entitlement line** (D-23). Either way remove the plan-JSON flags |
+| Volume discount | Add-ons only: 2 = 10%, 3-4 = 15%, 5+ = 20%. Hard cap 20%. Never above 20% without an Enterprise talk | **3 / 5 / 8 / 12 modules = 5 / 10 / 15 / 20%** | 10 / 15 / 20% at 2 / 3-4 / 5+ (matches June) | The brief matches June, the code does not. Align the code to the June ladder only if you keep a ladder (D-09). The 20% ceiling reason (stay below Enterprise) is sound and should be kept |
+| Stacking | Volume and annual do **not** stack; the higher applies once; best single discount | Best single discount, no stacking (partnership, volume, code) | | Same rule. Keep. Add ANNUAL as a discount source |
+| Annual contracts | Offered. 17% off base, 15% off add-ons. Auto-renew with 60 days notice. Price locked until renewal. No partial refunds | `billing_model` allows ANNUAL in schema, unused | | Offer after monthly billing is stable. Terms need legal review (D-24) |
+| Pause clause | Max 2 months per 12, 7 days notice, modules stop billing, base plan at 25% | Not built | | Optional, seasonal sectors (events, agriculture). Defer (D-25) |
+| Trial | 60-day pilot | 60, hard-coded in three places | 30 days, per tenant | 30 days (D-03). Note the June *annual-offer script* is timed to pilot end; move it to day 20-25 of 30 |
+| Cancellation | PILOT, ACTIVE, PAST_DUE, SUSPENDED, CANCELLED; day-30 cancel; **90-day data retention then deletion**; self-service export on Professional, assisted on Enterprise | Same states; no export, no retention job | 30-day read-only transition | Two different things: **retention after closure** (June: 90 days) and **read-only transition after losing the last paid module** (brief: 30 days). Keep both and name them separately (D-04, D-18). The 90 days is not a legal retention period (D-18) |
+| Bundles | Seven industry packs, **including the base plan**, 16-22% off (Security Ops R1,149, Mining & Plant R1,199, Finance Pro R1,299, Agency Studio R999, Property Manager R1,299, Clinic Practice R1,199, People & Talent R999) | None built | Four bundle families proposed | Take the seven June packs as the starting list. Decide whether a bundle price includes the base plan (June) or sits on top (D-22) |
+| Enterprise | All modules, **including every future module**, 4h SLA, dedicated manager | Unlimited users | Contract-listed modules | Keep as a contract, not an automatic grant (D-20). June promises "every module we ever release"; that is an open-ended liability |
+| Enforcement | Sprint 2 plan: user limit on invite (done), module activation limit, "never block module activation to force an upgrade" | User limit only | Caps on quotes/invoices | Consistent with soft caps and an upgrade prompt |
+| Difficult tenants | Written playbook: dispute, chargeback, annual cancellation, refund | None in product | | Keep as an operations document, add a legal review before use |
+
+### 2.1 Inconsistencies inside the June documents (to fix before reuse)
+
+1. **Discount at two add-ons.** The worked example in the Pricing Strategy applies 10% at two modules; its "Question 1" answer says "if 2 modules: no volume discount yet"; its annual combination table says 10% at two modules. Pick one.
+2. **Totals disagree.** The same example is shown as R2,871, R2,869.95 and R2,869. Rounding or a different add-on list; recompute from the catalogue.
+3. **Dunning timeline.** PAST_DUE starts on day 8 with a 7-day grace, so grace ends on day 15, yet the timeline says day 14. Non-payment also ends in CANCELLED at day 30 with 90-day retention, whereas the code stops at SUSPENDED and never cancels automatically.
+4. **Credit meaning.** The Platform Analysis asks whether `included_module_count` means "included in price" or "total allowed" and proposes Essential 1 and Professional 2; the Pricing Strategy says Essential 0 and Professional 1. The Pricing Strategy is the later, more specific document and is used here.
+5. **Unsourced claim.** "Zendesk tried forced tier upgrades in 2019 and saw a 23% increase in churn" is not supported by any source I can check. Do not repeat it externally.
+6. **Legal remarks.** The playbook suggests the CCMA for small debts. The CCMA deals with employment disputes, not customer debts. This must be corrected by a lawyer (small claims or magistrate's court is the usual route). Contract wording, refund rules and the early-termination fee also need legal and Consumer Protection Act review.
+7. **Enterprise arithmetic.** The "upgrade to Enterprise" sales message relies on a R128 difference between R2,871 and R2,999. That comparison holds only for that one add-on list.
 
 **Contradiction to resolve:** on 4 Nov you approved "CRM, Invoicing and Catalogue are free entry tiers". Today's brief says Free Core is **conditional on one paid module**. I have treated today's brief as current and updated the IAM documents accordingly (`ENTITLEMENT_TIERS_AND_GAPS.md` section 2 item 2 and the free-tier points). A tenant with no paid module and no trial then has **no ongoing access**, which affects sole proprietors who only want invoicing. That is a commercial choice, see D-01.
 
@@ -80,9 +94,10 @@ Why not the other two: **Option 1** (paid platform plan plus modules) taxes the 
 2. **Target architecture:** `03`. One entitlement snapshot per tenant, derived from module subscriptions, trials, derived Free Core, promotions and enterprise contracts; a feature catalogue; usage meters with append-only events and per-period counters; entitlement events for audit.
 3. **Module catalogue reconciliation:** `01`.
 4. **Most important P0 and P1 gaps:** `04` section 1.
-5. **Decisions needing approval:** `04` section 3 (D-01 to D-22).
+5. **Decisions needing approval:** `04` section 3 (D-01 to D-26).
 6. **Roadmap:** `04` section 2.
-7. **Retain / change from the historical approach:**
-   * Retain: monthly module pricing in a catalogue; the non-stacking best-discount rule and the "lock the discount at activation" decision; the PAST_DUE then SUSPENDED sequence with a 7-day grace; module trials capped to the account trial; statutory features never tiered.
-   * Change: the 60-day trial; the four entitlement sources; plan-JSON module flags; unenforced usage limits; R0 catalogue rows; in-place price edits (version the price book); the free-module credit; manual-only payment recording.
-   * Retire: the Professional free-module credit, per-plan module booleans, `FeatureEntitlement` as implemented (unused), the volume ladder once bundles exist.
+7. **Retain / change from the June 2026 approach:**
+   * Retain: monthly module pricing in a catalogue; the three base plans as the starting point for Growth and Business; add-on-only discounts with a 20% ceiling; the non-stacking best-discount rule and locking the discount at activation; price lock during a contract; the two-track (monthly default, annual with incentive) idea; the PAST_DUE then SUSPENDED sequence with a 7-day grace; module trials capped to the account trial; "never block module activation to force an upgrade"; statutory features never tiered.
+   * Change: the 60-day trial (30 days proposed); the volume ladder in code (3/5/8/12 at 5/10/15/20%) to the June ladder or to bundles; the four entitlement sources; plan-JSON module flags; unenforced usage limits and the unenforced module credit; R0 catalogue rows; in-place price edits (version the price book); manual-only payment recording; "Enterprise includes every future module".
+   * Add: conditional Free Core; usage metering; a read-only transition; separate retention after closure; a legal review of the annual terms, pause clause and playbook.
+   * Reconsider rather than retire: the Professional module credit (D-23). The earlier draft of this document said "retire"; the June strategy defines it carefully (one module, capped at R499, Clinic excluded), so it is a decision, not a leftover.

@@ -105,11 +105,26 @@ Existing engine: partnership > volume > code, best single discount, none stack, 
 4. **Promotions** have start, end, eligibility, redemption limit and cannot grant access beyond what price pays for; they affect price, never permissions.
 5. **Enterprise**: a contract record lists modules and limits; future modules are **not** automatically included (they must be added to the contract). All-modules access is a negotiated product, not a default.
 6. **Grandfathering**: the price lives on the subscription row as a snapshot; the catalogue price can change without touching existing subscribers. Version the price book (today prices are edited in place).
-7. **Annual**: schema allows `ANNUAL`, unused; offer with a clear discount after monthly billing is stable.
-8. **Professional free-module credit**: retire.
+7. **Annual**: schema allows `ANNUAL`, unused. June 2026 proposes 17% off base plans and 15% off add-ons, auto-renew with 60 days notice, price lock, no partial refunds. Offer after monthly billing is stable; terms need legal review (D-24).
+8. **Professional free-module credit**: June 2026 defines one credit, capped at R499 (Clinic excluded). Decide between replacing it with Free Core plus bundles or keeping it as an explicit, metered entitlement (D-23). Do not keep both unexamined, and remove the plan-JSON module flags either way.
 
 ## 9. Information needed to set real prices
 Hosting and database cost per tenant; storage, SMS, e-mail and AI cost per tenant per month; support hours per tenant; payment fees; competitor prices per module for South Africa (Xero, Sage, Zoho, SimplePay data exists in the 29 Oct audit; none for audit, tender, bureau or clinic); target margin; expected modules per tenant; churn assumptions; pilot customers' willingness to pay.
 
 ## 10. Enterprise model
 Named contract with modules, seats, limits, support level, term, price, and renewal. Negotiated items: SSO, retention terms, dedicated support, SLA, custom limits. Governance (maker-checker, scoped access) is part of the IAM roadmap, not a paid-only extra for basic security.
+
+## 11. Reconciliation with the June 2026 Pricing Strategy
+
+| Item | June 2026 | This document | Action |
+|---|---|---|---|
+| Plans | R599 / R1,299 / R2,999, 5 / 20 / unlimited users | Starter / Growth / Business / Enterprise | Map Essential to Starter and Professional to Growth as a starting point; Business is new. Price Starter at nil only with a paid module (D-02) |
+| Volume ladder | 10 / 15 / 20% at 2 / 3-4 / 5+, add-ons only, 20% cap | Live code 5 / 10 / 15 / 20% at 3 / 5 / 8 / 12 | One schedule, applied to add-ons only (D-09) |
+| Annual | 17% base, 15% add-ons, no stacking with volume | Deferred | Add `ANNUAL` as a discount source when built |
+| Pause | 2 months per year, base at 25% | Not proposed | Optional (D-25) |
+| Retention | 90 days after cancellation, export self-service on Professional | Transition 30 days read-only | Two separate periods; retention length needs advice (D-18) |
+| Bundles | 7 packs including base plan, 16-22% off | 4 families, bundles replace the ladder | Use the 7 packs as a first list (D-22) |
+| Enterprise | Includes all future modules | Contract-listed | Contract (D-20) |
+| Playbook | Disputes, chargebacks, annual cancellation, refunds | Not covered | Operations document after legal review (D-26) |
+
+Prices in the June documents (module prices, bundle totals) are inputs, not verified against the live `module_catalogue`; run the queries in `04` section 4 first.

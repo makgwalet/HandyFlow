@@ -121,3 +121,20 @@ I did not produce a per-feature matrix for all 41 modules. Doing so honestly nee
 ## 5. Shared services consumed (from the 22 Oct dependency map)
 
 Billing (28 importers), notifications (30), accounting (17), evidence (17), identity (17), approvals (8), hr (9), crm (7), invoicing (4). Hard dependencies from code: `fuel`→`fleet`; `pos`→`catalogue`, `accounting`; `invoicing`→`catalogue`, `crm`; `supplychain`→`ap`; `legalcompliance`→`debtcollection`, `contracting`; `agriculture`→`hr`, `supplychain`, `fleet`, `fuel`, `invoicing`; `earthmoving`→`crm`, `contracting`, `projects`, `invoicing`. Invoicing events post to Accounting **regardless of an Accounting subscription**; that is an integration, not a hard dependency, and should stay so. Examples in your brief that the code does **not** show: Earthmoving→Fleet, Fleet→Accounting, Legal Practice→Debt Collection (22 Oct). The remaining pairs in your list are UNKNOWN until each is checked.
+
+## Target customers (from the June 2026 Platform Analysis, section 7.2)
+
+These are the segments the platform was positioned for, useful for bundle design and for deciding which modules are core to a segment. They are marketing positions, not validated demand.
+
+| Segment | Modules the analysis pairs |
+|---|---|
+| Earthmoving contractor | Fleet, Fuel, Earthmoving, Invoicing |
+| Security company (PSiRA) | Security, Fleet, Invoicing, HR |
+| Accounting firm | Accountant |
+| Property manager | Property, Contracts, Invoicing |
+| Creative agency | Creative, Contracts, Tasks, Marketing |
+| Growing retail store | POS, Catalogue, Expenses, Invoicing |
+| GP practice | Clinic, Bookings, Invoicing |
+| Mining operation | Fuel, Earthmoving, Security |
+
+Note that the Platform Analysis names Marketing as part of the Creative bundle, which supports a decision to keep it (D-08) even though it is not in the 41-module brief.
