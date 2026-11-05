@@ -37,7 +37,9 @@ public enum AssetStatus {
     private static final Map<AssetStatus, Set<AssetStatus>> ALLOWED_TRANSITIONS = new EnumMap<>(AssetStatus.class);
 
     static {
-        ALLOWED_TRANSITIONS.put(AVAILABLE, EnumSet.of(DEPLOYED, MAINTENANCE, HIRED_OUT, RETIRED));
+        // BREAKDOWN is legal from AVAILABLE: a critical incident on an idle machine must take it out of service,
+        // otherwise it stays deployable (EarthmovingIncidentService.maybeAutoBreakdown relies on this).
+        ALLOWED_TRANSITIONS.put(AVAILABLE, EnumSet.of(DEPLOYED, MAINTENANCE, BREAKDOWN, HIRED_OUT, RETIRED));
         ALLOWED_TRANSITIONS.put(DEPLOYED, EnumSet.of(AVAILABLE, BREAKDOWN, MAINTENANCE));
         ALLOWED_TRANSITIONS.put(MAINTENANCE, EnumSet.of(AVAILABLE, BREAKDOWN, RETIRED));
         ALLOWED_TRANSITIONS.put(BREAKDOWN, EnumSet.of(AVAILABLE, MAINTENANCE, RETIRED));  // AVAILABLE = released after repair (needs EARTHMOVING_RELEASE, a reason, no open critical incident)
