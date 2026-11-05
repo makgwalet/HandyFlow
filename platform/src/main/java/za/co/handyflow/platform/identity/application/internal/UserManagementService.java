@@ -131,6 +131,7 @@ public class UserManagementService {
             Set<String> before = user.getRoles().stream().map(Role::getName).collect(Collectors.toCollection(TreeSet::new));
             user.clearRoles();
             user.assignRole(role);
+            tokenVersions.bump(tenantId.getValue());
             auditService.record(tenantId, "USER_ROLE_CHANGED", "USER", user.getId(), user.getEmail(),
                     Map.of("roles", before), Map.of("roles", Set.of(role.getName())));
         }

@@ -48,6 +48,19 @@ public class ModuleService {
 
     // ── Catalogue ─────────────────────────────────────────────────────────────
 
+    /**
+     * A module change changes what the tenant's tokens may carry, so earlier tokens go
+     * stale (tenants.token_version, the "tcv" claim). Plain SQL keeps billing free of an
+     * identity dependency, and a failure here never blocks the module change.
+     */
+    private void invalidateTokens(TenantId tenantId) {
+        try {
+            jdbc.update("UPDATE tenants SET token_version = token_version + 1 WHERE id = ?", tenantId.getValue());
+        } catch (Exception e) {
+            log.warn("TOKEN-VERSION could not bump tenant {}: {}", tenantId, e.getMessage());
+        }
+    }
+
     @Transactional(readOnly = true)
     public List<ModuleCatalogueResponse> getCatalogue() {
         return catalogueRepo.findAllActive().stream()
@@ -71,6 +84,7 @@ public class ModuleService {
                                                int trialDays,
                                                String discountCode,
                                                UUID activatedBy) {
+        invalidateTokens(tenantId);
         // Validate module exists
         ModuleCatalogue catalogue = catalogueRepo.findByKey(moduleKey)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -185,6 +199,7 @@ public class ModuleService {
 
     @Transactional
     public void cancelModule(TenantId tenantId, String moduleKey) {
+        invalidateTokens(tenantId);
         tenantModuleRepo.findByTenantAndKey(tenantId.getValue(), moduleKey)
                 .ifPresent(m -> {
                     m.cancel();
@@ -214,6 +229,7 @@ public class ModuleService {
     // through jdbc directly.
     @Transactional
     public void cancelAllTrialModules(TenantId tenantId) {
+        invalidateTokens(tenantId);
         List<String> trialModuleKeys = jdbc.queryForList(
                 "SELECT module_key FROM tenant_modules WHERE tenant_id = ? AND status = 'TRIAL'",
                 String.class, tenantId.getValue());

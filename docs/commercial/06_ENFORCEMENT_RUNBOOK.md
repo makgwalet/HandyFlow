@@ -67,4 +67,4 @@ Changing a role's permissions bumps the tenant's version. A token with an older 
 - When true, a stale token is treated as unauthenticated (401). The web app's refresh flow mints a fresh token with the current version, so users should not notice. Confirm that the frontend retries after a 401 before turning it on.
 - Tokens issued before this change have no claim and count as 0, so the first bump for a tenant makes all of its old tokens stale.
 - The version is cached for 10 seconds per instance. A bump clears the cache on the instance that made it; other instances catch up within 10 seconds.
-- Not yet bumped by: user role assignment, module entitlement changes. Add `TokenVersions.bump(tenantId)` there when wanted.
+- The version is bumped by: role permission edits, a user's role change, and module activation or cancellation (including cancelling all trial modules). Not yet by: user deactivation (refresh tokens are already revoked there) or plan changes outside the module endpoints.
