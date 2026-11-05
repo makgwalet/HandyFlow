@@ -20,6 +20,7 @@ import java.util.UUID;
 class ApDutyChecks {
 
     private final JdbcTemplate jdbc;
+    private final za.co.handyflow.platform.shared.SeparationOfDutiesChecker sod;
 
     /** Active people in the tenant, other than {@code actor}, who hold {@code permission}. */
     long otherHolders(TenantId tenantId, String permission, UUID actor) {
@@ -41,8 +42,8 @@ class ApDutyChecks {
         String problem = ApDutyRules.problem(duty, earlier, actor, others);
         if (problem != null) throw new HandyFlowException(problem, HttpStatus.CONFLICT, "SAME_PERSON");
         if (ApDutyRules.soleException(earlier, actor, others)) {
-            log.warn("[AP] Separation of duties not possible, allowed: duty={} {} tenant={} user={} (nobody else holds {})",
-                    duty, what, tenantId, actor, permission);
+            // logged and written to the audit trail so the owner can show it (itemType is capped at 40 characters)
+            sod.recordSoleException(tenantId, actor, permission, "AP_" + duty.name(), null, "duty=" + duty + " " + what);
         }
     }
 }

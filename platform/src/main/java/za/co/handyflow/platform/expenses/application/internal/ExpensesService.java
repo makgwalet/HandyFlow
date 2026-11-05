@@ -201,7 +201,7 @@ public class ExpensesService {
         if (problem != null) {
             if (approvedBy == null) throw new IllegalStateException(problem);
             // submitter or payee: refused when another approver exists, allowed and logged when nobody else could approve
-            duties.requireIfConflict(tenantId, "EXPENSES_MANAGE", true, approvedBy, problem, "expense claim=" + claim.getClaimNumber());
+            duties.requireIfConflict(tenantId, "EXPENSES_MANAGE", true, approvedBy, problem, "EXPENSE_CLAIM", claim.getId(), "expense claim=" + claim.getClaimNumber());
         }
 
         ApprovalRequestResponse result = actOnPendingStep(tenantId, claim, approvedBy, "APPROVE", null);
@@ -275,7 +275,7 @@ public class ExpensesService {
         if (self != null) {
             String message = self.replace("approve", "pay out").replace("approved", "paid out");
             if (by == null) throw new IllegalStateException(message);
-            duties.requireIfConflict(tenantId, "EXPENSES_ADMIN", true, by, message, "expense payout claim=" + claim.getClaimNumber());
+            duties.requireIfConflict(tenantId, "EXPENSES_ADMIN", true, by, message, "EXPENSE_CLAIM", claim.getId(), "expense payout claim=" + claim.getClaimNumber());
         }
         boolean keepsBankAccounts = !accountingFacade.getBankAccounts(tenantId).isEmpty();
         if (bankAccountId == null && keepsBankAccounts)

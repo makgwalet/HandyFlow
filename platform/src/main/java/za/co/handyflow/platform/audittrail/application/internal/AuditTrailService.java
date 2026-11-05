@@ -44,16 +44,23 @@ public class AuditTrailService implements AuditTrailFacade {
 
     @Transactional(readOnly = true)
     public List<Event> list(TenantId tenantId, String itemType, UUID itemId, int limit) {
+        return list(tenantId, itemType, itemId, null, limit);
+    }
+
+    /** As above, optionally narrowed to one action (for example SOLE_APPROVER_SELF_APPROVAL). */
+    @Transactional(readOnly = true)
+    public List<Event> list(TenantId tenantId, String itemType, UUID itemId, String action, int limit) {
         int cap = Math.max(1, Math.min(limit, 500));
         return jdbc.query("""
                 SELECT id, actor_type, actor_id, actor_name, action, item_type, item_id, before_json::text, after_json::text, occurred_at
                 FROM audit_events
                 WHERE tenant_id = ? AND (?::text IS NULL OR item_type = ?) AND (?::uuid IS NULL OR item_id = ?)
+                  AND (?::text IS NULL OR action = ?)
                 ORDER BY occurred_at DESC, id LIMIT ?
                 """, (rs, i) -> new Event((UUID) rs.getObject(1), rs.getString(2), (UUID) rs.getObject(3), rs.getString(4),
                         rs.getString(5), rs.getString(6), (UUID) rs.getObject(7), rs.getString(8), rs.getString(9),
                         rs.getTimestamp(10).toInstant()),
-                tenantId.getValue(), itemType, itemType, itemId, itemId, cap);
+                tenantId.getValue(), itemType, itemType, itemId, itemId, action, action, cap);
     }
 
     @Override

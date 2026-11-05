@@ -269,7 +269,7 @@ public class AccountingService {
         if (entry.getCreatedBy() != null && postedBy == null)
             throw new HandyFlowException(JournalReviewRules.postProblem(entry.getCreatedBy(), null), HttpStatus.BAD_REQUEST, "SAME_PERSON");
         duties.require(tenantId, "ACCOUNTING_ADMIN", entry.getCreatedBy(), postedBy,
-                "You made this journal, so a different person must post it", "journal=" + entry.getEntryNumber());
+                "You made this journal, so a different person must post it", "JOURNAL", entry.getId(), "journal=" + entry.getEntryNumber());
         return doPost(tenantId, entry, postedBy);
     }
 

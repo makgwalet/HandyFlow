@@ -61,9 +61,9 @@ Dependencies: none. Risks: 0.6 can break screens that call `/identity/users` for
 | Expense claims (approve, pay out) | Submitter or payee could never approve or pay, same lock-out | Same checker (`EXPENSES_MANAGE`, `EXPENSES_ADMIN`) |
 | Payroll | Tenant setting `allowSelfApproval` | unchanged (a different, explicit mechanism) |
 | Sales refunds and credit notes (invoicing) | No maker/checker at all; a refund is issued in one step | **open**: needs a pending-approval state, so a design decision |
-| Persisting `self_approved` for the accountant report | AP and the new checker only log a warning | **open**: needs columns on each approvable table |
+| Persisting the sole-approver record for the accountant report | AP and the checker only logged a warning | Patch 0630: every sole-approver step is written to `audit_events` (action `SOLE_APPROVER_SELF_APPROVAL`, item type e.g. `JOURNAL`, `EXPENSE_CLAIM`, `AP_APPROVE_OWN_BILL`), listed by `GET /api/v1/audit-trail?action=SOLE_APPROVER_SELF_APPROVAL` (needs `AUDIT_ADMIN`). No per-table column was needed. **Open:** an Owner screen over that list, and the same recording for payroll's `allowSelfApproval` setting |
 
-New shared pieces: `shared/SeparationOfDuties` (pure rule) and `shared/SeparationOfDutiesChecker` (counts other holders of the permission). AP keeps its own `ApDutyChecks` for now; moving it onto the shared checker is a no-behaviour-change follow-up.
+New shared pieces: `shared/SeparationOfDuties` (pure rule) and `shared/SeparationOfDutiesChecker` (counts other holders of the permission). AP keeps its own `ApDutyChecks` rules and messages but now records its sole-approver steps through the shared checker.
 
 
 Acceptance: a tenant without HR cannot call any HR endpoint even as `ADMIN` (integration test per module); no controller uses an unregistered authority; approving one's own AP bill, payroll run, journal, credit note, expense is refused for every role including `ADMIN`. Risks: tenants that today use a module without a subscription row (trials, internal tenants, demo tenant) lose access → run in **report mode** for one release (log what would have been blocked) before enforcing; data from `tenant_modules` must be verified clean first. Dependencies: product decision on which modules are free.

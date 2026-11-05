@@ -32,24 +32,37 @@ public class SeparationOfDutiesChecker {
         return n != null ? n : 0;
     }
 
+    /** Audit-trail action written when a step is allowed only because nobody else could do it. */
+    public static final String SOLE_APPROVER_ACTION = "SOLE_APPROVER_SELF_APPROVAL";
+
     /**
      * Refuses (409 SAME_PERSON) when {@code actor} repeats {@code earlier}'s step and someone else holding
-     * {@code permission} could do it. When nobody else could, allows it and logs a warning naming {@code what}.
+     * {@code permission} could do it. When nobody else could, allows it, logs a warning and writes an audit event
+     * (action {@value #SOLE_APPROVER_ACTION}) the owner can hand to an accountant or auditor.
      */
-    public void require(TenantId tenantId, String permission, UUID earlier, UUID actor, String message, String what) {
+    public void require(TenantId tenantId, String permission, UUID earlier, UUID actor, String message,
+                        String itemType, UUID itemId, String what) {
         if (earlier == null || actor == null || !earlier.equals(actor)) return;
         long others = otherHolders(tenantId, permission, actor);
         String problem = SeparationOfDuties.problem(message, earlier, actor, others);
         if (problem != null) throw new HandyFlowException(problem, HttpStatus.CONFLICT, "SAME_PERSON");
-        if (SeparationOfDuties.soleException(earlier, actor, others)) {
-            log.warn("[SOD] Separation of duties not possible, allowed: {} tenant={} user={} (nobody else holds {})",
-                    what, tenantId, actor, permission);
-        }
+        if (SeparationOfDuties.soleException(earlier, actor, others)) recordSoleException(tenantId, actor, permission, itemType, itemId, what);
     }
 
     /** Same as {@link #require} for a conflict already decided by the caller (for example "this claim pays you"). */
-    public void requireIfConflict(TenantId tenantId, String permission, boolean conflict, UUID actor, String message, String what) {
+    public void requireIfConflict(TenantId tenantId, String permission, boolean conflict, UUID actor, String message,
+                                  String itemType, UUID itemId, String what) {
         if (!conflict) return;
-        require(tenantId, permission, actor, actor, message, what);
+        require(tenantId, permission, actor, actor, message, itemType, itemId, what);
+    }
+
+    /** Logs and records (append-only audit event) that {@code actor} did a step nobody else could check. */
+    public void recordSoleException(TenantId tenantId, UUID actor, String permission, String itemType, UUID itemId, String what) {
+        log.warn("[SOD] Separation of duties not possible, allowed: {} tenant={} user={} (nobody else holds {})",
+                what, tenantId, actor, permission);
+        jdbc.update("""
+                INSERT INTO audit_events (tenant_id, actor_type, actor_id, action, item_type, item_id, after_json)
+                VALUES (?, 'STAFF', ?, ?, ?, ?, jsonb_build_object('permission', ?::text, 'detail', ?::text))""",
+                tenantId.getValue(), actor, SOLE_APPROVER_ACTION, itemType, itemId, permission, what);
     }
 }

@@ -23,11 +23,12 @@ public class AuditTrailController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('AUDIT_ADMIN')")
-    @Operation(summary = "Newest first. Filter by item type and id; at most 500 rows.")
+    @Operation(summary = "Newest first. Filter by item type, id and action (SOLE_APPROVER_SELF_APPROVAL lists steps done by the only person who could); at most 500 rows.")
     public ResponseEntity<ApiResponse<List<AuditTrailService.Event>>> list(
             @RequestParam(required = false) String itemType,
             @RequestParam(required = false) UUID itemId,
+            @RequestParam(required = false) String action,
             @RequestParam(defaultValue = "200") int limit) {
-        return ResponseEntity.ok(ApiResponse.success(service.list(TenantContext.getTenantIdAsObject(), itemType, itemId, limit)));
+        return ResponseEntity.ok(ApiResponse.success(service.list(TenantContext.getTenantIdAsObject(), itemType, itemId, action, limit)));
     }
 }

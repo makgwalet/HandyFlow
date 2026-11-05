@@ -19,6 +19,7 @@ import static org.mockito.Mockito.*;
 class SeparationOfDutiesTest {
 
     static final UUID MAKER = UUID.fromString("11111111-1111-4111-8111-111111111111");
+    static final UUID ITEM = UUID.fromString("33333333-3333-4333-8333-333333333333");
     static final UUID OTHER = UUID.fromString("22222222-2222-4222-8222-222222222222");
 
     @Mock JdbcTemplate jdbc;
@@ -61,26 +62,29 @@ class SeparationOfDutiesTest {
     @Test void checkerRefusesSelfApprovalWhenAnotherApproverExists() {
         var c = checkerWithOtherHolders(1);
         var e = assertThrows(HandyFlowException.class,
-                () -> c.require(tenant(), "ACCOUNTING_ADMIN", MAKER, MAKER, "You made this", "journal=J1"));
+                () -> c.require(tenant(), "ACCOUNTING_ADMIN", MAKER, MAKER, "You made this", "JOURNAL", ITEM, "journal=J1"));
         assertEquals(HttpStatus.CONFLICT, e.getStatus());
         assertEquals("SAME_PERSON", e.getErrorCode());
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
     }
 
     @Test void checkerAllowsASoleUserToApproveTheirOwnWork() {
         var c = checkerWithOtherHolders(0);
-        assertDoesNotThrow(() -> c.require(tenant(), "ACCOUNTING_ADMIN", MAKER, MAKER, "You made this", "journal=J1"));
+        assertDoesNotThrow(() -> c.require(tenant(), "ACCOUNTING_ADMIN", MAKER, MAKER, "You made this", "JOURNAL", ITEM, "journal=J1"));
+        // the sole-approver step is written to the audit trail so the owner can report it
+        verify(jdbc).update(contains("INSERT INTO audit_events"), any(Object[].class));
     }
 
     @Test void checkerDoesNotEvenCountWhenTheActorsDiffer() {
         var c = new SeparationOfDutiesChecker(jdbc);
-        assertDoesNotThrow(() -> c.require(tenant(), "ACCOUNTING_ADMIN", MAKER, OTHER, "x", "y"));
+        assertDoesNotThrow(() -> c.require(tenant(), "ACCOUNTING_ADMIN", MAKER, OTHER, "x", "JOURNAL", ITEM, "y"));
         verifyNoInteractions(jdbc);
     }
 
     @Test void aConflictDecidedByTheCallerStillAllowsTheSoleApprover() {
-        assertDoesNotThrow(() -> checkerWithOtherHolders(0).requireIfConflict(tenant(), "EXPENSES_MANAGE", true, MAKER, "x", "y"));
+        assertDoesNotThrow(() -> checkerWithOtherHolders(0).requireIfConflict(tenant(), "EXPENSES_MANAGE", true, MAKER, "x", "JOURNAL", ITEM, "y"));
         assertThrows(HandyFlowException.class,
-                () -> checkerWithOtherHolders(2).requireIfConflict(tenant(), "EXPENSES_MANAGE", true, MAKER, "x", "y"));
-        assertDoesNotThrow(() -> new SeparationOfDutiesChecker(jdbc).requireIfConflict(tenant(), "EXPENSES_MANAGE", false, MAKER, "x", "y"));
+                () -> checkerWithOtherHolders(2).requireIfConflict(tenant(), "EXPENSES_MANAGE", true, MAKER, "x", "JOURNAL", ITEM, "y"));
+        assertDoesNotThrow(() -> new SeparationOfDutiesChecker(jdbc).requireIfConflict(tenant(), "EXPENSES_MANAGE", false, MAKER, "x", "JOURNAL", ITEM, "y"));
     }
 }
