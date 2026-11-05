@@ -67,6 +67,7 @@ public class AccountingController {
     private final AccountingReportPdfService reportPdfService;
     private final LedgerPostingService ledgerPosting;
     private final PeriodLockService periodLock;
+    private final za.co.handyflow.platform.accounting.application.internal.InvoiceLedgerRepairService invoiceRepair;
 
     // ── Chart of Accounts ─────────────────────────────────────────────────────
 
@@ -194,6 +195,23 @@ public class AccountingController {
     public ResponseEntity<ApiResponse<Long>> countPostingFailures() {
         return ResponseEntity.ok(ApiResponse.success("Success",
                 ledgerPosting.openCount(TenantContext.getTenantIdAsObject())));
+    }
+
+    @GetMapping("/invoice-ledger-repair")
+    @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
+    @Operation(summary = "Issued invoices that have no issuance journal (INV-01), and whether their original date is still open. Changes nothing")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.accounting.application.internal.InvoiceLedgerRepairService.Preview>> invoiceRepairPreview() {
+        return ResponseEntity.ok(ApiResponse.success(invoiceRepair.preview(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/invoice-ledger-repair")
+    @PreAuthorize("hasAuthority('ACCOUNTING_ADMIN')")
+    @Operation(summary = "Post the missing issuance journals. policy is ORIGINAL (the issue date, refused where the books are locked) or TODAY; confirm must be true; invoiceIds limits the repair")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.accounting.application.internal.InvoiceLedgerRepairService.Result>> invoiceRepair(
+            @RequestParam String policy, @RequestParam boolean confirm, @RequestBody(required = false) java.util.Set<UUID> invoiceIds) {
+        if (!confirm) throw new za.co.handyflow.platform.shared.HandyFlowException("Preview first, then repeat with confirm=true.",
+                org.springframework.http.HttpStatus.BAD_REQUEST, "CONFIRM_REQUIRED");
+        return ResponseEntity.ok(ApiResponse.success("Done", invoiceRepair.repair(TenantContext.getTenantIdAsObject(), policy, invoiceIds)));
     }
 
     @PostMapping("/posting-failures/{id}/retry")
