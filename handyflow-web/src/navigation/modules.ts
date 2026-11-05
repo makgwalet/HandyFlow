@@ -28,6 +28,8 @@ export interface ModuleNavItem {
    * Recurring tab is at /recurring, so without this no sidebar item is highlighted there.
    */
   aliases?: string[]
+  /** Shown only to users holding this permission (workspace items; the API enforces it too). */
+  permission?: string
 }
 
 /** True when `pathname` is `route` or anything beneath it. */
@@ -98,6 +100,8 @@ export const WORKSPACE_NAV: Omit<ModuleNavItem, 'key'>[] = [
   // A cross-module "needs attention" board, open to any signed-in user (the API only requires
   // authentication). It is not a subscribed module, so it lives here, not in MODULE_REGISTRY.
   { icon: ShieldAlert, label: 'Control Exceptions', route: '/control-exceptions' },
+  // Steps done by the only person who could (the sole-user rule); the API needs AUDIT_ADMIN.
+  { icon: ShieldAlert, label: 'Sole-approver report', route: '/self-approvals', permission: 'AUDIT_ADMIN' },
 ]
 
 /** Core modules every tenant has, even if the billing API omits them. */

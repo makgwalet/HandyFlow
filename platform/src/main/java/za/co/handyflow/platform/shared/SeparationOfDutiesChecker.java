@@ -60,9 +60,11 @@ public class SeparationOfDutiesChecker {
     public void recordSoleException(TenantId tenantId, UUID actor, String permission, String itemType, UUID itemId, String what) {
         log.warn("[SOD] Separation of duties not possible, allowed: {} tenant={} user={} (nobody else holds {})",
                 what, tenantId, actor, permission);
+        String name = null;
+        try { name = TenantContext.getCurrentUserName(); } catch (RuntimeException ignored) { /* no named user in context */ }
         jdbc.update("""
-                INSERT INTO audit_events (tenant_id, actor_type, actor_id, action, item_type, item_id, after_json)
-                VALUES (?, 'STAFF', ?, ?, ?, ?, jsonb_build_object('permission', ?::text, 'detail', ?::text))""",
-                tenantId.getValue(), actor, SOLE_APPROVER_ACTION, itemType, itemId, permission, what);
+                INSERT INTO audit_events (tenant_id, actor_type, actor_id, actor_name, action, item_type, item_id, after_json)
+                VALUES (?, 'STAFF', ?, ?, ?, ?, ?, jsonb_build_object('permission', ?::text, 'detail', ?::text))""",
+                tenantId.getValue(), actor, name, SOLE_APPROVER_ACTION, itemType, itemId, permission, what);
     }
 }

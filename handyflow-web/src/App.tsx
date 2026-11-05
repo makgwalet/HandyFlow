@@ -123,6 +123,7 @@ import { BookingAgencyPortalLoginPage } from "./pages/booking-agency-portal/Book
 // AppShell like every other staff page (needs the nav bar and
 // ProtectedRoute), but isn't itself a subscribable module.
 import { ControlExceptionsPage } from "./pages/control-exceptions/ControlExceptionsPage"
+import { SoleApproverReportPage } from "./pages/audit-trail/SoleApproverReportPage"
 // NEW: Stage 3 — external auditor portal. Same four-page shape as
 // every other portal (login, accept-invite, home, detail), but
 // tenant-scoped rather than client-scoped — see AuditorAccessGrant's
@@ -424,6 +425,7 @@ export default function App() {
             <Route path="/agriculture/:section?" element={<AgriculturePage />} />
             {/* NEW: shared "needs attention" board — see import comment above. */}
             <Route path="/control-exceptions"     element={<ControlExceptionsPage />} />
+            <Route path="/self-approvals"         element={<SoleApproverReportPage />} />
 
             {/* ── Projects ── */}
             <Route path="/projects/:section?" element={<ProjectsPage />} />

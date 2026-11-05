@@ -75,7 +75,10 @@ export function Sidebar({ modules, pinnedKeys, pathname, mini, mobileOpen, onNav
   const pinned = pinnedKeys.map(k => byKey.get(k)).filter((m): m is ModuleNavItem => !!m)
   const pinnedSet = new Set(pinned.map(m => m.key))
   const others = modules.filter(m => !pinnedSet.has(m.key)).sort((a, b) => a.label.localeCompare(b.label))
-  const workspace = WORKSPACE_NAV.map(w => ({ ...w, key: w.route }))
+  const userPermissions = useAuthStore(s => s.user?.permissions)
+  const workspace = WORKSPACE_NAV
+    .filter(w => !w.permission || (userPermissions ?? []).includes(w.permission))
+    .map(w => ({ ...w, key: w.route }))
 
   return (
     <aside className={'hf-sidebar' + (mobileOpen ? ' is-open' : '')} aria-label="Main navigation">
