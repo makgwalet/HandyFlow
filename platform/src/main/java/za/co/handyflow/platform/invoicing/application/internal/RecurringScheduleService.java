@@ -25,6 +25,7 @@ import java.util.UUID;
 public class RecurringScheduleService {
 
     private final RecurringScheduleRepository scheduleRepo;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
     private final InvoiceRepository invoiceRepo;
     private final CrmFacade crmFacade;
     private final InvoiceNumberGenerator     invoiceNumberGenerator;
@@ -314,6 +315,11 @@ public class RecurringScheduleService {
         // through the tenant's payment terms; this path needed the same fix.
         LocalDate dueDate = paymentTermsResolver.resolveDueDate(tenantId, LocalDate.now());
         invoice.markIssued(dueDate);
+        // INV-01: this path used to issue the invoice without telling the ledger. The posting is once per invoice, so
+        // it is safe if anything else also announces it.
+        eventPublisher.publishEvent(za.co.handyflow.platform.invoicing.InvoiceIssuedEvent.of(
+                tenantId, invoice.getId(), invoice.getInvoiceNumber(), invoice.getCustomerId(),
+                invoice.getSubtotal(), invoice.getVatTotal(), invoice.getTotal()));
         if (schedule.getCustomerId() != null) {
             // On the customer's timeline. A timeline failure must not fail the invoice.
             try {
