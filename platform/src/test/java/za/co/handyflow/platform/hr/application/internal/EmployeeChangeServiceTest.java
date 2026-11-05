@@ -168,7 +168,7 @@ class EmployeeChangeServiceTest {
 
         assertThat(r.selfApproved()).isTrue();
         verify(audit).record(eq(tenant), eq(emp.getId()), eq("CHANGE_APPROVED_OWN"), any(), eq(asker));
-        @SuppressWarnings("unchecked") org.mockito.ArgumentCaptor<Map<String, ?>> details = org.mockito.ArgumentCaptor.forClass(Map.class);
+        @SuppressWarnings("unchecked") org.mockito.ArgumentCaptor<Map<String, Object>> details = org.mockito.ArgumentCaptor.forClass(Map.class);
         verify(duties).recordSoleException(eq(tenant), eq(asker), eq("HR_COMPENSATION_APPROVE"), eq("EMPLOYEE_CHANGE"), eq(c.getId()), any(), details.capture());
         assertThat(details.getValue()).containsEntry("reason", "Sole director, annual increase agreed in writing")
                 .containsEntry("initiator", asker).containsEntry("approver", asker).containsKeys("requestedAt", "approvedAt", "before", "after");
@@ -218,7 +218,7 @@ class EmployeeChangeServiceTest {
 
         service.approve(tenant, c.getId(), "Sole director, new business account", asker);
 
-        @SuppressWarnings("unchecked") org.mockito.ArgumentCaptor<Map<String, ?>> details = org.mockito.ArgumentCaptor.forClass(Map.class);
+        @SuppressWarnings("unchecked") org.mockito.ArgumentCaptor<Map<String, Object>> details = org.mockito.ArgumentCaptor.forClass(Map.class);
         verify(duties).recordSoleException(any(), eq(asker), any(), eq("EMPLOYEE_CHANGE"), eq(c.getId()), any(), details.capture());
         assertThat(String.valueOf(details.getValue().get("after"))).contains("****7890").doesNotContain("1234567890");
         assertThat(String.valueOf(details.getValue().get("before"))).contains("****2222").doesNotContain("62000011112222");

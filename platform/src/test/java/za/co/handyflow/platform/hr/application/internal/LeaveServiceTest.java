@@ -300,7 +300,7 @@ class LeaveServiceTest {
         assertThat(service.approve(tenant, r.id(), employeeLogin, Set.of("LEAVE_APPROVE"), "Sole owner, taking the Friday off").status())
                 .isEqualTo("APPROVED");
 
-        @SuppressWarnings("unchecked") org.mockito.ArgumentCaptor<Map<String, ?>> details = org.mockito.ArgumentCaptor.forClass(Map.class);
+        @SuppressWarnings("unchecked") org.mockito.ArgumentCaptor<Map<String, Object>> details = org.mockito.ArgumentCaptor.forClass(Map.class);
         verify(duties).recordSoleException(eq(tenant), eq(employeeLogin), eq("LEAVE_APPROVE"), eq("LEAVE_REQUEST"), eq(r.id()), any(), details.capture());
         assertThat(details.getValue()).containsEntry("reason", "Sole owner, taking the Friday off")
                 .containsKeys("initiator", "approver", "requestedAt", "approvedAt", "after");
