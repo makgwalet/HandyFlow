@@ -55,6 +55,7 @@ public class HrController {
     private final EmployeeAuditService  employeeAuditService;
     private final LeaveService          leaveService;
     private final za.co.handyflow.platform.hr.application.internal.TerminationApprovalService terminationApproval;
+    private final za.co.handyflow.platform.hr.application.internal.EmployeeStatusChangeService statusChanges;
 
     // ── Employees ─────────────────────────────────────────────────────────────
 
@@ -155,6 +156,61 @@ public class HrController {
     public ResponseEntity<ApiResponse<String>> cancelTermination(@PathVariable UUID requestId, Principal principal) {
         terminationApproval.cancel(TenantContext.getTenantIdAsObject(), requestId, resolveUserId(principal));
         return ResponseEntity.ok(ApiResponse.success("Termination request withdrawn", "CANCELLED"));
+    }
+
+    public record StatusChangeRequest(String toStatus, String reason, boolean emergency) {}
+
+    public record StatusReviewRequest(boolean confirm, String note) {}
+
+    @PostMapping("/employees/{id}/status-change")
+    @PreAuthorize("hasAuthority('HR_MANAGE')")
+    @Operation(summary = "Suspend or reinstate an employee. Another HR manager must approve; an emergency security or safety suspension takes effect now and needs independent review within one business day")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.hr.application.internal.EmployeeStatusChangeService.Outcome>> changeStatus(
+            @PathVariable UUID id, @RequestBody StatusChangeRequest req, Principal principal) {
+        var outcome = statusChanges.request(TenantContext.getTenantIdAsObject(), id, req.toStatus(), req.reason(), req.emergency(), resolveUserId(principal));
+        return ResponseEntity.ok(ApiResponse.success(outcome.applied() ? "Status changed" : "Waiting for another HR manager to approve", outcome));
+    }
+
+    @GetMapping("/status-changes/waiting")
+    @PreAuthorize("hasAuthority('HR_MANAGE')")
+    @Operation(summary = "Status changes waiting for approval, and emergency suspensions waiting for independent review (overdue ones flagged)")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.hr.application.internal.EmployeeStatusChangeService.Waiting>> statusChangesWaiting() {
+        return ResponseEntity.ok(ApiResponse.success(statusChanges.waiting(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/status-changes/{requestId}/approve")
+    @PreAuthorize("hasAuthority('HR_MANAGE')")
+    @Operation(summary = "Approve a status change someone else asked for. It takes effect now")
+    public ResponseEntity<ApiResponse<String>> approveStatusChange(
+            @PathVariable UUID requestId, @RequestBody(required = false) ChangeDecisionRequest req, Principal principal) {
+        statusChanges.approve(TenantContext.getTenantIdAsObject(), requestId, req == null ? null : req.note(), resolveUserId(principal));
+        return ResponseEntity.ok(ApiResponse.success("Status changed", "APPLIED"));
+    }
+
+    @PostMapping("/status-changes/{requestId}/reject")
+    @PreAuthorize("hasAuthority('HR_MANAGE')")
+    @Operation(summary = "Decline a status change. A reason is required")
+    public ResponseEntity<ApiResponse<String>> rejectStatusChange(
+            @PathVariable UUID requestId, @RequestBody(required = false) ChangeDecisionRequest req, Principal principal) {
+        statusChanges.reject(TenantContext.getTenantIdAsObject(), requestId, req == null ? null : req.note(), resolveUserId(principal));
+        return ResponseEntity.ok(ApiResponse.success("Status change declined", "REJECTED"));
+    }
+
+    @PostMapping("/status-changes/{requestId}/cancel")
+    @PreAuthorize("hasAuthority('HR_MANAGE')")
+    @Operation(summary = "Withdraw a status change you asked for")
+    public ResponseEntity<ApiResponse<String>> cancelStatusChange(@PathVariable UUID requestId, Principal principal) {
+        statusChanges.cancel(TenantContext.getTenantIdAsObject(), requestId, resolveUserId(principal));
+        return ResponseEntity.ok(ApiResponse.success("Status change withdrawn", "CANCELLED"));
+    }
+
+    @PostMapping("/status-changes/{requestId}/review")
+    @PreAuthorize("hasAuthority('HR_MANAGE')")
+    @Operation(summary = "Independent review of an emergency suspension: confirm it, or reverse it (the employee is reinstated)")
+    public ResponseEntity<ApiResponse<String>> reviewEmergencySuspension(
+            @PathVariable UUID requestId, @RequestBody StatusReviewRequest req, Principal principal) {
+        statusChanges.review(TenantContext.getTenantIdAsObject(), requestId, req.confirm(), req.note(), resolveUserId(principal));
+        return ResponseEntity.ok(ApiResponse.success(req.confirm() ? "Suspension confirmed" : "Suspension reversed", req.confirm() ? "CONFIRMED" : "REVERSED"));
     }
 
     @PutMapping("/employees/{id}/manager")

@@ -20,6 +20,7 @@ import EmployeeProfileModal from "./EmployeeProfileModal"
 import { EMPTY_FOREIGN, EXPIRING_FILTERS, endingBadge, expiringParam, expiryState, expiryText, foreignBody, fromServer, permitLabel, type ForeignBody } from "./foreignIdentity.logic"
 import { END_TYPES, employeeRights, terminationProblem, terminationQuery, today } from "./employees.logic"
 import TerminationApprovals from "./TerminationApprovals"
+import StatusChanges, { StatusChangeDialog } from "./StatusChanges"
 import { ApprovalsModal, HistoryModal, ReportingModal, RequestChangeModal } from "./EmployeeChanges"
 import { Plus, X, Search, Users, AlertTriangle, AlertCircle, Edit2, UserX } from "lucide-react"
 
@@ -101,6 +102,7 @@ export default function EmployeesTab() {
   const [selected, setSelected]     = useState<Employee | null>(null)
   const [profileOf, setProfileOf]     = useState<Employee | null>(null)
   const [terminating, setTerminating] = useState<Employee | null>(null)
+  const [statusFor, setStatusFor] = useState<Employee | null>(null)
   const [medicalFor, setMedicalFor] = useState<Employee | null>(null)
   const [benefitsFor, setBenefitsFor] = useState<Employee | null>(null)
   const [payItemsFor, setPayItemsFor] = useState<Employee | null>(null)
@@ -357,6 +359,7 @@ export default function EmployeesTab() {
         </div>
       )}
       <TerminationApprovals />
+      <StatusChanges />
       {/* Stats */}
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {Object.entries(STATUS_CFG).filter(([k]) => k !== "TERMINATED").map(([k, cfg]) => (
@@ -446,6 +449,7 @@ export default function EmployeesTab() {
                     <td style={{ padding: "12px 16px", borderBottom: "1px solid var(--hf-border-subtle)" }}>
                       <div style={{ display: "flex", gap: 5 }}>
                         {rights.manage && <button aria-label={`Edit ${emp.fullName}`} onClick={e => { e.stopPropagation(); openEdit(emp) }} style={{ background: "var(--hf-info-soft)", border: "none", borderRadius: 6, padding: "5px 7px", cursor: "pointer", color: "var(--hf-info-text)" }}><Edit2 size={12} /></button>}
+                        {rights.manage && (emp.status === "ACTIVE" || emp.status === "SUSPENDED") && <button aria-label={`${emp.status === "ACTIVE" ? "Suspend" : "Reinstate"} ${emp.fullName}`} onClick={e => { e.stopPropagation(); setStatusFor(emp) }} style={{ background: "var(--hf-warning-soft)", border: "none", borderRadius: 6, padding: "5px 8px", cursor: "pointer", fontSize: 11, fontWeight: 700 }}>{emp.status === "ACTIVE" ? "Suspend" : "Reinstate"}</button>}
                         {rights.manage && emp.status === "ACTIVE" && <button aria-label={`Terminate ${emp.fullName}`} onClick={e => { e.stopPropagation(); setTerminating(emp); setEndDate(""); setReason(""); setEndType(""); setNoticeOn(""); setError("") }} style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "5px 7px", cursor: "pointer", color: "var(--hf-danger-text)" }}><UserX size={12} /></button>}
                       </div>
                     </td>
@@ -556,6 +560,7 @@ export default function EmployeesTab() {
 
       {profileOf && <EmployeeProfileModal employeeId={profileOf.id} name={profileOf.fullName} startDate={profileOf.startDate} canSeeFamily={rights.sensitive} canEdit={rights.manage} onClose={() => setProfileOf(null)} />}
 
+      {statusFor && <StatusChangeDialog employeeId={statusFor.id} employeeName={statusFor.fullName} currentStatus={statusFor.status} onClose={() => setStatusFor(null)} />}
       {/* Terminate modal */}
       {terminating && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1001, backdropFilter: "blur(2px)" }}>
