@@ -49,7 +49,7 @@ Dependencies: none. Risks: 0.6 can break screens that call `/identity/users` for
 4. **`SeparationOfDutiesPolicy.assertDifferentActor`** and toxic-pair table; wire into AP pay, payroll approve/run, journal review, credit-note approval, refunds first; then the rest. Build rule: methods guarded by `*_APPROVE`, `PAY`, `ISSUE`, `SIGN` call it.
 5. **Reclassify approval permissions out of administrative templates** (matrix doc).
 
-**Status 2026-11-05:** the build rule in item 1 ("every `hasAuthority` name exists in the catalogue") is in place as `AuthorityCatalogueCoverageTest` (patch 0628). On the current source all 4,185 guard uses resolve to the 404 catalogue names; the only exception is `PORTAL_USER`, issued by `PortalJwtFilter`. Still to do in item 1: the metadata columns (`module_key`, `resource`, `verb`, `sensitivity`, `requires_second_person`, `grantable_by`) and the reviewed prefix map that fills them.
+**Status 2026-11-05:** the build rule in item 1 ("every `hasAuthority` name exists in the catalogue") is in place as `AuthorityCatalogueCoverageTest` (patch 0628). On the current source all 4,185 guard uses resolve to the 404 catalogue names; the only exception is `PORTAL_USER`, issued by `PortalJwtFilter`. The metadata columns (`module_key`, `resource`, `verb`, `sensitivity`, `requires_second_person`, `grantable_by`) are added and filled for all 397 permissions by `V590` (patch 0631), with a build test that fails for any permission added without metadata. Decisions to confirm are in `PERMISSION_METADATA_REVIEW.md`.
 
 **Status of item 4, 2026-11-05 (patch 0629).** The code is further along than this section assumed. Checked against the sole-user rule in `IAM_TARGET_ARCHITECTURE.md` 15.3:
 
