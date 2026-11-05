@@ -51,6 +51,21 @@ Dependencies: none. Risks: 0.6 can break screens that call `/identity/users` for
 
 **Status 2026-11-05:** the build rule in item 1 ("every `hasAuthority` name exists in the catalogue") is in place as `AuthorityCatalogueCoverageTest` (patch 0628). On the current source all 4,185 guard uses resolve to the 404 catalogue names; the only exception is `PORTAL_USER`, issued by `PortalJwtFilter`. Still to do in item 1: the metadata columns (`module_key`, `resource`, `verb`, `sensitivity`, `requires_second_person`, `grantable_by`) and the reviewed prefix map that fills them.
 
+**Status of item 4, 2026-11-05 (patch 0629).** The code is further along than this section assumed. Checked against the sole-user rule in `IAM_TARGET_ARCHITECTURE.md` 15.3:
+
+| Area | Before | Now |
+|---|---|---|
+| AP bills, second approval, payment, batch release, supplier banking | Different person unless nobody else can; sole exception logged (`ApDutyChecks`) | unchanged |
+| AP supplier credit notes | Creator excluded from approvers through the approvals engine when another approver exists | unchanged |
+| Manual journals (post) | Maker could never post, even as the only person able to: a sole-user business could not post its own journals | `SeparationOfDutiesChecker`: refused only when another `ACCOUNTING_ADMIN` holder exists |
+| Expense claims (approve, pay out) | Submitter or payee could never approve or pay, same lock-out | Same checker (`EXPENSES_MANAGE`, `EXPENSES_ADMIN`) |
+| Payroll | Tenant setting `allowSelfApproval` | unchanged (a different, explicit mechanism) |
+| Sales refunds and credit notes (invoicing) | No maker/checker at all; a refund is issued in one step | **open**: needs a pending-approval state, so a design decision |
+| Persisting `self_approved` for the accountant report | AP and the new checker only log a warning | **open**: needs columns on each approvable table |
+
+New shared pieces: `shared/SeparationOfDuties` (pure rule) and `shared/SeparationOfDutiesChecker` (counts other holders of the permission). AP keeps its own `ApDutyChecks` for now; moving it onto the shared checker is a no-behaviour-change follow-up.
+
+
 Acceptance: a tenant without HR cannot call any HR endpoint even as `ADMIN` (integration test per module); no controller uses an unregistered authority; approving one's own AP bill, payroll run, journal, credit note, expense is refused for every role including `ADMIN`. Risks: tenants that today use a module without a subscription row (trials, internal tenants, demo tenant) lose access → run in **report mode** for one release (log what would have been blocked) before enforcing; data from `tenant_modules` must be verified clean first. Dependencies: product decision on which modules are free.
 
 ## Phase 2 – Invitations v2, templates, People & Access UI (L)

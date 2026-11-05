@@ -50,6 +50,7 @@ public class AccountingService {
     private final CostCentreService            costCentres;
     // Finance patch F28: lines without a cost centre are tagged by the business's own rules.
     private final TagRuleService               tagRules;
+    private final za.co.handyflow.platform.shared.SeparationOfDutiesChecker duties;
 
     // ── Chart of Accounts ─────────────────────────────────────────────────────
 
@@ -263,8 +264,12 @@ public class AccountingService {
     public JournalEntryResponse postJournalEntryWithReview(TenantId tenantId, UUID id, UUID postedBy) {
         AccJournalEntry entry = journalRepo.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("JournalEntry", id.toString()));
-        String problem = JournalReviewRules.postProblem(entry.getCreatedBy(), postedBy);
-        if (problem != null) throw new HandyFlowException(problem, HttpStatus.BAD_REQUEST, "SAME_PERSON");
+        // A journal made by a person needs a poster we know. The maker may not post it when someone else could;
+        // when nobody else holds the posting permission the business could not post at all, so it is allowed and logged.
+        if (entry.getCreatedBy() != null && postedBy == null)
+            throw new HandyFlowException(JournalReviewRules.postProblem(entry.getCreatedBy(), null), HttpStatus.BAD_REQUEST, "SAME_PERSON");
+        duties.require(tenantId, "ACCOUNTING_ADMIN", entry.getCreatedBy(), postedBy,
+                "You made this journal, so a different person must post it", "journal=" + entry.getEntryNumber());
         return doPost(tenantId, entry, postedBy);
     }
 

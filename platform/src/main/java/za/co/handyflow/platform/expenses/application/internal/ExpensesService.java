@@ -52,6 +52,7 @@ public class ExpensesService {
     private final za.co.handyflow.platform.accounting.application.AccountingFacade accountingFacade;
     // Finance patch F18: limits, receipt rules and duplicate checks at submission.
     private final ExpensePolicyService policyService;
+    private final za.co.handyflow.platform.shared.SeparationOfDutiesChecker duties;
 
     private static final String MODULE = "expenses", ENTITY = "CLAIM";
 
@@ -197,7 +198,11 @@ public class ExpensesService {
         requireAction(claim, Action.APPROVE);
         String problem = ExpenseRules.selfApprovalProblem(claim.getSubmittedBy(), approvedBy,
                 employeeEmail(tenantId, claim.getEmployeeId()), userEmail(approvedBy));
-        if (problem != null) throw new IllegalStateException(problem);
+        if (problem != null) {
+            if (approvedBy == null) throw new IllegalStateException(problem);
+            // submitter or payee: refused when another approver exists, allowed and logged when nobody else could approve
+            duties.requireIfConflict(tenantId, "EXPENSES_MANAGE", true, approvedBy, problem, "expense claim=" + claim.getClaimNumber());
+        }
 
         ApprovalRequestResponse result = actOnPendingStep(tenantId, claim, approvedBy, "APPROVE", null);
         if ("APPROVED".equals(result.status())) {
@@ -267,7 +272,11 @@ public class ExpensesService {
         requireAction(claim, Action.REIMBURSE);
         String self = ExpenseRules.selfApprovalProblem(claim.getSubmittedBy(), by,
                 employeeEmail(tenantId, claim.getEmployeeId()), userEmail(by));
-        if (self != null) throw new IllegalStateException(self.replace("approve", "pay out").replace("approved", "paid out"));
+        if (self != null) {
+            String message = self.replace("approve", "pay out").replace("approved", "paid out");
+            if (by == null) throw new IllegalStateException(message);
+            duties.requireIfConflict(tenantId, "EXPENSES_ADMIN", true, by, message, "expense payout claim=" + claim.getClaimNumber());
+        }
         boolean keepsBankAccounts = !accountingFacade.getBankAccounts(tenantId).isEmpty();
         if (bankAccountId == null && keepsBankAccounts)
             throw new HandyFlowException("Choose the bank account the claim was paid from", HttpStatus.BAD_REQUEST, "BANK_ACCOUNT_REQUIRED");

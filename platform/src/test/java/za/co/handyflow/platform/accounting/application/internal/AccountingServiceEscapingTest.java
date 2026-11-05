@@ -58,7 +58,7 @@ class AccountingServiceEscapingTest {
 
     private AccountingService service() {
         return new AccountingService(accountRepo, journalRepo, bankAccountRepo, bankTxRepo,
-                vatPeriodRepo, coaSeeder, numberGen, periodLock, invoicingFacade, crmFacade, emailService, bankRecRepo, costCentres, tagRules);
+                vatPeriodRepo, coaSeeder, numberGen, periodLock, invoicingFacade, crmFacade, emailService, bankRecRepo, costCentres, tagRules, null);
     }
 
     @Test
