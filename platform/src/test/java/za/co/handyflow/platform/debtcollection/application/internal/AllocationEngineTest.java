@@ -29,7 +29,7 @@ class AllocationEngineTest {
 
     private static BigDecimal d(String s) { return new BigDecimal(s); }
 
-    private static UUID id(int n) { return UUID.fromString("00000000-0000-0000-0000-0000000000" + String.format("%02d", n)); }
+    private static UUID id(int n) { return UUID.fromString("00000000-0000-0000-0000-" + String.format("%012d", n)); }
 
     private static Collector col(int n, String name, CollectorTier tier, String team, Set<String> skills) {
         return new Collector(id(n), name, team, tier, skills, null, null, null, null, true, 0, BigDecimal.ZERO, 0L);

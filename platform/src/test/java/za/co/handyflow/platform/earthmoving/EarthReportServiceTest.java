@@ -65,8 +65,8 @@ class EarthReportServiceTest {
     }
 
     @Test void revenueAndCostAreAddedPerMachineAndMarginWorkedOut() {
-        when(charges.findRevenueBetween(any(), any(), any())).thenReturn(List.of(charge(d9, "1000", true), charge(d9, "500", false), charge(loader, "200", false)));
-        when(maintenance.findCostedBetween(any(), any(), any())).thenReturn(List.of(service(d9, "300"), service(loader, "250")));
+        doReturn(List.of(charge(d9, "1000", true), charge(d9, "500", false), charge(loader, "200", false))).when(charges).findRevenueBetween(any(), any(), any());
+        doReturn(List.of(service(d9, "300"), service(loader, "250"))).when(maintenance).findCostedBetween(any(), any(), any());
         ProfitabilityResponse r = service.profitability(tenant, FROM, TO);
         assertEquals(2, r.machines().size());
         ProfitabilityResponse.Row first = r.machines().get(0);
@@ -83,7 +83,7 @@ class EarthReportServiceTest {
     }
 
     @Test void aMachineWithOnlyCostsShowsALossAndNoPercentage() {
-        when(maintenance.findCostedBetween(any(), any(), any())).thenReturn(List.of(service(d9, "300")));
+        doReturn(List.of(service(d9, "300"))).when(maintenance).findCostedBetween(any(), any(), any());
         ProfitabilityResponse.Row row = service.profitability(tenant, FROM, TO).machines().get(0);
         assertEquals(n("-300"), row.margin());
         assertNull(row.marginPercent());

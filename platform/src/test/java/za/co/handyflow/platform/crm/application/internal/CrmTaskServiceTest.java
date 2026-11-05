@@ -23,6 +23,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -56,7 +57,7 @@ class CrmTaskServiceTest {
     void listsWithNamesAndLateness() {
         UUID cid = UUID.randomUUID();
         when(followUps.findOpen(any(), any())).thenReturn(List.of(task(cid, LocalDate.now().minusDays(4)), task(cid, LocalDate.now().plusDays(2))));
-        when(customers.findAllById(any())).thenReturn(List.of(customer(cid, "Acme Mining", tenant, false)));
+        doReturn(List.of(customer(cid, "Acme Mining", tenant, false))).when(customers).findAllById(any());
         var result = service().list(tenant, false);
         assertThat(result.tasks()).hasSize(2);
         assertThat(result.tasks().get(0).customerName()).isEqualTo("Acme Mining");
@@ -70,7 +71,7 @@ class CrmTaskServiceTest {
     void hidesDeletedAndForeign() {
         UUID live = UUID.randomUUID(), gone = UUID.randomUUID(), foreign = UUID.randomUUID();
         when(followUps.findOpen(any(), any())).thenReturn(List.of(task(live, LocalDate.now()), task(gone, LocalDate.now()), task(foreign, LocalDate.now())));
-        when(customers.findAllById(any())).thenReturn(List.of(customer(live, "Live", tenant, false), customer(gone, "Gone", tenant, true), customer(foreign, "Other", TenantId.generate(), false)));
+        doReturn(List.of(customer(live, "Live", tenant, false), customer(gone, "Gone", tenant, true), customer(foreign, "Other", TenantId.generate(), false))).when(customers).findAllById(any());
         assertThat(service().list(tenant, false).tasks()).extracting(t -> t.customerName()).containsExactly("Live");
     }
 
@@ -80,7 +81,7 @@ class CrmTaskServiceTest {
         List<CustomerFollowUp> many = new ArrayList<>();
         for (int i = 0; i < CrmTaskService.OPEN_LIMIT + 1; i++) many.add(task(cid, LocalDate.now()));
         when(followUps.findOpen(any(), any())).thenReturn(many);
-        when(customers.findAllById(any())).thenReturn(List.of(customer(cid, "Acme", tenant, false)));
+        doReturn(List.of(customer(cid, "Acme", tenant, false))).when(customers).findAllById(any());
         var result = service().list(tenant, false);
         assertThat(result.truncated()).isTrue();
         assertThat(result.tasks()).hasSize(CrmTaskService.OPEN_LIMIT);
@@ -91,7 +92,7 @@ class CrmTaskServiceTest {
         UUID cid = UUID.randomUUID(), other = UUID.randomUUID();
         var t = task(cid, LocalDate.now());
         when(followUps.findByIdAndTenant(any(), any())).thenReturn(Optional.of(t));
-        when(customers.findAllById(any())).thenReturn(List.of(customer(cid, "Acme", tenant, false)));
+        doReturn(List.of(customer(cid, "Acme", tenant, false))).when(customers).findAllById(any());
         when(users.resolveUser(tenant, other)).thenReturn(Optional.of(new Recipient(other, "Olive Other", null, null)));
         var out = service().update(tenant, UUID.randomUUID(), new UpdateTaskRequest(other, LocalDate.now().plusDays(7), CustomerFollowUp.Priority.HIGH));
         assertThat(out.dueDate()).isEqualTo(LocalDate.now().plusDays(7));

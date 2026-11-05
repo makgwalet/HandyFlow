@@ -149,8 +149,8 @@ class LeaveReminderServiceTest {
         when(policyRepo.findAll()).thenReturn(List.of(policy(2027)));
         when(leaveService.atRisk(any())).thenReturn(new AtRiskReport(new BigDecimal("10"), 2027,
                 List.of(new AtRisk(emp, "Thandi Nkosi", new BigDecimal("14"), new BigDecimal("16"), new BigDecimal("6")))));
-        when(employeeRepo.findActiveById(any(), eq(emp))).thenReturn(Optional.of(managedBy("Thandi Nkosi", "thandi@example.com", boss)));
-        when(employeeRepo.findActiveById(any(), eq(boss))).thenReturn(Optional.of(managedBy("Boss Dube", "boss@example.com", null)));
+        doReturn(Optional.of(managedBy("Thandi Nkosi", "thandi@example.com", boss))).when(employeeRepo).findActiveById(any(), eq(emp));
+        doReturn(Optional.of(managedBy("Boss Dube", "boss@example.com", null))).when(employeeRepo).findActiveById(any(), eq(boss));
         when(admins.resolveTenantAdmins(any(TenantId.class))).thenReturn(List.of());
 
         assertThat(service.remindAll(firstOfNovember)).isEqualTo(2);
@@ -167,8 +167,8 @@ class LeaveReminderServiceTest {
         when(policyRepo.findAll()).thenReturn(List.of(expiryPolicy()));
         when(leaveService.atRisk(any())).thenReturn(new AtRiskReport(null, 2028, List.of(), 6, expiry,
                 List.of(new Expiring(emp, "Thandi Nkosi", new BigDecimal("5"), expiry))));
-        when(employeeRepo.findActiveById(any(), eq(emp))).thenReturn(Optional.of(managedBy("Thandi Nkosi", "thandi@example.com", boss)));
-        when(employeeRepo.findActiveById(any(), eq(boss))).thenReturn(Optional.of(managedBy("Boss Dube", "boss@example.com", null)));
+        doReturn(Optional.of(managedBy("Thandi Nkosi", "thandi@example.com", boss))).when(employeeRepo).findActiveById(any(), eq(emp));
+        doReturn(Optional.of(managedBy("Boss Dube", "boss@example.com", null))).when(employeeRepo).findActiveById(any(), eq(boss));
 
         assertThat(service.remindAll(expiry.minusDays(14))).isEqualTo(2);
 

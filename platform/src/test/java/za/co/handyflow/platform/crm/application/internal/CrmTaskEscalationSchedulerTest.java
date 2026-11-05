@@ -22,6 +22,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -64,7 +65,7 @@ class CrmTaskEscalationSchedulerTest {
         var b = task(cid, 3);
         when(followUps.findForEscalation(tenant, today.minusDays(3))).thenReturn(List.of(a, b));
         when(admins.resolveTenantAdmins(tenant)).thenReturn(List.of(new Recipient(UUID.randomUUID(), "Boss", "boss@x.co", null)));
-        when(customers.findActiveById(tenant, cid)).thenReturn(Optional.of(customer("Acme")));
+        doReturn(Optional.of(customer("Acme"))).when(customers).findActiveById(tenant, cid);
         assertThat(scheduler().escalateForTenant(tenant, today)).isEqualTo(2);
         assertThat(a.getEscalationSentAt()).isNotNull();
         assertThat(b.getEscalationSentAt()).isNotNull();

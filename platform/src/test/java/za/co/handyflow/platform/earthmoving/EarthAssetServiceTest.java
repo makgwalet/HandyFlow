@@ -67,7 +67,8 @@ class EarthAssetServiceTest {
         EarthAsset a = EarthAsset.create(tenant, "CAT D9", "D9-001", "DOZER", "Caterpillar", "D9T", 2020, "S1", "GP1",
                 "OWN", null, null, null, new BigDecimal("18500"), new BigDecimal("2200"), null);
         if (status == AssetStatus.MAINTENANCE) a.sendToMaintenance();
-        if (status == AssetStatus.BREAKDOWN) a.breakdown();
+        // a machine cannot go from AVAILABLE straight to BREAKDOWN (AssetStatus rules), so reach it through maintenance
+        if (status == AssetStatus.BREAKDOWN) { a.sendToMaintenance(); a.breakdown(); }
         if (status == AssetStatus.DEPLOYED) a.deployTo("Mine A", "Anglo");
         when(assets.findActiveById(tenant, a.getId())).thenReturn(Optional.of(a));
         return a;
@@ -203,7 +204,7 @@ class EarthAssetServiceTest {
 
     @Test
     void reportingABreakdownRaisesOneRoutedAlert() {
-        EarthAsset a = machine(AssetStatus.AVAILABLE);
+        EarthAsset a = machine(AssetStatus.DEPLOYED);
         granted.add("EARTHMOVING_WRITE");
         service.updateStatus(tenant, a.getId(), status("BREAKDOWN", "Hydraulic hose burst"), actor);
         verify(alerts).raise(eq(tenant), eq("BREAKDOWN"), eq("CRITICAL"), eq(a.getId()), any(), any(), any(), any(),
@@ -266,7 +267,7 @@ class EarthAssetServiceTest {
 
     @Test
     void aBreakdownAlsoTellsTheSiteSupervisor() {
-        EarthAsset a = machine(AssetStatus.AVAILABLE);
+        EarthAsset a = machine(AssetStatus.DEPLOYED);
         granted.add("EARTHMOVING_WRITE");
         UUID supervisor = UUID.randomUUID();
         when(sites.supervisorForAsset(tenant, a.getId())).thenReturn(java.util.Optional.of(supervisor));

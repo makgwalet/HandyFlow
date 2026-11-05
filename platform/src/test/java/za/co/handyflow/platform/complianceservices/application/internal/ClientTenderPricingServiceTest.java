@@ -28,6 +28,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -77,7 +78,7 @@ class ClientTenderPricingServiceTest {
             ClientTender t = tenderAt(path);
             tenderExists(t);
             when(pricingRepository.findByTender(TENANT, tenderId)).thenReturn(Optional.of(ClientTenderPricing.create(TENANT, tenderId, new BigDecimal("15.00"), USER)));
-            when(lineRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+            when(lineRepository.findByTender(eq(TENANT), any())).thenReturn(List.of());
 
             ClientTenderPricingResponse r = service().addLine(TENANT, tenderId, lineReq("A", "x", "1", "1"), USER);
 
@@ -124,7 +125,7 @@ class ClientTenderPricingServiceTest {
     void lockedCanStillBeRead() {
         tenderExists(tenderAt("IN_PREPARATION", "INTERNAL_REVIEW", "READY_TO_SUBMIT", "SUBMITTED"));
         when(pricingRepository.findByTender(TENANT, tenderId)).thenReturn(Optional.empty());
-        when(lineRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(lineRepository.findByTender(eq(TENANT), any())).thenReturn(List.of());
 
         ClientTenderPricingResponse r = service().getPricing(TENANT, tenderId);
 
@@ -139,7 +140,7 @@ class ClientTenderPricingServiceTest {
     void unpricedReadsAsDefaults() {
         tenderExists(tenderAt());
         when(pricingRepository.findByTender(TENANT, tenderId)).thenReturn(Optional.empty());
-        when(lineRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(lineRepository.findByTender(eq(TENANT), any())).thenReturn(List.of());
 
         ClientTenderPricingResponse r = service().getPricing(TENANT, tenderId);
 
@@ -158,7 +159,7 @@ class ClientTenderPricingServiceTest {
         tenderExists(tenderAt());
         when(pricingRepository.findByTender(TENANT, tenderId)).thenReturn(Optional.empty());
         when(pricingRepository.saveAndFlush(any(ClientTenderPricing.class))).thenAnswer(i -> i.getArgument(0));
-        when(lineRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(lineRepository.findByTender(eq(TENANT), any())).thenReturn(List.of());
         when(lineRepository.maxSortOrder(TENANT, tenderId)).thenReturn(0);
 
         service().addLine(TENANT, tenderId, lineReq("A", "x", "1", "1"), USER);
@@ -176,7 +177,7 @@ class ClientTenderPricingServiceTest {
         tenderExists(tenderAt());
         ClientTenderPricing existing = ClientTenderPricing.create(TENANT, tenderId, new BigDecimal("14.00"), USER);
         when(pricingRepository.findByTender(TENANT, tenderId)).thenReturn(Optional.of(existing));
-        when(lineRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(existingLine(tenderId)));
+        when(lineRepository.findByTender(eq(TENANT), any())).thenReturn(List.of(existingLine(tenderId)));
 
         ClientTenderPricingResponse r = service().getPricing(TENANT, tenderId);
 
@@ -204,7 +205,7 @@ class ClientTenderPricingServiceTest {
         tenderExists(tenderAt("IN_PREPARATION"));
         ClientTenderPricing pricing = ClientTenderPricing.create(TENANT, tenderId, new BigDecimal("15.00"), USER);
         when(pricingRepository.findByTender(TENANT, tenderId)).thenReturn(Optional.of(pricing));
-        when(lineRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(
+        when(lineRepository.findByTender(eq(TENANT), any())).thenReturn(List.of(
                 ClientTenderPricingLine.create(TENANT, tenderId, "A", null, "x", null, new BigDecimal("1"), new BigDecimal("100"), 1, USER)));
 
         ClientTenderPricingResponse r = service().saveSettings(TENANT, tenderId,
@@ -224,7 +225,7 @@ class ClientTenderPricingServiceTest {
         tenderExists(tenderAt());
         ClientTenderPricing pricing = ClientTenderPricing.create(TENANT, tenderId, new BigDecimal("15.00"), USER);
         when(pricingRepository.findByTender(TENANT, tenderId)).thenReturn(Optional.of(pricing));
-        when(lineRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(lineRepository.findByTender(eq(TENANT), any())).thenReturn(List.of());
 
         ClientTenderPricingResponse r = service().saveSettings(TENANT, tenderId, new SaveClientTenderPricingSettingsRequest(null, null, null, null, null), USER);
 
@@ -251,7 +252,7 @@ class ClientTenderPricingServiceTest {
     void lineAppended() {
         tenderExists(tenderAt());
         when(pricingRepository.findByTender(TENANT, tenderId)).thenReturn(Optional.of(ClientTenderPricing.create(TENANT, tenderId, new BigDecimal("15.00"), USER)));
-        when(lineRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(lineRepository.findByTender(eq(TENANT), any())).thenReturn(List.of());
         when(lineRepository.maxSortOrder(TENANT, tenderId)).thenReturn(7);
 
         service().addLine(TENANT, tenderId, lineReq("   ", "Kerb", "2", "10"), USER);
@@ -287,7 +288,7 @@ class ClientTenderPricingServiceTest {
         when(lineRepository.findByIdForTenant(TENANT, lineId)).thenReturn(Optional.of(line));
         tenderExists(tenderAt());
         when(pricingRepository.findByTender(TENANT, tenderId)).thenReturn(Optional.of(ClientTenderPricing.create(TENANT, tenderId, new BigDecimal("15.00"), USER)));
-        when(lineRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(line));
+        when(lineRepository.findByTender(eq(TENANT), any())).thenReturn(List.of(line));
 
         ClientTenderPricingResponse r = service().updateLine(TENANT, lineId, lineReq("Drainage", "Pipe", "3", "100"), USER);
 
@@ -324,7 +325,7 @@ class ClientTenderPricingServiceTest {
         when(lineRepository.findByIdForTenant(TENANT, line.getId())).thenReturn(Optional.of(line));
         tenderExists(tenderAt());
         when(pricingRepository.findByTender(TENANT, tenderId)).thenReturn(Optional.empty());
-        when(lineRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(lineRepository.findByTender(eq(TENANT), any())).thenReturn(List.of());
 
         ClientTenderPricingResponse r = service().deleteLine(TENANT, line.getId());
 
@@ -337,7 +338,7 @@ class ClientTenderPricingServiceTest {
     void responseShape() {
         tenderExists(tenderAt());
         when(pricingRepository.findByTender(TENANT, tenderId)).thenReturn(Optional.empty());
-        when(lineRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(existingLine(tenderId)));
+        when(lineRepository.findByTender(eq(TENANT), any())).thenReturn(List.of(existingLine(tenderId)));
 
         ClientTenderPricingResponse r = service().getPricing(TENANT, tenderId);
 
@@ -353,14 +354,14 @@ class ClientTenderPricingServiceTest {
     void snapshotOf() {
         tenderExists(tenderAt());
         when(pricingRepository.findByTender(TENANT, tenderId)).thenReturn(Optional.empty());
-        when(lineRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(lineRepository.findByTender(eq(TENANT), any())).thenReturn(List.of());
         assertThat(service().snapshotOf(TENANT, tenderId)).isNull();
 
         when(pricingRepository.findByTender(TENANT, tenderId)).thenReturn(Optional.of(ClientTenderPricing.create(TENANT, tenderId, new BigDecimal("15.00"), USER)));
         assertThat(service().snapshotOf(TENANT, tenderId)).isNotNull();
 
         when(pricingRepository.findByTender(TENANT, tenderId)).thenReturn(Optional.empty());
-        when(lineRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(existingLine(tenderId)));
+        when(lineRepository.findByTender(eq(TENANT), any())).thenReturn(List.of(existingLine(tenderId)));
         assertThat(service().snapshotOf(TENANT, tenderId)).isNotNull();
     }
 }

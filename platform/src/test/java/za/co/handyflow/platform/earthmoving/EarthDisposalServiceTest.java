@@ -87,7 +87,7 @@ class EarthDisposalServiceTest {
 
     @Test void onlyOneLiveRequestPerMachine() {
         granted.add("EARTHMOVING_WRITE");
-        when(requests.findLiveForAsset(tenant, machine.getId())).thenReturn(Optional.of(stored("SCRAPPED")));
+        doReturn(Optional.of(stored("SCRAPPED"))).when(requests).findLiveForAsset(tenant, machine.getId());
         assertThrows(IllegalStateException.class, () -> service.request(tenant, ask(), asker));
     }
 

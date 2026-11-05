@@ -251,9 +251,9 @@ class ErReminderServiceTest {
         UUID decider = UUID.randomUUID(), respondent = UUID.randomUUID();
         c.setParties(null, decider, respondent);
         caseWith(c, rowDue(today.plusDays(1), "Response due"));
-        when(employeeRepo.findByUserId(any(), eq(owner))).thenReturn(Optional.of(ownerEmployee("olive@example.com", "ACTIVE")));
-        when(employeeRepo.findActiveById(any(), eq(decider))).thenReturn(Optional.of(person("Dina Decider", "dina@example.com")));
-        when(employeeRepo.findActiveById(any(), eq(respondent))).thenReturn(Optional.of(person("Rob Respondent", "rob@example.com")));
+        doReturn(Optional.of(ownerEmployee("olive@example.com", "ACTIVE"))).when(employeeRepo).findByUserId(any(), eq(owner));
+        doReturn(Optional.of(person("Dina Decider", "dina@example.com"))).when(employeeRepo).findActiveById(any(), eq(decider));
+        doReturn(Optional.of(person("Rob Respondent", "rob@example.com"))).when(employeeRepo).findActiveById(any(), eq(respondent));
 
         service.remindAll(today);
 
@@ -265,7 +265,7 @@ class ErReminderServiceTest {
         HrErCase c = aCase(owner);
         c.setParties(null, UUID.randomUUID(), null);
         caseWith(c, rowDue(today.plusDays(1), "Meeting"));
-        when(employeeRepo.findByUserId(any(), eq(owner))).thenReturn(Optional.of(ownerEmployee("olive@example.com", "ACTIVE")));
+        doReturn(Optional.of(ownerEmployee("olive@example.com", "ACTIVE"))).when(employeeRepo).findByUserId(any(), eq(owner));
         service.remindAll(today);
         assertThat(sent()).hasSize(1);
     }

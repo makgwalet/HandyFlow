@@ -52,6 +52,7 @@ class CatalogueServiceTest {
     void setUp() {
         service = new CatalogueService(items, categories, audit, new VatRateProvider(new BigDecimal("15.00")), structure, pricing);
         lenient().when(structure.resolveUnit(any(), anyString(), any())).thenAnswer(i -> ((String) i.getArgument(1)).trim());
+        lenient().when(structure.store(any(), any(), any())).thenReturn("");
         lenient().when(items.nameTaken(any(), anyString(), any())).thenReturn(false);
         lenient().when(items.skuTaken(any(), anyString(), any())).thenReturn(false);
         lenient().when(items.barcodeTaken(any(), anyString(), any())).thenReturn(false);

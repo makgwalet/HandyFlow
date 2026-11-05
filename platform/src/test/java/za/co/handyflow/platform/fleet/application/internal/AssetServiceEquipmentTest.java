@@ -131,7 +131,8 @@ class AssetServiceEquipmentTest {
 
         List<EquipmentResponse> out = service().listEquipment(TENANT);
 
-        assertEquals(List.of("A-TRACTOR", "b-harvester"), out.stream().map(EquipmentResponse::registration).toList());
+        // registrations are stored upper case
+        assertEquals(List.of("A-TRACTOR", "B-HARVESTER"), out.stream().map(EquipmentResponse::registration).toList());
         assertEquals(0, bd("85").compareTo(out.get(0).operatingRatePerHour()));
         assertNull(out.get(1).operatingRatePerHour());
     }
