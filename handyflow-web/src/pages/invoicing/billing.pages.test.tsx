@@ -305,6 +305,29 @@ describe('RecurringListPage and detail', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/v1/invoicing/recurring-schedules/s2/resume'))
   })
+  it('shows recurring invoices delayed by the invoice cap, waiting and overdue, never as skipped', async () => {
+    const entry = (o: any) => ({ id: 'q1', scheduleId: 's1', scheduleTitle: 'Monthly site security', scheduledFor: day(-12), periodStart: day(-12), periodEnd: day(17),
+      status: 'QUEUED', blockedReason: 'Waiting for room: 50 of 50 invoices used for 2026-11.', escalatedAt: null, invoiceId: null, issuedAt: null, ...o })
+    route({ '/recurring-schedules/delayed': one({ maxDelayDays: 7, waiting: 2, overdue: 1, items: [
+      { entry: entry({}), daysDelayed: 12, overdue: true },
+      { entry: entry({ id: 'q2', scheduleTitle: 'Excavator hire', scheduledFor: day(-2), blockedReason: null }), daysDelayed: 2, overdue: false },
+      { entry: entry({ id: 'q3', scheduleTitle: 'Old one', status: 'ISSUED', issuedAt: day(-1), blockedReason: null }), daysDelayed: 0, overdue: false }] }),
+      '/recurring-schedules': page([schedule()]), '/crm/customers': customers })
+    renderAt('/recurring', '/recurring', <RecurringListPage />)
+    const panel = await screen.findByRole('region', { name: 'Delayed recurring invoices' })
+    expect(within(panel).getByText(/2 recurring invoices are waiting/)).toBeTruthy()
+    expect(within(panel).getByText(/1 has waited longer than 7 days/)).toBeTruthy()
+    expect(within(panel).getByText(/Overdue — waiting more than 7 days/)).toBeTruthy()
+    expect(within(panel).getByText('Waiting for room')).toBeTruthy()
+    expect(within(panel).getByText(/Issued/)).toBeTruthy()
+    expect(within(panel).getByText('Waiting for room: 50 of 50 invoices used for 2026-11.')).toBeTruthy()
+  })
+  it('shows no delayed-invoice panel when nothing is delayed', async () => {
+    route({ '/recurring-schedules/delayed': one({ maxDelayDays: 7, waiting: 0, overdue: 0, items: [] }), '/recurring-schedules': page([schedule()]), '/crm/customers': customers })
+    renderAt('/recurring', '/recurring', <RecurringListPage />)
+    await screen.findByText('Monthly site security')
+    expect(screen.queryByRole('region', { name: 'Delayed recurring invoices' })).toBeNull()
+  })
   it('logs cycle hours, billing the minimum when fewer were worked', async () => {
     perms.add('INVOICE_CREATE')
     route({ '/recurring-schedules': page([schedule({ id: 'v1', title: 'Excavator hire', variableHours: true, ratePerHour: 900, minimumHoursPerCycle: 160 })]), '/crm/customers': customers })

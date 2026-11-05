@@ -42,6 +42,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class QuoteService {
 
+    // Hard invoice cap (see UsageCapFacade).
+    private final za.co.handyflow.platform.usage.UsageCapFacade usageCap;
+
     private final QuoteRepository quoteRepository;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
     private final InvoiceRepository invoiceRepository;
@@ -256,6 +259,7 @@ public class QuoteService {
             );
         }
 
+        usageCap.requireCapacity(tenantId);   // hard invoice cap: the quote stays accepted and can be converted when there is room
         String invoiceNumber = invoiceNumberGenerator.next(tenantId);
 
         Invoice invoice = Invoice.createFromQuote(

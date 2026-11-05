@@ -24,6 +24,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class RecurringScheduleService {
 
+    // Hard invoice cap (see UsageCapFacade).
+    private final za.co.handyflow.platform.usage.UsageCapFacade usageCap;
+    private final RecurringInvoiceQueue delayQueue;
+
+    @org.springframework.beans.factory.annotation.Value("${handyflow.invoicing.recurring-max-delay-days:7}")
+    private int maxDelayDays;
+
     private final RecurringScheduleRepository scheduleRepo;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
     private final InvoiceRepository invoiceRepo;
@@ -54,6 +61,16 @@ public class RecurringScheduleService {
                 .map(this::toResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("RecurringSchedule", id.toString()));
     }
+
+    /** Recurring invoices held back by the hard invoice cap (waiting, and issued in the last 30 days), oldest first. */
+    @Transactional(readOnly = true)
+    public DelayedRecurringInvoices delayedInvoices(TenantId tenantId) {
+        var rows = delayQueue.list(tenantId, LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg")), maxDelayDays);
+        return new DelayedRecurringInvoices(maxDelayDays, rows.stream().filter(r -> "QUEUED".equals(r.entry().status())).count(),
+                rows.stream().filter(RecurringInvoiceQueue.View::overdue).count(), rows);
+    }
+
+    public record DelayedRecurringInvoices(int maxDelayDays, long waiting, long overdue, java.util.List<RecurringInvoiceQueue.View> items) {}
 
     // ── Commands ──────────────────────────────────────────────────────────────
 
@@ -261,6 +278,7 @@ public class RecurringScheduleService {
                     "This schedule uses fixed line items. Use the standard invoice flow.");
         }
 
+        usageCap.requireCapacity(tenantId);   // hard invoice cap: nothing is created, so the hours can be logged again later
         BigDecimal billed    = schedule.resolveBillableHours(req.actualHours());
         boolean    minimised = billed.compareTo(req.actualHours()) > 0;
 

@@ -59,11 +59,17 @@ Other items touched by your answers:
 | Invoice and seat metering (Phase C) | First slice built in **report mode only** (patch 0646, V594): issued invoices counted per month by a trigger into an append-only table; seats = active users plus pending invitations; `GET /api/v1/usage`; `USAGE-REPORT` log lines at 80% and over. A tenant has no limits until `tenants.usage_tier` is set. Nothing blocks. | Blocking (the hard cap) waits for final approval of the limits and for the recurring-invoice rule. Fix INV-01 before relying on the counts. |
 | Downgrade transition (Phase D) | Not built | Needs the payment-failure and suspension rules (item 2 above). |
 
+## 4a. Decisions of 17:26 (built in patches 0653 and 0654)
+
+| Topic | Decision | Status |
+|---|---|---|
+| Missing invoice journals (33 invoices) | Mixed repair by accounting-period status. Original issue date when its period is open (including an authorised reopening). Current open period, classified a prior-period correction, when the original period is locked or closed. Never bypass period locks, overwrite history or create duplicate journals. Preserve original invoice date, source reference, repair time, reason and audit trail. Preview with a count per category first; approval required before posting. | DECIDED, built (0653). Not yet run on the real database. |
+| Recurring invoice at the hard cap | **Delay**, do not skip, do not exceed the cap. Queue the occurrence with its original scheduled date and service period, notify the tenant administrator, retry when capacity returns, issue exactly once with the actual issue date. Show queued and overdue occurrences. Configurable maximum delay with escalation. Never silently discard or bypass the cap. | DECIDED, built (0654). The cap itself is OFF by default (`handyflow.usage.invoice-hard-cap.enabled=false`) until the limits are finally approved. |
+
 ## 5. Unresolved items
 
 - D-23 (credit scheme), D-10 quantity, D-24 and D-26 pending legal review.
 - Payment-failure and suspension handling.
-- Recurring invoices against the hard cap.
 - Final commercial approval of the tier limits (invoice allowance and seats).
 - The five catalogue query results (answer 8).
 - The remaining register items not covered by answer 9: D-06 to D-09, D-12, D-14 to D-22.

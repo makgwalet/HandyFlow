@@ -240,6 +240,9 @@ public enum NotificationType {
     INVOICE_PAYMENT_RECEIVED(INFO, Set.of(IN_APP, EMAIL)),
     RETAINER_HOURS_OVERAGE(WARNING, Set.of(IN_APP, EMAIL)),
     RECURRING_SCHEDULE_FAILED(CRITICAL, Set.of(IN_APP, EMAIL)),
+    // A recurring invoice waiting because the business is at its hard invoice cap, and the same one waiting too long.
+    RECURRING_INVOICE_DELAYED(WARNING, Set.of(IN_APP, EMAIL)),
+    RECURRING_INVOICE_DELAY_ESCALATED(CRITICAL, Set.of(IN_APP, EMAIL)),
     // ── Marketing ────────────────────────────────────────────────────────────
     CAMPAIGN_LAUNCHED(INFO, Set.of(IN_APP)),
     CAMPAIGN_COMPLETED(INFO, Set.of(IN_APP)),

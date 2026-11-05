@@ -205,6 +205,21 @@ public class RecurringSchedule {
         }
     }
 
+    /**
+     * The occurrence scheduled for {@code scheduledFor} could not be issued tonight and is waiting in the delay queue.
+     * Moves the schedule on to its next occurrence, counted from the scheduled time so that nothing drifts; lastRunAt is
+     * untouched because nothing ran.
+     */
+    public void deferOccurrence(Instant scheduledFor) {
+        this.nextRunAt = computeNextRun(scheduledFor);
+        if (endDate != null && nextRunAt.isAfter(endDate)) {
+            this.status = RecurringScheduleStatus.COMPLETED;
+        }
+    }
+
+    /** When the occurrence after the one at {@code from} is scheduled. */
+    public Instant followingRun(Instant from) { return computeNextRun(from); }
+
     private Instant computeNextRun(Instant from) {
         return switch (frequency) {
             case DAILY   -> from.plusSeconds(86_400);

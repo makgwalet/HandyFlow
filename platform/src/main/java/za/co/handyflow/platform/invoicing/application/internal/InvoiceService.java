@@ -34,6 +34,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class InvoiceService {
 
+    // Hard invoice cap: issuing is refused (409 INVOICE_CAP_REACHED) when the plan has no room. Drafts are never refused.
+    private final za.co.handyflow.platform.usage.UsageCapFacade usageCap;
+
     private final InvoiceRepository      invoiceRepo;
     private final InvoiceQueryService    queryService;
     private final InvoiceNumberGenerator invoiceNumberGenerator;
@@ -73,6 +76,7 @@ public class InvoiceService {
         // Auto-issue if still DRAFT, with a real due date now that we have
         // one — recording payment implies it was already sent.
         if (invoice.getIssuedAt() == null) {
+            usageCap.requireCapacity(tenantId);
             LocalDate dueDate = paymentTermsResolver.resolveDueDate(tenantId, LocalDate.now());
             invoice.markIssued(dueDate);
             invoiceRepo.save(invoice);
@@ -143,6 +147,7 @@ public class InvoiceService {
     public InvoiceResponse issueInvoice(TenantId tenantId, UUID id) {
         Invoice invoice = invoiceRepo.findActiveByIdWithLineItems(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", id.toString()));
+        if (invoice.getIssuedAt() == null) usageCap.requireCapacity(tenantId);
         // FIXED: now sets a real due date instead of no-arg markIssued().
         LocalDate dueDate = paymentTermsResolver.resolveDueDate(tenantId, LocalDate.now());
         invoice.markIssued(dueDate);

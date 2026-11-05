@@ -11,6 +11,7 @@ import za.co.handyflow.platform.invoicing.domain.model.Invoice;
 import za.co.handyflow.platform.invoicing.domain.model.InvoiceLineItem;
 import za.co.handyflow.platform.invoicing.domain.model.Quote;
 import za.co.handyflow.platform.invoicing.domain.model.RecurringSchedule;
+import za.co.handyflow.platform.invoicing.domain.model.RecurringScheduleStatus;
 import za.co.handyflow.platform.invoicing.domain.repository.InvoiceRepository;
 import za.co.handyflow.platform.invoicing.domain.repository.QuoteRepository;
 import za.co.handyflow.platform.invoicing.domain.repository.RecurringScheduleRepository;
@@ -48,6 +49,16 @@ class InvoicingScheduler {
     // an already-saved invoice" pattern.
     private final InvoicePdfService            invoicePdfService;
     private final TenantFacade                 tenantFacade;
+    // Hard invoice cap (Decision 2): a recurring invoice that would go over the cap is delayed, never skipped or forced.
+    private final za.co.handyflow.platform.usage.UsageCapFacade usageCap;
+    private final RecurringInvoiceQueue        delayQueue;
+    private final org.springframework.transaction.support.TransactionTemplate tx;
+
+    /** How long a delayed recurring invoice may wait, from its original billing date, before the administrators are escalated to. */
+    @org.springframework.beans.factory.annotation.Value("${handyflow.invoicing.recurring-max-delay-days:7}")
+    private int maxDelayDays;
+
+    private static final java.time.ZoneId SA = java.time.ZoneId.of("Africa/Johannesburg");
 
     @Scheduled(cron = "0 30 2 * * *")
     @Transactional
@@ -161,8 +172,9 @@ class InvoicingScheduler {
         log.info("Recurring scheduler: {} schedule(s) due", due.size());
 
         for (var schedule : due) {
+            UUID scheduleId = schedule.getId();
             try {
-                spawnInvoiceForSchedule(schedule);
+                tx.executeWithoutResult(st -> fireOne(scheduleId));
             } catch (Exception e) {
                 log.error("Failed to spawn invoice for schedule={} tenant={}: {}",
                         schedule.getId(), schedule.getTenantId(), e.getMessage(), e);
@@ -174,10 +186,95 @@ class InvoicingScheduler {
                         "/recurring", schedule.getId().toString());
             }
         }
+        drainDelayedInvoices();
     }
 
-    @Transactional
-    protected void spawnInvoiceForSchedule(RecurringSchedule schedule) {
+    /** One due schedule, in one transaction, so the cap check, the invoice and the queue entry stand or fall together. */
+    private void fireOne(UUID scheduleId) {
+        var schedule = scheduleRepository.findById(scheduleId).orElse(null);
+        if (schedule == null || schedule.getStatus() != RecurringScheduleStatus.ACTIVE || schedule.getNextRunAt().isAfter(Instant.now())) return;
+        var tenantId = schedule.getTenantId();
+        var cap = usageCap.checkAndLock(tenantId);
+        if (RecurringQueueRules.shouldQueue(cap.enforced(), cap.allowed(), delayQueue.hasQueued(tenantId))) {
+            delay(schedule, cap);
+            return;
+        }
+        spawnInvoiceForSchedule(schedule, null);
+    }
+
+    /** The occurrence waits with its original billing date and the period it covers; the schedule moves on to the next one. */
+    private void delay(RecurringSchedule schedule, za.co.handyflow.platform.usage.UsageCapFacade.Decision cap) {
+        Instant scheduled = schedule.getNextRunAt();
+        LocalDate start = scheduled.atZone(SA).toLocalDate();
+        LocalDate end = RecurringQueueRules.periodEnd(start, schedule.followingRun(scheduled).atZone(SA).toLocalDate());
+        boolean added = delayQueue.enqueue(schedule.getTenantId(), schedule.getId(), start, start, end);
+        schedule.deferOccurrence(scheduled);
+        scheduleRepository.save(schedule);
+        log.warn("RECURRING-DELAYED tenant={} schedule={} scheduledFor={} cap={}/{} period={}", schedule.getTenantId().getValue(),
+                schedule.getId(), start, cap.used(), cap.limit(), cap.period());
+        if (added) {
+            String why = cap.allowed() ? "Earlier delayed invoices are being issued first."
+                    : "You have used " + cap.used() + " of the " + cap.limit() + " invoices your plan allows for " + cap.period() + ".";
+            staffNotifier.notify(schedule.getTenantId(), NotificationType.RECURRING_INVOICE_DELAYED,
+                    "Recurring invoice delayed: " + schedule.getTitle(),
+                    "The invoice for \"" + schedule.getTitle() + "\" due on " + start + " (service period " + start + " to " + end
+                            + ") has been delayed, not skipped. " + why + " It will be issued as soon as there is room, with today's date as its issue date.",
+                    "/recurring", schedule.getId().toString());
+        }
+    }
+
+    /** Issues delayed occurrences, oldest first, wherever the cap now allows. Each is issued exactly once. */
+    void drainDelayedInvoices() {
+        java.util.Set<UUID> full = new java.util.HashSet<>();
+        for (UUID id : delayQueue.queuedIds()) {
+            try {
+                tx.executeWithoutResult(st -> issueDelayed(id, full));
+            } catch (Exception e) {
+                log.error("Could not issue delayed recurring invoice queue={}: {}", id, e.getMessage(), e);
+            }
+        }
+        escalateOverdue();
+    }
+
+    private void issueDelayed(UUID queueId, java.util.Set<UUID> full) {
+        var entry = delayQueue.lockQueued(queueId).orElse(null);   // gone or already issued: nothing to do
+        if (entry == null || full.contains(entry.tenantId())) return;
+        var tenantId = TenantId.of(entry.tenantId());
+        var cap = usageCap.checkAndLock(tenantId);
+        if (cap.enforced() && !cap.allowed()) {
+            full.add(entry.tenantId());
+            delayQueue.attempted(queueId, "Waiting for room: " + cap.used() + " of " + cap.limit() + " invoices used for " + cap.period() + ".");
+            return;
+        }
+        var schedule = scheduleRepository.findById(entry.scheduleId()).orElse(null);
+        if (schedule == null || schedule.getStatus() == RecurringScheduleStatus.PAUSED || schedule.getStatus() == RecurringScheduleStatus.CANCELLED) {
+            delayQueue.attempted(queueId, "The recurring schedule is " + (schedule == null ? "missing" : schedule.getStatus().name().toLowerCase())
+                    + ". Resume it to issue this invoice.");
+            return;
+        }
+        spawnInvoiceForSchedule(schedule, entry);
+    }
+
+    /** Tells the administrators, once, about an occurrence that has waited longer than the configured limit. */
+    private void escalateOverdue() {
+        for (var e : delayQueue.needingEscalation(LocalDate.now(SA), maxDelayDays)) {
+            try {
+                staffNotifier.notify(TenantId.of(e.tenantId()), NotificationType.RECURRING_INVOICE_DELAY_ESCALATED,
+                        "Recurring invoice still waiting: " + e.scheduleTitle(),
+                        "The invoice for \"" + e.scheduleTitle() + "\" due on " + e.scheduledFor() + " (service period " + e.periodStart() + " to "
+                                + e.periodEnd() + ") has been waiting " + RecurringQueueRules.daysDelayed(e.scheduledFor(), LocalDate.now(SA))
+                                + " days, more than the " + maxDelayDays + "-day limit. It cannot be issued until your plan has room: upgrade your plan or wait for the new month.",
+                        "/recurring", e.scheduleId().toString());
+                delayQueue.escalated(e.id());
+                log.warn("RECURRING-ESCALATED tenant={} schedule={} scheduledFor={}", e.tenantId(), e.scheduleId(), e.scheduledFor());
+            } catch (RuntimeException ex) {
+                log.warn("Could not escalate delayed recurring invoice {}: {}", e.id(), ex.getMessage());
+            }
+        }
+    }
+
+    /** {@code delayed} is the queue entry when this occurrence was held back by the cap; it is then issued late, once. */
+    protected void spawnInvoiceForSchedule(RecurringSchedule schedule, RecurringInvoiceQueue.Entry delayed) {
         var tenantId      = schedule.getTenantId();
         var invoiceNumber = invoiceNumberGenerator.next(tenantId);
 
@@ -186,7 +283,8 @@ class InvoicingScheduler {
                 schedule.getCustomerId(),
                 schedule.getId(),
                 invoiceNumber,
-                schedule.getTitle(),
+                delayed == null ? schedule.getTitle()
+                        : RecurringQueueRules.delayedTitle(schedule.getTitle(), delayed.periodStart(), delayed.periodEnd()),
                 schedule.getSubtotal(),
                 schedule.getVatTotal(),
                 schedule.getTotal(),
@@ -223,8 +321,15 @@ class InvoicingScheduler {
             }
         }
 
-        schedule.markRan(Instant.now());
-        scheduleRepository.save(schedule);
+        if (delayed == null) {
+            schedule.markRan(Instant.now());
+            scheduleRepository.save(schedule);
+        } else {
+            // Already moved on when it was delayed; here the waiting occurrence is closed against the invoice it became.
+            delayQueue.issued(delayed.id(), invoice.getId());
+            log.info("Issued delayed recurring invoice={} for occurrence {} (period {} to {})", invoiceNumber,
+                    delayed.scheduledFor(), delayed.periodStart(), delayed.periodEnd());
+        }
 
         log.info("Spawned recurring invoice={} from schedule={} nextRun={}",
                 invoiceNumber, schedule.getId(), schedule.getNextRunAt());

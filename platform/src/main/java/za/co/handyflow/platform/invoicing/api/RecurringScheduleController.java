@@ -42,6 +42,14 @@ public class RecurringScheduleController {
                 scheduleService.getSchedules(TenantContext.getTenantIdAsObject(), pageable)));
     }
 
+    @GetMapping("/recurring-schedules/delayed")
+    @PreAuthorize("hasAuthority('INVOICE_READ')")
+    @Operation(summary = "Recurring invoices delayed by the hard invoice cap: waiting (with how long, and whether past the maximum delay) and recently issued")
+    public ResponseEntity<ApiResponse<RecurringScheduleService.DelayedRecurringInvoices>> delayed() {
+        featureGuard.requireModule("invoicing");
+        return ResponseEntity.ok(ApiResponse.success(scheduleService.delayedInvoices(TenantContext.getTenantIdAsObject())));
+    }
+
     @GetMapping("/recurring-schedules/{id}")
     @PreAuthorize("hasAuthority('INVOICE_READ')")
     @Operation(summary = "Get a recurring schedule by ID")

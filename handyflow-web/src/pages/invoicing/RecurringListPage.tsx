@@ -12,6 +12,7 @@ import {
   recurringStats, sortBy, type RecurringSchedule, type SortDir,
 } from "./billing.logic"
 import { CycleHoursDialog } from "./dialogs"
+import { DelayedInvoicesPanel } from "./DelayedInvoicesPanel"
 import { apiMessage, useCustomerNames, useSchedules } from "./queries"
 import { BillingNav, Btn, FilterPills, Kpis, Loading, LoadError, Notice, Pager, SearchBox, StateBox, TableShell, Th, td, trStyle } from "./ui"
 
@@ -82,6 +83,8 @@ export default function RecurringListPage() {
 
       <div style={{ marginBottom: 14 }}><Notice tone="ok"><RefreshCw size={14} aria-hidden="true" style={{ marginTop: 2, flexShrink: 0 }} />
         <span>Active schedules run automatically at <strong>02:45 every morning</strong>. Each run creates an issued invoice linked back to its schedule.</span></Notice></div>
+
+      <DelayedInvoicesPanel />
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
         <SearchBox value={search} onChange={v => { setSearch(v); setPage(0) }} placeholder="Search schedule or customer" />

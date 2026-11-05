@@ -16,6 +16,11 @@ public final class UsageRules {
         return NONE;
     }
 
+    /** Another invoice may be issued while fewer than the limit have been; no limit means always. */
+    public static boolean capAllows(long used, Integer limit) {
+        return limit == null || limit <= 0 || used < limit;
+    }
+
     /** Whole percent of the limit used, or null when there is no limit. */
     public static Integer percent(long used, Integer limit) {
         return limit == null || limit <= 0 ? null : (int) Math.min(Integer.MAX_VALUE, used * 100 / limit);
