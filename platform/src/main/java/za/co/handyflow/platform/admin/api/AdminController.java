@@ -121,6 +121,16 @@ public class AdminController {
                 "Tenant " + req.tenantSlug() + " suspended", null));
     }
 
+    @PutMapping("/tenants/{slug}/usage-tier")
+    @Operation(summary = "Set or clear a tenant's usage tier (seat and invoice limits shown in report mode)")
+    public ResponseEntity<ApiResponse<Void>> setUsageTier(
+            @PathVariable String slug,
+            @RequestBody SetUsageTierRequest req,
+            HttpServletRequest http) {
+        adminService.setUsageTier(getAdminId(), getAdminEmail(), slug, req.tier(), req.reason(), getIp(http));
+        return ResponseEntity.ok(ApiResponse.success("Usage tier updated for " + slug, null));
+    }
+
     @PostMapping("/tenants/{slug}/reactivate")
     @Operation(summary = "Reactivate a suspended tenant")
     public ResponseEntity<ApiResponse<Void>> reactivateTenant(

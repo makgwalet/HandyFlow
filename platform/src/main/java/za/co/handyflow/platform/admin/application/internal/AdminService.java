@@ -633,6 +633,30 @@ public class AdminService {
             """);
     }
 
+    // ── Usage tier ────────────────────────────────────────────────────────────
+
+    private static final java.util.Set<String> USAGE_TIERS =
+            java.util.Set.of("STARTER", "GROWTH", "BUSINESS", "ENTERPRISE");
+
+    /** Sets or clears tenants.usage_tier. Audited with the old and new value and a reason. */
+    @Transactional
+    public void setUsageTier(UUID adminId, String adminEmail, String slug, String tier,
+                             String reason, String ipAddress) {
+        String wanted = (tier == null || tier.isBlank()) ? null : tier.trim().toUpperCase();
+        if (wanted != null && !USAGE_TIERS.contains(wanted))
+            throw new HandyFlowException("Unknown tier '" + tier + "'. Use STARTER, GROWTH, BUSINESS or ENTERPRISE.",
+                    HttpStatus.BAD_REQUEST, "INVALID_TIER");
+        if (reason == null || reason.trim().length() < 10)
+            throw new HandyFlowException("Give a reason of at least 10 characters.",
+                    HttpStatus.BAD_REQUEST, "REASON_REQUIRED");
+        resolveTenantBySlug(slug);   // 404 when unknown
+        String before = jdbc.query("SELECT usage_tier FROM tenants WHERE slug = ?",
+                rs -> rs.next() ? rs.getString(1) : null, slug);
+        jdbc.update("UPDATE tenants SET usage_tier = ?, updated_at = NOW() WHERE slug = ?", wanted, slug);
+        audit(adminId, adminEmail, "SET_USAGE_TIER", "TENANT", slug, slug,
+                "from=" + before + " to=" + wanted + " reason=" + reason.trim(), ipAddress);
+    }
+
     // ── Slug resolution ───────────────────────────────────────────────────────────
 
     public UUID resolveTenantBySlug(String slug) {
