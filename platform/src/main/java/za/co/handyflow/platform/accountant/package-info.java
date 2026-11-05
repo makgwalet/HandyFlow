@@ -12,7 +12,9 @@
  *
  * Package: za.co.handyflow.platform.accountant
  */
+@ApplicationModule(allowedDependencies = {"shared", "accounting"})
 @NonNullApi
 package za.co.handyflow.platform.accountant;
 
 import org.springframework.lang.NonNullApi;
+import org.springframework.modulith.ApplicationModule;

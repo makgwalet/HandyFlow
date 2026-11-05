@@ -10,7 +10,9 @@
                 // .createBillFromSupplyChainInvoice() — see ScmService's
                 // own comment on approveSupplierInvoice() for the fuller
                 // design.
-                "ap"
+                "ap",
+                // Raises control exceptions through ControlExceptionFacade.
+                "controls"
         }
 )
 package za.co.handyflow.platform.supplychain;
