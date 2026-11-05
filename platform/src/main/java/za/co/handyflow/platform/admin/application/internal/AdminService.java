@@ -164,7 +164,7 @@ public class AdminService {
     public Map<String, Object> getTenantDetail(String slugOrId) {
         Map<String, Object> tenant = jdbc.queryForMap("""
             SELECT t.id, t.name, t.slug, t.email, t.phone,
-                   t.created_at,
+                   t.created_at, t.usage_tier,
                    s.status AS subscription_status,
                    s.pilot_ends_at,
                    s.past_due_since,
