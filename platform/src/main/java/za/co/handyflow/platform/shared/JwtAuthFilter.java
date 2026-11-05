@@ -24,9 +24,24 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
 
+    /** Optional so the filter still builds in tests that do not wire it. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private TokenVersions tokenVersions;
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         return request.getRequestURI().startsWith("/api/v1/admin/");
+    }
+
+    /** Real tenant tokens only: admin and impersonation tokens carry no tenant version. */
+    private boolean staleForTenant(String jwt) {
+        if (tokenVersions == null || jwtService.isImpersonation(jwt)) return false;
+        try {
+            return tokenVersions.rejects(java.util.UUID.fromString(jwtService.extractTenantId(jwt)),
+                    jwtService.extractTokenVersion(jwt));
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     @Override
@@ -42,7 +57,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 final String jwt = authHeader.substring(7);
 
-                if (jwtService.isTokenValid(jwt)) {
+                if (jwtService.isTokenValid(jwt) && !staleForTenant(jwt)) {
                     String userId   = jwtService.extractUserId(jwt);
                     String tenantId = jwtService.extractTenantId(jwt);
                     Set<String> permissions = jwtService.extractPermissions(jwt);

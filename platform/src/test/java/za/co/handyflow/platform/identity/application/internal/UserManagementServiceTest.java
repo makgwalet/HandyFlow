@@ -68,6 +68,7 @@ class UserManagementServiceTest {
     @Mock AccessAuditService auditService;
     @Mock RefreshTokenSecuritySweep securitySweep;
 
+    @Mock za.co.handyflow.platform.shared.TokenVersions tokenVersions;
     @InjectMocks UserManagementService service;
 
     static final UUID TENANT_UUID = UUID.fromString("9ecb3dc7-75d4-4e56-b0a2-c95d3c7c584f");

@@ -19,6 +19,13 @@ import java.util.function.Function;
 public class JwtService {
     private final SecretKey signingKey;
     private final long expirationMs;
+    /** Optional: absent in plain unit tests, in which case no tcv claim is written. */
+    private TokenVersions tokenVersions;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setTokenVersions(TokenVersions tokenVersions) {
+        this.tokenVersions = tokenVersions;
+    }
 
     public JwtService(
             @Value("${app.security.jwt.secret}") String secret,
@@ -47,9 +54,11 @@ public class JwtService {
     public String generateToken(UUID userId, UUID tenantId,
                                 String email, String firstName,
                                 String lastName, Set<String> permissions) {
+        int tcv = tokenVersions != null ? tokenVersions.current(tenantId) : 0;
         return Jwts.builder()
                 .subject(userId.toString())
                 .claims(Map.of(
+                        "tcv", tcv,
                         "tenantId", tenantId.toString(),
                         "email", email,
                         "firstName", firstName != null ? firstName : "",
@@ -135,6 +144,12 @@ public class JwtService {
             }
             return Set.copyOf((java.util.List<String>) raw);
         });
+    }
+
+    /** The tenant token version the token was minted with; 0 for tokens that predate the claim. */
+    public int extractTokenVersion(String token) {
+        Integer v = extractClaim(token, claims -> claims.get("tcv", Integer.class));
+        return v == null ? 0 : v;
     }
 
     public boolean isTokenValid(String token) {

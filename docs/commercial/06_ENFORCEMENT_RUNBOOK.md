@@ -56,3 +56,15 @@ Besides the per-request module check above, login, refresh and invitation-accept
 - Login never fails because of it: any error in the check returns the permissions unchanged.
 - Read the report lines the same way as step 2 (change the pattern to `TOKEN-ENTITLEMENT-REPORT`). Turn it on after the per-request switch has been on without surprises, because a user keeps the old permissions until their token is refreshed (default access-token lifetime) or they log in again.
 - Not done yet: the `tcv` claim that forces a re-login when a tenant's modules change, so a module added mid-session shows up only at the next refresh.
+
+## 8. Token version ("tcv") — immediate effect for permission changes
+
+Every access token now carries `tcv`, the tenant's `tenants.token_version` at the moment it was minted.
+Changing a role's permissions bumps the tenant's version. A token with an older version is stale.
+
+- Switch: `handyflow.token-version.enforce` (env `HANDYFLOW_TOKEN_VERSION_ENFORCE`), default **false**.
+- While false, the filter only logs `TOKEN-VERSION-REPORT tenant=… token=… current=…`. Watch these for a few days.
+- When true, a stale token is treated as unauthenticated (401). The web app's refresh flow mints a fresh token with the current version, so users should not notice. Confirm that the frontend retries after a 401 before turning it on.
+- Tokens issued before this change have no claim and count as 0, so the first bump for a tenant makes all of its old tokens stale.
+- The version is cached for 10 seconds per instance. A bump clears the cache on the instance that made it; other instances catch up within 10 seconds.
+- Not yet bumped by: user role assignment, module entitlement changes. Add `TokenVersions.bump(tenantId)` there when wanted.

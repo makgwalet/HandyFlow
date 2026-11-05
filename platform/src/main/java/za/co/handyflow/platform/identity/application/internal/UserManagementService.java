@@ -40,6 +40,7 @@ public class UserManagementService {
     private final AccessAuditService       auditService;
     private final RefreshTokenSecuritySweep securitySweep;
     private final TokenPermissions tokenPermissions;
+    private final za.co.handyflow.platform.shared.TokenVersions tokenVersions;
 
     /** Base URL of the web app used in emailed links (property app.frontend.url, same as the other modules). */
     @org.springframework.beans.factory.annotation.Value("${app.frontend.url:https://app.handyflow.co.za}")
@@ -483,6 +484,7 @@ public class UserManagementService {
         requested.forEach(role::addPermission);
 
         roleRepository.save(role);
+        tokenVersions.bump(tenantId.getValue());
         auditService.record(tenantId, "ROLE_PERMISSIONS_CHANGED", "ROLE", role.getId(), role.getName(),
                 Map.of("permissions", new TreeSet<>(before)), Map.of("permissions", after));
         log.info("Updated permissions for role={} in tenant={}", roleId, tenantId);
