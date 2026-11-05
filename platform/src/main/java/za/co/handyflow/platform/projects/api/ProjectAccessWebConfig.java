@@ -10,8 +10,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * Registers ProjectAccessInterceptor on every project route.
  *
  * The interceptor is taken through an ObjectProvider, like the Training, Recruiter, Accountant, Clinic and entitlement
- * configurations. A WebMvcConfigurer is part of every @WebMvcTest slice but the interceptor (a plain @Component) is not,
- * so a direct constructor dependency made every controller slice test fail to load its application context.
+ * configurations, so a slice test that does not contain it still loads.
  */
 @Configuration
 @RequiredArgsConstructor

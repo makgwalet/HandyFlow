@@ -78,6 +78,7 @@ class HrControllerTest {
     @Autowired ObjectMapper mapper;
 
     @MockitoBean HrService              hrService;
+    @MockitoBean za.co.handyflow.platform.hr.application.internal.Emp201Merge emp201Merge;
     @MockitoBean PayrollService         payrollService;
     @MockitoBean StatutoryRulesService  statutoryRulesService;
     @MockitoBean MedicalSchemeService   medicalSchemeService;

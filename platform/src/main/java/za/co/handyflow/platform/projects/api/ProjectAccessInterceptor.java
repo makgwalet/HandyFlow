@@ -2,9 +2,9 @@ package za.co.handyflow.platform.projects.api;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 import za.co.handyflow.platform.projects.application.internal.ProjectAccess;
@@ -37,11 +37,20 @@ import java.util.UUID;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class ProjectAccessInterceptor implements HandlerInterceptor {
 
     private final ProjectAccessGuard   guard;
     private final ProjectScopeResolver resolver;
+
+    /**
+     * Both collaborators are @Lazy: this interceptor is part of every @WebMvcTest slice (Spring Boot includes
+     * HandlerInterceptor beans) but the guard and resolver are not, so eager injection made every controller slice
+     * test fail to load. At runtime they resolve on first use, which is the first project request.
+     */
+    public ProjectAccessInterceptor(@Lazy ProjectAccessGuard guard, @Lazy ProjectScopeResolver resolver) {
+        this.guard = guard;
+        this.resolver = resolver;
+    }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
