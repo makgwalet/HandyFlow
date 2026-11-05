@@ -39,6 +39,7 @@ class EmployeeChangeServiceTest {
     HrPayrollSettingsRepository settingsRepo;
     EmployeeAuditService audit;
     EmployeeChangeService service;
+    za.co.handyflow.platform.shared.SeparationOfDutiesChecker duties;
     HrEmployee emp;
 
     @BeforeEach
@@ -47,7 +48,8 @@ class EmployeeChangeServiceTest {
         employeeRepo = mock(HrEmployeeRepository.class);
         settingsRepo = mock(HrPayrollSettingsRepository.class);
         audit = mock(EmployeeAuditService.class);
-        service = new EmployeeChangeService(changeRepo, employeeRepo, settingsRepo, audit, mock(org.springframework.context.ApplicationEventPublisher.class));
+        duties = mock(za.co.handyflow.platform.shared.SeparationOfDutiesChecker.class);
+        service = new EmployeeChangeService(changeRepo, employeeRepo, settingsRepo, audit, mock(org.springframework.context.ApplicationEventPublisher.class), duties);
 
         emp = HrEmployee.create(tenant, "EMP-1", "Jane", "Dlamini", LocalDate.of(2024, 1, 1), "PERMANENT", new BigDecimal("30000"), "MONTHLY");
         emp.setBankName("FNB");
@@ -153,6 +155,21 @@ class EmployeeChangeServiceTest {
 
         assertThat(r.selfApproved()).isTrue();
         verify(audit).record(eq(tenant), eq(emp.getId()), eq("CHANGE_APPROVED_OWN"), any(), eq(asker));
+        verify(duties).recordSoleException(eq(tenant), eq(asker), eq("HR_COMPENSATION_APPROVE"), eq("EMPLOYEE_CHANGE"), eq(c.getId()), any());
+    }
+
+    @Test
+    void settingDoesNotLetAskerApproveWhileAnotherApproverExists() {
+        HrPayrollSettings s = HrPayrollSettings.create(tenant.getValue());
+        s.setAllowSelfApproval(true, approver);
+        when(settingsRepo.findById(any())).thenReturn(Optional.of(s));
+        when(duties.otherHolders(any(), eq("HR_COMPENSATION_APPROVE"), eq(asker))).thenReturn(1L);
+        HrEmployeeChange c = pending(LocalDate.now().plusDays(10));
+        when(changeRepo.findByTenantAndId(any(), eq(c.getId()))).thenReturn(Optional.of(c));
+
+        assertThatThrownBy(() -> service.approve(tenant, c.getId(), null, asker)).isInstanceOf(AccessDeniedException.class);
+        assertThat(c.getStatus()).isEqualTo("PENDING");
+        verify(duties, never()).recordSoleException(any(), any(), any(), any(), any(), any());
     }
 
     @Test

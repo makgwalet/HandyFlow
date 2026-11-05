@@ -55,7 +55,8 @@ class LeaveServiceTest {
         holidays = mock(PublicHolidayRepository.class);
         viewService = mock(EmployeeViewService.class);
         service = new LeaveService(ledgerRepo, requestRepo, settingsRepo, employeeRepo, payrollSettings, holidays, viewService,
-                mock(NotificationService.class), mock(TenantAdminRecipients.class), policyRepo);
+                mock(NotificationService.class), mock(TenantAdminRecipients.class), policyRepo,
+                mock(za.co.handyflow.platform.shared.SeparationOfDutiesChecker.class));
 
         emp = HrEmployee.create(tenant, "EMP-1", "Jane", "Dlamini", today.minusYears(3), "PERMANENT", new BigDecimal("30000"), "MONTHLY");
         when(employeeRepo.findActiveById(any(), eq(emp.getId()))).thenReturn(Optional.of(emp));

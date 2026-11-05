@@ -30,6 +30,9 @@ public class EmployeeChangeService {
     private final HrPayrollSettingsRepository settingsRepo;
     private final EmployeeAuditService audit;
     private final org.springframework.context.ApplicationEventPublisher events;
+    private final za.co.handyflow.platform.shared.SeparationOfDutiesChecker duties;
+
+    static final String APPROVE_PERMISSION = "HR_COMPENSATION_APPROVE";
 
     @Transactional
     public EmployeeChangeResponse requestCompensation(TenantId tenantId, UUID employeeId, CompensationChangeRequest req, UUID actor) {
@@ -68,7 +71,13 @@ public class EmployeeChangeService {
     @Transactional
     public EmployeeChangeResponse approve(TenantId tenantId, UUID changeId, String note, UUID actor) {
         HrEmployeeChange c = change(tenantId, changeId);
-        boolean self = EmployeeChangeRules.checkCanDecide(c.getStatus(), c.getRequestedBy(), actor, allowSelfApproval(tenantId));
+        // The business setting alone is not enough: while another person can approve, the asker may not.
+        // Where nobody else can, the setting lets them, and that is recorded for the Owner's report.
+        boolean mayApproveOwn = allowSelfApproval(tenantId) && actor != null && c.getRequestedBy() != null
+                && c.getRequestedBy().equals(actor) && duties.otherHolders(tenantId, APPROVE_PERMISSION, actor) == 0;
+        boolean self = EmployeeChangeRules.checkCanDecide(c.getStatus(), c.getRequestedBy(), actor, mayApproveOwn);
+        if (self) duties.recordSoleException(tenantId, actor, APPROVE_PERMISSION, "EMPLOYEE_CHANGE", c.getId(),
+                "approved their own " + c.getChangeType().toLowerCase().replace('_', ' ') + " change (nobody else can approve)");
         c.approve(actor, note, self);
         changeRepo.save(c);
         audit.record(tenantId, c.getEmployeeId(), self ? "CHANGE_APPROVED_OWN" : "CHANGE_APPROVED", summary(c), actor);

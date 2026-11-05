@@ -50,6 +50,7 @@ public class LeaveService {
     private final NotificationService notificationService;
     private final TenantAdminRecipients tenantAdminRecipients;
     private final HrLeavePolicyRepository policyRepo;
+    private final za.co.handyflow.platform.shared.SeparationOfDutiesChecker duties;
 
     // ── Reading ─────────────────────────────────────────────────────────────────────────────────
 
@@ -121,7 +122,9 @@ public class LeaveService {
     public LeaveRequestResponse approve(TenantId tenantId, UUID requestId, UUID actor, Set<String> held) {
         HrLeaveRequest req = request(tenantId, requestId);
         if (!"PENDING".equals(req.getStatus())) throw new IllegalStateException("Only a request that is waiting can be approved.");
-        checkMayDecide(tenantId, req, actor, held);
+        if (checkMayDecide(tenantId, req, actor, held))
+            duties.recordSoleException(tenantId, actor, "LEAVE_APPROVE", "LEAVE_REQUEST", requestId,
+                    "approved their own leave request (nobody else can approve)");
 
         req.approve(actor);
         requestRepo.save(req);
@@ -509,15 +512,19 @@ public class LeaveService {
         }
     }
 
-    private void checkMayDecide(TenantId tenantId, HrLeaveRequest req, UUID actor, Set<String> held) {
+    /** @return true when the approver is the employee and is allowed only because nobody else can decide */
+    private boolean checkMayDecide(TenantId tenantId, HrLeaveRequest req, UUID actor, Set<String> held) {
         if (actor == null) throw new AccessDeniedException("Your user could not be identified, so this step cannot be recorded.");
         Optional<HrEmployee> me = employeeRepo.findByUserId(tenantId, actor);
         boolean own = me.map(e -> e.getId().equals(req.getEmployeeId())).orElse(false);
         boolean allowSelf = payrollSettingsRepo.findById(tenantId.getValue()).map(HrPayrollSettings::isAllowSelfApproval).orElse(false);
-        if (own && !allowSelf) throw new AccessDeniedException("You cannot decide your own leave request. Ask another approver.");
+        // The business setting is not enough while another approver exists.
+        boolean soleApprover = own && allowSelf && duties.otherHolders(tenantId, "LEAVE_APPROVE", actor) + duties.otherHolders(tenantId, "HR_MANAGE", actor) == 0;
+        if (own && !soleApprover) throw new AccessDeniedException("You cannot decide your own leave request. Ask another approver.");
         if (HrAccess.teamOnly(held) && !viewService.teamOf(tenantId, actor).contains(req.getEmployeeId())) {
             throw new AccessDeniedException("You can only decide leave for the people in your own team.");
         }
+        return soleApprover;
     }
 
     private static boolean isReservation(String kind) { return LeaveRules.RESERVED.equals(kind) || LeaveRules.RELEASED.equals(kind); }
