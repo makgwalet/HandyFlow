@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * Mode is set by handyflow.entitlement.enforce:
  *  false (default) = report only: a request the tenant is not entitled to is logged as a warning and allowed;
  *  true            = enforce: FeatureGuard.requireModule throws 402/403.
+ * Modules in ModuleEntitlementPaths.REPORT_ONLY (no catalogue row) are reported even when enforcing.
  * Run in report mode first and check the log for "ENTITLEMENT-REPORT" lines, because trial, internal and demo
  * tenants may use a module without a subscription row and would be locked out by enforcing straight away.
  */
@@ -49,7 +50,7 @@ public class ModuleEntitlementInterceptorConfig implements WebMvcConfigurer {
                 if (guard == null || !TenantContext.hasTenant()) return true;
                 String key = ModuleEntitlementPaths.moduleFor(request.getRequestURI()).orElse(null);
                 if (key == null) return true;
-                if (enforce) {
+                if (enforce && ModuleEntitlementPaths.enforceable(key)) {
                     guard.requireModule(key);
                 } else if (!guard.hasModule(key)) {
                     String id = TenantContext.getTenantIdAsObject().getValue() + "|" + key;
