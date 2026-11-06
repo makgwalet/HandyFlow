@@ -793,6 +793,12 @@ export const WAREHOUSING_SECTIONS: ModuleSections = {
         { id: 'locations', label: 'Locations', icon: PinIcon },
       ],
     },
+    {
+      label: 'Controls',
+      sections: [
+        { id: 'approvals', label: 'Approvals', icon: ShieldCheck, anyPermission: ['WAREHOUSING_MANAGE', 'WAREHOUSING_ADMIN', 'WAREHOUSING_ADJUST_APPROVE'] },
+      ],
+    },
   ],
 }
 

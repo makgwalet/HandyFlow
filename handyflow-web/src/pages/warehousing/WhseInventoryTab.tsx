@@ -23,9 +23,24 @@ function AdjustModal({ inv, itemLabel, onClose }: { inv: InventoryResponse; item
   const [delta, setDelta] = useState("")
   const [reason, setReason] = useState("")
 
+  // When the warehouse has set an approval threshold, a larger adjustment is requested rather than applied.
+  const { data: rule } = useQuery<{ thresholdQty: number | null }>({
+    queryKey: ["whse-adjust-threshold"],
+    queryFn: async () => (await apiClient.get("/api/v1/warehousing/adjustment-approval-threshold")).data,
+  })
+  const amount = parseFloat(delta)
+  const needsApproval = rule?.thresholdQty != null && !Number.isNaN(amount) && Math.abs(amount) > rule.thresholdQty
+  const [sent, setSent] = useState(false)
+
   const adjust = useMutation({
-    mutationFn: async () => apiClient.post(`/api/v1/warehousing/inventory/${inv.id}/adjust`, { delta: parseFloat(delta), reason }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["whse-inventory", inv.clientId] }); onClose() },
+    mutationFn: async () => needsApproval
+      ? apiClient.post(`/api/v1/warehousing/inventory/${inv.id}/adjustment-requests`, { delta: amount, reason })
+      : apiClient.post(`/api/v1/warehousing/inventory/${inv.id}/adjust`, { delta: amount, reason }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["whse-inventory", inv.clientId] })
+      qc.invalidateQueries({ queryKey: ["whse-adjustment-requests"] })
+      if (needsApproval) setSent(true); else onClose()
+    },
   })
 
   return (
@@ -43,10 +58,12 @@ function AdjustModal({ inv, itemLabel, onClose }: { inv: InventoryResponse; item
           </div>
           <div><label style={labelStyle}>Reason *</label><textarea style={{ ...inputStyle, minHeight: 60, resize: "vertical" }} value={reason} onChange={e => setReason(e.target.value)} placeholder="Count correction, damage write-off, etc." /></div>
         </div>
+        {needsApproval && !sent && <p style={{ fontSize: 12, color: "var(--hf-warning-text)", marginTop: 12 }}>Adjustments of more than {rule?.thresholdQty} units need a second person. This will be sent for approval and the stock will not change until it is approved.</p>}
+        {sent && <p style={{ fontSize: 12.5, color: "var(--hf-success-text-strong)", marginTop: 12 }}>Sent for approval. The stock will change once another person approves it.</p>}
         {adjust.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(adjust.error as any)?.response?.data?.message ?? "Could not adjust this stock position"}</p>}
-        <button onClick={() => adjust.mutate()} disabled={!delta || !reason || adjust.isPending}
-          style={{ marginTop: 18, width: "100%", padding: "11px", borderRadius: 8, border: "none", background: WHSE_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13.5, fontWeight: 700, cursor: "pointer", opacity: (!delta || !reason || adjust.isPending) ? 0.6 : 1 }}>
-          {adjust.isPending ? "Adjusting…" : "Record adjustment"}
+        <button onClick={() => (sent ? onClose() : adjust.mutate())} disabled={!sent && (!delta || !reason || adjust.isPending)}
+          style={{ marginTop: 18, width: "100%", padding: "11px", borderRadius: 8, border: "none", background: WHSE_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13.5, fontWeight: 700, cursor: "pointer", opacity: (!sent && (!delta || !reason || adjust.isPending)) ? 0.6 : 1 }}>
+          {sent ? "Close" : adjust.isPending ? "Sending…" : needsApproval ? "Send for approval" : "Record adjustment"}
         </button>
       </div>
     </div>

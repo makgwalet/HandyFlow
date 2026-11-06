@@ -12,6 +12,7 @@
 import WhseDashboard from "./WhseDashboard"
 import WhseClientsTab from "./WhseClientsTab"
 import WhseLocationsTab from "./WhseLocationsTab"
+import WhseApprovalsTab from "./WhseApprovalsTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { WAREHOUSING_SECTIONS } from "../../navigation/moduleSections"
 
@@ -24,6 +25,7 @@ export default function WarehousingPage() {
           case "dashboard": return <WhseDashboard />
           case "clients":   return <WhseClientsTab />
           case "locations": return <WhseLocationsTab />
+          case "approvals": return <WhseApprovalsTab />
           default:          return null
         }
       }} />

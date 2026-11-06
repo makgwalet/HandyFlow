@@ -37,7 +37,8 @@ public class WhseAdjustmentApprovalService {
     private final SeparationOfDutiesChecker duties;
 
     public record Item(UUID id, UUID inventoryId, BigDecimal delta, String reason, String status, UUID requestedBy,
-                       String requestedByName, Instant requestedAt) {}
+                       String requestedByName, Instant requestedAt, String clientName, String sku, String locationCode,
+                       BigDecimal qtyOnHand) {}
 
     /** Units above which an adjustment needs a second person; null when the rule is off. */
     @Transactional(readOnly = true)
@@ -111,12 +112,19 @@ public class WhseAdjustmentApprovalService {
     public List<Item> pending(TenantId tenantId) {
         return jdbc.query("""
                 SELECT r.id, r.inventory_id, r.delta, r.reason, r.status, r.requested_by, r.requested_at,
-                       trim(coalesce(u.first_name, '') || ' ' || coalesce(u.last_name, '')) AS requested_by_name
-                  FROM whse_adjustment_requests r LEFT JOIN users u ON u.id = r.requested_by
+                       trim(coalesce(u.first_name, '') || ' ' || coalesce(u.last_name, '')) AS requested_by_name,
+                       c.trading_name AS client_name, it.sku AS sku, l.code AS location_code, inv.qty_on_hand AS qty_on_hand
+                  FROM whse_adjustment_requests r
+                  JOIN whse_inventory inv ON inv.id = r.inventory_id
+                  JOIN whse_clients c ON c.id = inv.client_id
+                  JOIN whse_items it ON it.id = inv.item_id
+                  JOIN whse_locations l ON l.id = inv.location_id
+                  LEFT JOIN users u ON u.id = r.requested_by
                  WHERE r.tenant_id = ? AND r.status = 'PENDING' ORDER BY r.requested_at""",
                 (rs, i) -> new Item(rs.getObject("id", UUID.class), rs.getObject("inventory_id", UUID.class), rs.getBigDecimal("delta"),
                         rs.getString("reason"), rs.getString("status"), rs.getObject("requested_by", UUID.class),
-                        rs.getString("requested_by_name"), rs.getTimestamp("requested_at").toInstant()),
+                        rs.getString("requested_by_name"), rs.getTimestamp("requested_at").toInstant(),
+                        rs.getString("client_name"), rs.getString("sku"), rs.getString("location_code"), rs.getBigDecimal("qty_on_hand")),
                 tenantId.getValue());
     }
 
