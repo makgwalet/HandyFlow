@@ -44,7 +44,13 @@ public class WhseStorageAccrual {
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt = Instant.now();
 
     public static WhseStorageAccrual of(WhseInventory position, LocalDate date, BigDecimal monthlyRate, String rateSource) {
-        if (position.getQtyOnHand().signum() <= 0) {
+        return of(position, date, position.getQtyOnHand(), monthlyRate, rateSource);
+    }
+
+    /** {@code billableQty} is the most the position held on that day (see WhseStorageAccrualRepository.billableQuantities). */
+    public static WhseStorageAccrual of(WhseInventory position, LocalDate date, BigDecimal billableQty,
+                                        BigDecimal monthlyRate, String rateSource) {
+        if (billableQty == null || billableQty.signum() <= 0) {
             throw new IllegalArgumentException("Nothing on hand to accrue");
         }
         WhseStorageAccrual a = new WhseStorageAccrual();
@@ -55,10 +61,10 @@ public class WhseStorageAccrual {
         a.inventoryId = position.getId();
         a.status = position.getStatus();
         a.accrualDate = date;
-        a.qtyOnHand = position.getQtyOnHand();
+        a.qtyOnHand = billableQty;
         a.monthlyRate = monthlyRate;
         a.rateSource = rateSource;
-        a.amount = position.getQtyOnHand().multiply(monthlyRate)
+        a.amount = billableQty.multiply(monthlyRate)
                 .divide(BigDecimal.valueOf(DAYS_PER_MONTH), 4, RoundingMode.HALF_UP);
         return a;
     }

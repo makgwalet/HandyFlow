@@ -9,7 +9,7 @@ import za.co.handyflow.platform.warehousing.domain.repository.WhseProfileReposit
 
 import java.time.LocalDate;
 
-/** End-of-day accrual for every warehousing tenant. One tenant failing does not stop the others. */
+/** Daily accrual for every warehousing tenant. One tenant failing does not stop the others. */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -18,15 +18,22 @@ public class WhseStorageAccrualScheduler {
     private final WhseProfileRepository profileRepository;
     private final WhseStorageAccrualService accrualService;
 
-    @Scheduled(cron = "0 55 23 * * *")
-    public void accrueToday() {
-        LocalDate today = LocalDate.now();
+    /** Days re-checked on every run, so a night the job missed is made up. Days already accrued are left alone. */
+    static final int CATCH_UP_DAYS = 3;
+
+    /** Just after midnight, so the day being accrued is complete and includes late movements. */
+    @Scheduled(cron = "0 15 0 * * *", zone = "${handyflow.warehousing.billing-zone:Africa/Johannesburg}")
+    public void accrueRecentDays() {
+        LocalDate yesterday = LocalDate.now(accrualService.zone()).minusDays(1);
         for (WhseProfile profile : profileRepository.findAll()) {
-            try {
-                accrualService.accrueForTenant(profile.getTenantId(), today);
-            } catch (Exception e) {
-                log.error("[Warehousing] Storage accrual failed tenant={} date={}: {}",
-                        profile.getTenantId(), today, e.getMessage(), e);
+            for (int back = CATCH_UP_DAYS - 1; back >= 0; back--) {
+                LocalDate day = yesterday.minusDays(back);
+                try {
+                    accrualService.accrueForTenant(profile.getTenantId(), day);
+                } catch (Exception e) {
+                    log.error("[Warehousing] Storage accrual failed tenant={} date={}: {}",
+                            profile.getTenantId(), day, e.getMessage(), e);
+                }
             }
         }
     }

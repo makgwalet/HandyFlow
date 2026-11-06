@@ -24,8 +24,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Writes one accrual per stocked position per day. Safe to run twice for the same day and safe to run for a missed
- * past day (it uses the stock on hand now, so a backfill is only right if nothing moved since; see the scheduler).
+ * Writes one accrual per stocked position per day. Safe to run twice for the same day, and safe for a missed past day
+ * because the quantity comes from the movement ledger, not from today's balance.
  * Every status that holds physical stock is accrued, because quarantined and damaged goods still occupy space.
  */
 @Slf4j
@@ -37,6 +37,13 @@ public class WhseStorageAccrualService {
     private final WhseClientRepository clientRepository;
     private final WhseItemRepository itemRepository;
     private final WhseProfileRepository profileRepository;
+    private final za.co.handyflow.platform.warehousing.domain.repository.WhseInventoryRepository inventoryRepository;
+
+    /** Calendar days are cut in this zone (receipt day and dispatch day both count in full). */
+    @org.springframework.beans.factory.annotation.Value("${handyflow.warehousing.billing-zone:Africa/Johannesburg}")
+    private String billingZone = "Africa/Johannesburg";
+
+    public java.time.ZoneId zone() { return java.time.ZoneId.of(billingZone); }
 
     /** @return number of accrual rows written */
     @Transactional
@@ -48,8 +55,14 @@ public class WhseStorageAccrualService {
         List<WhseStorageAccrual> toSave = new ArrayList<>();
         int unrated = 0;
 
-        for (WhseInventory position : accrualRepository.findStockedPositions(tenantId)) {
-            if (done.contains(position.getId())) continue;
+        java.time.ZoneId zone = zone();
+        Map<UUID, java.math.BigDecimal> held = new HashMap<>();
+        for (Object[] row : accrualRepository.billableQuantities(tenantId, date.atStartOfDay(zone).toInstant(),
+                date.plusDays(1).atStartOfDay(zone).toInstant())) {
+            held.put((UUID) row[0], (java.math.BigDecimal) row[1]);
+        }
+        held.keySet().removeAll(done);
+        for (WhseInventory position : inventoryRepository.findAllById(held.keySet())) {
             WhseClient client = clients.computeIfAbsent(position.getClientId(),
                     id -> clientRepository.findById(id).orElse(null));
             if (client == null) continue;
@@ -61,7 +74,7 @@ public class WhseStorageAccrualService {
                 unrated++;
                 continue;
             }
-            toSave.add(WhseStorageAccrual.of(position, date, r.rate, r.source));
+            toSave.add(WhseStorageAccrual.of(position, date, held.get(position.getId()), r.rate, r.source));
         }
         accrualRepository.saveAll(toSave);
         if (unrated > 0) {
