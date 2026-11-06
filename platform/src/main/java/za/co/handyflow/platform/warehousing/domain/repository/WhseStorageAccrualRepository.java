@@ -22,6 +22,11 @@ public interface WhseStorageAccrualRepository extends JpaRepository<WhseStorageA
     List<WhseStorageAccrual> findUnbilled(@Param("tenantId") UUID tenantId, @Param("clientId") UUID clientId,
                                           @Param("after") LocalDate after, @Param("through") LocalDate through);
 
+    /** Gives the days back when an invoice is rejected (the database only allows this for a REJECTED invoice). */
+    @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE WhseStorageAccrual a SET a.billingInvoiceId = NULL WHERE a.billingInvoiceId = :invoiceId")
+    int release(@Param("invoiceId") UUID invoiceId);
+
     @Query("SELECT i FROM WhseInventory i WHERE i.tenantId = :tenantId AND i.qtyOnHand > 0")
     List<za.co.handyflow.platform.warehousing.domain.model.WhseInventory> findStockedPositions(@Param("tenantId") UUID tenantId);
 }

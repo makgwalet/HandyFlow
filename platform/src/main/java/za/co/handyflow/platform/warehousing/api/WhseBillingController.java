@@ -80,8 +80,28 @@ public class WhseBillingController {
     public ResponseEntity<ApiResponse<BillingInvoiceResponse>> generateInvoice(@PathVariable UUID clientId,
             @Valid @RequestBody GenerateInvoiceRequest req) {
         featureGuard.requireModule("warehousing");
-        WhseBillingInvoice invoice = billingService.generateInvoice(TenantContext.getTenantIdAsObject(), clientId, req.periodEnd());
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Invoice generated", toResponse(invoice)));
+        WhseBillingInvoice invoice = billingService.generateInvoice(TenantContext.getTenantIdAsObject(), clientId, req.periodEnd(), TenantContext.getCurrentUserId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Invoice prepared and waiting for approval", toResponse(invoice)));
+    }
+
+    @PostMapping("/billing-invoices/{id}/approve")
+    @PreAuthorize("hasAuthority('WAREHOUSING_BILLING_APPROVE')")
+    @Operation(summary = "Approve a prepared invoice (a different person from the one who prepared it): issues it and posts the revenue")
+    public ResponseEntity<ApiResponse<BillingInvoiceResponse>> approve(@PathVariable UUID id,
+            @RequestBody(required = false) ApprovalDecisionRequest req) {
+        featureGuard.requireModule("warehousing");
+        return ResponseEntity.ok(ApiResponse.success("Invoice approved and issued", toResponse(billingService.approveInvoice(
+                TenantContext.getTenantIdAsObject(), id, req == null ? null : req.note(), TenantContext.getCurrentUserId()))));
+    }
+
+    @PostMapping("/billing-invoices/{id}/reject")
+    @PreAuthorize("hasAuthority('WAREHOUSING_BILLING_APPROVE')")
+    @Operation(summary = "Reject a prepared invoice; its storage days become billable again")
+    public ResponseEntity<ApiResponse<BillingInvoiceResponse>> reject(@PathVariable UUID id,
+            @Valid @RequestBody ApprovalDecisionRequest req) {
+        featureGuard.requireModule("warehousing");
+        return ResponseEntity.ok(ApiResponse.success("Invoice rejected", toResponse(billingService.rejectInvoice(
+                TenantContext.getTenantIdAsObject(), id, req.note(), TenantContext.getCurrentUserId()))));
     }
 
     @PostMapping("/billing-invoices/{id}/payments")

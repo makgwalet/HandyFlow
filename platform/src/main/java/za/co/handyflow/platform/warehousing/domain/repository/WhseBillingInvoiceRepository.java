@@ -21,8 +21,12 @@ public interface WhseBillingInvoiceRepository extends JpaRepository<WhseBillingI
     Page<WhseBillingInvoice> findByClient(@Param("tenantId") UUID tenantId, @Param("clientId") UUID clientId, Pageable pageable);
 
     /** The most recently issued invoice for a client — its periodEnd is the start of the next billing period. */
-    @Query("SELECT i FROM WhseBillingInvoice i WHERE i.tenantId = :tenantId AND i.clientId = :clientId ORDER BY i.periodEnd DESC LIMIT 1")
+    @Query("SELECT i FROM WhseBillingInvoice i WHERE i.tenantId = :tenantId AND i.clientId = :clientId AND i.status <> 'REJECTED' ORDER BY i.periodEnd DESC LIMIT 1")
     Optional<WhseBillingInvoice> findMostRecentForClient(@Param("tenantId") UUID tenantId, @Param("clientId") UUID clientId);
+
+    /** An invoice waiting for approval blocks preparing another one for the same client. */
+    @Query("SELECT count(i) FROM WhseBillingInvoice i WHERE i.tenantId = :tenantId AND i.clientId = :clientId AND i.status = 'DRAFT'")
+    long countAwaitingApproval(@Param("tenantId") UUID tenantId, @Param("clientId") UUID clientId);
 
     /** Cross-tenant sweep for the overdue-invoice notification scheduler. */
     @Query("SELECT i FROM WhseBillingInvoice i WHERE i.status IN ('SENT', 'PARTIAL') AND i.dueDate < :today")

@@ -12,6 +12,7 @@ import za.co.handyflow.platform.accounting.dto.AccountResponse;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
+import za.co.handyflow.platform.shared.SeparationOfDutiesChecker;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.warehousing.domain.model.WhseBillingInvoice;
 import za.co.handyflow.platform.warehousing.domain.model.WhseClient;
@@ -109,9 +110,23 @@ public class WhseBillingService {
     private final WhseProfileService profileService;
     private final WhseNumberGenerator numberGenerator;
     private final AccountingFacade accountingFacade;
+    private final SeparationOfDutiesChecker duties;
 
-    @Transactional
+    public static final String APPROVE_PERMISSION = "WAREHOUSING_BILLING_APPROVE";
+
     public WhseBillingInvoice generateInvoice(TenantId tenantId, UUID clientId, LocalDate periodEnd) {
+        return generateInvoice(tenantId, clientId, periodEnd, null);
+    }
+
+    /**
+     * Prepares the invoice. It stays DRAFT (nothing is posted to the ledger) until a second person approves it with
+     * {@link #approveInvoice}; the accrual days it covers are reserved meanwhile.
+     */
+    @Transactional
+    public WhseBillingInvoice generateInvoice(TenantId tenantId, UUID clientId, LocalDate periodEnd, UUID preparedBy) {
+        if (invoiceRepository.countAwaitingApproval(tenantId.getValue(), clientId) > 0) {
+            throw new IllegalStateException("An invoice for this client is already waiting for approval. Approve or reject it first.");
+        }
         WhseClient client = clientService.findActive(tenantId, clientId);
         WhseProfile profile = profileService.get(tenantId);
 
@@ -143,19 +158,54 @@ public class WhseBillingService {
         LocalDate invoiceDate = LocalDate.now();
         WhseBillingInvoice invoice = WhseBillingInvoice.create(tenantId.getValue(), clientId, invoiceNumber,
                 periodStart, periodEnd, invoiceDate, invoiceDate.plusDays(30), storageFee, handlingFee, vatAmount);
+        invoice.preparedBy(preparedBy);
         invoice = invoiceRepository.save(invoice);
         for (WhseStorageAccrual accrual : accruals) {
             accrual.markBilled(invoice.getId());
         }
         accrualRepository.saveAll(accruals);
-        invoice.markSent();
-        invoice = invoiceRepository.save(invoice);
-        postBillingRevenueJournal(tenantId, invoice);
 
-        log.info("[Warehousing] Billing invoice generated tenant={} client={} invoice={} storageFee={} handlingFee={} period={}..{}",
+        log.info("[Warehousing] Billing invoice prepared (awaiting approval) tenant={} client={} invoice={} storageFee={} handlingFee={} period={}..{}",
                 tenantId.getValue(), clientId, invoiceNumber, storageFee, handlingFee, periodStart, periodEnd);
         return invoice;
     }
+
+    @Transactional
+    public WhseBillingInvoice approveInvoice(TenantId tenantId, UUID id, String note, UUID actor) {
+        if (actor == null) throw new org.springframework.security.access.AccessDeniedException("Your user could not be identified, so this step cannot be recorded.");
+        WhseBillingInvoice invoice = findActive(tenantId, id);
+        if (!"DRAFT".equals(invoice.getStatus())) {
+            throw new za.co.handyflow.platform.shared.HandyFlowException("This invoice has already been decided.",
+                    org.springframework.http.HttpStatus.CONFLICT, "INVOICE_DECIDED");
+        }
+        boolean sole = actor.equals(invoice.getPreparedBy()) && duties.otherHolders(tenantId, APPROVE_PERMISSION, actor) == 0;
+        duties.require(tenantId, APPROVE_PERMISSION, invoice.getPreparedBy(), actor,
+                "The person who prepared this invoice cannot approve it. Ask another warehouse administrator.",
+                "WHSE_BILLING_INVOICE", invoice.getId(), "approved their own client invoice " + invoice.getInvoiceNumber());
+        invoice.approve(actor, blank(note), sole);
+        invoice = invoiceRepository.save(invoice);
+        postBillingRevenueJournal(tenantId, invoice);
+        log.info("[Warehousing] Billing invoice approved tenant={} invoice={} by={} sole={}", tenantId.getValue(), invoice.getInvoiceNumber(), actor, sole);
+        return invoice;
+    }
+
+    @Transactional
+    public WhseBillingInvoice rejectInvoice(TenantId tenantId, UUID id, String note, UUID actor) {
+        if (actor == null) throw new org.springframework.security.access.AccessDeniedException("Your user could not be identified, so this step cannot be recorded.");
+        if (note == null || note.trim().length() < 5) throw new IllegalArgumentException("Give a reason for rejecting the invoice (at least 5 characters).");
+        WhseBillingInvoice invoice = findActive(tenantId, id);
+        if (!"DRAFT".equals(invoice.getStatus())) {
+            throw new za.co.handyflow.platform.shared.HandyFlowException("This invoice has already been decided.",
+                    org.springframework.http.HttpStatus.CONFLICT, "INVOICE_DECIDED");
+        }
+        invoice.reject(actor, note.trim());
+        invoice = invoiceRepository.saveAndFlush(invoice);
+        int released = accrualRepository.release(invoice.getId());
+        log.info("[Warehousing] Billing invoice rejected tenant={} invoice={} by={} accrualDaysReleased={}", tenantId.getValue(), invoice.getInvoiceNumber(), actor, released);
+        return invoice;
+    }
+
+    private static String blank(String s) { return s == null || s.isBlank() ? null : s.trim(); }
 
     @Transactional(readOnly = true)
     public Page<WhseBillingInvoice> listForClient(TenantId tenantId, UUID clientId, Pageable pageable) {

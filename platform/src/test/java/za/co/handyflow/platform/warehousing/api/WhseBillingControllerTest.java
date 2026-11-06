@@ -81,7 +81,7 @@ class WhseBillingControllerTest {
     void generateInvoiceWithAdminReturns201() throws Exception {
         UUID clientId = UUID.randomUUID();
         WhseBillingInvoice invoice = testInvoice(clientId);
-        when(billingService.generateInvoice(any(), any(), any())).thenReturn(invoice);
+        when(billingService.generateInvoice(any(), any(), any(), any())).thenReturn(invoice);
 
         mvc.perform(post(BASE + "/clients/" + clientId + "/billing-invoices/generate").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)

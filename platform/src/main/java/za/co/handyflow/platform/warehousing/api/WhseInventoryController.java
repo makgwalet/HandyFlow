@@ -27,6 +27,7 @@ import java.util.UUID;
 public class WhseInventoryController {
 
     private final WhseInventoryService inventoryService;
+    private final za.co.handyflow.platform.warehousing.application.internal.WhseAdjustmentApprovalService adjustmentApproval;
     private final FeatureGuard featureGuard;
 
     @GetMapping("/clients/{clientId}/inventory")
@@ -52,6 +53,7 @@ public class WhseInventoryController {
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody AdjustInventoryRequest req) {
         featureGuard.requireModule("warehousing");
+        adjustmentApproval.requireDirectAllowed(TenantContext.getTenantIdAsObject(), req.delta());
         WhseInventory inv = inventoryService.adjust(TenantContext.getTenantIdAsObject(), id, req.delta(),
                 req.reason(), TenantContext.getCurrentUserId(), idempotencyKey);
         return ResponseEntity.ok(ApiResponse.success("Stock adjusted", toResponse(inv)));

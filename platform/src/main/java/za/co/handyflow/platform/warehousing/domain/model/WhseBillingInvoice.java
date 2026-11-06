@@ -77,7 +77,7 @@ public class WhseBillingInvoice {
     private BigDecimal amountPaid = BigDecimal.ZERO;
 
     @Column(name = "status", nullable = false)
-    private String status = "DRAFT"; // DRAFT | SENT | PARTIAL | PAID
+    private String status = "DRAFT"; // DRAFT (awaiting approval) | SENT | PARTIAL | PAID | REJECTED
 
     @Column(name = "sent_at")
     private Instant sentAt;
@@ -87,6 +87,21 @@ public class WhseBillingInvoice {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @Column(name = "prepared_by")
+    private UUID preparedBy;
+
+    @Column(name = "decided_by")
+    private UUID decidedBy;
+
+    @Column(name = "decided_at")
+    private Instant decidedAt;
+
+    @Column(name = "decision_note")
+    private String decisionNote;
+
+    @Column(name = "sole_exception", nullable = false)
+    private boolean soleException;
 
     public static WhseBillingInvoice create(UUID tenantId, UUID clientId, String invoiceNumber,
                                              LocalDate periodStart, LocalDate periodEnd, LocalDate invoiceDate,
@@ -108,6 +123,28 @@ public class WhseBillingInvoice {
         inv.status = "DRAFT";
         inv.createdAt = Instant.now();
         return inv;
+    }
+
+    public void preparedBy(UUID userId) {
+        this.preparedBy = userId;
+    }
+
+    /** A second person approves a DRAFT invoice; it is then issued. {@code sole} marks the audited one-person exception. */
+    public void approve(UUID approver, String note, boolean sole) {
+        if (!"DRAFT".equals(status)) throw new IllegalStateException("Only DRAFT invoices can be approved");
+        this.decidedBy = approver;
+        this.decidedAt = Instant.now();
+        this.decisionNote = note;
+        this.soleException = sole;
+        markSent();
+    }
+
+    public void reject(UUID by, String note) {
+        if (!"DRAFT".equals(status)) throw new IllegalStateException("Only DRAFT invoices can be rejected");
+        this.status = "REJECTED";
+        this.decidedBy = by;
+        this.decidedAt = Instant.now();
+        this.decisionNote = note;
     }
 
     public void markSent() {
