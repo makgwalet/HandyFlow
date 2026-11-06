@@ -1,0 +1,395 @@
+permission,module,held_by_administrator,reason
+ACCOUNTANT_ALL_CLIENTS,accountant,YES,operational
+ACCOUNTANT_ASSIGN,accountant,YES,operational
+ACCOUNTANT_READ,accountant,YES,operational
+ACCOUNTANT_SIGNOFF,accountant,NO,R3 signing
+ACCOUNTANT_WRITE,accountant,YES,operational
+ACCOUNTING_ADMIN,accounting,NO,R2 maker-checker (requires_second_person)
+ACCOUNTING_MANAGE,accounting,YES,operational
+ACCOUNTING_PERIOD_REOPEN,accounting,NO,R2 maker-checker (requires_second_person)
+ACCOUNTING_READ,accounting,YES,operational
+ACCOUNTING_RECON_SIGNOFF,accounting,NO,R2 maker-checker (requires_second_person)
+AGRICULTURE_ADMIN,agriculture,YES,operational
+AGRICULTURE_FINANCE,agriculture,YES,operational
+AGRICULTURE_MANAGE,agriculture,YES,operational
+AGRICULTURE_READ,agriculture,YES,operational
+APPROVALS_MANAGE,core,YES,operational
+AP_APPROVE,ap,NO,R2 maker-checker (requires_second_person)
+AP_MANAGE,ap,YES,operational (financial/payroll preparation; approval is separate)
+AP_PAY,ap,NO,R2 maker-checker (requires_second_person)
+AP_READ,ap,YES,operational
+AP_SUPPLIER_BANKING,ap,NO,R2 maker-checker (requires_second_person)
+AUDIT_ADMIN,core,YES,operational
+BILLING_MANAGE,core,NO,R1 billing and subscription
+BILLING_READ,core,NO,R1 billing and subscription
+BOOKINGAGENCY_ADMIN,bookingagency,YES,operational
+BOOKINGAGENCY_MANAGE,bookingagency,YES,operational
+BOOKINGAGENCY_READ,bookingagency,YES,operational
+BOOKINGS_ADMIN,bookings,YES,operational
+BOOKINGS_MANAGE,bookings,YES,operational
+BOOKINGS_READ,bookings,YES,operational
+BOOKKEEPING_ADMIN,bookkeeping,YES,operational
+BOOKKEEPING_MANAGE,bookkeeping,YES,operational
+BOOKKEEPING_READ,bookkeeping,YES,operational
+CATALOGUE_ADMIN,catalogue,YES,operational
+CATALOGUE_APPROVE,catalogue,NO,R3 approval
+CATALOGUE_ARCHIVE,catalogue,YES,operational
+CATALOGUE_EXPORT,catalogue,YES,operational
+CATALOGUE_IMPORT,catalogue,YES,operational
+CATALOGUE_PRICE_APPROVE,catalogue,NO,R3 approval
+CATALOGUE_PRICE_READ,catalogue,YES,operational
+CATALOGUE_PRICE_WRITE,catalogue,YES,operational
+CATALOGUE_PUBLISH,catalogue,YES,operational
+CATALOGUE_READ,catalogue,YES,operational
+CATALOGUE_WRITE,catalogue,YES,operational
+CLINIC_ACCESS_LOG_READ,clinic,NO,clinical security/override/restricted-record
+CLINIC_ADMIN,clinic,YES,operational
+CLINIC_ADMIN_NOTE_READ,clinic,YES,operational
+CLINIC_ALLERGY_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_ALLERGY_WRITE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_APPOINTMENT_CANCEL,clinic,YES,operational
+CLINIC_APPOINTMENT_CHECK_IN,clinic,YES,operational
+CLINIC_APPOINTMENT_CREATE,clinic,YES,operational
+CLINIC_APPOINTMENT_READ,clinic,YES,operational
+CLINIC_APPOINTMENT_RESCHEDULE,clinic,YES,operational
+CLINIC_APPOINTMENT_UPDATE,clinic,YES,operational
+CLINIC_BILLING_READ,clinic,YES,operational
+CLINIC_BILLING_WRITE,clinic,YES,operational
+CLINIC_BILL_ADJUST,clinic,YES,operational
+CLINIC_BILL_CREATE,clinic,YES,operational
+CLINIC_BILL_READ,clinic,YES,operational
+CLINIC_BREAK_GLASS_EXPORT,clinic,NO,"R4 sensitive export/download (personal, payroll, medical)"
+CLINIC_BREAK_GLASS_PRINT,clinic,NO,clinical security/override/restricted-record
+CLINIC_BREAK_GLASS_REVIEW,clinic,NO,clinical security/override/restricted-record
+CLINIC_BREAK_GLASS_VIEW,clinic,NO,clinical security/override/restricted-record
+CLINIC_CATALOGUE_READ,clinic,YES,operational
+CLINIC_CLAIM_CORRECT,clinic,YES,operational
+CLINIC_CLAIM_CREATE,clinic,YES,operational
+CLINIC_CLAIM_PROGRESS,clinic,YES,operational
+CLINIC_CLAIM_READ,clinic,YES,operational
+CLINIC_CLAIM_RESUBMIT,clinic,YES,operational
+CLINIC_CLAIM_REVERSE,clinic,NO,R2 maker-checker (requires_second_person)
+CLINIC_CLAIM_SUBMIT,clinic,YES,operational
+CLINIC_CLINICAL_HISTORY_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_CLINICAL_HISTORY_WRITE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_CLINICAL_MATRIX_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_CLINICAL_MATRIX_WRITE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_CLINICAL_SIGN,clinic,NO,R3 signing
+CLINIC_CLINICAL_SUMMARY_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_CLINICAL_WRITE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_CLOSURE_MANAGE,clinic,YES,operational
+CLINIC_CONDITION_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_CONDITION_WRITE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_CONSENT_HISTORY_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_CONSENT_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_CONSENT_RECORD,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_CONSENT_REVOKE,clinic,NO,R3 revocation of consent/compliance
+CLINIC_CONSENT_UPDATE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_CONSULTATION_AMEND,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_CONSULTATION_CREATE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_CONSULTATION_LOCK,clinic,NO,R3 locking
+CLINIC_CONSULTATION_OVERRIDE_REQUIRED_STEP,clinic,NO,clinical security/override/restricted-record
+CLINIC_CONSULTATION_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_CONSULTATION_SIGN,clinic,NO,R3 signing
+CLINIC_CONSULTATION_UPDATE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_CONTENT_ADMIN,clinic,YES,operational
+CLINIC_CONTENT_APPROVE,clinic,NO,R3 approval
+CLINIC_DASHBOARD_READ,clinic,YES,operational
+CLINIC_DOCUMENT_CREATE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_DOCUMENT_DOWNLOAD,clinic,NO,"R4 sensitive export/download (personal, payroll, medical)"
+CLINIC_DOCUMENT_EMAIL,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_DOCUMENT_PRINT,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_DOCUMENT_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_DOCUMENT_SIGN_AS_OTHER,clinic,NO,R3 signing on behalf of another
+CLINIC_DOCUMENT_VOID,clinic,NO,R3 voiding
+CLINIC_GROWTH_EXPORT,clinic,NO,"R4 sensitive export/download (personal, payroll, medical)"
+CLINIC_GROWTH_INTERPRET,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_GROWTH_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_GROWTH_RECORD,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_GROWTH_UPDATE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_LAB_WRITE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_LETTERHEAD_MANAGE,clinic,YES,operational
+CLINIC_MEDICATION_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_MEDICATION_WRITE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_NOTE_CREATE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_NOTE_LOCK,clinic,NO,R3 locking
+CLINIC_NOTE_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_NOTE_UPDATE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_NURSE_HANDOFF,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_NURSE_HANDOFF_ACCEPT,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_NURSE_HANDOFF_COMPLETE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_NURSE_HANDOFF_RETURN,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_NURSE_INTAKE_CREATE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_NURSE_INTAKE_UPDATE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_PATIENT_ACCESS,clinic,YES,operational
+CLINIC_PATIENT_ADDRESS_READ,clinic,YES,operational
+CLINIC_PATIENT_ADDRESS_WRITE,clinic,YES,operational
+CLINIC_PATIENT_ARCHIVE,clinic,YES,operational
+CLINIC_PATIENT_CONTACT_READ,clinic,YES,operational
+CLINIC_PATIENT_CONTACT_WRITE,clinic,YES,operational
+CLINIC_PATIENT_CREATE,clinic,YES,operational
+CLINIC_PATIENT_DEMOGRAPHICS_READ,clinic,YES,operational
+CLINIC_PATIENT_DEMOGRAPHICS_WRITE,clinic,YES,operational
+CLINIC_PATIENT_DUPLICATE_REVIEW,clinic,YES,operational
+CLINIC_PATIENT_EMERGENCY_CONTACT_READ,clinic,YES,operational
+CLINIC_PATIENT_EMERGENCY_CONTACT_WRITE,clinic,YES,operational
+CLINIC_PATIENT_MERGE,clinic,NO,clinical security/override/restricted-record
+CLINIC_PATIENT_READ,clinic,YES,operational
+CLINIC_PATIENT_RELATIONSHIP_READ,clinic,YES,operational
+CLINIC_PATIENT_RELATIONSHIP_WRITE,clinic,YES,operational
+CLINIC_PATIENT_UPDATE,clinic,YES,operational
+CLINIC_PAYMENT_ALLOCATE,clinic,YES,operational
+CLINIC_PAYMENT_CREATE,clinic,YES,operational
+CLINIC_PAYMENT_READ,clinic,YES,operational
+CLINIC_PAYMENT_REVERSE,clinic,NO,R2 maker-checker (requires_second_person)
+CLINIC_PRACTITIONER_MANAGE,clinic,YES,operational
+CLINIC_PRACTITIONER_READ,clinic,YES,operational
+CLINIC_PRESCRIPTION_CREATE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_PRESCRIPTION_DISPENSE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_PRESCRIPTION_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_PRESCRIPTION_SIGN,clinic,NO,R3 signing
+CLINIC_PRESCRIPTION_UPDATE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_PRESCRIPTION_VOID,clinic,NO,R3 voiding
+CLINIC_PRESCRIPTION_WRITE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_PRIVATE_NOTE_READ,clinic,NO,clinical security/override/restricted-record
+CLINIC_QUESTIONNAIRE_ANSWER,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_QUESTIONNAIRE_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_QUEUE_MANAGE,clinic,YES,operational
+CLINIC_QUEUE_READ,clinic,YES,operational
+CLINIC_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_RECALL_MANAGE,clinic,YES,operational
+CLINIC_RECALL_READ,clinic,YES,operational
+CLINIC_REFERRAL_CREATE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_REFERRAL_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_REFERRAL_SEND,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_REFERRAL_SIGN,clinic,NO,R3 signing
+CLINIC_REFERRAL_UPDATE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_REFERRAL_VOID,clinic,NO,R3 voiding
+CLINIC_RESTRICTED_RECORD_ACCESS,clinic,NO,clinical security/override/restricted-record
+CLINIC_RESTRICTED_RECORD_MANAGE,clinic,NO,clinical security/override/restricted-record
+CLINIC_RESTRICTED_RECORD_REQUEST,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_RESULT_ACKNOWLEDGE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_RESULT_CREATE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_RESULT_FILE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_RESULT_INTERPRET,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_RESULT_MATCH,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_RESULT_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_RESULT_REVIEW,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_RESULT_UPDATE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_ROOM_MANAGE,clinic,YES,operational
+CLINIC_SICK_NOTE_CREATE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_SICK_NOTE_DOWNLOAD,clinic,NO,"R4 sensitive export/download (personal, payroll, medical)"
+CLINIC_SICK_NOTE_PRINT,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_SICK_NOTE_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_SICK_NOTE_SIGN,clinic,NO,R3 signing
+CLINIC_SICK_NOTE_UPDATE_DRAFT,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_SICK_NOTE_VOID,clinic,NO,R3 voiding
+CLINIC_TASK_COMPLETE,clinic,YES,operational
+CLINIC_TASK_CREATE,clinic,YES,operational
+CLINIC_TASK_READ,clinic,YES,operational
+CLINIC_TELEHEALTH_ROOM_CREATE,clinic,YES,operational
+CLINIC_TIMELINE_READ,clinic,YES,operational
+CLINIC_TIME_OFF_WRITE,clinic,YES,operational
+CLINIC_VITALS_READ,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_VITALS_VOID,clinic,NO,R3 voiding
+CLINIC_VITALS_WRITE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_WORKING_HOURS_WRITE,clinic,YES,operational
+CLINIC_WRITE,clinic,NO,"clinical record content: granted through clinical roles, not by default"
+CLINIC_WRITE_OFF,clinic,NO,R2 maker-checker (requires_second_person)
+COLLECTIONSAGENCY_ADMIN,collectionsagency,YES,operational
+COLLECTIONSAGENCY_MANAGE,collectionsagency,YES,operational
+COLLECTIONSAGENCY_READ,collectionsagency,YES,operational
+COMPLIANCE_ADMIN,compliancetender,YES,operational
+COMPLIANCE_MANAGE,compliancetender,YES,operational
+COMPLIANCE_READ,compliancetender,YES,operational
+COMPLIANCE_SERVICES_ADMIN,complianceservices,YES,operational
+COMPLIANCE_SERVICES_MANAGE,complianceservices,YES,operational
+COMPLIANCE_SERVICES_READ,complianceservices,YES,operational
+CONTRACTS_ADMIN,contracting,YES,operational
+CONTRACTS_MANAGE,contracting,YES,operational
+CONTROL_EXCEPTION_READ,core,YES,operational
+CONTROL_EXCEPTION_RESOLVE,core,YES,operational
+CREATIVE_MANAGE,creative,YES,operational
+CREATIVE_READ,creative,YES,operational
+CREDIT_NOTE_APPROVE,invoicing,NO,R2 maker-checker (requires_second_person)
+CREDIT_NOTE_ISSUE,invoicing,NO,R3 issuing certificate/letter/credit note
+CUSTOMER_CREATE,crm,YES,operational
+CUSTOMER_DELETE,crm,YES,operational
+CUSTOMER_READ,crm,YES,operational
+CUSTOMER_UPDATE,crm,YES,operational
+DEBTCOLLECTION_ADMIN,debtcollection,YES,operational
+DEBTCOLLECTION_MANAGE,debtcollection,YES,operational
+DEBTCOLLECTION_READ,debtcollection,YES,operational
+DESK_ADMIN,desk,YES,operational
+DESK_MANAGE,desk,YES,operational
+DESK_READ,desk,YES,operational
+EARTHMOVING_ADMIN,earthmoving,YES,operational
+EARTHMOVING_DEPLOY,earthmoving,YES,operational
+EARTHMOVING_MAINTAIN,earthmoving,YES,operational
+EARTHMOVING_READ,earthmoving,YES,operational
+EARTHMOVING_RELEASE,earthmoving,YES,operational
+EARTHMOVING_WRITE,earthmoving,YES,operational
+EVENTS_MANAGE,events,YES,operational
+EVENTS_READ,events,YES,operational
+EVIDENCE_READ,core,YES,operational
+EVIDENCE_WRITE,core,YES,operational
+EXPENSES_ADMIN,expenses,NO,approval / payout (verified in ExpensesController); claim creation needs no permission
+EXPENSES_MANAGE,expenses,NO,approval / payout (verified in ExpensesController); claim creation needs no permission
+EXPENSES_READ,expenses,YES,operational
+EXTERNAL_AUDIT_INVITE,auditor,NO,audit evidence access is separately authorised
+FACILITIESMANAGEMENT_ADMIN,facilitiesmanagement,YES,operational
+FACILITIESMANAGEMENT_AUDIT_READ,facilitiesmanagement,YES,operational
+FACILITIESMANAGEMENT_BILLING_APPROVE,facilitiesmanagement,NO,R3 approval
+FACILITIESMANAGEMENT_BILLING_MANAGE,facilitiesmanagement,YES,operational
+FACILITIESMANAGEMENT_CONTRACT_MANAGE,facilitiesmanagement,YES,operational
+FACILITIESMANAGEMENT_COST_READ,facilitiesmanagement,YES,operational
+FACILITIESMANAGEMENT_MANAGE,facilitiesmanagement,YES,operational
+FACILITIESMANAGEMENT_PORTAL_MANAGE,facilitiesmanagement,YES,operational
+FACILITIESMANAGEMENT_PPM_MANAGE,facilitiesmanagement,YES,operational
+FACILITIESMANAGEMENT_READ,facilitiesmanagement,YES,operational
+FACILITIESMANAGEMENT_SLA_MANAGE,facilitiesmanagement,YES,operational
+FACILITIESMANAGEMENT_TECHNICIAN,facilitiesmanagement,YES,operational
+FACILITIESMANAGEMENT_VENDOR_APPROVE,facilitiesmanagement,NO,R3 approval
+FACILITIESMANAGEMENT_WORKORDER_ASSIGN,facilitiesmanagement,YES,operational
+FACILITIESMANAGEMENT_WORKORDER_CREATE,facilitiesmanagement,YES,operational
+FACILITIES_ADMIN,facilities,YES,operational
+FACILITIES_AUDIT_READ,facilities,YES,operational
+FACILITIES_COMPLIANCE_MANAGE,facilities,YES,operational
+FACILITIES_COMPLIANCE_REVOKE,facilities,NO,R3 revocation of consent/compliance
+FACILITIES_INSPECT,facilities,YES,operational
+FACILITIES_MANAGE,facilities,YES,operational
+FACILITIES_PPM_MANAGE,facilities,YES,operational
+FACILITIES_READ,facilities,YES,operational
+FACILITIES_TECHNICIAN,facilities,YES,operational
+FACILITIES_VENDOR_APPROVE,facilities,NO,R3 approval
+FACILITIES_WORKORDER_APPROVE,facilities,NO,R3 approval
+FACILITIES_WORKORDER_ASSIGN,facilities,YES,operational
+FACILITIES_WORKORDER_CREATE,facilities,YES,operational
+FACILITIES_WORKORDER_REQUEST,facilities,YES,operational
+FACILITIES_WORKORDER_VERIFY,facilities,YES,operational
+FLEET_ADMIN,fleet,YES,operational
+FLEET_MANAGE,fleet,YES,operational
+FLEET_READ,fleet,YES,operational
+FUEL_MANAGE,fuel,YES,operational
+FUEL_MARGIN_READ,fuel,YES,operational (financial/payroll preparation; approval is separate)
+FUEL_READ,fuel,YES,operational
+HR_ATTENDANCE_MANAGE,hr,YES,operational
+HR_COMPENSATION_APPROVE,hr,NO,R2 maker-checker (requires_second_person)
+HR_COMPENSATION_MANAGE,hr,YES,operational (financial/payroll preparation; approval is separate)
+HR_COMPENSATION_READ,hr,YES,operational
+HR_ER_DECIDE,hr,YES,operational
+HR_ER_MANAGE,hr,YES,operational
+HR_ER_READ,hr,YES,operational
+HR_LETTER_ISSUE,hr,NO,R3 issuing certificate/letter/credit note
+HR_LETTER_MANAGE,hr,YES,operational
+HR_LETTER_READ,hr,YES,operational
+HR_MANAGE,hr,YES,operational
+HR_ONBOARDING_MANAGE,hr,YES,operational
+HR_OVERTIME_APPROVE,hr,NO,R3 approval
+HR_PERF_MANAGE,hr,YES,operational
+HR_PERF_READ,hr,YES,operational
+HR_READ,hr,YES,operational
+HR_REPORT_READ,hr,YES,operational
+HR_SENSITIVE_READ,hr,NO,R3 sensitive personal data
+HR_TEAM_READ,hr,YES,operational
+INSURANCEBROKERAGE_ADMIN,insurancebrokerage,YES,operational
+INSURANCEBROKERAGE_MANAGE,insurancebrokerage,YES,operational
+INSURANCEBROKERAGE_READ,insurancebrokerage,YES,operational
+INSURANCE_ADMIN,insurance,YES,operational
+INSURANCE_MANAGE,insurance,YES,operational
+INSURANCE_READ,insurance,YES,operational
+INVOICE_CREATE,invoicing,YES,operational
+INVOICE_DELETE,invoicing,YES,operational
+INVOICE_PAYMENT,invoicing,YES,operational
+INVOICE_READ,invoicing,YES,operational
+INVOICE_REFUND,invoicing,NO,R2 maker-checker (requires_second_person)
+INVOICE_SEND,invoicing,YES,operational
+LEAVE_ADJUST,hr,YES,operational
+LEAVE_APPROVE,hr,NO,R2 maker-checker (requires_second_person)
+LEGALCOMPLIANCE_ADMIN,legalcompliance,YES,operational
+LEGALCOMPLIANCE_MANAGE,legalcompliance,YES,operational
+LEGALCOMPLIANCE_READ,legalcompliance,YES,operational
+LEGALPRACTICE_ADMIN,legalpractice,YES,operational
+LEGALPRACTICE_MANAGE,legalpractice,YES,operational
+LEGALPRACTICE_READ,legalpractice,YES,operational
+MARKETING_ADMIN,marketing,YES,operational
+MARKETING_MANAGE,marketing,YES,operational
+MARKETING_READ,marketing,YES,operational
+PAYROLLBUREAU_ADMIN,payrollbureau,YES,operational
+PAYROLLBUREAU_MANAGE,payrollbureau,YES,operational
+PAYROLLBUREAU_READ,payrollbureau,YES,operational
+PAYROLL_APPROVE,hr,NO,R2 maker-checker (requires_second_person)
+PAYROLL_BANK_FILE_GENERATE,hr,NO,money-movement instrument
+PAYROLL_CERTIFICATE_ISSUE,hr,NO,R3 issuing certificate/letter/credit note
+PAYROLL_CONFIGURATION_ADMIN,hr,YES,operational (financial/payroll preparation; approval is separate)
+PAYROLL_FINALISE,hr,NO,R2 maker-checker (requires_second_person)
+PAYROLL_PREPARE,hr,YES,operational
+PAYROLL_READ,hr,YES,operational
+PAYROLL_RUN,hr,YES,operational (financial/payroll preparation; approval is separate)
+PAYROLL_STATUTORY_EXPORT,hr,NO,"R4 sensitive export/download (personal, payroll, medical)"
+PM_ADMIN,projects,YES,operational
+PM_APPROVE,projects,NO,R2 maker-checker (requires_second_person)
+PM_READ,projects,YES,operational
+PM_WRITE,projects,YES,operational
+POPIA_EXPORT,crm,NO,"R4 sensitive export/download (personal, payroll, medical)"
+POS_ADMIN,pos,YES,operational
+POS_CASHIER,pos,YES,operational
+POS_MANAGE,pos,YES,operational
+POS_READ,pos,YES,operational
+POS_REFUND,pos,NO,R3 financial finalise/refund/write-off
+POS_SELL,pos,YES,operational
+PROPERTY_ADMIN,property,YES,operational
+PROPERTY_MANAGE,property,YES,operational
+PROPERTY_READ,property,YES,operational
+RECORDS_APPROVE,core,NO,R3 approval
+RECORDS_MANAGE,core,YES,operational
+RECORDS_READ,core,YES,operational
+RECRUITER_ADMIN,recruiter,YES,operational
+RECRUITER_APPROVE,recruiter,NO,R3 approval
+RECRUITER_AUDIT,recruiter,YES,operational
+RECRUITER_CV,recruiter,YES,operational
+RECRUITER_HIRE,recruiter,YES,operational
+RECRUITER_MANAGE,recruiter,YES,operational
+RECRUITER_OFFER,recruiter,YES,operational
+RECRUITER_READ,recruiter,YES,operational
+RECRUITER_REPORTS,recruiter,YES,operational
+RECRUITMENTAGENCY_ADMIN,recruitmentagency,YES,operational
+RECRUITMENTAGENCY_MANAGE,recruitmentagency,YES,operational
+RECRUITMENTAGENCY_READ,recruitmentagency,YES,operational
+REPORT_VIEW,core,YES,operational
+ROLE_MANAGE,core,YES,operational
+ROLE_READ,core,YES,operational
+SCM_ADMIN,supply_chain,YES,operational
+SCM_INVENTORY,supply_chain,YES,operational
+SCM_INVOICE,supply_chain,YES,operational
+SCM_ORDER,supply_chain,YES,operational
+SCM_READ,supply_chain,YES,operational
+SCM_RECEIVE,supply_chain,YES,operational
+SCM_REQUISITION,supply_chain,YES,operational
+SECURITY_ADMIN,security,YES,operational
+SECURITY_GUARD,security,YES,operational
+SECURITY_MANAGE,security,YES,operational
+SECURITY_READ,security,YES,operational
+SETTINGS_MANAGE,core,YES,operational
+TASKS_ADMIN,tasks,YES,operational
+TASKS_MANAGE,tasks,YES,operational
+TASKS_READ,tasks,YES,operational
+TRAININGPROVIDER_ADMIN,trainingprovider,YES,operational
+TRAININGPROVIDER_MANAGE,trainingprovider,YES,operational
+TRAININGPROVIDER_READ,trainingprovider,YES,operational
+TRAINING_ADMIN,training,YES,operational
+TRAINING_AUDIT,training,YES,operational
+TRAINING_MANAGE,training,YES,operational
+TRAINING_READ,training,YES,operational
+TRAINING_REPORTS,training,YES,operational
+USER_CREATE,core,YES,operational
+USER_DEACTIVATE,core,YES,operational
+USER_DELETE,core,YES,operational
+USER_INVITE,core,YES,operational
+USER_READ,core,YES,operational
+USER_UPDATE,core,YES,operational
+VIP_DETAIL_ACCESS,security,YES,operational
+WAREHOUSING_ADMIN,warehousing,YES,operational
+WAREHOUSING_MANAGE,warehousing,YES,operational
+WAREHOUSING_READ,warehousing,YES,operational
+EXPENSES_POLICY_ADMIN,expenses,YES,"NEW: expense policy configuration, split from payout"
