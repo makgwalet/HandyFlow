@@ -21,6 +21,8 @@ import za.co.handyflow.platform.warehousing.domain.model.WhseItem;
 import za.co.handyflow.platform.warehousing.domain.model.WhseOutboundOrder;
 import za.co.handyflow.platform.warehousing.domain.model.WhseOutboundOrderLine;
 import za.co.handyflow.platform.warehousing.domain.model.WhseProfile;
+import za.co.handyflow.platform.warehousing.domain.model.WhseStorageAccrual;
+import za.co.handyflow.platform.warehousing.domain.repository.WhseStorageAccrualRepository;
 import za.co.handyflow.platform.warehousing.domain.repository.WhseBillingInvoiceRepository;
 import za.co.handyflow.platform.warehousing.domain.repository.WhseInboundShipmentLineRepository;
 import za.co.handyflow.platform.warehousing.domain.repository.WhseInventoryRepository;
@@ -46,7 +48,8 @@ import java.util.stream.Collectors;
  * <p>
  * <b>*** DELIBERATE SIMPLIFICATIONS — flagged, not silently guessed ***</b>
  * <ul>
- *   <li><b>Storage billing is a point-in-time snapshot, not true
+ *   <li><b>Update (V601): storage is now billed from daily accruals (WhseStorageAccrualService); the snapshot below is only the
+ *   fallback for a period that has no accruals.</b> Original note: storage billing is a point-in-time snapshot, not true
  *   daily-accrual proration.</b> A real 3PL typically bills storage on
  *   either (a) a daily average of qtyOnHand across the period, or (b) a
  *   fixed snapshot taken on a specific day (e.g. "stock as at the last day
@@ -97,6 +100,7 @@ public class WhseBillingService {
 
     private final WhseBillingInvoiceRepository invoiceRepository;
     private final WhseInventoryRepository inventoryRepository;
+    private final WhseStorageAccrualRepository accrualRepository;
     private final WhseItemRepository itemRepository;
     private final WhseInboundShipmentLineRepository shipmentLineRepository;
     private final WhseOutboundOrderRepository outboundOrderRepository;
@@ -120,7 +124,18 @@ public class WhseBillingService {
         }
         long daysInPeriod = ChronoUnit.DAYS.between(periodStart, periodEnd);
 
-        BigDecimal storageFee = computeStorageFee(tenantId, clientId, client, profile, daysInPeriod);
+        // Daily accruals are the source of truth. Only a period with no accruals at all (before the daily job
+        // started) falls back to the old point-in-time snapshot, and says so in the log.
+        List<WhseStorageAccrual> accruals = accrualRepository.findUnbilled(tenantId.getValue(), clientId, periodStart, periodEnd);
+        BigDecimal storageFee;
+        if (accruals.isEmpty()) {
+            log.warn("[Warehousing] No daily storage accruals for client={} {}..{}; using the legacy point-in-time snapshot",
+                    clientId, periodStart, periodEnd);
+            storageFee = computeStorageFee(tenantId, clientId, client, profile, daysInPeriod);
+        } else {
+            storageFee = accruals.stream().map(WhseStorageAccrual::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
+        }
         BigDecimal handlingFee = computeHandlingFee(tenantId, clientId, client, profile, periodStart);
         BigDecimal vatAmount = BigDecimal.ZERO; // VAT-on-invoice treatment is a real question this session should not guess at — see module status doc
 
@@ -129,6 +144,10 @@ public class WhseBillingService {
         WhseBillingInvoice invoice = WhseBillingInvoice.create(tenantId.getValue(), clientId, invoiceNumber,
                 periodStart, periodEnd, invoiceDate, invoiceDate.plusDays(30), storageFee, handlingFee, vatAmount);
         invoice = invoiceRepository.save(invoice);
+        for (WhseStorageAccrual accrual : accruals) {
+            accrual.markBilled(invoice.getId());
+        }
+        accrualRepository.saveAll(accruals);
         invoice.markSent();
         invoice = invoiceRepository.save(invoice);
         postBillingRevenueJournal(tenantId, invoice);
