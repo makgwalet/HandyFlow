@@ -94,7 +94,7 @@ public class WhseOutboundOrderController {
     public ResponseEntity<ApiResponse<OutboundOrderResponse>> startPicking(@PathVariable UUID id) {
         featureGuard.requireModule("warehousing");
         return ResponseEntity.ok(ApiResponse.success("Picking started",
-                toResponse(orderService.startPicking(TenantContext.getTenantIdAsObject(), id))));
+                toResponse(orderService.startPicking(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId()))));
     }
 
     @PostMapping("/outbound-orders/{id}/lines/{lineId}/pick")
@@ -133,7 +133,7 @@ public class WhseOutboundOrderController {
     public ResponseEntity<ApiResponse<OutboundOrderResponse>> cancel(@PathVariable UUID id) {
         featureGuard.requireModule("warehousing");
         return ResponseEntity.ok(ApiResponse.success("Order cancelled",
-                toResponse(orderService.cancel(TenantContext.getTenantIdAsObject(), id))));
+                toResponse(orderService.cancel(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId()))));
     }
 
     // ── PDF documents ────────────────────────────────────────────────────────

@@ -11,7 +11,7 @@ import { Boxes, SlidersHorizontal, X } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
 
-interface InventoryResponse { id: string; clientId: string; itemId: string; locationId: string; qtyOnHand: number; qtyAllocated: number; available: number }
+interface InventoryResponse { id: string; clientId: string; itemId: string; locationId: string; qtyOnHand: number; qtyAllocated: number; available: number; status?: string }
 interface ItemResponse { id: string; sku: string }
 interface LocationResponse { id: string; code: string }
 
@@ -94,7 +94,7 @@ export default function WhseInventoryTab({ clientId }: { clientId: string }) {
               <span style={{ fontSize: 12.5, color: "var(--hf-text-muted)" }}>{codeOf(inv.locationId)}</span>
               <span style={{ fontSize: 12.5, color: "var(--hf-text)", fontWeight: 600 }}>{inv.qtyOnHand}</span>
               <span style={{ fontSize: 12.5, color: "var(--hf-text-faint)" }}>{inv.qtyAllocated}</span>
-              <span style={{ fontSize: 12.5, color: inv.available > 0 ? "var(--hf-success-text)" : "var(--hf-danger-text)", fontWeight: 600 }}>{inv.available}</span>
+              <span style={{ fontSize: 12.5, color: inv.available > 0 ? "var(--hf-success-text)" : "var(--hf-danger-text)", fontWeight: 600 }}>{inv.available}{inv.status && inv.status !== "AVAILABLE" && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 700, color: "var(--hf-danger-text)" }}>{inv.status}</span>}</span>
               <button onClick={() => setAdjusting(inv)} title="Adjust"
                 style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer", width: "fit-content" }}>
                 <SlidersHorizontal size={12} style={{ color: 'var(--hf-text-muted)' }} />

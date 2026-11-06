@@ -4,8 +4,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.warehousing.domain.model.WhseAllocationEvent;
 import za.co.handyflow.platform.warehousing.domain.model.WhseInventory;
 import za.co.handyflow.platform.warehousing.domain.model.WhseStockMovement;
+import za.co.handyflow.platform.warehousing.domain.repository.WhseAllocationEventRepository;
 import za.co.handyflow.platform.warehousing.domain.repository.WhseInventoryRepository;
 import za.co.handyflow.platform.warehousing.domain.repository.WhseStockMovementRepository;
 
@@ -36,16 +38,28 @@ class WhseInventoryServiceTest {
 
     private WhseInventoryRepository inventoryRepo;
     private WhseStockMovementRepository movementRepo;
+    private WhseAllocationEventRepository allocationRepo;
     private WhseInventoryService service;
     private final List<WhseInventory> positions = new ArrayList<>();
     private final List<WhseStockMovement> ledger = new ArrayList<>();
+    private final List<WhseAllocationEvent> events = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
         inventoryRepo = mock(WhseInventoryRepository.class);
         movementRepo = mock(WhseStockMovementRepository.class);
+        allocationRepo = mock(WhseAllocationEventRepository.class);
         when(inventoryRepo.findPosition(eq(tenant), eq(client), eq(item), eq(loc)))
-                .thenAnswer(i -> positions.stream().findFirst());
+                .thenAnswer(i -> positions.stream().filter(p -> "AVAILABLE".equals(p.getStatus())).findFirst());
+        when(inventoryRepo.findPositionWithStatus(eq(tenant), eq(client), eq(item), eq(loc), any(String.class)))
+                .thenAnswer(i -> positions.stream().filter(p -> p.getStatus().equals(i.getArgument(4))).findFirst());
+        when(movementRepo.findFirstByTenantIdAndIdempotencyKey(eq(tenant), any(String.class)))
+                .thenAnswer(i -> ledger.stream().filter(m -> i.getArgument(1).equals(m.getIdempotencyKey())).findFirst());
+        when(allocationRepo.save(any(WhseAllocationEvent.class))).thenAnswer(i -> {
+            WhseAllocationEvent e = i.getArgument(0);
+            events.add(e);
+            return e;
+        });
         when(inventoryRepo.save(any(WhseInventory.class))).thenAnswer(i -> {
             WhseInventory p = i.getArgument(0);
             if (!positions.contains(p)) positions.add(p);
@@ -56,7 +70,7 @@ class WhseInventoryServiceTest {
             ledger.add(m);
             return m;
         });
-        service = new WhseInventoryService(inventoryRepo, movementRepo);
+        service = new WhseInventoryService(inventoryRepo, movementRepo, allocationRepo);
     }
 
     private BigDecimal ledgerTotal() {
@@ -157,5 +171,135 @@ class WhseInventoryServiceTest {
         assertEquals(ref, pick.getReferenceId());
         assertEquals("OUT-9", pick.getReferenceNumber());
         assertEquals(user, pick.getRecordedByUserId());
+    }
+
+    private BigDecimal ledgerTotal(String status) {
+        return ledger.stream().filter(m -> status.equals(m.getStatus())).map(WhseStockMovement::getQtyChange)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private WhseInventory position(String status) {
+        return positions.stream().filter(p -> p.getStatus().equals(status)).findFirst().orElseThrow();
+    }
+
+    @Test
+    @DisplayName("allocation, fulfilment and release each write an allocation event that chains")
+    void allocationEventsChain() {
+        service.receiveStock(t(), client, item, loc, q(10), "INBOUND_SHIPMENT", UUID.randomUUID(), "IN-1", user);
+        UUID order = UUID.randomUUID();
+        service.allocateStock(t(), client, item, loc, q(6), "OUTBOUND_ORDER", order, "OUT-1", user);
+        service.deallocateStock(t(), client, item, loc, q(2), "OUTBOUND_ORDER", order, "OUT-1", user);
+        service.fulfillPick(t(), client, item, loc, q(4), "OUTBOUND_ORDER", order, "OUT-1", user);
+
+        assertEquals(3, events.size());
+        assertEquals("ALLOCATE", events.get(0).getEventType());
+        assertEquals(0, q(0).compareTo(events.get(0).getAllocatedBefore()));
+        assertEquals(0, q(6).compareTo(events.get(0).getAllocatedAfter()));
+        assertEquals("DEALLOCATE", events.get(1).getEventType());
+        assertEquals(0, q(4).compareTo(events.get(1).getAllocatedAfter()));
+        assertEquals("FULFIL", events.get(2).getEventType());
+        assertEquals(0, q(0).compareTo(events.get(2).getAllocatedAfter()));
+        assertEquals(order, events.get(2).getReferenceId());
+        assertEquals(0, positions.get(0).getQtyAllocated().compareTo(q(0)));
+    }
+
+    @Test
+    @DisplayName("repeating an adjustment with the same idempotency key is applied once")
+    void adjustmentIsIdempotent() {
+        service.receiveStock(t(), client, item, loc, q(10), "INBOUND_SHIPMENT", UUID.randomUUID(), "IN-1", user);
+        WhseInventory inv = positions.get(0);
+        when(inventoryRepo.findByTenantAndId(tenant, inv.getId())).thenReturn(Optional.of(inv));
+
+        service.adjust(t(), inv.getId(), q(-3), "damaged", user, "key-1");
+        service.adjust(t(), inv.getId(), q(-3), "damaged", user, "key-1");
+
+        assertEquals(0, q(7).compareTo(inv.getQtyOnHand()));
+        assertEquals(2, ledger.size());
+    }
+
+    @Test
+    @DisplayName("an idempotency key reused for a different position is refused")
+    void idempotencyKeyCannotBeReused() {
+        service.receiveStock(t(), client, item, loc, q(10), "INBOUND_SHIPMENT", UUID.randomUUID(), "IN-1", user, "key-9");
+
+        assertThrows(IllegalStateException.class, () -> service.receiveStock(t(), client, UUID.randomUUID(), loc,
+                q(1), "INBOUND_SHIPMENT", UUID.randomUUID(), "IN-2", user, "key-9"));
+        assertEquals(1, ledger.size());
+    }
+
+    @Test
+    @DisplayName("quarantine moves stock to its own position as two movements and every position still reconciles")
+    void quarantineKeepsLedgerBalanced() {
+        service.receiveStock(t(), client, item, loc, q(10), "INBOUND_SHIPMENT", UUID.randomUUID(), "IN-1", user);
+        service.changeStatus(t(), client, item, loc, "AVAILABLE", "QUARANTINE", q(4), "awaiting inspection", user, null);
+
+        assertEquals(0, q(6).compareTo(position("AVAILABLE").getQtyOnHand()));
+        assertEquals(0, q(4).compareTo(position("QUARANTINE").getQtyOnHand()));
+        assertEquals(3, ledger.size());
+        assertEquals(0, position("AVAILABLE").getQtyOnHand().compareTo(ledgerTotal("AVAILABLE")));
+        assertEquals(0, position("QUARANTINE").getQtyOnHand().compareTo(ledgerTotal("QUARANTINE")));
+        assertEquals(0, q(0).compareTo(position("QUARANTINE").available()));
+    }
+
+    @Test
+    @DisplayName("quarantined stock cannot be allocated")
+    void quarantinedStockIsNotAllocatable() {
+        service.receiveStock(t(), client, item, loc, q(10), "INBOUND_SHIPMENT", UUID.randomUUID(), "IN-1", user);
+        service.changeStatus(t(), client, item, loc, "AVAILABLE", "QUARANTINE", q(10), "recall hold", user, null);
+
+        assertThrows(IllegalStateException.class, () -> service.allocateStock(t(), client, item, loc, q(1)));
+        assertThrows(IllegalStateException.class, () -> position("QUARANTINE").allocate(q(1)));
+    }
+
+    @Test
+    @DisplayName("allocated stock cannot be moved to quarantine, only the unallocated part")
+    void allocatedStockStaysPut() {
+        service.receiveStock(t(), client, item, loc, q(10), "INBOUND_SHIPMENT", UUID.randomUUID(), "IN-1", user);
+        service.allocateStock(t(), client, item, loc, q(8));
+
+        assertThrows(IllegalStateException.class,
+                () -> service.changeStatus(t(), client, item, loc, "AVAILABLE", "QUARANTINE", q(3), "hold it", user, null));
+        service.changeStatus(t(), client, item, loc, "AVAILABLE", "QUARANTINE", q(2), "hold it", user, null);
+        assertEquals(0, q(8).compareTo(position("AVAILABLE").getQtyOnHand()));
+    }
+
+    @Test
+    @DisplayName("release returns quarantined stock to available; damaged stock cannot be released")
+    void releaseAndDamaged() {
+        service.receiveStock(t(), client, item, loc, q(10), "INBOUND_SHIPMENT", UUID.randomUUID(), "IN-1", user);
+        service.changeStatus(t(), client, item, loc, "AVAILABLE", "QUARANTINE", q(5), "inspection", user, null);
+        service.changeStatus(t(), client, item, loc, "QUARANTINE", "AVAILABLE", q(3), "passed inspection", user, null);
+        service.changeStatus(t(), client, item, loc, "QUARANTINE", "DAMAGED", q(2), "failed inspection", user, null);
+
+        assertEquals(0, q(8).compareTo(position("AVAILABLE").getQtyOnHand()));
+        assertEquals(0, q(0).compareTo(position("QUARANTINE").getQtyOnHand()));
+        assertEquals(0, q(2).compareTo(position("DAMAGED").getQtyOnHand()));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.changeStatus(t(), client, item, loc, "DAMAGED", "AVAILABLE", q(1), "put it back", user, null));
+        for (String status : List.of("AVAILABLE", "QUARANTINE", "DAMAGED")) {
+            assertEquals(0, position(status).getQtyOnHand().compareTo(ledgerTotal(status)), status);
+        }
+    }
+
+    @Test
+    @DisplayName("a status change needs a reason")
+    void statusChangeNeedsReason() {
+        service.receiveStock(t(), client, item, loc, q(10), "INBOUND_SHIPMENT", UUID.randomUUID(), "IN-1", user);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.changeStatus(t(), client, item, loc, "AVAILABLE", "QUARANTINE", q(1), " ", user, null));
+        assertEquals(1, ledger.size());
+    }
+
+    @Test
+    @DisplayName("repeating a status change with the same key moves the stock once")
+    void statusChangeIsIdempotent() {
+        service.receiveStock(t(), client, item, loc, q(10), "INBOUND_SHIPMENT", UUID.randomUUID(), "IN-1", user);
+        service.changeStatus(t(), client, item, loc, "AVAILABLE", "QUARANTINE", q(4), "inspection", user, "chg-1");
+        service.changeStatus(t(), client, item, loc, "AVAILABLE", "QUARANTINE", q(4), "inspection", user, "chg-1");
+
+        assertEquals(0, q(6).compareTo(position("AVAILABLE").getQtyOnHand()));
+        assertEquals(0, q(4).compareTo(position("QUARANTINE").getQtyOnHand()));
+        assertEquals(3, ledger.size());
     }
 }

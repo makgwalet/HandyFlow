@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import za.co.handyflow.platform.warehousing.domain.model.WhseStockMovement;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface WhseStockMovementRepository extends JpaRepository<WhseStockMovement, UUID> {
@@ -16,6 +17,8 @@ public interface WhseStockMovementRepository extends JpaRepository<WhseStockMove
     @Query("SELECT m FROM WhseStockMovement m WHERE m.tenantId = :tenantId AND m.clientId = :clientId AND m.itemId = :itemId AND m.locationId = :locationId ORDER BY m.createdAt DESC")
     List<WhseStockMovement> findByPosition(@Param("tenantId") UUID tenantId, @Param("clientId") UUID clientId,
                                             @Param("itemId") UUID itemId, @Param("locationId") UUID locationId);
+
+    Optional<WhseStockMovement> findFirstByTenantIdAndIdempotencyKey(UUID tenantId, String idempotencyKey);
 
     @Query("SELECT m FROM WhseStockMovement m WHERE m.tenantId = :tenantId AND m.clientId = :clientId ORDER BY m.createdAt DESC")
     Page<WhseStockMovement> findByClient(@Param("tenantId") UUID tenantId, @Param("clientId") UUID clientId, Pageable pageable);

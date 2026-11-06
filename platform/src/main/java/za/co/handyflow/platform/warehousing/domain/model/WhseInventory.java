@@ -53,6 +53,15 @@ public class WhseInventory {
     @Column(name = "qty_allocated", nullable = false, precision = 12, scale = 3)
     private BigDecimal qtyAllocated = BigDecimal.ZERO;
 
+    /** AVAILABLE, QUARANTINE, DAMAGED or BLOCKED. Only AVAILABLE stock can be allocated. Part of the position's identity (V600). */
+    @Column(name = "status", nullable = false, length = 20)
+    private String status = STATUS_AVAILABLE;
+
+    public static final String STATUS_AVAILABLE = "AVAILABLE";
+    public static final String STATUS_QUARANTINE = "QUARANTINE";
+    public static final String STATUS_DAMAGED = "DAMAGED";
+    public static final String STATUS_BLOCKED = "BLOCKED";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -63,7 +72,12 @@ public class WhseInventory {
     private Long version;
 
     public static WhseInventory create(UUID tenantId, UUID clientId, UUID itemId, UUID locationId) {
+        return create(tenantId, clientId, itemId, locationId, STATUS_AVAILABLE);
+    }
+
+    public static WhseInventory create(UUID tenantId, UUID clientId, UUID itemId, UUID locationId, String status) {
         WhseInventory i = new WhseInventory();
+        i.status = status;
         i.tenantId = tenantId;
         i.clientId = clientId;
         i.itemId = itemId;
@@ -76,6 +90,7 @@ public class WhseInventory {
     }
 
     public BigDecimal available() {
+        if (!STATUS_AVAILABLE.equals(status)) return BigDecimal.ZERO;
         return qtyOnHand.subtract(qtyAllocated);
     }
 
@@ -83,6 +98,17 @@ public class WhseInventory {
     public void increaseOnHand(BigDecimal qty) {
         requirePositive(qty);
         this.qtyOnHand = this.qtyOnHand.add(qty);
+        this.updatedAt = Instant.now();
+    }
+
+    /** Takes stock out of this position for a status change; only the unallocated part can leave. */
+    public void decreaseOnHandUnallocated(BigDecimal qty) {
+        requirePositive(qty);
+        if (qty.compareTo(qtyOnHand.subtract(qtyAllocated)) > 0) {
+            throw new IllegalStateException("Cannot move " + qty + " — only " + qtyOnHand.subtract(qtyAllocated)
+                    + " is on hand and not allocated");
+        }
+        this.qtyOnHand = this.qtyOnHand.subtract(qty);
         this.updatedAt = Instant.now();
     }
 
@@ -103,6 +129,9 @@ public class WhseInventory {
     /** Commits stock to an outbound order — cannot allocate more than what's actually available (on-hand minus already allocated). */
     public void allocate(BigDecimal qty) {
         requirePositive(qty);
+        if (!STATUS_AVAILABLE.equals(status)) {
+            throw new IllegalStateException("Only available stock can be allocated; this stock is " + status);
+        }
         if (qty.compareTo(available()) > 0) {
             throw new IllegalStateException(
                     "Cannot allocate " + qty + " — only " + available() + " available at this location");

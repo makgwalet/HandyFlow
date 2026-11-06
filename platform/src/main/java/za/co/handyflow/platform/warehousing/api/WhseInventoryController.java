@@ -13,6 +13,7 @@ import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.warehousing.application.internal.WhseInventoryService;
 import za.co.handyflow.platform.warehousing.domain.model.WhseInventory;
 import za.co.handyflow.platform.warehousing.dto.AdjustInventoryRequest;
+import za.co.handyflow.platform.warehousing.dto.ChangeStockStatusRequest;
 import za.co.handyflow.platform.warehousing.dto.InventoryResponse;
 
 import java.util.List;
@@ -48,15 +49,29 @@ public class WhseInventoryController {
     @PreAuthorize("hasAnyAuthority('WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
     @Operation(summary = "Manually adjust a stock position (count correction, damage write-off, ...) — always recorded as an ADJUSTMENT movement")
     public ResponseEntity<ApiResponse<InventoryResponse>> adjust(@PathVariable UUID id,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody AdjustInventoryRequest req) {
         featureGuard.requireModule("warehousing");
         WhseInventory inv = inventoryService.adjust(TenantContext.getTenantIdAsObject(), id, req.delta(),
-                req.reason(), TenantContext.getCurrentUserId());
+                req.reason(), TenantContext.getCurrentUserId(), idempotencyKey);
         return ResponseEntity.ok(ApiResponse.success("Stock adjusted", toResponse(inv)));
+    }
+
+    @PostMapping("/clients/{clientId}/inventory/status-change")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
+    @Operation(summary = "Move unallocated stock between statuses (quarantine, release, damaged) — posted as two ledger movements")
+    public ResponseEntity<ApiResponse<InventoryResponse>> changeStatus(@PathVariable UUID clientId,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @Valid @RequestBody ChangeStockStatusRequest req) {
+        featureGuard.requireModule("warehousing");
+        WhseInventory dest = inventoryService.changeStatus(TenantContext.getTenantIdAsObject(), clientId, req.itemId(),
+                req.locationId(), req.fromStatus(), req.toStatus(), req.qty(), req.reason(),
+                TenantContext.getCurrentUserId(), idempotencyKey);
+        return ResponseEntity.ok(ApiResponse.success("Stock status changed", toResponse(dest)));
     }
 
     private InventoryResponse toResponse(WhseInventory i) {
         return new InventoryResponse(i.getId(), i.getClientId(), i.getItemId(), i.getLocationId(), i.getQtyOnHand(),
-                i.getQtyAllocated(), i.available());
+                i.getQtyAllocated(), i.available(), i.getStatus());
     }
 }

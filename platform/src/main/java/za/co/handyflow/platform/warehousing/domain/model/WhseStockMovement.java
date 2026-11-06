@@ -43,7 +43,7 @@ public class WhseStockMovement {
     private UUID locationId;
 
     @Column(name = "movement_type", nullable = false)
-    private String movementType; // RECEIPT | PICK | ADJUSTMENT
+    private String movementType; // RECEIPT | PICK | ADJUSTMENT | QUARANTINE | RELEASE | DAMAGE (more allowed by V599)
 
     @Column(name = "qty_change", nullable = false, precision = 12, scale = 3)
     private BigDecimal qtyChange; // signed
@@ -72,10 +72,27 @@ public class WhseStockMovement {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /** The stock status of the position this movement belongs to (V600). */
+    @Column(name = "status", nullable = false, length = 20)
+    private String status = "AVAILABLE";
+
+    /** Optional caller-supplied key: a retried request with the same key is recorded once (V599). */
+    @Column(name = "idempotency_key", length = 100)
+    private String idempotencyKey;
+
     public static WhseStockMovement record(UUID tenantId, UUID clientId, UUID itemId, UUID locationId,
                                            String movementType, BigDecimal qtyChange, BigDecimal qtyBefore,
                                            BigDecimal qtyAfter, String referenceType, UUID referenceId,
                                            String referenceNumber, String notes, UUID recordedByUserId) {
+        return record(tenantId, clientId, itemId, locationId, movementType, qtyChange, qtyBefore, qtyAfter,
+                referenceType, referenceId, referenceNumber, notes, recordedByUserId, "AVAILABLE", null);
+    }
+
+    public static WhseStockMovement record(UUID tenantId, UUID clientId, UUID itemId, UUID locationId,
+                                           String movementType, BigDecimal qtyChange, BigDecimal qtyBefore,
+                                           BigDecimal qtyAfter, String referenceType, UUID referenceId,
+                                           String referenceNumber, String notes, UUID recordedByUserId,
+                                           String status, String idempotencyKey) {
         if (qtyChange == null || qtyChange.signum() == 0) {
             throw new IllegalArgumentException("qtyChange must be non-zero");
         }
@@ -93,6 +110,8 @@ public class WhseStockMovement {
         m.referenceNumber = referenceNumber;
         m.notes = notes;
         m.recordedByUserId = recordedByUserId;
+        m.status = status;
+        m.idempotencyKey = idempotencyKey;
         m.createdAt = Instant.now();
         return m;
     }

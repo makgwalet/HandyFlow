@@ -72,6 +72,11 @@ public class WhseOutboundOrderService {
      */
     @Transactional
     public WhseOutboundOrder startPicking(TenantId tenantId, UUID orderId) {
+        return startPicking(tenantId, orderId, null);
+    }
+
+    @Transactional
+    public WhseOutboundOrder startPicking(TenantId tenantId, UUID orderId, UUID recordedBy) {
         WhseOutboundOrder order = findActive(tenantId, orderId);
         order.startPicking();
 
@@ -86,7 +91,7 @@ public class WhseOutboundOrderService {
                             "Insufficient available stock for item " + line.getItemId() + " — required "
                                     + line.getQtyOrdered() + ", no single location can cover it in full"));
             inventoryService.allocateStock(tenantId, order.getClientId(), line.getItemId(), best.getLocationId(),
-                    line.getQtyOrdered());
+                    line.getQtyOrdered(), "OUTBOUND_ORDER", order.getId(), order.getOrderReference(), recordedBy);
             line.allocate(best.getLocationId());
             lineRepository.save(line);
         }
@@ -141,13 +146,19 @@ public class WhseOutboundOrderService {
     /** Cancels a PENDING or PICKING order, releasing any allocation already made. */
     @Transactional
     public WhseOutboundOrder cancel(TenantId tenantId, UUID orderId) {
+        return cancel(tenantId, orderId, null);
+    }
+
+    @Transactional
+    public WhseOutboundOrder cancel(TenantId tenantId, UUID orderId, UUID recordedBy) {
         WhseOutboundOrder order = findActive(tenantId, orderId);
         if ("PICKING".equals(order.getStatus())) {
             List<WhseOutboundOrderLine> lines = lineRepository.findByOrder(tenantId.getValue(), orderId);
             for (WhseOutboundOrderLine line : lines) {
                 if (line.getLocationId() != null) {
                     inventoryService.deallocateStock(tenantId, order.getClientId(), line.getItemId(),
-                            line.getLocationId(), line.getQtyOrdered());
+                            line.getLocationId(), line.getQtyOrdered(), "OUTBOUND_ORDER", order.getId(),
+                            order.getOrderReference(), recordedBy);
                 }
             }
         }

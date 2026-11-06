@@ -5,5 +5,5 @@ import java.util.UUID;
 
 public record InventoryResponse(
         UUID id, UUID clientId, UUID itemId, UUID locationId, BigDecimal qtyOnHand, BigDecimal qtyAllocated,
-        BigDecimal available
+        BigDecimal available, String status
 ) {}
