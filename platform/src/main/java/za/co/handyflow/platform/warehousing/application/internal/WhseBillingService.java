@@ -111,6 +111,7 @@ public class WhseBillingService {
     private final WhseNumberGenerator numberGenerator;
     private final AccountingFacade accountingFacade;
     private final SeparationOfDutiesChecker duties;
+    private final WhseTariffService tariffService;
 
     public static final String APPROVE_PERMISSION = "WAREHOUSING_BILLING_APPROVE";
 
@@ -151,6 +152,14 @@ public class WhseBillingService {
             storageFee = accruals.stream().map(WhseStorageAccrual::getAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
         }
+        // Minimum storage charge (per 30 days, pro-rated to this period). The top-up is recorded on the invoice.
+        BigDecimal minimumTopUp = BigDecimal.ZERO;
+        BigDecimal floor = WhseTariffBook.proratedMinimum(
+                tariffService.minimumStorageCharge(tenantId, clientId, periodEnd), daysInPeriod);
+        if (storageFee.compareTo(floor) < 0) {
+            minimumTopUp = floor.subtract(storageFee);
+            storageFee = floor;
+        }
         BigDecimal handlingFee = computeHandlingFee(tenantId, clientId, client, profile, periodStart);
         BigDecimal vatAmount = BigDecimal.ZERO; // VAT-on-invoice treatment is a real question this session should not guess at — see module status doc
 
@@ -159,6 +168,7 @@ public class WhseBillingService {
         WhseBillingInvoice invoice = WhseBillingInvoice.create(tenantId.getValue(), clientId, invoiceNumber,
                 periodStart, periodEnd, invoiceDate, invoiceDate.plusDays(30), storageFee, handlingFee, vatAmount);
         invoice.preparedBy(preparedBy);
+        invoice.recordMinimumTopUp(minimumTopUp);
         invoice = invoiceRepository.save(invoice);
         for (WhseStorageAccrual accrual : accruals) {
             accrual.markBilled(invoice.getId());

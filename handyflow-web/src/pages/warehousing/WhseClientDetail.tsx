@@ -7,7 +7,7 @@
 // confirmed — the backend @PreAuthorize is the real gate, same note as
 // every other provider-module build this session.
 import { useState } from "react"
-import { ArrowLeft, Package, Boxes, Truck, PackageCheck, FileText, UserPlus } from "lucide-react"
+import { ArrowLeft, Package, Boxes, Truck, PackageCheck, FileText, UserPlus, Tags } from "lucide-react"
 import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
 import WhseItemsTab from "./WhseItemsTab"
 import WhseInventoryTab from "./WhseInventoryTab"
@@ -15,8 +15,9 @@ import WhseInboundShipmentsTab from "./WhseInboundShipmentsTab"
 import WhseOutboundOrdersTab from "./WhseOutboundOrdersTab"
 import WhseBillingInvoicesTab from "./WhseBillingInvoicesTab"
 import WhsePortalAccessTab from "./WhsePortalAccessTab"
+import WhseRatesTab from "./WhseRatesTab"
 
-type SubTab = "items" | "inventory" | "inbound" | "outbound" | "billing" | "portal"
+type SubTab = "items" | "inventory" | "inbound" | "outbound" | "billing" | "rates" | "portal"
 
 const SUB_TABS: { key: SubTab; label: string; icon: typeof Package }[] = [
   { key: "items", label: "Items", icon: Package },
@@ -24,6 +25,7 @@ const SUB_TABS: { key: SubTab; label: string; icon: typeof Package }[] = [
   { key: "inbound", label: "Inbound Shipments", icon: Truck },
   { key: "outbound", label: "Outbound Orders", icon: PackageCheck },
   { key: "billing", label: "Billing Invoices", icon: FileText },
+  { key: "rates", label: "Rates & Terms", icon: Tags },
   { key: "portal", label: "Portal Access", icon: UserPlus },
 ]
 
@@ -61,6 +63,7 @@ export default function WhseClientDetail({ clientId, clientName, onBack }: { cli
       {sub === "inbound" && <WhseInboundShipmentsTab clientId={clientId} />}
       {sub === "outbound" && <WhseOutboundOrdersTab clientId={clientId} />}
       {sub === "billing" && <WhseBillingInvoicesTab clientId={clientId} />}
+      {sub === "rates" && <WhseRatesTab clientId={clientId} />}
       {sub === "portal" && <WhsePortalAccessTab clientId={clientId} />}
     </div>
   )

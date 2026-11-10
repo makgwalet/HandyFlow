@@ -100,6 +100,9 @@ public class WhseBillingInvoice {
     @Column(name = "decision_note")
     private String decisionNote;
 
+    @Column(name = "storage_minimum_topup", nullable = false)
+    private BigDecimal storageMinimumTopup = BigDecimal.ZERO;
+
     @Column(name = "sole_exception", nullable = false)
     private boolean soleException;
 
@@ -123,6 +126,11 @@ public class WhseBillingInvoice {
         inv.status = "DRAFT";
         inv.createdAt = Instant.now();
         return inv;
+    }
+
+    /** Part of the storage fee that is the contract minimum rather than stored goods. */
+    public void recordMinimumTopUp(BigDecimal amount) {
+        this.storageMinimumTopup = amount == null ? BigDecimal.ZERO : amount;
     }
 
     public void preparedBy(UUID userId) {

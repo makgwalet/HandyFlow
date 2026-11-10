@@ -38,6 +38,7 @@ public class WhseStorageAccrualService {
     private final WhseItemRepository itemRepository;
     private final WhseProfileRepository profileRepository;
     private final za.co.handyflow.platform.warehousing.domain.repository.WhseInventoryRepository inventoryRepository;
+    private final WhseTariffBookSource tariffSource;
 
     /** Calendar days are cut in this zone (receipt day and dispatch day both count in full). */
     @org.springframework.beans.factory.annotation.Value("${handyflow.warehousing.billing-zone:Africa/Johannesburg}")
@@ -55,6 +56,7 @@ public class WhseStorageAccrualService {
         List<WhseStorageAccrual> toSave = new ArrayList<>();
         int unrated = 0;
 
+        WhseTariffBook book = tariffSource.bookFor(tenantId);
         java.time.ZoneId zone = zone();
         Map<UUID, java.math.BigDecimal> held = new HashMap<>();
         for (Object[] row : accrualRepository.billableQuantities(tenantId, date.atStartOfDay(zone).toInstant(),
@@ -69,12 +71,15 @@ public class WhseStorageAccrualService {
             Map<UUID, WhseItem> items = itemsByClient.computeIfAbsent(position.getClientId(),
                     id -> itemRepository.findAllActiveForClient(tenantId, id).stream()
                             .collect(java.util.stream.Collectors.toMap(WhseItem::getId, i -> i, (a, b) -> a)));
-            Resolved r = resolve(items.get(position.getItemId()), client, profile);
+            WhseItem item = items.get(position.getItemId());
+            WhseTariffBook.Rate r = book.resolve(position.getClientId(), position.getItemId(), date,
+                    item == null ? null : item.getStorageRatePerUnitPerMonth(), client.getStorageRatePerUnitPerMonth(),
+                    profile == null ? null : profile.getDefaultStorageRatePerUnitPerMonth());
             if (r == null) {
                 unrated++;
                 continue;
             }
-            toSave.add(WhseStorageAccrual.of(position, date, held.get(position.getId()), r.rate, r.source));
+            toSave.add(WhseStorageAccrual.of(position, date, held.get(position.getId()), r.rate(), r.source()).pricedBy(r.tariffId()));
         }
         accrualRepository.saveAll(toSave);
         if (unrated > 0) {
@@ -83,21 +88,5 @@ public class WhseStorageAccrualService {
         }
         log.info("[Warehousing] Storage accrual tenant={} date={} written={}", tenantId, date, toSave.size());
         return toSave.size();
-    }
-
-    record Resolved(java.math.BigDecimal rate, String source) {}
-
-    /** Same order as invoicing always used: item, then client, then the warehouse default. Null when none is set. */
-    static Resolved resolve(WhseItem item, WhseClient client, WhseProfile profile) {
-        if (item != null && item.getStorageRatePerUnitPerMonth() != null) {
-            return new Resolved(item.getStorageRatePerUnitPerMonth(), "ITEM");
-        }
-        if (client.getStorageRatePerUnitPerMonth() != null) {
-            return new Resolved(client.getStorageRatePerUnitPerMonth(), "CLIENT");
-        }
-        if (profile != null && profile.getDefaultStorageRatePerUnitPerMonth() != null) {
-            return new Resolved(profile.getDefaultStorageRatePerUnitPerMonth(), "PROFILE");
-        }
-        return null;
     }
 }

@@ -43,7 +43,7 @@ class WhseBillingApprovalTest {
         service = new WhseBillingService(invoices, mock(WhseInventoryRepository.class), accruals, mock(WhseItemRepository.class),
                 mock(WhseInboundShipmentLineRepository.class), mock(WhseOutboundOrderRepository.class),
                 mock(WhseOutboundOrderLineRepository.class), mock(WhseClientService.class), mock(WhseProfileService.class),
-                mock(WhseNumberGenerator.class), accounting, duties);
+                mock(WhseNumberGenerator.class), accounting, duties, mock(WhseTariffService.class));
         invoice = WhseBillingInvoice.create(tenant, client, "WHI00001", LocalDate.now().minusMonths(1), LocalDate.now(),
                 LocalDate.now(), LocalDate.now().plusDays(30), new BigDecimal("300"), new BigDecimal("100"), BigDecimal.ZERO);
         invoice.preparedBy(maker);

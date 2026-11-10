@@ -41,6 +41,7 @@ public class WhseStorageAccrual {
     @Column(name = "days_per_month", nullable = false) private int daysPerMonth = DAYS_PER_MONTH;
     @Column(name = "amount", nullable = false, precision = 15, scale = 4) private BigDecimal amount;
     @Column(name = "billing_invoice_id") private UUID billingInvoiceId;
+    @Column(name = "tariff_id") private UUID tariffId;
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt = Instant.now();
 
     public static WhseStorageAccrual of(WhseInventory position, LocalDate date, BigDecimal monthlyRate, String rateSource) {
@@ -67,6 +68,12 @@ public class WhseStorageAccrual {
         a.amount = billableQty.multiply(monthlyRate)
                 .divide(BigDecimal.valueOf(DAYS_PER_MONTH), 4, RoundingMode.HALF_UP);
         return a;
+    }
+
+    /** The tariff version that priced this day, when a version (not a plain rate field) did. */
+    public WhseStorageAccrual pricedBy(UUID tariffVersionId) {
+        this.tariffId = tariffVersionId;
+        return this;
     }
 
     public void markBilled(UUID invoiceId) {

@@ -46,7 +46,8 @@ class WhseStorageAccrualServiceTest {
         items = mock(WhseItemRepository.class);
         profiles = mock(WhseProfileRepository.class);
         inventoryRepo = mock(WhseInventoryRepository.class);
-        service = new WhseStorageAccrualService(accruals, clients, items, profiles, inventoryRepo);
+        service = new WhseStorageAccrualService(accruals, clients, items, profiles, inventoryRepo,
+                tenantId -> new WhseTariffBook(List.of(), List.of()));
         client = WhseClient.create(tenant, "Acme", null, null, null, null, null, null, null, null, null);
         item = WhseItem.create(tenant, client.getId(), "SKU1", "Widget", "EACH", null);
         when(clients.findById(client.getId())).thenReturn(Optional.of(client));
@@ -99,15 +100,21 @@ class WhseStorageAccrualServiceTest {
     }
 
     @Test
-    @DisplayName("item rate beats client rate beats warehouse default")
-    void rateOrder() {
-        WhseProfile p = WhseProfile.create(tenant, "WH", null, new BigDecimal("1"), null, null, null, null, null, null);
-        assertEquals("PROFILE", WhseStorageAccrualService.resolve(item, client, p).source());
-        WhseClient withRate = WhseClient.create(tenant, "B", null, new BigDecimal("2"), null, null, null, null, null, null, null);
-        assertEquals("CLIENT", WhseStorageAccrualService.resolve(item, withRate, p).source());
-        WhseItem rated = WhseItem.create(tenant, withRate.getId(), "S", "d", "EACH", new BigDecimal("3"));
-        assertEquals("ITEM", WhseStorageAccrualService.resolve(rated, withRate, p).source());
-        assertNull(WhseStorageAccrualService.resolve(item, client, null));
+    @DisplayName("a tariff version prices the day and is recorded on the accrual")
+    void tariffVersionPricesTheDay() {
+        profileRate("3.0000");
+        WhseTariffBook.TariffVersion v = new WhseTariffBook.TariffVersion(UUID.randomUUID(), client.getId(), null,
+                new BigDecimal("6.0000"), day.minusDays(1), java.time.Instant.now());
+        service = new WhseStorageAccrualService(accruals, clients, items, profiles, inventoryRepo,
+                tenantId -> new WhseTariffBook(List.of(v), List.of()));
+        held(stock(0), 30);
+
+        service.accrueForTenant(tenant, day);
+
+        WhseStorageAccrual a = saved().get(0);
+        assertEquals("CLIENT_TARIFF", a.getRateSource());
+        assertEquals(v.id(), a.getTariffId());
+        assertEquals(0, new BigDecimal("6.0000").compareTo(a.getAmount())); // 30 x 6 / 30
     }
 
     @Test
