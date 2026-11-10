@@ -35,6 +35,7 @@ public class WhseOutboundOrderService {
     private final WhseInventoryService inventoryService;
     private final WhseClientService clientService;
     private final WhseLotAllocationService lotAllocation;
+    private final WhseTaskService taskService;
 
     /** One ordered line on a new outbound order. */
     public record OutboundLine(UUID itemId, BigDecimal qtyOrdered, String notes) {}
@@ -103,6 +104,9 @@ public class WhseOutboundOrderService {
             line.allocate(best.getLocationId());
             lineRepository.save(line);
         }
+        // The pick tasks are built from the lines' locations and the lot allocations, so the lines must be written first.
+        lineRepository.flush();
+        taskService.createPickTasks(tenantId, order.getId());
         return orderRepository.save(order);
     }
 
@@ -117,6 +121,7 @@ public class WhseOutboundOrderService {
     @Transactional
     public WhseOutboundOrder markPacked(TenantId tenantId, UUID orderId) {
         WhseOutboundOrder order = findActive(tenantId, orderId);
+        requirePicksFinished(tenantId, orderId);
         order.markPacked();
         return orderRepository.save(order);
     }
@@ -137,6 +142,7 @@ public class WhseOutboundOrderService {
     public WhseOutboundOrder markShipped(TenantId tenantId, UUID orderId, String carrier, String trackingNumber,
                                           UUID recordedBy) {
         WhseOutboundOrder order = findActive(tenantId, orderId);
+        requirePicksFinished(tenantId, orderId);
         order.markShipped(carrier, trackingNumber);
 
         List<WhseOutboundOrderLine> lines = lineRepository.findByOrder(tenantId.getValue(), orderId);
@@ -167,12 +173,15 @@ public class WhseOutboundOrderService {
             throw new IllegalStateException("Only an order that is being picked can have its lots re-allocated (this one is " + order.getStatus() + ")");
         }
         lotAllocation.release(tenantId, order.getId(), order.getOrderReference(), recordedBy);
+        taskService.cancelPickTasks(tenantId, order.getId(), "Lots re-allocated");
         for (WhseOutboundOrderLine line : lineRepository.findByOrder(tenantId.getValue(), orderId)) {
             if (!lotAllocation.isLotTracked(tenantId.getValue(), line.getItemId())) continue;
             line.allocate(lotAllocation.allocate(tenantId, order.getId(), order.getOrderReference(), line.getId(), order.getClientId(),
                     line.getItemId(), line.getQtyOrdered(), recordedBy));
             lineRepository.save(line);
         }
+        lineRepository.flush();
+        taskService.createPickTasks(tenantId, order.getId());
         return order;
     }
 
@@ -187,6 +196,7 @@ public class WhseOutboundOrderService {
         WhseOutboundOrder order = findActive(tenantId, orderId);
         if ("PICKING".equals(order.getStatus())) {
             lotAllocation.release(tenantId, order.getId(), order.getOrderReference(), recordedBy);
+            taskService.cancelPickTasks(tenantId, order.getId(), "Order cancelled");
             List<WhseOutboundOrderLine> lines = lineRepository.findByOrder(tenantId.getValue(), orderId);
             for (WhseOutboundOrderLine line : lines) {
                 if (line.getLocationId() != null && !lotAllocation.isLotTracked(tenantId.getValue(), line.getItemId())) {
@@ -213,6 +223,14 @@ public class WhseOutboundOrderService {
     @Transactional(readOnly = true)
     public List<WhseOutboundOrderLine> listLines(TenantId tenantId, UUID orderId) {
         return lineRepository.findByOrder(tenantId.getValue(), orderId);
+    }
+
+    /** An order whose pick tasks are not all done (open, held, or short) cannot be packed or shipped. Orders without tasks are unaffected. */
+    private void requirePicksFinished(TenantId tenantId, UUID orderId) {
+        int open = taskService.unfinishedPickTasks(tenantId, orderId);
+        if (open > 0) {
+            throw new IllegalStateException(open + " pick task" + (open == 1 ? " is" : "s are") + " not finished (including any short picks). Finish them, or re-allocate or cancel the order.");
+        }
     }
 
     private WhseOutboundOrder findActive(TenantId tenantId, UUID orderId) {

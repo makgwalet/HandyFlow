@@ -302,4 +302,52 @@ class WhseInventoryServiceTest {
         assertEquals(0, q(4).compareTo(position("QUARANTINE").getQtyOnHand()));
         assertEquals(3, ledger.size());
     }
+
+    private void locationAwareLookups() {
+        when(inventoryRepo.findPositionWithStatus(eq(tenant), eq(client), eq(item), any(UUID.class), any(String.class)))
+                .thenAnswer(i -> positions.stream().filter(p -> p.getLocationId().equals(i.getArgument(3)) && p.getStatus().equals(i.getArgument(4))).findFirst());
+    }
+
+    @Test
+    @DisplayName("a transfer moves unallocated stock to another location with an out and an in row that net to zero")
+    void transferMovesStock() {
+        locationAwareLookups();
+        UUID loc2 = UUID.randomUUID();
+        service.receiveStock(t(), client, item, loc, q(10), "INBOUND_SHIPMENT", UUID.randomUUID(), "IN-1", user);
+        service.transfer(t(), client, item, loc, loc2, null, "AVAILABLE", q(6), "PUTAWAY", "WHSE_TASK", UUID.randomUUID(), "Put-away", null, user, "task:1");
+
+        assertEquals(2, positions.size());
+        assertEquals(0, q(4).compareTo(positions.get(0).getQtyOnHand()));
+        assertEquals(0, q(6).compareTo(positions.get(1).getQtyOnHand()));
+        assertEquals(3, ledger.size());
+        assertEquals(0, q(10).compareTo(ledgerTotal()), "stock is conserved: the ledger still totals what was received");
+        assertEquals("task:1", ledger.get(1).getIdempotencyKey());
+        assertEquals("task:1:in", ledger.get(2).getIdempotencyKey());
+    }
+
+    @Test
+    @DisplayName("a transfer tops up a position that already exists at the destination")
+    void transferTopsUp() {
+        locationAwareLookups();
+        UUID loc2 = UUID.randomUUID();
+        service.receiveStock(t(), client, item, loc, q(10), "INBOUND_SHIPMENT", UUID.randomUUID(), "IN-1", user);
+        service.receiveStock(t(), client, item, loc2, q(5), "INBOUND_SHIPMENT", UUID.randomUUID(), "IN-2", user);
+        service.transfer(t(), client, item, loc, loc2, null, "AVAILABLE", q(3), "TRANSFER", null, null, null, null, user, null);
+        assertEquals(2, positions.size());
+        assertEquals(0, q(8).compareTo(positions.get(1).getQtyOnHand()));
+    }
+
+    @Test
+    @DisplayName("allocated stock cannot be transferred, and neither can more than is there, nor to the same place")
+    void transferRefusals() {
+        locationAwareLookups();
+        UUID loc2 = UUID.randomUUID();
+        service.receiveStock(t(), client, item, loc, q(10), "INBOUND_SHIPMENT", UUID.randomUUID(), "IN-1", user);
+        service.allocateStock(t(), client, item, loc, q(8));
+        assertThrows(IllegalStateException.class, () -> service.transfer(t(), client, item, loc, loc2, null, "AVAILABLE", q(3), "PUTAWAY", null, null, null, null, user, null));
+        assertThrows(IllegalArgumentException.class, () -> service.transfer(t(), client, item, loc, loc, null, "AVAILABLE", q(1), "PUTAWAY", null, null, null, null, user, null));
+        assertThrows(IllegalArgumentException.class, () -> service.transfer(t(), client, item, loc, loc2, null, "AVAILABLE", q(1), "RECEIPT", null, null, null, null, user, null));
+        assertThrows(IllegalStateException.class, () -> service.transfer(t(), client, item, loc, loc2, null, "QUARANTINE", q(1), "PUTAWAY", null, null, null, null, user, null));
+        assertEquals(1, ledger.size(), "nothing was posted by the refused transfers");
+    }
 }

@@ -313,6 +313,35 @@ public class WhseInventoryService {
         return dest;
     }
 
+    /**
+     * Moves unallocated stock of one position (client, item, status, lot) to another location: a put-away or a transfer. Two ledger rows,
+     * one out and one in, sharing the reference; the destination position is created or topped up, in the same status and lot.
+     */
+    @Transactional
+    public WhseInventory transfer(TenantId tenantId, UUID clientId, UUID itemId, UUID fromLocationId, UUID toLocationId, UUID lotId,
+                                   String status, BigDecimal qty, String movementType, String referenceType, UUID referenceId,
+                                   String referenceNumber, String note, UUID recordedBy, String idempotencyKey) {
+        if (!java.util.Set.of("PUTAWAY", "TRANSFER").contains(movementType)) {
+            throw new IllegalArgumentException("Stock cannot be moved with movement type " + movementType);
+        }
+        if (fromLocationId.equals(toLocationId)) throw new IllegalArgumentException("The stock is already at that location.");
+        if (qty == null || qty.signum() <= 0) throw new IllegalArgumentException("The quantity to move must be above zero.");
+        WhseInventory source = find(tenantId, clientId, itemId, fromLocationId, status, lotId)
+                .orElseThrow(() -> new IllegalStateException("No " + status + " stock of this item at the source location to move"));
+        WhseInventory dest = find(tenantId, clientId, itemId, toLocationId, status, lotId)
+                .orElseGet(() -> repository.save(WhseInventory.create(tenantId.getValue(), clientId, itemId, toLocationId, status, lotId)));
+        BigDecimal sourceBefore = source.getQtyOnHand();
+        BigDecimal destBefore = dest.getQtyOnHand();
+        source.decreaseOnHandUnallocated(qty);
+        dest.increaseOnHand(qty);
+        source = repository.save(source);
+        dest = repository.save(dest);
+        recordMovement(tenantId, source, movementType, qty.negate(), sourceBefore, referenceType, referenceId, referenceNumber, note, recordedBy, idempotencyKey);
+        recordMovement(tenantId, dest, movementType, qty, destBefore, referenceType, referenceId, referenceNumber, note, recordedBy,
+                idempotencyKey == null ? null : idempotencyKey + ":in");
+        return dest;
+    }
+
     static String statusChangeType(String from, String to) {
         if (WhseInventory.STATUS_AVAILABLE.equals(from) && WhseInventory.STATUS_QUARANTINE.equals(to)) return "QUARANTINE";
         if (WhseInventory.STATUS_QUARANTINE.equals(from) && WhseInventory.STATUS_AVAILABLE.equals(to)) return "RELEASE";
