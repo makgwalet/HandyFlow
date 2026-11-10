@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, MapPin, X, Power, PowerOff, Trash2, Pencil } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
+import WhseFloorMap from "./WhseFloorMap"
 
 interface LocationResponse {
   id: string; code: string; zone: string | null; description: string | null
@@ -64,6 +65,7 @@ export default function WhseLocationsTab() {
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<LocationResponse | null>(null)
+  const [view, setView] = useState<"list" | "map">("list")
 
   const { data: locations = [], isLoading } = useQuery<LocationResponse[]>({
     queryKey: ["whse-locations"],
@@ -83,8 +85,22 @@ export default function WhseLocationsTab() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["whse-locations"] }),
   })
 
+  const viewToggle = (
+    <div role="tablist" aria-label="Locations view" style={{ display: "inline-flex", border: "1px solid var(--hf-border)", borderRadius: 8, overflow: "hidden", marginBottom: 14 }}>
+      {(["list", "map"] as const).map(v => (
+        <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)}
+          style={{ padding: "7px 16px", border: "none", fontSize: 12.5, fontWeight: 600, cursor: "pointer", background: view === v ? WHSE_ACCENT : "var(--hf-surface)", color: view === v ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
+          {v === "list" ? "List" : "Floor map"}
+        </button>
+      ))}
+    </div>
+  )
+
+  if (view === "map") return <div>{viewToggle}<WhseFloorMap /></div>
+
   return (
     <div>
+      {viewToggle}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0 }}>{locations.length} location{locations.length === 1 ? "" : "s"}</p>
         <button onClick={() => setShowForm(true)}

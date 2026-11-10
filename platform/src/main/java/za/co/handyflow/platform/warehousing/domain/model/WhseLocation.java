@@ -48,6 +48,27 @@ public class WhseLocation {
     @Column(name = "active", nullable = false)
     private boolean active = true;
 
+    @Column(name = "aisle")
+    private String aisle;
+
+    @Column(name = "bay")
+    private Integer bay;
+
+    @Column(name = "level")
+    private Integer level;
+
+    @Column(name = "location_type", nullable = false)
+    private String locationType = "BIN";
+
+    @Column(name = "pick_sequence")
+    private Integer pickSequence; // walking order for picking; lower comes first
+
+    @Column(name = "pos_x")
+    private Integer posX; // floor-grid cell; null = not placed on the map
+
+    @Column(name = "pos_y")
+    private Integer posY;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -82,6 +103,26 @@ public class WhseLocation {
         this.zone = zone;
         this.description = description;
         this.capacityUnits = capacityUnits;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Places the location in the building. A cell needs both coordinates or neither. */
+    public void applyLayout(String aisle, Integer bay, Integer level, String locationType, Integer pickSequence, Integer posX, Integer posY) {
+        if ((posX == null) != (posY == null)) throw new IllegalArgumentException("A map position needs both x and y.");
+        if (posX != null && (posX < 0 || posY < 0)) throw new IllegalArgumentException("A map position cannot be negative.");
+        if (bay != null && bay < 1) throw new IllegalArgumentException("Bay must be 1 or more.");
+        if (level != null && level < 1) throw new IllegalArgumentException("Level must be 1 or more.");
+        if (pickSequence != null && pickSequence < 0) throw new IllegalArgumentException("Pick sequence cannot be negative.");
+        if (locationType == null || !za.co.handyflow.platform.warehousing.application.internal.WhseFloorLayout.TYPES.contains(locationType)) {
+            throw new IllegalArgumentException("Unknown location type.");
+        }
+        this.aisle = aisle == null || aisle.isBlank() ? null : aisle.trim().toUpperCase();
+        this.bay = bay;
+        this.level = level;
+        this.locationType = locationType;
+        this.pickSequence = pickSequence;
+        this.posX = posX;
+        this.posY = posY;
         this.updatedAt = Instant.now();
     }
 

@@ -91,6 +91,6 @@ public class WhseLocationController {
 
     private LocationResponse toResponse(WhseLocation l) {
         return new LocationResponse(l.getId(), l.getCode(), l.getZone(), l.getDescription(), l.getCapacityUnits(),
-                l.isActive());
+                l.isActive(), l.getAisle(), l.getBay(), l.getLevel(), l.getLocationType(), l.getPickSequence(), l.getPosX(), l.getPosY());
     }
 }
