@@ -39,16 +39,16 @@ public interface WhseStorageAccrualRepository extends JpaRepository<WhseStorageA
               SELECT i.id,
                      CASE WHEN NOT EXISTS (SELECT 1 FROM whse_stock_movements m0
                                             WHERE m0.tenant_id = i.tenant_id AND m0.client_id = i.client_id AND m0.item_id = i.item_id
-                                              AND m0.location_id = i.location_id AND m0.status = i.status AND m0.created_at < :dayEnd)
+                                              AND m0.location_id = i.location_id AND m0.status = i.status AND m0.lot_id IS NOT DISTINCT FROM i.lot_id AND m0.created_at < :dayEnd)
                           THEN (CASE WHEN i.created_at < :dayEnd THEN i.qty_on_hand ELSE 0 END)
                           ELSE GREATEST(
                                  COALESCE((SELECT m1.qty_after FROM whse_stock_movements m1
                                             WHERE m1.tenant_id = i.tenant_id AND m1.client_id = i.client_id AND m1.item_id = i.item_id
-                                              AND m1.location_id = i.location_id AND m1.status = i.status AND m1.created_at < :dayStart
+                                              AND m1.location_id = i.location_id AND m1.status = i.status AND m1.lot_id IS NOT DISTINCT FROM i.lot_id AND m1.created_at < :dayStart
                                             ORDER BY m1.created_at DESC, m1.id DESC LIMIT 1), 0),
                                  COALESCE((SELECT max(m2.qty_after) FROM whse_stock_movements m2
                                             WHERE m2.tenant_id = i.tenant_id AND m2.client_id = i.client_id AND m2.item_id = i.item_id
-                                              AND m2.location_id = i.location_id AND m2.status = i.status
+                                              AND m2.location_id = i.location_id AND m2.status = i.status AND m2.lot_id IS NOT DISTINCT FROM i.lot_id
                                               AND m2.created_at >= :dayStart AND m2.created_at < :dayEnd), 0))
                      END AS qty
                 FROM whse_inventory i WHERE i.tenant_id = :tenantId) q

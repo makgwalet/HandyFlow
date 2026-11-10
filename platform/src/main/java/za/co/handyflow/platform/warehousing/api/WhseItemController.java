@@ -130,6 +130,6 @@ public class WhseItemController {
         return new ItemResponse(i.getId(), i.getClientId(), i.getSku(), i.getDescription(), i.getUom(),
                 i.getStorageRatePerUnitPerMonth(), i.isActive(),
                 d.barcode(), d.lengthMm(), d.widthMm(), d.heightMm(), d.volumeM3(), d.weightKg(), d.unitCost(), d.minQty(), d.maxQty(),
-                d.temperatureClass(), d.hazardous(), d.fragile(), d.stackable());
+                d.temperatureClass(), d.hazardous(), d.fragile(), d.stackable(), i.isLotTracked(), i.isExpiryTracked(), i.getMinShelfLifeDays());
     }
 }

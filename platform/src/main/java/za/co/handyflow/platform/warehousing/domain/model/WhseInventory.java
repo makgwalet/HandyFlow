@@ -62,6 +62,10 @@ public class WhseInventory {
     public static final String STATUS_DAMAGED = "DAMAGED";
     public static final String STATUS_BLOCKED = "BLOCKED";
 
+    /** The lot this stock belongs to. Null for items that are not lot tracked (V608). Part of the position's identity. */
+    @Column(name = "lot_id")
+    private UUID lotId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -76,7 +80,12 @@ public class WhseInventory {
     }
 
     public static WhseInventory create(UUID tenantId, UUID clientId, UUID itemId, UUID locationId, String status) {
+        return create(tenantId, clientId, itemId, locationId, status, null);
+    }
+
+    public static WhseInventory create(UUID tenantId, UUID clientId, UUID itemId, UUID locationId, String status, UUID lotId) {
         WhseInventory i = new WhseInventory();
+        i.lotId = lotId;
         i.status = status;
         i.tenantId = tenantId;
         i.clientId = clientId;

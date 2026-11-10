@@ -76,6 +76,10 @@ public class WhseStockMovement {
     @Column(name = "status", nullable = false, length = 20)
     private String status = "AVAILABLE";
 
+    /** The lot the movement belongs to, for lot-tracked items (V608). */
+    @Column(name = "lot_id")
+    private UUID lotId;
+
     /** Optional caller-supplied key: a retried request with the same key is recorded once (V599). */
     @Column(name = "idempotency_key", length = 100)
     private String idempotencyKey;
@@ -93,6 +97,15 @@ public class WhseStockMovement {
                                            BigDecimal qtyAfter, String referenceType, UUID referenceId,
                                            String referenceNumber, String notes, UUID recordedByUserId,
                                            String status, String idempotencyKey) {
+        return record(tenantId, clientId, itemId, locationId, movementType, qtyChange, qtyBefore, qtyAfter,
+                referenceType, referenceId, referenceNumber, notes, recordedByUserId, status, idempotencyKey, null);
+    }
+
+    public static WhseStockMovement record(UUID tenantId, UUID clientId, UUID itemId, UUID locationId,
+                                           String movementType, BigDecimal qtyChange, BigDecimal qtyBefore,
+                                           BigDecimal qtyAfter, String referenceType, UUID referenceId,
+                                           String referenceNumber, String notes, UUID recordedByUserId,
+                                           String status, String idempotencyKey, UUID lotId) {
         if (qtyChange == null || qtyChange.signum() == 0) {
             throw new IllegalArgumentException("qtyChange must be non-zero");
         }
@@ -112,6 +125,7 @@ public class WhseStockMovement {
         m.recordedByUserId = recordedByUserId;
         m.status = status;
         m.idempotencyKey = idempotencyKey;
+        m.lotId = lotId;
         m.createdAt = Instant.now();
         return m;
     }

@@ -55,7 +55,7 @@ public class WhseOperationsService {
 
     public record StockRow(UUID inventoryId, UUID clientId, String clientName, UUID itemId, String sku, String description, String uom,
                            UUID locationId, String locationCode, String zone, String status, BigDecimal qtyOnHand,
-                           BigDecimal qtyAllocated, BigDecimal available) {}
+                           BigDecimal qtyAllocated, BigDecimal available, UUID lotId, String lotNumber, LocalDate expiryDate) {}
     public record MovementRow(UUID id, java.time.Instant at, UUID clientId, String clientName, UUID itemId, String sku, String locationCode,
                               String movementType, String status, BigDecimal qtyChange, BigDecimal qtyBefore, BigDecimal qtyAfter,
                               String referenceType, UUID referenceId, String referenceNumber, String notes, UUID recordedBy) {}
@@ -147,11 +147,13 @@ public class WhseOperationsService {
         String like = q == null || q.isBlank() ? null : "%" + q.trim().toLowerCase().replace("%", "\\%").replace("_", "\\_") + "%";
         Object[] filter = {tenantId.getValue(), clientId, clientId, status, status, like, like, like, includeEmpty};
         long total = jdbc.queryForObject("SELECT count(*) FROM (" + SQL_STOCK_BASE + ") x", Long.class, filter);
-        List<StockRow> rows = jdbc.query("SELECT * FROM (" + SQL_STOCK_BASE + ") x ORDER BY sku, location_code, status LIMIT ? OFFSET ?",
+        List<StockRow> rows = jdbc.query("SELECT * FROM (" + SQL_STOCK_BASE + ") x ORDER BY sku, lot_number NULLS FIRST, location_code, status LIMIT ? OFFSET ?",
                 (rs, i) -> new StockRow(rs.getObject("inventory_id", UUID.class), rs.getObject("client_id", UUID.class), rs.getString("client_name"),
                         rs.getObject("item_id", UUID.class), rs.getString("sku"), rs.getString("description"), rs.getString("uom"),
                         rs.getObject("location_id", UUID.class), rs.getString("location_code"), rs.getString("zone"), rs.getString("status"),
-                        rs.getBigDecimal("qty_on_hand"), rs.getBigDecimal("qty_allocated"), rs.getBigDecimal("available")),
+                        rs.getBigDecimal("qty_on_hand"), rs.getBigDecimal("qty_allocated"), rs.getBigDecimal("available"),
+                        rs.getObject("lot_id", UUID.class), rs.getString("lot_number"),
+                        rs.getDate("expiry_date") == null ? null : rs.getDate("expiry_date").toLocalDate()),
                 concat(filter, s, (long) p * s));
         return new Page<>(rows, total, p, s);
     }
@@ -271,8 +273,10 @@ public class WhseOperationsService {
     static final String SQL_STOCK_BASE = """
             SELECT inv.id AS inventory_id, inv.client_id, c.trading_name AS client_name, inv.item_id, it.sku, it.description, it.uom,
                    inv.location_id, l.code AS location_code, l.zone, inv.status, inv.qty_on_hand, inv.qty_allocated,
-                   CASE WHEN inv.status = 'AVAILABLE' THEN inv.qty_on_hand - inv.qty_allocated ELSE 0 END AS available
+                   CASE WHEN inv.status = 'AVAILABLE' THEN inv.qty_on_hand - inv.qty_allocated ELSE 0 END AS available,
+                   inv.lot_id, lot.lot_number, lot.expiry_date
               FROM whse_inventory inv
+              LEFT JOIN whse_lots lot ON lot.id = inv.lot_id
               JOIN whse_clients c ON c.id = inv.client_id AND c.tenant_id = inv.tenant_id
               JOIN whse_items it ON it.id = inv.item_id AND it.tenant_id = inv.tenant_id
               JOIN whse_locations l ON l.id = inv.location_id AND l.tenant_id = inv.tenant_id

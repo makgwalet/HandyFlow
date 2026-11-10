@@ -74,6 +74,13 @@ public class WhseItem {
     @Column(name = "stackable", nullable = false)
     private boolean stackable = true;
 
+    @Column(name = "lot_tracked", nullable = false)
+    private boolean lotTracked;
+    @Column(name = "expiry_tracked", nullable = false)
+    private boolean expiryTracked;
+    @Column(name = "min_shelf_life_days")
+    private Integer minShelfLifeDays;
+
     @Column(name = "active", nullable = false)
     private boolean active = true;
 
@@ -127,6 +134,18 @@ public class WhseItem {
         this.hazardous = d.hazardous();
         this.fragile = d.fragile();
         this.stackable = d.stackable();
+        this.updatedAt = Instant.now();
+    }
+
+    /** Lot and expiry tracking. Expiry needs lot tracking; a minimum shelf life needs expiry. Callers must first check no stock is on hand. */
+    public void setTracking(boolean lotTracked, boolean expiryTracked, Integer minShelfLifeDays) {
+        if (expiryTracked && !lotTracked) throw new IllegalArgumentException("Expiry tracking needs lot tracking.");
+        if (minShelfLifeDays != null && (!expiryTracked || minShelfLifeDays < 0)) {
+            throw new IllegalArgumentException("A minimum shelf life needs expiry tracking and cannot be negative.");
+        }
+        this.lotTracked = lotTracked;
+        this.expiryTracked = expiryTracked;
+        this.minShelfLifeDays = minShelfLifeDays;
         this.updatedAt = Instant.now();
     }
 

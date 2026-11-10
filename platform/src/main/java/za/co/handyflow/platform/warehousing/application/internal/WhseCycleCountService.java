@@ -43,7 +43,8 @@ public class WhseCycleCountService {
                              long lines, long counted, long matched, long pending, long stale) {}
     public record LineRow(UUID id, UUID inventoryId, UUID clientId, String clientName, UUID itemId, String sku, String description,
                           UUID locationId, String locationCode, String stockStatus, BigDecimal expectedQty, BigDecimal countedQty,
-                          BigDecimal variance, String state, UUID countedBy, Instant countedAt, String decisionNote, boolean soleException) {}
+                          BigDecimal variance, String state, UUID countedBy, Instant countedAt, String decisionNote, boolean soleException,
+                          String lotNumber, java.time.LocalDate expiryDate) {}
     public record Detail(SessionRow session, List<LineRow> lines, boolean expectedHidden) {}
     public record SubmitResult(boolean submitted, long staleLines, long linesToApprove, boolean closed) {}
     public record Accuracy(int days, long linesCounted, long linesMatched, BigDecimal accuracyPct) {}
@@ -86,7 +87,7 @@ public class WhseCycleCountService {
                 .stream().findFirst().orElseThrow(() -> new ResourceNotFoundException("Cycle count", sessionId.toString()));
         // While a blind count is being counted, nobody sees the system quantity or the difference.
         boolean hide = s.blind() && "COUNTING".equals(s.status());
-        List<LineRow> lines = jdbc.query(SQL_LINES + " WHERE l.session_id = ? AND l.tenant_id = ? ORDER BY it.sku, loc.code, l.stock_status",
+        List<LineRow> lines = jdbc.query(SQL_LINES + " WHERE l.session_id = ? AND l.tenant_id = ? ORDER BY it.sku, lot.lot_number NULLS FIRST, loc.code, l.stock_status",
                 (rs, i) -> {
                     BigDecimal expected = rs.getBigDecimal("expected_qty");
                     BigDecimal counted = rs.getBigDecimal("counted_qty");
@@ -94,7 +95,8 @@ public class WhseCycleCountService {
                             rs.getString("client_name"), rs.getObject("item_id", UUID.class), rs.getString("sku"), rs.getString("description"),
                             rs.getObject("location_id", UUID.class), rs.getString("location_code"), rs.getString("stock_status"),
                             hide ? null : expected, counted, hide || counted == null ? null : counted.subtract(expected), rs.getString("state"),
-                            rs.getObject("counted_by", UUID.class), ts(rs.getTimestamp("counted_at")), rs.getString("decision_note"), rs.getBoolean("sole_exception"));
+                            rs.getObject("counted_by", UUID.class), ts(rs.getTimestamp("counted_at")), rs.getString("decision_note"), rs.getBoolean("sole_exception"),
+                            rs.getString("lot_number"), rs.getDate("expiry_date") == null ? null : rs.getDate("expiry_date").toLocalDate());
                 }, sessionId, tenantId.getValue());
         return new Detail(s, lines, hide);
     }
@@ -286,8 +288,10 @@ public class WhseCycleCountService {
     static final String SQL_LINES = """
             SELECT l.id, l.inventory_id, l.client_id, c.trading_name AS client_name, l.item_id, it.sku, it.description, l.location_id,
                    loc.code AS location_code, l.stock_status, l.expected_qty, l.counted_qty, l.state, l.counted_by, l.counted_at,
-                   l.decision_note, l.sole_exception
+                   l.decision_note, l.sole_exception, lot.lot_number, lot.expiry_date
               FROM whse_count_lines l
+              LEFT JOIN whse_inventory inv ON inv.id = l.inventory_id
+              LEFT JOIN whse_lots lot ON lot.id = inv.lot_id
               JOIN whse_clients c ON c.id = l.client_id AND c.tenant_id = l.tenant_id
               JOIN whse_items it ON it.id = l.item_id AND it.tenant_id = l.tenant_id
               JOIN whse_locations loc ON loc.id = l.location_id AND loc.tenant_id = l.tenant_id""";
@@ -295,14 +299,14 @@ public class WhseCycleCountService {
     /** A position moved after its line was frozen: any ledger movement newer than the snapshot. */
     static final String SQL_MOVED_SINCE = """
             SELECT count(*) FROM whse_stock_movements m JOIN whse_inventory i
-                ON i.tenant_id = m.tenant_id AND i.client_id = m.client_id AND i.item_id = m.item_id AND i.location_id = m.location_id AND i.status = m.status
+                ON i.tenant_id = m.tenant_id AND i.client_id = m.client_id AND i.item_id = m.item_id AND i.location_id = m.location_id AND i.status = m.status AND i.lot_id IS NOT DISTINCT FROM m.lot_id
              WHERE i.id = ? AND m.created_at > ?""";
 
     static final String SQL_MARK_STALE = """
             UPDATE whse_count_lines l SET state = 'STALE', counted_qty = NULL, counted_by = NULL, counted_at = NULL, version = version + 1
              WHERE l.session_id = ? AND l.tenant_id = ? AND l.state = 'COUNTED'
                AND EXISTS (SELECT 1 FROM whse_stock_movements m JOIN whse_inventory i
-                             ON i.tenant_id = m.tenant_id AND i.client_id = m.client_id AND i.item_id = m.item_id AND i.location_id = m.location_id AND i.status = m.status
+                             ON i.tenant_id = m.tenant_id AND i.client_id = m.client_id AND i.item_id = m.item_id AND i.location_id = m.location_id AND i.status = m.status AND i.lot_id IS NOT DISTINCT FROM m.lot_id
                             WHERE i.id = l.inventory_id AND m.created_at > l.expected_at)""";
 
     static final String SQL_ACCURACY = """

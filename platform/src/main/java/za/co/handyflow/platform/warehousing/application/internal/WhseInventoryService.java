@@ -100,6 +100,15 @@ public class WhseInventoryService {
     public WhseInventory receiveStockInStatus(TenantId tenantId, UUID clientId, UUID itemId, UUID locationId, BigDecimal qty,
                                                String status, String movementType, String referenceType, UUID referenceId,
                                                String referenceNumber, String note, UUID recordedBy, String idempotencyKey) {
+        return receiveStockInStatus(tenantId, clientId, itemId, locationId, null, qty, status, movementType, referenceType, referenceId,
+                referenceNumber, note, recordedBy, idempotencyKey);
+    }
+
+    /** The full form: stock for a lot-tracked item is received into its lot, anything else passes a null lot. */
+    @Transactional
+    public WhseInventory receiveStockInStatus(TenantId tenantId, UUID clientId, UUID itemId, UUID locationId, UUID lotId, BigDecimal qty,
+                                               String status, String movementType, String referenceType, UUID referenceId,
+                                               String referenceNumber, String note, UUID recordedBy, String idempotencyKey) {
         if (!java.util.Set.of("RECEIPT", "RETURN").contains(movementType)) {
             throw new IllegalArgumentException("Stock cannot be received with movement type " + movementType);
         }
@@ -107,11 +116,10 @@ public class WhseInventoryService {
             throw new IllegalArgumentException("Stock cannot be received into status " + status);
         }
         if (replayed(tenantId, idempotencyKey, clientId, itemId, locationId)) {
-            return repository.findPositionWithStatus(tenantId.getValue(), clientId, itemId, locationId, status)
-                    .orElseThrow(() -> new IllegalStateException("No " + status + " position found for the replayed request"));
+            return findOrThrow(tenantId, clientId, itemId, locationId, status, lotId);
         }
-        WhseInventory inv = repository.findPositionWithStatus(tenantId.getValue(), clientId, itemId, locationId, status)
-                .orElseGet(() -> repository.save(WhseInventory.create(tenantId.getValue(), clientId, itemId, locationId, status)));
+        WhseInventory inv = find(tenantId, clientId, itemId, locationId, status, lotId)
+                .orElseGet(() -> repository.save(WhseInventory.create(tenantId.getValue(), clientId, itemId, locationId, status, lotId)));
         BigDecimal before = inv.getQtyOnHand();
         inv.increaseOnHand(qty);
         inv = repository.save(inv);
@@ -236,17 +244,24 @@ public class WhseInventoryService {
     @Transactional
     public WhseInventory changeStatus(TenantId tenantId, UUID clientId, UUID itemId, UUID locationId, String from,
                                        String to, BigDecimal qty, String reason, UUID userId, String idempotencyKey) {
+        return changeStatus(tenantId, clientId, itemId, locationId, null, from, to, qty, reason, userId, idempotencyKey);
+    }
+
+    /** As above for one lot of a lot-tracked item; a null lot means the item is not lot tracked. */
+    @Transactional
+    public WhseInventory changeStatus(TenantId tenantId, UUID clientId, UUID itemId, UUID locationId, UUID lotId, String from,
+                                       String to, BigDecimal qty, String reason, UUID userId, String idempotencyKey) {
         String type = statusChangeType(from, to);
         if (reason == null || reason.trim().length() < 5) {
             throw new IllegalArgumentException("A reason of at least 5 characters is required");
         }
         if (replayed(tenantId, idempotencyKey, clientId, itemId, locationId)) {
-            return destination(tenantId, clientId, itemId, locationId, to);
+            return destination(tenantId, clientId, itemId, locationId, to, lotId);
         }
-        WhseInventory source = repository.findPositionWithStatus(tenantId.getValue(), clientId, itemId, locationId, from)
+        WhseInventory source = find(tenantId, clientId, itemId, locationId, from, lotId)
                 .orElseThrow(() -> new IllegalStateException("No " + from + " stock at this location to move"));
-        WhseInventory dest = repository.findPositionWithStatus(tenantId.getValue(), clientId, itemId, locationId, to)
-                .orElseGet(() -> repository.save(WhseInventory.create(tenantId.getValue(), clientId, itemId, locationId, to)));
+        WhseInventory dest = find(tenantId, clientId, itemId, locationId, to, lotId)
+                .orElseGet(() -> repository.save(WhseInventory.create(tenantId.getValue(), clientId, itemId, locationId, to, lotId)));
         UUID changeId = UUID.randomUUID();
         BigDecimal sourceBefore = source.getQtyOnHand();
         BigDecimal destBefore = dest.getQtyOnHand();
@@ -269,8 +284,19 @@ public class WhseInventoryService {
         throw new IllegalArgumentException("A status change from " + from + " to " + to + " is not allowed");
     }
 
-    private WhseInventory destination(TenantId tenantId, UUID clientId, UUID itemId, UUID locationId, String status) {
-        return repository.findPositionWithStatus(tenantId.getValue(), clientId, itemId, locationId, status)
+    private WhseInventory destination(TenantId tenantId, UUID clientId, UUID itemId, UUID locationId, String status, UUID lotId) {
+        return findOrThrow(tenantId, clientId, itemId, locationId, status, lotId);
+    }
+
+    /** The position for a status, in the lot when there is one and in the lot-less position otherwise. */
+    private java.util.Optional<WhseInventory> find(TenantId tenantId, UUID clientId, UUID itemId, UUID locationId, String status, UUID lotId) {
+        return lotId == null
+                ? repository.findPositionWithStatus(tenantId.getValue(), clientId, itemId, locationId, status)
+                : repository.findPositionForLot(tenantId.getValue(), clientId, itemId, locationId, status, lotId);
+    }
+
+    private WhseInventory findOrThrow(TenantId tenantId, UUID clientId, UUID itemId, UUID locationId, String status, UUID lotId) {
+        return find(tenantId, clientId, itemId, locationId, status, lotId)
                 .orElseThrow(() -> new IllegalStateException("No " + status + " position found for the replayed request"));
     }
 
@@ -307,7 +333,7 @@ public class WhseInventoryService {
                                  String notes, UUID recordedBy, String idempotencyKey) {
         movementRepository.save(WhseStockMovement.record(tenantId.getValue(), inv.getClientId(), inv.getItemId(),
                 inv.getLocationId(), movementType, qtyChange, qtyBefore, inv.getQtyOnHand(), referenceType,
-                referenceId, referenceNumber, notes, recordedBy, inv.getStatus(), idempotencyKey));
+                referenceId, referenceNumber, notes, recordedBy, inv.getStatus(), idempotencyKey, inv.getLotId()));
     }
 
     private void recordAllocation(TenantId tenantId, WhseInventory inv, String eventType, BigDecimal qty,

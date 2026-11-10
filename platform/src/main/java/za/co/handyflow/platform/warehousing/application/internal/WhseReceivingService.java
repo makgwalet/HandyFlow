@@ -19,6 +19,7 @@ import za.co.handyflow.platform.warehousing.domain.repository.WhseInboundShipmen
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -39,9 +40,11 @@ public class WhseReceivingService {
     private final WhseInboundShipmentLineRepository lineRepository;
     private final WhseInventoryService inventoryService;
     private final SeparationOfDutiesChecker duties;
+    private final WhseLotService lotService;
 
     public record ReceiptRow(UUID id, UUID lineId, UUID itemId, String sku, UUID locationId, String locationCode, BigDecimal qtyGood,
-                             BigDecimal qtyDamaged, BigDecimal qtyHeld, BigDecimal heldPending, String reason, UUID receivedBy, Instant receivedAt) {}
+                             BigDecimal qtyDamaged, BigDecimal qtyHeld, BigDecimal heldPending, String reason, UUID receivedBy, Instant receivedAt,
+                             String lotNumber, LocalDate expiryDate) {}
     public record LineDiscrepancy(UUID lineId, UUID itemId, String sku, String description, boolean unexpected, BigDecimal expected,
                                   BigDecimal received, BigDecimal good, BigDecimal damaged, BigDecimal heldPending,
                                   BigDecimal shortQty, BigDecimal overQty, List<String> types) {}
@@ -49,13 +52,14 @@ public class WhseReceivingService {
                                     List<LineDiscrepancy> lines) {}
     public record QueueRow(UUID receiptId, UUID shipmentId, String shipmentReference, UUID clientId, String clientName, UUID itemId, String sku,
                            String description, UUID locationId, String locationCode, BigDecimal heldPending, String reason, UUID receivedBy,
-                           Instant receivedAt) {}
+                           Instant receivedAt, String lotNumber, LocalDate expiryDate) {}
 
     // ── receive ─────────────────────────────────────────────────────────────
 
     @Transactional
     public UUID receive(TenantId tenantId, UUID shipmentId, UUID lineId, BigDecimal good, BigDecimal damaged, BigDecimal held,
-                        UUID locationId, String reason, String idempotencyKey, UUID actor) {
+                        UUID locationId, String reason, String lotNumber, LocalDate expiryDate, LocalDate manufacturedDate,
+                        String idempotencyKey, UUID actor) {
         requireActor(actor);
         BigDecimal g = nz(good), d = nz(damaged), h = nz(held);
         if (g.signum() < 0 || d.signum() < 0 || h.signum() < 0) throw new IllegalArgumentException("Quantities cannot be negative.");
@@ -86,14 +90,17 @@ public class WhseReceivingService {
             throw new ResourceNotFoundException("Location", locationId.toString());
         }
 
-        UUID eventId = UUID.randomUUID();
-        jdbc.update("INSERT INTO whse_receipt_events (id, tenant_id, shipment_id, line_id, client_id, item_id, location_id, qty_good, qty_damaged, qty_held, reason, received_by, idempotency_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                eventId, t, shipmentId, lineId, shipment.getClientId(), line.getItemId(), locationId, g, d, h,
-                d.add(h).signum() > 0 ? reason.trim() : null, actor, key);
+        // For a lot-tracked item this finds or creates the lot (and refuses a missing lot number or expiry date); otherwise it is null.
+        UUID lotId = lotService.resolveForReceipt(tenantId, shipment.getClientId(), line.getItemId(), lotNumber, expiryDate, manufacturedDate, actor);
 
-        post(tenantId, shipment, line, locationId, g, WhseInventory.STATUS_AVAILABLE, eventId, "G", null, actor);
-        post(tenantId, shipment, line, locationId, d, WhseInventory.STATUS_DAMAGED, eventId, "D", reason, actor);
-        post(tenantId, shipment, line, locationId, h, WhseInventory.STATUS_QUARANTINE, eventId, "H", reason, actor);
+        UUID eventId = UUID.randomUUID();
+        jdbc.update("INSERT INTO whse_receipt_events (id, tenant_id, shipment_id, line_id, client_id, item_id, location_id, qty_good, qty_damaged, qty_held, reason, received_by, idempotency_key, lot_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                eventId, t, shipmentId, lineId, shipment.getClientId(), line.getItemId(), locationId, g, d, h,
+                d.add(h).signum() > 0 ? reason.trim() : null, actor, key, lotId);
+
+        post(tenantId, shipment, line, locationId, lotId, g, WhseInventory.STATUS_AVAILABLE, eventId, "G", null, actor);
+        post(tenantId, shipment, line, locationId, lotId, d, WhseInventory.STATUS_DAMAGED, eventId, "D", reason, actor);
+        post(tenantId, shipment, line, locationId, lotId, h, WhseInventory.STATUS_QUARANTINE, eventId, "H", reason, actor);
 
         line.receive(total, locationId);
         lineRepository.save(line);
@@ -132,13 +139,13 @@ public class WhseReceivingService {
         if (reason == null || reason.trim().length() < 5) throw new IllegalArgumentException("Give a reason (at least 5 characters).");
         UUID t = tenantId.getValue();
 
-        record Ev(UUID shipmentId, UUID clientId, UUID itemId, UUID locationId, BigDecimal held, UUID receivedBy, String ref) {}
+        record Ev(UUID shipmentId, UUID clientId, UUID itemId, UUID locationId, BigDecimal held, UUID receivedBy, String ref, UUID lotId) {}
         List<Ev> rows = jdbc.query("""
-                SELECT e.shipment_id, e.client_id, e.item_id, e.location_id, e.qty_held, e.received_by, s.reference_number
+                SELECT e.shipment_id, e.client_id, e.item_id, e.location_id, e.qty_held, e.received_by, s.reference_number, e.lot_id
                   FROM whse_receipt_events e JOIN whse_inbound_shipments s ON s.id = e.shipment_id
                  WHERE e.id = ? AND e.tenant_id = ? FOR UPDATE OF e""",
                 (rs, i) -> new Ev(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class), rs.getObject(3, UUID.class), rs.getObject(4, UUID.class),
-                        rs.getBigDecimal(5), rs.getObject(6, UUID.class), rs.getString(7)), receiptId, t);
+                        rs.getBigDecimal(5), rs.getObject(6, UUID.class), rs.getString(7), rs.getObject(8, UUID.class)), receiptId, t);
         if (rows.isEmpty()) throw new ResourceNotFoundException("Receipt", receiptId.toString());
         Ev ev = rows.get(0);
         BigDecimal inspected = jdbc.queryForObject("SELECT coalesce(sum(qty), 0) FROM whse_receipt_inspections WHERE receipt_id = ?", BigDecimal.class, receiptId);
@@ -153,7 +160,7 @@ public class WhseReceivingService {
 
         UUID inspectionId = UUID.randomUUID();
         String to = "PASS".equals(outcome) ? WhseInventory.STATUS_AVAILABLE : WhseInventory.STATUS_DAMAGED;
-        inventoryService.changeStatus(tenantId, ev.clientId(), ev.itemId(), ev.locationId(), WhseInventory.STATUS_QUARANTINE, to, qty,
+        inventoryService.changeStatus(tenantId, ev.clientId(), ev.itemId(), ev.locationId(), ev.lotId(), WhseInventory.STATUS_QUARANTINE, to, qty,
                 "Receiving inspection " + outcome.toLowerCase() + ": " + reason.trim(), actor, "insp:" + inspectionId);
         jdbc.update("INSERT INTO whse_receipt_inspections (id, tenant_id, receipt_id, outcome, qty, reason, inspected_by, sole_exception) VALUES (?,?,?,?,?,?,?,?)",
                 inspectionId, t, receiptId, outcome, qty, reason.trim(), actor, sole);
@@ -199,7 +206,8 @@ public class WhseReceivingService {
                 (rs, i) -> new ReceiptRow(rs.getObject("id", UUID.class), rs.getObject("line_id", UUID.class), rs.getObject("item_id", UUID.class), rs.getString("sku"),
                         rs.getObject("location_id", UUID.class), rs.getString("location_code"), rs.getBigDecimal("qty_good"), rs.getBigDecimal("qty_damaged"),
                         rs.getBigDecimal("qty_held"), rs.getBigDecimal("held_pending"), rs.getString("reason"), rs.getObject("received_by", UUID.class),
-                        rs.getTimestamp("received_at").toInstant()),
+                        rs.getTimestamp("received_at").toInstant(), rs.getString("lot_number"),
+                        rs.getDate("expiry_date") == null ? null : rs.getDate("expiry_date").toLocalDate()),
                 tenantId.getValue(), shipmentId);
     }
 
@@ -222,19 +230,21 @@ public class WhseReceivingService {
         return jdbc.query("""
                 SELECT * FROM (
                   SELECT e.id AS receipt_id, e.shipment_id, s.reference_number, e.client_id, c.trading_name AS client_name, e.item_id, it.sku, it.description,
-                         e.location_id, loc.code AS location_code, e.reason, e.received_by, e.received_at,
+                         e.location_id, loc.code AS location_code, e.reason, e.received_by, e.received_at, lot.lot_number, lot.expiry_date,
                          e.qty_held - coalesce((SELECT sum(i.qty) FROM whse_receipt_inspections i WHERE i.receipt_id = e.id), 0) AS pending
                     FROM whse_receipt_events e
                     JOIN whse_inbound_shipments s ON s.id = e.shipment_id
                     JOIN whse_clients c ON c.id = e.client_id
                     JOIN whse_items it ON it.id = e.item_id
                     JOIN whse_locations loc ON loc.id = e.location_id
+                    LEFT JOIN whse_lots lot ON lot.id = e.lot_id
                    WHERE e.tenant_id = ? AND e.qty_held > 0) q
                  WHERE pending > 0 ORDER BY received_at LIMIT 500""",
                 (rs, i) -> new QueueRow(rs.getObject("receipt_id", UUID.class), rs.getObject("shipment_id", UUID.class), rs.getString("reference_number"),
                         rs.getObject("client_id", UUID.class), rs.getString("client_name"), rs.getObject("item_id", UUID.class), rs.getString("sku"),
                         rs.getString("description"), rs.getObject("location_id", UUID.class), rs.getString("location_code"), rs.getBigDecimal("pending"),
-                        rs.getString("reason"), rs.getObject("received_by", UUID.class), rs.getTimestamp("received_at").toInstant()),
+                        rs.getString("reason"), rs.getObject("received_by", UUID.class), rs.getTimestamp("received_at").toInstant(),
+                        rs.getString("lot_number"), rs.getDate("expiry_date") == null ? null : rs.getDate("expiry_date").toLocalDate()),
                 tenantId.getValue());
     }
 
@@ -261,11 +271,11 @@ public class WhseReceivingService {
         }, shipmentId, tenant);
     }
 
-    private void post(TenantId tenantId, WhseInboundShipment shipment, WhseInboundShipmentLine line, UUID locationId, BigDecimal qty,
+    private void post(TenantId tenantId, WhseInboundShipment shipment, WhseInboundShipmentLine line, UUID locationId, UUID lotId, BigDecimal qty,
                       String status, UUID eventId, String suffix, String note, UUID actor) {
         if (qty.signum() == 0) return;
-        inventoryService.receiveStockInStatus(tenantId, shipment.getClientId(), line.getItemId(), locationId, qty, status, "INBOUND_SHIPMENT",
-                shipment.getId(), shipment.getReferenceNumber(), note == null ? null : note.trim(), actor, "rcpt:" + eventId + ":" + suffix);
+        inventoryService.receiveStockInStatus(tenantId, shipment.getClientId(), line.getItemId(), locationId, lotId, qty, status, "RECEIPT",
+                "INBOUND_SHIPMENT", shipment.getId(), shipment.getReferenceNumber(), note == null ? null : note.trim(), actor, "rcpt:" + eventId + ":" + suffix);
     }
 
     private void rollStatus(TenantId tenantId, WhseInboundShipment shipment) {
@@ -290,10 +300,11 @@ public class WhseReceivingService {
     static final String SQL_RECEIPTS = """
             SELECT e.id, e.line_id, e.item_id, it.sku, e.location_id, loc.code AS location_code, e.qty_good, e.qty_damaged, e.qty_held,
                    e.qty_held - coalesce((SELECT sum(i.qty) FROM whse_receipt_inspections i WHERE i.receipt_id = e.id), 0) AS held_pending,
-                   e.reason, e.received_by, e.received_at
+                   e.reason, e.received_by, e.received_at, lot.lot_number, lot.expiry_date
               FROM whse_receipt_events e
               JOIN whse_items it ON it.id = e.item_id
-              JOIN whse_locations loc ON loc.id = e.location_id""";
+              JOIN whse_locations loc ON loc.id = e.location_id
+              LEFT JOIN whse_lots lot ON lot.id = e.lot_id""";
 
     static final String SQL_LINE_REPORT = """
             SELECT l.id AS line_id, l.item_id, it.sku, it.description, l.unexpected, l.expected_qty, l.received_qty,

@@ -37,6 +37,7 @@ class WhseReceivingServiceTest {
     private WhseInboundShipmentLineRepository lines;
     private WhseInventoryService inventory;
     private SeparationOfDutiesChecker duties;
+    private WhseLotService lotService;
     private WhseReceivingService service;
     private WhseInboundShipment shipment;
     private WhseInboundShipmentLine line;
@@ -48,7 +49,8 @@ class WhseReceivingServiceTest {
         lines = mock(WhseInboundShipmentLineRepository.class);
         inventory = mock(WhseInventoryService.class);
         duties = mock(SeparationOfDutiesChecker.class);
-        service = new WhseReceivingService(jdbc, shipments, lines, inventory, duties);
+        lotService = mock(WhseLotService.class);
+        service = new WhseReceivingService(jdbc, shipments, lines, inventory, duties, lotService);
         shipment = WhseInboundShipment.create(tenant, client, "ASN-1", null, null);
         line = WhseInboundShipmentLine.create(tenant, shipment.getId(), item, new BigDecimal("10"), null);
         when(shipments.findByTenantAndId(tenant, shipment.getId())).thenReturn(Optional.of(shipment));
@@ -65,27 +67,27 @@ class WhseReceivingServiceTest {
 
     @Test @DisplayName("a receipt splits into good, damaged and held stock, each posted in its own status")
     void splitsByStatus() {
-        service.receive(t(), shipment.getId(), line.getId(), n("5"), n("2"), n("3"), location, "crushed cartons", null, receiver);
+        service.receive(t(), shipment.getId(), line.getId(), n("5"), n("2"), n("3"), location, "crushed cartons", null, null, null, null, receiver);
 
-        verify(inventory).receiveStockInStatus(eq(t()), eq(client), eq(item), eq(location), eq(n("5")), eq("AVAILABLE"), anyString(), any(), any(), any(), eq(receiver), anyString());
-        verify(inventory).receiveStockInStatus(eq(t()), eq(client), eq(item), eq(location), eq(n("2")), eq("DAMAGED"), anyString(), any(), any(), any(), eq(receiver), anyString());
-        verify(inventory).receiveStockInStatus(eq(t()), eq(client), eq(item), eq(location), eq(n("3")), eq("QUARANTINE"), anyString(), any(), any(), any(), eq(receiver), anyString());
+        verify(inventory).receiveStockInStatus(eq(t()), eq(client), eq(item), eq(location), any(), eq(n("5")), eq("AVAILABLE"), eq("RECEIPT"), anyString(), any(), any(), any(), eq(receiver), anyString());
+        verify(inventory).receiveStockInStatus(eq(t()), eq(client), eq(item), eq(location), any(), eq(n("2")), eq("DAMAGED"), eq("RECEIPT"), anyString(), any(), any(), any(), eq(receiver), anyString());
+        verify(inventory).receiveStockInStatus(eq(t()), eq(client), eq(item), eq(location), any(), eq(n("3")), eq("QUARANTINE"), eq("RECEIPT"), anyString(), any(), any(), any(), eq(receiver), anyString());
         assertEquals(0, n("10").compareTo(line.getReceivedQty()));
         assertEquals("RECEIVED", shipment.getStatus());
     }
 
     @Test @DisplayName("a zero part is not posted")
     void zeroPartsSkipped() {
-        service.receive(t(), shipment.getId(), line.getId(), n("4"), null, null, location, null, null, receiver);
-        verify(inventory, times(1)).receiveStockInStatus(any(), any(), any(), any(), any(), anyString(), any(), any(), any(), any(), any(), any());
+        service.receive(t(), shipment.getId(), line.getId(), n("4"), null, null, location, null, null, null, null, null, receiver);
+        verify(inventory, times(1)).receiveStockInStatus(any(), any(), any(), any(), any(), any(), anyString(), anyString(), any(), any(), any(), any(), any(), any());
         assertEquals("PARTIALLY_RECEIVED", shipment.getStatus());
     }
 
     @Test @DisplayName("damaged or held stock needs a reason; nothing is posted without one")
     void reasonRequired() {
-        assertThrows(IllegalArgumentException.class, () -> service.receive(t(), shipment.getId(), line.getId(), n("5"), n("1"), null, location, " no", null, receiver));
-        assertThrows(IllegalArgumentException.class, () -> service.receive(t(), shipment.getId(), line.getId(), null, null, null, location, null, null, receiver));
-        assertThrows(IllegalArgumentException.class, () -> service.receive(t(), shipment.getId(), line.getId(), n("-1"), null, null, location, null, null, receiver));
+        assertThrows(IllegalArgumentException.class, () -> service.receive(t(), shipment.getId(), line.getId(), n("5"), n("1"), null, location, " no", null, null, null, null, receiver));
+        assertThrows(IllegalArgumentException.class, () -> service.receive(t(), shipment.getId(), line.getId(), null, null, null, location, null, null, null, null, null, receiver));
+        assertThrows(IllegalArgumentException.class, () -> service.receive(t(), shipment.getId(), line.getId(), n("-1"), null, null, location, null, null, null, null, null, receiver));
         verifyNoInteractions(inventory);
     }
 
@@ -93,14 +95,14 @@ class WhseReceivingServiceTest {
     void idempotent() {
         UUID first = UUID.randomUUID();
         when(jdbc.query(contains("idempotency_key"), any(RowMapper.class), any(Object[].class))).thenReturn(List.of(first));
-        assertEquals(first, service.receive(t(), shipment.getId(), line.getId(), n("5"), null, null, location, null, "scan-1", receiver));
+        assertEquals(first, service.receive(t(), shipment.getId(), line.getId(), n("5"), null, null, location, null, null, null, null, "scan-1", receiver));
         verifyNoInteractions(inventory);
     }
 
     @Test @DisplayName("a closed shipment cannot be received against")
     void closedRefused() {
         when(jdbc.queryForObject(contains("closed_at IS NOT NULL"), eq(Long.class), any(Object[].class))).thenReturn(1L);
-        assertThrows(HandyFlowException.class, () -> service.receive(t(), shipment.getId(), line.getId(), n("5"), null, null, location, null, null, receiver));
+        assertThrows(HandyFlowException.class, () -> service.receive(t(), shipment.getId(), line.getId(), n("5"), null, null, location, null, null, null, null, null, receiver));
         verifyNoInteractions(inventory);
     }
 
@@ -119,9 +121,9 @@ class WhseReceivingServiceTest {
         stubReceipt(n("3"), receiver);
         when(jdbc.queryForObject(contains("sum(qty)"), eq(BigDecimal.class), any(Object[].class))).thenReturn(BigDecimal.ZERO);
         service.inspect(t(), UUID.randomUUID(), "PASS", n("2"), "label and seal intact", inspector);
-        verify(inventory).changeStatus(eq(t()), eq(client), eq(item), eq(location), eq("QUARANTINE"), eq("AVAILABLE"), eq(n("2")), contains("pass"), eq(inspector), startsWith("insp:"));
+        verify(inventory).changeStatus(eq(t()), eq(client), eq(item), eq(location), any(), eq("QUARANTINE"), eq("AVAILABLE"), eq(n("2")), contains("pass"), eq(inspector), startsWith("insp:"));
         service.inspect(t(), UUID.randomUUID(), "FAIL", n("1"), "seal broken on opening", inspector);
-        verify(inventory).changeStatus(eq(t()), eq(client), eq(item), eq(location), eq("QUARANTINE"), eq("DAMAGED"), eq(n("1")), contains("fail"), eq(inspector), startsWith("insp:"));
+        verify(inventory).changeStatus(eq(t()), eq(client), eq(item), eq(location), any(), eq("QUARANTINE"), eq("DAMAGED"), eq(n("1")), contains("fail"), eq(inspector), startsWith("insp:"));
     }
 
     @Test @DisplayName("cannot inspect more than is still held, or when nothing is held")
@@ -152,6 +154,7 @@ class WhseReceivingServiceTest {
             when(rs.getBigDecimal(5)).thenReturn(held);
             when(rs.getObject(6, UUID.class)).thenReturn(receivedBy);
             when(rs.getString(7)).thenReturn("ASN-1");
+            when(rs.getObject(8, UUID.class)).thenReturn(null);
             when(jdbc.query(contains("FOR UPDATE OF e"), any(RowMapper.class), any(Object[].class))).thenAnswer(inv -> {
                 RowMapper m = inv.getArgument(1);
                 return List.of(m.mapRow(rs, 0));
@@ -162,6 +165,6 @@ class WhseReceivingServiceTest {
     @Test @DisplayName("no user means nothing is recorded")
     void noActor() {
         assertThrows(org.springframework.security.access.AccessDeniedException.class,
-                () -> service.receive(t(), shipment.getId(), line.getId(), n("1"), null, null, location, null, null, null));
+                () -> service.receive(t(), shipment.getId(), line.getId(), n("1"), null, null, location, null, null, null, null, null, null));
     }
 }

@@ -38,7 +38,8 @@ public class WhseReturnsController {
     public record CreateRequest(@NotNull UUID clientId, UUID outboundOrderId, @NotNull @Size(min = 3, max = 300) String reason,
                                 @Size(max = 500) String notes, @NotEmpty @Valid List<LineRequest> lines) {}
     public record ReceiveRequest(@DecimalMin("0") BigDecimal qtyRestock, @DecimalMin("0") BigDecimal qtyHeld, @DecimalMin("0") BigDecimal qtyDamaged,
-                                 @NotNull UUID locationId, @Size(max = 300) String reason, @Size(max = 100) String idempotencyKey) {}
+                                 @NotNull UUID locationId, @Size(max = 300) String reason, @Size(max = 100) String idempotencyKey,
+                                 @Size(max = 60) String lotNumber) {}
     public record CloseRequest(@Size(max = 500) String note) {}
 
     @GetMapping
@@ -71,7 +72,7 @@ public class WhseReturnsController {
     public ResponseEntity<ApiResponse<Map<String, UUID>>> receive(@PathVariable UUID id, @PathVariable UUID lineId, @Valid @RequestBody ReceiveRequest req) {
         featureGuard.requireModule("warehousing");
         UUID receiptId = service.receive(TenantContext.getTenantIdAsObject(), id, lineId, req.qtyRestock(), req.qtyHeld(), req.qtyDamaged(),
-                req.locationId(), req.reason(), req.idempotencyKey(), TenantContext.getCurrentUserId());
+                req.locationId(), req.reason(), req.lotNumber(), req.idempotencyKey(), TenantContext.getCurrentUserId());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Return received", Map.of("id", receiptId)));
     }
 

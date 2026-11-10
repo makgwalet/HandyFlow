@@ -74,6 +74,6 @@ public class WhseInventoryController {
 
     private InventoryResponse toResponse(WhseInventory i) {
         return new InventoryResponse(i.getId(), i.getClientId(), i.getItemId(), i.getLocationId(), i.getQtyOnHand(),
-                i.getQtyAllocated(), i.available(), i.getStatus());
+                i.getQtyAllocated(), i.available(), i.getStatus(), i.getLotId());
     }
 }

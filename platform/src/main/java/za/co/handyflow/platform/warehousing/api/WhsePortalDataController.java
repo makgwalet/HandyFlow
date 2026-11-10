@@ -64,7 +64,7 @@ public class WhsePortalDataController {
 
     private InventoryResponse toInventoryResponse(WhseInventory i) {
         return new InventoryResponse(i.getId(), i.getClientId(), i.getItemId(), i.getLocationId(), i.getQtyOnHand(),
-                i.getQtyAllocated(), i.available(), i.getStatus());
+                i.getQtyAllocated(), i.available(), i.getStatus(), i.getLotId());
     }
 
     private InboundShipmentResponse toShipmentResponse(WhseInboundShipment s) {

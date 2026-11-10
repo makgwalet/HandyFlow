@@ -34,6 +34,7 @@ public class WhseReturnsService {
     private final JdbcTemplate jdbc;
     private final WhseInventoryService inventoryService;
     private final TenantSequenceService sequenceService;
+    private final WhseLotService lotService;
 
     public record NewLine(UUID itemId, BigDecimal expectedQty) {}
     public record ReturnRow(UUID id, String rmaNumber, UUID clientId, String clientName, UUID outboundOrderId, String orderReference, String status,
@@ -85,7 +86,7 @@ public class WhseReturnsService {
 
     @Transactional
     public UUID receive(TenantId tenantId, UUID returnId, UUID lineId, BigDecimal restock, BigDecimal quarantine, BigDecimal damaged, UUID locationId,
-                        String reason, String idempotencyKey, UUID actor) {
+                        String reason, String lotNumber, String idempotencyKey, UUID actor) {
         requireActor(actor);
         BigDecimal r = nz(restock), q = nz(quarantine), d = nz(damaged);
         if (r.signum() < 0 || q.signum() < 0 || d.signum() < 0) throw new IllegalArgumentException("Quantities cannot be negative.");
@@ -119,12 +120,14 @@ public class WhseReturnsService {
             }
         }
 
+        // A returned lot-tracked item must name a lot that already exists; a return cannot invent a batch.
+        UUID lotId = lotService.requireExisting(tenantId, hdr.clientId(), itemId, lotNumber);
         UUID receiptId = UUID.randomUUID();
-        jdbc.update("INSERT INTO whse_return_receipts (id, tenant_id, return_id, line_id, item_id, location_id, qty_restock, qty_quarantine, qty_damaged, reason, received_by, idempotency_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                receiptId, t, returnId, lineId, itemId, locationId, r, q, d, q.add(d).signum() > 0 ? reason.trim() : null, actor, key);
-        post(tenantId, hdr.clientId(), itemId, locationId, r, WhseInventory.STATUS_AVAILABLE, returnId, hdr.rma(), receiptId, "R", null, actor);
-        post(tenantId, hdr.clientId(), itemId, locationId, q, WhseInventory.STATUS_QUARANTINE, returnId, hdr.rma(), receiptId, "Q", reason, actor);
-        post(tenantId, hdr.clientId(), itemId, locationId, d, WhseInventory.STATUS_DAMAGED, returnId, hdr.rma(), receiptId, "D", reason, actor);
+        jdbc.update("INSERT INTO whse_return_receipts (id, tenant_id, return_id, line_id, item_id, location_id, qty_restock, qty_quarantine, qty_damaged, reason, received_by, idempotency_key, lot_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                receiptId, t, returnId, lineId, itemId, locationId, r, q, d, q.add(d).signum() > 0 ? reason.trim() : null, actor, key, lotId);
+        post(tenantId, hdr.clientId(), itemId, locationId, lotId, r, WhseInventory.STATUS_AVAILABLE, returnId, hdr.rma(), receiptId, "R", null, actor);
+        post(tenantId, hdr.clientId(), itemId, locationId, lotId, q, WhseInventory.STATUS_QUARANTINE, returnId, hdr.rma(), receiptId, "Q", reason, actor);
+        post(tenantId, hdr.clientId(), itemId, locationId, lotId, d, WhseInventory.STATUS_DAMAGED, returnId, hdr.rma(), receiptId, "D", reason, actor);
         jdbc.update("UPDATE whse_returns SET status = 'RECEIVING', version = version + 1 WHERE id = ? AND status = 'EXPECTED'", returnId);
         return receiptId;
     }
@@ -204,10 +207,10 @@ public class WhseReturnsService {
         return v == null ? BigDecimal.ZERO : v;
     }
 
-    private void post(TenantId tenantId, UUID clientId, UUID itemId, UUID locationId, BigDecimal qty, String status, UUID returnId, String rma,
+    private void post(TenantId tenantId, UUID clientId, UUID itemId, UUID locationId, UUID lotId, BigDecimal qty, String status, UUID returnId, String rma,
                       UUID receiptId, String suffix, String note, UUID actor) {
         if (qty.signum() == 0) return;
-        inventoryService.receiveStockInStatus(tenantId, clientId, itemId, locationId, qty, status, "RETURN", "RETURN", returnId, rma,
+        inventoryService.receiveStockInStatus(tenantId, clientId, itemId, locationId, lotId, qty, status, "RETURN", "RETURN", returnId, rma,
                 note == null ? null : note.trim(), actor, "ret:" + receiptId + ":" + suffix);
     }
 

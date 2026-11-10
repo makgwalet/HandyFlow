@@ -31,6 +31,7 @@ class WhseReturnsServiceTest {
     private JdbcTemplate jdbc;
     private WhseInventoryService inventory;
     private TenantSequenceService sequences;
+    private WhseLotService lotService;
     private WhseReturnsService service;
 
     @BeforeEach
@@ -39,7 +40,8 @@ class WhseReturnsServiceTest {
         jdbc = mock(JdbcTemplate.class);
         inventory = mock(WhseInventoryService.class);
         sequences = mock(TenantSequenceService.class);
-        service = new WhseReturnsService(jdbc, inventory, sequences);
+        lotService = mock(WhseLotService.class);
+        service = new WhseReturnsService(jdbc, inventory, sequences, lotService);
         when(sequences.nextValue(any(), anyString())).thenReturn(7L);
         when(jdbc.queryForObject(anyString(), eq(Long.class), any(Object[].class))).thenReturn(1L);
         when(jdbc.query(contains("idempotency_key"), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
@@ -103,18 +105,18 @@ class WhseReturnsServiceTest {
     @Test @DisplayName("received goods are posted as RETURN movements in restock, quarantine and damaged status")
     void receivesInThreeStatuses() throws Exception {
         openReturn("EXPECTED", null);
-        service.receive(t(), ret, line, n("2"), n("1"), n("1"), location, "box crushed in transit", null, actor);
-        verify(inventory).receiveStockInStatus(eq(t()), eq(client), eq(item), eq(location), eq(n("2")), eq("AVAILABLE"), eq("RETURN"), eq("RETURN"), eq(ret), eq("RMA-00007"), any(), eq(actor), anyString());
-        verify(inventory).receiveStockInStatus(eq(t()), eq(client), eq(item), eq(location), eq(n("1")), eq("QUARANTINE"), eq("RETURN"), eq("RETURN"), eq(ret), eq("RMA-00007"), any(), eq(actor), anyString());
-        verify(inventory).receiveStockInStatus(eq(t()), eq(client), eq(item), eq(location), eq(n("1")), eq("DAMAGED"), eq("RETURN"), eq("RETURN"), eq(ret), eq("RMA-00007"), any(), eq(actor), anyString());
+        service.receive(t(), ret, line, n("2"), n("1"), n("1"), location, "box crushed in transit", null, null, actor);
+        verify(inventory).receiveStockInStatus(eq(t()), eq(client), eq(item), eq(location), any(), eq(n("2")), eq("AVAILABLE"), eq("RETURN"), eq("RETURN"), eq(ret), eq("RMA-00007"), any(), eq(actor), anyString());
+        verify(inventory).receiveStockInStatus(eq(t()), eq(client), eq(item), eq(location), any(), eq(n("1")), eq("QUARANTINE"), eq("RETURN"), eq("RETURN"), eq(ret), eq("RMA-00007"), any(), eq(actor), anyString());
+        verify(inventory).receiveStockInStatus(eq(t()), eq(client), eq(item), eq(location), any(), eq(n("1")), eq("DAMAGED"), eq("RETURN"), eq("RETURN"), eq(ret), eq("RMA-00007"), any(), eq(actor), anyString());
         verify(jdbc).update(contains("status = 'RECEIVING'"), any(Object[].class));
     }
 
     @Test @DisplayName("held or damaged goods need a reason; an empty receipt is refused; nothing is posted")
     void receiveValidation() throws Exception {
         openReturn("EXPECTED", null);
-        assertThrows(IllegalArgumentException.class, () -> service.receive(t(), ret, line, n("1"), n("1"), null, location, "no", null, actor));
-        assertThrows(IllegalArgumentException.class, () -> service.receive(t(), ret, line, null, null, null, location, null, null, actor));
+        assertThrows(IllegalArgumentException.class, () -> service.receive(t(), ret, line, n("1"), n("1"), null, location, "no", null, null, actor));
+        assertThrows(IllegalArgumentException.class, () -> service.receive(t(), ret, line, null, null, null, location, null, null, null, actor));
         verifyNoInteractions(inventory);
     }
 
@@ -122,15 +124,15 @@ class WhseReturnsServiceTest {
     void receiveCap() throws Exception {
         openReturn("EXPECTED", order);
         shipped("10", "8");
-        assertThrows(IllegalArgumentException.class, () -> service.receive(t(), ret, line, n("3"), null, null, location, null, null, actor));
+        assertThrows(IllegalArgumentException.class, () -> service.receive(t(), ret, line, n("3"), null, null, location, null, null, null, actor));
         verifyNoInteractions(inventory);
-        assertDoesNotThrow(() -> service.receive(t(), ret, line, n("2"), null, null, location, null, null, actor));
+        assertDoesNotThrow(() -> service.receive(t(), ret, line, n("2"), null, null, location, null, null, null, actor));
     }
 
     @Test @DisplayName("a closed return cannot be received against")
     void closedRefused() throws Exception {
         openReturn("CLOSED", null);
-        assertThrows(HandyFlowException.class, () -> service.receive(t(), ret, line, n("1"), null, null, location, null, null, actor));
+        assertThrows(HandyFlowException.class, () -> service.receive(t(), ret, line, n("1"), null, null, location, null, null, null, actor));
         verifyNoInteractions(inventory);
     }
 
@@ -139,7 +141,7 @@ class WhseReturnsServiceTest {
     void idempotent() {
         UUID first = UUID.randomUUID();
         when(jdbc.query(contains("idempotency_key"), any(RowMapper.class), any(Object[].class))).thenReturn(List.of(first));
-        assertEquals(first, service.receive(t(), ret, line, n("1"), null, null, location, null, "scan-9", actor));
+        assertEquals(first, service.receive(t(), ret, line, n("1"), null, null, location, null, null, "scan-9", actor));
         verifyNoInteractions(inventory);
     }
 
