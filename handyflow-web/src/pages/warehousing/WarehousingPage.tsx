@@ -17,6 +17,7 @@ import WhseTasksTab from "./WhseTasksTab"
 import WhseInspectionTab from "./WhseInspectionTab"
 import WhseReturnsTab from "./WhseReturnsTab"
 import WhseLotsTab from "./WhseLotsTab"
+import WhseDispatchTab from "./WhseDispatchTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { WAREHOUSING_SECTIONS } from "../../navigation/moduleSections"
 
@@ -34,6 +35,7 @@ export default function WarehousingPage() {
           case "inspection": return <WhseInspectionTab />
           case "returns":    return <WhseReturnsTab />
           case "lots":       return <WhseLotsTab />
+          case "dispatch":   return <WhseDispatchTab />
           default:          return null
         }
       }} />

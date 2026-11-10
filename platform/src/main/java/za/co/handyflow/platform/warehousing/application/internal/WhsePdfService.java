@@ -296,6 +296,72 @@ public class WhsePdfService {
         }
     }
 
+    /** The dispatch manifest: what is on the vehicle, order by order, with sign-off lines for the dispatcher and the driver. */
+    public byte[] generateManifest(String warehouseName, WhseDispatchService.ManifestDetail detail) {
+        WhseDispatchService.ManifestRow m = detail.manifest();
+        Document doc = new Document(PageSize.A4, 50, 50, 60, 50);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+            PdfWriter writer = PdfWriter.getInstance(doc, out);
+            String title = "Dispatch Manifest " + nullSafe(m.manifestNumber());
+            writer.setPageEvent(new FooterHandler(title));
+            doc.open();
+
+            PdfPTable header = new PdfPTable(1);
+            header.setWidthPercentage(100);
+            PdfPCell headerCell = new PdfPCell();
+            headerCell.setBackgroundColor(BRAND_COLOR);
+            headerCell.setPadding(12);
+            headerCell.setBorder(0);
+            headerCell.addElement(new Paragraph(title, TITLE_FONT));
+            headerCell.addElement(new Paragraph((warehouseName != null ? warehouseName : "HandyFlow") + " · status " + m.status(), SUBTITLE_FONT));
+            header.addCell(headerCell);
+            doc.add(header);
+            doc.add(new Paragraph(" "));
+
+            doc.add(new Paragraph("Carrier: " + (m.carrier() == null ? "-" : m.carrier()), BODY_FONT));
+            doc.add(new Paragraph("Vehicle: " + (m.vehicleRegistration() == null ? "-" : m.vehicleRegistration()), BODY_FONT));
+            doc.add(new Paragraph("Driver: " + (m.driverName() == null ? "-" : m.driverName()), BODY_FONT));
+            if (m.notes() != null) doc.add(new Paragraph("Notes: " + m.notes(), BODY_FONT));
+            doc.add(new Paragraph(detail.orders().size() + " order(s) · " + detail.orders().stream().map(WhseDispatchService.OrderRow::units)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add).stripTrailingZeros().toPlainString() + " unit(s)", BODY_BOLD_FONT));
+            doc.add(new Paragraph(" "));
+
+            for (WhseDispatchService.OrderRow o : detail.orders()) {
+                doc.add(new Paragraph(nullSafe(o.orderReference()) + " · " + nullSafe(o.clientName()), SECTION_FONT));
+                doc.add(new Paragraph("Deliver to: " + nullSafe(o.shipToName()) + (o.shipToAddress() == null ? "" : ", " + o.shipToAddress()), BODY_FONT));
+                PdfPTable table = new PdfPTable(new float[]{1.3f, 2.8f, 0.9f});
+                table.setWidthPercentage(100);
+                table.setSpacingBefore(4);
+                for (String h : new String[]{"SKU", "Description", "Qty"}) {
+                    PdfPCell cell = new PdfPCell(new Phrase(h, TABLE_HEADER_FONT));
+                    cell.setBackgroundColor(BRAND_COLOR);
+                    cell.setPadding(4);
+                    table.addCell(cell);
+                }
+                for (WhseDispatchService.LineRow l : o.lines()) {
+                    for (String v : new String[]{nullSafe(l.sku()), nullSafe(l.description()), l.qty().stripTrailingZeros().toPlainString()}) {
+                        PdfPCell cell = new PdfPCell(new Phrase(v, TABLE_CELL_FONT));
+                        cell.setPadding(3);
+                        table.addCell(cell);
+                    }
+                }
+                doc.add(table);
+                doc.add(new Paragraph(" "));
+            }
+
+            doc.add(new Paragraph(" "));
+            doc.add(new Paragraph("Loaded and checked by (warehouse): ______________________   Date / time: ______________", BODY_FONT));
+            doc.add(new Paragraph(" "));
+            doc.add(new Paragraph("Received on vehicle by (driver): ______________________   Signature: ______________", BODY_FONT));
+            doc.close();
+            return out.toByteArray();
+        } catch (Exception e) {
+            log.error("Failed to generate manifest {}: {}", m.id(), e.getMessage(), e);
+            throw new RuntimeException("Failed to generate manifest", e);
+        }
+    }
+
     private void addHeader(Document doc, String warehouseName, String reportTitle, int rowCount) throws Exception {
         PdfPTable header = new PdfPTable(1);
         header.setWidthPercentage(100);

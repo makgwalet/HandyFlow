@@ -20,7 +20,14 @@ public class WhseNumberGenerator {
 
     private static final String INVOICE_SEQUENCE_PREFIX = "WAREHOUSING_INVOICE:";
 
+    private static final String MANIFEST_SEQUENCE = "WAREHOUSING_MANIFEST";
+
     private final TenantSequenceService sequenceService;
+
+    /** Dispatch manifests number per warehouse: MAN00001, MAN00002, ... */
+    public String nextManifestNumber(TenantId tenantId) {
+        return "MAN" + String.format("%05d", sequenceService.nextValue(tenantId, MANIFEST_SEQUENCE));
+    }
 
     public String nextInvoiceNumber(TenantId tenantId, UUID clientId) {
         long next = sequenceService.nextValue(tenantId, INVOICE_SEQUENCE_PREFIX + clientId);

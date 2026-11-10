@@ -51,6 +51,7 @@ public class WhseOutboundOrderController {
     private final WhsePdfService pdfService;
     private final EvidenceFacade evidenceFacade;
     private final FeatureGuard featureGuard;
+    private final za.co.handyflow.platform.warehousing.application.internal.WhseDispatchService dispatchService;
 
     @GetMapping("/clients/{clientId}/outbound-orders")
     @PreAuthorize("hasAnyAuthority('WAREHOUSING_READ','WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
@@ -122,6 +123,9 @@ public class WhseOutboundOrderController {
     public ResponseEntity<ApiResponse<OutboundOrderResponse>> markShipped(@PathVariable UUID id,
             @RequestBody(required = false) MarkShippedRequest req) {
         featureGuard.requireModule("warehousing");
+        if (dispatchService.manifestOf(TenantContext.getTenantIdAsObject(), id) != null) {
+            throw new IllegalStateException("This order is on a dispatch manifest. Dispatch the manifest to ship it, or take the order off the manifest first.");
+        }
         String carrier = req != null ? req.carrier() : null;
         String trackingNumber = req != null ? req.trackingNumber() : null;
         return ResponseEntity.ok(ApiResponse.success("Order shipped", toResponse(

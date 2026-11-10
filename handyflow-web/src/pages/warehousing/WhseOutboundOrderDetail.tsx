@@ -15,6 +15,7 @@ import { ArrowLeft, PackageCheck, XCircle, Download, Truck } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { WHSE_ACCENT } from "./constants"
 import { ErrorLine, fmtQty } from "./whseUi"
+import { DeliveryPanel } from "./WhseDispatchTab"
 
 interface OutboundOrderResponse {
   id: string; orderReference: string | null; shipToName: string | null; status: string
@@ -24,6 +25,7 @@ interface OutboundOrderLineResponse { id: string; orderId: string; itemId: strin
 interface ItemLite { id: string; sku: string }
 interface LotAllocation { id: string; lotNumber: string; expiryDate: string | null; locationCode: string; qty: number; status: string }
 interface TaskLite { id: string; status: string }
+interface DeliveryInfo { manifestNumber: string | null; deliveredAt: string | null; receivedBy: string | null; note: string | null }
 
 const inputStyle: React.CSSProperties = { padding: "7px 10px", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12.5, boxSizing: "border-box", fontFamily: "inherit" }
 const btnStyle: React.CSSProperties = { display: "flex", alignItems: "center", gap: 6, border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }
@@ -53,6 +55,12 @@ export default function WhseOutboundOrderDetail({ orderId, clientId, items, onBa
   const { data: pickTasks = [] } = useQuery<TaskLite[]>({
     queryKey: ["whse-tasks-order", orderId],
     queryFn: async () => (await apiClient.get(`/api/v1/warehousing/tasks?orderId=${orderId}&type=PICK`)).data,
+  })
+
+  const isShipped = order?.status === "SHIPPED"
+  const { data: delivery } = useQuery<DeliveryInfo>({
+    queryKey: ["whse-order-delivery", orderId], enabled: isShipped,
+    queryFn: async () => (await apiClient.get(`/api/v1/warehousing/outbound-orders/${orderId}/delivery`)).data,
   })
 
   const invalidateAll = () => {
@@ -152,6 +160,15 @@ export default function WhseOutboundOrderDetail({ orderId, clientId, items, onBa
           <div><label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4, display: "block" }}>Tracking number</label><input style={inputStyle} value={trackingNumber} onChange={e => setTrackingNumber(e.target.value)} /></div>
           <button onClick={() => markShipped.mutate()} disabled={markShipped.isPending} style={{ ...btnStyle, background: WHSE_ACCENT, color: "var(--hf-text-on-solid)" }}>{markShipped.isPending ? "Shipping…" : "Confirm shipped"}</button>
           <button onClick={() => setShowShipForm(false)} style={{ ...btnStyle, background: "none", border: "1px solid var(--hf-border)", color: "var(--hf-text-muted)" }}>Cancel</button>
+        </div>
+      )}
+
+      {isShipped && (
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16, marginBottom: 18 }}>
+          <p style={{ fontSize: 12.5, fontWeight: 700, color: "var(--hf-text)", margin: "0 0 8px" }}>
+            Proof of delivery{delivery?.manifestNumber ? ` · manifest ${delivery.manifestNumber}` : ""}
+          </p>
+          <DeliveryPanel orderId={orderId} delivered={!!delivery?.deliveredAt} receivedBy={delivery?.receivedBy} deliveredAt={delivery?.deliveredAt} note={delivery?.note} />
         </div>
       )}
 
