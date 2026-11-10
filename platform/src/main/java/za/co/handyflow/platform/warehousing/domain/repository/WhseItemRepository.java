@@ -24,4 +24,10 @@ public interface WhseItemRepository extends JpaRepository<WhseItem, UUID> {
 
     @Query("SELECT i FROM WhseItem i WHERE i.tenantId = :tenantId AND i.clientId = :clientId AND i.sku = :sku AND i.deletedAt IS NULL")
     Optional<WhseItem> findActiveByClientAndSku(@Param("tenantId") UUID tenantId, @Param("clientId") UUID clientId, @Param("sku") String sku);
+
+    @Query("SELECT i FROM WhseItem i WHERE i.tenantId = :tenantId AND i.clientId = :clientId AND i.barcode = :barcode AND i.deletedAt IS NULL")
+    Optional<WhseItem> findActiveByClientAndBarcode(@Param("tenantId") UUID tenantId, @Param("clientId") UUID clientId, @Param("barcode") String barcode);
+
+    @Query("SELECT i FROM WhseItem i WHERE i.tenantId = :tenantId AND i.barcode = :barcode AND i.deletedAt IS NULL AND (:clientId IS NULL OR i.clientId = :clientId) ORDER BY i.sku ASC")
+    List<WhseItem> findByBarcode(@Param("tenantId") UUID tenantId, @Param("barcode") String barcode, @Param("clientId") UUID clientId);
 }

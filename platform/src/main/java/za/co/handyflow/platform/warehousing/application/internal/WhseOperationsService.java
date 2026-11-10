@@ -48,7 +48,9 @@ public class WhseOperationsService {
     public record Summary(LocalDate date, BigDecimal totalUnitsOnHand, BigDecimal totalUnitsAllocated, BigDecimal totalUnitsAvailable,
                           long stockedPositions, long activeClients, List<StatusStock> byStatus, Counts work, TodayActivity today,
                           long adjustmentsAwaitingApproval, long invoicesAwaitingApproval, List<TopMover> topMovers,
-                          BigDecimal stockAccuracyPct, long linesCountedLast30Days) {}
+                          BigDecimal stockAccuracyPct, long linesCountedLast30Days, BigDecimal stockValue, BigDecimal unitsWithoutCost) {}
+    public record StockAlert(UUID clientId, String clientName, UUID itemId, String sku, String description, String alert,
+                             BigDecimal available, BigDecimal minQty, BigDecimal maxQty, BigDecimal toOrder) {}
     public record TrendPoint(LocalDate day, BigDecimal received, BigDecimal dispatched, BigDecimal adjusted) {}
 
     public record StockRow(UUID inventoryId, UUID clientId, String clientName, UUID itemId, String sku, String description, String uom,
@@ -104,10 +106,16 @@ public class WhseOperationsService {
         BigDecimal accuracy = counted30 == 0 ? null
                 : BigDecimal.valueOf(matched30 * 100.0 / counted30).setScale(1, java.math.RoundingMode.HALF_UP);
 
+        BigDecimal[] value = jdbc.query(SQL_STOCK_VALUE, rs -> {
+            rs.next();
+            BigDecimal v = rs.getBigDecimal("value"), u = rs.getBigDecimal("no_cost");
+            return new BigDecimal[]{v == null ? BigDecimal.ZERO : v, u == null ? BigDecimal.ZERO : u};
+        }, t);
+
         return new Summary(today, onHand, allocated, availableUnits, positions, clients, byStatus,
                 new Counts(inbound.getOrDefault("EXPECTED", 0L), inbound.getOrDefault("PARTIALLY_RECEIVED", 0L), overdueIn,
                         outbound.getOrDefault("PENDING", 0L), outbound.getOrDefault("PICKING", 0L), outbound.getOrDefault("PACKED", 0L), overdueOut),
-                activity, adjPending, invPending, movers, accuracy, counted30);
+                activity, adjPending, invPending, movers, accuracy, counted30, value[0], value[1]);
     }
 
     /** Units received, dispatched and adjusted per calendar day for the last {@code days} days, oldest first, every day present. */
@@ -176,6 +184,16 @@ public class WhseOperationsService {
                 tenantId.getValue(), clientId, clientId);
     }
 
+    /** Items below their minimum or above their maximum. Available means on hand in AVAILABLE status less what is allocated. */
+    @Transactional(readOnly = true)
+    public List<StockAlert> stockAlerts(TenantId tenantId, UUID clientId) {
+        return jdbc.query(SQL_STOCK_ALERTS,
+                (rs, i) -> new StockAlert(rs.getObject("client_id", UUID.class), rs.getString("client_name"), rs.getObject("item_id", UUID.class),
+                        rs.getString("sku"), rs.getString("description"), rs.getString("alert"), rs.getBigDecimal("available"),
+                        rs.getBigDecimal("min_qty"), rs.getBigDecimal("max_qty"), rs.getBigDecimal("to_order")),
+                tenantId.getValue(), clientId, clientId);
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────
 
     private long count(String sql, Object... args) {
@@ -198,6 +216,31 @@ public class WhseOperationsService {
     }
 
     // ── SQL ─────────────────────────────────────────────────────────────────
+
+    /** Value of stock whose item has a cost, and the units that could not be valued because the item has none. */
+    static final String SQL_STOCK_VALUE = """
+            SELECT coalesce(sum(inv.qty_on_hand * it.unit_cost) FILTER (WHERE it.unit_cost IS NOT NULL), 0) AS value,
+                   coalesce(sum(inv.qty_on_hand) FILTER (WHERE it.unit_cost IS NULL), 0) AS no_cost
+              FROM whse_inventory inv JOIN whse_items it ON it.id = inv.item_id AND it.tenant_id = inv.tenant_id
+             WHERE inv.tenant_id = ? AND inv.qty_on_hand > 0""";
+
+    static final String SQL_STOCK_ALERTS = """
+            SELECT * FROM (
+              SELECT it.client_id, c.trading_name AS client_name, it.id AS item_id, it.sku, it.description, it.min_qty, it.max_qty,
+                     coalesce(sum(inv.qty_on_hand - inv.qty_allocated) FILTER (WHERE inv.status = 'AVAILABLE'), 0) AS available,
+                     coalesce(sum(inv.qty_on_hand) FILTER (WHERE inv.status = 'AVAILABLE'), 0) AS on_hand
+                FROM whse_items it
+                JOIN whse_clients c ON c.id = it.client_id AND c.tenant_id = it.tenant_id
+                LEFT JOIN whse_inventory inv ON inv.item_id = it.id AND inv.tenant_id = it.tenant_id
+               WHERE it.tenant_id = ? AND it.deleted_at IS NULL AND it.active AND (it.min_qty IS NOT NULL OR it.max_qty IS NOT NULL)
+                 AND (?::uuid IS NULL OR it.client_id = ?::uuid)
+               GROUP BY it.client_id, c.trading_name, it.id, it.sku, it.description, it.min_qty, it.max_qty
+            ) x
+            CROSS JOIN LATERAL (SELECT CASE WHEN x.min_qty IS NOT NULL AND x.available < x.min_qty THEN 'BELOW_MIN'
+                                            WHEN x.max_qty IS NOT NULL AND x.on_hand > x.max_qty THEN 'ABOVE_MAX' END AS alert,
+                                       CASE WHEN x.max_qty IS NOT NULL AND x.available < x.min_qty THEN x.max_qty - x.available END AS to_order) a
+            WHERE a.alert IS NOT NULL
+            ORDER BY a.alert, x.sku""";
 
     static final String SQL_STOCK_BY_STATUS = """
             SELECT status, coalesce(sum(qty_on_hand), 0) AS on_hand, coalesce(sum(qty_allocated), 0) AS allocated, count(*) AS positions

@@ -49,6 +49,31 @@ public class WhseItem {
     @Column(name = "storage_rate_per_unit_per_month", precision = 12, scale = 4)
     private BigDecimal storageRatePerUnitPerMonth; // null = fall through to WhseClient then WhseProfile default
 
+    @Column(name = "barcode")
+    private String barcode;
+    @Column(name = "length_mm", precision = 10, scale = 1)
+    private BigDecimal lengthMm;
+    @Column(name = "width_mm", precision = 10, scale = 1)
+    private BigDecimal widthMm;
+    @Column(name = "height_mm", precision = 10, scale = 1)
+    private BigDecimal heightMm;
+    @Column(name = "weight_kg", precision = 10, scale = 3)
+    private BigDecimal weightKg;
+    @Column(name = "unit_cost", precision = 14, scale = 4)
+    private BigDecimal unitCost;
+    @Column(name = "min_qty", precision = 12, scale = 3)
+    private BigDecimal minQty;
+    @Column(name = "max_qty", precision = 12, scale = 3)
+    private BigDecimal maxQty;
+    @Column(name = "temperature_class", nullable = false)
+    private String temperatureClass = "AMBIENT";
+    @Column(name = "hazardous", nullable = false)
+    private boolean hazardous;
+    @Column(name = "fragile", nullable = false)
+    private boolean fragile;
+    @Column(name = "stackable", nullable = false)
+    private boolean stackable = true;
+
     @Column(name = "active", nullable = false)
     private boolean active = true;
 
@@ -87,6 +112,27 @@ public class WhseItem {
         this.uom = (uom == null || uom.isBlank()) ? this.uom : uom;
         this.storageRatePerUnitPerMonth = storageRatePerUnitPerMonth;
         this.updatedAt = Instant.now();
+    }
+
+    public void applyDetails(WhseItemDetails d) {
+        this.barcode = d.barcode();
+        this.lengthMm = d.lengthMm();
+        this.widthMm = d.widthMm();
+        this.heightMm = d.heightMm();
+        this.weightKg = d.weightKg();
+        this.unitCost = d.unitCost();
+        this.minQty = d.minQty();
+        this.maxQty = d.maxQty();
+        this.temperatureClass = d.temperatureClass();
+        this.hazardous = d.hazardous();
+        this.fragile = d.fragile();
+        this.stackable = d.stackable();
+        this.updatedAt = Instant.now();
+    }
+
+    public WhseItemDetails details() {
+        return new WhseItemDetails(barcode, lengthMm, widthMm, heightMm, weightKg, unitCost, minQty, maxQty,
+                temperatureClass, hazardous, fragile, stackable);
     }
 
     public void deactivate() {

@@ -65,6 +65,14 @@ public class WhseOperationsController {
         return ResponseEntity.ok(ApiResponse.success(service.movements(TenantContext.getTenantIdAsObject(), clientId, itemId, type, from, to, page, size)));
     }
 
+    @GetMapping("/stock-alerts")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSING_READ','WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
+    @Operation(summary = "Items below their minimum or above their maximum level, with a suggested top-up quantity")
+    public ResponseEntity<ApiResponse<List<WhseOperationsService.StockAlert>>> stockAlerts(@RequestParam(required = false) UUID clientId) {
+        featureGuard.requireModule("warehousing");
+        return ResponseEntity.ok(ApiResponse.success(service.stockAlerts(TenantContext.getTenantIdAsObject(), clientId)));
+    }
+
     @GetMapping("/reservations")
     @PreAuthorize("hasAnyAuthority('WAREHOUSING_READ','WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
     @Operation(summary = "What is reserved right now, per order and position")

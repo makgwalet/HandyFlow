@@ -16,6 +16,7 @@ import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.warehousing.application.internal.WhseItemService;
 import za.co.handyflow.platform.warehousing.domain.model.WhseItem;
+import za.co.handyflow.platform.warehousing.domain.model.WhseItemDetails;
 import za.co.handyflow.platform.warehousing.dto.CreateItemRequest;
 import za.co.handyflow.platform.warehousing.dto.ItemResponse;
 import za.co.handyflow.platform.warehousing.dto.UpdateItemRequest;
@@ -66,7 +67,9 @@ public class WhseItemController {
             @Valid @RequestBody CreateItemRequest req) {
         featureGuard.requireModule("warehousing");
         WhseItem item = itemService.create(TenantContext.getTenantIdAsObject(), clientId, req.sku(),
-                req.description(), req.uom(), req.storageRatePerUnitPerMonth());
+                req.description(), req.uom(), req.storageRatePerUnitPerMonth(),
+                details(req.barcode(), req.lengthMm(), req.widthMm(), req.heightMm(), req.weightKg(), req.unitCost(), req.minQty(), req.maxQty(),
+                        req.temperatureClass(), req.hazardous(), req.fragile(), req.stackable()), TenantContext.getCurrentUserId());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Item created", toResponse(item)));
     }
 
@@ -76,8 +79,19 @@ public class WhseItemController {
             @Valid @RequestBody UpdateItemRequest req) {
         featureGuard.requireModule("warehousing");
         WhseItem item = itemService.update(TenantContext.getTenantIdAsObject(), id, req.description(), req.uom(),
-                req.storageRatePerUnitPerMonth());
+                req.storageRatePerUnitPerMonth(),
+                details(req.barcode(), req.lengthMm(), req.widthMm(), req.heightMm(), req.weightKg(), req.unitCost(), req.minQty(), req.maxQty(),
+                        req.temperatureClass(), req.hazardous(), req.fragile(), req.stackable()), TenantContext.getCurrentUserId());
         return ResponseEntity.ok(ApiResponse.success("Item updated", toResponse(item)));
+    }
+
+    @GetMapping("/items/by-barcode/{barcode}")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSING_READ','WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
+    @Operation(summary = "Find items by a scanned barcode. Optionally narrow to one client; several clients may stock the same product.")
+    public ResponseEntity<ApiResponse<List<ItemResponse>>> byBarcode(@PathVariable String barcode, @RequestParam(required = false) UUID clientId) {
+        featureGuard.requireModule("warehousing");
+        return ResponseEntity.ok(ApiResponse.success(
+                itemService.findByBarcode(TenantContext.getTenantIdAsObject(), barcode, clientId).stream().map(this::toResponse).toList()));
     }
 
     @PostMapping("/items/{id}/deactivate")
@@ -104,8 +118,18 @@ public class WhseItemController {
         return ResponseEntity.ok(ApiResponse.success("Item deleted", null));
     }
 
+    private static WhseItemDetails details(String barcode, java.math.BigDecimal l, java.math.BigDecimal w, java.math.BigDecimal h,
+                                           java.math.BigDecimal kg, java.math.BigDecimal cost, java.math.BigDecimal min, java.math.BigDecimal max,
+                                           String temp, Boolean hazardous, Boolean fragile, Boolean stackable) {
+        return new WhseItemDetails(barcode, l, w, h, kg, cost, min, max, temp,
+                Boolean.TRUE.equals(hazardous), Boolean.TRUE.equals(fragile), stackable == null || stackable);
+    }
+
     private ItemResponse toResponse(WhseItem i) {
+        WhseItemDetails d = i.details();
         return new ItemResponse(i.getId(), i.getClientId(), i.getSku(), i.getDescription(), i.getUom(),
-                i.getStorageRatePerUnitPerMonth(), i.isActive());
+                i.getStorageRatePerUnitPerMonth(), i.isActive(),
+                d.barcode(), d.lengthMm(), d.widthMm(), d.heightMm(), d.volumeM3(), d.weightKg(), d.unitCost(), d.minQty(), d.maxQty(),
+                d.temperatureClass(), d.hazardous(), d.fragile(), d.stackable());
     }
 }

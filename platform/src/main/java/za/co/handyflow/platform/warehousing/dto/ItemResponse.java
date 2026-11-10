@@ -5,5 +5,8 @@ import java.util.UUID;
 
 public record ItemResponse(
         UUID id, UUID clientId, String sku, String description, String uom, BigDecimal storageRatePerUnitPerMonth,
-        boolean active
+        boolean active,
+        String barcode, BigDecimal lengthMm, BigDecimal widthMm, BigDecimal heightMm, BigDecimal volumeM3, BigDecimal weightKg,
+        BigDecimal unitCost, BigDecimal minQty, BigDecimal maxQty, String temperatureClass, boolean hazardous, boolean fragile,
+        boolean stackable
 ) {}
