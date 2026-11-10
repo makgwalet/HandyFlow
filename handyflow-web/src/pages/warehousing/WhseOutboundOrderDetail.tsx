@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, PackageCheck, XCircle, Download, Truck } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { WHSE_ACCENT } from "./constants"
+import { ErrorLine, fmtQty } from "./whseUi"
 
 interface OutboundOrderResponse {
   id: string; orderReference: string | null; shipToName: string | null; status: string
@@ -21,6 +22,8 @@ interface OutboundOrderResponse {
 }
 interface OutboundOrderLineResponse { id: string; orderId: string; itemId: string; locationId: string | null; qtyOrdered: number; qtyPicked: number; notes: string | null }
 interface ItemLite { id: string; sku: string }
+interface LotAllocation { id: string; lotNumber: string; expiryDate: string | null; locationCode: string; qty: number; status: string }
+interface TaskLite { id: string; status: string }
 
 const inputStyle: React.CSSProperties = { padding: "7px 10px", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12.5, boxSizing: "border-box", fontFamily: "inherit" }
 const btnStyle: React.CSSProperties = { display: "flex", alignItems: "center", gap: 6, border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }
@@ -43,7 +46,19 @@ export default function WhseOutboundOrderDetail({ orderId, clientId, items, onBa
     queryFn: async () => (await apiClient.get(`/api/v1/warehousing/outbound-orders/${orderId}/lines`)).data,
   })
 
+  const { data: allocations = [] } = useQuery<LotAllocation[]>({
+    queryKey: ["whse-outbound-lot-allocations", orderId],
+    queryFn: async () => (await apiClient.get(`/api/v1/warehousing/outbound-orders/${orderId}/lot-allocations`)).data,
+  })
+  const { data: pickTasks = [] } = useQuery<TaskLite[]>({
+    queryKey: ["whse-tasks-order", orderId],
+    queryFn: async () => (await apiClient.get(`/api/v1/warehousing/tasks?orderId=${orderId}&type=PICK`)).data,
+  })
+
   const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ["whse-outbound-lot-allocations", orderId] })
+    qc.invalidateQueries({ queryKey: ["whse-tasks-order", orderId] })
+    qc.invalidateQueries({ queryKey: ["whse-tasks"] })
     qc.invalidateQueries({ queryKey: ["whse-outbound-order", orderId] })
     qc.invalidateQueries({ queryKey: ["whse-outbound-order-lines", orderId] })
     qc.invalidateQueries({ queryKey: ["whse-outbound-orders", clientId] })
@@ -56,6 +71,7 @@ export default function WhseOutboundOrderDetail({ orderId, clientId, items, onBa
     mutationFn: async () => apiClient.post(`/api/v1/warehousing/outbound-orders/${orderId}/ship`, { carrier: carrier || null, trackingNumber: trackingNumber || null }),
     onSuccess: () => { invalidateAll(); setShowShipForm(false) },
   })
+  const reallocate = useMutation({ mutationFn: async () => apiClient.post(`/api/v1/warehousing/outbound-orders/${orderId}/reallocate-lots`), onSuccess: invalidateAll })
   const cancelOrder = useMutation({ mutationFn: async () => apiClient.post(`/api/v1/warehousing/outbound-orders/${orderId}/cancel`), onSuccess: invalidateAll })
   const markPicked = useMutation({
     mutationFn: async ({ lineId, qty }: { lineId: string; qty: number }) => apiClient.post(`/api/v1/warehousing/outbound-orders/${orderId}/lines/${lineId}/pick`, { qty }),
@@ -105,6 +121,10 @@ export default function WhseOutboundOrderDetail({ orderId, clientId, items, onBa
           )}
           {status === "PICKING" && (
             <>
+              {allocations.some(a => a.status === "ALLOCATED") && (
+                <button onClick={() => { if (confirm("Give back this order's lot allocations and allocate again, first expiry first? Its pick tasks are replaced.")) reallocate.mutate() }}
+                  style={{ ...btnStyle, background: "none", border: "1px solid var(--hf-border)", color: "var(--hf-text-muted)" }}>Re-allocate lots</button>
+              )}
               <button onClick={() => markPacked.mutate()} style={{ ...btnStyle, background: WHSE_ACCENT, color: "var(--hf-text-on-solid)" }}>Mark packed</button>
               <button onClick={() => { if (confirm("Cancel this order? Any allocated stock will be released.")) cancelOrder.mutate() }} style={{ ...btnStyle, background: "none", border: "1px solid var(--hf-danger-border)", color: "var(--hf-danger-text)" }}>
                 <XCircle size={13} /> Cancel
@@ -118,6 +138,13 @@ export default function WhseOutboundOrderDetail({ orderId, clientId, items, onBa
           )}
         </div>
       </div>
+
+      <ErrorLine error={startPicking.error ?? markPacked.error ?? markShipped.error ?? cancelOrder.error ?? reallocate.error} fallback="That step could not be done" />
+      {status === "PICKING" && pickTasks.some(t => ["OPEN", "IN_PROGRESS", "SHORT"].includes(t.status)) && (
+        <p style={{ fontSize: 12.5, color: "var(--hf-warning-text-deep)", margin: "0 0 12px" }}>
+          {pickTasks.filter(t => ["OPEN", "IN_PROGRESS", "SHORT"].includes(t.status)).length} pick task(s) are not finished. The order can be packed once they are done (see Tasks).
+        </p>
+      )}
 
       {showShipForm && (
         <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16, marginBottom: 18, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
@@ -156,8 +183,20 @@ export default function WhseOutboundOrderDetail({ orderId, clientId, items, onBa
       )}
       {status === "PICKING" && (
         <p style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 8 }}>
-          "Pick" tracks picking progress for staff — shipping the order always fulfils the full ordered quantity on every line, regardless of what's recorded picked here.
+          Picking is done from the Tasks section. "Pick" here only records progress by hand; shipping always sends the full allocated quantity.
         </p>
+      )}
+      {allocations.length > 0 && (
+        <div style={{ marginTop: 18 }}>
+          <p style={{ fontSize: 12.5, fontWeight: 700, color: "var(--hf-text)", margin: "0 0 8px" }}>Lots allocated (first expiry first)</p>
+          <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
+            {allocations.map((a, i) => (
+              <div key={a.id} style={{ padding: "9px 14px", fontSize: 12.5, borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)", opacity: a.status === "RELEASED" ? 0.55 : 1 }}>
+                lot <strong>{a.lotNumber}</strong>{a.expiryDate ? ` (exp ${a.expiryDate})` : ""} · {a.locationCode} · {fmtQty(a.qty)} · {a.status.toLowerCase()}
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   )

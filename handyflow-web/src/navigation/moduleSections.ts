@@ -794,6 +794,15 @@ export const WAREHOUSING_SECTIONS: ModuleSections = {
       ],
     },
     {
+      label: 'Operations',
+      sections: [
+        { id: 'tasks', label: 'Tasks', icon: ListChecks },
+        { id: 'inspection', label: 'Inspection', icon: ClipboardCheck },
+        { id: 'returns', label: 'Returns', icon: ArrowRightLeft },
+        { id: 'lots', label: 'Lots & expiry', icon: CalendarClock },
+      ],
+    },
+    {
       label: 'Controls',
       sections: [
         { id: 'approvals', label: 'Approvals', icon: ShieldCheck, anyPermission: ['WAREHOUSING_MANAGE', 'WAREHOUSING_ADMIN', 'WAREHOUSING_ADJUST_APPROVE'] },

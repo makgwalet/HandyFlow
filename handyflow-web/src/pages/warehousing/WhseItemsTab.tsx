@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, Package, X, Power, PowerOff, Trash2, Pencil } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
+import ItemTrackingModal from "./ItemTrackingModal"
 import { buildItemPayload, validateItemForm, TEMPERATURE_OPTIONS, ItemFormState } from "./itemForm"
 
 interface ItemResponse {
@@ -18,6 +19,7 @@ interface ItemResponse {
   barcode: string | null; lengthMm: number | null; widthMm: number | null; heightMm: number | null; volumeM3: number | null
   weightKg: number | null; unitCost: number | null; minQty: number | null; maxQty: number | null
   temperatureClass: string; hazardous: boolean; fragile: boolean; stackable: boolean
+  lotTracked?: boolean; expiryTracked?: boolean; minShelfLifeDays?: number | null
 }
 
 const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
@@ -110,6 +112,7 @@ export default function WhseItemsTab({ clientId }: { clientId: string }) {
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<ItemResponse | null>(null)
+  const [tracking, setTracking] = useState<ItemResponse | null>(null)
 
   const { data: items = [], isLoading } = useQuery<ItemResponse[]>({
     queryKey: ["whse-items", clientId],
@@ -154,6 +157,11 @@ export default function WhseItemsTab({ clientId }: { clientId: string }) {
                 <div>
                   <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{it.sku}</p>
                   <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>{it.description ?? "—"}{it.uom ? ` · ${it.uom}` : ""}{it.barcode ? ` · ${it.barcode}` : ""}</p>
+                  {it.lotTracked && (
+                    <p style={{ fontSize: 10.5, color: "var(--hf-text-muted)", margin: "2px 0 0" }}>
+                      lot tracked{it.expiryTracked ? `, expires${it.minShelfLifeDays ? ` (min ${it.minShelfLifeDays} days left to ship)` : ""}` : ""}
+                    </p>
+                  )}
                   {(it.hazardous || it.fragile || !it.stackable || it.temperatureClass !== "AMBIENT") && (
                     <p style={{ fontSize: 10.5, color: "var(--hf-text-muted)", margin: "2px 0 0" }}>
                       {[it.temperatureClass !== "AMBIENT" ? it.temperatureClass.replace("_", " ").toLowerCase() : null, it.hazardous ? "hazardous" : null, it.fragile ? "fragile" : null, !it.stackable ? "do not stack" : null].filter(Boolean).join(" · ")}
@@ -164,6 +172,7 @@ export default function WhseItemsTab({ clientId }: { clientId: string }) {
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 {it.unitCost != null && <span style={{ fontSize: 11.5, color: "var(--hf-text-muted)" }}>cost R{Number(it.unitCost).toFixed(2)}</span>}
                 {it.storageRatePerUnitPerMonth != null && <span style={{ fontSize: 11.5, color: "var(--hf-text-muted)" }}>R{Number(it.storageRatePerUnitPerMonth).toFixed(2)}/mo</span>}
+                <button onClick={() => setTracking(it)} title="Lot and expiry tracking" style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontSize: 11, color: "var(--hf-text-muted)" }}>Lots</button>
                 <button onClick={() => setEditing(it)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer" }}><Pencil size={12} style={{ color: 'var(--hf-text-muted)' }} /></button>
                 {it.active ? (
                   <button onClick={() => deactivate.mutate(it.id)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer" }}><PowerOff size={12} style={{ color: 'var(--hf-text-faint)' }} /></button>
@@ -179,6 +188,7 @@ export default function WhseItemsTab({ clientId }: { clientId: string }) {
 
       {showForm && <ItemFormModal clientId={clientId} onClose={() => setShowForm(false)} />}
       {editing && <ItemFormModal clientId={clientId} initial={editing} onClose={() => setEditing(null)} />}
+      {tracking && <ItemTrackingModal clientId={clientId} item={tracking} onClose={() => setTracking(null)} />}
     </div>
   )
 }
