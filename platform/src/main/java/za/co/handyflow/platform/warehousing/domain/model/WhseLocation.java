@@ -63,6 +63,9 @@ public class WhseLocation {
     @Column(name = "pick_sequence")
     private Integer pickSequence; // walking order for picking; lower comes first
 
+    @Column(name = "barcode")
+    private String barcode; // optional scannable label; the code itself also scans
+
     @Column(name = "pos_x")
     private Integer posX; // floor-grid cell; null = not placed on the map
 
@@ -123,6 +126,15 @@ public class WhseLocation {
         this.pickSequence = pickSequence;
         this.posX = posX;
         this.posY = posY;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Sets or clears the scannable barcode. No spaces, at most 60 characters. */
+    public void setBarcode(String value) {
+        String v = value == null ? null : value.trim();
+        if (v != null && v.isEmpty()) v = null;
+        if (v != null && (v.length() > 60 || v.matches(".*\\s.*"))) throw new IllegalArgumentException("A barcode has no spaces and is at most 60 characters.");
+        this.barcode = v;
         this.updatedAt = Instant.now();
     }
 

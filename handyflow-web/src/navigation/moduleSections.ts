@@ -22,7 +22,7 @@ import {
   Stethoscope, ListPlus, ArrowRightLeft, FileClock,
   Megaphone, Warehouse, Handshake, UserCog,
   Database, CalendarRange, MessageSquare, Send, BookOpen as BookIcon,
-  UserCheck, Palette, Headphones, Wallet, Receipt, CheckSquare, LayoutGrid, ListChecks, Sprout, FlaskConical,
+  UserCheck, Palette, Headphones, Wallet, Receipt, CheckSquare, LayoutGrid, ListChecks, ScanBarcode, Sprout, FlaskConical,
   Columns3, Zap, History, Plug, Filter, Copy, SlidersHorizontal, Tags, Target, Ruler,
   UserPlus, Mail, KeyRound,
 } from 'lucide-react'
@@ -796,6 +796,7 @@ export const WAREHOUSING_SECTIONS: ModuleSections = {
     {
       label: 'Operations',
       sections: [
+        { id: 'scan', label: 'Scan', icon: ScanBarcode },
         { id: 'tasks', label: 'Tasks', icon: ListChecks },
         { id: 'dispatch', label: 'Dispatch', icon: Truck },
         { id: 'inspection', label: 'Inspection', icon: ClipboardCheck },
