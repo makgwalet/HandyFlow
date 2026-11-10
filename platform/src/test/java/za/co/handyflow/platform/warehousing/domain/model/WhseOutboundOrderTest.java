@@ -72,4 +72,15 @@ class WhseOutboundOrderTest {
         order.markPacked();
         assertThrows(IllegalStateException.class, order::cancel);
     }
+
+    @org.junit.jupiter.api.Test
+    void backorderCountsAsShortAndCannotExceedTheOrder() {
+        var line = za.co.handyflow.platform.warehousing.domain.model.WhseOutboundOrderLine.create(java.util.UUID.randomUUID(), java.util.UUID.randomUUID(),
+                java.util.UUID.randomUUID(), new java.math.BigDecimal("10"), null);
+        line.backorder(new java.math.BigDecimal("4"));
+        org.junit.jupiter.api.Assertions.assertEquals(0, new java.math.BigDecimal("6").compareTo(line.qtyToShip()));
+        org.junit.jupiter.api.Assertions.assertEquals(0, new java.math.BigDecimal("4").compareTo(line.getQtyBackordered()));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> line.backorder(new java.math.BigDecimal("7")));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> line.backorder(java.math.BigDecimal.ZERO));
+    }
 }

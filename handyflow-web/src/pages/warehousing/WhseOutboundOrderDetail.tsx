@@ -22,7 +22,7 @@ interface OutboundOrderResponse {
   id: string; orderReference: string | null; shipToName: string | null; status: string
   requestedShipDate: string | null; shippedDate: string | null; carrier: string | null; trackingNumber: string | null
 }
-interface OutboundOrderLineResponse { id: string; orderId: string; itemId: string; locationId: string | null; qtyOrdered: number; qtyPicked: number; qtyShort?: number; notes: string | null }
+interface OutboundOrderLineResponse { id: string; orderId: string; itemId: string; locationId: string | null; qtyOrdered: number; qtyPicked: number; qtyShort?: number; qtyBackordered?: number; notes: string | null }
 interface ItemLite { id: string; sku: string }
 interface LotAllocation { id: string; lotNumber: string; expiryDate: string | null; locationCode: string; qty: number; status: string }
 interface TaskLite { id: string; status: string }
@@ -74,7 +74,8 @@ export default function WhseOutboundOrderDetail({ orderId, clientId, items, onBa
     qc.invalidateQueries({ queryKey: ["whse-inventory", clientId] })
   }
 
-  const startPicking = useMutation({ mutationFn: async () => apiClient.post(`/api/v1/warehousing/outbound-orders/${orderId}/start-picking`), onSuccess: invalidateAll })
+  const [allowPartial, setAllowPartial] = useState(false)
+  const startPicking = useMutation({ mutationFn: async () => apiClient.post(`/api/v1/warehousing/outbound-orders/${orderId}/start-picking${allowPartial ? "?allowPartial=true" : ""}`), onSuccess: invalidateAll })
   const markPacked = useMutation({ mutationFn: async () => apiClient.post(`/api/v1/warehousing/outbound-orders/${orderId}/pack`), onSuccess: invalidateAll })
   const markShipped = useMutation({
     mutationFn: async () => apiClient.post(`/api/v1/warehousing/outbound-orders/${orderId}/ship`, { carrier: carrier || null, trackingNumber: trackingNumber || null }),
@@ -122,6 +123,9 @@ export default function WhseOutboundOrderDetail({ orderId, clientId, items, onBa
           </button>
           {status === "PENDING" && (
             <>
+              <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--hf-text-muted)" }} title="If the stock cannot cover a line, allocate what there is and back-order the rest instead of refusing">
+                <input type="checkbox" checked={allowPartial} onChange={e => setAllowPartial(e.target.checked)} /> Ship what is available
+              </label>
               <button onClick={() => startPicking.mutate()} style={{ ...btnStyle, background: WHSE_ACCENT, color: "var(--hf-text-on-solid)" }}>Start picking</button>
               <button onClick={() => { if (confirm("Cancel this order?")) cancelOrder.mutate() }} style={{ ...btnStyle, background: "none", border: "1px solid var(--hf-danger-border)", color: "var(--hf-danger-text)" }}>
                 <XCircle size={13} /> Cancel
@@ -182,7 +186,7 @@ export default function WhseOutboundOrderDetail({ orderId, clientId, items, onBa
             <div key={line.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div>
                 <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{skuOf(line.itemId)}</p>
-                <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>{line.qtyPicked} / {line.qtyOrdered} picked{(line.qtyShort ?? 0) > 0 ? ` · ${line.qtyShort} short, will not ship` : ""}{line.notes ? ` · ${line.notes}` : ""}</p>
+                <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>{line.qtyPicked} / {line.qtyOrdered} picked{(line.qtyBackordered ?? 0) > 0 ? ` · ${line.qtyBackordered} back-ordered (no stock), will not ship` : ""}{(line.qtyShort ?? 0) - (line.qtyBackordered ?? 0) > 0 ? ` · ${(line.qtyShort ?? 0) - (line.qtyBackordered ?? 0)} short, will not ship` : ""}{line.notes ? ` · ${line.notes}` : ""}</p>
               </div>
               {status === "PICKING" && line.qtyPicked < line.qtyOrdered - (line.qtyShort ?? 0) && (
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>

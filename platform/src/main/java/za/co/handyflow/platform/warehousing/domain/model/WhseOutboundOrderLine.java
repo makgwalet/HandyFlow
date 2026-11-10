@@ -42,6 +42,10 @@ public class WhseOutboundOrderLine {
     @Column(name = "qty_short", nullable = false, precision = 12, scale = 3)
     private BigDecimal qtyShort = BigDecimal.ZERO;
 
+    /** The part of {@link #qtyShort} that was never allocated because the stock was not there when picking started. */
+    @Column(name = "qty_backordered", nullable = false, precision = 12, scale = 3)
+    private BigDecimal qtyBackordered = BigDecimal.ZERO;
+
     @Column(name = "notes")
     private String notes;
 
@@ -62,6 +66,14 @@ public class WhseOutboundOrderLine {
 
     public void allocate(UUID locationId) {
         this.locationId = locationId;
+    }
+
+    /** Records quantity that could not be allocated: it will not ship on this order. */
+    public void backorder(BigDecimal qty) {
+        if (qty == null || qty.signum() <= 0) throw new IllegalArgumentException("qty must be positive");
+        if (qtyShort.add(qty).compareTo(qtyOrdered) > 0) throw new IllegalStateException("Cannot back-order more than was ordered");
+        this.qtyShort = qtyShort.add(qty);
+        this.qtyBackordered = qtyBackordered.add(qty);
     }
 
     public void markPicked(BigDecimal qty) {

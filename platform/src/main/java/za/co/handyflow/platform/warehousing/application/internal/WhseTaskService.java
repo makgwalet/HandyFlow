@@ -321,8 +321,10 @@ public class WhseTaskService {
         String note = reason.trim();
         String resolution;
 
-        if (lot != null) {
-            List<Object[]> alloc = jdbc.query("SELECT id, inventory_id, qty FROM whse_order_lot_allocations WHERE tenant_id = ? AND order_line_id = ? AND location_id = ? AND lot_id = ? AND status = 'ALLOCATED' FOR UPDATE",
+        // A line split across locations has allocation rows but no lot; it is resolved through them like a lot-tracked line.
+        boolean viaAllocations = lot != null || lotAllocation.hasAllocations(t, lineId);
+        if (viaAllocations) {
+            List<Object[]> alloc = jdbc.query("SELECT id, inventory_id, qty FROM whse_order_lot_allocations WHERE tenant_id = ? AND order_line_id = ? AND location_id = ? AND lot_id IS NOT DISTINCT FROM ? AND status = 'ALLOCATED' FOR UPDATE",
                     (rs, n) -> new Object[]{rs.getObject(1, UUID.class), rs.getObject(2, UUID.class), rs.getBigDecimal(3)}, t, lineId, from, lot);
             if (alloc.isEmpty()) throw new IllegalStateException("This pick's allocation is no longer open, so it cannot be resolved. Re-allocate the order's lots.");
             Object[] a = alloc.get(0);
@@ -338,7 +340,8 @@ public class WhseTaskService {
                 // Positions this line already uses (including the one that came up short) are not offered again.
                 java.util.Set<UUID> used = new java.util.HashSet<>(jdbc.query("SELECT DISTINCT inventory_id FROM whse_order_lot_allocations WHERE tenant_id = ? AND order_line_id = ?",
                         (rs, n) -> rs.getObject(1, UUID.class), t, lineId));
-                lotAllocation.allocate(tenantId, orderId, ref, lineId, client, item, shortfall, user, used);
+                if (lot != null) lotAllocation.allocate(tenantId, orderId, ref, lineId, client, item, shortfall, user, used);
+                else lotAllocation.allocateSplit(tenantId, orderId, ref, lineId, client, item, shortfall, user, false, used);
                 jdbc.update("""
                         INSERT INTO whse_tasks (id, tenant_id, task_type, priority, client_id, item_id, lot_id, from_location_id, qty, pick_sequence,
                                                 reference_type, reference_id, reference_number, order_line_id)
@@ -346,7 +349,7 @@ public class WhseTaskService {
                           FROM whse_order_lot_allocations a JOIN whse_locations loc ON loc.id = a.location_id
                          WHERE a.tenant_id = ? AND a.order_line_id = ? AND a.status = 'ALLOCATED'
                            AND NOT EXISTS (SELECT 1 FROM whse_tasks k WHERE k.order_line_id = a.order_line_id AND k.task_type = 'PICK' AND k.status <> 'CANCELLED'
-                                              AND k.from_location_id = a.location_id AND k.lot_id = a.lot_id)""",
+                                              AND k.from_location_id = a.location_id AND k.lot_id IS NOT DISTINCT FROM a.lot_id)""",
                         priority, client, item, ref, t, lineId);
             }
         } else if (SHIP_SHORT.equals(action)) {

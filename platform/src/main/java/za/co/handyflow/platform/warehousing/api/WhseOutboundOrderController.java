@@ -93,10 +93,11 @@ public class WhseOutboundOrderController {
     @PostMapping("/outbound-orders/{id}/start-picking")
     @PreAuthorize("hasAnyAuthority('WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
     @Operation(summary = "Move to PICKING and allocate stock for every line")
-    public ResponseEntity<ApiResponse<OutboundOrderResponse>> startPicking(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<OutboundOrderResponse>> startPicking(@PathVariable UUID id,
+            @RequestParam(defaultValue = "false") boolean allowPartial) {
         featureGuard.requireModule("warehousing");
         return ResponseEntity.ok(ApiResponse.success("Picking started",
-                toResponse(orderService.startPicking(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId()))));
+                toResponse(orderService.startPicking(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId(), allowPartial))));
     }
 
     @PostMapping("/outbound-orders/{id}/lines/{lineId}/pick")
@@ -213,6 +214,6 @@ public class WhseOutboundOrderController {
 
     private OutboundOrderLineResponse toLineResponse(WhseOutboundOrderLine l) {
         return new OutboundOrderLineResponse(l.getId(), l.getOrderId(), l.getItemId(), l.getLocationId(),
-                l.getQtyOrdered(), l.getQtyPicked(), l.getNotes(), l.isFullyPicked(), l.getQtyShort());
+                l.getQtyOrdered(), l.getQtyPicked(), l.getNotes(), l.isFullyPicked(), l.getQtyShort(), l.getQtyBackordered());
     }
 }

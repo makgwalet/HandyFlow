@@ -114,4 +114,65 @@ class WhseLotAllocationServiceTest {
         verify(inventory, times(2)).deallocateById(eq(t()), any(UUID.class), any(BigDecimal.class), eq("OUTBOUND_ORDER"), eq(order), eq("OUT-1"), eq(user));
         verify(jdbc, times(2)).update(contains("SET status = 'RELEASED'"), any(Object[].class));
     }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void plainPositions(WhseSplitPlan.Source... ss) {
+        when(jdbc.query(contains("i.lot_id IS NULL"), any(RowMapper.class), any(Object[].class))).thenReturn(List.of(ss));
+    }
+
+    @Test @DisplayName("a line no single location covers is split, one allocation row per piece with no lot")
+    void splitsAcrossLocations() {
+        WhseSplitPlan.Source big = new WhseSplitPlan.Source(UUID.randomUUID(), UUID.randomUUID(), 1, new BigDecimal("6"));
+        WhseSplitPlan.Source small = new WhseSplitPlan.Source(UUID.randomUUID(), UUID.randomUUID(), 2, new BigDecimal("3"));
+        plainPositions(small, big);
+        WhseLotAllocationService.Split r = service.allocateSplit(t(), order, "OUT-1", line, client, item, new BigDecimal("9"), user, false, java.util.Set.of());
+        assertEquals(big.locationId(), r.firstLocationId());
+        assertEquals(0, r.unallocated().signum());
+        verify(inventory).allocateById(eq(t()), eq(big.inventoryId()), eq(new BigDecimal("6")), eq("OUTBOUND_ORDER"), eq(order), eq("OUT-1"), eq(user));
+        verify(inventory).allocateById(eq(t()), eq(small.inventoryId()), eq(new BigDecimal("3")), eq("OUTBOUND_ORDER"), eq(order), eq("OUT-1"), eq(user));
+        verify(jdbc, times(2)).update(contains("INSERT INTO whse_order_lot_allocations"), any(Object[].class));
+    }
+
+    @Test @DisplayName("without partial allowed a shortage allocates nothing")
+    void splitShortageFails() {
+        plainPositions(new WhseSplitPlan.Source(UUID.randomUUID(), UUID.randomUUID(), 1, new BigDecimal("4")));
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> service.allocateSplit(t(), order, "OUT-1", line, client, item, new BigDecimal("9"), user, false, java.util.Set.of()));
+        assertTrue(e.getMessage().contains("only 4"));
+        verifyNoInteractions(inventory);
+    }
+
+    @Test @DisplayName("with partial allowed the stock there is gets allocated and the rest is reported")
+    void splitPartial() {
+        plainPositions(new WhseSplitPlan.Source(UUID.randomUUID(), UUID.randomUUID(), 1, new BigDecimal("4")));
+        WhseLotAllocationService.Split r = service.allocateSplit(t(), order, "OUT-1", line, client, item, new BigDecimal("9"), user, true, java.util.Set.of());
+        assertEquals(0, new BigDecimal("4").compareTo(r.allocated()));
+        assertEquals(0, new BigDecimal("5").compareTo(r.unallocated()));
+    }
+
+    @Test @DisplayName("with partial allowed and no stock at all nothing is allocated")
+    void splitNothing() {
+        plainPositions();
+        WhseLotAllocationService.Split r = service.allocateSplit(t(), order, "OUT-1", line, client, item, new BigDecimal("9"), user, true, java.util.Set.of());
+        assertNull(r.firstLocationId());
+        assertEquals(0, new BigDecimal("9").compareTo(r.unallocated()));
+        verifyNoInteractions(inventory);
+    }
+
+    @Test @DisplayName("excluded positions are not offered again")
+    void splitExcludes() {
+        WhseSplitPlan.Source used = new WhseSplitPlan.Source(UUID.randomUUID(), UUID.randomUUID(), 1, new BigDecimal("9"));
+        plainPositions(used);
+        assertThrows(IllegalStateException.class,
+                () -> service.allocateSplit(t(), order, "OUT-1", line, client, item, new BigDecimal("2"), user, false, java.util.Set.of(used.inventoryId())));
+    }
+
+    @Test @DisplayName("lot-tracked partial allocation takes the sellable lots and reports the rest")
+    void lotPartial() {
+        WhseFefo.Candidate a = cand("A", today().plusDays(20), false, "3");
+        candidates(a, cand("BLK", today().plusDays(5), true, "40"));
+        WhseLotAllocationService.Split r = service.allocateUpTo(t(), order, "OUT-1", line, client, item, new BigDecimal("8"), user);
+        assertEquals(a.locationId(), r.firstLocationId());
+        assertEquals(0, new BigDecimal("5").compareTo(r.unallocated()));
+    }
 }

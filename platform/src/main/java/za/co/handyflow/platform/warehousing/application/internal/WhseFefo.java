@@ -54,5 +54,25 @@ public final class WhseFefo {
         return picks;
     }
 
+    /** As {@link #plan}, but takes what it can: a shortage is not an error. Returns the picks (possibly none); the caller works out the rest. */
+    public static List<Pick> planUpTo(List<Candidate> candidates, BigDecimal required, LocalDate today, Integer minShelfLifeDays) {
+        if (required == null || required.signum() <= 0) throw new IllegalArgumentException("The quantity to allocate must be above zero.");
+        List<Candidate> usable = new ArrayList<>(candidates.stream()
+                .filter(c -> c.available() != null && c.available().signum() > 0 && !c.blocked() && WhseLotRules.sellable(c.expiry(), today, minShelfLifeDays)).toList());
+        usable.sort(Comparator
+                .comparing(Candidate::expiry, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(c -> c.lotNumber() == null ? "" : c.lotNumber())
+                .thenComparing(c -> c.inventoryId().toString()));
+        List<Pick> picks = new ArrayList<>();
+        BigDecimal left = required;
+        for (Candidate c : usable) {
+            if (left.signum() == 0) break;
+            BigDecimal take = c.available().min(left);
+            picks.add(new Pick(c, take));
+            left = left.subtract(take);
+        }
+        return picks;
+    }
+
     private static String plain(BigDecimal v) { return v.stripTrailingZeros().toPlainString(); }
 }

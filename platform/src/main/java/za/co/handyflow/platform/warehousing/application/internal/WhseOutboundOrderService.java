@@ -80,6 +80,16 @@ public class WhseOutboundOrderService {
 
     @Transactional
     public WhseOutboundOrder startPicking(TenantId tenantId, UUID orderId, UUID recordedBy) {
+        return startPicking(tenantId, orderId, recordedBy, false);
+    }
+
+    /**
+     * Starts picking. A line of an item that is not lot tracked is taken from one location when one holds it all, otherwise it is split across
+     * locations (biggest positions first). With {@code allowPartial}, a line the stock cannot cover in full is allocated what there is and the rest
+     * is back-ordered; without it, any shortage fails the whole start and nothing is allocated. An order with nothing to allocate at all fails either way.
+     */
+    @Transactional
+    public WhseOutboundOrder startPicking(TenantId tenantId, UUID orderId, UUID recordedBy, boolean allowPartial) {
         WhseOutboundOrder order = findActive(tenantId, orderId);
         order.startPicking();
 
@@ -87,8 +97,15 @@ public class WhseOutboundOrderService {
         for (WhseOutboundOrderLine line : lines) {
             if (lotAllocation.isLotTracked(tenantId.getValue(), line.getItemId())) {
                 // Lot-tracked items are allocated lot by lot, first expiry first, possibly across several locations.
-                line.allocate(lotAllocation.allocate(tenantId, order.getId(), order.getOrderReference(), line.getId(), order.getClientId(),
-                        line.getItemId(), line.getQtyOrdered(), recordedBy));
+                if (!allowPartial) {
+                    line.allocate(lotAllocation.allocate(tenantId, order.getId(), order.getOrderReference(), line.getId(), order.getClientId(),
+                            line.getItemId(), line.getQtyOrdered(), recordedBy));
+                } else {
+                    WhseLotAllocationService.Split split = lotAllocation.allocateUpTo(tenantId, order.getId(), order.getOrderReference(), line.getId(),
+                            order.getClientId(), line.getItemId(), line.getQtyOrdered(), recordedBy);
+                    if (split.firstLocationId() != null) line.allocate(split.firstLocationId());
+                    if (split.unallocated().signum() > 0) line.backorder(split.unallocated());
+                }
                 lineRepository.save(line);
                 continue;
             }
@@ -97,13 +114,21 @@ public class WhseOutboundOrderService {
             WhseInventory best = positions.stream()
                     .filter(p -> p.available().compareTo(line.getQtyOrdered()) >= 0)
                     .findFirst()
-                    .orElseThrow(() -> new IllegalStateException(
-                            "Insufficient available stock for item " + line.getItemId() + " — required "
-                                    + line.getQtyOrdered() + ", no single location can cover it in full"));
-            inventoryService.allocateStock(tenantId, order.getClientId(), line.getItemId(), best.getLocationId(),
-                    line.getQtyOrdered(), "OUTBOUND_ORDER", order.getId(), order.getOrderReference(), recordedBy);
-            line.allocate(best.getLocationId());
+                    .orElse(null);
+            if (best != null) {
+                inventoryService.allocateStock(tenantId, order.getClientId(), line.getItemId(), best.getLocationId(),
+                        line.getQtyOrdered(), "OUTBOUND_ORDER", order.getId(), order.getOrderReference(), recordedBy);
+                line.allocate(best.getLocationId());
+            } else {
+                WhseLotAllocationService.Split split = lotAllocation.allocateSplit(tenantId, order.getId(), order.getOrderReference(), line.getId(),
+                        order.getClientId(), line.getItemId(), line.getQtyOrdered(), recordedBy, allowPartial, java.util.Set.of());
+                if (split.firstLocationId() != null) line.allocate(split.firstLocationId());
+                if (split.unallocated().signum() > 0) line.backorder(split.unallocated());
+            }
             lineRepository.save(line);
+        }
+        if (lines.stream().allMatch(l -> l.qtyToShip().signum() == 0)) {
+            throw new IllegalStateException("No stock is available for any line of this order, so picking cannot start.");
         }
         // The pick tasks are built from the lines' locations and the lot allocations, so the lines must be written first.
         lineRepository.flush();
@@ -154,14 +179,14 @@ public class WhseOutboundOrderService {
         // Lot-tracked lines ship from their lot allocations, one PICK movement per lot.
         lotAllocation.fulfil(tenantId, order.getId(), order.getOrderReference(), recordedBy);
         for (WhseOutboundOrderLine line : lines) {
+            if (line.qtyToShip().signum() == 0) continue; // given up entirely after a short pick, or all back-ordered
             if (line.getLocationId() == null) {
                 throw new IllegalStateException(
                         "Line " + line.getId() + " was never allocated a location — cannot ship");
             }
-            if (lotAllocation.isLotTracked(tenantId.getValue(), line.getItemId())) {
-                continue;
+            if (lotAllocation.isLotTracked(tenantId.getValue(), line.getItemId()) || lotAllocation.hasAllocations(tenantId.getValue(), line.getId())) {
+                continue; // shipped from its allocation rows above
             }
-            if (line.qtyToShip().signum() == 0) continue; // given up entirely after a short pick
             inventoryService.fulfillPick(tenantId, order.getClientId(), line.getItemId(), line.getLocationId(),
                     line.qtyToShip(), "OUTBOUND_ORDER", order.getId(), order.getOrderReference(), recordedBy);
         }
@@ -206,7 +231,8 @@ public class WhseOutboundOrderService {
             taskService.cancelPickTasks(tenantId, order.getId(), "Order cancelled");
             List<WhseOutboundOrderLine> lines = lineRepository.findByOrder(tenantId.getValue(), orderId);
             for (WhseOutboundOrderLine line : lines) {
-                if (line.getLocationId() != null && line.qtyToShip().signum() > 0 && !lotAllocation.isLotTracked(tenantId.getValue(), line.getItemId())) {
+                if (line.getLocationId() != null && line.qtyToShip().signum() > 0 && !lotAllocation.isLotTracked(tenantId.getValue(), line.getItemId())
+                        && !lotAllocation.hasAllocations(tenantId.getValue(), line.getId())) {
                     inventoryService.deallocateStock(tenantId, order.getClientId(), line.getItemId(),
                             line.getLocationId(), line.qtyToShip(), "OUTBOUND_ORDER", order.getId(),
                             order.getOrderReference(), recordedBy);

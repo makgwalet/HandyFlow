@@ -72,4 +72,13 @@ class WhseFefoTest {
     void zeroQty() {
         assertThrows(IllegalArgumentException.class, () -> WhseFefo.plan(List.of(), BigDecimal.ZERO, TODAY, null));
     }
+
+    @Test @DisplayName("planUpTo takes what is sellable and skips blocked lots without failing")
+    void upTo() {
+        List<Pick> p = WhseFefo.planUpTo(List.of(c("A", TODAY.plusDays(30), false, "4"), c("BLK", TODAY.plusDays(10), true, "50")), bd("10"), TODAY, null);
+        assertEquals(1, p.size());
+        assertEquals("A", p.get(0).source().lotNumber());
+        assertEquals(0, bd("4").compareTo(p.get(0).qty()));
+        assertTrue(WhseFefo.planUpTo(List.of(), bd("1"), TODAY, null).isEmpty());
+    }
 }
