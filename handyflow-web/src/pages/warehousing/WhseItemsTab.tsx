@@ -11,7 +11,7 @@ import { Plus, Package, X, Power, PowerOff, Trash2, Pencil } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
 import ItemTrackingModal from "./ItemTrackingModal"
-import { buildItemPayload, validateItemForm, TEMPERATURE_OPTIONS, CURRENCY_OPTIONS, formatMoney, ItemFormState } from "./itemForm"
+import { buildItemPayload, validateItemForm, TEMPERATURE_OPTIONS, CURRENCY_OPTIONS, formatMoney, type ItemFormState } from "./itemForm"
 
 interface ItemResponse {
   id: string; clientId: string; sku: string; description: string | null; uom: string | null

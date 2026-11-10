@@ -129,7 +129,7 @@ class WhseTariffApprovalServiceTest {
     @DisplayName("a sole approver may apply their own request and it is recorded as an exception")
     void soleApproverException() {
         locked("TARIFF", maker, "PENDING");
-        when(duties.otherHolders(t(), WhseTariffApprovalService.PERMISSION, maker)).thenReturn(0);
+        when(duties.otherHolders(t(), WhseTariffApprovalService.PERMISSION, maker)).thenReturn(0L);
         service.approve(t(), requestId, null, maker);
         verify(jdbc).update(contains("status = 'APPLIED'"), eq(maker), isNull(), eq(true), any(), eq(requestId));
     }

@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { btnGhost, btnPrimary, ErrorLine, inputStyle, labelStyle, Modal } from "./whseUi"
-import { buildTrackingPayload, TrackingForm, validateTracking } from "./receiving"
+import { buildTrackingPayload, type TrackingForm, validateTracking } from "./receiving"
 
 export default function ItemTrackingModal({ clientId, item, onClose }: {
   clientId: string; item: { id: string; sku: string; lotTracked?: boolean; expiryTracked?: boolean; minShelfLifeDays?: number | null }; onClose: () => void

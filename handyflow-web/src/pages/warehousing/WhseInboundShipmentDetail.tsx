@@ -9,7 +9,7 @@ import { ArrowLeft, PackageCheck, XCircle, Plus } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { WHSE_ACCENT } from "./constants"
 import { btnDanger, btnGhost, btnPrimary, Chip, ErrorLine, fmtQty, inputStyle, labelStyle, today } from "./whseUi"
-import { buildReceiptPayload, emptyReceipt, ReceiptForm, shelfLifeWarning, Tracking, validateClose, validateReceipt } from "./receiving"
+import { buildReceiptPayload, emptyReceipt, type ReceiptForm, shelfLifeWarning, type Tracking, validateClose, validateReceipt } from "./receiving"
 
 interface InboundShipmentResponse { id: string; referenceNumber: string | null; expectedDate: string | null; receivedDate: string | null; status: string; notes: string | null }
 interface InboundShipmentLineResponse { id: string; shipmentId: string; itemId: string; expectedQty: number; qtyReceived: number; notes: string | null }

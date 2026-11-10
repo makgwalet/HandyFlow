@@ -9,7 +9,6 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, Download, Plus, Truck, X, Check, Upload } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { WHSE_ACCENT } from "./constants"
 import { Chip, ErrorLine, Modal, ReasonModal, btnDanger, btnGhost, btnPrimary, card, inputStyle, labelStyle } from "./whseUi"
 
 interface ManifestRow {

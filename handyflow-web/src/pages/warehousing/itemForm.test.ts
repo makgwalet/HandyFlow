@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { buildItemPayload, formatMoney, isValidGtin, validateItemForm, ItemFormState } from "./itemForm"
+import { buildItemPayload, formatMoney, isValidGtin, validateItemForm, type ItemFormState } from "./itemForm"
 
 const base: ItemFormState = {
   sku: "A1", description: "Widget", uom: "each", storageRate: "", barcode: "", lengthMm: "", widthMm: "", heightMm: "", weightKg: "",

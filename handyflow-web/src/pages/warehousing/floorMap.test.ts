@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { band, bounds, buildGeneratePayload, expiresSoon, FloorLocation, GenerateForm, groupCells, parseAisles, validateGenerate } from "./floorMap"
+import { band, bounds, buildGeneratePayload, expiresSoon, type FloorLocation, type GenerateForm, groupCells, parseAisles, validateGenerate } from "./floorMap"
 
 const loc = (o: Partial<FloorLocation>): FloorLocation => ({
   id: Math.random().toString(), code: "A-01-01", zone: "Z", aisle: "A", bay: 1, level: 1, locationType: "BIN", pickSequence: 1, posX: 0, posY: 0,

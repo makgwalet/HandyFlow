@@ -8,7 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, Plus } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { btnDanger, btnGhost, btnPrimary, card, Chip, ErrorLine, fmtQty, inputStyle, labelStyle, Modal } from "./whseUi"
-import { buildReturnReceivePayload, emptyReturnReceive, ReturnLineForm, ReturnReceiveForm, Tracking, validateNewReturn, validateReturnReceive } from "./receiving"
+import { buildReturnReceivePayload, emptyReturnReceive, type ReturnLineForm, type ReturnReceiveForm, type Tracking, validateNewReturn, validateReturnReceive } from "./receiving"
 
 interface ReturnRow { id: string; rmaNumber: string; clientName: string; clientId: string; orderReference: string | null; status: string; reason: string; closeNote: string | null; createdAt: string }
 interface LineRow { id: string; itemId: string; sku: string; description: string | null; expectedQty: number; restocked: number; held: number; damaged: number; received: number; maxReturnable: number }

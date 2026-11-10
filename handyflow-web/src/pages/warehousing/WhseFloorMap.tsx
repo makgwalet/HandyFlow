@@ -9,7 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Plus, X } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
-import { Band, band, bounds, buildGeneratePayload, Cell, expiresSoon, FloorLocation, GenerateForm, groupCells, validateGenerate } from "./floorMap"
+import { type Band, band, bounds, buildGeneratePayload, type Cell, expiresSoon, type FloorLocation, type GenerateForm, groupCells, validateGenerate } from "./floorMap"
 
 interface FloorMapData { locations: FloorLocation[]; placed: number; unplaced: number }
 interface PreviewSlot { slot: { code: string; x: number; y: number; level: number }; conflict: string | null }
