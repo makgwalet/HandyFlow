@@ -61,7 +61,7 @@ public class WhseItem {
     private BigDecimal weightKg;
     @Column(name = "unit_cost", precision = 14, scale = 4)
     private BigDecimal unitCost;
-    @Column(name = "unit_cost_currency", nullable = false, length = 3, columnDefinition = "char(3)")
+    @Column(name = "unit_cost_currency", nullable = false, length = 3)
     private String unitCostCurrency = "ZAR";
     @Column(name = "min_qty", precision = 12, scale = 3)
     private BigDecimal minQty;
