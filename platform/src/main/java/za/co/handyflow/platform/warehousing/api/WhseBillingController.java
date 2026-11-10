@@ -114,6 +114,22 @@ public class WhseBillingController {
                 toResponse(billingService.recordPayment(TenantContext.getTenantIdAsObject(), id, req.amount()))));
     }
 
+    @GetMapping(value = "/billing-invoices/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAnyAuthority('WAREHOUSING_READ','WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
+    @Operation(summary = "The invoice as a PDF, with any contract-minimum top-up shown as its own line")
+    public ResponseEntity<byte[]> invoicePdf(@PathVariable UUID id) {
+        featureGuard.requireModule("warehousing");
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        WhseBillingInvoice invoice = billingService.get(tenantId, id);
+        WhseClient client = clientService.get(tenantId, invoice.getClientId());
+        WhseProfile profile = profileService.get(tenantId);
+        byte[] pdf = pdfService.generateBillingInvoice(profile != null ? profile.getWarehouseName() : null,
+                profile != null ? profile.getRegistrationNumber() : null, client, invoice);
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"invoice-" + invoice.getInvoiceNumber() + ".pdf\"")
+                .body(pdf);
+    }
+
     @GetMapping(value = "/clients/{clientId}/inventory-statement/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     @PreAuthorize("hasAnyAuthority('WAREHOUSING_READ','WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
     @Operation(summary = "Export the client's current inventory statement as a PDF")

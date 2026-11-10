@@ -149,6 +149,15 @@ describe("invoice approval", () => {
     expect(screen.getByText(/You prepared this invoice/)).toBeTruthy()
   })
 
+  it("downloads the invoice PDF from its own endpoint", async () => {
+    withInvoice("SENT")
+    const createObjectURL = vi.fn(() => "blob:x"); const revokeObjectURL = vi.fn()
+    Object.assign(window.URL, { createObjectURL, revokeObjectURL })
+    wrap(<WhseBillingInvoicesTab clientId="c1" />)
+    fireEvent.click(await screen.findByTitle("Download invoice PDF"))
+    await waitFor(() => expect(get).toHaveBeenCalledWith(expect.stringMatching(/\/billing-invoices\/[^/]+\/pdf$/), { responseType: "blob" }))
+  })
+
   it("a rejected invoice is shown as rejected", async () => {
     withInvoice("REJECTED")
     wrap(<WhseBillingInvoicesTab clientId="c1" />)

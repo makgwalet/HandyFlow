@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import za.co.handyflow.platform.warehousing.domain.model.WhseClient;
 import za.co.handyflow.platform.warehousing.domain.model.WhseInventory;
 import za.co.handyflow.platform.warehousing.domain.model.WhseItem;
+import za.co.handyflow.platform.warehousing.domain.model.WhseBillingInvoice;
 import za.co.handyflow.platform.warehousing.domain.model.WhseLocation;
 import za.co.handyflow.platform.warehousing.domain.model.WhseOutboundOrder;
 import za.co.handyflow.platform.warehousing.domain.model.WhseOutboundOrderLine;
@@ -25,6 +26,8 @@ import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -186,6 +189,107 @@ public class WhsePdfService {
         } catch (Exception e) {
             log.error("Failed to generate packing slip for order {}: {}", order.getId(), e.getMessage(), e);
             throw new RuntimeException("Failed to generate packing slip", e);
+        }
+    }
+
+    /** One row of the invoice's amounts table. {@code emphasis} rows (totals) are drawn bold. */
+    record InvoiceLine(String label, BigDecimal amount, boolean emphasis) {}
+
+    /**
+     * The amounts on an invoice, in order. The storage fee is shown as stored goods plus, when the contract minimum
+     * lifted it, a separate "minimum charge top-up" line, so the client can see why storage is more than the goods held.
+     */
+    static List<InvoiceLine> invoiceLines(WhseBillingInvoice inv) {
+        BigDecimal topUp = inv.getStorageMinimumTopup() == null ? BigDecimal.ZERO : inv.getStorageMinimumTopup();
+        List<InvoiceLine> lines = new ArrayList<>();
+        if (topUp.signum() > 0) {
+            lines.add(new InvoiceLine("Storage of goods held", inv.getStorageFee().subtract(topUp), false));
+            lines.add(new InvoiceLine("Storage minimum charge top-up (contract minimum)", topUp, false));
+        } else {
+            lines.add(new InvoiceLine("Storage", inv.getStorageFee(), false));
+        }
+        lines.add(new InvoiceLine("Handling", inv.getHandlingFee(), false));
+        lines.add(new InvoiceLine("Subtotal", inv.getSubtotal(), true));
+        lines.add(new InvoiceLine("VAT", inv.getVatAmount(), false));
+        lines.add(new InvoiceLine("Total", inv.getTotal(), true));
+        BigDecimal paid = inv.getAmountPaid() == null ? BigDecimal.ZERO : inv.getAmountPaid();
+        if (paid.signum() > 0) {
+            lines.add(new InvoiceLine("Paid", paid, false));
+            lines.add(new InvoiceLine("Balance due", inv.getTotal().subtract(paid), true));
+        }
+        return lines;
+    }
+
+    public byte[] generateBillingInvoice(String warehouseName, String warehouseRegistration, WhseClient client, WhseBillingInvoice inv) {
+        Document doc = new Document(PageSize.A4, 50, 50, 60, 50);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+            PdfWriter writer = PdfWriter.getInstance(doc, out);
+            String title = "Invoice " + nullSafe(inv.getInvoiceNumber());
+            writer.setPageEvent(new FooterHandler(title));
+            doc.open();
+
+            PdfPTable header = new PdfPTable(1);
+            header.setWidthPercentage(100);
+            PdfPCell headerCell = new PdfPCell();
+            headerCell.setBackgroundColor(BRAND_COLOR);
+            headerCell.setPadding(12);
+            headerCell.setBorder(0);
+            headerCell.addElement(new Paragraph(title, TITLE_FONT));
+            headerCell.addElement(new Paragraph((warehouseName != null ? warehouseName : "HandyFlow")
+                    + (warehouseRegistration != null && !warehouseRegistration.isBlank() ? " · Reg " + warehouseRegistration : ""), SUBTITLE_FONT));
+            header.addCell(headerCell);
+            doc.add(header);
+            doc.add(new Paragraph(" "));
+
+            if ("DRAFT".equals(inv.getStatus()) || "REJECTED".equals(inv.getStatus())) {
+                // Not an issued tax document until a second person has approved it.
+                doc.add(new Paragraph(("REJECTED".equals(inv.getStatus()) ? "REJECTED" : "DRAFT") + " — NOT YET APPROVED, NOT A TAX INVOICE",
+                        FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11, new Color(180, 40, 40))));
+                doc.add(new Paragraph(" "));
+            }
+
+            doc.add(new Paragraph("Billed to", SECTION_FONT));
+            doc.add(new Paragraph(nullSafe(client.getTradingName()), BODY_BOLD_FONT));
+            if (client.getRegistrationNumber() != null) doc.add(new Paragraph("Reg " + client.getRegistrationNumber(), BODY_FONT));
+            if (client.getAddress() != null) doc.add(new Paragraph(client.getAddress(), BODY_FONT));
+            doc.add(new Paragraph(" "));
+
+            doc.add(new Paragraph("Invoice date: " + inv.getInvoiceDate().format(DATE_FMT), BODY_FONT));
+            doc.add(new Paragraph("Period: " + inv.getPeriodStart().format(DATE_FMT) + " to " + inv.getPeriodEnd().format(DATE_FMT), BODY_FONT));
+            doc.add(new Paragraph("Due: " + inv.getDueDate().format(DATE_FMT), BODY_FONT));
+            doc.add(new Paragraph(" "));
+
+            PdfPTable table = new PdfPTable(new float[]{3.4f, 1.2f});
+            table.setWidthPercentage(100);
+            for (String h : new String[]{"Description", "Amount (ZAR)"}) {
+                PdfPCell cell = new PdfPCell(new Phrase(h, TABLE_HEADER_FONT));
+                cell.setBackgroundColor(BRAND_COLOR);
+                cell.setPadding(5);
+                if (!"Description".equals(h)) cell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+                table.addCell(cell);
+            }
+            Font bold = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9);
+            for (InvoiceLine l : invoiceLines(inv)) {
+                PdfPCell label = new PdfPCell(new Phrase(l.label(), l.emphasis() ? bold : TABLE_CELL_FONT));
+                label.setPadding(4);
+                PdfPCell amount = new PdfPCell(new Phrase(l.amount().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString(), l.emphasis() ? bold : TABLE_CELL_FONT));
+                amount.setPadding(4);
+                amount.setHorizontalAlignment(Element.ALIGN_RIGHT);
+                table.addCell(label);
+                table.addCell(amount);
+            }
+            doc.add(table);
+            BigDecimal topUp = inv.getStorageMinimumTopup() == null ? BigDecimal.ZERO : inv.getStorageMinimumTopup();
+            if (topUp.signum() > 0) {
+                doc.add(new Paragraph(" "));
+                doc.add(new Paragraph("The top-up brings this period's storage up to the minimum storage charge agreed for your account.", FOOTER_FONT));
+            }
+            doc.close();
+            return out.toByteArray();
+        } catch (Exception e) {
+            log.error("Failed to generate invoice {}: {}", inv.getId(), e.getMessage(), e);
+            throw new RuntimeException("Failed to generate invoice", e);
         }
     }
 

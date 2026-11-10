@@ -143,6 +143,18 @@ export default function WhseBillingInvoicesTab({ clientId }: { clientId: string 
   })
   const invoices = data?.content ?? []
 
+  const downloadInvoice = async (inv: BillingInvoiceResponse) => {
+    const res = await apiClient.get(`/api/v1/warehousing/billing-invoices/${inv.id}/pdf`, { responseType: "blob" })
+    const url = window.URL.createObjectURL(new Blob([res.data]))
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `invoice-${inv.invoiceNumber}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  }
+
   const downloadStatement = async () => {
     const res = await apiClient.get(`/api/v1/warehousing/clients/${clientId}/inventory-statement/pdf`, { responseType: "blob" })
     const url = window.URL.createObjectURL(new Blob([res.data]))
@@ -199,6 +211,10 @@ export default function WhseBillingInvoicesTab({ clientId }: { clientId: string 
                     <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{fmtMoney(inv.total)}</p>
                     {inv.balance > 0 && inv.status !== "DRAFT" && inv.status !== "REJECTED" && <p style={{ fontSize: 11, color: "var(--hf-warning-text)", margin: 0 }}>{fmtMoney(inv.balance)} outstanding</p>}
                   </div>
+                  <button onClick={() => downloadInvoice(inv)} title="Download invoice PDF" aria-label={`Download invoice ${inv.invoiceNumber}`}
+                    style={{ display: "flex", alignItems: "center", background: "none", border: "1px solid var(--hf-border)", color: "var(--hf-text-muted)", borderRadius: 7, padding: "6px 8px", cursor: "pointer" }}>
+                    <Download size={13} />
+                  </button>
                   {inv.status === "DRAFT" && canDecide && (
                     <>
                       <button onClick={() => setDeciding({ invoice: inv, mode: "approve" })} title="Approve and issue"
