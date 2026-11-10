@@ -85,6 +85,19 @@ class WhseItemServiceTest {
         verify(jdbc).update(contains("audit_events"), any(Object[].class));
     }
 
+    @Test @DisplayName("changing only the cost currency is audited, and the same cost in a new currency is a different cost")
+    void currencyChangeAudited() {
+        WhseItem item = WhseItem.create(tenant, client, "SKU1", "Widget", "EACH", null);
+        item.applyDetails(details(null, "10"));
+        when(repo.findActiveById(tenant, item.getId())).thenReturn(Optional.of(item));
+
+        WhseItemDetails usd = new WhseItemDetails(null, null, null, null, null, new BigDecimal("10"), null, null, "AMBIENT", false, false, true, "usd");
+        WhseItem saved = service.update(t(), item.getId(), "Widget", "EACH", null, usd, actor);
+
+        assertEquals("USD", saved.getUnitCostCurrency());
+        verify(jdbc).update(contains("audit_events"), any(Object[].class));
+    }
+
     @Test @DisplayName("scanning an invalid barcode is refused before any lookup")
     void scanInvalid() {
         assertThrows(IllegalArgumentException.class, () -> service.findByBarcode(t(), "4006381333932", null));

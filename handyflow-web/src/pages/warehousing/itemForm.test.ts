@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest"
-import { buildItemPayload, isValidGtin, validateItemForm, ItemFormState } from "./itemForm"
+import { buildItemPayload, formatMoney, isValidGtin, validateItemForm, ItemFormState } from "./itemForm"
 
 const base: ItemFormState = {
   sku: "A1", description: "Widget", uom: "each", storageRate: "", barcode: "", lengthMm: "", widthMm: "", heightMm: "", weightKg: "",
-  unitCost: "", minQty: "", maxQty: "", temperatureClass: "AMBIENT", hazardous: false, fragile: false, stackable: true,
+  unitCost: "", unitCostCurrency: "ZAR", minQty: "", maxQty: "", temperatureClass: "AMBIENT", hazardous: false, fragile: false, stackable: true,
 }
 
 describe("item form", () => {
@@ -33,5 +33,19 @@ describe("item form", () => {
     expect(p.barcode).toBe("4006381333931")
     expect(p.fragile).toBe(true)
     expect(p.storageRatePerUnitPerMonth).toBeNull()
+  })
+
+  it("cost currency must be a 3-letter code and is sent upper-cased", () => {
+    expect(validateItemForm({ ...base, unitCostCurrency: "RAND" })).toMatch(/currency/i)
+    expect(validateItemForm({ ...base, unitCostCurrency: "" })).toMatch(/currency/i)
+    expect(validateItemForm({ ...base, unitCostCurrency: "usd" })).toBeNull()
+    expect(buildItemPayload({ ...base, unitCostCurrency: " usd " }).unitCostCurrency).toBe("USD")
+  })
+
+  it("formats an amount with its own currency and falls back for an unknown code", () => {
+    expect(formatMoney(12.5, "USD")).toMatch(/12[.,]50/)
+    expect(formatMoney(12.5, "USD")).not.toBe(formatMoney(12.5, "ZAR"))
+    expect(formatMoney(3, "ZZZ")).toMatch(/3[.,]00/)
+    expect(formatMoney(3, null)).toBe(formatMoney(3, "ZAR"))
   })
 })

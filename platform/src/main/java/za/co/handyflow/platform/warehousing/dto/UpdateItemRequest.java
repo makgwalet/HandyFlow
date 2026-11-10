@@ -8,5 +8,6 @@ import java.math.BigDecimal;
 public record UpdateItemRequest(
         @NotBlank String description, String uom, BigDecimal storageRatePerUnitPerMonth,
         String barcode, BigDecimal lengthMm, BigDecimal widthMm, BigDecimal heightMm, BigDecimal weightKg, BigDecimal unitCost,
-        BigDecimal minQty, BigDecimal maxQty, String temperatureClass, Boolean hazardous, Boolean fragile, Boolean stackable
+        BigDecimal minQty, BigDecimal maxQty, String temperatureClass, Boolean hazardous, Boolean fragile, Boolean stackable,
+        /** Three-letter code; blank means ZAR. */ String unitCostCurrency
 ) {}

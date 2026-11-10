@@ -11,13 +11,13 @@ import { Plus, Package, X, Power, PowerOff, Trash2, Pencil } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
 import ItemTrackingModal from "./ItemTrackingModal"
-import { buildItemPayload, validateItemForm, TEMPERATURE_OPTIONS, ItemFormState } from "./itemForm"
+import { buildItemPayload, validateItemForm, TEMPERATURE_OPTIONS, CURRENCY_OPTIONS, formatMoney, ItemFormState } from "./itemForm"
 
 interface ItemResponse {
   id: string; clientId: string; sku: string; description: string | null; uom: string | null
   storageRatePerUnitPerMonth: number | null; active: boolean
   barcode: string | null; lengthMm: number | null; widthMm: number | null; heightMm: number | null; volumeM3: number | null
-  weightKg: number | null; unitCost: number | null; minQty: number | null; maxQty: number | null
+  weightKg: number | null; unitCost: number | null; unitCostCurrency?: string; minQty: number | null; maxQty: number | null
   temperatureClass: string; hazardous: boolean; fragile: boolean; stackable: boolean
   lotTracked?: boolean; expiryTracked?: boolean; minShelfLifeDays?: number | null
 }
@@ -32,7 +32,7 @@ function ItemFormModal({ clientId, initial, onClose }: { clientId: string; initi
     sku: initial?.sku ?? "", description: initial?.description ?? "", uom: initial?.uom ?? "each",
     storageRate: str(initial?.storageRatePerUnitPerMonth),
     barcode: initial?.barcode ?? "", lengthMm: str(initial?.lengthMm), widthMm: str(initial?.widthMm), heightMm: str(initial?.heightMm),
-    weightKg: str(initial?.weightKg), unitCost: str(initial?.unitCost), minQty: str(initial?.minQty), maxQty: str(initial?.maxQty),
+    weightKg: str(initial?.weightKg), unitCost: str(initial?.unitCost), unitCostCurrency: initial?.unitCostCurrency ?? "ZAR", minQty: str(initial?.minQty), maxQty: str(initial?.maxQty),
     temperatureClass: initial?.temperatureClass ?? "AMBIENT", hazardous: initial?.hazardous ?? false,
     fragile: initial?.fragile ?? false, stackable: initial?.stackable ?? true,
   })
@@ -82,8 +82,14 @@ function ItemFormModal({ clientId, initial, onClose }: { clientId: string; initi
             {field("item-h", "Height mm", "heightMm", { type: "number", min: 0 })}
             {field("item-kg", "Weight kg", "weightKg", { type: "number", min: 0, step: "0.001" })}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-            {field("item-cost", "Unit cost (R)", "unitCost", { type: "number", min: 0, step: "0.01" })}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
+            <div>
+              <label htmlFor="item-currency" style={labelStyle}>Cost currency</label>
+              <select id="item-currency" value={form.unitCostCurrency} onChange={set("unitCostCurrency")} style={inputStyle}>
+                {(CURRENCY_OPTIONS.includes(form.unitCostCurrency) ? CURRENCY_OPTIONS : [form.unitCostCurrency, ...CURRENCY_OPTIONS]).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            {field("item-cost", "Unit cost", "unitCost", { type: "number", min: 0, step: "0.01" })}
             {field("item-min", "Minimum level", "minQty", { type: "number", min: 0 })}
             {field("item-max", "Maximum level", "maxQty", { type: "number", min: 0 })}
           </div>
@@ -170,7 +176,7 @@ export default function WhseItemsTab({ clientId }: { clientId: string }) {
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                {it.unitCost != null && <span style={{ fontSize: 11.5, color: "var(--hf-text-muted)" }}>cost R{Number(it.unitCost).toFixed(2)}</span>}
+                {it.unitCost != null && <span style={{ fontSize: 11.5, color: "var(--hf-text-muted)" }}>cost {formatMoney(Number(it.unitCost), it.unitCostCurrency)}</span>}
                 {it.storageRatePerUnitPerMonth != null && <span style={{ fontSize: 11.5, color: "var(--hf-text-muted)" }}>R{Number(it.storageRatePerUnitPerMonth).toFixed(2)}/mo</span>}
                 <button onClick={() => setTracking(it)} title="Lot and expiry tracking" style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontSize: 11, color: "var(--hf-text-muted)" }}>Lots</button>
                 <button onClick={() => setEditing(it)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer" }}><Pencil size={12} style={{ color: 'var(--hf-text-muted)' }} /></button>

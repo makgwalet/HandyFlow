@@ -48,7 +48,9 @@ public class WhseOperationsService {
     public record Summary(LocalDate date, BigDecimal totalUnitsOnHand, BigDecimal totalUnitsAllocated, BigDecimal totalUnitsAvailable,
                           long stockedPositions, long activeClients, List<StatusStock> byStatus, Counts work, TodayActivity today,
                           long adjustmentsAwaitingApproval, long invoicesAwaitingApproval, List<TopMover> topMovers,
-                          BigDecimal stockAccuracyPct, long linesCountedLast30Days, BigDecimal stockValue, BigDecimal unitsWithoutCost) {}
+                          BigDecimal stockAccuracyPct, long linesCountedLast30Days, List<CurrencyValue> stockValue, BigDecimal unitsWithoutCost) {}
+    /** Stock value in one currency. Values in different currencies are never added together. */
+    public record CurrencyValue(String currency, BigDecimal value) {}
     public record StockAlert(UUID clientId, String clientName, UUID itemId, String sku, String description, String alert,
                              BigDecimal available, BigDecimal minQty, BigDecimal maxQty, BigDecimal toOrder) {}
     public record TrendPoint(LocalDate day, BigDecimal received, BigDecimal dispatched, BigDecimal adjusted) {}
@@ -106,16 +108,19 @@ public class WhseOperationsService {
         BigDecimal accuracy = counted30 == 0 ? null
                 : BigDecimal.valueOf(matched30 * 100.0 / counted30).setScale(1, java.math.RoundingMode.HALF_UP);
 
-        BigDecimal[] value = jdbc.query(SQL_STOCK_VALUE, rs -> {
-            rs.next();
+        List<CurrencyValue> value = new java.util.ArrayList<>();
+        BigDecimal[] noCost = {BigDecimal.ZERO};
+        jdbc.query(SQL_STOCK_VALUE, rs -> {
+            String currency = rs.getString("currency");
             BigDecimal v = rs.getBigDecimal("value"), u = rs.getBigDecimal("no_cost");
-            return new BigDecimal[]{v == null ? BigDecimal.ZERO : v, u == null ? BigDecimal.ZERO : u};
+            if (u != null) noCost[0] = noCost[0].add(u);
+            if (currency != null && v != null && v.signum() != 0) value.add(new CurrencyValue(currency.trim(), v));
         }, t);
 
         return new Summary(today, onHand, allocated, availableUnits, positions, clients, byStatus,
                 new Counts(inbound.getOrDefault("EXPECTED", 0L), inbound.getOrDefault("PARTIALLY_RECEIVED", 0L), overdueIn,
                         outbound.getOrDefault("PENDING", 0L), outbound.getOrDefault("PICKING", 0L), outbound.getOrDefault("PACKED", 0L), overdueOut),
-                activity, adjPending, invPending, movers, accuracy, counted30, value[0], value[1]);
+                activity, adjPending, invPending, movers, accuracy, counted30, value, noCost[0]);
     }
 
     /** Units received, dispatched and adjusted per calendar day for the last {@code days} days, oldest first, every day present. */
@@ -219,12 +224,14 @@ public class WhseOperationsService {
 
     // ── SQL ─────────────────────────────────────────────────────────────────
 
-    /** Value of stock whose item has a cost, and the units that could not be valued because the item has none. */
+    /** Value of stock per cost currency, and the units that could not be valued because the item has no cost. */
     static final String SQL_STOCK_VALUE = """
-            SELECT coalesce(sum(inv.qty_on_hand * it.unit_cost) FILTER (WHERE it.unit_cost IS NOT NULL), 0) AS value,
+            SELECT it.unit_cost_currency AS currency,
+                   coalesce(sum(inv.qty_on_hand * it.unit_cost) FILTER (WHERE it.unit_cost IS NOT NULL), 0) AS value,
                    coalesce(sum(inv.qty_on_hand) FILTER (WHERE it.unit_cost IS NULL), 0) AS no_cost
               FROM whse_inventory inv JOIN whse_items it ON it.id = inv.item_id AND it.tenant_id = inv.tenant_id
-             WHERE inv.tenant_id = ? AND inv.qty_on_hand > 0""";
+             WHERE inv.tenant_id = ? AND inv.qty_on_hand > 0
+             GROUP BY it.unit_cost_currency ORDER BY it.unit_cost_currency""";
 
     static final String SQL_STOCK_ALERTS = """
             SELECT * FROM (

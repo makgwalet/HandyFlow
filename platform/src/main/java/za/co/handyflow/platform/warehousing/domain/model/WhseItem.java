@@ -61,6 +61,8 @@ public class WhseItem {
     private BigDecimal weightKg;
     @Column(name = "unit_cost", precision = 14, scale = 4)
     private BigDecimal unitCost;
+    @Column(name = "unit_cost_currency", nullable = false, length = 3, columnDefinition = "char(3)")
+    private String unitCostCurrency = "ZAR";
     @Column(name = "min_qty", precision = 12, scale = 3)
     private BigDecimal minQty;
     @Column(name = "max_qty", precision = 12, scale = 3)
@@ -128,6 +130,7 @@ public class WhseItem {
         this.heightMm = d.heightMm();
         this.weightKg = d.weightKg();
         this.unitCost = d.unitCost();
+        this.unitCostCurrency = d.unitCostCurrency();
         this.minQty = d.minQty();
         this.maxQty = d.maxQty();
         this.temperatureClass = d.temperatureClass();
@@ -151,7 +154,7 @@ public class WhseItem {
 
     public WhseItemDetails details() {
         return new WhseItemDetails(barcode, lengthMm, widthMm, heightMm, weightKg, unitCost, minQty, maxQty,
-                temperatureClass, hazardous, fragile, stackable);
+                temperatureClass, hazardous, fragile, stackable, unitCostCurrency);
     }
 
     public void deactivate() {

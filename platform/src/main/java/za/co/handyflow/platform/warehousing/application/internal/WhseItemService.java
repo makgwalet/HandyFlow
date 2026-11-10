@@ -80,7 +80,8 @@ public class WhseItemService {
         item.update(description, uom, storageRatePerUnitPerMonth);
         item.applyDetails(details);
         WhseItem saved = repository.save(item);
-        boolean costChanged = before.unitCost() == null ? details.unitCost() != null : details.unitCost() == null || before.unitCost().compareTo(details.unitCost()) != 0;
+        boolean costChanged = (before.unitCost() == null ? details.unitCost() != null : details.unitCost() == null || before.unitCost().compareTo(details.unitCost()) != 0)
+                || (details.unitCost() != null && !before.unitCostCurrency().equals(details.unitCostCurrency()));
         boolean barcodeChanged = !java.util.Objects.equals(before.barcode(), details.barcode());
         if (costChanged || barcodeChanged) {
             audit(tenantId, actor, id, saved.getSku(), before, details);
@@ -140,6 +141,7 @@ public class WhseItemService {
         String name = null;
         try { name = za.co.handyflow.platform.shared.TenantContext.getCurrentUserName(); } catch (RuntimeException ignored) { /* no named user */ }
         String json = "{\"sku\":\"" + sku.replace("\\", "\\\\").replace("\"", "\\\"") + "\",\"unitCostBefore\":" + num(before.unitCost()) + ",\"unitCostAfter\":" + num(after.unitCost())
+                + ",\"currencyBefore\":" + str(before.unitCostCurrency()) + ",\"currencyAfter\":" + str(after.unitCostCurrency())
                 + ",\"barcodeBefore\":" + str(before.barcode()) + ",\"barcodeAfter\":" + str(after.barcode()) + "}";
         jdbc.update("INSERT INTO audit_events (tenant_id, actor_type, actor_id, actor_name, action, item_type, item_id, after_json) VALUES (?, 'STAFF', ?, ?, ?, ?, ?, ?::jsonb)",
                 tenantId.getValue(), actor, name, "WHSE_ITEM_MASTER_CHANGED", "WHSE_ITEM", itemId, json);

@@ -57,4 +57,16 @@ class WhseItemDetailsTest {
         assertEquals(0, n("0.2").compareTo(full.volumeM3()));
         assertNull(new WhseItemDetails(null, n("1000"), n("500"), null, null, null, null, null, null, false, false, true).volumeM3());
     }
+
+    @Test @DisplayName("cost currency defaults to ZAR, is upper-cased, and must be a 3-letter code")
+    void costCurrency() {
+        assertEquals("ZAR", with(null, null, null, null).unitCostCurrency());
+        assertEquals("ZAR", WhseItemDetails.none().unitCostCurrency());
+        var usd = new WhseItemDetails(null, null, null, null, null, n("5"), null, null, null, false, false, true, " usd ");
+        assertEquals("USD", usd.unitCostCurrency());
+        assertEquals("ZAR", new WhseItemDetails(null, null, null, null, null, n("5"), null, null, null, false, false, true, "  ").unitCostCurrency());
+        for (String bad : new String[]{"US", "RAND", "Z4R", "€€€"}) {
+            assertThrows(IllegalArgumentException.class, () -> new WhseItemDetails(null, null, null, null, null, n("5"), null, null, null, false, false, true, bad), bad);
+        }
+    }
 }

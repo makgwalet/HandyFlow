@@ -2,7 +2,7 @@
 
 export interface ItemFormState {
   sku: string; description: string; uom: string; storageRate: string
-  barcode: string; lengthMm: string; widthMm: string; heightMm: string; weightKg: string; unitCost: string
+  barcode: string; lengthMm: string; widthMm: string; heightMm: string; weightKg: string; unitCost: string; unitCostCurrency: string
   minQty: string; maxQty: string; temperatureClass: string; hazardous: boolean; fragile: boolean; stackable: boolean
 }
 
@@ -10,6 +10,15 @@ export const TEMPERATURE_OPTIONS = [
   { value: "AMBIENT", label: "Ambient" }, { value: "CHILLED", label: "Chilled (2–8°C)" },
   { value: "FROZEN", label: "Frozen" }, { value: "CONTROLLED_ROOM", label: "Controlled room temperature" },
 ]
+
+export const CURRENCY_OPTIONS = ["ZAR", "USD", "EUR", "GBP", "BWP", "NAD", "ZMW", "MZN", "LSL", "SZL"]
+
+/** An amount with its currency, e.g. "R 12.50" or "US$ 12.50". Falls back to "CODE 12.50" for a code the runtime does not know. */
+export function formatMoney(amount: number, currency: string | null | undefined): string {
+  const code = (currency || "ZAR").toUpperCase()
+  try { return new Intl.NumberFormat("en-ZA", { style: "currency", currency: code }).format(amount) }
+  catch { return `${code} ${amount.toFixed(2)}` }
+}
 
 const num = (s: string): number | null => (s.trim() === "" ? null : Number(s.replace(",", ".")))
 
@@ -28,6 +37,7 @@ export function validateItemForm(f: ItemFormState): string | null {
     const n = num(v)
     if (n !== null && (Number.isNaN(n) || n <= 0)) return `${label} must be a number greater than zero.`
   }
+  if (!/^[A-Za-z]{3}$/.test(f.unitCostCurrency.trim())) return "The cost currency must be a 3-letter code such as ZAR or USD."
   for (const [label, v] of [["Unit cost", f.unitCost], ["Minimum level", f.minQty], ["Maximum level", f.maxQty]] as const) {
     const n = num(v)
     if (n !== null && (Number.isNaN(n) || n < 0)) return `${label} cannot be negative.`
@@ -41,7 +51,7 @@ export function buildItemPayload(f: ItemFormState) {
   return {
     description: f.description || null, uom: f.uom || null, storageRatePerUnitPerMonth: num(f.storageRate),
     barcode: f.barcode.trim() || null, lengthMm: num(f.lengthMm), widthMm: num(f.widthMm), heightMm: num(f.heightMm),
-    weightKg: num(f.weightKg), unitCost: num(f.unitCost), minQty: num(f.minQty), maxQty: num(f.maxQty),
+    weightKg: num(f.weightKg), unitCost: num(f.unitCost), unitCostCurrency: f.unitCostCurrency.trim().toUpperCase(), minQty: num(f.minQty), maxQty: num(f.maxQty),
     temperatureClass: f.temperatureClass, hazardous: f.hazardous, fragile: f.fragile, stackable: f.stackable,
   }
 }
