@@ -34,6 +34,7 @@ public class WhseTaskService {
     private final JdbcTemplate jdbc;
     private final WhseInventoryService inventoryService;
     private final WhseLotAllocationService lotAllocation;
+    private final WhseCycleCountService cycleCounts;
 
     public record TaskRow(UUID id, String taskType, String status, int priority, UUID clientId, String clientName, UUID itemId, String sku, String itemDescription,
                           UUID lotId, String lotNumber, LocalDate lotExpiry, UUID fromLocationId, String fromCode, UUID toLocationId, String toCode,
@@ -378,6 +379,10 @@ public class WhseTaskService {
         jdbc.update("UPDATE whse_tasks SET status = 'SHORT_CLOSED', resolution = ?, resolution_note = ?, resolved_by = ?, resolved_at = now(), updated_at = now() WHERE id = ?",
                 resolution, note, user, id);
         recomputePicked(lineId);
+        // Stock that cannot be found where the system says it is means the figure there is doubtful: have the location counted.
+        if (FIND_ELSEWHERE.equals(action)) {
+            cycleCounts.raiseForLocation(tenantId, from, "Short pick on " + ref + ": counted because stock could not be found here", user);
+        }
         jdbc.update("INSERT INTO audit_events (tenant_id, actor_type, actor_id, action, item_type, item_id, after_json) VALUES (?, 'STAFF', ?, 'WHSE_SHORT_PICK_RESOLVED', 'WHSE_TASK', ?, "
                         + "jsonb_build_object('resolution', ?::text, 'shortfall', ?::numeric, 'reason', ?::text, 'orderId', ?::text, 'orderReference', ?::text, 'fromLocationId', ?::text))",
                 t, user, id, resolution, shortfall, note, orderId.toString(), ref, from.toString());

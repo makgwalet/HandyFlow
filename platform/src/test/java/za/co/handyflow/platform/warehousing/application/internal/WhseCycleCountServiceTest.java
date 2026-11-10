@@ -151,4 +151,23 @@ class WhseCycleCountServiceTest {
     void noActor() {
         assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.submit(t(), session, null));
     }
+
+    @Test @DisplayName("raising a count for a location starts a blind one, unless the location is empty or already being counted")
+    void raiseForLocation() {
+        UUID loc = UUID.randomUUID();
+        when(jdbc.queryForObject(contains("status IN ('COUNTING','IN_REVIEW')"), eq(Long.class), any(Object[].class))).thenReturn(1L);
+        assertNull(service.raiseForLocation(t(), loc, "short pick", counter));
+        verify(jdbc, never()).update(contains("INSERT INTO whse_count_sessions"), any(Object[].class));
+
+        when(jdbc.queryForObject(contains("status IN ('COUNTING','IN_REVIEW')"), eq(Long.class), any(Object[].class))).thenReturn(0L);
+        when(jdbc.queryForObject(contains("FROM whse_inventory WHERE tenant_id = ?"), eq(Long.class), any(Object[].class))).thenReturn(0L);
+        assertNull(service.raiseForLocation(t(), loc, "short pick", counter));
+        verify(jdbc, never()).update(contains("INSERT INTO whse_count_sessions"), any(Object[].class));
+
+        when(jdbc.queryForObject(contains("FROM whse_inventory WHERE tenant_id = ?"), eq(Long.class), any(Object[].class))).thenReturn(2L);
+        when(jdbc.queryForObject(contains("FROM whse_locations"), eq(Long.class), any(Object[].class))).thenReturn(1L);
+        when(jdbc.queryForObject(contains("SELECT count_number"), eq(String.class), any(Object[].class))).thenReturn("CC-00007");
+        assertEquals("CC-00007", service.raiseForLocation(t(), loc, "short pick", counter));
+        verify(jdbc).update(contains("INSERT INTO whse_count_sessions"), any(Object[].class));
+    }
 }

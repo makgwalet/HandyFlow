@@ -73,6 +73,19 @@ public class WhseCycleCountService {
         return id;
     }
 
+    /**
+     * Starts a blind count of one location because something suggests the system's figure is wrong there (a short pick, say). Does nothing, and
+     * returns null, when the location holds no stock or already has a count in progress. Returns the new count's number otherwise.
+     */
+    @Transactional
+    public String raiseForLocation(TenantId tenantId, UUID locationId, String note, UUID actor) {
+        UUID t = tenantId.getValue();
+        if (count("SELECT count(*) FROM whse_count_sessions WHERE tenant_id = ? AND location_id = ? AND status IN ('COUNTING','IN_REVIEW')", t, locationId) > 0) return null;
+        if (count(SQL_SCOPE_COUNT, t, null, null, locationId, locationId) == 0) return null;
+        UUID id = create(tenantId, null, locationId, true, note, actor);
+        return jdbc.queryForObject("SELECT count_number FROM whse_count_sessions WHERE id = ?", String.class, id);
+    }
+
     // ── read ────────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)

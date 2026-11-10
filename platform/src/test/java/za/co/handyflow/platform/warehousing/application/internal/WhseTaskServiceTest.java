@@ -31,6 +31,7 @@ class WhseTaskServiceTest {
     private JdbcTemplate jdbc;
     private WhseInventoryService inventory;
     private WhseLotAllocationService lotAllocation;
+    private WhseCycleCountService cycleCounts;
     private WhseTaskService service;
 
     @BeforeEach
@@ -38,7 +39,8 @@ class WhseTaskServiceTest {
         jdbc = mock(JdbcTemplate.class);
         inventory = mock(WhseInventoryService.class);
         lotAllocation = mock(WhseLotAllocationService.class);
-        service = new WhseTaskService(jdbc, inventory, lotAllocation);
+        cycleCounts = mock(WhseCycleCountService.class);
+        service = new WhseTaskService(jdbc, inventory, lotAllocation, cycleCounts);
     }
 
     private TenantId t() { return TenantId.of(tenant); }
@@ -233,6 +235,7 @@ class WhseTaskServiceTest {
         verify(jdbc).update(contains("SET qty_short = qty_short + ?"), eq(bd("4")), eq(lineId));
         verify(jdbc).update(contains("SET status = 'SHORT_CLOSED'"), eq("SHIP_SHORT"), eq("customer agreed to 6"), eq(user), eq(taskId));
         verify(jdbc).update(contains("audit_events"), any(Object[].class));
+        verifyNoInteractions(cycleCounts);
     }
 
     @Test @DisplayName("shipping a lot line short shrinks its allocation, or releases it when none was found")
@@ -259,6 +262,7 @@ class WhseTaskServiceTest {
         verify(lotAllocation).allocate(eq(t()), eq(orderId), eq("OUT-1"), eq(lineId), eq(client), eq(item), eq(bd("4")), eq(user), eq(java.util.Set.of(invId)));
         verify(jdbc).update(contains("SET status = 'SHORT_CLOSED'"), eq("SOURCE_ELSEWHERE"), eq("stock found in B-02"), eq(user), eq(taskId));
         verify(jdbc, never()).update(contains("qty_short = qty_short + ?"), any(Object[].class));
+        verify(cycleCounts).raiseForLocation(eq(t()), eq(from), contains("OUT-1"), eq(user));
     }
 
     @Test @DisplayName("a line that is not lot tracked moves wholly to another location that holds all of it, or is refused")
@@ -276,6 +280,7 @@ class WhseTaskServiceTest {
         verify(inventory).allocateStock(eq(t()), eq(client), eq(item), eq(dest), eq(bd("10")), eq("OUTBOUND_ORDER"), eq(orderId), eq("OUT-1"), eq(user));
         verify(jdbc).update(contains("SET location_id = ?"), eq(dest), eq(lineId));
         verify(jdbc).update(contains("SET status = 'SHORT_CLOSED'"), eq("MOVE_LINE"), eq("look elsewhere"), eq(user), eq(taskId));
+        verify(cycleCounts).raiseForLocation(eq(t()), eq(from), contains("OUT-1"), eq(user));
     }
 
     @Test @DisplayName("only a short pick of an order still being picked can be resolved, with a reason and a known action")
