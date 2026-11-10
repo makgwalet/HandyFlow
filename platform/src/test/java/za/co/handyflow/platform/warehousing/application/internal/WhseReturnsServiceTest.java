@@ -50,7 +50,7 @@ class WhseReturnsServiceTest {
 
     /** The linked-order cap: shipped quantity and what earlier returns already took. */
     private void shipped(String shipped, String other) {
-        when(jdbc.queryForObject(contains("sum(qty_picked)"), eq(BigDecimal.class), any(Object[].class))).thenReturn(n(shipped));
+        when(jdbc.queryForObject(contains("movement_type = 'PICK'"), eq(BigDecimal.class), any(Object[].class))).thenReturn(n(shipped));
         when(jdbc.queryForObject(contains("greatest(x.received"), eq(BigDecimal.class), any(Object[].class))).thenReturn(n(other));
     }
 

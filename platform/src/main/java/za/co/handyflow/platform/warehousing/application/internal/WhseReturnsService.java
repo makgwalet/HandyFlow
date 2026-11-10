@@ -183,7 +183,9 @@ public class WhseReturnsService {
 
     /** What can still come back for an item on an order: shipped, less what other returns already received. This return's own receipts are excluded when {@code self} is given. */
     BigDecimal returnable(UUID tenant, UUID orderId, UUID itemId, UUID self) {
-        BigDecimal shipped = jdbc.queryForObject("SELECT coalesce(sum(qty_picked), 0) FROM whse_outbound_order_lines WHERE order_id = ? AND item_id = ? AND tenant_id = ?", BigDecimal.class, orderId, itemId, tenant);
+        // Shipped means what the ledger says left the building: the PICK movements posted when the order shipped. qty_picked on the order
+        // line is only a picking-progress note and can be zero on an order that shipped.
+        BigDecimal shipped = jdbc.queryForObject("SELECT coalesce(-sum(qty_change), 0) FROM whse_stock_movements WHERE tenant_id = ? AND movement_type = 'PICK' AND reference_type = 'OUTBOUND_ORDER' AND reference_id = ? AND item_id = ?", BigDecimal.class, tenant, orderId, itemId);
         if (shipped == null || shipped.signum() == 0) throw new IllegalArgumentException("That item was not shipped on the linked order.");
         BigDecimal other = jdbc.queryForObject("""
                 SELECT coalesce(sum(CASE WHEN r.status = 'CLOSED' THEN x.received ELSE greatest(x.received, x.expected) END), 0)
