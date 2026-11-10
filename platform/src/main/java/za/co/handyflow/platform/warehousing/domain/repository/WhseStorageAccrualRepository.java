@@ -28,6 +28,19 @@ public interface WhseStorageAccrualRepository extends JpaRepository<WhseStorageA
     int release(@Param("invoiceId") UUID invoiceId);
 
     /**
+     * Stock received (RECEIPT movements that added stock) in a window, per client, item and lot. Used for free days: the
+     * newest stock held is the stock that arrived inside the window. Each row is {client id, item id, lot id (may be null), quantity}.
+     */
+    @Query(value = """
+            SELECT m.client_id, m.item_id, m.lot_id, SUM(m.qty_change)
+              FROM whse_stock_movements m
+             WHERE m.tenant_id = :tenantId AND m.movement_type = 'RECEIPT' AND m.qty_change > 0
+               AND m.created_at >= :windowStart AND m.created_at < :dayEnd
+             GROUP BY m.client_id, m.item_id, m.lot_id""", nativeQuery = true)
+    List<Object[]> receivedBetween(@Param("tenantId") UUID tenantId, @Param("windowStart") java.time.Instant windowStart,
+                                   @Param("dayEnd") java.time.Instant dayEnd);
+
+    /**
      * What each stock position held on a calendar day, worked out from the movement ledger: the larger of the
      * balance it opened the day with and the highest balance it reached during the day. So stock received today
      * and stock shipped today are both billed for today. A position with no movements at all falls back to its

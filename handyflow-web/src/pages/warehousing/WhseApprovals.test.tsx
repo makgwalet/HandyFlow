@@ -149,6 +149,12 @@ describe("invoice approval", () => {
     expect(screen.getByText(/You prepared this invoice/)).toBeTruthy()
   })
 
+  it("shows pallet/bin position fees included in storage", async () => {
+    get.mockResolvedValue({ data: { content: [{ ...invoice("SENT"), storageLocationFees: 300 }] } })
+    wrap(<WhseBillingInvoicesTab clientId="c1" />)
+    await waitFor(() => expect(screen.getByText(/in pallet \/ bin position fees/)).toBeTruthy())
+  })
+
   it("downloads the invoice PDF from its own endpoint", async () => {
     withInvoice("SENT")
     const createObjectURL = vi.fn(() => "blob:x"); const revokeObjectURL = vi.fn()

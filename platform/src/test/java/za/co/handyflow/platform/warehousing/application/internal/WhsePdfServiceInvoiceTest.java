@@ -39,6 +39,18 @@ class WhsePdfServiceInvoiceTest {
     }
 
     @Test
+    @DisplayName("pallet/bin fees are their own line and storage of goods is what is left")
+    void positionFeesLine() {
+        WhseBillingInvoice inv = invoice("900.00", "100.00");
+        inv.recordLocationFees(new BigDecimal("300.00"));
+        List<WhsePdfService.InvoiceLine> lines = WhsePdfService.invoiceLines(inv);
+        assertEquals(0, new BigDecimal("500.00").compareTo(lines.get(0).amount()));
+        assertEquals("Pallet / bin position fees", lines.get(1).label());
+        assertEquals(0, new BigDecimal("300.00").compareTo(lines.get(1).amount()));
+        assertTrue(lines.get(2).label().contains("top-up"));
+    }
+
+    @Test
     @DisplayName("with no top-up there is a single storage line and no top-up row")
     void noTopUp() {
         List<WhsePdfService.InvoiceLine> lines = WhsePdfService.invoiceLines(invoice("900.00", null));

@@ -154,6 +154,6 @@ public class WhseBillingController {
         return new BillingInvoiceResponse(i.getId(), i.getClientId(), i.getInvoiceNumber(), i.getPeriodStart(),
                 i.getPeriodEnd(), i.getInvoiceDate(), i.getDueDate(), i.getStorageFee(), i.getHandlingFee(),
                 i.getVatAmount(), i.getSubtotal(), i.getTotal(), i.getAmountPaid(), i.balance(), i.getStatus(),
-                i.getSentAt(), i.getPaidAt(), i.getStorageMinimumTopup(), i.getPreparedBy());
+                i.getSentAt(), i.getPaidAt(), i.getStorageMinimumTopup(), i.getPreparedBy(), i.getStorageLocationFees());
     }
 }

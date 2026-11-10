@@ -17,7 +17,7 @@ const wrap = (ui: React.ReactElement) =>
 
 const request = { id: "r1", kind: "TARIFF", clientName: "Acme", sku: null, monthlyRate: 12.5, minimumStorageCharge: null,
   effectiveFrom: "2026-12-01", note: "2027 renewal", requestedByName: "Thabo M", requestedAt: "2026-11-09T08:00:00Z" }
-const termsRequest = { ...request, id: "r2", kind: "TERMS", monthlyRate: null, minimumStorageCharge: 900, note: null }
+const termsRequest = { ...request, id: "r2", kind: "TERMS", monthlyRate: null, minimumStorageCharge: 900, freeDays: 14, locationFeePerMonth: 45, note: null }
 
 beforeEach(() => {
   get.mockReset(); post.mockReset(); put.mockReset(); perms = []; required = false
@@ -36,7 +36,7 @@ describe("tariff and minimum approval", () => {
   it("lists waiting rate and minimum changes with who asked and when they start", async () => {
     wrap(<WhseApprovalsTab />)
     await waitFor(() => expect(screen.getByText(/12,50 per unit per month|12.50 per unit per month/)).toBeTruthy())
-    expect(screen.getByText(/Minimum .*900.* per 30 days/)).toBeTruthy()
+    expect(screen.getByText(/Minimum .*900.* per 30 days · 14 free days · .*45.* per pallet or bin per month/)).toBeTruthy()
     expect(screen.getByText(/Starts 2026-12-01 — 2027 renewal/)).toBeTruthy()
     expect(screen.getAllByText(/Asked by Thabo M/).length).toBe(2)
   })

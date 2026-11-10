@@ -20,7 +20,18 @@ import java.util.UUID;
 final class WhseTariffBook {
 
     record TariffVersion(UUID id, UUID clientId, UUID itemId, BigDecimal rate, LocalDate effectiveFrom, Instant createdAt) {}
-    record TermsVersion(UUID id, UUID clientId, BigDecimal minimumStorageCharge, LocalDate effectiveFrom, Instant createdAt) {}
+    /** A full snapshot of one scope's billing terms from a date. */
+    record TermsVersion(UUID id, UUID clientId, BigDecimal minimumStorageCharge, int freeDays, BigDecimal locationFeePerMonth,
+                        LocalDate effectiveFrom, Instant createdAt) {
+        /** A version that sets only a minimum charge (no free days, no fixed fee). */
+        TermsVersion(UUID id, UUID clientId, BigDecimal minimumStorageCharge, LocalDate effectiveFrom, Instant createdAt) {
+            this(id, clientId, minimumStorageCharge, 0, BigDecimal.ZERO, effectiveFrom, createdAt);
+        }
+    }
+    /** The terms in force for a client on a day. */
+    record Terms(BigDecimal minimumStorageCharge, int freeDays, BigDecimal locationFeePerMonth) {
+        static final Terms NONE = new Terms(BigDecimal.ZERO, 0, BigDecimal.ZERO);
+    }
     record Rate(BigDecimal rate, String source, UUID tariffId) {}
 
     static final int DAYS_PER_MONTH = 30;
@@ -54,11 +65,16 @@ final class WhseTariffBook {
                 .max(Comparator.comparing(TariffVersion::effectiveFrom).thenComparing(TariffVersion::createdAt));
     }
 
+    /** The client's own terms if it has a version in force, otherwise the warehouse default's; nothing when neither. */
+    Terms termsFor(UUID clientId, LocalDate day) {
+        Optional<TermsVersion> own = latestTerms(clientId, day);
+        Optional<TermsVersion> v = own.isPresent() ? own : latestTerms(null, day);
+        return v.map(t -> new Terms(t.minimumStorageCharge(), t.freeDays(), t.locationFeePerMonth())).orElse(Terms.NONE);
+    }
+
     /** The client's own minimum if it has one in force, otherwise the warehouse default; zero when none. */
     BigDecimal minimumStorageCharge(UUID clientId, LocalDate day) {
-        Optional<TermsVersion> own = latestTerms(clientId, day);
-        if (own.isPresent()) return own.get().minimumStorageCharge();
-        return latestTerms(null, day).map(TermsVersion::minimumStorageCharge).orElse(BigDecimal.ZERO);
+        return termsFor(clientId, day).minimumStorageCharge();
     }
 
     private Optional<TermsVersion> latestTerms(UUID clientId, LocalDate day) {
@@ -66,6 +82,15 @@ final class WhseTariffBook {
                 .filter(t -> java.util.Objects.equals(t.clientId(), clientId))
                 .filter(t -> !t.effectiveFrom().isAfter(day))
                 .max(Comparator.comparing(TermsVersion::effectiveFrom).thenComparing(TermsVersion::createdAt));
+    }
+
+    /**
+     * How much of what was held is free: stock received in the window is the newest stock held (first-in-first-out), so the
+     * free part is the smaller of what is held and what arrived inside the free window.
+     */
+    static BigDecimal freeQuantity(BigDecimal held, BigDecimal receivedInWindow) {
+        if (held == null || receivedInWindow == null || held.signum() <= 0 || receivedInWindow.signum() <= 0) return BigDecimal.ZERO;
+        return held.min(receivedInWindow);
     }
 
     /** A minimum is stated per 30 days; an invoice covering fewer or more days gets its share. */

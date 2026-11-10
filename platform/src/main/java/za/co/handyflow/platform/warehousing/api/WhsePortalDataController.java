@@ -82,7 +82,7 @@ public class WhsePortalDataController {
         return new BillingInvoiceResponse(i.getId(), i.getClientId(), i.getInvoiceNumber(), i.getPeriodStart(),
                 i.getPeriodEnd(), i.getInvoiceDate(), i.getDueDate(), i.getStorageFee(), i.getHandlingFee(),
                 i.getVatAmount(), i.getSubtotal(), i.getTotal(), i.getAmountPaid(), i.balance(), i.getStatus(),
-                i.getSentAt(), i.getPaidAt(), i.getStorageMinimumTopup(), null); // preparer is internal
+                i.getSentAt(), i.getPaidAt(), i.getStorageMinimumTopup(), null, i.getStorageLocationFees()); // preparer is internal
     }
 
     private UUID getPortalUserId() {

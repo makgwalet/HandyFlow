@@ -94,4 +94,29 @@ class WhseTariffBookTest {
         assertEquals(0, BigDecimal.ZERO.compareTo(WhseTariffBook.proratedMinimum(null, 30)));
         assertEquals(0, BigDecimal.ZERO.compareTo(WhseTariffBook.proratedMinimum(new BigDecimal("500"), 0)));
     }
+
+    @Test
+    @DisplayName("terms are a full snapshot: the client's own version supplies all three values, else the warehouse default's")
+    void termsSnapshot() {
+        UUID none = null;
+        WhseTariffBook b = new WhseTariffBook(List.of(), List.of(
+                new WhseTariffBook.TermsVersion(UUID.randomUUID(), none, new BigDecimal("300"), 14, new BigDecimal("20"), d1, t0),
+                new WhseTariffBook.TermsVersion(UUID.randomUUID(), client, new BigDecimal("500"), 0, BigDecimal.ZERO, d15, t0)));
+        WhseTariffBook.Terms def = b.termsFor(otherClient, d15);
+        assertEquals(14, def.freeDays());
+        assertEquals(0, new BigDecimal("20").compareTo(def.locationFeePerMonth()));
+        WhseTariffBook.Terms own = b.termsFor(client, d15);
+        assertEquals(0, own.freeDays(), "the client's own version replaces the default's free days");
+        assertEquals(0, BigDecimal.ZERO.compareTo(own.locationFeePerMonth()));
+        assertEquals(WhseTariffBook.Terms.NONE, b.termsFor(client, LocalDate.of(2026, 10, 1)));
+    }
+
+    @Test
+    @DisplayName("free quantity is the smaller of what is held and what arrived inside the window; nothing when either is zero")
+    void freeQuantity() {
+        assertEquals(0, new BigDecimal("40").compareTo(WhseTariffBook.freeQuantity(new BigDecimal("100"), new BigDecimal("40"))));
+        assertEquals(0, new BigDecimal("30").compareTo(WhseTariffBook.freeQuantity(new BigDecimal("30"), new BigDecimal("40"))));
+        assertEquals(0, BigDecimal.ZERO.compareTo(WhseTariffBook.freeQuantity(new BigDecimal("30"), null)));
+        assertEquals(0, BigDecimal.ZERO.compareTo(WhseTariffBook.freeQuantity(BigDecimal.ZERO, new BigDecimal("5"))));
+    }
 }

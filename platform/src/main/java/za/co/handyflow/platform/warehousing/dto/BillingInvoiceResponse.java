@@ -10,5 +10,5 @@ public record BillingInvoiceResponse(
         LocalDate invoiceDate, LocalDate dueDate, BigDecimal storageFee, BigDecimal handlingFee,
         BigDecimal vatAmount, BigDecimal subtotal, BigDecimal total, BigDecimal amountPaid, BigDecimal balance,
         String status, Instant sentAt, Instant paidAt,
-        BigDecimal storageMinimumTopup, UUID preparedBy
+        BigDecimal storageMinimumTopup, UUID preparedBy, BigDecimal storageLocationFees
 ) {}

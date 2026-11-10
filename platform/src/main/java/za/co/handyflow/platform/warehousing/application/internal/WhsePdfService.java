@@ -201,10 +201,13 @@ public class WhsePdfService {
      */
     static List<InvoiceLine> invoiceLines(WhseBillingInvoice inv) {
         BigDecimal topUp = inv.getStorageMinimumTopup() == null ? BigDecimal.ZERO : inv.getStorageMinimumTopup();
+        BigDecimal positionFees = inv.getStorageLocationFees() == null ? BigDecimal.ZERO : inv.getStorageLocationFees();
         List<InvoiceLine> lines = new ArrayList<>();
-        if (topUp.signum() > 0) {
-            lines.add(new InvoiceLine("Storage of goods held", inv.getStorageFee().subtract(topUp), false));
-            lines.add(new InvoiceLine("Storage minimum charge top-up (contract minimum)", topUp, false));
+        BigDecimal goods = inv.getStorageFee().subtract(topUp).subtract(positionFees);
+        if (topUp.signum() > 0 || positionFees.signum() > 0) {
+            lines.add(new InvoiceLine("Storage of goods held", goods, false));
+            if (positionFees.signum() > 0) lines.add(new InvoiceLine("Pallet / bin position fees", positionFees, false));
+            if (topUp.signum() > 0) lines.add(new InvoiceLine("Storage minimum charge top-up (contract minimum)", topUp, false));
         } else {
             lines.add(new InvoiceLine("Storage", inv.getStorageFee(), false));
         }

@@ -47,7 +47,8 @@ class WhseStorageAccrualServiceTest {
         profiles = mock(WhseProfileRepository.class);
         inventoryRepo = mock(WhseInventoryRepository.class);
         service = new WhseStorageAccrualService(accruals, clients, items, profiles, inventoryRepo,
-                tenantId -> new WhseTariffBook(List.of(), List.of()));
+                tenantId -> new WhseTariffBook(List.of(), List.of()),
+                mock(za.co.handyflow.platform.warehousing.domain.repository.WhseLocationAccrualRepository.class));
         client = WhseClient.create(tenant, "Acme", null, null, null, null, null, null, null, null, null);
         item = WhseItem.create(tenant, client.getId(), "SKU1", "Widget", "EACH", null);
         when(clients.findById(client.getId())).thenReturn(Optional.of(client));
@@ -106,7 +107,8 @@ class WhseStorageAccrualServiceTest {
         WhseTariffBook.TariffVersion v = new WhseTariffBook.TariffVersion(UUID.randomUUID(), client.getId(), null,
                 new BigDecimal("6.0000"), day.minusDays(1), java.time.Instant.now());
         service = new WhseStorageAccrualService(accruals, clients, items, profiles, inventoryRepo,
-                tenantId -> new WhseTariffBook(List.of(v), List.of()));
+                tenantId -> new WhseTariffBook(List.of(v), List.of()),
+                mock(za.co.handyflow.platform.warehousing.domain.repository.WhseLocationAccrualRepository.class));
         held(stock(0), 30);
 
         service.accrueForTenant(tenant, day);

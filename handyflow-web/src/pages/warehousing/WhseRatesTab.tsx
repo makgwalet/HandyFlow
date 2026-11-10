@@ -11,7 +11,7 @@ import { usePermission } from "../../hooks/usePermission"
 import { WHSE_ACCENT } from "./constants"
 
 interface TariffRow { id: string; clientId: string | null; itemId: string | null; monthlyRate: number; effectiveFrom: string; note: string | null }
-interface TermsRow { id: string; clientId: string | null; minimumStorageCharge: number; effectiveFrom: string; note: string | null }
+interface TermsRow { id: string; clientId: string | null; minimumStorageCharge: number; freeDays: number; locationFeePerMonth: number; effectiveFrom: string; note: string | null }
 interface ItemResponse { id: string; sku: string }
 
 const cardStyle: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: 20, marginBottom: 20 }
@@ -58,14 +58,20 @@ export default function WhseRatesTab({ clientId }: { clientId: string }) {
     else { setSent(null); qc.invalidateQueries({ queryKey: [key, clientId] }) }
   }
   const [minCharge, setMinCharge] = useState(""); const [minFrom, setMinFrom] = useState(today())
+  const [freeDays, setFreeDays] = useState(""); const [binFee, setBinFee] = useState("")
+  const num = (v: string) => (v.trim() === "" ? null : parseFloat(v))
+  const termsInvalid = [minCharge, binFee].some(v => v.trim() !== "" && Number.isNaN(parseFloat(v)))
+    || (freeDays.trim() !== "" && !/^\d+$/.test(freeDays.trim()))
+  const termsEmpty = minCharge.trim() === "" && freeDays.trim() === "" && binFee.trim() === ""
 
   const addTariff = useMutation({
     mutationFn: async () => apiClient.post("/api/v1/warehousing/storage-tariffs", { clientId, itemId: itemId || null, monthlyRate: parseFloat(rate), effectiveFrom: from, note: note.trim() || null }),
     onSuccess: (res) => { afterSave(res, "whse-tariffs"); setRate(""); setNote("") },
   })
   const addTerms = useMutation({
-    mutationFn: async () => apiClient.post("/api/v1/warehousing/billing-terms", { clientId, minimumStorageCharge: parseFloat(minCharge), effectiveFrom: minFrom }),
-    onSuccess: (res) => { afterSave(res, "whse-terms"); setMinCharge("") },
+    mutationFn: async () => apiClient.post("/api/v1/warehousing/billing-terms", {
+      clientId, minimumStorageCharge: num(minCharge), freeDays: freeDays.trim() === "" ? null : parseInt(freeDays, 10), locationFeePerMonth: num(binFee), effectiveFrom: minFrom }),
+    onSuccess: (res) => { afterSave(res, "whse-terms"); setMinCharge(""); setFreeDays(""); setBinFee("") },
   })
 
   const tariffNow = inForce(tariffs, t => `${t.clientId ?? "default"}|${t.itemId ?? ""}`)
@@ -115,16 +121,20 @@ export default function WhseRatesTab({ clientId }: { clientId: string }) {
       </div>
 
       <div style={cardStyle}>
-        <p style={{ fontSize: 14, fontWeight: 800, color: "var(--hf-text)", margin: "0 0 4px" }}>Minimum storage charge</p>
+        <p style={{ fontSize: 14, fontWeight: 800, color: "var(--hf-text)", margin: "0 0 4px" }}>Minimum charge, free days and pallet/bin fee</p>
         <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: "0 0 14px" }}>
-          Per 30 days, shared out over the days each invoice covers. When storage comes to less, the invoice is topped up to the minimum and the top-up is recorded on the invoice.
+          Minimum: per 30 days, shared out over the days each invoice covers; when storage comes to less, the invoice is topped up and the top-up is shown on it.
+          Free days: stock received in the last N days (the day it arrives is day 1) is not charged per-unit storage. Pallet/bin fee: a flat monthly fee for each pallet or bin position the client occupies, charged by the day and waived while everything in that position is still inside its free days.
+          A new version starts from the date you give; anything you leave empty carries over from the terms in force.
         </p>
         {terms.length === 0 ? <p style={{ fontSize: 13, color: "var(--hf-text-faint)" }}>No minimum set.</p> : (
           <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
             {terms.map((t, i) => (
               <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
                 <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>
-                  {money(t.minimumStorageCharge)} <span style={{ fontWeight: 500, color: "var(--hf-text-muted)" }}>/ 30 days · {t.clientId ? "this client" : "All clients"} · from {t.effectiveFrom}</span>
+                  {money(t.minimumStorageCharge)} <span style={{ fontWeight: 500, color: "var(--hf-text-muted)" }}>/ 30 days minimum
+                    {t.freeDays > 0 ? ` · ${t.freeDays} free days` : ""}{t.locationFeePerMonth > 0 ? ` · ${money(t.locationFeePerMonth)} / pallet or bin / month` : ""}
+                    {" "}· {t.clientId ? "this client" : "All clients"} · from {t.effectiveFrom}</span>
                 </p>
                 <Badge tone={tone(termsNow.has(t), t.effectiveFrom > today())}>{termsNow.has(t) ? "IN FORCE" : t.effectiveFrom > today() ? "STARTS LATER" : "SUPERSEDED"}</Badge>
               </div>
@@ -133,11 +143,13 @@ export default function WhseRatesTab({ clientId }: { clientId: string }) {
         )}
         {canEdit && (
           <div style={{ display: "grid", gap: 12, maxWidth: 460 }}>
-            <div><label htmlFor="min" style={labelStyle}>Minimum per 30 days (R) — 0 removes it *</label><input id="min" type="number" min="0" step="0.01" style={inputStyle} value={minCharge} onChange={e => setMinCharge(e.target.value)} /></div>
+            <div><label htmlFor="min" style={labelStyle}>Minimum per 30 days (R), 0 removes it</label><input id="min" type="number" min="0" step="0.01" style={inputStyle} value={minCharge} onChange={e => setMinCharge(e.target.value)} /></div>
+            <div><label htmlFor="free-days" style={labelStyle}>Free days, 0 removes them</label><input id="free-days" type="number" min="0" max="3650" step="1" style={inputStyle} value={freeDays} onChange={e => setFreeDays(e.target.value)} /></div>
+            <div><label htmlFor="bin-fee" style={labelStyle}>Pallet / bin fee per month (R), 0 removes it</label><input id="bin-fee" type="number" min="0" step="0.01" style={inputStyle} value={binFee} onChange={e => setBinFee(e.target.value)} /></div>
             <div><label htmlFor="min-from" style={labelStyle}>Starts *</label><input id="min-from" type="date" min={today()} style={inputStyle} value={minFrom} onChange={e => setMinFrom(e.target.value)} /></div>
             {addTerms.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, margin: 0 }}>{errMsg(addTerms.error, "Could not add this minimum")}</p>}
-            <button onClick={() => addTerms.mutate()} disabled={!minCharge || Number.isNaN(parseFloat(minCharge)) || !minFrom || addTerms.isPending}
-              style={{ padding: 10, borderRadius: 8, border: "none", background: WHSE_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: (!minCharge || addTerms.isPending) ? 0.6 : 1 }}>
+            <button onClick={() => addTerms.mutate()} disabled={termsEmpty || termsInvalid || !minFrom || addTerms.isPending}
+              style={{ padding: 10, borderRadius: 8, border: "none", background: WHSE_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: (termsEmpty || termsInvalid || addTerms.isPending) ? 0.6 : 1 }}>
               {addTerms.isPending ? "Saving…" : needsApproval ? "Request minimum" : "Set minimum"}
             </button>
           </div>

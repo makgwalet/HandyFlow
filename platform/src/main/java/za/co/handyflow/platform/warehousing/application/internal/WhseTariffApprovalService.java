@@ -39,7 +39,7 @@ public class WhseTariffApprovalService {
     private final SeparationOfDutiesChecker duties;
 
     public record Item(UUID id, String kind, UUID clientId, String clientName, UUID itemId, String sku, BigDecimal monthlyRate,
-                       BigDecimal minimumStorageCharge, LocalDate effectiveFrom, String note, UUID requestedBy,
+                       BigDecimal minimumStorageCharge, Integer freeDays, BigDecimal locationFeePerMonth, LocalDate effectiveFrom, String note, UUID requestedBy,
                        String requestedByName, Instant requestedAt) {}
 
     @Transactional(readOnly = true)
@@ -82,12 +82,13 @@ public class WhseTariffApprovalService {
     }
 
     @Transactional
-    public UUID requestTerms(TenantId tenantId, UUID clientId, BigDecimal minimumStorageCharge, LocalDate effectiveFrom, String note, UUID actor) {
+    public UUID requestTerms(TenantId tenantId, UUID clientId, BigDecimal minimumStorageCharge, Integer freeDays, BigDecimal locationFeePerMonth,
+                             LocalDate effectiveFrom, String note, UUID actor) {
         requireActor(actor);
-        tariffs.precheckTerms(tenantId, clientId, minimumStorageCharge, effectiveFrom);
+        tariffs.precheckTerms(tenantId, clientId, minimumStorageCharge, freeDays, locationFeePerMonth, effectiveFrom);
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO whse_tariff_requests (id, tenant_id, kind, client_id, minimum_storage_charge, effective_from, note, requested_by) VALUES (?,?,?,?,?,?,?,?)",
-                id, tenantId.getValue(), TERMS, clientId, minimumStorageCharge, effectiveFrom, blank(note), actor);
+        jdbc.update("INSERT INTO whse_tariff_requests (id, tenant_id, kind, client_id, minimum_storage_charge, free_days, location_fee_per_month, effective_from, note, requested_by) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                id, tenantId.getValue(), TERMS, clientId, minimumStorageCharge, freeDays, locationFeePerMonth, effectiveFrom, blank(note), actor);
         return id;
     }
 
@@ -103,7 +104,7 @@ public class WhseTariffApprovalService {
         // A past start date is refused by the tariff service, so a late approval can never re-price a day already billed.
         UUID created = TARIFF.equals(r.kind)
                 ? tariffs.addTariff(tenantId, r.clientId, r.itemId, r.monthlyRate, r.effectiveFrom, r.note, r.requestedBy, actor)
-                : tariffs.addTerms(tenantId, r.clientId, r.minimumStorageCharge, r.effectiveFrom, r.note, r.requestedBy, actor);
+                : tariffs.addTerms(tenantId, r.clientId, r.minimumStorageCharge, r.freeDays, r.locationFeePerMonth, r.effectiveFrom, r.note, r.requestedBy, actor);
         jdbc.update("UPDATE whse_tariff_requests SET status = 'APPLIED', decided_by = ?, decided_at = now(), decision_note = ?, sole_exception = ?, resulting_id = ?, version = version + 1 WHERE id = ?",
                 actor, blank(note), sole, created, requestId);
     }
@@ -130,7 +131,7 @@ public class WhseTariffApprovalService {
     public List<Item> pending(TenantId tenantId) {
         return jdbc.query("""
                 SELECT r.id, r.kind, r.client_id, c.trading_name AS client_name, r.item_id, it.sku AS sku, r.monthly_rate,
-                       r.minimum_storage_charge, r.effective_from, r.note, r.requested_by, r.requested_at,
+                       r.minimum_storage_charge, r.free_days, r.location_fee_per_month, r.effective_from, r.note, r.requested_by, r.requested_at,
                        trim(coalesce(u.first_name, '') || ' ' || coalesce(u.last_name, '')) AS requested_by_name
                   FROM whse_tariff_requests r
                   LEFT JOIN whse_clients c ON c.id = r.client_id
@@ -139,7 +140,8 @@ public class WhseTariffApprovalService {
                  WHERE r.tenant_id = ? AND r.status = 'PENDING' ORDER BY r.requested_at""",
                 (rs, i) -> new Item(rs.getObject("id", UUID.class), rs.getString("kind"), rs.getObject("client_id", UUID.class),
                         rs.getString("client_name"), rs.getObject("item_id", UUID.class), rs.getString("sku"), rs.getBigDecimal("monthly_rate"),
-                        rs.getBigDecimal("minimum_storage_charge"), rs.getDate("effective_from").toLocalDate(), rs.getString("note"),
+                        rs.getBigDecimal("minimum_storage_charge"), (Integer) rs.getObject("free_days"), rs.getBigDecimal("location_fee_per_month"),
+                        rs.getDate("effective_from").toLocalDate(), rs.getString("note"),
                         rs.getObject("requested_by", UUID.class), rs.getString("requested_by_name"), rs.getTimestamp("requested_at").toInstant()),
                 tenantId.getValue());
     }
@@ -147,14 +149,15 @@ public class WhseTariffApprovalService {
     // ── internals ───────────────────────────────────────────────────────────
 
     record Row(String kind, UUID clientId, UUID itemId, BigDecimal monthlyRate, BigDecimal minimumStorageCharge,
-               LocalDate effectiveFrom, String note, String status, UUID requestedBy) {}
+               Integer freeDays, BigDecimal locationFeePerMonth, LocalDate effectiveFrom, String note, String status, UUID requestedBy) {}
 
     private Row lock(TenantId tenantId, UUID id) {
         List<Row> rows = jdbc.query("""
-                SELECT kind, client_id, item_id, monthly_rate, minimum_storage_charge, effective_from, note, status, requested_by
+                SELECT kind, client_id, item_id, monthly_rate, minimum_storage_charge, free_days, location_fee_per_month, effective_from, note, status, requested_by
                   FROM whse_tariff_requests WHERE tenant_id = ? AND id = ? FOR UPDATE""",
                 (rs, i) -> new Row(rs.getString("kind"), rs.getObject("client_id", UUID.class), rs.getObject("item_id", UUID.class),
-                        rs.getBigDecimal("monthly_rate"), rs.getBigDecimal("minimum_storage_charge"), rs.getDate("effective_from").toLocalDate(),
+                        rs.getBigDecimal("monthly_rate"), rs.getBigDecimal("minimum_storage_charge"),
+                        (Integer) rs.getObject("free_days"), rs.getBigDecimal("location_fee_per_month"), rs.getDate("effective_from").toLocalDate(),
                         rs.getString("note"), rs.getString("status"), rs.getObject("requested_by", UUID.class)),
                 tenantId.getValue(), id);
         if (rows.isEmpty()) throw new ResourceNotFoundException("Tariff request", id.toString());

@@ -61,6 +61,36 @@ describe("rates and terms", () => {
     fireEvent.change(screen.getByLabelText(/Minimum per 30 days/), { target: { value: "750" } })
     fireEvent.click(set)
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/warehousing/billing-terms",
-      { clientId: "c1", minimumStorageCharge: 750, effectiveFrom: day(0) }))
+      { clientId: "c1", minimumStorageCharge: 750, freeDays: null, locationFeePerMonth: null, effectiveFrom: day(0) }))
+  })
+
+  it("an administrator sets free days and a pallet/bin fee without touching the minimum", async () => {
+    perms = ["WAREHOUSING_ADMIN"]
+    wrap()
+    const set = await screen.findByText("Set minimum")
+    expect((set as HTMLButtonElement).disabled).toBe(true)          // nothing entered yet
+    fireEvent.change(screen.getByLabelText(/Free days/), { target: { value: "14" } })
+    fireEvent.change(screen.getByLabelText(/Pallet \/ bin fee/), { target: { value: "45.50" } })
+    fireEvent.click(set)
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/warehousing/billing-terms",
+      { clientId: "c1", minimumStorageCharge: null, freeDays: 14, locationFeePerMonth: 45.5, effectiveFrom: day(0) }))
+  })
+
+  it("free days must be a whole number", async () => {
+    perms = ["WAREHOUSING_ADMIN"]
+    wrap()
+    const set = (await screen.findByText("Set minimum")) as HTMLButtonElement
+    fireEvent.change(screen.getByLabelText(/Free days/), { target: { value: "2.5" } })
+    expect(set.disabled).toBe(true)
+  })
+
+  it("shows free days and the pallet/bin fee on a terms version", async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.includes("billing-terms")) return { data: [{ id: "m1", clientId: "c1", minimumStorageCharge: 500, freeDays: 14, locationFeePerMonth: 45, effectiveFrom: day(-1), note: null }] }
+      return { data: [] }
+    })
+    wrap()
+    await waitFor(() => expect(screen.getByText(/14 free days/)).toBeTruthy())
+    expect(screen.getByText(/pallet or bin \/ month/)).toBeTruthy()
   })
 })

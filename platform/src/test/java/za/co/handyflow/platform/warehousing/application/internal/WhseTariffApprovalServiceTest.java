@@ -54,7 +54,7 @@ class WhseTariffApprovalServiceTest {
     private void locked(String kind, UUID by, String status) {
         boolean tariff = "TARIFF".equals(kind);
         List rows = List.of(new WhseTariffApprovalService.Row(kind, client, null, tariff ? new BigDecimal("12.5") : null,
-                tariff ? null : new BigDecimal("900"), start, "note", status, by));
+                tariff ? null : new BigDecimal("900"), null, null, start, "note", status, by));
         when(jdbc.query(contains("FOR UPDATE"), any(RowMapper.class), any(Object[].class))).thenReturn(rows);
     }
 
@@ -83,8 +83,8 @@ class WhseTariffApprovalServiceTest {
         assertNotNull(id);
         verify(tariffs).precheckTariff(t(), client, null, new BigDecimal("12.5"), start);
         verify(jdbc).update(contains("INSERT INTO whse_tariff_requests"), any(Object[].class));
-        service.requestTerms(t(), client, new BigDecimal("900"), start, null, maker);
-        verify(tariffs).precheckTerms(t(), client, new BigDecimal("900"), start);
+        service.requestTerms(t(), client, new BigDecimal("900"), 14, new BigDecimal("25"), start, null, maker);
+        verify(tariffs).precheckTerms(t(), client, new BigDecimal("900"), 14, new BigDecimal("25"), start);
     }
 
     @Test
@@ -112,7 +112,7 @@ class WhseTariffApprovalServiceTest {
     void approveAppliesTerms() {
         locked("TERMS", maker, "PENDING");
         service.approve(t(), requestId, null, checker);
-        verify(tariffs).addTerms(t(), client, new BigDecimal("900"), start, "note", maker, checker);
+        verify(tariffs).addTerms(t(), client, new BigDecimal("900"), null, null, start, "note", maker, checker);
     }
 
     @Test

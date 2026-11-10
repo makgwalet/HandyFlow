@@ -42,6 +42,8 @@ public class WhseStorageAccrual {
     @Column(name = "amount", nullable = false, precision = 15, scale = 4) private BigDecimal amount;
     @Column(name = "billing_invoice_id") private UUID billingInvoiceId;
     @Column(name = "tariff_id") private UUID tariffId;
+    /** The part of {@code qtyOnHand} that was inside its free days; the amount excludes it. */
+    @Column(name = "free_qty", nullable = false, precision = 12, scale = 3) private BigDecimal freeQty = BigDecimal.ZERO;
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt = Instant.now();
 
     public static WhseStorageAccrual of(WhseInventory position, LocalDate date, BigDecimal monthlyRate, String rateSource) {
@@ -68,6 +70,15 @@ public class WhseStorageAccrual {
         a.amount = billableQty.multiply(monthlyRate)
                 .divide(BigDecimal.valueOf(DAYS_PER_MONTH), 4, RoundingMode.HALF_UP);
         return a;
+    }
+
+    /** Marks part of the day's quantity as free (stock still inside its free days) and prices only the rest. */
+    public WhseStorageAccrual withFreeQty(BigDecimal free) {
+        BigDecimal f = free == null ? BigDecimal.ZERO : free;
+        if (f.signum() < 0 || f.compareTo(qtyOnHand) > 0) throw new IllegalArgumentException("Free quantity must be between 0 and the quantity held");
+        this.freeQty = f;
+        this.amount = qtyOnHand.subtract(f).multiply(monthlyRate).divide(BigDecimal.valueOf(DAYS_PER_MONTH), 4, RoundingMode.HALF_UP);
+        return this;
     }
 
     /** The tariff version that priced this day, when a version (not a plain rate field) did. */

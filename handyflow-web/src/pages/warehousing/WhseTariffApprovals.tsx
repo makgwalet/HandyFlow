@@ -14,7 +14,7 @@ import { WHSE_ACCENT } from "./constants"
 
 interface PendingTariff {
   id: string; kind: "TARIFF" | "TERMS"; clientName: string | null; sku: string | null; monthlyRate: number | null
-  minimumStorageCharge: number | null; effectiveFrom: string; note: string | null; requestedByName: string | null; requestedAt: string
+  minimumStorageCharge: number | null; freeDays?: number | null; locationFeePerMonth?: number | null; effectiveFrom: string; note: string | null; requestedByName: string | null; requestedAt: string
 }
 
 const cardStyle: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: 20, marginBottom: 20 }
@@ -74,7 +74,11 @@ function Row({ item }: { item: PendingTariff }) {
   const cancel = useMutation({ mutationFn: async () => apiClient.post(`${base}/cancel`, {}), onSuccess: done })
   const what = item.kind === "TARIFF"
     ? `${money(item.monthlyRate ?? 0)} per unit per month · ${item.sku ? `item ${item.sku}` : item.clientName ? "all of the client's stock" : "warehouse default"}`
-    : `Minimum ${money(item.minimumStorageCharge ?? 0)} per 30 days`
+    : [
+        item.minimumStorageCharge != null ? `Minimum ${money(item.minimumStorageCharge)} per 30 days` : null,
+        item.freeDays != null ? `${item.freeDays} free days` : null,
+        item.locationFeePerMonth != null ? `${money(item.locationFeePerMonth)} per pallet or bin per month` : null,
+      ].filter(Boolean).join(" · ")
 
   return (
     <div style={{ padding: "14px 16px", borderTop: "1px solid var(--hf-border-subtle)" }}>

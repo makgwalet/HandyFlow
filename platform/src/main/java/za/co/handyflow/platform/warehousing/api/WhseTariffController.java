@@ -64,16 +64,16 @@ public class WhseTariffController {
 
     @PostMapping("/billing-terms")
     @PreAuthorize("hasAuthority('WAREHOUSING_ADMIN')")
-    @Operation(summary = "Add a minimum storage charge (per 30 days) starting today or later")
+    @Operation(summary = "Add billing terms starting today or later: minimum storage charge (per 30 days), free storage days, fixed pallet/bin fee. Values left out carry forward.")
     public ResponseEntity<ApiResponse<Map<String, UUID>>> addTerms(@Valid @RequestBody AddBillingTermsRequest req) {
         featureGuard.requireModule("warehousing");
         if (approvals.required(TenantContext.getTenantIdAsObject())) {
-            UUID requestId = approvals.requestTerms(TenantContext.getTenantIdAsObject(), req.clientId(), req.minimumStorageCharge(),
-                    req.effectiveFrom(), req.note(), TenantContext.getCurrentUserId());
+            UUID requestId = approvals.requestTerms(TenantContext.getTenantIdAsObject(), req.clientId(), req.minimumStorageCharge(), req.freeDays(),
+                    req.locationFeePerMonth(), req.effectiveFrom(), req.note(), TenantContext.getCurrentUserId());
             return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.success("Sent for approval", Map.of("requestId", requestId)));
         }
-        UUID id = service.addTerms(TenantContext.getTenantIdAsObject(), req.clientId(), req.minimumStorageCharge(),
-                req.effectiveFrom(), req.note(), TenantContext.getCurrentUserId());
+        UUID id = service.addTerms(TenantContext.getTenantIdAsObject(), req.clientId(), req.minimumStorageCharge(), req.freeDays(),
+                req.locationFeePerMonth(), req.effectiveFrom(), req.note(), TenantContext.getCurrentUserId(), null);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Billing terms added", Map.of("id", id)));
     }
 

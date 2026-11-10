@@ -31,7 +31,8 @@ public class WhseTariffService implements WhseTariffBookSource {
     private String billingZone = "Africa/Johannesburg";
 
     public record TariffRow(UUID id, UUID clientId, UUID itemId, BigDecimal monthlyRate, LocalDate effectiveFrom, String note, Instant createdAt) {}
-    public record TermsRow(UUID id, UUID clientId, BigDecimal minimumStorageCharge, LocalDate effectiveFrom, String note, Instant createdAt) {}
+    public record TermsRow(UUID id, UUID clientId, BigDecimal minimumStorageCharge, int freeDays, BigDecimal locationFeePerMonth,
+                           LocalDate effectiveFrom, String note, Instant createdAt) {}
 
     @Override
     public WhseTariffBook bookFor(UUID tenantId) {
@@ -46,9 +47,10 @@ public class WhseTariffService implements WhseTariffBookSource {
                         rs.getObject("item_id", UUID.class), rs.getBigDecimal("monthly_rate"),
                         rs.getDate("effective_from").toLocalDate(), rs.getTimestamp("created_at").toInstant()), tenantId.getValue());
         List<WhseTariffBook.TermsVersion> terms = jdbc.query(
-                "SELECT id, client_id, minimum_storage_charge, effective_from, created_at FROM whse_billing_terms WHERE tenant_id = ?",
+                "SELECT id, client_id, minimum_storage_charge, free_days, location_fee_per_month, effective_from, created_at FROM whse_billing_terms WHERE tenant_id = ?",
                 (rs, i) -> new WhseTariffBook.TermsVersion(rs.getObject("id", UUID.class), rs.getObject("client_id", UUID.class),
-                        rs.getBigDecimal("minimum_storage_charge"), rs.getDate("effective_from").toLocalDate(),
+                        rs.getBigDecimal("minimum_storage_charge"), rs.getInt("free_days"), rs.getBigDecimal("location_fee_per_month"),
+                        rs.getDate("effective_from").toLocalDate(),
                         rs.getTimestamp("created_at").toInstant()), tenantId.getValue());
         return new WhseTariffBook(tariffs, terms);
     }
@@ -74,11 +76,12 @@ public class WhseTariffService implements WhseTariffBookSource {
     @Transactional(readOnly = true)
     public List<TermsRow> terms(TenantId tenantId, UUID clientId) {
         return jdbc.query("""
-                SELECT id, client_id, minimum_storage_charge, effective_from, note, created_at FROM whse_billing_terms
+                SELECT id, client_id, minimum_storage_charge, free_days, location_fee_per_month, effective_from, note, created_at FROM whse_billing_terms
                  WHERE tenant_id = ? AND (? IS NULL OR client_id = ? OR client_id IS NULL)
                  ORDER BY effective_from DESC, created_at DESC LIMIT 500""",
                 (rs, i) -> new TermsRow(rs.getObject("id", UUID.class), rs.getObject("client_id", UUID.class),
-                        rs.getBigDecimal("minimum_storage_charge"), rs.getDate("effective_from").toLocalDate(), rs.getString("note"),
+                        rs.getBigDecimal("minimum_storage_charge"), rs.getInt("free_days"), rs.getBigDecimal("location_fee_per_month"),
+                        rs.getDate("effective_from").toLocalDate(), rs.getString("note"),
                         rs.getTimestamp("created_at").toInstant()),
                 tenantId.getValue(), clientId, clientId);
     }
@@ -113,15 +116,29 @@ public class WhseTariffService implements WhseTariffBookSource {
     /** As above; {@code approvedBy} is the second person when the change went through approval. */
     @Transactional
     public UUID addTerms(TenantId tenantId, UUID clientId, BigDecimal minimumStorageCharge, LocalDate effectiveFrom, String note, UUID actor, UUID approvedBy) {
+        return addTerms(tenantId, clientId, minimumStorageCharge, null, null, effectiveFrom, note, actor, approvedBy);
+    }
+
+    /**
+     * Adds a terms version: minimum charge per 30 days, free storage days and a fixed monthly fee per occupied pallet/bin.
+     * A version is a full snapshot, so any value left null carries forward from the terms in force for this client on the start
+     * date (the client's own, else the warehouse default's, else zero).
+     */
+    @Transactional
+    public UUID addTerms(TenantId tenantId, UUID clientId, BigDecimal minimumStorageCharge, Integer freeDays, BigDecimal locationFeePerMonth,
+                         LocalDate effectiveFrom, String note, UUID actor, UUID approvedBy) {
         requireActor(actor);
-        if (minimumStorageCharge == null || minimumStorageCharge.signum() < 0) throw new IllegalArgumentException("The minimum charge cannot be negative.");
-        requireNotBackdated(effectiveFrom);
-        requireClient(tenantId, clientId);
+        precheckTerms(tenantId, clientId, minimumStorageCharge, freeDays, locationFeePerMonth, effectiveFrom);
+        WhseTariffBook.Terms current = book(tenantId).termsFor(clientId, effectiveFrom);
+        BigDecimal min = minimumStorageCharge != null ? minimumStorageCharge : current.minimumStorageCharge();
+        int days = freeDays != null ? freeDays : current.freeDays();
+        BigDecimal fee = locationFeePerMonth != null ? locationFeePerMonth : current.locationFeePerMonth();
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO whse_billing_terms (id, tenant_id, client_id, minimum_storage_charge, effective_from, note, created_by) VALUES (?,?,?,?,?,?,?)",
-                id, tenantId.getValue(), clientId, minimumStorageCharge, effectiveFrom, trim(note), actor);
+        jdbc.update("INSERT INTO whse_billing_terms (id, tenant_id, client_id, minimum_storage_charge, free_days, location_fee_per_month, effective_from, note, created_by) VALUES (?,?,?,?,?,?,?,?,?)",
+                id, tenantId.getValue(), clientId, min, days, fee, effectiveFrom, trim(note), actor);
         audit(tenantId, actor, "WHSE_BILLING_TERMS_ADDED", "WHSE_BILLING_TERMS", id,
-                "{\"clientId\":" + q(clientId) + ",\"minimumStorageCharge\":" + minimumStorageCharge.toPlainString() + ",\"effectiveFrom\":\"" + effectiveFrom + "\",\"approvedBy\":" + q(approvedBy) + "}");
+                "{\"clientId\":" + q(clientId) + ",\"minimumStorageCharge\":" + min.toPlainString() + ",\"freeDays\":" + days
+                        + ",\"locationFeePerMonth\":" + fee.toPlainString() + ",\"effectiveFrom\":\"" + effectiveFrom + "\",\"approvedBy\":" + q(approvedBy) + "}");
         return id;
     }
 
@@ -136,8 +153,13 @@ public class WhseTariffService implements WhseTariffBookSource {
         if (itemId != null) requireItemOfClient(tenantId, clientId, itemId);
     }
 
-    void precheckTerms(TenantId tenantId, UUID clientId, BigDecimal minimumStorageCharge, LocalDate effectiveFrom) {
-        if (minimumStorageCharge == null || minimumStorageCharge.signum() < 0) throw new IllegalArgumentException("The minimum charge cannot be negative.");
+    void precheckTerms(TenantId tenantId, UUID clientId, BigDecimal minimumStorageCharge, Integer freeDays, BigDecimal locationFeePerMonth, LocalDate effectiveFrom) {
+        if (minimumStorageCharge == null && freeDays == null && locationFeePerMonth == null) {
+            throw new IllegalArgumentException("Give at least one of: minimum charge, free days, pallet/bin fee.");
+        }
+        if (minimumStorageCharge != null && minimumStorageCharge.signum() < 0) throw new IllegalArgumentException("The minimum charge cannot be negative.");
+        if (freeDays != null && (freeDays < 0 || freeDays > 3650)) throw new IllegalArgumentException("Free days must be between 0 and 3650.");
+        if (locationFeePerMonth != null && locationFeePerMonth.signum() < 0) throw new IllegalArgumentException("The pallet/bin fee cannot be negative.");
         requireNotBackdated(effectiveFrom);
         requireClient(tenantId, clientId);
     }

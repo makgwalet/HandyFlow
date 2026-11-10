@@ -112,6 +112,7 @@ public class WhseBillingService {
     private final AccountingFacade accountingFacade;
     private final SeparationOfDutiesChecker duties;
     private final WhseTariffService tariffService;
+    private final za.co.handyflow.platform.warehousing.domain.repository.WhseLocationAccrualRepository locationAccrualRepository;
 
     public static final String APPROVE_PERMISSION = "WAREHOUSING_BILLING_APPROVE";
 
@@ -143,14 +144,20 @@ public class WhseBillingService {
         // Daily accruals are the source of truth. Only a period with no accruals at all (before the daily job
         // started) falls back to the old point-in-time snapshot, and says so in the log.
         List<WhseStorageAccrual> accruals = accrualRepository.findUnbilled(tenantId.getValue(), clientId, periodStart, periodEnd);
+        List<za.co.handyflow.platform.warehousing.domain.model.WhseLocationAccrual> locationAccruals =
+                locationAccrualRepository.findUnbilled(tenantId.getValue(), clientId, periodStart, periodEnd);
+        BigDecimal locationFees = locationAccruals.stream()
+                .map(za.co.handyflow.platform.warehousing.domain.model.WhseLocationAccrual::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
         BigDecimal storageFee;
-        if (accruals.isEmpty()) {
+        if (accruals.isEmpty() && locationAccruals.isEmpty()) {
             log.warn("[Warehousing] No daily storage accruals for client={} {}..{}; using the legacy point-in-time snapshot",
                     clientId, periodStart, periodEnd);
             storageFee = computeStorageFee(tenantId, clientId, client, profile, daysInPeriod);
         } else {
+            // Per-unit storage plus the fixed pallet/bin fees; the latter are shown as their own line on the invoice.
             storageFee = accruals.stream().map(WhseStorageAccrual::getAmount)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
+                    .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP).add(locationFees);
         }
         // Minimum storage charge (per 30 days, pro-rated to this period). The top-up is recorded on the invoice.
         BigDecimal minimumTopUp = BigDecimal.ZERO;
@@ -169,11 +176,16 @@ public class WhseBillingService {
                 periodStart, periodEnd, invoiceDate, invoiceDate.plusDays(30), storageFee, handlingFee, vatAmount);
         invoice.preparedBy(preparedBy);
         invoice.recordMinimumTopUp(minimumTopUp);
+        invoice.recordLocationFees(locationFees);
         invoice = invoiceRepository.save(invoice);
         for (WhseStorageAccrual accrual : accruals) {
             accrual.markBilled(invoice.getId());
         }
         accrualRepository.saveAll(accruals);
+        for (za.co.handyflow.platform.warehousing.domain.model.WhseLocationAccrual accrual : locationAccruals) {
+            accrual.markBilled(invoice.getId());
+        }
+        locationAccrualRepository.saveAll(locationAccruals);
 
         log.info("[Warehousing] Billing invoice prepared (awaiting approval) tenant={} client={} invoice={} storageFee={} handlingFee={} period={}..{}",
                 tenantId.getValue(), clientId, invoiceNumber, storageFee, handlingFee, periodStart, periodEnd);
@@ -210,7 +222,7 @@ public class WhseBillingService {
         }
         invoice.reject(actor, note.trim());
         invoice = invoiceRepository.saveAndFlush(invoice);
-        int released = accrualRepository.release(invoice.getId());
+        int released = accrualRepository.release(invoice.getId()) + locationAccrualRepository.release(invoice.getId());
         log.info("[Warehousing] Billing invoice rejected tenant={} invoice={} by={} accrualDaysReleased={}", tenantId.getValue(), invoice.getInvoiceNumber(), actor, released);
         return invoice;
     }
