@@ -6,6 +6,7 @@
 //    audited sole-approver exception where nobody else can);
 //  - the approval threshold (units above which an adjustment needs a second person), editable by
 //    WAREHOUSING_ADMIN. Empty means the rule is off. Every change needs a reason and is audited.
+// Rate and minimum-charge changes have the same control (see WhseTariffApprovals).
 // Invoice approval lives on each client's Billing tab.
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -13,6 +14,7 @@ import { Check, X } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
+import { TariffRuleCard, TariffRequestsCard } from "./WhseTariffApprovals"
 
 interface PendingAdjustment {
   id: string; inventoryId: string; delta: number; reason: string; requestedByName: string | null; requestedAt: string
@@ -146,6 +148,8 @@ export default function WhseApprovalsTab() {
           : pending.length === 0 ? <p style={{ color: "var(--hf-text-faint)", fontSize: 13, padding: "0 16px 16px", margin: 0 }}>Nothing is waiting.</p>
           : pending.map(p => <PendingRow key={p.id} item={p} />)}
       </div>
+      <TariffRuleCard />
+      <TariffRequestsCard />
       <p style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>Client invoices waiting for approval are on each client's Billing tab.</p>
     </div>
   )

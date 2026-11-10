@@ -85,6 +85,12 @@ public class WhseTariffService implements WhseTariffBookSource {
 
     @Transactional
     public UUID addTariff(TenantId tenantId, UUID clientId, UUID itemId, BigDecimal monthlyRate, LocalDate effectiveFrom, String note, UUID actor) {
+        return addTariff(tenantId, clientId, itemId, monthlyRate, effectiveFrom, note, actor, null);
+    }
+
+    /** As above; {@code approvedBy} is the second person when the change went through approval (the version is credited to {@code actor}, who asked). */
+    @Transactional
+    public UUID addTariff(TenantId tenantId, UUID clientId, UUID itemId, BigDecimal monthlyRate, LocalDate effectiveFrom, String note, UUID actor, UUID approvedBy) {
         requireActor(actor);
         if (monthlyRate == null || monthlyRate.signum() < 0) throw new IllegalArgumentException("The monthly rate cannot be negative.");
         requireNotBackdated(effectiveFrom);
@@ -95,12 +101,18 @@ public class WhseTariffService implements WhseTariffBookSource {
         jdbc.update("INSERT INTO whse_storage_tariffs (id, tenant_id, client_id, item_id, monthly_rate, effective_from, note, created_by) VALUES (?,?,?,?,?,?,?,?)",
                 id, tenantId.getValue(), clientId, itemId, monthlyRate, effectiveFrom, trim(note), actor);
         audit(tenantId, actor, "WHSE_STORAGE_TARIFF_ADDED", "WHSE_STORAGE_TARIFF", id,
-                "{\"clientId\":" + q(clientId) + ",\"itemId\":" + q(itemId) + ",\"monthlyRate\":" + monthlyRate.toPlainString() + ",\"effectiveFrom\":\"" + effectiveFrom + "\"}");
+                "{\"clientId\":" + q(clientId) + ",\"itemId\":" + q(itemId) + ",\"monthlyRate\":" + monthlyRate.toPlainString() + ",\"effectiveFrom\":\"" + effectiveFrom + "\",\"approvedBy\":" + q(approvedBy) + "}");
         return id;
     }
 
     @Transactional
     public UUID addTerms(TenantId tenantId, UUID clientId, BigDecimal minimumStorageCharge, LocalDate effectiveFrom, String note, UUID actor) {
+        return addTerms(tenantId, clientId, minimumStorageCharge, effectiveFrom, note, actor, null);
+    }
+
+    /** As above; {@code approvedBy} is the second person when the change went through approval. */
+    @Transactional
+    public UUID addTerms(TenantId tenantId, UUID clientId, BigDecimal minimumStorageCharge, LocalDate effectiveFrom, String note, UUID actor, UUID approvedBy) {
         requireActor(actor);
         if (minimumStorageCharge == null || minimumStorageCharge.signum() < 0) throw new IllegalArgumentException("The minimum charge cannot be negative.");
         requireNotBackdated(effectiveFrom);
@@ -109,13 +121,28 @@ public class WhseTariffService implements WhseTariffBookSource {
         jdbc.update("INSERT INTO whse_billing_terms (id, tenant_id, client_id, minimum_storage_charge, effective_from, note, created_by) VALUES (?,?,?,?,?,?,?)",
                 id, tenantId.getValue(), clientId, minimumStorageCharge, effectiveFrom, trim(note), actor);
         audit(tenantId, actor, "WHSE_BILLING_TERMS_ADDED", "WHSE_BILLING_TERMS", id,
-                "{\"clientId\":" + q(clientId) + ",\"minimumStorageCharge\":" + minimumStorageCharge.toPlainString() + ",\"effectiveFrom\":\"" + effectiveFrom + "\"}");
+                "{\"clientId\":" + q(clientId) + ",\"minimumStorageCharge\":" + minimumStorageCharge.toPlainString() + ",\"effectiveFrom\":\"" + effectiveFrom + "\",\"approvedBy\":" + q(approvedBy) + "}");
         return id;
     }
 
     // ── internals ───────────────────────────────────────────────────────────
 
-    private void requireNotBackdated(LocalDate effectiveFrom) {
+    /** Checks a tariff change would be accepted, without writing it; used when a change is put up for approval. */
+    void precheckTariff(TenantId tenantId, UUID clientId, UUID itemId, BigDecimal monthlyRate, LocalDate effectiveFrom) {
+        if (monthlyRate == null || monthlyRate.signum() < 0) throw new IllegalArgumentException("The monthly rate cannot be negative.");
+        requireNotBackdated(effectiveFrom);
+        if (itemId != null && clientId == null) throw new IllegalArgumentException("An item rate needs its client.");
+        requireClient(tenantId, clientId);
+        if (itemId != null) requireItemOfClient(tenantId, clientId, itemId);
+    }
+
+    void precheckTerms(TenantId tenantId, UUID clientId, BigDecimal minimumStorageCharge, LocalDate effectiveFrom) {
+        if (minimumStorageCharge == null || minimumStorageCharge.signum() < 0) throw new IllegalArgumentException("The minimum charge cannot be negative.");
+        requireNotBackdated(effectiveFrom);
+        requireClient(tenantId, clientId);
+    }
+
+    void requireNotBackdated(LocalDate effectiveFrom) {
         if (effectiveFrom == null) throw new IllegalArgumentException("Say when the change starts.");
         if (effectiveFrom.isBefore(LocalDate.now(java.time.ZoneId.of(billingZone)))) {
             throw new IllegalArgumentException("A tariff or term cannot start in the past. Past days keep the rate they were charged; correct an invoice with a credit.");

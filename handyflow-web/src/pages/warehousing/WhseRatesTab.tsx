@@ -49,15 +49,23 @@ export default function WhseRatesTab({ clientId }: { clientId: string }) {
   const skuOf = (id: string | null) => items.find(i => i.id === id)?.sku ?? "item"
 
   const [rate, setRate] = useState(""); const [itemId, setItemId] = useState(""); const [from, setFrom] = useState(today()); const [note, setNote] = useState("")
+  const [sent, setSent] = useState<string | null>(null)
+  const { data: rule } = useQuery<{ required: boolean }>({ queryKey: ["whse-tariff-rule"], queryFn: async () => (await apiClient.get("/api/v1/warehousing/tariff-approval-rule")).data })
+  const needsApproval = !!rule?.required
+  // A change that needs a second person comes back as a request id, not a version: say so rather than leave the list looking unchanged.
+  const afterSave = (res: { data?: { requestId?: string } | null }, key: string) => {
+    if (res?.data?.requestId) { setSent("Sent for approval. It applies once a second person approves it."); qc.invalidateQueries({ queryKey: ["whse-tariff-requests"] }) }
+    else { setSent(null); qc.invalidateQueries({ queryKey: [key, clientId] }) }
+  }
   const [minCharge, setMinCharge] = useState(""); const [minFrom, setMinFrom] = useState(today())
 
   const addTariff = useMutation({
     mutationFn: async () => apiClient.post("/api/v1/warehousing/storage-tariffs", { clientId, itemId: itemId || null, monthlyRate: parseFloat(rate), effectiveFrom: from, note: note.trim() || null }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["whse-tariffs", clientId] }); setRate(""); setNote("") },
+    onSuccess: (res) => { afterSave(res, "whse-tariffs"); setRate(""); setNote("") },
   })
   const addTerms = useMutation({
     mutationFn: async () => apiClient.post("/api/v1/warehousing/billing-terms", { clientId, minimumStorageCharge: parseFloat(minCharge), effectiveFrom: minFrom }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["whse-terms", clientId] }); setMinCharge("") },
+    onSuccess: (res) => { afterSave(res, "whse-terms"); setMinCharge("") },
   })
 
   const tariffNow = inForce(tariffs, t => `${t.clientId ?? "default"}|${t.itemId ?? ""}`)
@@ -66,6 +74,7 @@ export default function WhseRatesTab({ clientId }: { clientId: string }) {
 
   return (
     <div>
+      {sent && <p role="status" style={{ background: "var(--hf-info-soft-strong)", color: "var(--hf-info-text)", borderRadius: 10, padding: "10px 14px", fontSize: 13, fontWeight: 600, margin: "0 0 16px" }}>{sent}</p>}
       <div style={cardStyle}>
         <p style={{ fontSize: 14, fontWeight: 800, color: "var(--hf-text)", margin: "0 0 4px" }}>Storage rates</p>
         <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: "0 0 14px" }}>
@@ -99,7 +108,7 @@ export default function WhseRatesTab({ clientId }: { clientId: string }) {
             {addTariff.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, margin: 0 }}>{errMsg(addTariff.error, "Could not add this rate")}</p>}
             <button onClick={() => addTariff.mutate()} disabled={!rate || Number.isNaN(parseFloat(rate)) || !from || addTariff.isPending}
               style={{ padding: 10, borderRadius: 8, border: "none", background: WHSE_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: (!rate || addTariff.isPending) ? 0.6 : 1 }}>
-              {addTariff.isPending ? "Saving…" : "Add rate"}
+              {addTariff.isPending ? "Saving…" : needsApproval ? "Request rate" : "Add rate"}
             </button>
           </div>
         ) : <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: 0 }}>Only a warehouse administrator can add a rate.</p>}
@@ -129,7 +138,7 @@ export default function WhseRatesTab({ clientId }: { clientId: string }) {
             {addTerms.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, margin: 0 }}>{errMsg(addTerms.error, "Could not add this minimum")}</p>}
             <button onClick={() => addTerms.mutate()} disabled={!minCharge || Number.isNaN(parseFloat(minCharge)) || !minFrom || addTerms.isPending}
               style={{ padding: 10, borderRadius: 8, border: "none", background: WHSE_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: (!minCharge || addTerms.isPending) ? 0.6 : 1 }}>
-              {addTerms.isPending ? "Saving…" : "Set minimum"}
+              {addTerms.isPending ? "Saving…" : needsApproval ? "Request minimum" : "Set minimum"}
             </button>
           </div>
         )}
