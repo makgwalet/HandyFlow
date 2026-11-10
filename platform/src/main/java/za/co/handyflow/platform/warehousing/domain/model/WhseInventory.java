@@ -122,6 +122,10 @@ public class WhseInventory {
             throw new IllegalStateException("Adjustment would take on-hand quantity below zero (currently "
                     + this.qtyOnHand + ", delta " + delta + ")");
         }
+        if (newQty.compareTo(qtyAllocated) < 0) {
+            throw new IllegalStateException("Adjustment would take on-hand quantity (" + newQty
+                    + ") below the quantity already allocated to orders (" + qtyAllocated + "). Release the allocation first.");
+        }
         this.qtyOnHand = newQty;
         this.updatedAt = Instant.now();
     }

@@ -47,7 +47,8 @@ public class WhseOperationsService {
     public record TopMover(UUID itemId, String sku, String description, String clientName, BigDecimal unitsMoved) {}
     public record Summary(LocalDate date, BigDecimal totalUnitsOnHand, BigDecimal totalUnitsAllocated, BigDecimal totalUnitsAvailable,
                           long stockedPositions, long activeClients, List<StatusStock> byStatus, Counts work, TodayActivity today,
-                          long adjustmentsAwaitingApproval, long invoicesAwaitingApproval, List<TopMover> topMovers) {}
+                          long adjustmentsAwaitingApproval, long invoicesAwaitingApproval, List<TopMover> topMovers,
+                          BigDecimal stockAccuracyPct, long linesCountedLast30Days) {}
     public record TrendPoint(LocalDate day, BigDecimal received, BigDecimal dispatched, BigDecimal adjusted) {}
 
     public record StockRow(UUID inventoryId, UUID clientId, String clientName, UUID itemId, String sku, String description, String uom,
@@ -98,10 +99,15 @@ public class WhseOperationsService {
                 (rs, i) -> new TopMover(rs.getObject("item_id", UUID.class), rs.getString("sku"), rs.getString("description"),
                         rs.getString("client_name"), rs.getBigDecimal("moved")), t, since, to);
 
+        long counted30 = count("SELECT count(*) FROM whse_count_lines WHERE tenant_id = ? AND initial_counted_qty IS NOT NULL AND counted_at >= now() - interval '30 days'", t);
+        long matched30 = count("SELECT count(*) FROM whse_count_lines WHERE tenant_id = ? AND initial_counted_qty = expected_qty AND counted_at >= now() - interval '30 days'", t);
+        BigDecimal accuracy = counted30 == 0 ? null
+                : BigDecimal.valueOf(matched30 * 100.0 / counted30).setScale(1, java.math.RoundingMode.HALF_UP);
+
         return new Summary(today, onHand, allocated, availableUnits, positions, clients, byStatus,
                 new Counts(inbound.getOrDefault("EXPECTED", 0L), inbound.getOrDefault("PARTIALLY_RECEIVED", 0L), overdueIn,
                         outbound.getOrDefault("PENDING", 0L), outbound.getOrDefault("PICKING", 0L), outbound.getOrDefault("PACKED", 0L), overdueOut),
-                activity, adjPending, invPending, movers);
+                activity, adjPending, invPending, movers, accuracy, counted30);
     }
 
     /** Units received, dispatched and adjusted per calendar day for the last {@code days} days, oldest first, every day present. */

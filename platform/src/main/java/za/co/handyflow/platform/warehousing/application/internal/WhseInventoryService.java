@@ -172,6 +172,25 @@ public class WhseInventoryService {
     }
 
     /**
+     * Posts an approved cycle-count variance as a COUNT_VARIANCE movement referencing the count session. The idempotency
+     * key is the count line, so approving twice posts once.
+     */
+    @Transactional
+    public WhseInventory adjustForCount(TenantId tenantId, UUID inventoryId, BigDecimal delta, UUID sessionId,
+                                         String countNumber, String note, UUID userId, String idempotencyKey) {
+        WhseInventory inv = get(tenantId, inventoryId);
+        if (replayed(tenantId, idempotencyKey, inv.getClientId(), inv.getItemId(), inv.getLocationId())) {
+            return inv;
+        }
+        BigDecimal before = inv.getQtyOnHand();
+        inv.adjustOnHand(delta);
+        inv = repository.save(inv);
+        recordMovement(tenantId, inv, "COUNT_VARIANCE", delta, before, "CYCLE_COUNT", sessionId, countNumber, note, userId,
+                idempotencyKey);
+        return inv;
+    }
+
+    /**
      * Moves unallocated stock between statuses at one location, as two ledger movements (out of the source status,
      * into the destination status) sharing one reference. Allowed: AVAILABLE to QUARANTINE, QUARANTINE to AVAILABLE
      * (release), AVAILABLE or QUARANTINE to DAMAGED. Damaged stock does not return to available without a disposition
