@@ -40,6 +40,13 @@ public class WhseLotAllocationService {
     /** Allocates one line first-expiry-first-out. Returns the location of the first piece, kept on the line for display. */
     @Transactional
     public UUID allocate(TenantId tenantId, UUID orderId, String orderRef, UUID lineId, UUID clientId, UUID itemId, BigDecimal qty, UUID user) {
+        return allocate(tenantId, orderId, orderRef, lineId, clientId, itemId, qty, user, java.util.Set.of());
+    }
+
+    /** As above, never taking from the given positions (inventory ids), for stock that could not be found where it was expected. */
+    @Transactional
+    public UUID allocate(TenantId tenantId, UUID orderId, String orderRef, UUID lineId, UUID clientId, UUID itemId, BigDecimal qty, UUID user,
+                         java.util.Set<UUID> excludeInventoryIds) {
         UUID t = tenantId.getValue();
         Integer minShelf = jdbc.queryForObject("SELECT min_shelf_life_days FROM whse_items WHERE id = ? AND tenant_id = ?", Integer.class, itemId, t);
         List<WhseFefo.Candidate> candidates = jdbc.query("""
@@ -49,6 +56,7 @@ public class WhseLotAllocationService {
                 (rs, n) -> new WhseFefo.Candidate(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class), rs.getString(3), rs.getObject(4, UUID.class),
                         rs.getDate(5) == null ? null : rs.getDate(5).toLocalDate(), rs.getBoolean(6), rs.getBigDecimal(7)),
                 t, clientId, itemId);
+        if (!excludeInventoryIds.isEmpty()) candidates = candidates.stream().filter(c -> !excludeInventoryIds.contains(c.inventoryId())).toList();
         List<WhseFefo.Pick> picks;
         try {
             picks = WhseFefo.plan(candidates, qty, LocalDate.now(ZoneId.of(zoneId)), minShelf);

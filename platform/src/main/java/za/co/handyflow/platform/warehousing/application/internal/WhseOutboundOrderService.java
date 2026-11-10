@@ -143,9 +143,11 @@ public class WhseOutboundOrderService {
                                           UUID recordedBy) {
         WhseOutboundOrder order = findActive(tenantId, orderId);
         requirePicksFinished(tenantId, orderId);
-        order.markShipped(carrier, trackingNumber);
-
         List<WhseOutboundOrderLine> lines = lineRepository.findByOrder(tenantId.getValue(), orderId);
+        if (lines.stream().allMatch(l -> l.qtyToShip().signum() == 0)) {
+            throw new IllegalStateException("Every line was short-picked down to nothing, so there is nothing to ship. Cancel the order instead.");
+        }
+        order.markShipped(carrier, trackingNumber);
         // Lot-tracked lines ship from their lot allocations, one PICK movement per lot.
         lotAllocation.fulfil(tenantId, order.getId(), order.getOrderReference(), recordedBy);
         for (WhseOutboundOrderLine line : lines) {
@@ -156,8 +158,9 @@ public class WhseOutboundOrderService {
             if (lotAllocation.isLotTracked(tenantId.getValue(), line.getItemId())) {
                 continue;
             }
+            if (line.qtyToShip().signum() == 0) continue; // given up entirely after a short pick
             inventoryService.fulfillPick(tenantId, order.getClientId(), line.getItemId(), line.getLocationId(),
-                    line.getQtyOrdered(), "OUTBOUND_ORDER", order.getId(), order.getOrderReference(), recordedBy);
+                    line.qtyToShip(), "OUTBOUND_ORDER", order.getId(), order.getOrderReference(), recordedBy);
         }
         return orderRepository.save(order);
     }
@@ -175,9 +178,9 @@ public class WhseOutboundOrderService {
         lotAllocation.release(tenantId, order.getId(), order.getOrderReference(), recordedBy);
         taskService.cancelPickTasks(tenantId, order.getId(), "Lots re-allocated");
         for (WhseOutboundOrderLine line : lineRepository.findByOrder(tenantId.getValue(), orderId)) {
-            if (!lotAllocation.isLotTracked(tenantId.getValue(), line.getItemId())) continue;
+            if (!lotAllocation.isLotTracked(tenantId.getValue(), line.getItemId()) || line.qtyToShip().signum() == 0) continue;
             line.allocate(lotAllocation.allocate(tenantId, order.getId(), order.getOrderReference(), line.getId(), order.getClientId(),
-                    line.getItemId(), line.getQtyOrdered(), recordedBy));
+                    line.getItemId(), line.qtyToShip(), recordedBy));
             lineRepository.save(line);
         }
         lineRepository.flush();
@@ -199,9 +202,9 @@ public class WhseOutboundOrderService {
             taskService.cancelPickTasks(tenantId, order.getId(), "Order cancelled");
             List<WhseOutboundOrderLine> lines = lineRepository.findByOrder(tenantId.getValue(), orderId);
             for (WhseOutboundOrderLine line : lines) {
-                if (line.getLocationId() != null && !lotAllocation.isLotTracked(tenantId.getValue(), line.getItemId())) {
+                if (line.getLocationId() != null && line.qtyToShip().signum() > 0 && !lotAllocation.isLotTracked(tenantId.getValue(), line.getItemId())) {
                     inventoryService.deallocateStock(tenantId, order.getClientId(), line.getItemId(),
-                            line.getLocationId(), line.getQtyOrdered(), "OUTBOUND_ORDER", order.getId(),
+                            line.getLocationId(), line.qtyToShip(), "OUTBOUND_ORDER", order.getId(),
                             order.getOrderReference(), recordedBy);
                 }
             }

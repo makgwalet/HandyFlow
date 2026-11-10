@@ -15,6 +15,7 @@ export interface TaskRow {
   id: string; taskType: "PICK" | "PUTAWAY"; status: string; priority: number; clientName: string; sku: string; itemDescription: string | null
   lotNumber: string | null; lotExpiry: string | null; fromLocationId: string; fromCode: string; toLocationId: string | null; toCode: string | null
   qty: number; qtyDone: number; referenceNumber: string | null; assignedTo: string | null; note: string | null
+  resolution?: string | null; resolutionNote?: string | null
 }
 interface Suggestion { locationId: string; code: string; reason: string; roomLeft: number | null }
 interface Summary { openPicks: number; inProgressPicks: number; shortPicks: number; openPutaways: number; inProgressPutaways: number }
@@ -24,7 +25,14 @@ const STATUS_CHIP: Record<string, { bg: string; fg: string; label: string }> = {
   IN_PROGRESS: { bg: "var(--hf-warning-soft-strong)", fg: "var(--hf-warning-text-deep)", label: "In progress" },
   SHORT: { bg: "var(--hf-danger-soft)", fg: "var(--hf-danger-text)", label: "Short" },
   DONE: { bg: "var(--hf-success-soft)", fg: "var(--hf-success-text-strong)", label: "Done" },
+  SHORT_CLOSED: { bg: "var(--hf-surface-muted)", fg: "var(--hf-text-muted)", label: "Short, closed" },
   CANCELLED: { bg: "var(--hf-surface-muted)", fg: "var(--hf-text-muted)", label: "Cancelled" },
+}
+
+const RESOLUTION_TEXT: Record<string, string> = {
+  SHIP_SHORT: "The line ships what was found; the rest was released.",
+  SOURCE_ELSEWHERE: "What was found ships; the rest was allocated from other stock.",
+  MOVE_LINE: "The whole line was allocated again at another location.",
 }
 
 function TaskCard({ task, canWork }: { task: TaskRow; canWork: boolean }) {
@@ -34,10 +42,11 @@ function TaskCard({ task, canWork }: { task: TaskRow; canWork: boolean }) {
   const [reason, setReason] = useState("")
   const [dest, setDest] = useState(task.toLocationId ?? "")
   const [cancelling, setCancelling] = useState(false)
+  const [resolving, setResolving] = useState<"SHIP_SHORT" | "FIND_ELSEWHERE" | null>(null)
   const planned = task.qty - task.qtyDone
   const n = parseQty(qty)
-  const isShort = task.taskType === "PICK" && n != null && n > 0 && n < planned
-  const problem = n == null || n <= 0 ? "Enter the quantity done." : n > planned ? `At most ${fmtQty(planned)}.`
+  const isShort = task.taskType === "PICK" && n != null && n >= 0 && n < planned
+  const problem = n == null || n < 0 || (n === 0 && task.taskType === "PUTAWAY") ? "Enter the quantity done." : n > planned ? `At most ${fmtQty(planned)}.`
     : isShort && reason.trim().length < 5 ? "Picking less than asked needs a reason (at least 5 characters)."
     : task.taskType === "PUTAWAY" && !dest ? "Choose where it goes." : null
 
@@ -55,8 +64,12 @@ function TaskCard({ task, canWork }: { task: TaskRow; canWork: boolean }) {
     mutationFn: async (r: string) => apiClient.post(`/api/v1/warehousing/tasks/${task.id}/cancel`, { reason: r }),
     onSuccess: () => { setCancelling(false); refresh() },
   })
+  const resolve = useMutation({
+    mutationFn: async (v: { action: string; reason: string }) => apiClient.post(`/api/v1/warehousing/tasks/${task.id}/resolve-short`, v),
+    onSuccess: () => { setResolving(null); refresh(); qc.invalidateQueries({ queryKey: ["whse-outbound-order-lines"] }); qc.invalidateQueries({ queryKey: ["whse-outbound-lot-allocations"] }); qc.invalidateQueries({ queryKey: ["whse-tasks-order"] }) },
+  })
   const chip = STATUS_CHIP[task.status] ?? STATUS_CHIP.OPEN
-  const finished = task.status === "DONE" || task.status === "CANCELLED"
+  const finished = task.status === "DONE" || task.status === "CANCELLED" || task.status === "SHORT_CLOSED"
 
   return (
     <div style={{ ...card, padding: 14, marginBottom: 10 }}>
@@ -70,10 +83,17 @@ function TaskCard({ task, canWork }: { task: TaskRow; canWork: boolean }) {
             From <strong>{task.fromCode}</strong>{task.taskType === "PUTAWAY" ? ` → ${task.toCode ?? "no suggestion"}` : ""} · {task.clientName}{task.referenceNumber ? ` · ${task.referenceNumber}` : ""}
             {task.priority <= 3 ? " · urgent" : ""}
           </p>
-          {task.status === "SHORT" && <p style={{ fontSize: 12, color: "var(--hf-danger-text)", margin: "4px 0 0" }}>Picked {fmtQty(task.qtyDone)} of {fmtQty(task.qty)}: {task.note}. Re-allocate or cancel the order to deal with it.</p>}
+          {task.status === "SHORT" && <p style={{ fontSize: 12, color: "var(--hf-danger-text)", margin: "4px 0 0" }}>Picked {fmtQty(task.qtyDone)} of {fmtQty(task.qty)}: {task.note}. The order cannot be packed until you ship it short or find the rest elsewhere.</p>}
+          {task.status === "SHORT_CLOSED" && <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "4px 0 0" }}>Picked {fmtQty(task.qtyDone)} of {fmtQty(task.qty)}. {RESOLUTION_TEXT[task.resolution ?? ""] ?? "Closed."} {task.resolutionNote}</p>}
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <Chip bg={chip.bg} fg={chip.fg}>{chip.label}</Chip>
+          {canWork && task.status === "SHORT" && task.taskType === "PICK" && (
+            <>
+              <button onClick={() => setResolving("SHIP_SHORT")} style={btnGhost}>Ship short</button>
+              <button onClick={() => setResolving("FIND_ELSEWHERE")} style={btnPrimary}>Find elsewhere</button>
+            </>
+          )}
           {canWork && !finished && task.status !== "SHORT" && (
             <>
               {task.status === "OPEN" && <button onClick={() => act.mutate("claim")} disabled={act.isPending} style={btnGhost}>Claim</button>}
@@ -107,6 +127,17 @@ function TaskCard({ task, canWork }: { task: TaskRow; canWork: boolean }) {
           </div>
           <ErrorLine error={complete.error} fallback="Could not complete this task" />
         </div>
+      )}
+      {resolving && (
+        <ReasonModal
+          title={resolving === "SHIP_SHORT" ? "Ship this line short" : "Find the stock elsewhere"}
+          intro={resolving === "SHIP_SHORT"
+            ? "The line will ship only what was found. The rest of its reservation is released and the order shows it as short."
+            : "Looks for the missing quantity in other stock (first expiry first for lot-tracked items). An item that is not lot tracked moves wholly to another location that holds all of it. Nothing changes if no other stock is found."}
+          confirmLabel={resolving === "SHIP_SHORT" ? "Ship short" : "Find elsewhere"}
+          pending={resolve.isPending} error={resolve.error}
+          onConfirm={r => resolve.mutate({ action: resolving, reason: r })}
+          onClose={() => { setResolving(null); resolve.reset() }} />
       )}
       {cancelling && <ReasonModal title="Cancel this task" confirmLabel="Cancel task" pending={cancel.isPending} error={cancel.error} onConfirm={r => cancel.mutate(r)} onClose={() => { setCancelling(false); cancel.reset() }} />}
     </div>

@@ -209,6 +209,6 @@ public class WhseOutboundOrderController {
 
     private OutboundOrderLineResponse toLineResponse(WhseOutboundOrderLine l) {
         return new OutboundOrderLineResponse(l.getId(), l.getOrderId(), l.getItemId(), l.getLocationId(),
-                l.getQtyOrdered(), l.getQtyPicked(), l.getNotes(), l.isFullyPicked());
+                l.getQtyOrdered(), l.getQtyPicked(), l.getNotes(), l.isFullyPicked(), l.getQtyShort());
     }
 }

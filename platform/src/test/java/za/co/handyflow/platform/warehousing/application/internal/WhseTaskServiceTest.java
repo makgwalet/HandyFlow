@@ -30,13 +30,15 @@ class WhseTaskServiceTest {
 
     private JdbcTemplate jdbc;
     private WhseInventoryService inventory;
+    private WhseLotAllocationService lotAllocation;
     private WhseTaskService service;
 
     @BeforeEach
     void setUp() {
         jdbc = mock(JdbcTemplate.class);
         inventory = mock(WhseInventoryService.class);
-        service = new WhseTaskService(jdbc, inventory);
+        lotAllocation = mock(WhseLotAllocationService.class);
+        service = new WhseTaskService(jdbc, inventory, lotAllocation);
     }
 
     private TenantId t() { return TenantId.of(tenant); }
@@ -59,7 +61,7 @@ class WhseTaskServiceTest {
     private void taskAfterwards() {
         when(jdbc.query(contains("WHERE t.tenant_id = ? AND t.id = ?"), any(RowMapper.class), any(Object[].class)))
                 .thenReturn(List.of(new WhseTaskService.TaskRow(taskId, "PICK", "DONE", 5, client, "C", item, "SKU", "d", null, null, null, from, "A-01", null, null,
-                        bd("4"), bd("4"), 1, null, "OUT-1", user, null)));
+                        bd("4"), bd("4"), 1, null, "OUT-1", user, null, null, null)));
     }
 
     @Test @DisplayName("claiming takes an open task and reports a task someone else holds")
@@ -71,7 +73,7 @@ class WhseTaskServiceTest {
         when(jdbc.update(contains("SET status = 'IN_PROGRESS'"), any(Object[].class))).thenReturn(0);
         when(jdbc.query(contains("WHERE t.tenant_id = ? AND t.id = ?"), any(RowMapper.class), any(Object[].class)))
                 .thenReturn(List.of(new WhseTaskService.TaskRow(taskId, "PICK", "IN_PROGRESS", 5, client, "C", item, "SKU", "d", null, null, null, from, "A-01", null, null,
-                        bd("4"), bd("0"), 1, null, "OUT-1", other, null)));
+                        bd("4"), bd("0"), 1, null, "OUT-1", other, null, null, null)));
         HandyFlowException e = assertThrows(HandyFlowException.class, () -> service.claim(t(), taskId, user));
         assertEquals("TASK_TAKEN", e.getErrorCode());
     }
@@ -189,5 +191,103 @@ class WhseTaskServiceTest {
         assertEquals(3, service.unfinishedPickTasks(t(), UUID.randomUUID()));
         when(jdbc.queryForObject(contains("status IN ('OPEN','IN_PROGRESS','SHORT')"), eq(Integer.class), any(Object[].class))).thenReturn(null);
         assertEquals(0, service.unfinishedPickTasks(t(), UUID.randomUUID()));
+    }
+
+    // ── short picks ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    private final UUID orderId = UUID.randomUUID();
+    private final UUID lot = UUID.randomUUID();
+    private final UUID invId = UUID.randomUUID();
+    private final UUID allocId = UUID.randomUUID();
+
+    /** The locked row read in resolveShort(): type, status, client, item, lot, from, qty, qty done, order, reference, line, priority. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void shortTask(String status, UUID lotId, String qty, String done) {
+        when(jdbc.query(contains("FROM whse_tasks WHERE tenant_id = ? AND id = ? FOR UPDATE"), any(RowMapper.class), any(Object[].class)))
+                .thenReturn(List.<Object[]>of(new Object[]{"PICK", status, client, item, lotId, from, bd(qty), bd(done), orderId, "OUT-1", lineId, 5}));
+        when(jdbc.queryForObject(contains("FROM whse_outbound_orders"), eq(String.class), any(Object[].class))).thenReturn("PICKING");
+        taskAfterwards();
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void allocation(String qty) {
+        when(jdbc.query(contains("FROM whse_order_lot_allocations WHERE tenant_id = ? AND order_line_id = ? AND location_id"), any(RowMapper.class), any(Object[].class)))
+                .thenReturn(List.<Object[]>of(new Object[]{allocId, invId, bd(qty)}));
+    }
+
+    @Test @DisplayName("finding none of a pick is a short pick with a reason; a put-away of none is refused")
+    void zeroPick() {
+        lockedTask("PICK", "OPEN", null, null, "4");
+        taskAfterwards();
+        service.complete(t(), taskId, bd("0"), "bin is empty", null, user);
+        verify(jdbc).update(contains("SET status = ?, qty_done = ?"), eq("SHORT"), eq(bd("0")), eq("bin is empty"), eq(user), eq(user), eq(taskId));
+        lockedTask("PUTAWAY", "OPEN", null, dest, "6");
+        assertThrows(IllegalArgumentException.class, () -> service.complete(t(), taskId, bd("0"), "x", null, user));
+    }
+
+    @Test @DisplayName("shipping a line short releases the unfound quantity, records it on the line and closes the task")
+    void shipShortLegacy() {
+        shortTask("SHORT", null, "10", "6");
+        service.resolveShort(t(), taskId, "SHIP_SHORT", "customer agreed to 6", user);
+        verify(inventory).deallocateStock(eq(t()), eq(client), eq(item), eq(from), eq(bd("4")), eq("OUTBOUND_ORDER"), eq(orderId), eq("OUT-1"), eq(user));
+        verify(jdbc).update(contains("SET qty_short = qty_short + ?"), eq(bd("4")), eq(lineId));
+        verify(jdbc).update(contains("SET status = 'SHORT_CLOSED'"), eq("SHIP_SHORT"), eq("customer agreed to 6"), eq(user), eq(taskId));
+        verify(jdbc).update(contains("audit_events"), any(Object[].class));
+    }
+
+    @Test @DisplayName("shipping a lot line short shrinks its allocation, or releases it when none was found")
+    void shipShortLot() {
+        shortTask("SHORT", lot, "10", "6");
+        allocation("10");
+        service.resolveShort(t(), taskId, "SHIP_SHORT", "customer agreed to 6", user);
+        verify(inventory).deallocateById(eq(t()), eq(invId), eq(bd("4")), eq("OUTBOUND_ORDER"), eq(orderId), eq("OUT-1"), eq(user));
+        verify(jdbc).update(contains("SET qty = ?"), eq(bd("6")), eq(allocId));
+
+        shortTask("SHORT", lot, "10", "0");
+        allocation("10");
+        service.resolveShort(t(), taskId, "SHIP_SHORT", "none on the shelf", user);
+        verify(jdbc).update(contains("SET status = 'RELEASED'"), eq(allocId));
+    }
+
+    @Test @DisplayName("finding a lot line's shortfall elsewhere allocates it again without the positions the line already uses")
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void findElsewhereLot() {
+        shortTask("SHORT", lot, "10", "6");
+        allocation("10");
+        when(jdbc.query(contains("SELECT DISTINCT inventory_id"), any(RowMapper.class), any(Object[].class))).thenReturn(List.of(invId));
+        service.resolveShort(t(), taskId, "FIND_ELSEWHERE", "stock found in B-02", user);
+        verify(lotAllocation).allocate(eq(t()), eq(orderId), eq("OUT-1"), eq(lineId), eq(client), eq(item), eq(bd("4")), eq(user), eq(java.util.Set.of(invId)));
+        verify(jdbc).update(contains("SET status = 'SHORT_CLOSED'"), eq("SOURCE_ELSEWHERE"), eq("stock found in B-02"), eq(user), eq(taskId));
+        verify(jdbc, never()).update(contains("qty_short = qty_short + ?"), any(Object[].class));
+    }
+
+    @Test @DisplayName("a line that is not lot tracked moves wholly to another location that holds all of it, or is refused")
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void findElsewhereLegacy() {
+        shortTask("SHORT", null, "10", "6");
+        when(jdbc.queryForObject(contains("qty_ordered - qty_short"), eq(BigDecimal.class), any(Object[].class))).thenReturn(bd("10"));
+        when(jdbc.query(contains("i.location_id <> ?"), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
+        assertThrows(IllegalStateException.class, () -> service.resolveShort(t(), taskId, "FIND_ELSEWHERE", "look elsewhere", user));
+        verifyNoInteractions(inventory);
+
+        when(jdbc.query(contains("i.location_id <> ?"), any(RowMapper.class), any(Object[].class))).thenReturn(List.of(dest));
+        service.resolveShort(t(), taskId, "FIND_ELSEWHERE", "look elsewhere", user);
+        verify(inventory).deallocateStock(eq(t()), eq(client), eq(item), eq(from), eq(bd("10")), eq("OUTBOUND_ORDER"), eq(orderId), eq("OUT-1"), eq(user));
+        verify(inventory).allocateStock(eq(t()), eq(client), eq(item), eq(dest), eq(bd("10")), eq("OUTBOUND_ORDER"), eq(orderId), eq("OUT-1"), eq(user));
+        verify(jdbc).update(contains("SET location_id = ?"), eq(dest), eq(lineId));
+        verify(jdbc).update(contains("SET status = 'SHORT_CLOSED'"), eq("MOVE_LINE"), eq("look elsewhere"), eq(user), eq(taskId));
+    }
+
+    @Test @DisplayName("only a short pick of an order still being picked can be resolved, with a reason and a known action")
+    void resolveRefusals() {
+        shortTask("DONE", null, "10", "10");
+        assertEquals("TASK_NOT_SHORT", assertThrows(HandyFlowException.class, () -> service.resolveShort(t(), taskId, "SHIP_SHORT", "because", user)).getErrorCode());
+        shortTask("SHORT", null, "10", "6");
+        when(jdbc.queryForObject(contains("FROM whse_outbound_orders"), eq(String.class), any(Object[].class))).thenReturn("PACKED");
+        assertEquals("ORDER_NOT_PICKING", assertThrows(HandyFlowException.class, () -> service.resolveShort(t(), taskId, "SHIP_SHORT", "because", user)).getErrorCode());
+        assertThrows(IllegalArgumentException.class, () -> service.resolveShort(t(), taskId, "SHIP_SHORT", " ", user));
+        assertThrows(IllegalArgumentException.class, () -> service.resolveShort(t(), taskId, "CANCEL", "because", user));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.resolveShort(t(), taskId, "SHIP_SHORT", "because", null));
+        verifyNoInteractions(inventory);
     }
 }

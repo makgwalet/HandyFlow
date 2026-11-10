@@ -113,8 +113,50 @@ describe("tasks", () => {
   it("explains a short task and what to do about it", async () => {
     perms = ["WAREHOUSING_MANAGE"]; serve([pick({ status: "SHORT", qtyDone: 2, note: "only two on the shelf" })])
     wrap(<WhseTasksTab />)
-    expect(await screen.findByText(/Re-allocate or cancel the order/)).toBeTruthy()
+    expect(await screen.findByText(/ship it short or find the rest elsewhere/)).toBeTruthy()
     expect(screen.queryByText("Do it")).toBeNull()
+  })
+
+  it("finding none of a pick is a short pick that needs a reason", async () => {
+    perms = ["WAREHOUSING_MANAGE"]; serve([pick({ status: "IN_PROGRESS", assignedTo: "me" })])
+    wrap(<WhseTasksTab />)
+    fireEvent.click(await screen.findByText("Do it"))
+    fireEvent.change(screen.getByLabelText("Quantity done"), { target: { value: "0" } })
+    const record = screen.getByText("Record short pick") as HTMLButtonElement
+    expect(record.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText("Short pick reason"), { target: { value: "bin is empty" } })
+    fireEvent.click(record)
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/warehousing/tasks/t1/complete", { qty: 0, reason: "bin is empty", toLocationId: null }))
+  })
+
+  it("ships a short pick short, with a reason", async () => {
+    perms = ["WAREHOUSING_MANAGE"]; serve([pick({ status: "SHORT", qtyDone: 2, note: "only two on the shelf" })])
+    wrap(<WhseTasksTab />)
+    fireEvent.click(await screen.findByText("Ship short"))
+    fireEvent.change(screen.getByLabelText(/Reason/), { target: { value: "customer agreed to two" } })
+    fireEvent.click(within(screen.getByRole("dialog")).getByText("Ship short"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/warehousing/tasks/t1/resolve-short", { action: "SHIP_SHORT", reason: "customer agreed to two" }))
+  })
+
+  it("looks for the stock elsewhere", async () => {
+    perms = ["WAREHOUSING_MANAGE"]; serve([pick({ status: "SHORT", qtyDone: 2, note: "only two on the shelf" })])
+    wrap(<WhseTasksTab />)
+    fireEvent.click(await screen.findByText("Find elsewhere"))
+    fireEvent.change(screen.getByLabelText(/Reason/), { target: { value: "more in B-02" } })
+    fireEvent.click(within(screen.getByRole("dialog")).getByText("Find elsewhere"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/warehousing/tasks/t1/resolve-short", { action: "FIND_ELSEWHERE", reason: "more in B-02" }))
+  })
+
+  it("only a manager is offered the short-pick actions, and a closed short pick says what was done", async () => {
+    perms = ["WAREHOUSING_READ"]; serve([pick({ status: "SHORT", qtyDone: 2, note: "only two" })])
+    const view = wrap(<WhseTasksTab />)
+    await screen.findByText(/Picked 2 of 4/)
+    expect(screen.queryByText("Ship short")).toBeNull()
+    view.unmount()
+    perms = ["WAREHOUSING_MANAGE"]; serve([pick({ status: "SHORT_CLOSED", qtyDone: 2, resolution: "SHIP_SHORT", resolutionNote: "customer agreed" })])
+    wrap(<WhseTasksTab />)
+    expect(await screen.findByText(/The line ships what was found/)).toBeTruthy()
+    expect(screen.queryByText("Ship short")).toBeNull()
   })
 
   it("syncs the put-away list and moves the stock to a suggested location", async () => {

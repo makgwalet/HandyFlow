@@ -155,8 +155,8 @@ public class WhsePdfService {
             if (order.getTrackingNumber() != null) doc.add(new Paragraph("Tracking: " + order.getTrackingNumber(), BODY_FONT));
             doc.add(new Paragraph(" "));
 
-            String[] headers = {"SKU", "Description", "Qty Ordered", "Qty Picked"};
-            float[] widths = {1.2f, 2.4f, 1.0f, 1.0f};
+            String[] headers = {"SKU", "Description", "Qty Ordered", "Qty Picked", "Short"};
+            float[] widths = {1.2f, 2.2f, 0.9f, 0.9f, 0.8f};
             PdfPTable table = new PdfPTable(widths);
             table.setWidthPercentage(100);
             table.setSpacingBefore(6);
@@ -172,7 +172,8 @@ public class WhsePdfService {
                         item != null ? nullSafe(item.getSku()) : line.getItemId().toString(),
                         item != null ? nullSafe(item.getDescription()) : "",
                         line.getQtyOrdered().toPlainString(),
-                        line.getQtyPicked().toPlainString()
+                        line.getQtyPicked().toPlainString(),
+                        line.getQtyShort().signum() > 0 ? line.getQtyShort().toPlainString() : "-"
                 }) {
                     PdfPCell cell = new PdfPCell(new Phrase(value, TABLE_CELL_FONT));
                     cell.setPadding(4);

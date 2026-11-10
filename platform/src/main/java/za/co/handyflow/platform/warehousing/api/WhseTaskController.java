@@ -94,6 +94,17 @@ public class WhseTaskController {
                 req.toLocationId(), TenantContext.getCurrentUserId())));
     }
 
+    public record ResolveShortRequest(@NotNull @jakarta.validation.constraints.Pattern(regexp = "SHIP_SHORT|FIND_ELSEWHERE") String action,
+                                      @NotNull @Size(min = 5, max = 300) String reason) {}
+
+    @PostMapping("/{id}/resolve-short")
+    @PreAuthorize(MANAGE)
+    @Operation(summary = "Resolves a short pick without cancelling the order: SHIP_SHORT ships what was found and releases the rest; FIND_ELSEWHERE allocates the shortfall (or the whole line, if it is not lot tracked) from other stock")
+    public ResponseEntity<ApiResponse<WhseTaskService.TaskRow>> resolveShort(@PathVariable UUID id, @Valid @RequestBody ResolveShortRequest req) {
+        featureGuard.requireModule("warehousing");
+        return ResponseEntity.ok(ApiResponse.success("Short pick resolved", service.resolveShort(TenantContext.getTenantIdAsObject(), id, req.action(), req.reason(), TenantContext.getCurrentUserId())));
+    }
+
     @PostMapping("/{id}/cancel")
     @PreAuthorize(MANAGE)
     public ResponseEntity<ApiResponse<WhseTaskService.TaskRow>> cancel(@PathVariable UUID id, @Valid @RequestBody ReasonRequest req) {

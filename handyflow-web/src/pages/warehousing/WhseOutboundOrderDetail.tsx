@@ -20,7 +20,7 @@ interface OutboundOrderResponse {
   id: string; orderReference: string | null; shipToName: string | null; status: string
   requestedShipDate: string | null; shippedDate: string | null; carrier: string | null; trackingNumber: string | null
 }
-interface OutboundOrderLineResponse { id: string; orderId: string; itemId: string; locationId: string | null; qtyOrdered: number; qtyPicked: number; notes: string | null }
+interface OutboundOrderLineResponse { id: string; orderId: string; itemId: string; locationId: string | null; qtyOrdered: number; qtyPicked: number; qtyShort?: number; notes: string | null }
 interface ItemLite { id: string; sku: string }
 interface LotAllocation { id: string; lotNumber: string; expiryDate: string | null; locationCode: string; qty: number; status: string }
 interface TaskLite { id: string; status: string }
@@ -164,9 +164,9 @@ export default function WhseOutboundOrderDetail({ orderId, clientId, items, onBa
             <div key={line.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div>
                 <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{skuOf(line.itemId)}</p>
-                <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>{line.qtyPicked} / {line.qtyOrdered} picked{line.notes ? ` · ${line.notes}` : ""}</p>
+                <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>{line.qtyPicked} / {line.qtyOrdered} picked{(line.qtyShort ?? 0) > 0 ? ` · ${line.qtyShort} short, will not ship` : ""}{line.notes ? ` · ${line.notes}` : ""}</p>
               </div>
-              {status === "PICKING" && line.qtyPicked < line.qtyOrdered && (
+              {status === "PICKING" && line.qtyPicked < line.qtyOrdered - (line.qtyShort ?? 0) && (
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                   <input type="number" step="0.01" placeholder="Qty" style={{ ...inputStyle, width: 80 }}
                     value={pickQty[line.id] ?? ""} onChange={e => setPickQty(s => ({ ...s, [line.id]: e.target.value }))} />

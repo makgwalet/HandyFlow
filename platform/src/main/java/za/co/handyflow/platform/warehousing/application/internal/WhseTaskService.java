@@ -26,21 +26,26 @@ public class WhseTaskService {
 
     static final String PICK = "PICK";
     static final String PUTAWAY = "PUTAWAY";
+    public static final String SHIP_SHORT = "SHIP_SHORT";
+    public static final String FIND_ELSEWHERE = "FIND_ELSEWHERE";
     private static final String ORDER = "OUTBOUND_ORDER";
     private static final String TASK = "WHSE_TASK";
 
     private final JdbcTemplate jdbc;
     private final WhseInventoryService inventoryService;
+    private final WhseLotAllocationService lotAllocation;
 
     public record TaskRow(UUID id, String taskType, String status, int priority, UUID clientId, String clientName, UUID itemId, String sku, String itemDescription,
                           UUID lotId, String lotNumber, LocalDate lotExpiry, UUID fromLocationId, String fromCode, UUID toLocationId, String toCode,
-                          BigDecimal qty, BigDecimal qtyDone, Integer pickSequence, UUID referenceId, String referenceNumber, UUID assignedTo, String note) {}
+                          BigDecimal qty, BigDecimal qtyDone, Integer pickSequence, UUID referenceId, String referenceNumber, UUID assignedTo, String note,
+                          String resolution, String resolutionNote) {}
 
     public record Summary(int openPicks, int inProgressPicks, int shortPicks, int openPutaways, int inProgressPutaways) {}
 
     private static final String SELECT = """
             SELECT t.id, t.task_type, t.status, t.priority, t.client_id, c.trading_name, t.item_id, it.sku, it.description, t.lot_id, lot.lot_number, lot.expiry_date,
-                   t.from_location_id, fl.code, t.to_location_id, tl.code, t.qty, t.qty_done, t.pick_sequence, t.reference_id, t.reference_number, t.assigned_to, t.note
+                   t.from_location_id, fl.code, t.to_location_id, tl.code, t.qty, t.qty_done, t.pick_sequence, t.reference_id, t.reference_number, t.assigned_to, t.note,
+                   t.resolution, t.resolution_note
               FROM whse_tasks t
               JOIN whse_clients c ON c.id = t.client_id
               JOIN whse_items it ON it.id = t.item_id
@@ -54,7 +59,7 @@ public class WhseTaskService {
                 rs.getObject(7, UUID.class), rs.getString(8), rs.getString(9), rs.getObject(10, UUID.class), rs.getString(11),
                 rs.getDate(12) == null ? null : rs.getDate(12).toLocalDate(), rs.getObject(13, UUID.class), rs.getString(14), rs.getObject(15, UUID.class),
                 rs.getString(16), rs.getBigDecimal(17), rs.getBigDecimal(18), (Integer) rs.getObject(19), rs.getObject(20, UUID.class), rs.getString(21),
-                rs.getObject(22, UUID.class), rs.getString(23));
+                rs.getObject(22, UUID.class), rs.getString(23), rs.getString(24), rs.getString(25));
     }
 
     // ── picking ─────────────────────────────────────────────────────────────────────────────────────────────────
@@ -78,10 +83,10 @@ public class WhseTaskService {
                 + "'OUTBOUND_ORDER', o.id, o.order_reference, ol.id "
                 + "FROM whse_order_lot_allocations a JOIN whse_outbound_orders o ON o.id = a.order_id JOIN whse_outbound_order_lines ol ON ol.id = a.order_line_id "
                 + "JOIN whse_locations loc ON loc.id = a.location_id WHERE a.tenant_id = ? AND a.order_id = ? AND a.status = 'ALLOCATED'", t, orderId);
-        n += jdbc.update(cols + "SELECT gen_random_uuid(), ol.tenant_id, 'PICK', " + prio + ", o.client_id, ol.item_id, NULL, ol.location_id, ol.qty_ordered, loc.pick_sequence, "
+        n += jdbc.update(cols + "SELECT gen_random_uuid(), ol.tenant_id, 'PICK', " + prio + ", o.client_id, ol.item_id, NULL, ol.location_id, ol.qty_ordered - ol.qty_short, loc.pick_sequence, "
                 + "'OUTBOUND_ORDER', o.id, o.order_reference, ol.id "
                 + "FROM whse_outbound_order_lines ol JOIN whse_outbound_orders o ON o.id = ol.order_id JOIN whse_locations loc ON loc.id = ol.location_id "
-                + "WHERE ol.tenant_id = ? AND ol.order_id = ? AND ol.location_id IS NOT NULL "
+                + "WHERE ol.tenant_id = ? AND ol.order_id = ? AND ol.location_id IS NOT NULL AND ol.qty_ordered > ol.qty_short "
                 + "AND NOT EXISTS (SELECT 1 FROM whse_order_lot_allocations a WHERE a.order_line_id = ol.id)", t, orderId);
         return n;
     }
@@ -245,21 +250,19 @@ public class WhseTaskService {
         if ("IN_PROGRESS".equals(status) && holder != null && !holder.equals(user)) {
             throw new HandyFlowException("Someone else is working on this task.", HttpStatus.CONFLICT, "TASK_TAKEN");
         }
-        if (qty == null || qty.signum() <= 0) throw new IllegalArgumentException("Enter the quantity done (above zero). To say nothing could be found, cancel the task or re-allocate the order.");
+        if (qty == null || qty.signum() < 0) throw new IllegalArgumentException("Enter the quantity done.");
+        if (qty.signum() == 0 && !PICK.equals(type)) throw new IllegalArgumentException("Enter the quantity moved (above zero).");
         if (qty.compareTo(planned) > 0) throw new IllegalArgumentException("The quantity done cannot be more than the " + plain(planned) + " the task asks for.");
 
         if (PICK.equals(type)) {
             boolean shortPick = qty.compareTo(planned) < 0;
             if (shortPick && (reason == null || reason.trim().length() < 5)) {
-                throw new IllegalArgumentException("Picking less than " + plain(planned) + " needs a reason (at least 5 characters).");
+                throw new IllegalArgumentException((qty.signum() == 0 ? "Finding none of the " : "Picking less than ") + plain(planned) + " needs a reason (at least 5 characters).");
             }
             jdbc.update("UPDATE whse_tasks SET status = ?, qty_done = ?, note = ?, completed_by = ?, completed_at = now(), assigned_to = coalesce(assigned_to, ?), updated_at = now() WHERE id = ?",
                     shortPick ? "SHORT" : "DONE", qty, shortPick ? reason.trim() : null, user, user, id);
             UUID lineId = (UUID) k[11];
-            if (lineId != null) {
-                jdbc.update("UPDATE whse_outbound_order_lines SET qty_picked = (SELECT coalesce(sum(qty_done), 0) FROM whse_tasks WHERE order_line_id = ? AND task_type = 'PICK' AND status IN ('DONE','SHORT')) WHERE id = ?",
-                        lineId, lineId);
-            }
+            if (lineId != null) recomputePicked(lineId);
         } else {
             UUID dest = toLocationId != null ? toLocationId : (UUID) k[7];
             if (dest == null) throw new IllegalArgumentException("No destination was suggested for this put-away. Choose a location.");
@@ -272,6 +275,112 @@ public class WhseTaskService {
             jdbc.update("UPDATE whse_tasks SET status = 'DONE', qty_done = ?, to_location_id = ?, completed_by = ?, completed_at = now(), assigned_to = coalesce(assigned_to, ?), updated_at = now() WHERE id = ?",
                     qty, dest, user, user, id);
         }
+        return get(tenantId, id);
+    }
+
+    /** Quantity picked on a line: what its tasks found, except where a task was closed by moving the whole line to another location. */
+    private void recomputePicked(UUID lineId) {
+        jdbc.update("UPDATE whse_outbound_order_lines SET qty_picked = (SELECT coalesce(sum(qty_done), 0) FROM whse_tasks WHERE order_line_id = ? AND task_type = 'PICK' "
+                + "AND (status IN ('DONE','SHORT') OR (status = 'SHORT_CLOSED' AND resolution IN ('SHIP_SHORT','SOURCE_ELSEWHERE')))) WHERE id = ?", lineId, lineId);
+    }
+
+    /**
+     * Deals with a short pick without cancelling the order. The order must still be PICKING.
+     * <ul>
+     * <li>{@code SHIP_SHORT}: the line ships what was found. The rest of the allocation is released and recorded on the line as short.</li>
+     * <li>{@code FIND_ELSEWHERE}, lot-tracked line: what was found ships, and the shortfall is allocated again, first expiry first, from positions the
+     * line does not already use; new pick tasks are made for it. A line that is not lot tracked has one location, so the whole line is allocated again
+     * at another location that holds all of it, with a new pick task (anything already found goes back on the shelf).</li>
+     * </ul>
+     * Picking moves no stock, so there is nothing to undo. Everything happens in one transaction: if no other stock is found, nothing changes.
+     */
+    @Transactional
+    public TaskRow resolveShort(TenantId tenantId, UUID id, String action, String reason, UUID user) {
+        requireUser(user);
+        if (!SHIP_SHORT.equals(action) && !FIND_ELSEWHERE.equals(action)) throw new IllegalArgumentException("Choose to ship short or to find the stock elsewhere.");
+        if (reason == null || reason.trim().length() < 5) throw new IllegalArgumentException("Give a reason (at least 5 characters).");
+        UUID t = tenantId.getValue();
+        List<Object[]> locked = jdbc.query("SELECT task_type, status, client_id, item_id, lot_id, from_location_id, qty, qty_done, reference_id, reference_number, order_line_id, priority "
+                        + "FROM whse_tasks WHERE tenant_id = ? AND id = ? FOR UPDATE",
+                (rs, n) -> new Object[]{rs.getString(1), rs.getString(2), rs.getObject(3, UUID.class), rs.getObject(4, UUID.class), rs.getObject(5, UUID.class), rs.getObject(6, UUID.class),
+                        rs.getBigDecimal(7), rs.getBigDecimal(8), rs.getObject(9, UUID.class), rs.getString(10), rs.getObject(11, UUID.class), rs.getInt(12)}, t, id);
+        if (locked.isEmpty()) throw new ResourceNotFoundException("WhseTask", id.toString());
+        Object[] k = locked.get(0);
+        if (!PICK.equals(k[0]) || !"SHORT".equals(k[1]) || k[10] == null) {
+            throw new HandyFlowException("Only a short pick can be resolved this way.", HttpStatus.CONFLICT, "TASK_NOT_SHORT");
+        }
+        UUID client = (UUID) k[2], item = (UUID) k[3], lot = (UUID) k[4], from = (UUID) k[5], orderId = (UUID) k[8], lineId = (UUID) k[10];
+        BigDecimal shortfall = ((BigDecimal) k[6]).subtract((BigDecimal) k[7]);
+        String ref = (String) k[9];
+        int priority = (Integer) k[11];
+        String orderStatus = jdbc.queryForObject("SELECT status FROM whse_outbound_orders WHERE tenant_id = ? AND id = ?", String.class, t, orderId);
+        if (!"PICKING".equals(orderStatus)) {
+            throw new HandyFlowException("The order is " + String.valueOf(orderStatus).toLowerCase() + ", so its short picks can no longer be resolved.", HttpStatus.CONFLICT, "ORDER_NOT_PICKING");
+        }
+        String note = reason.trim();
+        String resolution;
+
+        if (lot != null) {
+            List<Object[]> alloc = jdbc.query("SELECT id, inventory_id, qty FROM whse_order_lot_allocations WHERE tenant_id = ? AND order_line_id = ? AND location_id = ? AND lot_id = ? AND status = 'ALLOCATED' FOR UPDATE",
+                    (rs, n) -> new Object[]{rs.getObject(1, UUID.class), rs.getObject(2, UUID.class), rs.getBigDecimal(3)}, t, lineId, from, lot);
+            if (alloc.isEmpty()) throw new IllegalStateException("This pick's allocation is no longer open, so it cannot be resolved. Re-allocate the order's lots.");
+            Object[] a = alloc.get(0);
+            BigDecimal remaining = ((BigDecimal) a[2]).subtract(shortfall);
+            inventoryService.deallocateById(tenantId, (UUID) a[1], shortfall, ORDER, orderId, ref, user);
+            if (remaining.signum() <= 0) jdbc.update("UPDATE whse_order_lot_allocations SET status = 'RELEASED', closed_at = now() WHERE id = ?", (UUID) a[0]);
+            else jdbc.update("UPDATE whse_order_lot_allocations SET qty = ? WHERE id = ?", remaining, (UUID) a[0]);
+            if (SHIP_SHORT.equals(action)) {
+                resolution = "SHIP_SHORT";
+                jdbc.update("UPDATE whse_outbound_order_lines SET qty_short = qty_short + ? WHERE id = ?", shortfall, lineId);
+            } else {
+                resolution = "SOURCE_ELSEWHERE";
+                // Positions this line already uses (including the one that came up short) are not offered again.
+                java.util.Set<UUID> used = new java.util.HashSet<>(jdbc.query("SELECT DISTINCT inventory_id FROM whse_order_lot_allocations WHERE tenant_id = ? AND order_line_id = ?",
+                        (rs, n) -> rs.getObject(1, UUID.class), t, lineId));
+                lotAllocation.allocate(tenantId, orderId, ref, lineId, client, item, shortfall, user, used);
+                jdbc.update("""
+                        INSERT INTO whse_tasks (id, tenant_id, task_type, priority, client_id, item_id, lot_id, from_location_id, qty, pick_sequence,
+                                                reference_type, reference_id, reference_number, order_line_id)
+                        SELECT gen_random_uuid(), a.tenant_id, 'PICK', ?, ?, ?, a.lot_id, a.location_id, a.qty, loc.pick_sequence, 'OUTBOUND_ORDER', a.order_id, ?, a.order_line_id
+                          FROM whse_order_lot_allocations a JOIN whse_locations loc ON loc.id = a.location_id
+                         WHERE a.tenant_id = ? AND a.order_line_id = ? AND a.status = 'ALLOCATED'
+                           AND NOT EXISTS (SELECT 1 FROM whse_tasks k WHERE k.order_line_id = a.order_line_id AND k.task_type = 'PICK' AND k.status <> 'CANCELLED'
+                                              AND k.from_location_id = a.location_id AND k.lot_id = a.lot_id)""",
+                        priority, client, item, ref, t, lineId);
+            }
+        } else if (SHIP_SHORT.equals(action)) {
+            resolution = "SHIP_SHORT";
+            inventoryService.deallocateStock(tenantId, client, item, from, shortfall, ORDER, orderId, ref, user);
+            jdbc.update("UPDATE whse_outbound_order_lines SET qty_short = qty_short + ? WHERE id = ?", shortfall, lineId);
+        } else {
+            resolution = "MOVE_LINE";
+            BigDecimal needed = jdbc.queryForObject("SELECT qty_ordered - qty_short FROM whse_outbound_order_lines WHERE id = ?", BigDecimal.class, lineId);
+            List<UUID> elsewhere = jdbc.query("""
+                    SELECT i.location_id FROM whse_inventory i JOIN whse_locations loc ON loc.id = i.location_id
+                     WHERE i.tenant_id = ? AND i.client_id = ? AND i.item_id = ? AND i.lot_id IS NULL AND i.status = 'AVAILABLE'
+                       AND i.location_id <> ? AND loc.deleted_at IS NULL AND i.qty_on_hand - i.qty_allocated >= ?
+                     ORDER BY loc.pick_sequence NULLS LAST, loc.code LIMIT 1""",
+                    (rs, n) -> rs.getObject(1, UUID.class), t, client, item, from, needed);
+            if (elsewhere.isEmpty()) {
+                throw new IllegalStateException("No other location holds all " + plain(needed) + " of this item. Ship the line short, or cancel the order.");
+            }
+            UUID to = elsewhere.get(0);
+            inventoryService.deallocateStock(tenantId, client, item, from, needed, ORDER, orderId, ref, user);
+            inventoryService.allocateStock(tenantId, client, item, to, needed, ORDER, orderId, ref, user);
+            jdbc.update("UPDATE whse_outbound_order_lines SET location_id = ? WHERE id = ?", to, lineId);
+            jdbc.update("""
+                    INSERT INTO whse_tasks (id, tenant_id, task_type, priority, client_id, item_id, from_location_id, qty, pick_sequence,
+                                            reference_type, reference_id, reference_number, order_line_id)
+                    SELECT gen_random_uuid(), ?, 'PICK', ?, ?, ?, loc.id, ?, loc.pick_sequence, 'OUTBOUND_ORDER', ?, ?, ? FROM whse_locations loc WHERE loc.id = ?""",
+                    t, priority, client, item, needed, orderId, ref, lineId, to);
+        }
+
+        jdbc.update("UPDATE whse_tasks SET status = 'SHORT_CLOSED', resolution = ?, resolution_note = ?, resolved_by = ?, resolved_at = now(), updated_at = now() WHERE id = ?",
+                resolution, note, user, id);
+        recomputePicked(lineId);
+        jdbc.update("INSERT INTO audit_events (tenant_id, actor_type, actor_id, action, item_type, item_id, after_json) VALUES (?, 'STAFF', ?, 'WHSE_SHORT_PICK_RESOLVED', 'WHSE_TASK', ?, "
+                        + "jsonb_build_object('resolution', ?::text, 'shortfall', ?::numeric, 'reason', ?::text, 'orderId', ?::text, 'orderReference', ?::text, 'fromLocationId', ?::text))",
+                t, user, id, resolution, shortfall, note, orderId.toString(), ref, from.toString());
         return get(tenantId, id);
     }
 

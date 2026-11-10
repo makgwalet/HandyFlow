@@ -38,6 +38,10 @@ public class WhseOutboundOrderLine {
     @Column(name = "qty_picked", nullable = false, precision = 12, scale = 3)
     private BigDecimal qtyPicked = BigDecimal.ZERO;
 
+    /** Quantity given up after a short pick: ordered, but it will not ship. Written by the task engine when a short pick is resolved. */
+    @Column(name = "qty_short", nullable = false, precision = 12, scale = 3)
+    private BigDecimal qtyShort = BigDecimal.ZERO;
+
     @Column(name = "notes")
     private String notes;
 
@@ -69,6 +73,11 @@ public class WhseOutboundOrderLine {
                     + this.qtyOrdered + " ordered, " + this.qtyPicked + " already picked)");
         }
         this.qtyPicked = this.qtyPicked.add(qty);
+    }
+
+    /** What will ship: the quantity ordered less any short-picked quantity given up. */
+    public BigDecimal qtyToShip() {
+        return qtyOrdered.subtract(qtyShort);
     }
 
     public boolean isFullyPicked() {
