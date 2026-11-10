@@ -91,6 +91,18 @@ public class WhseInventoryService {
     public WhseInventory receiveStockInStatus(TenantId tenantId, UUID clientId, UUID itemId, UUID locationId, BigDecimal qty,
                                                String status, String referenceType, UUID referenceId, String referenceNumber,
                                                String note, UUID recordedBy, String idempotencyKey) {
+        return receiveStockInStatus(tenantId, clientId, itemId, locationId, qty, status, "RECEIPT", referenceType, referenceId,
+                referenceNumber, note, recordedBy, idempotencyKey);
+    }
+
+    /** As above with an explicit movement type, for example RETURN for stock that came back from a customer. */
+    @Transactional
+    public WhseInventory receiveStockInStatus(TenantId tenantId, UUID clientId, UUID itemId, UUID locationId, BigDecimal qty,
+                                               String status, String movementType, String referenceType, UUID referenceId,
+                                               String referenceNumber, String note, UUID recordedBy, String idempotencyKey) {
+        if (!java.util.Set.of("RECEIPT", "RETURN").contains(movementType)) {
+            throw new IllegalArgumentException("Stock cannot be received with movement type " + movementType);
+        }
         if (!java.util.Set.of(WhseInventory.STATUS_AVAILABLE, WhseInventory.STATUS_QUARANTINE, WhseInventory.STATUS_DAMAGED).contains(status)) {
             throw new IllegalArgumentException("Stock cannot be received into status " + status);
         }
@@ -103,7 +115,7 @@ public class WhseInventoryService {
         BigDecimal before = inv.getQtyOnHand();
         inv.increaseOnHand(qty);
         inv = repository.save(inv);
-        recordMovement(tenantId, inv, "RECEIPT", qty, before, referenceType, referenceId, referenceNumber, note, recordedBy, idempotencyKey);
+        recordMovement(tenantId, inv, movementType, qty, before, referenceType, referenceId, referenceNumber, note, recordedBy, idempotencyKey);
         return inv;
     }
 
