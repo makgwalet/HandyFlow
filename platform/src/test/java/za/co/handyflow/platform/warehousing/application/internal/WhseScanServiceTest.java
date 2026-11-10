@@ -60,7 +60,7 @@ class WhseScanServiceTest {
                 new WhseScanService.Match("ITEM", UUID.randomUUID(), "SKU1", "Widget · Karoo", UUID.randomUUID()));
         List<WhseScanService.Match> out = service.resolve(t(), "  A-01-01 ");
         assertEquals(List.of("LOCATION", "ITEM", "ITEM"), out.stream().map(WhseScanService.Match::type).toList());
-        verify(jdbc, times(6)).query(anyString(), any(RowMapper.class), any(Object[].class));
+        verify(jdbc, times(7)).query(anyString(), any(RowMapper.class), any(Object[].class));
         verify(jdbc).query(contains("FROM whse_locations"), any(RowMapper.class), eq(tenant), eq("A-01-01"), eq("A-01-01"));
     }
 

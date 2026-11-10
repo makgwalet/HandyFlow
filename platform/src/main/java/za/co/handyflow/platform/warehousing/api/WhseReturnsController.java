@@ -32,6 +32,7 @@ public class WhseReturnsController {
     private static final String WRITE = "hasAnyAuthority('WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')";
 
     private final WhseReturnsService service;
+    private final za.co.handyflow.platform.warehousing.application.internal.WhseSerialFlows flows;
     private final FeatureGuard featureGuard;
 
     public record LineRequest(@NotNull UUID itemId, @NotNull @DecimalMin("0.001") BigDecimal expectedQty) {}
@@ -39,7 +40,7 @@ public class WhseReturnsController {
                                 @Size(max = 500) String notes, @NotEmpty @Valid List<LineRequest> lines) {}
     public record ReceiveRequest(@DecimalMin("0") BigDecimal qtyRestock, @DecimalMin("0") BigDecimal qtyHeld, @DecimalMin("0") BigDecimal qtyDamaged,
                                  @NotNull UUID locationId, @Size(max = 300) String reason, @Size(max = 100) String idempotencyKey,
-                                 @Size(max = 60) String lotNumber) {}
+                                 @Size(max = 60) String lotNumber, @Size(max = 1000) List<String> serials) {}
     public record CloseRequest(@Size(max = 500) String note) {}
 
     @GetMapping
@@ -71,8 +72,8 @@ public class WhseReturnsController {
     @Operation(summary = "Receive returned goods as restocked (available), held for inspection (quarantine) or damaged")
     public ResponseEntity<ApiResponse<Map<String, UUID>>> receive(@PathVariable UUID id, @PathVariable UUID lineId, @Valid @RequestBody ReceiveRequest req) {
         featureGuard.requireModule("warehousing");
-        UUID receiptId = service.receive(TenantContext.getTenantIdAsObject(), id, lineId, req.qtyRestock(), req.qtyHeld(), req.qtyDamaged(),
-                req.locationId(), req.reason(), req.lotNumber(), req.idempotencyKey(), TenantContext.getCurrentUserId());
+        UUID receiptId = flows.receiveReturn(TenantContext.getTenantIdAsObject(), id, lineId, req.qtyRestock(), req.qtyHeld(), req.qtyDamaged(),
+                req.locationId(), req.reason(), req.lotNumber(), req.idempotencyKey(), req.serials(), TenantContext.getCurrentUserId());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Return received", Map.of("id", receiptId)));
     }
 

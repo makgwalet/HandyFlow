@@ -8,13 +8,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, Plus } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { btnDanger, btnGhost, btnPrimary, card, Chip, ErrorLine, fmtQty, inputStyle, labelStyle, Modal } from "./whseUi"
+import { SerialEntry } from "./WhseSerialPanel"
 import { buildReturnReceivePayload, emptyReturnReceive, type ReturnLineForm, type ReturnReceiveForm, type Tracking, validateNewReturn, validateReturnReceive } from "./receiving"
 
 interface ReturnRow { id: string; rmaNumber: string; clientName: string; clientId: string; orderReference: string | null; status: string; reason: string; closeNote: string | null; createdAt: string }
 interface LineRow { id: string; itemId: string; sku: string; description: string | null; expectedQty: number; restocked: number; held: number; damaged: number; received: number; maxReturnable: number }
 interface Detail { header: ReturnRow; lines: LineRow[] }
 interface Client { id: string; tradingName: string }
-interface Item { id: string; sku: string; lotTracked?: boolean; expiryTracked?: boolean }
+interface Item { id: string; sku: string; lotTracked?: boolean; expiryTracked?: boolean; serialTracked?: boolean }
 interface Loc { id: string; code: string; active: boolean }
 
 const STATUS_STYLE: Record<string, { bg: string; fg: string }> = {
@@ -70,7 +71,7 @@ function NewReturnModal({ onClose, onCreated }: { onClose: () => void; onCreated
 
 function ReceiveLine({ returnId, line, item, locations, onDone }: { returnId: string; line: LineRow; item?: Item; locations: Loc[]; onDone: () => void }) {
   const [f, setF] = useState<ReturnReceiveForm>(emptyReturnReceive)
-  const t: Tracking = { lotTracked: !!item?.lotTracked, expiryTracked: !!item?.expiryTracked }
+  const t: Tracking = { lotTracked: !!item?.lotTracked, expiryTracked: !!item?.expiryTracked, serialTracked: !!item?.serialTracked }
   const set = (k: keyof ReturnReceiveForm, v: string) => setF(s => ({ ...s, [k]: v }))
   const problem = validateReturnReceive(f, t)
   const receive = useMutation({
@@ -88,6 +89,7 @@ function ReceiveLine({ returnId, line, item, locations, onDone }: { returnId: st
           </select></div>
         {t.lotTracked && <div style={{ width: 120 }}><label style={labelStyle}>Lot *</label><input aria-label="Lot" style={{ ...inputStyle, width: "100%" }} value={f.lotNumber} onChange={e => set("lotNumber", e.target.value)} /></div>}
       </div>
+      {t.serialTracked && <SerialEntry value={f.serials ?? ""} onChange={v => set("serials", v)} units={(Number(f.qtyRestock) || 0) + (Number(f.qtyHeld) || 0) + (Number(f.qtyDamaged) || 0)} />}
       <input aria-label="What is wrong" placeholder="What is wrong (held or damaged)" style={{ ...inputStyle, width: "100%" }} value={f.reason} onChange={e => set("reason", e.target.value)} />
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
         <button onClick={() => receive.mutate()} disabled={!!problem || receive.isPending} style={{ ...btnPrimary, opacity: problem ? 0.5 : 1 }}>{receive.isPending ? "Receiving…" : "Receive"}</button>

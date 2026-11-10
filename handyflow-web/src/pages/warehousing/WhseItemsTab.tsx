@@ -19,7 +19,7 @@ interface ItemResponse {
   barcode: string | null; lengthMm: number | null; widthMm: number | null; heightMm: number | null; volumeM3: number | null
   weightKg: number | null; unitCost: number | null; unitCostCurrency?: string; minQty: number | null; maxQty: number | null
   temperatureClass: string; hazardous: boolean; fragile: boolean; stackable: boolean
-  lotTracked?: boolean; expiryTracked?: boolean; minShelfLifeDays?: number | null
+  lotTracked?: boolean; expiryTracked?: boolean; minShelfLifeDays?: number | null; serialTracked?: boolean
 }
 
 const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
@@ -168,6 +168,7 @@ export default function WhseItemsTab({ clientId }: { clientId: string }) {
                       lot tracked{it.expiryTracked ? `, expires${it.minShelfLifeDays ? ` (min ${it.minShelfLifeDays} days left to ship)` : ""}` : ""}
                     </p>
                   )}
+                  {it.serialTracked && <p style={{ fontSize: 10.5, color: "var(--hf-text-muted)", margin: "2px 0 0" }}>serial tracked</p>}
                   {(it.hazardous || it.fragile || !it.stackable || it.temperatureClass !== "AMBIENT") && (
                     <p style={{ fontSize: 10.5, color: "var(--hf-text-muted)", margin: "2px 0 0" }}>
                       {[it.temperatureClass !== "AMBIENT" ? it.temperatureClass.replace("_", " ").toLowerCase() : null, it.hazardous ? "hazardous" : null, it.fragile ? "fragile" : null, !it.stackable ? "do not stack" : null].filter(Boolean).join(" · ")}
@@ -178,7 +179,7 @@ export default function WhseItemsTab({ clientId }: { clientId: string }) {
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 {it.unitCost != null && <span style={{ fontSize: 11.5, color: "var(--hf-text-muted)" }}>cost {formatMoney(Number(it.unitCost), it.unitCostCurrency)}</span>}
                 {it.storageRatePerUnitPerMonth != null && <span style={{ fontSize: 11.5, color: "var(--hf-text-muted)" }}>R{Number(it.storageRatePerUnitPerMonth).toFixed(2)}/mo</span>}
-                <button onClick={() => setTracking(it)} title="Lot and expiry tracking" style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontSize: 11, color: "var(--hf-text-muted)" }}>Lots</button>
+                <button onClick={() => setTracking(it)} title="Lot, expiry and serial tracking" style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontSize: 11, color: "var(--hf-text-muted)" }}>Lots</button>
                 <button onClick={() => setEditing(it)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer" }}><Pencil size={12} style={{ color: 'var(--hf-text-muted)' }} /></button>
                 {it.active ? (
                   <button onClick={() => deactivate.mutate(it.id)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer" }}><PowerOff size={12} style={{ color: 'var(--hf-text-faint)' }} /></button>

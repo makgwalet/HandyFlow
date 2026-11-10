@@ -7,13 +7,17 @@ import { btnGhost, btnPrimary, ErrorLine, inputStyle, labelStyle, Modal } from "
 import { buildTrackingPayload, type TrackingForm, validateTracking } from "./receiving"
 
 export default function ItemTrackingModal({ clientId, item, onClose }: {
-  clientId: string; item: { id: string; sku: string; lotTracked?: boolean; expiryTracked?: boolean; minShelfLifeDays?: number | null }; onClose: () => void
+  clientId: string; item: { id: string; sku: string; lotTracked?: boolean; expiryTracked?: boolean; minShelfLifeDays?: number | null; serialTracked?: boolean }; onClose: () => void
 }) {
   const qc = useQueryClient()
   const [f, setF] = useState<TrackingForm>({ lotTracked: !!item.lotTracked, expiryTracked: !!item.expiryTracked, minShelfLifeDays: item.minShelfLifeDays == null ? "" : String(item.minShelfLifeDays) })
+  const [serial, setSerial] = useState(!!item.serialTracked)
   const problem = validateTracking(f)
   const save = useMutation({
-    mutationFn: async () => apiClient.put(`/api/v1/warehousing/items/${item.id}/tracking`, buildTrackingPayload(f)),
+    mutationFn: async () => {
+      await apiClient.put(`/api/v1/warehousing/items/${item.id}/tracking`, buildTrackingPayload(f))
+      if (serial !== !!item.serialTracked) await apiClient.put(`/api/v1/warehousing/items/${item.id}/serial-tracking`, { serialTracked: serial })
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["whse-items", clientId] }); onClose() },
   })
   return (
@@ -24,6 +28,9 @@ export default function ItemTrackingModal({ clientId, item, onClose }: {
         </label>
         <label style={{ fontSize: 13, display: "flex", gap: 8, alignItems: "center", opacity: f.lotTracked ? 1 : 0.5 }}>
           <input type="checkbox" checked={f.expiryTracked} disabled={!f.lotTracked} onChange={e => setF({ ...f, expiryTracked: e.target.checked })} /> Has an expiry date
+        </label>
+        <label style={{ fontSize: 13, display: "flex", gap: 8, alignItems: "center" }}>
+          <input type="checkbox" checked={serial} onChange={e => setSerial(e.target.checked)} /> Track by serial number (one per unit)
         </label>
         <div><label style={labelStyle} htmlFor="whse-min-shelf">Minimum days of shelf life left when shipped</label>
           <input id="whse-min-shelf" inputMode="numeric" style={{ ...inputStyle, width: 120 }} disabled={!f.expiryTracked} value={f.minShelfLifeDays} onChange={e => setF({ ...f, minShelfLifeDays: e.target.value })} placeholder="none" /></div>

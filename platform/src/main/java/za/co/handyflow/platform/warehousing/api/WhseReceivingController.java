@@ -33,11 +33,13 @@ public class WhseReceivingController {
     private static final String QC = "hasAuthority('WAREHOUSING_QC_RELEASE')";
 
     private final WhseReceivingService service;
+    private final za.co.handyflow.platform.warehousing.application.internal.WhseSerialFlows flows;
     private final FeatureGuard featureGuard;
 
     public record ReceiptRequest(@DecimalMin("0") BigDecimal qtyGood, @DecimalMin("0") BigDecimal qtyDamaged, @DecimalMin("0") BigDecimal qtyHeld,
                                  @NotNull UUID locationId, @Size(max = 300) String reason, @Size(max = 100) String idempotencyKey,
-                                 @Size(max = 60) String lotNumber, java.time.LocalDate expiryDate, java.time.LocalDate manufacturedDate) {}
+                                 @Size(max = 60) String lotNumber, java.time.LocalDate expiryDate, java.time.LocalDate manufacturedDate,
+                                 @Size(max = 1000) java.util.List<String> serials) {}
     public record UnexpectedLineRequest(@NotNull UUID itemId, @Size(max = 255) String note) {}
     public record InspectRequest(@NotNull @Pattern(regexp = "PASS|FAIL") String outcome, @NotNull @DecimalMin("0.001") BigDecimal qty,
                                  @NotNull @Size(min = 5, max = 300) String reason) {}
@@ -48,8 +50,8 @@ public class WhseReceivingController {
     @Operation(summary = "Receive a line, splitting what arrived into good, damaged and held-for-inspection stock")
     public ResponseEntity<ApiResponse<Map<String, UUID>>> receive(@PathVariable UUID id, @PathVariable UUID lineId, @Valid @RequestBody ReceiptRequest req) {
         featureGuard.requireModule("warehousing");
-        UUID receiptId = service.receive(TenantContext.getTenantIdAsObject(), id, lineId, req.qtyGood(), req.qtyDamaged(), req.qtyHeld(),
-                req.locationId(), req.reason(), req.lotNumber(), req.expiryDate(), req.manufacturedDate(), req.idempotencyKey(), TenantContext.getCurrentUserId());
+        UUID receiptId = flows.receive(TenantContext.getTenantIdAsObject(), id, lineId, req.qtyGood(), req.qtyDamaged(), req.qtyHeld(),
+                req.locationId(), req.reason(), req.lotNumber(), req.expiryDate(), req.manufacturedDate(), req.idempotencyKey(), req.serials(), TenantContext.getCurrentUserId());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Receipt recorded", Map.of("id", receiptId)));
     }
 

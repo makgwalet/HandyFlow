@@ -9,12 +9,13 @@ import { ArrowLeft, PackageCheck, XCircle, Plus } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { WHSE_ACCENT } from "./constants"
 import { btnDanger, btnGhost, btnPrimary, Chip, ErrorLine, fmtQty, inputStyle, labelStyle, today } from "./whseUi"
+import { SerialEntry } from "./WhseSerialPanel"
 import { buildReceiptPayload, emptyReceipt, type ReceiptForm, shelfLifeWarning, type Tracking, validateClose, validateReceipt } from "./receiving"
 
 interface InboundShipmentResponse { id: string; referenceNumber: string | null; expectedDate: string | null; receivedDate: string | null; status: string; notes: string | null }
 interface InboundShipmentLineResponse { id: string; shipmentId: string; itemId: string; expectedQty: number; qtyReceived: number; notes: string | null }
 interface LocationResponse { id: string; code: string; active: boolean; locationType?: string }
-interface ItemLite { id: string; sku: string; lotTracked?: boolean; expiryTracked?: boolean; minShelfLifeDays?: number | null }
+interface ItemLite { id: string; sku: string; lotTracked?: boolean; expiryTracked?: boolean; minShelfLifeDays?: number | null; serialTracked?: boolean }
 interface ReceiptRow {
   id: string; lineId: string; sku: string; locationCode: string; qtyGood: number; qtyDamaged: number; qtyHeld: number; heldPending: number
   reason: string | null; receivedAt: string; lotNumber: string | null; expiryDate: string | null
@@ -23,7 +24,7 @@ interface LineDiscrepancy { lineId: string; sku: string; unexpected: boolean; ex
 interface DiscrepancyReport { closed: boolean; closeNote: string | null; needsSignOff: boolean; lines: LineDiscrepancy[] }
 
 const TYPE_LABEL: Record<string, string> = { SHORT: "Short", OVER: "Over", DAMAGED: "Damaged", UNEXPECTED_ITEM: "Not on the order", HELD_FOR_INSPECTION: "Held for inspection" }
-const trackingOf = (i?: ItemLite): Tracking => ({ lotTracked: !!i?.lotTracked, expiryTracked: !!i?.expiryTracked, minShelfLifeDays: i?.minShelfLifeDays })
+const trackingOf = (i?: ItemLite): Tracking => ({ lotTracked: !!i?.lotTracked, expiryTracked: !!i?.expiryTracked, minShelfLifeDays: i?.minShelfLifeDays, serialTracked: !!i?.serialTracked })
 
 function ReceiveForm({ shipmentId, lineId, item, locations, onDone }: { shipmentId: string; lineId: string; item?: ItemLite; locations: LocationResponse[]; onDone: () => void }) {
   const [f, setF] = useState<ReceiptForm>(emptyReceipt)
@@ -56,6 +57,7 @@ function ReceiveForm({ shipmentId, lineId, item, locations, onDone }: { shipment
           <div><label style={labelStyle}>Made on</label><input aria-label="Manufactured date" type="date" style={inputStyle} value={f.manufacturedDate} onChange={e => set("manufacturedDate", e.target.value)} /></div>
         </div>
       )}
+      {t.serialTracked && <SerialEntry value={f.serials ?? ""} onChange={v => set("serials", v)} units={(Number(f.qtyGood) || 0) + (Number(f.qtyDamaged) || 0) + (Number(f.qtyHeld) || 0)} />}
       <div><label style={labelStyle}>What is wrong (damaged or held)</label><input aria-label="Reason" style={{ ...inputStyle, width: "100%" }} value={f.reason} onChange={e => set("reason", e.target.value)} /></div>
       {warn && <p style={{ fontSize: 12, color: "var(--hf-warning-text-deep)", margin: 0 }}>{warn}</p>}
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>

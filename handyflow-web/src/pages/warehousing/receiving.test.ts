@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import {
-  buildReceiptPayload, buildReturnReceivePayload, buildTrackingPayload, daysLabel, emptyReceipt, emptyReturnReceive, parseQty, shelfLifeWarning,
+  buildReceiptPayload, buildReturnReceivePayload, buildTrackingPayload, daysLabel, emptyReceipt, emptyReturnReceive, parseQty, parseSerials, serialProblem, shelfLifeWarning,
   validateClose, validateInspection, validateNewReturn, validateReason, validateReceipt, validateReturnReceive, validateTracking,
 } from "./receiving"
 
@@ -88,5 +88,41 @@ describe("item tracking", () => {
     expect(validateTracking({ lotTracked: true, expiryTracked: true, minShelfLifeDays: "1.5" })).toMatch(/whole number/)
     expect(validateTracking({ lotTracked: true, expiryTracked: true, minShelfLifeDays: "30" })).toBeNull()
     expect(buildTrackingPayload({ lotTracked: true, expiryTracked: true, minShelfLifeDays: "" })).toEqual({ lotTracked: true, expiryTracked: true, minShelfLifeDays: null })
+  })
+})
+
+describe("serial numbers", () => {
+  const serial = { lotTracked: false, expiryTracked: false, serialTracked: true }
+
+  it("splits what was typed, pasted or scanned on lines, spaces, commas and semicolons", () => {
+    expect(parseSerials("A1\nA2, A3;A4  A5\n\n")).toEqual(["A1", "A2", "A3", "A4", "A5"])
+    expect(parseSerials(undefined)).toEqual([])
+  })
+
+  it("needs one serial per unit, whole units, valid and not repeated", () => {
+    expect(serialProblem("A1 A2", 3, serial)).toMatch(/Enter 3 serial numbers \(2 so far\)/)
+    expect(serialProblem("A1", 1, serial)).toBeNull()
+    expect(serialProblem("A1", 2.5, serial)).toMatch(/whole units/)
+    expect(serialProblem("A1 a1", 2, serial)).toMatch(/listed twice/)
+    expect(serialProblem("-bad", 1, serial)).toMatch(/not a valid serial/)
+    expect(serialProblem("", 1, plain)).toBeNull() // an item that is not serial tracked asks for none
+  })
+
+  it("a receipt counts good, damaged and held units against the serials, and sends them", () => {
+    const f = { ...ok, qtyGood: "2", qtyDamaged: "1", reason: "dented box", serials: "A1 A2" }
+    expect(validateReceipt(f, serial)).toMatch(/Enter 3 serial numbers/)
+    const done = { ...f, serials: "A1\nA2\nA3" }
+    expect(validateReceipt(done, serial)).toBeNull()
+    expect(buildReceiptPayload(done, serial).serials).toEqual(["A1", "A2", "A3"])
+    expect("serials" in buildReceiptPayload(done, plain)).toBe(false)
+  })
+
+  it("a return counts restock, held and damaged units, and sends the serials", () => {
+    const f = { ...emptyReturnReceive, qtyRestock: "1", qtyHeld: "1", locationId: "L1", reason: "to inspect", serials: "A1" }
+    expect(validateReturnReceive(f, serial)).toMatch(/Enter 2 serial numbers/)
+    const done = { ...f, serials: "A1, A2" }
+    expect(validateReturnReceive(done, serial)).toBeNull()
+    expect(buildReturnReceivePayload(done, serial).serials).toEqual(["A1", "A2"])
+    expect("serials" in buildReturnReceivePayload(done, plain)).toBe(false)
   })
 })

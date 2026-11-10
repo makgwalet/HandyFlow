@@ -83,6 +83,9 @@ public class WhseItem {
     @Column(name = "min_shelf_life_days")
     private Integer minShelfLifeDays;
 
+    @Column(name = "serial_tracked", nullable = false)
+    private boolean serialTracked; // changed only through WhseSerialService.setSerialTracked, which checks there is no stock
+
     @Column(name = "active", nullable = false)
     private boolean active = true;
 

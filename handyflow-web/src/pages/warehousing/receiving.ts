@@ -1,12 +1,32 @@
 // Pure form logic for receiving, returns, inspection and lots. The server checks everything again; these catch the common slips before a round trip.
 
-export interface Tracking { lotTracked: boolean; expiryTracked: boolean; minShelfLifeDays?: number | null }
+export interface Tracking { lotTracked: boolean; expiryTracked: boolean; minShelfLifeDays?: number | null; serialTracked?: boolean }
 
 export interface ReceiptForm {
   qtyGood: string; qtyDamaged: string; qtyHeld: string; locationId: string; reason: string
-  lotNumber: string; expiryDate: string; manufacturedDate: string
+  lotNumber: string; expiryDate: string; manufacturedDate: string; serials?: string
 }
 export const emptyReceipt: ReceiptForm = { qtyGood: "", qtyDamaged: "", qtyHeld: "", locationId: "", reason: "", lotNumber: "", expiryDate: "", manufacturedDate: "" }
+
+/** Serial numbers typed, pasted or scanned: separated by new lines, spaces, commas or semicolons. */
+export function parseSerials(text: string | undefined): string[] {
+  return (text ?? "").split(/[\s,;]+/).map(s => s.trim()).filter(s => s !== "")
+}
+
+/** One serial per unit, whole units only, no repeats. Null when it is fine (or the item is not serial tracked). */
+export function serialProblem(text: string | undefined, units: number, t: Tracking): string | null {
+  if (!t.serialTracked) return null
+  if (!Number.isInteger(units)) return "This item is serial tracked, so quantities must be whole units."
+  const list = parseSerials(text)
+  const seen = new Set<string>()
+  for (const s of list) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._/-]{0,79}$/.test(s)) return `“${s}” is not a valid serial number.`
+    if (seen.has(s.toUpperCase())) return `Serial ${s} is listed twice.`
+    seen.add(s.toUpperCase())
+  }
+  if (list.length !== units) return `Enter ${units} serial number${units === 1 ? "" : "s"} (${list.length} so far).`
+  return null
+}
 
 /** Blank is 0; a decimal comma is accepted; anything else that is not a number is null. */
 export function parseQty(s: string): number | null {
@@ -36,7 +56,7 @@ export function validateReceipt(f: ReceiptForm, t: Tracking): string | null {
   if ("error" in q) return q.error
   if (q.nums[1] + q.nums[2] > 0 && f.reason.trim().length < 5) return "Say what is wrong with the damaged or held stock (at least 5 characters)."
   if (!f.locationId) return "Choose where the stock is put away."
-  return lotProblem(f, t)
+  return lotProblem(f, t) ?? serialProblem(f.serials, q.nums[0] + q.nums[1] + q.nums[2], t)
 }
 
 export function buildReceiptPayload(f: ReceiptForm, t: Tracking) {
@@ -46,6 +66,7 @@ export function buildReceiptPayload(f: ReceiptForm, t: Tracking) {
     lotNumber: t.lotTracked ? f.lotNumber.trim() : null,
     expiryDate: t.expiryTracked ? f.expiryDate || null : null,
     manufacturedDate: t.lotTracked ? f.manufacturedDate || null : null,
+    ...(t.serialTracked ? { serials: parseSerials(f.serials) } : {}),
   }
 }
 
@@ -58,7 +79,7 @@ export function shelfLifeWarning(expiry: string, today: string, minDays: number 
   return null
 }
 
-export interface ReturnReceiveForm { qtyRestock: string; qtyHeld: string; qtyDamaged: string; locationId: string; reason: string; lotNumber: string }
+export interface ReturnReceiveForm { qtyRestock: string; qtyHeld: string; qtyDamaged: string; locationId: string; reason: string; lotNumber: string; serials?: string }
 export const emptyReturnReceive: ReturnReceiveForm = { qtyRestock: "", qtyHeld: "", qtyDamaged: "", locationId: "", reason: "", lotNumber: "" }
 
 export function validateReturnReceive(f: ReturnReceiveForm, t: Tracking): string | null {
@@ -67,13 +88,14 @@ export function validateReturnReceive(f: ReturnReceiveForm, t: Tracking): string
   if (q.nums[1] + q.nums[2] > 0 && f.reason.trim().length < 5) return "Say what is wrong with the held or damaged goods (at least 5 characters)."
   if (!f.locationId) return "Choose where the goods are put away."
   if (t.lotTracked && !f.lotNumber.trim()) return "This item is lot tracked: enter the lot it came from."
-  return null
+  return serialProblem(f.serials, q.nums[0] + q.nums[1] + q.nums[2], t)
 }
 
 export function buildReturnReceivePayload(f: ReturnReceiveForm, t: Tracking) {
   return {
     qtyRestock: parseQty(f.qtyRestock) ?? 0, qtyHeld: parseQty(f.qtyHeld) ?? 0, qtyDamaged: parseQty(f.qtyDamaged) ?? 0,
     locationId: f.locationId, reason: f.reason.trim() || null, lotNumber: t.lotTracked ? f.lotNumber.trim() : null,
+    ...(t.serialTracked ? { serials: parseSerials(f.serials) } : {}),
   }
 }
 

@@ -35,7 +35,7 @@ public class WhseScanService {
     public record StockLine(UUID locationId, String locationCode, UUID itemId, String sku, String description, String clientName,
                             String lotNumber, LocalDate expiryDate, BigDecimal onHand, BigDecimal allocated, String status) {}
 
-    /** Everything the code could be. Types: LOCATION, ITEM, LOT, INBOUND, OUTBOUND, MANIFEST. */
+    /** Everything the code could be. Types: LOCATION, ITEM, LOT, SERIAL, INBOUND, OUTBOUND, MANIFEST. */
     @Transactional(readOnly = true)
     public List<Match> resolve(TenantId tenantId, String raw) {
         String code = clean(raw);
@@ -59,6 +59,12 @@ public class WhseScanService {
                 (rs, i) -> new Match("OUTBOUND", rs.getObject("id", UUID.class), rs.getString("order_reference"), rs.getString("status"), rs.getObject("client_id", UUID.class)), t, code));
         out.addAll(jdbc.query("SELECT id, manifest_number, status FROM whse_dispatch_manifests WHERE tenant_id = ? AND upper(manifest_number) = upper(?) LIMIT " + PER_TYPE,
                 (rs, i) -> new Match("MANIFEST", rs.getObject("id", UUID.class), rs.getString("manifest_number"), rs.getString("status"), null), t, code));
+        out.addAll(jdbc.query("""
+                SELECT s.id, s.serial_number, s.status, s.client_id, i.sku, c.trading_name FROM whse_serials s
+                  JOIN whse_items i ON i.id = s.item_id JOIN whse_clients c ON c.id = s.client_id
+                 WHERE s.tenant_id = ? AND upper(s.serial_number) = upper(?) ORDER BY i.sku LIMIT\040""" + PER_TYPE,
+                (rs, i) -> new Match("SERIAL", rs.getObject("id", UUID.class), rs.getString("serial_number"),
+                        rs.getString("sku") + " · " + rs.getString("trading_name") + " · " + rs.getString("status").toLowerCase().replace('_', ' '), rs.getObject("client_id", UUID.class)), t, code));
         return out;
     }
 

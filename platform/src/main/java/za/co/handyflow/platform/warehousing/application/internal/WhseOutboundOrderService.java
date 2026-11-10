@@ -36,6 +36,7 @@ public class WhseOutboundOrderService {
     private final WhseClientService clientService;
     private final WhseLotAllocationService lotAllocation;
     private final WhseTaskService taskService;
+    private final WhseSerialService serialService;
 
     /** One ordered line on a new outbound order. */
     public record OutboundLine(UUID itemId, BigDecimal qtyOrdered, String notes) {}
@@ -147,7 +148,9 @@ public class WhseOutboundOrderService {
         if (lines.stream().allMatch(l -> l.qtyToShip().signum() == 0)) {
             throw new IllegalStateException("Every line was short-picked down to nothing, so there is nothing to ship. Cancel the order instead.");
         }
+        serialService.requireCaptured(tenantId, orderId); // serial-tracked lines need a serial for every unit leaving
         order.markShipped(carrier, trackingNumber);
+        serialService.markShipped(tenantId, orderId, recordedBy);
         // Lot-tracked lines ship from their lot allocations, one PICK movement per lot.
         lotAllocation.fulfil(tenantId, order.getId(), order.getOrderReference(), recordedBy);
         for (WhseOutboundOrderLine line : lines) {
@@ -198,6 +201,7 @@ public class WhseOutboundOrderService {
     public WhseOutboundOrder cancel(TenantId tenantId, UUID orderId, UUID recordedBy) {
         WhseOutboundOrder order = findActive(tenantId, orderId);
         if ("PICKING".equals(order.getStatus())) {
+            serialService.releasePicked(tenantId, order.getId(), recordedBy);
             lotAllocation.release(tenantId, order.getId(), order.getOrderReference(), recordedBy);
             taskService.cancelPickTasks(tenantId, order.getId(), "Order cancelled");
             List<WhseOutboundOrderLine> lines = lineRepository.findByOrder(tenantId.getValue(), orderId);

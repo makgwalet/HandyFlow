@@ -10,14 +10,14 @@ import { apiClient } from "../../api/client"
 import { WHSE_ACCENT_TEXT } from "./constants"
 import { btnGhost, btnPrimary, card, ErrorLine, inputStyle, labelStyle } from "./whseUi"
 
-export interface ScanMatch { type: "LOCATION" | "ITEM" | "LOT" | "INBOUND" | "OUTBOUND" | "MANIFEST"; id: string; label: string; detail: string | null; clientId: string | null }
+export interface ScanMatch { type: "LOCATION" | "ITEM" | "LOT" | "SERIAL" | "INBOUND" | "OUTBOUND" | "MANIFEST"; id: string; label: string; detail: string | null; clientId: string | null }
 interface StockLine {
   locationId: string; locationCode: string; itemId: string; sku: string; description: string; clientName: string
   lotNumber: string | null; expiryDate: string | null; onHand: number; allocated: number; status: string
 }
 
 const TYPE_LABEL: Record<ScanMatch["type"], string> = {
-  LOCATION: "Location", ITEM: "Item", LOT: "Lot", INBOUND: "Inbound shipment", OUTBOUND: "Outbound order", MANIFEST: "Dispatch manifest",
+  LOCATION: "Location", ITEM: "Item", LOT: "Lot", SERIAL: "Serial number", INBOUND: "Inbound shipment", OUTBOUND: "Outbound order", MANIFEST: "Dispatch manifest",
 }
 const STOCK_PATH: Partial<Record<ScanMatch["type"], string>> = { LOCATION: "locations", ITEM: "items", LOT: "lots" }
 const num = (n: number) => n.toLocaleString("en-ZA", { maximumFractionDigits: 3 })
@@ -44,6 +44,28 @@ function StockList({ match }: { match: ScanMatch }) {
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+interface Trace { id: string; serialNumber: string; status: string; clientName: string; sku: string; description: string; orderReference: string | null; shippedAt: string | null; returnCount: number; history: { event: string; reference: string | null; at: string }[] }
+
+function SerialTrace({ match }: { match: ScanMatch }) {
+  const { data, isLoading, error } = useQuery<Trace>({
+    queryKey: ["whse-serial-trace", match.id],
+    queryFn: async () => (await apiClient.get(`/api/v1/warehousing/serials/${match.id}`)).data,
+  })
+  if (isLoading) return <p style={{ fontSize: 13, color: "var(--hf-text-faint)" }}>Loading history…</p>
+  if (error || !data) return <ErrorLine error={error} fallback="Could not load this serial" />
+  return (
+    <div style={{ marginTop: 8, fontSize: 13 }}>
+      <div>{data.sku} · {data.description} · {data.clientName}</div>
+      <div style={{ color: "var(--hf-text-muted)" }}>
+        {data.status.toLowerCase().replace("_", " ")}{data.orderReference ? ` on ${data.orderReference}` : ""}{data.returnCount > 0 ? ` · returned ${data.returnCount} time${data.returnCount === 1 ? "" : "s"}` : ""}
+      </div>
+      <ol style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+        {data.history.map((h, i) => <li key={i}>{h.event.toLowerCase()} · {new Date(h.at).toLocaleString("en-ZA")}</li>)}
+      </ol>
     </div>
   )
 }
@@ -124,6 +146,7 @@ export default function WhseScanTab() {
           <div style={{ fontSize: 18, fontWeight: 800 }}>{picked.label}</div>
           {picked.detail && <div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>{picked.detail}</div>}
           {STOCK_PATH[picked.type] && <StockList match={picked} />}
+          {picked.type === "SERIAL" && <SerialTrace match={picked} />}
           {picked.type === "LOCATION" && <LocationBarcode match={picked} />}
           {matches.length > 1 && <button style={{ ...btnGhost, marginTop: 12 }} onClick={() => setPicked(null)}>Back to the matches</button>}
         </div>
