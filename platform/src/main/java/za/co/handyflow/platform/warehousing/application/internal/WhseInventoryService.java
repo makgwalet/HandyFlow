@@ -82,6 +82,31 @@ public class WhseInventoryService {
         return inv;
     }
 
+    /**
+     * Receives stock into a specific status: AVAILABLE for good stock, QUARANTINE for stock held for inspection, DAMAGED for
+     * stock that arrived broken. Posts a RECEIPT movement in that status, so held and damaged stock is on the ledger from the
+     * moment it crosses the dock but can never be allocated or picked.
+     */
+    @Transactional
+    public WhseInventory receiveStockInStatus(TenantId tenantId, UUID clientId, UUID itemId, UUID locationId, BigDecimal qty,
+                                               String status, String referenceType, UUID referenceId, String referenceNumber,
+                                               String note, UUID recordedBy, String idempotencyKey) {
+        if (!java.util.Set.of(WhseInventory.STATUS_AVAILABLE, WhseInventory.STATUS_QUARANTINE, WhseInventory.STATUS_DAMAGED).contains(status)) {
+            throw new IllegalArgumentException("Stock cannot be received into status " + status);
+        }
+        if (replayed(tenantId, idempotencyKey, clientId, itemId, locationId)) {
+            return repository.findPositionWithStatus(tenantId.getValue(), clientId, itemId, locationId, status)
+                    .orElseThrow(() -> new IllegalStateException("No " + status + " position found for the replayed request"));
+        }
+        WhseInventory inv = repository.findPositionWithStatus(tenantId.getValue(), clientId, itemId, locationId, status)
+                .orElseGet(() -> repository.save(WhseInventory.create(tenantId.getValue(), clientId, itemId, locationId, status)));
+        BigDecimal before = inv.getQtyOnHand();
+        inv.increaseOnHand(qty);
+        inv = repository.save(inv);
+        recordMovement(tenantId, inv, "RECEIPT", qty, before, referenceType, referenceId, referenceNumber, note, recordedBy, idempotencyKey);
+        return inv;
+    }
+
     /** Commits stock to an outbound order line. A reservation, not a physical change: it writes an allocation event, not a stock movement. */
     @Transactional
     public WhseInventory allocateStock(TenantId tenantId, UUID clientId, UUID itemId, UUID locationId,
