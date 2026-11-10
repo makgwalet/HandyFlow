@@ -70,4 +70,96 @@ describe("floor map", () => {
     await waitFor(() => expect(screen.getByText(/will be created/)).toBeTruthy())
     expect((screen.getByText("Create") as HTMLButtonElement).disabled).toBe(false)
   })
+
+  describe("editing the layout", () => {
+    const two = () => serve([
+      loc({ id: "1", code: "A-01-01", level: 1, posX: 0, posY: 0, onHand: 0 }),
+      loc({ id: "2", code: "A-02-01", level: 1, bay: 2, posX: 1, posY: 0, onHand: 0 }),
+    ])
+
+    it("shows empty squares only while editing", async () => {
+      two()
+      wrap(<WhseFloorMap />)
+      await waitFor(() => expect(screen.getAllByRole("gridcell")).toHaveLength(2))
+      fireEvent.click(screen.getByText("Edit layout"))
+      expect(screen.getAllByLabelText(/Empty square/).length).toBeGreaterThan(0)
+      fireEvent.click(screen.getByText("Done editing"))
+      expect(screen.queryAllByLabelText(/Empty square/)).toHaveLength(0)
+    })
+
+    it("moves a bay when it is dropped on an empty square", async () => {
+      two(); post.mockResolvedValue({ data: {} })
+      wrap(<WhseFloorMap />)
+      await waitFor(() => expect(screen.getAllByRole("gridcell")).toHaveLength(2))
+      fireEvent.click(screen.getByText("Edit layout"))
+      fireEvent.drop(screen.getByLabelText("Empty square column 0, row 1"), { dataTransfer: { getData: () => "1:0" } })
+      await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/warehousing/floor-map/cells/move", { fromX: 1, fromY: 0, toX: 0, toY: 1 }))
+    })
+
+    it("moves the selected bay when an empty square is clicked, and shows the server's refusal", async () => {
+      two(); post.mockRejectedValue({ response: { data: { message: "Something is already at column 2, row 0." } } })
+      wrap(<WhseFloorMap />)
+      await waitFor(() => expect(screen.getAllByRole("gridcell")).toHaveLength(2))
+      fireEvent.click(screen.getByText("Edit layout"))
+      fireEvent.click(screen.getByTitle(/A-01-01/))
+      fireEvent.click(screen.getByLabelText("Empty square column 2, row 0"))
+      await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/warehousing/floor-map/cells/move", { fromX: 0, fromY: 0, toX: 2, toY: 0 }))
+      await waitFor(() => expect(screen.getAllByText(/already at column 2/).length).toBeGreaterThan(0))
+    })
+
+    it("moves by typed column and row, saves type and capacity, adds levels and bays", async () => {
+      two(); post.mockResolvedValue({ data: {} })
+      wrap(<WhseFloorMap />)
+      await waitFor(() => expect(screen.getAllByRole("gridcell")).toHaveLength(2))
+      fireEvent.click(screen.getByText("Edit layout"))
+      fireEvent.click(screen.getByTitle(/A-01-01/))
+
+      const move = screen.getByText("Move bay") as HTMLButtonElement
+      expect(move.disabled).toBe(true)
+      fireEvent.change(screen.getByLabelText("Move to column"), { target: { value: "5" } })
+      fireEvent.change(screen.getByLabelText("Move to row"), { target: { value: "3" } })
+      fireEvent.click(move)
+      await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/warehousing/floor-map/cells/move", { fromX: 0, fromY: 0, toX: 5, toY: 3 }))
+    })
+
+    it("edits type, capacity, in-use, levels and aisle length of the selected bay", async () => {
+      two(); post.mockResolvedValue({ data: {} })
+      wrap(<WhseFloorMap />)
+      await waitFor(() => expect(screen.getAllByRole("gridcell")).toHaveLength(2))
+      fireEvent.click(screen.getByText("Edit layout"))
+      fireEvent.click(screen.getByTitle(/A-01-01/))
+      const url = (p: string) => `/api/v1/warehousing/floor-map${p}`
+
+      fireEvent.change(screen.getByLabelText("Type (all levels)"), { target: { value: "SHELF" } })
+      fireEvent.click(screen.getByText("Save type"))
+      await waitFor(() => expect(post).toHaveBeenCalledWith(url("/cells/edit"), { x: 0, y: 0, locationType: "SHELF" }))
+
+      fireEvent.change(screen.getByLabelText("Capacity per level (units)"), { target: { value: "25" } })
+      fireEvent.click(screen.getByText("Save capacity"))
+      await waitFor(() => expect(post).toHaveBeenCalledWith(url("/cells/edit"), { x: 0, y: 0, capacityUnits: 25 }))
+      fireEvent.click(screen.getByText("Clear"))
+      await waitFor(() => expect(post).toHaveBeenCalledWith(url("/cells/edit"), { x: 0, y: 0, clearCapacity: true }))
+
+      fireEvent.change(screen.getByLabelText("Add levels on top"), { target: { value: "2" } })
+      fireEvent.click(screen.getByText("Add levels"))
+      await waitFor(() => expect(post).toHaveBeenCalledWith(url("/cells/add-levels"), { x: 0, y: 0, count: 2 }))
+
+      fireEvent.change(screen.getByLabelText("Add bays to the end of aisle A"), { target: { value: "3" } })
+      fireEvent.click(screen.getByText("Add bays"))
+      await waitFor(() => expect(post).toHaveBeenCalledWith(url("/aisles/extend"), { aisle: "A", bays: 3 }))
+
+      fireEvent.click(screen.getByText("Switch bay off"))
+      await waitFor(() => expect(post).toHaveBeenCalledWith(url("/cells/edit"), { x: 0, y: 0, active: false }))
+    })
+
+    it("shows why a bay with stock cannot be switched off", async () => {
+      two(); post.mockRejectedValue({ response: { data: { message: "A-01-01 still holds stock, so this bay cannot be switched off." } } })
+      wrap(<WhseFloorMap />)
+      await waitFor(() => expect(screen.getAllByRole("gridcell")).toHaveLength(2))
+      fireEvent.click(screen.getByText("Edit layout"))
+      fireEvent.click(screen.getByTitle(/A-01-01/))
+      fireEvent.click(screen.getByText("Switch bay off"))
+      await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/still holds stock/))
+    })
+  })
 })

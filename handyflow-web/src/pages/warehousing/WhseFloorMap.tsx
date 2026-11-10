@@ -2,7 +2,8 @@
 //
 // The floor map: every placed location as a cell on the building grid, coloured by how full it is (or by held stock, or by expiry),
 // with a panel for the levels of the selected bay. Racking is generated in blocks (aisles x bays x levels); locations that were created
-// before the map existed show under "Not on the map" and can be given a cell.
+// before the map existed show under "Not on the map" and can be given a cell. "Edit layout" lets a bay be dragged (or clicked, or typed) to
+// another cell, its type/capacity/in-use state changed, levels added on top and bays added to the end of an aisle.
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Plus, X } from "lucide-react"
@@ -122,11 +123,98 @@ function PlaceRow({ l }: { l: FloorLocation }) {
   )
 }
 
+const FLOOR = "/api/v1/warehousing/floor-map"
+
+/** Edits the selected bay: move, type, capacity, in-use, add levels, extend its aisle. Every change is one call and refreshes the map. */
+function BayEditor({ cell, onMoved }: { cell: Cell; onMoved: (x: number, y: number) => void }) {
+  const qc = useQueryClient()
+  const first = cell.locations[0]
+  const [type, setType] = useState(first.locationType)
+  const [capacity, setCapacity] = useState("")
+  const [col, setCol] = useState(""), [row, setRow] = useState("")
+  const [levels, setLevels] = useState("1"), [bays, setBays] = useState("1")
+  const [done, setDone] = useState<string | null>(null)
+  const refresh = () => { qc.invalidateQueries({ queryKey: ["whse-floor-map"] }); qc.invalidateQueries({ queryKey: ["whse-locations"] }) }
+  const call = useMutation({
+    mutationFn: async (a: { path: string; body: object; message: string; after?: () => void }) => { await apiClient.post(`${FLOOR}${a.path}`, a.body); return a },
+    onSuccess: a => { setDone(a.message); refresh(); a.after?.() },
+    onError: () => setDone(null),
+  })
+  const run = (path: string, body: object, message: string, after?: () => void) => { setDone(null); call.mutate({ path, body, message, after }) }
+  const at = { x: cell.x, y: cell.y }
+  const goodCell = /^\d+$/.test(col) && /^\d+$/.test(row)
+  const btn: React.CSSProperties = { border: "none", background: WHSE_ACCENT, color: "var(--hf-text-on-solid)", borderRadius: 6, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }
+  const ghost: React.CSSProperties = { border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text)", borderRadius: 6, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }
+  const inUse = cell.locations.some(l => l.active)
+
+  return (
+    <div style={{ borderTop: "1px solid var(--hf-border-subtle)", marginTop: 10, paddingTop: 10, display: "grid", gap: 12 }}>
+      <p style={{ fontSize: 12.5, fontWeight: 700, margin: 0, color: "var(--hf-text)" }}>Edit this bay</p>
+      <div>
+        <label style={labelStyle} htmlFor="bay-move-col">Move to column and row</label>
+        <div style={{ display: "flex", gap: 6 }}>
+          <input id="bay-move-col" aria-label="Move to column" style={{ ...inputStyle, width: 64 }} placeholder="col" value={col} onChange={e => setCol(e.target.value)} />
+          <input aria-label="Move to row" style={{ ...inputStyle, width: 64 }} placeholder="row" value={row} onChange={e => setRow(e.target.value)} />
+          <button style={{ ...btn, opacity: goodCell ? 1 : 0.5 }} disabled={!goodCell || call.isPending}
+            onClick={() => run("/cells/move", { fromX: cell.x, fromY: cell.y, toX: Number(col), toY: Number(row) }, "Bay moved", () => onMoved(Number(col), Number(row)))}>Move bay</button>
+        </div>
+        <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: "4px 0 0" }}>Or drag the bay onto an empty square, or click an empty square.</p>
+      </div>
+      <div>
+        <label style={labelStyle} htmlFor="bay-type">Type (all levels)</label>
+        <div style={{ display: "flex", gap: 6 }}>
+          <select id="bay-type" style={inputStyle} value={type} onChange={e => setType(e.target.value)}>{TYPES.map(t => <option key={t}>{t}</option>)}</select>
+          <button style={btn} disabled={call.isPending || type === first.locationType} onClick={() => run("/cells/edit", { ...at, locationType: type }, "Type saved")}>Save type</button>
+        </div>
+      </div>
+      <div>
+        <label style={labelStyle} htmlFor="bay-cap">Capacity per level (units)</label>
+        <div style={{ display: "flex", gap: 6 }}>
+          <input id="bay-cap" style={inputStyle} value={capacity} onChange={e => setCapacity(e.target.value)} placeholder={first.capacityUnits != null ? String(first.capacityUnits) : "not set"} />
+          <button style={{ ...btn, opacity: /^\d+(\.\d+)?$/.test(capacity) ? 1 : 0.5 }} disabled={!/^\d+(\.\d+)?$/.test(capacity) || call.isPending}
+            onClick={() => run("/cells/edit", { ...at, capacityUnits: Number(capacity) }, "Capacity saved", () => setCapacity(""))}>Save capacity</button>
+          <button style={ghost} disabled={call.isPending} onClick={() => run("/cells/edit", { ...at, clearCapacity: true }, "Capacity cleared")}>Clear</button>
+        </div>
+      </div>
+      <div>
+        <label style={labelStyle} htmlFor="bay-levels">Add levels on top</label>
+        <div style={{ display: "flex", gap: 6 }}>
+          <input id="bay-levels" type="number" min={1} max={10} style={{ ...inputStyle, width: 70 }} value={levels} onChange={e => setLevels(e.target.value)} />
+          <button style={btn} disabled={call.isPending || !(Number(levels) >= 1)} onClick={() => run("/cells/add-levels", { ...at, count: Number(levels) }, `${levels} level(s) added`)}>Add levels</button>
+        </div>
+      </div>
+      {first.aisle && (
+        <div>
+          <label style={labelStyle} htmlFor="bay-extend">Add bays to the end of aisle {first.aisle}</label>
+          <div style={{ display: "flex", gap: 6 }}>
+            <input id="bay-extend" type="number" min={1} max={99} style={{ ...inputStyle, width: 70 }} value={bays} onChange={e => setBays(e.target.value)} />
+            <button style={btn} disabled={call.isPending || !(Number(bays) >= 1)} onClick={() => run("/aisles/extend", { aisle: first.aisle, bays: Number(bays) }, `${bays} bay(s) added to aisle ${first.aisle}`)}>Add bays</button>
+          </div>
+          <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: "4px 0 0" }}>Copies this aisle's last bay (levels, type, zone) and continues on the same row. New bays are picked last.</p>
+        </div>
+      )}
+      <div>
+        <button style={ghost} disabled={call.isPending} onClick={() => run("/cells/edit", { ...at, active: !inUse }, inUse ? "Bay switched off" : "Bay switched on")}>
+          {inUse ? "Switch bay off" : "Switch bay on"}
+        </button>
+      </div>
+      {call.isError && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12, margin: 0 }}>{errText(call.error, "Could not save this change")}</p>}
+      {done && !call.isError && <p role="status" style={{ color: "var(--hf-success-text-strong)", fontSize: 12, margin: 0 }}>{done}</p>}
+    </div>
+  )
+}
+
 export default function WhseFloorMap() {
   const [mode, setMode] = useState<Mode>("fill")
   const [zone, setZone] = useState("")
   const [selected, setSelected] = useState<string | null>(null)
   const [showGenerate, setShowGenerate] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const qc = useQueryClient()
+  const move = useMutation({
+    mutationFn: async (m: { fromX: number; fromY: number; toX: number; toY: number }) => apiClient.post(`${FLOOR}/cells/move`, m),
+    onSuccess: (_r, m) => { setSelected(`${m.toX}:${m.toY}`); qc.invalidateQueries({ queryKey: ["whse-floor-map"] }) },
+  })
 
   const { data, isLoading } = useQuery<FloorMapData>({
     queryKey: ["whse-floor-map"],
@@ -135,7 +223,17 @@ export default function WhseFloorMap() {
   const locations = data?.locations ?? []
   const zones = useMemo(() => [...new Set(locations.map(l => l.zone).filter((z): z is string => !!z))].sort(), [locations])
   const cells = useMemo(() => groupCells(locations, zone || null), [locations, zone])
-  const box = bounds(cells)
+  const raw = bounds(cells)
+  // While editing the grid grows by one square on every side so a bay can be dropped just outside the current edge.
+  const box = raw && editing ? { minX: Math.max(0, raw.minX - 1), minY: Math.max(0, raw.minY - 1), maxX: raw.maxX + 1, maxY: raw.maxY + 1 } : raw
+  const occupied = useMemo(() => new Set(cells.map(c => `${c.x}:${c.y}`)), [cells])
+  const emptySlots = useMemo(() => {
+    if (!box || !editing || (box.maxX - box.minX + 1) * (box.maxY - box.minY + 1) > 2500) return []
+    const out: { x: number; y: number }[] = []
+    for (let y = box.minY; y <= box.maxY; y++) for (let x = box.minX; x <= box.maxX; x++) if (!occupied.has(`${x}:${y}`)) out.push({ x, y })
+    return out
+  }, [box, editing, occupied])
+  const moveSelectedTo = (x: number, y: number) => { if (current) move.mutate({ fromX: current.x, fromY: current.y, toX: x, toY: y }) }
   const current = cells.find(c => `${c.x}:${c.y}` === selected) ?? null
   const unplaced = locations.filter(l => l.posX == null)
 
@@ -149,6 +247,10 @@ export default function WhseFloorMap() {
           <option value="fill">Colour: how full</option><option value="held">Colour: held or damaged stock</option><option value="expiry">Colour: expiring within 30 days</option>
         </select>
         <span style={{ flex: 1 }} />
+        <button aria-pressed={editing} onClick={() => { setEditing(!editing); move.reset() }}
+          style={{ background: editing ? WHSE_ACCENT_TEXT : "var(--hf-surface)", color: editing ? "var(--hf-text-on-solid)" : "var(--hf-text)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          {editing ? "Done editing" : "Edit layout"}
+        </button>
         <button onClick={() => setShowGenerate(true)}
           style={{ display: "flex", alignItems: "center", gap: 6, background: WHSE_ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Generate racking
@@ -169,6 +271,7 @@ export default function WhseFloorMap() {
                   const active = `${c.x}:${c.y}` === selected
                   return (
                     <button key={`${c.x}:${c.y}`} role="gridcell" onClick={() => setSelected(active ? null : `${c.x}:${c.y}`)}
+                      draggable={editing} onDragStart={e => { e.dataTransfer.setData("text/plain", `${c.x}:${c.y}`); e.dataTransfer.effectAllowed = "move" }}
                       title={`${c.locations.map(l => l.code).join(", ")}\n${num(c.onHand)} on hand${c.held ? `, ${num(c.held)} held` : ""}${c.utilisationPct != null ? `, ${c.utilisationPct}% full` : ""}`}
                       style={{
                         gridColumn: c.x - box.minX + 1, gridRow: c.y - box.minY + 1, background: cellColour(c, mode), color: "var(--hf-text)",
@@ -180,7 +283,20 @@ export default function WhseFloorMap() {
                     </button>
                   )
                 })}
+                {emptySlots.map(sl => (
+                  <div key={`empty-${sl.x}:${sl.y}`} role="gridcell" aria-label={`Empty square column ${sl.x}, row ${sl.y}`}
+                    onClick={() => moveSelectedTo(sl.x, sl.y)}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => {
+                      e.preventDefault()
+                      const [fx, fy] = e.dataTransfer.getData("text/plain").split(":").map(Number)
+                      if (Number.isInteger(fx) && Number.isInteger(fy)) move.mutate({ fromX: fx, fromY: fy, toX: sl.x, toY: sl.y })
+                    }}
+                    style={{ gridColumn: sl.x - box.minX + 1, gridRow: sl.y - box.minY + 1, border: "1px dashed var(--hf-border)", borderRadius: 6, cursor: current ? "copy" : "default" }} />
+                ))}
               </div>
+              {editing && <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: "10px 0 0" }}>Drag a bay onto a dashed square to move it, or select a bay and click a dashed square.</p>}
+              {move.isError && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12, margin: "8px 0 0" }}>{errText(move.error, "Could not move the bay")}</p>}
               {mode === "fill" && (
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
                   {(Object.keys(BAND_BG) as Band[]).map(b => (
@@ -208,6 +324,7 @@ export default function WhseFloorMap() {
                     {l.earliestExpiry && <div style={{ color: expiresSoon(l.earliestExpiry, today()) ? "var(--hf-danger-text)" : "var(--hf-text-faint)" }}>Earliest expiry {l.earliestExpiry}</div>}
                   </div>
                 ))}
+                {editing && <BayEditor key={`${current.x}:${current.y}:${current.locations.length}`} cell={current} onMoved={(x, y) => setSelected(`${x}:${y}`)} />}
               </div>
             )}
           </div>

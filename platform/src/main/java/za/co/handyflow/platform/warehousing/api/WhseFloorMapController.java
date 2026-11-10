@@ -83,4 +83,46 @@ public class WhseFloorMapController {
         return ResponseEntity.ok(ApiResponse.success("Layout saved", new LocationResponse(l.getId(), l.getCode(), l.getZone(), l.getDescription(),
                 l.getCapacityUnits(), l.isActive(), l.getAisle(), l.getBay(), l.getLevel(), l.getLocationType(), l.getPickSequence(), l.getPosX(), l.getPosY())));
     }
+
+    public record MoveCellRequest(@Min(0) int fromX, @Min(0) int fromY, @Min(0) int toX, @Min(0) int toY) {}
+    public record EditBayRequest(@Min(0) int x, @Min(0) int y, String locationType, @Min(0) BigDecimal capacityUnits, boolean clearCapacity, Boolean active) {}
+    public record AddLevelsRequest(@Min(0) int x, @Min(0) int y, @Min(1) @Max(10) int count, @Min(0) BigDecimal capacityUnits) {}
+    public record ExtendAisleRequest(@NotNull String aisle, @Min(1) @Max(99) int bays, @Min(0) BigDecimal capacityUnits) {}
+
+    @PostMapping("/cells/move")
+    @PreAuthorize(MANAGE)
+    @Operation(summary = "Moves every level of a bay to another cell (drag on the map). Codes do not change; the target must be free.")
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> move(@Valid @RequestBody MoveCellRequest req) {
+        featureGuard.requireModule("warehousing");
+        int n = service.moveCell(TenantContext.getTenantIdAsObject(), req.fromX(), req.fromY(), req.toX(), req.toY(), TenantContext.getCurrentUserId());
+        return ResponseEntity.ok(ApiResponse.success("Moved", Map.of("moved", n)));
+    }
+
+    @PostMapping("/cells/edit")
+    @PreAuthorize(MANAGE)
+    @Operation(summary = "Changes the type, capacity per level or in-use state of every level of a bay. A bay that holds stock cannot be switched off.")
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> edit(@Valid @RequestBody EditBayRequest req) {
+        featureGuard.requireModule("warehousing");
+        int n = service.editBay(TenantContext.getTenantIdAsObject(), req.x(), req.y(), req.locationType(), req.capacityUnits(), req.clearCapacity(), req.active(),
+                TenantContext.getCurrentUserId());
+        return ResponseEntity.ok(ApiResponse.success("Saved", Map.of("changed", n)));
+    }
+
+    @PostMapping("/cells/add-levels")
+    @PreAuthorize(MANAGE)
+    @Operation(summary = "Adds levels on top of a bay")
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> addLevels(@Valid @RequestBody AddLevelsRequest req) {
+        featureGuard.requireModule("warehousing");
+        int n = service.addLevels(TenantContext.getTenantIdAsObject(), req.x(), req.y(), req.count(), req.capacityUnits(), TenantContext.getCurrentUserId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Levels added", Map.of("created", n)));
+    }
+
+    @PostMapping("/aisles/extend")
+    @PreAuthorize(MANAGE)
+    @Operation(summary = "Adds bays to the end of an aisle, like its last bay. New bays are last in the picking order.")
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> extend(@Valid @RequestBody ExtendAisleRequest req) {
+        featureGuard.requireModule("warehousing");
+        int n = service.extendAisle(TenantContext.getTenantIdAsObject(), req.aisle(), req.bays(), req.capacityUnits(), TenantContext.getCurrentUserId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Aisle extended", Map.of("created", n)));
+    }
 }

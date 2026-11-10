@@ -42,7 +42,11 @@ public class WhseFloorMapService {
     @Transactional(readOnly = true)
     public List<PreviewSlot> preview(TenantId tenantId, WhseFloorLayout.Spec spec) {
         UUID t = tenantId.getValue();
-        List<WhseFloorLayout.Slot> slots = WhseFloorLayout.generate(spec, nextSequence(t));
+        return check(t, WhseFloorLayout.generate(spec, nextSequence(t)));
+    }
+
+    /** Marks each slot that clashes with an existing code or cell. */
+    private List<PreviewSlot> check(UUID t, List<WhseFloorLayout.Slot> slots) {
         // Codes stay reserved even for deleted locations (the unique constraint covers every row); cells are only taken by live ones.
         Set<String> codes = new HashSet<>(jdbc.queryForList("SELECT code FROM whse_locations WHERE tenant_id = ?", String.class, t));
         Set<String> cells = new HashSet<>(jdbc.query("SELECT pos_x, pos_y, coalesce(level, 0) FROM whse_locations WHERE tenant_id = ? AND pos_x IS NOT NULL AND deleted_at IS NULL",
@@ -57,26 +61,158 @@ public class WhseFloorMapService {
         return out;
     }
 
+    /** Saves the slots as new locations, or nothing when any code or cell is already taken. */
+    private void createAll(UUID t, List<WhseFloorLayout.Slot> slots, BigDecimal capacityUnits) {
+        List<PreviewSlot> checked = check(t, slots);
+        List<String> conflicts = checked.stream().map(PreviewSlot::conflict).filter(c -> c != null).toList();
+        if (!conflicts.isEmpty()) {
+            String shown = String.join(" ", conflicts.stream().limit(3).toList());
+            throw new HandyFlowException(conflicts.size() + " of " + checked.size() + " locations clash with existing ones, so nothing was created. " + shown
+                    + (conflicts.size() > 3 ? " ..." : ""), HttpStatus.CONFLICT, "FLOOR_LAYOUT_CONFLICT");
+        }
+        for (WhseFloorLayout.Slot s : slots) {
+            WhseLocation l = WhseLocation.create(t, s.code(), s.zone(), null, capacityUnits);
+            l.applyLayout(s.aisle(), s.bay(), s.level(), s.type(), s.pickSequence(), s.x(), s.y());
+            repository.save(l);
+        }
+    }
+
     /** Creates the whole block, or nothing when any code or cell is already taken. */
     @Transactional
     public int generate(TenantId tenantId, WhseFloorLayout.Spec spec, BigDecimal capacityUnits, UUID actor) {
         if (capacityUnits != null && capacityUnits.signum() < 0) throw new IllegalArgumentException("Capacity cannot be negative.");
-        List<PreviewSlot> slots = preview(tenantId, spec);
-        List<String> conflicts = slots.stream().map(PreviewSlot::conflict).filter(c -> c != null).toList();
-        if (!conflicts.isEmpty()) {
-            String shown = String.join(" ", conflicts.stream().limit(3).toList());
-            throw new HandyFlowException(conflicts.size() + " of " + slots.size() + " locations clash with existing ones, so nothing was created. " + shown
-                    + (conflicts.size() > 3 ? " ..." : ""), HttpStatus.CONFLICT, "FLOOR_LAYOUT_CONFLICT");
-        }
-        for (PreviewSlot p : slots) {
-            WhseFloorLayout.Slot s = p.slot();
-            WhseLocation l = WhseLocation.create(tenantId.getValue(), s.code(), s.zone(), null, capacityUnits);
-            l.applyLayout(s.aisle(), s.bay(), s.level(), s.type(), s.pickSequence(), s.x(), s.y());
-            repository.save(l);
-        }
+        List<WhseFloorLayout.Slot> slots = WhseFloorLayout.generate(spec, nextSequence(tenantId.getValue()));
+        createAll(tenantId.getValue(), slots, capacityUnits);
         jdbc.update("INSERT INTO audit_events (tenant_id, actor_type, actor_id, action, item_type, after_json) VALUES (?, 'STAFF', ?, 'WHSE_LOCATIONS_GENERATED', 'WHSE_LOCATION', ?::jsonb)",
                 tenantId.getValue(), actor, "{\"count\":" + slots.size() + ",\"aisles\":" + spec.aisles().size() + ",\"zone\":" + quote(spec.zone()) + "}");
         return slots.size();
+    }
+
+    // ── editing after generation ────────────────────────────────────────────
+
+    /**
+     * Moves every level of the bay at one cell to another cell (drag on the map). Codes, aisle, bay and levels do not change, only
+     * where the bay is drawn. The target must be free at each of those levels; nothing moves otherwise.
+     */
+    @Transactional
+    public int moveCell(TenantId tenantId, int fromX, int fromY, int toX, int toY, UUID actor) {
+        UUID t = tenantId.getValue();
+        if (fromX < 0 || fromY < 0 || toX < 0 || toY < 0) throw new IllegalArgumentException("A map position cannot be negative.");
+        if (fromX == toX && fromY == toY) throw new IllegalArgumentException("That is where it already is.");
+        List<WhseLocation> moving = atCell(t, fromX, fromY);
+        if (moving.isEmpty()) throw new ResourceNotFoundException("Map cell", fromX + "," + fromY);
+        Set<Integer> targetLevels = new HashSet<>();
+        for (WhseLocation o : atCell(t, toX, toY)) targetLevels.add(o.getLevel() == null ? 0 : o.getLevel());
+        for (WhseLocation l : moving) {
+            if (targetLevels.contains(l.getLevel() == null ? 0 : l.getLevel())) {
+                throw new HandyFlowException("Something is already at column " + toX + ", row " + toY + ". Move it first, or choose an empty cell.", HttpStatus.CONFLICT, "CELL_OCCUPIED");
+            }
+        }
+        for (WhseLocation l : moving) {
+            l.applyLayout(l.getAisle(), l.getBay(), l.getLevel(), l.getLocationType(), l.getPickSequence(), toX, toY);
+            repository.save(l);
+        }
+        audit(t, actor, "WHSE_FLOOR_CELL_MOVED", "{\"from\":\"" + fromX + "," + fromY + "\",\"to\":\"" + toX + "," + toY + "\",\"locations\":" + moving.size() + "}");
+        return moving.size();
+    }
+
+    /**
+     * Changes every level of a bay at once: the location type, the capacity per level, or whether it is in use. At least one must be given.
+     * A bay that still holds stock cannot be switched off.
+     */
+    @Transactional
+    public int editBay(TenantId tenantId, int x, int y, String type, BigDecimal capacityUnits, boolean clearCapacity, Boolean active, UUID actor) {
+        UUID t = tenantId.getValue();
+        if (type == null && capacityUnits == null && !clearCapacity && active == null) throw new IllegalArgumentException("Choose something to change.");
+        if (type != null && !WhseFloorLayout.TYPES.contains(type)) throw new IllegalArgumentException("Unknown location type.");
+        if (capacityUnits != null && capacityUnits.signum() < 0) throw new IllegalArgumentException("Capacity cannot be negative.");
+        if (capacityUnits != null && clearCapacity) throw new IllegalArgumentException("Give a capacity or clear it, not both.");
+        List<WhseLocation> locations = atCell(t, x, y);
+        if (locations.isEmpty()) throw new ResourceNotFoundException("Map cell", x + "," + y);
+        if (Boolean.FALSE.equals(active)) {
+            for (WhseLocation l : locations) {
+                BigDecimal held = jdbc.queryForObject("SELECT coalesce(sum(qty_on_hand), 0) FROM whse_inventory WHERE tenant_id = ? AND location_id = ?", BigDecimal.class, t, l.getId());
+                if (held != null && held.signum() > 0) {
+                    throw new HandyFlowException(l.getCode() + " still holds stock, so this bay cannot be switched off. Move the stock first.", HttpStatus.CONFLICT, "LOCATION_HAS_STOCK");
+                }
+            }
+        }
+        for (WhseLocation l : locations) {
+            if (type != null) l.applyLayout(l.getAisle(), l.getBay(), l.getLevel(), type, l.getPickSequence(), l.getPosX(), l.getPosY());
+            if (capacityUnits != null || clearCapacity) l.update(l.getCode(), l.getZone(), l.getDescription(), clearCapacity ? null : capacityUnits);
+            if (Boolean.TRUE.equals(active)) l.reactivate();
+            if (Boolean.FALSE.equals(active)) l.deactivate();
+            repository.save(l);
+        }
+        audit(t, actor, "WHSE_FLOOR_BAY_EDITED", "{\"cell\":\"" + x + "," + y + "\",\"type\":" + quote(type) + ",\"capacity\":"
+                + (clearCapacity ? "\"cleared\"" : capacityUnits == null ? "null" : capacityUnits.toPlainString()) + ",\"active\":" + active + ",\"locations\":" + locations.size() + "}");
+        return locations.size();
+    }
+
+    /** Adds levels on top of a bay, named like the generator names them (aisle-bay-level), with the bay's type, zone and picking order. */
+    @Transactional
+    public int addLevels(TenantId tenantId, int x, int y, int count, BigDecimal capacityUnits, UUID actor) {
+        UUID t = tenantId.getValue();
+        if (count < 1 || count > 10) throw new IllegalArgumentException("Add between 1 and 10 levels.");
+        if (capacityUnits != null && capacityUnits.signum() < 0) throw new IllegalArgumentException("Capacity cannot be negative.");
+        List<WhseLocation> locations = atCell(t, x, y);
+        if (locations.isEmpty()) throw new ResourceNotFoundException("Map cell", x + "," + y);
+        WhseLocation top = locations.get(locations.size() - 1);
+        if (top.getAisle() == null || top.getBay() == null) throw new IllegalArgumentException("This bay has no aisle and bay number, so level codes cannot be made for it.");
+        int topLevel = top.getLevel() == null ? 0 : top.getLevel();
+        if (topLevel + count > 10) throw new IllegalArgumentException("A bay can have at most 10 levels; this one has " + topLevel + ".");
+        List<WhseFloorLayout.Slot> slots = new ArrayList<>();
+        for (int i = 1; i <= count; i++) {
+            int level = topLevel + i;
+            slots.add(new WhseFloorLayout.Slot(WhseFloorLayout.code(top.getAisle(), top.getBay(), level), top.getZone(), top.getAisle(), top.getBay(), level,
+                    top.getLocationType(), x, y, top.getPickSequence() == null ? 0 : top.getPickSequence()));
+        }
+        createAll(t, slots, capacityUnits != null ? capacityUnits : top.getCapacityUnits());
+        audit(t, actor, "WHSE_FLOOR_LEVELS_ADDED", "{\"cell\":\"" + x + "," + y + "\",\"levels\":" + count + "}");
+        return count;
+    }
+
+    /**
+     * Adds bays to the end of an existing aisle, with the same number of levels, type and zone as its last bay, on the same row.
+     * The new bays are last in the picking order (the walking order of the aisle is not renumbered).
+     */
+    @Transactional
+    public int extendAisle(TenantId tenantId, String aisle, int addBays, BigDecimal capacityUnits, UUID actor) {
+        UUID t = tenantId.getValue();
+        String name = aisle == null ? "" : aisle.trim().toUpperCase();
+        if (addBays < 1 || addBays > 99) throw new IllegalArgumentException("Add between 1 and 99 bays.");
+        if (capacityUnits != null && capacityUnits.signum() < 0) throw new IllegalArgumentException("Capacity cannot be negative.");
+        List<WhseLocation> inAisle = repository.findAllActive(t).stream()
+                .filter(l -> name.equals(l.getAisle()) && l.getBay() != null && l.getPosX() != null && l.getPosY() != null).toList();
+        if (inAisle.isEmpty()) throw new ResourceNotFoundException("Aisle on the map", name);
+        int lastBay = inAisle.stream().mapToInt(WhseLocation::getBay).max().orElseThrow();
+        if (lastBay + addBays > 99) throw new IllegalArgumentException("An aisle can have at most 99 bays; " + name + " has " + lastBay + ".");
+        List<WhseLocation> last = inAisle.stream().filter(l -> l.getBay() == lastBay).sorted(java.util.Comparator.comparingInt(l -> l.getLevel() == null ? 0 : l.getLevel())).toList();
+        WhseLocation template = last.get(last.size() - 1);
+        int levels = template.getLevel() == null ? 1 : template.getLevel();
+        int seq = nextSequence(t);
+        List<WhseFloorLayout.Slot> slots = new ArrayList<>();
+        for (int b = 1; b <= addBays; b++) {
+            for (int level = 1; level <= levels; level++) {
+                slots.add(new WhseFloorLayout.Slot(WhseFloorLayout.code(name, lastBay + b, level), template.getZone(), name, lastBay + b, level,
+                        template.getLocationType(), template.getPosX() + b, template.getPosY(), seq++));
+            }
+        }
+        if (slots.size() > WhseFloorLayout.MAX_SLOTS) throw new IllegalArgumentException("That is more than " + WhseFloorLayout.MAX_SLOTS + " locations in one go.");
+        createAll(t, slots, capacityUnits != null ? capacityUnits : template.getCapacityUnits());
+        audit(t, actor, "WHSE_FLOOR_AISLE_EXTENDED", "{\"aisle\":" + quote(name) + ",\"bays\":" + addBays + ",\"locations\":" + slots.size() + "}");
+        return slots.size();
+    }
+
+    private List<WhseLocation> atCell(UUID t, int x, int y) {
+        return repository.findAllActive(t).stream()
+                .filter(l -> l.getPosX() != null && l.getPosX() == x && l.getPosY() != null && l.getPosY() == y)
+                .sorted(java.util.Comparator.comparingInt(l -> l.getLevel() == null ? 0 : l.getLevel()))
+                .toList();
+    }
+
+    private void audit(UUID t, UUID actor, String action, String afterJson) {
+        jdbc.update("INSERT INTO audit_events (tenant_id, actor_type, actor_id, action, item_type, after_json) VALUES (?, 'STAFF', ?, ?, 'WHSE_LOCATION', ?::jsonb)", t, actor, action, afterJson);
     }
 
     /** Moves a location to a cell, or sets its aisle, bay, level, type and picking order. A null position takes it off the map. */
