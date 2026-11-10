@@ -28,6 +28,7 @@ public class WhseInventoryController {
 
     private final WhseInventoryService inventoryService;
     private final za.co.handyflow.platform.warehousing.application.internal.WhseAdjustmentApprovalService adjustmentApproval;
+    private final za.co.handyflow.platform.warehousing.application.internal.WhseLotAllocationService lotAllocation;
     private final FeatureGuard featureGuard;
 
     @GetMapping("/clients/{clientId}/inventory")
@@ -66,8 +67,12 @@ public class WhseInventoryController {
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody ChangeStockStatusRequest req) {
         featureGuard.requireModule("warehousing");
+        boolean tracked = lotAllocation.isLotTracked(TenantContext.getTenantIdAsObject().getValue(), req.itemId());
+        if (tracked && req.lotId() == null) {
+            throw new IllegalArgumentException("This item is lot tracked: choose the lot whose status is changing.");
+        }
         WhseInventory dest = inventoryService.changeStatus(TenantContext.getTenantIdAsObject(), clientId, req.itemId(),
-                req.locationId(), req.fromStatus(), req.toStatus(), req.qty(), req.reason(),
+                req.locationId(), tracked ? req.lotId() : null, req.fromStatus(), req.toStatus(), req.qty(), req.reason(),
                 TenantContext.getCurrentUserId(), idempotencyKey);
         return ResponseEntity.ok(ApiResponse.success("Stock status changed", toResponse(dest)));
     }

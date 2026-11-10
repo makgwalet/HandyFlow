@@ -183,6 +183,29 @@ class WhseInventoryServiceTest {
     }
 
     @Test
+    @DisplayName("an allocation event carries the lot of the position it reserved")
+    void allocationEventCarriesLot() {
+        UUID lot = UUID.randomUUID();
+        WhseInventory inv = WhseInventory.create(tenant, client, item, loc, "AVAILABLE", lot);
+        inv.increaseOnHand(q(10));
+        positions.add(inv);
+        UUID invId = UUID.randomUUID();
+        when(inventoryRepo.findByTenantAndId(eq(tenant), eq(invId))).thenReturn(Optional.of(inv));
+        service.allocateById(t(), invId, q(4), "OUTBOUND_ORDER", UUID.randomUUID(), "OUT-9", user);
+
+        assertEquals(1, events.size());
+        assertEquals(lot, events.get(0).getLotId());
+    }
+
+    @Test
+    @DisplayName("an allocation event for an untracked item has no lot")
+    void allocationEventWithoutLot() {
+        service.receiveStock(t(), client, item, loc, q(10), "INBOUND_SHIPMENT", UUID.randomUUID(), "IN-1", user);
+        service.allocateStock(t(), client, item, loc, q(3), "OUTBOUND_ORDER", UUID.randomUUID(), "OUT-1", user);
+        assertNull(events.get(0).getLotId());
+    }
+
+    @Test
     @DisplayName("allocation, fulfilment and release each write an allocation event that chains")
     void allocationEventsChain() {
         service.receiveStock(t(), client, item, loc, q(10), "INBOUND_SHIPMENT", UUID.randomUUID(), "IN-1", user);

@@ -52,6 +52,8 @@ public class WhseAllocationEvent {
     private String referenceNumber;
     @Column(name = "recorded_by_user_id", updatable = false)
     private UUID recordedByUserId;
+    @Column(name = "lot_id", updatable = false)
+    private UUID lotId;
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -59,7 +61,17 @@ public class WhseAllocationEvent {
                                              String eventType, BigDecimal qty, BigDecimal allocatedBefore,
                                              BigDecimal allocatedAfter, String referenceType, UUID referenceId,
                                              String referenceNumber, UUID recordedByUserId) {
+        return record(tenantId, clientId, itemId, locationId, eventType, qty, allocatedBefore, allocatedAfter,
+                referenceType, referenceId, referenceNumber, recordedByUserId, null);
+    }
+
+    /** As above, for a reservation against one lot of a lot-tracked item. */
+    public static WhseAllocationEvent record(UUID tenantId, UUID clientId, UUID itemId, UUID locationId,
+                                             String eventType, BigDecimal qty, BigDecimal allocatedBefore,
+                                             BigDecimal allocatedAfter, String referenceType, UUID referenceId,
+                                             String referenceNumber, UUID recordedByUserId, UUID lotId) {
         WhseAllocationEvent e = new WhseAllocationEvent();
+        e.lotId = lotId;
         e.tenantId = tenantId;
         e.clientId = clientId;
         e.itemId = itemId;

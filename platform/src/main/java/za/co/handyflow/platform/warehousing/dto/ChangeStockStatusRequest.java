@@ -10,4 +10,5 @@ import java.util.UUID;
 /** Moves unallocated stock at one location between statuses (AVAILABLE, QUARANTINE, DAMAGED). */
 public record ChangeStockStatusRequest(@NotNull UUID itemId, @NotNull UUID locationId,
                                        @NotBlank String fromStatus, @NotBlank String toStatus,
-                                       @NotNull @Positive BigDecimal qty, @NotBlank String reason) {}
+                                       @NotNull @Positive BigDecimal qty, @NotBlank String reason,
+                                       /** Required for a lot-tracked item, ignored otherwise. */ UUID lotId) {}

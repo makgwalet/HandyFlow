@@ -407,6 +407,6 @@ public class WhseInventoryService {
                                    String referenceNumber, UUID recordedBy) {
         allocationEventRepository.save(WhseAllocationEvent.record(tenantId.getValue(), inv.getClientId(),
                 inv.getItemId(), inv.getLocationId(), eventType, qty, allocatedBefore, inv.getQtyAllocated(),
-                referenceType, referenceId, referenceNumber, recordedBy));
+                referenceType, referenceId, referenceNumber, recordedBy, inv.getLotId()));
     }
 }

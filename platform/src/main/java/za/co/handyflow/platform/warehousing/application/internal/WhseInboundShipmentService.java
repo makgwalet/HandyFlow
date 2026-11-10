@@ -35,6 +35,7 @@ public class WhseInboundShipmentService {
     private final WhseInboundShipmentLineRepository lineRepository;
     private final WhseInventoryService inventoryService;
     private final WhseClientService clientService;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     /** One expected line on a new shipment. */
     public record InboundLine(UUID itemId, BigDecimal expectedQty, String notes) {}
@@ -65,11 +66,26 @@ public class WhseInboundShipmentService {
      * quantity into WhseInventory immediately and rolls the shipment
      * header's status forward.
      */
+    /**
+     * The quick receive posts stock with no lot. A lot-tracked item must be received with its lot number
+     * (and expiry date where tracked), which the receipts endpoint takes; refuse here with that instruction
+     * rather than letting the database reject the posting.
+     */
+    private void requireNotLotTracked(TenantId tenantId, UUID itemId) {
+        Boolean tracked = jdbc.queryForObject("SELECT lot_tracked FROM whse_items WHERE id = ? AND tenant_id = ?",
+                Boolean.class, itemId, tenantId.getValue());
+        if (Boolean.TRUE.equals(tracked)) {
+            throw new IllegalArgumentException("This item is lot tracked, so it must be received with a lot number. "
+                    + "Use Receive on the shipment's receiving screen instead of the quick receive.");
+        }
+    }
+
     @Transactional
     public WhseInboundShipmentLine receiveLine(TenantId tenantId, UUID shipmentId, UUID lineId, BigDecimal qty,
                                                 UUID locationId, UUID recordedBy) {
         WhseInboundShipment shipment = findActive(tenantId, shipmentId);
         WhseInboundShipmentLine line = findLine(tenantId, shipmentId, lineId);
+        requireNotLotTracked(tenantId, line.getItemId());
 
         line.receive(qty, locationId);
         lineRepository.save(line);
