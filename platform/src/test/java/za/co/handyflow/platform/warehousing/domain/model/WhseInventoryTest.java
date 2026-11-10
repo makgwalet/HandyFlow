@@ -126,7 +126,8 @@ class WhseInventoryTest {
         WhseInventory inv = newPosition();
         inv.increaseOnHand(new BigDecimal("5"));
         inv.allocate(new BigDecimal("5"));
-        inv.adjustOnHand(new BigDecimal("-2")); // now qtyOnHand=3, qtyAllocated=5 — an inconsistent state deliberately forced for this test
+        // adjustOnHand now refuses to go below the allocated quantity, so the inconsistent state (onHand 3, allocated 5) is forced directly.
+        org.springframework.test.util.ReflectionTestUtils.setField(inv, "qtyOnHand", new BigDecimal("3"));
         assertThrows(IllegalStateException.class, () -> inv.fulfillAllocation(new BigDecimal("5")));
     }
 
