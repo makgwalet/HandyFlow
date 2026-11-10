@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { FileText, X, Download, CreditCard, Check } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
+import { useAuthStore } from "../../store/auth.store"
 import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
 
 interface BillingInvoiceResponse {
@@ -22,6 +23,7 @@ interface BillingInvoiceResponse {
   invoiceDate: string; dueDate: string; storageFee: number; handlingFee: number; vatAmount: number
   subtotal: number; total: number; amountPaid: number; balance: number
   status: "DRAFT" | "SENT" | "PARTIAL" | "PAID" | "REJECTED"; sentAt: string | null; paidAt: string | null
+  storageMinimumTopup?: number; preparedBy?: string | null
 }
 interface InvoicePage { content: BillingInvoiceResponse[] }
 
@@ -133,6 +135,7 @@ export default function WhseBillingInvoicesTab({ clientId }: { clientId: string 
   const [paying, setPaying] = useState<BillingInvoiceResponse | null>(null)
   const [deciding, setDeciding] = useState<{ invoice: BillingInvoiceResponse; mode: "approve" | "reject" } | null>(null)
   const canDecide = usePermission("WAREHOUSING_BILLING_APPROVE")
+  const myId = useAuthStore(s => s.user?.userId)
 
   const { data, isLoading } = useQuery<InvoicePage>({
     queryKey: ["whse-invoices", clientId],
@@ -184,6 +187,12 @@ export default function WhseBillingInvoicesTab({ clientId }: { clientId: string 
                     <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: colors.bg, color: colors.fg }}>{STATUS_LABELS[inv.status] ?? inv.status}</span>
                   </div>
                   <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>{inv.periodStart} → {inv.periodEnd} · Due {inv.dueDate}</p>
+                  {(inv.storageMinimumTopup ?? 0) > 0 && (
+                    <p style={{ fontSize: 11.5, color: "var(--hf-text-muted)", margin: 0 }}>Storage includes {fmtMoney(inv.storageMinimumTopup!)} to reach the contract minimum</p>
+                  )}
+                  {inv.status === "DRAFT" && inv.preparedBy && inv.preparedBy === myId && (
+                    <p style={{ fontSize: 11.5, color: "var(--hf-warning-text)", margin: 0 }}>You prepared this invoice; a second person needs to approve it.</p>
+                  )}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ textAlign: "right" }}>

@@ -8,6 +8,8 @@ const get = vi.fn()
 const post = vi.fn()
 const put = vi.fn()
 let perms: string[] = []
+let me = "someone-else"
+vi.mock("../../store/auth.store", () => ({ useAuthStore: (sel: (s: any) => unknown) => sel({ user: { userId: me } }) }))
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a), put: (...a: unknown[]) => put(...a) } }))
 vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.includes(p) }))
 
@@ -25,7 +27,7 @@ function route(threshold: number | null, pending: unknown[] = [adjustment]) {
   })
 }
 
-beforeEach(() => { get.mockReset(); post.mockReset(); put.mockReset(); perms = []; post.mockResolvedValue({ data: null }); put.mockResolvedValue({ data: null }) })
+beforeEach(() => { me = "someone-else"; get.mockReset(); post.mockReset(); put.mockReset(); perms = []; post.mockResolvedValue({ data: null }); put.mockResolvedValue({ data: null }) })
 afterEach(cleanup)
 
 describe("adjustment approvals", () => {
@@ -137,6 +139,14 @@ describe("invoice approval", () => {
     await waitFor(() => screen.getByText("SENT"))
     expect(screen.queryByText("Approve")).toBeNull()
     expect(screen.getByTitle("Record payment")).toBeTruthy()
+  })
+
+  it("shows the minimum-charge top-up, and tells the preparer a second person must approve", async () => {
+    get.mockResolvedValue({ data: { content: [{ ...invoice("DRAFT"), storageMinimumTopup: 120, preparedBy: "me" }] } })
+    me = "me"
+    wrap(<WhseBillingInvoicesTab clientId="c1" />)
+    await waitFor(() => expect(screen.getByText(/to reach the contract minimum/)).toBeTruthy())
+    expect(screen.getByText(/You prepared this invoice/)).toBeTruthy()
   })
 
   it("a rejected invoice is shown as rejected", async () => {

@@ -42,6 +42,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class WhsePortalDataService {
 
+    /** What a client may see. DRAFT (awaiting approval) and REJECTED invoices are never shown to the client. */
+    static final java.util.Set<String> ISSUED_STATUSES = java.util.Set.of("SENT", "PARTIAL", "PAID");
+
     private final WhsePortalAccessGrantRepository grantRepo;
     private final WhseClientRepository clientRepo;
     private final WhseInventoryRepository inventoryRepo;
@@ -82,8 +85,11 @@ public class WhsePortalDataService {
     @Transactional(readOnly = true)
     public List<WhseBillingInvoice> getMyBillingInvoices(UUID portalUserId, UUID clientId) {
         requireAccess(portalUserId, clientId);
+        // Only invoices that have been issued. A prepared invoice waiting for approval, or a rejected one, is internal.
         return invoiceRepo.findByClient(resolveTenantId(clientId), clientId,
-                org.springframework.data.domain.Pageable.unpaged()).getContent();
+                org.springframework.data.domain.Pageable.unpaged()).getContent().stream()
+                .filter(i -> ISSUED_STATUSES.contains(i.getStatus()))
+                .toList();
     }
 
     private WhsePortalAccessGrant requireAccess(UUID portalUserId, UUID clientId) {
