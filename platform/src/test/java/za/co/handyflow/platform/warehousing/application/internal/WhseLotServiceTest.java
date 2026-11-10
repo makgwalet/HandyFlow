@@ -42,9 +42,12 @@ class WhseLotServiceTest {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private void existingLot(UUID id, LocalDate expiry) {
+    private void existingLot(UUID id, LocalDate expiry) { existingLot(id, expiry, false); }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void existingLot(UUID id, LocalDate expiry, boolean blocked) {
         when(jdbc.query(contains("FROM whse_lots WHERE tenant_id"), any(RowMapper.class), any(Object[].class)))
-                .thenReturn(expiry == null && id == null ? List.of() : List.<Object[]>of(new Object[]{id, expiry, null}));
+                .thenReturn(expiry == null && id == null ? List.of() : List.<Object[]>of(new Object[]{id, expiry, null, blocked}));
     }
 
     @Test @DisplayName("an item that is not lot tracked resolves to no lot and creates nothing")
@@ -109,5 +112,46 @@ class WhseLotServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.setTracking(t(), item, false, true, null, actor));
         assertThrows(IllegalArgumentException.class, () -> service.setTracking(t(), item, true, false, 10, actor));
         assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.setTracking(t(), item, true, true, null, null));
+    }
+
+    @Test @DisplayName("stock cannot be received into a blocked lot")
+    void blockedLotRefusesReceipt() {
+        tracking(true, true);
+        existingLot(UUID.randomUUID(), EXPIRY, true);
+        HandyFlowException e = assertThrows(HandyFlowException.class, () -> service.resolveForReceipt(t(), client, item, "L7", EXPIRY, null, actor));
+        assertEquals("LOT_BLOCKED", e.getErrorCode());
+    }
+
+    @Test @DisplayName("blocking needs a reason and a known user")
+    void blockNeedsReason() {
+        assertThrows(IllegalArgumentException.class, () -> service.block(t(), UUID.randomUUID(), "  ", actor));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.block(t(), UUID.randomUUID(), "supplier recall", null));
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+    }
+
+    @Test @DisplayName("blocking an unknown lot is a not-found and writes no audit")
+    void blockUnknownLot() {
+        when(jdbc.update(contains("SET blocked = TRUE"), any(Object[].class))).thenReturn(0);
+        assertThrows(za.co.handyflow.platform.shared.ResourceNotFoundException.class, () -> service.block(t(), UUID.randomUUID(), "supplier recall", actor));
+        verify(jdbc, never()).update(contains("audit_events"), any(Object[].class));
+    }
+
+    @Test @DisplayName("blocking a lot audits it and returns the orders holding its stock")
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void blockAudits() {
+        UUID lot = UUID.randomUUID();
+        when(jdbc.update(contains("SET blocked = TRUE"), any(Object[].class))).thenReturn(1);
+        when(jdbc.query(contains("whse_order_lot_allocations"), any(RowMapper.class), any(Object[].class)))
+                .thenReturn(List.of(new WhseLotService.AffectedOrder(UUID.randomUUID(), "OUT-1", new java.math.BigDecimal("4"))));
+        List<WhseLotService.AffectedOrder> affected = service.block(t(), lot, "supplier recall", actor);
+        assertEquals(1, affected.size());
+        verify(jdbc).update(contains("audit_events"), any(Object[].class));
+    }
+
+    @Test @DisplayName("releasing a lot that is not blocked is a conflict")
+    void unblockNotBlocked() {
+        when(jdbc.update(contains("SET blocked = FALSE"), any(Object[].class))).thenReturn(0);
+        HandyFlowException e = assertThrows(HandyFlowException.class, () -> service.unblock(t(), UUID.randomUUID(), "cleared by QA", actor));
+        assertEquals("LOT_NOT_BLOCKED", e.getErrorCode());
     }
 }

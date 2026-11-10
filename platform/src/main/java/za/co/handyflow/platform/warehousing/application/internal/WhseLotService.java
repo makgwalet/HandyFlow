@@ -28,7 +28,8 @@ public class WhseLotService {
 
     public record Tracking(boolean lotTracked, boolean expiryTracked, Integer minShelfLifeDays) {}
     public record LotRow(UUID id, UUID clientId, UUID itemId, String sku, String lotNumber, LocalDate expiryDate, LocalDate manufacturedDate,
-                         Long daysToExpiry, String expiryStatus, BigDecimal onHand, BigDecimal available) {}
+                         Long daysToExpiry, String expiryStatus, BigDecimal onHand, BigDecimal available, boolean blocked, String blockedReason) {}
+    public record AffectedOrder(UUID orderId, String orderReference, BigDecimal qty) {}
     public record ExpiryRow(UUID inventoryId, UUID clientId, String clientName, UUID itemId, String sku, String description, UUID locationId,
                             String locationCode, String stockStatus, UUID lotId, String lotNumber, LocalDate expiryDate, long daysToExpiry,
                             String expiryStatus, BigDecimal qtyOnHand, BigDecimal qtyAllocated) {}
@@ -45,10 +46,13 @@ public class WhseLotService {
         String lot = WhseLotRules.validateLotInput(tr.lotTracked(), tr.expiryTracked(), lotNumber, expiry, manufactured);
         if (lot == null) return null;
         UUID t = tenantId.getValue();
-        List<Object[]> existing = jdbc.query("SELECT id, expiry_date, manufactured_date FROM whse_lots WHERE tenant_id = ? AND client_id = ? AND item_id = ? AND lot_number = ?",
+        List<Object[]> existing = jdbc.query("SELECT id, expiry_date, manufactured_date, blocked FROM whse_lots WHERE tenant_id = ? AND client_id = ? AND item_id = ? AND lot_number = ?",
                 (rs, i) -> new Object[]{rs.getObject(1, UUID.class), rs.getDate(2) == null ? null : rs.getDate(2).toLocalDate(),
-                        rs.getDate(3) == null ? null : rs.getDate(3).toLocalDate()}, t, clientId, itemId, lot);
+                        rs.getDate(3) == null ? null : rs.getDate(3).toLocalDate(), rs.getBoolean(4)}, t, clientId, itemId, lot);
         if (!existing.isEmpty()) {
+            if (Boolean.TRUE.equals(existing.get(0)[3])) {
+                throw new HandyFlowException("Lot " + lot + " is blocked. Stock cannot be received into a blocked lot.", HttpStatus.CONFLICT, "LOT_BLOCKED");
+            }
             LocalDate have = (LocalDate) existing.get(0)[1];
             if (tr.expiryTracked() && !expiry.equals(have)) {
                 throw new HandyFlowException("Lot " + lot + " is already on file with expiry " + have + ". A lot has one expiry date; check the lot number or the date.",
@@ -78,7 +82,7 @@ public class WhseLotService {
     public List<LotRow> list(TenantId tenantId, UUID clientId, UUID itemId) {
         LocalDate today = today();
         return jdbc.query("""
-                SELECT l.id, l.client_id, l.item_id, it.sku, l.lot_number, l.expiry_date, l.manufactured_date,
+                SELECT l.id, l.client_id, l.item_id, it.sku, l.lot_number, l.expiry_date, l.manufactured_date, l.blocked, l.blocked_reason,
                        coalesce(sum(i.qty_on_hand), 0) AS on_hand,
                        coalesce(sum(i.qty_on_hand - i.qty_allocated) FILTER (WHERE i.status = 'AVAILABLE'), 0) AS available
                   FROM whse_lots l JOIN whse_items it ON it.id = l.item_id
@@ -90,7 +94,7 @@ public class WhseLotService {
                     LocalDate exp = rs.getDate("expiry_date") == null ? null : rs.getDate("expiry_date").toLocalDate();
                     return new LotRow(rs.getObject("id", UUID.class), rs.getObject("client_id", UUID.class), rs.getObject("item_id", UUID.class), rs.getString("sku"),
                             rs.getString("lot_number"), exp, rs.getDate("manufactured_date") == null ? null : rs.getDate("manufactured_date").toLocalDate(),
-                            WhseLotRules.daysToExpiry(exp, today), WhseLotRules.expiryStatus(exp, today, 30), rs.getBigDecimal("on_hand"), rs.getBigDecimal("available"));
+                            WhseLotRules.daysToExpiry(exp, today), WhseLotRules.expiryStatus(exp, today, 30), rs.getBigDecimal("on_hand"), rs.getBigDecimal("available"), rs.getBoolean("blocked"), rs.getString("blocked_reason"));
                 }, tenantId.getValue(), clientId, clientId, itemId, itemId);
     }
 
@@ -118,6 +122,43 @@ public class WhseLotService {
                             WhseLotRules.daysToExpiry(exp, today), WhseLotRules.expiryStatus(exp, today, d), rs.getBigDecimal("qty_on_hand"), rs.getBigDecimal("qty_allocated"));
                 }, tenantId.getValue(), java.sql.Date.valueOf(today.plusDays(d)), clientId, clientId);
     }
+
+    /**
+     * Blocks a lot, for a recall or a quality hold. A blocked lot is never allocated, cannot be shipped and takes no further receipts.
+     * Returns the open orders that still hold stock of the lot, which need their lots re-allocated.
+     */
+    @Transactional
+    public List<AffectedOrder> block(TenantId tenantId, UUID lotId, String reason, UUID actor) {
+        if (actor == null) throw new AccessDeniedException("Your user could not be identified, so this step cannot be recorded.");
+        if (reason == null || reason.trim().length() < 5) throw new IllegalArgumentException("Give a reason for blocking the lot (at least 5 characters).");
+        UUID t = tenantId.getValue();
+        int n = jdbc.update("UPDATE whse_lots SET blocked = TRUE, blocked_reason = ?, blocked_at = now(), blocked_by = ? WHERE id = ? AND tenant_id = ?", reason.trim(), actor, lotId, t);
+        if (n == 0) throw new ResourceNotFoundException("Lot", lotId.toString());
+        audit(t, actor, lotId, "WHSE_LOT_BLOCKED", "{\"reason\":" + quote(reason.trim()) + "}");
+        return jdbc.query("""
+                SELECT o.id, o.order_reference, sum(a.qty) FROM whse_order_lot_allocations a JOIN whse_outbound_orders o ON o.id = a.order_id
+                 WHERE a.tenant_id = ? AND a.lot_id = ? AND a.status = 'ALLOCATED' GROUP BY o.id, o.order_reference ORDER BY o.order_reference""",
+                (rs, i) -> new AffectedOrder(rs.getObject(1, UUID.class), rs.getString(2), rs.getBigDecimal(3)), t, lotId);
+    }
+
+    @Transactional
+    public void unblock(TenantId tenantId, UUID lotId, String reason, UUID actor) {
+        if (actor == null) throw new AccessDeniedException("Your user could not be identified, so this step cannot be recorded.");
+        if (reason == null || reason.trim().length() < 5) throw new IllegalArgumentException("Give a reason for releasing the lot (at least 5 characters).");
+        UUID t = tenantId.getValue();
+        int n = jdbc.update("UPDATE whse_lots SET blocked = FALSE, blocked_reason = NULL, blocked_at = NULL, blocked_by = NULL WHERE id = ? AND tenant_id = ? AND blocked", lotId, t);
+        if (n == 0) throw new HandyFlowException("That lot is not blocked.", HttpStatus.CONFLICT, "LOT_NOT_BLOCKED");
+        audit(t, actor, lotId, "WHSE_LOT_UNBLOCKED", "{\"reason\":" + quote(reason.trim()) + "}");
+    }
+
+    private void audit(UUID tenant, UUID actor, UUID lotId, String action, String json) {
+        String name = null;
+        try { name = za.co.handyflow.platform.shared.TenantContext.getCurrentUserName(); } catch (RuntimeException ignored) { /* no named user */ }
+        jdbc.update("INSERT INTO audit_events (tenant_id, actor_type, actor_id, actor_name, action, item_type, item_id, after_json) VALUES (?, 'STAFF', ?, ?, ?, ?, ?, ?::jsonb)",
+                tenant, actor, name, action, "WHSE_LOT", lotId, json);
+    }
+
+    private static String quote(String s) { return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""; }
 
     /** Switches an item's lot / expiry tracking. Refused while any stock of the item is on hand, because existing stock has no lots. */
     @Transactional

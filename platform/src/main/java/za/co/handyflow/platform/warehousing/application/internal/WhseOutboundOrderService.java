@@ -34,6 +34,7 @@ public class WhseOutboundOrderService {
     private final WhseInventoryRepository inventoryRepository;
     private final WhseInventoryService inventoryService;
     private final WhseClientService clientService;
+    private final WhseLotAllocationService lotAllocation;
 
     /** One ordered line on a new outbound order. */
     public record OutboundLine(UUID itemId, BigDecimal qtyOrdered, String notes) {}
@@ -82,6 +83,13 @@ public class WhseOutboundOrderService {
 
         List<WhseOutboundOrderLine> lines = lineRepository.findByOrder(tenantId.getValue(), orderId);
         for (WhseOutboundOrderLine line : lines) {
+            if (lotAllocation.isLotTracked(tenantId.getValue(), line.getItemId())) {
+                // Lot-tracked items are allocated lot by lot, first expiry first, possibly across several locations.
+                line.allocate(lotAllocation.allocate(tenantId, order.getId(), order.getOrderReference(), line.getId(), order.getClientId(),
+                        line.getItemId(), line.getQtyOrdered(), recordedBy));
+                lineRepository.save(line);
+                continue;
+            }
             List<WhseInventory> positions = inventoryRepository.findByClientAndItem(tenantId.getValue(),
                     order.getClientId(), line.getItemId());
             WhseInventory best = positions.stream()
@@ -132,15 +140,40 @@ public class WhseOutboundOrderService {
         order.markShipped(carrier, trackingNumber);
 
         List<WhseOutboundOrderLine> lines = lineRepository.findByOrder(tenantId.getValue(), orderId);
+        // Lot-tracked lines ship from their lot allocations, one PICK movement per lot.
+        lotAllocation.fulfil(tenantId, order.getId(), order.getOrderReference(), recordedBy);
         for (WhseOutboundOrderLine line : lines) {
             if (line.getLocationId() == null) {
                 throw new IllegalStateException(
                         "Line " + line.getId() + " was never allocated a location — cannot ship");
             }
+            if (lotAllocation.isLotTracked(tenantId.getValue(), line.getItemId())) {
+                continue;
+            }
             inventoryService.fulfillPick(tenantId, order.getClientId(), line.getItemId(), line.getLocationId(),
                     line.getQtyOrdered(), "OUTBOUND_ORDER", order.getId(), order.getOrderReference(), recordedBy);
         }
         return orderRepository.save(order);
+    }
+
+    /**
+     * Gives back an order's lot allocations and allocates them again, first expiry first. For a PICKING order whose lots were blocked or
+     * went out of date after allocation. Lines of items that are not lot tracked keep their allocation.
+     */
+    @Transactional
+    public WhseOutboundOrder reallocateLots(TenantId tenantId, UUID orderId, UUID recordedBy) {
+        WhseOutboundOrder order = findActive(tenantId, orderId);
+        if (!"PICKING".equals(order.getStatus())) {
+            throw new IllegalStateException("Only an order that is being picked can have its lots re-allocated (this one is " + order.getStatus() + ")");
+        }
+        lotAllocation.release(tenantId, order.getId(), order.getOrderReference(), recordedBy);
+        for (WhseOutboundOrderLine line : lineRepository.findByOrder(tenantId.getValue(), orderId)) {
+            if (!lotAllocation.isLotTracked(tenantId.getValue(), line.getItemId())) continue;
+            line.allocate(lotAllocation.allocate(tenantId, order.getId(), order.getOrderReference(), line.getId(), order.getClientId(),
+                    line.getItemId(), line.getQtyOrdered(), recordedBy));
+            lineRepository.save(line);
+        }
+        return order;
     }
 
     /** Cancels a PENDING or PICKING order, releasing any allocation already made. */
@@ -153,9 +186,10 @@ public class WhseOutboundOrderService {
     public WhseOutboundOrder cancel(TenantId tenantId, UUID orderId, UUID recordedBy) {
         WhseOutboundOrder order = findActive(tenantId, orderId);
         if ("PICKING".equals(order.getStatus())) {
+            lotAllocation.release(tenantId, order.getId(), order.getOrderReference(), recordedBy);
             List<WhseOutboundOrderLine> lines = lineRepository.findByOrder(tenantId.getValue(), orderId);
             for (WhseOutboundOrderLine line : lines) {
-                if (line.getLocationId() != null) {
+                if (line.getLocationId() != null && !lotAllocation.isLotTracked(tenantId.getValue(), line.getItemId())) {
                     inventoryService.deallocateStock(tenantId, order.getClientId(), line.getItemId(),
                             line.getLocationId(), line.getQtyOrdered(), "OUTBOUND_ORDER", order.getId(),
                             order.getOrderReference(), recordedBy);

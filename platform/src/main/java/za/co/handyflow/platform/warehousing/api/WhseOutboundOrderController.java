@@ -45,6 +45,7 @@ public class WhseOutboundOrderController {
     private static final String EVIDENCE_ENTITY_TYPE = "WhseOutboundOrder";
 
     private final WhseOutboundOrderService orderService;
+    private final za.co.handyflow.platform.warehousing.application.internal.WhseLotAllocationService lotAllocationService;
     private final WhseClientService clientService;
     private final WhseItemService itemService;
     private final WhsePdfService pdfService;
@@ -126,6 +127,23 @@ public class WhseOutboundOrderController {
         return ResponseEntity.ok(ApiResponse.success("Order shipped", toResponse(
                 orderService.markShipped(TenantContext.getTenantIdAsObject(), id, carrier, trackingNumber,
                         TenantContext.getCurrentUserId()))));
+    }
+
+    @GetMapping("/outbound-orders/{id}/lot-allocations")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSING_READ','WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
+    @Operation(summary = "Which lots, locations and quantities an order was allocated, first expiry first")
+    public ResponseEntity<ApiResponse<java.util.List<za.co.handyflow.platform.warehousing.application.internal.WhseLotAllocationService.AllocationRow>>> lotAllocations(@PathVariable UUID id) {
+        featureGuard.requireModule("warehousing");
+        return ResponseEntity.ok(ApiResponse.success(lotAllocationService.forOrder(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/outbound-orders/{id}/reallocate-lots")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
+    @Operation(summary = "Give back a picking order's lot allocations and allocate again, for lots that were blocked or went out of date")
+    public ResponseEntity<ApiResponse<OutboundOrderResponse>> reallocateLots(@PathVariable UUID id) {
+        featureGuard.requireModule("warehousing");
+        return ResponseEntity.ok(ApiResponse.success("Lots re-allocated",
+                toResponse(orderService.reallocateLots(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId()))));
     }
 
     @PostMapping("/outbound-orders/{id}/cancel")

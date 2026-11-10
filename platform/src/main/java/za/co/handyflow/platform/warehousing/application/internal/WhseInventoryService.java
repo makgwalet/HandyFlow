@@ -147,6 +147,43 @@ public class WhseInventoryService {
         return inv;
     }
 
+    /** Allocates from one specific position, for lot-level allocation where the caller has already chosen the lot and location. */
+    @Transactional
+    public WhseInventory allocateById(TenantId tenantId, UUID inventoryId, BigDecimal qty, String referenceType, UUID referenceId,
+                                       String referenceNumber, UUID recordedBy) {
+        WhseInventory inv = get(tenantId, inventoryId);
+        BigDecimal before = inv.getQtyAllocated();
+        inv.allocate(qty);
+        inv = repository.save(inv);
+        recordAllocation(tenantId, inv, WhseAllocationEvent.ALLOCATE, qty, before, referenceType, referenceId, referenceNumber, recordedBy);
+        return inv;
+    }
+
+    @Transactional
+    public WhseInventory deallocateById(TenantId tenantId, UUID inventoryId, BigDecimal qty, String referenceType, UUID referenceId,
+                                         String referenceNumber, UUID recordedBy) {
+        WhseInventory inv = get(tenantId, inventoryId);
+        BigDecimal before = inv.getQtyAllocated();
+        inv.deallocate(qty);
+        inv = repository.save(inv);
+        recordAllocation(tenantId, inv, WhseAllocationEvent.DEALLOCATE, qty, before, referenceType, referenceId, referenceNumber, recordedBy);
+        return inv;
+    }
+
+    /** Ships from one specific position: a PICK movement in that lot, and the allocation is used up. */
+    @Transactional
+    public WhseInventory fulfillById(TenantId tenantId, UUID inventoryId, BigDecimal qty, String referenceType, UUID referenceId,
+                                      String referenceNumber, UUID recordedBy) {
+        WhseInventory inv = get(tenantId, inventoryId);
+        BigDecimal before = inv.getQtyOnHand();
+        BigDecimal allocatedBefore = inv.getQtyAllocated();
+        inv.fulfillAllocation(qty);
+        inv = repository.save(inv);
+        recordMovement(tenantId, inv, "PICK", qty.negate(), before, referenceType, referenceId, referenceNumber, null, recordedBy, null);
+        recordAllocation(tenantId, inv, WhseAllocationEvent.FULFIL, qty, allocatedBefore, referenceType, referenceId, referenceNumber, recordedBy);
+        return inv;
+    }
+
     /** Releases a previously allocated quantity without shipping it, e.g. an order line is cancelled. */
     @Transactional
     public WhseInventory deallocateStock(TenantId tenantId, UUID clientId, UUID itemId, UUID locationId,

@@ -27,6 +27,7 @@ public class WhseLotController {
     private final WhseLotService service;
     private final FeatureGuard featureGuard;
 
+    public record ReasonRequest(@jakarta.validation.constraints.NotNull @jakarta.validation.constraints.Size(min = 5, max = 300) String reason) {}
     public record TrackingRequest(boolean lotTracked, boolean expiryTracked, @Min(0) Integer minShelfLifeDays) {}
 
     @GetMapping("/lots")
@@ -43,6 +44,22 @@ public class WhseLotController {
     public ResponseEntity<ApiResponse<List<WhseLotService.ExpiryRow>>> expiry(@RequestParam(required = false) UUID clientId, @RequestParam(defaultValue = "30") int days) {
         featureGuard.requireModule("warehousing");
         return ResponseEntity.ok(ApiResponse.success(service.expiryReport(TenantContext.getTenantIdAsObject(), clientId, days)));
+    }
+
+    @PostMapping("/lots/{id}/block")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
+    @Operation(summary = "Block a lot (recall or quality hold). Returns the open orders that hold stock of it and need re-allocating.")
+    public ResponseEntity<ApiResponse<List<WhseLotService.AffectedOrder>>> block(@PathVariable UUID id, @Valid @RequestBody ReasonRequest req) {
+        featureGuard.requireModule("warehousing");
+        return ResponseEntity.ok(ApiResponse.success("Lot blocked", service.block(TenantContext.getTenantIdAsObject(), id, req.reason(), TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/lots/{id}/unblock")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> unblock(@PathVariable UUID id, @Valid @RequestBody ReasonRequest req) {
+        featureGuard.requireModule("warehousing");
+        service.unblock(TenantContext.getTenantIdAsObject(), id, req.reason(), TenantContext.getCurrentUserId());
+        return ResponseEntity.ok(ApiResponse.success("Lot released", null));
     }
 
     @PutMapping("/items/{id}/tracking")
