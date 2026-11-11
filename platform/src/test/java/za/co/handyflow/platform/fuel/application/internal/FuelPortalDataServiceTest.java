@@ -114,7 +114,7 @@ class FuelPortalDataServiceTest {
         when(grants.findActiveGrant(USER, ACCOUNT)).thenReturn(Optional.of(activeGrant()));
         when(orders.findByAccount(any(), eq(ACCOUNT))).thenReturn(List.of());
         when(orderService.create(any(), any(), any())).thenReturn(resp());
-        when(adminRecipients.resolveTenantAdmins(any())).thenReturn(List.of(new Recipient(UUID.randomUUID(), "Admin", "admin@acme.co.za", null)));
+        when(adminRecipients.resolveTenantAdmins(any(TenantId.class))).thenReturn(List.of(new Recipient(UUID.randomUUID(), "Admin", "admin@acme.co.za", null)));
         service.requestOrder(USER, ACCOUNT, body());
         ArgumentCaptor<NotificationRequest> n = ArgumentCaptor.forClass(NotificationRequest.class);
         verify(notifications).send(n.capture());
@@ -129,7 +129,7 @@ class FuelPortalDataServiceTest {
         when(grants.findActiveGrant(USER, ACCOUNT)).thenReturn(Optional.of(activeGrant()));
         when(orders.findByAccount(any(), eq(ACCOUNT))).thenReturn(List.of());
         when(orderService.create(any(), any(), any())).thenReturn(resp());
-        when(adminRecipients.resolveTenantAdmins(any())).thenReturn(List.of());
+        when(adminRecipients.resolveTenantAdmins(any(TenantId.class))).thenReturn(List.of());
         assertNotNull(service.requestOrder(USER, ACCOUNT, body()));
         verifyNoInteractions(notifications);
     }
