@@ -17,6 +17,10 @@ import InvoicingTab from "./InvoicingTab"
 import PlanningTab from "./PlanningTab"
 import DriverTab from "./DriverTab"
 import StockTab       from "./StockTab"
+import PricingTab from "./PricingTab"
+import ComplianceTab from "./ComplianceTab"
+import PurchaseOrdersTab from "./PurchaseOrdersTab"
+import OverviewTab from "./OverviewTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { FUEL_SECTIONS } from "../../navigation/moduleSections"
 
@@ -36,6 +40,10 @@ export function FuelPage() {
         case "invoicing":  return <InvoicingTab />
         case "planning":   return <PlanningTab />
         case "driver":     return <DriverTab />
+        case "pricing":    return <PricingTab />
+        case "compliance": return <ComplianceTab />
+        case "purchase-orders": return <PurchaseOrdersTab />
+        case "overview":   return <OverviewTab onNavigate={goTo} />
         case "margin":     return <MarginTab />
         default:           return null
       }

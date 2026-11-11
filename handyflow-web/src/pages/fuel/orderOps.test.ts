@@ -11,6 +11,7 @@ describe("orderOps", () => {
     expect(validateOrder("a", "DIESEL", "10", "-1", "")).toMatch(/Price/)
     expect(validateOrder("a", "DIESEL", "10", "1", "2020-01-01")).toMatch(/past/)
     expect(validateOrder("a", "DIESEL", "10", "1", "2999-01-01")).toBeNull()
+    expect(validateOrder("a", "DIESEL", "10", "", "")).toBeNull() // blank price = use the price list
   })
   it("confirm needs a tank; over limit needs permission and a reason; a hold blocks outright", () => {
     expect(validateConfirm("", check(), false, "")).toMatch(/tank/)

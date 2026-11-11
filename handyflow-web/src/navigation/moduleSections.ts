@@ -240,6 +240,7 @@ export const FUEL_SECTIONS: ModuleSections = {
       sections: [
         { id: 'customers', label: 'Customer accounts', icon: Users },
         { id: 'orders', label: 'Orders', icon: ClipboardList },
+        { id: 'pricing', label: 'Price lists', icon: Tags },
         { id: 'invoicing', label: 'Delivered, not invoiced', icon: FileText },
       ],
     },
@@ -255,11 +256,16 @@ export const FUEL_SECTIONS: ModuleSections = {
       sections: [
         { id: 'deliveries', label: 'Deliveries', icon: Truck },
         { id: 'suppliers', label: 'Suppliers', icon: Users },
+        { id: 'purchase-orders', label: 'Purchase orders', icon: ShoppingCart },
+        { id: 'compliance', label: 'Compliance', icon: ShieldCheck },
       ],
     },
     {
       label: 'Insights',
-      sections: [{ id: 'margin', label: 'Cost & Margin', icon: TrendingUp, permission: 'FUEL_MARGIN_READ' }],
+      sections: [
+        { id: 'overview', label: 'Manager overview', icon: BarChart2 },
+        { id: 'margin', label: 'Cost & Margin', icon: TrendingUp, permission: 'FUEL_MARGIN_READ' },
+      ],
     },
   ],
 }

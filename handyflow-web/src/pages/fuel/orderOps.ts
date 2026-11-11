@@ -37,7 +37,8 @@ export function validateOrder(accountId: string, fuelType: string, litres: strin
   if (!accountId) return "Choose the customer account."
   if (!fuelType) return "Choose the fuel type."
   const l = num(litres); if (Number.isNaN(l) || l <= 0) return "Litres must be greater than zero."
-  const p = num(price); if (Number.isNaN(p) || p < 0) return "Price per litre cannot be negative."
+  // Blank is allowed: the server then uses the price list.
+  if (price.trim() !== "") { const p = num(price); if (Number.isNaN(p) || p < 0) return "Price per litre cannot be negative." }
   if (validUntil && new Date(validUntil + "T23:59:59") < today) return "The quotation validity date is in the past."
   return null
 }

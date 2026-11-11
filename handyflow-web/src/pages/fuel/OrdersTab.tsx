@@ -115,13 +115,13 @@ function Footer({ onClose, label, pending, onSubmit }: { onClose: () => void; la
 
 function QuoteDialog({ order, onDone, onClose }: { order?: Order; onDone: () => void; onClose: () => void }) {
   const [f, setF] = useState({ accountId: order?.accountId ?? "", siteId: order?.siteId ?? "", fuelType: order?.fuelType ?? "DIESEL", litres: order ? String(order.litresOrdered) : "", price: order ? String(order.pricePerLitre) : "", requestedDate: order?.requestedDate ?? "", validUntil: order?.quoteValidUntil ?? "", ref: order?.customerReference ?? "", notes: order?.notes ?? "" })
-  const [err, setErr] = useState("")
+  const [err, setErr] = useState(""); const [note, setNote] = useState("")
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF(s => ({ ...s, [k]: e.target.value }))
   const accounts = useQuery<CustomerAccount[]>({ queryKey: ["fuel-customer-accounts"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/customer-accounts")) })
   const acct = useQuery<CustomerAccount>({ queryKey: ["fuel-customer-account", f.accountId], enabled: !!f.accountId, queryFn: async () => unwrap(await apiClient.get(`/api/v1/fuel/customer-accounts/${f.accountId}`)) })
   const save = useMutation({
     mutationFn: () => {
-      const body = { accountId: f.accountId, siteId: f.siteId || null, fuelType: f.fuelType, litres: Number(f.litres), pricePerLitre: Number(f.price), requestedDate: f.requestedDate || null, quoteValidUntil: f.validUntil || null, customerReference: f.ref || null, notes: f.notes || null }
+      const body = { accountId: f.accountId, siteId: f.siteId || null, fuelType: f.fuelType, litres: Number(f.litres), pricePerLitre: f.price.trim() === "" ? null : Number(f.price), requestedDate: f.requestedDate || null, quoteValidUntil: f.validUntil || null, customerReference: f.ref || null, notes: f.notes || null }
       return order ? apiClient.put(`/api/v1/fuel/orders/${order.id}`, body) : apiClient.post("/api/v1/fuel/orders", body)
     },
     onSuccess: () => { onDone(); onClose() }, onError: (e: any) => setErr(msg(e, "Could not save the quotation")),
@@ -140,7 +140,17 @@ function QuoteDialog({ order, onDone, onClose }: { order?: Order; onDone: () => 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
           <div><label style={labelStyle}>Fuel *</label><select aria-label="Fuel type" value={f.fuelType} onChange={set("fuelType")} style={inputStyle}>{FUELS.map(x => <option key={x} value={x}>{x}</option>)}</select></div>
           <div><label style={labelStyle}>Litres *</label><input aria-label="Litres" type="number" value={f.litres} onChange={set("litres")} style={inputStyle} /></div>
-          <div><label style={labelStyle}>Price / litre (R) *</label><input aria-label="Price per litre" type="number" value={f.price} onChange={set("price")} style={inputStyle} /></div>
+          <div><label style={labelStyle}>Price / litre (R)</label><input aria-label="Price per litre" type="number" placeholder="From price list" value={f.price} onChange={set("price")} style={inputStyle} /></div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <button type="button" style={btnGhost} disabled={!f.accountId || !(Number(f.litres) > 0)} onClick={async () => {
+            try {
+              const q = new URLSearchParams({ accountId: f.accountId, fuelType: f.fuelType, litres: f.litres })
+              const r = unwrap(await apiClient.get(`/api/v1/fuel/prices/resolve?${q}`))
+              setF(s => ({ ...s, price: String(r.pricePerLitre) })); setNote(`${r.source === "CONTRACT" ? "Contract" : "Standard"} price from the price list`); setErr("")
+            } catch (e: any) { setNote(""); setErr(msg(e, "No price found in the price list")) }
+          }}>Use price list</button>
+          <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{note || "Leave the price blank to use the price list when you save."}</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <div><label style={labelStyle}>Requested delivery date</label><input type="date" value={f.requestedDate} onChange={set("requestedDate")} style={inputStyle} /></div>

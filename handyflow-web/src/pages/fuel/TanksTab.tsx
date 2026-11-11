@@ -42,7 +42,7 @@ export default function TanksTab() {
   const [error, setError]           = useState("")
 
   const [tankForm, setTankForm]     = useState({ name: "", fuelType: "DIESEL", capacityLitres: "", location: "", lowThresholdPct: "20" })
-  const [receiveForm, setReceiveForm] = useState({ litresReceived: "", pricePerLitre: "", supplierId: "", deliveryNote: "", invoiceRef: "" })
+  const [receiveForm, setReceiveForm] = useState({ litresReceived: "", pricePerLitre: "", supplierId: "", deliveryNote: "", invoiceRef: "", purchaseOrderId: "" })
   const [dipForm, setDipForm]       = useState({ actualLitres: "", readBy: "", notes: "" })
 
   const { data: tanks = [], isLoading } = useQuery<Tank[]>({
@@ -96,10 +96,17 @@ export default function TanksTab() {
     setShowEdit(tank)
   }
 
+  const { data: poRaw } = useQuery({
+    queryKey: ["fuel-purchase-orders"], enabled: !!showReceive,
+    queryFn: async () => { const r = await apiClient.get("/api/v1/fuel/purchase-orders"); return r.data?.data ?? r.data ?? [] },
+  })
+  const openPOs = ((Array.isArray(poRaw) ? poRaw : []) as any[]).filter(p =>
+    (p.status === "ORDERED" || p.status === "PART_RECEIVED") && showReceive && p.fuelType === showReceive.fuelType && (!receiveForm.supplierId || p.supplierId === receiveForm.supplierId))
+
   const receiveFuel = useMutation({
     mutationFn: ({ tankId, body }: { tankId: string; body: any }) =>
       apiClient.post(`/api/v1/fuel/tanks/${tankId}/receive`, body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tanks"] }); qc.invalidateQueries({ queryKey: ["receipts"] }); setShowReceive(null); setReceiveForm({ litresReceived: "", pricePerLitre: "", supplierId: "", deliveryNote: "", invoiceRef: "" }); setError("") },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tanks"] }); qc.invalidateQueries({ queryKey: ["receipts"] }); setShowReceive(null); setReceiveForm({ litresReceived: "", pricePerLitre: "", supplierId: "", deliveryNote: "", invoiceRef: "", purchaseOrderId: "" }); setError("") },
     onError: (e: any) => setError(e.response?.data?.message ?? "Failed to receive fuel"),
   })
 
@@ -138,12 +145,13 @@ export default function TanksTab() {
         supplierId: s?.lastSupplierId ?? "",
         deliveryNote: "",
         invoiceRef: "",
+        purchaseOrderId: "",
       })
       setPrefilled(!!(s?.suggestedLitres || s?.lastSupplierId))
     } catch {
       // Suggestion is a convenience, not a requirement — fall back to a blank form
       // rather than blocking the receive flow if the endpoint has a hiccup.
-      setReceiveForm({ litresReceived: "", pricePerLitre: "", supplierId: "", deliveryNote: "", invoiceRef: "" })
+      setReceiveForm({ litresReceived: "", pricePerLitre: "", supplierId: "", deliveryNote: "", invoiceRef: "", purchaseOrderId: "" })
     }
     setShowReceive(tank)
   }
@@ -442,6 +450,18 @@ export default function TanksTab() {
               <label style={lbl}>Delivery Note</label>
               <input value={receiveForm.deliveryNote} onChange={e => setReceiveForm(f => ({ ...f, deliveryNote: e.target.value }))} placeholder="DN-20260510-001" style={inp} />
             </div>
+            {openPOs.length > 0 && (
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={lbl}>Against purchase order</label>
+                <select aria-label="Purchase order" value={receiveForm.purchaseOrderId} style={sel} onChange={e => {
+                  const po = openPOs.find(p => p.id === e.target.value)
+                  setReceiveForm(f => ({ ...f, purchaseOrderId: e.target.value, supplierId: po ? po.supplierId : f.supplierId, pricePerLitre: po && !f.pricePerLitre ? String(po.pricePerLitre) : f.pricePerLitre }))
+                }}>
+                  <option value="">Not against an order</option>
+                  {openPOs.map(p => <option key={p.id} value={p.id}>{p.poNumber} · {p.supplierName} · {Number(p.litresOutstanding).toLocaleString()} L outstanding</option>)}
+                </select>
+              </div>
+            )}
             <div style={{ gridColumn: "1 / -1" }}>
               <label style={lbl}>Invoice Reference</label>
               <input value={receiveForm.invoiceRef} onChange={e => setReceiveForm(f => ({ ...f, invoiceRef: e.target.value }))} placeholder="SASOL-INV-8834" style={inp} />
@@ -454,7 +474,7 @@ export default function TanksTab() {
           )}
           {error && <ErrBanner msg={error} />}
           <MFoot onCancel={() => { setShowReceive(null); setError("") }}
-            onSubmit={() => receiveFuel.mutate({ tankId: showReceive.id, body: { litresReceived: Number(receiveForm.litresReceived), pricePerLitre: Number(receiveForm.pricePerLitre), receivedAt: new Date().toISOString(), supplierId: receiveForm.supplierId || null, deliveryNote: receiveForm.deliveryNote || null, invoiceRef: receiveForm.invoiceRef || null } })}
+            onSubmit={() => receiveFuel.mutate({ tankId: showReceive.id, body: { litresReceived: Number(receiveForm.litresReceived), pricePerLitre: Number(receiveForm.pricePerLitre), receivedAt: new Date().toISOString(), supplierId: receiveForm.supplierId || null, purchaseOrderId: receiveForm.purchaseOrderId || null, deliveryNote: receiveForm.deliveryNote || null, invoiceRef: receiveForm.invoiceRef || null } })}
             loading={receiveFuel.isPending} label="Receive Fuel"
             disabled={!receiveForm.litresReceived || !receiveForm.pricePerLitre} />
         </Overlay>
