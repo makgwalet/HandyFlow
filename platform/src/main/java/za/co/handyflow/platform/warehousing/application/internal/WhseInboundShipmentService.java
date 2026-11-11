@@ -44,6 +44,10 @@ public class WhseInboundShipmentService {
         if (packages != null) packages.requireRoomFor(tenantId, limit);
     }
 
+    private void recordTransaction(TenantId tenantId, String type, UUID id) {
+        if (packages != null) packages.recordTransaction(tenantId, type, id);
+    }
+
     /** One expected line on a new shipment. */
     public record InboundLine(UUID itemId, BigDecimal expectedQty, String notes) {}
 
@@ -59,6 +63,7 @@ public class WhseInboundShipmentService {
         WhseInboundShipment shipment = WhseInboundShipment.create(tenantId.getValue(), clientId, referenceNumber,
                 expectedDate, notes);
         shipment = shipmentRepository.save(shipment);
+        recordTransaction(tenantId, "RECEIPT", shipment.getId());
 
         for (InboundLine line : lines) {
             lineRepository.save(WhseInboundShipmentLine.create(tenantId.getValue(), shipment.getId(),

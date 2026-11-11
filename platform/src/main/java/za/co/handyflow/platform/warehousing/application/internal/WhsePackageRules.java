@@ -7,7 +7,7 @@ public final class WhsePackageRules {
     public enum Enforcement { OFF, MONITOR, ENFORCE }
 
     public enum Limit {
-        WAREHOUSES("warehouses"), CLIENT_ACCOUNTS("3PL client accounts"), MONTHLY_TRANSACTIONS("transactions this month"), WEBHOOKS("webhooks");
+        WAREHOUSES("warehouses"), CLIENT_ACCOUNTS("3PL client accounts"), MONTHLY_TRANSACTIONS("transactions this billing month"), WEBHOOKS("webhooks");
         public final String label;
         Limit(String label) { this.label = label; }
     }

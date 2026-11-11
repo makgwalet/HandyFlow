@@ -25,7 +25,7 @@ public class WhsePackageService {
 
     public record Meter(String key, String label, long used, Integer limit, boolean over) {}
 
-    public record Usage(boolean assigned, PackageDef pkg, Enforcement enforcement, List<Meter> meters) {}
+    public record Usage(boolean assigned, PackageDef pkg, Enforcement enforcement, List<Meter> meters, java.time.LocalDate periodStart, java.time.LocalDate periodEnd) {}
 
     private static PackageDef row(java.sql.ResultSet rs, int i) throws java.sql.SQLException {
         return new PackageDef(rs.getString("code"), rs.getString("name"), rs.getBigDecimal("monthly_price"), (Integer) rs.getObject("max_warehouses"),
@@ -60,10 +60,34 @@ public class WhsePackageService {
             case WAREHOUSES -> count("SELECT count(*) FROM whse_warehouses WHERE tenant_id = ? AND active AND deleted_at IS NULL", t);
             case CLIENT_ACCOUNTS -> count("SELECT count(*) FROM whse_clients WHERE tenant_id = ? AND deleted_at IS NULL", t);
             case WEBHOOKS -> count("SELECT count(*) FROM whse_webhooks WHERE tenant_id = ? AND deleted_at IS NULL", t);
-            // Receipts plus outbound orders created in the current calendar month, Johannesburg time.
-            case MONTHLY_TRANSACTIONS -> count("SELECT (SELECT count(*) FROM whse_inbound_shipments WHERE tenant_id = ? AND (created_at AT TIME ZONE 'Africa/Johannesburg') >= date_trunc('month', now() AT TIME ZONE 'Africa/Johannesburg')) "
-                    + "+ (SELECT count(*) FROM whse_outbound_orders WHERE tenant_id = ? AND (created_at AT TIME ZONE 'Africa/Johannesburg') >= date_trunc('month', now() AT TIME ZONE 'Africa/Johannesburg'))", t);
+            // Goods receipts plus customer orders recorded in the usage ledger during the tenant's current billing month.
+            case MONTHLY_TRANSACTIONS -> transactionsThisPeriod(t);
         };
+    }
+
+    private static final java.time.ZoneId ZONE = java.time.ZoneId.of("Africa/Johannesburg");
+
+    /** The billing month the tenant's Warehousing subscription is in now: it renews on the subscription's billing-anchor day. */
+    public WhseUsagePeriod.Period currentPeriod(TenantId t) {
+        List<Integer> anchor = jdbc.query("SELECT billing_anchor FROM tenant_modules WHERE tenant_id = ? AND module_key = 'warehousing'", (rs, i) -> (Integer) rs.getObject(1), t.getValue());
+        return WhseUsagePeriod.containing(java.time.LocalDate.now(ZONE), anchor.isEmpty() ? null : anchor.get(0));
+    }
+
+    private long transactionsThisPeriod(TenantId t) {
+        WhseUsagePeriod.Period p = currentPeriod(t);
+        Long n = jdbc.queryForObject("SELECT count(*) FROM whse_usage_events WHERE tenant_id = ? AND meter = 'TRANSACTION' AND occurred_at >= ? AND occurred_at < ?",
+                Long.class, t.getValue(), java.sql.Timestamp.from(p.start().atStartOfDay(ZONE).toInstant()), java.sql.Timestamp.from(p.endExclusive().atStartOfDay(ZONE).toInstant()));
+        return n == null ? 0 : n;
+    }
+
+    /**
+     * Records a goods receipt or customer order that has just been created, in the same transaction as the record. Recording the same record twice
+     * adds nothing, so editing or re-processing never counts again. Recorded for every tenant, assigned a tier or not.
+     */
+    @Transactional
+    public void recordTransaction(TenantId tenantId, String sourceType, UUID sourceId) {
+        jdbc.update("INSERT INTO whse_usage_events (id, tenant_id, meter, source_type, source_id) VALUES (?,?,'TRANSACTION',?,?) ON CONFLICT (tenant_id, meter, source_type, source_id) DO NOTHING",
+                UUID.randomUUID(), tenantId.getValue(), sourceType, sourceId);
     }
 
     private static Integer limitOf(PackageDef p, Limit l) {
@@ -84,7 +108,8 @@ public class WhsePackageService {
             Integer max = a == null ? null : limitOf(a.pkg(), l);
             meters.add(new Meter(l.name(), l.label, u, max, a != null && a.mode() != Enforcement.OFF && WhsePackageRules.isOver(u, max)));
         }
-        return new Usage(a != null, a == null ? null : a.pkg(), a == null ? Enforcement.OFF : a.mode(), meters);
+        WhseUsagePeriod.Period period = currentPeriod(tenantId);
+        return new Usage(a != null, a == null ? null : a.pkg(), a == null ? Enforcement.OFF : a.mode(), meters, period.start(), period.endExclusive().minusDays(1));
     }
 
     /** Call before adding a record that counts against a limit. No package, or enforcement not ENFORCE, never refuses. */

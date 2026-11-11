@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import WhsePackagePanel from "./WhsePackagePanel"
-import { enforcementText, limitText, percentUsed, priceText, type PackageUsage } from "./packageUsage"
+import { enforcementText, limitText, percentUsed, periodText, priceText, type PackageUsage } from "./packageUsage"
 
 const get = vi.fn()
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a) } }))
@@ -11,7 +11,7 @@ beforeEach(() => get.mockReset())
 afterEach(cleanup)
 
 const usage = (over: Partial<PackageUsage> = {}): PackageUsage => ({
-  assigned: true, enforcement: "MONITOR", pkg: { code: "STARTER", name: "Starter", monthlyPrice: 699, proposed: false },
+  assigned: true, periodStart: "2026-11-01", periodEnd: "2026-11-30", enforcement: "MONITOR", pkg: { code: "STARTER", name: "Starter", monthlyPrice: 699, proposed: false },
   meters: [
     { key: "WAREHOUSES", label: "warehouses", used: 2, limit: 1, over: true },
     { key: "CLIENT_ACCOUNTS", label: "3PL client accounts", used: 1, limit: 3, over: false },
@@ -24,6 +24,10 @@ describe("package helpers", () => {
     expect(percentUsed({ used: 9, limit: 4 })).toBe(100)
     expect(percentUsed({ used: 9, limit: null })).toBe(0)
     expect(percentUsed({ used: 1, limit: 0 })).toBe(100)
+  })
+  it("names the billing month", () => {
+    expect(periodText({ periodStart: "2026-10-15", periodEnd: "2026-11-14" })).toBe("Billing month 2026-10-15 to 2026-11-14")
+    expect(periodText({})).toBeNull()
   })
   it("words", () => {
     expect(limitText(null)).toBe("no limit")
@@ -43,6 +47,7 @@ describe("WhsePackagePanel", () => {
     expect(screen.getByText(/2 of 1 \(over\)/)).toBeTruthy()
     expect(screen.getByText(/4 no limit/)).toBeTruthy()
     expect(screen.getAllByRole("progressbar").length).toBe(2)
+    expect(screen.getByText(/Billing month 2026-11-01 to 2026-11-30/)).toBeTruthy()
   })
   it("says no limits apply when no package is assigned", async () => {
     get.mockResolvedValue({ data: usage({ assigned: false, pkg: null, enforcement: "OFF", meters: [] }) })

@@ -48,6 +48,10 @@ public class WhseOutboundOrderService {
         if (packages != null) packages.requireRoomFor(tenantId, limit);
     }
 
+    private void recordTransaction(TenantId tenantId, String type, UUID id) {
+        if (packages != null) packages.recordTransaction(tenantId, type, id);
+    }
+
     /** One ordered line on a new outbound order. */
     public record OutboundLine(UUID itemId, BigDecimal qtyOrdered, String notes) {}
 
@@ -64,6 +68,7 @@ public class WhseOutboundOrderService {
         WhseOutboundOrder order = WhseOutboundOrder.create(tenantId.getValue(), clientId, orderReference,
                 shipToName, shipToAddress, requestedShipDate, notes);
         order = orderRepository.save(order);
+        recordTransaction(tenantId, "ORDER", order.getId());
 
         for (OutboundLine line : lines) {
             lineRepository.save(WhseOutboundOrderLine.create(tenantId.getValue(), order.getId(), line.itemId(),

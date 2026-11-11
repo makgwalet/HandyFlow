@@ -4,7 +4,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { card } from "./whseUi"
-import { enforcementText, limitText, percentUsed, priceText, type PackageUsage } from "./packageUsage"
+import { enforcementText, limitText, percentUsed, periodText, priceText, type PackageUsage } from "./packageUsage"
 
 export default function WhsePackagePanel() {
   const { data } = useQuery<PackageUsage>({ queryKey: ["whse-package"], queryFn: async () => (await apiClient.get("/api/v1/warehousing/package")).data })
@@ -18,6 +18,7 @@ export default function WhsePackagePanel() {
         <>
           <p style={{ fontSize: 12.5, margin: "0 0 2px" }}><strong>{data.pkg.name}</strong>: {priceText(data.pkg.monthlyPrice)}</p>
           <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "0 0 10px" }}>{enforcementText(data.enforcement)}</p>
+          {periodText(data) && <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "0 0 8px" }}>{periodText(data)}. Receipts and orders are counted once, when they are created; cancelled ones stay counted.</p>}
           <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 8 }}>
             {data.meters.map(m => (
               <li key={m.key} style={{ fontSize: 12.5 }}>

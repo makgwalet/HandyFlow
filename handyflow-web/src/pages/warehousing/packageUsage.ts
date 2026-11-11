@@ -5,6 +5,7 @@ export interface PackageUsage {
   assigned: boolean; enforcement: "OFF" | "MONITOR" | "ENFORCE"
   pkg: { code: string; name: string; monthlyPrice: number | null; proposed: boolean } | null
   meters: Meter[]
+  periodStart?: string; periodEnd?: string
 }
 
 export const limitText = (limit: number | null) => (limit == null ? "no limit" : `of ${limit.toLocaleString("en-ZA")}`)
@@ -22,4 +23,9 @@ export function enforcementText(e: PackageUsage["enforcement"]): string {
   if (e === "ENFORCE") return "New records beyond a limit are refused."
   if (e === "MONITOR") return "Usage is measured and anything over a limit is flagged, but nothing is refused."
   return "Limits are recorded but not applied."
+}
+
+/** The billing month the transaction count belongs to, for display. */
+export function periodText(u: Pick<PackageUsage, "periodStart" | "periodEnd">): string | null {
+  return u.periodStart && u.periodEnd ? `Billing month ${u.periodStart} to ${u.periodEnd}` : null
 }

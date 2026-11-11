@@ -103,4 +103,25 @@ class WhsePackageServiceTest {
         service.assign(t(), " ", null, actor);
         verify(jdbc).update(contains("DELETE FROM whse_tenant_subscription"), any(Object.class));
     }
+
+    @Test @DisplayName("a created receipt or order is written to the usage ledger once, whatever the tier")
+    void recordsTransaction() {
+        UUID source = UUID.randomUUID();
+        service.recordTransaction(t(), "RECEIPT", source);
+        verify(jdbc).update(contains("INSERT INTO whse_usage_events"), any(Object[].class));
+        verify(jdbc, never()).queryForObject(anyString(), eq(Long.class), any(Object[].class)); // recording does not look at limits
+    }
+
+    @Test @DisplayName("the monthly count comes from the ledger within the billing month, and the billing anchor decides the month")
+    void countsFromLedger() throws Exception {
+        assigned("ENFORCE");
+        when(jdbc.query(contains("FROM tenant_modules"), any(RowMapper.class), any(Object[].class))).thenReturn(List.of(15));
+        when(jdbc.queryForObject(anyString(), eq(Long.class), any(Object[].class))).thenReturn(0L);
+        when(jdbc.queryForObject(contains("FROM whse_usage_events"), eq(Long.class), any(Object[].class))).thenReturn(500L);
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> service.requireRoomFor(t(), Limit.MONTHLY_TRANSACTIONS));
+        assertTrue(e.getMessage().contains("transactions this billing month"));
+        WhsePackageService.Usage u = service.usage(t());
+        assertEquals(15, u.periodStart().getDayOfMonth());
+        assertEquals(14, u.periodEnd().getDayOfMonth());
+    }
 }
