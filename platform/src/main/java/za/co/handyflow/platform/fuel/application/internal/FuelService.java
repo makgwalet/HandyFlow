@@ -604,10 +604,11 @@ public class FuelService {
         UUID customerId = req.customerId();
         FuelCustomerSite site = null;
         if (req.siteId() != null) {
-            site = siteRepository.findActiveById(tenantId, req.siteId())
+            final FuelCustomerSite found = siteRepository.findActiveById(tenantId, req.siteId())
                     .orElseThrow(() -> new ResourceNotFoundException("Delivery site", req.siteId().toString()));
-            FuelCustomerAccount siteAccount = accountRepository.findActiveById(tenantId, site.getAccountId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Customer account", site.getAccountId().toString()));
+            site = found;
+            FuelCustomerAccount siteAccount = accountRepository.findActiveById(tenantId, found.getAccountId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Customer account", found.getAccountId().toString()));
             if (customerId != null && !customerId.equals(siteAccount.getCrmCustomerId())) {
                 throw new IllegalArgumentException("That delivery site belongs to a different customer.");
             }
