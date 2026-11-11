@@ -27,6 +27,7 @@ public class WhseTaskService {
     static final String PICK = "PICK";
     static final String PUTAWAY = "PUTAWAY";
     static final String REPLEN = "REPLEN";
+    static final String MOVE = "MOVE";
     public static final String SHIP_SHORT = "SHIP_SHORT";
     public static final String FIND_ELSEWHERE = "FIND_ELSEWHERE";
     private static final String ORDER = "OUTBOUND_ORDER";
@@ -267,7 +268,8 @@ public class WhseTaskService {
             if (lineId != null) recomputePicked(lineId);
         } else {
             boolean replen = REPLEN.equals(type);
-            if (replen && toLocationId != null && !toLocationId.equals(k[7])) throw new IllegalArgumentException("A replenishment goes to its pick face; it cannot be sent elsewhere.");
+            boolean fixed = replen || MOVE.equals(type);
+            if (fixed && toLocationId != null && !toLocationId.equals(k[7])) throw new IllegalArgumentException(replen ? "A replenishment goes to its pick face; it cannot be sent elsewhere." : "A slotting move goes to its chosen location; it cannot be sent elsewhere.");
             UUID dest = toLocationId != null ? toLocationId : (UUID) k[7];
             if (dest == null) throw new IllegalArgumentException("No destination was suggested for this put-away. Choose a location.");
             UUID from = (UUID) k[6], client = (UUID) k[3], item = (UUID) k[4], lot = (UUID) k[5];
@@ -275,7 +277,7 @@ public class WhseTaskService {
             if (cand.isEmpty()) throw new ResourceNotFoundException("WhseLocation", dest.toString());
             String problem = WhsePutawayRules.problem(cand.get(0), qty);
             if (problem != null) throw new IllegalArgumentException(problem);
-            inventoryService.transfer(tenantId, client, item, from, dest, lot, "AVAILABLE", qty, replen ? "TRANSFER" : "PUTAWAY", TASK, id, replen ? "Replenishment" : "Put-away", null, user, "task:" + id);
+            inventoryService.transfer(tenantId, client, item, from, dest, lot, "AVAILABLE", qty, fixed ? "TRANSFER" : "PUTAWAY", TASK, id, replen ? "Replenishment" : fixed ? "Slotting move" : "Put-away", null, user, "task:" + id);
             jdbc.update("UPDATE whse_tasks SET status = 'DONE', qty_done = ?, to_location_id = ?, completed_by = ?, completed_at = now(), assigned_to = coalesce(assigned_to, ?), updated_at = now() WHERE id = ?",
                     qty, dest, user, user, id);
         }

@@ -12,7 +12,7 @@ import { btnDanger, btnGhost, btnPrimary, card, Chip, ErrorLine, fmtQty, inputSt
 import { parseQty } from "./receiving"
 
 export interface TaskRow {
-  id: string; taskType: "PICK" | "PUTAWAY" | "REPLEN"; status: string; priority: number; clientName: string; sku: string; itemDescription: string | null
+  id: string; taskType: "PICK" | "PUTAWAY" | "REPLEN" | "MOVE"; status: string; priority: number; clientName: string; sku: string; itemDescription: string | null
   lotNumber: string | null; lotExpiry: string | null; fromLocationId: string; fromCode: string; toLocationId: string | null; toCode: string | null
   qty: number; qtyDone: number; referenceNumber: string | null; assignedTo: string | null; note: string | null
   resolution?: string | null; resolutionNote?: string | null
@@ -76,7 +76,7 @@ function TaskCard({ task, canWork }: { task: TaskRow; canWork: boolean }) {
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <div>
           <p style={{ fontSize: 13.5, fontWeight: 700, margin: 0, color: "var(--hf-text)" }}>
-            {task.taskType === "PICK" ? "Pick" : task.taskType === "REPLEN" ? "Replenish" : "Put away"} {fmtQty(planned)} × {task.sku}
+            {task.taskType === "PICK" ? "Pick" : task.taskType === "REPLEN" ? "Replenish" : task.taskType === "MOVE" ? "Move" : "Put away"} {fmtQty(planned)} × {task.sku}
             {task.lotNumber && <span style={{ fontWeight: 400, color: "var(--hf-text-muted)" }}> · lot {task.lotNumber}{task.lotExpiry ? ` (exp ${task.lotExpiry})` : ""}</span>}
           </p>
           <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: "2px 0 0" }}>
@@ -147,7 +147,7 @@ function TaskCard({ task, canWork }: { task: TaskRow; canWork: boolean }) {
 export default function WhseTasksTab() {
   const qc = useQueryClient()
   const canWork = usePermission("WAREHOUSING_MANAGE") || usePermission("WAREHOUSING_ADMIN")
-  const [type, setType] = useState<"PICK" | "PUTAWAY" | "REPLEN">("PICK")
+  const [type, setType] = useState<"PICK" | "PUTAWAY" | "REPLEN" | "MOVE">("PICK")
   const [mine, setMine] = useState(false)
 
   const sync = useMutation({
@@ -155,7 +155,7 @@ export default function WhseTasksTab() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["whse-tasks"] }); qc.invalidateQueries({ queryKey: ["whse-task-summary"] }) },
   })
   // Opening the put-away list brings it up to date with what is sitting at the docks.
-  useEffect(() => { if (type !== "PICK" && canWork) sync.mutate() }, [type, canWork]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if ((type === "PUTAWAY" || type === "REPLEN") && canWork) sync.mutate() }, [type, canWork]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: summary } = useQuery<Summary>({ queryKey: ["whse-task-summary"], queryFn: async () => (await apiClient.get("/api/v1/warehousing/tasks/summary")).data })
   const { data: tasks = [], isLoading } = useQuery<TaskRow[]>({
@@ -178,21 +178,21 @@ export default function WhseTasksTab() {
       </div>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
         <div role="tablist" aria-label="Task type" style={{ display: "inline-flex", border: "1px solid var(--hf-border)", borderRadius: 8, overflow: "hidden" }}>
-          {(["PICK", "PUTAWAY", "REPLEN"] as const).map(v => (
+          {(["PICK", "PUTAWAY", "REPLEN", "MOVE"] as const).map(v => (
             <button key={v} role="tab" aria-selected={type === v} onClick={() => setType(v)}
               style={{ padding: "7px 16px", border: "none", fontSize: 12.5, fontWeight: 600, cursor: "pointer", background: type === v ? "var(--hf-accent-solid-strong)" : "var(--hf-surface)", color: type === v ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
-              {v === "PICK" ? "Picking" : v === "PUTAWAY" ? "Put-away" : "Replenish"}
+              {v === "PICK" ? "Picking" : v === "PUTAWAY" ? "Put-away" : v === "REPLEN" ? "Replenish" : "Moves"}
             </button>
           ))}
         </div>
         <label style={{ fontSize: 12.5, color: "var(--hf-text-muted)", display: "flex", gap: 6, alignItems: "center" }}>
           <input type="checkbox" checked={mine} onChange={e => setMine(e.target.checked)} /> Only mine
         </label>
-        {type !== "PICK" && canWork && <button onClick={() => sync.mutate()} disabled={sync.isPending} style={btnGhost}><RefreshCw size={13} /> {sync.isPending ? "Checking…" : type === "REPLEN" ? "Refresh from pick faces" : "Refresh from docks"}</button>}
+        {(type === "PUTAWAY" || type === "REPLEN") && canWork && <button onClick={() => sync.mutate()} disabled={sync.isPending} style={btnGhost}><RefreshCw size={13} /> {sync.isPending ? "Checking…" : type === "REPLEN" ? "Refresh from pick faces" : "Refresh from docks"}</button>}
       </div>
       <ErrorLine error={sync.error} />
       {isLoading ? <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p> : tasks.length === 0
-        ? <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>{type === "PICK" ? "No pick tasks. They appear when an order starts picking." : type === "REPLEN" ? "Nothing to replenish. Tasks appear when a pick face falls below its minimum (set levels under Replenishment)." : "Nothing to put away. Stock received into a dock or staging location appears here."}</p>
+        ? <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>{type === "PICK" ? "No pick tasks. They appear when an order starts picking." : type === "MOVE" ? "No moves waiting. Create them from the Slotting suggestions." : type === "REPLEN" ? "Nothing to replenish. Tasks appear when a pick face falls below its minimum (set levels under Replenishment)." : "Nothing to put away. Stock received into a dock or staging location appears here."}</p>
         : tasks.map(t => <TaskCard key={t.id} task={t} canWork={canWork} />)}
     </div>
   )
