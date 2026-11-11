@@ -244,6 +244,13 @@ export const FUEL_SECTIONS: ModuleSections = {
       ],
     },
     {
+      label: 'Distribution',
+      sections: [
+        { id: 'planning', label: 'Planning & tankers', icon: CalendarDays },
+        { id: 'driver', label: 'My loads', icon: Truck },
+      ],
+    },
+    {
       label: 'Logistics',
       sections: [
         { id: 'deliveries', label: 'Deliveries', icon: Truck },
