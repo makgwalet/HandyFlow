@@ -7,6 +7,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.fuel.application.internal.FuelDashboardService;
+import za.co.handyflow.platform.fuel.application.internal.FuelCostToServeService;
+import za.co.handyflow.platform.fuel.dto.CostToServeResponse;
 import za.co.handyflow.platform.fuel.dto.DashboardResponse;
 import za.co.handyflow.platform.fuel.dto.MarginResponse;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -20,6 +22,7 @@ import za.co.handyflow.platform.shared.TenantContext;
 public class FuelDashboardController {
 
     private final FuelDashboardService dashboard;
+    private final FuelCostToServeService costToServe;
     private final FeatureGuard featureGuard;
 
     @GetMapping
@@ -34,5 +37,12 @@ public class FuelDashboardController {
     public ResponseEntity<ApiResponse<MarginResponse>> margin(@RequestParam(defaultValue = "30") int days) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(dashboard.margin(TenantContext.getTenantIdAsObject(), days)));
+    }
+
+    @GetMapping("/cost-to-serve")
+    @PreAuthorize("hasAuthority('FUEL_MARGIN_READ')")
+    public ResponseEntity<ApiResponse<CostToServeResponse>> costToServe(@RequestParam(defaultValue = "30") int days) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(costToServe.costToServe(TenantContext.getTenantIdAsObject(), days)));
     }
 }

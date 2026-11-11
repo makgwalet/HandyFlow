@@ -16,6 +16,11 @@ import za.co.handyflow.platform.fuel.domain.repository.*;
 import za.co.handyflow.platform.fuel.dto.OrderRequest;
 import za.co.handyflow.platform.fuel.dto.OrderResponse;
 import za.co.handyflow.platform.fuel.dto.PortalDtos.OrderRequestBody;
+import za.co.handyflow.platform.notifications.application.NotificationRequest;
+import za.co.handyflow.platform.notifications.application.Recipient;
+import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
+import za.co.handyflow.platform.notifications.application.internal.NotificationService;
+import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.PortalUserRepository;
 import za.co.handyflow.platform.shared.TenantId;
@@ -45,6 +50,8 @@ class FuelPortalDataServiceTest {
     @Mock FuelOrderService orderService;
     @Mock CrmFacade crm;
     @Mock PortalUserRepository portalUsers;
+    @Mock NotificationService notifications;
+    @Mock TenantAdminRecipients adminRecipients;
     @InjectMocks FuelPortalDataService service;
 
     private FuelPortalAccessGrant activeGrant() {
@@ -100,6 +107,31 @@ class FuelPortalDataServiceTest {
         assertTrue(req.getValue().notes().startsWith(FuelPortalDataService.PORTAL_NOTE));
         assertTrue(req.getValue().notes().contains("Gate code 1234"));
         assertEquals("PO-77", req.getValue().customerReference());
+    }
+
+    @Test @DisplayName("staff are told when a customer asks for fuel, and a notification failure does not lose the request")
+    void staffNotified() {
+        when(grants.findActiveGrant(USER, ACCOUNT)).thenReturn(Optional.of(activeGrant()));
+        when(orders.findByAccount(any(), eq(ACCOUNT))).thenReturn(List.of());
+        when(orderService.create(any(), any(), any())).thenReturn(resp());
+        when(adminRecipients.resolveTenantAdmins(any())).thenReturn(List.of(new Recipient(UUID.randomUUID(), "Admin", "admin@acme.co.za", null)));
+        service.requestOrder(USER, ACCOUNT, body());
+        ArgumentCaptor<NotificationRequest> n = ArgumentCaptor.forClass(NotificationRequest.class);
+        verify(notifications).send(n.capture());
+        assertEquals(NotificationType.FUEL_PORTAL_REQUEST, n.getValue().type());
+
+        doThrow(new RuntimeException("smtp down")).when(notifications).send(any());
+        assertNotNull(service.requestOrder(USER, ACCOUNT, body()));
+    }
+
+    @Test @DisplayName("no admins to tell is not an error")
+    void noAdmins() {
+        when(grants.findActiveGrant(USER, ACCOUNT)).thenReturn(Optional.of(activeGrant()));
+        when(orders.findByAccount(any(), eq(ACCOUNT))).thenReturn(List.of());
+        when(orderService.create(any(), any(), any())).thenReturn(resp());
+        when(adminRecipients.resolveTenantAdmins(any())).thenReturn(List.of());
+        assertNotNull(service.requestOrder(USER, ACCOUNT, body()));
+        verifyNoInteractions(notifications);
     }
 
     @Test @DisplayName("an unpriced request tells the customer to call, not 'Add one under Pricing'")

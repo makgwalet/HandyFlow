@@ -82,7 +82,7 @@ class FuelCustomerServiceTest {
         when(accounts.findActiveById(tenant, id)).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> service.get(tenant, id));
         assertThrows(ResourceNotFoundException.class, () -> service.addSite(tenant, id,
-                new CustomerSiteRequest("Pit 1", "Farm road", null, null, null, null)));
+                new CustomerSiteRequest("Pit 1", "Farm road", null, null, null, null, null)));
         verify(sites, never()).save(any());
     }
 
@@ -92,6 +92,6 @@ class FuelCustomerServiceTest {
         when(sites.findActiveById(tenant, id)).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> service.removeSite(tenant, id));
         assertThrows(ResourceNotFoundException.class, () -> service.updateSite(tenant, id,
-                new CustomerSiteRequest("Pit 1", "Farm road", null, null, null, null)));
+                new CustomerSiteRequest("Pit 1", "Farm road", null, null, null, null, null)));
     }
 }

@@ -44,6 +44,10 @@ public class FuelCustomerSite {
     @Column(name = "operating_hours", length = 100)
     private String operatingHours;
 
+    /** One-way road distance from the depot, entered by staff. Cost-to-serve doubles it for the round trip. */
+    @Column(name = "distance_km", precision = 8, scale = 1)
+    private java.math.BigDecimal distanceKm;
+
     @Column(nullable = false)
     private boolean active = true;
 
@@ -74,6 +78,11 @@ public class FuelCustomerSite {
         this.name = name.trim(); this.address = clean(address); this.contactName = clean(contactName);
         this.contactPhone = clean(contactPhone); this.deliveryInstructions = clean(instructions); this.operatingHours = clean(hours);
         this.updatedAt = Instant.now();
+    }
+
+    public void setDistanceKm(java.math.BigDecimal km) {
+        if (km != null && (km.signum() < 0 || km.compareTo(new java.math.BigDecimal("5000")) > 0)) throw new IllegalArgumentException("Distance must be between 0 and 5000 km.");
+        this.distanceKm = km; this.updatedAt = Instant.now();
     }
 
     public void softDelete() { this.deletedAt = Instant.now(); this.active = false; this.updatedAt = Instant.now(); }

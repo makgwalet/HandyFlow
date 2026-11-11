@@ -1,6 +1,7 @@
 package za.co.handyflow.platform.fuel.application.internal;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +16,11 @@ import za.co.handyflow.platform.fuel.domain.repository.*;
 import za.co.handyflow.platform.fuel.dto.OrderRequest;
 import za.co.handyflow.platform.fuel.dto.OrderResponse;
 import za.co.handyflow.platform.fuel.dto.PortalDtos.*;
+import za.co.handyflow.platform.notifications.application.NotificationRequest;
+import za.co.handyflow.platform.notifications.application.Recipient;
+import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
+import za.co.handyflow.platform.notifications.application.internal.NotificationService;
+import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.PortalUserRepository;
 import za.co.handyflow.platform.shared.TenantId;
@@ -26,6 +32,7 @@ import java.util.*;
  * What a customer sees. The portal token proves who they are; only an ACTIVE grant proves what they may see.
  * Every method goes through {@link #requireGrant} first, so a customer can never reach another customer's account by guessing an id.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class FuelPortalDataService {
@@ -42,6 +49,8 @@ public class FuelPortalDataService {
     private final FuelOrderService orderService;
     private final CrmFacade crm;
     private final PortalUserRepository portalUsers;
+    private final NotificationService notifications;
+    private final TenantAdminRecipients adminRecipients;
 
     @Transactional(readOnly = true)
     public List<AccountSummary> myAccounts(UUID portalUserId) {
@@ -109,6 +118,7 @@ public class FuelPortalDataService {
             }
             throw e;
         }
+        notifyStaff(tenant, created, email);
         return new OrderView(created.id(), created.orderNumber(), created.siteName(), created.fuelType(), created.litresOrdered(), created.pricePerLitre(),
                 created.value(), created.status(), created.requestedDate(), created.customerReference(), created.litresDelivered(), created.litresRemaining(), created.createdAt());
     }
@@ -134,5 +144,27 @@ public class FuelPortalDataService {
         return new OrderView(o.getId(), o.getOrderNumber(), o.getSiteId() == null ? null : siteNames.get(o.getSiteId()), o.getFuelType(),
                 o.getLitresOrdered(), o.getPricePerLitre(), o.getLitresOrdered().multiply(o.getPricePerLitre()).setScale(2, java.math.RoundingMode.HALF_UP),
                 o.getStatus(), o.getRequestedDate(), o.getCustomerReference(), delivered, remaining, o.getCreatedAt());
+    }
+
+    /** Tells the tenant's admins a customer has asked for fuel. Never fails the request: the order is already saved. */
+    private void notifyStaff(TenantId tenant, OrderResponse created, String requestedBy) {
+        try {
+            List<Recipient> recipients = adminRecipients.resolveTenantAdmins(tenant);
+            if (recipients.isEmpty()) return;
+            notifications.send(NotificationRequest.builder()
+                    .tenantId(tenant)
+                    .type(NotificationType.FUEL_PORTAL_REQUEST)
+                    .title("Fuel request from a customer")
+                    .message(requestedBy + " asked for " + created.litresOrdered() + " L of " + created.fuelType()
+                            + (created.siteName() == null ? "" : " at " + created.siteName()) + " (" + created.orderNumber()
+                            + "). It is waiting to be confirmed.")
+                    .actionUrl("/fuel/orders")
+                    .sourceModule("fuel")
+                    .sourceEntityId(String.valueOf(created.id()))
+                    .recipients(recipients)
+                    .build());
+        } catch (RuntimeException ex) {
+            log.warn("Could not notify staff of portal fuel request {}: {}", created.orderNumber(), ex.getMessage());
+        }
     }
 }

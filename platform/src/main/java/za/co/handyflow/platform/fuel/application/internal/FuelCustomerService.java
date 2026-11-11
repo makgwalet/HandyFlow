@@ -76,13 +76,15 @@ public class FuelCustomerService {
         find(tenantId, accountId);
         FuelCustomerSite s = sites.save(FuelCustomerSite.create(tenantId, accountId, req.name(), req.address(),
                 req.contactName(), req.contactPhone(), req.deliveryInstructions(), req.operatingHours()));
-        return toResponse(s);
+        s.setDistanceKm(req.distanceKm());
+        return toResponse(sites.save(s));
     }
 
     @Transactional
     public CustomerSiteResponse updateSite(TenantId tenantId, UUID siteId, CustomerSiteRequest req) {
         FuelCustomerSite s = findSite(tenantId, siteId);
         s.update(req.name(), req.address(), req.contactName(), req.contactPhone(), req.deliveryInstructions(), req.operatingHours());
+        s.setDistanceKm(req.distanceKm());
         return toResponse(sites.save(s));
     }
 
@@ -110,6 +112,6 @@ public class FuelCustomerService {
 
     private CustomerSiteResponse toResponse(FuelCustomerSite s) {
         return new CustomerSiteResponse(s.getId(), s.getAccountId(), s.getName(), s.getAddress(), s.getContactName(),
-                s.getContactPhone(), s.getDeliveryInstructions(), s.getOperatingHours());
+                s.getContactPhone(), s.getDeliveryInstructions(), s.getOperatingHours(), s.getDistanceKm());
     }
 }

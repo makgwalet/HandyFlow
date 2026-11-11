@@ -72,6 +72,13 @@ public class FuelPurchasingController {
         return ResponseEntity.ok(ApiResponse.success("Cancelled", purchasing.cancel(TenantContext.getTenantIdAsObject(), id, req.reason())));
     }
 
+    @PostMapping("/{id}/close-short")
+    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    public ResponseEntity<ApiResponse<PurchaseOrderResponse>> closeShort(@PathVariable UUID id, @Valid @RequestBody CancelRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Closed", purchasing.closeShort(TenantContext.getTenantIdAsObject(), id, req.reason())));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('FUEL_MANAGE')")
     public ResponseEntity<ApiResponse<Void>> remove(@PathVariable UUID id) {

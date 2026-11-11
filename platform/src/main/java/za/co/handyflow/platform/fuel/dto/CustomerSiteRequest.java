@@ -9,5 +9,6 @@ public record CustomerSiteRequest(
         @Size(max = 120) String contactName,
         @Size(max = 30) String contactPhone,
         @Size(max = 500) String deliveryInstructions,
-        @Size(max = 100) String operatingHours
+        @Size(max = 100) String operatingHours,
+        @jakarta.validation.constraints.DecimalMin("0") @jakarta.validation.constraints.DecimalMax("5000") java.math.BigDecimal distanceKm
 ) {}

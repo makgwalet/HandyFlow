@@ -36,6 +36,7 @@ public class FuelPurchasingService {
     private final FuelReceiptRepository receipts;
     private final FuelSupplierRepository suppliers;
     private final PurchaseOrderNumberGenerator numbers;
+    private final FuelSettingsService settings;
 
     @Transactional(readOnly = true)
     public List<PurchaseOrderResponse> list(TenantId tenantId) {
@@ -80,6 +81,16 @@ public class FuelPurchasingService {
     }
 
     @Transactional
+    public PurchaseOrderResponse closeShort(TenantId tenantId, UUID id, String reason) {
+        FuelPurchaseOrder p = orders.findActiveByIdForUpdate(tenantId, id).orElseThrow(() -> new ResourceNotFoundException("Purchase order", id.toString()));
+        // Re-sync first so a status that lagged behind the receipts is not closed on stale numbers.
+        p.applyReceived(receipts.sumReceivedForPo(tenantId, id), settings.poToleranceFraction(tenantId));
+        p.closeShort(reason);
+        orders.save(p);
+        return toResponse(tenantId, p, receipts.sumReceivedForPo(tenantId, id), new HashMap<>());
+    }
+
+    @Transactional
     public void remove(TenantId tenantId, UUID id) {
         FuelPurchaseOrder p = find(tenantId, id);
         p.softDelete();
@@ -118,9 +129,10 @@ public class FuelPurchasingService {
             throw new IllegalArgumentException(p.getPoNumber() + " is for " + p.getFuelType() + " but this tank holds " + tankFuelType + ".");
         }
         BigDecimal so = receipts.sumReceivedForPo(tenantId, poId);
-        if (so.add(litres).compareTo(p.maxReceivable()) > 0) {
+        BigDecimal tolerance = settings.poToleranceFraction(tenantId);
+        if (so.add(litres).compareTo(p.maxReceivable(tolerance)) > 0) {
             throw new IllegalStateException("That would be " + so.add(litres) + " L received against " + p.getPoNumber() + ", which ordered "
-                    + p.getLitresOrdered() + " L (up to " + p.maxReceivable() + " L is accepted).");
+                    + p.getLitresOrdered() + " L (up to " + p.maxReceivable(tolerance) + " L is accepted).");
         }
         return p;
     }
@@ -130,7 +142,7 @@ public class FuelPurchasingService {
     public void resync(TenantId tenantId, UUID poId) {
         if (poId == null) return;
         orders.findActiveByIdForUpdate(tenantId, poId).ifPresent(p -> {
-            p.applyReceived(receipts.sumReceivedForPo(tenantId, poId));
+            p.applyReceived(receipts.sumReceivedForPo(tenantId, poId), settings.poToleranceFraction(tenantId));
             orders.save(p);
         });
     }
@@ -149,6 +161,6 @@ public class FuelPurchasingService {
         boolean overdue = p.canReceive() && p.getExpectedDate() != null && p.getExpectedDate().isBefore(LocalDate.now(SAST));
         return new PurchaseOrderResponse(p.getId(), p.getPoNumber(), p.getSupplierId(), name, p.getFuelType(), p.getLitresOrdered(), received,
                 outstanding, p.getPricePerLitre(), p.getLitresOrdered().multiply(p.getPricePerLitre()).setScale(2, java.math.RoundingMode.HALF_UP),
-                p.getStatus(), p.getExpectedDate(), overdue, p.getCancelReason(), p.getNotes());
+                p.getStatus(), p.getExpectedDate(), overdue, p.getCancelReason(), p.getCloseReason(), p.getNotes());
     }
 }

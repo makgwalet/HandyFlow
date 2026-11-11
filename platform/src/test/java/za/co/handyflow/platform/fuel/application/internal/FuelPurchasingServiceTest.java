@@ -37,7 +37,11 @@ class FuelPurchasingServiceTest {
     @Mock FuelReceiptRepository receipts;
     @Mock FuelSupplierRepository suppliers;
     @Mock PurchaseOrderNumberGenerator numbers;
+    @Mock FuelSettingsService settings;
     @InjectMocks FuelPurchasingService service;
+
+    @org.junit.jupiter.api.BeforeEach
+    void defaults() { when(settings.poToleranceFraction(any())).thenReturn(bd("0.02")); }
 
     private static BigDecimal bd(String s) { return new BigDecimal(s); }
 
@@ -130,5 +134,50 @@ class FuelPurchasingServiceTest {
         assertTrue(m.receipts().get(0).priceDiffers());
         assertFalse(m.receipts().get(1).priceDiffers());
         assertTrue(m.receipts().get(1).reversed());
+    }
+
+    @Test @DisplayName("a tenant's own tolerance decides what is accepted and when an order counts as fully received")
+    void tenantTolerance() {
+        FuelPurchaseOrder p = placed("1000", "20");
+        when(orders.findActiveByIdForUpdate(T, p.getId())).thenReturn(Optional.of(p));
+        when(receipts.sumReceivedForPo(T, p.getId())).thenReturn(bd("1000"));
+        when(settings.poToleranceFraction(any())).thenReturn(bd("0.05"));
+        assertDoesNotThrow(() -> service.checkReceivable(T, p.getId(), SUPPLIER, "DIESEL_50", bd("50")));
+        assertThrows(IllegalStateException.class, () -> service.checkReceivable(T, p.getId(), SUPPLIER, "DIESEL_50", bd("51")));
+        p.applyReceived(bd("960"), bd("0.05"));
+        assertEquals("RECEIVED", p.getStatus()); // 960 of 1000 is within 5%
+        p.applyReceived(bd("960"), bd("0.02"));
+        assertEquals("PART_RECEIVED", p.getStatus());
+        p.applyReceived(bd("950"), bd("0.05"));
+        assertEquals("RECEIVED", p.getStatus());
+    }
+
+    @Test @DisplayName("close short: only a part-received order, with a real reason; receiving stops and the litres stay")
+    void closeShortRules() {
+        FuelPurchaseOrder none = placed("1000", "20");
+        assertThrows(IllegalStateException.class, () -> none.closeShort("supplier short"));   // nothing received: cancel instead
+        FuelPurchaseOrder p = placed("1000", "20");
+        p.applyReceived(bd("600"));
+        assertThrows(IllegalArgumentException.class, () -> p.closeShort("  "));
+        assertThrows(IllegalArgumentException.class, () -> p.closeShort("no"));
+        p.closeShort("Supplier ran out of stock");
+        assertEquals("CLOSED_SHORT", p.getStatus());
+        assertFalse(p.canReceive());
+        p.applyReceived(bd("1000"));                      // later receipts changes do not reopen it
+        assertEquals("CLOSED_SHORT", p.getStatus());
+        assertThrows(IllegalStateException.class, () -> p.cancel("x"));
+    }
+
+    @Test @DisplayName("closing short through the service re-syncs first, so a fully received order is not closed short")
+    void closeShortService() {
+        FuelPurchaseOrder p = placed("1000", "20");
+        when(orders.findActiveByIdForUpdate(T, p.getId())).thenReturn(Optional.of(p));
+        when(suppliers.findActiveById(T, SUPPLIER)).thenReturn(Optional.empty());
+        when(receipts.sumReceivedForPo(T, p.getId())).thenReturn(bd("700"));
+        assertEquals("CLOSED_SHORT", service.closeShort(T, p.getId(), "Supplier cannot deliver the rest").status());
+        FuelPurchaseOrder full = placed("1000", "20");
+        when(orders.findActiveByIdForUpdate(T, full.getId())).thenReturn(Optional.of(full));
+        when(receipts.sumReceivedForPo(T, full.getId())).thenReturn(bd("995"));
+        assertThrows(IllegalStateException.class, () -> service.closeShort(T, full.getId(), "Supplier cannot deliver the rest"));
     }
 }

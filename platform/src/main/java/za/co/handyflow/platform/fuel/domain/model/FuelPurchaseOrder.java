@@ -51,6 +51,9 @@ public class FuelPurchaseOrder {
     @Column(name = "cancel_reason", length = 300)
     private String cancelReason;
 
+    @Column(name = "close_reason", length = 300)
+    private String closeReason;
+
     @Column(length = 500)
     private String notes;
 
@@ -103,15 +106,34 @@ public class FuelPurchaseOrder {
 
     public boolean canReceive() { return "ORDERED".equals(status) || "PART_RECEIVED".equals(status); }
 
-    /** The most that may be received in total, allowing the delivery tolerance. */
-    public BigDecimal maxReceivable() {
-        return litresOrdered.multiply(BigDecimal.ONE.add(OVER_TOLERANCE)).setScale(2, java.math.RoundingMode.DOWN);
+    /** The most that may be received in total, allowing the default delivery tolerance. */
+    public BigDecimal maxReceivable() { return maxReceivable(OVER_TOLERANCE); }
+
+    /** The most that may be received in total, allowing the given tolerance (a fraction: 0.02 is 2%). */
+    public BigDecimal maxReceivable(BigDecimal tolerance) {
+        return litresOrdered.multiply(BigDecimal.ONE.add(tolerance)).setScale(2, java.math.RoundingMode.DOWN);
+    }
+
+    /**
+     * The supplier will not deliver the rest. Only an order that has had some fuel received can be closed short;
+     * one with nothing received is cancelled instead. The litres received so far stay on the books.
+     */
+    public void closeShort(String reason) {
+        if (!"PART_RECEIVED".equals(status)) {
+            throw new IllegalStateException(poNumber + " is " + status + ". Only a part-received order can be closed short"
+                    + ("ORDERED".equals(status) ? "; nothing has been received on it, so cancel it instead." : "."));
+        }
+        if (reason == null || reason.isBlank() || reason.trim().length() < 5) throw new IllegalArgumentException("Say why the rest will not be delivered (at least 5 characters).");
+        this.status = "CLOSED_SHORT"; this.closeReason = reason.trim(); this.updatedAt = Instant.now();
     }
 
     /** Sets the status from the litres received so far (already net of reversed receipts). Does nothing to draft or cancelled orders. */
-    public void applyReceived(BigDecimal received) {
+    public void applyReceived(BigDecimal received) { applyReceived(received, OVER_TOLERANCE); }
+
+    /** As above, treating an order as fully received once it is within the given tolerance (a fraction) of the litres ordered. */
+    public void applyReceived(BigDecimal received, BigDecimal tolerance) {
         if (!canReceive() && !"RECEIVED".equals(status)) return;
-        BigDecimal full = litresOrdered.multiply(BigDecimal.ONE.subtract(OVER_TOLERANCE));
+        BigDecimal full = litresOrdered.multiply(BigDecimal.ONE.subtract(tolerance));
         String next = received.signum() <= 0 ? "ORDERED" : received.compareTo(full) >= 0 ? "RECEIVED" : "PART_RECEIVED";
         if (!next.equals(status)) { this.status = next; this.updatedAt = Instant.now(); }
     }
