@@ -164,7 +164,7 @@ class WhseTaskServiceTest {
     @Test @DisplayName("the summary counts replenishments apart from put-aways")
     @SuppressWarnings({"unchecked", "rawtypes"})
     void summaryExcludesReplen() throws Exception {
-        when(jdbc.query(contains("GROUP BY task_type, status"), any(org.springframework.jdbc.core.RowCallbackHandler.class), any(Object[].class))).thenAnswer(inv -> {
+        doAnswer(inv -> {
             org.springframework.jdbc.core.RowCallbackHandler h = inv.getArgument(1);
             for (Object[] r : new Object[][]{{"PUTAWAY", "OPEN", 2}, {"REPLEN", "OPEN", 7}, {"REPLEN", "IN_PROGRESS", 4}, {"PICK", "OPEN", 3}}) {
                 java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
@@ -174,7 +174,7 @@ class WhseTaskServiceTest {
                 h.processRow(rs);
             }
             return null;
-        });
+        }).when(jdbc).query(contains("GROUP BY task_type, status"), any(org.springframework.jdbc.core.RowCallbackHandler.class), any(Object[].class));
         WhseTaskService.Summary s = service.summary(t());
         assertEquals(2, s.openPutaways());
         assertEquals(0, s.inProgressPutaways());

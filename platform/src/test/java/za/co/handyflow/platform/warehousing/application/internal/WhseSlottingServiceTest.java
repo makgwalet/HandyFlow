@@ -122,18 +122,18 @@ class WhseSlottingServiceTest {
     @SuppressWarnings({"unchecked", "rawtypes"})
     void overview() throws Exception {
         UUID slow = UUID.randomUUID(), emptyLoc = UUID.randomUUID(), slowLoc = UUID.randomUUID();
-        when(jdbc.query(contains("FROM whse_tasks WHERE tenant_id = ? AND task_type = 'PICK'"), any(RowCallbackHandler.class), any(Object[].class))).thenAnswer(inv -> {
+        doAnswer(inv -> {
             RowCallbackHandler h = inv.getArgument(1);
             h.processRow(rs(item, new BigDecimal("900")));
             h.processRow(rs(slow, new BigDecimal("1")));
             return null;
-        });
-        when(jdbc.query(contains("FROM whse_items i JOIN whse_clients c"), any(RowCallbackHandler.class), any(Object[].class))).thenAnswer(inv -> {
+        }).when(jdbc).query(contains("FROM whse_tasks WHERE tenant_id = ? AND task_type = 'PICK'"), any(RowCallbackHandler.class), any(Object[].class));
+        doAnswer(inv -> {
             RowCallbackHandler h = inv.getArgument(1);
             h.processRow(rs(item, "FAST-1", "Fast thing", "Acme"));
             h.processRow(rs(slow, "SLOW-1", "Slow thing", "Acme"));
             return null;
-        });
+        }).when(jdbc).query(contains("FROM whse_items i JOIN whse_clients c"), any(RowCallbackHandler.class), any(Object[].class));
         when(jdbc.query(contains("FROM whse_inventory i JOIN whse_locations loc"), any(RowMapper.class), any(Object[].class))).thenReturn(List.of(
                 new WhseSlottingRules.Placed(client, item, null, from, "Z-99", 90, new BigDecimal("30"), BigDecimal.ZERO, "C"),
                 new WhseSlottingRules.Placed(client, slow, null, slowLoc, "Z-98", 80, new BigDecimal("5"), BigDecimal.ZERO, "C")));
