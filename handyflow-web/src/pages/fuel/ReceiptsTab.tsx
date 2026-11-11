@@ -2,6 +2,7 @@
 // NEW tab — stock-in history across all tanks with supplier details and totals
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import ReverseModal from "./ReverseModal"
 import { apiClient } from "../../api/client"
 import { ArrowDownToLine, List, TrendingUp } from "lucide-react"
 
@@ -18,6 +19,8 @@ const FUEL_COLORS: Record<string, string> = {
 export default function ReceiptsTab() {
   const [filterTank, setFilterTank] = useState("ALL")
   const [view, setView]             = useState<"history" | "trend">("history")
+  const [reversing, setReversing]   = useState<any | null>(null)
+  const [showReversed, setShowReversed] = useState(false)
 
   const { data: receipts = [], isLoading } = useQuery<any[]>({
     queryKey: ["receipts"],
@@ -29,7 +32,12 @@ export default function ReceiptsTab() {
     queryFn: async () => { const r = await apiClient.get("/api/v1/fuel/tanks"); return r.data?.data ?? r.data ?? [] },
   })
 
-  const filtered = filterTank === "ALL" ? (receipts as any[]) : (receipts as any[]).filter(r => r.tankId === filterTank)
+  // Reversed receipts never count towards totals or the trend; they are
+  // listed (muted) only when "Show reversed" is on, for audit.
+  const byTank = filterTank === "ALL" ? (receipts as any[]) : (receipts as any[]).filter(r => r.tankId === filterTank)
+  const filtered = byTank.filter(r => !r.reversedAt)
+  const reversedCount = byTank.length - filtered.length
+  const rows = showReversed ? byTank : filtered
   const totalLitres = filtered.reduce((s, r) => s + Number(r.litresReceived ?? 0), 0)
   const totalCost   = filtered.reduce((s, r) => s + Number(r.totalCost ?? 0), 0)
 
@@ -96,14 +104,14 @@ export default function ReceiptsTab() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
               <tr style={{ background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border)" }}>
-                {["Date","Tank","Litres","Price/L","Total Cost","Delivery Note","Invoice","Level Before → After"].map(h => (
+                {["Date","Tank","Litres","Price/L","Total Cost","Delivery Note","Invoice","Level Before → After",""].map(h => (
                   <th key={h} style={{ padding: "11px 14px", textAlign: "left", fontWeight: 700, fontSize: 11, color: "var(--hf-text-muted)", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r, i) => (
-                <tr key={r.id} style={{ borderBottom: i < filtered.length - 1 ? "1px solid var(--hf-border-subtle)" : "none", background: "var(--hf-surface)" }}>
+              {rows.map((r, i) => (
+                <tr key={r.id} style={{ borderBottom: i < rows.length - 1 ? "1px solid var(--hf-border-subtle)" : "none", background: "var(--hf-surface)", opacity: r.reversedAt ? 0.55 : 1, textDecoration: r.reversedAt ? "line-through" : "none" }}>
                   <td style={{ padding: "12px 14px", fontWeight: 600, color: "var(--hf-text)", whiteSpace: "nowrap" }}>{fmtDate(r.receivedAt)}</td>
                   <td style={{ padding: "12px 14px", color: "var(--hf-text-tertiary)" }}>{tankMap[r.tankId] ?? "—"}</td>
                   <td style={{ padding: "12px 14px", fontWeight: 700, color: "var(--hf-accent-text)" }}>{Number(r.litresReceived).toLocaleString()} L</td>
@@ -116,11 +124,31 @@ export default function ReceiptsTab() {
                     <span style={{ margin: "0 6px", color: "var(--hf-text-disabled)" }}>→</span>
                     {r.levelAfter != null ? <strong style={{ color: "var(--hf-accent-text)" }}>{Number(r.levelAfter).toLocaleString()} L</strong> : "—"}
                   </td>
+                  <td style={{ padding: "12px 14px", whiteSpace: "nowrap", textDecoration: "none" }}>
+                    {r.reversedAt
+                      ? <span title={r.reversalReason ?? ""} style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-danger-text)" }}>Reversed</span>
+                      : <button onClick={() => setReversing(r)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--hf-danger-border)", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", cursor: "pointer" }}>Reverse</button>}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+      {reversedCount > 0 && (
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 12, fontSize: 12, color: "var(--hf-text-muted)" }}>
+          <input type="checkbox" checked={showReversed} onChange={e => setShowReversed(e.target.checked)} />
+          Show {reversedCount} reversed {reversedCount === 1 ? "entry" : "entries"} (not counted in totals)
+        </label>
+      )}
+      {reversing && (
+        <ReverseModal
+          title="Reverse stock receipt"
+          summary={`This removes ${Number(reversing.litresReceived).toLocaleString()} L from ${tankMap[reversing.tankId] ?? "the tank"}. It is refused if that fuel has already been used. The original record is kept for audit.`}
+          endpoint={`/api/v1/fuel/receipts/${reversing.id}/reverse`}
+          invalidate={[["receipts"], ["tanks"]]}
+          onClose={() => setReversing(null)}
+        />
       )}
     </div>
   )

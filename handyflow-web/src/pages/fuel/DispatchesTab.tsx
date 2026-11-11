@@ -3,6 +3,7 @@
 import { useState, Fragment } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import ReverseModal from "./ReverseModal"
 import { Plus, Fuel, X, AlertCircle, AlertTriangle, List, BarChart3, Download } from "lucide-react"
 
 const unwrap     = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
@@ -18,6 +19,8 @@ export default function DispatchesTab() {
   const [showDispatch, setShowDispatch] = useState(false)
   const [filterMonth, setFilterMonth]   = useState(new Date().toISOString().slice(0, 7))
   const [view, setView]                 = useState<"log" | "rollup">("log")
+  const [reversing, setReversing]       = useState<any | null>(null)
+  const [showReversed, setShowReversed] = useState(false)
 
   // FIX: "no monthly fuel-usage report PDF" gap — exports the currently
   // selected month (same scope as the rollup table on screen) as a PDF via
@@ -68,7 +71,12 @@ export default function DispatchesTab() {
     onError: (e: any) => setError(e.response?.data?.message ?? "Failed to dispatch fuel"),
   })
 
-  const filtered = (dispatches as any[]).filter(d => d.dispatchedAt?.startsWith(filterMonth))
+  // Reversed dispatches never count towards totals or the rollup; they are
+  // listed (muted) only when "Show reversed" is on, for audit.
+  const inMonth = (dispatches as any[]).filter(d => d.dispatchedAt?.startsWith(filterMonth))
+  const filtered = inMonth.filter(d => !d.reversedAt)
+  const reversedCount = inMonth.length - filtered.length
+  const logRows = showReversed ? inMonth : filtered
   const selectedTank = (tanks as any[]).find(t => t.id === form.tankId)
 
   const totalLitres = filtered.reduce((s, d) => s + Number(d.litresDispensed ?? 0), 0)
@@ -208,15 +216,15 @@ export default function DispatchesTab() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
               <tr style={{ background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border)" }}>
-                {["Recipient","Litres","Level Change","Price/L","Authorised By","Odometer / Hours","Date & Time","Review"].map(h => (
+                {["Recipient","Litres","Level Change","Price/L","Authorised By","Odometer / Hours","Date & Time","Review",""].map(h => (
                   <th key={h} style={{ padding: "11px 14px", textAlign: "left", fontWeight: 700, fontSize: 11, color: "var(--hf-text-muted)", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((d, i) => (
+              {logRows.map((d, i) => (
                 <Fragment key={d.id}>
-                <tr style={{ borderBottom: expandedApprovalId === d.id || i < filtered.length - 1 ? "1px solid var(--hf-border-subtle)" : "none", background: "var(--hf-surface)" }}>
+                <tr style={{ borderBottom: expandedApprovalId === d.id || i < logRows.length - 1 ? "1px solid var(--hf-border-subtle)" : "none", background: "var(--hf-surface)", opacity: d.reversedAt ? 0.55 : 1 }}>
                   <td style={{ padding: "12px 14px" }}>
                     <div style={{ fontWeight: 600, color: "var(--hf-text)" }}>{d.recipientName || "—"}</div>
                   </td>
@@ -245,10 +253,15 @@ export default function DispatchesTab() {
                       {expandedApprovalId === d.id ? "Hide" : "Status"}
                     </button>
                   </td>
+                  <td style={{ padding: "12px 14px", whiteSpace: "nowrap" }}>
+                    {d.reversedAt
+                      ? <span title={d.reversalReason ?? ""} style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-danger-text)" }}>Reversed</span>
+                      : <button onClick={() => setReversing(d)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--hf-danger-border)", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", cursor: "pointer" }}>Reverse</button>}
+                  </td>
                 </tr>
                 {expandedApprovalId === d.id && (
                   <tr style={{ borderBottom: i < filtered.length - 1 ? "1px solid var(--hf-border-subtle)" : "none" }}>
-                    <td colSpan={8} style={{ padding: "10px 14px", background: "var(--hf-surface-muted)" }}>
+                    <td colSpan={9} style={{ padding: "10px 14px", background: "var(--hf-surface-muted)" }}>
                       {approvalStatusQuery.isLoading ? (
                         <span style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>Loading…</span>
                       ) : !approvalStatusQuery.data ? (
@@ -279,6 +292,21 @@ export default function DispatchesTab() {
             </tbody>
           </table>
         </div>
+      )}
+      {view === "log" && reversedCount > 0 && (
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 12, fontSize: 12, color: "var(--hf-text-muted)" }}>
+          <input type="checkbox" checked={showReversed} onChange={e => setShowReversed(e.target.checked)} />
+          Show {reversedCount} reversed {reversedCount === 1 ? "entry" : "entries"} (not counted in totals)
+        </label>
+      )}
+      {reversing && (
+        <ReverseModal
+          title="Reverse dispatch"
+          summary={`This puts ${Number(reversing.litresDispensed).toLocaleString()} L back into the tank${reversing.recipientName ? ` (issued to ${reversing.recipientName})` : ""}. The original record is kept for audit. A linked Fleet fill-up, if any, is not removed automatically.`}
+          endpoint={`/api/v1/fuel/dispatches/${reversing.id}/reverse`}
+          invalidate={[["dispatches"], ["tanks"]]}
+          onClose={() => setReversing(null)}
+        />
       )}
 
       {/* Dispatch Modal */}

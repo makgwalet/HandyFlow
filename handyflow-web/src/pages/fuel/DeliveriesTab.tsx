@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import ReverseModal from "./ReverseModal"
 import { apiClient } from "../../api/client"
 import { Plus, Truck, CheckCircle, X, Download } from "lucide-react"
 interface Delivery {
@@ -12,7 +13,7 @@ interface Delivery {
   litresDelivered: number | null
   pricePerLitre: number
   totalAmount: number
-  status: "SCHEDULED" | "IN_TRANSIT" | "DELIVERED" | "CANCELLED"
+  status: "SCHEDULED" | "IN_TRANSIT" | "DELIVERED" | "CANCELLED" | "REVERSED"
   scheduledAt: string
   deliveredAt: string | null
   driverName: string | null
@@ -32,12 +33,14 @@ const STATUS_CONFIG = {
   IN_TRANSIT: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", label: "In Transit" },
   DELIVERED:  { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", label: "Delivered"  },
   CANCELLED:  { color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)", label: "Cancelled"  },
+  REVERSED:   { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", label: "Reversed"  },
 }
 
 export default function DeliveriesTab() {
   const qc = useQueryClient()
   const [showSchedule, setShowSchedule] = useState(false)
   const [showComplete, setShowComplete] = useState<Delivery | null>(null)
+  const [reversing, setReversing] = useState<Delivery | null>(null)
   const [filterStatus, setFilterStatus] = useState("ALL")
   const [error, setError] = useState("")
 
@@ -136,7 +139,7 @@ export default function DeliveriesTab() {
       {/* Toolbar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
         <div style={{ display: "flex", gap: 6 }}>
-          {["ALL", "SCHEDULED", "IN_TRANSIT", "DELIVERED", "CANCELLED"].map(s => (
+          {["ALL", "SCHEDULED", "IN_TRANSIT", "DELIVERED", "CANCELLED", "REVERSED"].map(s => (
             <button key={s} onClick={() => setFilterStatus(s)} style={{ padding: "6px 12px", borderRadius: 20, border: "1px solid", borderColor: filterStatus === s ? "var(--hf-primary)" : "var(--hf-border)", background: filterStatus === s ? "var(--hf-primary)" : "var(--hf-surface)", color: filterStatus === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
               {s === "ALL" ? "All" : STATUS_CONFIG[s as keyof typeof STATUS_CONFIG]?.label}
             </button>
@@ -222,6 +225,11 @@ export default function DeliveriesTab() {
                         <Download size={13} /> Receipt
                       </button>
                     )}
+                    {d.status === "DELIVERED" && (
+                      <button onClick={() => setReversing(d)} style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        Reverse
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -300,6 +308,16 @@ export default function DeliveriesTab() {
             </button>
           </div>
         </Modal>
+      )}
+
+      {reversing && (
+        <ReverseModal
+          title="Reverse delivery"
+          summary={`This puts ${Number(reversing.litresDelivered ?? 0).toLocaleString()} L back into the tank and marks the delivery${reversing.receiptNumber ? ` (receipt ${reversing.receiptNumber})` : ""} as reversed. The original record is kept for audit.`}
+          endpoint={`/api/v1/fuel/deliveries/${reversing.id}/reverse`}
+          invalidate={[["deliveries"], ["tanks"]]}
+          onClose={() => setReversing(null)}
+        />
       )}
 
       {/* Complete Delivery Modal */}
