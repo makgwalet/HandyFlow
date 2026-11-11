@@ -28,6 +28,14 @@ public class WhseClientService {
     private final WhseClientRepository repository;
     private final WhseSettingsService settings;
 
+    /** Optional so the services can be built without it; Spring injects it. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private WhsePackageService packages;
+
+    private void requireRoom(TenantId tenantId, WhsePackageRules.Limit limit) {
+        if (packages != null) packages.requireRoomFor(tenantId, limit);
+    }
+
     @Transactional(readOnly = true)
     public Page<WhseClient> list(TenantId tenantId, Pageable pageable) {
         return repository.findAllActive(tenantId.getValue(), pageable);
@@ -50,6 +58,7 @@ public class WhseClientService {
                               BigDecimal pickFeePerUnit, BigDecimal packFeePerOrder, String contactName,
                               String contactEmail, String contactPhone, String address) {
         settings.requireCanAddClient(tenantId); // an internal warehouse has one owner
+        requireRoom(tenantId, WhsePackageRules.Limit.CLIENT_ACCOUNTS);
         WhseClient client = WhseClient.create(tenantId.getValue(), tradingName, registrationNumber,
                 storageRatePerUnitPerMonth, receivingFeePerUnit, pickFeePerUnit, packFeePerOrder, contactName,
                 contactEmail, contactPhone, address);

@@ -40,6 +40,14 @@ public class WhseOutboundOrderService {
     private final WhsePackingService packingService;
     private final WhseOutbox outbox;
 
+    /** Optional so the services can be built without it; Spring injects it. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private WhsePackageService packages;
+
+    private void requireRoom(TenantId tenantId, WhsePackageRules.Limit limit) {
+        if (packages != null) packages.requireRoomFor(tenantId, limit);
+    }
+
     /** One ordered line on a new outbound order. */
     public record OutboundLine(UUID itemId, BigDecimal qtyOrdered, String notes) {}
 
@@ -50,6 +58,7 @@ public class WhseOutboundOrderService {
         if (lines == null || lines.isEmpty()) {
             throw new IllegalArgumentException("An outbound order must contain at least one line");
         }
+        requireRoom(tenantId, WhsePackageRules.Limit.MONTHLY_TRANSACTIONS);
         clientService.findActive(tenantId, clientId);
 
         WhseOutboundOrder order = WhseOutboundOrder.create(tenantId.getValue(), clientId, orderReference,

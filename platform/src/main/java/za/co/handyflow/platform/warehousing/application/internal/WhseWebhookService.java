@@ -25,6 +25,14 @@ public class WhseWebhookService {
     private final JdbcTemplate jdbc;
     private final WhseWebhookDispatcher dispatcher;
 
+    /** Optional so the services can be built without it; Spring injects it. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private WhsePackageService packages;
+
+    private void requireRoom(TenantId tenantId, WhsePackageRules.Limit limit) {
+        if (packages != null) packages.requireRoomFor(tenantId, limit);
+    }
+
     public record Webhook(UUID id, String name, String url, List<String> events, boolean active, boolean suspended, int consecutiveFailures, Instant createdAt) {}
     public record Created(Webhook webhook, String secret) {}
     public record Delivery(UUID id, UUID webhookId, String webhookName, String eventType, UUID eventId, String status, int attempts, Instant nextAttemptAt,
@@ -54,6 +62,7 @@ public class WhseWebhookService {
     public Created create(TenantId tenantId, String name, String url, List<String> events, UUID actor) {
         requireActor(actor);
         WhseWebhookRules.check(name, url, events);
+        requireRoom(tenantId, WhsePackageRules.Limit.WEBHOOKS);
         UUID t = tenantId.getValue();
         Integer count = jdbc.queryForObject("SELECT count(*) FROM whse_webhooks WHERE tenant_id = ? AND deleted_at IS NULL", Integer.class, t);
         if (count != null && count >= WhseWebhookRules.MAX_WEBHOOKS) throw new IllegalStateException("At most " + WhseWebhookRules.MAX_WEBHOOKS + " webhooks.");

@@ -20,6 +20,14 @@ public class WhseWarehouseService {
 
     private final JdbcTemplate jdbc;
 
+    /** Optional so the services can be built without it; Spring injects it. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private WhsePackageService packages;
+
+    private void requireRoom(TenantId tenantId, WhsePackageRules.Limit limit) {
+        if (packages != null) packages.requireRoomFor(tenantId, limit);
+    }
+
     public record Warehouse(UUID id, String code, String name, String address, boolean active, boolean isDefault, int locations, BigDecimal stockOnHand, Instant createdAt) {}
 
     private static final String SELECT = """
@@ -64,6 +72,7 @@ public class WhseWarehouseService {
     public Warehouse create(TenantId tenantId, String code, String name, String address, UUID actor) {
         requireActor(actor);
         String c = WhseWarehouseRules.code(code);
+        requireRoom(tenantId, WhsePackageRules.Limit.WAREHOUSES);
         String n = WhseWarehouseRules.name(name);
         Integer clash = jdbc.queryForObject("SELECT count(*) FROM whse_warehouses WHERE tenant_id = ? AND code = ?", Integer.class, tenantId.getValue(), c);
         if (clash != null && clash > 0) throw new IllegalStateException("A warehouse with code " + c + " already exists.");
@@ -101,6 +110,7 @@ public class WhseWarehouseService {
         requireActor(actor);
         Warehouse w = get(tenantId, id);
         if (!active) WhseWarehouseRules.checkDeactivate(w.isDefault(), w.stockOnHand());
+        if (active && !w.active()) requireRoom(tenantId, WhsePackageRules.Limit.WAREHOUSES);
         jdbc.update("UPDATE whse_warehouses SET active = ?, updated_at = now() WHERE tenant_id = ? AND id = ?", active, tenantId.getValue(), id);
         audit(tenantId, actor, active ? "WHSE_WAREHOUSE_ACTIVATED" : "WHSE_WAREHOUSE_DEACTIVATED", id, "{}");
         return get(tenantId, id);

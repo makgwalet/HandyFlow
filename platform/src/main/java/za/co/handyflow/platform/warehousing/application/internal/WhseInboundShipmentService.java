@@ -37,6 +37,13 @@ public class WhseInboundShipmentService {
     private final WhseClientService clientService;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private WhsePackageService packages;
+
+    private void requireRoom(TenantId tenantId, WhsePackageRules.Limit limit) {
+        if (packages != null) packages.requireRoomFor(tenantId, limit);
+    }
+
     /** One expected line on a new shipment. */
     public record InboundLine(UUID itemId, BigDecimal expectedQty, String notes) {}
 
@@ -46,6 +53,7 @@ public class WhseInboundShipmentService {
         if (lines == null || lines.isEmpty()) {
             throw new IllegalArgumentException("An inbound shipment must contain at least one line");
         }
+        requireRoom(tenantId, WhsePackageRules.Limit.MONTHLY_TRANSACTIONS);
         clientService.findActive(tenantId, clientId);
 
         WhseInboundShipment shipment = WhseInboundShipment.create(tenantId.getValue(), clientId, referenceNumber,
