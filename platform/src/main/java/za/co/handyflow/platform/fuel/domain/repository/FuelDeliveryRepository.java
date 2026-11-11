@@ -25,7 +25,7 @@ public interface FuelDeliveryRepository extends JpaRepository<FuelDelivery, UUID
     @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.id = :id AND d.deletedAt IS NULL")
     Optional<FuelDelivery> findActiveById(TenantId tenantId, UUID id);
 
-    @jakarta.persistence.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.id = :id AND d.deletedAt IS NULL")
     Optional<FuelDelivery> findActiveByIdForUpdate(TenantId tenantId, UUID id);
 
