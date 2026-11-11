@@ -239,6 +239,8 @@ export const FUEL_SECTIONS: ModuleSections = {
       label: 'Customers',
       sections: [
         { id: 'customers', label: 'Customer accounts', icon: Users },
+        { id: 'orders', label: 'Orders', icon: ClipboardList },
+        { id: 'invoicing', label: 'Delivered, not invoiced', icon: FileText },
       ],
     },
     {
