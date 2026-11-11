@@ -2,7 +2,18 @@
 export interface ComplianceItem {
   id: string; itemType: string; title: string; referenceNo: string | null; subjectType: string; subjectId: string | null; subjectLabel: string | null
   issuedOn: string | null; expiresOn: string; notes: string | null; status: "VALID" | "EXPIRING" | "EXPIRED"; daysToExpiry: number
+  legalEntityId?: string | null; legalEntityName?: string | null; licensedActivity?: string | null; issuingAuthority?: string | null; evidenceCount?: number
 }
+export interface ComplianceEvidence { id: string; itemId: string; fileRef: string; note: string | null; capturedAt: string; status: "ACTIVE" | "SUPERSEDED"; supersededReason: string | null }
+export interface CoverageRow { legalEntityId: string; name: string; valid: number; expiring: number; expired: number; activities: string[] }
+export interface Coverage { entities: CoverageRow[]; unlinkedLicences: number }
+export const ACTIVITIES = ["WHOLESALE", "RETAIL", "DISTRIBUTION", "STORAGE", "TRANSPORT", "OTHER"]
+export const activityLabel = (a: string) => a.charAt(0) + a.slice(1).toLowerCase()
+
+/** "2 valid, 1 expiring, 0 expired" for a coverage row. */
+export const coverageText = (r: Pick<CoverageRow, "valid" | "expiring" | "expired">) => `${r.valid} valid, ${r.expiring} expiring, ${r.expired} expired`
+
+export function validateEvidenceRef(ref: string): string | null { return ref.trim() ? null : "Enter the file link or reference." }
 export const TYPES = ["LICENCE", "CALIBRATION", "INSPECTION", "CERTIFICATE", "INSURANCE", "OTHER"]
 export const SUBJECTS = ["COMPANY", "DEPOT", "TANK", "TANKER", "DRIVER", "OTHER"]
 export const subjectNeedsPick = (s: string) => s === "DEPOT" || s === "TANK" || s === "TANKER" || s === "DRIVER"

@@ -3,15 +3,15 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
-import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
-import { TYPES, SUBJECTS, subjectNeedsPick, validateItem, validateRenew, whenLabel, byUrgency, type ComplianceItem } from "./complianceOps"
+import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip, ReasonModal } from "../warehousing/whseUi"
+import { TYPES, SUBJECTS, ACTIVITIES, activityLabel, coverageText, validateEvidenceRef, subjectNeedsPick, validateItem, validateRenew, whenLabel, byUrgency, type ComplianceItem, type ComplianceEvidence, type Coverage } from "./complianceOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const msg = (e: any, fb: string) => e?.response?.data?.message ?? fb
 const th: React.CSSProperties = { textAlign: "left", padding: "10px 12px", fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", whiteSpace: "nowrap" }
 const td: React.CSSProperties = { padding: "10px 12px", fontSize: 13, color: "var(--hf-text)" }
 const tone = (s: string) => s === "EXPIRED" ? { bg: "var(--hf-danger-soft)", fg: "var(--hf-danger-text)" } : s === "EXPIRING" ? { bg: "var(--hf-warning-soft)", fg: "var(--hf-warning-text)" } : { bg: "var(--hf-success-soft-strong)", fg: "var(--hf-success-text-strong)" }
-type Dialog = { kind: "edit"; item?: ComplianceItem } | { kind: "renew"; item: ComplianceItem } | null
+type Dialog = { kind: "edit"; item?: ComplianceItem } | { kind: "evidence"; item: ComplianceItem } | { kind: "renew"; item: ComplianceItem } | null
 
 export default function ComplianceTab() {
   const canManage = usePermissions(["FUEL_MANAGE"])
@@ -19,7 +19,9 @@ export default function ComplianceTab() {
   const [dialog, setDialog] = useState<Dialog>(null)
   const [err, setErr] = useState("")
   const list = useQuery<ComplianceItem[]>({ queryKey: ["fuel-compliance"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/compliance")) })
-  const refresh = () => qc.invalidateQueries({ queryKey: ["fuel-compliance"] })
+  const coverage = useQuery<Coverage>({ queryKey: ["fuel-compliance-coverage"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/compliance/coverage")) })
+  const refresh = () => { qc.invalidateQueries({ queryKey: ["fuel-compliance"] }); qc.invalidateQueries({ queryKey: ["fuel-compliance-coverage"] }) }
+  const cov = Array.isArray(coverage.data?.entities) ? coverage.data!.entities : []
   const remove = useMutation({ mutationFn: (id: string) => apiClient.delete(`/api/v1/fuel/compliance/${id}`), onSuccess: () => { setErr(""); refresh() }, onError: (e: any) => setErr(msg(e, "Could not remove it")) })
   const rows = [...(list.data ?? [])].sort(byUrgency)
   const expired = rows.filter(r => r.status === "EXPIRED").length
@@ -31,6 +33,18 @@ export default function ComplianceTab() {
         </p>
         {canManage && <button style={btnPrimary} onClick={() => setDialog({ kind: "edit" })}>Add item</button>}
       </div>
+      {cov.length > 0 && (
+        <div style={{ ...card, padding: 12, marginBottom: 14 }}>
+          <p style={{ margin: "0 0 6px", fontSize: 12.5, fontWeight: 700 }}>Licences by legal entity</p>
+          {cov.map(c => (
+            <div key={c.legalEntityId} style={{ fontSize: 12.5, padding: "3px 0" }}>
+              <strong>{c.name}</strong>: {coverageText(c)}{c.activities.length > 0 && <span style={{ color: "var(--hf-text-muted)" }}> · {c.activities.map(activityLabel).join(", ")}</span>}
+            </div>
+          ))}
+          {(coverage.data?.unlinkedLicences ?? 0) > 0 && <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 4 }}>{coverage.data!.unlinkedLicences} licence{coverage.data!.unlinkedLicences === 1 ? " is" : "s are"} not linked to a legal entity.</div>}
+          <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 4 }}>For information only. The system does not know which licences your business is required to hold.</div>
+        </div>
+      )}
       {expired > 0 && <p role="status" style={{ color: "var(--hf-danger-text)", fontSize: 13, fontWeight: 600 }}>{expired} expired: affected loads cannot be allocated until renewed.</p>}
       {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12 }}>{err}</p>}
       {list.isLoading ? <p style={{ color: "var(--hf-text-muted)" }}>Loading…</p> : rows.length === 0 ? <p style={{ color: "var(--hf-text-muted)" }}>Nothing recorded yet.</p> : (
@@ -41,15 +55,18 @@ export default function ComplianceTab() {
               {rows.map(i => (
                 <tr key={i.id} style={{ borderTop: "1px solid var(--hf-border)" }}>
                   <td style={td}>{i.title}<div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{i.itemType.toLowerCase()}</div></td>
-                  <td style={td}>{i.subjectType === "COMPANY" ? "Company" : `${i.subjectType.toLowerCase()}: ${i.subjectLabel ?? ""}`}</td>
+                  <td style={td}>{i.subjectType === "COMPANY" ? "Company" : `${i.subjectType.toLowerCase()}: ${i.subjectLabel ?? ""}`}
+                    {(i.legalEntityName || i.licensedActivity) && <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{[i.legalEntityName, i.licensedActivity ? activityLabel(i.licensedActivity) : null, i.issuingAuthority].filter(Boolean).join(" · ")}</div>}</td>
                   <td style={td}>{i.referenceNo ?? "–"}</td>
                   <td style={td}>{i.expiresOn}<div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{whenLabel(i)}</div></td>
                   <td style={td}><Chip bg={tone(i.status).bg} fg={tone(i.status).fg}>{i.status === "VALID" ? "Valid" : i.status === "EXPIRING" ? "Expiring" : "Expired"}</Chip></td>
-                  <td style={td}>{canManage && <span style={{ display: "flex", gap: 6 }}>
+                  <td style={td}><span style={{ display: "flex", gap: 6 }}>
+                    <button style={btnGhost} onClick={() => setDialog({ kind: "evidence", item: i })}>{`Evidence (${i.evidenceCount ?? 0})`}</button>
+                    {canManage && <>
                     <button style={btnPrimary} onClick={() => setDialog({ kind: "renew", item: i })}>Renew</button>
                     <button style={btnGhost} onClick={() => setDialog({ kind: "edit", item: i })}>Edit</button>
                     <button style={btnGhost} onClick={() => { if (window.confirm(`Remove ${i.title}?`)) remove.mutate(i.id) }}>Remove</button>
-                  </span>}</td>
+                  </>}</span></td>
                 </tr>
               ))}
             </tbody>
@@ -57,13 +74,15 @@ export default function ComplianceTab() {
         </div>
       )}
       {dialog?.kind === "edit" && <EditDialog item={dialog.item} onDone={refresh} onClose={() => setDialog(null)} />}
+      {dialog?.kind === "evidence" && <EvidenceDialog item={dialog.item} canManage={canManage} onDone={refresh} onClose={() => setDialog(null)} />}
       {dialog?.kind === "renew" && <RenewDialog item={dialog.item} onDone={refresh} onClose={() => setDialog(null)} />}
     </div>
   )
 }
 
 function EditDialog({ item, onDone, onClose }: { item?: ComplianceItem; onDone: () => void; onClose: () => void }) {
-  const [f, setF] = useState({ itemType: item?.itemType ?? "CERTIFICATE", title: item?.title ?? "", referenceNo: item?.referenceNo ?? "", subjectType: item?.subjectType ?? "TANKER", subjectId: item?.subjectId ?? "", subjectLabel: item?.subjectLabel ?? "", issuedOn: item?.issuedOn ?? "", expiresOn: item?.expiresOn ?? "", notes: item?.notes ?? "" })
+  const [f, setF] = useState({ itemType: item?.itemType ?? "CERTIFICATE", title: item?.title ?? "", referenceNo: item?.referenceNo ?? "", subjectType: item?.subjectType ?? "TANKER", subjectId: item?.subjectId ?? "", subjectLabel: item?.subjectLabel ?? "", issuedOn: item?.issuedOn ?? "", expiresOn: item?.expiresOn ?? "", notes: item?.notes ?? "", legalEntityId: item?.legalEntityId ?? "", licensedActivity: item?.licensedActivity ?? "", issuingAuthority: item?.issuingAuthority ?? "" })
+  const entities = useQuery<{ id: string; name: string }[]>({ queryKey: ["fuel-legal-entities"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/legal-entities")) })
   const [err, setErr] = useState("")
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF(s => ({ ...s, [k]: e.target.value }))
   const pick = f.subjectType
@@ -78,7 +97,7 @@ function EditDialog({ item, onDone, onClose }: { item?: ComplianceItem; onDone: 
   })
   const save = useMutation({
     mutationFn: () => {
-      const body = { itemType: f.itemType, title: f.title, referenceNo: f.referenceNo || null, subjectType: f.subjectType, subjectId: f.subjectId || null, subjectLabel: f.subjectLabel || null, issuedOn: f.issuedOn || null, expiresOn: f.expiresOn, notes: f.notes || null }
+      const body = { itemType: f.itemType, title: f.title, referenceNo: f.referenceNo || null, subjectType: f.subjectType, subjectId: f.subjectId || null, subjectLabel: f.subjectLabel || null, issuedOn: f.issuedOn || null, expiresOn: f.expiresOn, notes: f.notes || null, legalEntityId: f.legalEntityId || null, licensedActivity: f.licensedActivity || null, issuingAuthority: f.issuingAuthority.trim() || null }
       return item ? apiClient.put(`/api/v1/fuel/compliance/${item.id}`, body) : apiClient.post("/api/v1/fuel/compliance", body)
     },
     onSuccess: () => { onDone(); onClose() }, onError: (e: any) => setErr(msg(e, "Could not save")),
@@ -100,12 +119,54 @@ function EditDialog({ item, onDone, onClose }: { item?: ComplianceItem; onDone: 
           <div><label style={labelStyle}>Issued</label><input aria-label="Issued" type="date" value={f.issuedOn} onChange={set("issuedOn")} style={inputStyle} /></div>
           <div><label style={labelStyle}>Expires *</label><input aria-label="Expires" type="date" value={f.expiresOn} onChange={set("expiresOn")} style={inputStyle} /></div>
         </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div><label style={labelStyle} htmlFor="ci-entity">Legal entity</label>
+            <select id="ci-entity" value={f.legalEntityId} onChange={set("legalEntityId")} style={inputStyle}><option value="">Not linked</option>{(Array.isArray(entities.data) ? entities.data : []).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
+          <div><label style={labelStyle} htmlFor="ci-activity">Licensed activity</label>
+            <select id="ci-activity" value={f.licensedActivity} onChange={set("licensedActivity")} style={inputStyle}><option value="">Not stated</option>{ACTIVITIES.map(a => <option key={a} value={a}>{activityLabel(a)}</option>)}</select></div>
+        </div>
+        <div><label style={labelStyle} htmlFor="ci-authority">Issuing authority</label><input id="ci-authority" value={f.issuingAuthority} onChange={set("issuingAuthority")} style={inputStyle} /></div>
         {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12, margin: 0 }}>{err}</p>}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button style={btnGhost} onClick={onClose}>Cancel</button>
           <button style={btnPrimary} disabled={save.isPending} onClick={() => { const v = validateItem(f.title, f.subjectType, f.subjectId, f.expiresOn, f.issuedOn); if (v) return setErr(v); setErr(""); save.mutate() }}>Save</button>
         </div>
       </div>
+    </Modal>
+  )
+}
+
+function EvidenceDialog({ item, canManage, onDone, onClose }: { item: ComplianceItem; canManage: boolean; onDone: () => void; onClose: () => void }) {
+  const qc = useQueryClient()
+  const q = useQuery<ComplianceEvidence[]>({ queryKey: ["fuel-compliance-evidence", item.id], queryFn: async () => unwrap(await apiClient.get(`/api/v1/fuel/compliance/${item.id}/evidence`)) })
+  const [ref, setRef] = useState(""); const [note, setNote] = useState(""); const [err, setErr] = useState(""); const [replacing, setReplacing] = useState<string | null>(null)
+  const done = () => { setErr(""); setReplacing(null); qc.invalidateQueries({ queryKey: ["fuel-compliance-evidence", item.id] }); onDone() }
+  const add = useMutation({ mutationFn: () => apiClient.post(`/api/v1/fuel/compliance/${item.id}/evidence`, { fileRef: ref.trim(), note: note.trim() || null }), onSuccess: () => { setRef(""); setNote(""); done() }, onError: (e: any) => setErr(msg(e, "Could not add the evidence")) })
+  const replace = useMutation({ mutationFn: (a: { id: string; reason: string }) => apiClient.post(`/api/v1/fuel/compliance/evidence/${a.id}/supersede`, { reason: a.reason }), onSuccess: done })
+  const list = Array.isArray(q.data) ? q.data : []
+  return (
+    <Modal title={`Evidence: ${item.title}`} onClose={onClose}>
+      <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", marginTop: 0 }}>Links to the scanned licence or certificate. The file is not uploaded here. Evidence is never edited or deleted: a wrong one is replaced with a reason and kept on record.</p>
+      {list.length === 0 && <p style={{ fontSize: 13 }}>{q.isLoading ? "Loading…" : "No evidence recorded."}</p>}
+      {list.map(e => (
+        <div key={e.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 0", borderTop: "1px solid var(--hf-border)", fontSize: 12.5 }}>
+          <span style={{ flex: 1, wordBreak: "break-all", textDecoration: e.status === "SUPERSEDED" ? "line-through" : undefined }}>{e.fileRef}{e.note ? ` · ${e.note}` : ""}{e.status === "SUPERSEDED" ? ` · Replaced: ${e.supersededReason}` : ""}</span>
+          {canManage && e.status === "ACTIVE" && <button style={btnGhost} onClick={() => setReplacing(e.id)}>Replace</button>}
+        </div>
+      ))}
+      {canManage && (
+        <div style={{ marginTop: 10 }}>
+          <label style={labelStyle} htmlFor="ev-ref">File link or reference *</label>
+          <input id="ev-ref" value={ref} onChange={e => setRef(e.target.value)} style={inputStyle} />
+          <label style={{ ...labelStyle, marginTop: 8 }} htmlFor="ev-note">Note</label>
+          <input id="ev-note" value={note} onChange={e => setNote(e.target.value)} style={inputStyle} />
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+            <button style={btnPrimary} disabled={add.isPending} onClick={() => { const v = validateEvidenceRef(ref); if (v) return setErr(v); setErr(""); add.mutate() }}>Add evidence</button>
+          </div>
+        </div>
+      )}
+      {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12 }}>{err}</p>}
+      {replacing && <ReasonModal title="Replace evidence" confirmLabel="Replace" pending={replace.isPending} error={replace.error} onConfirm={reason => replace.mutate({ id: replacing, reason })} onClose={() => setReplacing(null)} />}
     </Modal>
   )
 }
