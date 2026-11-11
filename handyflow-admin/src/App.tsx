@@ -17,6 +17,7 @@ import { authStore }          from './store/auth'
 import { AdminLookupsPage } from './pages/lookups/AdminLookupsPage'
 import { AdminNewModulePage } from './pages/modules/AdminNewModulePage'
 import { AdminOnboardingPage } from './pages/onboarding/AdminOnboardingPage'
+import { AdminWarehousingPage } from './pages/warehousing/AdminWarehousingPage'
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } })
 
@@ -57,6 +58,7 @@ export default function App() {
             <Route path="/lookups"       element={<AdminLookupsPage />} />
             <Route path="/modules/new"   element={<AdminNewModulePage />} />
             <Route path="/onboarding" element={<AdminOnboardingPage />} />
+            <Route path="/warehousing" element={<AdminWarehousingPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

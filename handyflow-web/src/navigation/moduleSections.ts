@@ -10,6 +10,7 @@
 // (and bundle) a module's pages just to render its navigation.
 import type { ElementType } from 'react'
 import {
+  Boxes,
   AlertTriangle, Bell, CheckCircle2, Coins, Camera, ClipboardList, Clock, Crosshair, DoorOpen, FileBarChart,
   GitBranch, Key, LayoutDashboard, Lock, MapPin, Radio, RefreshCw, Repeat, Route,
   Footprints, QrCode, Gauge, Shield, ShieldCheck, Siren, Tablet, DollarSign, Wheat, Tractor, PawPrint,
@@ -796,6 +797,7 @@ export const WAREHOUSING_SECTIONS: ModuleSections = {
     {
       label: 'Operations',
       sections: [
+        { id: 'stock', label: 'Stock', icon: Boxes },
         { id: 'scan', label: 'Scan', icon: ScanBarcode },
         { id: 'tasks', label: 'Tasks', icon: ListChecks },
         { id: 'replenishment', label: 'Replenishment', icon: PackageCheck },
