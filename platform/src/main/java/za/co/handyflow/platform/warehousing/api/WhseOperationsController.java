@@ -28,17 +28,17 @@ public class WhseOperationsController {
     @GetMapping("/summary")
     @PreAuthorize("hasAnyAuthority('WAREHOUSING_READ','WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
     @Operation(summary = "Dashboard numbers: stock by status, work in progress, today's activity, top movers")
-    public ResponseEntity<ApiResponse<WhseOperationsService.Summary>> summary() {
+    public ResponseEntity<ApiResponse<WhseOperationsService.Summary>> summary(@RequestParam(required = false) UUID warehouseId) {
         featureGuard.requireModule("warehousing");
-        return ResponseEntity.ok(ApiResponse.success(service.summary(TenantContext.getTenantIdAsObject())));
+        return ResponseEntity.ok(ApiResponse.success(service.summary(TenantContext.getTenantIdAsObject(), warehouseId)));
     }
 
     @GetMapping("/trend")
     @PreAuthorize("hasAnyAuthority('WAREHOUSING_READ','WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
     @Operation(summary = "Units received, dispatched and adjusted per day (default 7 days, at most 90)")
-    public ResponseEntity<ApiResponse<List<WhseOperationsService.TrendPoint>>> trend(@RequestParam(defaultValue = "7") int days) {
+    public ResponseEntity<ApiResponse<List<WhseOperationsService.TrendPoint>>> trend(@RequestParam(defaultValue = "7") int days, @RequestParam(required = false) UUID warehouseId) {
         featureGuard.requireModule("warehousing");
-        return ResponseEntity.ok(ApiResponse.success(service.trend(TenantContext.getTenantIdAsObject(), days)));
+        return ResponseEntity.ok(ApiResponse.success(service.trend(TenantContext.getTenantIdAsObject(), days, warehouseId)));
     }
 
     @GetMapping("/inventory")
@@ -47,9 +47,10 @@ public class WhseOperationsController {
     public ResponseEntity<ApiResponse<WhseOperationsService.Page<WhseOperationsService.StockRow>>> inventory(
             @RequestParam(required = false) UUID clientId, @RequestParam(required = false) String status,
             @RequestParam(required = false) String q, @RequestParam(defaultValue = "false") boolean includeEmpty,
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size,
+            @RequestParam(required = false) UUID warehouseId) {
         featureGuard.requireModule("warehousing");
-        return ResponseEntity.ok(ApiResponse.success(service.stock(TenantContext.getTenantIdAsObject(), clientId, status, q, includeEmpty, page, size)));
+        return ResponseEntity.ok(ApiResponse.success(service.stock(TenantContext.getTenantIdAsObject(), clientId, status, q, includeEmpty, page, size, warehouseId)));
     }
 
     @GetMapping("/movements")
@@ -60,9 +61,10 @@ public class WhseOperationsController {
             @RequestParam(required = false) String type,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size,
+            @RequestParam(required = false) UUID warehouseId) {
         featureGuard.requireModule("warehousing");
-        return ResponseEntity.ok(ApiResponse.success(service.movements(TenantContext.getTenantIdAsObject(), clientId, itemId, type, from, to, page, size)));
+        return ResponseEntity.ok(ApiResponse.success(service.movements(TenantContext.getTenantIdAsObject(), clientId, itemId, type, from, to, page, size, warehouseId)));
     }
 
     @GetMapping("/stock-alerts")

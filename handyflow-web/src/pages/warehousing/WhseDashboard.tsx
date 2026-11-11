@@ -3,12 +3,15 @@
 // Two parts. The first cards (clients, locations, default rate) are computed from GET /clients/all and GET /locations. Below them the
 // operational tiles read the cross-client operations endpoints (/operations/summary, /operations/stock-alerts, /tasks/summary), each
 // on its own query so one failing leaves the others on screen. Stock value is shown one line per currency and never summed.
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Building2, MapPin, Percent } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { WHSE_ACCENT_TEXT } from "./constants"
 import { formatMoney } from "./itemForm"
 import { fmtQty } from "./whseUi"
+import WhseWarehouseSelect, { useWarehouses } from "./WhseWarehouseSelect"
+import { pickWarehouse, scope } from "./warehouses"
 
 interface ClientResponse { id: string; tradingName: string; status: string }
 interface LocationResponse { id: string; code: string; zone: string | null; active: boolean }
@@ -46,9 +49,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 /** The operational tiles: today, stock, work in flight, tasks and what needs attention. Each reads its own endpoint, so one failing leaves the rest. */
-function OperationsTiles() {
-  const { data: s } = useQuery<OpsSummary>({ queryKey: ["whse-ops-summary"], queryFn: async () => (await apiClient.get("/api/v1/warehousing/operations/summary")).data })
-  const { data: t } = useQuery<TaskSummary>({ queryKey: ["whse-task-summary"], queryFn: async () => (await apiClient.get("/api/v1/warehousing/tasks/summary")).data })
+function OperationsTiles({ warehouseId }: { warehouseId?: string }) {
+  const { data: s } = useQuery<OpsSummary>({ queryKey: ["whse-ops-summary", warehouseId ?? "all"], queryFn: async () => (await apiClient.get("/api/v1/warehousing/operations/summary", scope(warehouseId))).data })
+  const { data: t } = useQuery<TaskSummary>({ queryKey: ["whse-task-summary", warehouseId ?? "all"], queryFn: async () => (await apiClient.get("/api/v1/warehousing/tasks/summary", scope(warehouseId))).data })
   const { data: alerts = [] } = useQuery<StockAlert[]>({ queryKey: ["whse-stock-alerts"], queryFn: async () => (await apiClient.get("/api/v1/warehousing/operations/stock-alerts")).data })
   const below = alerts.filter(a => a.alert === "BELOW_MIN")
   const above = alerts.filter(a => a.alert === "ABOVE_MAX")
@@ -99,13 +102,15 @@ function OperationsTiles() {
 const cardStyle: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-primary-border)", borderRadius: 14, padding: 20 }
 
 export default function WhseDashboard() {
+  const [chosen, setChosen] = useState<string | undefined>(undefined)
+  const warehouseId = pickWarehouse(useWarehouses(), chosen) // undefined when there is only one warehouse
   const { data: clients = [], isLoading: clientsLoading } = useQuery<ClientResponse[]>({
     queryKey: ["whse-clients-all"],
     queryFn: async () => (await apiClient.get("/api/v1/warehousing/clients/all")).data,
   })
   const { data: locations = [], isLoading: locationsLoading } = useQuery<LocationResponse[]>({
-    queryKey: ["whse-locations"],
-    queryFn: async () => (await apiClient.get("/api/v1/warehousing/locations")).data,
+    queryKey: ["whse-locations", warehouseId ?? "all"],
+    queryFn: async () => (await apiClient.get("/api/v1/warehousing/locations", scope(warehouseId))).data,
   })
   const { data: profile } = useQuery<ProfileResponse | null>({
     queryKey: ["whse-profile"],
@@ -118,6 +123,7 @@ export default function WhseDashboard() {
 
   return (
     <div>
+      <WhseWarehouseSelect value={warehouseId} onChange={setChosen} />
       {profile?.warehouseName && (
         <p style={{ fontSize: 13, color: "var(--hf-text-muted)", marginBottom: 18 }}>
           Operating as <strong style={{ color: "var(--hf-text)" }}>{profile.warehouseName}</strong>
@@ -159,7 +165,7 @@ export default function WhseDashboard() {
         </div>
       )}
 
-      <OperationsTiles />
+      <OperationsTiles warehouseId={warehouseId} />
 
       {!loading && clients.length === 0 && (
         <p style={{ color: "var(--hf-text-faint)", fontSize: 13, marginTop: 20 }}>

@@ -41,18 +41,18 @@ public class WhseTaskController {
     @Operation(summary = "The worklist, in work order (priority, then the walking order). type PICK or PUTAWAY; status is a comma list; mine=true shows tasks you hold; orderId narrows to an order")
     public ResponseEntity<ApiResponse<List<WhseTaskService.TaskRow>>> list(@RequestParam(required = false) String type, @RequestParam(required = false) String status,
                                                                             @RequestParam(defaultValue = "false") boolean mine, @RequestParam(required = false) UUID orderId,
-                                                                            @RequestParam(defaultValue = "200") int limit) {
+                                                                            @RequestParam(defaultValue = "200") int limit, @RequestParam(required = false) UUID warehouseId) {
         featureGuard.requireModule("warehousing");
         List<String> statuses = status == null || status.isBlank() ? List.of("OPEN", "IN_PROGRESS", "SHORT") : List.of(status.split(","));
         return ResponseEntity.ok(ApiResponse.success(service.list(TenantContext.getTenantIdAsObject(), type, statuses,
-                mine ? TenantContext.getCurrentUserId() : null, orderId, limit)));
+                mine ? TenantContext.getCurrentUserId() : null, orderId, limit, warehouseId)));
     }
 
     @GetMapping("/summary")
     @PreAuthorize(READ)
-    public ResponseEntity<ApiResponse<WhseTaskService.Summary>> summary() {
+    public ResponseEntity<ApiResponse<WhseTaskService.Summary>> summary(@RequestParam(required = false) UUID warehouseId) {
         featureGuard.requireModule("warehousing");
-        return ResponseEntity.ok(ApiResponse.success(service.summary(TenantContext.getTenantIdAsObject())));
+        return ResponseEntity.ok(ApiResponse.success(service.summary(TenantContext.getTenantIdAsObject(), warehouseId)));
     }
 
     @PostMapping("/putaway/sync")

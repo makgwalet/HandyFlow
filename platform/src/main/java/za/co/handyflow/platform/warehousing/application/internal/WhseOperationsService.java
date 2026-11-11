@@ -67,15 +67,18 @@ public class WhseOperationsService {
 
     // ── summary ─────────────────────────────────────────────────────────────
 
+    public Summary summary(TenantId tenantId) { return summary(tenantId, null); }
+
+    /** warehouseId, when given, limits the stock figures and today's movements to that warehouse. Order and shipment counts are not held per warehouse and stay tenant-wide. */
     @Transactional(readOnly = true)
-    public Summary summary(TenantId tenantId) {
+    public Summary summary(TenantId tenantId, UUID warehouseId) {
         UUID t = tenantId.getValue();
         LocalDate today = LocalDate.now(zone());
         Timestamp from = Timestamp.from(today.atStartOfDay(zone()).toInstant());
         Timestamp to = Timestamp.from(today.plusDays(1).atStartOfDay(zone()).toInstant());
 
         List<StatusStock> byStatus = jdbc.query(SQL_STOCK_BY_STATUS,
-                (rs, i) -> new StatusStock(rs.getString("status"), rs.getBigDecimal("on_hand"), rs.getBigDecimal("allocated"), rs.getLong("positions")), t);
+                (rs, i) -> new StatusStock(rs.getString("status"), rs.getBigDecimal("on_hand"), rs.getBigDecimal("allocated"), rs.getLong("positions")), t, warehouseId, warehouseId);
         BigDecimal onHand = byStatus.stream().map(StatusStock::unitsOnHand).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal allocated = byStatus.stream().map(StatusStock::unitsAllocated).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal availableUnits = byStatus.stream().filter(s -> "AVAILABLE".equals(s.status()))
@@ -90,7 +93,7 @@ public class WhseOperationsService {
 
         TodayActivity activity = jdbc.queryForObject(SQL_TODAY,
                 (rs, i) -> new TodayActivity(rs.getBigDecimal("received"), rs.getBigDecimal("dispatched"), 0, 0, rs.getLong("adjustments")),
-                t, from, to);
+                t, from, to, warehouseId, warehouseId);
         long receivedToday = count("SELECT count(*) FROM whse_inbound_shipments WHERE tenant_id = ? AND received_date = ?", t, java.sql.Date.valueOf(today));
         long shippedToday = count("SELECT count(*) FROM whse_outbound_orders WHERE tenant_id = ? AND shipped_date = ?", t, java.sql.Date.valueOf(today));
         activity = new TodayActivity(activity.unitsReceived(), activity.unitsDispatched(), receivedToday, shippedToday, activity.adjustments());
@@ -101,7 +104,7 @@ public class WhseOperationsService {
         Timestamp since = Timestamp.from(today.minusDays(29).atStartOfDay(zone()).toInstant());
         List<TopMover> movers = jdbc.query(SQL_TOP_MOVERS,
                 (rs, i) -> new TopMover(rs.getObject("item_id", UUID.class), rs.getString("sku"), rs.getString("description"),
-                        rs.getString("client_name"), rs.getBigDecimal("moved")), t, since, to);
+                        rs.getString("client_name"), rs.getBigDecimal("moved")), t, since, to, warehouseId, warehouseId);
 
         long counted30 = count("SELECT count(*) FROM whse_count_lines WHERE tenant_id = ? AND initial_counted_qty IS NOT NULL AND counted_at >= now() - interval '30 days'", t);
         long matched30 = count("SELECT count(*) FROM whse_count_lines WHERE tenant_id = ? AND initial_counted_qty = expected_qty AND counted_at >= now() - interval '30 days'", t);
@@ -115,7 +118,7 @@ public class WhseOperationsService {
             BigDecimal v = rs.getBigDecimal("value"), u = rs.getBigDecimal("no_cost");
             if (u != null) noCost[0] = noCost[0].add(u);
             if (currency != null && v != null && v.signum() != 0) value.add(new CurrencyValue(currency.trim(), v));
-        }, t);
+        }, t, warehouseId, warehouseId);
 
         return new Summary(today, onHand, allocated, availableUnits, positions, clients, byStatus,
                 new Counts(inbound.getOrDefault("EXPECTED", 0L), inbound.getOrDefault("PARTIALLY_RECEIVED", 0L), overdueIn,
@@ -125,7 +128,10 @@ public class WhseOperationsService {
 
     /** Units received, dispatched and adjusted per calendar day for the last {@code days} days, oldest first, every day present. */
     @Transactional(readOnly = true)
-    public List<TrendPoint> trend(TenantId tenantId, int days) {
+    public List<TrendPoint> trend(TenantId tenantId, int days) { return trend(tenantId, days, null); }
+
+    @Transactional(readOnly = true)
+    public List<TrendPoint> trend(TenantId tenantId, int days, UUID warehouseId) {
         int n = Math.max(1, Math.min(days, MAX_TREND_DAYS));
         LocalDate today = LocalDate.now(zone());
         LocalDate first = today.minusDays(n - 1L);
@@ -137,7 +143,7 @@ public class WhseOperationsService {
             LocalDate d = rs.getDate("day").toLocalDate();
             BigDecimal[] v = byDay.get(d);
             if (v != null) { v[0] = rs.getBigDecimal("received"); v[1] = rs.getBigDecimal("dispatched"); v[2] = rs.getBigDecimal("adjusted"); }
-        }, billingZone, tenantId.getValue(), from, to);
+        }, billingZone, tenantId.getValue(), from, to, warehouseId, warehouseId);
         List<TrendPoint> out = new ArrayList<>();
         byDay.forEach((d, v) -> out.add(new TrendPoint(d, v[0], v[1], v[2])));
         return out;
@@ -148,9 +154,14 @@ public class WhseOperationsService {
     /** Stock across every client. Filters are optional; {@code q} matches SKU or description. */
     @Transactional(readOnly = true)
     public Page<StockRow> stock(TenantId tenantId, UUID clientId, String status, String q, boolean includeEmpty, int page, int size) {
+        return stock(tenantId, clientId, status, q, includeEmpty, page, size, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<StockRow> stock(TenantId tenantId, UUID clientId, String status, String q, boolean includeEmpty, int page, int size, UUID warehouseId) {
         int s = clampSize(size), p = Math.max(0, page);
         String like = q == null || q.isBlank() ? null : "%" + q.trim().toLowerCase().replace("%", "\\%").replace("_", "\\_") + "%";
-        Object[] filter = {tenantId.getValue(), clientId, clientId, status, status, like, like, like, includeEmpty};
+        Object[] filter = {tenantId.getValue(), clientId, clientId, status, status, like, like, like, includeEmpty, warehouseId, warehouseId};
         long total = jdbc.queryForObject("SELECT count(*) FROM (" + SQL_STOCK_BASE + ") x", Long.class, filter);
         List<StockRow> rows = jdbc.query("SELECT * FROM (" + SQL_STOCK_BASE + ") x ORDER BY sku, lot_number NULLS FIRST, location_code, status LIMIT ? OFFSET ?",
                 (rs, i) -> new StockRow(rs.getObject("inventory_id", UUID.class), rs.getObject("client_id", UUID.class), rs.getString("client_name"),
@@ -165,10 +176,15 @@ public class WhseOperationsService {
 
     @Transactional(readOnly = true)
     public Page<MovementRow> movements(TenantId tenantId, UUID clientId, UUID itemId, String type, LocalDate from, LocalDate to, int page, int size) {
+        return movements(tenantId, clientId, itemId, type, from, to, page, size, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<MovementRow> movements(TenantId tenantId, UUID clientId, UUID itemId, String type, LocalDate from, LocalDate to, int page, int size, UUID warehouseId) {
         int s = clampSize(size), p = Math.max(0, page);
         Timestamp fromTs = from == null ? null : Timestamp.from(from.atStartOfDay(zone()).toInstant());
         Timestamp toTs = to == null ? null : Timestamp.from(to.plusDays(1).atStartOfDay(zone()).toInstant());
-        Object[] filter = {tenantId.getValue(), clientId, clientId, itemId, itemId, type, type, fromTs, fromTs, toTs, toTs};
+        Object[] filter = {tenantId.getValue(), clientId, clientId, itemId, itemId, type, type, fromTs, fromTs, toTs, toTs, warehouseId, warehouseId};
         long total = jdbc.queryForObject("SELECT count(*) FROM (" + SQL_MOVEMENTS_BASE + ") x", Long.class, filter);
         List<MovementRow> rows = jdbc.query("SELECT * FROM (" + SQL_MOVEMENTS_BASE + ") x ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
                 (rs, i) -> new MovementRow(rs.getObject("id", UUID.class), rs.getTimestamp("created_at").toInstant(),
@@ -231,6 +247,7 @@ public class WhseOperationsService {
                    coalesce(sum(inv.qty_on_hand) FILTER (WHERE it.unit_cost IS NULL), 0) AS no_cost
               FROM whse_inventory inv JOIN whse_items it ON it.id = inv.item_id AND it.tenant_id = inv.tenant_id
              WHERE inv.tenant_id = ? AND inv.qty_on_hand > 0
+               AND (?::uuid IS NULL OR inv.location_id IN (SELECT id FROM whse_locations WHERE warehouse_id = ?::uuid))
              GROUP BY it.unit_cost_currency ORDER BY it.unit_cost_currency""";
 
     static final String SQL_STOCK_ALERTS = """
@@ -253,13 +270,16 @@ public class WhseOperationsService {
 
     static final String SQL_STOCK_BY_STATUS = """
             SELECT status, coalesce(sum(qty_on_hand), 0) AS on_hand, coalesce(sum(qty_allocated), 0) AS allocated, count(*) AS positions
-              FROM whse_inventory WHERE tenant_id = ? AND qty_on_hand > 0 GROUP BY status ORDER BY status""";
+              FROM whse_inventory WHERE tenant_id = ? AND qty_on_hand > 0
+               AND (?::uuid IS NULL OR location_id IN (SELECT id FROM whse_locations WHERE warehouse_id = ?::uuid))
+             GROUP BY status ORDER BY status""";
 
     static final String SQL_TODAY = """
             SELECT coalesce(sum(CASE WHEN movement_type IN ('RECEIPT','RETURN') THEN qty_change END), 0) AS received,
                    coalesce(sum(CASE WHEN movement_type IN ('PICK','SHIP') THEN -qty_change END), 0) AS dispatched,
                    count(*) FILTER (WHERE movement_type IN ('ADJUSTMENT','COUNT_VARIANCE','LOSS','FOUND')) AS adjustments
-              FROM whse_stock_movements WHERE tenant_id = ? AND created_at >= ? AND created_at < ?""";
+              FROM whse_stock_movements WHERE tenant_id = ? AND created_at >= ? AND created_at < ?
+               AND (?::uuid IS NULL OR location_id IN (SELECT id FROM whse_locations WHERE warehouse_id = ?::uuid))""";
 
     static final String SQL_TOP_MOVERS = """
             SELECT m.item_id, i.sku, i.description, c.trading_name AS client_name, sum(abs(m.qty_change)) AS moved
@@ -267,6 +287,7 @@ public class WhseOperationsService {
               JOIN whse_items i ON i.id = m.item_id AND i.tenant_id = m.tenant_id
               JOIN whse_clients c ON c.id = m.client_id AND c.tenant_id = m.tenant_id
              WHERE m.tenant_id = ? AND m.movement_type IN ('PICK','SHIP') AND m.created_at >= ? AND m.created_at < ?
+               AND (?::uuid IS NULL OR m.location_id IN (SELECT id FROM whse_locations WHERE warehouse_id = ?::uuid))
              GROUP BY m.item_id, i.sku, i.description, c.trading_name ORDER BY moved DESC, i.sku LIMIT 5""";
 
     static final String SQL_TREND = """
@@ -275,6 +296,7 @@ public class WhseOperationsService {
                    coalesce(sum(CASE WHEN movement_type IN ('PICK','SHIP') THEN -qty_change END), 0) AS dispatched,
                    coalesce(sum(CASE WHEN movement_type IN ('ADJUSTMENT','COUNT_VARIANCE','LOSS','FOUND') THEN qty_change END), 0) AS adjusted
               FROM whse_stock_movements WHERE tenant_id = ? AND created_at >= ? AND created_at < ?
+               AND (?::uuid IS NULL OR location_id IN (SELECT id FROM whse_locations WHERE warehouse_id = ?::uuid))
              GROUP BY 1 ORDER BY 1""";
 
     static final String SQL_STOCK_BASE = """
@@ -291,7 +313,8 @@ public class WhseOperationsService {
                AND (?::uuid IS NULL OR inv.client_id = ?::uuid)
                AND (?::text IS NULL OR inv.status = ?::text)
                AND (?::text IS NULL OR lower(it.sku) LIKE ?::text ESCAPE '\\' OR lower(it.description) LIKE ?::text ESCAPE '\\')
-               AND (? OR inv.qty_on_hand > 0)""";
+               AND (? OR inv.qty_on_hand > 0)
+               AND (?::uuid IS NULL OR inv.location_id IN (SELECT id FROM whse_locations WHERE warehouse_id = ?::uuid))""";
 
     static final String SQL_MOVEMENTS_BASE = """
             SELECT m.id, m.created_at, m.client_id, c.trading_name AS client_name, m.item_id, it.sku, l.code AS location_code,
@@ -306,7 +329,8 @@ public class WhseOperationsService {
                AND (?::uuid IS NULL OR m.item_id = ?::uuid)
                AND (?::text IS NULL OR m.movement_type = ?::text)
                AND (?::timestamptz IS NULL OR m.created_at >= ?::timestamptz)
-               AND (?::timestamptz IS NULL OR m.created_at < ?::timestamptz)""";
+               AND (?::timestamptz IS NULL OR m.created_at < ?::timestamptz)
+               AND (?::uuid IS NULL OR m.location_id IN (SELECT id FROM whse_locations WHERE warehouse_id = ?::uuid))""";
 
     static final String SQL_RESERVATIONS = """
             SELECT e.reference_type, e.reference_id, e.reference_number, e.client_id, c.trading_name AS client_name, e.item_id, it.sku,

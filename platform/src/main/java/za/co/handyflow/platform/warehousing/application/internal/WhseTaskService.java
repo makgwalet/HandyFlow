@@ -168,6 +168,12 @@ public class WhseTaskService {
     /** Tasks in work order: highest priority first, then the walking order, then oldest. {@code mine} narrows to the user's claimed tasks. */
     @Transactional(readOnly = true)
     public List<TaskRow> list(TenantId tenantId, String type, List<String> statuses, UUID mineUser, UUID orderId, int limit) {
+        return list(tenantId, type, statuses, mineUser, orderId, limit, null);
+    }
+
+    /** warehouseId limits the list to tasks whose pick-from (or put-away source) location is in that warehouse. */
+    @Transactional(readOnly = true)
+    public List<TaskRow> list(TenantId tenantId, String type, List<String> statuses, UUID mineUser, UUID orderId, int limit, UUID warehouseId) {
         StringBuilder sql = new StringBuilder(SELECT).append(" WHERE t.tenant_id = ?");
         List<Object> args = new ArrayList<>();
         args.add(tenantId.getValue());
@@ -178,6 +184,7 @@ public class WhseTaskService {
         }
         if (mineUser != null) { sql.append(" AND t.assigned_to = ? AND t.status = 'IN_PROGRESS'"); args.add(mineUser); }
         if (orderId != null) { sql.append(" AND t.reference_id = ?"); args.add(orderId); }
+        if (warehouseId != null) { sql.append(" AND fl.warehouse_id = ?"); args.add(warehouseId); }
         sql.append(" ORDER BY t.priority, t.pick_sequence NULLS LAST, t.created_at, t.id LIMIT ?");
         args.add(Math.max(1, Math.min(limit, 500)));
         return jdbc.query(sql.toString(), WhseTaskService::row, args.toArray());
@@ -191,15 +198,21 @@ public class WhseTaskService {
     }
 
     @Transactional(readOnly = true)
-    public Summary summary(TenantId tenantId) {
+    public Summary summary(TenantId tenantId) { return summary(tenantId, null); }
+
+    @Transactional(readOnly = true)
+    public Summary summary(TenantId tenantId, UUID warehouseId) {
         int[] c = new int[5];
-        jdbc.query("SELECT task_type, status, count(*) FROM whse_tasks WHERE tenant_id = ? AND status IN ('OPEN','IN_PROGRESS','SHORT') GROUP BY task_type, status",
+        String scope = warehouseId == null ? "" : " AND from_location_id IN (SELECT id FROM whse_locations WHERE tenant_id = ? AND warehouse_id = ?)";
+        List<Object> args = new ArrayList<>(List.of(tenantId.getValue()));
+        if (warehouseId != null) { args.add(tenantId.getValue()); args.add(warehouseId); }
+        jdbc.query("SELECT task_type, status, count(*) FROM whse_tasks WHERE tenant_id = ? AND status IN ('OPEN','IN_PROGRESS','SHORT')" + scope + " GROUP BY task_type, status",
                 rs -> {
                     String type = rs.getString(1), status = rs.getString(2);
                     int n = rs.getInt(3);
                     if (PICK.equals(type)) { if ("OPEN".equals(status)) c[0] = n; else if ("IN_PROGRESS".equals(status)) c[1] = n; else c[2] = n; }
                     else if (PUTAWAY.equals(type)) { if ("OPEN".equals(status)) c[3] = n; else if ("IN_PROGRESS".equals(status)) c[4] = n; }
-                }, tenantId.getValue());
+                }, args.toArray());
         return new Summary(c[0], c[1], c[2], c[3], c[4]);
     }
 

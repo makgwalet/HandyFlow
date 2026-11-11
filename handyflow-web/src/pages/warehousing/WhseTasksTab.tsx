@@ -4,6 +4,8 @@
 // dock or staging location to storage, with suggested destinations. A person claims a task and completes it. Picking less than asked needs a
 // reason and leaves the task short, which holds the order back until it is dealt with.
 import { useEffect, useState } from "react"
+import WhseWarehouseSelect, { useWarehouses } from "./WhseWarehouseSelect"
+import { pickWarehouse, scope } from "./warehouses"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { RefreshCw } from "lucide-react"
 import { apiClient } from "../../api/client"
@@ -149,6 +151,8 @@ export default function WhseTasksTab() {
   const canWork = usePermission("WAREHOUSING_MANAGE") || usePermission("WAREHOUSING_ADMIN")
   const [type, setType] = useState<"PICK" | "PUTAWAY" | "REPLEN" | "MOVE">("PICK")
   const [mine, setMine] = useState(false)
+  const [chosenWh, setChosenWh] = useState<string | undefined>(undefined)
+  const warehouseId = pickWarehouse(useWarehouses(), chosenWh) // undefined when there is only one warehouse
 
   const sync = useMutation({
     mutationFn: async () => (await apiClient.post(type === "REPLEN" ? "/api/v1/warehousing/replenishment/sync" : "/api/v1/warehousing/tasks/putaway/sync")).data as { created: number },
@@ -157,10 +161,10 @@ export default function WhseTasksTab() {
   // Opening the put-away list brings it up to date with what is sitting at the docks.
   useEffect(() => { if ((type === "PUTAWAY" || type === "REPLEN") && canWork) sync.mutate() }, [type, canWork]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { data: summary } = useQuery<Summary>({ queryKey: ["whse-task-summary"], queryFn: async () => (await apiClient.get("/api/v1/warehousing/tasks/summary")).data })
+  const { data: summary } = useQuery<Summary>({ queryKey: ["whse-task-summary", warehouseId ?? "all"], queryFn: async () => (await apiClient.get("/api/v1/warehousing/tasks/summary", scope(warehouseId))).data })
   const { data: tasks = [], isLoading } = useQuery<TaskRow[]>({
-    queryKey: ["whse-tasks", type, mine],
-    queryFn: async () => (await apiClient.get(`/api/v1/warehousing/tasks?type=${type}${mine ? "&mine=true" : ""}`)).data,
+    queryKey: ["whse-tasks", type, mine, warehouseId ?? "all"],
+    queryFn: async () => (await apiClient.get(`/api/v1/warehousing/tasks?type=${type}${mine ? "&mine=true" : ""}${warehouseId ? `&warehouseId=${encodeURIComponent(warehouseId)}` : ""}`)).data,
   })
 
   const tile = (label: string, n: number | undefined, warn = false) => (
@@ -172,6 +176,7 @@ export default function WhseTasksTab() {
 
   return (
     <div>
+      <WhseWarehouseSelect value={warehouseId} onChange={setChosenWh} />
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
         {tile("Picks open", summary?.openPicks)}{tile("Picks in progress", summary?.inProgressPicks)}{tile("Short picks", summary?.shortPicks, true)}
         {tile("Put-aways open", summary?.openPutaways)}{tile("Put-aways in progress", summary?.inProgressPutaways)}
