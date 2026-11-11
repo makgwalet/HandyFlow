@@ -60,6 +60,15 @@ public class WhseBillingDayController {
         return ResponseEntity.ok(ApiResponse.success("Saved", null));
     }
 
+    /** Adds the South African public holidays for a year (default: this year) that are not already listed. */
+    @PostMapping("/holidays/south-africa")
+    @PreAuthorize("hasAuthority('WAREHOUSING_ADMIN')")
+    public ResponseEntity<ApiResponse<Integer>> addSouthAfricanHolidays(@RequestParam(required = false) Integer year) {
+        featureGuard.requireModule("warehousing");
+        int y = year != null ? year : LocalDate.now(ZoneId.of("Africa/Johannesburg")).getYear();
+        return ResponseEntity.ok(ApiResponse.success("Added", service.addSouthAfricanHolidays(TenantContext.getTenantIdAsObject(), y, TenantContext.getCurrentUserId())));
+    }
+
     @DeleteMapping("/holidays/{date}")
     @PreAuthorize("hasAuthority('WAREHOUSING_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> removeHoliday(@PathVariable LocalDate date) {

@@ -75,4 +75,13 @@ class WhseBillingDayServiceTest {
         service.addRule(t(), null, "WEEKDAYS_ONLY", "BILLABLE_DAYS", today, null, actor, today);
         verify(jdbc).update(contains("minimum_basis"), any(Object[].class));
     }
+
+    @Test @DisplayName("the South African holidays are added without overwriting ones already entered, and only for an identified user")
+    void saHolidays() {
+        assertThrows(AccessDeniedException.class, () -> service.addSouthAfricanHolidays(t(), 2026, null));
+        when(jdbc.update(contains("ON CONFLICT (tenant_id, holiday_date) DO NOTHING"), any(Object[].class))).thenReturn(1);
+        assertEquals(13, service.addSouthAfricanHolidays(t(), 2026, actor));
+        verify(jdbc, times(13)).update(contains("DO NOTHING"), any(Object[].class));
+        assertThrows(IllegalArgumentException.class, () -> service.addSouthAfricanHolidays(t(), 1900, actor));
+    }
 }

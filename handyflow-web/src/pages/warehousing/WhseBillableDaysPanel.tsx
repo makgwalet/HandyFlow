@@ -5,7 +5,7 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { btnGhost, btnPrimary, card, ErrorLine, inputStyle, labelStyle, today } from "./whseUi"
-import { billableDaysInStay, ruleProblem, scopeLabel, STANDARD_TEXT, type DayRuleView } from "./billableDays"
+import { billableDaysInStay, holidaysMissing, ruleProblem, scopeLabel, STANDARD_TEXT, type DayRuleView } from "./billableDays"
 
 const BASE = "/api/v1/warehousing/billing-day-rules"
 
@@ -23,11 +23,13 @@ export default function WhseBillableDaysPanel() {
   const refresh = () => qc.invalidateQueries({ queryKey: ["whse-day-rules"] })
   const addRule = useMutation({ mutationFn: async () => apiClient.post(BASE, { clientId: clientId || null, dayRule, minimumBasis: basis, effectiveFrom: from, note: note || null }), onSuccess: () => { setNote(""); refresh() } })
   const addHoliday = useMutation({ mutationFn: async () => apiClient.post(`${BASE}/holidays`, { date: hDate, name: hName }), onSuccess: () => { setHDate(""); setHName(""); refresh() } })
+  const addSa = useMutation({ mutationFn: async (year: number) => apiClient.post(`${BASE}/holidays/south-africa?year=${year}`), onSuccess: refresh })
   const removeHoliday = useMutation({ mutationFn: async (d: string) => apiClient.delete(`${BASE}/holidays/${d}`), onSuccess: refresh })
 
   if (!data || !Array.isArray(data.rules) || !Array.isArray(data.holidays) || !Array.isArray(data.options)) return null
   const clients = Array.isArray(clientPage?.content) ? clientPage!.content! : []
   const problem = ruleProblem(dayRule, from, today())
+  const thisYear = new Date().getFullYear()
   // Friday to Monday, the example the standard is explained with.
   const example = (rule: string) => billableDaysInStay("2026-11-13", "2026-11-16", rule, data.holidays.map(h => h.date))
 
@@ -66,6 +68,16 @@ export default function WhseBillableDaysPanel() {
 
       <h4 style={{ fontSize: 13, fontWeight: 700, margin: "14px 0 4px" }}>Public holidays</h4>
       <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "0 0 6px" }}>Only rules that skip public holidays use this list. Keep it up to date; HandyFlow does not guess the dates.</p>
+      {holidaysMissing(data.rules, data.holidays, thisYear) && (
+        <p role="alert" style={{ fontSize: 12, color: "var(--hf-warning-text-deep)", margin: "0 0 6px" }}>A rule skips public holidays, but none are listed for {thisYear}, so it currently skips none. Add them below.</p>
+      )}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "0 0 8px" }}>
+        {[thisYear, thisYear + 1].map(y => (
+          <button key={y} style={btnGhost} disabled={addSa.isPending} onClick={() => addSa.mutate(y)}>Add South African public holidays for {y}</button>
+        ))}
+      </div>
+      <ErrorLine error={addSa.error} />
+      <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "0 0 6px" }}>These are the twelve statutory holidays, with a Sunday holiday moved to the next free weekday. A holiday the President declares for one year (such as an election day) is added by hand. Holidays you have already entered are not changed.</p>
       {data.holidays.length > 0 && (
         <ul style={{ listStyle: "none", padding: 0, margin: "0 0 8px", display: "grid", gap: 4 }}>
           {data.holidays.map(h => (

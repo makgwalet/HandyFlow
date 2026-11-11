@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import WhseBillableDaysPanel from "./WhseBillableDaysPanel"
-import { billableDaysInStay, ruleProblem, scopeLabel } from "./billableDays"
+import { billableDaysInStay, holidaysMissing, ruleProblem, scopeLabel } from "./billableDays"
 
 const get = vi.fn(), post = vi.fn(), del = vi.fn()
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a), delete: (...a: unknown[]) => del(...a) } }))
@@ -24,6 +24,11 @@ describe("billable day helpers", () => {
     expect(ruleProblem("WEEKDAYS_ONLY", "2026-11-10", "2026-11-11")).toMatch(/past/)
     expect(ruleProblem("", "2026-11-12", "2026-11-11")).toMatch(/Choose a rule/)
     expect(ruleProblem("WEEKDAYS_ONLY", "2026-11-11", "2026-11-11")).toBeNull()
+  })
+  it("warns only when a holiday-skipping rule has no holidays for the year", () => {
+    expect(holidaysMissing([{ dayRule: "WEEKDAYS_NO_HOLIDAYS" }], [], 2026)).toBe(true)
+    expect(holidaysMissing([{ dayRule: "WEEKDAYS_NO_HOLIDAYS" }], [{ date: "2026-04-03", name: "Good Friday" }], 2026)).toBe(false)
+    expect(holidaysMissing([{ dayRule: "WEEKDAYS_ONLY" }], [], 2026)).toBe(false)
   })
   it("scope label", () => {
     expect(scopeLabel({ clientId: null, clientName: null })).toMatch(/Whole warehouse/)
@@ -59,6 +64,15 @@ describe("WhseBillableDaysPanel", () => {
     fireEvent.click(screen.getByText("Add rule"))
     await waitFor(() => expect(post).toHaveBeenCalled())
     expect(post.mock.calls[0][1]).toMatchObject({ minimumBasis: "BILLABLE_DAYS" })
+  })
+  it("adds the South African holidays for a year", async () => {
+    serve(view())
+    wrap(<WhseBillableDaysPanel />)
+    await screen.findByText("Billable days")
+    const y = new Date().getFullYear()
+    fireEvent.click(screen.getByText(`Add South African public holidays for ${y}`))
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post.mock.calls[0][0]).toContain(`/holidays/south-africa?year=${y}`)
   })
   it("refuses a start date in the past", async () => {
     serve(view())

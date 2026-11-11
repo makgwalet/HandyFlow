@@ -105,4 +105,19 @@ public class WhseBillingDayService {
         if (actor == null) throw new AccessDeniedException("Your user could not be identified, so this change cannot be recorded.");
         jdbc.update("DELETE FROM whse_billing_holidays WHERE tenant_id = ? AND holiday_date = ?", tenantId.getValue(), date);
     }
+
+    /**
+     * Adds the South African public holidays for a year that are not already on the list. A holiday the warehouse has already entered (or renamed) is left as it
+     * is. Returns how many were added.
+     */
+    @Transactional
+    public int addSouthAfricanHolidays(TenantId tenantId, int year, UUID actor) {
+        if (actor == null) throw new AccessDeniedException("Your user could not be identified, so this change cannot be recorded.");
+        int added = 0;
+        for (WhseSaHolidays.Holiday h : WhseSaHolidays.forYear(year)) {
+            added += jdbc.update("INSERT INTO whse_billing_holidays (tenant_id, holiday_date, name, created_by) VALUES (?,?,?,?) ON CONFLICT (tenant_id, holiday_date) DO NOTHING",
+                    tenantId.getValue(), h.date(), h.name(), actor);
+        }
+        return added;
+    }
 }

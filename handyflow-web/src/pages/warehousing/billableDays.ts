@@ -27,3 +27,8 @@ export function billableDaysInStay(from: string, to: string, rule: string, holid
   }
   return n
 }
+
+/** True when a rule skips public holidays but no holiday is listed for the year, so it would silently skip nothing. */
+export function holidaysMissing(rules: Pick<DayRuleRow, "dayRule">[], holidays: HolidayRow[], year: number): boolean {
+  return rules.some(r => r.dayRule === "WEEKDAYS_NO_HOLIDAYS") && !holidays.some(h => h.date.startsWith(`${year}-`))
+}
