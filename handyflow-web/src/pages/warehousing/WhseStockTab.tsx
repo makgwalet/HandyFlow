@@ -1,15 +1,17 @@
 // src/pages/warehousing/WhseStockTab.tsx
 //
-// Stock across every client, and the movement ledger. Both read the cross-client operations endpoints (/operations/inventory and
-// /operations/movements) and can be cut to one warehouse, one client and a search or type. Read only: stock is adjusted from the client's own
-// inventory screen, where the approval rules apply.
+// Stock across every client, the movement ledger and stock alerts. Stock and movements read the cross-client operations endpoints (/operations/inventory
+// and /operations/movements) and can be cut to one warehouse, one client and a search or type; they are read only (stock is adjusted from the client's own
+// inventory screen, where the approval rules apply). Alerts come from /stock-alerts, where managers acknowledge them, resolve them with a note and set a
+// warehouse's own minimum and maximum.
 import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { card, fmtQty, inputStyle, Chip } from "./whseUi"
+import { btnGhost, btnPrimary, card, Chip, ErrorLine, fmtQty, inputStyle, labelStyle, Modal, ReasonModal } from "./whseUi"
 import WhseWarehouseSelect, { useWarehouses } from "./WhseWarehouseSelect"
 import { pickWarehouse, showSelector } from "./warehouses"
-import { hasNext, listParams, movementText, MOVEMENT_TYPES, rangeText, signedQty, statusText, STOCK_STATUSES } from "./stockView"
+import { usePermission } from "../../hooks/usePermission"
+import { alertKindText, alertTone, ALERT_KINDS, hasNext, levelsText, listParams, movementText, MOVEMENT_TYPES, rangeText, recommendationText, signedQty, statusText, STOCK_STATUSES, stockBreakdown, thresholdProblem, type AlertRow } from "./stockView"
 
 interface Paged<T> { content: T[]; total: number; page: number; size: number }
 interface StockRow {
@@ -154,14 +156,118 @@ function MovementsView({ warehouseId, clients }: { warehouseId: string | undefin
   )
 }
 
+const TONE: Record<string, { bg: string; fg: string }> = {
+  bad: { bg: "var(--hf-danger-bg, #fee2e2)", fg: "var(--hf-danger-text, #991b1b)" },
+  warn: { bg: "var(--hf-warning-bg, #fef3c7)", fg: "var(--hf-warning-text, #92400e)" },
+  info: { bg: "var(--hf-info-bg, #dbeafe)", fg: "var(--hf-info-text, #1e40af)" },
+}
+
+function LevelsModal({ alert, onClose }: { alert: AlertRow; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [min, setMin] = useState(alert.minSource === "WAREHOUSE" && alert.minQty != null ? String(alert.minQty) : "")
+  const [max, setMax] = useState(alert.maxSource === "WAREHOUSE" && alert.maxQty != null ? String(alert.maxQty) : "")
+  const problem = thresholdProblem(min, max)
+  const save = useMutation({
+    mutationFn: async () => apiClient.put("/api/v1/warehousing/stock-alerts/thresholds", { warehouseId: alert.warehouseId, itemId: alert.itemId, minQty: min.trim() === "" ? null : Number(min), maxQty: max.trim() === "" ? null : Number(max) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["whse-alerts"] }); onClose() },
+  })
+  return (
+    <Modal title={`Levels for ${alert.sku} in ${alert.warehouseCode}`} onClose={onClose}>
+      <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: "0 0 12px" }}>These apply to this warehouse only. A level left blank uses the item's own default.</p>
+      <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ flex: 1 }}><label style={labelStyle} htmlFor="lv-min">Minimum</label><input id="lv-min" style={{ ...inputStyle, width: "100%" }} inputMode="decimal" value={min} onChange={e => setMin(e.target.value)} /></div>
+        <div style={{ flex: 1 }}><label style={labelStyle} htmlFor="lv-max">Maximum</label><input id="lv-max" style={{ ...inputStyle, width: "100%" }} inputMode="decimal" value={max} onChange={e => setMax(e.target.value)} /></div>
+      </div>
+      {(min !== "" || max !== "") && problem && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12, margin: "8px 0 0" }}>{problem}</p>}
+      <ErrorLine error={save.error} />
+      <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+        <button onClick={onClose} style={{ ...btnGhost, flex: 1, justifyContent: "center" }}>Back</button>
+        <button onClick={() => save.mutate()} disabled={!!problem || save.isPending} style={{ ...btnPrimary, flex: 1, justifyContent: "center", opacity: problem ? 0.5 : 1 }}>{save.isPending ? "Saving…" : "Save levels"}</button>
+      </div>
+    </Modal>
+  )
+}
+
+function AlertsView({ warehouseId, clients }: { warehouseId: string | undefined; clients: ClientLite[] }) {
+  const qc = useQueryClient()
+  const canAct = usePermission("WAREHOUSING_MANAGE") || usePermission("WAREHOUSING_ADMIN")
+  const [clientId, setClientId] = useState("")
+  const [kind, setKind] = useState("")
+  const [showResolved, setShowResolved] = useState(false)
+  const [resolving, setResolving] = useState<AlertRow | null>(null)
+  const [editing, setEditing] = useState<AlertRow | null>(null)
+  const params = listParams({ clientId, kind, warehouseId, status: showResolved ? "RESOLVED" : "" })
+  const { data, isLoading } = useQuery<AlertRow[]>({
+    queryKey: ["whse-alerts", params],
+    queryFn: async () => (await apiClient.get("/api/v1/warehousing/stock-alerts", { params })).data,
+  })
+  const refresh = () => qc.invalidateQueries({ queryKey: ["whse-alerts"] })
+  const ack = useMutation({ mutationFn: async (id: string) => apiClient.post(`/api/v1/warehousing/stock-alerts/${id}/acknowledge`), onSuccess: refresh })
+  const resolve = useMutation({
+    mutationFn: async (v: { id: string; note: string }) => apiClient.post(`/api/v1/warehousing/stock-alerts/${v.id}/resolve`, { note: v.note }),
+    onSuccess: () => { setResolving(null); refresh() },
+  })
+  const rows = Array.isArray(data) ? data : []
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
+        <Filters clients={clients} clientId={clientId} setClientId={setClientId}>
+          <select aria-label="Alert type" style={inputStyle} value={kind} onChange={e => setKind(e.target.value)}>
+            <option value="">Any alert</option>
+            {ALERT_KINDS.map(k => <option key={k.value} value={k.value}>{k.label}</option>)}
+          </select>
+          <label style={{ fontSize: 12.5, color: "var(--hf-text-muted)", display: "inline-flex", gap: 6, alignItems: "center" }}>
+            <input type="checkbox" checked={showResolved} onChange={e => setShowResolved(e.target.checked)} /> Show resolved
+          </label>
+        </Filters>
+      </div>
+      {isLoading ? <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p> : rows.length === 0
+        ? <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>{showResolved ? "No resolved alerts." : "No stock alerts. Levels come from each item's own minimum and maximum, or from a warehouse's own levels."}</p>
+        : (
+          <div style={{ ...card, overflow: "hidden" }}>
+            {rows.map((a, i) => {
+              const tone = TONE[alertTone(a.kind)]
+              const rec = recommendationText(a)
+              return (
+                <div key={a.id} style={{ padding: "11px 14px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <Chip bg={tone.bg} fg={tone.fg}>{alertKindText(a.kind)}</Chip>
+                      <span style={{ fontSize: 13, fontWeight: 700 }}>{a.sku}{a.description ? ` · ${a.description}` : ""}</span>
+                      <span style={{ fontSize: 11.5, color: "var(--hf-text-faint)" }}>{a.warehouseCode} · {a.clientName}</span>
+                      {a.status === "ACKNOWLEDGED" && <Chip bg="var(--hf-surface-alt, #f1f5f9)" fg="var(--hf-text-muted)">Acknowledged</Chip>}
+                    </div>
+                    {canAct && a.status !== "RESOLVED" && (
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button type="button" style={btnGhost} onClick={() => setEditing(a)}>Set levels</button>
+                        {a.status === "OPEN" && <button type="button" style={btnGhost} disabled={ack.isPending} onClick={() => ack.mutate(a.id)}>Acknowledge</button>}
+                        <button type="button" style={btnGhost} onClick={() => setResolving(a)}>Resolve</button>
+                      </div>
+                    )}
+                  </div>
+                  <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--hf-text-muted)" }}>{stockBreakdown(a)}{levelsText(a) ? ` · ${levelsText(a)}` : ""}</p>
+                  {rec && <p style={{ margin: "2px 0 0", fontSize: 12, fontWeight: 600 }}>{rec}</p>}
+                  {a.status === "RESOLVED" && <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--hf-text-faint)" }}>{a.resolution === "MANUAL" ? `Resolved: ${a.resolutionNote}` : a.resolution === "CLEARED" ? "Cleared: the stock recovered." : "Replaced by a different alert."}</p>}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      {resolving && <ReasonModal title={`Resolve ${resolving.sku} in ${resolving.warehouseCode}`} intro="It will not be raised again until the stock has recovered and fallen again." confirmLabel="Resolve" pending={resolve.isPending} error={resolve.error}
+        onConfirm={note => resolve.mutate({ id: resolving.id, note })} onClose={() => setResolving(null)} />}
+      {editing && <LevelsModal alert={editing} onClose={() => setEditing(null)} />}
+    </div>
+  )
+}
+
 export default function WhseStockTab() {
-  const [view, setView] = useState<"stock" | "movements">("stock")
+  const [view, setView] = useState<"stock" | "movements" | "alerts">("stock")
   const [chosenWh, setChosenWh] = useState<string | undefined>(undefined)
   const warehouses = useWarehouses()
   const warehouseId = showSelector(warehouses) ? pickWarehouse(warehouses, chosenWh) : undefined
   const { data: clients = [] } = useQuery<ClientLite[]>({ queryKey: ["whse-clients-all"], queryFn: async () => (await apiClient.get("/api/v1/warehousing/clients/all")).data })
   const clientList = Array.isArray(clients) ? clients : []
-  const tab = (id: "stock" | "movements", text: string) => (
+  const tab = (id: "stock" | "movements" | "alerts", text: string) => (
     <button type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)}
       style={{ ...inputStyle, cursor: "pointer", fontWeight: view === id ? 700 : 500, background: view === id ? "var(--hf-surface-alt, var(--hf-surface))" : "var(--hf-surface)" }}>{text}</button>
   )
@@ -170,9 +276,10 @@ export default function WhseStockTab() {
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }} role="tablist" aria-label="Stock views">
         {tab("stock", "Stock on hand")}
         {tab("movements", "Movements")}
+        {tab("alerts", "Alerts")}
       </div>
       <WhseWarehouseSelect value={chosenWh} onChange={setChosenWh} />
-      {view === "stock" ? <StockView warehouseId={warehouseId} clients={clientList} /> : <MovementsView warehouseId={warehouseId} clients={clientList} />}
+      {view === "stock" ? <StockView warehouseId={warehouseId} clients={clientList} /> : view === "movements" ? <MovementsView warehouseId={warehouseId} clients={clientList} /> : <AlertsView warehouseId={warehouseId} clients={clientList} />}
     </div>
   )
 }
