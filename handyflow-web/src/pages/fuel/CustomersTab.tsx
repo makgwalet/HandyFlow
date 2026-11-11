@@ -9,7 +9,7 @@ import { CUSTOMER_TYPES, typeLabel, fmtR, validateAccount, validateHold, validat
 const unwrap = (r: any) => r.data?.data ?? r.data
 const msg = (e: any, fallback: string) => e?.response?.data?.message ?? fallback
 
-type Dialog = { kind: "account"; account?: CustomerAccount } | { kind: "hold"; account: CustomerAccount } | { kind: "site"; account: CustomerAccount; site?: CustomerSite } | null
+type Dialog = { kind: "account"; account?: CustomerAccount } | { kind: "hold"; account: CustomerAccount } | { kind: "site"; account: CustomerAccount; site?: CustomerSite } | { kind: "portal"; account: CustomerAccount } | null
 const th: React.CSSProperties = { textAlign: "left", padding: "10px 12px", fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", whiteSpace: "nowrap" }
 const td: React.CSSProperties = { padding: "10px 12px", fontSize: 13, color: "var(--hf-text)" }
 
@@ -67,6 +67,7 @@ export default function CustomersTab() {
                           {a.creditHold
                             ? <button style={btnGhost} disabled={release.isPending} onClick={() => release.mutate(a.id)}>Release hold</button>
                             : <button style={btnGhost} onClick={() => setDialog({ kind: "hold", account: a })}>Credit hold</button>}
+                          <button style={btnGhost} onClick={() => setDialog({ kind: "portal", account: a })}>Portal access</button>
                         </span>}
                       </td>
                     </tr>
@@ -95,6 +96,7 @@ export default function CustomersTab() {
         )}
       {dialog?.kind === "account" && <AccountDialog account={dialog.account} existing={list} onDone={refresh} onClose={() => setDialog(null)} />}
       {dialog?.kind === "hold" && <HoldDialog account={dialog.account} onDone={refresh} onClose={() => setDialog(null)} />}
+      {dialog?.kind === "portal" && <PortalAccessDialog account={dialog.account} onClose={() => setDialog(null)} />}
       {dialog?.kind === "site" && <SiteDialog account={dialog.account} site={dialog.site} onDone={refresh} onClose={() => setDialog(null)} />}
     </div>
   )
@@ -143,6 +145,45 @@ function AccountDialog({ account, existing, onDone, onClose }: { account?: Custo
           <button style={btnPrimary} disabled={save.isPending} onClick={submit}>Save account</button>
         </div>
       </div>
+    </Modal>
+  )
+}
+
+type PortalGrant = { id: string; inviteEmail: string; status: string; invitedAt: string | null; acceptedAt: string | null; revokedAt: string | null }
+
+function PortalAccessDialog({ account, onClose }: { account: CustomerAccount; onClose: () => void }) {
+  const qc = useQueryClient()
+  const key = ["fuel-portal-grants", account.id]
+  const [email, setEmail] = useState(""); const [err, setErr] = useState("")
+  const grants = useQuery<PortalGrant[]>({ queryKey: key, queryFn: async () => unwrap(await apiClient.get(`/api/v1/fuel/customer-accounts/${account.id}/portal-access`)) })
+  const invite = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/fuel/customer-accounts/${account.id}/portal-access`, { email: email.trim() }),
+    onSuccess: () => { setEmail(""); setErr(""); qc.invalidateQueries({ queryKey: key }) }, onError: (e: any) => setErr(msg(e, "Could not send the invite")),
+  })
+  const revoke = useMutation({
+    mutationFn: (grantId: string) => apiClient.post(`/api/v1/fuel/customer-accounts/${account.id}/portal-access/${grantId}/revoke`, {}),
+    onSuccess: () => { setErr(""); qc.invalidateQueries({ queryKey: key }) }, onError: (e: any) => setErr(msg(e, "Could not revoke access")),
+  })
+  const label = (s: string) => s === "ACTIVE" ? "Active" : s === "PENDING" ? "Invite sent" : "Revoked"
+  return (
+    <Modal title={`Portal access: ${account.customerName}`} onClose={onClose}>
+      <p style={{ fontSize: 13, color: "var(--hf-text-muted)", marginTop: 0 }}>People invited here can sign in to the customer portal and see only this account's orders and deliveries, and request fuel.</p>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input aria-label="Invite email" type="email" placeholder="name@customer.co.za" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
+        <button style={btnPrimary} disabled={invite.isPending} onClick={() => { if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setErr("Enter a valid email address."); setErr(""); invite.mutate() }}>Send invite</button>
+      </div>
+      {err && <Err text={err} />}
+      <div style={{ marginTop: 14 }}>
+        {(grants.data ?? []).length === 0
+          ? <p style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>{grants.isLoading ? "Loading…" : "No one has portal access yet."}</p>
+          : (grants.data ?? []).map(g => (
+            <div key={g.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: "1px solid var(--hf-border)", fontSize: 13 }}>
+              <span>{g.inviteEmail} <span style={{ color: "var(--hf-text-muted)" }}>· {label(g.status)}</span></span>
+              {g.status !== "REVOKED" && <button style={btnGhost} disabled={revoke.isPending} onClick={() => revoke.mutate(g.id)}>Revoke</button>}
+            </div>
+          ))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}><button style={btnGhost} onClick={onClose}>Close</button></div>
     </Modal>
   )
 }

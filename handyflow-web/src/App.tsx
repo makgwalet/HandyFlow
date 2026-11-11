@@ -151,6 +151,9 @@ import { WhsePortalAcceptInvitePage } from "./pages/warehousing-portal/WhsePorta
 import { WhsePortalClientDetailPage } from "./pages/warehousing-portal/WhsePortalClientDetailPage"
 import { WhsePortalHomePage } from "./pages/warehousing-portal/WhsePortalHomePage"
 import { WhsePortalLoginPage } from "./pages/warehousing-portal/WhsePortalLoginPage"
+import { FuelPortalLoginPage } from "./pages/fuel-portal/FuelPortalLoginPage"
+import { FuelPortalAcceptInvitePage } from "./pages/fuel-portal/FuelPortalAcceptInvitePage"
+import { FuelPortalHomePage } from "./pages/fuel-portal/FuelPortalHomePage"
 import { PropPortalLoginPage } from "./pages/property-portal/PropPortalLoginPage"
 import { PropPortalAcceptInvitePage } from "./pages/property-portal/PropPortalAcceptInvitePage"
 import { PropPortalHomePage } from "./pages/property-portal/PropPortalHomePage"
@@ -229,6 +232,12 @@ function CollAgencyPortalProtectedRoute({ children }: { children: React.ReactNod
 function WhsePortalProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = usePortalAuthStore(s => s.token)
   if (!token) return <Navigate to="/warehousing/portal/login" replace />
+  return <>{children}</>
+}
+
+function FuelPortalProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = usePortalAuthStore(s => s.token)
+  if (!token) return <Navigate to="/fuel/portal/login" replace />
   return <>{children}</>
 }
 
@@ -323,6 +332,12 @@ export default function App() {
           } />
           <Route path="/warehousing/portal/clients/:clientId" element={
             <WhsePortalProtectedRoute><WhsePortalClientDetailPage /></WhsePortalProtectedRoute>
+          } />
+
+          <Route path="/fuel/portal/login" element={<FuelPortalLoginPage />} />
+          <Route path="/fuel/portal/auth/accept-invite" element={<FuelPortalAcceptInvitePage />} />
+          <Route path="/fuel/portal" element={
+            <FuelPortalProtectedRoute><FuelPortalHomePage /></FuelPortalProtectedRoute>
           } />
 
           {/* Property tenant portal — 3 routes only (no separate lease-

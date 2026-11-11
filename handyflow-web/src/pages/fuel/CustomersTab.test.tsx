@@ -108,4 +108,29 @@ describe("CustomersTab", () => {
     fireEvent.click(screen.getByText("Save site"))
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/customer-accounts/a1/sites", expect.objectContaining({ name: "Pit 2" })))
   })
+  it("invites a contact to the portal and can revoke access", async () => {
+    const grants = [{ id: "g1", inviteEmail: "old@gold.co.za", status: "ACTIVE", invitedAt: null, acceptedAt: null, revokedAt: null }]
+    const base = get.getMockImplementation()!
+    get.mockImplementation(async (u: string) => u.includes("/portal-access") ? { data: { data: grants } } : base(u))
+    mount()
+    await waitFor(() => screen.getByText("Gold Mine Ltd"))
+    fireEvent.click(screen.getAllByText("Portal access")[0])
+    await waitFor(() => screen.getByText("old@gold.co.za"))
+    fireEvent.change(screen.getByLabelText("Invite email"), { target: { value: "not-an-email" } })
+    fireEvent.click(screen.getByText("Send invite"))
+    expect(screen.getByText("Enter a valid email address.")).toBeTruthy()
+    expect(post).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText("Invite email"), { target: { value: "new@gold.co.za" } })
+    fireEvent.click(screen.getByText("Send invite"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/customer-accounts/a1/portal-access", { email: "new@gold.co.za" }))
+    fireEvent.click(screen.getByText("Revoke"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/customer-accounts/a1/portal-access/g1/revoke", {}))
+  })
+
+  it("hides Portal access from users who cannot manage", async () => {
+    perms = ["FUEL_READ"]
+    mount()
+    await waitFor(() => screen.getByText("Gold Mine Ltd"))
+    expect(screen.queryByText("Portal access")).toBeNull()
+  })
 })
