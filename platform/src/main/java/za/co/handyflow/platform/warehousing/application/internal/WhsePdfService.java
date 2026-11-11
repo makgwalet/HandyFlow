@@ -377,6 +377,44 @@ public class WhsePdfService {
         doc.add(header);
     }
 
+    /** A 100 x 150 mm shipping label for one package: where it goes, which package of how many, the weight and a Code 128 barcode of order/package. */
+    public byte[] generatePackageLabel(WhsePackingService.LabelData d) {
+        Document doc = new Document(new com.lowagie.text.Rectangle(283.5f, 425.2f), 14, 14, 14, 14);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+            PdfWriter writer = PdfWriter.getInstance(doc, out);
+            doc.open();
+            Font big = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 22, Color.BLACK);
+            Font mid = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.BLACK);
+            Font small = FontFactory.getFont(FontFactory.HELVETICA, 9, Color.BLACK);
+            doc.add(new Paragraph("SHIP TO", small));
+            doc.add(new Paragraph(nullSafe(d.shipToName()), mid));
+            if (d.shipToAddress() != null) doc.add(new Paragraph(d.shipToAddress(), small));
+            doc.add(new Paragraph(" ", small));
+            doc.add(new Paragraph("Package " + d.packageNo() + " of " + d.packageCount(), big));
+            doc.add(new Paragraph(d.type() + " · " + d.grossKg().stripTrailingZeros().toPlainString() + " kg"
+                    + (d.lengthMm() != null && d.widthMm() != null && d.heightMm() != null ? " · " + d.lengthMm() + "x" + d.widthMm() + "x" + d.heightMm() + " mm" : ""), small));
+            doc.add(new Paragraph(" ", small));
+            doc.add(new Paragraph("Order " + nullSafe(d.orderReference()), mid));
+            doc.add(new Paragraph("From " + nullSafe(d.clientName()), small));
+            doc.add(new Paragraph(" ", small));
+            for (WhsePackingService.PackedItem it : d.items()) {
+                doc.add(new Paragraph(it.qty().stripTrailingZeros().toPlainString() + " × " + it.sku(), small));
+            }
+            com.lowagie.text.pdf.Barcode128 bc = new com.lowagie.text.pdf.Barcode128();
+            bc.setCode(nullSafe(d.orderReference()) + "/P" + d.packageNo());
+            bc.setCodeType(com.lowagie.text.pdf.Barcode128.CODE128);
+            bc.setBarHeight(40f);
+            com.lowagie.text.Image img = bc.createImageWithBarcode(writer.getDirectContent(), Color.BLACK, Color.BLACK);
+            doc.add(new Paragraph(" ", small));
+            doc.add(img);
+            doc.close();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to generate package label", e);
+        }
+        return out.toByteArray();
+    }
+
     private static String nullSafe(String s) {
         return s != null ? s : "";
     }

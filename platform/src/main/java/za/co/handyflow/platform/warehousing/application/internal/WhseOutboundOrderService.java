@@ -37,6 +37,7 @@ public class WhseOutboundOrderService {
     private final WhseLotAllocationService lotAllocation;
     private final WhseTaskService taskService;
     private final WhseSerialService serialService;
+    private final WhsePackingService packingService;
 
     /** One ordered line on a new outbound order. */
     public record OutboundLine(UUID itemId, BigDecimal qtyOrdered, String notes) {}
@@ -148,6 +149,7 @@ public class WhseOutboundOrderService {
     public WhseOutboundOrder markPacked(TenantId tenantId, UUID orderId) {
         WhseOutboundOrder order = findActive(tenantId, orderId);
         requirePicksFinished(tenantId, orderId);
+        packingService.requireReadyToPack(tenantId, orderId); // an order with packages needs them all closed and everything in them
         order.markPacked();
         return orderRepository.save(order);
     }

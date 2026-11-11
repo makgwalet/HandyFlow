@@ -17,6 +17,7 @@ import { WHSE_ACCENT } from "./constants"
 import { ErrorLine, fmtQty } from "./whseUi"
 import { DeliveryPanel } from "./WhseDispatchTab"
 import SerialPanel from "./WhseSerialPanel"
+import PackingPanel from "./WhsePackingPanel"
 
 interface OutboundOrderResponse {
   id: string; orderReference: string | null; shipToName: string | null; status: string
@@ -204,6 +205,7 @@ export default function WhseOutboundOrderDetail({ orderId, clientId, items, onBa
         </div>
       )}
       <SerialPanel orderId={orderId} status={status ?? ""} />
+      <PackingPanel orderId={orderId} status={status ?? ""} />
 
       {status === "PICKING" && (
         <p style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 8 }}>
