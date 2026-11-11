@@ -21,30 +21,45 @@ public class WhsePackageService {
     private final JdbcTemplate jdbc;
 
     public record PackageDef(String code, String name, BigDecimal monthlyPrice, Integer maxWarehouses, Integer maxClientAccounts,
-                             Integer maxMonthlyTransactions, Integer maxWebhooks, boolean proposed) {}
+                             Integer maxMonthlyTransactions, Integer maxWebhooks, boolean proposed, int sortOrder) {}
 
-    public record Meter(String key, String label, long used, Integer limit, boolean over) {}
+    /** limit is the effective limit (tier plus overrides); extra is how much of it comes from overrides in force. */
+    public record Meter(String key, String label, long used, Integer limit, boolean over, long extra) {}
 
-    public record Usage(boolean assigned, PackageDef pkg, Enforcement enforcement, List<Meter> meters, java.time.LocalDate periodStart, java.time.LocalDate periodEnd) {}
+    public record Upgrade(String code, String name, BigDecimal monthlyPrice, Integer maxWarehouses, Integer maxClientAccounts, Integer maxMonthlyTransactions, Integer maxWebhooks) {}
+
+    /** state: ACTIVE, SCHEDULED or EXPIRED. Only ACTIVE applies limits. Without a subscription row assigned is false. */
+    public record Usage(boolean assigned, PackageDef pkg, Enforcement enforcement, List<Meter> meters, java.time.LocalDate periodStart, java.time.LocalDate periodEnd,
+                        String state, java.time.LocalDate effectiveFrom, java.time.LocalDate expiresOn, String note, List<Upgrade> upgradeOptions) {}
+
+    public record Override(UUID id, String limitKey, int extra, java.time.LocalDate validUntil, String reason, UUID createdBy, java.time.Instant createdAt, boolean inForce) {}
 
     private static PackageDef row(java.sql.ResultSet rs, int i) throws java.sql.SQLException {
         return new PackageDef(rs.getString("code"), rs.getString("name"), rs.getBigDecimal("monthly_price"), (Integer) rs.getObject("max_warehouses"),
-                (Integer) rs.getObject("max_client_accounts"), (Integer) rs.getObject("max_monthly_transactions"), (Integer) rs.getObject("max_webhooks"), rs.getBoolean("proposed"));
+                (Integer) rs.getObject("max_client_accounts"), (Integer) rs.getObject("max_monthly_transactions"), (Integer) rs.getObject("max_webhooks"), rs.getBoolean("proposed"), rs.getInt("sort_order"));
     }
 
-    private static final String SELECT = "SELECT code, name, monthly_price, max_warehouses, max_client_accounts, max_monthly_transactions, max_webhooks, proposed FROM whse_subscription_tiers";
+    private static final String SELECT = "SELECT code, name, monthly_price, max_warehouses, max_client_accounts, max_monthly_transactions, max_webhooks, proposed, sort_order FROM whse_subscription_tiers";
 
     @Transactional(readOnly = true)
     public List<PackageDef> packages() {
         return jdbc.query(SELECT + " ORDER BY sort_order", WhsePackageService::row);
     }
 
-    private record Assigned(PackageDef pkg, Enforcement mode) {}
+    private record Assigned(PackageDef pkg, Enforcement mode, java.time.LocalDate from, java.time.LocalDate to, String note, WhsePackageRules.WindowState state) {
+        boolean applies() { return state == WhsePackageRules.WindowState.ACTIVE; }
+    }
+
+    private static java.time.LocalDate day(java.sql.Date d) { return d == null ? null : d.toLocalDate(); }
 
     private Assigned assigned(TenantId tenantId) {
-        List<Assigned> r = jdbc.query("SELECT p.code, p.name, p.monthly_price, p.max_warehouses, p.max_client_accounts, p.max_monthly_transactions, p.max_webhooks, p.proposed, t.enforcement "
+        List<Assigned> r = jdbc.query("SELECT p.code, p.name, p.monthly_price, p.max_warehouses, p.max_client_accounts, p.max_monthly_transactions, p.max_webhooks, p.proposed, p.sort_order, t.enforcement, t.effective_from, t.expires_on, t.renewal_note "
                 + "FROM whse_tenant_subscription t JOIN whse_subscription_tiers p ON p.code = t.package_code WHERE t.tenant_id = ?",
-                (rs, i) -> new Assigned(row(rs, i), WhsePackageRules.parseEnforcement(rs.getString("enforcement"))), tenantId.getValue());
+                (rs, i) -> {
+                    java.time.LocalDate from = day(rs.getDate("effective_from")), to = day(rs.getDate("expires_on"));
+                    return new Assigned(row(rs, i), WhsePackageRules.parseEnforcement(rs.getString("enforcement")), from, to, rs.getString("renewal_note"),
+                            WhsePackageRules.windowState(from, to, java.time.LocalDate.now(ZONE)));
+                }, tenantId.getValue());
         return r.isEmpty() ? null : r.get(0);
     }
 
@@ -90,6 +105,14 @@ public class WhsePackageService {
                 UUID.randomUUID(), tenantId.getValue(), sourceType, sourceId);
     }
 
+    /** Extra allowance in force today, per limit. */
+    private java.util.Map<Limit, Long> extras(TenantId t) {
+        java.util.Map<Limit, Long> out = new java.util.EnumMap<>(Limit.class);
+        jdbc.query("SELECT limit_key, sum(extra) FROM whse_tier_overrides WHERE tenant_id = ? AND revoked_at IS NULL AND valid_until >= ? GROUP BY limit_key",
+                rs -> { out.put(Limit.valueOf(rs.getString(1)), rs.getLong(2)); }, t.getValue(), java.sql.Date.valueOf(java.time.LocalDate.now(ZONE)));
+        return out;
+    }
+
     private static Integer limitOf(PackageDef p, Limit l) {
         return switch (l) {
             case WAREHOUSES -> p.maxWarehouses();
@@ -102,27 +125,48 @@ public class WhsePackageService {
     @Transactional(readOnly = true)
     public Usage usage(TenantId tenantId) {
         Assigned a = assigned(tenantId);
+        boolean applies = a != null && a.applies();
+        java.util.Map<Limit, Long> extras = applies ? extras(tenantId) : java.util.Map.of();
         List<Meter> meters = new java.util.ArrayList<>();
+        long[] used = new long[Limit.values().length];
         for (Limit l : Limit.values()) {
             long u = used(l, tenantId);
-            Integer max = a == null ? null : limitOf(a.pkg(), l);
-            meters.add(new Meter(l.name(), l.label, u, max, a != null && a.mode() != Enforcement.OFF && WhsePackageRules.isOver(u, max)));
+            used[l.ordinal()] = u;
+            long extra = extras.getOrDefault(l, 0L);
+            Integer max = applies ? WhsePackageRules.effectiveLimit(limitOf(a.pkg(), l), extra) : null;
+            meters.add(new Meter(l.name(), l.label, u, max, applies && a.mode() != Enforcement.OFF && WhsePackageRules.isOver(u, max), applies ? extra : 0));
         }
         WhseUsagePeriod.Period period = currentPeriod(tenantId);
-        return new Usage(a != null, a == null ? null : a.pkg(), a == null ? Enforcement.OFF : a.mode(), meters, period.start(), period.endExclusive().minusDays(1));
+        List<Upgrade> upgrades = a == null ? List.of() : WhsePackageRules.upgradeOptions(a.pkg().sortOrder(), tiers(), used).stream()
+                .map(t -> new Upgrade(t.code(), t.name(), t.price(), t.limits()[0], t.limits()[1], t.limits()[2], t.limits()[3])).toList();
+        return new Usage(a != null, a == null ? null : a.pkg(), a == null ? Enforcement.OFF : a.mode(), meters, period.start(), period.endExclusive().minusDays(1),
+                a == null ? null : a.state().name(), a == null ? null : a.from(), a == null ? null : a.to(), a == null ? null : a.note(), upgrades);
+    }
+
+    /** Every tier as limits in {@link Limit} order. */
+    private List<WhsePackageRules.Tier> tiers() {
+        return packages().stream().map(p -> new WhsePackageRules.Tier(p.code(), p.name(), p.monthlyPrice(), p.sortOrder(),
+                new Integer[]{p.maxWarehouses(), p.maxClientAccounts(), p.maxMonthlyTransactions(), p.maxWebhooks()})).toList();
     }
 
     /** Call before adding a record that counts against a limit. No package, or enforcement not ENFORCE, never refuses. */
     @Transactional(readOnly = true)
     public void requireRoomFor(TenantId tenantId, Limit limit) {
         Assigned a = assigned(tenantId);
-        if (a == null || a.mode() != Enforcement.ENFORCE) return;
-        WhsePackageRules.checkAdd(limit, used(limit, tenantId), limitOf(a.pkg(), limit), a.mode(), a.pkg().name());
+        if (a == null || !a.applies() || a.mode() != Enforcement.ENFORCE) return;
+        long extra = extras(tenantId).getOrDefault(limit, 0L);
+        WhsePackageRules.checkAdd(limit, used(limit, tenantId), WhsePackageRules.effectiveLimit(limitOf(a.pkg(), limit), extra), a.mode(), a.pkg().name());
     }
 
     /** Platform administrators only: give a tenant a package, or clear it (packageCode null). */
     @Transactional
     public Usage assign(TenantId tenantId, String packageCode, String enforcement, UUID actor) {
+        return assign(tenantId, packageCode, enforcement, null, null, null, actor);
+    }
+
+    /** effectiveFrom, expiresOn and note are optional; no dates means the tier applies from now with no expiry. */
+    @Transactional
+    public Usage assign(TenantId tenantId, String packageCode, String enforcement, java.time.LocalDate effectiveFrom, java.time.LocalDate expiresOn, String note, UUID actor) {
         if (actor == null) throw new AccessDeniedException("Your user could not be identified, so this change cannot be recorded.");
         if (packageCode == null || packageCode.isBlank()) {
             jdbc.update("DELETE FROM whse_tenant_subscription WHERE tenant_id = ?", tenantId.getValue());
@@ -131,13 +175,52 @@ public class WhsePackageService {
             Integer known = jdbc.queryForObject("SELECT count(*) FROM whse_subscription_tiers WHERE code = ?", Integer.class, code);
             if (known == null || known == 0) throw new IllegalArgumentException("Unknown package " + code + ".");
             Enforcement mode = WhsePackageRules.parseEnforcement(enforcement);
-            jdbc.update("INSERT INTO whse_tenant_subscription (tenant_id, package_code, enforcement, updated_by, updated_at) VALUES (?,?,?,?, now()) "
-                    + "ON CONFLICT (tenant_id) DO UPDATE SET package_code = EXCLUDED.package_code, enforcement = EXCLUDED.enforcement, updated_by = EXCLUDED.updated_by, updated_at = now()",
-                    tenantId.getValue(), code, mode.name(), actor);
+            WhsePackageRules.checkWindow(effectiveFrom, expiresOn);
+            String n = note == null || note.isBlank() ? null : note.strip();
+            if (n != null && n.length() > 300) throw new IllegalArgumentException("The note can be at most 300 characters.");
+            jdbc.update("INSERT INTO whse_tenant_subscription (tenant_id, package_code, enforcement, effective_from, expires_on, renewal_note, updated_by, updated_at) VALUES (?,?,?,?,?,?,?, now()) "
+                    + "ON CONFLICT (tenant_id) DO UPDATE SET package_code = EXCLUDED.package_code, enforcement = EXCLUDED.enforcement, effective_from = EXCLUDED.effective_from, "
+                    + "expires_on = EXCLUDED.expires_on, renewal_note = EXCLUDED.renewal_note, updated_by = EXCLUDED.updated_by, updated_at = now()",
+                    tenantId.getValue(), code, mode.name(), effectiveFrom, expiresOn, n, actor);
         }
-        jdbc.update("INSERT INTO audit_events (tenant_id, actor_type, actor_id, action, item_type, after_json) VALUES (?, 'STAFF', ?, 'WHSE_PACKAGE_ASSIGNED', 'WHSE_PACKAGE', jsonb_build_object('package', ?::text, 'enforcement', ?::text))",
-                tenantId.getValue(), actor, packageCode == null ? "" : packageCode.strip().toUpperCase(), enforcement == null ? "" : enforcement);
+        jdbc.update("INSERT INTO audit_events (tenant_id, actor_type, actor_id, action, item_type, after_json) VALUES (?, 'STAFF', ?, 'WHSE_PACKAGE_ASSIGNED', 'WHSE_PACKAGE', jsonb_build_object('package', ?::text, 'enforcement', ?::text, 'effectiveFrom', ?::text, 'expiresOn', ?::text))",
+                tenantId.getValue(), actor, packageCode == null ? "" : packageCode.strip().toUpperCase(), enforcement == null ? "" : enforcement,
+                effectiveFrom == null ? "" : effectiveFrom.toString(), expiresOn == null ? "" : expiresOn.toString());
         return usage(tenantId);
+    }
+
+    /** Platform administrators: a temporary extra allowance on one limit, with a reason (kept in the audit trail) and an end date of at most a year. */
+    @Transactional
+    public UUID addOverride(TenantId tenantId, String limitKey, int extra, java.time.LocalDate validUntil, String reason, UUID actor) {
+        if (actor == null) throw new AccessDeniedException("Your user could not be identified, so this change cannot be recorded.");
+        Limit limit;
+        try { limit = Limit.valueOf(limitKey == null ? "" : limitKey.strip().toUpperCase()); }
+        catch (IllegalArgumentException e) { throw new IllegalArgumentException("Unknown limit " + limitKey + "."); }
+        WhsePackageRules.checkOverride(extra, validUntil, reason, java.time.LocalDate.now(ZONE));
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO whse_tier_overrides (id, tenant_id, limit_key, extra, valid_until, reason, created_by) VALUES (?,?,?,?,?,?,?)",
+                id, tenantId.getValue(), limit.name(), extra, validUntil, reason.strip(), actor);
+        jdbc.update("INSERT INTO audit_events (tenant_id, actor_type, actor_id, action, item_type, item_id, after_json) VALUES (?, 'STAFF', ?, 'WHSE_TIER_OVERRIDE_ADDED', 'WHSE_TIER_OVERRIDE', ?, jsonb_build_object('limit', ?::text, 'extra', ?::int, 'validUntil', ?::text, 'reason', ?::text))",
+                tenantId.getValue(), actor, id, limit.name(), extra, validUntil.toString(), reason.strip());
+        return id;
+    }
+
+    @Transactional
+    public void revokeOverride(TenantId tenantId, UUID id, UUID actor) {
+        if (actor == null) throw new AccessDeniedException("Your user could not be identified, so this change cannot be recorded.");
+        int n = jdbc.update("UPDATE whse_tier_overrides SET revoked_at = now(), revoked_by = ? WHERE tenant_id = ? AND id = ? AND revoked_at IS NULL", actor, tenantId.getValue(), id);
+        if (n == 0) throw new IllegalArgumentException("That override was not found or is already revoked.");
+        jdbc.update("INSERT INTO audit_events (tenant_id, actor_type, actor_id, action, item_type, item_id, after_json) VALUES (?, 'STAFF', ?, 'WHSE_TIER_OVERRIDE_REVOKED', 'WHSE_TIER_OVERRIDE', ?, '{}'::jsonb)",
+                tenantId.getValue(), actor, id);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Override> overrides(TenantId tenantId) {
+        java.time.LocalDate today = java.time.LocalDate.now(ZONE);
+        return jdbc.query("SELECT id, limit_key, extra, valid_until, reason, created_by, created_at, revoked_at FROM whse_tier_overrides WHERE tenant_id = ? ORDER BY created_at DESC",
+                (rs, i) -> new Override((UUID) rs.getObject("id"), rs.getString("limit_key"), rs.getInt("extra"), rs.getDate("valid_until").toLocalDate(), rs.getString("reason"),
+                        (UUID) rs.getObject("created_by"), rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("revoked_at") == null && !rs.getDate("valid_until").toLocalDate().isBefore(today)),
+                tenantId.getValue());
     }
 
     public record BillingRow(UUID tenantId, String tenantName, String moduleStatus, String tierCode, String enforcement, BigDecimal tierPrice, BigDecimal cataloguePrice,

@@ -124,4 +124,69 @@ class WhsePackageServiceTest {
         assertEquals(15, u.periodStart().getDayOfMonth());
         assertEquals(14, u.periodEnd().getDayOfMonth());
     }
+
+    @Test @DisplayName("an expired or not-yet-started tier applies no limits")
+    void windowOutside() throws Exception {
+        assigned("ENFORCE"); used(5);
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getString("code")).thenReturn("STARTER");
+        when(rs.getString("name")).thenReturn("Starter");
+        when(rs.getObject("max_warehouses")).thenReturn(1);
+        when(rs.getString("enforcement")).thenReturn("ENFORCE");
+        when(rs.getDate("expires_on")).thenReturn(java.sql.Date.valueOf(java.time.LocalDate.now().minusDays(400)));
+        when(jdbc.query(contains("FROM whse_tenant_subscription"), any(RowMapper.class), any(Object[].class)))
+                .thenAnswer(inv -> List.of(((RowMapper) inv.getArgument(1)).mapRow(rs, 0)));
+        assertDoesNotThrow(() -> service.requireRoomFor(t(), Limit.WAREHOUSES));
+        WhsePackageService.Usage u = service.usage(t());
+        assertEquals("EXPIRED", u.state());
+        assertTrue(u.meters().stream().allMatch(m -> m.limit() == null && !m.over()));
+    }
+
+    @Test @DisplayName("an override in force raises the limit it names")
+    void overrideRaisesLimit() throws Exception {
+        assigned("ENFORCE"); used(1);
+        ResultSet r = mock(ResultSet.class);
+        when(r.getString(1)).thenReturn("WAREHOUSES");
+        when(r.getLong(2)).thenReturn(2L);
+        // query(String, RowCallbackHandler, Object...) returns void, so it is stubbed with doAnswer
+        doAnswer(inv -> {
+            ((org.springframework.jdbc.core.RowCallbackHandler) inv.getArgument(1)).processRow(r);
+            return null;
+        }).when(jdbc).query(contains("FROM whse_tier_overrides"), any(org.springframework.jdbc.core.RowCallbackHandler.class), any(Object[].class));
+        assertDoesNotThrow(() -> service.requireRoomFor(t(), Limit.WAREHOUSES)); // limit 1 + 2 = 3, one in use
+        WhsePackageService.Meter m = service.usage(t()).meters().stream().filter(x -> x.key().equals("WAREHOUSES")).findFirst().orElseThrow();
+        assertEquals(3, m.limit());
+        assertEquals(2, m.extra());
+    }
+
+    @Test @DisplayName("an override needs an identified administrator, a known limit and a valid reason")
+    void overrideRefusals() {
+        java.time.LocalDate soon = java.time.LocalDate.now().plusDays(10);
+        assertThrows(AccessDeniedException.class, () -> service.addOverride(t(), "WAREHOUSES", 1, soon, "Agreed with the customer", null));
+        assertThrows(IllegalArgumentException.class, () -> service.addOverride(t(), "USERS", 1, soon, "Agreed with the customer", actor));
+        assertThrows(IllegalArgumentException.class, () -> service.addOverride(t(), "WAREHOUSES", 1, soon, "short", actor));
+        verify(jdbc, never()).update(contains("INSERT INTO whse_tier_overrides"), any(Object[].class));
+        service.addOverride(t(), "warehouses", 1, soon, "Agreed with the customer", actor);
+        verify(jdbc).update(contains("INSERT INTO whse_tier_overrides"), any(Object[].class));
+        verify(jdbc).update(contains("WHSE_TIER_OVERRIDE_ADDED"), any(Object[].class));
+    }
+
+    @Test @DisplayName("revoking an override that is not there is refused")
+    void revoke() {
+        UUID id = UUID.randomUUID();
+        when(jdbc.update(contains("UPDATE whse_tier_overrides"), any(Object[].class))).thenReturn(0);
+        assertThrows(IllegalArgumentException.class, () -> service.revokeOverride(t(), id, actor));
+        when(jdbc.update(contains("UPDATE whse_tier_overrides"), any(Object[].class))).thenReturn(1);
+        service.revokeOverride(t(), id, actor);
+        verify(jdbc).update(contains("WHSE_TIER_OVERRIDE_REVOKED"), any(Object[].class));
+    }
+
+    @Test @DisplayName("assigning with dates stores them, and an expiry before the start is refused")
+    void assignWithDates() {
+        when(jdbc.queryForObject(contains("FROM whse_subscription_tiers WHERE code"), eq(Integer.class), any(Object[].class))).thenReturn(1);
+        java.time.LocalDate from = java.time.LocalDate.now();
+        assertThrows(IllegalArgumentException.class, () -> service.assign(t(), "SME", "OFF", from, from.minusDays(1), null, actor));
+        service.assign(t(), "SME", "OFF", from, from.plusMonths(12), "Contract 14", actor);
+        verify(jdbc).update(contains("expires_on = EXCLUDED.expires_on"), any(Object[].class));
+    }
 }

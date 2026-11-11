@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import WhsePackagePanel from "./WhsePackagePanel"
-import { enforcementText, limitText, percentUsed, periodText, priceText, type PackageUsage } from "./packageUsage"
+import { enforcementText, limitText, percentUsed, periodText, priceText, upgradeText, windowText, type PackageUsage } from "./packageUsage"
 
 const get = vi.fn()
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a) } }))
@@ -29,6 +29,19 @@ describe("package helpers", () => {
     expect(periodText({ periodStart: "2026-10-15", periodEnd: "2026-11-14" })).toBe("Billing month 2026-10-15 to 2026-11-14")
     expect(periodText({})).toBeNull()
   })
+  it("explains what the dates on a tier mean", () => {
+    expect(windowText({ state: "SCHEDULED", effectiveFrom: "2027-01-01" })).toMatch(/starts on 2027-01-01/)
+    expect(windowText({ state: "EXPIRED", expiresOn: "2026-10-31" })).toMatch(/ended on 2026-10-31/)
+    expect(windowText({ state: "ACTIVE", expiresOn: "2027-06-30" })).toMatch(/2027-06-30/)
+    expect(windowText({ state: "ACTIVE" })).toBeNull()
+  })
+  it("describes an upgrade with its price and limits", () => {
+    const t = upgradeText({ code: "PRO", name: "Professional", monthlyPrice: 4999, maxWarehouses: 5, maxClientAccounts: 40, maxMonthlyTransactions: 15000, maxWebhooks: null })
+    expect(t).toMatch(/^Professional: R4[\s ,]?999 per month/)
+    expect(t).toMatch(/5 warehouses/)
+    expect(t).toMatch(/unlimited webhooks/)
+    expect(upgradeText({ code: "E", name: "Enterprise", monthlyPrice: null, maxWarehouses: null, maxClientAccounts: null, maxMonthlyTransactions: null, maxWebhooks: null })).toMatch(/Custom quotation/)
+  })
   it("words", () => {
     expect(limitText(null)).toBe("no limit")
     expect(priceText(null)).toBe("Custom quotation")
@@ -48,6 +61,15 @@ describe("WhsePackagePanel", () => {
     expect(screen.getByText(/4 no limit/)).toBeTruthy()
     expect(screen.getAllByRole("progressbar").length).toBe(2)
     expect(screen.getByText(/Billing month 2026-11-01 to 2026-11-30/)).toBeTruthy()
+  })
+  it("offers upgrades and shows an override on a meter", async () => {
+    get.mockResolvedValue({ data: usage({
+      meters: [{ key: "WAREHOUSES", label: "warehouses", used: 1, limit: 3, over: false, extra: 2 }],
+      upgradeOptions: [{ code: "SME", name: "SME", monthlyPrice: 1999, maxWarehouses: 2, maxClientAccounts: 10, maxMonthlyTransactions: 3000, maxWebhooks: 1 }] }) })
+    wrap(<WhsePackagePanel />)
+    await screen.findByText("Need more room?")
+    expect(screen.getByText(/SME: R1[\s ,]?999 per month/)).toBeTruthy()
+    expect(screen.getByText(/includes 2 extra allowed for now/)).toBeTruthy()
   })
   it("says no limits apply when no package is assigned", async () => {
     get.mockResolvedValue({ data: usage({ assigned: false, pkg: null, enforcement: "OFF", meters: [] }) })
