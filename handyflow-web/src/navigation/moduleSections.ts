@@ -589,6 +589,8 @@ export const EVENTS_SECTIONS: ModuleSections = {
       label: 'Selected event',
       sections: [
         { id: 'guests', label: 'Guests', icon: Users },
+        { id: 'add-guests', label: 'Add guests', icon: UserPlus },
+        { id: 'waitlist', label: 'Waitlist', icon: ListPlus },
         { id: 'vendors', label: 'Vendors', icon: Truck },
         { id: 'analytics', label: 'Analytics', icon: BarChart2 },
         { id: 'audit', label: 'Audit trail', icon: History },

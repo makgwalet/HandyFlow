@@ -2,6 +2,9 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { usePermissions } from "../../hooks/usePermission"
+import { TransferModal } from "./GuestOpsDialogs"
+import { checkInView } from "./guestOps"
 import {
   Plus, X, QrCode, UserCheck, UserX, Ticket, Users,
   Search, Download, ChevronLeft, AlertTriangle, Tag,
@@ -18,12 +21,16 @@ const GUEST_STATUS: Record<string, { color: string; bg: string }> = {
   CHECKED_IN:  { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
   CANCELLED:   { color: "var(--hf-text-faint)", bg: "var(--hf-surface-sunken)" },
   NO_SHOW:     { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
+  RESERVED:    { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+  EXPIRED:     { color: "var(--hf-text-faint)", bg: "var(--hf-surface-sunken)" },
+  TRANSFERRED: { color: "var(--hf-text-faint)", bg: "var(--hf-surface-sunken)" },
 }
 const PAY_STATUS: Record<string, { color: string; bg: string }> = {
   FREE:    { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
   PAID:    { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
   PENDING: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
   REFUNDED:{ color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" },
+  PARTIALLY_REFUNDED: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
 }
 
 interface Props {
@@ -42,6 +49,8 @@ export default function GuestsTab({ eventId, eventTitle, onChangeEvent }: Props)
   const [qrInput,      setQrInput]      = useState("")
   const [checkInResult, setCheckInResult] = useState<any>(null)
   const [error,        setError]        = useState("")
+  const [transferTarget, setTransferTarget] = useState<{ id: string; fullName: string; ticketNumber?: string } | null>(null)
+  const canTransfer = usePermissions(["EVENTS_REGISTRATION_MANAGE", "EVENTS_MANAGE"])
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null)
 
   const INIT_GUEST = () => ({ tierId: "", fullName: "", email: "", phone: "", company: "", dietaryRequirements: "", amountPaid: "", notes: "" })
@@ -284,6 +293,12 @@ export default function GuestsTab({ eventId, eventTitle, onChangeEvent }: Props)
                       {g.checkedInAt ? <span style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--hf-success-text-strong)" }}><UserCheck size={12} />{fmtDT(g.checkedInAt)}</span> : "—"}
                     </td>
                     <td style={{ padding: "10px 14px" }}>
+                      {canTransfer && ["REGISTERED", "CONFIRMED"].includes(g.status) && (
+                        <button onClick={() => setTransferTarget({ id: g.id, fullName: g.fullName, ticketNumber: g.ticketNumber })}
+                          style={{ padding: "4px 10px", background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, fontSize: 11, color: "var(--hf-text-muted)", cursor: "pointer", marginRight: 6 }}>
+                          Transfer
+                        </button>
+                      )}
                       {!["CANCELLED","CHECKED_IN"].includes(g.status) && (
                         <button onClick={() => setConfirmTarget({ id: g.id, name: g.fullName })}
                           style={{ padding: "4px 10px", background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, fontSize: 11, color: "var(--hf-text-faint)", cursor: "pointer" }}>
@@ -357,19 +372,19 @@ export default function GuestsTab({ eventId, eventTitle, onChangeEvent }: Props)
 
                 {/* Result display */}
                 {checkInResult && (() => {
-                  const cfg: Record<string, { bg: string; color: string; border: string; icon: any; label: string }> = {
-                    SUCCESS:            { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "var(--hf-success-border)", icon: UserCheck,    label: "Welcome!" },
-                    ALREADY_CHECKED_IN: { bg: "var(--hf-warning-soft)", color: "var(--hf-warning-text)", border: "var(--hf-warning-border)", icon: AlertTriangle, label: "Already checked in" },
-                    CANCELLED_TICKET:   { bg: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "var(--hf-danger-border)", icon: UserX,         label: "Cancelled ticket" },
-                    NOT_FOUND:          { bg: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "var(--hf-danger-border)", icon: UserX,         label: "Not found" },
-                    ERROR:              { bg: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "var(--hf-danger-border)", icon: AlertTriangle, label: "Error" },
+                  const view = checkInView(checkInResult.result)
+                  const TONES = {
+                    ok:   { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "var(--hf-success-border)", icon: UserCheck },
+                    warn: { bg: "var(--hf-warning-soft)", color: "var(--hf-warning-text)", border: "var(--hf-warning-border)", icon: AlertTriangle },
+                    bad:  { bg: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "var(--hf-danger-border)", icon: UserX },
                   }
-                  const c   = cfg[checkInResult.result] ?? cfg.NOT_FOUND
+                  const c = { ...TONES[view.tone], label: view.title }
                   const Icon = c.icon
                   return (
                     <div style={{ padding: "16px", background: c.bg, border: `1px solid ${c.border}`, borderRadius: 12, textAlign: "center" as const }}>
                       <Icon size={32} style={{ color: c.color, marginBottom: 8 }} />
                       <div style={{ fontWeight: 800, fontSize: 16, color: c.color, marginBottom: 6 }}>{c.label}</div>
+                      {view.hint && <div style={{ fontSize: 12.5, color: c.color, marginBottom: 6 }}>{view.hint}</div>}
                       {checkInResult.guestName && checkInResult.guestName !== "Unknown" && (
                         <div style={{ fontWeight: 700, fontSize: 17, color: "var(--hf-text)", marginBottom: 2 }}>{checkInResult.guestName}</div>
                       )}
@@ -604,6 +619,7 @@ export default function GuestsTab({ eventId, eventTitle, onChangeEvent }: Props)
           </div>
         </div>
       )}
+      {transferTarget && eventId && <TransferModal eventId={eventId} guest={transferTarget} onClose={() => setTransferTarget(null)} />}
     </div>
   )
 }
