@@ -47,4 +47,12 @@ public interface FuelReceiptRepository extends JpaRepository<FuelReceipt, UUID> 
 
     @Query("SELECT r FROM FuelReceipt r WHERE r.tenantId = :tenantId AND r.purchaseOrderId = :poId AND r.deletedAt IS NULL ORDER BY r.receivedAt")
     List<FuelReceipt> findByPo(TenantId tenantId, UUID poId);
+
+    @Query("SELECT r FROM FuelReceipt r WHERE r.tenantId = :tenantId AND r.id IN :ids AND r.deletedAt IS NULL")
+    List<FuelReceipt> findActiveByIds(TenantId tenantId, java.util.Collection<UUID> ids);
+
+    /** Receipts from a supplier that are not reversed and are not yet on any supplier invoice: what an invoice can still cover. */
+    @Query("SELECT r FROM FuelReceipt r WHERE r.tenantId = :tenantId AND r.supplierId = :supplierId AND r.deletedAt IS NULL AND r.reversedAt IS NULL "
+            + "AND r.id NOT IN (SELECT l.receiptId FROM FuelSupplierInvoiceReceipt l WHERE l.tenantId = :tenantId) ORDER BY r.receivedAt DESC")
+    List<FuelReceipt> findInvoiceCandidates(TenantId tenantId, UUID supplierId, Pageable pageable);
 }

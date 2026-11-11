@@ -177,6 +177,8 @@ public enum NotificationType {
     FUEL_NEGATIVE_VARIANCE(CRITICAL, Set.of(IN_APP, EMAIL, SMS)),
     FUEL_DELIVERY_UPCOMING(INFO, Set.of(IN_APP, EMAIL)),
     FUEL_DELIVERY_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
+    FUEL_COMPLIANCE_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
+    FUEL_COMPLIANCE_EXPIRED(CRITICAL, Set.of(IN_APP, EMAIL)),
 
     // ── HR / Payroll ─────────────────────────────────────────────────────────
     PAY_RUN_PROCESSED(INFO, Set.of(IN_APP, EMAIL)),

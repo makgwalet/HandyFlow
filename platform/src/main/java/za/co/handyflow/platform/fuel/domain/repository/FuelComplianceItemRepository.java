@@ -30,4 +30,8 @@ public interface FuelComplianceItemRepository extends JpaRepository<FuelComplian
 
     @Query("SELECT COUNT(i) FROM FuelComplianceItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL AND i.expiresOn >= :today AND i.expiresOn <= :until")
     long countExpiring(TenantId tenantId, LocalDate today, LocalDate until);
+
+    /** Every tenant's items whose expiry falls in [from, until]: the daily reminder sweep. */
+    @Query("SELECT i FROM FuelComplianceItem i WHERE i.deletedAt IS NULL AND i.expiresOn >= :from AND i.expiresOn <= :until ORDER BY i.expiresOn")
+    List<FuelComplianceItem> findExpiringBetweenAllTenants(LocalDate from, LocalDate until);
 }
