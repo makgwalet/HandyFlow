@@ -49,7 +49,8 @@ class WhsePackingServiceTest {
     @Test @DisplayName("a package is numbered after the last one and audited")
     void creates() {
         orderStatus("PICKING");
-        when(jdbc.queryForObject(contains("max(package_no)"), eq(Integer.class), any(Object[].class))).thenReturn(2);
+        // The query itself returns the NEXT number (max + 1), so with two packages already it returns 3.
+        when(jdbc.queryForObject(contains("max(package_no)"), eq(Integer.class), any(Object[].class))).thenReturn(3);
         UUID id = service.createPackage(t(), order, "pallet", 1200, 1000, null, new BigDecimal("20"), actor);
         assertNotNull(id);
         verify(jdbc).update(contains("INSERT INTO whse_packages"), eq(id), eq(tenant), eq(order), eq(3), eq("PALLET"), eq(1200), eq(1000), isNull(), eq(new BigDecimal("20")), eq(actor));
