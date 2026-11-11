@@ -10,6 +10,7 @@ import { apiClient } from "../../api/client"
 import { WHSE_ACCENT } from "./constants"
 import { btnDanger, btnGhost, btnPrimary, Chip, ErrorLine, fmtQty, inputStyle, labelStyle, today } from "./whseUi"
 import { SerialEntry } from "./WhseSerialPanel"
+import WhseReceiptDocuments from "./WhseReceiptDocuments"
 import { buildReceiptPayload, emptyReceipt, type ReceiptForm, shelfLifeWarning, type Tracking, validateClose, validateReceipt } from "./receiving"
 
 interface InboundShipmentResponse { id: string; referenceNumber: string | null; expectedDate: string | null; receivedDate: string | null; status: string; notes: string | null }
@@ -198,6 +199,7 @@ export default function WhseInboundShipmentDetail({ shipmentId, clientId, items,
           )}
         </div>
       )}
+      <WhseReceiptDocuments shipmentId={shipmentId} />
     </div>
   )
 }

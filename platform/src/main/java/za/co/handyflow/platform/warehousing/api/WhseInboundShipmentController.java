@@ -19,6 +19,7 @@ import za.co.handyflow.platform.evidence.dto.EvidenceResponse;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.warehousing.application.internal.WhseEvidenceRules;
 import za.co.handyflow.platform.warehousing.application.internal.WhseInboundShipmentService;
 import za.co.handyflow.platform.warehousing.application.internal.WhseInboundShipmentService.InboundLine;
 import za.co.handyflow.platform.warehousing.domain.model.WhseInboundShipment;
@@ -107,7 +108,12 @@ public class WhseInboundShipmentController {
         featureGuard.requireModule("warehousing");
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         shipmentService.get(tenantId, id); // 404s if the shipment doesn't exist or isn't this tenant's
-        EvidenceResponse evidence = evidenceFacade.attach(tenantId, file, evidenceType, "warehousing",
+        String type = WhseEvidenceRules.requireInboundType(evidenceType);
+        if (file == null || file.isEmpty()) throw new IllegalArgumentException("Choose a file to attach.");
+        if (!WhseEvidenceRules.acceptableFile(file.getOriginalFilename(), file.getContentType())) {
+            throw new IllegalArgumentException("Attach a photo, PDF, text or Office document.");
+        }
+        EvidenceResponse evidence = evidenceFacade.attach(tenantId, file, type, "warehousing",
                 EVIDENCE_ENTITY_TYPE, id, null, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Evidence attached", evidence));
     }
@@ -119,6 +125,26 @@ public class WhseInboundShipmentController {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         shipmentService.get(tenantId, id);
         return ResponseEntity.ok(ApiResponse.success(evidenceFacade.listFor(tenantId, "warehousing", EVIDENCE_ENTITY_TYPE, id)));
+    }
+
+    @GetMapping("/inbound-shipments/{id}/evidence/{evidenceId}/download")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSING_READ','WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
+    @Operation(summary = "Download a document attached to this shipment")
+    public ResponseEntity<byte[]> downloadEvidence(@PathVariable UUID id, @PathVariable UUID evidenceId) {
+        featureGuard.requireModule("warehousing");
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        shipmentService.get(tenantId, id);
+        // Only a document attached to this shipment: an id from another record (or tenant) is not found here.
+        if (evidenceFacade.listFor(tenantId, "warehousing", EVIDENCE_ENTITY_TYPE, id).stream().noneMatch(e -> e.id().equals(evidenceId))) {
+            throw new za.co.handyflow.platform.shared.ResourceNotFoundException("Evidence", evidenceId.toString());
+        }
+        EvidenceFacade.DownloadedEvidence file = evidenceFacade.download(tenantId, evidenceId);
+        String safeName = file.fileName() == null ? "document" : file.fileName().replaceAll("[\\r\\n\"\\\\/]", "_");
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + safeName + "\"")
+                .header("X-Content-Type-Options", "nosniff")
+                .contentType(MediaType.parseMediaType(file.contentType() == null ? "application/octet-stream" : file.contentType()))
+                .body(file.content());
     }
 
     private InboundShipmentResponse toResponse(WhseInboundShipment s) {
