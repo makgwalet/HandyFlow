@@ -23,6 +23,10 @@ describe("events dashboard", () => {
   it("is closed to people without the reports permission and fetches nothing", () => {
     wrap(<EventsDashboardTab onOpenEvent={() => {}} />); expect(screen.getByText(/do not have access/)).toBeTruthy(); expect(get).not.toHaveBeenCalled()
   })
+  it("plain read access is enough, as on the server", async () => {
+    perms = ["EVENTS_READ"]; get.mockResolvedValue({ data: { data: overview } }); wrap(<EventsDashboardTab onOpenEvent={() => {}} />)
+    await waitFor(() => screen.getByText("Summit"))
+  })
   it("shows counts, warnings before info, and opens an event", async () => {
     perms = ["EVENTS_REPORTS_READ"]; get.mockResolvedValue({ data: { data: overview } }); const open = vi.fn()
     wrap(<EventsDashboardTab onOpenEvent={open} />)

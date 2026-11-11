@@ -580,7 +580,7 @@ export const EVENTS_SECTIONS: ModuleSections = {
   basePath: '/events',
   title: 'Events',
   icon: PartyPopper,
-  // Opens on the list, which anyone with EVENTS_READ can use; the dashboard needs EVENTS_REPORTS_READ.
+  // Opens on the list, as it always has.
   defaultSection: 'events',
   groups: [
     { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
@@ -595,6 +595,7 @@ export const EVENTS_SECTIONS: ModuleSections = {
         { id: 'add-guests', label: 'Add guests', icon: UserPlus },
         { id: 'waitlist', label: 'Waitlist', icon: ListPlus },
         { id: 'payments', label: 'Payments', icon: CreditCard },
+        { id: 'budget', label: 'Budget & costs', icon: Wallet },
         { id: 'vendors', label: 'Vendors', icon: Truck },
         { id: 'analytics', label: 'Analytics', icon: BarChart2 },
         { id: 'audit', label: 'Audit trail', icon: History },

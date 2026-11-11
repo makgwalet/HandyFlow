@@ -2,7 +2,7 @@
 //
 // Numbers for the selected event, from the server's dashboards (exact at any size; the previous version added up the first 500 guests in the browser):
 // registration (capacity, ticket types, where registrations came from, per day) and, while the door is open, live attendance that refreshes every 15
-// seconds. Needs EVENTS_REPORTS_READ.
+// seconds. Needs EVENTS_REPORTS_READ or plain EVENTS_READ.
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
@@ -41,7 +41,7 @@ function Bars({ rows, label }: { rows: { key: string; label: string; value: numb
 }
 
 export default function EventAnalytics({ eventId }: { eventId: string | null }) {
-  const allowed = usePermissions(["EVENTS_REPORTS_READ", "EVENTS_MANAGE"])
+  const allowed = usePermissions(["EVENTS_REPORTS_READ", "EVENTS_READ", "EVENTS_MANAGE"])
   const { data: reg, isLoading, error } = useQuery<Reg>({
     queryKey: ["event-dash-registration", eventId], enabled: !!eventId && allowed,
     queryFn: async () => { const r = await apiClient.get(`/api/v1/events/${eventId}/dashboard/registration`); return r.data?.data ?? r.data },

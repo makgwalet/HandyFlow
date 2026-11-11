@@ -1,7 +1,7 @@
 // src/pages/events/EventPaymentsTab.tsx
 //
 // Money for the selected event: what was asked and received, confirming money that arrived outside a provider (EFT, cash, card machine), cancelling an unpaid
-// checkout, refunds (raise, then mark paid out or failed) and a reconciliation CSV. Needs EVENTS_PAYMENTS_READ; each action needs its own permission.
+// checkout, refunds (raise, then mark paid out or failed) and a reconciliation CSV. Needs EVENTS_PAYMENTS_READ (also given by payments-manage or budget-read); each action needs its own permission.
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -37,7 +37,7 @@ type Action = { kind: "confirm"; p: Payment } | { kind: "cancel"; p: Payment } |
 
 export default function EventPaymentsTab({ eventId, eventTitle, onChangeEvent }: { eventId: string | null; eventTitle: string; onChangeEvent: () => void }) {
   const qc = useQueryClient()
-  const canRead = usePermissions(["EVENTS_PAYMENTS_READ", "EVENTS_MANAGE"])
+  const canRead = usePermissions(["EVENTS_PAYMENTS_READ", "EVENTS_PAYMENTS_MANAGE", "EVENTS_BUDGET_READ", "EVENTS_MANAGE"])
   const canManage = usePermissions(["EVENTS_PAYMENTS_MANAGE", "EVENTS_MANAGE"])
   const canRefundPerm = usePermissions(["EVENTS_REFUND", "EVENTS_MANAGE"])
   const [status, setStatus] = useState("")

@@ -25,6 +25,7 @@ describe("event payments", () => {
     await waitFor(() => screen.getByText(/T-1/)); expect(screen.getAllByText("Waiting for payment").length).toBeGreaterThan(1)
     for (const t of ["Confirm payment", "Cancel checkout", "Refund"]) expect(screen.queryByText(t)).toBeNull()
   })
+  it("budget-read is enough to see payments, as on the server", async () => { perms = ["EVENTS_BUDGET_READ"]; wrap(); await waitFor(() => screen.getByText(/T-1/)) })
   it("without read access nothing is fetched", () => { wrap(); expect(screen.getByText(/do not have access/)).toBeTruthy(); expect(get).not.toHaveBeenCalled() })
 
   it("confirming the right amount posts it with the reference", async () => {

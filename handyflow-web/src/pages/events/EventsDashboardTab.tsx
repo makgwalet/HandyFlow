@@ -1,7 +1,7 @@
 // src/pages/events/EventsDashboardTab.tsx
 //
 // The module's front page: how many events are in each state, what is live or coming up (with how full it is), and what needs attention. Reads
-// /events/dashboard/overview (EVENTS_REPORTS_READ). Opening an event takes you to its guests.
+// /events/dashboard/overview (EVENTS_REPORTS_READ, or plain EVENTS_READ). Opening an event takes you to its guests.
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
@@ -9,7 +9,7 @@ import { card, ErrorLine, btnGhost } from "../warehousing/whseUi"
 import { attentionTitle, barPercent, budgetStatusText, daysText, fillText, sortAttention, STATUS_ORDER, statusLabel, type Overview } from "./dashboardView"
 
 export default function EventsDashboardTab({ onOpenEvent }: { onOpenEvent: (id: string, title: string) => void }) {
-  const allowed = usePermissions(["EVENTS_REPORTS_READ", "EVENTS_MANAGE"])
+  const allowed = usePermissions(["EVENTS_REPORTS_READ", "EVENTS_READ", "EVENTS_MANAGE"])
   const { data, isLoading, error } = useQuery<Overview>({
     queryKey: ["events-overview"], enabled: allowed, refetchInterval: 60000,
     queryFn: async () => { const r = await apiClient.get("/api/v1/events/dashboard/overview"); return r.data?.data ?? r.data },
