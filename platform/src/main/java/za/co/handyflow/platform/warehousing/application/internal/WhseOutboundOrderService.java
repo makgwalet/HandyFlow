@@ -38,6 +38,7 @@ public class WhseOutboundOrderService {
     private final WhseTaskService taskService;
     private final WhseSerialService serialService;
     private final WhsePackingService packingService;
+    private final WhseOutbox outbox;
 
     /** One ordered line on a new outbound order. */
     public record OutboundLine(UUID itemId, BigDecimal qtyOrdered, String notes) {}
@@ -134,7 +135,9 @@ public class WhseOutboundOrderService {
         // The pick tasks are built from the lines' locations and the lot allocations, so the lines must be written first.
         lineRepository.flush();
         taskService.createPickTasks(tenantId, order.getId());
-        return orderRepository.save(order);
+        order = orderRepository.save(order);
+        emit(tenantId, order, lines, WhseWebhookRules.OUTBOUND_PICKING_STARTED, null);
+        return order;
     }
 
     /** Records picking progress on one line — informational only in this first pass, see markShipped()'s Javadoc. */
@@ -192,7 +195,33 @@ public class WhseOutboundOrderService {
             inventoryService.fulfillPick(tenantId, order.getClientId(), line.getItemId(), line.getLocationId(),
                     line.qtyToShip(), "OUTBOUND_ORDER", order.getId(), order.getOrderReference(), recordedBy);
         }
-        return orderRepository.save(order);
+        order = orderRepository.save(order);
+        emit(tenantId, order, lines, WhseWebhookRules.OUTBOUND_SHIPPED, java.util.Map.of("carrier", carrier == null ? "" : carrier, "trackingNumber", trackingNumber == null ? "" : trackingNumber));
+        return order;
+    }
+
+    /** Writes the outbox event for an order change, in the same transaction. Lines carry SKU and the quantities that matter at that point. */
+    private void emit(TenantId tenantId, WhseOutboundOrder order, List<WhseOutboundOrderLine> lines, String type, java.util.Map<String, Object> extra) {
+        java.util.Map<UUID, String> skus = outbox.skus(tenantId, lines.stream().map(WhseOutboundOrderLine::getItemId).distinct().toList());
+        java.util.List<java.util.Map<String, Object>> out = new java.util.ArrayList<>();
+        for (WhseOutboundOrderLine l : lines) {
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("lineId", l.getId());
+            m.put("itemId", l.getItemId());
+            m.put("sku", skus.get(l.getItemId()));
+            m.put("qtyOrdered", l.getQtyOrdered());
+            m.put("qtyToShip", l.qtyToShip());
+            m.put("qtyBackordered", l.getQtyBackordered());
+            out.add(m);
+        }
+        java.util.Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("orderId", order.getId());
+        data.put("orderReference", order.getOrderReference());
+        data.put("clientId", order.getClientId());
+        data.put("status", order.getStatus());
+        if (extra != null) data.putAll(extra);
+        data.put("lines", out);
+        outbox.record(tenantId, type, "OUTBOUND_ORDER", order.getId(), data);
     }
 
     /**
@@ -242,7 +271,9 @@ public class WhseOutboundOrderService {
             }
         }
         order.cancel();
-        return orderRepository.save(order);
+        order = orderRepository.save(order);
+        emit(tenantId, order, lineRepository.findByOrder(tenantId.getValue(), orderId), WhseWebhookRules.OUTBOUND_CANCELLED, null);
+        return order;
     }
 
     @Transactional(readOnly = true)

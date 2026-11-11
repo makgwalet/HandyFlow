@@ -41,6 +41,7 @@ public class WhseReceivingService {
     private final WhseInventoryService inventoryService;
     private final SeparationOfDutiesChecker duties;
     private final WhseLotService lotService;
+    private final WhseOutbox outbox;
 
     public record ReceiptRow(UUID id, UUID lineId, UUID itemId, String sku, UUID locationId, String locationCode, BigDecimal qtyGood,
                              BigDecimal qtyDamaged, BigDecimal qtyHeld, BigDecimal heldPending, String reason, UUID receivedBy, Instant receivedAt,
@@ -105,6 +106,19 @@ public class WhseReceivingService {
         line.receive(total, locationId);
         lineRepository.save(line);
         rollStatus(tenantId, shipment);
+        java.util.Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("receiptId", eventId);
+        data.put("shipmentId", shipmentId);
+        data.put("shipmentReference", shipment.getReferenceNumber());
+        data.put("shipmentStatus", shipment.getStatus());
+        data.put("itemId", line.getItemId());
+        data.put("sku", outbox.skus(tenantId, java.util.List.of(line.getItemId())).get(line.getItemId()));
+        data.put("qtyGood", g);
+        data.put("qtyDamaged", d);
+        data.put("qtyHeld", h);
+        data.put("locationId", locationId);
+        data.put("lotNumber", lotNumber == null || lotNumber.isBlank() ? null : lotNumber.trim());
+        outbox.record(tenantId, WhseWebhookRules.INBOUND_RECEIVED, "INBOUND_SHIPMENT", shipmentId, data);
         return eventId;
     }
 

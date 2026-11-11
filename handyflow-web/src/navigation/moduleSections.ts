@@ -805,6 +805,7 @@ export const WAREHOUSING_SECTIONS: ModuleSections = {
         { id: 'inspection', label: 'Inspection', icon: ClipboardCheck },
         { id: 'returns', label: 'Returns', icon: ArrowRightLeft },
         { id: 'lots', label: 'Lots & expiry', icon: CalendarClock },
+        { id: 'webhooks', label: 'Webhooks', icon: Plug, permission: 'WAREHOUSING_ADMIN' },
       ],
     },
     {

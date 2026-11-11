@@ -38,6 +38,7 @@ class WhseReceivingServiceTest {
     private WhseInventoryService inventory;
     private SeparationOfDutiesChecker duties;
     private WhseLotService lotService;
+    private WhseOutbox outbox;
     private WhseReceivingService service;
     private WhseInboundShipment shipment;
     private WhseInboundShipmentLine line;
@@ -50,7 +51,8 @@ class WhseReceivingServiceTest {
         inventory = mock(WhseInventoryService.class);
         duties = mock(SeparationOfDutiesChecker.class);
         lotService = mock(WhseLotService.class);
-        service = new WhseReceivingService(jdbc, shipments, lines, inventory, duties, lotService);
+        outbox = mock(WhseOutbox.class);
+        service = new WhseReceivingService(jdbc, shipments, lines, inventory, duties, lotService, outbox);
         shipment = WhseInboundShipment.create(tenant, client, "ASN-1", null, null);
         line = WhseInboundShipmentLine.create(tenant, shipment.getId(), item, new BigDecimal("10"), null);
         when(shipments.findByTenantAndId(tenant, shipment.getId())).thenReturn(Optional.of(shipment));
@@ -74,6 +76,25 @@ class WhseReceivingServiceTest {
         verify(inventory).receiveStockInStatus(eq(t()), eq(client), eq(item), eq(location), any(), eq(n("3")), eq("QUARANTINE"), eq("RECEIPT"), anyString(), any(), any(), any(), eq(receiver), anyString());
         assertEquals(0, n("10").compareTo(line.getReceivedQty()));
         assertEquals("RECEIVED", shipment.getStatus());
+    }
+
+    @Test @DisplayName("a receipt writes an inbound.received event in the same transaction, carrying the split quantities")
+    void writesOutboxEvent() {
+        service.receive(t(), shipment.getId(), line.getId(), n("5"), n("2"), n("3"), location, "crushed cartons", null, null, null, null, receiver);
+        org.mockito.ArgumentCaptor<java.util.Map<String, Object>> data = org.mockito.ArgumentCaptor.forClass(java.util.Map.class);
+        verify(outbox).record(eq(t()), eq("inbound.received"), eq("INBOUND_SHIPMENT"), eq(shipment.getId()), data.capture());
+        assertEquals(n("5"), data.getValue().get("qtyGood"));
+        assertEquals(n("2"), data.getValue().get("qtyDamaged"));
+        assertEquals(n("3"), data.getValue().get("qtyHeld"));
+        assertEquals("ASN-1", data.getValue().get("shipmentReference"));
+    }
+
+    @Test @DisplayName("a repeated idempotent request writes no second event")
+    void noSecondEvent() {
+        UUID first = UUID.randomUUID();
+        when(jdbc.query(contains("idempotency_key"), any(RowMapper.class), any(Object[].class))).thenReturn(List.of(first));
+        service.receive(t(), shipment.getId(), line.getId(), n("5"), null, null, location, null, null, null, null, "key-1", receiver);
+        verifyNoInteractions(outbox);
     }
 
     @Test @DisplayName("a zero part is not posted")
