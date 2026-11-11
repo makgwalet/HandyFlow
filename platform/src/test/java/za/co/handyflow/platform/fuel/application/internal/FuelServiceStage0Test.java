@@ -45,6 +45,7 @@ class FuelServiceStage0Test {
     @Mock FuelCustomerAccountRepository accountRepository;
     @Mock FuelCustomerSiteRepository siteRepository;
     @Mock FuelOrderFulfilment orderFulfilment;
+    @Mock FuelPurchasingService purchasing;
     @InjectMocks FuelService service;
 
     static final TenantId TENANT = TenantId.of(UUID.randomUUID());
@@ -163,7 +164,7 @@ class FuelServiceStage0Test {
     void receiveRejectsForeignSupplier() {
         UUID foreign = UUID.randomUUID();
         when(supplierRepository.findActiveById(eq(TENANT), any())).thenReturn(Optional.empty());
-        ReceiveFuelRequest req = new ReceiveFuelRequest(bd("100"), bd("20"), Instant.now(), foreign, null, null);
+        ReceiveFuelRequest req = new ReceiveFuelRequest(bd("100"), bd("20"), Instant.now(), foreign, null, null, null);
         assertThrows(ResourceNotFoundException.class, () -> service.receiveFuel(TENANT, UUID.randomUUID(), req));
         assertEquals(0, bd("5000").compareTo(tank.getCurrentLitres()));
     }

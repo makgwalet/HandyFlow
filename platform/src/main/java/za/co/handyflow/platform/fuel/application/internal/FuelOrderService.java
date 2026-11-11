@@ -37,6 +37,7 @@ public class FuelOrderService {
     private final OrderNumberGenerator numbers;
     private final InvoicingFacade invoicing;
     private final CrmFacade crm;
+    private final FuelPricingService pricing;
 
     @Transactional(readOnly = true)
     public Page<OrderResponse> list(TenantId tenantId, Pageable pageable) {
@@ -53,8 +54,9 @@ public class FuelOrderService {
         FuelCustomerAccount account = accounts.findActiveById(tenantId, req.accountId())
                 .orElseThrow(() -> new ResourceNotFoundException("Customer account", req.accountId().toString()));
         requireSiteOf(tenantId, req.siteId(), account);
+        BigDecimal price = priceFor(tenantId, account, req);
         FuelSalesOrder o = FuelSalesOrder.create(tenantId, numbers.generate(tenantId), account.getId(), account.getCrmCustomerId(),
-                req.siteId(), req.fuelType(), req.litres(), req.pricePerLitre(), req.requestedDate(), req.quoteValidUntil(),
+                req.siteId(), req.fuelType(), req.litres(), price, req.requestedDate(), req.quoteValidUntil(),
                 req.customerReference(), req.notes(), by);
         return toResponse(tenantId, orders.save(o), false);
     }
@@ -65,7 +67,7 @@ public class FuelOrderService {
         FuelCustomerAccount account = accounts.findActiveById(tenantId, o.getAccountId())
                 .orElseThrow(() -> new ResourceNotFoundException("Customer account", o.getAccountId().toString()));
         requireSiteOf(tenantId, req.siteId(), account);
-        o.revise(req.siteId(), req.fuelType(), req.litres(), req.pricePerLitre(), req.requestedDate(), req.quoteValidUntil(),
+        o.revise(req.siteId(), req.fuelType(), req.litres(), priceFor(tenantId, account, req), req.requestedDate(), req.quoteValidUntil(),
                 req.customerReference(), req.notes());
         return toResponse(tenantId, orders.save(o), false);
     }
@@ -181,6 +183,14 @@ public class FuelOrderService {
         BigDecimal after = ar.add(uninvoiced).add(others).add(thisOrder);
         return new CreditCheckResponse(account.getCreditLimit(), ar, uninvoiced, others, thisOrder, after,
                 after.compareTo(account.getCreditLimit()) <= 0, account.isCreditHold());
+    }
+
+    /** A typed price wins; otherwise the contract/standard price applies, and with none set the quote cannot be priced. */
+    private BigDecimal priceFor(TenantId tenantId, FuelCustomerAccount account, OrderRequest req) {
+        if (req.pricePerLitre() != null) return req.pricePerLitre();
+        return pricing.resolve(tenantId, account.getId(), req.fuelType(), req.litres(), LocalDate.now(SAST))
+                .map(za.co.handyflow.platform.fuel.dto.ResolvedPriceResponse::pricePerLitre)
+                .orElseThrow(() -> new IllegalArgumentException("No price is set for " + req.fuelType() + " for this customer and quantity. Enter a price, or add one under Pricing."));
     }
 
     private void requireSiteOf(TenantId tenantId, UUID siteId, FuelCustomerAccount account) {

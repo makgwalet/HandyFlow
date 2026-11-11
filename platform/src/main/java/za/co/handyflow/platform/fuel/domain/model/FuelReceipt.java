@@ -67,6 +67,9 @@ public class FuelReceipt {
     @Version
     private Long version;
 
+    @Column(name = "purchase_order_id")
+    private UUID purchaseOrderId;
+
     @Column(name = "reversed_at")
     private Instant reversedAt;
 
@@ -98,6 +101,8 @@ public class FuelReceipt {
         r.updatedAt      = Instant.now();
         return r;
     }
+
+    public void assignPurchaseOrder(UUID purchaseOrderId) { this.purchaseOrderId = purchaseOrderId; }
 
     public boolean isDeleted() { return deletedAt != null; }
 

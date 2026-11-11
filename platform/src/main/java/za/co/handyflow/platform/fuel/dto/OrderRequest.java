@@ -11,7 +11,8 @@ public record OrderRequest(
         UUID siteId,
         @NotBlank @Size(max = 30) String fuelType,
         @NotNull @Positive(message = "Litres must be greater than zero") BigDecimal litres,
-        @NotNull @PositiveOrZero(message = "Price per litre cannot be negative") BigDecimal pricePerLitre,
+        // Leave empty to use the contract or standard price for the customer, product and quantity.
+        @PositiveOrZero(message = "Price per litre cannot be negative") BigDecimal pricePerLitre,
         LocalDate requestedDate,
         LocalDate quoteValidUntil,
         @Size(max = 60) String customerReference,

@@ -43,6 +43,7 @@ class FuelTransportServiceTest {
     @Mock FuelService fuelService;
     @Mock HrFacade hr;
     @Mock CrmFacade crm;
+    @Mock FuelComplianceService compliance;
     @InjectMocks FuelTransportService service;
 
     static final TenantId T = TenantId.of(UUID.randomUUID());
@@ -170,5 +171,14 @@ class FuelTransportServiceTest {
         when(hr.findEmployeeByUserId(T, me)).thenReturn(Optional.empty());
         IllegalStateException e = assertThrows(IllegalStateException.class, () -> service.myLoads(T, me));
         assertTrue(e.getMessage().contains("linked to an employee"));
+    }
+
+    @Test @DisplayName("Stage 4: an expired certificate stops the allocation before anything is saved")
+    void complianceBlocks() {
+        doThrow(new IllegalStateException("Cannot allocate: GP 12 AB has an expired Roadworthy (expired 2026-10-01).")).when(compliance)
+                .requireCompliantForAllocation(any(), any(), any(), any(), any());
+        assertThrows(IllegalStateException.class, () -> service.allocate(T, load.getId(), alloc("10000", "2000")));
+        assertFalse(load.isAllocated());
+        verify(loadSplits, never()).saveAll(any());
     }
 }

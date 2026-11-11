@@ -28,4 +28,7 @@ public interface FuelSalesOrderRepository extends JpaRepository<FuelSalesOrder, 
     /** Orders that still owe fuel to this customer (confirmed or part delivered). */
     @Query("SELECT o FROM FuelSalesOrder o WHERE o.tenantId = :tenantId AND o.crmCustomerId = :customerId AND o.status IN ('CONFIRMED','PART_DELIVERED') AND o.deletedAt IS NULL")
     List<FuelSalesOrder> findOpenForCustomer(TenantId tenantId, UUID customerId);
+
+    @Query("SELECT COUNT(o) FROM FuelSalesOrder o WHERE o.tenantId = :tenantId AND o.status = :status AND o.deletedAt IS NULL")
+    long countByStatus(TenantId tenantId, String status);
 }

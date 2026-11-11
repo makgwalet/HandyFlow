@@ -38,6 +38,7 @@ public class FuelTransportService {
     private final FuelService fuelService;
     private final HrFacade hr;
     private final CrmFacade crm;
+    private final FuelComplianceService compliance;
 
     // ── Tankers ──────────────────────────────────────────────────────────────
 
@@ -107,6 +108,8 @@ public class FuelTransportService {
         if (driver.status() != null && driver.status().toUpperCase().startsWith("TERMINATED")) {
             throw new IllegalStateException(driver.fullName() + " is no longer employed.");
         }
+
+        compliance.requireCompliantForAllocation(tenantId, tanker.getId(), tanker.getRegistration(), driver.id(), driver.fullName());
 
         Map<UUID, FuelTankerCompartment> comps = compartments.findByTanker(tenantId, tanker.getId()).stream()
                 .collect(Collectors.toMap(FuelTankerCompartment::getId, c -> c));

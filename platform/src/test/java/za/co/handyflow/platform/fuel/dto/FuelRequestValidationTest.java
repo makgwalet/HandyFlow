@@ -19,29 +19,29 @@ class FuelRequestValidationTest {
 
     @Test @DisplayName("dispatch: zero and negative litres are rejected, positive accepted")
     void dispatch() {
-        assertFalse(v.validate(new DispatchFuelRequest(bd("-5"), null, Instant.now(), null, null, null, "X", null, null, null, null)).isEmpty());
-        assertFalse(v.validate(new DispatchFuelRequest(bd("0"), null, Instant.now(), null, null, null, "X", null, null, null, null)).isEmpty());
-        assertTrue(v.validate(new DispatchFuelRequest(bd("50"), bd("22.1"), Instant.now(), null, null, null, "X", null, null, null, null)).isEmpty());
-        assertFalse(v.validate(new DispatchFuelRequest(bd("50"), bd("-1"), Instant.now(), null, null, null, "X", null, null, null, null)).isEmpty());
+        assertFalse(v.validate(new DispatchFuelRequest(bd("-5"), null, Instant.now(), null, null, null, "X", null, null, null, null, null)).isEmpty());
+        assertFalse(v.validate(new DispatchFuelRequest(bd("0"), null, Instant.now(), null, null, null, "X", null, null, null, null, null)).isEmpty());
+        assertTrue(v.validate(new DispatchFuelRequest(bd("50"), bd("22.1"), Instant.now(), null, null, null, "X", null, null, null, null, null)).isEmpty());
+        assertFalse(v.validate(new DispatchFuelRequest(bd("50"), bd("-1"), Instant.now(), null, null, null, "X", null, null, null, null, null)).isEmpty());
     }
 
     @Test @DisplayName("receive: litres and price must be positive")
     void receive() {
-        assertFalse(v.validate(new ReceiveFuelRequest(bd("-1"), bd("20"), Instant.now(), null, null, null)).isEmpty());
-        assertFalse(v.validate(new ReceiveFuelRequest(bd("10"), bd("0"), Instant.now(), null, null, null)).isEmpty());
-        assertTrue(v.validate(new ReceiveFuelRequest(bd("10"), bd("20"), Instant.now(), null, null, null)).isEmpty());
+        assertFalse(v.validate(new ReceiveFuelRequest(bd("-1"), bd("20"), Instant.now(), null, null, null, null)).isEmpty());
+        assertFalse(v.validate(new ReceiveFuelRequest(bd("10"), bd("0"), Instant.now(), null, null, null, null)).isEmpty());
+        assertTrue(v.validate(new ReceiveFuelRequest(bd("10"), bd("20"), Instant.now(), null, null, null, null)).isEmpty());
     }
 
     @Test @DisplayName("complete delivery: litres must be positive")
     void complete() {
-        assertFalse(v.validate(new CompleteDeliveryRequest(bd("-1"), "R", null, null, null, false, null, null, null)).isEmpty());
-        assertTrue(v.validate(new CompleteDeliveryRequest(bd("1"), "R", null, null, null, false, null, null, null)).isEmpty());
+        assertFalse(v.validate(new CompleteDeliveryRequest(bd("-1"), "R", null, null, null, false, null, null, null, null)).isEmpty());
+        assertTrue(v.validate(new CompleteDeliveryRequest(bd("1"), "R", null, null, null, false, null, null, null, null)).isEmpty());
     }
 
     @Test @DisplayName("schedule delivery: litres must be positive")
     void schedule() {
-        assertFalse(v.validate(new CreateDeliveryRequest(UUID.randomUUID(), null, Map.of(), "DIESEL", bd("0"), bd("22"), Instant.now(), null, null, null)).isEmpty());
-        assertTrue(v.validate(new CreateDeliveryRequest(UUID.randomUUID(), null, Map.of(), "DIESEL", bd("500"), bd("22"), Instant.now(), null, null, null)).isEmpty());
+        assertFalse(v.validate(new CreateDeliveryRequest(UUID.randomUUID(), null, Map.of(), "DIESEL", bd("0"), bd("22"), Instant.now(), null, null, null, null)).isEmpty());
+        assertTrue(v.validate(new CreateDeliveryRequest(UUID.randomUUID(), null, Map.of(), "DIESEL", bd("500"), bd("22"), Instant.now(), null, null, null, null)).isEmpty());
     }
 
     @Test @DisplayName("tank: capacity must be positive; threshold 0-100")

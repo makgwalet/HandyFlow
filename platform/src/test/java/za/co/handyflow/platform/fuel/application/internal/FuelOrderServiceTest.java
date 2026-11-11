@@ -16,6 +16,7 @@ import za.co.handyflow.platform.fuel.domain.model.FuelSalesOrder;
 import za.co.handyflow.platform.fuel.domain.model.FuelTank;
 import za.co.handyflow.platform.fuel.domain.repository.*;
 import za.co.handyflow.platform.fuel.dto.*;
+import za.co.handyflow.platform.fuel.dto.ResolvedPriceResponse;
 import za.co.handyflow.platform.invoicing.application.InvoicingFacade;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
@@ -45,6 +46,7 @@ class FuelOrderServiceTest {
     @Mock OrderNumberGenerator numbers;
     @Mock InvoicingFacade invoicing;
     @Mock CrmFacade crm;
+    @Mock FuelPricingService pricing;
     @InjectMocks FuelOrderService service;
 
     static final TenantId T = TenantId.of(UUID.randomUUID());
@@ -177,5 +179,17 @@ class FuelOrderServiceTest {
         assertThrows(ResourceNotFoundException.class, () -> service.get(other, id));
         assertThrows(ResourceNotFoundException.class, () -> service.confirm(other, id, confirmReq(null), true, null));
         assertThrows(ResourceNotFoundException.class, () -> service.cancel(other, id, new OrderCancelRequest("Not yours")));
+    }
+
+    @Test @DisplayName("Stage 4: an empty price is filled from the price list; a typed price wins; no price at all refuses the quote")
+    void priceDefaulting() {
+        when(numbers.generate(any())).thenReturn("SO-2026-00009");
+        when(pricing.resolve(any(), any(), any(), any(), any())).thenReturn(Optional.of(new ResolvedPriceResponse(bd("21.75"), "CONTRACT", UUID.randomUUID(), BigDecimal.ZERO)));
+        OrderResponse r = service.create(T, new OrderRequest(account.getId(), null, "DIESEL", bd("1000"), null, null, null, null, null), null);
+        assertEquals(0, bd("21.75").compareTo(r.pricePerLitre()));
+        r = service.create(T, new OrderRequest(account.getId(), null, "DIESEL", bd("1000"), bd("19.00"), null, null, null, null), null);
+        assertEquals(0, bd("19.00").compareTo(r.pricePerLitre()));
+        when(pricing.resolve(any(), any(), any(), any(), any())).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> service.create(T, new OrderRequest(account.getId(), null, "DIESEL", bd("1000"), null, null, null, null, null), null));
     }
 }

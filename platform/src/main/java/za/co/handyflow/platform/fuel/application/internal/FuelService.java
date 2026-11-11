@@ -52,6 +52,7 @@ public class FuelService {
 
     private final FuelTankRepository     tankRepository;
     private final FuelSupplierRepository supplierRepository;
+    private final FuelPurchasingService purchasing;
     private final FuelReceiptRepository  receiptRepository;
     private final FuelDispatchRepository dispatchRepository;
     private final DipReadingRepository   dipRepository;
@@ -378,6 +379,9 @@ public class FuelService {
                                        ReceiveFuelRequest req) {
         requireSupplier(tenantId, req.supplierId());
         FuelTank tank = findActiveTankForUpdate(tenantId, tankId);
+        if (req.purchaseOrderId() != null) {
+            purchasing.checkReceivable(tenantId, req.purchaseOrderId(), req.supplierId(), tank.getFuelType(), req.litresReceived());
+        }
         var levelBefore = tank.getCurrentLitres();
 
         // addStock validates capacity — throws if would overflow.
@@ -390,7 +394,9 @@ public class FuelService {
                 req.supplierId(), req.litresReceived(), req.pricePerLitre(),
                 req.receivedAt(), req.deliveryNote(), req.invoiceRef(),
                 levelBefore, levelAfter);
+        receipt.assignPurchaseOrder(req.purchaseOrderId());
         receiptRepository.save(receipt);
+        if (req.purchaseOrderId() != null) purchasing.resync(tenantId, req.purchaseOrderId());
         ledger.post(tank, FuelStockMovement.Type.RECEIPT, req.litresReceived(), "RECEIPT", receipt.getId(),
                 req.deliveryNote() != null ? "Delivery note " + req.deliveryNote() : null);
 
@@ -764,6 +770,7 @@ public class FuelService {
         tankRepository.save(tank);
         r.reverse(actingUserId, req.reason().trim());
         receiptRepository.save(r);
+        if (r.getPurchaseOrderId() != null) purchasing.resync(tenantId, r.getPurchaseOrderId());
         ledger.post(tank, FuelStockMovement.Type.REVERSAL, r.getLitresReceived().negate(), "RECEIPT", r.getId(), req.reason().trim());
         log.info("Receipt reversed id={} litres={} by={}", receiptId, r.getLitresReceived(), actingUserId);
         return toReceiptResponse(r);

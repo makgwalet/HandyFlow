@@ -36,4 +36,15 @@ public interface FuelReceiptRepository extends JpaRepository<FuelReceipt, UUID> 
 
     @Query("SELECT r FROM FuelReceipt r WHERE r.tenantId = :tenantId AND r.id = :id AND r.deletedAt IS NULL")
     Optional<FuelReceipt> findActiveById(TenantId tenantId, UUID id);
+
+    /** Litres received against a purchase order, net of reversed receipts. */
+    @Query("SELECT COALESCE(SUM(r.litresReceived), 0) FROM FuelReceipt r WHERE r.tenantId = :tenantId AND r.purchaseOrderId = :poId AND r.deletedAt IS NULL AND r.reversedAt IS NULL")
+    java.math.BigDecimal sumReceivedForPo(TenantId tenantId, UUID poId);
+
+    /** Same, for many orders at once: rows of [purchaseOrderId, litres]. */
+    @Query("SELECT r.purchaseOrderId, SUM(r.litresReceived) FROM FuelReceipt r WHERE r.tenantId = :tenantId AND r.purchaseOrderId IS NOT NULL AND r.deletedAt IS NULL AND r.reversedAt IS NULL GROUP BY r.purchaseOrderId")
+    List<Object[]> sumReceivedByPo(TenantId tenantId);
+
+    @Query("SELECT r FROM FuelReceipt r WHERE r.tenantId = :tenantId AND r.purchaseOrderId = :poId AND r.deletedAt IS NULL ORDER BY r.receivedAt")
+    List<FuelReceipt> findByPo(TenantId tenantId, UUID poId);
 }
