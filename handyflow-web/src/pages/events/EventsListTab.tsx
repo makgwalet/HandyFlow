@@ -8,6 +8,7 @@ import {
 } from "lucide-react"
 import { usePermissions } from "../../hooks/usePermission"
 import { ErrorLine } from "../warehousing/whseUi"
+import EventWizard from "./EventWizard"
 import { CancelEventModal, DuplicateModal, EVENT_TYPES, EventFormModal, PostponeModal } from "./EventDialogs"
 import { canCancel, canComplete, canDuplicate, canEdit, canGoLive, canPostpone, canPublish } from "./eventActions"
 
@@ -172,7 +173,7 @@ export default function EventsListTab({ onSelectEvent }: Props) {
         </div>
       )}
 
-      {dialog?.kind === "create" && <EventFormModal onClose={() => setDialog(null)} />}
+      {dialog?.kind === "create" && <EventWizard onClose={() => setDialog(null)} onCreated={(id, title) => { setDialog(null); onSelectEvent(id, title) }} />}
       {dialog?.kind === "edit" && <EventFormModal event={dialog.event} onClose={() => setDialog(null)} />}
       {dialog?.kind === "postpone" && <PostponeModal event={dialog.event} onClose={() => setDialog(null)} />}
       {dialog?.kind === "copy" && <DuplicateModal event={dialog.event} onClose={() => setDialog(null)} />}
