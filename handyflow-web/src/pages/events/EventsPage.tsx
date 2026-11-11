@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import EventsListTab   from "./EventsListTab"
 import EventsCalendarTab from "./EventsCalendarTab"
+import EventOverviewTab from "./EventOverviewTab"
 import GuestsTab       from "./GuestsTab"
 import VendorsTab      from "./VendorsTab"
 import EventAnalytics  from "./EventAnalytics"
@@ -74,13 +75,14 @@ export function EventsPage() {
       render={(id, goTo) => {
         switch (id) {
           case "dashboard":
-            return <EventsDashboardTab onOpenEvent={(eid: string, title: string) => { setSelectedEventId(eid); setSelectedEventTitle(title); goTo("guests") }} />
+            return <EventsDashboardTab onOpenEvent={(eid: string, title: string) => { setSelectedEventId(eid); setSelectedEventTitle(title); goTo("overview") }} />
           case "events":
             return <EventsListTab onSelectEvent={(eid: string, title: string) => {
-              setSelectedEventId(eid); setSelectedEventTitle(title); goTo("guests")
+              setSelectedEventId(eid); setSelectedEventTitle(title); goTo("overview")
             }} />
           case "calendar":
-            return <EventsCalendarTab onSelectEvent={(eid: string, title: string) => { setSelectedEventId(eid); setSelectedEventTitle(title); goTo("guests") }} />
+            return <EventsCalendarTab onSelectEvent={(eid: string, title: string) => { setSelectedEventId(eid); setSelectedEventTitle(title); goTo("overview") }} />
+          case "overview":  return <EventOverviewTab eventId={selectedEventId} onChangeEvent={() => goTo("events")} goTo={goTo} />
           case "tickets":   return <EventTicketsTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />
           case "guests":    return <GuestsTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />
           case "waitlist":  return <WaitlistTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />

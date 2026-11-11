@@ -590,6 +590,7 @@ export const EVENTS_SECTIONS: ModuleSections = {
       // current selection under its title.
       label: 'Selected event',
       sections: [
+        { id: 'overview', label: 'Overview', icon: LayoutDashboard },
         { id: 'tickets', label: 'Ticket types', icon: Tags },
         { id: 'guests', label: 'Guests', icon: Users },
         { id: 'add-guests', label: 'Add guests', icon: UserPlus },
