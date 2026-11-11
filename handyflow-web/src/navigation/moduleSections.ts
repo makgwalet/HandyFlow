@@ -598,6 +598,8 @@ export const EVENTS_SECTIONS: ModuleSections = {
         { id: 'budget', label: 'Budget & costs', icon: Wallet },
         { id: 'programme', label: 'Run sheet', icon: CalendarClock },
         { id: 'checklist', label: 'Checklist', icon: ListChecks },
+        { id: 'staff', label: 'Roster', icon: UserCheck },
+        { id: 'incidents', label: 'Incidents', icon: Siren },
         { id: 'vendors', label: 'Vendors', icon: Truck },
         { id: 'analytics', label: 'Analytics', icon: BarChart2 },
         { id: 'audit', label: 'Audit trail', icon: History },
