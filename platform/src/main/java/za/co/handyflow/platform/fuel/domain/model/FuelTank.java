@@ -106,6 +106,9 @@ public class FuelTank {
     // 0, so the formula reduces to receiptPrice directly — no special
     // case needed).
     public BigDecimal addStock(BigDecimal litres, BigDecimal receiptPricePerLitre) {
+        if (litres == null || litres.signum() <= 0) {
+            throw new IllegalArgumentException("Litres must be greater than zero.");
+        }
         BigDecimal newLevel = this.currentLitres.add(litres);
         if (newLevel.compareTo(this.capacityLitres) > 0) {
             throw new IllegalArgumentException(
@@ -125,7 +128,26 @@ public class FuelTank {
         return this.currentLitres;
     }
 
+    /**
+     * Puts litres back after a reversed dispatch or delivery. Capacity is
+     * still enforced, but the weighted-average cost is left alone: the
+     * fuel returns at the cost it left at.
+     */
+    public BigDecimal restoreStock(BigDecimal litres) {
+        BigDecimal newLevel = this.currentLitres.add(litres);
+        if (newLevel.compareTo(this.capacityLitres) > 0) {
+            throw new IllegalStateException("Cannot reverse: restoring " + litres
+                    + "L would exceed the tank capacity (" + capacityLitres + "L, now " + currentLitres + "L).");
+        }
+        this.currentLitres = newLevel;
+        this.updatedAt     = Instant.now();
+        return newLevel;
+    }
+
     public BigDecimal removeStock(BigDecimal litres) {
+        if (litres == null || litres.signum() <= 0) {
+            throw new IllegalArgumentException("Litres must be greater than zero.");
+        }
         if (litres.compareTo(this.currentLitres) > 0) {
             throw new IllegalArgumentException(
                     "Insufficient fuel. Requested: " + litres +

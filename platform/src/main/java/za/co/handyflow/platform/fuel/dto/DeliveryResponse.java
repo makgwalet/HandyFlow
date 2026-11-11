@@ -16,5 +16,6 @@ public record DeliveryResponse(
         BigDecimal meterReadingStart, BigDecimal meterReadingEnd,
         String receiptNumber, Instant receiptGeneratedAt,
         boolean signedOnBehalf, String onBehalfOf,
-        Instant createdAt
+        Instant createdAt,
+        Instant reversedAt, String reversalReason
 ) {}

@@ -56,7 +56,7 @@ class FleetFuelDispatchEventHandler {
                 return;
             }
 
-            Vehicle vehicle = vehicleRepo.findById(event.vehicleId()).orElse(null);
+            Vehicle vehicle = vehicleRepo.findActiveById(event.tenantId(), event.vehicleId()).orElse(null);
             if (vehicle == null) {
                 log.warn("[Fleet] Fuel dispatch={} references vehicle={} not found in Fleet — not reconciled",
                         event.dispatchId(), event.vehicleId());

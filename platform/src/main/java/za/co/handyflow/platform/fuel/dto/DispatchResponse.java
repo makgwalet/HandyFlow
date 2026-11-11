@@ -5,5 +5,6 @@ public record DispatchResponse(
         String recipientName, BigDecimal litresDispensed, BigDecimal pricePerLitre,
         Instant dispatchedAt, Integer odometerReading, BigDecimal hoursReading,
         String authorisedBy, BigDecimal levelBefore, BigDecimal levelAfter,
-        Instant createdAt
+        Instant createdAt,
+        Instant reversedAt, String reversalReason
 ) {}

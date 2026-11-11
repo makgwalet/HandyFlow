@@ -340,6 +340,53 @@ public class FuelTankController {
                 fuelService.completeDelivery(TenantContext.getTenantIdAsObject(), id, request)));
     }
 
+    @PostMapping("/deliveries/{id}/dispatch")
+    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    public ResponseEntity<ApiResponse<DeliveryResponse>> dispatchDelivery(
+            @PathVariable UUID id, @Valid @RequestBody DispatchDeliveryRequest request) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Delivery on its way",
+                fuelService.dispatchDelivery(TenantContext.getTenantIdAsObject(), id, request)));
+    }
+
+    @PostMapping("/deliveries/{id}/cancel")
+    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    public ResponseEntity<ApiResponse<DeliveryResponse>> cancelDelivery(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Delivery cancelled",
+                fuelService.cancelDelivery(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/deliveries/{id}/reverse")
+    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    public ResponseEntity<ApiResponse<DeliveryResponse>> reverseDelivery(
+            @PathVariable UUID id, @Valid @RequestBody ReverseRequest request) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Delivery reversed",
+                fuelService.reverseDelivery(TenantContext.getTenantIdAsObject(), id, request,
+                        TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/dispatches/{id}/reverse")
+    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    public ResponseEntity<ApiResponse<DispatchResponse>> reverseDispatch(
+            @PathVariable UUID id, @Valid @RequestBody ReverseRequest request) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Dispatch reversed",
+                fuelService.reverseDispatch(TenantContext.getTenantIdAsObject(), id, request,
+                        TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/receipts/{id}/reverse")
+    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    public ResponseEntity<ApiResponse<ReceiptResponse>> reverseReceipt(
+            @PathVariable UUID id, @Valid @RequestBody ReverseRequest request) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Receipt reversed",
+                fuelService.reverseReceipt(TenantContext.getTenantIdAsObject(), id, request,
+                        TenantContext.getCurrentUserId())));
+    }
+
     @GetMapping("/deliveries/{id}/receipt")
     @PreAuthorize("hasAuthority('FUEL_READ')")
     public ResponseEntity<byte[]> downloadReceipt(@PathVariable UUID id) {

@@ -69,6 +69,7 @@ public class FuelService {
     private final ApplicationEventPublisher eventPublisher;
     // FIX: backlog 5.3 — submits dispatches for post-hoc review.
     private final ApprovalFacade approvalFacade;
+    private final za.co.handyflow.platform.crm.CrmFacade crmFacade;
 
     @Value("${fuel.forecast.lookback-days:30}")
     private int forecastLookbackDays = 30;
@@ -371,7 +372,8 @@ public class FuelService {
     @Transactional
     public ReceiptResponse receiveFuel(TenantId tenantId, UUID tankId,
                                        ReceiveFuelRequest req) {
-        FuelTank tank = findActiveTank(tenantId, tankId);
+        requireSupplier(tenantId, req.supplierId());
+        FuelTank tank = findActiveTankForUpdate(tenantId, tankId);
         var levelBefore = tank.getCurrentLitres();
 
         // addStock validates capacity — throws if would overflow.
@@ -425,7 +427,8 @@ public class FuelService {
     @Transactional
     public DispatchResponse dispatchFuel(TenantId tenantId, UUID tankId,
                                          DispatchFuelRequest req, UUID actingUserId) {
-        FuelTank tank = findActiveTank(tenantId, tankId);
+        requireCustomer(tenantId, req.customerId());
+        FuelTank tank = findActiveTankForUpdate(tenantId, tankId);
         var levelBefore = tank.getCurrentLitres();
         boolean wasLow = tank.isLow();
 
@@ -581,6 +584,7 @@ public class FuelService {
     public DeliveryResponse scheduleDelivery(TenantId tenantId,
                                              CreateDeliveryRequest req) {
         findActiveTank(tenantId, req.tankId());
+        requireCustomer(tenantId, req.customerId());
         FuelDelivery delivery = FuelDelivery.create(tenantId, req.tankId(),
                 req.customerId(), req.deliveryAddress(), req.fuelType(),
                 req.litresOrdered(), req.pricePerLitre(), req.scheduledAt(),
@@ -593,6 +597,97 @@ public class FuelService {
 
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private FuelTank findActiveTankForUpdate(TenantId tenantId, UUID id) {
+        return tankRepository.findActiveByIdForUpdate(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Tank", id.toString()));
+    }
+
+    private void requireSupplier(TenantId tenantId, UUID supplierId) {
+        if (supplierId != null && supplierRepository.findActiveById(tenantId, supplierId).isEmpty()) {
+            throw new ResourceNotFoundException("Supplier", supplierId.toString());
+        }
+    }
+
+    private void requireCustomer(TenantId tenantId, UUID customerId) {
+        if (customerId != null && !crmFacade.customerExists(tenantId, customerId)) {
+            throw new ResourceNotFoundException("Customer", customerId.toString());
+        }
+    }
+
+    // ── Delivery lifecycle and reversals (Stage 0 correction path) ───────────
+
+    @Transactional
+    public DeliveryResponse dispatchDelivery(TenantId tenantId, UUID deliveryId,
+                                             DispatchDeliveryRequest req) {
+        FuelDelivery d = deliveryRepository.findActiveByIdForUpdate(tenantId, deliveryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery", deliveryId.toString()));
+        d.dispatch(req.driverName().trim(), req.vehicleReg().trim());
+        deliveryRepository.save(d);
+        return toDeliveryResponse(d);
+    }
+
+    @Transactional
+    public DeliveryResponse cancelDelivery(TenantId tenantId, UUID deliveryId) {
+        FuelDelivery d = deliveryRepository.findActiveByIdForUpdate(tenantId, deliveryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery", deliveryId.toString()));
+        d.cancel();
+        deliveryRepository.save(d);
+        return toDeliveryResponse(d);
+    }
+
+    @Transactional
+    public DeliveryResponse reverseDelivery(TenantId tenantId, UUID deliveryId,
+                                            ReverseRequest req, UUID actingUserId) {
+        FuelDelivery d = deliveryRepository.findActiveByIdForUpdate(tenantId, deliveryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery", deliveryId.toString()));
+        if (!"DELIVERED".equals(d.getStatus())) {
+            throw new IllegalStateException("Only a completed delivery can be reversed (this one is "
+                    + d.getStatus().toLowerCase().replace('_', ' ') + ").");
+        }
+        FuelTank tank = findActiveTankForUpdate(tenantId, d.getTankId());
+        tank.restoreStock(d.getLitresDelivered());
+        tankRepository.save(tank);
+        d.reverse(actingUserId, req.reason().trim());
+        deliveryRepository.save(d);
+        log.info("Delivery reversed id={} litres={} by={}", deliveryId, d.getLitresDelivered(), actingUserId);
+        return toDeliveryResponse(d);
+    }
+
+    @Transactional
+    public DispatchResponse reverseDispatch(TenantId tenantId, UUID dispatchId,
+                                            ReverseRequest req, UUID actingUserId) {
+        FuelDispatch d = dispatchRepository.findActiveById(tenantId, dispatchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Dispatch", dispatchId.toString()));
+        FuelTank tank = findActiveTankForUpdate(tenantId, d.getTankId());
+        if (d.isReversed()) throw new IllegalStateException("This dispatch has already been reversed.");
+        tank.restoreStock(d.getLitresDispensed());
+        tankRepository.save(tank);
+        d.reverse(actingUserId, req.reason().trim());
+        dispatchRepository.save(d);
+        log.info("Dispatch reversed id={} litres={} by={}", dispatchId, d.getLitresDispensed(), actingUserId);
+        return toDispatchResponse(d);
+    }
+
+    @Transactional
+    public ReceiptResponse reverseReceipt(TenantId tenantId, UUID receiptId,
+                                          ReverseRequest req, UUID actingUserId) {
+        FuelReceipt r = receiptRepository.findActiveById(tenantId, receiptId)
+                .orElseThrow(() -> new ResourceNotFoundException("Receipt", receiptId.toString()));
+        FuelTank tank = findActiveTankForUpdate(tenantId, r.getTankId());
+        if (r.isReversed()) throw new IllegalStateException("This receipt has already been reversed.");
+        if (tank.getCurrentLitres().compareTo(r.getLitresReceived()) < 0) {
+            throw new IllegalStateException("Cannot reverse this receipt: the tank holds "
+                    + tank.getCurrentLitres() + "L but " + r.getLitresReceived()
+                    + "L would be removed. Some of that fuel has already been used.");
+        }
+        tank.removeStock(r.getLitresReceived());
+        tankRepository.save(tank);
+        r.reverse(actingUserId, req.reason().trim());
+        receiptRepository.save(r);
+        log.info("Receipt reversed id={} litres={} by={}", receiptId, r.getLitresReceived(), actingUserId);
+        return toReceiptResponse(r);
+    }
 
     private FuelTank findActiveTank(TenantId tenantId, UUID id) {
         return tankRepository.findActiveById(tenantId, id)
@@ -616,7 +711,8 @@ public class FuelService {
         return new ReceiptResponse(r.getId(), r.getTankId(), r.getSupplierId(),
                 r.getLitresReceived(), r.getPricePerLitre(), r.getTotalCost(),
                 r.getReceivedAt(), r.getDeliveryNote(), r.getInvoiceRef(),
-                r.getLevelBefore(), r.getLevelAfter(), r.getCreatedAt());
+                r.getLevelBefore(), r.getLevelAfter(), r.getCreatedAt(),
+                r.getReversedAt(), r.getReversalReason());
     }
 
     private DispatchResponse toDispatchResponse(FuelDispatch d) {
@@ -624,7 +720,8 @@ public class FuelService {
                 d.getAssetId(), d.getCustomerId(), d.getRecipientName(),
                 d.getLitresDispensed(), d.getPricePerLitre(), d.getDispatchedAt(),
                 d.getOdometerReading(), d.getHoursReading(), d.getAuthorisedBy(),
-                d.getLevelBefore(), d.getLevelAfter(), d.getCreatedAt());
+                d.getLevelBefore(), d.getLevelAfter(), d.getCreatedAt(),
+                d.getReversedAt(), d.getReversalReason());
     }
 
     private DipReadingResponse toDipResponse(DipReading d) {
@@ -645,7 +742,8 @@ public class FuelService {
                 d.getMeterReadingStart(), d.getMeterReadingEnd(),
                 d.getReceiptNumber(), d.getReceiptGeneratedAt(),
                 d.isSignedOnBehalf(), d.getOnBehalfOf(),
-                d.getCreatedAt()
+                d.getCreatedAt(),
+                d.getReversedAt(), d.getReversalReason()
         );
     }
 
@@ -653,12 +751,18 @@ public class FuelService {
     public DeliveryResponse completeDelivery(TenantId tenantId, UUID deliveryId,
                                              CompleteDeliveryRequest req) {
         FuelDelivery delivery = deliveryRepository
-                .findActiveById(tenantId, deliveryId)
+                .findActiveByIdForUpdate(tenantId, deliveryId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Delivery", deliveryId.toString()
                 ));
+        // Stage 0: refuse a repeat completion BEFORE touching the tank,
+        // so a retry can never deduct stock twice.
+        if (!"SCHEDULED".equals(delivery.getStatus()) && !"IN_TRANSIT".equals(delivery.getStatus())) {
+            throw new IllegalStateException("Cannot complete a delivery that is "
+                    + delivery.getStatus().toLowerCase().replace('_', ' ') + ".");
+        }
 
-        FuelTank tank = findActiveTank(tenantId, delivery.getTankId());
+        FuelTank tank = findActiveTankForUpdate(tenantId, delivery.getTankId());
         boolean wasLow = tank.isLow();
         tank.removeStock(req.litresDelivered());
         tankRepository.save(tank);

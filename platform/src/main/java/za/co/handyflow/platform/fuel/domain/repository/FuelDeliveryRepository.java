@@ -25,6 +25,10 @@ public interface FuelDeliveryRepository extends JpaRepository<FuelDelivery, UUID
     @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.id = :id AND d.deletedAt IS NULL")
     Optional<FuelDelivery> findActiveById(TenantId tenantId, UUID id);
 
+    @jakarta.persistence.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.id = :id AND d.deletedAt IS NULL")
+    Optional<FuelDelivery> findActiveByIdForUpdate(TenantId tenantId, UUID id);
+
     // FIX (fuel cost/margin engine): backs the margin report, same
     // pattern as FuelDispatchRepository.findByTenantAndDispatchedAtBetween
     // (that one already existed for the usage report; this one didn't

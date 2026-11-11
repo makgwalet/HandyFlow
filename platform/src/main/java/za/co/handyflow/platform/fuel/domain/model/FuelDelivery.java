@@ -124,6 +124,15 @@ public class FuelDelivery {
      * doesn't re-alert every day it stays overdue. Mirrors
      * Task.overdueAlertSentAt's role in the Tasks module's scheduler.
      */
+    @Column(name = "reversed_at")
+    private Instant reversedAt;
+
+    @Column(name = "reversed_by")
+    private UUID reversedBy;
+
+    @Column(name = "reversal_reason", length = 500)
+    private String reversalReason;
+
     @Column(name = "reminder_sent_at")
     private Instant reminderSentAt;
 
@@ -155,6 +164,7 @@ public class FuelDelivery {
     }
 
     public void dispatch(String driverName, String vehicleReg) {
+        requireStatus("dispatch", "SCHEDULED");
         this.status     = "IN_TRANSIT";
         this.driverName = driverName;
         this.vehicleReg = vehicleReg;
@@ -165,6 +175,10 @@ public class FuelDelivery {
                          String receiverIdBadge, BigDecimal meterReadingStart,
                          BigDecimal meterReadingEnd, Boolean signedOnBehalf,
                          String onBehalfOf, String receiverSignatureUrl) {
+        // Stage 0 guard: a delivery can be completed exactly once, and
+        // never after it was cancelled. Without this a retry or double
+        // tap deducted the tank twice and issued a second receipt.
+        requireStatus("complete", "SCHEDULED", "IN_TRANSIT");
         this.status              = "DELIVERED";
         this.litresDelivered     = litresDelivered;
         this.deliveredAt         = Instant.now();
@@ -187,11 +201,30 @@ public class FuelDelivery {
     }
 
     public void cancel() {
+        requireStatus("cancel", "SCHEDULED", "IN_TRANSIT");
         this.status    = "CANCELLED";
         this.updatedAt = Instant.now();
     }
 
     public boolean isDeleted() { return deletedAt != null; }
+
+    private void requireStatus(String action, String... allowed) {
+        for (String s : allowed) {
+            if (s.equals(this.status)) return;
+        }
+        throw new IllegalStateException("Cannot " + action + " a delivery that is "
+                + this.status.toLowerCase().replace('_', ' ') + ".");
+    }
+
+    /** Reversal of a DELIVERED delivery (stock restored by the service). */
+    public void reverse(UUID reversedBy, String reason) {
+        requireStatus("reverse", "DELIVERED");
+        this.status         = "REVERSED";
+        this.reversedAt     = Instant.now();
+        this.reversedBy     = reversedBy;
+        this.reversalReason = reason;
+        this.updatedAt      = Instant.now();
+    }
 
     // FIX (fuel cost/margin engine, agreed design): called separately
     // from complete(), right after the service calls

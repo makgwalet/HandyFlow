@@ -23,7 +23,7 @@ public interface FuelDispatchRepository extends JpaRepository<FuelDispatch, UUID
     Page<FuelDispatch> findAllActive(TenantId tenantId, Pageable pageable);
 
     /** Backs the monthly usage report — full (non-paginated) dispatches within a date range. */
-    @Query("SELECT d FROM FuelDispatch d WHERE d.tenantId = :tenantId AND d.deletedAt IS NULL AND d.dispatchedAt BETWEEN :from AND :to ORDER BY d.dispatchedAt ASC")
+    @Query("SELECT d FROM FuelDispatch d WHERE d.tenantId = :tenantId AND d.deletedAt IS NULL AND d.reversedAt IS NULL AND d.dispatchedAt BETWEEN :from AND :to ORDER BY d.dispatchedAt ASC")
     List<FuelDispatch> findByTenantAndDispatchedAtBetween(TenantId tenantId, Instant from, Instant to);
 
     /**
@@ -35,7 +35,7 @@ public interface FuelDispatchRepository extends JpaRepository<FuelDispatch, UUID
     @Query("""
         SELECT d.tankId, COALESCE(SUM(d.litresDispensed), 0)
         FROM FuelDispatch d
-        WHERE d.tankId IN :tankIds AND d.deletedAt IS NULL AND d.dispatchedAt BETWEEN :from AND :to
+        WHERE d.tankId IN :tankIds AND d.deletedAt IS NULL AND d.reversedAt IS NULL AND d.dispatchedAt BETWEEN :from AND :to
         GROUP BY d.tankId
         """)
     List<Object[]> sumLitresDispensedByTankIdsRaw(List<UUID> tankIds, Instant from, Instant to);
@@ -52,7 +52,7 @@ public interface FuelDispatchRepository extends JpaRepository<FuelDispatch, UUID
     // of fuel, not the tenant's own consumption, and must never be offered for allocation to production.
     @Query("""
         SELECT d FROM FuelDispatch d
-        WHERE d.tenantId = :tenantId AND d.deletedAt IS NULL AND d.customerId IS NULL
+        WHERE d.tenantId = :tenantId AND d.deletedAt IS NULL AND d.reversedAt IS NULL AND d.customerId IS NULL
         AND (d.vehicleId IS NOT NULL OR d.assetId IS NOT NULL)
         AND d.dispatchedAt >= :from AND d.dispatchedAt < :to
         ORDER BY d.dispatchedAt DESC
@@ -61,8 +61,11 @@ public interface FuelDispatchRepository extends JpaRepository<FuelDispatch, UUID
 
     @Query("""
         SELECT d FROM FuelDispatch d
-        WHERE d.tenantId = :tenantId AND d.id = :id AND d.deletedAt IS NULL AND d.customerId IS NULL
+        WHERE d.tenantId = :tenantId AND d.id = :id AND d.deletedAt IS NULL AND d.reversedAt IS NULL AND d.customerId IS NULL
         AND (d.vehicleId IS NOT NULL OR d.assetId IS NOT NULL)
         """)
     Optional<FuelDispatch> findOwnById(TenantId tenantId, UUID id);
+
+    @Query("SELECT d FROM FuelDispatch d WHERE d.tenantId = :tenantId AND d.id = :id AND d.deletedAt IS NULL")
+    Optional<FuelDispatch> findActiveById(TenantId tenantId, UUID id);
 }

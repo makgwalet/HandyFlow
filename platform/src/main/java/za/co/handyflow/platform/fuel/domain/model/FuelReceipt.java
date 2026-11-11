@@ -67,6 +67,15 @@ public class FuelReceipt {
     @Version
     private Long version;
 
+    @Column(name = "reversed_at")
+    private Instant reversedAt;
+
+    @Column(name = "reversed_by")
+    private UUID reversedBy;
+
+    @Column(name = "reversal_reason", length = 500)
+    private String reversalReason;
+
     public static FuelReceipt create(TenantId tenantId, UUID tankId,
                                      UUID supplierId, BigDecimal litresReceived,
                                      BigDecimal pricePerLitre, Instant receivedAt,
@@ -91,6 +100,16 @@ public class FuelReceipt {
     }
 
     public boolean isDeleted() { return deletedAt != null; }
+
+    public boolean isReversed() { return reversedAt != null; }
+
+    public void reverse(UUID reversedBy, String reason) {
+        if (isReversed()) throw new IllegalStateException("This entry has already been reversed.");
+        this.reversedAt     = Instant.now();
+        this.reversedBy     = reversedBy;
+        this.reversalReason = reason;
+        this.updatedAt      = Instant.now();
+    }
 
     @PreUpdate
     void onUpdate() { this.updatedAt = Instant.now(); }

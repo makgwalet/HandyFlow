@@ -87,6 +87,15 @@ public class FuelDispatch {
     @Version
     private Long version;
 
+    @Column(name = "reversed_at")
+    private Instant reversedAt;
+
+    @Column(name = "reversed_by")
+    private UUID reversedBy;
+
+    @Column(name = "reversal_reason", length = 500)
+    private String reversalReason;
+
     public static FuelDispatch create(TenantId tenantId, UUID tankId,
                                       UUID vehicleId, UUID assetId, UUID customerId,
                                       String recipientName, BigDecimal litresDispensed,
@@ -116,6 +125,16 @@ public class FuelDispatch {
     }
 
     public boolean isDeleted() { return deletedAt != null; }
+
+    public boolean isReversed() { return reversedAt != null; }
+
+    public void reverse(UUID reversedBy, String reason) {
+        if (isReversed()) throw new IllegalStateException("This entry has already been reversed.");
+        this.reversedAt     = Instant.now();
+        this.reversedBy     = reversedBy;
+        this.reversalReason = reason;
+        this.updatedAt      = Instant.now();
+    }
 
     // FIX (fuel cost/margin engine, agreed design): same reasoning as
     // FuelDelivery.recordCostSnapshot() — called separately, right

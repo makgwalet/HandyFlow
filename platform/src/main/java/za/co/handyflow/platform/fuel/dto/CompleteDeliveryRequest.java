@@ -2,11 +2,13 @@
 
 package za.co.handyflow.platform.fuel.dto;
 
+import jakarta.validation.constraints.Positive;
+
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 public record CompleteDeliveryRequest(
-        @NotNull BigDecimal litresDelivered,
+        @NotNull @Positive(message = "Litres delivered must be greater than zero") BigDecimal litresDelivered,
         String receiverName,        // person at mine who accepted delivery
         String receiverIdBadge,     // their ID or site badge number
         BigDecimal meterReadingStart, // pump meter at start

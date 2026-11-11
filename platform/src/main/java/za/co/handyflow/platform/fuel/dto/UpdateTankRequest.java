@@ -8,6 +8,6 @@ import java.math.BigDecimal;
 // same posture as every other stock-tracked entity in this codebase.
 public record UpdateTankRequest(
         @NotBlank String name, @NotBlank String fuelType,
-        @NotNull BigDecimal capacityLitres, String location,
-        BigDecimal lowThresholdPct
+        @NotNull @jakarta.validation.constraints.Positive(message = "Capacity must be greater than zero") BigDecimal capacityLitres, String location,
+        @jakarta.validation.constraints.DecimalMin(value = "0", message = "Low threshold cannot be negative") @jakarta.validation.constraints.DecimalMax(value = "100", message = "Low threshold cannot exceed 100%") BigDecimal lowThresholdPct
 ) {}

@@ -25,12 +25,15 @@ public interface FuelReceiptRepository extends JpaRepository<FuelReceipt, UUID> 
     /**
      * Most recent receipt for a tank — backs the reorder suggestion's "last supplier" hint.
      */
-    @Query("SELECT r FROM FuelReceipt r WHERE r.tankId = :tankId AND r.deletedAt IS NULL ORDER BY r.receivedAt DESC LIMIT 1")
+    @Query("SELECT r FROM FuelReceipt r WHERE r.tankId = :tankId AND r.deletedAt IS NULL AND r.reversedAt IS NULL ORDER BY r.receivedAt DESC LIMIT 1")
     Optional<FuelReceipt> findMostRecentForTank(UUID tankId);
 
     /**
      * Backs the supplier statement report — full (non-paginated) receipts from one supplier within a date range.
      */
-    @Query("SELECT r FROM FuelReceipt r WHERE r.tenantId = :tenantId AND r.supplierId = :supplierId AND r.deletedAt IS NULL AND r.receivedAt BETWEEN :from AND :to ORDER BY r.receivedAt ASC")
+    @Query("SELECT r FROM FuelReceipt r WHERE r.tenantId = :tenantId AND r.supplierId = :supplierId AND r.deletedAt IS NULL AND r.reversedAt IS NULL AND r.receivedAt BETWEEN :from AND :to ORDER BY r.receivedAt ASC")
     List<FuelReceipt> findBySupplierAndReceivedAtBetween(TenantId tenantId, UUID supplierId, Instant from, Instant to);
+
+    @Query("SELECT r FROM FuelReceipt r WHERE r.tenantId = :tenantId AND r.id = :id AND r.deletedAt IS NULL")
+    Optional<FuelReceipt> findActiveById(TenantId tenantId, UUID id);
 }
