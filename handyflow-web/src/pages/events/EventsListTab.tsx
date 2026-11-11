@@ -3,14 +3,16 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import {
-  Plus, X, Calendar, MapPin, Users, Clock, ChevronRight,
-  Radio, CheckCircle, XCircle, Eye, Megaphone, Search, AlertTriangle,
+  Plus, Calendar, MapPin, Users, Clock, ChevronRight,
+  Radio, CheckCircle, XCircle, Eye, Megaphone, Search, Pencil, CalendarClock, Copy,
 } from "lucide-react"
+import { usePermissions } from "../../hooks/usePermission"
+import { ErrorLine } from "../warehousing/whseUi"
+import { CancelEventModal, DuplicateModal, EVENT_TYPES, EventFormModal, PostponeModal } from "./EventDialogs"
+import { canCancel, canComplete, canDuplicate, canEdit, canGoLive, canPostpone, canPublish } from "./eventActions"
 
 const fmtDT = (d: any) => d ? new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"
 const fmtD  = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
 
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string; dot: string }> = {
   DRAFT:     { label: "Draft",     color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)", dot: "var(--hf-text-faint)" },
@@ -20,12 +22,13 @@ const STATUS_CFG: Record<string, { label: string; color: string; bg: string; dot
   COMPLETED: { label: "Completed", color: "var(--hf-sky-text)", bg: "var(--hf-sky-soft-strong)", dot: "var(--hf-sky-dot)" },
   CANCELLED: { label: "Cancelled", color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)", dot: "var(--hf-border-strong)" },
 }
-const EVENT_TYPES = ["CONFERENCE","WEDDING","CHURCH","FESTIVAL","CORPORATE","COMMUNITY","FUNDRAISER","GENERAL"]
 const TYPE_COLOR:  Record<string, string> = {
   CONFERENCE: "var(--hf-info-text)", WEDDING: "var(--hf-pink-text)", CHURCH: "var(--hf-violet-text)",
   FESTIVAL: "var(--hf-warning-text)", CORPORATE: "var(--hf-sky-text)", COMMUNITY: "var(--hf-success-text)",
   FUNDRAISER: "var(--hf-orange-text)", GENERAL: "var(--hf-text-muted)",
 }
+
+const SECONDARY: React.CSSProperties = { display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-surface-muted)", color: "var(--hf-text-secondary)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12, cursor: "pointer" }
 
 interface Props { onSelectEvent: (id: string, title: string) => void }
 
@@ -34,18 +37,10 @@ export default function EventsListTab({ onSelectEvent }: Props) {
   const [filterStatus, setFilterStatus] = useState("ALL")
   const [filterType,   setFilterType]   = useState("ALL")
   const [search,       setSearch]       = useState("")
-  const [showCreate,   setShowCreate]   = useState(false)
-  const [error,        setError]        = useState("")
-  const [cancelConfirm, setCancelConfirm] = useState<{ id: string; title: string } | null>(null)
-
-  const INIT = () => ({
-    title: "", description: "", eventType: "GENERAL",
-    venueName: "", venueAddress: "", venueCapacity: "",
-    startDatetime: "", endDatetime: "", isFree: true, isPrivate: false,
-    registrationDeadline: "", notes: "",
-  })
-  const [form, setForm] = useState(INIT())
-  const f = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
+  const [dialog, setDialog] = useState<{ kind: "create" } | { kind: "edit" | "postpone" | "copy" | "cancel"; event: any } | null>(null)
+  const canWrite = usePermissions(["EVENTS_WRITE", "EVENTS_MANAGE"])
+  const canApprove = usePermissions(["EVENTS_APPROVE", "EVENTS_MANAGE"])
+  const canCancelEvents = usePermissions(["EVENTS_CANCEL", "EVENTS_MANAGE"])
 
   const { data: events = [], isLoading } = useQuery<any[]>({
     queryKey: ["events", filterStatus, filterType],
@@ -59,17 +54,10 @@ export default function EventsListTab({ onSelectEvent }: Props) {
     },
   })
 
-  const createEvent = useMutation({
-    mutationFn: (body: any) => apiClient.post("/api/v1/events", body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["events"] }); qc.invalidateQueries({ queryKey: ["events-kpi"] }); setShowCreate(false); setForm(INIT()); setError("") },
-    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to create event"),
-  })
-
   const transition = useMutation({
     mutationFn: ({ id, action }: { id: string; action: string }) =>
       apiClient.post(`/api/v1/events/${id}/${action}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["events"] }); qc.invalidateQueries({ queryKey: ["events-kpi"] }) },
-    onError: (e: any) => alert(e.response?.data?.message ?? "Action failed"),
   })
 
   const filtered = (events as any[]).filter(e => {
@@ -99,12 +87,13 @@ export default function EventsListTab({ onSelectEvent }: Props) {
             {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
-        <button onClick={() => { setShowCreate(true); setError("") }}
+        {canWrite && <button onClick={() => setDialog({ kind: "create" })}
           style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-sky)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> New Event
-        </button>
+        </button>}
       </div>
 
+      <ErrorLine error={transition.error} fallback="That action could not be completed" />
       {isLoading ? (
         <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading events...</div>
       ) : filtered.length === 0 ? (
@@ -150,30 +139,28 @@ export default function EventsListTab({ onSelectEvent }: Props) {
 
                 {/* Actions */}
                 <div style={{ display: "flex", gap: 7, flexShrink: 0, flexWrap: "wrap" }}>
-                  {e.status === "DRAFT" && (
+                  {canApprove && canPublish(e.status) && (
                     <button onClick={() => transition.mutate({ id: e.id, action: "publish" })}
                       style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                       <Megaphone size={12} /> Publish
                     </button>
                   )}
-                  {e.status === "PUBLISHED" && (
+                  {canApprove && canGoLive(e.status) && (
                     <button onClick={() => transition.mutate({ id: e.id, action: "go-live" })}
                       style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                       <Radio size={12} /> Go Live
                     </button>
                   )}
-                  {e.status === "LIVE" && (
+                  {canApprove && canComplete(e.status) && (
                     <button onClick={() => transition.mutate({ id: e.id, action: "complete" })}
                       style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-sky-soft-strong)", color: "var(--hf-sky-text)", border: "1px solid var(--hf-sky-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                       <CheckCircle size={12} /> Complete
                     </button>
                   )}
-                  {["DRAFT","PUBLISHED","SOLD_OUT"].includes(e.status) && (
-                    <button onClick={() => setCancelConfirm({ id: e.id, title: e.title })}
-                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-surface-muted)", color: "var(--hf-text-faint)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12, cursor: "pointer" }}>
-                      <XCircle size={12} /> Cancel
-                    </button>
-                  )}
+                  {canWrite && canEdit(e.status) && <button onClick={() => setDialog({ kind: "edit", event: e })} style={SECONDARY}><Pencil size={12} /> Edit</button>}
+                  {canWrite && canPostpone(e.status) && <button onClick={() => setDialog({ kind: "postpone", event: e })} style={SECONDARY}><CalendarClock size={12} /> Postpone</button>}
+                  {canWrite && canDuplicate(e.status) && <button onClick={() => setDialog({ kind: "copy", event: e })} style={SECONDARY}><Copy size={12} /> Copy</button>}
+                  {canCancelEvents && canCancel(e.status) && <button onClick={() => setDialog({ kind: "cancel", event: e })} style={SECONDARY}><XCircle size={12} /> Cancel</button>}
                   <button onClick={() => onSelectEvent(e.id, e.title)}
                     style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-sky)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                     <Eye size={12} /> Guests <ChevronRight size={12} />
@@ -185,132 +172,11 @@ export default function EventsListTab({ onSelectEvent }: Props) {
         </div>
       )}
 
-      {/* Create event modal */}
-      {showCreate && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 700, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>Create Event</h3>
-                <p style={{ margin: "3px 0 0", fontSize: 13, color: "var(--hf-text-muted)" }}>Fill in the details — you can edit everything before publishing</p>
-              </div>
-              <button onClick={() => setShowCreate(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}><X size={20} /></button>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              <div style={{ gridColumn: "1/-1" }}>
-                <label style={lbl}>Event title *</label>
-                <input autoFocus value={form.title} onChange={e => f("title", e.target.value)} placeholder="Annual Business Summit 2026" style={inp} />
-              </div>
-              <div>
-                <label style={lbl}>Event type *</label>
-                <select value={form.eventType} onChange={e => f("eventType", e.target.value)} style={{ ...inp, background: "var(--hf-surface)" }}>
-                  {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Venue capacity</label>
-                <input type="number" value={form.venueCapacity} onChange={e => f("venueCapacity", e.target.value)} placeholder="500" style={inp} />
-              </div>
-              <div>
-                <label style={lbl}>Venue name</label>
-                <input value={form.venueName} onChange={e => f("venueName", e.target.value)} placeholder="Sandton Convention Centre" style={inp} />
-              </div>
-              <div>
-                <label style={lbl}>Venue address</label>
-                <input value={form.venueAddress} onChange={e => f("venueAddress", e.target.value)} placeholder="161 Maude St, Sandton" style={inp} />
-              </div>
-              <div>
-                <label style={lbl}>Start date & time *</label>
-                <input type="datetime-local" value={form.startDatetime} onChange={e => f("startDatetime", e.target.value)} style={inp} />
-              </div>
-              <div>
-                <label style={lbl}>End date & time *</label>
-                <input type="datetime-local" value={form.endDatetime} onChange={e => f("endDatetime", e.target.value)} style={inp} />
-              </div>
-              <div>
-                <label style={lbl}>Registration deadline</label>
-                <input type="datetime-local" value={form.registrationDeadline} onChange={e => f("registrationDeadline", e.target.value)} style={inp} />
-              </div>
-              <div style={{ display: "flex", gap: 20, alignItems: "center", paddingTop: 26 }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: 13 }}>
-                  <input type="checkbox" checked={form.isFree} onChange={e => f("isFree", e.target.checked)} style={{ width: 15, height: 15 }} />
-                  Free event
-                </label>
-                <label style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: 13 }}>
-                  <input type="checkbox" checked={form.isPrivate} onChange={e => f("isPrivate", e.target.checked)} style={{ width: 15, height: 15 }} />
-                  Private (invite only)
-                </label>
-              </div>
-              <div style={{ gridColumn: "1/-1" }}>
-                <label style={lbl}>Description</label>
-                <textarea value={form.description} onChange={e => f("description", e.target.value)} rows={3} placeholder="What's this event about?" style={{ ...inp, resize: "vertical" as const }} />
-              </div>
-              <div style={{ gridColumn: "1/-1" }}>
-                <label style={lbl}>Internal notes</label>
-                <textarea value={form.notes} onChange={e => f("notes", e.target.value)} rows={2} style={{ ...inp, resize: "vertical" as const }} />
-              </div>
-            </div>
-
-            {/* Ticket tiers notice */}
-            <div style={{ marginTop: 16, padding: "12px 14px", background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-info-text)" }}>
-              Ticket tiers (Early Bird, VIP, General) can be added after creating the event — from the Guests tab.
-            </div>
-
-            {error && <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
-
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 22 }}>
-              <button onClick={() => setShowCreate(false)} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer" }}>Cancel</button>
-              <button
-                disabled={!form.title || !form.startDatetime || !form.endDatetime || createEvent.isPending}
-                onClick={() => createEvent.mutate({
-                  ...form,
-                  venueCapacity: form.venueCapacity ? parseInt(form.venueCapacity) : null,
-                  registrationDeadline: form.registrationDeadline || null,
-                  description: form.description || null,
-                  notes: form.notes || null,
-                  venueName: form.venueName || null,
-                  venueAddress: form.venueAddress || null,
-                })}
-                style={{ padding: "9px 22px", background: !form.title ? "var(--hf-text-faint)" : "var(--hf-sky)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-                {createEvent.isPending ? "Creating..." : "Create Event"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Custom cancel-event confirmation modal */}
-      {cancelConfirm && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 28, width: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 22 }}>
-              <div style={{ width: 42, height: 42, borderRadius: "50%", background: "var(--hf-danger-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
-                <AlertTriangle size={20} style={{ color: 'var(--hf-danger-text)' }} />
-              </div>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 16, color: "var(--hf-text)", marginBottom: 6 }}>Cancel event?</div>
-                <div style={{ fontSize: 13, color: "var(--hf-text-muted)", lineHeight: 1.6 }}>
-                  <strong style={{ color: "var(--hf-text)" }}>{cancelConfirm.title}</strong> will be marked as cancelled.
-                  All registered guests will lose their spots. This action cannot be undone.
-                </div>
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button
-                onClick={() => setCancelConfirm(null)}
-                style={{ padding: "9px 20px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)", fontWeight: 500 }}>
-                Keep event
-              </button>
-              <button
-                onClick={() => { transition.mutate({ id: cancelConfirm.id, action: "cancel" }); setCancelConfirm(null) }}
-                style={{ padding: "9px 20px", background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-                Cancel event
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {dialog?.kind === "create" && <EventFormModal onClose={() => setDialog(null)} />}
+      {dialog?.kind === "edit" && <EventFormModal event={dialog.event} onClose={() => setDialog(null)} />}
+      {dialog?.kind === "postpone" && <PostponeModal event={dialog.event} onClose={() => setDialog(null)} />}
+      {dialog?.kind === "copy" && <DuplicateModal event={dialog.event} onClose={() => setDialog(null)} />}
+      {dialog?.kind === "cancel" && <CancelEventModal event={dialog.event} onClose={() => setDialog(null)} />}
     </div>
   )
 }

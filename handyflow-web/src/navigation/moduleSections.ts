@@ -584,13 +584,14 @@ export const EVENTS_SECTIONS: ModuleSections = {
   groups: [
     { label: 'Events', sections: [{ id: 'events', label: 'Events', icon: Calendar }] },
     {
-      // These three work on the event picked in the list; the page shows the
+      // These work on the event picked in the list; the page shows the
       // current selection under its title.
       label: 'Selected event',
       sections: [
         { id: 'guests', label: 'Guests', icon: Users },
         { id: 'vendors', label: 'Vendors', icon: Truck },
         { id: 'analytics', label: 'Analytics', icon: BarChart2 },
+        { id: 'audit', label: 'Audit trail', icon: History },
       ],
     },
   ],

@@ -14,6 +14,7 @@ import EventsListTab   from "./EventsListTab"
 import GuestsTab       from "./GuestsTab"
 import VendorsTab      from "./VendorsTab"
 import EventAnalytics  from "./EventAnalytics"
+import EventAuditTab   from "./EventAuditTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { EVENTS_SECTIONS } from "../../navigation/moduleSections"
 
@@ -66,6 +67,7 @@ export function EventsPage() {
             }} />
           case "guests":    return <GuestsTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />
           case "vendors":   return <VendorsTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />
+          case "audit":     return <EventAuditTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />
           case "analytics": return <EventAnalytics eventId={selectedEventId} />
           default:          return null
         }
