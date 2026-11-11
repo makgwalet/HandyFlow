@@ -11,7 +11,7 @@ beforeEach(() => get.mockReset())
 afterEach(cleanup)
 
 const usage = (over: Partial<PackageUsage> = {}): PackageUsage => ({
-  assigned: true, enforcement: "REPORT", pkg: { code: "STARTER", name: "Starter", monthlyPrice: 699, proposed: true },
+  assigned: true, enforcement: "MONITOR", pkg: { code: "STARTER", name: "Starter", monthlyPrice: 699, proposed: false },
   meters: [
     { key: "WAREHOUSES", label: "warehouses", used: 2, limit: 1, over: true },
     { key: "CLIENT_ACCOUNTS", label: "3PL client accounts", used: 1, limit: 3, over: false },

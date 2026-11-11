@@ -4,7 +4,7 @@ package za.co.handyflow.platform.warehousing.application.internal;
 public final class WhsePackageRules {
     private WhsePackageRules() {}
 
-    public enum Enforcement { OFF, REPORT, ENFORCE }
+    public enum Enforcement { OFF, MONITOR, ENFORCE }
 
     public enum Limit {
         WAREHOUSES("warehouses"), CLIENT_ACCOUNTS("3PL client accounts"), MONTHLY_TRANSACTIONS("transactions this month"), WEBHOOKS("webhooks");
@@ -13,9 +13,9 @@ public final class WhsePackageRules {
     }
 
     public static Enforcement parseEnforcement(String s) {
-        if (s == null || s.isBlank()) throw new IllegalArgumentException("Choose OFF, REPORT or ENFORCE.");
+        if (s == null || s.isBlank()) throw new IllegalArgumentException("Choose OFF, MONITOR or ENFORCE.");
         try { return Enforcement.valueOf(s.strip().toUpperCase()); }
-        catch (IllegalArgumentException e) { throw new IllegalArgumentException("Enforcement must be OFF, REPORT or ENFORCE."); }
+        catch (IllegalArgumentException e) { throw new IllegalArgumentException("Enforcement must be OFF, MONITOR or ENFORCE."); }
     }
 
     /** True when adding one more would go past the limit. A null limit means unlimited. */

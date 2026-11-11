@@ -61,9 +61,9 @@ class WhsePackageServiceTest {
         verify(jdbc, never()).queryForObject(anyString(), eq(Long.class), any(Object[].class));
     }
 
-    @Test @DisplayName("REPORT shows the overage but does not refuse")
+    @Test @DisplayName("MONITOR shows the overage but does not refuse")
     void reportOnly() throws Exception {
-        assigned("REPORT"); used(2);
+        assigned("MONITOR"); used(2);
         assertDoesNotThrow(() -> service.requireRoomFor(t(), Limit.WAREHOUSES));
         WhsePackageService.Usage u = service.usage(t());
         assertTrue(u.assigned());

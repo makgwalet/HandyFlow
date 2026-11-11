@@ -2,7 +2,7 @@
 
 export interface Meter { key: string; label: string; used: number; limit: number | null; over: boolean }
 export interface PackageUsage {
-  assigned: boolean; enforcement: "OFF" | "REPORT" | "ENFORCE"
+  assigned: boolean; enforcement: "OFF" | "MONITOR" | "ENFORCE"
   pkg: { code: string; name: string; monthlyPrice: number | null; proposed: boolean } | null
   meters: Meter[]
 }
@@ -20,6 +20,6 @@ export const priceText = (price: number | null) => (price == null ? "Custom quot
 
 export function enforcementText(e: PackageUsage["enforcement"]): string {
   if (e === "ENFORCE") return "New records beyond a limit are refused."
-  if (e === "REPORT") return "Usage is shown and anything over a limit is flagged, but nothing is refused."
+  if (e === "MONITOR") return "Usage is measured and anything over a limit is flagged, but nothing is refused."
   return "Limits are recorded but not applied."
 }

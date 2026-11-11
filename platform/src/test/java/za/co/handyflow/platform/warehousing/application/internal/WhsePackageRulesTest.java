@@ -31,7 +31,7 @@ class WhsePackageRulesTest {
     @Test @DisplayName("only ENFORCE refuses, and the message names the package, limit and usage")
     void enforcement() {
         assertDoesNotThrow(() -> WhsePackageRules.checkAdd(Limit.WAREHOUSES, 1, 1, Enforcement.OFF, "Starter"));
-        assertDoesNotThrow(() -> WhsePackageRules.checkAdd(Limit.WAREHOUSES, 1, 1, Enforcement.REPORT, "Starter"));
+        assertDoesNotThrow(() -> WhsePackageRules.checkAdd(Limit.WAREHOUSES, 1, 1, Enforcement.MONITOR, "Starter"));
         IllegalStateException e = assertThrows(IllegalStateException.class, () -> WhsePackageRules.checkAdd(Limit.WAREHOUSES, 1, 1, Enforcement.ENFORCE, "Starter"));
         assertTrue(e.getMessage().contains("Starter") && e.getMessage().contains("1 warehouses") && e.getMessage().contains("larger package"));
         assertDoesNotThrow(() -> WhsePackageRules.checkAdd(Limit.WAREHOUSES, 0, 1, Enforcement.ENFORCE, "Starter"));
@@ -41,6 +41,8 @@ class WhsePackageRulesTest {
     void parse() {
         assertEquals(Enforcement.ENFORCE, WhsePackageRules.parseEnforcement(" enforce "));
         assertThrows(IllegalArgumentException.class, () -> WhsePackageRules.parseEnforcement("maybe"));
+        assertEquals(Enforcement.MONITOR, WhsePackageRules.parseEnforcement("monitor"));
+        assertThrows(IllegalArgumentException.class, () -> WhsePackageRules.parseEnforcement("REPORT")); // renamed to MONITOR
         assertThrows(IllegalArgumentException.class, () -> WhsePackageRules.parseEnforcement(null));
     }
 }
