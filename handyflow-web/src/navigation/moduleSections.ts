@@ -257,6 +257,7 @@ export const FUEL_SECTIONS: ModuleSections = {
         { id: 'deliveries', label: 'Deliveries', icon: Truck },
         { id: 'suppliers', label: 'Suppliers', icon: Users },
         { id: 'purchase-orders', label: 'Purchase orders', icon: ShoppingCart },
+        { id: 'supplier-invoices', label: 'Supplier invoices', icon: FileText },
         { id: 'compliance', label: 'Compliance', icon: ShieldCheck },
       ],
     },

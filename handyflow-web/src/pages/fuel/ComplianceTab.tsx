@@ -27,7 +27,7 @@ export default function ComplianceTab() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
         <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: 0, flex: 1 }}>
-          Anything that expires: licences, calibrations, roadworthy and inspection certificates, insurance. A tanker or driver with an expired item cannot be allocated to a load, and neither can anyone while the company's licence has expired. No reminders are emailed yet: check here or on the manager overview.
+          Anything that expires: licences, calibrations, roadworthy and inspection certificates, insurance. A tanker or driver with an expired item cannot be allocated to a load, and neither can anyone while the company's licence has expired. Account admins are emailed a reminder 30 days and 7 days before an item expires, and once when it has expired.
         </p>
         {canManage && <button style={btnPrimary} onClick={() => setDialog({ kind: "edit" })}>Add item</button>}
       </div>

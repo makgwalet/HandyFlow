@@ -30,7 +30,7 @@ export default function PurchaseOrdersTab() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
         <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: 0, flex: 1 }}>
-          Raise an order, place it with the supplier, then choose it when you receive the fuel (Tanks &rarr; Receive). The order follows the litres that arrive, and a delivery more than 2% over is refused. This matches litres and unit price; supplier invoices are matched in Accounts Payable.
+          Raise an order, place it with the supplier, then choose it when you receive the fuel (Tanks &rarr; Receive). The order follows the litres that arrive, and a delivery more than 2% over is refused. The supplier's invoice is matched to the order and receipts under Supplier invoices.
         </p>
         {canManage && <button style={btnPrimary} onClick={() => setDialog({ kind: "edit" })}>New purchase order</button>}
       </div>
