@@ -142,6 +142,7 @@ public class SecurityConfig {
                                 // /portal/auth/** scoping convention as
                                 // every other portal above.
                                 "/api/v1/warehousing/portal/auth/**",
+                                "/api/v1/fuel/portal/auth/**",
                                 "/api/v1/training-provider/portal/auth/**",
                                 "/api/v1/facilitiesmanagement/portal/auth/**",
                                 "/api/v1/recruitment-agency/portal/auth/**",

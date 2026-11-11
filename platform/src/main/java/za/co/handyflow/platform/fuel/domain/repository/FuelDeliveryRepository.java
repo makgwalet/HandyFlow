@@ -116,4 +116,8 @@ public interface FuelDeliveryRepository extends JpaRepository<FuelDelivery, UUID
 
     @Query("SELECT COUNT(d) FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.tankerId = :tankerId AND d.status IN ('SCHEDULED','IN_TRANSIT') AND d.deletedAt IS NULL")
     long countOpenForTanker(TenantId tenantId, UUID tankerId);
+
+    /** Completed, not reversed, deliveries for one customer: what the customer portal shows. */
+    @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.customerId = :customerId AND d.status = 'DELIVERED' AND d.reversedAt IS NULL AND d.deletedAt IS NULL ORDER BY d.deliveredAt DESC")
+    List<FuelDelivery> findDeliveredForCustomer(TenantId tenantId, UUID customerId);
 }

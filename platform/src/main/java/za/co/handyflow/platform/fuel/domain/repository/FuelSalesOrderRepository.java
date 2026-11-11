@@ -31,4 +31,7 @@ public interface FuelSalesOrderRepository extends JpaRepository<FuelSalesOrder, 
 
     @Query("SELECT COUNT(o) FROM FuelSalesOrder o WHERE o.tenantId = :tenantId AND o.status = :status AND o.deletedAt IS NULL")
     long countByStatus(TenantId tenantId, String status);
+
+    @Query("SELECT o FROM FuelSalesOrder o WHERE o.tenantId = :tenantId AND o.accountId = :accountId AND o.deletedAt IS NULL ORDER BY o.createdAt DESC")
+    List<FuelSalesOrder> findByAccount(TenantId tenantId, UUID accountId);
 }
