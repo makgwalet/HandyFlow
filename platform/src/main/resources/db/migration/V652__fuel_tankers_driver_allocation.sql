@@ -48,7 +48,7 @@ INSERT INTO permissions (id, name, description) VALUES
 ON CONFLICT (name) DO NOTHING;
 
 UPDATE permissions
-   SET module_key = 'fuel', resource = 'driver', verb = 'EXECUTE', sensitivity = 'STANDARD',
+   SET module_key = 'fuel', resource = 'driver', verb = 'EXECUTE', sensitivity = 'NORMAL',
        requires_second_person = false, grantable_by = 'ADMIN'
  WHERE name = 'FUEL_DRIVER';
 
