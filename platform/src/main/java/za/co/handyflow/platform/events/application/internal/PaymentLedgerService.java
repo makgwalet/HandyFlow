@@ -262,6 +262,16 @@ public class PaymentLedgerService {
         EventGuest guest = guestRepo.findById(p.getGuestId()).orElse(null);
 
         boolean paid = n.outcome() == PaymentGateway.Outcome.PAID;
+
+        // Money for a still-open checkout must never buy a ticket to an event that has since been cancelled or
+        // finished. Release the held seat and flag the money for refund instead.
+        if (paid && EventPayment.PENDING.equals(p.getStatus()) && !l.event().acceptsRegistrations()) {
+            if (guest != null && "RESERVED".equals(guest.getStatus())) releaseSeat(l, guest, false);
+            NotificationOutcome out = requireRefund(l, p, n, note,
+                    "Payment arrived after the event was " + l.event().getStatus().toLowerCase(Locale.ROOT).replace('_', ' '));
+            finishInbox(inboxProvider, n.providerEventId(), out.name());
+            return out;
+        }
         boolean amountMatches = paid && n.amountReceived().compareTo(p.getAmount()) == 0;
         boolean canReinstate = paid && amountMatches && guest != null
                 && "EXPIRED".equals(guest.getStatus()) && canPlaceAgain(l.event(), guest);
@@ -372,6 +382,41 @@ public class PaymentLedgerService {
     public void onPaidGuestCancelled(UUID guestId) {
         for (EventPayment p : paymentRepo.findPaidForGuest(guestId)) {
             p.flagRefundDue("Registration cancelled after payment — refund due per cancellation policy");
+            paymentRepo.save(p);
+        }
+    }
+
+    /**
+     * The event was cancelled: every open checkout is cancelled with it and its held seat released, so no
+     * payment can still turn into a ticket. The event row is already locked by the caller. A payment that
+     * arrives for one of these later is flagged REQUIRES_REFUND (the decision table never reinstates a CANCELLED payment).
+     *
+     * @return how many open checkouts were cancelled
+     */
+    @Transactional
+    public int cancelOpenCheckouts(TenantId tenantId, Event event, String reason) {
+        int cancelled = 0;
+        for (EventPayment p : paymentRepo.findPendingByEvent(event.getId())) {
+            Locked l = new Locked(tenantId, event, p);
+            p.cancel(reason);
+            paymentRepo.save(p);
+            guestRepo.findById(p.getGuestId()).ifPresent(g -> {
+                if ("RESERVED".equals(g.getStatus())) releaseSeat(l, g, false);
+            });
+            auditPayment(l, "CHECKOUT_CANCELLED", "Checkout cancelled — " + reason, null);
+            cancelled++;
+        }
+        return cancelled;
+    }
+
+    /**
+     * A ticket was transferred. Money already received for it now belongs to the new holder's ticket, so a later
+     * refund or cancellation finds the right guest. (The old record is TRANSFERRED and can never be refunded or cancelled.)
+     */
+    @Transactional
+    public void onGuestTransferred(UUID oldGuestId, UUID newGuestId) {
+        for (EventPayment p : paymentRepo.findMoneyHeldForGuest(oldGuestId)) {
+            p.reassignGuest(newGuestId);
             paymentRepo.save(p);
         }
     }

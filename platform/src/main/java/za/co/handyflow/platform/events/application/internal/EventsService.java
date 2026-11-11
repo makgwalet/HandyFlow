@@ -183,12 +183,14 @@ public class EventsService {
         event.cancel();
         eventRepo.save(event);
         waitlist.closeWaitlist(id);
+        int holdsReleased = payments.cancelOpenCheckouts(tenantId, event, "Event cancelled");
 
         String reason = (req != null && req.reason() != null && !req.reason().isBlank())
                 ? req.reason().trim() : null;
         audit.record(tenantId, id, "EVENT_CANCELLED", "EVENT", id,
                 "Event " + event.getEventNumber() + " cancelled"
-                        + (reason != null ? " — " + reason : " (no reason recorded)"));
+                        + (reason != null ? " — " + reason : " (no reason recorded)")
+                        + (holdsReleased > 0 ? "; " + holdsReleased + " open checkout" + (holdsReleased == 1 ? "" : "s") + " cancelled" : ""));
 
         if (req != null && req.notifyGuests()) {
             String body = "<p>We're sorry to let you know that <strong>"
@@ -296,7 +298,15 @@ public class EventsService {
     @Transactional
     public TierResponse createTier(TenantId tenantId, UUID eventId,
                                    CreateTierRequest req) {
-        findActive(tenantId, eventId);
+        Event event = findActive(tenantId, eventId);
+        if ("COMPLETED".equals(event.getStatus()) || "CANCELLED".equals(event.getStatus())) {
+            throw new HandyFlowException("Ticket tiers cannot be added to a " + event.getStatus() + " event",
+                    HttpStatus.CONFLICT, "EVENT_CLOSED");
+        }
+        if (req.saleStart() != null && req.saleEnd() != null && !req.saleEnd().isAfter(req.saleStart())) {
+            throw new HandyFlowException("The sale window must end after it starts",
+                    HttpStatus.BAD_REQUEST, "SALE_WINDOW_INVALID");
+        }
         EventTicketTier tier = EventTicketTier.create(tenantId, eventId,
                 req.name(), req.description(), req.price(), req.quantity(),
                 req.saleStart(), req.saleEnd());

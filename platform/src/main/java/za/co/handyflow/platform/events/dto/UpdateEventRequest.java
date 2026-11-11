@@ -2,22 +2,25 @@ package za.co.handyflow.platform.events.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 
 /** Full-replace update (PUT semantics), same shape as CreateEventRequest. */
 public record UpdateEventRequest(
-        @NotBlank @Size(max = 200) String title,
-        String description,
+        @NotBlank @Size(max = 300) String title,
+        @Size(max = 20000) String description,
+        @Pattern(regexp = "CONFERENCE|WEDDING|CHURCH|FESTIVAL|CORPORATE|COMMUNITY|FUNDRAISER|GENERAL",
+                message = "must be one of CONFERENCE, WEDDING, CHURCH, FESTIVAL, CORPORATE, COMMUNITY, FUNDRAISER, GENERAL")
         String eventType,
-        String venueName,
-        String venueAddress,
+        @Size(max = 300) String venueName,
+        @Size(max = 2000) String venueAddress,
         @Positive Integer venueCapacity,
         @NotNull LocalDateTime startDatetime,
         @NotNull LocalDateTime endDatetime,
         boolean isFree,
         boolean isPrivate,
         LocalDateTime registrationDeadline,
-        String notes
+        @Size(max = 20000) String notes
 ) {}

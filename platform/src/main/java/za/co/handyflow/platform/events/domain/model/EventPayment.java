@@ -167,6 +167,15 @@ public class EventPayment {
         touch();
     }
 
+    /** The ticket this money paid for moved to a new holder: the payment follows the ticket, so refunds find the right guest. */
+    public void reassignGuest(UUID newGuestId) {
+        if (newGuestId == null) throw new IllegalArgumentException("A guest is required");
+        if (!isMoneyHeld())
+            throw new IllegalStateException("Only a payment holding money can move to another guest (status is " + status + ")");
+        this.guestId = newGuestId;
+        touch();
+    }
+
     private boolean canReceiveMoney() {
         return PENDING.equals(status) || EXPIRED.equals(status) || CANCELLED.equals(status) || FAILED.equals(status);
     }

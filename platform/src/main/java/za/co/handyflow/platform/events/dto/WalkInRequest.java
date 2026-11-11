@@ -1,5 +1,8 @@
 package za.co.handyflow.platform.events.dto;
 
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.PositiveOrZero;
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -13,6 +16,6 @@ public record WalkInRequest(
         @Size(max = 50) String phone,
         @Size(max = 200) String company,
         @Size(max = 500) String dietaryRequirements,
-        BigDecimal amountPaid,
+        @PositiveOrZero @Digits(integer = 8, fraction = 2) BigDecimal amountPaid,
         @Size(max = 200) String location
 ) {}

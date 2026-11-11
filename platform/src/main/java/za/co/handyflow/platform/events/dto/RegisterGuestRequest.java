@@ -1,17 +1,22 @@
 package za.co.handyflow.platform.events.dto;
 
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
+
 import java.math.BigDecimal;
 import java.util.UUID;
 
 public record RegisterGuestRequest(
         UUID tierId,
         UUID customerId,
-        @NotBlank String fullName,
-        String email,
-        String phone,
-        String company,
-        String dietaryRequirements,
-        BigDecimal amountPaid,
-        String notes
+        @NotBlank @Size(max = 200) String fullName,
+        @Email @Size(max = 254) String email,
+        @Size(max = 50) String phone,
+        @Size(max = 200) String company,
+        @Size(max = 500) String dietaryRequirements,
+        @PositiveOrZero @Digits(integer = 8, fraction = 2) BigDecimal amountPaid,
+        @Size(max = 2000) String notes
 ) {}

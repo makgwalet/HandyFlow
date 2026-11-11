@@ -27,6 +27,14 @@ public interface EventPaymentRepository extends JpaRepository<EventPayment, UUID
     @Query("SELECT p FROM EventPayment p WHERE p.guestId = :guestId AND p.status = 'PAID'")
     List<EventPayment> findPaidForGuest(UUID guestId);
 
+    /** Payments still holding the payer's money (paid, or paid-but-unhonoured) for a guest — they follow a transferred ticket. */
+    @Query("SELECT p FROM EventPayment p WHERE p.guestId = :guestId AND p.status IN ('PAID','REQUIRES_REFUND')")
+    List<EventPayment> findMoneyHeldForGuest(UUID guestId);
+
+    /** Every open checkout of an event — released when the event is cancelled. */
+    @Query("SELECT p FROM EventPayment p WHERE p.eventId = :eventId AND p.status = 'PENDING'")
+    List<EventPayment> findPendingByEvent(UUID eventId);
+
     @Query("SELECT p FROM EventPayment p WHERE p.eventId = :eventId " +
             "AND (:status IS NULL OR p.status = :status) ORDER BY p.createdAt DESC")
     Page<EventPayment> search(UUID eventId, String status, Pageable pageable);

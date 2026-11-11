@@ -1,5 +1,8 @@
 package za.co.handyflow.platform.events.dto;
 
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.PositiveOrZero;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
@@ -11,6 +14,6 @@ import java.util.UUID;
 public record GroupRegistrationRequest(
         UUID tierId,
         UUID customerId,
-        BigDecimal amountPaidEach,
+        @PositiveOrZero @Digits(integer = 8, fraction = 2) BigDecimal amountPaidEach,
         @NotEmpty @Size(max = 50) @Valid List<GroupMemberRequest> members
 ) {}

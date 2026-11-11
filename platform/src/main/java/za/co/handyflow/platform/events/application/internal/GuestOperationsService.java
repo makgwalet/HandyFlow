@@ -50,6 +50,7 @@ public class GuestOperationsService {
     private final EventNumberGenerator      numberGen;
     private final EmailService              emailService;
     private final EventAuditService         audit;
+    private final PaymentLedgerService      payments;
 
     // ── Group registration ────────────────────────────────────────────────────
 
@@ -236,6 +237,7 @@ public class GuestOperationsService {
         old.markTransferred();
         guestRepo.save(old);
         guestRepo.save(fresh);
+        payments.onGuestTransferred(old.getId(), fresh.getId());
 
         List<String> details = new ArrayList<>();
         details.add("ticket " + oldTicket + " -> " + newTicket);
