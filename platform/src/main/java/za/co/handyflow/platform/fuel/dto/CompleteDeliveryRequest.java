@@ -25,5 +25,7 @@ public record CompleteDeliveryRequest(
         // ReceiptPdfService.decodeLogoBytes) — no new storage
         // infrastructure needed, just actually wiring the field that
         // was already there.
-        String receiverSignatureUrl
+        String receiverSignatureUrl,
+        // Stage 3: generated once on the device. Sending the same id again returns the first result instead of failing or repeating.
+        java.util.UUID clientRequestId
 ) {}

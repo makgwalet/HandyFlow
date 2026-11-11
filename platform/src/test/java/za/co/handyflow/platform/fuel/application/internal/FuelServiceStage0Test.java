@@ -70,7 +70,7 @@ class FuelServiceStage0Test {
     }
 
     private CompleteDeliveryRequest completeReq(String litres) {
-        return new CompleteDeliveryRequest(bd(litres), "P Botha", null, null, null, false, null, null);
+        return new CompleteDeliveryRequest(bd(litres), "P Botha", null, null, null, false, null, null, null);
     }
 
     @Test @DisplayName("completing a delivery twice deducts the tank once and refuses the second call")
@@ -166,5 +166,19 @@ class FuelServiceStage0Test {
         ReceiveFuelRequest req = new ReceiveFuelRequest(bd("100"), bd("20"), Instant.now(), foreign, null, null);
         assertThrows(ResourceNotFoundException.class, () -> service.receiveFuel(TENANT, UUID.randomUUID(), req));
         assertEquals(0, bd("5000").compareTo(tank.getCurrentLitres()));
+    }
+
+    @Test @DisplayName("Stage 3: retrying the same request id returns the first result and deducts once; a different id is refused")
+    void idempotentCompletion() {
+        UUID key = UUID.randomUUID();
+        CompleteDeliveryRequest first = new CompleteDeliveryRequest(bd("1000"), "P Botha", null, null, null, false, null, null, key);
+        service.completeDelivery(TENANT, UUID.randomUUID(), first);
+        assertEquals(0, bd("4000").compareTo(tank.getCurrentLitres()));
+        assertDoesNotThrow(() -> service.completeDelivery(TENANT, UUID.randomUUID(), first));
+        assertEquals(0, bd("4000").compareTo(tank.getCurrentLitres()), "retry must not deduct again");
+        verify(receiptNumberGenerator, times(1)).generate(any());
+        CompleteDeliveryRequest other = new CompleteDeliveryRequest(bd("1000"), "P Botha", null, null, null, false, null, null, UUID.randomUUID());
+        assertThrows(IllegalStateException.class, () -> service.completeDelivery(TENANT, UUID.randomUUID(), other));
+        assertEquals(0, bd("4000").compareTo(tank.getCurrentLitres()));
     }
 }

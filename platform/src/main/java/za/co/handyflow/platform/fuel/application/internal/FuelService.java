@@ -679,6 +679,15 @@ public class FuelService {
         return deliveryRepository.findByOrder(tenantId, orderId).stream().map(this::toDeliveryResponse).toList();
     }
 
+    /** One delivery as the API shows it (used by the transport service). */
+    public DeliveryResponse toResponse(FuelDelivery d) { return toDeliveryResponse(d); }
+
+    @Transactional(readOnly = true)
+    public DeliveryResponse deliveriesForOrderOrSelf(TenantId tenantId, UUID deliveryId) {
+        return deliveryRepository.findActiveById(tenantId, deliveryId).map(this::toDeliveryResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery", deliveryId.toString()));
+    }
+
     /** Ties a freshly scheduled delivery to its order (same transaction as the scheduling). */
     @Transactional
     public void attachToOrder(TenantId tenantId, UUID deliveryId, UUID orderId) {
@@ -817,7 +826,8 @@ public class FuelService {
                 d.getReversedAt(), d.getReversalReason(),
                 d.getSiteId(),
                 d.getOrderId(), d.getLoadedLitres(), d.getSealNumbers(),
-                d.getInvoiceState(), d.getInvoiceId(), d.getInvoiceNumber(), d.getInvoiceError()
+                d.getInvoiceState(), d.getInvoiceId(), d.getInvoiceNumber(), d.getInvoiceError(),
+                d.getTankerId(), d.getDriverEmployeeId()
         );
     }
 
@@ -829,6 +839,12 @@ public class FuelService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Delivery", deliveryId.toString()
                 ));
+        // Stage 3: a retry of the SAME request (same client id) returns what happened the first time.
+        if (req.clientRequestId() != null && req.clientRequestId().equals(delivery.getCompletionRequestId())
+                && "DELIVERED".equals(delivery.getStatus())) {
+            log.info("Delivery {} already completed by request {}; returning the first result", deliveryId, req.clientRequestId());
+            return toDeliveryResponse(delivery);
+        }
         // Stage 0: refuse a repeat completion BEFORE touching the tank,
         // so a retry can never deduct stock twice.
         if (!"SCHEDULED".equals(delivery.getStatus()) && !"IN_TRANSIT".equals(delivery.getStatus())) {
@@ -857,6 +873,7 @@ public class FuelService {
         // own comment for why this is a separate call rather than a
         // parameter on complete() above.
         delivery.recordCostSnapshot(tank.getCostPerLitreWac());
+        delivery.recordCompletionRequest(req.clientRequestId());
 
         delivery.assignReceiptNumber(receiptNumberGenerator.generate(tenantId));
         deliveryRepository.save(delivery);

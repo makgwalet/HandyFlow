@@ -20,5 +20,6 @@ public record DeliveryResponse(
         Instant reversedAt, String reversalReason,
         UUID siteId,
         UUID orderId, java.math.BigDecimal loadedLitres, String sealNumbers,
-        String invoiceState, UUID invoiceId, String invoiceNumber, String invoiceError
+        String invoiceState, UUID invoiceId, String invoiceNumber, String invoiceError,
+        UUID tankerId, UUID driverEmployeeId
 ) {}

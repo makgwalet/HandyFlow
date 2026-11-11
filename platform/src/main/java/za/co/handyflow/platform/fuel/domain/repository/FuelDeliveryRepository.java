@@ -99,4 +99,21 @@ public interface FuelDeliveryRepository extends JpaRepository<FuelDelivery, UUID
            "WHERE d.tenantId = :tenantId AND d.id IN :ids AND d.status = 'DELIVERED' AND d.deletedAt IS NULL " +
            "AND (d.invoiceState IN ('NONE','FAILED') OR (d.invoiceState = 'INVOICING' AND d.invoiceClaimedAt < :stale))")
     int claimForInvoicing(TenantId tenantId, java.util.Collection<UUID> ids, Instant now, Instant stale);
+
+    // ── Stage 3: allocation and planning ─────────────────────────────────────
+
+    @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.tankerId = :tankerId AND d.id <> :selfId AND d.status IN ('SCHEDULED','IN_TRANSIT') AND d.scheduledAt BETWEEN :from AND :to AND d.deletedAt IS NULL")
+    List<FuelDelivery> findTankerConflicts(TenantId tenantId, UUID tankerId, UUID selfId, Instant from, Instant to);
+
+    @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.driverEmployeeId = :driverId AND d.id <> :selfId AND d.status IN ('SCHEDULED','IN_TRANSIT') AND d.scheduledAt BETWEEN :from AND :to AND d.deletedAt IS NULL")
+    List<FuelDelivery> findDriverConflicts(TenantId tenantId, UUID driverId, UUID selfId, Instant from, Instant to);
+
+    @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.scheduledAt >= :from AND d.scheduledAt < :to AND d.status <> 'CANCELLED' AND d.deletedAt IS NULL ORDER BY d.scheduledAt")
+    List<FuelDelivery> findScheduledBetween(TenantId tenantId, Instant from, Instant to);
+
+    @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.driverEmployeeId = :driverId AND d.status IN ('SCHEDULED','IN_TRANSIT') AND d.deletedAt IS NULL ORDER BY d.scheduledAt")
+    List<FuelDelivery> findOpenForDriver(TenantId tenantId, UUID driverId);
+
+    @Query("SELECT COUNT(d) FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.tankerId = :tankerId AND d.status IN ('SCHEDULED','IN_TRANSIT') AND d.deletedAt IS NULL")
+    long countOpenForTanker(TenantId tenantId, UUID tankerId);
 }

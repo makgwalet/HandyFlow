@@ -34,8 +34,8 @@ class FuelRequestValidationTest {
 
     @Test @DisplayName("complete delivery: litres must be positive")
     void complete() {
-        assertFalse(v.validate(new CompleteDeliveryRequest(bd("-1"), "R", null, null, null, false, null, null)).isEmpty());
-        assertTrue(v.validate(new CompleteDeliveryRequest(bd("1"), "R", null, null, null, false, null, null)).isEmpty());
+        assertFalse(v.validate(new CompleteDeliveryRequest(bd("-1"), "R", null, null, null, false, null, null, null)).isEmpty());
+        assertTrue(v.validate(new CompleteDeliveryRequest(bd("1"), "R", null, null, null, false, null, null, null)).isEmpty());
     }
 
     @Test @DisplayName("schedule delivery: litres must be positive")

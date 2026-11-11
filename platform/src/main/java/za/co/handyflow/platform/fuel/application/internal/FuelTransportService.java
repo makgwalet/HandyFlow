@@ -1,0 +1,224 @@
+package za.co.handyflow.platform.fuel.application.internal;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.crm.CrmFacade;
+import za.co.handyflow.platform.crm.CustomerSummary;
+import za.co.handyflow.platform.fuel.domain.model.*;
+import za.co.handyflow.platform.fuel.domain.repository.*;
+import za.co.handyflow.platform.fuel.dto.*;
+import za.co.handyflow.platform.hr.EmployeeSummary;
+import za.co.handyflow.platform.hr.application.HrFacade;
+import za.co.handyflow.platform.shared.ConflictException;
+import za.co.handyflow.platform.shared.ResourceNotFoundException;
+import za.co.handyflow.platform.shared.TenantId;
+
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/** Stage 3: tankers with compartments, putting a tanker and driver on a load, the day's planning board, and the driver's own loads. */
+@Service
+@RequiredArgsConstructor
+public class FuelTransportService {
+
+    private static final ZoneId SAST = ZoneId.of("Africa/Johannesburg");
+    /** A tanker or driver cannot be on two open loads scheduled closer together than this. */
+    static final Duration TURNAROUND = Duration.ofHours(4);
+
+    private final FuelTankerRepository tankers;
+    private final FuelTankerCompartmentRepository compartments;
+    private final FuelDeliveryCompartmentRepository loadSplits;
+    private final FuelDeliveryRepository deliveries;
+    private final FuelService fuelService;
+    private final HrFacade hr;
+    private final CrmFacade crm;
+
+    // ── Tankers ──────────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<TankerResponse> listTankers(TenantId tenantId) {
+        List<FuelTanker> list = tankers.findAllActive(tenantId);
+        Map<UUID, List<FuelTankerCompartment>> byTanker = list.isEmpty() ? Map.of()
+                : compartments.findByTankers(tenantId, list.stream().map(FuelTanker::getId).toList())
+                        .stream().collect(Collectors.groupingBy(FuelTankerCompartment::getTankerId));
+        return list.stream().map(t -> toResponse(tenantId, t, byTanker.getOrDefault(t.getId(), List.of()))).toList();
+    }
+
+    @Transactional
+    public TankerResponse createTanker(TenantId tenantId, TankerRequest req) {
+        FuelTanker t = FuelTanker.create(tenantId, req.registration(), req.name());
+        if (tankers.registrationTaken(tenantId, t.getRegistration(), t.getId())) {
+            throw new ConflictException("A tanker with registration " + t.getRegistration() + " already exists.");
+        }
+        tankers.save(t);
+        List<FuelTankerCompartment> list = new ArrayList<>();
+        int n = 1;
+        for (BigDecimal cap : req.compartmentCapacities()) list.add(FuelTankerCompartment.create(tenantId, t.getId(), n++, cap));
+        compartments.saveAll(list);
+        return toResponse(tenantId, t, list);
+    }
+
+    /** Registration and name only; compartments are fixed (deactivate and recreate if the tanker is rebuilt). */
+    @Transactional
+    public TankerResponse updateTanker(TenantId tenantId, UUID id, String registration, String name) {
+        FuelTanker t = findTanker(tenantId, id);
+        t.update(registration, name);
+        if (tankers.registrationTaken(tenantId, t.getRegistration(), t.getId())) {
+            throw new ConflictException("A tanker with registration " + t.getRegistration() + " already exists.");
+        }
+        tankers.save(t);
+        return toResponse(tenantId, t, compartments.findByTanker(tenantId, id));
+    }
+
+    @Transactional
+    public void deactivateTanker(TenantId tenantId, UUID id) {
+        FuelTanker t = findTanker(tenantId, id);
+        if (deliveries.countOpenForTanker(tenantId, id) > 0) {
+            throw new IllegalStateException("This tanker is allocated to loads that have not been delivered. Reallocate them first.");
+        }
+        t.deactivate();
+        tankers.save(t);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DriverResponse> drivers(TenantId tenantId) {
+        return hr.activeEmployees(tenantId).stream()
+                .map(e -> new DriverResponse(e.id(), e.fullName(), e.jobTitle(), e.phone())).toList();
+    }
+
+    // ── Allocation ───────────────────────────────────────────────────────────
+
+    @Transactional
+    public DeliveryResponse allocate(TenantId tenantId, UUID deliveryId, AllocationRequest req) {
+        FuelDelivery d = deliveries.findActiveByIdForUpdate(tenantId, deliveryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery", deliveryId.toString()));
+        if (!"SCHEDULED".equals(d.getStatus())) {
+            throw new IllegalStateException("Only a scheduled load can be allocated (this one is " + d.getStatus().toLowerCase().replace('_', ' ') + ").");
+        }
+        FuelTanker tanker = findTanker(tenantId, req.tankerId());
+        EmployeeSummary driver = hr.findEmployeeById(tenantId, req.driverEmployeeId())
+                .orElseThrow(() -> new ResourceNotFoundException("Driver", req.driverEmployeeId().toString()));
+        if (driver.status() != null && driver.status().toUpperCase().startsWith("TERMINATED")) {
+            throw new IllegalStateException(driver.fullName() + " is no longer employed.");
+        }
+
+        Map<UUID, FuelTankerCompartment> comps = compartments.findByTanker(tenantId, tanker.getId()).stream()
+                .collect(Collectors.toMap(FuelTankerCompartment::getId, c -> c));
+        BigDecimal total = BigDecimal.ZERO;
+        Set<UUID> seen = new HashSet<>();
+        for (AllocationRequest.CompartmentLoad l : req.loads()) {
+            FuelTankerCompartment c = comps.get(l.compartmentId());
+            if (c == null) throw new IllegalArgumentException("That compartment does not belong to " + tanker.getRegistration() + ".");
+            if (!seen.add(c.getId())) throw new IllegalArgumentException("Compartment " + c.getNumber() + " is listed twice.");
+            if (l.litres().compareTo(c.getCapacityLitres()) > 0) {
+                throw new IllegalArgumentException("Compartment " + c.getNumber() + " holds " + c.getCapacityLitres().stripTrailingZeros().toPlainString() + " L; you asked for " + l.litres().stripTrailingZeros().toPlainString() + " L.");
+            }
+            total = total.add(l.litres());
+        }
+        if (total.compareTo(d.getLitresOrdered()) != 0) {
+            throw new IllegalArgumentException("The compartments add up to " + total.stripTrailingZeros().toPlainString() + " L but the load is "
+                    + d.getLitresOrdered().stripTrailingZeros().toPlainString() + " L.");
+        }
+
+        Instant from = d.getScheduledAt().minus(TURNAROUND), to = d.getScheduledAt().plus(TURNAROUND);
+        if (!deliveries.findTankerConflicts(tenantId, tanker.getId(), d.getId(), from, to).isEmpty()) {
+            throw new IllegalStateException(tanker.getRegistration() + " is already on another load within " + TURNAROUND.toHours() + " hours of this one.");
+        }
+        if (!deliveries.findDriverConflicts(tenantId, req.driverEmployeeId(), d.getId(), from, to).isEmpty()) {
+            throw new IllegalStateException(driver.fullName() + " is already on another load within " + TURNAROUND.toHours() + " hours of this one.");
+        }
+
+        d.allocate(tanker.getId(), tanker.getRegistration(), driver.id(), driver.fullName());
+        deliveries.save(d);
+        loadSplits.deleteByDelivery(tenantId, d.getId());
+        loadSplits.saveAll(req.loads().stream().map(l -> FuelDeliveryCompartment.create(tenantId, d.getId(), l.compartmentId(), l.litres())).toList());
+        return fuelService.deliveriesForOrderOrSelf(tenantId, d.getId());
+    }
+
+    // ── Planning board ───────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public PlanningResponse planning(TenantId tenantId, LocalDate date) {
+        Instant from = date.atStartOfDay(SAST).toInstant(), to = date.plusDays(1).atStartOfDay(SAST).toInstant();
+        List<FuelDelivery> day = deliveries.findScheduledBetween(tenantId, from, to);
+        Map<UUID, String> names = new HashMap<>();
+        Map<UUID, FuelTanker> tankerById = tankers.findAllActive(tenantId).stream().collect(Collectors.toMap(FuelTanker::getId, t -> t));
+        List<PlanningResponse.PlanLoad> loads = new ArrayList<>();
+        Map<UUID, int[]> count = new HashMap<>();
+        Map<UUID, BigDecimal> litres = new HashMap<>();
+        for (FuelDelivery d : day) {
+            String customer = d.getCustomerId() == null ? null : names.computeIfAbsent(d.getCustomerId(),
+                    id -> crm.findCustomerById(tenantId, id).map(CustomerSummary::name).orElse("(customer removed)"));
+            FuelTanker t = d.getTankerId() == null ? null : tankerById.get(d.getTankerId());
+            loads.add(new PlanningResponse.PlanLoad(d.getId(), d.getStatus(), d.getScheduledAt(), d.getCustomerId(), customer, d.getFuelType(),
+                    d.getLitresOrdered(), d.getTankerId(), t != null ? t.getRegistration() : d.getVehicleReg(),
+                    d.getDriverEmployeeId(), d.getDriverName(), d.isAllocated()));
+            if (d.getTankerId() != null) {
+                count.computeIfAbsent(d.getTankerId(), k -> new int[1])[0]++;
+                litres.merge(d.getTankerId(), d.getLitresOrdered(), BigDecimal::add);
+            }
+        }
+        List<FuelTankerCompartment> comps = tankerById.isEmpty() ? List.of() : compartments.findByTankers(tenantId, tankerById.keySet());
+        Map<UUID, BigDecimal> capacity = new HashMap<>();
+        comps.forEach(c -> capacity.merge(c.getTankerId(), c.getCapacityLitres(), BigDecimal::add));
+        List<PlanningResponse.TankerDay> days = tankerById.values().stream()
+                .map(t -> new PlanningResponse.TankerDay(t.getId(), t.getRegistration(), capacity.getOrDefault(t.getId(), BigDecimal.ZERO),
+                        count.getOrDefault(t.getId(), new int[1])[0], litres.getOrDefault(t.getId(), BigDecimal.ZERO)))
+                .sorted(Comparator.comparing(PlanningResponse.TankerDay::registration)).toList();
+        return new PlanningResponse(date, loads, days);
+    }
+
+    // ── Driver ───────────────────────────────────────────────────────────────
+
+    /** The loads allocated to the signed-in driver that are still open. */
+    @Transactional(readOnly = true)
+    public List<DeliveryResponse> myLoads(TenantId tenantId, UUID userId) {
+        EmployeeSummary me = requireDriver(tenantId, userId);
+        return deliveries.findOpenForDriver(tenantId, me.id()).stream().map(d -> fuelService.toResponse(d)).toList();
+    }
+
+    @Transactional
+    public DeliveryResponse myDispatch(TenantId tenantId, UUID userId, UUID deliveryId) {
+        FuelDelivery d = ownLoad(tenantId, userId, deliveryId);
+        return fuelService.dispatchDelivery(tenantId, d.getId(), new DispatchDeliveryRequest(
+                d.getDriverName() == null ? "Driver" : d.getDriverName(), d.getVehicleReg() == null ? "-" : d.getVehicleReg()));
+    }
+
+    @Transactional
+    public DeliveryResponse myComplete(TenantId tenantId, UUID userId, UUID deliveryId, CompleteDeliveryRequest req) {
+        FuelDelivery d = ownLoad(tenantId, userId, deliveryId);
+        return fuelService.completeDelivery(tenantId, d.getId(), req);
+    }
+
+    private FuelDelivery ownLoad(TenantId tenantId, UUID userId, UUID deliveryId) {
+        EmployeeSummary me = requireDriver(tenantId, userId);
+        FuelDelivery d = deliveries.findActiveById(tenantId, deliveryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery", deliveryId.toString()));
+        // Same message as a missing load so a driver cannot probe other drivers' loads.
+        if (!me.id().equals(d.getDriverEmployeeId())) throw new ResourceNotFoundException("Delivery", deliveryId.toString());
+        return d;
+    }
+
+    private EmployeeSummary requireDriver(TenantId tenantId, UUID userId) {
+        if (userId == null) throw new IllegalStateException("You are not signed in as a user.");
+        return hr.findEmployeeByUserId(tenantId, userId)
+                .orElseThrow(() -> new IllegalStateException("Your login is not linked to an employee record, so no loads can be allocated to you. Ask HR to link it."));
+    }
+
+    private FuelTanker findTanker(TenantId tenantId, UUID id) {
+        return tankers.findActiveById(tenantId, id).orElseThrow(() -> new ResourceNotFoundException("Tanker", id.toString()));
+    }
+
+    private TankerResponse toResponse(TenantId tenantId, FuelTanker t, List<FuelTankerCompartment> comps) {
+        BigDecimal total = comps.stream().map(FuelTankerCompartment::getCapacityLitres).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new TankerResponse(t.getId(), t.getRegistration(), t.getName(), t.isActive(), total,
+                comps.stream().map(c -> new TankerResponse.CompartmentResponse(c.getId(), c.getNumber(), c.getCapacityLitres())).toList(),
+                deliveries.countOpenForTanker(tenantId, t.getId()));
+    }
+}

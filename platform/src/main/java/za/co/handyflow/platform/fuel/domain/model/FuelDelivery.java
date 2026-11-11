@@ -140,6 +140,16 @@ public class FuelDelivery {
     @Column(name = "seal_numbers", length = 200)
     private String sealNumbers;
 
+    // Stage 3: allocated tanker and driver (HR employee), and the key that makes completion safe to retry.
+    @Column(name = "tanker_id")
+    private UUID tankerId;
+
+    @Column(name = "driver_employee_id")
+    private UUID driverEmployeeId;
+
+    @Column(name = "completion_request_id")
+    private UUID completionRequestId;
+
     @Column(name = "invoice_state", nullable = false, length = 12)
     private String invoiceState = "NONE";
 
@@ -243,6 +253,18 @@ public class FuelDelivery {
     public boolean isDeleted() { return deletedAt != null; }
 
     public void assignOrder(UUID orderId) { this.orderId = orderId; }
+
+    /** Names the tanker and driver for this load; the free-text fields keep the receipts and older screens working. */
+    public void allocate(UUID tankerId, String tankerReg, UUID driverEmployeeId, String driverName) {
+        requireStatus("allocate", "SCHEDULED");
+        this.tankerId = tankerId; this.vehicleReg = tankerReg;
+        this.driverEmployeeId = driverEmployeeId; this.driverName = driverName;
+        this.updatedAt = Instant.now();
+    }
+
+    public boolean isAllocated() { return tankerId != null && driverEmployeeId != null; }
+
+    public void recordCompletionRequest(UUID requestId) { this.completionRequestId = requestId; }
 
     /** What was loaded onto the tanker and the seals fitted. Variance against what is delivered is reviewed, never auto-written-off. */
     public void recordLoading(BigDecimal loadedLitres, String sealNumbers) {
