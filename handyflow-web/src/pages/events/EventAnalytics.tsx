@@ -1,216 +1,99 @@
 // src/pages/events/EventAnalytics.tsx
+//
+// Numbers for the selected event, from the server's dashboards (exact at any size; the previous version added up the first 500 guests in the browser):
+// registration (capacity, ticket types, where registrations came from, per day) and, while the door is open, live attendance that refreshes every 15
+// seconds. Needs EVENTS_REPORTS_READ.
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { BarChart2, TrendingUp, Calendar } from "lucide-react"
+import { usePermissions } from "../../hooks/usePermission"
+import { card, ErrorLine } from "../warehousing/whseUi"
+import { bucketLabel, barPercent, fillText } from "./dashboardView"
+import { checkInView } from "./guestOps"
+import { rand } from "./paymentOps"
 
-const fmtR  = (n: any) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
-const fmtDT = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
+interface Reg {
+  status: string; registered: number; venueCapacity: number | null; fillPercent: number | null; seatsRemaining: number | null; waitlisted: number; cancelled: number; transferred: number
+  checkedIn: number; bySource: Record<string, number>; amountRecorded: number; paymentsPending: number
+  tiers: { id: string; name: string; price: number; quantity: number; sold: number; available: number; checkedIn: number; faceValueSold: number }[]
+  registrationsByDay: { date: string; count: number; cumulative: number }[]
+}
+interface Att {
+  expected: number; checkedIn: number; remaining: number; checkInRatePercent: number | null; walkIns: number; scanResults: Record<string, number>
+  byTier: { tierId: string; tierName: string; registered: number; checkedIn: number }[]; arrivalsByQuarterHour: { start: string; count: number }[]
+}
 
-interface Props { eventId: string | null }
+const Tile = ({ k, v }: { k: string; v: string | number }) => <div style={{ ...card, padding: "10px 16px", minWidth: 130 }}><div style={{ fontSize: 20, fontWeight: 800 }}>{v}</div><div style={{ fontSize: 11.5, color: "var(--hf-text-muted)" }}>{k}</div></div>
+const SOURCES: Record<string, string> = { STAFF: "Added by staff", GROUP: "Group", WALK_IN: "Walk-in", IMPORT: "Imported", WAITLIST: "From waitlist", TRANSFER: "Transferred" }
 
-export default function EventAnalytics({ eventId }: Props) {
-  const { data: events = [] } = useQuery<any[]>({
-    queryKey: ["events", "ALL", "ALL"],
-    queryFn: async () => {
-      const r = await apiClient.get("/api/v1/events?size=200")
-      const p = r.data?.data ?? r.data
-      return p?.content ?? p ?? []
-    },
-  })
-
-  useQuery<any>({
-    queryKey: ["event-stats", eventId],
-    queryFn: async () => {
-      if (!eventId) return null
-      const r = await apiClient.get(`/api/v1/events/${eventId}/stats`)
-      return r.data?.data ?? r.data
-    },
-    enabled: !!eventId,
-    refetchInterval: 15000,
-  })
-
-  const { data: guests = [] } = useQuery<any[]>({
-    queryKey: ["event-guests", eventId, "ALL"],
-    queryFn: async () => {
-      if (!eventId) return []
-      const r = await apiClient.get(`/api/v1/events/${eventId}/guests?size=500`)
-      const p = r.data?.data ?? r.data
-      return p?.content ?? p ?? []
-    },
-    enabled: !!eventId,
-  })
-
-  const { data: tiers = [] } = useQuery<any[]>({
-    queryKey: ["event-tiers", eventId],
-    queryFn: async () => {
-      if (!eventId) return []
-      const r = await apiClient.get(`/api/v1/events/${eventId}/tiers`)
-      return r.data?.data ?? r.data ?? []
-    },
-    enabled: !!eventId,
-  })
-
-  // Compute analytics
-  const selectedEvent = (events as any[]).find(e => e.id === eventId)
-  const totalRevenue  = (guests as any[]).reduce((s: number, g: any) => s + parseFloat(g.amountPaid ?? 0), 0)
-  const paidGuests    = (guests as any[]).filter(g => g.paymentStatus === "PAID").length
-  const freeGuests    = (guests as any[]).filter(g => g.paymentStatus === "FREE").length
-  const noShows       = (guests as any[]).filter(g => g.status === "NO_SHOW").length
-  const cancelled     = (guests as any[]).filter(g => g.status === "CANCELLED").length
-  const checkedIn     = (guests as any[]).filter(g => g.status === "CHECKED_IN").length
-  const registered    = (guests as any[]).filter(g => !["CANCELLED","NO_SHOW"].includes(g.status)).length
-  const attendanceRate = registered > 0 ? Math.round(checkedIn / registered * 100) : 0
-
-  // Dietary breakdown
-  const dietaryMap = (guests as any[]).reduce((acc: any, g: any) => {
-    if (g.dietaryRequirements) acc[g.dietaryRequirements] = (acc[g.dietaryRequirements] ?? 0) + 1
-    return acc
-  }, {})
-
-  // Portfolio-level stats
-  const totalEvents    = (events as any[]).length
-  const liveNow        = (events as any[]).filter(e => e.status === "LIVE").length
-  const upcoming       = (events as any[]).filter(e => ["PUBLISHED","DRAFT"].includes(e.status)).length
-  const completed      = (events as any[]).filter(e => e.status === "COMPLETED").length
-
+function Bars({ rows, label }: { rows: { key: string; label: string; value: number }[]; label: string }) {
+  const max = Math.max(1, ...rows.map(r => r.value))
   return (
-    <div>
-      {/* Portfolio overview — always shown */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 12 }}>Portfolio overview</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-          {[
-            { label: "Total events",  value: totalEvents, color: "var(--hf-sky-text)", bg: "var(--hf-sky-soft-strong)", icon: Calendar },
-            { label: "Live now",      value: liveNow,     color: liveNow > 0 ? "var(--hf-danger-text)" : "var(--hf-text-muted)", bg: liveNow > 0 ? "var(--hf-danger-soft)" : "var(--hf-surface-muted)", icon: TrendingUp },
-            { label: "Upcoming",      value: upcoming,    color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", icon: Calendar },
-            { label: "Completed",     value: completed,   color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", icon: BarChart2 },
-          ].map(s => {
-            const Icon = s.icon
-            return (
-              <div key={s.label} style={{ background: s.bg, borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: s.color }}>{s.value}</div>
-                  <div style={{ fontSize: 11, color: s.color, opacity: 0.8, marginTop: 2 }}>{s.label}</div>
-                </div>
-                <Icon size={22} style={{ color: s.color, opacity: 0.4 }} />
-              </div>
-            )
-          })}
+    <div aria-label={label} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {rows.map(r => (
+        <div key={r.key} style={{ display: "grid", gridTemplateColumns: "120px 1fr 40px", gap: 8, alignItems: "center", fontSize: 12 }}>
+          <span style={{ color: "var(--hf-text-muted)" }}>{r.label}</span>
+          <div style={{ height: 8, background: "var(--hf-surface-sunken)", borderRadius: 4 }}><div style={{ width: `${barPercent(r.value, max)}%`, height: "100%", background: "var(--hf-sky)", borderRadius: 4 }} /></div>
+          <span style={{ textAlign: "right" }}>{r.value}</span>
         </div>
+      ))}
+    </div>
+  )
+}
+
+export default function EventAnalytics({ eventId }: { eventId: string | null }) {
+  const allowed = usePermissions(["EVENTS_REPORTS_READ", "EVENTS_MANAGE"])
+  const { data: reg, isLoading, error } = useQuery<Reg>({
+    queryKey: ["event-dash-registration", eventId], enabled: !!eventId && allowed,
+    queryFn: async () => { const r = await apiClient.get(`/api/v1/events/${eventId}/dashboard/registration`); return r.data?.data ?? r.data },
+  })
+  const { data: att } = useQuery<Att>({
+    queryKey: ["event-dash-attendance", eventId], enabled: !!eventId && allowed && (reg?.status === "LIVE" || reg?.status === "COMPLETED"),
+    refetchInterval: reg?.status === "LIVE" ? 15000 : false,
+    queryFn: async () => { const r = await apiClient.get(`/api/v1/events/${eventId}/dashboard/attendance`); return r.data?.data ?? r.data },
+  })
+  if (!eventId) return <p style={{ padding: 30, textAlign: "center", color: "var(--hf-text-muted)" }}>Pick an event from the Events list first.</p>
+  if (!allowed) return <p style={{ padding: 20, color: "var(--hf-text-muted)" }}>You do not have access to event analytics.</p>
+  if (isLoading || !reg) return <div><ErrorLine error={error} fallback="The analytics could not be loaded" />{isLoading && <p>Loading…</p>}</div>
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <Tile k="Registered" v={fillText(reg.registered, reg.venueCapacity, reg.fillPercent)} />
+        {reg.seatsRemaining != null && <Tile k="Places left" v={reg.seatsRemaining} />}
+        <Tile k="Waitlisted" v={reg.waitlisted} /><Tile k="Cancelled" v={reg.cancelled} /><Tile k="Transferred" v={reg.transferred} />
+        <Tile k="Payments recorded" v={rand(reg.amountRecorded)} />
+        {reg.paymentsPending > 0 && <Tile k="Payments still pending" v={reg.paymentsPending} />}
       </div>
 
-      {/* Event-specific analytics */}
-      {!eventId ? (
-        <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)", border: "1px dashed var(--hf-border)", borderRadius: 12 }}>
-          <BarChart2 size={36} style={{ marginBottom: 10, opacity: 0.3 }} />
-          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>Select an event for detailed analytics</div>
-          <div style={{ fontSize: 13, marginTop: 4 }}>Go to Events tab and click on any event to load per-event stats here.</div>
-        </div>
-      ) : (
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 12 }}>
-            {selectedEvent?.title ?? "Event analytics"}
+      {att && (
+        <section style={{ ...card, padding: 14 }}>
+          <h3 style={{ fontSize: 14, margin: "0 0 8px" }}>At the door {reg.status === "LIVE" ? "(live)" : ""}</h3>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+            <Tile k="Checked in" v={att.checkedIn} /><Tile k="Still expected" v={att.remaining} />
+            <Tile k="Check-in rate" v={att.checkInRatePercent == null ? "–" : `${Math.round(Number(att.checkInRatePercent))}%`} /><Tile k="Walk-ins" v={att.walkIns} />
           </div>
+          <Bars label="Scan results" rows={Object.entries(att.scanResults).map(([k, v]) => ({ key: k, label: checkInView(k).title, value: v }))} />
+          {att.arrivalsByQuarterHour.length > 0 && (
+            <div style={{ marginTop: 10 }}><div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Arrivals per 15 minutes</div>
+              <Bars label="Arrivals" rows={att.arrivalsByQuarterHour.map(b => ({ key: b.start, label: bucketLabel(b.start), value: b.count }))} /></div>
+          )}
+        </section>
+      )}
 
-          {/* KPIs */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 22 }}>
-            {[
-              { label: "Registered",     value: registered,   color: "var(--hf-sky-text)", bg: "var(--hf-sky-soft-strong)" },
-              { label: "Checked in",     value: checkedIn,    color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
-              { label: "Attendance rate",value: `${attendanceRate}%`, color: attendanceRate >= 70 ? "var(--hf-success-text-strong)" : "var(--hf-warning-text)", bg: attendanceRate >= 70 ? "var(--hf-success-soft-strong)" : "var(--hf-warning-soft)" },
-              { label: "No-shows",       value: noShows,      color: noShows > 0 ? "var(--hf-danger-text)" : "var(--hf-text-muted)", bg: noShows > 0 ? "var(--hf-danger-soft)" : "var(--hf-surface-muted)" },
-              { label: "Cancellations",  value: cancelled,    color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)" },
-              { label: "Total revenue",  value: fmtR(totalRevenue), color: "var(--hf-accent-text)", bg: "var(--hf-accent-soft)" },
-            ].map(k => (
-              <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: "14px 18px" }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: k.color }}>{k.value}</div>
-                <div style={{ fontSize: 11, color: k.color, opacity: 0.8, marginTop: 2 }}>{k.label}</div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            {/* Ticket tier breakdown */}
-            {(tiers as any[]).length > 0 && (
-              <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, padding: "18px 20px" }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)", marginBottom: 14 }}>Ticket tier breakdown</div>
-                {(tiers as any[]).map((t: any) => {
-                  const pct = t.quantity > 0 ? Math.round(t.quantitySold / t.quantity * 100) : 0
-                  return (
-                    <div key={t.id} style={{ marginBottom: 14 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5, fontSize: 13 }}>
-                        <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{t.name}</span>
-                        <span style={{ color: "var(--hf-text-muted)" }}>{t.quantitySold} / {t.quantity} sold</span>
-                      </div>
-                      <div style={{ height: 7, background: "var(--hf-surface-sunken)", borderRadius: 10, overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${pct}%`, background: pct >= 90 ? "var(--hf-danger)" : pct >= 60 ? "var(--hf-warning)" : "var(--hf-success)", borderRadius: 10, transition: "width 0.5s" }} />
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--hf-text-faint)", marginTop: 3 }}>
-                        <span>{pct}% sold · {t.available} remaining</span>
-                        <span>{t.quantityCheckedIn} checked in</span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* Payment breakdown */}
-            <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, padding: "18px 20px" }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)", marginBottom: 14 }}>Payment breakdown</div>
-              {[
-                { label: "Paid tickets",     value: paidGuests, color: "var(--hf-success-text-strong)", pct: registered > 0 ? Math.round(paidGuests / registered * 100) : 0 },
-                { label: "Free admission",   value: freeGuests, color: "var(--hf-sky-text)", pct: registered > 0 ? Math.round(freeGuests / registered * 100) : 0 },
-              ].map(r => (
-                <div key={r.label} style={{ marginBottom: 14 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5, fontSize: 13 }}>
-                    <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{r.label}</span>
-                    <span style={{ color: "var(--hf-text-muted)" }}>{r.value} ({r.pct}%)</span>
-                  </div>
-                  <div style={{ height: 7, background: "var(--hf-surface-sunken)", borderRadius: 10, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${r.pct}%`, background: r.color, borderRadius: 10 }} />
-                  </div>
-                </div>
-              ))}
-              {totalRevenue > 0 && (
-                <div style={{ marginTop: 16, padding: "12px 14px", background: "var(--hf-accent-soft)", border: "1px solid var(--hf-accent-border)", borderRadius: 9, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: 13, color: "var(--hf-accent-text)", fontWeight: 600 }}>Total revenue collected</span>
-                  <span style={{ fontSize: 18, fontWeight: 800, color: "var(--hf-accent-text)" }}>{fmtR(totalRevenue)}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Dietary requirements */}
-            {Object.keys(dietaryMap).length > 0 && (
-              <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, padding: "18px 20px" }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)", marginBottom: 14 }}>Dietary requirements</div>
-                {Object.entries(dietaryMap).map(([diet, count]: any) => (
-                  <div key={diet} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid var(--hf-border-subtle)", fontSize: 13 }}>
-                    <span style={{ color: "var(--hf-text-secondary)" }}>{diet}</span>
-                    <span style={{ fontWeight: 700, color: "var(--hf-warning-text)" }}>{count} guest{count > 1 ? "s" : ""}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Upcoming events list */}
-            <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, padding: "18px 20px" }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)", marginBottom: 14 }}>All events overview</div>
-              {(events as any[]).slice(0, 6).map((e: any) => {
-                const cfg: Record<string, string> = { LIVE: "var(--hf-danger-text)", PUBLISHED: "var(--hf-success-text-strong)", DRAFT: "var(--hf-text-faint)", COMPLETED: "var(--hf-sky-text)", CANCELLED: "var(--hf-text-disabled)", SOLD_OUT: "var(--hf-warning-text)" }
-                return (
-                  <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: "1px solid var(--hf-border-subtle)", fontSize: 12 }}>
-                    <div>
-                      <div style={{ fontWeight: 600, color: e.id === eventId ? "var(--hf-sky-text)" : "var(--hf-text)" }}>{e.title}</div>
-                      <div style={{ color: "var(--hf-text-faint)" }}>{fmtDT(e.startDatetime)}</div>
-                    </div>
-                    <span style={{ background: `color-mix(in srgb, ${cfg[e.status] ?? "var(--hf-text-faint)"} 9%, transparent)`, color: cfg[e.status] ?? "var(--hf-text-faint)", padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>{e.status}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
+      <section style={{ ...card, padding: 14 }}>
+        <h3 style={{ fontSize: 14, margin: "0 0 8px" }}>Ticket types</h3>
+        {reg.tiers.length === 0 ? <p style={{ color: "var(--hf-text-muted)", fontSize: 13 }}>No ticket types yet.</p> : (
+          <Bars label="Sold by ticket type" rows={reg.tiers.map(t => ({ key: t.id, label: `${t.name} (${t.sold}/${t.quantity})`, value: t.sold }))} />
+        )}
+      </section>
+      <section style={{ ...card, padding: 14 }}>
+        <h3 style={{ fontSize: 14, margin: "0 0 8px" }}>Where registrations came from</h3>
+        <Bars label="Sources" rows={Object.entries(reg.bySource).map(([k, v]) => ({ key: k, label: SOURCES[k] ?? k, value: v }))} />
+      </section>
+      {reg.registrationsByDay.length > 0 && (
+        <section style={{ ...card, padding: 14 }}>
+          <h3 style={{ fontSize: 14, margin: "0 0 8px" }}>Registrations per day</h3>
+          <Bars label="Per day" rows={reg.registrationsByDay.map(d => ({ key: d.date, label: new Date(d.date).toLocaleDateString("en-ZA", { day: "numeric", month: "short" }), value: d.count }))} />
+        </section>
       )}
     </div>
   )

@@ -17,6 +17,8 @@ import EventAnalytics  from "./EventAnalytics"
 import EventAuditTab   from "./EventAuditTab"
 import WaitlistTab     from "./WaitlistTab"
 import EventPaymentsTab from "./EventPaymentsTab"
+import EventsDashboardTab from "./EventsDashboardTab"
+import EventTicketsTab from "./EventTicketsTab"
 import GuestToolsTab   from "./GuestToolsTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { EVENTS_SECTIONS } from "../../navigation/moduleSections"
@@ -64,10 +66,13 @@ export function EventsPage() {
         : "Ticketing · QR check-in · Vendor coordination · Analytics"}
       render={(id, goTo) => {
         switch (id) {
+          case "dashboard":
+            return <EventsDashboardTab onOpenEvent={(eid: string, title: string) => { setSelectedEventId(eid); setSelectedEventTitle(title); goTo("guests") }} />
           case "events":
             return <EventsListTab onSelectEvent={(eid: string, title: string) => {
               setSelectedEventId(eid); setSelectedEventTitle(title); goTo("guests")
             }} />
+          case "tickets":   return <EventTicketsTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />
           case "guests":    return <GuestsTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />
           case "waitlist":  return <WaitlistTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />
           case "add-guests": return <GuestToolsTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />

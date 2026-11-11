@@ -580,14 +580,17 @@ export const EVENTS_SECTIONS: ModuleSections = {
   basePath: '/events',
   title: 'Events',
   icon: PartyPopper,
+  // Opens on the list, which anyone with EVENTS_READ can use; the dashboard needs EVENTS_REPORTS_READ.
   defaultSection: 'events',
   groups: [
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
     { label: 'Events', sections: [{ id: 'events', label: 'Events', icon: Calendar }] },
     {
       // These work on the event picked in the list; the page shows the
       // current selection under its title.
       label: 'Selected event',
       sections: [
+        { id: 'tickets', label: 'Ticket types', icon: Tags },
         { id: 'guests', label: 'Guests', icon: Users },
         { id: 'add-guests', label: 'Add guests', icon: UserPlus },
         { id: 'waitlist', label: 'Waitlist', icon: ListPlus },
