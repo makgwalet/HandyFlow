@@ -21,6 +21,7 @@ import PricingTab from "./PricingTab"
 import ComplianceTab from "./ComplianceTab"
 import PurchaseOrdersTab from "./PurchaseOrdersTab"
 import OverviewTab from "./OverviewTab"
+import ForecourtTab from "./ForecourtTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { FUEL_SECTIONS } from "../../navigation/moduleSections"
 
@@ -43,6 +44,7 @@ export function FuelPage() {
         case "pricing":    return <PricingTab />
         case "compliance": return <ComplianceTab />
         case "purchase-orders": return <PurchaseOrdersTab />
+        case "forecourt":  return <ForecourtTab />
         case "overview":   return <OverviewTab onNavigate={goTo} />
         case "margin":     return <MarginTab />
         default:           return null

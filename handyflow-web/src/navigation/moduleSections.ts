@@ -261,6 +261,12 @@ export const FUEL_SECTIONS: ModuleSections = {
       ],
     },
     {
+      label: 'Retail',
+      sections: [
+        { id: 'forecourt', label: 'Forecourt', icon: Fuel, anyPermission: ['FUEL_READ', 'FUEL_FORECOURT', 'FUEL_MANAGE'] },
+      ],
+    },
+    {
       label: 'Insights',
       sections: [
         { id: 'overview', label: 'Manager overview', icon: BarChart2 },
