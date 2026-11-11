@@ -25,7 +25,7 @@ import {
   Database, CalendarRange, MessageSquare, Send, BookOpen as BookIcon,
   UserCheck, Palette, Headphones, Wallet, Receipt, CheckSquare, LayoutGrid, ListChecks, ScanBarcode, PackageCheck, ArrowDownUp, Sprout, FlaskConical,
   Columns3, Zap, History, Plug, Filter, Copy, SlidersHorizontal, Tags, Target, Ruler,
-  UserPlus, Mail, KeyRound,
+  UserPlus, Mail, KeyRound, Layers,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -230,8 +230,15 @@ export const FUEL_SECTIONS: ModuleSections = {
       label: 'Stock',
       sections: [
         { id: 'tanks', label: 'Tanks', icon: Droplets },
+        { id: 'stock', label: 'Stock & Ledger', icon: Layers },
         { id: 'receipts', label: 'Stock In', icon: ArrowDownToLine },
         { id: 'dispatches', label: 'Dispatches', icon: Fuel },
+      ],
+    },
+    {
+      label: 'Customers',
+      sections: [
+        { id: 'customers', label: 'Customer accounts', icon: Users },
       ],
     },
     {

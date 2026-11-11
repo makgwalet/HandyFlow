@@ -1,3 +1,4 @@
+import type { CustomerAccount } from "./customerOps"
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import ReverseModal from "./ReverseModal"
@@ -72,12 +73,25 @@ export default function DeliveriesTab() {
     },
   })
 
+  // Stage 1B: pick the customer account and delivery site; accounts on credit hold cannot be chosen.
+  const [accountId, setAccountId] = useState("")
+  const [siteId, setSiteId] = useState("")
+  const { data: accounts = [] } = useQuery<CustomerAccount[]>({
+    queryKey: ["fuel-customer-accounts"], enabled: showSchedule,
+    queryFn: async () => { const r = await apiClient.get("/api/v1/fuel/customer-accounts"); return r.data?.data ?? r.data },
+  })
+  const { data: accountDetail } = useQuery<CustomerAccount>({
+    queryKey: ["fuel-customer-account", accountId], enabled: showSchedule && !!accountId,
+    queryFn: async () => { const r = await apiClient.get(`/api/v1/fuel/customer-accounts/${accountId}`); return r.data?.data ?? r.data },
+  })
+
   const scheduleDelivery = useMutation({
     mutationFn: (body: any) => apiClient.post("/api/v1/fuel/deliveries", body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["deliveries"] })
       setShowSchedule(false)
       setScheduleForm({ tankId: "", fuelType: "DIESEL", litresOrdered: "", pricePerLitre: "", scheduledAt: "", driverName: "", vehicleReg: "", street: "", suburb: "", city: "", postalCode: "" })
+      setAccountId(""); setSiteId("")
       setError("")
     },
     onError: (e: any) => setError(e.response?.data?.message || "Failed to schedule delivery"),
@@ -277,6 +291,27 @@ export default function DeliveriesTab() {
                 <input value={scheduleForm.vehicleReg} onChange={e => setScheduleForm(f => ({ ...f, vehicleReg: e.target.value }))} placeholder="GP-45-67-JHB" style={inputStyle} />
               </div>
             </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Customer account</label>
+                <select aria-label="Customer account" value={accountId} onChange={e => { setAccountId(e.target.value); setSiteId("") }} style={selectStyle}>
+                  <option value="">No account (walk-in)</option>
+                  {accounts.map(a => <option key={a.id} value={a.id} disabled={a.creditHold}>{a.customerName}{a.creditHold ? " (on credit hold)" : ""}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Delivery site</label>
+                <select aria-label="Delivery site" value={siteId} disabled={!accountId}
+                  onChange={e => {
+                    setSiteId(e.target.value)
+                    const s = accountDetail?.sites?.find(x => x.id === e.target.value)
+                    if (s?.address) setScheduleForm(f => ({ ...f, street: s.address! }))
+                  }} style={selectStyle}>
+                  <option value="">Choose a site…</option>
+                  {(accountDetail?.sites ?? []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            </div>
             <div style={{ borderTop: "1px solid var(--hf-border-subtle)", paddingTop: 14 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: "var(--hf-text-muted)", marginBottom: 10, letterSpacing: "0.05em" }}>DELIVERY ADDRESS</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -293,6 +328,8 @@ export default function DeliveriesTab() {
             <button
               onClick={() => scheduleDelivery.mutate({
                 tankId: scheduleForm.tankId,
+                customerId: accountDetail?.crmCustomerId ?? null,
+                siteId: siteId || null,
                 fuelType: scheduleForm.fuelType,
                 litresOrdered: Number(scheduleForm.litresOrdered),
                 pricePerLitre: Number(scheduleForm.pricePerLitre),
