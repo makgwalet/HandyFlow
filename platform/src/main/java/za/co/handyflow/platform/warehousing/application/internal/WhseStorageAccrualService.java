@@ -50,6 +50,10 @@ public class WhseStorageAccrualService {
 
     public java.time.ZoneId zone() { return java.time.ZoneId.of(billingZone); }
 
+    /** Optional so the service can be built without it; Spring injects it. Without it every day bills (the standard). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private WhseBillingDayService billingDays;
+
     /** @return number of accrual rows written (per-unit storage rows plus fixed pallet/bin fee rows) */
     @Transactional
     public int accrueForTenant(UUID tenantId, LocalDate date) {
@@ -72,6 +76,11 @@ public class WhseStorageAccrualService {
         List<WhseInventory> positions = new ArrayList<>();
         inventoryRepository.findAllById(held.keySet()).forEach(positions::add);
         positions.sort(java.util.Comparator.comparing(p -> p.getId().toString()));
+        // A contract may replace the standard (every calendar day) with, say, weekdays only; on a day it does not bill, nothing accrues for that client.
+        if (billingDays != null) {
+            WhseBillingDayService.Book days = billingDays.book(za.co.handyflow.platform.shared.TenantId.of(tenantId));
+            positions.removeIf(p -> !days.billable(p.getClientId(), date));
+        }
         Map<UUID, java.math.BigDecimal> free = freeQuantities(tenantId, date, zone, book, positions, held);
 
         for (WhseInventory position : positions) {
