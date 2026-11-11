@@ -26,6 +26,7 @@ import java.util.UUID;
 public class WhseClientService {
 
     private final WhseClientRepository repository;
+    private final WhseSettingsService settings;
 
     @Transactional(readOnly = true)
     public Page<WhseClient> list(TenantId tenantId, Pageable pageable) {
@@ -48,6 +49,7 @@ public class WhseClientService {
                               BigDecimal storageRatePerUnitPerMonth, BigDecimal receivingFeePerUnit,
                               BigDecimal pickFeePerUnit, BigDecimal packFeePerOrder, String contactName,
                               String contactEmail, String contactPhone, String address) {
+        settings.requireCanAddClient(tenantId); // an internal warehouse has one owner
         WhseClient client = WhseClient.create(tenantId.getValue(), tradingName, registrationNumber,
                 storageRatePerUnitPerMonth, receivingFeePerUnit, pickFeePerUnit, packFeePerOrder, contactName,
                 contactEmail, contactPhone, address);

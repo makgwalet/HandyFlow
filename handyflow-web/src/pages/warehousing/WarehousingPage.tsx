@@ -22,6 +22,7 @@ import WhseScanTab from "./WhseScanTab"
 import WhseReplenTab from "./WhseReplenTab"
 import WhseDockTab from "./WhseDockTab"
 import WhseWebhooksTab from "./WhseWebhooksTab"
+import WhseSetupTab from "./WhseSetupTab"
 import WhseSlottingTab from "./WhseSlottingTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { WAREHOUSING_SECTIONS } from "../../navigation/moduleSections"
@@ -45,6 +46,7 @@ export default function WarehousingPage() {
           case "dispatch":   return <WhseDispatchTab />
           case "dock":       return <WhseDockTab />
           case "webhooks":   return <WhseWebhooksTab />
+          case "setup":      return <WhseSetupTab />
           case "slotting":   return <WhseSlottingTab />
           default:          return null
         }

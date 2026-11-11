@@ -54,6 +54,17 @@ class WhseItemServiceTest {
         assertEquals(0, new BigDecimal("12.50").compareTo(i.getUnitCost()));
     }
 
+    @Test @DisplayName("a new item starts with the tracking of the industry profile; a general profile sets none")
+    void industryDefaults() {
+        when(jdbc.query(eq("SELECT industry_profile FROM whse_profile WHERE tenant_id = ?"), any(org.springframework.jdbc.core.RowMapper.class), any(Object[].class))).thenReturn(java.util.List.of("PHARMA"));
+        WhseItem p = service.create(t(), client, "SKU-P", "Tablets", "EACH", null, details(null, null), actor);
+        assertTrue(p.isLotTracked());
+        assertTrue(p.isExpiryTracked());
+        when(jdbc.query(eq("SELECT industry_profile FROM whse_profile WHERE tenant_id = ?"), any(org.springframework.jdbc.core.RowMapper.class), any(Object[].class))).thenReturn(java.util.List.of("GENERAL"));
+        WhseItem g = service.create(t(), client, "SKU-G", "Bolts", "EACH", null, details(null, null), actor);
+        assertFalse(g.isLotTracked());
+    }
+
     @Test @DisplayName("the same barcode on another item of the same client is a conflict")
     void duplicateBarcode() {
         WhseItem other = WhseItem.create(tenant, client, "OTHER", "Other", "EACH", null);

@@ -59,6 +59,12 @@ public class WhseItemService {
         WhseItem item = WhseItem.create(tenantId.getValue(), clientId, sku, description, uom,
                 storageRatePerUnitPerMonth);
         item.applyDetails(details);
+        // A new item starts with the tracking its industry profile sets (a new item has no stock, so this is always allowed).
+        List<String> industry = jdbc.query("SELECT industry_profile FROM whse_profile WHERE tenant_id = ?", (rs, i) -> rs.getString(1), tenantId.getValue());
+        if (industry != null && !industry.isEmpty() && industry.get(0) != null) {
+            WhseSettingsRules.ItemDefaults d = WhseSettingsRules.itemDefaults(WhseSettingsRules.parseIndustry(industry.get(0)));
+            if (d.lotTracked()) item.setTracking(true, d.expiryTracked(), null);
+        }
         return repository.save(item);
     }
 
