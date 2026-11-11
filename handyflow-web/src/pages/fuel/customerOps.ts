@@ -1,5 +1,5 @@
 // Stage 1B helpers: customer account types and validation mirroring the server rules.
-export interface CustomerSite { id: string; accountId: string; name: string; address: string | null; contactName: string | null; contactPhone: string | null; deliveryInstructions: string | null; operatingHours: string | null }
+export interface CustomerSite { id: string; accountId: string; name: string; address: string | null; contactName: string | null; contactPhone: string | null; deliveryInstructions: string | null; operatingHours: string | null; distanceKm?: number | null }
 export interface CustomerAccount {
   id: string; crmCustomerId: string; customerName: string; customerType: string; creditLimit: number
   paymentTermsDays: number; creditHold: boolean; creditHoldReason: string | null; licenceNumber: string | null
@@ -31,6 +31,14 @@ export const validateHold = (reason: string): string | null =>
   reason.trim().length < 5 ? "Give a reason of at least 5 characters for the credit hold." : null
 
 export const validateSite = (name: string): string | null => (name.trim() === "" ? "Give the site a name." : null)
+
+/** Blank is fine (distance unknown). Otherwise 0 to 5000 km, as the server enforces. */
+export function validateDistance(km: string): string | null {
+  if (km.trim() === "") return null
+  const n = Number(km)
+  if (Number.isNaN(n) || n < 0 || n > 5000) return "Distance must be between 0 and 5000 km."
+  return null
+}
 
 /** Accounts a delivery can be scheduled for: those not on credit hold. */
 export const deliverable = (accounts: CustomerAccount[]) => accounts.filter(a => !a.creditHold)

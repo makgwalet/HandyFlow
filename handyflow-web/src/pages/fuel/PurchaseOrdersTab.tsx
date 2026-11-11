@@ -5,15 +5,15 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import { fmtL, fmtR } from "./orderOps"
-import { STATUS_LABEL, validatePo, litresVarianceLabel, type PurchaseOrder, type Match } from "./purchasingOps"
+import { STATUS_LABEL, validatePo, validateCloseReason, litresVarianceLabel, type PurchaseOrder, type Match } from "./purchasingOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const msg = (e: any, fb: string) => e?.response?.data?.message ?? fb
 const th: React.CSSProperties = { textAlign: "left", padding: "10px 12px", fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", whiteSpace: "nowrap" }
 const td: React.CSSProperties = { padding: "10px 12px", fontSize: 13, color: "var(--hf-text)" }
 const FUELS = ["DIESEL", "DIESEL_50PPM", "DIESEL_500PPM", "PETROL_95", "PETROL_93", "PARAFFIN"]
-const tone = (s: string) => s === "RECEIVED" ? { bg: "var(--hf-success-soft-strong)", fg: "var(--hf-success-text-strong)" } : s === "CANCELLED" ? { bg: "var(--hf-danger-soft)", fg: "var(--hf-danger-text)" } : s === "PART_RECEIVED" ? { bg: "var(--hf-warning-soft)", fg: "var(--hf-warning-text)" } : { bg: "var(--hf-surface-alt)", fg: "var(--hf-text)" }
-type Dialog = { kind: "edit"; po?: PurchaseOrder } | { kind: "cancel"; po: PurchaseOrder } | null
+const tone = (s: string) => s === "RECEIVED" ? { bg: "var(--hf-success-soft-strong)", fg: "var(--hf-success-text-strong)" } : s === "CANCELLED" ? { bg: "var(--hf-danger-soft)", fg: "var(--hf-danger-text)" } : s === "PART_RECEIVED" || s === "CLOSED_SHORT" ? { bg: "var(--hf-warning-soft)", fg: "var(--hf-warning-text)" } : { bg: "var(--hf-surface-alt)", fg: "var(--hf-text)" }
+type Dialog = { kind: "edit"; po?: PurchaseOrder } | { kind: "cancel"; po: PurchaseOrder } | { kind: "closeShort"; po: PurchaseOrder } | null
 
 export default function PurchaseOrdersTab() {
   const canManage = usePermissions(["FUEL_MANAGE"])
@@ -30,7 +30,7 @@ export default function PurchaseOrdersTab() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
         <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: 0, flex: 1 }}>
-          Raise an order, place it with the supplier, then choose it when you receive the fuel (Tanks &rarr; Receive). The order follows the litres that arrive, and a delivery more than 2% over is refused. The supplier's invoice is matched to the order and receipts under Supplier invoices.
+          Raise an order, place it with the supplier, then choose it when you receive the fuel (Tanks &rarr; Receive). The order follows the litres that arrive, and a delivery over the tolerance in Settings (2% unless you changed it) is refused. If the supplier will not deliver the rest, close the order short. The supplier's invoice is matched to the order and receipts under Supplier invoices.
         </p>
         {canManage && <button style={btnPrimary} onClick={() => setDialog({ kind: "edit" })}>New purchase order</button>}
       </div>
@@ -51,6 +51,7 @@ export default function PurchaseOrdersTab() {
                     <td style={td}>{canManage && <span style={{ display: "flex", gap: 6 }}>
                       {p.status === "DRAFT" && <><button style={btnGhost} onClick={() => setDialog({ kind: "edit", po: p })}>Edit</button><button style={btnPrimary} onClick={() => place.mutate(p.id)}>Place order</button></>}
                       {(p.status === "DRAFT" || p.status === "ORDERED") && <button style={btnGhost} onClick={() => setDialog({ kind: "cancel", po: p })}>Cancel</button>}
+                      {p.status === "PART_RECEIVED" && <button style={btnGhost} onClick={() => setDialog({ kind: "closeShort", po: p })}>Close short</button>}
                     </span>}</td>
                   </tr>
                   {open === p.id && (
@@ -59,7 +60,7 @@ export default function PurchaseOrdersTab() {
                         <div>
                           <p style={{ margin: "0 0 8px", fontSize: 13 }}>
                             Ordered {fmtL(match.data.order.litresOrdered)} at {fmtR(match.data.order.pricePerLitre)} = {fmtR(match.data.order.orderValue)}. Received {fmtL(match.data.order.litresReceived)} worth {fmtR(match.data.receivedValue)}:
-                            {" "}<strong>{litresVarianceLabel(match.data.litresVariance)}</strong>{match.data.order.cancelReason ? `. Cancelled: ${match.data.order.cancelReason}` : ""}.
+                            {" "}<strong>{litresVarianceLabel(match.data.litresVariance)}</strong>{match.data.order.cancelReason ? `. Cancelled: ${match.data.order.cancelReason}` : ""}{match.data.order.closeReason ? `. Closed short: ${match.data.order.closeReason}` : ""}.
                           </p>
                           {match.data.receipts.length === 0 ? <p style={{ margin: 0, color: "var(--hf-text-muted)", fontSize: 12.5 }}>Nothing received against this order yet.</p> : (
                             <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -84,6 +85,7 @@ export default function PurchaseOrdersTab() {
         </div>
       )}
       {dialog?.kind === "edit" && <EditDialog po={dialog.po} onDone={refresh} onClose={() => setDialog(null)} />}
+      {dialog?.kind === "closeShort" && <CloseShortDialog po={dialog.po} onDone={refresh} onClose={() => setDialog(null)} />}
       {dialog?.kind === "cancel" && <CancelDialog po={dialog.po} onDone={refresh} onClose={() => setDialog(null)} />}
     </div>
   )
@@ -133,6 +135,23 @@ function CancelDialog({ po, onDone, onClose }: { po: PurchaseOrder; onDone: () =
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
         <button style={btnGhost} onClick={onClose}>Keep order</button>
         <button style={btnPrimary} disabled={cancel.isPending} onClick={() => { if (reason.trim().length < 3) return setErr("Give a reason for cancelling."); setErr(""); cancel.mutate() }}>Cancel order</button>
+      </div>
+    </Modal>
+  )
+}
+
+function CloseShortDialog({ po, onDone, onClose }: { po: PurchaseOrder; onDone: () => void; onClose: () => void }) {
+  const [reason, setReason] = useState(""); const [err, setErr] = useState("")
+  const close = useMutation({ mutationFn: () => apiClient.post(`/api/v1/fuel/purchase-orders/${po.id}/close-short`, { reason: reason.trim() }), onSuccess: () => { onDone(); onClose() }, onError: (e: any) => setErr(msg(e, "Could not close the order")) })
+  return (
+    <Modal title={`Close ${po.poNumber} short`} onClose={onClose}>
+      <p style={{ fontSize: 13, margin: "0 0 10px" }}>{fmtL(po.litresReceived)} of {fmtL(po.litresOrdered)} has arrived. Closing short means the remaining {fmtL(po.litresOutstanding)} will not be received. The fuel already received stays in stock, and nothing more can be received on this order.</p>
+      <label style={labelStyle}>Reason *</label>
+      <input aria-label="Reason" value={reason} onChange={e => setReason(e.target.value)} style={{ ...inputStyle, width: "100%" }} />
+      {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12 }}>{err}</p>}
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
+        <button style={btnGhost} onClick={onClose}>Keep open</button>
+        <button style={btnPrimary} disabled={close.isPending} onClick={() => { const v = validateCloseReason(reason); if (v) return setErr(v); setErr(""); close.mutate() }}>Close short</button>
       </div>
     </Modal>
   )

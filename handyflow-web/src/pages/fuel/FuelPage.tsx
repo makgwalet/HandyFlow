@@ -23,6 +23,8 @@ import PurchaseOrdersTab from "./PurchaseOrdersTab"
 import OverviewTab from "./OverviewTab"
 import ForecourtTab from "./ForecourtTab"
 import SupplierInvoicesTab from "./SupplierInvoicesTab"
+import CostToServeTab from "./CostToServeTab"
+import SettingsTab from "./SettingsTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { FUEL_SECTIONS } from "../../navigation/moduleSections"
 
@@ -49,6 +51,8 @@ export function FuelPage() {
         case "forecourt":  return <ForecourtTab />
         case "overview":   return <OverviewTab onNavigate={goTo} />
         case "margin":     return <MarginTab />
+        case "cost-to-serve": return <CostToServeTab onNavigate={goTo} />
+        case "settings":   return <SettingsTab />
         default:           return null
       }
     }} />

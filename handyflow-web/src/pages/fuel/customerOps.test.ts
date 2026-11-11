@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { validateAccount, validateHold, validateSite, deliverable, typeLabel, fmtR, type CustomerAccount } from "./customerOps"
+import { validateDistance, validateAccount, validateHold, validateSite, deliverable, typeLabel, fmtR, type CustomerAccount } from "./customerOps"
 
 describe("customerOps", () => {
   it("validates account fields", () => {
@@ -23,4 +23,8 @@ describe("customerOps", () => {
     expect(deliverable([a("1", false), a("2", true)]).map(x => x.id)).toEqual(["1"])
   })
   it("formats", () => { expect(typeLabel("MINING_COMPANY")).toBe("Mining company"); expect(typeLabel("X")).toBe("X"); expect(fmtR(null)).toBe("–") })
+  it("a site distance may be blank, otherwise 0 to 5000 km", () => {
+    expect(validateDistance("")).toBeNull(); expect(validateDistance("42.5")).toBeNull(); expect(validateDistance("0")).toBeNull()
+    expect(validateDistance("-1")).toMatch(/5000/); expect(validateDistance("5001")).toMatch(/5000/); expect(validateDistance("far")).toMatch(/5000/)
+  })
 })

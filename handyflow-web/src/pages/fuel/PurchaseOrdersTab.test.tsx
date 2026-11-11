@@ -73,4 +73,40 @@ describe("PurchaseOrdersTab", () => {
     fireEvent.click(screen.getByText("Save"))
     expect((await screen.findByRole("alert")).textContent).toMatch(/supplier/)
   })
+
+  it("only a part-received order offers Close short, and it needs a reason", async () => {
+    mount()
+    await screen.findByText("PO-2026-00001")
+    expect(screen.getAllByText("Close short")).toHaveLength(1)
+    fireEvent.click(screen.getByText("Close short"))
+    const buttons = screen.getAllByText("Close short").filter(e => e.tagName === "BUTTON")
+    fireEvent.click(buttons[buttons.length - 1])
+    expect((await screen.findByRole("alert")).textContent).toMatch(/why/)
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  it("closes short with the reason", async () => {
+    mount()
+    await screen.findByText("PO-2026-00001")
+    fireEvent.click(screen.getByText("Close short"))
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "Supplier ran out" } })
+    const buttons = screen.getAllByText("Close short").filter(e => e.tagName === "BUTTON")
+    fireEvent.click(buttons[buttons.length - 1])
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post.mock.calls[0][0]).toMatch(/p2\/close-short/)
+    expect(post.mock.calls[0][1]).toEqual({ reason: "Supplier ran out" })
+  })
+
+  it("shows why a closed-short order was closed", async () => {
+    get.mockImplementation(async (u: string) => {
+      if (u.endsWith("/purchase-orders")) return { data: { data: [po({ id: "p3", poNumber: "PO-3", status: "CLOSED_SHORT", litresReceived: 4000, closeReason: "Supplier ran out" })] } }
+      if (u.includes("/match")) return { data: { data: { order: po({ id: "p3", status: "CLOSED_SHORT", closeReason: "Supplier ran out" }), receivedValue: 0, valueVariance: 0, litresVariance: -6000, receipts: [] } } }
+      return { data: { data: [] } }
+    })
+    mount()
+    expect(await screen.findByText("Closed short")).toBeTruthy()
+    expect(screen.queryByText("Close short")).toBeNull()
+    fireEvent.click(screen.getByText("PO-3"))
+    expect(await screen.findByText(/Closed short: Supplier ran out/)).toBeTruthy()
+  })
 })

@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
-import { CUSTOMER_TYPES, typeLabel, fmtR, validateAccount, validateHold, validateSite, type CustomerAccount, type CustomerSite } from "./customerOps"
+import { CUSTOMER_TYPES, typeLabel, fmtR, validateAccount, validateHold, validateSite, validateDistance, type CustomerAccount, type CustomerSite } from "./customerOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const msg = (e: any, fallback: string) => e?.response?.data?.message ?? fallback
@@ -209,11 +209,14 @@ function HoldDialog({ account, onDone, onClose }: { account: CustomerAccount; on
 }
 
 function SiteDialog({ account, site, onDone, onClose }: { account: CustomerAccount; site?: CustomerSite; onDone: () => void; onClose: () => void }) {
-  const [f, setF] = useState({ name: site?.name ?? "", address: site?.address ?? "", contactName: site?.contactName ?? "", contactPhone: site?.contactPhone ?? "", deliveryInstructions: site?.deliveryInstructions ?? "", operatingHours: site?.operatingHours ?? "" })
+  const [f, setF] = useState({ name: site?.name ?? "", address: site?.address ?? "", contactName: site?.contactName ?? "", contactPhone: site?.contactPhone ?? "", deliveryInstructions: site?.deliveryInstructions ?? "", operatingHours: site?.operatingHours ?? "", distanceKm: site?.distanceKm == null ? "" : String(site.distanceKm) })
   const [err, setErr] = useState("")
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF(s => ({ ...s, [k]: e.target.value }))
   const save = useMutation({
-    mutationFn: () => site ? apiClient.put(`/api/v1/fuel/customer-sites/${site.id}`, f) : apiClient.post(`/api/v1/fuel/customer-accounts/${account.id}/sites`, f),
+    mutationFn: () => {
+      const body = { ...f, distanceKm: f.distanceKm.trim() === "" ? null : Number(f.distanceKm) }
+      return site ? apiClient.put(`/api/v1/fuel/customer-sites/${site.id}`, body) : apiClient.post(`/api/v1/fuel/customer-accounts/${account.id}/sites`, body)
+    },
     onSuccess: () => { onDone(); onClose() }, onError: (e: any) => setErr(msg(e, "Could not save the site")),
   })
   return (
@@ -227,10 +230,15 @@ function SiteDialog({ account, site, onDone, onClose }: { account: CustomerAccou
         </div>
         <div><label style={labelStyle}>Delivery instructions</label><input value={f.deliveryInstructions} onChange={set("deliveryInstructions")} style={inputStyle} /></div>
         <div><label style={labelStyle}>Operating hours</label><input value={f.operatingHours} onChange={set("operatingHours")} style={inputStyle} /></div>
+        <div>
+          <label style={labelStyle}>Distance from the depot (km, one way)</label>
+          <input aria-label="Distance km" inputMode="decimal" value={f.distanceKm} onChange={set("distanceKm")} style={inputStyle} />
+          <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 3 }}>Used for cost-to-serve. Leave blank if you do not know; those deliveries are then shown without a vehicle cost.</div>
+        </div>
         {err && <Err text={err} />}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button style={btnGhost} onClick={onClose}>Cancel</button>
-          <button style={btnPrimary} disabled={save.isPending} onClick={() => { const v = validateSite(f.name); if (v) return setErr(v); setErr(""); save.mutate() }}>Save site</button>
+          <button style={btnPrimary} disabled={save.isPending} onClick={() => { const v = validateSite(f.name) ?? validateDistance(f.distanceKm); if (v) return setErr(v); setErr(""); save.mutate() }}>Save site</button>
         </div>
       </div>
     </Modal>

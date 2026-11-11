@@ -272,6 +272,13 @@ export const FUEL_SECTIONS: ModuleSections = {
       sections: [
         { id: 'overview', label: 'Manager overview', icon: BarChart2 },
         { id: 'margin', label: 'Cost & Margin', icon: TrendingUp, permission: 'FUEL_MARGIN_READ' },
+        { id: 'cost-to-serve', label: 'Cost to serve', icon: TrendingUp, permission: 'FUEL_MARGIN_READ' },
+      ],
+    },
+    {
+      label: 'Setup',
+      sections: [
+        { id: 'settings', label: 'Settings', icon: Settings, permission: 'FUEL_MANAGE' },
       ],
     },
   ],
