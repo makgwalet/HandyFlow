@@ -42,6 +42,9 @@ function ControlsCard() {
       <label style={labelStyle} htmlFor="fs-adjThreshold">Stock adjustments needing a second person (litres)</label>
       <input id="fs-adjThreshold" inputMode="decimal" style={{ ...inputStyle, maxWidth: 240 }} value={f.threshold} disabled={!canConfigure} placeholder="No limit" onChange={e => { setSaved(false); setF(s => s && ({ ...s, threshold: e.target.value })) }} />
       <div style={{ fontSize: 11, color: "var(--hf-text-muted)", margin: "3px 0 10px" }}>An adjustment of this many litres or more, up or down, is held until a different person with approval rights accepts it. Leave empty for no limit.</div>
+      <label style={labelStyle} htmlFor="fs-varTol">Load variance tolerance (%)</label>
+      <input id="fs-varTol" inputMode="decimal" style={{ ...inputStyle, maxWidth: 240 }} value={f.variance} disabled={!canConfigure} placeholder="Not set" onChange={e => { setSaved(false); setF(s => s && ({ ...s, variance: e.target.value })) }} />
+      <div style={{ fontSize: 11, color: "var(--hf-text-muted)", margin: "3px 0 10px" }}>A delivery whose litres delivered differ from litres loaded by more than this percentage is raised on the Load variances page for review. Leave empty and no variances are raised. There is no default: set the figure your own rules require.</div>
       {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12 }}>{err}</p>}
       {saved && <p role="status" style={{ color: "var(--hf-success-text-strong)", fontSize: 12 }}>Saved.</p>}
       {canConfigure

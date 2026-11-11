@@ -2,6 +2,7 @@ import type { CustomerAccount } from "./customerOps"
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import ReverseModal from "./ReverseModal"
+import EvidenceModal from "./EvidenceModal"
 import { apiClient } from "../../api/client"
 import { Plus, Truck, CheckCircle, X, Download } from "lucide-react"
 interface Delivery {
@@ -42,6 +43,7 @@ export default function DeliveriesTab() {
   const [showSchedule, setShowSchedule] = useState(false)
   const [showComplete, setShowComplete] = useState<Delivery | null>(null)
   const [reversing, setReversing] = useState<Delivery | null>(null)
+  const [proofFor, setProofFor] = useState<Delivery | null>(null)
   const [filterStatus, setFilterStatus] = useState("ALL")
   const [error, setError] = useState("")
 
@@ -239,6 +241,11 @@ export default function DeliveriesTab() {
                         <Download size={13} /> Receipt
                       </button>
                     )}
+                    {(d.status === "IN_TRANSIT" || d.status === "DELIVERED") && (
+                      <button onClick={() => setProofFor(d)} style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-surface)", color: "var(--hf-text)", border: "1px solid var(--hf-border)", borderRadius: 7, padding: "7px 12px", fontSize: 12, cursor: "pointer" }}>
+                        Proof of delivery
+                      </button>
+                    )}
                     {d.status === "DELIVERED" && (
                       <button onClick={() => setReversing(d)} style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                         Reverse
@@ -347,6 +354,7 @@ export default function DeliveriesTab() {
         </Modal>
       )}
 
+      {proofFor && <EvidenceModal deliveryId={proofFor.id} label={proofFor.receiptNumber ?? `${proofFor.fuelType} delivery`} canAdd={proofFor.status !== "CANCELLED"} onClose={() => setProofFor(null)} />}
       {reversing && (
         <ReverseModal
           title="Reverse delivery"

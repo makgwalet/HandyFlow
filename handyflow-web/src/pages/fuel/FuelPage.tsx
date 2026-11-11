@@ -25,6 +25,7 @@ import ForecourtTab from "./ForecourtTab"
 import SupplierInvoicesTab from "./SupplierInvoicesTab"
 import CostToServeTab from "./CostToServeTab"
 import SettingsTab from "./SettingsTab"
+import VariancesTab from "./VariancesTab"
 import SetupTab from "./SetupTab"
 import LegalEntitiesTab from "./LegalEntitiesTab"
 import { useEffect } from "react"
@@ -80,6 +81,7 @@ export function FuelPage() {
         case "margin":     return <MarginTab />
         case "cost-to-serve": return <CostToServeTab onNavigate={goTo} />
         case "settings":   return <SettingsTab />
+        case "variances": return <VariancesTab />
         case "setup":      return <SetupTab />
         case "legal-entities": return <LegalEntitiesTab />
         default:           return null

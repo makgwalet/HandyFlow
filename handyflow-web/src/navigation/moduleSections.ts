@@ -260,6 +260,7 @@ export const FUEL_SECTIONS: ModuleSections = {
       label: 'Logistics',
       sections: [
         { id: 'deliveries', label: 'Deliveries', icon: Truck, divisions: ['WHOLESALE_SUPPLY', 'DISTRIBUTION'] },
+        { id: 'variances', label: 'Load variances', icon: Scale, anyPermission: ['FUEL_READ', 'FUEL_VARIANCE_REVIEW'], divisions: ['WHOLESALE_SUPPLY', 'DISTRIBUTION'] },
         { id: 'suppliers', label: 'Suppliers', icon: Users },
         { id: 'purchase-orders', label: 'Purchase orders', icon: ShoppingCart, divisions: ['WHOLESALE_SUPPLY', 'RETAIL_FORECOURT'] },
         { id: 'supplier-invoices', label: 'Supplier invoices', icon: FileText, divisions: ['WHOLESALE_SUPPLY', 'RETAIL_FORECOURT'] },

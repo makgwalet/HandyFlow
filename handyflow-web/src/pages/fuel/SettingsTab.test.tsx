@@ -68,7 +68,7 @@ describe("SettingsTab", () => {
     fireEvent.change(box, { target: { value: "" } })
     fireEvent.click(screen.getByLabelText(/New suppliers must be approved/))
     fireEvent.click(screen.getByText("Save controls"))
-    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/settings/controls", { requireSupplierApproval: true, adjustmentThresholdLitres: null }))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/settings/controls", { requireSupplierApproval: true, adjustmentThresholdLitres: null, varianceTolerancePct: null }))
   })
 
   it("rejects a zero threshold before calling the server", async () => {
