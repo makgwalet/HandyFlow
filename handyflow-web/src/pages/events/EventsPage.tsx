@@ -16,6 +16,7 @@ import VendorsTab      from "./VendorsTab"
 import EventAnalytics  from "./EventAnalytics"
 import EventAuditTab   from "./EventAuditTab"
 import WaitlistTab     from "./WaitlistTab"
+import EventPaymentsTab from "./EventPaymentsTab"
 import GuestToolsTab   from "./GuestToolsTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { EVENTS_SECTIONS } from "../../navigation/moduleSections"
@@ -70,6 +71,7 @@ export function EventsPage() {
           case "guests":    return <GuestsTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />
           case "waitlist":  return <WaitlistTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />
           case "add-guests": return <GuestToolsTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />
+          case "payments":  return <EventPaymentsTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />
           case "vendors":   return <VendorsTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />
           case "audit":     return <EventAuditTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />
           case "analytics": return <EventAnalytics eventId={selectedEventId} />

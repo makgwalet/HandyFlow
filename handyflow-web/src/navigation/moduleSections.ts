@@ -591,6 +591,7 @@ export const EVENTS_SECTIONS: ModuleSections = {
         { id: 'guests', label: 'Guests', icon: Users },
         { id: 'add-guests', label: 'Add guests', icon: UserPlus },
         { id: 'waitlist', label: 'Waitlist', icon: ListPlus },
+        { id: 'payments', label: 'Payments', icon: CreditCard },
         { id: 'vendors', label: 'Vendors', icon: Truck },
         { id: 'analytics', label: 'Analytics', icon: BarChart2 },
         { id: 'audit', label: 'Audit trail', icon: History },
