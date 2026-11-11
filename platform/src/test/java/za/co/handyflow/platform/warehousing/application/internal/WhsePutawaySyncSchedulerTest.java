@@ -25,8 +25,11 @@ class WhsePutawaySyncSchedulerTest {
         when(profiles.findAll()).thenReturn(List.of(a, b));
         when(tasks.syncPutaway(any())).thenThrow(new IllegalStateException("boom")).thenReturn(2);
 
-        new WhsePutawaySyncScheduler(profiles, tasks).syncAll();
+        WhseReplenService replen = mock(WhseReplenService.class);
+
+        new WhsePutawaySyncScheduler(profiles, tasks, replen).syncAll();
 
         verify(tasks, times(2)).syncPutaway(any());
+        verify(replen, times(1)).sync(any()); // the tenant whose put-away sync failed is skipped as a whole
     }
 }

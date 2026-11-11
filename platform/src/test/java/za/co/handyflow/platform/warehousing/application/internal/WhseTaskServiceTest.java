@@ -138,6 +138,49 @@ class WhseTaskServiceTest {
         verify(jdbc).update(contains("SET status = 'DONE', qty_done = ?, to_location_id = ?"), eq(bd("6")), eq(dest), eq(user), eq(user), eq(taskId));
     }
 
+    @Test @DisplayName("a replenishment moves stock to its pick face as a transfer, not a put-away")
+    void replenishment() {
+        lockedTask("REPLEN", "OPEN", null, dest, "6");
+        candidate("A-02", "BIN", null, "0", false);
+        taskAfterwards();
+        service.complete(t(), taskId, bd("6"), null, null, user);
+        verify(inventory).transfer(eq(t()), eq(client), eq(item), eq(from), eq(dest), isNull(), eq("AVAILABLE"), eq(bd("6")), eq("TRANSFER"), eq("WHSE_TASK"), eq(taskId),
+                eq("Replenishment"), isNull(), eq(user), eq("task:" + taskId));
+    }
+
+    @Test @DisplayName("a replenishment cannot be sent to any other location than its face")
+    void replenishmentFixedDestination() {
+        lockedTask("REPLEN", "OPEN", null, dest, "6");
+        assertThrows(IllegalArgumentException.class, () -> service.complete(t(), taskId, bd("6"), null, UUID.randomUUID(), user));
+        verifyNoInteractions(inventory);
+    }
+
+    @Test @DisplayName("a replenishment moves something: zero is refused")
+    void replenishmentNeedsQty() {
+        lockedTask("REPLEN", "OPEN", null, dest, "6");
+        assertThrows(IllegalArgumentException.class, () -> service.complete(t(), taskId, BigDecimal.ZERO, null, null, user));
+    }
+
+    @Test @DisplayName("the summary counts replenishments apart from put-aways")
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void summaryExcludesReplen() throws Exception {
+        when(jdbc.query(contains("GROUP BY task_type, status"), any(org.springframework.jdbc.core.RowCallbackHandler.class), any(Object[].class))).thenAnswer(inv -> {
+            org.springframework.jdbc.core.RowCallbackHandler h = inv.getArgument(1);
+            for (Object[] r : new Object[][]{{"PUTAWAY", "OPEN", 2}, {"REPLEN", "OPEN", 7}, {"REPLEN", "IN_PROGRESS", 4}, {"PICK", "OPEN", 3}}) {
+                java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+                when(rs.getString(1)).thenReturn((String) r[0]);
+                when(rs.getString(2)).thenReturn((String) r[1]);
+                when(rs.getInt(3)).thenReturn((Integer) r[2]);
+                h.processRow(rs);
+            }
+            return null;
+        });
+        WhseTaskService.Summary s = service.summary(t());
+        assertEquals(2, s.openPutaways());
+        assertEquals(0, s.inProgressPutaways());
+        assertEquals(3, s.openPicks());
+    }
+
     @Test @DisplayName("a put-away needs a destination, and refuses one that is full, a dock, or holds another client's stock")
     void putawayRefusals() {
         lockedTask("PUTAWAY", "OPEN", null, null, "6");

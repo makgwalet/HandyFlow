@@ -19,6 +19,7 @@ import WhseReturnsTab from "./WhseReturnsTab"
 import WhseLotsTab from "./WhseLotsTab"
 import WhseDispatchTab from "./WhseDispatchTab"
 import WhseScanTab from "./WhseScanTab"
+import WhseReplenTab from "./WhseReplenTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { WAREHOUSING_SECTIONS } from "../../navigation/moduleSections"
 
@@ -34,6 +35,7 @@ export default function WarehousingPage() {
           case "approvals": return <WhseApprovalsTab />
           case "scan":       return <WhseScanTab />
           case "tasks":      return <WhseTasksTab />
+          case "replenishment": return <WhseReplenTab />
           case "inspection": return <WhseInspectionTab />
           case "returns":    return <WhseReturnsTab />
           case "lots":       return <WhseLotsTab />

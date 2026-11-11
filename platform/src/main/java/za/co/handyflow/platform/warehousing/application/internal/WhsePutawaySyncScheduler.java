@@ -9,7 +9,7 @@ import za.co.handyflow.platform.warehousing.domain.model.WhseProfile;
 import za.co.handyflow.platform.warehousing.domain.repository.WhseProfileRepository;
 
 /**
- * Creates put-away tasks for stock that has landed on a dock or staging location, for every warehousing tenant,
+ * Creates put-away tasks (and replenishment tasks for pick faces below their minimum) for stock that has landed on a dock or staging location, for every warehousing tenant,
  * so the worklist is current without anyone opening the screen. One tenant failing does not stop the others.
  * Safe to run at any time: stock already covered by an open task is skipped.
  */
@@ -20,6 +20,7 @@ public class WhsePutawaySyncScheduler {
 
     private final WhseProfileRepository profileRepository;
     private final WhseTaskService taskService;
+    private final WhseReplenService replenService;
 
     @Scheduled(fixedDelayString = "${handyflow.warehousing.putaway-sync-ms:300000}",
             initialDelayString = "${handyflow.warehousing.putaway-sync-initial-ms:60000}")
@@ -29,6 +30,10 @@ public class WhsePutawaySyncScheduler {
                 int created = taskService.syncPutaway(TenantId.of(profile.getTenantId()));
                 if (created > 0) {
                     log.info("[Warehousing] Put-away sync created {} task(s) tenant={}", created, profile.getTenantId());
+                }
+                int refills = replenService.sync(TenantId.of(profile.getTenantId()));
+                if (refills > 0) {
+                    log.info("[Warehousing] Replenishment sync created {} task(s) tenant={}", refills, profile.getTenantId());
                 }
             } catch (Exception e) {
                 log.error("[Warehousing] Put-away sync failed tenant={}: {}", profile.getTenantId(), e.getMessage(), e);

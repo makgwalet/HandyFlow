@@ -26,6 +26,7 @@ public class WhseTaskService {
 
     static final String PICK = "PICK";
     static final String PUTAWAY = "PUTAWAY";
+    static final String REPLEN = "REPLEN";
     public static final String SHIP_SHORT = "SHIP_SHORT";
     public static final String FIND_ELSEWHERE = "FIND_ELSEWHERE";
     private static final String ORDER = "OUTBOUND_ORDER";
@@ -196,7 +197,7 @@ public class WhseTaskService {
                     String type = rs.getString(1), status = rs.getString(2);
                     int n = rs.getInt(3);
                     if (PICK.equals(type)) { if ("OPEN".equals(status)) c[0] = n; else if ("IN_PROGRESS".equals(status)) c[1] = n; else c[2] = n; }
-                    else { if ("OPEN".equals(status)) c[3] = n; else if ("IN_PROGRESS".equals(status)) c[4] = n; }
+                    else if (PUTAWAY.equals(type)) { if ("OPEN".equals(status)) c[3] = n; else if ("IN_PROGRESS".equals(status)) c[4] = n; }
                 }, tenantId.getValue());
         return new Summary(c[0], c[1], c[2], c[3], c[4]);
     }
@@ -265,6 +266,8 @@ public class WhseTaskService {
             UUID lineId = (UUID) k[11];
             if (lineId != null) recomputePicked(lineId);
         } else {
+            boolean replen = REPLEN.equals(type);
+            if (replen && toLocationId != null && !toLocationId.equals(k[7])) throw new IllegalArgumentException("A replenishment goes to its pick face; it cannot be sent elsewhere.");
             UUID dest = toLocationId != null ? toLocationId : (UUID) k[7];
             if (dest == null) throw new IllegalArgumentException("No destination was suggested for this put-away. Choose a location.");
             UUID from = (UUID) k[6], client = (UUID) k[3], item = (UUID) k[4], lot = (UUID) k[5];
@@ -272,7 +275,7 @@ public class WhseTaskService {
             if (cand.isEmpty()) throw new ResourceNotFoundException("WhseLocation", dest.toString());
             String problem = WhsePutawayRules.problem(cand.get(0), qty);
             if (problem != null) throw new IllegalArgumentException(problem);
-            inventoryService.transfer(tenantId, client, item, from, dest, lot, "AVAILABLE", qty, "PUTAWAY", TASK, id, "Put-away", null, user, "task:" + id);
+            inventoryService.transfer(tenantId, client, item, from, dest, lot, "AVAILABLE", qty, replen ? "TRANSFER" : "PUTAWAY", TASK, id, replen ? "Replenishment" : "Put-away", null, user, "task:" + id);
             jdbc.update("UPDATE whse_tasks SET status = 'DONE', qty_done = ?, to_location_id = ?, completed_by = ?, completed_at = now(), assigned_to = coalesce(assigned_to, ?), updated_at = now() WHERE id = ?",
                     qty, dest, user, user, id);
         }
