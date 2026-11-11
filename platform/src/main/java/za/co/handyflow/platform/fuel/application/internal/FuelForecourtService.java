@@ -1,0 +1,245 @@
+package za.co.handyflow.platform.fuel.application.internal;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.fuel.domain.model.*;
+import za.co.handyflow.platform.fuel.domain.repository.*;
+import za.co.handyflow.platform.fuel.dto.ForecourtDtos.*;
+import za.co.handyflow.platform.shared.ResourceNotFoundException;
+import za.co.handyflow.platform.shared.TenantId;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+/**
+ * Retail forecourt. A shift opens with a meter reading per pump and closes with the closing readings and the takings.
+ * Litres sold = meter movement minus test litres. Stock leaves the tank (one ledger line per tank) when the shift closes.
+ * The takings variance is recorded and explained, never written off.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class FuelForecourtService {
+
+    private final FuelPumpRepository pumps;
+    private final FuelShiftRepository shifts;
+    private final FuelShiftReadingRepository readings;
+    private final FuelTankRepository tanks;
+    private final FuelStockLedger ledger;
+    private final ShiftNumberGenerator numbers;
+
+    // ── Pumps ────────────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<PumpResponse> listPumps(TenantId tenantId) {
+        List<FuelPump> all = pumps.findAllActive(tenantId);
+        Map<UUID, FuelTank> tankMap = tankMap(tenantId);
+        Set<UUID> busy = all.isEmpty() ? Set.of() : readings.findOpenForPumps(tenantId, all.stream().map(FuelPump::getId).toList())
+                .stream().map(FuelShiftReading::getPumpId).collect(Collectors.toSet());
+        return all.stream().map(p -> toPump(p, tankMap.get(p.getTankId()), busy.contains(p.getId()))).toList();
+    }
+
+    @Transactional
+    public PumpResponse createPump(TenantId tenantId, PumpRequest req) {
+        FuelTank tank = tank(tenantId, req.tankId());
+        FuelPump p = pumps.save(FuelPump.create(tenantId, req.name(), tank.getId(), req.pricePerLitre()));
+        return toPump(p, tank, false);
+    }
+
+    @Transactional
+    public PumpResponse updatePump(TenantId tenantId, UUID id, PumpRequest req) {
+        FuelPump p = pump(tenantId, id);
+        boolean busy = isOnOpenShift(tenantId, id);
+        boolean priceOrTankChanged = p.getPricePerLitre().compareTo(req.pricePerLitre()) != 0 || !p.getTankId().equals(req.tankId());
+        if (busy && priceOrTankChanged) {
+            throw new IllegalStateException("This pump is on an open shift. Close the shift before changing its price or tank.");
+        }
+        FuelTank tank = tank(tenantId, req.tankId());
+        boolean active = req.active() == null ? p.isActive() : req.active();
+        if (busy && !active) throw new IllegalStateException("This pump is on an open shift. Close the shift before deactivating it.");
+        p.update(req.name(), tank.getId(), req.pricePerLitre(), active);
+        return toPump(pumps.save(p), tank, busy);
+    }
+
+    @Transactional
+    public void deletePump(TenantId tenantId, UUID id) {
+        FuelPump p = pump(tenantId, id);
+        if (isOnOpenShift(tenantId, id)) throw new IllegalStateException("This pump is on an open shift. Close the shift first.");
+        p.softDelete();
+        pumps.save(p);
+    }
+
+    // ── Shifts ───────────────────────────────────────────────────────────────
+
+    @Transactional
+    public ShiftResponse openShift(TenantId tenantId, OpenShiftRequest req, UUID userId) {
+        Set<UUID> ids = new LinkedHashSet<>();
+        for (OpenReading r : req.readings()) {
+            if (!ids.add(r.pumpId())) throw new IllegalArgumentException("A pump appears twice in the opening readings.");
+        }
+        Map<UUID, FuelPump> pumpMap = pumps.findActiveByIds(tenantId, ids).stream().collect(Collectors.toMap(FuelPump::getId, Function.identity()));
+        for (UUID id : ids) if (!pumpMap.containsKey(id)) throw new ResourceNotFoundException("Pump", id.toString());
+        for (FuelPump p : pumpMap.values()) {
+            if (!p.isActive()) throw new IllegalStateException(p.getName() + " is not active.");
+        }
+        Set<UUID> busy = readings.findOpenForPumps(tenantId, ids).stream().map(FuelShiftReading::getPumpId).collect(Collectors.toSet());
+        if (!busy.isEmpty()) {
+            String names = busy.stream().map(i -> pumpMap.get(i).getName()).sorted().collect(Collectors.joining(", "));
+            throw new IllegalStateException("Already on an open shift: " + names + ". Close that shift first.");
+        }
+        Map<UUID, FuelTank> tankMap = tankMap(tenantId);
+        FuelShift shift = shifts.save(FuelShift.open(tenantId, numbers.generate(tenantId), req.attendantName(), userId, req.notes()));
+        for (OpenReading r : req.readings()) {
+            FuelPump p = pumpMap.get(r.pumpId());
+            FuelTank t = tankMap.get(p.getTankId());
+            if (t == null) throw new IllegalStateException(p.getName() + " is linked to a tank that no longer exists.");
+            BigDecimal gap = p.getLastMeter() == null ? BigDecimal.ZERO : r.openingMeter().subtract(p.getLastMeter());
+            readings.save(FuelShiftReading.open(tenantId, shift.getId(), p, t.getFuelType(), r.openingMeter(), gap));
+        }
+        log.info("Forecourt shift opened {} pumps={} by={}", shift.getShiftNumber(), ids.size(), userId);
+        return toShift(shift, readings.findByShift(tenantId, shift.getId()), pumpNames(tenantId));
+    }
+
+    @Transactional
+    public ShiftResponse closeShift(TenantId tenantId, UUID shiftId, CloseShiftRequest req, UUID userId) {
+        FuelShift shift = shift(tenantId, shiftId);
+        if (!shift.isOpen()) throw new IllegalStateException("This shift is already " + shift.getStatus().toLowerCase() + ".");
+        List<FuelShiftReading> rows = readings.findByShift(tenantId, shiftId);
+        Map<UUID, CloseReading> given = new HashMap<>();
+        for (CloseReading c : req.readings()) {
+            if (given.put(c.pumpId(), c) != null) throw new IllegalArgumentException("A pump appears twice in the closing readings.");
+        }
+        Map<UUID, FuelPump> pumpMap = pumps.findAllActive(tenantId).stream().collect(Collectors.toMap(FuelPump::getId, Function.identity()));
+        for (UUID id : given.keySet()) {
+            if (rows.stream().noneMatch(r -> r.getPumpId().equals(id))) throw new IllegalArgumentException("A closing reading was given for a pump that is not on this shift.");
+        }
+        Map<UUID, FuelTank> tankMap = tankMap(tenantId);
+        BigDecimal expected = BigDecimal.ZERO, litres = BigDecimal.ZERO;
+        Map<UUID, BigDecimal> perTank = new TreeMap<>();
+        for (FuelShiftReading r : rows) {
+            CloseReading c = given.get(r.getPumpId());
+            String pumpName = pumpMap.containsKey(r.getPumpId()) ? pumpMap.get(r.getPumpId()).getName() : "a pump";
+            if (c == null) throw new IllegalArgumentException("Enter the closing meter for " + pumpName + ".");
+            FuelTank t = tankMap.get(r.getTankId());
+            r.close(c.closingMeter(), c.testLitres(), t == null ? null : t.getCostPerLitreWac(), pumpName);
+            expected = expected.add(r.getSalesValue());
+            litres = litres.add(r.getLitresSold());
+            if (r.getLitresSold().signum() > 0) perTank.merge(r.getTankId(), r.getLitresSold(), BigDecimal::add);
+        }
+        // Validate the takings before touching stock, so a refusal leaves nothing half done.
+        shift.close(req.cash(), req.card(), req.account(), req.other(), expected, litres, req.varianceReason(), userId);
+
+        // Lock tanks in id order (TreeMap) so two shifts closing together cannot deadlock.
+        for (Map.Entry<UUID, BigDecimal> e : perTank.entrySet()) {
+            FuelTank tank = tanks.findActiveByIdForUpdate(tenantId, e.getKey()).orElseThrow(() -> new ResourceNotFoundException("Tank", e.getKey().toString()));
+            ledger.requireUnreserved(tank, e.getValue(), BigDecimal.ZERO);
+            try {
+                tank.removeStock(e.getValue());
+            } catch (IllegalArgumentException ex) {
+                throw new IllegalStateException("The meters say " + e.getValue().toPlainString() + "L was sold from " + tank.getName() + " but the book stock is only "
+                        + tank.getCurrentLitres().toPlainString() + "L. Record the latest delivery or a dip adjustment first, then close the shift.");
+            }
+            tanks.save(tank);
+            ledger.post(tank, FuelStockMovement.Type.DISPATCH, e.getValue().negate(), "FORECOURT_SHIFT", shiftId, "Forecourt sales " + shift.getShiftNumber());
+        }
+        for (FuelShiftReading r : rows) {
+            FuelPump p = pumpMap.get(r.getPumpId());
+            if (p != null) { p.recordMeter(r.getClosingMeter()); pumps.save(p); }
+        }
+        readings.saveAll(rows);
+        shifts.save(shift);
+        log.info("Forecourt shift closed {} litres={} variance={} by={}", shift.getShiftNumber(), litres, shift.getVarianceAmount(), userId);
+        return toShift(shift, rows, pumpNames(tenantId));
+    }
+
+    @Transactional
+    public ShiftResponse reverseShift(TenantId tenantId, UUID shiftId, ReverseShiftRequest req, UUID userId) {
+        FuelShift shift = shift(tenantId, shiftId);
+        if (!shift.isClosed()) throw new IllegalStateException("Only a closed shift can be reversed.");
+        List<FuelShiftReading> rows = readings.findByShift(tenantId, shiftId);
+        Map<UUID, BigDecimal> perTank = new TreeMap<>();
+        for (FuelShiftReading r : rows) if (r.getLitresSold() != null && r.getLitresSold().signum() > 0) perTank.merge(r.getTankId(), r.getLitresSold(), BigDecimal::add);
+        shift.reverse(req.reason(), userId);
+        for (Map.Entry<UUID, BigDecimal> e : perTank.entrySet()) {
+            FuelTank tank = tanks.findActiveByIdForUpdate(tenantId, e.getKey()).orElseThrow(() -> new ResourceNotFoundException("Tank", e.getKey().toString()));
+            tank.restoreStock(e.getValue());
+            tanks.save(tank);
+            ledger.post(tank, FuelStockMovement.Type.REVERSAL, e.getValue(), "FORECOURT_SHIFT", shiftId, req.reason().trim());
+        }
+        shifts.save(shift);
+        log.info("Forecourt shift reversed {} by={}", shift.getShiftNumber(), userId);
+        return toShift(shift, rows, pumpNames(tenantId));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShiftResponse> listShifts(TenantId tenantId, int limit) {
+        List<FuelShift> list = shifts.findRecent(tenantId, PageRequest.of(0, Math.max(1, Math.min(limit, 200))));
+        if (list.isEmpty()) return List.of();
+        Map<UUID, List<FuelShiftReading>> byShift = readings.findByShifts(tenantId, list.stream().map(FuelShift::getId).toList())
+                .stream().collect(Collectors.groupingBy(FuelShiftReading::getShiftId));
+        Map<UUID, String> names = pumpNames(tenantId);
+        return list.stream().map(s -> toShift(s, byShift.getOrDefault(s.getId(), List.of()), names)).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ShiftResponse getShift(TenantId tenantId, UUID id) {
+        FuelShift s = shift(tenantId, id);
+        return toShift(s, readings.findByShift(tenantId, id), pumpNames(tenantId));
+    }
+
+    @Transactional(readOnly = true)
+    public ForecourtSummary summary(TenantId tenantId, int days) {
+        int d = Math.max(1, Math.min(days, 366));
+        List<FuelShift> closed = shifts.findClosedSince(tenantId, Instant.now().minus(d, ChronoUnit.DAYS));
+        if (closed.isEmpty()) return new ForecourtSummary(d, 0, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0, List.of());
+        BigDecimal litres = BigDecimal.ZERO, sales = BigDecimal.ZERO, variance = BigDecimal.ZERO;
+        int flagged = 0;
+        for (FuelShift s : closed) {
+            litres = litres.add(s.getLitresSold() == null ? BigDecimal.ZERO : s.getLitresSold());
+            sales = sales.add(s.getExpectedAmount() == null ? BigDecimal.ZERO : s.getExpectedAmount());
+            BigDecimal v = s.getVarianceAmount() == null ? BigDecimal.ZERO : s.getVarianceAmount();
+            variance = variance.add(v);
+            if (v.abs().compareTo(FuelShift.VARIANCE_TOLERANCE) > 0) flagged++;
+        }
+        Map<String, BigDecimal[]> byFuel = new TreeMap<>();
+        for (FuelShiftReading r : readings.findByShifts(tenantId, closed.stream().map(FuelShift::getId).toList())) {
+            if (r.getLitresSold() == null) continue;
+            BigDecimal[] a = byFuel.computeIfAbsent(r.getFuelType(), k -> new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
+            a[0] = a[0].add(r.getLitresSold());
+            a[1] = a[1].add(r.getSalesValue());
+        }
+        List<FuelTotal> totals = byFuel.entrySet().stream().map(e -> new FuelTotal(e.getKey(), e.getValue()[0], e.getValue()[1])).toList();
+        return new ForecourtSummary(d, closed.size(), litres, sales, variance, flagged, totals);
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    private boolean isOnOpenShift(TenantId tenantId, UUID pumpId) { return !readings.findOpenForPumps(tenantId, List.of(pumpId)).isEmpty(); }
+
+    private FuelPump pump(TenantId t, UUID id) { return pumps.findActiveById(t, id).orElseThrow(() -> new ResourceNotFoundException("Pump", id.toString())); }
+    private FuelShift shift(TenantId t, UUID id) { return shifts.findByTenantAndId(t, id).orElseThrow(() -> new ResourceNotFoundException("Shift", id.toString())); }
+    private FuelTank tank(TenantId t, UUID id) { return tanks.findActiveById(t, id).orElseThrow(() -> new ResourceNotFoundException("Tank", id.toString())); }
+
+    private Map<UUID, FuelTank> tankMap(TenantId t) { return tanks.findAllActive(t).stream().collect(Collectors.toMap(FuelTank::getId, Function.identity())); }
+    private Map<UUID, String> pumpNames(TenantId t) { return pumps.findAllActive(t).stream().collect(Collectors.toMap(FuelPump::getId, FuelPump::getName)); }
+
+    private static PumpResponse toPump(FuelPump p, FuelTank t, boolean onShift) {
+        return new PumpResponse(p.getId(), p.getName(), p.getTankId(), t == null ? null : t.getName(), t == null ? null : t.getFuelType(),
+                p.getPricePerLitre(), p.getLastMeter(), p.isActive(), onShift);
+    }
+
+    private static ShiftResponse toShift(FuelShift s, List<FuelShiftReading> rows, Map<UUID, String> names) {
+        List<ReadingResponse> rr = rows.stream().map(r -> new ReadingResponse(r.getPumpId(), names.getOrDefault(r.getPumpId(), "Pump"), r.getFuelType(),
+                r.getOpeningMeter(), r.getOpeningGap(), r.getClosingMeter(), r.getTestLitres(), r.getLitresSold(), r.getPricePerLitre(), r.getSalesValue())).toList();
+        return new ShiftResponse(s.getId(), s.getShiftNumber(), s.getAttendantName(), s.getStatus(), s.getOpenedAt(), s.getClosedAt(),
+                s.getCashAmount(), s.getCardAmount(), s.getAccountAmount(), s.getOtherAmount(), s.getExpectedAmount(), s.getLitresSold(),
+                s.getVarianceAmount(), s.getVarianceReason(), s.getNotes(), s.getReverseReason(), rr);
+    }
+}
