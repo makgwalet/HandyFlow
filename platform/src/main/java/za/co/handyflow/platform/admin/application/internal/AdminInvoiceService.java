@@ -62,6 +62,10 @@ public class AdminInvoiceService {
     // is what PosService/CatalogueService use instead — same underlying
     // value, two representations, no call site had to change shape.
     private final VatRateProvider           vatRateProvider;
+    // Tier subscriptions (generic price book). Optional so older wiring and tests keep working; when absent every
+    // module bills at the flat catalogue price as before.
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ModuleTierService               moduleTierService;
 
     private static final DeviceRgb  NAVY       = new DeviceRgb(27,  58,  107);
     private static final DeviceRgb  TEAL       = new DeviceRgb(13,  148, 136);
@@ -105,6 +109,33 @@ public class AdminInvoiceService {
         if (modules.isEmpty()) throw new HandyFlowException(
                 "No active modules for tenant: " + tenantSlug,
                 HttpStatus.BAD_REQUEST, "NO_MODULES");
+
+        // A priced tier subscription REPLACES the flat module charge (never added to it). Unpriced modules keep the
+        // flat catalogue price. Prorated upgrade adjustments appear as their own lines.
+        List<UUID> prorationsBilled = new ArrayList<>();
+        if (moduleTierService != null) {
+            Map<String, ModuleTierService.Charge> tier = moduleTierService.chargesFor(tenantId, YearMonth.of(year, month));
+            List<Map<String, Object>> adjusted = new ArrayList<>();
+            for (Map<String, Object> m : modules) {
+                ModuleTierService.Charge c = tier.get((String) m.get("module_key"));
+                boolean active = "ACTIVE".equals(m.get("status"));
+                if (c == null || !active) { adjusted.add(m); continue; }
+                Map<String, Object> line = new LinkedHashMap<>(m);
+                line.put("name", m.get("name") + " – " + c.tierName() + (c.period() == TierPricing.Period.ANNUAL
+                        ? (c.prepaid() ? " (annual, prepaid)" : " (annual)") : ""));
+                line.put("monthly_price", c.amount());
+                adjusted.add(line);
+                if (c.proration() != null) {
+                    Map<String, Object> adj = new LinkedHashMap<>(m);
+                    adj.put("module_key", m.get("module_key") + ":upgrade-adjustment");
+                    adj.put("name", m.get("name") + " – prorated upgrade to " + c.tierName());
+                    adj.put("monthly_price", c.proration());
+                    adjusted.add(adj);
+                    prorationsBilled.add(c.prorationSubscriptionId());
+                }
+            }
+            modules = adjusted;
+        }
 
         // Calculate amounts — TRIAL modules billed at R0 (still listed for transparency)
         BigDecimal subtotal = modules.stream()
@@ -155,6 +186,8 @@ public class AdminInvoiceService {
                 subtotal, vat, total, vatRateProvider.rateFraction(),
                 lineItems.toString(), dueDate, pdfBase64,
                 adminId, adminEmail);
+
+        if (moduleTierService != null && !prorationsBilled.isEmpty()) moduleTierService.markProrationInvoiced(prorationsBilled);
 
         audit(adminId, adminEmail, "GENERATE_INVOICE", "INVOICE",
                 invoiceId.toString(), invoiceNumber,
