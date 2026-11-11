@@ -50,6 +50,8 @@ public class FuelDepot {
     @Version
     private Long version;
 
+    public void assignLegalEntity(UUID legalEntityId) { this.legalEntityId = legalEntityId; this.updatedAt = Instant.now(); }
+
     public static FuelDepot create(TenantId tenantId, String name, String code, String address) {
         FuelDepot d = new FuelDepot();
         d.tenantId  = tenantId;

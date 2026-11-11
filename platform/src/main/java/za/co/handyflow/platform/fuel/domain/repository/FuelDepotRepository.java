@@ -23,4 +23,7 @@ public interface FuelDepotRepository extends JpaRepository<FuelDepot, UUID> {
 
     @Query("SELECT COUNT(d) > 0 FROM FuelDepot d WHERE d.tenantId = :tenantId AND UPPER(d.code) = UPPER(:code) AND d.deletedAt IS NULL AND (:excludeId IS NULL OR d.id <> :excludeId)")
     boolean codeInUse(TenantId tenantId, String code, UUID excludeId);
+
+    @Query("SELECT COUNT(d) FROM FuelDepot d WHERE d.tenantId = :tenantId AND d.legalEntityId = :legalEntityId AND d.deletedAt IS NULL")
+    long countByLegalEntity(TenantId tenantId, UUID legalEntityId);
 }
