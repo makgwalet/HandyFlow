@@ -37,7 +37,7 @@ public class WhseLotAllocationService {
         return Boolean.TRUE.equals(b);
     }
 
-    /** Allocates one line first-expiry-first-out. Returns the location of the first piece, kept on the line for display. */
+    /** Allocates one line first-expiry-first-out (see {@link WhseFefo#PICK_ORDER}). Returns the location of the first piece, kept on the line for display. */
     @Transactional
     public UUID allocate(TenantId tenantId, UUID orderId, String orderRef, UUID lineId, UUID clientId, UUID itemId, BigDecimal qty, UUID user) {
         return allocate(tenantId, orderId, orderRef, lineId, clientId, itemId, qty, user, java.util.Set.of());
@@ -75,11 +75,13 @@ public class WhseLotAllocationService {
 
     private List<WhseFefo.Candidate> candidates(UUID t, UUID clientId, UUID itemId, java.util.Set<UUID> excludeInventoryIds) {
         List<WhseFefo.Candidate> candidates = jdbc.query("""
-                SELECT i.id, l.id AS lot_id, l.lot_number, i.location_id, l.expiry_date, l.blocked, i.qty_on_hand - i.qty_allocated AS available
+                SELECT i.id, l.id AS lot_id, l.lot_number, i.location_id, l.expiry_date, l.blocked, i.qty_on_hand - i.qty_allocated AS available,
+                       coalesce((SELECT min(m.created_at) FROM whse_stock_movements m WHERE m.tenant_id = l.tenant_id AND m.lot_id = l.id AND m.movement_type = 'RECEIPT'), l.created_at)::date AS received
                   FROM whse_inventory i JOIN whse_lots l ON l.id = i.lot_id
                  WHERE i.tenant_id = ? AND i.client_id = ? AND i.item_id = ? AND i.status = 'AVAILABLE' AND i.qty_on_hand - i.qty_allocated > 0""",
                 (rs, n) -> new WhseFefo.Candidate(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class), rs.getString(3), rs.getObject(4, UUID.class),
-                        rs.getDate(5) == null ? null : rs.getDate(5).toLocalDate(), rs.getBoolean(6), rs.getBigDecimal(7)),
+                        rs.getDate(5) == null ? null : rs.getDate(5).toLocalDate(), rs.getBoolean(6), rs.getBigDecimal(7),
+                        rs.getDate(8) == null ? null : rs.getDate(8).toLocalDate()),
                 t, clientId, itemId);
         return excludeInventoryIds.isEmpty() ? candidates : candidates.stream().filter(c -> !excludeInventoryIds.contains(c.inventoryId())).toList();
     }

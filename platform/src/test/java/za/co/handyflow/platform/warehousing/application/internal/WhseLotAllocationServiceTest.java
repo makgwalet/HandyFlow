@@ -64,6 +64,18 @@ class WhseLotAllocationServiceTest {
         verify(jdbc, times(2)).update(contains("INSERT INTO whse_order_lot_allocations"), any(Object[].class));
     }
 
+    @Test @DisplayName("the candidate query reads the date each lot first came in, from its first receipt or else when the lot was created")
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void candidateQueryHasReceivedDate() {
+        candidates(cand("L", today().plusDays(20), false, "10"));
+        service.allocate(t(), order, "OUT-1", line, client, item, new BigDecimal("1"), user);
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbc).query(sql.capture(), any(RowMapper.class), any(Object[].class));
+        assertTrue(sql.getValue().contains("min(m.created_at)"));
+        assertTrue(sql.getValue().contains("m.movement_type = 'RECEIPT'"));
+        assertTrue(sql.getValue().contains("l.created_at"));
+    }
+
     @Test @DisplayName("a shortfall allocates nothing and names the item")
     void shortfall() {
         candidates(cand("BLK", today().plusDays(20), true, "50"));

@@ -12,12 +12,28 @@ public final class WhseFefo {
 
     private WhseFefo() {}
 
-    public record Candidate(UUID inventoryId, UUID lotId, String lotNumber, UUID locationId, LocalDate expiry, boolean blocked, BigDecimal available) {}
+    /**
+     * The one pick order. Stock with an expiry date goes first, earliest expiry first, so stock that is not going to expire is never taken ahead of stock that
+     * is. Then, among equal expiry dates and among stock with no expiry date, the oldest receipt first (an unknown receipt date after a known one), then lot
+     * number, then the position's id so the plan is repeatable. This is first-expiry-first-out; it is not a selectable first-in-first-out strategy.
+     */
+    static final Comparator<Candidate> PICK_ORDER = Comparator
+            .comparing(Candidate::expiry, Comparator.nullsLast(Comparator.<LocalDate>naturalOrder()))
+            .thenComparing(Candidate::received, Comparator.nullsLast(Comparator.<LocalDate>naturalOrder()))
+            .thenComparing(c -> c.lotNumber() == null ? "" : c.lotNumber())
+            .thenComparing(c -> c.inventoryId().toString());
+
+    /** received is the date the lot first came in (null when unknown). It orders stock that has no expiry date, and breaks a tie between equal expiry dates. */
+    public record Candidate(UUID inventoryId, UUID lotId, String lotNumber, UUID locationId, LocalDate expiry, boolean blocked, BigDecimal available, LocalDate received) {
+        public Candidate(UUID inventoryId, UUID lotId, String lotNumber, UUID locationId, LocalDate expiry, boolean blocked, BigDecimal available) {
+            this(inventoryId, lotId, lotNumber, locationId, expiry, blocked, available, null);
+        }
+    }
     public record Pick(Candidate source, BigDecimal qty) {}
 
     /**
-     * Takes the required quantity from the lots with the earliest expiry first (lots without an expiry date last), skipping blocked lots,
-     * expired lots and lots with less than {@code minShelfLifeDays} left. Ties go by lot number then position, so a plan is repeatable.
+     * Takes the required quantity in {@link #PICK_ORDER}, skipping blocked lots, expired lots (never allocated automatically) and lots with less than
+     * {@code minShelfLifeDays} left.
      *
      * @throws IllegalStateException when the sellable stock does not cover the quantity; the message says what was held back and why
      */
@@ -31,10 +47,7 @@ public final class WhseFefo {
             if (!WhseLotRules.sellable(c.expiry(), today, minShelfLifeDays)) { shortDatedQty = shortDatedQty.add(c.available()); continue; }
             usable.add(c);
         }
-        usable.sort(Comparator
-                .comparing(Candidate::expiry, Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(c -> c.lotNumber() == null ? "" : c.lotNumber())
-                .thenComparing(c -> c.inventoryId().toString()));
+        usable.sort(PICK_ORDER);
 
         List<Pick> picks = new ArrayList<>();
         BigDecimal left = required;
@@ -59,10 +72,7 @@ public final class WhseFefo {
         if (required == null || required.signum() <= 0) throw new IllegalArgumentException("The quantity to allocate must be above zero.");
         List<Candidate> usable = new ArrayList<>(candidates.stream()
                 .filter(c -> c.available() != null && c.available().signum() > 0 && !c.blocked() && WhseLotRules.sellable(c.expiry(), today, minShelfLifeDays)).toList());
-        usable.sort(Comparator
-                .comparing(Candidate::expiry, Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(c -> c.lotNumber() == null ? "" : c.lotNumber())
-                .thenComparing(c -> c.inventoryId().toString()));
+        usable.sort(PICK_ORDER);
         List<Pick> picks = new ArrayList<>();
         BigDecimal left = required;
         for (Candidate c : usable) {
