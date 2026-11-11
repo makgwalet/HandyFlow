@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import WhseBillableDaysPanel from "./WhseBillableDaysPanel"
-import { billableDaysInStay, holidaysMissing, ruleProblem, scopeLabel } from "./billableDays"
+import { billableDaysInStay, defaultBasisFor, holidaysMissing, reviewText, ruleProblem, scopeLabel } from "./billableDays"
 
 const get = vi.fn(), post = vi.fn(), del = vi.fn()
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a), delete: (...a: unknown[]) => del(...a) } }))
@@ -30,6 +30,14 @@ describe("billable day helpers", () => {
     expect(holidaysMissing([{ dayRule: "WEEKDAYS_NO_HOLIDAYS" }], [{ date: "2026-04-03", name: "Good Friday" }], 2026)).toBe(false)
     expect(holidaysMissing([{ dayRule: "WEEKDAYS_ONLY" }], [], 2026)).toBe(false)
   })
+  it("the default basis follows the rule", () => {
+    expect(defaultBasisFor("ALL_DAYS")).toBe("CALENDAR_DAYS")
+    expect(defaultBasisFor("WEEKDAYS_ONLY")).toBe("BILLABLE_DAYS")
+    expect(defaultBasisFor("WEEKDAYS_NO_HOLIDAYS")).toBe("BILLABLE_DAYS")
+  })
+  it("the review line names the account and says nothing was changed by it", () => {
+    expect(reviewText({ clientId: "c1", clientName: "Acme", label: "Monday to Friday only", effectiveFrom: "2026-01-01" })).toMatch(/^Acme: Monday to Friday only, from 2026-01-01\. Saved before/)
+  })
   it("scope label", () => {
     expect(scopeLabel({ clientId: null, clientName: null })).toMatch(/Whole warehouse/)
     expect(scopeLabel({ clientId: "c1", clientName: "Acme" })).toBe("Acme")
@@ -52,7 +60,7 @@ describe("WhseBillableDaysPanel", () => {
     fireEvent.change(screen.getByLabelText("Starts"), { target: { value: "2099-02-01" } })
     fireEvent.click(screen.getByText("Add rule"))
     await waitFor(() => expect(post).toHaveBeenCalled())
-    expect(post.mock.calls[0][1]).toMatchObject({ clientId: null, dayRule: "WEEKDAYS_ONLY", minimumBasis: "CALENDAR_DAYS", effectiveFrom: "2099-02-01" })
+    expect(post.mock.calls[0][1]).toMatchObject({ clientId: null, dayRule: "WEEKDAYS_ONLY", minimumBasis: null, effectiveFrom: "2099-02-01" })
   })
   it("can pro-rate the minimum by billable days and says so in the list", async () => {
     serve(view({ minimumBases: [{ value: "CALENDAR_DAYS", label: "Calendar days in the invoice period (standard)" }, { value: "BILLABLE_DAYS", label: "Billable days in the invoice period" }],
@@ -64,6 +72,21 @@ describe("WhseBillableDaysPanel", () => {
     fireEvent.click(screen.getByText("Add rule"))
     await waitFor(() => expect(post).toHaveBeenCalled())
     expect(post.mock.calls[0][1]).toMatchObject({ minimumBasis: "BILLABLE_DAYS" })
+  })
+  it("lists older rules for review and leaves them alone", async () => {
+    serve(view({ review: [{ id: "r9", clientId: "c1", clientName: "Acme", dayRule: "WEEKDAYS_ONLY", label: "Monday to Friday only", minimumBasis: "CALENDAR_DAYS", minimumBasisLabel: "Calendar days", effectiveFrom: "2026-01-01", note: null, basisSource: "LEGACY" }] }))
+    wrap(<WhseBillableDaysPanel />)
+    await screen.findByText("Older rules to review")
+    expect(screen.getByText(/Acme: Monday to Friday only, from 2026-01-01/)).toBeTruthy()
+    expect(screen.getByText(/Nothing was changed/)).toBeTruthy()
+    expect(post).not.toHaveBeenCalled()
+  })
+  it("offers the default for the rule as the first choice", async () => {
+    serve(view({ minimumBases: [{ value: "CALENDAR_DAYS", label: "Calendar days" }, { value: "BILLABLE_DAYS", label: "Billable days" }] }))
+    wrap(<WhseBillableDaysPanel />)
+    const select = (await screen.findByLabelText("Minimum charge is pro-rated by")) as HTMLSelectElement
+    expect(select.value).toBe("")
+    expect(select.options[0].textContent).toMatch(/Default for the rule/)
   })
   it("adds the South African holidays for a year", async () => {
     serve(view())

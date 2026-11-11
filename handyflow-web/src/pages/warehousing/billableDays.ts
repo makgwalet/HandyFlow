@@ -1,8 +1,8 @@
 // Pure helpers for the billable-day rule panel. The server checks everything again.
 
-export interface DayRuleRow { id: string; clientId: string | null; clientName: string | null; dayRule: string; label: string; minimumBasis: string; minimumBasisLabel: string; effectiveFrom: string; note: string | null }
+export interface DayRuleRow { id: string; clientId: string | null; clientName: string | null; dayRule: string; label: string; minimumBasis: string; minimumBasisLabel: string; effectiveFrom: string; note: string | null; basisSource?: string }
 export interface HolidayRow { date: string; name: string }
-export interface DayRuleView { rules: DayRuleRow[]; holidays: HolidayRow[]; options: { value: string; label: string }[]; minimumBases?: { value: string; label: string }[] }
+export interface DayRuleView { rules: DayRuleRow[]; holidays: HolidayRow[]; options: { value: string; label: string }[]; minimumBases?: { value: string; label: string }[]; review?: DayRuleRow[] }
 
 export const STANDARD_TEXT = "Standard: every calendar day bills, including the arrival and dispatch days, weekends and public holidays. A part day bills in full."
 
@@ -32,3 +32,12 @@ export function billableDaysInStay(from: string, to: string, rule: string, holid
 export function holidaysMissing(rules: Pick<DayRuleRow, "dayRule">[], holidays: HolidayRow[], year: number): boolean {
   return rules.some(r => r.dayRule === "WEEKDAYS_NO_HOLIDAYS") && !holidays.some(h => h.date.startsWith(`${year}-`))
 }
+
+/** What the minimum-charge choice means when "default" is picked: billable days for a weekday rule, calendar days for every-day billing. */
+export const defaultBasisFor = (dayRule: string) => (dayRule === "ALL_DAYS" ? "CALENDAR_DAYS" : "BILLABLE_DAYS")
+
+export const DEFAULT_BASIS_TEXT = "Default for the rule: billable days for a weekday rule, calendar days for every-day billing"
+
+/** The line shown for an older rule that still pro-rates its minimum by calendar days. */
+export const reviewText = (r: Pick<DayRuleRow, "clientId" | "clientName" | "label" | "effectiveFrom">) =>
+  `${scopeLabel(r)}: ${r.label}, from ${r.effectiveFrom}. Saved before the weekday default existed, so its minimum is still pro-rated by calendar days.`

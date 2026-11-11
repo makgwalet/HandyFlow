@@ -88,6 +88,30 @@ class WhseBillableDayRulesTest {
         assertEquals(2, WhseBillableDayRules.minimumDays(starts, a, after, through, Set.of())); // Fri counts (rule not started), Sat and Sun do not, Mon does
     }
 
+    @Test @DisplayName("with no basis chosen a weekday contract pro-rates by billable days and a seven-day contract by calendar days")
+    void defaultBasis() {
+        assertEquals(WhseBillableDayRules.MinimumBasis.BILLABLE_DAYS, WhseBillableDayRules.defaultBasis(DayRule.WEEKDAYS_ONLY));
+        assertEquals(WhseBillableDayRules.MinimumBasis.BILLABLE_DAYS, WhseBillableDayRules.defaultBasis(DayRule.WEEKDAYS_NO_HOLIDAYS));
+        assertEquals(WhseBillableDayRules.MinimumBasis.CALENDAR_DAYS, WhseBillableDayRules.defaultBasis(DayRule.ALL_DAYS));
+        assertNull(WhseBillableDayRules.parseBasisOrNull(null));
+        assertNull(WhseBillableDayRules.parseBasisOrNull("  "));
+        assertEquals(WhseBillableDayRules.MinimumBasis.CALENDAR_DAYS, WhseBillableDayRules.parseBasisOrNull("calendar_days"));
+    }
+
+    @Test @DisplayName("a rule saved with no basis follows the default when billing runs; one with a basis keeps it; the old four-argument form stays calendar")
+    void defaultAppliesAtBillingTime() {
+        LocalDate after = FRI.minusDays(1), through = MON; // Fri, Sat, Sun, Mon
+        Set<LocalDate> none = Set.of();
+        assertEquals(2, WhseBillableDayRules.minimumDays(List.of(new RuleVersion(a, DayRule.WEEKDAYS_ONLY, FRI.minusDays(30), Instant.EPOCH, null)), a, after, through, none));
+        assertEquals(4, WhseBillableDayRules.minimumDays(List.of(new RuleVersion(a, DayRule.ALL_DAYS, FRI.minusDays(30), Instant.EPOCH, null)), a, after, through, none));
+        assertEquals(4, WhseBillableDayRules.minimumDays(List.of(new RuleVersion(a, DayRule.WEEKDAYS_ONLY, FRI.minusDays(30), Instant.EPOCH, WhseBillableDayRules.MinimumBasis.CALENDAR_DAYS)), a, after, through, none));
+        assertEquals(4, WhseBillableDayRules.minimumDays(List.of(v(a, DayRule.WEEKDAYS_ONLY, FRI.minusDays(30), 1)), a, after, through, none));
+        // the holiday policy of the rule still decides which weekdays bill
+        Set<LocalDate> monHoliday = Set.of(MON);
+        assertEquals(1, WhseBillableDayRules.minimumDays(List.of(new RuleVersion(a, DayRule.WEEKDAYS_NO_HOLIDAYS, FRI.minusDays(30), Instant.EPOCH, null)), a, after, through, monHoliday));
+        assertEquals(2, WhseBillableDayRules.minimumDays(List.of(new RuleVersion(a, DayRule.WEEKDAYS_ONLY, FRI.minusDays(30), Instant.EPOCH, null)), a, after, through, monHoliday));
+    }
+
     @Test @DisplayName("minimum basis parses, and blank means the standard")
     void basis() {
         assertEquals(WhseBillableDayRules.MinimumBasis.CALENDAR_DAYS, WhseBillableDayRules.parseBasis(null));

@@ -27,7 +27,7 @@ public class WhseBillingDayController {
     private final FeatureGuard featureGuard;
 
     public record Option(String value, String label) {}
-    public record View(List<WhseBillingDayService.Rule> rules, List<WhseBillingDayService.Holiday> holidays, List<Option> options, List<Option> minimumBases) {}
+    public record View(List<WhseBillingDayService.Rule> rules, List<WhseBillingDayService.Holiday> holidays, List<Option> options, List<Option> minimumBases, List<WhseBillingDayService.Rule> review) {}
     public record AddRule(UUID clientId, String dayRule, String minimumBasis, LocalDate effectiveFrom, String note) {}
     public record AddHoliday(LocalDate date, String name) {}
 
@@ -40,7 +40,8 @@ public class WhseBillingDayController {
         var t = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(new View(service.rules(t), service.holidays(t),
                 Arrays.stream(WhseBillableDayRules.DayRule.values()).map(r -> new Option(r.name(), r.label)).toList(),
-                Arrays.stream(WhseBillableDayRules.MinimumBasis.values()).map(b -> new Option(b.name(), b.label)).toList())));
+                Arrays.stream(WhseBillableDayRules.MinimumBasis.values()).map(b -> new Option(b.name(), b.label)).toList(),
+                service.reviewList(t, LocalDate.now(ZoneId.of("Africa/Johannesburg"))))));
     }
 
     /** clientId omitted sets the warehouse default. */

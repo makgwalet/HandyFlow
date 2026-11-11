@@ -23,7 +23,8 @@ public class WhseBillingDayService {
 
     private final JdbcTemplate jdbc;
 
-    public record Rule(UUID id, UUID clientId, String clientName, String dayRule, String label, String minimumBasis, String minimumBasisLabel, LocalDate effectiveFrom, String note, Instant createdAt) {}
+    /** minimumBasis is the basis that applies (the one chosen, else the default for the rule). basisSource: LEGACY (saved before the default existed), EXPLICIT or DEFAULT. */
+    public record Rule(UUID id, UUID clientId, String clientName, String dayRule, String label, String minimumBasis, String minimumBasisLabel, LocalDate effectiveFrom, String note, Instant createdAt, String basisSource) {}
     public record Holiday(LocalDate date, String name) {}
 
     /** What accrual needs for a tenant: the rule versions and holidays, loaded once per run. */
@@ -45,7 +46,7 @@ public class WhseBillingDayService {
     @Transactional(readOnly = true)
     public Book book(TenantId tenantId) {
         List<RuleVersion> v = jdbc.query("SELECT client_id, day_rule, minimum_basis, effective_from, created_at FROM whse_billing_day_rules WHERE tenant_id = ?",
-                (rs, i) -> new RuleVersion((UUID) rs.getObject("client_id"), WhseBillableDayRules.parse(rs.getString("day_rule")), rs.getDate("effective_from").toLocalDate(), rs.getTimestamp("created_at").toInstant(), WhseBillableDayRules.parseBasis(rs.getString("minimum_basis"))),
+                (rs, i) -> new RuleVersion((UUID) rs.getObject("client_id"), WhseBillableDayRules.parse(rs.getString("day_rule")), rs.getDate("effective_from").toLocalDate(), rs.getTimestamp("created_at").toInstant(), WhseBillableDayRules.parseBasisOrNull(rs.getString("minimum_basis"))),
                 tenantId.getValue());
         Set<LocalDate> h = new HashSet<>(jdbc.query("SELECT holiday_date FROM whse_billing_holidays WHERE tenant_id = ?", (rs, i) -> rs.getDate(1).toLocalDate(), tenantId.getValue()));
         return new Book(v, h);
@@ -53,11 +54,37 @@ public class WhseBillingDayService {
 
     @Transactional(readOnly = true)
     public List<Rule> rules(TenantId tenantId) {
-        return jdbc.query("SELECT r.id, r.client_id, c.trading_name, r.day_rule, r.minimum_basis, r.effective_from, r.note, r.created_at FROM whse_billing_day_rules r LEFT JOIN whse_clients c ON c.id = r.client_id "
-                + "WHERE r.tenant_id = ? ORDER BY r.effective_from DESC, r.created_at DESC",
-                (rs, i) -> new Rule((UUID) rs.getObject("id"), (UUID) rs.getObject("client_id"), rs.getString("trading_name"), rs.getString("day_rule"),
-                        WhseBillableDayRules.parse(rs.getString("day_rule")).label, rs.getString("minimum_basis"), WhseBillableDayRules.parseBasis(rs.getString("minimum_basis")).label, rs.getDate("effective_from").toLocalDate(), rs.getString("note"), rs.getTimestamp("created_at").toInstant()),
-                tenantId.getValue());
+        return jdbc.query(SQL_RULES + "WHERE r.tenant_id = ? ORDER BY r.effective_from DESC, r.created_at DESC", ruleMapper(), tenantId.getValue());
+    }
+
+    private static final String SQL_RULES = "SELECT r.id, r.client_id, c.trading_name, r.day_rule, r.minimum_basis, r.minimum_basis_source, r.effective_from, r.note, r.created_at "
+            + "FROM whse_billing_day_rules r LEFT JOIN whse_clients c ON c.id = r.client_id ";
+
+    private static org.springframework.jdbc.core.RowMapper<Rule> ruleMapper() {
+        return (rs, i) -> {
+            DayRule rule = WhseBillableDayRules.parse(rs.getString("day_rule"));
+            WhseBillableDayRules.MinimumBasis chosen = WhseBillableDayRules.parseBasisOrNull(rs.getString("minimum_basis"));
+            WhseBillableDayRules.MinimumBasis basis = chosen != null ? chosen : WhseBillableDayRules.defaultBasis(rule);
+            return new Rule((UUID) rs.getObject("id"), (UUID) rs.getObject("client_id"), rs.getString("trading_name"), rule.name(), rule.label,
+                    basis.name(), basis.label, rs.getDate("effective_from").toLocalDate(), rs.getString("note"), rs.getTimestamp("created_at").toInstant(),
+                    rs.getString("minimum_basis_source"));
+        };
+    }
+
+    /**
+     * Rules saved before the weekday default existed that are in force today, are not for seven-day billing and still pro-rate the minimum by calendar days.
+     * They were left as they were; an administrator reviews them and, where the contract should pro-rate by billable days, saves a new rule from a future
+     * date. Saving any new rule for the same scope takes it off this list.
+     */
+    @Transactional(readOnly = true)
+    public List<Rule> reviewList(TenantId tenantId, LocalDate today) {
+        return jdbc.query("SELECT * FROM (SELECT DISTINCT ON (coalesce(r.client_id, '00000000-0000-0000-0000-000000000000'::uuid)) "
+                + "r.id, r.client_id, c.trading_name, r.day_rule, r.minimum_basis, r.minimum_basis_source, r.effective_from, r.note, r.created_at "
+                + "FROM whse_billing_day_rules r LEFT JOIN whse_clients c ON c.id = r.client_id "
+                + "WHERE r.tenant_id = ? AND r.effective_from <= ? "
+                + "ORDER BY coalesce(r.client_id, '00000000-0000-0000-0000-000000000000'::uuid), r.effective_from DESC, r.created_at DESC) cur "
+                + "WHERE cur.minimum_basis_source = 'LEGACY' AND cur.day_rule <> 'ALL_DAYS' AND cur.minimum_basis = 'CALENDAR_DAYS' "
+                + "ORDER BY cur.trading_name NULLS FIRST", ruleMapper(), tenantId.getValue(), java.sql.Date.valueOf(today));
     }
 
     /** clientId null sets the warehouse default. */
@@ -66,20 +93,21 @@ public class WhseBillingDayService {
         return addRule(tenantId, clientId, dayRule, null, effectiveFrom, note, actor, today);
     }
 
-    /** minimumBasis null means CALENDAR_DAYS, the standard. */
+    /** minimumBasis null means the default for the rule: billable days for a weekday rule, calendar days for every-day billing. */
     @Transactional
     public UUID addRule(TenantId tenantId, UUID clientId, String dayRule, String minimumBasis, LocalDate effectiveFrom, String note, UUID actor, LocalDate today) {
         if (actor == null) throw new AccessDeniedException("Your user could not be identified, so this change cannot be recorded.");
         DayRule rule = WhseBillableDayRules.parse(dayRule);
-        WhseBillableDayRules.MinimumBasis basis = WhseBillableDayRules.parseBasis(minimumBasis);
+        WhseBillableDayRules.MinimumBasis chosen = WhseBillableDayRules.parseBasisOrNull(minimumBasis);
+        WhseBillableDayRules.MinimumBasis basis = chosen != null ? chosen : WhseBillableDayRules.defaultBasis(rule);
         WhseBillableDayRules.checkEffectiveFrom(effectiveFrom, today);
         if (clientId != null) {
             Integer c = jdbc.queryForObject("SELECT count(*) FROM whse_clients WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL", Integer.class, tenantId.getValue(), clientId);
             if (c == null || c == 0) throw new IllegalArgumentException("That client account was not found.");
         }
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO whse_billing_day_rules (id, tenant_id, client_id, day_rule, minimum_basis, effective_from, note, created_by) VALUES (?,?,?,?,?,?,?,?)",
-                id, tenantId.getValue(), clientId, rule.name(), basis.name(), effectiveFrom, note == null || note.isBlank() ? null : note.strip(), actor);
+        jdbc.update("INSERT INTO whse_billing_day_rules (id, tenant_id, client_id, day_rule, minimum_basis, minimum_basis_source, effective_from, note, created_by) VALUES (?,?,?,?,?,?,?,?,?)",
+                id, tenantId.getValue(), clientId, rule.name(), chosen == null ? null : chosen.name(), chosen == null ? "DEFAULT" : "EXPLICIT", effectiveFrom, note == null || note.isBlank() ? null : note.strip(), actor);
         jdbc.update("INSERT INTO audit_events (tenant_id, actor_type, actor_id, action, item_type, item_id, after_json) VALUES (?, 'STAFF', ?, 'WHSE_BILLABLE_DAY_RULE_SET', 'WHSE_BILLING_DAY_RULE', ?, jsonb_build_object('rule', ?::text, 'minimumBasis', ?::text, 'effectiveFrom', ?::text, 'clientId', ?::text))",
                 tenantId.getValue(), actor, id, rule.name(), basis.name(), effectiveFrom.toString(), clientId == null ? "" : clientId.toString());
         return id;

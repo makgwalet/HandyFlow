@@ -5,7 +5,7 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { btnGhost, btnPrimary, card, ErrorLine, inputStyle, labelStyle, today } from "./whseUi"
-import { billableDaysInStay, holidaysMissing, ruleProblem, scopeLabel, STANDARD_TEXT, type DayRuleView } from "./billableDays"
+import { billableDaysInStay, DEFAULT_BASIS_TEXT, holidaysMissing, reviewText, ruleProblem, scopeLabel, STANDARD_TEXT, type DayRuleView } from "./billableDays"
 
 const BASE = "/api/v1/warehousing/billing-day-rules"
 
@@ -15,13 +15,13 @@ export default function WhseBillableDaysPanel() {
   const { data: clientPage } = useQuery<{ content?: { id: string; tradingName: string }[] }>({ queryKey: ["whse-clients-lite"], queryFn: async () => (await apiClient.get("/api/v1/warehousing/clients?size=100")).data })
   const [clientId, setClientId] = useState("")
   const [dayRule, setDayRule] = useState("WEEKDAYS_ONLY")
-  const [basis, setBasis] = useState("CALENDAR_DAYS")
+  const [basis, setBasis] = useState("")
   const [from, setFrom] = useState(today())
   const [note, setNote] = useState("")
   const [hDate, setHDate] = useState("")
   const [hName, setHName] = useState("")
   const refresh = () => qc.invalidateQueries({ queryKey: ["whse-day-rules"] })
-  const addRule = useMutation({ mutationFn: async () => apiClient.post(BASE, { clientId: clientId || null, dayRule, minimumBasis: basis, effectiveFrom: from, note: note || null }), onSuccess: () => { setNote(""); refresh() } })
+  const addRule = useMutation({ mutationFn: async () => apiClient.post(BASE, { clientId: clientId || null, dayRule, minimumBasis: basis || null, effectiveFrom: from, note: note || null }), onSuccess: () => { setNote(""); refresh() } })
   const addHoliday = useMutation({ mutationFn: async () => apiClient.post(`${BASE}/holidays`, { date: hDate, name: hName }), onSuccess: () => { setHDate(""); setHName(""); refresh() } })
   const addSa = useMutation({ mutationFn: async (year: number) => apiClient.post(`${BASE}/holidays/south-africa?year=${year}`), onSuccess: refresh })
   const removeHoliday = useMutation({ mutationFn: async (d: string) => apiClient.delete(`${BASE}/holidays/${d}`), onSuccess: refresh })
@@ -38,6 +38,13 @@ export default function WhseBillableDaysPanel() {
       <h3 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 4px" }}>Billable days</h3>
       <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: "0 0 10px" }}>{STANDARD_TEXT} A contract may change this; the change applies from the date you choose and days already billed are never rewritten.</p>
 
+      {Array.isArray(data.review) && data.review.length > 0 && (
+        <div role="status" style={{ border: "1px solid var(--hf-warning-border, #f59e0b)", borderRadius: 8, padding: "8px 12px", margin: "0 0 10px" }}>
+          <p style={{ fontSize: 12.5, fontWeight: 700, margin: "0 0 4px" }}>Older rules to review</p>
+          <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 2 }}>{data.review.map(r => <li key={r.id} style={{ fontSize: 12.5 }}>{reviewText(r)}</li>)}</ul>
+          <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "6px 0 0" }}>Nothing was changed. To pro-rate one of these by billable days, add a new rule for the same account from a future date.</p>
+        </div>
+      )}
       {data.rules.length === 0 ? <p style={{ fontSize: 12.5, margin: "0 0 10px" }}>No contract overrides: every account uses the standard.</p> : (
         <ul style={{ listStyle: "none", padding: 0, margin: "0 0 10px", display: "grid", gap: 4 }}>
           {data.rules.map(r => <li key={r.id} style={{ fontSize: 12.5 }}><strong>{scopeLabel(r)}</strong>: {r.label}, from {r.effectiveFrom}{r.minimumBasis === "BILLABLE_DAYS" ? "; minimum pro-rated by billable days" : ""}{r.note ? ` (${r.note})` : ""}</li>)}
@@ -56,7 +63,8 @@ export default function WhseBillableDaysPanel() {
           </select></div>
         <div><label style={labelStyle} htmlFor="bd-basis">Minimum charge is pro-rated by</label>
           <select id="bd-basis" style={inputStyle} value={basis} onChange={e => setBasis(e.target.value)}>
-            {(data.minimumBases ?? [{ value: "CALENDAR_DAYS", label: "Calendar days in the invoice period (standard)" }]).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            <option value="">{DEFAULT_BASIS_TEXT}</option>
+            {(data.minimumBases ?? []).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select></div>
         <div><label style={labelStyle} htmlFor="bd-from">Starts</label><input id="bd-from" type="date" style={inputStyle} value={from} min={today()} onChange={e => setFrom(e.target.value)} /></div>
         <div style={{ flex: 1, minWidth: 160 }}><label style={labelStyle} htmlFor="bd-note">Contract reference</label><input id="bd-note" style={{ ...inputStyle, width: "100%" }} value={note} maxLength={300} onChange={e => setNote(e.target.value)} /></div>

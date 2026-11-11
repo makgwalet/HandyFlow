@@ -31,10 +31,26 @@ public final class WhseBillableDayRules {
         MinimumBasis(String label) { this.label = label; }
     }
 
+    /**
+     * minimumBasis null means "the default for this rule" (see {@link #defaultBasis}). The four-argument form states the basis outright: calendar days, as every
+     * rule saved before the default existed has.
+     */
     public record RuleVersion(UUID clientId, DayRule rule, LocalDate effectiveFrom, Instant createdAt, MinimumBasis minimumBasis) {
         public RuleVersion(UUID clientId, DayRule rule, LocalDate effectiveFrom, Instant createdAt) {
             this(clientId, rule, effectiveFrom, createdAt, MinimumBasis.CALENDAR_DAYS);
         }
+        /** The basis that applies: the one chosen, else the default for the rule. */
+        public MinimumBasis basis() { return minimumBasis != null ? minimumBasis : defaultBasis(rule); }
+    }
+
+    /** The default for a contract with no basis chosen: a weekday contract pro-rates by the days it bills, a seven-day contract by calendar days. */
+    public static MinimumBasis defaultBasis(DayRule rule) {
+        return rule == DayRule.ALL_DAYS ? MinimumBasis.CALENDAR_DAYS : MinimumBasis.BILLABLE_DAYS;
+    }
+
+    /** Null (or blank) stays null: no basis chosen. */
+    public static MinimumBasis parseBasisOrNull(String s) {
+        return s == null || s.isBlank() ? null : parseBasis(s);
     }
 
     public static MinimumBasis parseBasis(String s) {
@@ -83,7 +99,7 @@ public final class WhseBillableDayRules {
         long n = 0;
         for (LocalDate d = after.plusDays(1); !d.isAfter(through); d = d.plusDays(1)) {
             RuleVersion v = versionFor(versions, clientId, d);
-            if (v == null || v.minimumBasis() == MinimumBasis.CALENDAR_DAYS || isBillable(v.rule(), d, holidays)) n++;
+            if (v == null || v.basis() == MinimumBasis.CALENDAR_DAYS || isBillable(v.rule(), d, holidays)) n++;
         }
         return n;
     }
