@@ -46,6 +46,7 @@ class FuelServiceCustomerTest {
     @Mock FuelStockLedger ledger;
     @Mock FuelCustomerAccountRepository accountRepository;
     @Mock FuelCustomerSiteRepository siteRepository;
+    @Mock FuelOrderFulfilment orderFulfilment;
     @InjectMocks FuelService service;
 
     static final TenantId TENANT = TenantId.of(UUID.randomUUID());
@@ -120,5 +121,31 @@ class FuelServiceCustomerTest {
     void noAccountNoHold() {
         when(accountRepository.findByCrmCustomerId(any(), any())).thenReturn(Optional.empty());
         assertDoesNotThrow(() -> service.scheduleDelivery(TENANT, req(UUID.randomUUID(), null)));
+    }
+
+    @Test @DisplayName("an invoiced delivery cannot be reversed until its invoice is credited")
+    void invoicedDeliveryNotReversible() {
+        FuelDelivery d = FuelDelivery.create(TENANT, UUID.randomUUID(), crmId, Map.of(), "DIESEL",
+                new BigDecimal("500"), new BigDecimal("22"), Instant.now(), null, null);
+        d.complete(new BigDecimal("500"), "P Botha", null, null, null, false, null, null);
+        d.markInvoiced(UUID.randomUUID(), "INV-00042");
+        when(deliveryRepository.findActiveByIdForUpdate(eq(TENANT), any())).thenReturn(Optional.of(d));
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> service.reverseDelivery(TENANT, UUID.randomUUID(), new ReverseRequest("Wrong customer"), UUID.randomUUID()));
+        assertTrue(e.getMessage().contains("INV-00042"));
+        verify(tankRepository, never()).save(any());
+    }
+
+    @Test @DisplayName("loading is recorded only for loads still on the way, with positive litres")
+    void loadingRules() {
+        FuelDelivery d = FuelDelivery.create(TENANT, UUID.randomUUID(), crmId, Map.of(), "DIESEL",
+                new BigDecimal("500"), new BigDecimal("22"), Instant.now(), null, null);
+        when(deliveryRepository.findActiveByIdForUpdate(eq(TENANT), any())).thenReturn(Optional.of(d));
+        assertThrows(IllegalArgumentException.class, () -> service.recordLoading(TENANT, UUID.randomUUID(), new LoadingRequest(BigDecimal.ZERO, null)));
+        DeliveryResponse r = service.recordLoading(TENANT, UUID.randomUUID(), new LoadingRequest(new BigDecimal("505"), " S-101, S-102 "));
+        assertEquals(0, new BigDecimal("505").compareTo(r.loadedLitres()));
+        assertEquals("S-101, S-102", r.sealNumbers());
+        d.cancel();
+        assertThrows(IllegalStateException.class, () -> service.recordLoading(TENANT, UUID.randomUUID(), new LoadingRequest(new BigDecimal("1"), null)));
     }
 }

@@ -18,5 +18,7 @@ public record DeliveryResponse(
         boolean signedOnBehalf, String onBehalfOf,
         Instant createdAt,
         Instant reversedAt, String reversalReason,
-        UUID siteId
+        UUID siteId,
+        UUID orderId, java.math.BigDecimal loadedLitres, String sealNumbers,
+        String invoiceState, UUID invoiceId, String invoiceNumber, String invoiceError
 ) {}

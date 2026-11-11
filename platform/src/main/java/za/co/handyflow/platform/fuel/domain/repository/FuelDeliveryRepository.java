@@ -66,4 +66,37 @@ public interface FuelDeliveryRepository extends JpaRepository<FuelDelivery, UUID
         AND d.overdueAlertSentAt IS NULL
         """)
     List<FuelDelivery> findOverdueNeedingAlert(Instant now);
+
+    // ── Stage 2: orders and invoicing ────────────────────────────────────────
+
+    @Query("SELECT COALESCE(SUM(d.litresDelivered), 0) FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.orderId = :orderId AND d.status = 'DELIVERED' AND d.deletedAt IS NULL")
+    java.math.BigDecimal sumDeliveredForOrder(TenantId tenantId, UUID orderId);
+
+    /** Litres of scheduled or in-transit loads that have not yet been delivered against the order. */
+    @Query("SELECT COALESCE(SUM(d.litresOrdered), 0) FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.orderId = :orderId AND d.status IN ('SCHEDULED','IN_TRANSIT') AND d.deletedAt IS NULL")
+    java.math.BigDecimal sumPendingForOrder(TenantId tenantId, UUID orderId);
+
+    @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.orderId = :orderId AND d.deletedAt IS NULL ORDER BY d.scheduledAt")
+    List<FuelDelivery> findByOrder(TenantId tenantId, UUID orderId);
+
+    /** Delivered fuel with no invoice (or a failed invoice attempt): the "delivered, not invoiced" queue. */
+    @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.status = 'DELIVERED' AND d.invoiceState IN ('NONE','FAILED') AND d.deletedAt IS NULL ORDER BY d.deliveredAt")
+    List<FuelDelivery> findNotInvoiced(TenantId tenantId);
+
+    @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.id IN :ids AND d.deletedAt IS NULL")
+    List<FuelDelivery> findAllByIds(TenantId tenantId, java.util.Collection<UUID> ids);
+
+    /** Uninvoiced delivered value for a customer (credit exposure). */
+    @Query("SELECT COALESCE(SUM(d.totalAmount), 0) FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.customerId = :customerId AND d.status = 'DELIVERED' AND d.invoiceState <> 'INVOICED' AND d.deletedAt IS NULL")
+    java.math.BigDecimal sumUninvoicedValue(TenantId tenantId, UUID customerId);
+
+    /**
+     * Atomically claims deliveries for invoicing. Returns how many were claimed; the caller compares with the
+     * number asked for. A claim left over from a crashed attempt (older than {@code stale}) can be taken again.
+     */
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE FuelDelivery d SET d.invoiceState = 'INVOICING', d.invoiceClaimedAt = :now, d.invoiceError = NULL " +
+           "WHERE d.tenantId = :tenantId AND d.id IN :ids AND d.status = 'DELIVERED' AND d.deletedAt IS NULL " +
+           "AND (d.invoiceState IN ('NONE','FAILED') OR (d.invoiceState = 'INVOICING' AND d.invoiceClaimedAt < :stale))")
+    int claimForInvoicing(TenantId tenantId, java.util.Collection<UUID> ids, Instant now, Instant stale);
 }

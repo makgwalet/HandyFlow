@@ -127,6 +127,37 @@ public class FuelDelivery {
     @Column(name = "site_id")
     private UUID siteId;
 
+    // Stage 2: the order this load belongs to, the loading record, and the invoice hand-off.
+    @Column(name = "order_id")
+    private UUID orderId;
+
+    @Column(name = "loaded_litres", precision = 12, scale = 2)
+    private BigDecimal loadedLitres;
+
+    @Column(name = "loaded_at")
+    private Instant loadedAt;
+
+    @Column(name = "seal_numbers", length = 200)
+    private String sealNumbers;
+
+    @Column(name = "invoice_state", nullable = false, length = 12)
+    private String invoiceState = "NONE";
+
+    @Column(name = "invoice_id")
+    private UUID invoiceId;
+
+    @Column(name = "invoice_number", length = 40)
+    private String invoiceNumber;
+
+    @Column(name = "invoiced_at")
+    private Instant invoicedAt;
+
+    @Column(name = "invoice_error", length = 500)
+    private String invoiceError;
+
+    @Column(name = "invoice_claimed_at")
+    private Instant invoiceClaimedAt;
+
     @Column(name = "reversed_at")
     private Instant reversedAt;
 
@@ -210,6 +241,31 @@ public class FuelDelivery {
     }
 
     public boolean isDeleted() { return deletedAt != null; }
+
+    public void assignOrder(UUID orderId) { this.orderId = orderId; }
+
+    /** What was loaded onto the tanker and the seals fitted. Variance against what is delivered is reviewed, never auto-written-off. */
+    public void recordLoading(BigDecimal loadedLitres, String sealNumbers) {
+        requireStatus("record loading for", "SCHEDULED", "IN_TRANSIT");
+        if (loadedLitres == null || loadedLitres.signum() <= 0) throw new IllegalArgumentException("Loaded litres must be greater than zero.");
+        this.loadedLitres = loadedLitres;
+        this.sealNumbers = sealNumbers == null || sealNumbers.isBlank() ? null : sealNumbers.trim();
+        this.loadedAt = Instant.now();
+        this.updatedAt = Instant.now();
+    }
+
+    public boolean isInvoiceLocked() { return "INVOICED".equals(invoiceState) || "INVOICING".equals(invoiceState); }
+
+    public void markInvoiced(UUID invoiceId, String invoiceNumber) {
+        this.invoiceState = "INVOICED"; this.invoiceId = invoiceId; this.invoiceNumber = invoiceNumber;
+        this.invoicedAt = Instant.now(); this.invoiceError = null; this.updatedAt = Instant.now();
+    }
+
+    public void markInvoiceFailed(String message) {
+        this.invoiceState = "FAILED";
+        this.invoiceError = message == null ? "Invoice could not be created." : (message.length() > 490 ? message.substring(0, 490) : message);
+        this.updatedAt = Instant.now();
+    }
 
     /** The customer delivery site this load is for (validated by the service). */
     public void assignSite(UUID siteId) { this.siteId = siteId; }

@@ -73,6 +73,7 @@ public class FuelService {
     private final FuelStockLedger ledger;
     private final FuelCustomerAccountRepository accountRepository;
     private final FuelCustomerSiteRepository siteRepository;
+    private final FuelOrderFulfilment orderFulfilment;
 
     @Value("${fuel.forecast.lookback-days:30}")
     private int forecastLookbackDays = 30;
@@ -663,6 +664,30 @@ public class FuelService {
         return toDeliveryResponse(d);
     }
 
+    /** Records what was loaded onto the tanker and the seals fitted (before or while it is on the road). */
+    @Transactional
+    public DeliveryResponse recordLoading(TenantId tenantId, UUID deliveryId, LoadingRequest req) {
+        FuelDelivery d = deliveryRepository.findActiveByIdForUpdate(tenantId, deliveryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery", deliveryId.toString()));
+        d.recordLoading(req.loadedLitres(), req.sealNumbers());
+        deliveryRepository.save(d);
+        return toDeliveryResponse(d);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<DeliveryResponse> deliveriesForOrder(TenantId tenantId, UUID orderId) {
+        return deliveryRepository.findByOrder(tenantId, orderId).stream().map(this::toDeliveryResponse).toList();
+    }
+
+    /** Ties a freshly scheduled delivery to its order (same transaction as the scheduling). */
+    @Transactional
+    public void attachToOrder(TenantId tenantId, UUID deliveryId, UUID orderId) {
+        FuelDelivery d = deliveryRepository.findActiveById(tenantId, deliveryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery", deliveryId.toString()));
+        d.assignOrder(orderId);
+        deliveryRepository.save(d);
+    }
+
     @Transactional
     public DeliveryResponse cancelDelivery(TenantId tenantId, UUID deliveryId) {
         FuelDelivery d = deliveryRepository.findActiveByIdForUpdate(tenantId, deliveryId)
@@ -681,12 +706,18 @@ public class FuelService {
             throw new IllegalStateException("Only a completed delivery can be reversed (this one is "
                     + d.getStatus().toLowerCase().replace('_', ' ') + ").");
         }
+        if (d.isInvoiceLocked()) {
+            throw new IllegalStateException("This delivery has been invoiced"
+                    + (d.getInvoiceNumber() != null ? " (" + d.getInvoiceNumber() + ")" : "")
+                    + ". Credit the invoice in Invoicing first, then reverse the delivery.");
+        }
         FuelTank tank = findActiveTankForUpdate(tenantId, d.getTankId());
         tank.restoreStock(d.getLitresDelivered());
         tankRepository.save(tank);
         d.reverse(actingUserId, req.reason().trim());
         deliveryRepository.save(d);
         ledger.post(tank, FuelStockMovement.Type.REVERSAL, d.getLitresDelivered(), "DELIVERY", d.getId(), req.reason().trim());
+        if (d.getOrderId() != null) orderFulfilment.resync(tenantId, d.getOrderId());
         log.info("Delivery reversed id={} litres={} by={}", deliveryId, d.getLitresDelivered(), actingUserId);
         return toDeliveryResponse(d);
     }
@@ -784,7 +815,9 @@ public class FuelService {
                 d.isSignedOnBehalf(), d.getOnBehalfOf(),
                 d.getCreatedAt(),
                 d.getReversedAt(), d.getReversalReason(),
-                d.getSiteId()
+                d.getSiteId(),
+                d.getOrderId(), d.getLoadedLitres(), d.getSealNumbers(),
+                d.getInvoiceState(), d.getInvoiceId(), d.getInvoiceNumber(), d.getInvoiceError()
         );
     }
 
@@ -806,7 +839,10 @@ public class FuelService {
         FuelTank tank = findActiveTankForUpdate(tenantId, delivery.getTankId());
         boolean wasLow = tank.isLow();
         // A delivery may use what it reserved itself, but not what is reserved for others.
-        var ownReservations = ledger.ownReservations(tenantId, tank.getId(), "DELIVERY", delivery.getId());
+        var ownReservations = new java.util.ArrayList<>(ledger.ownReservations(tenantId, tank.getId(), "DELIVERY", delivery.getId()));
+        if (delivery.getOrderId() != null) {
+            ownReservations.addAll(ledger.ownReservations(tenantId, tank.getId(), "ORDER", delivery.getOrderId()));
+        }
         ledger.requireUnreserved(tank, req.litresDelivered(), ledger.total(ownReservations));
         tank.removeStock(req.litresDelivered());
         tankRepository.save(tank);
@@ -827,6 +863,7 @@ public class FuelService {
         ledger.post(tank, FuelStockMovement.Type.DELIVERY, req.litresDelivered().negate(), "DELIVERY", delivery.getId(),
                 delivery.getReceiptNumber());
         ledger.consume(ownReservations);
+        if (delivery.getOrderId() != null) orderFulfilment.resync(tenantId, delivery.getOrderId());
 
         if (!wasLow && tank.isLow()) {
             notifyLowStock(tenantId, tank);

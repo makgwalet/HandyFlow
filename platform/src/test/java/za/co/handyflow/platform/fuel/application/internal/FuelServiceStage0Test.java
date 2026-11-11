@@ -44,6 +44,7 @@ class FuelServiceStage0Test {
     @Mock FuelStockLedger ledger;
     @Mock FuelCustomerAccountRepository accountRepository;
     @Mock FuelCustomerSiteRepository siteRepository;
+    @Mock FuelOrderFulfilment orderFulfilment;
     @InjectMocks FuelService service;
 
     static final TenantId TENANT = TenantId.of(UUID.randomUUID());
