@@ -52,6 +52,10 @@ public class FuelSettings {
     @Column(name = "adjustment_threshold_litres", precision = 14, scale = 3)
     private BigDecimal adjustmentThresholdLitres;
 
+    /** Loaded-versus-delivered difference (as a percentage of litres loaded) above which a variance is raised. Null: not set, nothing is flagged. */
+    @Column(name = "variance_tolerance_pct", precision = 5, scale = 2)
+    private BigDecimal varianceTolerancePct;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -90,6 +94,12 @@ public class FuelSettings {
         }
         this.requireSupplierApproval = requireSupplierApproval;
         this.adjustmentThresholdLitres = adjustmentThresholdLitres;
+        this.updatedAt = Instant.now();
+    }
+
+    public void updateVarianceTolerance(BigDecimal pct) {
+        if (pct != null && (pct.signum() < 0 || pct.compareTo(new BigDecimal("100")) > 0)) throw new IllegalArgumentException("The variance tolerance must be between 0% and 100%, or empty to switch the check off.");
+        this.varianceTolerancePct = pct;
         this.updatedAt = Instant.now();
     }
 

@@ -11,8 +11,8 @@ import java.util.UUID;
 public final class FuelWholesaleDtos {
     private FuelWholesaleDtos() {}
 
-    public record ControlsRequest(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres) {}
-    public record ControlsResponse(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres) {}
+    public record ControlsRequest(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres, BigDecimal varianceTolerancePct) {}
+    public record ControlsResponse(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres, BigDecimal varianceTolerancePct) {}
 
     public record ReasonRequest(@NotBlank @Size(min = 5, max = 300, message = "Reason must be 5 to 300 characters") String reason) {}
 

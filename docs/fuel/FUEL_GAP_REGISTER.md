@@ -38,3 +38,8 @@ Each row is a gap statement; the backend/frontend/database/permission/test lists
 - **B04** done in code (supplier status, off by default). Banking details and supplier documents are **not** built.
 - **B05** done in code through the Approvals engine (module fuel, type PURCHASE_ORDER). Requisitions are not built.
 - **B06 (quotes, contracts), B07 (price approval/margin guard)**: not started. **B08**: blocked on the Accounts Payable decision.
+
+## Status after Phase 3 (code written; Java not compiled or run by the author)
+- **C02** done in code: loaded-versus-delivered variance with a per-company tolerance that has **no default** (nothing is flagged until set), a review record (open, investigating, closed with EXPLAINED or WRITTEN_OFF and a note). A decision is a record only and moves no stock.
+- **C01** done in code: append-only evidence records (photo, signature, document, GPS) with replace-before-verify and verify-by-someone-else-then-lock. Files are referenced, not uploaded by this feature. The existing completion fields are unchanged.
+- **C03** not started (waiting for your decision on `fuel_tankers` versus Fleet vehicles). **C04** not started (P2). **C05** not started (offline queue, depends on C01).

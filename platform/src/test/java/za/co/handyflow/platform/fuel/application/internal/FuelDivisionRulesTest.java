@@ -21,7 +21,7 @@ class FuelDivisionRulesTest {
 
     @Test @DisplayName("customers, orders, prices, invoicing and deliveries are shared by Wholesale and Distribution")
     void commercial() {
-        for (String p : new String[]{"/customer-accounts/1/sites", "/customer-sites/2", "/orders/3/confirm", "/invoicing/queue", "/prices/resolve", "/deliveries/4/complete", "/customer-accounts/1/portal-access"})
+        for (String p : new String[]{"/customer-accounts/1/sites", "/customer-sites/2", "/orders/3/confirm", "/invoicing/queue", "/prices/resolve", "/deliveries/4/complete", "/customer-accounts/1/portal-access", "/variances", "/evidence/5/verify"})
             assertEquals(Set.of(WHOLESALE_SUPPLY, DISTRIBUTION), req(p), p);
     }
 

@@ -22,6 +22,12 @@ public interface FuelDeliveryRepository extends JpaRepository<FuelDelivery, UUID
     @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.status = :status AND d.deletedAt IS NULL ORDER BY d.scheduledAt ASC")
     Page<FuelDelivery> findByStatus(TenantId tenantId, String status, Pageable pageable);
 
+    /** Delivered, not reversed, loading recorded, delivered since a date, and not yet checked for a variance. */
+    @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.status = 'DELIVERED' AND d.deletedAt IS NULL AND d.reversedAt IS NULL "
+            + "AND d.loadedLitres IS NOT NULL AND d.litresDelivered IS NOT NULL AND d.deliveredAt >= :since "
+            + "AND NOT EXISTS (SELECT 1 FROM FuelDeliveryVariance v WHERE v.tenantId = :tenantId AND v.deliveryId = d.id)")
+    List<FuelDelivery> findUncheckedForVariance(TenantId tenantId, Instant since);
+
     @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.id = :id AND d.deletedAt IS NULL")
     Optional<FuelDelivery> findActiveById(TenantId tenantId, UUID id);
 

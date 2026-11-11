@@ -44,15 +44,16 @@ public class FuelSettingsService {
     @Transactional(readOnly = true)
     public ControlsResponse controls(TenantId tenantId) {
         FuelSettings s = current(tenantId);
-        return new ControlsResponse(s.isRequireSupplierApproval(), s.getAdjustmentThresholdLitres());
+        return new ControlsResponse(s.isRequireSupplierApproval(), s.getAdjustmentThresholdLitres(), s.getVarianceTolerancePct());
     }
 
     @Transactional
     public ControlsResponse updateControls(TenantId tenantId, ControlsRequest req) {
         FuelSettings s = settings.findByTenant(tenantId).orElseGet(() -> FuelSettings.forTenant(tenantId));
         s.updateControls(req.requireSupplierApproval(), req.adjustmentThresholdLitres());
+        s.updateVarianceTolerance(req.varianceTolerancePct());
         FuelSettings saved = settings.save(s);
-        return new ControlsResponse(saved.isRequireSupplierApproval(), saved.getAdjustmentThresholdLitres());
+        return new ControlsResponse(saved.isRequireSupplierApproval(), saved.getAdjustmentThresholdLitres(), saved.getVarianceTolerancePct());
     }
 
     private static SettingsResponse toResponse(FuelSettings s) {
