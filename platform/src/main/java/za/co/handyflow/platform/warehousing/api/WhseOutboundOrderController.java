@@ -81,12 +81,13 @@ public class WhseOutboundOrderController {
     @PreAuthorize("hasAnyAuthority('WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
     @Operation(summary = "Create an outbound fulfilment order")
     public ResponseEntity<ApiResponse<OutboundOrderResponse>> create(@PathVariable UUID clientId,
-            @Valid @RequestBody CreateOutboundOrderRequest req) {
+            @Valid @RequestBody CreateOutboundOrderRequest req,
+            @RequestParam(required = false) UUID warehouseId) {
         featureGuard.requireModule("warehousing");
         List<OutboundLine> lines = req.lines().stream()
                 .map(l -> new OutboundLine(l.itemId(), l.qtyOrdered(), l.notes())).toList();
         WhseOutboundOrder order = orderService.createOrder(TenantContext.getTenantIdAsObject(), clientId,
-                req.orderReference(), req.shipToName(), req.shipToAddress(), req.requestedShipDate(), lines, req.notes());
+                req.orderReference(), req.shipToName(), req.shipToAddress(), req.requestedShipDate(), lines, req.notes(), warehouseId);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Order created", toResponse(order)));
     }
 

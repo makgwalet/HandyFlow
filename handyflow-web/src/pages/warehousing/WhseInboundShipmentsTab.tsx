@@ -8,6 +8,8 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, Truck, X, ChevronRight, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
+import WhseWarehouseSelect, { useWarehouses } from "./WhseWarehouseSelect"
+import { pickWarehouse, showSelector } from "./warehouses"
 import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
 import WhseInboundShipmentDetail from "./WhseInboundShipmentDetail"
 
@@ -27,6 +29,9 @@ const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: 
 
 function NewShipmentModal({ clientId, items, onClose }: { clientId: string; items: ItemResponse[]; onClose: () => void }) {
   const qc = useQueryClient()
+  const warehouses = useWarehouses()
+  const [chosenWh, setChosenWh] = useState<string | undefined>(undefined)
+  const warehouseId = showSelector(warehouses) ? pickWarehouse(warehouses, chosenWh) || undefined : undefined
   const [referenceNumber, setReferenceNumber] = useState("")
   const [expectedDate, setExpectedDate] = useState("")
   const [notes, setNotes] = useState("")
@@ -37,10 +42,14 @@ function NewShipmentModal({ clientId, items, onClose }: { clientId: string; item
   const updateLine = (i: number, field: string, value: string) => setLines(lines.map((l, idx) => idx === i ? { ...l, [field]: value } : l))
 
   const create = useMutation({
-    mutationFn: async () => apiClient.post(`/api/v1/warehousing/clients/${clientId}/inbound-shipments`, {
+    mutationFn: async () => {
+      const url = `/api/v1/warehousing/clients/${clientId}/inbound-shipments`
+      const body = {
       referenceNumber: referenceNumber || null, expectedDate: expectedDate || null, notes: notes || null,
       lines: lines.filter(l => l.itemId && l.expectedQty).map(l => ({ itemId: l.itemId, expectedQty: parseFloat(l.expectedQty), notes: l.notes || null })),
-    }),
+      }
+      return warehouseId ? apiClient.post(url, body, { params: { warehouseId } }) : apiClient.post(url, body)
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["whse-inbound-shipments", clientId] }); onClose() },
   })
 
@@ -53,6 +62,7 @@ function NewShipmentModal({ clientId, items, onClose }: { clientId: string; item
           <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>New inbound shipment</p>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
+        <WhseWarehouseSelect value={chosenWh} onChange={setChosenWh} />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
           <div><label style={labelStyle}>Reference / ASN number</label><input style={inputStyle} value={referenceNumber} onChange={e => setReferenceNumber(e.target.value)} /></div>
           <div><label style={labelStyle}>Expected date</label><input type="date" style={inputStyle} value={expectedDate} onChange={e => setExpectedDate(e.target.value)} /></div>

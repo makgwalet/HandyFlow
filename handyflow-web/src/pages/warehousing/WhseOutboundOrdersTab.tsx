@@ -10,6 +10,8 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, PackageCheck, X, ChevronRight, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
+import WhseWarehouseSelect, { useWarehouses } from "./WhseWarehouseSelect"
+import { pickWarehouse, showSelector } from "./warehouses"
 import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
 import WhseOutboundOrderDetail from "./WhseOutboundOrderDetail"
 
@@ -32,6 +34,9 @@ const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: 
 
 function NewOrderModal({ clientId, items, onClose }: { clientId: string; items: ItemResponse[]; onClose: () => void }) {
   const qc = useQueryClient()
+  const warehouses = useWarehouses()
+  const [chosenWh, setChosenWh] = useState<string | undefined>(undefined)
+  const warehouseId = showSelector(warehouses) ? pickWarehouse(warehouses, chosenWh) || undefined : undefined
   const [orderReference, setOrderReference] = useState("")
   const [shipToName, setShipToName] = useState("")
   const [shipToAddress, setShipToAddress] = useState("")
@@ -44,11 +49,15 @@ function NewOrderModal({ clientId, items, onClose }: { clientId: string; items: 
   const updateLine = (i: number, field: string, value: string) => setLines(lines.map((l, idx) => idx === i ? { ...l, [field]: value } : l))
 
   const create = useMutation({
-    mutationFn: async () => apiClient.post(`/api/v1/warehousing/clients/${clientId}/outbound-orders`, {
+    mutationFn: async () => {
+      const url = `/api/v1/warehousing/clients/${clientId}/outbound-orders`
+      const body = {
       orderReference: orderReference || null, shipToName: shipToName || null, shipToAddress: shipToAddress || null,
       requestedShipDate: requestedShipDate || null, notes: notes || null,
       lines: lines.filter(l => l.itemId && l.qtyOrdered).map(l => ({ itemId: l.itemId, qtyOrdered: parseFloat(l.qtyOrdered), notes: l.notes || null })),
-    }),
+      }
+      return warehouseId ? apiClient.post(url, body, { params: { warehouseId } }) : apiClient.post(url, body)
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["whse-outbound-orders", clientId] }); onClose() },
   })
 
@@ -61,6 +70,7 @@ function NewOrderModal({ clientId, items, onClose }: { clientId: string; items: 
           <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>New outbound order</p>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
+        <WhseWarehouseSelect value={chosenWh} onChange={setChosenWh} />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
           <div><label style={labelStyle}>Order reference</label><input style={inputStyle} value={orderReference} onChange={e => setOrderReference(e.target.value)} /></div>
           <div><label style={labelStyle}>Requested ship date</label><input type="date" style={inputStyle} value={requestedShipDate} onChange={e => setRequestedShipDate(e.target.value)} /></div>

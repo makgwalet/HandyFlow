@@ -40,6 +40,9 @@ public class WhseInboundShipmentService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private WhsePackageService packages;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private WhseDocumentWarehouse documentWarehouse;
+
     private void requireRoom(TenantId tenantId, WhsePackageRules.Limit limit) {
         if (packages != null) packages.requireRoomFor(tenantId, limit);
     }
@@ -54,6 +57,13 @@ public class WhseInboundShipmentService {
     @Transactional
     public WhseInboundShipment createShipment(TenantId tenantId, UUID clientId, String referenceNumber,
                                                LocalDate expectedDate, List<InboundLine> lines, String notes) {
+        return createShipment(tenantId, clientId, referenceNumber, expectedDate, lines, notes, null);
+    }
+
+    /** warehouseId is the warehouse the stock is coming to; null means the tenant's default warehouse. */
+    @Transactional
+    public WhseInboundShipment createShipment(TenantId tenantId, UUID clientId, String referenceNumber,
+                                               LocalDate expectedDate, List<InboundLine> lines, String notes, UUID warehouseId) {
         if (lines == null || lines.isEmpty()) {
             throw new IllegalArgumentException("An inbound shipment must contain at least one line");
         }
@@ -63,6 +73,7 @@ public class WhseInboundShipmentService {
         WhseInboundShipment shipment = WhseInboundShipment.create(tenantId.getValue(), clientId, referenceNumber,
                 expectedDate, notes);
         shipment = shipmentRepository.save(shipment);
+        if (documentWarehouse != null) documentWarehouse.assign(tenantId, WhseDocumentWarehouse.Kind.INBOUND, shipment.getId(), warehouseId);
         recordTransaction(tenantId, "RECEIPT", shipment.getId());
 
         for (InboundLine line : lines) {

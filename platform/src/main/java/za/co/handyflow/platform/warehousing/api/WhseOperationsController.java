@@ -78,8 +78,8 @@ public class WhseOperationsController {
     @GetMapping("/reservations")
     @PreAuthorize("hasAnyAuthority('WAREHOUSING_READ','WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
     @Operation(summary = "What is reserved right now, per order and position")
-    public ResponseEntity<ApiResponse<List<WhseOperationsService.ReservationRow>>> reservations(@RequestParam(required = false) UUID clientId) {
+    public ResponseEntity<ApiResponse<List<WhseOperationsService.ReservationRow>>> reservations(@RequestParam(required = false) UUID clientId, @RequestParam(required = false) UUID warehouseId) {
         featureGuard.requireModule("warehousing");
-        return ResponseEntity.ok(ApiResponse.success(service.reservations(TenantContext.getTenantIdAsObject(), clientId)));
+        return ResponseEntity.ok(ApiResponse.success(service.reservations(TenantContext.getTenantIdAsObject(), clientId, warehouseId)));
     }
 }

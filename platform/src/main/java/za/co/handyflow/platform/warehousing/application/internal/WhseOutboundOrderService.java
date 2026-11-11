@@ -44,6 +44,10 @@ public class WhseOutboundOrderService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private WhsePackageService packages;
 
+    /** Optional so the services can be built without it; Spring injects it. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private WhseDocumentWarehouse documentWarehouse;
+
     private void requireRoom(TenantId tenantId, WhsePackageRules.Limit limit) {
         if (packages != null) packages.requireRoomFor(tenantId, limit);
     }
@@ -59,6 +63,14 @@ public class WhseOutboundOrderService {
     public WhseOutboundOrder createOrder(TenantId tenantId, UUID clientId, String orderReference, String shipToName,
                                           String shipToAddress, LocalDate requestedShipDate,
                                           List<OutboundLine> lines, String notes) {
+        return createOrder(tenantId, clientId, orderReference, shipToName, shipToAddress, requestedShipDate, lines, notes, null);
+    }
+
+    /** warehouseId is the warehouse that will fulfil the order; null means the tenant's default warehouse. */
+    @Transactional
+    public WhseOutboundOrder createOrder(TenantId tenantId, UUID clientId, String orderReference, String shipToName,
+                                          String shipToAddress, LocalDate requestedShipDate,
+                                          List<OutboundLine> lines, String notes, UUID warehouseId) {
         if (lines == null || lines.isEmpty()) {
             throw new IllegalArgumentException("An outbound order must contain at least one line");
         }
@@ -68,6 +80,7 @@ public class WhseOutboundOrderService {
         WhseOutboundOrder order = WhseOutboundOrder.create(tenantId.getValue(), clientId, orderReference,
                 shipToName, shipToAddress, requestedShipDate, notes);
         order = orderRepository.save(order);
+        if (documentWarehouse != null) documentWarehouse.assign(tenantId, WhseDocumentWarehouse.Kind.OUTBOUND, order.getId(), warehouseId);
         recordTransaction(tenantId, "ORDER", order.getId());
 
         for (OutboundLine line : lines) {

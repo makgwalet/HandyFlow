@@ -70,12 +70,13 @@ public class WhseInboundShipmentController {
     @PreAuthorize("hasAnyAuthority('WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
     @Operation(summary = "Create an inbound shipment (ASN) — the client telling the operator stock is coming")
     public ResponseEntity<ApiResponse<InboundShipmentResponse>> create(@PathVariable UUID clientId,
-            @Valid @RequestBody CreateInboundShipmentRequest req) {
+            @Valid @RequestBody CreateInboundShipmentRequest req,
+            @RequestParam(required = false) UUID warehouseId) {
         featureGuard.requireModule("warehousing");
         List<InboundLine> lines = req.lines().stream()
                 .map(l -> new InboundLine(l.itemId(), l.expectedQty(), l.notes())).toList();
         WhseInboundShipment shipment = shipmentService.createShipment(TenantContext.getTenantIdAsObject(), clientId,
-                req.referenceNumber(), req.expectedDate(), lines, req.notes());
+                req.referenceNumber(), req.expectedDate(), lines, req.notes(), warehouseId);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Shipment created", toResponse(shipment)));
     }
 

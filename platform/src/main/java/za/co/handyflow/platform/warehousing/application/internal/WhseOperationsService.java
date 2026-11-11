@@ -69,7 +69,7 @@ public class WhseOperationsService {
 
     public Summary summary(TenantId tenantId) { return summary(tenantId, null); }
 
-    /** warehouseId, when given, limits the stock figures and today's movements to that warehouse. Order and shipment counts are not held per warehouse and stay tenant-wide. */
+    /** warehouseId, when given, limits the stock figures, today's movements and the order and shipment counts to that warehouse. */
     @Transactional(readOnly = true)
     public Summary summary(TenantId tenantId, UUID warehouseId) {
         UUID t = tenantId.getValue();
@@ -86,16 +86,16 @@ public class WhseOperationsService {
         long positions = byStatus.stream().mapToLong(StatusStock::positions).sum();
 
         long clients = count("SELECT count(*) FROM whse_clients WHERE tenant_id = ? AND deleted_at IS NULL AND status = 'ACTIVE'", t);
-        Map<String, Long> inbound = statusCounts("SELECT status, count(*) AS n FROM whse_inbound_shipments WHERE tenant_id = ? AND status IN ('EXPECTED','PARTIALLY_RECEIVED') GROUP BY status", t);
-        Map<String, Long> outbound = statusCounts("SELECT status, count(*) AS n FROM whse_outbound_orders WHERE tenant_id = ? AND status IN ('PENDING','PICKING','PACKED') GROUP BY status", t);
-        long overdueIn = count("SELECT count(*) FROM whse_inbound_shipments WHERE tenant_id = ? AND status IN ('EXPECTED','PARTIALLY_RECEIVED') AND expected_date < ?", t, java.sql.Date.valueOf(today));
-        long overdueOut = count("SELECT count(*) FROM whse_outbound_orders WHERE tenant_id = ? AND status IN ('PENDING','PICKING','PACKED') AND requested_ship_date < ?", t, java.sql.Date.valueOf(today));
+        Map<String, Long> inbound = statusCounts("SELECT status, count(*) AS n FROM whse_inbound_shipments WHERE tenant_id = ? AND status IN ('EXPECTED','PARTIALLY_RECEIVED') AND (?::uuid IS NULL OR warehouse_id = ?::uuid) GROUP BY status", t, warehouseId, warehouseId);
+        Map<String, Long> outbound = statusCounts("SELECT status, count(*) AS n FROM whse_outbound_orders WHERE tenant_id = ? AND status IN ('PENDING','PICKING','PACKED') AND (?::uuid IS NULL OR warehouse_id = ?::uuid) GROUP BY status", t, warehouseId, warehouseId);
+        long overdueIn = count("SELECT count(*) FROM whse_inbound_shipments WHERE tenant_id = ? AND status IN ('EXPECTED','PARTIALLY_RECEIVED') AND expected_date < ? AND (?::uuid IS NULL OR warehouse_id = ?::uuid)", t, java.sql.Date.valueOf(today), warehouseId, warehouseId);
+        long overdueOut = count("SELECT count(*) FROM whse_outbound_orders WHERE tenant_id = ? AND status IN ('PENDING','PICKING','PACKED') AND requested_ship_date < ? AND (?::uuid IS NULL OR warehouse_id = ?::uuid)", t, java.sql.Date.valueOf(today), warehouseId, warehouseId);
 
         TodayActivity activity = jdbc.queryForObject(SQL_TODAY,
                 (rs, i) -> new TodayActivity(rs.getBigDecimal("received"), rs.getBigDecimal("dispatched"), 0, 0, rs.getLong("adjustments")),
                 t, from, to, warehouseId, warehouseId);
-        long receivedToday = count("SELECT count(*) FROM whse_inbound_shipments WHERE tenant_id = ? AND received_date = ?", t, java.sql.Date.valueOf(today));
-        long shippedToday = count("SELECT count(*) FROM whse_outbound_orders WHERE tenant_id = ? AND shipped_date = ?", t, java.sql.Date.valueOf(today));
+        long receivedToday = count("SELECT count(*) FROM whse_inbound_shipments WHERE tenant_id = ? AND received_date = ? AND (?::uuid IS NULL OR warehouse_id = ?::uuid)", t, java.sql.Date.valueOf(today), warehouseId, warehouseId);
+        long shippedToday = count("SELECT count(*) FROM whse_outbound_orders WHERE tenant_id = ? AND shipped_date = ? AND (?::uuid IS NULL OR warehouse_id = ?::uuid)", t, java.sql.Date.valueOf(today), warehouseId, warehouseId);
         activity = new TodayActivity(activity.unitsReceived(), activity.unitsDispatched(), receivedToday, shippedToday, activity.adjustments());
 
         long adjPending = count("SELECT count(*) FROM whse_adjustment_requests WHERE tenant_id = ? AND status = 'PENDING'", t);
@@ -199,12 +199,15 @@ public class WhseOperationsService {
 
     /** What is reserved right now, per order and position: allocations less what was released or picked. */
     @Transactional(readOnly = true)
-    public List<ReservationRow> reservations(TenantId tenantId, UUID clientId) {
+    public List<ReservationRow> reservations(TenantId tenantId, UUID clientId) { return reservations(tenantId, clientId, null); }
+
+    @Transactional(readOnly = true)
+    public List<ReservationRow> reservations(TenantId tenantId, UUID clientId, UUID warehouseId) {
         return jdbc.query(SQL_RESERVATIONS,
                 (rs, i) -> new ReservationRow(rs.getString("reference_type"), rs.getObject("reference_id", UUID.class), rs.getString("reference_number"),
                         rs.getObject("client_id", UUID.class), rs.getString("client_name"), rs.getObject("item_id", UUID.class), rs.getString("sku"),
                         rs.getString("location_code"), rs.getBigDecimal("reserved")),
-                tenantId.getValue(), clientId, clientId);
+                tenantId.getValue(), clientId, clientId, warehouseId, warehouseId);
     }
 
     /** Items below their minimum or above their maximum. Available means on hand in AVAILABLE status less what is allocated. */
@@ -341,6 +344,7 @@ public class WhseOperationsService {
               JOIN whse_items it ON it.id = e.item_id AND it.tenant_id = e.tenant_id
               JOIN whse_locations l ON l.id = e.location_id AND l.tenant_id = e.tenant_id
              WHERE e.tenant_id = ? AND (?::uuid IS NULL OR e.client_id = ?::uuid)
+               AND (?::uuid IS NULL OR e.location_id IN (SELECT id FROM whse_locations WHERE warehouse_id = ?::uuid))
              GROUP BY e.reference_type, e.reference_id, e.reference_number, e.client_id, c.trading_name, e.item_id, it.sku, l.code
             HAVING sum(CASE WHEN e.event_type = 'ALLOCATE' THEN e.qty ELSE -e.qty END) > 0
              ORDER BY e.reference_number NULLS LAST, it.sku""";
