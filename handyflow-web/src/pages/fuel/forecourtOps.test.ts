@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { validatePump, validateOpen, validateClose, pumpTotals, expectedTotals, takings, needsReason, varianceText, type CloseRow } from "./forecourtOps"
+import { validatePump, validateOpen, validateClose, pumpTotals, expectedTotals, takings, needsReason, varianceText, validateAdjustment, pendingAdjustments, approvedAdjustmentTotal, canDecideAdjustment, canWithdrawAdjustment, awaitingReview, type CloseRow, type ShiftAdjustment, type Shift } from "./forecourtOps"
 
 const row = (o: Partial<CloseRow> = {}): CloseRow => ({ pumpId: "p1", name: "Pump 1", opening: 1000, price: 20, closing: "1210", test: "10", ...o })
 
@@ -41,5 +41,41 @@ describe("forecourtOps", () => {
     expect(validateClose([row()], ok, "")).toBeNull()
     expect(validateClose([row()], { ...ok, cash: "3000" }, "")).toMatch(/Give a reason/)
     expect(validateClose([row()], { ...ok, cash: "3000" }, "Drive-off reported")).toBeNull()
+  })
+
+  it("fleet-card takings count, and the company tolerance replaces R5", () => {
+    expect(takings("1000", "", "", "", "500")).toBe(1500)
+    expect(needsReason(-20)).toBe(true)
+    expect(needsReason(-20, 50)).toBe(false)
+    expect(needsReason(-50, 50)).toBe(false)
+    const ok = { cash: "3980", card: "0", account: "0", other: "0" }
+    expect(validateClose([row()], ok, "")).toMatch(/Give a reason/)
+    expect(validateClose([row()], ok, "", { tolerance: 50 })).toBeNull()
+    expect(validateClose([row()], { ...ok, cash: "2000", fleetCard: "2000" }, "")).toBeNull()
+  })
+  it("approved adjustments lower what the shift is expected to hold", () => {
+    expect(validateClose([row()], { cash: "3900", card: "0", account: "0", other: "0" }, "", { adjustments: 100 })).toBeNull()
+    expect(validateClose([row()], { cash: "3900", card: "0", account: "0", other: "0" }, "")).toMatch(/Give a reason/)
+  })
+  const adj = (o: Partial<ShiftAdjustment> = {}): ShiftAdjustment => ({ id: "a1", shiftId: "s1", kind: "REFUND", amount: 50, reason: "Overfill", status: "PENDING", recordedBy: "alice", recordedAt: "2026-11-11T08:00:00Z", ...o })
+  it("validates a refund, void or discount", () => {
+    expect(validateAdjustment("", "Overfill")).toMatch(/above R 0/)
+    expect(validateAdjustment("0", "Overfill")).toMatch(/above R 0/)
+    expect(validateAdjustment("50", "no")).toMatch(/5 characters/)
+    expect(validateAdjustment("50", "Overfill")).toBeNull()
+  })
+  it("counts pending and approved entries; four-eyes in the UI", () => {
+    const l = [adj(), adj({ id: "a2", status: "APPROVED", amount: 25.5 }), adj({ id: "a3", status: "APPROVED", amount: 10 }), adj({ id: "a4", status: "REJECTED" })]
+    expect(pendingAdjustments(l)).toBe(1)
+    expect(approvedAdjustmentTotal(l)).toBe(35.5)
+    expect(canDecideAdjustment(adj(), "bob")).toBe(true)
+    expect(canDecideAdjustment(adj(), "alice")).toBe(false)
+    expect(canDecideAdjustment(adj({ status: "APPROVED" }), "bob")).toBe(false)
+    expect(canWithdrawAdjustment(adj(), "alice")).toBe(true)
+    expect(canWithdrawAdjustment(adj(), "bob")).toBe(false)
+  })
+  it("counts closed shifts waiting for review", () => {
+    const sh = (o: Partial<Shift>) => ({ status: "CLOSED", reviewStatus: "NONE", ...o }) as Shift
+    expect(awaitingReview([sh({ reviewStatus: "PENDING_REVIEW" }), sh({}), sh({ status: "REVERSED", reviewStatus: "PENDING_REVIEW" })])).toBe(1)
   })
 })

@@ -68,7 +68,7 @@ describe("SettingsTab", () => {
     fireEvent.change(box, { target: { value: "" } })
     fireEvent.click(screen.getByLabelText(/New suppliers must be approved/))
     fireEvent.click(screen.getByText("Save controls"))
-    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/settings/controls", { requireSupplierApproval: true, adjustmentThresholdLitres: null, varianceTolerancePct: null }))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/settings/controls", { requireSupplierApproval: true, adjustmentThresholdLitres: null, varianceTolerancePct: null, cashVarianceTolerance: 5, requireSeparateCloser: false }))
   })
 
   it("rejects a zero threshold before calling the server", async () => {
@@ -78,6 +78,28 @@ describe("SettingsTab", () => {
     fireEvent.change(await screen.findByLabelText("Stock adjustments needing a second person (litres)"), { target: { value: "0" } })
     fireEvent.click(screen.getByText("Save controls"))
     expect((await screen.findAllByRole("alert")).some(a => /above 0/.test(a.textContent ?? ""))).toBe(true)
+    expect(put).not.toHaveBeenCalledWith("/api/v1/fuel/settings/controls", expect.anything())
+  })
+
+  it("cash tolerance and the separate-closer rule load, edit and save", async () => {
+    perms = ["FUEL_MANAGE", "FUEL_CONFIGURATION_MANAGE"]
+    get.mockImplementation(async (u: string) => u.includes("/controls") ? { data: { data: { requireSupplierApproval: false, adjustmentThresholdLitres: null, cashVarianceTolerance: 20, requireSeparateCloser: false } } } : { data: { data: saved } })
+    mount()
+    const box = (await screen.findByLabelText("Forecourt cash tolerance (R)")) as HTMLInputElement
+    expect(box.value).toBe("20")
+    fireEvent.change(box, { target: { value: "10" } })
+    fireEvent.click(screen.getByLabelText(/cannot be the person who closes/))
+    fireEvent.click(screen.getByText("Save controls"))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/settings/controls", expect.objectContaining({ cashVarianceTolerance: 10, requireSeparateCloser: true })))
+  })
+
+  it("refuses a blank cash tolerance before calling the server", async () => {
+    perms = ["FUEL_MANAGE", "FUEL_CONFIGURATION_MANAGE"]
+    get.mockImplementation(async (u: string) => u.includes("/controls") ? { data: { data: { requireSupplierApproval: false, adjustmentThresholdLitres: null, cashVarianceTolerance: 5 } } } : { data: { data: saved } })
+    mount()
+    fireEvent.change(await screen.findByLabelText("Forecourt cash tolerance (R)"), { target: { value: "" } })
+    fireEvent.click(screen.getByText("Save controls"))
+    expect((await screen.findAllByRole("alert")).some(a => /cash tolerance/.test(a.textContent ?? ""))).toBe(true)
     expect(put).not.toHaveBeenCalledWith("/api/v1/fuel/settings/controls", expect.anything())
   })
 })

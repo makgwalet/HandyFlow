@@ -11,6 +11,12 @@ export interface Shift {
   id: string; shiftNumber: string; attendantName: string; status: "OPEN" | "CLOSED" | "REVERSED"; openedAt: string; closedAt: string | null
   cash: number | null; card: number | null; account: number | null; other: number | null; expected: number | null; litresSold: number | null
   variance: number | null; varianceReason: string | null; notes: string | null; reverseReason: string | null; readings: ShiftReading[]
+  fleetCard?: number | null; adjustments?: number | null; tolerance?: number | null
+  reviewStatus?: "NONE" | "PENDING_REVIEW" | "REVIEWED"; reviewNote?: string | null; reviewedAt?: string | null
+}
+export interface ShiftAdjustment {
+  id: string; shiftId: string; kind: "REFUND" | "VOID" | "DISCOUNT"; amount: number; reason: string; status: "PENDING" | "APPROVED" | "REJECTED" | "WITHDRAWN"
+  recordedBy: string | null; recordedAt: string; decidedBy?: string | null; decidedAt?: string | null; decisionNote?: string | null
 }
 export interface ForecourtSummary {
   days: number; shifts: number; litres: number; sales: number; variance: number; flaggedShifts: number; byFuel: { fuelType: string; litres: number; sales: number }[]
@@ -56,10 +62,11 @@ export function expectedTotals(rows: CloseRow[]): { litres: number; value: numbe
   return rows.reduce((a, r) => { const t = pumpTotals(r); return t ? { litres: round2(a.litres + t.litres), value: round2(a.value + t.value) } : a }, { litres: 0, value: 0 })
 }
 
-export const takings = (cash: string, card: string, account: string, other: string) =>
-  round2([cash, card, account, other].reduce((a, s) => a + (s.trim() === "" ? 0 : Number(s) || 0), 0))
+export const takings = (cash: string, card: string, account: string, other: string, fleetCard = "") =>
+  round2([cash, card, account, other, fleetCard].reduce((a, s) => a + (s.trim() === "" ? 0 : Number(s) || 0), 0))
 
-export const needsReason = (variance: number) => Math.abs(variance) > VARIANCE_TOLERANCE
+/** tolerance defaults to the original R5.00; callers pass the company's own figure. */
+export const needsReason = (variance: number, tolerance: number = VARIANCE_TOLERANCE) => Math.abs(variance) > tolerance
 
 export function varianceText(v: number | null | undefined): string {
   if (v == null) return "–"
@@ -67,7 +74,8 @@ export function varianceText(v: number | null | undefined): string {
   return v < 0 ? `${fmtR(Math.abs(v))} short` : `${fmtR(v)} over`
 }
 
-export function validateClose(rows: CloseRow[], amounts: { cash: string; card: string; account: string; other: string }, reason: string): string | null {
+export function validateClose(rows: CloseRow[], amounts: { cash: string; card: string; account: string; other: string; fleetCard?: string }, reason: string,
+  opts: { tolerance?: number; adjustments?: number } = {}): string | null {
   for (const r of rows) {
     const c = num(r.closing)
     if (Number.isNaN(c)) return `Enter the closing meter for ${r.name}.`
@@ -77,9 +85,25 @@ export function validateClose(rows: CloseRow[], amounts: { cash: string; card: s
     if (t > c - r.opening) return `Test litres for ${r.name} are more than the meter moved.`
   }
   for (const [k, v] of Object.entries(amounts)) {
-    if (v.trim() !== "" && (Number.isNaN(Number(v)) || Number(v) < 0)) return `${k.charAt(0).toUpperCase() + k.slice(1)} must be zero or more.`
+    if (v !== undefined && v.trim() !== "" && (Number.isNaN(Number(v)) || Number(v) < 0)) return `${k.charAt(0).toUpperCase() + k.slice(1)} must be zero or more.`
   }
-  const variance = round2(takings(amounts.cash, amounts.card, amounts.account, amounts.other) - expectedTotals(rows).value)
-  if (needsReason(variance) && reason.trim().length < 5) return `The takings are ${varianceText(variance)}. Give a reason (at least 5 characters) to close the shift.`
+  const variance = round2(takings(amounts.cash, amounts.card, amounts.account, amounts.other, amounts.fleetCard ?? "") - (expectedTotals(rows).value - (opts.adjustments ?? 0)))
+  if (needsReason(variance, opts.tolerance) && reason.trim().length < 5) return `The takings are ${varianceText(variance)}. Give a reason (at least 5 characters) to close the shift.`
   return null
 }
+
+export const ADJ_LABEL: Record<string, string> = { REFUND: "Refund", VOID: "Void", DISCOUNT: "Discount" }
+export const ADJ_STATUS_LABEL: Record<string, string> = { PENDING: "Waiting for a supervisor", APPROVED: "Approved", REJECTED: "Rejected", WITHDRAWN: "Withdrawn" }
+
+export function validateAdjustment(amount: string, reason: string): string | null {
+  const a = num(amount)
+  if (Number.isNaN(a) || a <= 0) return "Enter an amount above R 0."
+  if (reason.trim().length < 5) return "Give a reason of at least 5 characters."
+  return null
+}
+export const pendingAdjustments = (l: ShiftAdjustment[] | undefined) => (l ?? []).filter(a => a.status === "PENDING").length
+export const approvedAdjustmentTotal = (l: ShiftAdjustment[] | undefined) => round2((l ?? []).filter(a => a.status === "APPROVED").reduce((t, a) => t + a.amount, 0))
+/** A supervisor may decide an entry only if they did not record it. */
+export const canDecideAdjustment = (a: ShiftAdjustment, me: string | undefined) => a.status === "PENDING" && !!me && a.recordedBy !== me
+export const canWithdrawAdjustment = (a: ShiftAdjustment, me: string | undefined) => a.status === "PENDING" && !!me && a.recordedBy === me
+export const awaitingReview = (l: Shift[] | undefined) => (l ?? []).filter(s => s.status === "CLOSED" && s.reviewStatus === "PENDING_REVIEW").length

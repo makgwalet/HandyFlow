@@ -4,9 +4,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
+import ShiftAdjustmentsPanel from "./ShiftAdjustmentsPanel"
+import type { Controls } from "./wholesaleOps"
 import {
-  fmtL, fmtR, validatePump, validateOpen, validateClose, expectedTotals, takings, needsReason, varianceText, pumpTotals,
-  type Pump, type Shift, type ForecourtSummary, type CloseRow,
+  fmtL, fmtR, validatePump, validateOpen, validateClose, expectedTotals, takings, needsReason, varianceText, pumpTotals, awaitingReview,
+  approvedAdjustmentTotal, pendingAdjustments, VARIANCE_TOLERANCE,
+  type Pump, type Shift, type ShiftAdjustment, type ForecourtSummary, type CloseRow,
 } from "./forecourtOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -15,7 +18,7 @@ const th: React.CSSProperties = { textAlign: "left", padding: "10px 12px", fontS
 const td: React.CSSProperties = { padding: "10px 12px", fontSize: 13, color: "var(--hf-text)" }
 const BASE = "/api/v1/fuel/forecourt"
 
-type Dialog = { kind: "open" } | { kind: "close"; shift: Shift } | { kind: "reverse"; shift: Shift } | { kind: "pump"; pump?: Pump } | null
+type Dialog = { kind: "open" } | { kind: "review"; shift: Shift } | { kind: "close"; shift: Shift } | { kind: "reverse"; shift: Shift } | { kind: "pump"; pump?: Pump } | null
 
 function Err({ text }: { text: string }) { return <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12.5, margin: "10px 0 0" }}>{text}</p> }
 
@@ -27,6 +30,7 @@ const statusChip = (s: Shift["status"]) =>
 export default function ForecourtTab() {
   const canRun = usePermissions(["FUEL_FORECOURT", "FUEL_MANAGE"])
   const canManage = usePermissions(["FUEL_MANAGE"])
+  const canSupervise = usePermissions(["FUEL_SHIFT_SUPERVISE"])
   const qc = useQueryClient()
   const [dialog, setDialog] = useState<Dialog>(null)
   const [open, setOpen] = useState<string | null>(null)
@@ -55,6 +59,7 @@ export default function ForecourtTab() {
           <Stat label="Sales (by meters)" value={fmtR(s.sales)} />
           <Stat label="Net takings variance" value={varianceText(s.variance)} warn={Math.abs(s.variance) > 5} />
           <Stat label="Shifts needing a look" value={String(s.flaggedShifts)} warn={s.flaggedShifts > 0} />
+          <Stat label="Awaiting supervisor review" value={String(awaitingReview(list))} warn={awaitingReview(list) > 0} />
         </div>
       )}
 
@@ -81,11 +86,12 @@ export default function ForecourtTab() {
                       <td style={td}>{new Date(sh.openedAt).toLocaleString("en-ZA", { dateStyle: "short", timeStyle: "short" })}</td>
                       <td style={td}>{fmtL(sh.litresSold)}</td>
                       <td style={td}>{fmtR(sh.expected)}</td>
-                      <td style={{ ...td, color: sh.variance != null && needsReason(sh.variance) ? "var(--hf-danger-text)" : undefined }}>{sh.status === "CLOSED" ? varianceText(sh.variance) : "–"}</td>
+                      <td style={{ ...td, color: sh.variance != null && needsReason(sh.variance, sh.tolerance ?? VARIANCE_TOLERANCE) ? "var(--hf-danger-text)" : undefined }}>{sh.status === "CLOSED" ? varianceText(sh.variance) : "–"}{sh.status === "CLOSED" && sh.reviewStatus === "PENDING_REVIEW" && <> <Chip bg="var(--hf-warning-soft)" fg="var(--hf-warning-text)">Needs review</Chip></>}{sh.status === "CLOSED" && sh.reviewStatus === "REVIEWED" && <> <Chip bg="var(--hf-success-soft-strong)" fg="var(--hf-success-text-strong)">Reviewed</Chip></>}</td>
                       <td style={td}>{statusChip(sh.status)}</td>
                       <td style={td}>
                         <span style={{ display: "flex", gap: 6 }}>
                           {sh.status === "OPEN" && canRun && <button style={btnGhost} onClick={() => setDialog({ kind: "close", shift: sh })}>Close shift</button>}
+                          {sh.status === "CLOSED" && sh.reviewStatus === "PENDING_REVIEW" && canSupervise && <button style={btnGhost} onClick={() => setDialog({ kind: "review", shift: sh })}>Review</button>}
                           {sh.status === "CLOSED" && canManage && <button style={btnGhost} onClick={() => setDialog({ kind: "reverse", shift: sh })}>Reverse</button>}
                         </span>
                       </td>
@@ -104,10 +110,12 @@ export default function ForecourtTab() {
                         </table>
                         {sh.status !== "OPEN" && (
                           <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: "8px 0 0" }}>
-                            Cash {fmtR(sh.cash)} · Card {fmtR(sh.card)} · Account {fmtR(sh.account)} · Other {fmtR(sh.other)}
-                            {sh.varianceReason ? ` · Reason: ${sh.varianceReason}` : ""}{sh.reverseReason ? ` · Reversed: ${sh.reverseReason}` : ""}
+                            Cash {fmtR(sh.cash)} · Card {fmtR(sh.card)} · Fleet card {fmtR(sh.fleetCard ?? 0)} · Account {fmtR(sh.account)} · Other {fmtR(sh.other)}
+                            {sh.adjustments ? ` · Approved refunds, voids and discounts ${fmtR(sh.adjustments)}` : ""}
+                            {sh.varianceReason ? ` · Reason: ${sh.varianceReason}` : ""}{sh.reviewNote ? ` · Review: ${sh.reviewNote}` : ""}{sh.reverseReason ? ` · Reversed: ${sh.reverseReason}` : ""}
                           </p>
                         )}
+                        <ShiftAdjustmentsPanel shiftId={sh.id} open={sh.status === "OPEN"} />
                       </td></tr>
                     )}
                   </Fragment>
@@ -144,6 +152,7 @@ export default function ForecourtTab() {
 
       {dialog?.kind === "open" && <OpenDialog pumps={pumpList} onDone={refresh} onClose={() => setDialog(null)} />}
       {dialog?.kind === "close" && <CloseDialog shift={dialog.shift} onDone={refresh} onClose={() => setDialog(null)} />}
+      {dialog?.kind === "review" && <ReviewDialog shift={dialog.shift} onDone={refresh} onClose={() => setDialog(null)} />}
       {dialog?.kind === "reverse" && <ReverseDialog shift={dialog.shift} onDone={refresh} onClose={() => setDialog(null)} />}
       {dialog?.kind === "pump" && <PumpDialog pump={dialog.pump} onDone={refresh} onClose={() => setDialog(null)} />}
     </div>
@@ -202,15 +211,20 @@ function OpenDialog({ pumps, onDone, onClose }: { pumps: Pump[]; onDone: () => v
 function CloseDialog({ shift, onDone, onClose }: { shift: Shift; onDone: () => void; onClose: () => void }) {
   const [closing, setClosing] = useState<Record<string, string>>({})
   const [test, setTest] = useState<Record<string, string>>({})
-  const [amt, setAmt] = useState({ cash: "", card: "", account: "", other: "" })
+  const [amt, setAmt] = useState({ cash: "", card: "", fleetCard: "", account: "", other: "" })
+  const controls = useQuery<Controls>({ queryKey: ["fuel-settings-controls"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/settings/controls")) })
+  const adj = useQuery<ShiftAdjustment[]>({ queryKey: ["fuel-shift-adjustments", shift.id], queryFn: async () => unwrap(await apiClient.get(`${BASE}/shifts/${shift.id}/adjustments`)) })
+  const tol = typeof controls.data?.cashVarianceTolerance === "number" ? controls.data.cashVarianceTolerance : VARIANCE_TOLERANCE
+  const adjList = Array.isArray(adj.data) ? adj.data : []
+  const approvedAdj = approvedAdjustmentTotal(adjList); const pendingAdj = pendingAdjustments(adjList)
   const [reason, setReason] = useState("")
   const [err, setErr] = useState("")
   const rows: CloseRow[] = shift.readings.map(r => ({ pumpId: r.pumpId, name: r.pumpName, opening: r.openingMeter, price: r.pricePerLitre, closing: closing[r.pumpId] ?? "", test: test[r.pumpId] ?? "" }))
   const exp = expectedTotals(rows)
-  const variance = Math.round((takings(amt.cash, amt.card, amt.account, amt.other) - exp.value) * 100) / 100
+  const variance = Math.round((takings(amt.cash, amt.card, amt.account, amt.other, amt.fleetCard) - (exp.value - approvedAdj)) * 100) / 100
   const save = useMutation({
     mutationFn: () => apiClient.post(`${BASE}/shifts/${shift.id}/close`, {
-      cash: Number(amt.cash || 0), card: Number(amt.card || 0), account: Number(amt.account || 0), other: Number(amt.other || 0), varianceReason: reason.trim() || null,
+      cash: Number(amt.cash || 0), card: Number(amt.card || 0), fleetCard: Number(amt.fleetCard || 0), account: Number(amt.account || 0), other: Number(amt.other || 0), varianceReason: reason.trim() || null,
       readings: rows.map(r => ({ pumpId: r.pumpId, closingMeter: Number(r.closing), testLitres: r.test.trim() === "" ? 0 : Number(r.test) })),
     }),
     onSuccess: () => { onDone(); onClose() }, onError: (e: any) => setErr(msg(e, "Could not close the shift")),
@@ -234,18 +248,40 @@ function CloseDialog({ shift, onDone, onClose }: { shift: Shift; onDone: () => v
       })}
       <p style={{ fontSize: 13, fontWeight: 700, margin: "10px 0 6px" }}>Meters say: {fmtL(exp.litres)} = {fmtR(exp.value)}</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
-        {field("cash", "Cash")}{field("card", "Card")}{field("account", "Account")}{field("other", "Other")}
+        {field("cash", "Cash")}{field("card", "Card")}{field("fleetCard", "Fleet card")}{field("account", "Account")}{field("other", "Other")}
       </div>
-      <p data-testid="variance" style={{ fontSize: 13, margin: "10px 0 0", color: needsReason(variance) ? "var(--hf-danger-text)" : "var(--hf-text)" }}>
-        Takings {fmtR(takings(amt.cash, amt.card, amt.account, amt.other))} · {varianceText(variance)}
+      {approvedAdj > 0 && <p style={{ fontSize: 12.5, margin: "8px 0 0", color: "var(--hf-text-muted)" }}>Approved refunds, voids and discounts of {fmtR(approvedAdj)} are taken off what is expected.</p>}
+      {pendingAdj > 0 && <p role="alert" style={{ fontSize: 12.5, margin: "8px 0 0", color: "var(--hf-warning-text)" }}>{pendingAdj} refund, void or discount {pendingAdj === 1 ? "is" : "entries are"} still waiting for a supervisor. The shift cannot be closed until {pendingAdj === 1 ? "it is" : "they are"} decided or withdrawn.</p>}
+      <p data-testid="variance" style={{ fontSize: 13, margin: "10px 0 0", color: needsReason(variance, tol) ? "var(--hf-danger-text)" : "var(--hf-text)" }}>
+        Takings {fmtR(takings(amt.cash, amt.card, amt.account, amt.other, amt.fleetCard))} · {varianceText(variance)}
       </p>
-      {needsReason(variance) && (
+      {needsReason(variance, tol) && (
         <div><label style={labelStyle}>Reason for the difference *</label><input aria-label="Reason" style={inputStyle} value={reason} onChange={e => setReason(e.target.value)} /></div>
       )}
       {err && <Err text={err} />}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
         <button style={btnGhost} onClick={onClose}>Cancel</button>
-        <button style={btnPrimary} disabled={save.isPending} onClick={() => { const v = validateClose(rows, amt, reason); if (v) return setErr(v); setErr(""); save.mutate() }}>Close shift</button>
+        <button style={btnPrimary} disabled={save.isPending} onClick={() => { const v = validateClose(rows, amt, reason, { tolerance: tol, adjustments: approvedAdj }); if (v) return setErr(v); setErr(""); save.mutate() }}>Close shift</button>
+      </div>
+    </Modal>
+  )
+}
+
+function ReviewDialog({ shift, onDone, onClose }: { shift: Shift; onDone: () => void; onClose: () => void }) {
+  const [note, setNote] = useState(""); const [err, setErr] = useState("")
+  const save = useMutation({
+    mutationFn: () => apiClient.post(`${BASE}/shifts/${shift.id}/review`, { reason: note.trim() }),
+    onSuccess: () => { onDone(); onClose() }, onError: (e: any) => setErr(msg(e, "Could not save the review")),
+  })
+  return (
+    <Modal title={`Review ${shift.shiftNumber}`} onClose={onClose}>
+      <p style={{ fontSize: 13, color: "var(--hf-text-muted)", marginTop: 0 }}>The takings were {varianceText(shift.variance)}. Reason given: {shift.varianceReason ?? "none"}. Reviewing records that a supervisor looked into it. It does not change the takings, stock or any account, and it cannot be done by the person who closed the shift.</p>
+      <label style={labelStyle}>Review note *</label>
+      <input aria-label="Review note" value={note} onChange={e => setNote(e.target.value)} style={inputStyle} />
+      {err && <Err text={err} />}
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
+        <button style={btnGhost} onClick={onClose}>Cancel</button>
+        <button style={btnPrimary} disabled={save.isPending} onClick={() => { if (note.trim().length < 5) return setErr("Give a review note of at least 5 characters."); setErr(""); save.mutate() }}>Mark reviewed</button>
       </div>
     </Modal>
   )

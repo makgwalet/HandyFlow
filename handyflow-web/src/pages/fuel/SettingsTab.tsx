@@ -45,6 +45,13 @@ function ControlsCard() {
       <label style={labelStyle} htmlFor="fs-varTol">Load variance tolerance (%)</label>
       <input id="fs-varTol" inputMode="decimal" style={{ ...inputStyle, maxWidth: 240 }} value={f.variance} disabled={!canConfigure} placeholder="Not set" onChange={e => { setSaved(false); setF(s => s && ({ ...s, variance: e.target.value })) }} />
       <div style={{ fontSize: 11, color: "var(--hf-text-muted)", margin: "3px 0 10px" }}>A delivery whose litres delivered differ from litres loaded by more than this percentage is raised on the Load variances page for review. Leave empty and no variances are raised. There is no default: set the figure your own rules require.</div>
+      <label style={labelStyle} htmlFor="fs-cashTol">Forecourt cash tolerance (R)</label>
+      <input id="fs-cashTol" inputMode="decimal" style={{ ...inputStyle, maxWidth: 240 }} value={f.cashTol} disabled={!canConfigure} onChange={e => { setSaved(false); setF(s => s && ({ ...s, cashTol: e.target.value })) }} />
+      <div style={{ fontSize: 11, color: "var(--hf-text-muted)", margin: "3px 0 10px" }}>A shift whose takings are short or over by more than this needs a reason to close and is held for a supervisor's review. It starts at R 5.00, which is what the system used before this was configurable.</div>
+      <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, marginBottom: 12 }}>
+        <input type="checkbox" checked={f.separateCloser} disabled={!canConfigure} onChange={e => { setSaved(false); setF(s => s && ({ ...s, separateCloser: e.target.checked })) }} />
+        The person who opens a shift cannot be the person who closes it
+      </label>
       {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12 }}>{err}</p>}
       {saved && <p role="status" style={{ color: "var(--hf-success-text-strong)", fontSize: 12 }}>Saved.</p>}
       {canConfigure
