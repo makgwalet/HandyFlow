@@ -70,6 +70,9 @@ public class FuelService {
     // FIX: backlog 5.3 — submits dispatches for post-hoc review.
     private final ApprovalFacade approvalFacade;
     private final za.co.handyflow.platform.crm.CrmFacade crmFacade;
+    private final FuelStockLedger ledger;
+    private final FuelCustomerAccountRepository accountRepository;
+    private final FuelCustomerSiteRepository siteRepository;
 
     @Value("${fuel.forecast.lookback-days:30}")
     private int forecastLookbackDays = 30;
@@ -387,6 +390,8 @@ public class FuelService {
                 req.receivedAt(), req.deliveryNote(), req.invoiceRef(),
                 levelBefore, levelAfter);
         receiptRepository.save(receipt);
+        ledger.post(tank, FuelStockMovement.Type.RECEIPT, req.litresReceived(), "RECEIPT", receipt.getId(),
+                req.deliveryNote() != null ? "Delivery note " + req.deliveryNote() : null);
 
         log.info("Fuel received tank={} litres={} supplier={}",
                 tank.getName(), req.litresReceived(), req.supplierId());
@@ -432,6 +437,8 @@ public class FuelService {
         var levelBefore = tank.getCurrentLitres();
         boolean wasLow = tank.isLow();
 
+        // Never silently take fuel reserved for someone else.
+        ledger.requireUnreserved(tank, req.litresDispensed(), java.math.BigDecimal.ZERO);
         // removeStock validates sufficient fuel — throws if insufficient
         var levelAfter = tank.removeStock(req.litresDispensed());
         tankRepository.save(tank);
@@ -446,6 +453,8 @@ public class FuelService {
         // FuelDispatch.recordCostSnapshot()'s own comment.
         dispatch.recordCostSnapshot(tank.getCostPerLitreWac());
         dispatchRepository.save(dispatch);
+        ledger.post(tank, FuelStockMovement.Type.DISPATCH, req.litresDispensed().negate(), "DISPATCH", dispatch.getId(),
+                req.recipientName());
 
         // FIX: backlog 5.1 — only when the dispatch actually went to a
         // vehicle. Dispatches to assets (req.assetId()) or external
@@ -585,10 +594,24 @@ public class FuelService {
                                              CreateDeliveryRequest req) {
         findActiveTank(tenantId, req.tankId());
         requireCustomer(tenantId, req.customerId());
+        UUID customerId = req.customerId();
+        FuelCustomerSite site = null;
+        if (req.siteId() != null) {
+            site = siteRepository.findActiveById(tenantId, req.siteId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Delivery site", req.siteId().toString()));
+            FuelCustomerAccount siteAccount = accountRepository.findActiveById(tenantId, site.getAccountId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Customer account", site.getAccountId().toString()));
+            if (customerId != null && !customerId.equals(siteAccount.getCrmCustomerId())) {
+                throw new IllegalArgumentException("That delivery site belongs to a different customer.");
+            }
+            customerId = siteAccount.getCrmCustomerId();
+        }
+        requireNotOnCreditHold(tenantId, customerId);
         FuelDelivery delivery = FuelDelivery.create(tenantId, req.tankId(),
-                req.customerId(), req.deliveryAddress(), req.fuelType(),
+                customerId, req.deliveryAddress(), req.fuelType(),
                 req.litresOrdered(), req.pricePerLitre(), req.scheduledAt(),
                 req.driverName(), req.vehicleReg());
+        if (site != null) delivery.assignSite(site.getId());
         deliveryRepository.save(delivery);
         log.info("Delivery scheduled tenant={} litres={} fuelType={}",
                 tenantId, req.litresOrdered(), req.fuelType());
@@ -609,6 +632,18 @@ public class FuelService {
         }
     }
 
+    /** Fuel is not sent to a customer whose account is on credit hold; release the hold first (an authorised act). */
+    private void requireNotOnCreditHold(TenantId tenantId, UUID customerId) {
+        if (customerId == null) return;
+        accountRepository.findByCrmCustomerId(tenantId, customerId)
+                .filter(FuelCustomerAccount::isCreditHold)
+                .ifPresent(a -> {
+                    throw new IllegalStateException("This customer is on credit hold"
+                            + (a.getCreditHoldReason() != null ? " (" + a.getCreditHoldReason() + ")" : "")
+                            + ". Release the hold before sending fuel.");
+                });
+    }
+
     private void requireCustomer(TenantId tenantId, UUID customerId) {
         if (customerId != null && !crmFacade.customerExists(tenantId, customerId)) {
             throw new ResourceNotFoundException("Customer", customerId.toString());
@@ -622,6 +657,7 @@ public class FuelService {
                                              DispatchDeliveryRequest req) {
         FuelDelivery d = deliveryRepository.findActiveByIdForUpdate(tenantId, deliveryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery", deliveryId.toString()));
+        requireNotOnCreditHold(tenantId, d.getCustomerId());
         d.dispatch(req.driverName().trim(), req.vehicleReg().trim());
         deliveryRepository.save(d);
         return toDeliveryResponse(d);
@@ -650,6 +686,7 @@ public class FuelService {
         tankRepository.save(tank);
         d.reverse(actingUserId, req.reason().trim());
         deliveryRepository.save(d);
+        ledger.post(tank, FuelStockMovement.Type.REVERSAL, d.getLitresDelivered(), "DELIVERY", d.getId(), req.reason().trim());
         log.info("Delivery reversed id={} litres={} by={}", deliveryId, d.getLitresDelivered(), actingUserId);
         return toDeliveryResponse(d);
     }
@@ -665,6 +702,7 @@ public class FuelService {
         tankRepository.save(tank);
         d.reverse(actingUserId, req.reason().trim());
         dispatchRepository.save(d);
+        ledger.post(tank, FuelStockMovement.Type.REVERSAL, d.getLitresDispensed(), "DISPATCH", d.getId(), req.reason().trim());
         log.info("Dispatch reversed id={} litres={} by={}", dispatchId, d.getLitresDispensed(), actingUserId);
         return toDispatchResponse(d);
     }
@@ -681,10 +719,12 @@ public class FuelService {
                     + tank.getCurrentLitres() + "L but " + r.getLitresReceived()
                     + "L would be removed. Some of that fuel has already been used.");
         }
+        ledger.requireUnreserved(tank, r.getLitresReceived(), java.math.BigDecimal.ZERO);
         tank.removeStock(r.getLitresReceived());
         tankRepository.save(tank);
         r.reverse(actingUserId, req.reason().trim());
         receiptRepository.save(r);
+        ledger.post(tank, FuelStockMovement.Type.REVERSAL, r.getLitresReceived().negate(), "RECEIPT", r.getId(), req.reason().trim());
         log.info("Receipt reversed id={} litres={} by={}", receiptId, r.getLitresReceived(), actingUserId);
         return toReceiptResponse(r);
     }
@@ -743,7 +783,8 @@ public class FuelService {
                 d.getReceiptNumber(), d.getReceiptGeneratedAt(),
                 d.isSignedOnBehalf(), d.getOnBehalfOf(),
                 d.getCreatedAt(),
-                d.getReversedAt(), d.getReversalReason()
+                d.getReversedAt(), d.getReversalReason(),
+                d.getSiteId()
         );
     }
 
@@ -764,6 +805,9 @@ public class FuelService {
 
         FuelTank tank = findActiveTankForUpdate(tenantId, delivery.getTankId());
         boolean wasLow = tank.isLow();
+        // A delivery may use what it reserved itself, but not what is reserved for others.
+        var ownReservations = ledger.ownReservations(tenantId, tank.getId(), "DELIVERY", delivery.getId());
+        ledger.requireUnreserved(tank, req.litresDelivered(), ledger.total(ownReservations));
         tank.removeStock(req.litresDelivered());
         tankRepository.save(tank);
 
@@ -780,6 +824,9 @@ public class FuelService {
 
         delivery.assignReceiptNumber(receiptNumberGenerator.generate(tenantId));
         deliveryRepository.save(delivery);
+        ledger.post(tank, FuelStockMovement.Type.DELIVERY, req.litresDelivered().negate(), "DELIVERY", delivery.getId(),
+                delivery.getReceiptNumber());
+        ledger.consume(ownReservations);
 
         if (!wasLow && tank.isLow()) {
             notifyLowStock(tenantId, tank);

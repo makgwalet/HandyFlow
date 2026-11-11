@@ -41,6 +41,9 @@ class FuelServiceStage0Test {
     @Mock ReceiptNumberGenerator receiptNumberGenerator;
     @Mock za.co.handyflow.platform.notifications.application.internal.NotificationService notificationService;
     @Mock CrmFacade crmFacade;
+    @Mock FuelStockLedger ledger;
+    @Mock FuelCustomerAccountRepository accountRepository;
+    @Mock FuelCustomerSiteRepository siteRepository;
     @InjectMocks FuelService service;
 
     static final TenantId TENANT = TenantId.of(UUID.randomUUID());

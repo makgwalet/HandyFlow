@@ -40,8 +40,8 @@ class FuelRequestValidationTest {
 
     @Test @DisplayName("schedule delivery: litres must be positive")
     void schedule() {
-        assertFalse(v.validate(new CreateDeliveryRequest(UUID.randomUUID(), null, Map.of(), "DIESEL", bd("0"), bd("22"), Instant.now(), null, null)).isEmpty());
-        assertTrue(v.validate(new CreateDeliveryRequest(UUID.randomUUID(), null, Map.of(), "DIESEL", bd("500"), bd("22"), Instant.now(), null, null)).isEmpty());
+        assertFalse(v.validate(new CreateDeliveryRequest(UUID.randomUUID(), null, Map.of(), "DIESEL", bd("0"), bd("22"), Instant.now(), null, null, null)).isEmpty());
+        assertTrue(v.validate(new CreateDeliveryRequest(UUID.randomUUID(), null, Map.of(), "DIESEL", bd("500"), bd("22"), Instant.now(), null, null, null)).isEmpty());
     }
 
     @Test @DisplayName("tank: capacity must be positive; threshold 0-100")

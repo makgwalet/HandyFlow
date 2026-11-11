@@ -45,6 +45,12 @@ public class FuelTank {
     private BigDecimal costPerLitreWac;
 
     private String location;
+
+    @Column(name = "depot_id")
+    private UUID depotId;
+
+    @Column(name = "safety_stock_litres", nullable = false, precision = 12, scale = 2)
+    private BigDecimal safetyStockLitres = BigDecimal.ZERO;
     private String notes;
 
     private BigDecimal lowThresholdPct;
@@ -141,6 +147,39 @@ public class FuelTank {
         }
         this.currentLitres = newLevel;
         this.updatedAt     = Instant.now();
+        return newLevel;
+    }
+
+    /** Which depot the tank belongs to and how much must be kept back from promises. */
+    public void place(UUID depotId, BigDecimal safetyStockLitres) {
+        if (safetyStockLitres == null || safetyStockLitres.signum() < 0) {
+            throw new IllegalArgumentException("Safety stock cannot be negative.");
+        }
+        if (safetyStockLitres.compareTo(this.capacityLitres) > 0) {
+            throw new IllegalArgumentException("Safety stock cannot exceed the tank capacity (" + capacityLitres + "L).");
+        }
+        this.depotId = depotId;
+        this.safetyStockLitres = safetyStockLitres;
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * Applies a signed correction (stocktake). Unlike dispatch/receipt it never
+     * touches the weighted-average cost. Refuses to go below zero or above capacity.
+     */
+    public BigDecimal adjust(BigDecimal deltaLitres) {
+        if (deltaLitres == null || deltaLitres.signum() == 0) {
+            throw new IllegalArgumentException("An adjustment cannot be zero litres.");
+        }
+        BigDecimal newLevel = this.currentLitres.add(deltaLitres);
+        if (newLevel.signum() < 0) {
+            throw new IllegalArgumentException("Adjustment would take the tank below zero (now " + currentLitres + "L).");
+        }
+        if (newLevel.compareTo(this.capacityLitres) > 0) {
+            throw new IllegalArgumentException("Adjustment would exceed the tank capacity (" + capacityLitres + "L).");
+        }
+        this.currentLitres = newLevel;
+        this.updatedAt = Instant.now();
         return newLevel;
     }
 

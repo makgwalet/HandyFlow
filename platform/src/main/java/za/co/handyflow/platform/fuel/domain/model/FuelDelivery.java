@@ -124,6 +124,9 @@ public class FuelDelivery {
      * doesn't re-alert every day it stays overdue. Mirrors
      * Task.overdueAlertSentAt's role in the Tasks module's scheduler.
      */
+    @Column(name = "site_id")
+    private UUID siteId;
+
     @Column(name = "reversed_at")
     private Instant reversedAt;
 
@@ -207,6 +210,12 @@ public class FuelDelivery {
     }
 
     public boolean isDeleted() { return deletedAt != null; }
+
+    /** The customer delivery site this load is for (validated by the service). */
+    public void assignSite(UUID siteId) { this.siteId = siteId; }
+
+    /** Customer set from the site's account when the request names only the site. */
+    public void assignCustomer(UUID customerId) { this.customerId = customerId; }
 
     private void requireStatus(String action, String... allowed) {
         for (String s : allowed) {

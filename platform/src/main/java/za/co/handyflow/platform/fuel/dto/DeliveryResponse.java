@@ -17,5 +17,6 @@ public record DeliveryResponse(
         String receiptNumber, Instant receiptGeneratedAt,
         boolean signedOnBehalf, String onBehalfOf,
         Instant createdAt,
-        Instant reversedAt, String reversalReason
+        Instant reversedAt, String reversalReason,
+        UUID siteId
 ) {}

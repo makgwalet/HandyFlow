@@ -12,5 +12,6 @@ public record CreateDeliveryRequest(
         @NotNull @Positive(message = "Litres ordered must be greater than zero") BigDecimal litresOrdered,
         @NotNull @PositiveOrZero(message = "Price per litre cannot be negative") BigDecimal pricePerLitre,
         @NotNull Instant scheduledAt,
-        String driverName, String vehicleReg
+        String driverName, String vehicleReg,
+        UUID siteId
 ) {}
