@@ -27,8 +27,8 @@ public class WhseBillingDayController {
     private final FeatureGuard featureGuard;
 
     public record Option(String value, String label) {}
-    public record View(List<WhseBillingDayService.Rule> rules, List<WhseBillingDayService.Holiday> holidays, List<Option> options) {}
-    public record AddRule(UUID clientId, String dayRule, LocalDate effectiveFrom, String note) {}
+    public record View(List<WhseBillingDayService.Rule> rules, List<WhseBillingDayService.Holiday> holidays, List<Option> options, List<Option> minimumBases) {}
+    public record AddRule(UUID clientId, String dayRule, String minimumBasis, LocalDate effectiveFrom, String note) {}
     public record AddHoliday(LocalDate date, String name) {}
 
     private static final String READ = "hasAnyAuthority('WAREHOUSING_READ','WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')";
@@ -39,7 +39,8 @@ public class WhseBillingDayController {
         featureGuard.requireModule("warehousing");
         var t = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(new View(service.rules(t), service.holidays(t),
-                Arrays.stream(WhseBillableDayRules.DayRule.values()).map(r -> new Option(r.name(), r.label)).toList())));
+                Arrays.stream(WhseBillableDayRules.DayRule.values()).map(r -> new Option(r.name(), r.label)).toList(),
+                Arrays.stream(WhseBillableDayRules.MinimumBasis.values()).map(b -> new Option(b.name(), b.label)).toList())));
     }
 
     /** clientId omitted sets the warehouse default. */
@@ -48,7 +49,7 @@ public class WhseBillingDayController {
     public ResponseEntity<ApiResponse<UUID>> add(@RequestBody AddRule r) {
         featureGuard.requireModule("warehousing");
         LocalDate today = LocalDate.now(ZoneId.of("Africa/Johannesburg"));
-        return ResponseEntity.ok(ApiResponse.success("Saved", service.addRule(TenantContext.getTenantIdAsObject(), r.clientId(), r.dayRule(), r.effectiveFrom(), r.note(), TenantContext.getCurrentUserId(), today)));
+        return ResponseEntity.ok(ApiResponse.success("Saved", service.addRule(TenantContext.getTenantIdAsObject(), r.clientId(), r.dayRule(), r.minimumBasis(), r.effectiveFrom(), r.note(), TenantContext.getCurrentUserId(), today)));
     }
 
     @PostMapping("/holidays")

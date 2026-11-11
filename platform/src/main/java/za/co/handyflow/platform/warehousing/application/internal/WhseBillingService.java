@@ -94,6 +94,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class WhseBillingService {
 
+    /** Optional so the service can be built without it; Spring injects it. Without it the minimum is pro-rated by calendar days (the standard). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private WhseBillingDayService billingDays;
+
     private static final String AR_ACCOUNT_CODE = "1100";      // Accounts Receivable
     private static final String REVENUE_ACCOUNT_CODE = "4000"; // Revenue/Sales
     private static final String VAT_ACCOUNT_CODE = "2100";     // VAT Output
@@ -161,8 +165,10 @@ public class WhseBillingService {
         }
         // Minimum storage charge (per 30 days, pro-rated to this period). The top-up is recorded on the invoice.
         BigDecimal minimumTopUp = BigDecimal.ZERO;
+        // A contract's billable-day rule may pro-rate the minimum by the days it bills instead of every calendar day.
+        long minimumDays = billingDays == null ? daysInPeriod : billingDays.book(tenantId).minimumDays(clientId, periodStart, periodEnd);
         BigDecimal floor = WhseTariffBook.proratedMinimum(
-                tariffService.minimumStorageCharge(tenantId, clientId, periodEnd), daysInPeriod);
+                tariffService.minimumStorageCharge(tenantId, clientId, periodEnd), minimumDays);
         if (storageFee.compareTo(floor) < 0) {
             minimumTopUp = floor.subtract(storageFee);
             storageFee = floor;

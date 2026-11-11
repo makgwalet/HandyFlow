@@ -23,7 +23,25 @@ public final class WhseBillableDayRules {
         DayRule(String label) { this.label = label; }
     }
 
-    public record RuleVersion(UUID clientId, DayRule rule, LocalDate effectiveFrom, Instant createdAt) {}
+    /** How a monthly minimum storage charge is pro-rated: by the calendar days an invoice covers (the default) or by the days the contract bills. */
+    public enum MinimumBasis {
+        CALENDAR_DAYS("Calendar days in the invoice period (standard)"),
+        BILLABLE_DAYS("Billable days in the invoice period");
+        public final String label;
+        MinimumBasis(String label) { this.label = label; }
+    }
+
+    public record RuleVersion(UUID clientId, DayRule rule, LocalDate effectiveFrom, Instant createdAt, MinimumBasis minimumBasis) {
+        public RuleVersion(UUID clientId, DayRule rule, LocalDate effectiveFrom, Instant createdAt) {
+            this(clientId, rule, effectiveFrom, createdAt, MinimumBasis.CALENDAR_DAYS);
+        }
+    }
+
+    public static MinimumBasis parseBasis(String s) {
+        if (s == null || s.isBlank()) return MinimumBasis.CALENDAR_DAYS;
+        try { return MinimumBasis.valueOf(s.strip().toUpperCase()); }
+        catch (IllegalArgumentException e) { throw new IllegalArgumentException("Unknown minimum-charge basis " + s.strip() + "."); }
+    }
 
     public static DayRule parse(String s) {
         if (s == null || s.isBlank()) throw new IllegalArgumentException("Choose a billable-day rule.");
@@ -40,10 +58,34 @@ public final class WhseBillableDayRules {
     }
 
     private static DayRule newest(List<RuleVersion> versions, UUID clientId, LocalDate date) {
+        RuleVersion v = newestVersion(versions, clientId, date);
+        return v == null ? null : v.rule();
+    }
+
+    private static RuleVersion newestVersion(List<RuleVersion> versions, UUID clientId, LocalDate date) {
         return versions.stream()
                 .filter(v -> java.util.Objects.equals(v.clientId(), clientId) && !v.effectiveFrom().isAfter(date))
                 .max(Comparator.comparing(RuleVersion::effectiveFrom).thenComparing(RuleVersion::createdAt))
-                .map(RuleVersion::rule).orElse(null);
+                .orElse(null);
+    }
+
+    /** The version in force for a client on a day: its own, else the warehouse default's, else none (the standard). */
+    public static RuleVersion versionFor(List<RuleVersion> versions, UUID clientId, LocalDate date) {
+        RuleVersion own = clientId == null ? null : newestVersion(versions, clientId, date);
+        return own != null ? own : newestVersion(versions, null, date);
+    }
+
+    /**
+     * The days a minimum charge is pro-rated over for an invoice covering the days after {@code after} up to and including {@code through}.
+     * Each day counts once, unless the rule in force that day pro-rates by billable days and the day does not bill.
+     */
+    public static long minimumDays(List<RuleVersion> versions, UUID clientId, LocalDate after, LocalDate through, Set<LocalDate> holidays) {
+        long n = 0;
+        for (LocalDate d = after.plusDays(1); !d.isAfter(through); d = d.plusDays(1)) {
+            RuleVersion v = versionFor(versions, clientId, d);
+            if (v == null || v.minimumBasis() == MinimumBasis.CALENDAR_DAYS || isBillable(v.rule(), d, holidays)) n++;
+        }
+        return n;
     }
 
     public static boolean isBillable(DayRule rule, LocalDate date, Set<LocalDate> holidays) {

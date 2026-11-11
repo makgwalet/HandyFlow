@@ -47,7 +47,18 @@ describe("WhseBillableDaysPanel", () => {
     fireEvent.change(screen.getByLabelText("Starts"), { target: { value: "2099-02-01" } })
     fireEvent.click(screen.getByText("Add rule"))
     await waitFor(() => expect(post).toHaveBeenCalled())
-    expect(post.mock.calls[0][1]).toMatchObject({ clientId: null, dayRule: "WEEKDAYS_ONLY", effectiveFrom: "2099-02-01" })
+    expect(post.mock.calls[0][1]).toMatchObject({ clientId: null, dayRule: "WEEKDAYS_ONLY", minimumBasis: "CALENDAR_DAYS", effectiveFrom: "2099-02-01" })
+  })
+  it("can pro-rate the minimum by billable days and says so in the list", async () => {
+    serve(view({ minimumBases: [{ value: "CALENDAR_DAYS", label: "Calendar days in the invoice period (standard)" }, { value: "BILLABLE_DAYS", label: "Billable days in the invoice period" }],
+      rules: [{ id: "r1", clientId: null, clientName: null, dayRule: "WEEKDAYS_ONLY", label: "Monday to Friday only", minimumBasis: "BILLABLE_DAYS", minimumBasisLabel: "Billable days in the invoice period", effectiveFrom: "2099-01-01", note: null }] }))
+    wrap(<WhseBillableDaysPanel />)
+    await screen.findByText(/minimum pro-rated by billable days/)
+    fireEvent.change(screen.getByLabelText("Minimum charge is pro-rated by"), { target: { value: "BILLABLE_DAYS" } })
+    fireEvent.change(screen.getByLabelText("Starts"), { target: { value: "2099-02-01" } })
+    fireEvent.click(screen.getByText("Add rule"))
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post.mock.calls[0][1]).toMatchObject({ minimumBasis: "BILLABLE_DAYS" })
   })
   it("refuses a start date in the past", async () => {
     serve(view())

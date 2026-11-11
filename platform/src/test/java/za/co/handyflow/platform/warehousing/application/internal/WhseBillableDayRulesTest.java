@@ -74,4 +74,24 @@ class WhseBillableDayRulesTest {
         assertThrows(IllegalArgumentException.class, () -> WhseBillableDayRules.parse("sundays"));
         assertThrows(IllegalArgumentException.class, () -> WhseBillableDayRules.parse(null));
     }
+
+    @Test @DisplayName("the minimum is pro-rated over every calendar day unless the rule says billable days")
+    void minimumDays() {
+        LocalDate after = FRI.minusDays(1), through = MON; // Fri, Sat, Sun, Mon
+        assertEquals(4, WhseBillableDayRules.minimumDays(List.of(), a, after, through, Set.of()));
+        List<RuleVersion> calendar = List.of(new RuleVersion(a, DayRule.WEEKDAYS_ONLY, FRI.minusDays(30), Instant.EPOCH, WhseBillableDayRules.MinimumBasis.CALENDAR_DAYS));
+        assertEquals(4, WhseBillableDayRules.minimumDays(calendar, a, after, through, Set.of()));
+        List<RuleVersion> billable = List.of(new RuleVersion(a, DayRule.WEEKDAYS_ONLY, FRI.minusDays(30), Instant.EPOCH, WhseBillableDayRules.MinimumBasis.BILLABLE_DAYS));
+        assertEquals(2, WhseBillableDayRules.minimumDays(billable, a, after, through, Set.of()));
+        assertEquals(4, WhseBillableDayRules.minimumDays(billable, b, after, through, Set.of())); // another client keeps the standard
+        List<RuleVersion> starts = List.of(new RuleVersion(a, DayRule.WEEKDAYS_ONLY, SAT, Instant.EPOCH, WhseBillableDayRules.MinimumBasis.BILLABLE_DAYS));
+        assertEquals(2, WhseBillableDayRules.minimumDays(starts, a, after, through, Set.of())); // Fri counts (rule not started), Sat and Sun do not, Mon does
+    }
+
+    @Test @DisplayName("minimum basis parses, and blank means the standard")
+    void basis() {
+        assertEquals(WhseBillableDayRules.MinimumBasis.CALENDAR_DAYS, WhseBillableDayRules.parseBasis(null));
+        assertEquals(WhseBillableDayRules.MinimumBasis.BILLABLE_DAYS, WhseBillableDayRules.parseBasis(" billable_days "));
+        assertThrows(IllegalArgumentException.class, () -> WhseBillableDayRules.parseBasis("weekly"));
+    }
 }

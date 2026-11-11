@@ -15,12 +15,13 @@ export default function WhseBillableDaysPanel() {
   const { data: clientPage } = useQuery<{ content?: { id: string; tradingName: string }[] }>({ queryKey: ["whse-clients-lite"], queryFn: async () => (await apiClient.get("/api/v1/warehousing/clients?size=100")).data })
   const [clientId, setClientId] = useState("")
   const [dayRule, setDayRule] = useState("WEEKDAYS_ONLY")
+  const [basis, setBasis] = useState("CALENDAR_DAYS")
   const [from, setFrom] = useState(today())
   const [note, setNote] = useState("")
   const [hDate, setHDate] = useState("")
   const [hName, setHName] = useState("")
   const refresh = () => qc.invalidateQueries({ queryKey: ["whse-day-rules"] })
-  const addRule = useMutation({ mutationFn: async () => apiClient.post(BASE, { clientId: clientId || null, dayRule, effectiveFrom: from, note: note || null }), onSuccess: () => { setNote(""); refresh() } })
+  const addRule = useMutation({ mutationFn: async () => apiClient.post(BASE, { clientId: clientId || null, dayRule, minimumBasis: basis, effectiveFrom: from, note: note || null }), onSuccess: () => { setNote(""); refresh() } })
   const addHoliday = useMutation({ mutationFn: async () => apiClient.post(`${BASE}/holidays`, { date: hDate, name: hName }), onSuccess: () => { setHDate(""); setHName(""); refresh() } })
   const removeHoliday = useMutation({ mutationFn: async (d: string) => apiClient.delete(`${BASE}/holidays/${d}`), onSuccess: refresh })
 
@@ -37,7 +38,7 @@ export default function WhseBillableDaysPanel() {
 
       {data.rules.length === 0 ? <p style={{ fontSize: 12.5, margin: "0 0 10px" }}>No contract overrides: every account uses the standard.</p> : (
         <ul style={{ listStyle: "none", padding: 0, margin: "0 0 10px", display: "grid", gap: 4 }}>
-          {data.rules.map(r => <li key={r.id} style={{ fontSize: 12.5 }}><strong>{scopeLabel(r)}</strong>: {r.label}, from {r.effectiveFrom}{r.note ? ` (${r.note})` : ""}</li>)}
+          {data.rules.map(r => <li key={r.id} style={{ fontSize: 12.5 }}><strong>{scopeLabel(r)}</strong>: {r.label}, from {r.effectiveFrom}{r.minimumBasis === "BILLABLE_DAYS" ? "; minimum pro-rated by billable days" : ""}{r.note ? ` (${r.note})` : ""}</li>)}
         </ul>
       )}
 
@@ -50,6 +51,10 @@ export default function WhseBillableDaysPanel() {
         <div><label style={labelStyle} htmlFor="bd-rule">Rule</label>
           <select id="bd-rule" style={inputStyle} value={dayRule} onChange={e => setDayRule(e.target.value)}>
             {data.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select></div>
+        <div><label style={labelStyle} htmlFor="bd-basis">Minimum charge is pro-rated by</label>
+          <select id="bd-basis" style={inputStyle} value={basis} onChange={e => setBasis(e.target.value)}>
+            {(data.minimumBases ?? [{ value: "CALENDAR_DAYS", label: "Calendar days in the invoice period (standard)" }]).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select></div>
         <div><label style={labelStyle} htmlFor="bd-from">Starts</label><input id="bd-from" type="date" style={inputStyle} value={from} min={today()} onChange={e => setFrom(e.target.value)} /></div>
         <div style={{ flex: 1, minWidth: 160 }}><label style={labelStyle} htmlFor="bd-note">Contract reference</label><input id="bd-note" style={{ ...inputStyle, width: "100%" }} value={note} maxLength={300} onChange={e => setNote(e.target.value)} /></div>

@@ -1,8 +1,8 @@
 // Pure helpers for the billable-day rule panel. The server checks everything again.
 
-export interface DayRuleRow { id: string; clientId: string | null; clientName: string | null; dayRule: string; label: string; effectiveFrom: string; note: string | null }
+export interface DayRuleRow { id: string; clientId: string | null; clientName: string | null; dayRule: string; label: string; minimumBasis: string; minimumBasisLabel: string; effectiveFrom: string; note: string | null }
 export interface HolidayRow { date: string; name: string }
-export interface DayRuleView { rules: DayRuleRow[]; holidays: HolidayRow[]; options: { value: string; label: string }[] }
+export interface DayRuleView { rules: DayRuleRow[]; holidays: HolidayRow[]; options: { value: string; label: string }[]; minimumBases?: { value: string; label: string }[] }
 
 export const STANDARD_TEXT = "Standard: every calendar day bills, including the arrival and dispatch days, weekends and public holidays. A part day bills in full."
 

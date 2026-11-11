@@ -63,4 +63,16 @@ class WhseBillingDayServiceTest {
         service.addHoliday(t(), today, "Day", actor);
         verify(jdbc).update(contains("INSERT INTO whse_billing_holidays"), any(Object[].class));
     }
+
+    @Test @DisplayName("an unknown minimum-charge basis is refused before anything is written")
+    void badBasis() {
+        assertThrows(IllegalArgumentException.class, () -> service.addRule(t(), null, "WEEKDAYS_ONLY", "weekly", today, null, actor, today));
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+    }
+
+    @Test @DisplayName("the minimum basis is stored with the rule")
+    void storesBasis() {
+        service.addRule(t(), null, "WEEKDAYS_ONLY", "BILLABLE_DAYS", today, null, actor, today);
+        verify(jdbc).update(contains("minimum_basis"), any(Object[].class));
+    }
 }
