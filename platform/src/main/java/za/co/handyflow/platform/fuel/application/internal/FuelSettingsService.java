@@ -5,6 +5,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.fuel.domain.model.FuelSettings;
 import za.co.handyflow.platform.fuel.domain.repository.FuelSettingsRepository;
+import za.co.handyflow.platform.fuel.dto.FuelWholesaleDtos.ControlsRequest;
+import za.co.handyflow.platform.fuel.dto.FuelWholesaleDtos.ControlsResponse;
 import za.co.handyflow.platform.fuel.dto.FuelSettingsDtos.SettingsRequest;
 import za.co.handyflow.platform.fuel.dto.FuelSettingsDtos.SettingsResponse;
 import za.co.handyflow.platform.shared.TenantId;
@@ -37,6 +39,20 @@ public class FuelSettingsService {
         s.update(req.driverCostPerHour(), req.vehicleCostPerKm(), req.fixedCostPerDelivery(), req.overheadPctOfRevenue(),
                 req.defaultTripHours(), req.poOverTolerancePct());
         return toResponse(settings.save(s));
+    }
+
+    @Transactional(readOnly = true)
+    public ControlsResponse controls(TenantId tenantId) {
+        FuelSettings s = current(tenantId);
+        return new ControlsResponse(s.isRequireSupplierApproval(), s.getAdjustmentThresholdLitres());
+    }
+
+    @Transactional
+    public ControlsResponse updateControls(TenantId tenantId, ControlsRequest req) {
+        FuelSettings s = settings.findByTenant(tenantId).orElseGet(() -> FuelSettings.forTenant(tenantId));
+        s.updateControls(req.requireSupplierApproval(), req.adjustmentThresholdLitres());
+        FuelSettings saved = settings.save(s);
+        return new ControlsResponse(saved.isRequireSupplierApproval(), saved.getAdjustmentThresholdLitres());
     }
 
     private static SettingsResponse toResponse(FuelSettings s) {

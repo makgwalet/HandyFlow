@@ -41,6 +41,21 @@ public class FuelSupplier {
 
     private String notes;
 
+    @Column(name = "approval_status", nullable = false, length = 20)
+    private String approvalStatus = "APPROVED";
+
+    @Column(name = "status_reason", length = 300)
+    private String statusReason;
+
+    @Column(name = "status_changed_by")
+    private UUID statusChangedBy;
+
+    @Column(name = "status_changed_at")
+    private Instant statusChangedAt;
+
+    @Column(name = "created_by")
+    private UUID createdBy;
+
     @Column(nullable = false)
     private boolean active = true;
 
@@ -73,6 +88,28 @@ public class FuelSupplier {
         s.createdAt     = Instant.now();
         s.updatedAt     = Instant.now();
         return s;
+    }
+
+    /** New supplier when the company requires approval: usable only after someone else approves it. */
+    public void requireApproval(UUID createdBy) {
+        this.approvalStatus = "PENDING_APPROVAL"; this.createdBy = createdBy; this.updatedAt = Instant.now();
+    }
+
+    public boolean isApproved() { return "APPROVED".equals(approvalStatus); }
+
+    /** The person who created a supplier may not approve it when the creator is known. */
+    public void approve(UUID by) {
+        if (!"PENDING_APPROVAL".equals(approvalStatus) && !"SUSPENDED".equals(approvalStatus)) return;
+        if ("PENDING_APPROVAL".equals(approvalStatus) && by != null && by.equals(createdBy)) {
+            throw new IllegalStateException("A supplier cannot be approved by the person who added it. Ask someone else to approve it.");
+        }
+        this.approvalStatus = "APPROVED"; this.statusReason = null; this.statusChangedBy = by; this.statusChangedAt = Instant.now(); this.updatedAt = Instant.now();
+    }
+
+    public void suspend(UUID by, String reason) {
+        if (reason == null || reason.trim().length() < 5) throw new IllegalArgumentException("Give a reason of at least 5 characters.");
+        if ("SUSPENDED".equals(approvalStatus)) return;
+        this.approvalStatus = "SUSPENDED"; this.statusReason = reason.trim(); this.statusChangedBy = by; this.statusChangedAt = Instant.now(); this.updatedAt = Instant.now();
     }
 
     public void softDelete(UUID deletedByUserId) {

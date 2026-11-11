@@ -45,6 +45,13 @@ public class FuelSettings {
     @Column(name = "po_over_tolerance_pct", nullable = false, precision = 5, scale = 2)
     private BigDecimal poOverTolerancePct = DEFAULT_TOLERANCE_PCT;
 
+    @Column(name = "require_supplier_approval", nullable = false)
+    private boolean requireSupplierApproval = false;
+
+    /** Stock adjustments of at least this many litres (either direction) need a second person. Null means no limit. */
+    @Column(name = "adjustment_threshold_litres", precision = 14, scale = 3)
+    private BigDecimal adjustmentThresholdLitres;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -75,6 +82,20 @@ public class FuelSettings {
         if (tol.signum() < 0 || tol.compareTo(new BigDecimal("10")) > 0) throw new IllegalArgumentException("Delivery tolerance must be between 0% and 10%.");
         this.poOverTolerancePct = tol;
         this.updatedAt = Instant.now();
+    }
+
+    public void updateControls(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres) {
+        if (adjustmentThresholdLitres != null && adjustmentThresholdLitres.signum() <= 0) {
+            throw new IllegalArgumentException("The adjustment threshold must be more than 0 litres, or left empty for no limit.");
+        }
+        this.requireSupplierApproval = requireSupplierApproval;
+        this.adjustmentThresholdLitres = adjustmentThresholdLitres;
+        this.updatedAt = Instant.now();
+    }
+
+    /** True when an adjustment of this size needs a second person. */
+    public boolean adjustmentNeedsApproval(BigDecimal litres) {
+        return adjustmentThresholdLitres != null && litres != null && litres.abs().compareTo(adjustmentThresholdLitres) >= 0;
     }
 
     /** The tolerance as a fraction (2% is 0.02). */

@@ -31,3 +31,10 @@ Priority: P0 security/integrity/financial/tenant/critical · P1 essential · P2 
 | H01 | Tests | Controller/security/cross-tenant tests | 22 Fuel unit-test classes (181 @Test), none for controllers/tenant isolation | no security tests | Regression risk | Unproven isolation | P0 | none | Add MockMvc + cross-tenant tests |
 
 Each row is a gap statement; the backend/frontend/database/permission/test lists per gap are in FUEL_TARGET_ARCHITECTURE.md (change map) and are to be detailed per phase.
+
+## Status after Phase 2 (code written; Java not compiled or run by the author)
+- **B01** done in code: adjustments at or above a per-tenant litre threshold are held until a different person with FUEL_STOCK_ADJUST_APPROVE approves. No threshold means no change from before.
+- **B03** done in code for dip readings (tenant parameter added). `FuelReceiptRepository.findByTank` and `FuelDispatchRepository.findByTank` have the same shape but no callers; left alone.
+- **B04** done in code (supplier status, off by default). Banking details and supplier documents are **not** built.
+- **B05** done in code through the Approvals engine (module fuel, type PURCHASE_ORDER). Requisitions are not built.
+- **B06 (quotes, contracts), B07 (price approval/margin guard)**: not started. **B08**: blocked on the Accounts Payable decision.

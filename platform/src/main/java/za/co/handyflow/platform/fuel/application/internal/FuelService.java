@@ -217,7 +217,7 @@ public class FuelService {
         Instant rangeTo   = to != null ? to : Instant.now();
         Instant rangeFrom = from != null ? from : rangeTo.minus(90, java.time.temporal.ChronoUnit.DAYS);
 
-        List<DipReading> readings = dipRepository.findByTankAndReadAtBetween(tankId, rangeFrom, rangeTo);
+        List<DipReading> readings = dipRepository.findByTankAndReadAtBetween(tenantId, tankId, rangeFrom, rangeTo);
         return reconciliationPdfGenerator.generate(tank, readings, rangeFrom, rangeTo, resolveTenantName(tenantId));
     }
 
@@ -503,7 +503,7 @@ public class FuelService {
     public Page<DipReadingResponse> getDipReadings(TenantId tenantId,
                                                    UUID tankId, Pageable pageable) {
         findActiveTank(tenantId, tankId);
-        return dipRepository.findByTank(tankId, pageable)
+        return dipRepository.findByTank(tenantId, tankId, pageable)
                 .map(this::toDipResponse);
     }
 
@@ -792,7 +792,7 @@ public class FuelService {
     private SupplierResponse toSupplierResponse(FuelSupplier s) {
         return new SupplierResponse(s.getId(), s.getName(), s.getContactName(),
                 s.getContactPhone(), s.getContactEmail(),
-                s.getAccountNumber(), s.getCreatedAt());
+                s.getAccountNumber(), s.getCreatedAt(), s.getApprovalStatus(), s.getStatusReason());
     }
 
     private ReceiptResponse toReceiptResponse(FuelReceipt r) {

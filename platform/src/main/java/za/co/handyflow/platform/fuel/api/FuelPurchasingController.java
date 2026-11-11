@@ -62,7 +62,7 @@ public class FuelPurchasingController {
     @PreAuthorize("hasAuthority('FUEL_MANAGE')")
     public ResponseEntity<ApiResponse<PurchaseOrderResponse>> place(@PathVariable UUID id) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success("Placed", purchasing.place(TenantContext.getTenantIdAsObject(), id)));
+        return ResponseEntity.ok(ApiResponse.success("Placed", purchasing.place(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/{id}/cancel")

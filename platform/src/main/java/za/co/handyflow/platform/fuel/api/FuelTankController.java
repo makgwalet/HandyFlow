@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.fuel.application.internal.DeliveryReceiptPdfService;
 import za.co.handyflow.platform.fuel.application.internal.FuelService;
+import za.co.handyflow.platform.fuel.application.internal.FuelSupplierApprovalService;
 import za.co.handyflow.platform.fuel.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -58,6 +59,7 @@ import java.util.UUID;
 public class FuelTankController {
 
     private final FuelService              fuelService;
+    private final FuelSupplierApprovalService supplierApproval;
     private final FeatureGuard             featureGuard;
     private final DeliveryReceiptPdfService receiptPdfService;
 
@@ -141,7 +143,25 @@ public class FuelTankController {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Supplier added",
-                        fuelService.createSupplier(TenantContext.getTenantIdAsObject(), request)));
+                        supplierApproval.create(TenantContext.getTenantIdAsObject(), request, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/suppliers/{id}/approve")
+    @PreAuthorize("hasAuthority('FUEL_SUPPLIER_APPROVE')")
+    @Operation(summary = "Approve a supplier (not by the person who added it), or reinstate a suspended one")
+    public ResponseEntity<ApiResponse<SupplierResponse>> approveSupplier(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Supplier approved",
+                supplierApproval.approve(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/suppliers/{id}/suspend")
+    @PreAuthorize("hasAuthority('FUEL_SUPPLIER_APPROVE')")
+    @Operation(summary = "Suspend a supplier with a reason; no new orders can be raised or placed with them")
+    public ResponseEntity<ApiResponse<SupplierResponse>> suspendSupplier(@PathVariable UUID id, @Valid @RequestBody FuelWholesaleDtos.ReasonRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Supplier suspended",
+                supplierApproval.suspend(TenantContext.getTenantIdAsObject(), id, req.reason(), TenantContext.getCurrentUserId())));
     }
 
     // FIX: PUT instead of PATCH — avoids CORS preflight failures.

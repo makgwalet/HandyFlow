@@ -54,6 +54,12 @@ public class FuelPurchaseOrder {
     @Column(name = "close_reason", length = 300)
     private String closeReason;
 
+    @Column(name = "approval_request_id")
+    private UUID approvalRequestId;
+
+    @Column(name = "approval_note", length = 300)
+    private String approvalNote;
+
     @Column(length = 500)
     private String notes;
 
@@ -96,8 +102,30 @@ public class FuelPurchaseOrder {
         this.status = "ORDERED"; this.updatedAt = Instant.now();
     }
 
+    /** The order needs approval before it can be placed with the supplier. */
+    public void submitForApproval(UUID approvalRequestId) {
+        if (!"DRAFT".equals(status)) throw new IllegalStateException(poNumber + " is " + status + ", not a draft.");
+        this.status = "PENDING_APPROVAL"; this.approvalRequestId = approvalRequestId; this.approvalNote = null; this.updatedAt = Instant.now();
+    }
+
+    public boolean isPendingApproval() { return "PENDING_APPROVAL".equals(status); }
+
+    /** Approved: the order is now placed. Does nothing unless the order is waiting for approval, so a repeated outcome is harmless. */
+    public boolean approvalGranted() {
+        if (!isPendingApproval()) return false;
+        this.status = "ORDERED"; this.approvalNote = null; this.updatedAt = Instant.now();
+        return true;
+    }
+
+    /** Rejected: back to draft so it can be corrected or cancelled. The reason is kept. */
+    public boolean approvalRejected(String note) {
+        if (!isPendingApproval()) return false;
+        this.status = "DRAFT"; this.approvalNote = note == null ? "Approval was rejected" : note; this.updatedAt = Instant.now();
+        return true;
+    }
+
     public void cancel(String reason) {
-        if (!"DRAFT".equals(status) && !"ORDERED".equals(status)) {
+        if (!"DRAFT".equals(status) && !"PENDING_APPROVAL".equals(status) && !"ORDERED".equals(status)) {
             throw new IllegalStateException(poNumber + " is " + status + " and cannot be cancelled" + ("RECEIVED".equals(status) || "PART_RECEIVED".equals(status) ? " because fuel has been received against it." : "."));
         }
         if (reason == null || reason.isBlank()) throw new IllegalArgumentException("Give a reason for cancelling.");

@@ -7,6 +7,9 @@ import za.co.handyflow.platform.fuel.domain.model.FuelPurchaseOrder;
 import za.co.handyflow.platform.fuel.domain.model.FuelReceipt;
 import za.co.handyflow.platform.fuel.domain.repository.FuelPurchaseOrderRepository;
 import za.co.handyflow.platform.fuel.domain.repository.FuelReceiptRepository;
+import za.co.handyflow.platform.approvals.application.ApprovalFacade;
+import za.co.handyflow.platform.approvals.dto.ApprovalRequestResponse;
+import za.co.handyflow.platform.fuel.domain.model.FuelSupplier;
 import za.co.handyflow.platform.fuel.domain.repository.FuelSupplierRepository;
 import za.co.handyflow.platform.fuel.dto.PurchaseOrderMatchResponse;
 import za.co.handyflow.platform.fuel.dto.PurchaseOrderRequest;
@@ -37,6 +40,7 @@ public class FuelPurchasingService {
     private final FuelSupplierRepository suppliers;
     private final PurchaseOrderNumberGenerator numbers;
     private final FuelSettingsService settings;
+    private final ApprovalFacade approvalFacade;
 
     @Transactional(readOnly = true)
     public List<PurchaseOrderResponse> list(TenantId tenantId) {
@@ -65,10 +69,26 @@ public class FuelPurchasingService {
     }
 
     @Transactional
-    public PurchaseOrderResponse place(TenantId tenantId, UUID id) {
+    public PurchaseOrderResponse place(TenantId tenantId, UUID id, UUID by) {
         FuelPurchaseOrder p = find(tenantId, id);
-        p.place();
+        requireSupplier(tenantId, p.getSupplierId());
+        if (!"DRAFT".equals(p.getStatus())) throw new IllegalStateException(p.getPoNumber() + " is " + p.getStatus() + ", not a draft.");
+        // The Approvals engine decides: no rule for fuel purchase orders means approved straight away. A failure here is not swallowed,
+        // because placing an order that should have waited for approval is worse than asking the user to try again.
+        BigDecimal value = p.getLitresOrdered().multiply(p.getPricePerLitre()).setScale(2, java.math.RoundingMode.HALF_UP);
+        ApprovalRequestResponse r = approvalFacade.submit(tenantId, "fuel", "PURCHASE_ORDER", p.getId(), by,
+                Map.of("totalAmount", value.doubleValue(), "litres", p.getLitresOrdered().doubleValue(), "fuelType", p.getFuelType()));
+        if ("APPROVED".equals(r.status())) p.place(); else p.submitForApproval(r.id());
         return toResponse(tenantId, orders.save(p), BigDecimal.ZERO, new HashMap<>());
+    }
+
+    /** Applies an approval outcome from the Approvals engine. Does nothing unless the order is still waiting, so repeats and races are harmless. */
+    @Transactional
+    public void applyApprovalOutcome(TenantId tenantId, UUID poId, String outcome) {
+        FuelPurchaseOrder p = orders.findActiveByIdForUpdate(tenantId, poId).orElse(null);
+        if (p == null) return;
+        boolean changed = "APPROVED".equals(outcome) ? p.approvalGranted() : "REJECTED".equals(outcome) && p.approvalRejected("Approval was rejected");
+        if (changed) orders.save(p);
     }
 
     @Transactional
@@ -148,7 +168,10 @@ public class FuelPurchasingService {
     }
 
     private void requireSupplier(TenantId tenantId, UUID supplierId) {
-        if (suppliers.findActiveById(tenantId, supplierId).isEmpty()) throw new ResourceNotFoundException("Supplier", supplierId.toString());
+        FuelSupplier s = suppliers.findActiveById(tenantId, supplierId).orElseThrow(() -> new ResourceNotFoundException("Supplier", supplierId.toString()));
+        if (!s.isApproved()) {
+            throw new IllegalStateException(s.getName() + " is " + ("SUSPENDED".equals(s.getApprovalStatus()) ? "suspended" : "waiting for approval") + ", so orders cannot be raised or placed with them.");
+        }
     }
 
     private FuelPurchaseOrder find(TenantId tenantId, UUID id) {
@@ -161,6 +184,6 @@ public class FuelPurchasingService {
         boolean overdue = p.canReceive() && p.getExpectedDate() != null && p.getExpectedDate().isBefore(LocalDate.now(SAST));
         return new PurchaseOrderResponse(p.getId(), p.getPoNumber(), p.getSupplierId(), name, p.getFuelType(), p.getLitresOrdered(), received,
                 outstanding, p.getPricePerLitre(), p.getLitresOrdered().multiply(p.getPricePerLitre()).setScale(2, java.math.RoundingMode.HALF_UP),
-                p.getStatus(), p.getExpectedDate(), overdue, p.getCancelReason(), p.getCloseReason(), p.getNotes());
+                p.getStatus(), p.getExpectedDate(), overdue, p.getCancelReason(), p.getCloseReason(), p.getNotes(), p.getApprovalNote());
     }
 }

@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.fuel.application.internal.FuelStockAdjustmentApprovalService;
 import za.co.handyflow.platform.fuel.application.internal.FuelStockService;
 import za.co.handyflow.platform.fuel.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -28,6 +29,7 @@ import java.util.UUID;
 public class FuelStockController {
 
     private final FuelStockService stock;
+    private final FuelStockAdjustmentApprovalService adjustments;
     private final FeatureGuard featureGuard;
 
     // ── Depots ───────────────────────────────────────────────────────────────
@@ -76,11 +78,42 @@ public class FuelStockController {
 
     @PostMapping("/tanks/{id}/adjust")
     @PreAuthorize("hasAuthority('FUEL_STOCK_ADJUST')")
-    @Operation(summary = "Signed stock correction with a mandatory reason (ledger line)")
-    public ResponseEntity<ApiResponse<MovementResponse>> adjust(@PathVariable UUID id, @Valid @RequestBody AdjustStockRequest req) {
+    @Operation(summary = "Signed stock correction with a mandatory reason. Large ones wait for a second person.")
+    public ResponseEntity<ApiResponse<FuelWholesaleDtos.AdjustOutcome>> adjust(@PathVariable UUID id, @Valid @RequestBody AdjustStockRequest req) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success("Stock adjusted",
-                stock.adjust(TenantContext.getTenantIdAsObject(), id, req)));
+        FuelWholesaleDtos.AdjustOutcome out = adjustments.adjust(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId());
+        return ResponseEntity.ok(ApiResponse.success(out.pendingApproval() ? "Sent for approval" : "Stock adjusted", out));
+    }
+
+    @GetMapping("/adjustment-requests")
+    @PreAuthorize("hasAnyAuthority('FUEL_STOCK_ADJUST','FUEL_STOCK_ADJUST_APPROVE')")
+    public ResponseEntity<ApiResponse<List<FuelWholesaleDtos.AdjustmentRequestView>>> adjustmentRequests() {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(adjustments.list(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/adjustment-requests/{id}/approve")
+    @PreAuthorize("hasAuthority('FUEL_STOCK_ADJUST_APPROVE')")
+    public ResponseEntity<ApiResponse<FuelWholesaleDtos.AdjustmentRequestView>> approveAdjustment(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Adjustment approved and posted",
+                adjustments.approve(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/adjustment-requests/{id}/reject")
+    @PreAuthorize("hasAuthority('FUEL_STOCK_ADJUST_APPROVE')")
+    public ResponseEntity<ApiResponse<FuelWholesaleDtos.AdjustmentRequestView>> rejectAdjustment(@PathVariable UUID id, @Valid @RequestBody FuelWholesaleDtos.ReasonRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Adjustment rejected",
+                adjustments.reject(TenantContext.getTenantIdAsObject(), id, req.reason(), TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/adjustment-requests/{id}/withdraw")
+    @PreAuthorize("hasAuthority('FUEL_STOCK_ADJUST')")
+    public ResponseEntity<ApiResponse<FuelWholesaleDtos.AdjustmentRequestView>> withdrawAdjustment(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Adjustment withdrawn",
+                adjustments.withdraw(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/transfers")

@@ -3,5 +3,6 @@ import java.time.Instant; import java.util.UUID;
 public record SupplierResponse(
         UUID id, String name, String contactName,
         String contactPhone, String contactEmail,
-        String accountNumber, Instant createdAt
+        String accountNumber, Instant createdAt,
+        String approvalStatus, String statusReason
 ) {}
