@@ -8,6 +8,7 @@ import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Plus, X } from "lucide-react"
 import { apiClient } from "../../api/client"
+import { scopeQuery } from "./warehouses"
 import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
 import { type Band, band, bounds, buildGeneratePayload, type Cell, expiresSoon, type FloorLocation, type GenerateForm, groupCells, validateGenerate } from "./floorMap"
 
@@ -38,7 +39,7 @@ function cellColour(c: Cell, mode: Mode): string {
   return BAND_BG[band(c)]
 }
 
-function GenerateModal({ onClose }: { onClose: () => void }) {
+function GenerateModal({ warehouseId, onClose }: { warehouseId?: string; onClose: () => void }) {
   const qc = useQueryClient()
   const [f, setF] = useState<GenerateForm>({ zone: "", aisles: "A-C", bays: "10", levels: "3", locationType: "PALLET", originX: "0", originY: "0", aisleSpacing: "2", capacityUnits: "" })
   const [preview, setPreview] = useState<PreviewSlot[] | null>(null)
@@ -46,11 +47,11 @@ function GenerateModal({ onClose }: { onClose: () => void }) {
   const set = (k: keyof GenerateForm, v: string) => { setF({ ...f, [k]: v }); setPreview(null) }
 
   const check = useMutation({
-    mutationFn: async () => (await apiClient.post("/api/v1/warehousing/floor-map/generate/preview", buildGeneratePayload(f))).data as PreviewSlot[],
+    mutationFn: async () => (await apiClient.post(`/api/v1/warehousing/floor-map/generate/preview${scopeQuery(warehouseId)}`, buildGeneratePayload(f))).data as PreviewSlot[],
     onSuccess: setPreview,
   })
   const create = useMutation({
-    mutationFn: async () => apiClient.post("/api/v1/warehousing/floor-map/generate", buildGeneratePayload(f)),
+    mutationFn: async () => apiClient.post(`/api/v1/warehousing/floor-map/generate${scopeQuery(warehouseId)}`, buildGeneratePayload(f)),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["whse-floor-map"] }); qc.invalidateQueries({ queryKey: ["whse-locations"] }); onClose() },
   })
   const clashes = preview?.filter(p => p.conflict) ?? []
@@ -126,7 +127,7 @@ function PlaceRow({ l }: { l: FloorLocation }) {
 const FLOOR = "/api/v1/warehousing/floor-map"
 
 /** Edits the selected bay: move, type, capacity, in-use, add levels, extend its aisle. Every change is one call and refreshes the map. */
-function BayEditor({ cell, onMoved }: { cell: Cell; onMoved: (x: number, y: number) => void }) {
+function BayEditor({ cell, warehouseId, onMoved }: { cell: Cell; warehouseId?: string; onMoved: (x: number, y: number) => void }) {
   const qc = useQueryClient()
   const first = cell.locations[0]
   const [type, setType] = useState(first.locationType)
@@ -136,7 +137,7 @@ function BayEditor({ cell, onMoved }: { cell: Cell; onMoved: (x: number, y: numb
   const [done, setDone] = useState<string | null>(null)
   const refresh = () => { qc.invalidateQueries({ queryKey: ["whse-floor-map"] }); qc.invalidateQueries({ queryKey: ["whse-locations"] }) }
   const call = useMutation({
-    mutationFn: async (a: { path: string; body: object; message: string; after?: () => void }) => { await apiClient.post(`${FLOOR}${a.path}`, a.body); return a },
+    mutationFn: async (a: { path: string; body: object; message: string; after?: () => void }) => { await apiClient.post(`${FLOOR}${a.path}${scopeQuery(warehouseId)}`, a.body); return a },
     onSuccess: a => { setDone(a.message); refresh(); a.after?.() },
     onError: () => setDone(null),
   })
@@ -204,7 +205,7 @@ function BayEditor({ cell, onMoved }: { cell: Cell; onMoved: (x: number, y: numb
   )
 }
 
-export default function WhseFloorMap() {
+export default function WhseFloorMap({ warehouseId }: { warehouseId?: string } = {}) {
   const [mode, setMode] = useState<Mode>("fill")
   const [zone, setZone] = useState("")
   const [selected, setSelected] = useState<string | null>(null)
@@ -212,13 +213,13 @@ export default function WhseFloorMap() {
   const [editing, setEditing] = useState(false)
   const qc = useQueryClient()
   const move = useMutation({
-    mutationFn: async (m: { fromX: number; fromY: number; toX: number; toY: number }) => apiClient.post(`${FLOOR}/cells/move`, m),
+    mutationFn: async (m: { fromX: number; fromY: number; toX: number; toY: number }) => apiClient.post(`${FLOOR}/cells/move${scopeQuery(warehouseId)}`, m),
     onSuccess: (_r, m) => { setSelected(`${m.toX}:${m.toY}`); qc.invalidateQueries({ queryKey: ["whse-floor-map"] }) },
   })
 
   const { data, isLoading } = useQuery<FloorMapData>({
-    queryKey: ["whse-floor-map"],
-    queryFn: async () => (await apiClient.get("/api/v1/warehousing/floor-map")).data,
+    queryKey: ["whse-floor-map", warehouseId ?? "all"],
+    queryFn: async () => (await apiClient.get(`/api/v1/warehousing/floor-map${scopeQuery(warehouseId)}`)).data,
   })
   const locations = data?.locations ?? []
   const zones = useMemo(() => [...new Set(locations.map(l => l.zone).filter((z): z is string => !!z))].sort(), [locations])
@@ -324,7 +325,7 @@ export default function WhseFloorMap() {
                     {l.earliestExpiry && <div style={{ color: expiresSoon(l.earliestExpiry, today()) ? "var(--hf-danger-text)" : "var(--hf-text-faint)" }}>Earliest expiry {l.earliestExpiry}</div>}
                   </div>
                 ))}
-                {editing && <BayEditor key={`${current.x}:${current.y}:${current.locations.length}`} cell={current} onMoved={(x, y) => setSelected(`${x}:${y}`)} />}
+                {editing && <BayEditor key={`${current.x}:${current.y}:${current.locations.length}`} cell={current} warehouseId={warehouseId} onMoved={(x, y) => setSelected(`${x}:${y}`)} />}
               </div>
             )}
           </div>
@@ -339,7 +340,7 @@ export default function WhseFloorMap() {
         </div>
       )}
 
-      {showGenerate && <GenerateModal onClose={() => setShowGenerate(false)} />}
+      {showGenerate && <GenerateModal warehouseId={warehouseId} onClose={() => setShowGenerate(false)} />}
     </div>
   )
 }

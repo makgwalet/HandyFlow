@@ -72,6 +72,10 @@ public class WhseLocation {
     @Column(name = "pos_y")
     private Integer posY;
 
+    /** The warehouse this location is in. Left null on a new location, the database puts it in the tenant's default warehouse; it never changes afterwards. */
+    @Column(name = "warehouse_id", updatable = false)
+    private UUID warehouseId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -107,6 +111,12 @@ public class WhseLocation {
         this.description = description;
         this.capacityUnits = capacityUnits;
         this.updatedAt = Instant.now();
+    }
+
+    /** For a new location only: puts it in this warehouse instead of the default one. */
+    public void assignWarehouse(UUID warehouseId) {
+        if (this.warehouseId != null && !this.warehouseId.equals(warehouseId)) throw new IllegalStateException("A location cannot be moved to another warehouse.");
+        this.warehouseId = warehouseId;
     }
 
     /** Places the location in the building. A cell needs both coordinates or neither. */

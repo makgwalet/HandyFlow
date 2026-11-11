@@ -9,6 +9,8 @@ import { Plus, MapPin, X, Power, PowerOff, Trash2, Pencil } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
 import WhseFloorMap from "./WhseFloorMap"
+import WhseWarehouseSelect, { useWarehouses } from "./WhseWarehouseSelect"
+import { pickWarehouse, scope } from "./warehouses"
 
 interface LocationResponse {
   id: string; code: string; zone: string | null; description: string | null
@@ -18,7 +20,7 @@ interface LocationResponse {
 const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
 const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5, display: "block" }
 
-function LocationFormModal({ initial, onClose }: { initial?: LocationResponse; onClose: () => void }) {
+function LocationFormModal({ initial, warehouseId, onClose }: { initial?: LocationResponse; warehouseId?: string; onClose: () => void }) {
   const qc = useQueryClient()
   const [form, setForm] = useState({
     code: initial?.code ?? "", zone: initial?.zone ?? "", description: initial?.description ?? "",
@@ -30,6 +32,7 @@ function LocationFormModal({ initial, onClose }: { initial?: LocationResponse; o
       const body = {
         code: form.code, zone: form.zone || null, description: form.description || null,
         capacityUnits: form.capacityUnits.trim() === "" ? null : parseInt(form.capacityUnits, 10),
+        ...(warehouseId && !initial ? { warehouseId } : {}),
       }
       return initial
         ? apiClient.put(`/api/v1/warehousing/locations/${initial.id}`, body)
@@ -66,10 +69,12 @@ export default function WhseLocationsTab() {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<LocationResponse | null>(null)
   const [view, setView] = useState<"list" | "map">("list")
+  const [chosen, setChosen] = useState<string | undefined>(undefined)
+  const warehouseId = pickWarehouse(useWarehouses(), chosen) // undefined when there is only one warehouse
 
   const { data: locations = [], isLoading } = useQuery<LocationResponse[]>({
-    queryKey: ["whse-locations"],
-    queryFn: async () => (await apiClient.get("/api/v1/warehousing/locations")).data,
+    queryKey: ["whse-locations", warehouseId ?? "all"],
+    queryFn: async () => (await apiClient.get("/api/v1/warehousing/locations", scope(warehouseId))).data,
   })
 
   const deactivate = useMutation({
@@ -96,11 +101,12 @@ export default function WhseLocationsTab() {
     </div>
   )
 
-  if (view === "map") return <div>{viewToggle}<WhseFloorMap /></div>
+  const picker = <WhseWarehouseSelect value={warehouseId} onChange={setChosen} />
+  if (view === "map") return <div>{viewToggle}{picker}<WhseFloorMap warehouseId={warehouseId} /></div>
 
   return (
     <div>
-      {viewToggle}
+      {viewToggle}{picker}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0 }}>{locations.length} location{locations.length === 1 ? "" : "s"}</p>
         <button onClick={() => setShowForm(true)}
@@ -138,7 +144,7 @@ export default function WhseLocationsTab() {
         </div>
       )}
 
-      {showForm && <LocationFormModal onClose={() => setShowForm(false)} />}
+      {showForm && <LocationFormModal warehouseId={warehouseId} onClose={() => setShowForm(false)} />}
       {editing && <LocationFormModal initial={editing} onClose={() => setEditing(null)} />}
     </div>
   )

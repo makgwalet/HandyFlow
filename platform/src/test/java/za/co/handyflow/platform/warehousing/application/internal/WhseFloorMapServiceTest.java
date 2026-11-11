@@ -258,4 +258,71 @@ class WhseFloorMapServiceTest {
         assertThrows(HandyFlowException.class, () -> service.extendAisle(t(), "A", 1, null, actor));
         verify(repo, never()).save(any());
     }
+
+    // ── warehouses ───────────────────────────────────────────────────────────
+
+    private final UUID cpt = UUID.randomUUID(), jhb = UUID.randomUUID();
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void warehouseIsActive() {
+        when(jdbc.query(contains("SELECT active FROM whse_warehouses"), any(RowMapper.class), any(Object[].class))).thenReturn(List.of(true));
+    }
+
+    @Test @DisplayName("generating into a warehouse puts every new location in it")
+    void generatesIntoWarehouse() {
+        existing(List.of(), List.of());
+        warehouseIsActive();
+        assertEquals(2, service.generate(t(), spec(), null, actor, jhb));
+        ArgumentCaptor<WhseLocation> c = ArgumentCaptor.forClass(WhseLocation.class);
+        verify(repo, times(2)).save(c.capture());
+        assertEquals(jhb, c.getAllValues().get(0).getWarehouseId());
+        assertEquals(jhb, c.getAllValues().get(1).getWarehouseId());
+    }
+
+    @Test @DisplayName("a warehouse that is not this tenant's, or not found, is refused and nothing is created")
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void unknownWarehouse() {
+        existing(List.of(), List.of());
+        when(jdbc.query(contains("SELECT active FROM whse_warehouses"), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
+        assertThrows(ResourceNotFoundException.class, () -> service.generate(t(), spec(), null, actor, jhb));
+        verify(repo, never()).save(any());
+    }
+
+    @Test @DisplayName("a warehouse that is switched off is refused")
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void inactiveWarehouse() {
+        existing(List.of(), List.of());
+        when(jdbc.query(contains("SELECT active FROM whse_warehouses"), any(RowMapper.class), any(Object[].class))).thenReturn(List.of(false));
+        assertThrows(HandyFlowException.class, () -> service.generate(t(), spec(), null, actor, jhb));
+        verify(repo, never()).save(any());
+    }
+
+    @Test @DisplayName("two warehouses can have a bay in the same cell: moving one warehouse's bay leaves the other's alone")
+    void cellsArePerWarehouse() {
+        WhseLocation inCpt = at("A", 1, 1, 0, 0), inJhb = at("A", 1, 1, 0, 0);
+        inCpt.assignWarehouse(cpt);
+        inJhb.assignWarehouse(jhb);
+        onMap(inCpt, inJhb);
+        warehouseIsActive();
+        assertEquals(1, service.moveCell(t(), 0, 0, 0, 3, actor, jhb));
+        assertEquals(3, inJhb.getPosY());
+        assertEquals(0, inCpt.getPosY());
+    }
+
+    @Test @DisplayName("a cell that holds nothing in this warehouse is not found, even if another warehouse has a bay there")
+    void emptyInThisWarehouse() {
+        WhseLocation inCpt = at("A", 1, 1, 0, 0);
+        inCpt.assignWarehouse(cpt);
+        onMap(inCpt);
+        warehouseIsActive();
+        assertThrows(ResourceNotFoundException.class, () -> service.moveCell(t(), 0, 0, 0, 3, actor, jhb));
+    }
+
+    @Test @DisplayName("a location cannot change warehouse once it has one")
+    void warehouseIsFixed() {
+        WhseLocation l = at("A", 1, 1, 0, 0);
+        l.assignWarehouse(cpt);
+        assertDoesNotThrow(() -> l.assignWarehouse(cpt));
+        assertThrows(IllegalStateException.class, () -> l.assignWarehouse(jhb));
+    }
 }

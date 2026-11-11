@@ -20,10 +20,18 @@ import java.util.UUID;
 public class WhseLocationService {
 
     private final WhseLocationRepository repository;
+    private final WhseWarehouseService warehouses;
 
     @Transactional(readOnly = true)
     public List<WhseLocation> listAll(TenantId tenantId) {
         return repository.findAllActive(tenantId.getValue());
+    }
+
+    /** Every active location, or only those of one warehouse. */
+    @Transactional(readOnly = true)
+    public List<WhseLocation> listAll(TenantId tenantId, UUID warehouseId) {
+        List<WhseLocation> all = repository.findAllActive(tenantId.getValue());
+        return warehouseId == null ? all : all.stream().filter(l -> warehouseId.equals(l.getWarehouseId())).toList();
     }
 
     @Transactional(readOnly = true)
@@ -34,8 +42,17 @@ public class WhseLocationService {
     @Transactional
     public WhseLocation create(TenantId tenantId, String code, String zone, String description,
                                 BigDecimal capacityUnits) {
+        return create(tenantId, code, zone, description, capacityUnits, null);
+    }
+
+    /** A new location goes into the warehouse asked for, else the default one. */
+    @Transactional
+    public WhseLocation create(TenantId tenantId, String code, String zone, String description,
+                                BigDecimal capacityUnits, UUID warehouseId) {
         requireUniqueCode(tenantId, code, null);
         WhseLocation location = WhseLocation.create(tenantId.getValue(), code, zone, description, capacityUnits);
+        UUID w = warehouses.resolve(tenantId, warehouseId);
+        if (w != null) location.assignWarehouse(w);
         return repository.save(location);
     }
 

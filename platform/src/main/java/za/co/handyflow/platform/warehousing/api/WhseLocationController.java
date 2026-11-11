@@ -31,10 +31,10 @@ public class WhseLocationController {
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('WAREHOUSING_READ','WAREHOUSING_MANAGE','WAREHOUSING_ADMIN')")
-    public ResponseEntity<ApiResponse<List<LocationResponse>>> list() {
+    public ResponseEntity<ApiResponse<List<LocationResponse>>> list(@RequestParam(required = false) UUID warehouseId) {
         featureGuard.requireModule("warehousing");
         return ResponseEntity.ok(ApiResponse.success(
-                locationService.listAll(TenantContext.getTenantIdAsObject()).stream().map(this::toResponse).toList()));
+                locationService.listAll(TenantContext.getTenantIdAsObject(), warehouseId).stream().map(this::toResponse).toList()));
     }
 
     @GetMapping("/{id}")
@@ -51,7 +51,7 @@ public class WhseLocationController {
     public ResponseEntity<ApiResponse<LocationResponse>> create(@Valid @RequestBody UpsertLocationRequest req) {
         featureGuard.requireModule("warehousing");
         WhseLocation location = locationService.create(TenantContext.getTenantIdAsObject(), req.code(), req.zone(),
-                req.description(), req.capacityUnits());
+                req.description(), req.capacityUnits(), req.warehouseId());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Location created", toResponse(location)));
     }
 
@@ -91,6 +91,6 @@ public class WhseLocationController {
 
     private LocationResponse toResponse(WhseLocation l) {
         return new LocationResponse(l.getId(), l.getCode(), l.getZone(), l.getDescription(), l.getCapacityUnits(),
-                l.isActive(), l.getAisle(), l.getBay(), l.getLevel(), l.getLocationType(), l.getPickSequence(), l.getPosX(), l.getPosY());
+                l.isActive(), l.getAisle(), l.getBay(), l.getLevel(), l.getLocationType(), l.getPickSequence(), l.getPosX(), l.getPosY(), l.getWarehouseId());
     }
 }

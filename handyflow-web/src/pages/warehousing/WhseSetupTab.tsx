@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { btnPrimary, card, ErrorLine, inputStyle, labelStyle } from "./whseUi"
+import WhseWarehousesPanel from "./WhseWarehousesPanel"
 
 export interface Option { value: string; label: string }
 export interface WhseSettings {
@@ -80,6 +81,7 @@ export default function WhseSetupTab() {
       <ErrorLine error={save.error} fallback="Could not save the setup" />
       <button style={{ ...btnPrimary, opacity: !changed || problem ? 0.5 : 1 }} disabled={!changed || !!problem || save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : "Save"}</button>
       {save.isSuccess && !changed && <span role="status" style={{ fontSize: 12.5, marginLeft: 10, color: "var(--hf-success-text-strong)" }}>Saved.</span>}
+      <WhseWarehousesPanel />
     </div>
   )
 }

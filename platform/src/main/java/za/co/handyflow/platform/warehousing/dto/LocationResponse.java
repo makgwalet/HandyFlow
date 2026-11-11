@@ -5,5 +5,5 @@ import java.util.UUID;
 
 public record LocationResponse(
         UUID id, String code, String zone, String description, BigDecimal capacityUnits, boolean active,
-        String aisle, Integer bay, Integer level, String locationType, Integer pickSequence, Integer posX, Integer posY
+        String aisle, Integer bay, Integer level, String locationType, Integer pickSequence, Integer posX, Integer posY, UUID warehouseId
 ) {}
