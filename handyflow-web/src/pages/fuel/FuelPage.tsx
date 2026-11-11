@@ -25,10 +25,37 @@ import ForecourtTab from "./ForecourtTab"
 import SupplierInvoicesTab from "./SupplierInvoicesTab"
 import CostToServeTab from "./CostToServeTab"
 import SettingsTab from "./SettingsTab"
+import SetupTab from "./SetupTab"
+import LegalEntitiesTab from "./LegalEntitiesTab"
+import { useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { apiClient } from "../../api/client"
+import { useFuelNavStore } from "../../store/fuelNav.store"
+import type { Profile } from "./setupOps"
+import { Link } from "react-router-dom"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { FUEL_SECTIONS } from "../../navigation/moduleSections"
 
+/** Loads which divisions are active so the sidebar can hide the rest. A failed load leaves everything visible (the server still enforces). */
+function useFuelDivisions() {
+  const setDivisions = useFuelNavStore(s => s.setDivisions)
+  const q = useQuery<Profile>({ queryKey: ["fuel-profile"], queryFn: async () => { const r: any = await apiClient.get("/api/v1/fuel/operating-profile"); return r.data?.data ?? r.data }, retry: false })
+  useEffect(() => { if (q.data) setDivisions(q.data.activeDivisions) }, [q.data, setDivisions])
+  useEffect(() => () => setDivisions(null), [setDivisions])
+  return q.data
+}
+
+function SetupBanner() {
+  return (
+    <div role="status" style={{ padding: "10px 14px", marginBottom: 12, borderRadius: 8, background: "var(--hf-warning-bg)", color: "var(--hf-warning-text)", fontSize: 13 }}>
+      Fuel setup is not finished. <Link to="/fuel/setup">Choose your divisions</Link> to unlock the division screens.
+    </div>
+  )
+}
+
 export function FuelPage() {
+  const profile = useFuelDivisions()
+  const needsSetup = profile != null && profile.status !== "ACTIVE"
   return (
     <SectionedModulePage config={FUEL_SECTIONS} render={(id, goTo) => {
       switch (id) {
@@ -53,8 +80,10 @@ export function FuelPage() {
         case "margin":     return <MarginTab />
         case "cost-to-serve": return <CostToServeTab onNavigate={goTo} />
         case "settings":   return <SettingsTab />
+        case "setup":      return <SetupTab />
+        case "legal-entities": return <LegalEntitiesTab />
         default:           return null
       }
-    }} />
+    }} banner={needsSetup ? <SetupBanner /> : undefined} />
   )
 }

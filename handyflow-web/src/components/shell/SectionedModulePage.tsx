@@ -13,6 +13,7 @@ import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { PageHeader } from '../ui/PageHeader'
 import { findSection, type ModuleSections } from '../../navigation/moduleSections'
 import { useAuthStore } from '../../store/auth.store'
+import { useFuelNavStore } from '../../store/fuelNav.store'
 
 const NO_PERMISSIONS: string[] = []
 
@@ -41,9 +42,11 @@ export function SectionedModulePage({ config, render, action, subtitle, detail, 
   const navigate = useNavigate()
   const location = useLocation()
   const permissions = useAuthStore(s => s.user?.permissions ?? NO_PERMISSIONS)
+  const fuelDivisions = useFuelNavStore(s => s.divisions)
+  const activeDivisions = config.moduleKey === 'fuel' ? fuelDivisions : null
   const base = config.basePath
 
-  const found = findSection(config, rawSection, permissions)
+  const found = findSection(config, rawSection, permissions, activeDivisions)
   // Keep the query string and hash, so a link such as /tasks?board=1&task=2 (a notification deep link)
   // still reaches its board after being redirected to the default section.
   if (!found) return <Navigate replace to={{ pathname: `${base}/${config.defaultSection}`, search: location.search, hash: location.hash }} />

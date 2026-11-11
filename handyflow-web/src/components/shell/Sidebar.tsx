@@ -7,6 +7,7 @@ import { WORKSPACE_NAV, isNavItemActive } from '../../navigation/modules'
 import { sectionsForPath, visibleGroups, type ModuleSections } from '../../navigation/moduleSections'
 import { useSectionBadges } from '../../navigation/sectionBadges'
 import { useAuthStore } from '../../store/auth.store'
+import { useFuelNavStore } from '../../store/fuelNav.store'
 
 interface SidebarProps {
   modules: ModuleNavItem[]
@@ -124,6 +125,8 @@ function ContextNav({ config, onNavigate, onShowAll }: {
 }) {
   const permissions = useAuthStore(s => s.user?.permissions ?? NO_PERMISSIONS)
   const badges = useSectionBadges(config)
+  const fuelDivisions = useFuelNavStore(s => s.divisions)
+  const activeDivisions = config.moduleKey === 'fuel' ? fuelDivisions : null
   const Icon = config.icon
   return (
     <>
@@ -135,7 +138,7 @@ function ContextNav({ config, onNavigate, onShowAll }: {
         <span className="hf-nav-context-icon"><Icon size={16} aria-hidden="true" /></span>
         <span className="hf-nav-label">{config.title}</span>
       </div>
-      {visibleGroups(config, permissions).map(group => (
+      {visibleGroups(config, permissions, activeDivisions).map(group => (
         <NavSection key={group.label} label={group.label} onNavigate={onNavigate}
           items={group.sections.map(sec => ({
             key: sec.id, icon: sec.icon, label: sec.label,

@@ -47,6 +47,11 @@ export interface ModuleSection {
   permission?: string
   /** Alternative to `permission`: visible when the user holds at least one of these. */
   anyPermission?: string[]
+  /**
+   * Operating divisions this section belongs to (Fuel). Visible when at least one is active for the company. Like
+   * `permission`, this only avoids showing a dead end: the server enforces divisions on every route.
+   */
+  divisions?: string[]
 }
 
 export interface ModuleSectionGroup {
@@ -238,33 +243,33 @@ export const FUEL_SECTIONS: ModuleSections = {
     {
       label: 'Customers',
       sections: [
-        { id: 'customers', label: 'Customer accounts', icon: Users },
-        { id: 'orders', label: 'Orders', icon: ClipboardList },
-        { id: 'pricing', label: 'Price lists', icon: Tags },
-        { id: 'invoicing', label: 'Delivered, not invoiced', icon: FileText },
+        { id: 'customers', label: 'Customer accounts', icon: Users, divisions: ['WHOLESALE_SUPPLY', 'DISTRIBUTION'] },
+        { id: 'orders', label: 'Orders', icon: ClipboardList, divisions: ['WHOLESALE_SUPPLY', 'DISTRIBUTION'] },
+        { id: 'pricing', label: 'Price lists', icon: Tags, divisions: ['WHOLESALE_SUPPLY', 'DISTRIBUTION'] },
+        { id: 'invoicing', label: 'Delivered, not invoiced', icon: FileText, divisions: ['WHOLESALE_SUPPLY', 'DISTRIBUTION'] },
       ],
     },
     {
       label: 'Distribution',
       sections: [
-        { id: 'planning', label: 'Planning & tankers', icon: CalendarDays },
-        { id: 'driver', label: 'My loads', icon: Truck },
+        { id: 'planning', label: 'Planning & tankers', icon: CalendarDays, divisions: ['DISTRIBUTION'] },
+        { id: 'driver', label: 'My loads', icon: Truck, divisions: ['DISTRIBUTION'] },
       ],
     },
     {
       label: 'Logistics',
       sections: [
-        { id: 'deliveries', label: 'Deliveries', icon: Truck },
+        { id: 'deliveries', label: 'Deliveries', icon: Truck, divisions: ['WHOLESALE_SUPPLY', 'DISTRIBUTION'] },
         { id: 'suppliers', label: 'Suppliers', icon: Users },
-        { id: 'purchase-orders', label: 'Purchase orders', icon: ShoppingCart },
-        { id: 'supplier-invoices', label: 'Supplier invoices', icon: FileText },
+        { id: 'purchase-orders', label: 'Purchase orders', icon: ShoppingCart, divisions: ['WHOLESALE_SUPPLY', 'RETAIL_FORECOURT'] },
+        { id: 'supplier-invoices', label: 'Supplier invoices', icon: FileText, divisions: ['WHOLESALE_SUPPLY', 'RETAIL_FORECOURT'] },
         { id: 'compliance', label: 'Compliance', icon: ShieldCheck },
       ],
     },
     {
       label: 'Retail',
       sections: [
-        { id: 'forecourt', label: 'Forecourt', icon: Fuel, anyPermission: ['FUEL_READ', 'FUEL_FORECOURT', 'FUEL_MANAGE'] },
+        { id: 'forecourt', label: 'Forecourt', icon: Fuel, anyPermission: ['FUEL_READ', 'FUEL_FORECOURT', 'FUEL_MANAGE'], divisions: ['RETAIL_FORECOURT'] },
       ],
     },
     {
@@ -278,6 +283,8 @@ export const FUEL_SECTIONS: ModuleSections = {
     {
       label: 'Setup',
       sections: [
+        { id: 'setup', label: 'Setup & divisions', icon: Layers, anyPermission: ['FUEL_CONFIGURATION_READ', 'FUEL_CONFIGURATION_MANAGE'] },
+        { id: 'legal-entities', label: 'Legal entities', icon: Building2, anyPermission: ['FUEL_CONFIGURATION_READ', 'FUEL_CONFIGURATION_MANAGE'] },
         { id: 'settings', label: 'Settings', icon: Settings, permission: 'FUEL_MANAGE' },
       ],
     },
@@ -1309,9 +1316,14 @@ const REGISTRY: ModuleSections[] = [
 ]
 
 /** Groups with sections the user may not see removed (and empty groups dropped). */
-export function visibleGroups(config: ModuleSections, permissions: readonly string[]): ModuleSectionGroup[] {
+/**
+ * `activeDivisions`: null/undefined means "not known" (not loaded yet, or a module without divisions), so nothing is
+ * hidden for division reasons. An array hides division-tagged sections none of whose divisions are in it.
+ */
+export function visibleGroups(config: ModuleSections, permissions: readonly string[], activeDivisions?: readonly string[] | null): ModuleSectionGroup[] {
   return config.groups
-    .map(g => ({ ...g, sections: g.sections.filter(s => (!s.permission || permissions.includes(s.permission)) && (!s.anyPermission || s.anyPermission.some(p => permissions.includes(p)))) }))
+    .map(g => ({ ...g, sections: g.sections.filter(s => (!s.permission || permissions.includes(s.permission)) && (!s.anyPermission || s.anyPermission.some(p => permissions.includes(p)))
+      && (!s.divisions || !activeDivisions || s.divisions.some(d => activeDivisions.includes(d)))) }))
     .filter(g => g.sections.length > 0)
 }
 
@@ -1324,10 +1336,10 @@ export function sectionsForPath(pathname: string): ModuleSections | undefined {
  * Section by id. When `permissions` is given, sections the user may not see
  * are treated as not found, so pages redirect away from them.
  */
-export function findSection(config: ModuleSections, id: string | undefined, permissions?: readonly string[]):
+export function findSection(config: ModuleSections, id: string | undefined, permissions?: readonly string[], activeDivisions?: readonly string[] | null):
   { section: ModuleSection; group: ModuleSectionGroup } | undefined {
   if (!id) return undefined
-  const groups = permissions ? visibleGroups(config, permissions) : config.groups
+  const groups = permissions ? visibleGroups(config, permissions, activeDivisions) : config.groups
   for (const group of groups) {
     const section = group.sections.find(s => s.id === id)
     if (section) return { section, group }

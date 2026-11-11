@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { CLINIC_SECTIONS, visibleGroups } from "./moduleSections"
+import { CLINIC_SECTIONS, FUEL_SECTIONS, findSection, visibleGroups } from "./moduleSections"
 
 const ids = (perms: string[]) => visibleGroups(CLINIC_SECTIONS, perms).flatMap(g => g.sections.map(s => s.id))
 
@@ -65,5 +65,30 @@ describe("visibleGroups: clinic sections follow the permission catalogue (W-5)",
   })
   it("always leaves the dashboard so the default section never redirects away", () => {
     expect(ids(["CLINIC_PATIENT_READ"])).toContain("dashboard")
+  })
+})
+
+describe("visibleGroups: fuel divisions", () => {
+  const P = ["FUEL_READ", "FUEL_MANAGE", "FUEL_CONFIGURATION_MANAGE", "FUEL_MARGIN_READ"]
+  const fuel = (d?: string[] | null) => visibleGroups(FUEL_SECTIONS, P, d).flatMap(g => g.sections.map(s => s.id))
+  it("hides nothing while divisions are unknown", () => {
+    expect(fuel(null)).toContain("forecourt"); expect(fuel(undefined)).toContain("planning")
+  })
+  it("hides sections of divisions that are off and keeps shared ones", () => {
+    const seen = fuel(["RETAIL_FORECOURT"])
+    expect(seen).toContain("forecourt"); expect(seen).toContain("purchase-orders")
+    expect(seen).not.toContain("planning"); expect(seen).not.toContain("orders"); expect(seen).not.toContain("customers")
+    for (const shared of ["dashboard", "tanks", "stock", "compliance", "suppliers", "setup", "legal-entities"]) expect(seen).toContain(shared)
+  })
+  it("shows wholesale screens for either wholesale or distribution", () => {
+    expect(fuel(["DISTRIBUTION"])).toContain("orders"); expect(fuel(["WHOLESALE_SUPPLY"])).toContain("orders")
+    expect(fuel(["DISTRIBUTION"])).not.toContain("purchase-orders")
+  })
+  it("never hides the dashboard, even with no division on", () => {
+    expect(fuel([])).toContain("dashboard")
+  })
+  it("does not resolve a hidden section, so the page redirects to the default", () => {
+    expect(findSection(FUEL_SECTIONS, "forecourt", P, ["DISTRIBUTION"])).toBeUndefined()
+    expect(findSection(FUEL_SECTIONS, "forecourt", P, null)?.section.id).toBe("forecourt")
   })
 })
