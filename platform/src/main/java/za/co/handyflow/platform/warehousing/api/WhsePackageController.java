@@ -53,4 +53,11 @@ public class WhsePackageController {
         UUID actor = auth == null ? null : UUID.fromString(auth.getPrincipal().toString());
         return ResponseEntity.ok(ApiResponse.success("Saved", service.assign(TenantId.of(tenantId), r.packageCode(), r.enforcement(), actor)));
     }
+
+    /** What each tenant's tier says against what the platform bills for Warehousing. The platform bills one flat catalogue price until tiered billing exists. */
+    @GetMapping("/api/v1/admin/warehousing/billing-check")
+    @PreAuthorize("hasRole('SUPERADMIN')")
+    public ResponseEntity<ApiResponse<List<WhsePackageService.BillingRow>>> billingCheck() {
+        return ResponseEntity.ok(ApiResponse.success(service.billingCheck()));
+    }
 }

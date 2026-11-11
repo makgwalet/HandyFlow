@@ -114,4 +114,29 @@ public class WhsePackageService {
                 tenantId.getValue(), actor, packageCode == null ? "" : packageCode.strip().toUpperCase(), enforcement == null ? "" : enforcement);
         return usage(tenantId);
     }
+
+    public record BillingRow(UUID tenantId, String tenantName, String moduleStatus, String tierCode, String enforcement, BigDecimal tierPrice, BigDecimal cataloguePrice,
+                             String finding, String message) {}
+
+    /** Platform administrators: every tenant with Warehousing or a tier, with what the platform bills against what the tier says. Rows with nothing to report are left out. */
+    @Transactional(readOnly = true)
+    public List<BillingRow> billingCheck() {
+        BigDecimal catalogue = jdbc.query("SELECT monthly_price FROM module_catalogue WHERE key = 'warehousing'", (rs, i) -> rs.getBigDecimal(1)).stream().findFirst().orElse(null);
+        List<BillingRow> out = new java.util.ArrayList<>();
+        jdbc.query("SELECT t.id, t.name, m.status AS module_status, s.package_code, s.enforcement, p.monthly_price "
+                + "FROM tenants t "
+                + "LEFT JOIN tenant_modules m ON m.tenant_id = t.id AND m.module_key = 'warehousing' "
+                + "LEFT JOIN whse_tenant_subscription s ON s.tenant_id = t.id "
+                + "LEFT JOIN whse_subscription_tiers p ON p.code = s.package_code "
+                + "WHERE m.tenant_id IS NOT NULL OR s.tenant_id IS NOT NULL ORDER BY t.name", rs -> {
+            String status = rs.getString("module_status");
+            boolean active = "ACTIVE".equals(status) || "TRIAL".equals(status);
+            boolean tier = rs.getString("package_code") != null;
+            BigDecimal price = rs.getBigDecimal("monthly_price");
+            WhseTierBillingCheck.Finding f = WhseTierBillingCheck.classify(active, tier, price, catalogue);
+            if (f == null) return;
+            out.add(new BillingRow((UUID) rs.getObject("id"), rs.getString("name"), status, rs.getString("package_code"), rs.getString("enforcement"), price, catalogue, f.name(), f.message));
+        });
+        return out;
+    }
 }
