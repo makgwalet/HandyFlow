@@ -27,7 +27,13 @@ public final class ForecourtDtos {
 
     public record CloseShiftRequest(@NotNull @PositiveOrZero BigDecimal cash, @NotNull @PositiveOrZero BigDecimal card,
                                     @NotNull @PositiveOrZero BigDecimal account, @NotNull @PositiveOrZero BigDecimal other,
-                                    @Size(max = 500) String varianceReason, @NotEmpty @Valid List<CloseReading> readings) {}
+                                    @Size(max = 500) String varianceReason, @NotEmpty @Valid List<CloseReading> readings,
+                                    @PositiveOrZero BigDecimal fleetCard) {
+        /** Without a fleet-card amount (older clients): treated as 0. */
+        public CloseShiftRequest(BigDecimal cash, BigDecimal card, BigDecimal account, BigDecimal other, String varianceReason, List<CloseReading> readings) {
+            this(cash, card, account, other, varianceReason, readings, null);
+        }
+    }
 
     public record ReverseShiftRequest(@NotBlank @Size(min = 5, max = 500) String reason) {}
 
@@ -37,7 +43,17 @@ public final class ForecourtDtos {
     public record ShiftResponse(UUID id, String shiftNumber, String attendantName, String status, Instant openedAt, Instant closedAt,
                                 BigDecimal cash, BigDecimal card, BigDecimal account, BigDecimal other, BigDecimal expected,
                                 BigDecimal litresSold, BigDecimal variance, String varianceReason, String notes, String reverseReason,
-                                List<ReadingResponse> readings) {}
+                                List<ReadingResponse> readings, BigDecimal fleetCard, BigDecimal adjustments, BigDecimal tolerance,
+                                String reviewStatus, String reviewNote, Instant reviewedAt) {}
+
+    public record AdjustmentRequest(@NotBlank @Pattern(regexp = "REFUND|VOID|DISCOUNT", message = "Kind must be REFUND, VOID or DISCOUNT") String kind,
+                                    @NotNull @Positive @DecimalMax("1000000") BigDecimal amount,
+                                    @NotBlank @Size(min = 5, max = 300, message = "Reason must be 5 to 300 characters") String reason) {}
+
+    public record DecisionNote(@Size(max = 300) String note) {}
+
+    public record AdjustmentView(UUID id, UUID shiftId, String kind, BigDecimal amount, String reason, String status, UUID recordedBy,
+                                 Instant recordedAt, UUID decidedBy, Instant decidedAt, String decisionNote) {}
 
     public record FuelTotal(String fuelType, BigDecimal litres, BigDecimal sales) {}
 

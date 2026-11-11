@@ -43,3 +43,7 @@ Each row is a gap statement; the backend/frontend/database/permission/test lists
 - **C02** done in code: loaded-versus-delivered variance with a per-company tolerance that has **no default** (nothing is flagged until set), a review record (open, investigating, closed with EXPLAINED or WRITTEN_OFF and a note). A decision is a record only and moves no stock.
 - **C01** done in code: append-only evidence records (photo, signature, document, GPS) with replace-before-verify and verify-by-someone-else-then-lock. Files are referenced, not uploaded by this feature. The existing completion fields are unchanged.
 - **C03** not started (waiting for your decision on `fuel_tankers` versus Fleet vehicles). **C04** not started (P2). **C05** not started (offline queue, depends on C01).
+
+## Status after Phase 4 (code written; Java not compiled or run by the author)
+- **D02** done in code: per-company cash tolerance (default R5.00, as before), fleet-card tender, refunds/voids/discounts with supervisor approval (never the recorder), supervisor review of out-of-tolerance shifts, optional "closer differs from opener" rule. Review and approval are records only and move no stock or money.
+- **D01 (nozzles)** not started: changes the meter model. **D03 (POS/pump integration, P2)** not started: boundary only.

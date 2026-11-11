@@ -11,8 +11,15 @@ import java.util.UUID;
 public final class FuelWholesaleDtos {
     private FuelWholesaleDtos() {}
 
-    public record ControlsRequest(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres, BigDecimal varianceTolerancePct) {}
-    public record ControlsResponse(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres, BigDecimal varianceTolerancePct) {}
+    /** cashVarianceTolerance and requireSeparateCloser: null means "leave as it is". */
+    public record ControlsRequest(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres, BigDecimal varianceTolerancePct,
+                                  BigDecimal cashVarianceTolerance, Boolean requireSeparateCloser) {
+        public ControlsRequest(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres, BigDecimal varianceTolerancePct) {
+            this(requireSupplierApproval, adjustmentThresholdLitres, varianceTolerancePct, null, null);
+        }
+    }
+    public record ControlsResponse(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres, BigDecimal varianceTolerancePct,
+                                   BigDecimal cashVarianceTolerance, boolean requireSeparateCloser) {}
 
     public record ReasonRequest(@NotBlank @Size(min = 5, max = 300, message = "Reason must be 5 to 300 characters") String reason) {}
 

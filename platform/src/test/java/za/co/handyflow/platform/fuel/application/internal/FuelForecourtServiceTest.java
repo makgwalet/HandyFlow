@@ -36,6 +36,7 @@ class FuelForecourtServiceTest {
     @Mock FuelTankRepository tanks;
     @Mock FuelStockLedger ledger;
     @Mock ShiftNumberGenerator numbers;
+    @Mock FuelCashControlService cash;
     @InjectMocks FuelForecourtService service;
 
     FuelTank diesel;
@@ -63,6 +64,9 @@ class FuelForecourtServiceTest {
         when(readings.save(any())).thenAnswer(i -> { stored.add(i.getArgument(0)); return i.getArgument(0); });
         when(readings.findByShift(eq(TENANT), any())).thenAnswer(i -> stored);
         when(readings.findOpenForPumps(eq(TENANT), any())).thenReturn(List.of());
+        when(cash.policy(TENANT)).thenReturn(new FuelCashControlService.CashPolicy(d("5.00"), false));
+        when(cash.approvedTotal(eq(TENANT), any())).thenReturn(BigDecimal.ZERO);
+        when(cash.pendingCount(eq(TENANT), any())).thenReturn(0L);
         openShift = null;
     }
 
@@ -197,5 +201,36 @@ class FuelForecourtServiceTest {
         TenantId other = TenantId.of(UUID.randomUUID());
         when(shifts.findByTenantAndId(eq(other), any())).thenReturn(Optional.empty());
         assertThrows(za.co.handyflow.platform.shared.ResourceNotFoundException.class, () -> service.getShift(other, UUID.randomUUID()));
+    }
+
+    @Test @DisplayName("pending refunds/voids/discounts block closing the shift and nothing is posted")
+    void pendingAdjustmentsBlockClose() {
+        FuelShift s = opened();
+        when(cash.pendingCount(TENANT, s.getId())).thenReturn(2L);
+        assertThrows(IllegalStateException.class, () -> service.closeShift(TENANT, s.getId(), close("4000", "2000", null, "1210", "10", "5100"), USER));
+        assertTrue(s.isOpen());
+        verify(ledger, never()).post(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test @DisplayName("approved adjustments and fleet-card takings are applied; the company tolerance and closer rule are used")
+    void usesCashControls() {
+        FuelShift s = opened();
+        when(cash.approvedTotal(TENANT, s.getId())).thenReturn(d("100"));
+        // R6000 sold, R100 approved refund => R5900 expected; R3900 cash + R2000 fleet card
+        CloseShiftRequest req = new CloseShiftRequest(d("3900"), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, null,
+                List.of(new CloseReading(pump1.getId(), d("1210"), d("10")), new CloseReading(pump2.getId(), d("5100"), BigDecimal.ZERO)), d("2000"));
+        ShiftResponse r = service.closeShift(TENANT, s.getId(), req, UUID.randomUUID());
+        assertEquals(0, BigDecimal.ZERO.compareTo(r.variance()));
+        assertEquals(0, d("100").compareTo(r.adjustments()));
+        assertEquals(0, d("2000").compareTo(r.fleetCard()));
+        assertEquals("NONE", r.reviewStatus());
+    }
+
+    @Test @DisplayName("separate-closer rule from settings stops the opener closing")
+    void separateCloserEnforced() {
+        FuelShift s = opened();
+        when(cash.policy(TENANT)).thenReturn(new FuelCashControlService.CashPolicy(d("5.00"), true));
+        assertThrows(IllegalStateException.class, () -> service.closeShift(TENANT, s.getId(), close("4000", "2000", null, "1210", "10", "5100"), USER));
+        assertTrue(s.isOpen());
     }
 }

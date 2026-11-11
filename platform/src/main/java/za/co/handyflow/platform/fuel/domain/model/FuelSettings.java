@@ -56,6 +56,14 @@ public class FuelSettings {
     @Column(name = "variance_tolerance_pct", precision = 5, scale = 2)
     private BigDecimal varianceTolerancePct;
 
+    /** Forecourt takings variance (rand) above which a shift needs a reason and a supervisor's review. */
+    @Column(name = "cash_variance_tolerance", nullable = false, precision = 10, scale = 2)
+    private BigDecimal cashVarianceTolerance = new BigDecimal("5.00");
+
+    /** When on, the person who closes a shift must not be the person who opened it. */
+    @Column(name = "require_separate_closer", nullable = false)
+    private boolean requireSeparateCloser = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -94,6 +102,16 @@ public class FuelSettings {
         }
         this.requireSupplierApproval = requireSupplierApproval;
         this.adjustmentThresholdLitres = adjustmentThresholdLitres;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Null arguments leave the current value alone, so an older client that does not send them cannot reset them. */
+    public void updateCashControls(BigDecimal tolerance, Boolean separateCloser) {
+        if (tolerance != null) {
+            if (tolerance.signum() < 0) throw new IllegalArgumentException("The cash tolerance cannot be negative.");
+            this.cashVarianceTolerance = tolerance;
+        }
+        if (separateCloser != null) this.requireSeparateCloser = separateCloser;
         this.updatedAt = Instant.now();
     }
 

@@ -8,7 +8,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.fuel.application.internal.FuelCashControlService;
 import za.co.handyflow.platform.fuel.application.internal.FuelForecourtService;
+import za.co.handyflow.platform.fuel.dto.FuelWholesaleDtos.ReasonRequest;
 import za.co.handyflow.platform.fuel.dto.ForecourtDtos.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -26,7 +28,10 @@ public class FuelForecourtController {
     private static final String RUN = "hasAnyAuthority('FUEL_FORECOURT','FUEL_MANAGE')";
     private static final String SEE = "hasAnyAuthority('FUEL_READ','FUEL_FORECOURT','FUEL_MANAGE')";
 
+    private static final String SUPERVISE = "hasAuthority('FUEL_SHIFT_SUPERVISE')";
+
     private final FuelForecourtService forecourt;
+    private final FuelCashControlService cash;
     private final FeatureGuard featureGuard;
 
     @GetMapping("/pumps")
@@ -92,6 +97,50 @@ public class FuelForecourtController {
     public ResponseEntity<ApiResponse<ShiftResponse>> reverse(@PathVariable UUID id, @Valid @RequestBody ReverseShiftRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Shift reversed", forecourt.reverseShift(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
+    }
+
+    @GetMapping("/shifts/{id}/adjustments")
+    @PreAuthorize(SEE)
+    public ResponseEntity<ApiResponse<List<AdjustmentView>>> adjustments(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(cash.list(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/shifts/{id}/adjustments")
+    @PreAuthorize(RUN)
+    public ResponseEntity<ApiResponse<AdjustmentView>> recordAdjustment(@PathVariable UUID id, @Valid @RequestBody AdjustmentRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Recorded. A supervisor must approve it.",
+                cash.record(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/adjustments/{id}/approve")
+    @PreAuthorize(SUPERVISE)
+    public ResponseEntity<ApiResponse<AdjustmentView>> approveAdjustment(@PathVariable UUID id, @Valid @RequestBody(required = false) DecisionNote req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Approved", cash.approve(TenantContext.getTenantIdAsObject(), id, req == null ? null : req.note(), TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/adjustments/{id}/reject")
+    @PreAuthorize(SUPERVISE)
+    public ResponseEntity<ApiResponse<AdjustmentView>> rejectAdjustment(@PathVariable UUID id, @Valid @RequestBody ReasonRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Rejected", cash.reject(TenantContext.getTenantIdAsObject(), id, req.reason(), TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/adjustments/{id}/withdraw")
+    @PreAuthorize(RUN)
+    public ResponseEntity<ApiResponse<AdjustmentView>> withdrawAdjustment(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Withdrawn", cash.withdraw(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/shifts/{id}/review")
+    @PreAuthorize(SUPERVISE)
+    public ResponseEntity<ApiResponse<ShiftResponse>> reviewShift(@PathVariable UUID id, @Valid @RequestBody ReasonRequest req) {
+        featureGuard.requireModule("fuel");
+        cash.reviewShift(TenantContext.getTenantIdAsObject(), id, req.reason(), TenantContext.getCurrentUserId());
+        return ResponseEntity.ok(ApiResponse.success("Reviewed", forecourt.getShift(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @GetMapping("/summary")

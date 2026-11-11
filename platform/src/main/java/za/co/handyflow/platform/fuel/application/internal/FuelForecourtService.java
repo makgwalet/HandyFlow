@@ -34,6 +34,7 @@ public class FuelForecourtService {
     private final FuelTankRepository tanks;
     private final FuelStockLedger ledger;
     private final ShiftNumberGenerator numbers;
+    private final FuelCashControlService cash;
 
     // ── Pumps ────────────────────────────────────────────────────────────────
 
@@ -134,7 +135,12 @@ public class FuelForecourtService {
             if (r.getLitresSold().signum() > 0) perTank.merge(r.getTankId(), r.getLitresSold(), BigDecimal::add);
         }
         // Validate the takings before touching stock, so a refusal leaves nothing half done.
-        shift.close(req.cash(), req.card(), req.account(), req.other(), expected, litres, req.varianceReason(), userId);
+        long pending = cash.pendingCount(tenantId, shiftId);
+        if (pending > 0) throw new IllegalStateException(pending + " refund, void or discount entr" + (pending == 1 ? "y is" : "ies are")
+                + " still waiting for a supervisor. Decide or withdraw " + (pending == 1 ? "it" : "them") + " before closing the shift.");
+        FuelCashControlService.CashPolicy policy = cash.policy(tenantId);
+        shift.close(req.cash(), req.card(), req.fleetCard(), req.account(), req.other(), expected, cash.approvedTotal(tenantId, shiftId), litres,
+                req.varianceReason(), userId, policy.tolerance(), policy.requireSeparateCloser());
 
         // Lock tanks in id order (TreeMap) so two shifts closing together cannot deadlock.
         for (Map.Entry<UUID, BigDecimal> e : perTank.entrySet()) {
@@ -206,7 +212,7 @@ public class FuelForecourtService {
             sales = sales.add(s.getExpectedAmount() == null ? BigDecimal.ZERO : s.getExpectedAmount());
             BigDecimal v = s.getVarianceAmount() == null ? BigDecimal.ZERO : s.getVarianceAmount();
             variance = variance.add(v);
-            if (v.abs().compareTo(FuelShift.VARIANCE_TOLERANCE) > 0) flagged++;
+            if (s.isOutsideTolerance()) flagged++;
         }
         Map<String, BigDecimal[]> byFuel = new TreeMap<>();
         for (FuelShiftReading r : readings.findByShifts(tenantId, closed.stream().map(FuelShift::getId).toList())) {
@@ -240,6 +246,7 @@ public class FuelForecourtService {
                 r.getOpeningMeter(), r.getOpeningGap(), r.getClosingMeter(), r.getTestLitres(), r.getLitresSold(), r.getPricePerLitre(), r.getSalesValue())).toList();
         return new ShiftResponse(s.getId(), s.getShiftNumber(), s.getAttendantName(), s.getStatus(), s.getOpenedAt(), s.getClosedAt(),
                 s.getCashAmount(), s.getCardAmount(), s.getAccountAmount(), s.getOtherAmount(), s.getExpectedAmount(), s.getLitresSold(),
-                s.getVarianceAmount(), s.getVarianceReason(), s.getNotes(), s.getReverseReason(), rr);
+                s.getVarianceAmount(), s.getVarianceReason(), s.getNotes(), s.getReverseReason(), rr, s.getFleetCardAmount(), s.getAdjustmentsAmount(),
+                s.getToleranceApplied(), s.getReviewStatus(), s.getReviewNote(), s.getReviewedAt());
     }
 }
