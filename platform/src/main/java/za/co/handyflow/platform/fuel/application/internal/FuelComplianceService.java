@@ -3,7 +3,10 @@ package za.co.handyflow.platform.fuel.application.internal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.fuel.domain.model.FuelComplianceEvidence;
 import za.co.handyflow.platform.fuel.domain.model.FuelComplianceItem;
+import za.co.handyflow.platform.fuel.domain.model.FuelLegalEntity;
+import za.co.handyflow.platform.fuel.dto.ComplianceLinkageDtos.*;
 import za.co.handyflow.platform.fuel.domain.model.FuelComplianceRenewal;
 import za.co.handyflow.platform.fuel.domain.repository.*;
 import za.co.handyflow.platform.fuel.dto.ComplianceRequest;
@@ -16,8 +19,7 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 /** Stage 4B: licences, calibrations, inspections and certificates with expiry. An expired tanker, driver or company licence blocks allocation. */
 @Service
@@ -32,11 +34,71 @@ public class FuelComplianceService {
     private final FuelTankRepository tanks;
     private final FuelDepotRepository depots;
     private final HrFacade hr;
+    private final FuelLegalEntityRepository legalEntities;
+    private final FuelComplianceEvidenceRepository evidence;
 
     @Transactional(readOnly = true)
     public List<ComplianceResponse> list(TenantId tenantId) {
         LocalDate today = LocalDate.now(SAST);
-        return items.findAllActive(tenantId).stream().map(i -> toResponse(i, today)).toList();
+        Map<UUID, String> names = entityNames(tenantId);
+        Map<UUID, Long> counts = new HashMap<>();
+        for (Object[] row : evidence.countActiveByItem(tenantId)) counts.put((UUID) row[0], ((Number) row[1]).longValue());
+        return items.findAllActive(tenantId).stream().map(i -> toResponse(i, today, names.get(i.getLegalEntityId()), counts.getOrDefault(i.getId(), 0L))).toList();
+    }
+
+    /** Licences by legal entity and status today. Information only: the system does not know which licences a business must hold. */
+    @Transactional(readOnly = true)
+    public Coverage coverage(TenantId tenantId) {
+        LocalDate today = LocalDate.now(SAST);
+        List<FuelComplianceItem> licences = items.findAllActive(tenantId).stream().filter(i -> "LICENCE".equals(i.getItemType())).toList();
+        List<CoverageRow> rows = new ArrayList<>();
+        for (FuelLegalEntity e : legalEntities.findAllActive(tenantId)) {
+            long valid = 0, expiring = 0, expired = 0;
+            TreeSet<String> activities = new TreeSet<>();
+            for (FuelComplianceItem i : licences) {
+                if (!e.getId().equals(i.getLegalEntityId())) continue;
+                switch (i.statusOn(today)) { case "EXPIRED" -> expired++; case "EXPIRING" -> expiring++; default -> valid++; }
+                if (i.getLicensedActivity() != null) activities.add(i.getLicensedActivity());
+            }
+            rows.add(new CoverageRow(e.getId(), e.getName(), valid, expiring, expired, List.copyOf(activities)));
+        }
+        return new Coverage(rows, licences.stream().filter(i -> i.getLegalEntityId() == null).count());
+    }
+
+    @Transactional(readOnly = true)
+    public List<EvidenceView> listEvidence(TenantId tenantId, UUID itemId) {
+        find(tenantId, itemId);
+        return evidence.findByItem(tenantId, itemId).stream().map(FuelComplianceService::view).toList();
+    }
+
+    @Transactional
+    public EvidenceView addEvidence(TenantId tenantId, UUID itemId, EvidenceRequest req, UUID by) {
+        find(tenantId, itemId);
+        return view(evidence.save(FuelComplianceEvidence.create(tenantId, itemId, req.fileRef(), req.note(), by)));
+    }
+
+    @Transactional
+    public EvidenceView supersedeEvidence(TenantId tenantId, UUID evidenceId, String reason, UUID by) {
+        FuelComplianceEvidence e = evidence.findByIdForUpdate(tenantId, evidenceId).orElseThrow(() -> new ResourceNotFoundException("Evidence", evidenceId.toString()));
+        e.supersede(reason, by);
+        return view(evidence.save(e));
+    }
+
+    private static EvidenceView view(FuelComplianceEvidence e) {
+        return new EvidenceView(e.getId(), e.getItemId(), e.getFileRef(), e.getNote(), e.getCapturedBy(), e.getCapturedAt(), e.getStatus(), e.getSupersededReason());
+    }
+
+    private Map<UUID, String> entityNames(TenantId tenantId) {
+        Map<UUID, String> m = new HashMap<>();
+        for (FuelLegalEntity e : legalEntities.findAllActive(tenantId)) m.put(e.getId(), e.getName());
+        return m;
+    }
+
+    /** The legal entity must belong to this tenant. Null means "not linked". */
+    private String requireEntity(TenantId tenantId, UUID legalEntityId) {
+        if (legalEntityId == null) return null;
+        return legalEntities.findActiveById(tenantId, legalEntityId).map(FuelLegalEntity::getName)
+                .orElseThrow(() -> new ResourceNotFoundException("Legal entity", legalEntityId.toString()));
     }
 
     @Transactional
@@ -44,7 +106,9 @@ public class FuelComplianceService {
         String label = resolveLabel(tenantId, req.subjectType(), req.subjectId(), req.subjectLabel());
         FuelComplianceItem i = FuelComplianceItem.create(tenantId, req.itemType(), req.title(), req.referenceNo(), req.subjectType(),
                 req.subjectId(), label, req.issuedOn(), req.expiresOn(), req.notes());
-        return toResponse(items.save(i), LocalDate.now(SAST));
+        String entityName = requireEntity(tenantId, req.legalEntityId());
+        i.applyScope(req.legalEntityId(), req.licensedActivity(), req.issuingAuthority());
+        return toResponse(items.save(i), LocalDate.now(SAST), entityName, 0L);
     }
 
     /** What the item is (type, title, dates, notes); who it is for cannot change: add a new item instead. */
@@ -52,7 +116,9 @@ public class FuelComplianceService {
     public ComplianceResponse update(TenantId tenantId, UUID id, ComplianceRequest req) {
         FuelComplianceItem i = find(tenantId, id);
         i.update(req.itemType(), req.title(), req.referenceNo(), req.issuedOn(), req.expiresOn(), req.notes());
-        return toResponse(items.save(i), LocalDate.now(SAST));
+        String entityName = requireEntity(tenantId, req.legalEntityId());
+        i.applyScope(req.legalEntityId(), req.licensedActivity(), req.issuingAuthority());
+        return toResponse(items.save(i), LocalDate.now(SAST), entityName, evidence.countActive(tenantId, id));
     }
 
     @Transactional
@@ -61,7 +127,7 @@ public class FuelComplianceService {
         LocalDate previous = i.renew(req.newExpiresOn(), req.issuedOn());
         items.save(i);
         renewals.save(FuelComplianceRenewal.of(tenantId, id, previous, req.newExpiresOn(), by, req.note()));
-        return toResponse(i, LocalDate.now(SAST));
+        return toResponse(i, LocalDate.now(SAST), i.getLegalEntityId() == null ? null : entityNames(tenantId).get(i.getLegalEntityId()), evidence.countActive(tenantId, id));
     }
 
     @Transactional
@@ -114,8 +180,9 @@ public class FuelComplianceService {
         return items.findActiveById(tenantId, id).orElseThrow(() -> new ResourceNotFoundException("Compliance item", id.toString()));
     }
 
-    private ComplianceResponse toResponse(FuelComplianceItem i, LocalDate today) {
+    private ComplianceResponse toResponse(FuelComplianceItem i, LocalDate today, String entityName, long evidenceCount) {
         return new ComplianceResponse(i.getId(), i.getItemType(), i.getTitle(), i.getReferenceNo(), i.getSubjectType(), i.getSubjectId(),
-                i.getSubjectLabel(), i.getIssuedOn(), i.getExpiresOn(), i.getNotes(), i.statusOn(today), ChronoUnit.DAYS.between(today, i.getExpiresOn()));
+                i.getSubjectLabel(), i.getIssuedOn(), i.getExpiresOn(), i.getNotes(), i.statusOn(today), ChronoUnit.DAYS.between(today, i.getExpiresOn()),
+                i.getLegalEntityId(), entityName, i.getLicensedActivity(), i.getIssuingAuthority(), evidenceCount);
     }
 }

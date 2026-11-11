@@ -47,3 +47,7 @@ Each row is a gap statement; the backend/frontend/database/permission/test lists
 ## Status after Phase 4 (code written; Java not compiled or run by the author)
 - **D02** done in code: per-company cash tolerance (default R5.00, as before), fleet-card tender, refunds/voids/discounts with supervisor approval (never the recorder), supervisor review of out-of-tolerance shifts, optional "closer differs from opener" rule. Review and approval are records only and move no stock or money.
 - **D01 (nozzles)** not started: changes the meter model. **D03 (POS/pump integration, P2)** not started: boundary only.
+
+## Status after F01 (code written; Java not compiled or run by the author)
+- **F01** done in code: licences link to a legal entity, a licensed activity and an issuing authority; evidence references (append-only); per-entity coverage (information only, no required-licence rules). Not done: site entity link, blocking by entity, evidence verification.
+- Owner decisions recorded 2026-11-11: Truck Stop reservations on Bookings (E01); tankers to reference Fleet vehicles (C03); Fuel may depend on Accounts Payable via a facade (B08). Each adds a module dependency, so A01 should be settled first.

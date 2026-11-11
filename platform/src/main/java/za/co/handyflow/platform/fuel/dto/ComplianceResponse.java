@@ -5,4 +5,5 @@ import java.util.UUID;
 
 public record ComplianceResponse(UUID id, String itemType, String title, String referenceNo, String subjectType, UUID subjectId,
                                  String subjectLabel, LocalDate issuedOn, LocalDate expiresOn, String notes,
-                                 String status, long daysToExpiry) {}
+                                 String status, long daysToExpiry, UUID legalEntityId, String legalEntityName, String licensedActivity,
+                                 String issuingAuthority, long evidenceCount) {}

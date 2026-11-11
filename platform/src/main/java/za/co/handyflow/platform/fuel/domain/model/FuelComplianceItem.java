@@ -20,6 +20,8 @@ public class FuelComplianceItem {
 
     public static final Set<String> TYPES = Set.of("LICENCE", "CALIBRATION", "INSPECTION", "CERTIFICATE", "INSURANCE", "OTHER");
     public static final Set<String> SUBJECTS = Set.of("COMPANY", "DEPOT", "TANK", "TANKER", "DRIVER", "OTHER");
+    /** A broad label for what a licence allows. The company chooses it; the system draws no regulatory conclusion from it. */
+    public static final Set<String> ACTIVITIES = Set.of("WHOLESALE", "RETAIL", "DISTRIBUTION", "STORAGE", "TRANSPORT", "OTHER");
     /** Days before expiry that an item is flagged as expiring. */
     public static final int WARN_DAYS = 30;
 
@@ -57,6 +59,16 @@ public class FuelComplianceItem {
     @Column(length = 500)
     private String notes;
 
+    /** The company in the group that holds this licence or certificate. Null for items not tied to an entity (all existing rows). */
+    @Column(name = "legal_entity_id")
+    private UUID legalEntityId;
+
+    @Column(name = "licensed_activity", length = 16)
+    private String licensedActivity;
+
+    @Column(name = "issuing_authority", length = 120)
+    private String issuingAuthority;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -88,6 +100,14 @@ public class FuelComplianceItem {
         if (issuedOn != null && expiresOn.isBefore(issuedOn)) throw new IllegalArgumentException("The expiry date is before the issue date.");
         this.itemType = type; this.title = title.trim(); this.referenceNo = blank(referenceNo);
         this.issuedOn = issuedOn; this.expiresOn = expiresOn; this.notes = blank(notes); this.updatedAt = Instant.now();
+    }
+
+    /** Which legal entity holds this, for what activity, and who issued it. All three are optional. */
+    public void applyScope(UUID legalEntityId, String activity, String authority) {
+        String a = activity == null || activity.isBlank() ? null : activity.trim().toUpperCase();
+        if (a != null && !ACTIVITIES.contains(a)) throw new IllegalArgumentException("Unknown licensed activity: " + activity);
+        this.legalEntityId = legalEntityId; this.licensedActivity = a; this.issuingAuthority = blank(authority);
+        this.updatedAt = Instant.now();
     }
 
     /** Extends validity. The new expiry must be later than the current one: renewing cannot shorten a certificate. */

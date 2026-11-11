@@ -38,6 +38,8 @@ class FuelComplianceServiceTest {
     @Mock FuelTankRepository tanks;
     @Mock FuelDepotRepository depots;
     @Mock HrFacade hr;
+    @Mock FuelLegalEntityRepository legalEntities;
+    @Mock FuelComplianceEvidenceRepository evidence;
     @InjectMocks FuelComplianceService service;
 
     private FuelComplianceItem item(String subject, UUID id, LocalDate expires) {

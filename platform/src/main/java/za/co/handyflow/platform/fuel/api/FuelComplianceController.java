@@ -9,6 +9,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.fuel.application.internal.FuelComplianceService;
+import za.co.handyflow.platform.fuel.dto.ComplianceLinkageDtos.*;
+import za.co.handyflow.platform.fuel.dto.FuelWholesaleDtos.ReasonRequest;
 import za.co.handyflow.platform.fuel.dto.ComplianceRequest;
 import za.co.handyflow.platform.fuel.dto.ComplianceResponse;
 import za.co.handyflow.platform.fuel.dto.RenewRequest;
@@ -33,6 +35,34 @@ public class FuelComplianceController {
     public ResponseEntity<ApiResponse<List<ComplianceResponse>>> list() {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(compliance.list(TenantContext.getTenantIdAsObject())));
+    }
+
+    @GetMapping("/coverage")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<Coverage>> coverage() {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(compliance.coverage(TenantContext.getTenantIdAsObject())));
+    }
+
+    @GetMapping("/{id}/evidence")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<List<EvidenceView>>> evidence(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(compliance.listEvidence(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/{id}/evidence")
+    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    public ResponseEntity<ApiResponse<EvidenceView>> addEvidence(@PathVariable UUID id, @Valid @RequestBody EvidenceRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Added", compliance.addEvidence(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/evidence/{evidenceId}/supersede")
+    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    public ResponseEntity<ApiResponse<EvidenceView>> supersedeEvidence(@PathVariable UUID evidenceId, @Valid @RequestBody ReasonRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Replaced", compliance.supersedeEvidence(TenantContext.getTenantIdAsObject(), evidenceId, req.reason(), TenantContext.getCurrentUserId())));
     }
 
     @PostMapping

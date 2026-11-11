@@ -16,5 +16,14 @@ public record ComplianceRequest(
         @Size(max = 120) String subjectLabel,   // used for COMPANY / OTHER subjects
         LocalDate issuedOn,
         @NotNull LocalDate expiresOn,
-        @Size(max = 500) String notes
-) {}
+        @Size(max = 500) String notes,
+        UUID legalEntityId,
+        @Size(max = 16) String licensedActivity,
+        @Size(max = 120) String issuingAuthority
+) {
+    /** Without the licence-linkage fields (older clients). */
+    public ComplianceRequest(String itemType, String title, String referenceNo, String subjectType, UUID subjectId, String subjectLabel,
+                             LocalDate issuedOn, LocalDate expiresOn, String notes) {
+        this(itemType, title, referenceNo, subjectType, subjectId, subjectLabel, issuedOn, expiresOn, notes, null, null, null);
+    }
+}
