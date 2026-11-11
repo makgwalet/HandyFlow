@@ -584,7 +584,7 @@ export const EVENTS_SECTIONS: ModuleSections = {
   defaultSection: 'events',
   groups: [
     { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
-    { label: 'Events', sections: [{ id: 'events', label: 'Events', icon: Calendar }] },
+    { label: 'Events', sections: [{ id: 'events', label: 'Events', icon: Calendar }, { id: 'calendar', label: 'Calendar', icon: CalendarDays }] },
     {
       // These work on the event picked in the list; the page shows the
       // current selection under its title.

@@ -11,6 +11,7 @@ import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import EventsListTab   from "./EventsListTab"
+import EventsCalendarTab from "./EventsCalendarTab"
 import GuestsTab       from "./GuestsTab"
 import VendorsTab      from "./VendorsTab"
 import EventAnalytics  from "./EventAnalytics"
@@ -78,6 +79,8 @@ export function EventsPage() {
             return <EventsListTab onSelectEvent={(eid: string, title: string) => {
               setSelectedEventId(eid); setSelectedEventTitle(title); goTo("guests")
             }} />
+          case "calendar":
+            return <EventsCalendarTab onSelectEvent={(eid: string, title: string) => { setSelectedEventId(eid); setSelectedEventTitle(title); goTo("guests") }} />
           case "tickets":   return <EventTicketsTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />
           case "guests":    return <GuestsTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />
           case "waitlist":  return <WaitlistTab eventId={selectedEventId} eventTitle={selectedEventTitle} onChangeEvent={() => goTo("events")} />
