@@ -109,4 +109,15 @@ describe("StockTab", () => {
     fireEvent.click(within(dlg).getByRole("button", { name: "Save" }))
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/depots", { name: "Rustenburg", code: "RUS1", address: null }))
   })
+
+  it("tells the user a large adjustment was sent for approval instead of posted", async () => {
+    perms = ["FUEL_STOCK_ADJUST"]
+    post.mockResolvedValue({ data: { data: { pendingApproval: true, movement: null, request: { id: "r1" } } } })
+    mount()
+    fireEvent.click((await screen.findAllByText("Adjust"))[0])
+    fireEvent.change(screen.getByLabelText("Litres (+/-)"), { target: { value: "-800" } })
+    fireEvent.change(screen.getByLabelText("Reason *"), { target: { value: "Stocktake loss" } })
+    fireEvent.click(screen.getByText("Post adjustment"))
+    expect((await screen.findByRole("status")).textContent).toMatch(/sent for approval/)
+  })
 })

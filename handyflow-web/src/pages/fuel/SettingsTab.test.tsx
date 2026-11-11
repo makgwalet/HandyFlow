@@ -58,4 +58,26 @@ describe("SettingsTab", () => {
     expect(input.disabled).toBe(true)
     expect(screen.queryByText("Save settings")).toBeNull()
   })
+
+  it("saves the approval controls with a blank threshold as no limit", async () => {
+    perms = ["FUEL_MANAGE", "FUEL_CONFIGURATION_MANAGE"]
+    get.mockImplementation(async (u: string) => u.includes("/controls") ? { data: { data: { requireSupplierApproval: false, adjustmentThresholdLitres: 500 } } } : { data: { data: saved } })
+    mount()
+    const box = (await screen.findByLabelText("Stock adjustments needing a second person (litres)")) as HTMLInputElement
+    expect(box.value).toBe("500")
+    fireEvent.change(box, { target: { value: "" } })
+    fireEvent.click(screen.getByLabelText(/New suppliers must be approved/))
+    fireEvent.click(screen.getByText("Save controls"))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/settings/controls", { requireSupplierApproval: true, adjustmentThresholdLitres: null }))
+  })
+
+  it("rejects a zero threshold before calling the server", async () => {
+    perms = ["FUEL_MANAGE", "FUEL_CONFIGURATION_MANAGE"]
+    get.mockImplementation(async (u: string) => u.includes("/controls") ? { data: { data: { requireSupplierApproval: false, adjustmentThresholdLitres: null } } } : { data: { data: saved } })
+    mount()
+    fireEvent.change(await screen.findByLabelText("Stock adjustments needing a second person (litres)"), { target: { value: "0" } })
+    fireEvent.click(screen.getByText("Save controls"))
+    expect((await screen.findAllByRole("alert")).some(a => /above 0/.test(a.textContent ?? ""))).toBe(true)
+    expect(put).not.toHaveBeenCalledWith("/api/v1/fuel/settings/controls", expect.anything())
+  })
 })

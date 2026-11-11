@@ -1,0 +1,29 @@
+// Pure helpers for Wholesale controls: supplier approval, held stock adjustments, the two control settings.
+export interface AdjustmentRequest {
+  id: string; tankId: string; tankName: string; litres: number; reason: string; status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED"
+  requestedBy: string | null; requestedAt: string; decidedBy?: string | null; decidedAt?: string | null; decisionNote?: string | null
+}
+export interface Controls { requireSupplierApproval: boolean; adjustmentThresholdLitres: number | null }
+export interface ControlsForm { requireSupplierApproval: boolean; threshold: string }
+
+export const SUPPLIER_STATUS_LABEL: Record<string, string> = { APPROVED: "Approved", PENDING_APPROVAL: "Waiting for approval", SUSPENDED: "Suspended" }
+
+export const controlsToForm = (c: Controls): ControlsForm => ({ requireSupplierApproval: c.requireSupplierApproval, threshold: c.adjustmentThresholdLitres == null ? "" : String(c.adjustmentThresholdLitres) })
+
+/** Blank threshold means no limit. */
+export function validateControls(f: ControlsForm): string | null {
+  if (f.threshold.trim() === "") return null
+  const n = Number(f.threshold)
+  if (!Number.isFinite(n) || n <= 0) return "Enter a number of litres above 0, or leave it empty for no limit."
+  return null
+}
+export const toControlsRequest = (f: ControlsForm) => ({ requireSupplierApproval: f.requireSupplierApproval, adjustmentThresholdLitres: f.threshold.trim() === "" ? null : Number(f.threshold) })
+
+/** What the adjust endpoint's answer means for the person who sent it. */
+export function adjustMessage(outcome: { pendingApproval?: boolean } | undefined): string | null {
+  return outcome?.pendingApproval ? "This adjustment is large enough to need a second person. It has been sent for approval, and no stock has moved yet." : null
+}
+
+/** A person may decide a request only if it is pending and they did not raise it. The server enforces this; this only hides the buttons. */
+export const canDecide = (r: AdjustmentRequest, me: string | undefined) => r.status === "PENDING" && !!me && r.requestedBy !== me
+export const canWithdraw = (r: AdjustmentRequest, me: string | undefined) => r.status === "PENDING" && !!me && r.requestedBy === me

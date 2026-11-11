@@ -5,6 +5,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, ErrorLine, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
+import AdjustmentRequestsPanel from "./AdjustmentRequestsPanel"
+import { adjustMessage } from "./wholesaleOps"
 import {
   fmtL, movementLabel, mismatches, validateAdjust, validateTransfer, validateReserve,
   type Availability, type TankLine,
@@ -47,6 +49,7 @@ export default function StockTab() {
         </div>
       )}
 
+      <AdjustmentRequestsPanel />
       {view === "position" && <Position data={availability.data} loading={availability.isLoading} canManage={canManage} canAdjust={canAdjust} onDialog={setDialog} />}
       {view === "ledger" && <Ledger tanks={availability.data?.tanks ?? []} />}
       {view === "depots" && <Depots canManage={canManage} onDialog={setDialog} />}
@@ -230,9 +233,19 @@ function useDone(keys: string[][], onClose: () => void) {
 
 function AdjustDialog({ tank, onClose }: { tank: TankLine; onClose: () => void }) {
   const [litres, setLitres] = useState(""); const [reason, setReason] = useState("")
-  const done = useDone([["fuel-availability"], ["fuel-ledger"], ["tanks"]], onClose)
-  const m = useMutation({ mutationFn: () => apiClient.post(`/api/v1/fuel/tanks/${tank.tankId}/adjust`, { litres: Number(litres), reason: reason.trim() }), onSuccess: done })
+  const done = useDone([["fuel-availability"], ["fuel-ledger"], ["tanks"], ["fuel-adjustment-requests"]], onClose)
+  const [held, setHeld] = useState<string | null>(null)
+  const m = useMutation({
+    mutationFn: async () => unwrap(await apiClient.post(`/api/v1/fuel/tanks/${tank.tankId}/adjust`, { litres: Number(litres), reason: reason.trim() })),
+    onSuccess: (out: any) => { const note = adjustMessage(out); if (note) setHeld(note); else done() },
+  })
   const problem = validateAdjust(litres, reason, tank)
+  if (held) return (
+    <Modal title={`Adjust stock: ${tank.tankName}`} onClose={done}>
+      <p role="status" style={{ fontSize: 13 }}>{held}</p>
+      <button style={btnPrimary} onClick={done}>OK</button>
+    </Modal>
+  )
   return (
     <Modal title={`Adjust stock: ${tank.tankName}`} onClose={onClose}>
       <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: "0 0 10px" }}>Currently {fmtL(tank.physical)}. Use + for fuel found, - for fuel lost. Every adjustment is a permanent ledger line.</p>

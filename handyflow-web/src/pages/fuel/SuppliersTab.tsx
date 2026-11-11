@@ -1,6 +1,9 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { usePermissions } from "../../hooks/usePermission"
+import { ReasonModal } from "../warehousing/whseUi"
+import { SUPPLIER_STATUS_LABEL } from "./wholesaleOps"
 import { Plus, Users, Phone, Mail, X, Pencil, Download } from "lucide-react"
 
 interface Supplier {
@@ -11,6 +14,8 @@ interface Supplier {
   contactEmail: string | null
   accountNumber: string | null
   createdAt: string
+  approvalStatus?: string
+  statusReason?: string | null
 }
 
 const EMPTY = { name: "", contactName: "", contactPhone: "", contactEmail: "", accountNumber: "" }
@@ -22,6 +27,11 @@ export default function SuppliersTab() {
   const [error, setError]       = useState("")
   const [form, setForm]         = useState(EMPTY)
   const [editForm, setEditForm] = useState(EMPTY)
+  const canApprove = usePermissions(["FUEL_SUPPLIER_APPROVE"])
+  const [suspending, setSuspending] = useState<Supplier | null>(null)
+  const statusDone = () => { qc.invalidateQueries({ queryKey: ["fuel-suppliers"] }); setSuspending(null); setError("") }
+  const approve = useMutation({ mutationFn: (id: string) => apiClient.post(`/api/v1/fuel/suppliers/${id}/approve`), onSuccess: statusDone, onError: (e: any) => setError(e.response?.data?.message || "Could not approve the supplier") })
+  const suspend = useMutation({ mutationFn: (a: { id: string; reason: string }) => apiClient.post(`/api/v1/fuel/suppliers/${a.id}/suspend`, { reason: a.reason }), onSuccess: statusDone })
 
   const { data: suppliers = [], isLoading } = useQuery<Supplier[]>({
     queryKey: ["fuel-suppliers"],
@@ -89,6 +99,8 @@ export default function SuppliersTab() {
 
   return (
     <div>
+      {error && !showAdd && !editing && <ErrMsg msg={error} />}
+      {suspending && <ReasonModal title={`Suspend ${suspending.name}`} intro="No new orders can be raised or placed with a suspended supplier. Orders already placed are not affected." confirmLabel="Suspend" pending={suspend.isPending} error={suspend.error} onConfirm={reason => suspend.mutate({ id: suspending.id, reason })} onClose={() => setSuspending(null)} />}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div style={{ fontSize: 14, color: "var(--hf-text-muted)" }}>
           {suppliers.length} supplier{suppliers.length !== 1 ? "s" : ""}
@@ -133,6 +145,20 @@ export default function SuppliersTab() {
                   </button>
                 </div>
               </div>
+
+              {s.approvalStatus && s.approvalStatus !== "APPROVED" && (
+                <div role="status" style={{ fontSize: 12, marginBottom: 8, color: "var(--hf-warning-text)" }}>
+                  {SUPPLIER_STATUS_LABEL[s.approvalStatus] ?? s.approvalStatus}{s.statusReason ? `: ${s.statusReason}` : ""}. No orders can be raised with this supplier.
+                </div>
+              )}
+              {canApprove && (
+                <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                  {s.approvalStatus && s.approvalStatus !== "APPROVED" && <button onClick={() => approve.mutate(s.id)} disabled={approve.isPending} aria-label={`Approve ${s.name}`}
+                    style={{ padding: "4px 10px", fontSize: 12, borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", cursor: "pointer" }}>{s.approvalStatus === "SUSPENDED" ? "Reinstate" : "Approve"}</button>}
+                  {s.approvalStatus !== "SUSPENDED" && <button onClick={() => setSuspending(s)} aria-label={`Suspend ${s.name}`}
+                    style={{ padding: "4px 10px", fontSize: 12, borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", cursor: "pointer" }}>Suspend</button>}
+                </div>
+              )}
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {s.contactName && (

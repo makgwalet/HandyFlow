@@ -12,7 +12,7 @@ const msg = (e: any, fb: string) => e?.response?.data?.message ?? fb
 const th: React.CSSProperties = { textAlign: "left", padding: "10px 12px", fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", whiteSpace: "nowrap" }
 const td: React.CSSProperties = { padding: "10px 12px", fontSize: 13, color: "var(--hf-text)" }
 const FUELS = ["DIESEL", "DIESEL_50PPM", "DIESEL_500PPM", "PETROL_95", "PETROL_93", "PARAFFIN"]
-const tone = (s: string) => s === "RECEIVED" ? { bg: "var(--hf-success-soft-strong)", fg: "var(--hf-success-text-strong)" } : s === "CANCELLED" ? { bg: "var(--hf-danger-soft)", fg: "var(--hf-danger-text)" } : s === "PART_RECEIVED" || s === "CLOSED_SHORT" ? { bg: "var(--hf-warning-soft)", fg: "var(--hf-warning-text)" } : { bg: "var(--hf-surface-alt)", fg: "var(--hf-text)" }
+const tone = (s: string) => s === "RECEIVED" ? { bg: "var(--hf-success-soft-strong)", fg: "var(--hf-success-text-strong)" } : s === "CANCELLED" ? { bg: "var(--hf-danger-soft)", fg: "var(--hf-danger-text)" } : s === "PART_RECEIVED" || s === "CLOSED_SHORT" || s === "PENDING_APPROVAL" ? { bg: "var(--hf-warning-soft)", fg: "var(--hf-warning-text)" } : { bg: "var(--hf-surface-alt)", fg: "var(--hf-text)" }
 type Dialog = { kind: "edit"; po?: PurchaseOrder } | { kind: "cancel"; po: PurchaseOrder } | { kind: "closeShort"; po: PurchaseOrder } | null
 
 export default function PurchaseOrdersTab() {
@@ -47,10 +47,10 @@ export default function PurchaseOrdersTab() {
                     <td style={td}>{p.supplierName}</td><td style={td}>{p.fuelType}</td><td style={td}>{fmtL(p.litresOrdered)}</td><td style={td}>{fmtL(p.litresReceived)}</td>
                     <td style={td}>{fmtR(p.pricePerLitre)}</td>
                     <td style={td}>{p.expectedDate ?? "–"}{p.overdue && <span style={{ color: "var(--hf-danger-text)", marginLeft: 6, fontWeight: 600 }}>overdue</span>}</td>
-                    <td style={td}><Chip bg={tone(p.status).bg} fg={tone(p.status).fg}>{STATUS_LABEL[p.status]}</Chip></td>
+                    <td style={td}><Chip bg={tone(p.status).bg} fg={tone(p.status).fg}>{STATUS_LABEL[p.status]}</Chip>{p.status === "DRAFT" && p.approvalNote && <div style={{ fontSize: 11, color: "var(--hf-danger-text)", marginTop: 3 }}>{p.approvalNote}</div>}</td>
                     <td style={td}>{canManage && <span style={{ display: "flex", gap: 6 }}>
                       {p.status === "DRAFT" && <><button style={btnGhost} onClick={() => setDialog({ kind: "edit", po: p })}>Edit</button><button style={btnPrimary} onClick={() => place.mutate(p.id)}>Place order</button></>}
-                      {(p.status === "DRAFT" || p.status === "ORDERED") && <button style={btnGhost} onClick={() => setDialog({ kind: "cancel", po: p })}>Cancel</button>}
+                      {(p.status === "DRAFT" || p.status === "PENDING_APPROVAL" || p.status === "ORDERED") && <button style={btnGhost} onClick={() => setDialog({ kind: "cancel", po: p })}>Cancel</button>}
                       {p.status === "PART_RECEIVED" && <button style={btnGhost} onClick={() => setDialog({ kind: "closeShort", po: p })}>Close short</button>}
                     </span>}</td>
                   </tr>

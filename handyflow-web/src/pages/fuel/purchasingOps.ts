@@ -2,12 +2,12 @@
 export interface PurchaseOrder {
   id: string; poNumber: string; supplierId: string; supplierName: string; fuelType: string
   litresOrdered: number; litresReceived: number; litresOutstanding: number; pricePerLitre: number; orderValue: number
-  status: "DRAFT" | "ORDERED" | "PART_RECEIVED" | "RECEIVED" | "CLOSED_SHORT" | "CANCELLED"; expectedDate: string | null; overdue: boolean; cancelReason: string | null; closeReason?: string | null; notes: string | null
+  status: "DRAFT" | "PENDING_APPROVAL" | "ORDERED" | "PART_RECEIVED" | "RECEIVED" | "CLOSED_SHORT" | "CANCELLED"; expectedDate: string | null; overdue: boolean; cancelReason: string | null; closeReason?: string | null; notes: string | null; approvalNote?: string | null
 }
 export interface MatchLine { receiptId: string; receivedAt: string; litres: number; pricePerLitre: number; priceVariance: number; totalCost: number; deliveryNote: string | null; invoiceRef: string | null; reversed: boolean; priceDiffers: boolean }
 export interface Match { order: PurchaseOrder; receivedValue: number; valueVariance: number; litresVariance: number; receipts: MatchLine[] }
 
-export const STATUS_LABEL: Record<string, string> = { DRAFT: "Draft", ORDERED: "Ordered", PART_RECEIVED: "Part received", RECEIVED: "Received", CLOSED_SHORT: "Closed short", CANCELLED: "Cancelled" }
+export const STATUS_LABEL: Record<string, string> = { DRAFT: "Draft", PENDING_APPROVAL: "Waiting for approval", ORDERED: "Ordered", PART_RECEIVED: "Part received", RECEIVED: "Received", CLOSED_SHORT: "Closed short", CANCELLED: "Cancelled" }
 
 export function validatePo(supplierId: string, fuelType: string, litres: string, price: string): string | null {
   if (!supplierId) return "Choose the supplier."
