@@ -26,16 +26,25 @@ public class EventCheckIn {
 
     public static EventCheckIn create(TenantId tenantId, UUID eventId,
                                       UUID guestId, UUID scannedBy,
-                                      String location, String result) {
+                                      String location, String scanDevice,
+                                      String result) {
         EventCheckIn c = new EventCheckIn();
-        c.id        = UUID.randomUUID();
-        c.tenantId  = tenantId.getValue();
-        c.eventId   = eventId;
-        c.guestId   = guestId;
-        c.scannedBy = scannedBy;
-        c.location  = location;
-        c.result    = result;
-        c.scannedAt = Instant.now();
+        c.id         = UUID.randomUUID();
+        c.tenantId   = tenantId.getValue();
+        c.eventId    = eventId;
+        c.guestId    = guestId;
+        c.scannedBy  = scannedBy;
+        c.location   = location;
+        c.scanDevice = scanDevice;
+        c.result     = result;
+        c.scannedAt  = Instant.now();
         return c;
+    }
+
+    /** Previous signature — kept so any existing caller still compiles; scanDevice is simply not recorded. */
+    public static EventCheckIn create(TenantId tenantId, UUID eventId,
+                                      UUID guestId, UUID scannedBy,
+                                      String location, String result) {
+        return create(tenantId, eventId, guestId, scannedBy, location, null, result);
     }
 }

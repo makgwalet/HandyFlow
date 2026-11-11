@@ -19,5 +19,7 @@ public record GuestResponse(
         String paymentStatus,
         BigDecimal amountPaid,
         Instant checkedInAt,
-        Instant createdAt
+        Instant createdAt,
+        String source,      // STAFF | GROUP | WALK_IN | IMPORT | WAITLIST | TRANSFER  (new, additive)
+        UUID groupRef       // shared by members of one group registration (new, additive)
 ) {}

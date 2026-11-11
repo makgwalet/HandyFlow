@@ -64,11 +64,34 @@ public class EventTicketTier {
         return Math.max(0, quantity - quantitySold);
     }
 
+    /**
+     * Whether this tier is open for sale at {@code now} (Africa/Johannesburg
+     * local time, matching the stored LocalDateTime window). Does NOT check
+     * remaining inventory — that is decided atomically by
+     * EventTicketTierRepository.claimSeat(), never by reading quantitySold here.
+     */
+    public boolean isOnSale(LocalDateTime now) {
+        if (!active) return false;
+        if (saleStart != null && now.isBefore(saleStart)) return false;
+        if (saleEnd != null && now.isAfter(saleEnd)) return false;
+        return true;
+    }
+
+    /**
+     * @deprecated Read-modify-write on a loaded entity loses concurrent
+     * updates and can oversell. Use EventTicketTierRepository.claimSeat().
+     */
+    @Deprecated
     public void incrementSold() {
         this.quantitySold++;
         this.updatedAt = Instant.now();
     }
 
+    /**
+     * @deprecated Same lost-update hazard as incrementSold(). Use
+     * EventTicketTierRepository.markCheckedIn().
+     */
+    @Deprecated
     public void incrementCheckedIn() {
         this.quantityCheckedIn++;
         this.updatedAt = Instant.now();
