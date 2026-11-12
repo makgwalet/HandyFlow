@@ -71,8 +71,11 @@ public class GuardDuressController {
             """)
     public ResponseEntity<ApiResponse<AlarmEvent>> triggerDuress(
             @Valid @RequestBody TriggerDuressRequest req) {
+        // Who raised it comes from the token. A body naming another guard is ignored.
+        TriggerDuressRequest own = new TriggerDuressRequest(
+                req.protectionDetailId(), TenantContext.getCurrentUserId(), req.latitude(), req.longitude());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(
-                        controlRoomService.triggerDuress(TenantContext.getTenantIdAsObject(), req)));
+                        controlRoomService.triggerDuress(TenantContext.getTenantIdAsObject(), own)));
     }
 }

@@ -89,3 +89,16 @@ A and B ship as patches the same way Fuel did. C onward is blocked on the reposi
 ## 8. Not covered
 
 Close protection, armoury inventory, control-room camera screens, client portal and payroll are not guard-app scope. The competitor comparison in the performance backlog was not re-checked.
+
+## 9. Status: step A (patch 0815, 2026-11-12)
+
+Written, not compiled or run here (Maven Central is not reachable from this workspace; only a syntax check was done). Run `mvn -q test "-Dtest=SessionGeofenceTest,DeviceSessionServiceGuardTest,ControllerAccessCoverageTest"` with the app stopped.
+
+| Item | Change |
+|---|---|
+| R1 clock-in | `POST /api/v1/guard/sessions/open` now takes `{deviceHardwareId, latitude?, longitude?, accuracyMetres?}`. The guard is the token's guard. The PIN flag is set by the server (the PIN was checked at login). The geofence is computed from the phone's position and the site's saved position (300 m, plus up to 50 m for GPS error; a poor fix or missing position is recorded as unknown, not passed). The phone's face score is no longer stored. The staff route (`/api/v1/security/sessions/open`, supervisor on behalf of a guard) is unchanged. |
+| R2 panic | `triggeredByGuardId` in the body is ignored; the token's guard is used. |
+| New hole found and closed | On the guard routes, close, location ping, equipment checkout and equipment return did not check the session or item belonged to the calling guard. They now do (another guard's session reads as not found), and the guard route's close sets the PIN flag from the token and drops the face score. `GET /current` shows only the caller's own session. |
+| Works for shared tablets | Identity is the signed-in guard's token, so each guard signing in on a shared device is handled the same way. Decision 3 now only affects the app screens. |
+
+Not changed: a per-site geofence radius (needs a column and screen; 300 m is a constant), the face check (decision 2), and whether a clock-in with an unknown or failed geofence should be refused or just flagged for the supervisor (today it is recorded only).

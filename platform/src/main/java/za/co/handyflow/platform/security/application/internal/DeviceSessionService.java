@@ -44,16 +44,53 @@ public class DeviceSessionService {
     private final GuardRepository           guardRepository;
     private final ShiftRepository           shiftRepository;
     private final PatrolRoundService        patrolRoundService;
+    private final SiteRepository            siteRepository;
 
     // ── Session Open ───────────────────────────────────────────────────────────
 
+    /**
+     * Staff route (tenant JWT): a supervisor opens a session on a guard's behalf, so the
+     * guard and the check results come from the request. Unchanged behaviour.
+     */
     @Transactional
     public DeviceSessionResponse openSession(TenantId tenantId, OpenSessionRequest req) {
+        return doOpen(tenantId, req.deviceHardwareId(), req.guardId(), req.pinVerified(),
+                req.faceMatchConfidence() != null
+                        ? new BigDecimal(req.faceMatchConfidence().toString()) : null,
+                device -> req.geofenceOk());
+    }
+
+    /**
+     * Guard route (guard token). The guard is the token's subject, never the request body.
+     * The PIN was verified by the server when the token was issued, so that flag is set
+     * here, not accepted from the phone. The geofence is computed here from the phone's
+     * reported position and the site's saved position. The face score is not stored:
+     * a score computed on the phone proves nothing (assessment R1).
+     */
+    @Transactional
+    public DeviceSessionResponse openGuardSession(TenantId tenantId, UUID authenticatedGuardId,
+                                                  GuardOpenSessionRequest req) {
+        return doOpen(tenantId, req.deviceHardwareId(), authenticatedGuardId, true, null,
+                device -> evaluateGeofence(tenantId, device, req));
+    }
+
+    private Boolean evaluateGeofence(TenantId tenantId, SecurityDevice device,
+                                     GuardOpenSessionRequest req) {
+        if (device.getSiteId() == null) return null;
+        return siteRepository.findActiveById(tenantId, device.getSiteId())
+                .map(site -> SessionGeofence.evaluate(site.getLatitude(), site.getLongitude(),
+                        req.latitude(), req.longitude(), req.accuracyMetres()))
+                .orElse(null);
+    }
+
+    private DeviceSessionResponse doOpen(TenantId tenantId, String deviceHardwareId, UUID guardId,
+                                         boolean pinVerified, BigDecimal faceConfidence,
+                                         java.util.function.Function<SecurityDevice, Boolean> geofence) {
 
         SecurityDevice device = deviceRepository
-                .findByTenantIdAndDeviceHardwareId(tenantId, req.deviceHardwareId())
+                .findByTenantIdAndDeviceHardwareId(tenantId, deviceHardwareId)
                 .orElseThrow(() -> new ResourceNotFoundException("SecurityDevice",
-                        req.deviceHardwareId()));
+                        deviceHardwareId));
 
         if (!device.isActive()) {
             throw new HandyFlowException(
@@ -68,16 +105,16 @@ public class DeviceSessionService {
                     HttpStatus.CONFLICT, "DEVICE_SESSION_CONFLICT");
         });
 
-        sessionRepository.findOpenByGuard(req.guardId()).ifPresent(existing -> {
+        sessionRepository.findOpenByGuard(guardId).ifPresent(existing -> {
             throw new HandyFlowException(
                     "This guard already has an open session on device "
                             + existing.getDeviceId() + ". Close that session first.",
                     HttpStatus.CONFLICT, "GUARD_SESSION_CONFLICT");
         });
 
-        Guard guard = guardRepository.findActiveById(tenantId, req.guardId())
+        Guard guard = guardRepository.findActiveById(tenantId, guardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Guard",
-                        req.guardId().toString()));
+                        guardId.toString()));
 
         if (!guard.isSchedulable()) {
             throw new HandyFlowException(
@@ -93,7 +130,7 @@ public class DeviceSessionService {
         List<za.co.handyflow.platform.security.domain.model.Shift> candidateShifts =
                 shiftRepository.findScheduledStartingBefore(tenantId, windowEnd)
                         .stream()
-                        .filter(s -> s.getGuardId().equals(req.guardId()))
+                        .filter(s -> s.getGuardId().equals(guardId))
                         .filter(s -> s.getSiteId().equals(device.getSiteId()))
                         .filter(s -> s.getStartAt().isAfter(windowStart))
                         .toList();
@@ -106,12 +143,9 @@ public class DeviceSessionService {
         }
 
         DeviceSession session = DeviceSession.open(
-                tenantId, device.getId(), req.guardId(),
+                tenantId, device.getId(), guardId,
                 shift != null ? shift.getId() : null,
-                req.pinVerified(),
-                req.faceMatchConfidence() != null
-                        ? new BigDecimal(req.faceMatchConfidence().toString()) : null,
-                req.geofenceOk());
+                pinVerified, faceConfidence, geofence.apply(device));
         sessionRepository.save(session);
 
         if (shift != null && device.getSiteId() != null) {
@@ -119,10 +153,36 @@ public class DeviceSessionService {
         }
 
         log.info("[Security] Session opened sessionId={} guardId={} deviceId={} shiftId={}",
-                session.getId(), req.guardId(), device.getId(),
+                session.getId(), guardId, device.getId(),
                 shift != null ? shift.getId() : "none");
 
         return toResponse(session, guard, device, shift);
+    }
+
+    // ── Ownership (guard route) ────────────────────────────────────────────────
+
+    /** A guard may act only on their own session. Another guard's session looks like it does not exist. */
+    @Transactional(readOnly = true)
+    public void assertSessionOwnedBy(TenantId tenantId, UUID sessionId, UUID guardId) {
+        sessionRepository.findById(sessionId)
+                .filter(s -> s.getTenantId().equals(tenantId) && s.getGuardId().equals(guardId))
+                .orElseThrow(() -> new ResourceNotFoundException("DeviceSession", sessionId.toString()));
+    }
+
+    @Transactional(readOnly = true)
+    public void assertCustodyOwnedBy(TenantId tenantId, UUID custodyId, UUID guardId) {
+        custodyRepository.findById(custodyId)
+                .filter(c -> c.getTenantId().equals(tenantId) && guardId.equals(c.getGuardId()))
+                .orElseThrow(() -> new ResourceNotFoundException("ResourceCustody", custodyId.toString()));
+    }
+
+    /** Guard route close: ownership checked, PIN claim taken from the token, face score dropped. */
+    @Transactional
+    public DeviceSessionResponse closeGuardSession(TenantId tenantId, UUID authenticatedGuardId,
+                                                   UUID sessionId, CloseSessionRequest req) {
+        assertSessionOwnedBy(tenantId, sessionId, authenticatedGuardId);
+        return closeSession(tenantId, sessionId, new CloseSessionRequest(
+                true, null, req.handoverNotes(), req.resourcesReturned(), req.incompletePatrolReason()));
     }
 
     // ── Session Close ──────────────────────────────────────────────────────────

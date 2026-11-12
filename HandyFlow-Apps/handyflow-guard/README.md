@@ -21,6 +21,6 @@ Done: scaffold, strict config, API client (envelope, timeout, 401 sign-out, netw
 Not done: shift (clock in/out), patrol rounds, checkpoint scan, panic, incident with photos, post orders, swaps, offline queue, push, Android/iOS builds (EAS), real icon and splash.
 
 ## Rules for this app
-- The phone never states who the guard is, whether a PIN passed, or whether they are inside the geofence. The server decides all three (assessment R1, R2). Until the backend is fixed, the clock-in screen must not be built against the current `OpenSessionRequest`.
+- The phone never states who the guard is, whether a PIN passed, or whether they are inside the geofence. The server decides all three (assessment R1, R2). Clock-in sends only `{deviceHardwareId, latitude, longitude, accuracyMetres}` to `POST /api/v1/guard/sessions/open` (backend patch 0815); it never sends a guard id or check results.
 - Writes that can be repeated (scan, incident, panic) get a client-generated id and a recorded-at time before they go on the wire (assessment G3).
 - Token only in secure storage. No guard data in logs.

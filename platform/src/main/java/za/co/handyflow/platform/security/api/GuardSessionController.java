@@ -69,10 +69,11 @@ public class GuardSessionController {
                     "a 30-minute window). Identity resolved from deviceHardwareId in the " +
                     "request body, not a JWT claim.")
     public ResponseEntity<ApiResponse<DeviceSessionResponse>> openSession(
-            @Valid @RequestBody OpenSessionRequest req) {
+            @Valid @RequestBody GuardOpenSessionRequest req) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(sessionService.openSession(tenantId, req)));
+                .body(ApiResponse.success(sessionService.openGuardSession(
+                        tenantId, TenantContext.getCurrentUserId(), req)));
     }
 
     @PostMapping("/{sessionId}/close")
@@ -85,7 +86,7 @@ public class GuardSessionController {
             @Valid @RequestBody CloseSessionRequest req) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
-                sessionService.closeSession(tenantId, sessionId, req)));
+                sessionService.closeGuardSession(tenantId, TenantContext.getCurrentUserId(), sessionId, req)));
     }
 
     @GetMapping("/current")
@@ -96,7 +97,9 @@ public class GuardSessionController {
     public ResponseEntity<ApiResponse<DeviceSession>> getCurrentSession(
             @RequestParam String deviceHardwareId) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
+        UUID me = TenantContext.getCurrentUserId();
         return sessionService.getCurrentSession(deviceHardwareId, tenantId)
+                .filter(s -> s.getGuardId().equals(me)) // never show another guard's session on a shared device
                 .map(s -> ResponseEntity.ok(ApiResponse.success(s)))
                 .orElseGet(() -> ResponseEntity.ok(ApiResponse.success((DeviceSession) null)));
     }
@@ -112,6 +115,7 @@ public class GuardSessionController {
             @PathVariable UUID sessionId,
             @Valid @RequestBody RecordLocationPingRequest req) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
+        sessionService.assertSessionOwnedBy(tenantId, sessionId, TenantContext.getCurrentUserId());
         guardLocationService.recordPing(tenantId, sessionId, req);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
@@ -128,6 +132,7 @@ public class GuardSessionController {
             @PathVariable UUID sessionId,
             @Valid @RequestBody CheckoutResourceRequest req) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
+        sessionService.assertSessionOwnedBy(tenantId, sessionId, TenantContext.getCurrentUserId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(
                         sessionService.checkoutResource(tenantId, sessionId, req)));
@@ -143,6 +148,7 @@ public class GuardSessionController {
             @PathVariable UUID custodyId,
             @Valid @RequestBody ReturnResourceRequest req) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
+        sessionService.assertCustodyOwnedBy(tenantId, custodyId, TenantContext.getCurrentUserId());
         return ResponseEntity.ok(ApiResponse.success(
                 sessionService.returnResource(tenantId, custodyId, req)));
     }
