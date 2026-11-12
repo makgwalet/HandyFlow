@@ -92,6 +92,22 @@ Use a second guard, enrolled the same way, with a shift at a second site (create
 | G10 | Open incident at the site: Acknowledge, then Resolve with a note | Status changes; the incident timeline in Swagger shows Lerato's name and the note |
 | G11 | An incident at another site, with Lerato's token on `.../supervisor/incidents/<id>/acknowledge` | 404 |
 
+## H. Push alerts (patches 0836, 0837) — needs a real phone with an EAS preview build
+
+Switch on first: set `handyflow.guard.push.enabled=true` on the backend (it is off by default), run `eas init` and build with `--profile preview`, and point the build at a backend the phone can reach over https.
+
+| # | Do | Expect |
+|---|----|--------|
+| H1 | Sign in on the phone and allow notifications | `security_guard_push_tokens` has one live row for Lerato's phone id |
+| H2 | Create a shift for Lerato in Swagger (A7) | An alert "New shift" arrives; tapping it opens Home |
+| H3 | Sipho asks Lerato to take a shift (`POST /api/v1/guard/shifts/swaps` with Lerato as proposed guard) | Lerato gets "Shift swap request"; tapping opens Swaps |
+| H4 | Approve or reject that swap (web or supervisor view) | Sipho gets "Swap approved" or "Swap refused" and, on approval, Lerato gets "New shift" |
+| H5 | Lerato presses panic; the control room triages the alarm | Lerato gets "The control room has seen your alert" |
+| H6 | Acknowledge an incident Lerato reported | She gets "Report received" |
+| H7 | Sign out | Her token row is revoked. Sign in as Sipho on the same phone: the token moves to Sipho; Lerato gets nothing further |
+| H8 | Uninstall the app, trigger an alert for that guard, then another | The first send marks the token dead (revoked); the backend log shows no error spam |
+| H9 | Turn `handyflow.guard.push.enabled` off and repeat H2 | No alert, no errors, the shift is still created |
+
 ## F. What to send back
 
 For every row that did not behave as expected: the row number, what you saw, a screenshot, and the backend log lines around the time. Also tell me: how long Start shift took, whether the camera scan worked from the monitor, and anything a guard would find confusing.

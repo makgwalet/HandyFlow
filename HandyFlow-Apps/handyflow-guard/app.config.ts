@@ -53,6 +53,7 @@ const config: ExpoConfig = {
       "expo-image-picker",
       { cameraPermission: "HandyFlow Guard takes photos to attach to incident reports." },
     ],
+    ["expo-notifications", { defaultChannel: "default" }],
     [
       "expo-camera",
       { cameraPermission: "HandyFlow Guard uses the camera to scan checkpoint codes." },

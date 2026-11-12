@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { configureApi } from "@/api/client";
 import { GuardSession, guardSessionSchema, loginGuard, logoutGuard, changePin as changePinApi } from "@/api/guardAuth";
+import { unregisterPushToken } from "@/api/pushApi";
 import { clearSession, getDeviceId, loadSession, saveSession } from "./deviceStore";
 
 type Status = "loading" | "signedOut" | "signedIn";
@@ -66,6 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    try {
+      await unregisterPushToken(await getDeviceId()); // stop this guard's alerts on this phone while the sign-in still works
+    } catch {
+      /* offline: the next guard to register on this phone takes the token over */
+    }
     try {
       await logoutGuard(); // revoke on the server; ignore failure, local sign-out must always work
     } catch {

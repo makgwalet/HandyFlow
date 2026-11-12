@@ -6,7 +6,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { LoginScreen } from "@/screens/LoginScreen";
 import { ChangePinScreen } from "@/screens/ChangePinScreen";
-import { NavigationContainer, DarkTheme } from "@react-navigation/native";
+import { NavigationContainer, DarkTheme, createNavigationContainerRef } from "@react-navigation/native";
+import * as Notifications from "expo-notifications";
+import { configurePush, registerForPush, screenFromData } from "@/push";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { OutboxProvider } from "@/offline/OutboxProvider";
 import { HomeScreen } from "@/screens/HomeScreen";
@@ -23,13 +25,32 @@ import type { RootStackParamList } from "@/screens/types";
 import { colors } from "@/ui/theme";
 
 const queryClient = new QueryClient();
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
+void configurePush();
+
+/** Registers this phone for alerts once signed in, and opens the right screen when an alert is tapped. */
+function PushBridge() {
+  React.useEffect(() => {
+    void registerForPush();
+    const open = (data: unknown) => {
+      const screen = screenFromData(data);
+      if (screen && navigationRef.isReady()) navigationRef.navigate(screen);
+    };
+    const last = Notifications.getLastNotificationResponse();
+    if (last) open(last.notification.request.content.data);
+    const sub = Notifications.addNotificationResponseReceivedListener((r) => open(r.notification.request.content.data));
+    return () => sub.remove();
+  }, []);
+  return null;
+}
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const navTheme = { ...DarkTheme, colors: { ...DarkTheme.colors, background: colors.bg, card: colors.surface, text: colors.text, border: colors.border } };
 
 function SignedIn() {
   return (
     <OutboxProvider>
-      <NavigationContainer theme={navTheme}>
+      <NavigationContainer theme={navTheme} ref={navigationRef}>
+        <PushBridge />
         <Stack.Navigator>
           <Stack.Screen name="Home" component={HomeScreen} options={{ title: "HandyFlow Guard", headerBackVisible: false }} />
           <Stack.Screen name="Patrol" component={PatrolScreen} options={{ title: "Patrol" }} />

@@ -30,7 +30,9 @@ Gate log: who is on site, log an arrival (visitor, contractor, delivery, staff v
 
 Site overview (guards a manager made site supervisors only): who is on duty at the site they are on shift at, round counts, last scan, and unresolved incidents from the last 24 hours. Read only. The button appears on Home only when the server allows it.
 
-Not done: push alerts, supervisor actions (approving swaps, acknowledging incidents), naming a colleague for a swap (the server has no guard-facing colleague list), offline acknowledgement, equipment checkout, gate log, EAS builds, real icon and splash, translations.
+Push alerts: the app registers the phone's token after sign-in, removes it on sign-out, and opens the right screen when an alert is tapped. Needs a real phone with an EAS build (not an emulator, not Expo Go) and `eas init` so the project id exists. The backend sends only when `handyflow.guard.push.enabled=true`.
+
+Not done: supervisor actions (approving swaps, acknowledging incidents), naming a colleague for a swap (the server has no guard-facing colleague list), offline acknowledgement, equipment checkout, gate log, EAS builds, real icon and splash, translations.
 Never run on a phone or emulator: checked only by type check, unit tests and an Android bundle build.
 
 ## Rules for this app
