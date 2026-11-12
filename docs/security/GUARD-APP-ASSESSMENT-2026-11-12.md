@@ -1,0 +1,91 @@
+# HandyFlow Guard: what exists, what is missing, what to build first
+
+Assessed 2026-11-12 on branch `fuel-stage0`. Discovery only: nothing was installed, built or changed. Status words follow the mobile documents: `[Verified]` seen in code, `[Proposed]` recommendation, `[Requires approval]` needs a product-owner decision.
+
+Not run: no Java was compiled or executed for this assessment, and no guard flow was exercised on a device. Everything below is from reading code and the earlier audits (22 Oct readiness audit, 12 Nov mobile documents).
+
+## 1. Where we are
+
+- `[Verified]` **There is no Guard app in the repository.** Code comments call it "HandyFlow Shield"; nothing by that name exists under `HandyFlow-Apps/`. The four folders there are a Fuel scaffold, a Fuel prototype (named "handyfarm"), the Agriculture app and a desktop clinic app. Guard starts from nothing, so it can follow the mobile standards from day one.
+- `[Verified]` The backend is well ahead. Security is the largest module (about 300 endpoints). The guard-facing part is already separated onto its own token and path (`/api/v1/guard/**`, filter `GuardJwtFilter`, tokens stored and revocable in `security_guard_tokens`).
+
+## 2. What a guard can already do through the API
+
+| Need | Endpoint | State |
+|---|---|---|
+| Sign in with phone or employee code + 6-digit PIN | `POST /api/v1/auth/guard/login` | `[Verified]` 13 h token, lockout after 5 failures for 30 min, forced PIN change flag |
+| Move to a new phone | `POST /api/v1/auth/guard/activate-device` (6-digit supervisor code, 15 min, rate limited) | `[Verified]` |
+| Change PIN, log out | `POST /api/v1/guard/auth/change-pin`, `/logout` | `[Verified]` |
+| Start and end a shift | `POST /api/v1/guard/sessions/open`, `/{id}/close`, `GET /current` | `[Verified]` see risk R1 |
+| Location pings | `POST /api/v1/guard/sessions/{id}/location` | `[Verified]` |
+| Equipment (radio, torch, firearm) out and back | `.../resources/checkout`, `/resources/{id}/return` | `[Verified]` |
+| Scan a checkpoint (QR, NFC, BLE, GPS, manual) | `POST /api/v1/guard/checkpoints/scan` | `[Verified]` guard taken from the token, not the body |
+| Duress / panic | `POST /api/v1/guard/duress` | `[Verified]` |
+| Report an incident | `POST /api/v1/guard/incidents` | `[Verified]` text only, see gap G2 |
+| Post orders for my post, acknowledge | `GET /api/v1/guard/my-post`, `/posts/{id}`, `/orders/{id}/acknowledge` | `[Verified]` |
+| Gate log: who is on site, sign people in and out, attach photo | `/api/v1/guard/gate/**` | `[Verified]` the one place photos can be sent today |
+| Shift swaps: mine, offer, accept, cancel | `/api/v1/guard/shifts/swaps/**` | `[Verified]` |
+
+## 3. Risks to close before any guard uses a phone
+
+| # | Risk | Evidence | Why it matters |
+|---|---|---|---|
+| R1 | **Clock-in trusts the phone.** The open-session request carries `guardId`, `pinVerified`, `faceMatchConfidence` and `geofenceOk` from the client, and the service stores them as given. The guard is picked from the body, not the token. | `OpenSessionRequest`, `DeviceSessionService.openSession` | Anyone holding a valid guard token on a registered device can clock in as another guard, or report a passed PIN/face/geofence that never happened. Attendance and pay evidence is only as good as this. This is audit item SEC-02 and it is **still open**. `[Proposed]` take the guard from the token, verify the PIN on the server, compute geofence on the server from the site's saved position, treat the face score as a recorded signal, not proof. |
+| R2 | **Duress names who triggered it in the body** (`triggeredByGuardId`). | `TriggerDuressRequest` | A false or misattributed duress alert. `[Proposed]` use the token's guard and ignore the body field. |
+| R3 | **Two identity modes for devices.** Guard endpoints under `/api/v1/security/sessions/**` use a tenant JWT; the same actions under `/api/v1/guard/**` use the guard token. Duplicates can drift. | `DeviceSessionController`, `GuardSessionController` | `[Proposed]` the app uses only `/api/v1/guard/**`. |
+| R4 | **Revoked tokens on staff paths** (audit PLT-01, untyped tokens on one key). Not re-checked in this pass. | 22 Oct audit | Needs a quick re-test before launch. |
+| R5 | **Entitlement check**: about 200 Security endpoints had no subscription check in the October audit; not re-checked here. | audit | Re-test. |
+
+## 4. Gaps the app needs (backend work)
+
+| # | Gap | Why |
+|---|---|---|
+| G1 | **No guard-side "my shifts" and "my rounds".** Rounds are listed only for staff (`/api/v1/security/patrols`), shifts only by staff. A guard cannot see tonight's roster, route or checkpoint order. | Core screen |
+| G2 | **Incident photos and video cannot be uploaded by a guard.** Evidence upload exists only on the staff incident path. | Core screen |
+| G3 | **No offline-safe writes.** Scan, incident, duress and clock-in requests have no client-generated id, so a retry after a dropped signal can create duplicates, and a late scan has no "recorded at" time. | Patrols happen in basements and remote sites. Fuel already uses this pattern. |
+| G4 | **No push token registry** for the guard device, so alerts (shift change, missed round, supervisor message) cannot reach a locked phone. | Needed for supervisor-to-guard alerts |
+| G5 | **No "my attendance and pay summary"** for the guard. | Common first request from guards; payslip PDF exists on the staff side |
+| G6 | **No supervisor view on a phone**: live guards, missed rounds, approve swaps, close a session. Exists on the web only. | Role the roadmap calls "supervisors" |
+
+## 5. Recommended first release (Guard v1)
+
+Scope is a single-purpose guard app, not a general HR app.
+
+1. Sign in and activate device (PIN, forced change, lock after failures).
+2. Clock in and out with server-side checks (closes R1).
+3. Tonight's shift and patrol rounds, checkpoints in order.
+4. Scan QR/NFC, with GPS recorded, working offline with a sync queue.
+5. Panic button, always one tap, works with poor signal and falls back to SMS where the backend supports it `[Requires approval]`.
+6. Report an incident with photos.
+7. Post orders and acknowledgement.
+8. Shift swaps.
+9. Equipment checkout.
+
+Later: gate log on the phone, supervisor mode, attendance summary, face check done on the server, push alerts, check calls (no backend yet).
+
+Technology follows `MOBILE_TECHNOLOGY_STANDARDS.md`: Expo SDK per the decision still open there, TypeScript, secure storage for the token, SQLite write queue (same as the Agriculture app), TanStack Query.
+
+## 6. Order of work
+
+| Step | What | Size |
+|---|---|---|
+| A | Backend hardening: R1, R2, R3 decisions, plus tests proving a guard cannot act as another guard | S to M |
+| B | Backend additions: G1 (my shifts, my rounds), G2 (incident evidence), G3 (client id and recorded-at on scan, incident, duress, session), G4 (device and push token) | M |
+| C | App scaffold in the agreed monorepo layout, auth, secure storage, API client, offline queue, design tokens | M |
+| D | Screens: shift, patrol, scan, panic, incident, post orders, swaps | L |
+| E | Test script for security staff and a pilot on one site; then supervisor mode | M |
+
+A and B ship as patches the same way Fuel did. C onward is blocked on the repository decisions below.
+
+## 7. Decisions needed `[Requires approval]`
+
+1. **Repository layout and Expo SDK** (the open items 1 and 2 in the mobile overview): monorepo `HandyFlow-Apps/{apps,packages}`, current stable SDK, fresh scaffold. Guard should not be the first app on the old SDK 52.
+2. **Clock-in proof**: is a server-checked PIN plus geofence enough, or must a face check be required? A face score computed on the phone cannot be trusted by itself. Options: keep it as a recorded signal; run matching on the server; or drop it.
+3. **Shared tablets**: do some posts use one shared device for several guards (the demo data does)? If yes, the guard signs in on the shared device with their own PIN each time, and the token, not the device, decides who is clocked in. This changes R1's fix.
+4. **Panic with no data signal**: allow an SMS fallback to the control room? It has a cost and needs a number per tenant.
+5. **Should Guard be its own store app or part of a shared HandyFlow Work app?** The assessment recommends a separate field app for guards (own icon, locked-down, kiosk friendly).
+6. **Pilot site and a named person to test** before general release.
+
+## 8. Not covered
+
+Close protection, armoury inventory, control-room camera screens, client portal and payroll are not guard-app scope. The competitor comparison in the performance backlog was not re-checked.
