@@ -6,6 +6,7 @@ export interface SupplierInvoice {
   status: "CAPTURED" | "APPROVED" | "REJECTED"; matchStatus: "MATCHED" | "VARIANCE" | "UNMATCHED"; decisionReason: string | null; notes: string | null
   capturedAt: string; decidedAt: string | null; litresReceived: number; receiptValue: number; litresVariance: number; goodsValue: number; valueVariance: number
   priceVsPo: number | null; issues: string[]; receipts: InvReceipt[]
+  apBillId?: string | null; apHandedOffAt?: string | null
 }
 
 const num = (s: string) => (s.trim() === "" ? NaN : Number(s))

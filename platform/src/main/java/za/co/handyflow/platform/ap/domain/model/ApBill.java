@@ -158,6 +158,20 @@ public class ApBill {
         return b;
     }
 
+    /**
+     * A bill handed over from another module (e.g. FUEL). Same rules as the Supply Chain hand-off: DRAFT, category OTHER,
+     * AP's own approval and payment flow takes over. supplierId stays null: it references CRM customers, not the source module's supplier.
+     */
+    public static ApBill createFromSource(TenantId tenantId, String sourceType, String supplierName, String billNumber,
+                                          LocalDate billDate, LocalDate dueDate, BigDecimal amount, BigDecimal vatAmount,
+                                          String description, String sourceReference, UUID createdBy) {
+        ApBill b = create(tenantId, null, supplierName, billNumber, billDate, dueDate,
+                "OTHER", description, amount, vatAmount, null, null, null, createdBy);
+        b.sourceType      = sourceType;
+        b.sourceReference = sourceReference;
+        return b;
+    }
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     public void approve(UUID journalEntryId) {

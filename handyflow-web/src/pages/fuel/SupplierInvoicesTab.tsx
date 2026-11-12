@@ -26,6 +26,11 @@ export default function SupplierInvoicesTab() {
   const [open, setOpen] = useState<string | null>(null)
   const list = useQuery<SupplierInvoice[]>({ queryKey: ["fuel-supplier-invoices"], queryFn: async () => unwrap(await apiClient.get(BASE)) })
   const refresh = () => { for (const k of ["fuel-supplier-invoices", "fuel-purchase-orders", "fuel-po-match"]) qc.invalidateQueries({ queryKey: [k] }) }
+  const [apErr, setApErr] = useState("")
+  const sendToAp = useMutation({
+    mutationFn: (id: string) => apiClient.post(`${BASE}/${id}/send-to-ap`),
+    onSuccess: () => { setApErr(""); refresh() }, onError: (e: any) => setApErr(msg(e, "Could not send the invoice to Accounts Payable")),
+  })
   const rows = list.data ?? []
   const waiting = rows.filter(r => r.status === "CAPTURED").length
 
@@ -33,10 +38,11 @@ export default function SupplierInvoicesTab() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
         <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: 0, flex: 1, minWidth: 260 }}>
-          Capture the supplier's invoice, tick the deliveries it covers and we check the litres against what you received and the price against the receipts and the purchase order. A mismatch can still be approved, with a reason. Approval here records the decision; it does not post to Accounts Payable or pay anything.
+          Capture the supplier's invoice, tick the deliveries it covers and we check the litres against what you received and the price against the receipts and the purchase order. A mismatch can still be approved, with a reason. Approving sends the invoice to Accounts Payable as a draft bill when that module is on; paying it stays in Accounts Payable.
         </p>
         {canManage && <button style={btnPrimary} onClick={() => setDialog({ kind: "capture" })}>Capture invoice</button>}
       </div>
+      {apErr && <Err text={apErr} />}
       {waiting > 0 && <p style={{ fontSize: 13, color: "var(--hf-text)", margin: "0 0 10px" }}>{waiting} invoice{waiting === 1 ? "" : "s"} awaiting approval.</p>}
 
       {list.isLoading ? <p style={{ color: "var(--hf-text-muted)" }}>Loading…</p> : rows.length === 0 ? <p style={{ color: "var(--hf-text-muted)" }}>No supplier invoices yet.</p> : (
@@ -55,12 +61,14 @@ export default function SupplierInvoicesTab() {
                       <td style={td}>{fmtL(i.litres)}</td>
                       <td style={td}>{fmtR(i.totalAmount)}</td>
                       <td style={td}>{i.status === "REJECTED" ? "–" : <Chip bg={mb} fg={mf}>{MATCH_LABEL[i.matchStatus]}</Chip>}</td>
-                      <td style={td}><Chip bg={sb} fg={sf}>{STATUS_LABEL[i.status]}</Chip></td>
+                      <td style={td}><Chip bg={sb} fg={sf}>{STATUS_LABEL[i.status]}</Chip>{i.apBillId && <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>In Accounts Payable</div>}</td>
                       <td style={td}>{canManage && i.status === "CAPTURED" && (
                         <span style={{ display: "flex", gap: 6 }}>
                           <button style={btnGhost} onClick={() => setDialog({ kind: "approve", inv: i })}>Approve</button>
                           <button style={btnGhost} onClick={() => setDialog({ kind: "reject", inv: i })}>Reject</button>
-                        </span>)}</td>
+                        </span>)}
+                        {canManage && i.status === "APPROVED" && !i.apBillId && (
+                          <button style={btnGhost} disabled={sendToAp.isPending} onClick={() => sendToAp.mutate(i.id)}>Send to Accounts Payable</button>)}</td>
                     </tr>
                     {open === i.id && (
                       <tr><td colSpan={8} style={{ ...td, background: "var(--hf-surface-alt)" }}>

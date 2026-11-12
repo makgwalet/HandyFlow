@@ -62,6 +62,14 @@ public class FuelSupplierInvoiceController {
         return ResponseEntity.ok(ApiResponse.success("Invoice approved", service.approve(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
     }
 
+    /** B08: hands an already-approved invoice to Accounts Payable (approvals do this themselves when AP is on). */
+    @PostMapping("/{id}/send-to-ap")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_SUPPLIER_INVOICE_MANAGE')")
+    public ResponseEntity<ApiResponse<InvoiceResponse>> sendToAp(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Sent to Accounts Payable", service.sendToAp(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
+    }
+
     @PostMapping("/{id}/reject")
     @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_SUPPLIER_INVOICE_MANAGE')")
     public ResponseEntity<ApiResponse<InvoiceResponse>> reject(@PathVariable UUID id, @Valid @RequestBody DecisionRequest req) {

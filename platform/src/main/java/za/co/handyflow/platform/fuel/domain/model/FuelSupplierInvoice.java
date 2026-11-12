@@ -47,6 +47,8 @@ public class FuelSupplierInvoice {
     @Column(name = "captured_at", nullable = false, updatable = false) private Instant capturedAt;
     @Column(name = "decided_by") private UUID decidedBy;
     @Column(name = "decided_at") private Instant decidedAt;
+    @Column(name = "ap_bill_id") private UUID apBillId;
+    @Column(name = "ap_handed_off_at") private Instant apHandedOffAt;
     @Version private Long version;
 
     public static FuelSupplierInvoice capture(TenantId tenantId, UUID supplierId, UUID purchaseOrderId, String invoiceNumber, LocalDate invoiceDate,
@@ -70,6 +72,20 @@ public class FuelSupplierInvoice {
         i.capturedBy = by; i.capturedAt = Instant.now();
         return i;
     }
+
+    public boolean isApproved() { return "APPROVED".equals(status); }
+    public boolean isHandedToAp() { return apBillId != null; }
+
+    /** Only an approved invoice goes to AP, and only once. */
+    public void recordApHandOff(UUID billId) {
+        if (!isApproved()) throw new IllegalStateException("Only an approved invoice can be sent to Accounts Payable.");
+        if (billId == null) throw new IllegalArgumentException("No bill id.");
+        if (apBillId != null) return;
+        this.apBillId = billId; this.apHandedOffAt = Instant.now();
+    }
+
+    /** Ex-VAT amount: what AP stores as the bill amount (AP adds the VAT back to get the total). */
+    public BigDecimal amountExVat() { return totalAmount.subtract(vatAmount); }
 
     public boolean isCaptured() { return "CAPTURED".equals(status); }
 

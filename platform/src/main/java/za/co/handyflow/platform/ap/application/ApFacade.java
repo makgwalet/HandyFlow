@@ -76,4 +76,18 @@ public class ApFacade {
                                     billNumber, billDate, dueDate, amount, vatAmount, sourceReference, createdBy));
                 });
     }
+
+    /**
+     * Fuel -> AP hand-off for an approved supplier invoice. Returns only the bill id, so Fuel never touches AP's entities.
+     * Idempotent by (FUEL, sourceReference): a retry returns the existing bill rather than a second liability.
+     * Starts at DRAFT; AP's own approval and payment controls apply from here.
+     */
+    @Transactional
+    public UUID createBillFromFuelInvoice(TenantId tenantId, String supplierName, String sourceReference, String billNumber,
+                                          LocalDate billDate, LocalDate dueDate, BigDecimal amountExVat, BigDecimal vatAmount, UUID createdBy) {
+        return billRepository.findBySource(tenantId, "FUEL", sourceReference)
+                .orElseGet(() -> billRepository.save(ApBill.createFromSource(tenantId, "FUEL", supplierName, billNumber, billDate, dueDate,
+                        amountExVat, vatAmount, "Fuel supplier invoice " + billNumber, sourceReference, createdBy)))
+                .getId();
+    }
 }

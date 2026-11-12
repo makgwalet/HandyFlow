@@ -8,6 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.fuel.domain.model.*;
 import za.co.handyflow.platform.fuel.domain.repository.*;
 import za.co.handyflow.platform.fuel.dto.SupplierInvoiceDtos.*;
+import za.co.handyflow.platform.ap.application.ApFacade;
+import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -29,6 +31,8 @@ public class FuelSupplierInvoiceService {
     private final FuelReceiptRepository receipts;
     private final FuelPurchaseOrderRepository orders;
     private final FuelSupplierRepository suppliers;
+    private final ApFacade ap;
+    private final FeatureGuard featureGuard;
 
     @Transactional(readOnly = true)
     public List<InvoiceResponse> list(TenantId tenantId, int limit) {
@@ -99,9 +103,33 @@ public class FuelSupplierInvoiceService {
         FuelSupplierInvoice inv = find(tenantId, id);
         InvoiceResponse current = view(tenantId, inv); // match is recomputed now: a receipt reversed since capture counts
         inv.approve(current.matchStatus(), req == null ? null : req.reason(), by);
+        // Same transaction: if AP refuses, the approval rolls back and nothing is half done. Tenants without AP keep approving as before.
+        if (featureGuard.hasModule("ap")) handOffToAp(tenantId, inv, by);
         invoices.save(inv);
         log.info("Supplier invoice approved {} match={} by={}", inv.getInvoiceNumber(), current.matchStatus(), by);
         return view(tenantId, inv);
+    }
+
+    /** For invoices approved before AP was on, or before this existed: hands the approved invoice over now. Safe to repeat. */
+    @Transactional
+    public InvoiceResponse sendToAp(TenantId tenantId, UUID id, UUID by) {
+        FuelSupplierInvoice inv = find(tenantId, id);
+        if (!inv.isApproved()) throw new IllegalStateException("Only an approved invoice can be sent to Accounts Payable.");
+        featureGuard.requireModule("ap");
+        handOffToAp(tenantId, inv, by);
+        invoices.save(inv);
+        return view(tenantId, inv);
+    }
+
+    private void handOffToAp(TenantId tenantId, FuelSupplierInvoice inv, UUID by) {
+        if (inv.isHandedToAp()) return;
+        // Reference is the invoice id (unique per tenant); invoice numbers are only unique per supplier. The bill number is prefixed so it cannot collide with a hand-typed AP bill.
+        String billNumber = ("FUEL-" + inv.getInvoiceNumber());
+        if (billNumber.length() > 50) billNumber = billNumber.substring(0, 50);
+        UUID billId = ap.createBillFromFuelInvoice(tenantId, supplierName(tenantId, inv.getSupplierId()), inv.getId().toString(), billNumber,
+                inv.getInvoiceDate(), inv.getDueDate() == null ? inv.getInvoiceDate() : inv.getDueDate(), inv.amountExVat(), inv.getVatAmount(), by);
+        inv.recordApHandOff(billId);
+        log.info("Supplier invoice {} handed to AP bill={}", inv.getInvoiceNumber(), billId);
     }
 
     @Transactional
@@ -134,7 +162,8 @@ public class FuelSupplierInvoiceService {
                 i.getInvoiceDate(), i.getDueDate(), i.getLitres(), i.getPricePerLitre(), i.getOtherCharges(), i.getVatAmount(), i.getTotalAmount(),
                 i.getStatus(), matchStatus, i.getDecisionReason(), i.getNotes(), i.getCapturedAt(), i.getDecidedAt(),
                 m.litresReceived(), m.receiptValue(), m.litresVariance(), m.goodsValue(), m.valueVariance(), m.priceVsPo(),
-                "REJECTED".equals(i.getStatus()) ? List.of() : m.issues(), rs.stream().map(FuelSupplierInvoiceService::line).toList());
+                "REJECTED".equals(i.getStatus()) ? List.of() : m.issues(), rs.stream().map(FuelSupplierInvoiceService::line).toList(),
+                i.getApBillId(), i.getApHandedOffAt());
     }
 
     private static ReceiptLine line(FuelReceipt r) {

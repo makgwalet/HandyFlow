@@ -37,7 +37,7 @@ Each row is a gap statement; the backend/frontend/database/permission/test lists
 - **B03** done in code for dip readings (tenant parameter added). `FuelReceiptRepository.findByTank` and `FuelDispatchRepository.findByTank` have the same shape but no callers; left alone.
 - **B04** done in code (supplier status, off by default). Banking details and supplier documents are **not** built.
 - **B05** done in code through the Approvals engine (module fuel, type PURCHASE_ORDER). Requisitions are not built.
-- **B06 (quotes, contracts), B07 (price approval/margin guard)**: not started. **B08**: blocked on the Accounts Payable decision.
+- **B06 (quotes, contracts), B07 (price approval/margin guard)**: not started. **B08**: built (V668), see FUEL-B08-SUPPLIER-INVOICE-TO-AP-NOTES-2026-11-12.
 
 ## Status after Phase 3 (code written; Java not compiled or run by the author)
 - **C02** done in code: loaded-versus-delivered variance with a per-company tolerance that has **no default** (nothing is flagged until set), a review record (open, investigating, closed with EXPLAINED or WRITTEN_OFF and a note). A decision is a record only and moves no stock.

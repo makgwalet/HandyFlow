@@ -22,6 +22,8 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import za.co.handyflow.platform.ap.application.ApFacade;
+import za.co.handyflow.platform.billing.FeatureGuard;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -37,6 +39,8 @@ class FuelSupplierInvoiceServiceTest {
     @Mock FuelReceiptRepository receipts;
     @Mock FuelPurchaseOrderRepository orders;
     @Mock FuelSupplierRepository suppliers;
+    @Mock ApFacade ap;
+    @Mock FeatureGuard featureGuard;
     @InjectMocks FuelSupplierInvoiceService service;
 
     FuelSupplier supplier;
@@ -180,6 +184,58 @@ class FuelSupplierInvoiceServiceTest {
         InvoiceResponse r = service.approve(TENANT, inv.getId(), null, USER);
         assertEquals("APPROVED", r.status());
         assertEquals("MATCHED", r.matchStatus());
+    }
+
+    // ---- B08: hand-off to Accounts Payable ----
+
+    @Test @DisplayName("B08: approving with AP on creates one AP bill from the invoice (ex-VAT amount, due date, supplier name) and records it")
+    void approveHandsToAp() {
+        when(featureGuard.hasModule("ap")).thenReturn(true);
+        UUID bill = UUID.randomUUID();
+        when(ap.createBillFromFuelInvoice(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(bill);
+        FuelSupplierInvoice inv = capturedWith("10000", "20.00");
+        InvoiceResponse r = service.approve(TENANT, inv.getId(), null, USER);
+        assertEquals(bill, r.apBillId());
+        verify(ap).createBillFromFuelInvoice(eq(TENANT), eq("Acme Fuels"), eq(inv.getId().toString()), eq("FUEL-" + inv.getInvoiceNumber()),
+                eq(inv.getInvoiceDate()), any(), eq(inv.getTotalAmount().subtract(inv.getVatAmount())), eq(inv.getVatAmount()), eq(USER));
+    }
+
+    @Test @DisplayName("B08: with AP off, approving works as before and nothing is sent")
+    void approveWithoutAp() {
+        when(featureGuard.hasModule("ap")).thenReturn(false);
+        FuelSupplierInvoice inv = capturedWith("10000", "20.00");
+        InvoiceResponse r = service.approve(TENANT, inv.getId(), null, USER);
+        assertEquals("APPROVED", r.status());
+        assertNull(r.apBillId());
+        verifyNoInteractions(ap);
+    }
+
+    @Test @DisplayName("B08: if AP refuses, the approval fails rather than leaving an approved invoice with no bill")
+    void apFailureStopsApproval() {
+        when(featureGuard.hasModule("ap")).thenReturn(true);
+        when(ap.createBillFromFuelInvoice(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenThrow(new IllegalStateException("AP down"));
+        FuelSupplierInvoice inv = capturedWith("10000", "20.00");
+        assertThrows(IllegalStateException.class, () -> service.approve(TENANT, inv.getId(), null, USER));
+        verify(invoices, never()).save(argThat(x -> x == inv && x.isHandedToAp()));
+    }
+
+    @Test @DisplayName("B08: sending an approved invoice later hands it over once, and a repeat does not call AP again")
+    void sendToApLaterIsOnce() {
+        FuelSupplierInvoice inv = capturedWith("10000", "20.00");
+        service.approve(TENANT, inv.getId(), null, USER);
+        when(featureGuard.hasModule("ap")).thenReturn(true);
+        UUID bill = UUID.randomUUID();
+        when(ap.createBillFromFuelInvoice(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(bill);
+        assertEquals(bill, service.sendToAp(TENANT, inv.getId(), USER).apBillId());
+        service.sendToAp(TENANT, inv.getId(), USER);
+        verify(ap, times(1)).createBillFromFuelInvoice(any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test @DisplayName("B08: only an approved invoice can be sent to AP")
+    void onlyApprovedGoes() {
+        FuelSupplierInvoice inv = capturedWith("10000", "20.00");
+        assertThrows(IllegalStateException.class, () -> service.sendToAp(TENANT, inv.getId(), USER));
+        verifyNoInteractions(ap);
     }
 
     @Test @DisplayName("a mismatch needs a reason to approve, and the reason is kept")

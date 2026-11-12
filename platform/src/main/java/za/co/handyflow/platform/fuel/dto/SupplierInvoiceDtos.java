@@ -27,5 +27,6 @@ public final class SupplierInvoiceDtos {
                                   LocalDate invoiceDate, LocalDate dueDate, BigDecimal litres, BigDecimal pricePerLitre, BigDecimal otherCharges,
                                   BigDecimal vatAmount, BigDecimal totalAmount, String status, String matchStatus, String decisionReason, String notes,
                                   Instant capturedAt, Instant decidedAt, BigDecimal litresReceived, BigDecimal receiptValue, BigDecimal litresVariance,
-                                  BigDecimal goodsValue, BigDecimal valueVariance, BigDecimal priceVsPo, List<String> issues, List<ReceiptLine> receipts) {}
+                                  BigDecimal goodsValue, BigDecimal valueVariance, BigDecimal priceVsPo, List<String> issues, List<ReceiptLine> receipts,
+                                  UUID apBillId, Instant apHandedOffAt) {}
 }

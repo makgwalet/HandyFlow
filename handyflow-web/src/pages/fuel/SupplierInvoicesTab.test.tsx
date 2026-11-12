@@ -53,6 +53,30 @@ describe("SupplierInvoicesTab", () => {
     await waitFor(() => screen.getByText(/10,500 L but 10,000 L was received/))
   })
 
+  it("B08: an approved invoice not yet in Accounts Payable offers Send to Accounts Payable", async () => {
+    list = [inv({ status: "APPROVED" })]
+    mount()
+    await waitFor(() => screen.getByText("Send to Accounts Payable"))
+    fireEvent.click(screen.getByText("Send to Accounts Payable"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/supplier-invoices/i1/send-to-ap"))
+  })
+
+  it("B08: an invoice already in Accounts Payable says so and has no button", async () => {
+    list = [inv({ status: "APPROVED", apBillId: "b1" })]
+    mount()
+    await waitFor(() => screen.getByText("In Accounts Payable"))
+    expect(screen.queryByText("Send to Accounts Payable")).toBeNull()
+  })
+
+  it("B08: a refusal from the server (for example the module is off) is shown", async () => {
+    list = [inv({ status: "APPROVED" })]
+    post.mockRejectedValueOnce({ response: { data: { message: "Accounts Payable is not enabled for this tenant." } } })
+    mount()
+    await waitFor(() => screen.getByText("Send to Accounts Payable"))
+    fireEvent.click(screen.getByText("Send to Accounts Payable"))
+    await waitFor(() => screen.getByText("Accounts Payable is not enabled for this tenant."))
+  })
+
   it("approves a matching invoice without a reason", async () => {
     list = [inv()]
     mount()
