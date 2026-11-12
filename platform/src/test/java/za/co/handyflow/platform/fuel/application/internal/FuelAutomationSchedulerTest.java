@@ -51,7 +51,7 @@ class FuelAutomationSchedulerTest {
 
     private void common() {
         when(featureGuard.hasModuleFor(any(), eq("fuel"))).thenReturn(true);
-        when(adminRecipients.resolveTenantAdmins(any())).thenReturn(List.of(admin));
+        when(adminRecipients.resolveTenantAdmins(any(TenantId.class))).thenReturn(List.of(admin));
         when(settings.findTenantsAlertingOverduePurchaseOrders()).thenReturn(List.of());
     }
 
