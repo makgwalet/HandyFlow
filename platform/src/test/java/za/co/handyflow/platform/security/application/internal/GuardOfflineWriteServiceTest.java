@@ -2,6 +2,9 @@ package za.co.handyflow.platform.security.application.internal;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.mock.web.MockMultipartFile;
+import za.co.handyflow.platform.evidence.application.EvidenceFacade;
+import za.co.handyflow.platform.evidence.dto.EvidenceResponse;
 import za.co.handyflow.platform.security.application.internal.GuardClientLedger.Kind;
 import za.co.handyflow.platform.security.domain.model.AlarmEvent;
 import za.co.handyflow.platform.security.domain.repository.AlarmEventRepository;
@@ -36,7 +39,9 @@ class GuardOfflineWriteServiceTest {
     private final IncidentService incidents = mock(IncidentService.class);
     private final ControlRoomService controlRoom = mock(ControlRoomService.class);
     private final AlarmEventRepository alarms = mock(AlarmEventRepository.class);
-    private final GuardOfflineWriteService service = new GuardOfflineWriteService(ledger, scans, incidents, controlRoom, alarms);
+    private final IncidentCaseService cases = mock(IncidentCaseService.class);
+    private final EvidenceFacade evidenceFacade = mock(EvidenceFacade.class);
+    private final GuardOfflineWriteService service = new GuardOfflineWriteService(ledger, scans, incidents, controlRoom, alarms, cases, evidenceFacade);
 
     private final UUID guard = UUID.randomUUID();
     private final UUID ref = UUID.randomUUID();
@@ -110,5 +115,48 @@ class GuardOfflineWriteServiceTest {
 
         assertThatThrownBy(() -> service.scan(TENANT, guard, scanReq(ref)))
                 .isInstanceOf(HandyFlowException.class).hasMessageContaining("already being processed");
+    }
+
+    private static EvidenceResponse evidence(UUID id) {
+        return new EvidenceResponse(id, "p.jpg", "image/jpeg", 3, "PHOTO", "ACTIVE", "Lerato", Instant.now());
+    }
+
+    private final MockMultipartFile photo = new MockMultipartFile("file", "p.jpg", "image/jpeg", new byte[]{1, 2, 3});
+
+    @Test
+    void aPhotoSentBeforeItsIncidentHasArrivedIsToldToRetry() {
+        when(ledger.find(TENANT, Kind.INCIDENT, ref, guard)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.evidence(TENANT, guard, "Lerato", ref, UUID.randomUUID(), photo, null))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("not reached the server");
+        verify(cases, never()).attachByGuard(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void theFirstUploadOfAPhotoIsAttachedAndRemembered() {
+        UUID incidentId = UUID.randomUUID();
+        UUID photoRef = UUID.randomUUID();
+        UUID evidenceId = UUID.randomUUID();
+        EvidenceResponse made = evidence(evidenceId);
+        when(ledger.find(TENANT, Kind.INCIDENT, ref, guard)).thenReturn(Optional.of(incidentId));
+        when(ledger.find(TENANT, Kind.EVIDENCE, photoRef, guard)).thenReturn(Optional.empty());
+        when(cases.attachByGuard(TENANT, incidentId, guard, photo, "Gate", "Lerato")).thenReturn(made);
+
+        assertThat(service.evidence(TENANT, guard, "Lerato", ref, photoRef, photo, "Gate")).isSameAs(made);
+        verify(ledger).record(TENANT, guard, Kind.EVIDENCE, photoRef, evidenceId);
+    }
+
+    @Test
+    void aRetriedPhotoIsNotAttachedTwice() {
+        UUID incidentId = UUID.randomUUID();
+        UUID photoRef = UUID.randomUUID();
+        UUID evidenceId = UUID.randomUUID();
+        EvidenceResponse first = evidence(evidenceId);
+        when(ledger.find(TENANT, Kind.INCIDENT, ref, guard)).thenReturn(Optional.of(incidentId));
+        when(ledger.find(TENANT, Kind.EVIDENCE, photoRef, guard)).thenReturn(Optional.of(evidenceId));
+        when(evidenceFacade.listFor(TENANT, "security", "Incident", incidentId)).thenReturn(java.util.List.of(first));
+
+        assertThat(service.evidence(TENANT, guard, "Lerato", ref, photoRef, photo, null)).isSameAs(first);
+        verify(cases, never()).attachByGuard(any(), any(), any(), any(), any(), any());
     }
 }

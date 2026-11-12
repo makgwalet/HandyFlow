@@ -73,6 +73,21 @@ public class GuardIncidentController {
                 offlineWrites.incident(TenantContext.getTenantIdAsObject(), me, TenantContext.getCurrentUserName(), own)));
     }
 
+    @PostMapping(value = "/by-ref/{incidentRef}/evidence", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('SECURITY_GUARD')")
+    @Operation(summary = "Attach a photo to an incident you reported, named by its clientRef — guard-facing, retry-safe",
+            description = "For the guard app's offline queue: the photo may be sent before the phone knows the server's incident id. " +
+                    "photoRef is a UUID the phone makes once per photo; a retry with the same photoRef attaches nothing new. " +
+                    "409 until the incident itself has reached the server.")
+    public ResponseEntity<ApiResponse<EvidenceResponse>> attachByRef(@PathVariable UUID incidentRef,
+                                                                     @RequestParam("file") MultipartFile file,
+                                                                     @RequestParam("photoRef") UUID photoRef,
+                                                                     @RequestParam(value = "label", required = false) String label) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Evidence attached",
+                offlineWrites.evidence(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(),
+                        TenantContext.getCurrentUserName(), incidentRef, photoRef, file, label)));
+    }
+
     @PostMapping(value = "/{id}/evidence", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAuthority('SECURITY_GUARD')")
     @Operation(summary = "Attach a photo or file to an incident you reported — guard-facing",

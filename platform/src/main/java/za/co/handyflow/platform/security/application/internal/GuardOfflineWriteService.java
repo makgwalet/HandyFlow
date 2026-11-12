@@ -6,6 +6,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import za.co.handyflow.platform.evidence.application.EvidenceFacade;
+import za.co.handyflow.platform.evidence.dto.EvidenceResponse;
 import za.co.handyflow.platform.security.application.internal.GuardClientLedger.Kind;
 import za.co.handyflow.platform.security.domain.model.AlarmEvent;
 import za.co.handyflow.platform.security.domain.repository.AlarmEventRepository;
@@ -38,6 +41,8 @@ public class GuardOfflineWriteService {
     private final IncidentService incidentService;
     private final ControlRoomService controlRoomService;
     private final AlarmEventRepository alarmEvents;
+    private final IncidentCaseService caseService;
+    private final EvidenceFacade evidenceFacade;
 
     @Transactional
     public ScanResponse scan(TenantId tenantId, UUID guardId, ScanRequest req) {
@@ -58,6 +63,23 @@ public class GuardOfflineWriteService {
         return once(tenantId, guardId, Kind.DURESS, req.clientRef(),
                 () -> controlRoomService.triggerDuress(tenantId, req), AlarmEvent::getId,
                 id -> alarmEvents.findById(id).orElseThrow(() -> new ResourceNotFoundException("AlarmEvent", id.toString())));
+    }
+
+    /**
+     * A photo for an incident the guard reported, named by the incident's clientRef because the phone may send the photo
+     * before it knows the server's id. Until the incident has reached the server this answers 409 and the phone retries.
+     * The photo's own id (photoRef) makes a retried upload a no-op.
+     */
+    @Transactional
+    public EvidenceResponse evidence(TenantId tenantId, UUID guardId, String guardName, UUID incidentRef, UUID photoRef,
+                                     MultipartFile file, String label) {
+        UUID incidentId = ledger.find(tenantId, Kind.INCIDENT, incidentRef, guardId).orElseThrow(() -> new HandyFlowException(
+                "The incident report has not reached the server yet. Try again shortly.", HttpStatus.CONFLICT, "INCIDENT_NOT_SENT_YET"));
+        return once(tenantId, guardId, Kind.EVIDENCE, photoRef,
+                () -> caseService.attachByGuard(tenantId, incidentId, guardId, file, label, guardName), EvidenceResponse::id,
+                id -> evidenceFacade.listFor(tenantId, IncidentCaseService.SOURCE_MODULE, IncidentCaseService.ENTITY_TYPE, incidentId).stream()
+                        .filter(e -> e.id().equals(id)).findFirst()
+                        .orElseThrow(() -> new ResourceNotFoundException("Evidence", id.toString())));
     }
 
     private <T> T once(TenantId tenantId, UUID guardId, Kind kind, UUID clientRef,
