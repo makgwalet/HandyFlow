@@ -1,6 +1,6 @@
 import { ApiError } from "@/api/client";
 
-export type OutboxKind = "SCAN" | "INCIDENT" | "DURESS";
+export type OutboxKind = "SCAN" | "INCIDENT" | "DURESS" | "EVIDENCE";
 export type OutboxStatus = "PENDING" | "FAILED";
 
 /** One write waiting to reach the server. `id` is also the clientRef, so a retry can never double-create. */
@@ -38,8 +38,8 @@ export interface FlushResult {
   stopped: boolean;
 }
 
-/** Panic goes out before anything else; the rest keep the order they were made in. */
-const PRIORITY: Record<OutboxKind, number> = { DURESS: 0, INCIDENT: 1, SCAN: 2 };
+/** Panic goes out before anything else, photos go last (they need their incident on the server first); the rest keep the order they were made in. */
+const PRIORITY: Record<OutboxKind, number> = { DURESS: 0, INCIDENT: 1, SCAN: 2, EVIDENCE: 3 };
 
 export function sortForSending(items: OutboxItem[]): OutboxItem[] {
   return [...items].sort(

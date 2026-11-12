@@ -38,12 +38,15 @@ export function configureApi(opts: { token: TokenProvider; onUnauthorized: Unaut
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE";
   body?: unknown;
+  /** A multipart upload (photos). Sent as is; the content type and its boundary are set by the platform. */
+  form?: FormData;
   /** Skip the bearer header and the sign-out-on-401 behaviour (login endpoints). */
   anonymous?: boolean;
   signal?: AbortSignal;
 }
 
 const REQUEST_TIMEOUT_MS = 20_000;
+const UPLOAD_TIMEOUT_MS = 60_000;
 
 /**
  * Calls the backend and returns the envelope's `data`.
@@ -58,7 +61,7 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
   }
 
   const timeout = new AbortController();
-  const timer = setTimeout(() => timeout.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => timeout.abort(), opts.form ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
   opts.signal?.addEventListener("abort", () => timeout.abort());
 
   let response: Response;
@@ -66,7 +69,7 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
     response = await fetch(`${API_BASE_URL}${path}`, {
       method: opts.method ?? "GET",
       headers,
-      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+      body: opts.form ?? (opts.body === undefined ? undefined : JSON.stringify(opts.body)),
       signal: timeout.signal,
     });
   } catch {

@@ -20,7 +20,9 @@ Always add packages with `npx expo install <pkg>` on a machine that can reach ap
 Done: scaffold, strict config, API client, sign-in (phone or employee code + 6-digit PIN), forced PIN change, device id in secure storage.
 Done (screens, patch 0818): shift and clock in/out, patrol rounds with checkpoint ticks, QR scan with camera and GPS, incident report, panic (hold 1.5 s), sync banner.
 Offline: every scan, incident and panic is saved in SQLite first, then sent. Each carries a `clientRef` and `recordedAt`. Panic sends first, then incidents, then scans. No signal or an expired sign-in stops sending and keeps everything; a request the server refuses for good is parked as failed and shown. Each item is only ever sent under its own guard's sign-in (shared tablets), and Sign out is blocked while items are waiting.
-Not done: incident photos (needs the camera and file upload in the queue), push alerts, supervisor mode, shift swaps, post orders, equipment checkout, gate log, EAS builds, real icon and splash, translations.
+Incident photos: up to 5 per report, taken in the report screen, kept in the app's private storage, queued behind the report and uploaded by the report's id (a retry never attaches twice); the phone's copy is deleted after a successful upload. A photo whose report was refused for good stays parked as failed.
+
+Not done: push alerts, supervisor mode, shift swaps, post orders, equipment checkout, gate log, EAS builds, real icon and splash, translations.
 Never run on a phone or emulator: checked only by type check, unit tests and an Android bundle build.
 
 ## Rules for this app

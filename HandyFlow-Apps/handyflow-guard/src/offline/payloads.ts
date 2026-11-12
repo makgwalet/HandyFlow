@@ -85,6 +85,17 @@ export function incidentItem(
   );
 }
 
+/**
+ * A photo for an incident that may not have reached the server yet. `incidentRef` is the incident item's id (its
+ * clientRef); the item's own id is the photo's id, so a retried upload is attached once.
+ */
+export function evidenceItem(
+  input: { incidentRef: string; localUri: string; label: string | null },
+  ctx: Context,
+): OutboxItem {
+  return make("EVIDENCE", { incidentRef: input.incidentRef, localUri: input.localUri, label: input.label }, ctx);
+}
+
 export function duressItem(input: { position: Position | null }, ctx: Context): OutboxItem {
   return make(
     "DURESS",

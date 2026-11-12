@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { api } from "./client";
 import type { OutboxItem } from "@/offline/outbox";
+import { removePhoto } from "@/photos";
 
 export const shiftSchema = z.object({
   id: z.string(),
@@ -84,9 +85,24 @@ export function clockOut(
 
 /** Sends one queued write to its endpoint. The body already carries clientRef and recordedAt. */
 export async function sendOutboxItem(item: OutboxItem): Promise<void> {
+  if (item.kind === "EVIDENCE") {
+    await sendPhoto(item);
+    return;
+  }
   const path =
     item.kind === "SCAN" ? "/api/v1/guard/checkpoints/scan"
     : item.kind === "INCIDENT" ? "/api/v1/guard/incidents"
     : "/api/v1/guard/duress";
   await api<unknown>(path, { method: "POST", body: item.payload });
+}
+
+/** Uploads one queued photo, then deletes the phone's copy. A failed upload keeps the file for the retry. */
+async function sendPhoto(item: OutboxItem): Promise<void> {
+  const p = item.payload as { incidentRef: string; localUri: string; label: string | null };
+  const form = new FormData();
+  form.append("file", { uri: p.localUri, name: `${item.id}.jpg`, type: "image/jpeg" } as unknown as Blob);
+  form.append("photoRef", item.id);
+  if (p.label) form.append("label", p.label);
+  await api<unknown>(`/api/v1/guard/incidents/by-ref/${p.incidentRef}/evidence`, { method: "POST", form });
+  await removePhoto(p.localUri);
 }

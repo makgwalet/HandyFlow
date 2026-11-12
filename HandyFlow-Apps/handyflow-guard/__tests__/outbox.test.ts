@@ -1,6 +1,6 @@
 import { ApiError } from "@/api/client";
 import { flush, MAX_ATTEMPTS, sortForSending, type OutboxItem, type OutboxStore } from "@/offline/outbox";
-import { duressItem, incidentItem, scanItem, type Context } from "@/offline/payloads";
+import { duressItem, evidenceItem, incidentItem, scanItem, type Context } from "@/offline/payloads";
 
 function memoryStore(): OutboxStore & { all: Map<string, OutboxItem> } {
   const all = new Map<string, OutboxItem>();
@@ -135,5 +135,30 @@ describe("flush", () => {
     release();
     await Promise.all([first, second]);
     expect(send).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("incident photos", () => {
+  it("name their incident by its id and keep their own id as the photo id", () => {
+    const incident = incidentItem(
+      { siteId: "site", shiftId: null, title: "Gate forced", description: "", severity: "HIGH", type: "THEFT", position: null },
+      ctx(),
+    );
+    const photo = evidenceItem({ incidentRef: incident.id, localUri: "file:///p.jpg", label: "Gate forced" }, ctx());
+    expect(photo.kind).toBe("EVIDENCE");
+    expect(photo.payload.incidentRef).toBe(incident.id);
+    expect(photo.payload.clientRef).toBe(photo.id);
+    expect(photo.id).not.toBe(incident.id);
+  });
+
+  it("go out after the panic, the report and the scans, however early they were taken", () => {
+    const c = ctx();
+    const photo = evidenceItem({ incidentRef: "i", localUri: "file:///p.jpg", label: null }, c);
+    const scan = scanItem({ qrCode: "q", shiftId: null, position: null, deviceId: "d" }, ctx("g1", "2026-11-12T11:00:00.000Z"));
+    const incident = incidentItem(
+      { siteId: "s", shiftId: null, title: "Fire", description: "", severity: "LOW", type: "FIRE", position: null },
+      ctx("g1", "2026-11-12T11:30:00.000Z"),
+    );
+    expect(sortForSending([photo, scan, incident]).map((i) => i.kind)).toEqual(["INCIDENT", "SCAN", "EVIDENCE"]);
   });
 });

@@ -126,3 +126,10 @@ Written, not compiled or run here. Adds migration **V687** (`security_client_req
 | Clock-in | Stays online-only on purpose: it has server checks and conflicts that cannot be replayed safely. |
 
 Open: (1) a scan that arrives after its round was already marked missed does not count towards a round, because round routing only looks at open rounds; a grace window for late syncs is a rule decision. (2) Incident photo uploads have no client id, so a retried upload can attach twice (cap 20). (3) The ledger is never pruned; a cleanup after 90 days is easy to add. (4) The staff routes accept the new fields and ignore them.
+
+## 12. Status: incident photos (patches 0819 backend, 0820 app, 2026-11-12)
+
+- Backend: `POST /api/v1/guard/incidents/by-ref/{incidentRef}/evidence` (multipart `file`, required `photoRef`, optional `label`). The incident is found through the idempotency ledger by the clientRef the phone made, so a photo can be sent before the phone knows the server id; until the report has arrived the answer is 409 `INCIDENT_NOT_SENT_YET` and the phone retries. `photoRef` is recorded as kind EVIDENCE (migration V688 widens the kind check), so a retried upload returns the first result. Only the guard who reported the incident can attach (existing rule), 20 files per incident, type and size limits are the evidence store's.
+- App: up to 5 photos per report (`expo-image-picker`, quality 0.6), copied into app storage, queued as EVIDENCE items after the report, scans and panic; multipart upload with a 60 s timeout; the local copy is deleted after success.
+- Written, not compiled or run (Java). Tests added to `GuardOfflineWriteServiceTest` (photo before report, first upload, retry). App: `tsc` clean, 19 jest tests, `expo export` succeeds; the camera flow has not been run on a device.
+- Open: a failed report leaves its photos retrying until parked; photos of a dismissed failed item stay in storage; no compression beyond quality 0.6, so a very large photo could still exceed 5 MB and be refused.
