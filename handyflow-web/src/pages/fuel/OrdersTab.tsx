@@ -7,7 +7,7 @@ import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from 
 import type { CustomerAccount } from "./customerOps"
 import {
   statusLabel, fmtL, fmtR, validateOrder, validateConfirm, validateLoad, validateLoading, loadVariance,
-  type Order, type CreditCheck, type DeliveryLine,
+  type Order, type CreditCheck, type DeliveryLine, type OrderHistory, ACCEPT_CHANNELS, acceptancePayload, validateAcceptance,
 } from "./orderOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -32,6 +32,7 @@ export default function OrdersTab() {
   const [open, setOpen] = useState<string | null>(null)
 
   const list = useQuery<Order[]>({ queryKey: ["fuel-orders"], queryFn: async () => { const d = unwrap(await apiClient.get("/api/v1/fuel/orders")); return Array.isArray(d) ? d : (d?.content ?? []) } })
+  const history = useQuery<OrderHistory>({ queryKey: ["fuel-order-history", open], enabled: !!open, queryFn: async () => unwrap(await apiClient.get(`/api/v1/fuel/orders/${open}/history`)) })
   const detail = useQuery<Order>({ queryKey: ["fuel-order", open], enabled: !!open, queryFn: async () => unwrap(await apiClient.get(`/api/v1/fuel/orders/${open}`)) })
   const refresh = () => { qc.invalidateQueries({ queryKey: ["fuel-orders"] }); qc.invalidateQueries({ queryKey: ["fuel-order"] }); qc.invalidateQueries({ queryKey: ["fuel-availability"] }); qc.invalidateQueries({ queryKey: ["deliveries"] }) }
   const rows = list.data ?? []
@@ -72,6 +73,13 @@ export default function OrdersTab() {
                         {o.tankName ? `Supplied from ${o.tankName}. ` : ""}Remaining {fmtL(o.litresRemaining)}, scheduled {fmtL(o.litresScheduled)}.
                         {o.creditOverrideReason ? ` Credit override: ${o.creditOverrideReason}.` : ""}{o.cancelReason ? ` Cancelled: ${o.cancelReason}.` : ""}
                       </div>
+                      {history.data && ((history.data.revisions?.length ?? 0) > 1 || history.data.acceptance) && (
+                        <div style={{ fontSize: 12.5, marginBottom: 8 }}>
+                          {(history.data.revisions?.length ?? 0) > 1 && <div><strong>Quotation versions:</strong>{" "}
+                            {(history.data.revisions ?? []).map(r => `v${r.revisionNo} ${fmtL(r.litres)} at ${fmtR(r.pricePerLitre)}/L${r.priceChange ? ` (${r.priceChange > 0 ? "+" : ""}${r.priceChange.toFixed(2)})` : ""}`).join(" → ")}</div>}
+                          {history.data.acceptance && <div><strong>Accepted</strong> by {history.data.acceptance.acceptedBy} ({ACCEPT_CHANNELS[history.data.acceptance.channel] ?? history.data.acceptance.channel}
+                            {history.data.acceptance.reference ? `, ${history.data.acceptance.reference}` : ""}) on {history.data.acceptance.acceptedOn}, version {history.data.acceptance.revisionNo}.</div>}
+                        </div>)}
                       {(detail.data?.deliveries ?? []).length === 0 ? <span style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No loads yet.</span>
                         : (detail.data?.deliveries ?? []).map(d => {
                           const v = loadVariance(d.loadedLitres, d.litresDelivered)
@@ -167,12 +175,16 @@ function QuoteDialog({ order, onDone, onClose }: { order?: Order; onDone: () => 
 function ConfirmDialog({ order, onDone, onClose }: { order: Order; onDone: () => void; onClose: () => void }) {
   const canOverride = usePermissions(["FUEL_CREDIT_OVERRIDE"])
   const [tankId, setTankId] = useState(""); const [reason, setReason] = useState(""); const [err, setErr] = useState("")
+  const [accBy, setAccBy] = useState(""); const [accChannel, setAccChannel] = useState(""); const [accRef, setAccRef] = useState("")
   const check = useQuery<CreditCheck>({ queryKey: ["fuel-credit-check", order.id], queryFn: async () => unwrap(await apiClient.get(`/api/v1/fuel/orders/${order.id}/credit-check`)) })
   const tanks = useQuery<any[]>({ queryKey: ["tanks"], queryFn: async () => { const r = await apiClient.get("/api/v1/fuel/tanks"); return r.data?.data ?? r.data } })
   const matching = (tanks.data ?? []).filter(t => t.fuelType === order.fuelType)
   const c = check.data
   const confirm = useMutation({
-    mutationFn: () => apiClient.post(`/api/v1/fuel/orders/${order.id}/confirm`, { tankId, overrideReason: reason || null }),
+    mutationFn: () => {
+      const acceptance = acceptancePayload(accBy, accChannel, accRef)
+      return apiClient.post(`/api/v1/fuel/orders/${order.id}/confirm`, acceptance ? { tankId, overrideReason: reason || null, acceptance } : { tankId, overrideReason: reason || null })
+    },
     onSuccess: () => { onDone(); onClose() }, onError: (e: any) => setErr(msg(e, "Could not confirm the order")),
   })
   return (
@@ -196,8 +208,19 @@ function ConfirmDialog({ order, onDone, onClose }: { order: Order; onDone: () =>
         <label style={{ ...labelStyle, marginTop: 10 }}>Reason for overriding the credit limit *</label>
         <input aria-label="Override reason" value={reason} onChange={e => setReason(e.target.value)} style={inputStyle} />
       </>)}
+      <div style={{ ...card, padding: 12, marginTop: 12 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>Customer's acceptance (optional)</div>
+        <label style={labelStyle}>Accepted by</label>
+        <input aria-label="Accepted by" value={accBy} onChange={e => setAccBy(e.target.value)} style={inputStyle} />
+        <label style={{ ...labelStyle, marginTop: 8 }}>How</label>
+        <select aria-label="How accepted" value={accChannel} onChange={e => setAccChannel(e.target.value)} style={inputStyle}>
+          <option value="">Not recorded</option>{Object.entries(ACCEPT_CHANNELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <label style={{ ...labelStyle, marginTop: 8 }}>Reference (PO number, email subject)</label>
+        <input aria-label="Acceptance reference" value={accRef} onChange={e => setAccRef(e.target.value)} style={inputStyle} />
+      </div>
       <Err text={err} />
-      <Footer onClose={onClose} label="Confirm and allocate stock" pending={confirm.isPending} onSubmit={() => { const v = validateConfirm(tankId, c, canOverride, reason); if (v) return setErr(v); setErr(""); confirm.mutate() }} />
+      <Footer onClose={onClose} label="Confirm and allocate stock" pending={confirm.isPending} onSubmit={() => { const v = validateConfirm(tankId, c, canOverride, reason) ?? validateAcceptance(accBy, accChannel, accRef); if (v) return setErr(v); setErr(""); confirm.mutate() }} />
     </Modal>
   )
 }

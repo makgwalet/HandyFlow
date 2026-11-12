@@ -10,7 +10,7 @@ vi.mock("../../hooks/usePermission", () => ({ usePermissions: (ps: string[]) => 
 
 const order = (o: any = {}) => ({ id: "o1", orderNumber: "SO-2026-00001", accountId: "a1", customerId: "c1", customerName: "Gold Mine Ltd", siteId: null, siteName: null, fuelType: "DIESEL", litresOrdered: 30000, pricePerLitre: 22.5, value: 675000, status: "QUOTE", requestedDate: null, quoteValidUntil: null, tankId: null, tankName: null, litresDelivered: 0, litresScheduled: 0, litresRemaining: 30000, creditOverrideReason: null, cancelReason: null, customerReference: null, notes: null, deliveries: null, ...o })
 const check = (o: any = {}) => ({ creditLimit: 1000000, invoicesOutstanding: 0, deliveredNotInvoiced: 0, otherOpenOrders: 0, thisOrder: 675000, exposureAfter: 675000, withinLimit: true, onCreditHold: false, ...o })
-let orders: any[]; let credit: any
+let orders: any[]; let credit: any; let history: any
 
 function mount() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
@@ -24,9 +24,11 @@ describe("OrdersTab", () => {
       { id: "d1", status: "DELIVERED", litresOrdered: 10000, litresDelivered: 9800, scheduledAt: "2026-11-11T08:00:00Z", loadedLitres: 10000, sealNumbers: "S-1", receiptNumber: "FDR-2026-00001", invoiceState: "NONE", invoiceNumber: null, orderId: "o2" },
       { id: "d2", status: "SCHEDULED", litresOrdered: 5000, litresDelivered: null, scheduledAt: "2026-11-12T08:00:00Z", loadedLitres: null, sealNumbers: null, receiptNumber: null, invoiceState: "NONE", invoiceNumber: null, orderId: "o2" }] })]
     credit = check()
+    history = { revisions: [], acceptance: null }
     post.mockResolvedValue({ data: { data: {} } })
     get.mockImplementation(async (u: string) => {
       if (u.endsWith("/orders")) return { data: { data: { content: orders } } }
+      if (u.endsWith("/history")) return { data: { data: history } }
       if (u.includes("/credit-check")) return { data: { data: credit } }
       if (u.includes("/orders/")) return { data: { data: orders.find(o => u.endsWith(o.id)) } }
       if (u.endsWith("/tanks")) return { data: [{ id: "t1", name: "Diesel 1", fuelType: "DIESEL", currentLitres: 40000 }, { id: "t2", name: "Petrol 1", fuelType: "PETROL_95", currentLitres: 9000 }] }
@@ -52,6 +54,39 @@ describe("OrdersTab", () => {
     await waitFor(() => screen.getByText("SO-2026-00001"))
     expect(screen.queryByText("Confirm")).toBeNull()
     expect(screen.queryByText("New quotation")).toBeNull()
+  })
+
+  it("B06: confirming with an acceptance sends who, how and the reference; a half-filled acceptance is refused", async () => {
+    mount()
+    await waitFor(() => screen.getByText("SO-2026-00001"))
+    fireEvent.click(screen.getByText("Confirm"))
+    await waitFor(() => screen.getByText("Within credit limit"))
+    fireEvent.change(screen.getByLabelText("Tank"), { target: { value: "t1" } })
+    fireEvent.change(screen.getByLabelText("Acceptance reference"), { target: { value: "PO 4471" } })
+    fireEvent.click(screen.getByText("Confirm and allocate stock"))
+    expect(screen.getByRole("alert").textContent).toMatch(/who accepted/)
+    expect(post).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText("Accepted by"), { target: { value: "Thabo Nkosi" } })
+    fireEvent.click(screen.getByText("Confirm and allocate stock"))
+    expect(screen.getByRole("alert").textContent).toMatch(/how/)
+    fireEvent.change(screen.getByLabelText("How accepted"), { target: { value: "CUSTOMER_PO" } })
+    fireEvent.click(screen.getByText("Confirm and allocate stock"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/orders/o1/confirm",
+      { tankId: "t1", overrideReason: null, acceptance: { acceptedBy: "Thabo Nkosi", channel: "CUSTOMER_PO", reference: "PO 4471" } }))
+  })
+
+  it("B06: an opened order shows its quotation versions and how it was accepted", async () => {
+    history = {
+      revisions: [{ revisionNo: 1, fuelType: "DIESEL", litres: 30000, pricePerLitre: 22.5, quoteValidUntil: null, recordedAt: "2026-11-10T08:00:00Z", priceChange: null },
+                  { revisionNo: 2, fuelType: "DIESEL", litres: 30000, pricePerLitre: 22, quoteValidUntil: null, recordedAt: "2026-11-11T08:00:00Z", priceChange: -0.5 }],
+      acceptance: { revisionNo: 2, acceptedBy: "Thabo Nkosi", channel: "EMAIL", reference: null, acceptedOn: "2026-11-11", recordedAt: "2026-11-11T09:00:00Z" },
+    }
+    mount()
+    await waitFor(() => screen.getByText("SO-2026-00001"))
+    fireEvent.click(screen.getByText("SO-2026-00001"))
+    await waitFor(() => screen.getByText(/Quotation versions/))
+    expect(screen.getByText(/v2 .* \(-0.50\)/)).toBeTruthy()
+    expect(screen.getByText(/by Thabo Nkosi \(Email\) on 2026-11-11, version 2/)).toBeTruthy()
   })
 
   it("confirm shows the credit position, offers only tanks of the right fuel and posts the tank", async () => {

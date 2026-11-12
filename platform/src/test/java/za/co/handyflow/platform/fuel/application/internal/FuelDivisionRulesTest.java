@@ -31,6 +31,11 @@ class FuelDivisionRulesTest {
         assertEquals(Set.of(WHOLESALE_SUPPLY, RETAIL_FORECOURT), req("/supplier-invoices"));
     }
 
+    @Test @DisplayName("B06: enquiries follow orders: Wholesale or Distribution")
+    void enquiries() {
+        assertEquals(Set.of(FuelDivision.WHOLESALE_SUPPLY, FuelDivision.DISTRIBUTION), req("/enquiries/abc/quote"));
+    }
+
     @Test @DisplayName("E01: truck stop routes need the Truck Stop division and nothing else opens them")
     void truckStopRoutes() {
         assertEquals(Set.of(FuelDivision.TRUCK_STOP), req("/truck-stop/reservations"));

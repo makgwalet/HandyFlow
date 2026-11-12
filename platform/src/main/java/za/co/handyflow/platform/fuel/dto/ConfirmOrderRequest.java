@@ -8,5 +8,9 @@ import java.util.UUID;
 /** Confirms a quotation: the tank to supply from, and (only if over the credit limit) why it is allowed. */
 public record ConfirmOrderRequest(
         @NotNull UUID tankId,
-        @Size(max = 300) String overrideReason
-) {}
+        @Size(max = 300) String overrideReason,
+        // Optional: how and by whom the customer accepted the quotation. Recorded with the confirmation.
+        @jakarta.validation.Valid EnquiryDtos.AcceptanceRequest acceptance
+) {
+    public ConfirmOrderRequest(UUID tankId, String overrideReason) { this(tankId, overrideReason, null); }
+}

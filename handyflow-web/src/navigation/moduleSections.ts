@@ -244,6 +244,7 @@ export const FUEL_SECTIONS: ModuleSections = {
       label: 'Customers',
       sections: [
         { id: 'customers', label: 'Customer accounts', icon: Users, divisions: ['WHOLESALE_SUPPLY', 'DISTRIBUTION'] },
+        { id: 'enquiries', label: 'Enquiries', icon: MessageSquare, divisions: ['WHOLESALE_SUPPLY', 'DISTRIBUTION'] },
         { id: 'orders', label: 'Orders', icon: ClipboardList, divisions: ['WHOLESALE_SUPPLY', 'DISTRIBUTION'] },
         { id: 'pricing', label: 'Price lists', icon: Tags, divisions: ['WHOLESALE_SUPPLY', 'DISTRIBUTION'] },
         { id: 'invoicing', label: 'Delivered, not invoiced', icon: FileText, divisions: ['WHOLESALE_SUPPLY', 'DISTRIBUTION'] },

@@ -38,6 +38,7 @@ public class FuelOrderService {
     private final InvoicingFacade invoicing;
     private final CrmFacade crm;
     private final FuelPricingService pricing;
+    private final FuelOrderHistory history;
 
     @Transactional(readOnly = true)
     public Page<OrderResponse> list(TenantId tenantId, Pageable pageable) {
@@ -58,18 +59,28 @@ public class FuelOrderService {
         FuelSalesOrder o = FuelSalesOrder.create(tenantId, numbers.generate(tenantId), account.getId(), account.getCrmCustomerId(),
                 req.siteId(), req.fuelType(), req.litres(), price, req.requestedDate(), req.quoteValidUntil(),
                 req.customerReference(), req.notes(), by);
-        return toResponse(tenantId, orders.save(o), false);
+        orders.save(o);
+        history.recordRevision(tenantId, o, by);
+        return toResponse(tenantId, o, false);
     }
 
     @Transactional
     public OrderResponse revise(TenantId tenantId, UUID id, OrderRequest req) {
+        return revise(tenantId, id, req, null);
+    }
+
+    /** As above, and the new version of the quotation is added to its history under this user. */
+    @Transactional
+    public OrderResponse revise(TenantId tenantId, UUID id, OrderRequest req, UUID by) {
         FuelSalesOrder o = orders.findActiveByIdForUpdate(tenantId, id).orElseThrow(() -> notFound(id));
         FuelCustomerAccount account = accounts.findActiveById(tenantId, o.getAccountId())
                 .orElseThrow(() -> new ResourceNotFoundException("Customer account", o.getAccountId().toString()));
         requireSiteOf(tenantId, req.siteId(), account);
         o.revise(req.siteId(), req.fuelType(), req.litres(), priceFor(tenantId, account, req), req.requestedDate(), req.quoteValidUntil(),
                 req.customerReference(), req.notes());
-        return toResponse(tenantId, orders.save(o), false);
+        orders.save(o);
+        history.recordRevision(tenantId, o, by);
+        return toResponse(tenantId, o, false);
     }
 
     /** What the customer's exposure would be if this order were confirmed. */
@@ -113,6 +124,7 @@ public class FuelOrderService {
         }
         o.confirm(tank.getId(), credit.withinLimit() ? null : override, LocalDate.now(SAST));
         orders.save(o);
+        if (req.acceptance() != null) history.recordAcceptance(tenantId, o, req.acceptance(), LocalDate.now(SAST), by);
         // Allocation: stock is promised to this order; refuses if the tank cannot cover it.
         stock.reserve(tenantId, new ReservationRequest(tank.getId(), o.getLitresOrdered(), o.getCrmCustomerId(), "ORDER", o.getId(),
                 null, "Order " + o.getOrderNumber()), by);

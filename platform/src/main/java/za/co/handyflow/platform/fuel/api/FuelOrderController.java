@@ -33,6 +33,7 @@ import java.util.UUID;
 public class FuelOrderController {
 
     private final FuelOrderService orders;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelOrderHistory history;
     private final FuelInvoicingService invoicing;
     private final FuelInvoiceAttemptService attempts;
     private final FuelService fuel;
@@ -71,7 +72,16 @@ public class FuelOrderController {
     @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_ORDERS_MANAGE')")
     public ResponseEntity<ApiResponse<OrderResponse>> revise(@PathVariable UUID id, @Valid @RequestBody OrderRequest req) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success("Quotation updated", orders.revise(TenantContext.getTenantIdAsObject(), id, req)));
+        return ResponseEntity.ok(ApiResponse.success("Quotation updated", orders.revise(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
+    }
+
+    /** B06: the versions of a quotation and, once confirmed, how the customer accepted it. */
+    @GetMapping("/orders/{id}/history")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<EnquiryDtos.OrderHistory>> history(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        orders.get(TenantContext.getTenantIdAsObject(), id); // 404 for another tenant's order
+        return ResponseEntity.ok(ApiResponse.success(history.history(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @PostMapping("/orders/{id}/confirm")

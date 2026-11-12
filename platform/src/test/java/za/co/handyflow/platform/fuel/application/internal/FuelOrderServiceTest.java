@@ -47,6 +47,7 @@ class FuelOrderServiceTest {
     @Mock InvoicingFacade invoicing;
     @Mock CrmFacade crm;
     @Mock FuelPricingService pricing;
+    @Mock FuelOrderHistory history;
     @InjectMocks FuelOrderService service;
 
     static final TenantId T = TenantId.of(UUID.randomUUID());
@@ -191,5 +192,41 @@ class FuelOrderServiceTest {
         assertEquals(0, bd("19.00").compareTo(r.pricePerLitre()));
         when(pricing.resolve(any(), any(), any(), any(), any())).thenReturn(Optional.empty());
         assertThrows(IllegalArgumentException.class, () -> service.create(T, new OrderRequest(account.getId(), null, "DIESEL", bd("1000"), null, null, null, null, null), null));
+    }
+
+    @Test @DisplayName("B06: creating and revising a quotation each add a version to its history, under the user")
+    void historyRecorded() {
+        when(numbers.generate(any())).thenReturn("SO-2026-00010");
+        UUID by = UUID.randomUUID();
+        service.create(T, new OrderRequest(account.getId(), null, "DIESEL", bd("1000"), bd("19.00"), null, null, null, null), by);
+        verify(history).recordRevision(eq(T), any(), eq(by));
+        service.revise(T, order.getId(), new OrderRequest(account.getId(), null, "DIESEL", bd("2000"), bd("20.00"), null, null, null, null), by);
+        verify(history, times(2)).recordRevision(eq(T), any(), eq(by));
+    }
+
+    @Test @DisplayName("B06: a refused revision (not a quotation any more) adds no history")
+    void refusedRevisionRecordsNothing() {
+        order.confirm(tank.getId(), null, LocalDate.now());
+        assertThrows(IllegalStateException.class, () -> service.revise(T, order.getId(), new OrderRequest(account.getId(), null, "DIESEL", bd("2000"), bd("20.00"), null, null, null, null), null));
+        verify(history, never()).recordRevision(any(), any(), any());
+    }
+
+    @Test @DisplayName("B06: the customer's acceptance is recorded with the confirmation, and not when none is given")
+    void acceptanceRecordedOnConfirm() {
+        service.confirm(T, order.getId(), confirmReq(null), false, UUID.randomUUID());
+        verify(history, never()).recordAcceptance(any(), any(), any(), any(), any());
+        order = FuelSalesOrder.create(T, "SO-2026-00002", account.getId(), customer, null, "DIESEL", bd("30000"), bd("22.50"), null, null, null, null, null);
+        when(orders.findActiveByIdForUpdate(eq(T), any())).thenReturn(Optional.of(order));
+        EnquiryDtos.AcceptanceRequest acc = new EnquiryDtos.AcceptanceRequest("Thabo Nkosi", "email", "RE: quote", null);
+        service.confirm(T, order.getId(), new ConfirmOrderRequest(tank.getId(), null, acc), false, UUID.randomUUID());
+        verify(history).recordAcceptance(eq(T), eq(order), eq(acc), any(), any());
+    }
+
+    @Test @DisplayName("B06: if the acceptance is refused, the confirmation fails with it (same transaction) and no stock is reserved")
+    void badAcceptanceStopsConfirm() {
+        doThrow(new IllegalArgumentException("Choose how it was accepted")).when(history).recordAcceptance(any(), any(), any(), any(), any());
+        EnquiryDtos.AcceptanceRequest acc = new EnquiryDtos.AcceptanceRequest("Thabo Nkosi", "SMOKE", null, null);
+        assertThrows(IllegalArgumentException.class, () -> service.confirm(T, order.getId(), new ConfirmOrderRequest(tank.getId(), null, acc), false, UUID.randomUUID()));
+        verify(stock, never()).reserve(any(), any(), any());
     }
 }

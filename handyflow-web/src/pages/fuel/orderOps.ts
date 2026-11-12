@@ -84,3 +84,21 @@ export function groupByCustomer(lines: QueueLine[]): { customerId: string | null
   }
   return [...m.values()]
 }
+
+// ---- B06: quotation history and acceptance ----
+export interface OrderRevision { revisionNo: number; fuelType: string; litres: number; pricePerLitre: number; quoteValidUntil: string | null; recordedAt: string; priceChange: number | null }
+export interface OrderAcceptance { revisionNo: number; acceptedBy: string; channel: string; reference: string | null; acceptedOn: string; recordedAt: string }
+export interface OrderHistory { revisions: OrderRevision[]; acceptance: OrderAcceptance | null }
+export const ACCEPT_CHANNELS: Record<string, string> = { EMAIL: "Email", PHONE: "Phone", SIGNED_QUOTE: "Signed quotation", CUSTOMER_PO: "Customer purchase order", PORTAL: "Customer portal", OTHER: "Other" }
+
+/** Acceptance is optional, but once any part is filled in it needs a name and a channel. Returns null when nothing is being recorded. */
+export function acceptancePayload(by: string, channel: string, reference: string): { acceptedBy: string; channel: string; reference: string | null } | null {
+  if (!by.trim() && !channel && !reference.trim()) return null
+  return { acceptedBy: by.trim(), channel, reference: reference.trim() || null }
+}
+export function validateAcceptance(by: string, channel: string, reference: string): string | null {
+  if (!acceptancePayload(by, channel, reference)) return null
+  if (by.trim().length < 2) return "Enter who accepted the quotation."
+  if (!channel) return "Choose how it was accepted."
+  return null
+}
