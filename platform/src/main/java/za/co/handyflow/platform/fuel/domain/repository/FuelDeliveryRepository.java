@@ -130,4 +130,10 @@ public interface FuelDeliveryRepository extends JpaRepository<FuelDelivery, UUID
     /** Scheduled or on the road: work a division cannot be switched off underneath. */
     @Query("SELECT COUNT(d) FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.status IN ('SCHEDULED','IN_TRANSIT') AND d.deletedAt IS NULL")
     long countOpen(TenantId tenantId);
+
+    @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.routeId = :routeId AND d.deletedAt IS NULL ORDER BY d.routeSequence")
+    List<FuelDelivery> findByRoute(TenantId tenantId, UUID routeId);
+
+    @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.routeId IN :routeIds AND d.deletedAt IS NULL ORDER BY d.routeId, d.routeSequence")
+    List<FuelDelivery> findByRoutes(TenantId tenantId, java.util.Collection<UUID> routeIds);
 }

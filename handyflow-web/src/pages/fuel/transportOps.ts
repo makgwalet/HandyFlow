@@ -12,7 +12,7 @@ export interface Driver { id: string; name: string; jobTitle: string | null; pho
 export interface PlanLoad {
   deliveryId: string; status: string; scheduledAt: string; customerId: string | null; customerName: string | null; fuelType: string
   litres: number; tankerId: string | null; tankerRegistration: string | null; driverEmployeeId: string | null; driverName: string | null; allocated: boolean
-  windowStart?: string | null; windowEnd?: string | null; failedAttempts?: number
+  windowStart?: string | null; windowEnd?: string | null; failedAttempts?: number; routeId?: string | null; routeSequence?: number | null
 }
 export interface TankerDay { tankerId: string; registration: string; capacity: number; loads: number; litres: number }
 export interface Plan { date: string; loads: PlanLoad[]; tankers: TankerDay[] }
@@ -89,3 +89,25 @@ export function validateFailure(reasonCode: string, note: string, litresReturned
   }
   return null
 }
+
+// ── C04 part 2: routes ──────────────────────────────────────────────────────
+export interface RouteStop { deliveryId: string; sequence: number; customerName: string | null; fuelType: string; litres: number; status: string; scheduledAt: string; windowStart: string | null; windowEnd: string | null; failedAttempts: number }
+export interface RouteView {
+  id: string; routeDate: string; label: string | null; status: string; state: "PLANNED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED"
+  tankerId: string; tankerRegistration: string | null; driverEmployeeId: string; driverName: string | null
+  capacityLitres: number; plannedLitres: number; stopCount: number; deliveredCount: number; cancelReason: string | null; stops: RouteStop[]
+}
+
+/** The stop ids in a new order after moving the stop at `index` up (-1) or down (+1). A stop that is no longer scheduled does not move, and nothing moves past one. */
+export function moveStop(stops: RouteStop[], index: number, dir: -1 | 1): string[] | null {
+  const to = index + dir
+  if (index < 0 || index >= stops.length || to < 0 || to >= stops.length) return null
+  if (stops[index].status !== "SCHEDULED" || stops[to].status !== "SCHEDULED") return null
+  const ids = stops.map(s => s.deliveryId); [ids[index], ids[to]] = [ids[to], ids[index]]
+  return ids
+}
+
+/** Loads on the day that could still be added to a route: scheduled and not already a stop. */
+export const routable = (loads: PlanLoad[]) => loads.filter(l => l.status === "SCHEDULED" && !l.routeId)
+
+export const routeStateLabel = (s: string) => ({ PLANNED: "Planned", IN_PROGRESS: "On the road", COMPLETED: "Completed", CANCELLED: "Cancelled" } as Record<string, string>)[s] ?? s

@@ -11,6 +11,7 @@ public record PlanningResponse(LocalDate date, List<PlanLoad> loads, List<Tanker
     public record PlanLoad(UUID deliveryId, String status, Instant scheduledAt, UUID customerId, String customerName,
                            String fuelType, BigDecimal litres, UUID tankerId, String tankerRegistration,
                            UUID driverEmployeeId, String driverName, boolean allocated,
-                           Instant windowStart, Instant windowEnd, int failedAttempts) {}
+                           Instant windowStart, Instant windowEnd, int failedAttempts,
+                           UUID routeId, Integer routeSequence) {}
     public record TankerDay(UUID tankerId, String registration, BigDecimal capacity, int loads, BigDecimal litres) {}
 }

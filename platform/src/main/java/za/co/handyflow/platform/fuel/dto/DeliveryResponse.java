@@ -22,5 +22,6 @@ public record DeliveryResponse(
         UUID orderId, java.math.BigDecimal loadedLitres, String sealNumbers,
         String invoiceState, UUID invoiceId, String invoiceNumber, String invoiceError,
         UUID tankerId, UUID driverEmployeeId,
-        Instant windowStart, Instant windowEnd, int failedAttempts
+        Instant windowStart, Instant windowEnd, int failedAttempts,
+        UUID routeId, Integer routeSequence
 ) {}

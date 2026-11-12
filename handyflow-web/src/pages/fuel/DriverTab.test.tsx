@@ -146,6 +146,12 @@ describe("DriverTab", () => {
     expect(screen.getByText(/failed delivery saved/)).toBeTruthy()
   })
 
+  it("shows which stop on the route a load is", async () => {
+    loads = [load({ routeId: "r1", routeSequence: 2 })]
+    mount()
+    await waitFor(() => screen.getByText(/stop 2 on your route/))
+  })
+
   it("says when nothing is allocated", async () => {
     loads = []; mount()
     await waitFor(() => screen.getByText(/No loads allocated to you/))

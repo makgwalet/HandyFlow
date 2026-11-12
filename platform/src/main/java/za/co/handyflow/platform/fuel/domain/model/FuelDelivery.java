@@ -72,6 +72,12 @@ public class FuelDelivery {
     @Column(name = "failed_attempts", nullable = false)
     private int failedAttempts = 0;
 
+    @Column(name = "route_id")
+    private UUID routeId;
+
+    @Column(name = "route_sequence")
+    private Integer routeSequence;
+
     @Column(name = "driver_name")
     private String driverName;
 
@@ -251,6 +257,26 @@ public class FuelDelivery {
         this.receiptNumber        = receiptNumber;
         this.receiptGeneratedAt   = Instant.now();
         this.updatedAt            = Instant.now();
+    }
+
+    /** Makes this load a stop on a route. Only a scheduled load can join or move. */
+    public void joinRoute(UUID routeId, int sequence) {
+        requireStatus("put on a route", "SCHEDULED");
+        if (routeId == null || sequence < 1) throw new IllegalArgumentException("A stop needs a route and a position of 1 or more.");
+        this.routeId = routeId; this.routeSequence = sequence; this.updatedAt = Instant.now();
+    }
+
+    /** Position change inside the same route. A delivered or on-the-road stop keeps its position, so only the order is checked by the caller. */
+    public void moveInRoute(int sequence) {
+        if (routeId == null) throw new IllegalStateException("This load is not on a route.");
+        if (sequence < 1) throw new IllegalArgumentException("A stop position must be 1 or more.");
+        this.routeSequence = sequence; this.updatedAt = Instant.now();
+    }
+
+    /** Takes the load off its route. It stays allocated to the same tanker and driver. */
+    public void leaveRoute() {
+        requireStatus("take off a route", "SCHEDULED");
+        this.routeId = null; this.routeSequence = null; this.updatedAt = Instant.now();
     }
 
     /** The time the customer can receive the fuel. Either end may be left open; when both are given the end must be after the start. */

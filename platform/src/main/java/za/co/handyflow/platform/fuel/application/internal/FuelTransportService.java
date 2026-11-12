@@ -123,8 +123,21 @@ public class FuelTransportService {
 
     @Transactional
     public DeliveryResponse allocate(TenantId tenantId, UUID deliveryId, AllocationRequest req) {
+        return allocate(tenantId, deliveryId, req, null);
+    }
+
+    /**
+     * Allocates a load. With a route id the load is a stop on that route: the tanker is shared with the route's other stops, so
+     * the time-conflict check ignores them, a compartment may be used by several stops as long as together they fit and carry
+     * one fuel type, and a load already on a route can only be changed from that route.
+     */
+    @Transactional
+    public DeliveryResponse allocate(TenantId tenantId, UUID deliveryId, AllocationRequest req, UUID routeId) {
         FuelDelivery d = deliveries.findActiveByIdForUpdate(tenantId, deliveryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery", deliveryId.toString()));
+        if (routeId == null && d.getRouteId() != null) {
+            throw new IllegalStateException("This load is a stop on a route. Change it from the route.");
+        }
         if (!"SCHEDULED".equals(d.getStatus())) {
             throw new IllegalStateException("Only a scheduled load can be allocated (this one is " + d.getStatus().toLowerCase().replace('_', ' ') + ").");
         }
@@ -155,11 +168,13 @@ public class FuelTransportService {
                     + d.getLitresOrdered().stripTrailingZeros().toPlainString() + " L.");
         }
 
+        if (routeId != null) checkRouteCompartments(tenantId, routeId, d, req, comps);
+
         Instant from = d.getScheduledAt().minus(TURNAROUND), to = d.getScheduledAt().plus(TURNAROUND);
-        if (!deliveries.findTankerConflicts(tenantId, tanker.getId(), d.getId(), from, to).isEmpty()) {
+        if (deliveries.findTankerConflicts(tenantId, tanker.getId(), d.getId(), from, to).stream().anyMatch(c -> !sameRoute(c, routeId))) {
             throw new IllegalStateException(tanker.getRegistration() + " is already on another load within " + TURNAROUND.toHours() + " hours of this one.");
         }
-        if (!deliveries.findDriverConflicts(tenantId, req.driverEmployeeId(), d.getId(), from, to).isEmpty()) {
+        if (deliveries.findDriverConflicts(tenantId, req.driverEmployeeId(), d.getId(), from, to).stream().anyMatch(c -> !sameRoute(c, routeId))) {
             throw new IllegalStateException(driver.fullName() + " is already on another load within " + TURNAROUND.toHours() + " hours of this one.");
         }
 
@@ -168,6 +183,35 @@ public class FuelTransportService {
         loadSplits.deleteByDelivery(tenantId, d.getId());
         loadSplits.saveAll(req.loads().stream().map(l -> FuelDeliveryCompartment.create(tenantId, d.getId(), l.compartmentId(), l.litres())).toList());
         return fuelService.deliveriesForOrderOrSelf(tenantId, d.getId());
+    }
+
+    private static boolean sameRoute(FuelDelivery other, UUID routeId) {
+        return routeId != null && routeId.equals(other.getRouteId());
+    }
+
+    /** Across all the stops on a route the tanker is filled once: each compartment holds one fuel type and its total cannot pass its capacity. */
+    private void checkRouteCompartments(TenantId tenantId, UUID routeId, FuelDelivery self, AllocationRequest req, Map<UUID, FuelTankerCompartment> comps) {
+        Map<UUID, BigDecimal> used = new HashMap<>();
+        Map<UUID, String> fuel = new HashMap<>();
+        for (FuelDelivery sibling : deliveries.findByRoute(tenantId, routeId)) {
+            if (sibling.getId().equals(self.getId())) continue;
+            for (FuelDeliveryCompartment s : loadSplits.findByDelivery(tenantId, sibling.getId())) {
+                used.merge(s.getCompartmentId(), s.getLitres(), BigDecimal::add);
+                fuel.put(s.getCompartmentId(), sibling.getFuelType());
+            }
+        }
+        for (AllocationRequest.CompartmentLoad l : req.loads()) {
+            FuelTankerCompartment c = comps.get(l.compartmentId());
+            String other = fuel.get(c.getId());
+            if (other != null && !other.equals(self.getFuelType())) {
+                throw new IllegalArgumentException("Compartment " + c.getNumber() + " already carries " + other + " for another stop on this route.");
+            }
+            BigDecimal total = used.getOrDefault(c.getId(), BigDecimal.ZERO).add(l.litres());
+            if (total.compareTo(c.getCapacityLitres()) > 0) {
+                throw new IllegalArgumentException("Compartment " + c.getNumber() + " holds " + c.getCapacityLitres().stripTrailingZeros().toPlainString()
+                        + " L and other stops on this route already use " + used.getOrDefault(c.getId(), BigDecimal.ZERO).stripTrailingZeros().toPlainString() + " L of it.");
+            }
+        }
     }
 
     // ── Planning board ───────────────────────────────────────────────────────
@@ -188,7 +232,7 @@ public class FuelTransportService {
             loads.add(new PlanningResponse.PlanLoad(d.getId(), d.getStatus(), d.getScheduledAt(), d.getCustomerId(), customer, d.getFuelType(),
                     d.getLitresOrdered(), d.getTankerId(), t != null ? t.getRegistration() : d.getVehicleReg(),
                     d.getDriverEmployeeId(), d.getDriverName(), d.isAllocated(),
-                    d.getWindowStart(), d.getWindowEnd(), d.getFailedAttempts()));
+                    d.getWindowStart(), d.getWindowEnd(), d.getFailedAttempts(), d.getRouteId(), d.getRouteSequence()));
             if (d.getTankerId() != null) {
                 count.computeIfAbsent(d.getTankerId(), k -> new int[1])[0]++;
                 litres.merge(d.getTankerId(), d.getLitresOrdered(), BigDecimal::add);

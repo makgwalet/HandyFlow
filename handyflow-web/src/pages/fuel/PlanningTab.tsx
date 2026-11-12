@@ -6,6 +6,7 @@ import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import { fmtL } from "./orderOps"
 import { WindowDialog, FailedAttemptDialog } from "./DeliveryExceptionDialogs"
+import RoutesPanel from "./RoutesPanel"
 import { parseCapacities, validateTanker, autoSplit, validateAllocation, type Plan, type PlanLoad, type Tanker, type Driver, type FleetVehicleOption, fleetOptionText, windowText } from "./transportOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -49,8 +50,8 @@ export default function PlanningTab() {
                 <tr key={l.deliveryId} style={{ borderTop: "1px solid var(--hf-border)" }}>
                   <td style={td}>{time(l.scheduledAt)}</td><td style={td}>{windowText(l.windowStart, l.windowEnd) ?? "–"}</td><td style={td}>{l.customerName ?? "Walk-in"}</td><td style={td}>{l.fuelType}</td><td style={td}>{fmtL(l.litres)}</td>
                   <td style={td}>{l.tankerRegistration ?? "–"}</td><td style={td}>{l.driverName ?? "–"}</td>
-                  <td style={td}>{l.status === "SCHEDULED" && !l.allocated ? <Chip bg="var(--hf-danger-soft)" fg="var(--hf-danger-text)">Unallocated</Chip> : l.status.toLowerCase().replace("_", " ")}{(l.failedAttempts ?? 0) > 0 && <> <Chip bg="var(--hf-warning-soft)" fg="var(--hf-warning-text)">{l.failedAttempts} failed attempt{l.failedAttempts === 1 ? "" : "s"}</Chip></>}</td>
-                  <td style={td}>{canManage && l.status === "SCHEDULED" && <button style={btnGhost} onClick={() => setAllocating(l)}>{l.allocated ? "Reallocate" : "Allocate"}</button>}
+                  <td style={td}>{l.status === "SCHEDULED" && !l.allocated ? <Chip bg="var(--hf-danger-soft)" fg="var(--hf-danger-text)">Unallocated</Chip> : l.status.toLowerCase().replace("_", " ")}{l.routeId && <> <Chip bg="var(--hf-surface-muted)" fg="var(--hf-text)">Stop {l.routeSequence}</Chip></>}{(l.failedAttempts ?? 0) > 0 && <> <Chip bg="var(--hf-warning-soft)" fg="var(--hf-warning-text)">{l.failedAttempts} failed attempt{l.failedAttempts === 1 ? "" : "s"}</Chip></>}</td>
+                  <td style={td}>{canManage && l.status === "SCHEDULED" && !l.routeId && <button style={btnGhost} onClick={() => setAllocating(l)}>{l.allocated ? "Reallocate" : "Allocate"}</button>}
                     {canManage && (l.status === "SCHEDULED" || l.status === "IN_TRANSIT") && <button style={{ ...btnGhost, marginLeft: 6 }} onClick={() => setWindowFor(l)}>Window</button>}
                     {canManage && l.status === "IN_TRANSIT" && <button style={{ ...btnGhost, marginLeft: 6 }} onClick={() => setFailing(l)}>Could not deliver</button>}</td>
                 </tr>
@@ -59,6 +60,8 @@ export default function PlanningTab() {
           </table>
         </div>
       )}
+
+      <RoutesPanel date={date} loads={loads} tankers={tankers.data ?? []} canManage={canManage} onChanged={refresh} />
 
       {(plan.data?.tankers ?? []).length > 0 && (
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>

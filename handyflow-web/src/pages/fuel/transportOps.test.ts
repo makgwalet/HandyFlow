@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { parseCapacities, validateTanker, autoSplit, validateAllocation, fleetOptionText, windowText, validateFailure, reasonLabel, FAILURE_REASONS, type Compartment } from "./transportOps"
+import { parseCapacities, validateTanker, autoSplit, validateAllocation, fleetOptionText, windowText, validateFailure, reasonLabel, FAILURE_REASONS, moveStop, routable, routeStateLabel, type RouteStop, type PlanLoad, type Compartment } from "./transportOps"
 
 const comps: Compartment[] = [{ id: "c1", number: 1, capacityLitres: 10000 }, { id: "c2", number: 2, capacityLitres: 6000 }]
 
@@ -57,4 +57,26 @@ describe("delivery windows and failed attempts (C04)", () => {
     expect(FAILURE_REASONS.every(r => reasonLabel(r.code) === r.label)).toBe(true)
     expect(reasonLabel("UNKNOWN")).toBe("UNKNOWN")
   })
+})
+
+describe("routes (C04 part 2)", () => {
+  const stop = (id: string, seq: number, status = "SCHEDULED"): RouteStop => ({ deliveryId: id, sequence: seq, customerName: id, fuelType: "DIESEL", litres: 1000, status, scheduledAt: "2026-11-13T08:00:00Z", windowStart: null, windowEnd: null, failedAttempts: 0 })
+  it("swaps a stop with its neighbour and refuses to go past the ends", () => {
+    const stops = [stop("a", 1), stop("b", 2), stop("c", 3)]
+    expect(moveStop(stops, 1, -1)).toEqual(["b", "a", "c"])
+    expect(moveStop(stops, 1, 1)).toEqual(["a", "c", "b"])
+    expect(moveStop(stops, 0, -1)).toBeNull()
+    expect(moveStop(stops, 2, 1)).toBeNull()
+  })
+  it("does not move a stop that is on the road or delivered, or move another past it", () => {
+    const stops = [stop("a", 1, "DELIVERED"), stop("b", 2), stop("c", 3)]
+    expect(moveStop(stops, 0, 1)).toBeNull()
+    expect(moveStop(stops, 1, -1)).toBeNull()
+    expect(moveStop(stops, 1, 1)).toEqual(["a", "c", "b"])
+  })
+  it("offers only scheduled loads that are not already stops", () => {
+    const l = (id: string, status: string, routeId: string | null = null) => ({ deliveryId: id, status, routeId } as PlanLoad)
+    expect(routable([l("1", "SCHEDULED"), l("2", "SCHEDULED", "r"), l("3", "IN_TRANSIT")]).map(x => x.deliveryId)).toEqual(["1"])
+  })
+  it("labels route states", () => { expect(routeStateLabel("IN_PROGRESS")).toBe("On the road"); expect(routeStateLabel("X")).toBe("X") })
 })

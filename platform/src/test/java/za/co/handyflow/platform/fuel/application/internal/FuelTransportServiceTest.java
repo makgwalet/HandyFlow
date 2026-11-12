@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import za.co.handyflow.platform.crm.CrmFacade;
 import za.co.handyflow.platform.fuel.domain.model.FuelDelivery;
+import za.co.handyflow.platform.fuel.domain.model.FuelDeliveryCompartment;
 import za.co.handyflow.platform.fuel.domain.model.FuelTanker;
 import za.co.handyflow.platform.fuel.domain.model.FuelTankerCompartment;
 import za.co.handyflow.platform.fuel.domain.repository.*;
@@ -252,5 +253,53 @@ class FuelTransportServiceTest {
         assertThrows(IllegalStateException.class, () -> service.allocate(T, load.getId(), alloc("10000", "2000")));
         assertFalse(load.isAllocated());
         verify(loadSplits, never()).saveAll(any());
+    }
+
+    // ---- C04 part 2: stops on a route ----
+
+    private FuelDelivery sibling(UUID routeId, String fuel, FuelTankerCompartment inComp, String litres) {
+        FuelDelivery s = FuelDelivery.create(T, UUID.randomUUID(), UUID.randomUUID(), Map.of(), fuel, bd(litres), bd("22"), Instant.now(), null, null);
+        s.joinRoute(routeId, 1);
+        when(deliveries.findByRoute(T, routeId)).thenReturn(List.of(s));
+        when(loadSplits.findByDelivery(T, s.getId())).thenReturn(List.of(FuelDeliveryCompartment.create(T, s.getId(), inComp.getId(), bd(litres))));
+        return s;
+    }
+
+    @Test @DisplayName("C04: a stop is not in conflict with the other stops on its own route, but is with any other load")
+    void routeSiblingsDoNotConflict() {
+        UUID route = UUID.randomUUID();
+        FuelDelivery s = sibling(route, "DIESEL", c2, "1000");
+        when(deliveries.findTankerConflicts(any(), any(), any(), any(), any())).thenReturn(List.of(s));
+        when(deliveries.findDriverConflicts(any(), any(), any(), any(), any())).thenReturn(List.of(s));
+        service.allocate(T, load.getId(), alloc("10000", "2000"), route);
+        verify(deliveries).save(load);
+        // the same sibling is a conflict when the load is allocated on its own
+        FuelDelivery other = FuelDelivery.create(T, UUID.randomUUID(), UUID.randomUUID(), Map.of(), "DIESEL", bd("500"), bd("22"), Instant.now(), null, null);
+        when(deliveries.findTankerConflicts(any(), any(), any(), any(), any())).thenReturn(List.of(other));
+        assertThrows(IllegalStateException.class, () -> service.allocate(T, load.getId(), alloc("10000", "2000"), route));
+    }
+
+    @Test @DisplayName("C04: stops together cannot overfill a compartment")
+    void routeCompartmentCapacity() {
+        UUID route = UUID.randomUUID();
+        sibling(route, "DIESEL", c1, "4000");
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> service.allocate(T, load.getId(), alloc("7000", "5000"), route));
+        assertTrue(e.getMessage().contains("already use"));
+        service.allocate(T, load.getId(), alloc("6000", "6000"), route); // 4000 + 6000 = 10000 fits
+    }
+
+    @Test @DisplayName("C04: a compartment cannot carry two fuel types on one route")
+    void routeNoFuelMixing() {
+        UUID route = UUID.randomUUID();
+        sibling(route, "PETROL_95", c1, "1000");
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> service.allocate(T, load.getId(), alloc("6000", "6000"), route));
+        assertTrue(e.getMessage().contains("already carries PETROL_95"));
+    }
+
+    @Test @DisplayName("C04: a load that is a stop on a route cannot be allocated on its own")
+    void routedLoadNeedsRoute() {
+        load.joinRoute(UUID.randomUUID(), 1);
+        assertThrows(IllegalStateException.class, () -> service.allocate(T, load.getId(), alloc("10000", "2000")));
+        verify(deliveries, never()).save(any());
     }
 }
