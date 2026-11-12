@@ -146,4 +146,52 @@ class IncidentCaseServiceTest {
         var out = service().get(TENANT, i.getId());
         assertThat(out.allowedActions()).contains("RESOLVE", "ESCALATE", "ASSIGN").doesNotContain("ACKNOWLEDGE", "REOPEN");
     }
+
+    @Test @DisplayName("A guard can attach a file to an incident they reported")
+    void guardAttachesToOwnIncident() {
+        UUID guard = UUID.randomUUID();
+        Incident i = Incident.create(TENANT, UUID.randomUUID(), null, guard, "Gate forced", "desc", "LOW", null, null);
+        lenient().when(incidentRepo.findByIdAndTenantId(i.getId(), TENANT)).thenReturn(Optional.of(i));
+        var file = new org.springframework.mock.web.MockMultipartFile("file", "gate.jpg", "image/jpeg", new byte[]{1, 2, 3});
+        when(evidenceFacade.listFor(any(), any(), any(), any())).thenReturn(List.of());
+        EvidenceResponse saved = org.mockito.Mockito.mock(EvidenceResponse.class);
+        when(saved.fileName()).thenReturn("gate.jpg");
+        when(evidenceFacade.attach(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(saved);
+
+        service().attachByGuard(TENANT, i.getId(), guard, file, null, "Lerato");
+
+        wroteEvent("EVIDENCE_ADDED");
+    }
+
+    @Test @DisplayName("A guard cannot attach to another guard's incident, and the other guard's incident reads as not found")
+    void guardCannotAttachToSomeoneElsesIncident() {
+        Incident i = Incident.create(TENANT, UUID.randomUUID(), null, UUID.randomUUID(), "Gate forced", "desc", "LOW", null, null);
+        lenient().when(incidentRepo.findByIdAndTenantId(i.getId(), TENANT)).thenReturn(Optional.of(i));
+        var file = new org.springframework.mock.web.MockMultipartFile("file", "gate.jpg", "image/jpeg", new byte[]{1});
+
+        assertThatThrownBy(() -> service().attachByGuard(TENANT, i.getId(), UUID.randomUUID(), file, null, "Mallory"))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(evidenceFacade, never()).attach(any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test @DisplayName("An incident with no guard on it cannot take guard uploads")
+    void incidentWithNoGuardRefusesGuardUploads() {
+        Incident i = incident("LOW", "OPEN"); // created with no guard
+        var file = new org.springframework.mock.web.MockMultipartFile("file", "gate.jpg", "image/jpeg", new byte[]{1});
+        assertThatThrownBy(() -> service().attachByGuard(TENANT, i.getId(), UUID.randomUUID(), file, null, "X"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test @DisplayName("A guard is capped at 20 files per incident")
+    void guardUploadsAreCapped() {
+        UUID guard = UUID.randomUUID();
+        Incident i = Incident.create(TENANT, UUID.randomUUID(), null, guard, "Gate forced", "desc", "LOW", null, null);
+        lenient().when(incidentRepo.findByIdAndTenantId(i.getId(), TENANT)).thenReturn(Optional.of(i));
+        List<EvidenceResponse> twenty = java.util.Collections.nCopies(20, org.mockito.Mockito.mock(EvidenceResponse.class));
+        when(evidenceFacade.listFor(any(), any(), any(), any())).thenReturn(twenty);
+        var file = new org.springframework.mock.web.MockMultipartFile("file", "gate.jpg", "image/jpeg", new byte[]{1});
+
+        assertThatThrownBy(() -> service().attachByGuard(TENANT, i.getId(), guard, file, null, "Lerato"))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("20 files");
+    }
 }

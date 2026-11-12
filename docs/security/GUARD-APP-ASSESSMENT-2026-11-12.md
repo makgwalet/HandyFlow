@@ -102,3 +102,15 @@ Written, not compiled or run here (Maven Central is not reachable from this work
 | Works for shared tablets | Identity is the signed-in guard's token, so each guard signing in on a shared device is handled the same way. Decision 3 now only affects the app screens. |
 
 Not changed: a per-site geofence radius (needs a column and screen; 300 m is a constant), the face check (decision 2), and whether a clock-in with an unknown or failed geofence should be refused or just flagged for the supervisor (today it is recorded only).
+
+## 10. Status: step B1 (patch 0816, 2026-11-12)
+
+Written, not compiled or run here (same limit as step A). Run `mvn -q test "-Dtest=GuardMyWorkServiceTest,IncidentCaseServiceTest,ControllerAccessCoverageTest"` with the app stopped.
+
+| Gap | Change |
+|---|---|
+| G1 my shifts, my rounds | `GET /api/v1/guard/me/shifts` (12 hours back to 7 days ahead, with site names). `GET /api/v1/guard/me/rounds`: rounds of the shift on the guard's open session, each with its checkpoints in route order and which are scanned. 409 `NO_OPEN_SESSION` until the guard clocks in. The guard is always the token's guard. Checks module entitlement. |
+| G2 incident photos | `POST /api/v1/guard/incidents/{id}/evidence` (multipart `file`, optional `label`). Only the guard who reported the incident; another guard's incident is a 404. At most 20 files per incident from the field. File type and size limits are the evidence store's. |
+| New hole closed | The guard incident route took the reporting guard from the request body, so a guard could file as someone else or as nobody. It now uses the token's guard. |
+
+Still open from section 4: G3 (client ids and recorded-at for scan, incident, panic, clock-in, needs a migration), G4 (push token), G5, G6. The other guard controllers are still on the "no entitlement check" debt list; only the new controller checks it.

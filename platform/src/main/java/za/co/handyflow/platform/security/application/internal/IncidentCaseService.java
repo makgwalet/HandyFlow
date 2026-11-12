@@ -105,6 +105,25 @@ public class IncidentCaseService {
         return saved;
     }
 
+    /** Most files a guard may attach to one incident from the field. Supervisors have no such cap. */
+    static final int MAX_GUARD_FILES_PER_INCIDENT = 20;
+
+    /**
+     * A guard adds a photo or file to an incident they reported. Another guard's incident reads as not found.
+     * The guard is the one named on the incident, which the guard route sets from the token.
+     */
+    @Transactional
+    public EvidenceResponse attachByGuard(TenantId tenantId, UUID id, UUID guardId, MultipartFile file, String label, String guardName) {
+        Incident i = find(tenantId, id);
+        if (i.getGuardId() == null || !i.getGuardId().equals(guardId)) {
+            throw new ResourceNotFoundException("Incident", id.toString());
+        }
+        if (evidenceFacade.listFor(tenantId, SOURCE_MODULE, ENTITY_TYPE, id).size() >= MAX_GUARD_FILES_PER_INCIDENT) {
+            throw bad("This incident already has " + MAX_GUARD_FILES_PER_INCIDENT + " files. Tell your supervisor.", "TOO_MANY_FILES");
+        }
+        return attach(tenantId, id, file, label, guardId, guardName);
+    }
+
     @Transactional(readOnly = true)
     public EvidenceFacade.DownloadedEvidence download(TenantId tenantId, UUID id, UUID evidenceId) {
         requireOwned(tenantId, id, evidenceId);

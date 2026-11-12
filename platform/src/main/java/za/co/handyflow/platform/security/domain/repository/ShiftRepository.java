@@ -25,6 +25,19 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
         """)
     Page<Shift> findAllActive(TenantId tenantId, Pageable pageable);
 
+    /** One guard's own shifts in a window, for the guard app's "my shifts" screen. */
+    @Query("""
+        SELECT s FROM Shift s
+        WHERE s.tenantId = :tenantId
+        AND s.guardId    = :guardId
+        AND s.deletedAt  IS NULL
+        AND s.status NOT IN ('CANCELLED')
+        AND s.endAt      > :from
+        AND s.startAt    < :to
+        ORDER BY s.startAt ASC
+        """)
+    List<Shift> findForGuardBetween(TenantId tenantId, UUID guardId, Instant from, Instant to);
+
     @Query("""
         SELECT s FROM Shift s
         WHERE s.tenantId = :tenantId

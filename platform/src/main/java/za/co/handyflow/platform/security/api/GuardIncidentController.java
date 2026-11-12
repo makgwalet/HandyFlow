@@ -7,14 +7,20 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import za.co.handyflow.platform.evidence.dto.EvidenceResponse;
+import za.co.handyflow.platform.security.application.internal.IncidentCaseService;
 import za.co.handyflow.platform.security.application.internal.IncidentService;
 import za.co.handyflow.platform.security.dto.CreateIncidentRequest;
 import za.co.handyflow.platform.security.dto.IncidentResponse;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
+
+import java.util.UUID;
 
 /**
  * GAP-02 fix: independent of GAP-01's routing problem, {@code
@@ -46,6 +52,7 @@ import za.co.handyflow.platform.shared.TenantContext;
 public class GuardIncidentController {
 
     private final IncidentService incidentService;
+    private final IncidentCaseService caseService;
 
     @PostMapping
     @PreAuthorize("hasAuthority('SECURITY_GUARD')")
@@ -57,7 +64,24 @@ public class GuardIncidentController {
                     "supervisor-only on the original IncidentController.")
     public ResponseEntity<ApiResponse<IncidentResponse>> createIncident(
             @Valid @RequestBody CreateIncidentRequest req) {
+        // The reporting guard is the token's guard. A body naming another guard, or none, is overridden.
+        UUID me = TenantContext.getCurrentUserId();
+        CreateIncidentRequest own = new CreateIncidentRequest(req.siteId(), req.shiftId(), me, req.title(),
+                req.description(), req.severity(), req.type(), req.latitude(), req.longitude());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
-                incidentService.createIncident(TenantContext.getTenantIdAsObject(), req, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
+                incidentService.createIncident(TenantContext.getTenantIdAsObject(), own, me, TenantContext.getCurrentUserName())));
+    }
+
+    @PostMapping(value = "/{id}/evidence", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('SECURITY_GUARD')")
+    @Operation(summary = "Attach a photo or file to an incident you reported — guard-facing",
+            description = "Only the guard who reported the incident can attach. Another guard's incident returns 404. " +
+                    "Up to 20 files per incident from the field; type and size limits are the evidence store's.")
+    public ResponseEntity<ApiResponse<EvidenceResponse>> attach(@PathVariable UUID id,
+                                                                @RequestParam("file") MultipartFile file,
+                                                                @RequestParam(value = "label", required = false) String label) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Evidence attached",
+                caseService.attachByGuard(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId(),
+                        file, label, TenantContext.getCurrentUserName())));
     }
 }
