@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { validatePump, validateOpen, validateClose, pumpTotals, expectedTotals, takings, needsReason, varianceText, validateAdjustment, pendingAdjustments, approvedAdjustmentTotal, canDecideAdjustment, canWithdrawAdjustment, awaitingReview, type CloseRow, type ShiftAdjustment, type Shift } from "./forecourtOps"
+import { validateNozzle, nozzleFields, nozzleLabel, validatePump, validateOpen, validateClose, pumpTotals, expectedTotals, takings, needsReason, varianceText, validateAdjustment, pendingAdjustments, approvedAdjustmentTotal, canDecideAdjustment, canWithdrawAdjustment, awaitingReview, type CloseRow, type ShiftAdjustment, type Shift } from "./forecourtOps"
 
 const row = (o: Partial<CloseRow> = {}): CloseRow => ({ pumpId: "p1", name: "Pump 1", opening: 1000, price: 20, closing: "1210", test: "10", ...o })
 
@@ -77,5 +77,20 @@ describe("forecourtOps", () => {
   it("counts closed shifts waiting for review", () => {
     const sh = (o: Partial<Shift>) => ({ status: "CLOSED", reviewStatus: "NONE", ...o }) as Shift
     expect(awaitingReview([sh({ reviewStatus: "PENDING_REVIEW" }), sh({}), sh({ status: "REVERSED", reviewStatus: "PENDING_REVIEW" })])).toBe(1)
+  })
+
+  it("D01 nozzle grouping: a number needs a dispenser and 1 to 20; ungrouped pumps send nothing; clearing sends an empty label", () => {
+    expect(validateNozzle("", "")).toBeNull()
+    expect(validateNozzle("Island 1", "")).toBeNull()
+    expect(validateNozzle("", "2")).toMatch(/dispenser/)
+    expect(validateNozzle("Island 1", "0")).toMatch(/1 to 20/)
+    expect(validateNozzle("Island 1", "2.5")).toMatch(/1 to 20/)
+    expect(validateNozzle("Island 1", "3")).toBeNull()
+    expect(nozzleFields("", "", false)).toEqual({})
+    expect(nozzleFields("", "", true)).toEqual({ dispenserLabel: "" })
+    expect(nozzleFields(" Island 1 ", "2", false)).toEqual({ dispenserLabel: "Island 1", nozzleNumber: 2 })
+    expect(nozzleFields("Island 1", "", true)).toEqual({ dispenserLabel: "Island 1" })
+    expect(nozzleLabel({ dispenserLabel: "Island 1", nozzleNumber: 2 })).toBe("Island 1, nozzle 2")
+    expect(nozzleLabel({ dispenserLabel: null, nozzleNumber: null })).toBe("–")
   })
 })

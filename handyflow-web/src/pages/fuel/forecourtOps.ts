@@ -2,6 +2,7 @@
 export interface Pump {
   id: string; name: string; tankId: string; tankName: string | null; fuelType: string | null; pricePerLitre: number
   lastMeter: number | null; active: boolean; onShift: boolean
+  dispenserLabel?: string | null; nozzleNumber?: number | null
 }
 export interface ShiftReading {
   pumpId: string; pumpName: string; fuelType: string; openingMeter: number; openingGap: number; closingMeter: number | null
@@ -37,6 +38,25 @@ export function validatePump(name: string, tankId: string, price: string): strin
   const p = num(price); if (Number.isNaN(p) || p <= 0) return "Enter a pump price greater than zero."
   return null
 }
+
+/** D01: optional dispenser/nozzle grouping. Mirrors the server: a nozzle number (1 to 20) needs a dispenser. */
+export function validateNozzle(label: string, number: string): string | null {
+  if (number.trim() === "") return null
+  const n = Number(number)
+  if (!Number.isInteger(n) || n < 1 || n > 20) return "The nozzle number must be a whole number from 1 to 20."
+  if (!label.trim()) return "Name the dispenser this nozzle is on."
+  return null
+}
+
+/** What to add to the save body. Nothing is sent for an ungrouped pump (so older behaviour is unchanged); clearing a grouped pump sends an empty label. */
+export function nozzleFields(label: string, number: string, hadGrouping: boolean): { dispenserLabel?: string; nozzleNumber?: number } {
+  const l = label.trim()
+  if (!l) return hadGrouping ? { dispenserLabel: "" } : {}
+  return number.trim() === "" ? { dispenserLabel: l } : { dispenserLabel: l, nozzleNumber: Number(number) }
+}
+
+export const nozzleLabel = (p: Pick<Pump, "dispenserLabel" | "nozzleNumber">): string =>
+  p.dispenserLabel ? (p.nozzleNumber ? `${p.dispenserLabel}, nozzle ${p.nozzleNumber}` : p.dispenserLabel) : "–"
 
 export function validateOpen(attendant: string, rows: { pumpId: string; meter: string; name: string }[]): string | null {
   if (!attendant.trim()) return "Enter the attendant's name."

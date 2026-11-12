@@ -50,8 +50,10 @@ public class FuelForecourtService {
     @Transactional
     public PumpResponse createPump(TenantId tenantId, PumpRequest req) {
         FuelTank tank = tank(tenantId, req.tankId());
-        FuelPump p = pumps.save(FuelPump.create(tenantId, req.name(), tank.getId(), req.pricePerLitre()));
-        return toPump(p, tank, false);
+        FuelPump created = FuelPump.create(tenantId, req.name(), tank.getId(), req.pricePerLitre());
+        created.assignNozzle(req.dispenserLabel(), req.nozzleNumber());
+        requireNozzleFree(tenantId, created, null);
+        return toPump(pumps.save(created), tank, false);
     }
 
     @Transactional
@@ -66,6 +68,11 @@ public class FuelForecourtService {
         boolean active = req.active() == null ? p.isActive() : req.active();
         if (busy && !active) throw new IllegalStateException("This pump is on an open shift. Close the shift before deactivating it.");
         p.update(req.name(), tank.getId(), req.pricePerLitre(), active);
+        // Null in both leaves the grouping alone, so an older client that does not send them cannot ungroup a pump.
+        if (req.dispenserLabel() != null || req.nozzleNumber() != null) {
+            p.assignNozzle(req.dispenserLabel(), req.nozzleNumber());
+            requireNozzleFree(tenantId, p, p.getId());
+        }
         return toPump(pumps.save(p), tank, busy);
     }
 
@@ -236,9 +243,17 @@ public class FuelForecourtService {
     private Map<UUID, FuelTank> tankMap(TenantId t) { return tanks.findAllActive(t).stream().collect(Collectors.toMap(FuelTank::getId, Function.identity())); }
     private Map<UUID, String> pumpNames(TenantId t) { return pumps.findAllActive(t).stream().collect(Collectors.toMap(FuelPump::getId, FuelPump::getName)); }
 
+    /** The database also enforces this; checking here gives a readable message instead of a constraint error. */
+    private void requireNozzleFree(TenantId tenantId, FuelPump p, UUID selfId) {
+        if (p.getDispenserLabel() == null || p.getNozzleNumber() == null) return;
+        boolean taken = pumps.findAllActive(tenantId).stream().anyMatch(o -> !o.getId().equals(selfId) && o.getDispenserLabel() != null && o.getNozzleNumber() != null
+                && o.getDispenserLabel().equalsIgnoreCase(p.getDispenserLabel()) && o.getNozzleNumber().equals(p.getNozzleNumber()));
+        if (taken) throw new IllegalStateException("Nozzle " + p.getNozzleNumber() + " on " + p.getDispenserLabel() + " is already in use. Choose another number.");
+    }
+
     private static PumpResponse toPump(FuelPump p, FuelTank t, boolean onShift) {
         return new PumpResponse(p.getId(), p.getName(), p.getTankId(), t == null ? null : t.getName(), t == null ? null : t.getFuelType(),
-                p.getPricePerLitre(), p.getLastMeter(), p.isActive(), onShift);
+                p.getPricePerLitre(), p.getLastMeter(), p.isActive(), onShift, p.getDispenserLabel(), p.getNozzleNumber());
     }
 
     private static ShiftResponse toShift(FuelShift s, List<FuelShiftReading> rows, Map<UUID, String> names) {

@@ -136,6 +136,22 @@ describe("ForecourtTab", () => {
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/forecourt/pumps", { name: "Pump 3", tankId: "t1", pricePerLitre: 21.5, active: true }))
   })
 
+  it("adds a pump grouped as a nozzle on a dispenser (D01), and refuses a nozzle number with no dispenser", async () => {
+    perms = ["FUEL_MANAGE"]
+    mount()
+    await waitFor(() => screen.getByText("Pumps"))
+    fireEvent.click(screen.getByText("Pumps"))
+    fireEvent.click(await screen.findByText("Add pump"))
+    await waitFor(() => screen.getByText("Diesel 1 (DIESEL)"))
+    type("Pump name", "Pump 3"); type("Tank", "t1"); type("Price per litre", "21.50"); type("Nozzle number", "2")
+    fireEvent.click(screen.getByText("Save pump"))
+    await waitFor(() => screen.getByText("Name the dispenser this nozzle is on."))
+    expect(post).not.toHaveBeenCalledWith("/api/v1/fuel/forecourt/pumps", expect.anything())
+    type("Dispenser", "Island 1")
+    fireEvent.click(screen.getByText("Save pump"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/forecourt/pumps", { name: "Pump 3", tankId: "t1", pricePerLitre: 21.5, active: true, dispenserLabel: "Island 1", nozzleNumber: 2 }))
+  })
+
   const adj = (o: any = {}) => ({ id: "a1", shiftId: "s1", kind: "REFUND", amount: 100, reason: "Customer overfilled", status: "PENDING", recordedBy: "alice", recordedAt: "2026-11-11T08:00:00Z", ...o })
   const openClose = async () => {
     mount()

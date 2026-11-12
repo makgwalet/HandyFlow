@@ -13,10 +13,19 @@ public final class ForecourtDtos {
     private ForecourtDtos() {}
 
     public record PumpRequest(@NotBlank @Size(max = 40) String name, @NotNull UUID tankId,
-                              @NotNull @Positive @DecimalMax("1000") BigDecimal pricePerLitre, Boolean active) {}
+                              @NotNull @Positive @DecimalMax("1000") BigDecimal pricePerLitre, Boolean active,
+                              @Size(max = 40) String dispenserLabel, @Min(1) @Max(20) Integer nozzleNumber) {
+        public PumpRequest(String name, UUID tankId, BigDecimal pricePerLitre, Boolean active) { this(name, tankId, pricePerLitre, active, null, null); }
+    }
 
     public record PumpResponse(UUID id, String name, UUID tankId, String tankName, String fuelType, BigDecimal pricePerLitre,
-                               BigDecimal lastMeter, boolean active, boolean onShift) {}
+                               BigDecimal lastMeter, boolean active, boolean onShift,
+                               String dispenserLabel, Integer nozzleNumber) {
+        public PumpResponse(UUID id, String name, UUID tankId, String tankName, String fuelType, BigDecimal pricePerLitre,
+                            BigDecimal lastMeter, boolean active, boolean onShift) {
+            this(id, name, tankId, tankName, fuelType, pricePerLitre, lastMeter, active, onShift, null, null);
+        }
+    }
 
     public record OpenReading(@NotNull UUID pumpId, @NotNull @PositiveOrZero BigDecimal openingMeter) {}
 

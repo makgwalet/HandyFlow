@@ -32,6 +32,13 @@ public class FuelPump {
     @Column(name = "price_per_litre", nullable = false, precision = 10, scale = 4)
     private BigDecimal pricePerLitre;
 
+    /** Optional: the physical dispenser this nozzle belongs to, and its number on it. */
+    @Column(name = "dispenser_label", length = 40)
+    private String dispenserLabel;
+
+    @Column(name = "nozzle_number")
+    private Integer nozzleNumber;
+
     @Column(name = "last_meter", precision = 14, scale = 2)
     private BigDecimal lastMeter;
 
@@ -70,6 +77,15 @@ public class FuelPump {
         this.tankId = tankId;
         this.pricePerLitre = pricePerLitre;
         this.active = active;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Both blank means the pump is not grouped. A nozzle number needs a dispenser to belong to. */
+    public void assignNozzle(String dispenserLabel, Integer nozzleNumber) {
+        String label = dispenserLabel == null || dispenserLabel.isBlank() ? null : dispenserLabel.trim();
+        if (nozzleNumber != null && (nozzleNumber < 1 || nozzleNumber > 20)) throw new IllegalArgumentException("The nozzle number must be between 1 and 20.");
+        if (nozzleNumber != null && label == null) throw new IllegalArgumentException("Name the dispenser this nozzle is on.");
+        this.dispenserLabel = label; this.nozzleNumber = label == null ? null : nozzleNumber;
         this.updatedAt = Instant.now();
     }
 

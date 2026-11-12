@@ -72,3 +72,6 @@ Built (patch 0779): threshold and margin guard, approval via ApprovalFacade, cha
 
 ## G02 - Invoice attempt trail (2026-11-12)
 Built (patch 0780): attempt trail, needs-attention panel, relink/release, block on re-invoicing unlinked deliveries. No automatic retry by design (no idempotency key in Invoicing). See FUEL-G02-INVOICE-ATTEMPTS-NOTES-2026-11-12.md.
+
+## D01 - Nozzles and tank-to-pump reconciliation (2026-11-12)
+Built (patch 0781): reconciliation report + panel; nozzle grouping as a label layer on pump records (shift flow untouched by design). See FUEL-D01-NOZZLES-RECONCILIATION-NOTES-2026-11-12.md.

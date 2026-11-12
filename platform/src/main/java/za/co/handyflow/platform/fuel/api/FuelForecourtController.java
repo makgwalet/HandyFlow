@@ -3,6 +3,7 @@ package za.co.handyflow.platform.fuel.api;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -10,11 +11,15 @@ import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.fuel.application.internal.FuelCashControlService;
 import za.co.handyflow.platform.fuel.application.internal.FuelForecourtService;
+import za.co.handyflow.platform.fuel.application.internal.FuelTankReconciliationService;
+import za.co.handyflow.platform.fuel.dto.FuelRetailDtos;
 import za.co.handyflow.platform.fuel.dto.FuelWholesaleDtos.ReasonRequest;
 import za.co.handyflow.platform.fuel.dto.ForecourtDtos.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,7 +37,19 @@ public class FuelForecourtController {
 
     private final FuelForecourtService forecourt;
     private final FuelCashControlService cash;
+    private final FuelTankReconciliationService reconciliation;
     private final FeatureGuard featureGuard;
+
+    /** D01: opening dip + recorded movements against the closing dip, and pump meters against the ledger. tolerancePct is optional. */
+    @GetMapping("/tanks/{id}/reconciliation")
+    @PreAuthorize(SEE)
+    public ResponseEntity<ApiResponse<FuelRetailDtos.TankReconciliation>> reconcileTank(@PathVariable UUID id,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+            @RequestParam(required = false) BigDecimal tolerancePct) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(reconciliation.reconcile(TenantContext.getTenantIdAsObject(), id, from, to, tolerancePct)));
+    }
 
     @GetMapping("/pumps")
     @PreAuthorize(SEE)

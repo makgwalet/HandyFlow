@@ -16,6 +16,10 @@ public interface FuelShiftReadingRepository extends JpaRepository<FuelShiftReadi
     @Query("SELECT r FROM FuelShiftReading r WHERE r.tenantId = :tenantId AND r.shiftId IN :shiftIds")
     List<FuelShiftReading> findByShifts(TenantId tenantId, Collection<UUID> shiftIds);
 
+    /** Litres the pump meters recorded for a tank on shifts closed in the window (reversed shifts excluded). */
+    @Query("SELECT COALESCE(SUM(r.litresSold), 0) FROM FuelShiftReading r, FuelShift s WHERE r.shiftId = s.id AND r.tenantId = :tenantId AND s.tenantId = :tenantId AND r.tankId = :tankId AND s.status = 'CLOSED' AND s.closedAt > :after AND s.closedAt <= :upTo")
+    java.math.BigDecimal sumMeterLitresForTank(TenantId tenantId, UUID tankId, java.time.Instant after, java.time.Instant upTo);
+
     @Query("SELECT r FROM FuelShiftReading r WHERE r.tenantId = :tenantId AND r.open = true AND r.pumpId IN :pumpIds")
     List<FuelShiftReading> findOpenForPumps(TenantId tenantId, Collection<UUID> pumpIds);
 }

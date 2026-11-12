@@ -5,10 +5,11 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import ShiftAdjustmentsPanel from "./ShiftAdjustmentsPanel"
+import TankReconciliationPanel from "./TankReconciliationPanel"
 import type { Controls } from "./wholesaleOps"
 import {
   fmtL, fmtR, validatePump, validateOpen, validateClose, expectedTotals, takings, needsReason, varianceText, pumpTotals, awaitingReview,
-  approvedAdjustmentTotal, pendingAdjustments, VARIANCE_TOLERANCE,
+  approvedAdjustmentTotal, pendingAdjustments, VARIANCE_TOLERANCE, validateNozzle, nozzleFields, nozzleLabel,
   type Pump, type Shift, type ShiftAdjustment, type ForecourtSummary, type CloseRow,
 } from "./forecourtOps"
 
@@ -130,11 +131,11 @@ export default function ForecourtTab() {
         pumpList.length === 0 ? <p style={{ color: "var(--hf-text-muted)" }}>{pumps.isLoading ? "Loading…" : "No pumps yet. Add each pump with the tank it draws from and its price."}</p> : (
           <div style={{ ...card, overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr><th style={th}>Pump</th><th style={th}>Tank</th><th style={th}>Fuel</th><th style={th}>Price / L</th><th style={th}>Last meter</th><th style={th}>Status</th><th style={th}></th></tr></thead>
+              <thead><tr><th style={th}>Pump</th><th style={th}>Dispenser / nozzle</th><th style={th}>Tank</th><th style={th}>Fuel</th><th style={th}>Price / L</th><th style={th}>Last meter</th><th style={th}>Status</th><th style={th}></th></tr></thead>
               <tbody>
                 {pumpList.map(p => (
                   <tr key={p.id} style={{ borderTop: "1px solid var(--hf-border)" }}>
-                    <td style={td}>{p.name}</td><td style={td}>{p.tankName ?? "–"}</td><td style={td}>{p.fuelType ?? "–"}</td>
+                    <td style={td}>{p.name}</td><td style={td}>{nozzleLabel(p)}</td><td style={td}>{p.tankName ?? "–"}</td><td style={td}>{p.fuelType ?? "–"}</td>
                     <td style={td}>{fmtR(p.pricePerLitre)}</td><td style={td}>{p.lastMeter ?? "–"}</td>
                     <td style={td}>{p.onShift ? <Chip bg="var(--hf-info-soft)" fg="var(--hf-info-text)">On shift</Chip> : p.active ? "Idle" : "Inactive"}</td>
                     <td style={td}>{canManage && <span style={{ display: "flex", gap: 6 }}>
@@ -149,6 +150,8 @@ export default function ForecourtTab() {
         )
       )}
       {view === "shifts" && !hasOpen && list.length > 0 && <p style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 10 }}>No shift is open.</p>}
+
+      <TankReconciliationPanel />
 
       {dialog?.kind === "open" && <OpenDialog pumps={pumpList} onDone={refresh} onClose={() => setDialog(null)} />}
       {dialog?.kind === "close" && <CloseDialog shift={dialog.shift} onDone={refresh} onClose={() => setDialog(null)} />}
@@ -308,11 +311,11 @@ function ReverseDialog({ shift, onDone, onClose }: { shift: Shift; onDone: () =>
 }
 
 function PumpDialog({ pump, onDone, onClose }: { pump?: Pump; onDone: () => void; onClose: () => void }) {
-  const [f, setF] = useState({ name: pump?.name ?? "", tankId: pump?.tankId ?? "", price: pump ? String(pump.pricePerLitre) : "" })
+  const [f, setF] = useState({ name: pump?.name ?? "", tankId: pump?.tankId ?? "", price: pump ? String(pump.pricePerLitre) : "", dispenser: pump?.dispenserLabel ?? "", nozzle: pump?.nozzleNumber ? String(pump.nozzleNumber) : "" })
   const [err, setErr] = useState("")
   const tanks = useQuery<{ id: string; name: string; fuelType: string }[]>({ queryKey: ["fuel-tanks"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/tanks")) })
   const save = useMutation({
-    mutationFn: () => { const body = { name: f.name.trim(), tankId: f.tankId, pricePerLitre: Number(f.price), active: pump ? pump.active : true }
+    mutationFn: () => { const body = { name: f.name.trim(), tankId: f.tankId, pricePerLitre: Number(f.price), active: pump ? pump.active : true, ...nozzleFields(f.dispenser, f.nozzle, !!pump?.dispenserLabel) }
       return pump ? apiClient.put(`${BASE}/pumps/${pump.id}`, body) : apiClient.post(`${BASE}/pumps`, body) },
     onSuccess: () => { onDone(); onClose() }, onError: (e: any) => setErr(msg(e, "Could not save the pump")),
   })
@@ -327,10 +330,15 @@ function PumpDialog({ pump, onDone, onClose }: { pump?: Pump; onDone: () => void
       </select>
       <label style={{ ...labelStyle, marginTop: 10 }}>Price per litre *</label>
       <input aria-label="Price per litre" type="number" min="0" step="0.01" value={f.price} onChange={e => setF(s => ({ ...s, price: e.target.value }))} style={inputStyle} />
+      <label style={{ ...labelStyle, marginTop: 10 }}>Dispenser (optional)</label>
+      <input aria-label="Dispenser" placeholder="e.g. Island 1" value={f.dispenser} onChange={e => setF(s => ({ ...s, dispenser: e.target.value }))} style={inputStyle} />
+      <label style={{ ...labelStyle, marginTop: 10 }}>Nozzle number (optional)</label>
+      <input aria-label="Nozzle number" inputMode="numeric" value={f.nozzle} onChange={e => setF(s => ({ ...s, nozzle: e.target.value }))} style={inputStyle} />
+      <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 4 }}>Each pump here is one metered nozzle. Naming the dispenser and nozzle number only groups them for reading; shifts and meters work as before.</div>
       {err && <Err text={err} />}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
         <button style={btnGhost} onClick={onClose}>Cancel</button>
-        <button style={btnPrimary} disabled={save.isPending} onClick={() => { const v = validatePump(f.name, f.tankId, f.price); if (v) return setErr(v); setErr(""); save.mutate() }}>Save pump</button>
+        <button style={btnPrimary} disabled={save.isPending} onClick={() => { const v = validatePump(f.name, f.tankId, f.price) ?? validateNozzle(f.dispenser, f.nozzle); if (v) return setErr(v); setErr(""); save.mutate() }}>Save pump</button>
       </div>
     </Modal>
   )

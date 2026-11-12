@@ -175,6 +175,41 @@ class FuelForecourtServiceTest {
         assertDoesNotThrow(() -> service.updatePump(TENANT, pump1.getId(), new PumpRequest("Pump One", diesel.getId(), d("20.00"), true)));
     }
 
+    // ---- D01: nozzle grouping ----
+
+    @Test @DisplayName("D01: a nozzle needs a dispenser, a sensible number, and blank clears the grouping")
+    void nozzleRules() {
+        pump1.assignNozzle(" Island 1 ", 2);
+        assertEquals("Island 1", pump1.getDispenserLabel());
+        assertEquals(2, pump1.getNozzleNumber());
+        assertThrows(IllegalArgumentException.class, () -> pump1.assignNozzle(null, 1));
+        assertThrows(IllegalArgumentException.class, () -> pump1.assignNozzle("Island 1", 0));
+        assertThrows(IllegalArgumentException.class, () -> pump1.assignNozzle("Island 1", 21));
+        pump1.assignNozzle("Island 1", null);
+        assertNull(pump1.getNozzleNumber());
+        pump1.assignNozzle("", null);
+        assertNull(pump1.getDispenserLabel());
+    }
+
+    @Test @DisplayName("D01: two nozzles cannot share a number on the same dispenser (any letter case), but different dispensers can")
+    void nozzleNumberUnique() {
+        pump2.assignNozzle("Island 1", 1);
+        assertThrows(IllegalStateException.class, () -> service.updatePump(TENANT, pump1.getId(), new PumpRequest("Pump 1", diesel.getId(), d("20.00"), true, "island 1", 1)));
+        assertDoesNotThrow(() -> service.updatePump(TENANT, pump1.getId(), new PumpRequest("Pump 1", diesel.getId(), d("20.00"), true, "Island 2", 1)));
+        assertEquals("Island 2", pump1.getDispenserLabel());
+    }
+
+    @Test @DisplayName("D01: an older client that sends no grouping does not ungroup the pump; an empty label does")
+    void nozzleLeftAloneWhenNotSent() {
+        pump1.assignNozzle("Island 1", 3);
+        service.updatePump(TENANT, pump1.getId(), new PumpRequest("Pump 1", diesel.getId(), d("20.00"), true));
+        assertEquals("Island 1", pump1.getDispenserLabel());
+        assertEquals(3, pump1.getNozzleNumber());
+        service.updatePump(TENANT, pump1.getId(), new PumpRequest("Pump 1", diesel.getId(), d("20.00"), true, "", null));
+        assertNull(pump1.getDispenserLabel());
+        assertNull(pump1.getNozzleNumber());
+    }
+
     @Test @DisplayName("reversing a closed shift puts the litres back and posts a reversal; an open or already reversed shift cannot be reversed")
     void reverseRestores() {
         FuelShift s = opened();
