@@ -29,8 +29,8 @@ const statusChip = (s: Shift["status"]) =>
   : <Chip bg="var(--hf-success-soft-strong)" fg="var(--hf-success-text-strong)">Closed</Chip>
 
 export default function ForecourtTab() {
-  const canRun = usePermissions(["FUEL_FORECOURT", "FUEL_MANAGE"])
-  const canManage = usePermissions(["FUEL_MANAGE"])
+  const canRun = usePermissions(["FUEL_FORECOURT", "FUEL_MANAGE", "FUEL_FORECOURT_MANAGE"])
+  const canManage = usePermissions(["FUEL_MANAGE", "FUEL_FORECOURT_MANAGE"])
   const canSupervise = usePermissions(["FUEL_SHIFT_SUPERVISE"])
   const qc = useQueryClient()
   const [dialog, setDialog] = useState<Dialog>(null)

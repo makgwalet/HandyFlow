@@ -24,7 +24,7 @@ type Dialog =
 export default function StockTab() {
   const [view, setView] = useState<View>("position")
   const [dialog, setDialog] = useState<Dialog>(null)
-  const canManage = usePermissions(["FUEL_MANAGE"])
+  const canManage = usePermissions(["FUEL_MANAGE", "FUEL_STOCK_MANAGE"])
   const canAdjust = usePermissions(["FUEL_STOCK_ADJUST"])
 
   const availability = useQuery<Availability>({ queryKey: ["fuel-availability"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/availability")) })

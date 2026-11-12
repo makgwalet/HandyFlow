@@ -59,7 +59,7 @@ public class FuelDistributionController {
     }
 
     @PostMapping("/deliveries/{id}/evidence")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_DISTRIBUTION_MANAGE')")
     public ResponseEntity<ApiResponse<EvidenceView>> addEvidence(@PathVariable UUID id, @Valid @RequestBody EvidenceRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Evidence added",
@@ -67,14 +67,14 @@ public class FuelDistributionController {
     }
 
     @GetMapping("/driver/loads/{id}/evidence")
-    @PreAuthorize("hasAnyAuthority('FUEL_DRIVER','FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_DRIVER','FUEL_MANAGE','FUEL_DISTRIBUTION_MANAGE')")
     public ResponseEntity<ApiResponse<List<EvidenceView>>> myEvidence(@PathVariable UUID id) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(evidence.listAsDriver(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id)));
     }
 
     @PostMapping("/driver/loads/{id}/evidence")
-    @PreAuthorize("hasAnyAuthority('FUEL_DRIVER','FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_DRIVER','FUEL_MANAGE','FUEL_DISTRIBUTION_MANAGE')")
     public ResponseEntity<ApiResponse<EvidenceView>> addMyEvidence(@PathVariable UUID id, @Valid @RequestBody EvidenceRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Evidence added",
@@ -82,7 +82,7 @@ public class FuelDistributionController {
     }
 
     @PostMapping("/evidence/{id}/supersede")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_DISTRIBUTION_MANAGE')")
     public ResponseEntity<ApiResponse<List<EvidenceView>>> supersede(@PathVariable UUID id, @Valid @RequestBody SupersedeRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Evidence replaced",

@@ -91,7 +91,7 @@ public class FuelTankController {
     }
 
     @PostMapping("/tanks")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_OPERATIONS_MANAGE')")
     public ResponseEntity<ApiResponse<TankResponse>> createTank(
             @Valid @RequestBody CreateTankRequest request) {
         featureGuard.requireModule("fuel");
@@ -101,7 +101,7 @@ public class FuelTankController {
     }
 
     @PutMapping("/tanks/{id}")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_OPERATIONS_MANAGE')")
     public ResponseEntity<ApiResponse<TankResponse>> updateTank(
             @PathVariable UUID id, @Valid @RequestBody UpdateTankRequest request) {
         featureGuard.requireModule("fuel");
@@ -110,7 +110,7 @@ public class FuelTankController {
     }
 
     @PostMapping("/tanks/{id}/deactivate")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_OPERATIONS_MANAGE')")
     public ResponseEntity<ApiResponse<Void>> deactivateTank(@PathVariable UUID id) {
         featureGuard.requireModule("fuel");
         fuelService.deactivateTank(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId());
@@ -137,7 +137,7 @@ public class FuelTankController {
     }
 
     @PostMapping("/suppliers")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_OPERATIONS_MANAGE')")
     public ResponseEntity<ApiResponse<SupplierResponse>> createSupplier(
             @Valid @RequestBody CreateSupplierRequest request) {
         featureGuard.requireModule("fuel");
@@ -167,7 +167,7 @@ public class FuelTankController {
     // FIX: PUT instead of PATCH — avoids CORS preflight failures.
     // Was completely missing — SuppliersTab calls PUT /suppliers/{id}.
     @PutMapping("/suppliers/{id}")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_OPERATIONS_MANAGE')")
     @Operation(summary = "Update an existing fuel supplier's contact details")
     public ResponseEntity<ApiResponse<SupplierResponse>> updateSupplier(
             @PathVariable UUID id,
@@ -206,7 +206,7 @@ public class FuelTankController {
     }
 
     @PostMapping("/tanks/{id}/receive")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_OPERATIONS_MANAGE')")
     public ResponseEntity<ApiResponse<ReceiptResponse>> receiveFuel(
             @PathVariable UUID id,
             @Valid @RequestBody ReceiveFuelRequest request) {
@@ -244,7 +244,7 @@ public class FuelTankController {
     }
 
     @PostMapping("/tanks/{id}/dispatch")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_OPERATIONS_MANAGE')")
     public ResponseEntity<ApiResponse<DispatchResponse>> dispatchFuel(
             @PathVariable UUID id,
             @Valid @RequestBody DispatchFuelRequest request) {
@@ -268,7 +268,7 @@ public class FuelTankController {
     }
 
     @PostMapping("/tanks/{id}/dip-readings")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_OPERATIONS_MANAGE')")
     public ResponseEntity<ApiResponse<DipReadingResponse>> recordDipReading(
             @PathVariable UUID id,
             @Valid @RequestBody DipReadingRequest request) {
@@ -341,7 +341,7 @@ public class FuelTankController {
     }
 
     @PostMapping("/deliveries")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_OPERATIONS_MANAGE')")
     public ResponseEntity<ApiResponse<DeliveryResponse>> scheduleDelivery(
             @Valid @RequestBody CreateDeliveryRequest request) {
         featureGuard.requireModule("fuel");
@@ -351,7 +351,7 @@ public class FuelTankController {
     }
 
     @PostMapping("/deliveries/{id}/complete")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_OPERATIONS_MANAGE')")
     public ResponseEntity<ApiResponse<DeliveryResponse>> completeDelivery(
             @PathVariable UUID id,
             @Valid @RequestBody CompleteDeliveryRequest request) {
@@ -361,7 +361,7 @@ public class FuelTankController {
     }
 
     @PostMapping("/deliveries/{id}/dispatch")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_OPERATIONS_MANAGE')")
     public ResponseEntity<ApiResponse<DeliveryResponse>> dispatchDelivery(
             @PathVariable UUID id, @Valid @RequestBody DispatchDeliveryRequest request) {
         featureGuard.requireModule("fuel");
@@ -370,7 +370,7 @@ public class FuelTankController {
     }
 
     @PostMapping("/deliveries/{id}/cancel")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_OPERATIONS_MANAGE')")
     public ResponseEntity<ApiResponse<DeliveryResponse>> cancelDelivery(@PathVariable UUID id) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Delivery cancelled",
@@ -378,7 +378,7 @@ public class FuelTankController {
     }
 
     @PostMapping("/deliveries/{id}/reverse")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_OPERATIONS_MANAGE')")
     public ResponseEntity<ApiResponse<DeliveryResponse>> reverseDelivery(
             @PathVariable UUID id, @Valid @RequestBody ReverseRequest request) {
         featureGuard.requireModule("fuel");
@@ -388,7 +388,7 @@ public class FuelTankController {
     }
 
     @PostMapping("/dispatches/{id}/reverse")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_OPERATIONS_MANAGE')")
     public ResponseEntity<ApiResponse<DispatchResponse>> reverseDispatch(
             @PathVariable UUID id, @Valid @RequestBody ReverseRequest request) {
         featureGuard.requireModule("fuel");
@@ -398,7 +398,7 @@ public class FuelTankController {
     }
 
     @PostMapping("/receipts/{id}/reverse")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_OPERATIONS_MANAGE')")
     public ResponseEntity<ApiResponse<ReceiptResponse>> reverseReceipt(
             @PathVariable UUID id, @Valid @RequestBody ReverseRequest request) {
         featureGuard.requireModule("fuel");

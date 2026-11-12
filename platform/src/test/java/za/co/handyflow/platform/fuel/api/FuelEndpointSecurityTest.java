@@ -141,4 +141,38 @@ class FuelEndpointSecurityTest {
         }
         assertThat(bad).as("tenantId must never be client-supplied").isEmpty();
     }
+
+    /** G01: FUEL_MANAGE is the umbrella. Every area controller must also accept its own narrower permission. */
+    private static final Set<String> UMBRELLA_ONLY = Set.of("FuelSettingsController.java");
+
+    @Test
+    void fuelManageAlwaysComesWithAnAreaPermission() throws IOException {
+        List<String> bad = new ArrayList<>();
+        Pattern umbrellaAlone = Pattern.compile("hasAuthority\\('FUEL_MANAGE'\\)");
+        for (Path p : controllers()) {
+            if (UMBRELLA_ONLY.contains(p.getFileName().toString())) continue;
+            for (Endpoint e : endpoints(p)) {
+                if (umbrellaAlone.matcher(e.annotations()).find()) bad.add(e.file() + ":" + e.line());
+            }
+        }
+        assertThat(bad).as("endpoints guarded by FUEL_MANAGE alone; add the area permission beside it").isEmpty();
+    }
+
+    @Test
+    void areaPermissionsAreSeededForFuelAndGivenToAdmin() throws IOException {
+        String sql = Files.readString(MIGRATIONS.resolve("V666__fuel_granular_manage_permissions.sql"));
+        Set<String> used = new java.util.TreeSet<>();
+        for (Path p : controllers()) {
+            for (Endpoint e : endpoints(p)) {
+                Matcher m = AUTH.matcher(e.annotations());
+                while (m.find()) if (m.group(1).matches("FUEL_[A-Z_]+_MANAGE") && !m.group(1).equals("FUEL_CONFIGURATION_MANAGE")) used.add(m.group(1));
+            }
+        }
+        assertThat(used).hasSizeGreaterThanOrEqualTo(12);
+        for (String perm : used) {
+            assertThat(sql).as(perm + " inserted").contains("'" + perm + "', '");
+            assertThat(sql).as(perm + " has module_key fuel").containsPattern("module_key = 'fuel'[^;]*WHERE name = '" + perm + "'");
+            assertThat(sql).as(perm + " given to ADMIN").contains("'" + perm + "'");
+        }
+    }
 }

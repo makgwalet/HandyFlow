@@ -44,7 +44,7 @@ public class FuelPurchasingController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_PURCHASING_MANAGE')")
     public ResponseEntity<ApiResponse<PurchaseOrderResponse>> create(@Valid @RequestBody PurchaseOrderRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Created",
@@ -52,35 +52,35 @@ public class FuelPurchasingController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_PURCHASING_MANAGE')")
     public ResponseEntity<ApiResponse<PurchaseOrderResponse>> update(@PathVariable UUID id, @Valid @RequestBody PurchaseOrderRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Updated", purchasing.update(TenantContext.getTenantIdAsObject(), id, req)));
     }
 
     @PostMapping("/{id}/place")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_PURCHASING_MANAGE')")
     public ResponseEntity<ApiResponse<PurchaseOrderResponse>> place(@PathVariable UUID id) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Placed", purchasing.place(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_PURCHASING_MANAGE')")
     public ResponseEntity<ApiResponse<PurchaseOrderResponse>> cancel(@PathVariable UUID id, @Valid @RequestBody CancelRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Cancelled", purchasing.cancel(TenantContext.getTenantIdAsObject(), id, req.reason())));
     }
 
     @PostMapping("/{id}/close-short")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_PURCHASING_MANAGE')")
     public ResponseEntity<ApiResponse<PurchaseOrderResponse>> closeShort(@PathVariable UUID id, @Valid @RequestBody CancelRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Closed", purchasing.closeShort(TenantContext.getTenantIdAsObject(), id, req.reason())));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_PURCHASING_MANAGE')")
     public ResponseEntity<ApiResponse<Void>> remove(@PathVariable UUID id) {
         featureGuard.requireModule("fuel");
         purchasing.remove(TenantContext.getTenantIdAsObject(), id);

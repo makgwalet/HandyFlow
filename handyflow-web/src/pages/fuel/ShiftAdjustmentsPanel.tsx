@@ -12,7 +12,7 @@ const BASE = "/api/v1/fuel/forecourt"
 
 /** Refunds, voids and discounts on one shift. A supervisor, not the person who recorded it, approves each; pending ones block closing. */
 export default function ShiftAdjustmentsPanel({ shiftId, open }: { shiftId: string; open: boolean }) {
-  const canRun = usePermissions(["FUEL_FORECOURT", "FUEL_MANAGE"])
+  const canRun = usePermissions(["FUEL_FORECOURT", "FUEL_MANAGE", "FUEL_FORECOURT_MANAGE"])
   const canSupervise = usePermissions(["FUEL_SHIFT_SUPERVISE"])
   const me = useAuthStore(s => s.user?.userId) as string | undefined
   const qc = useQueryClient()

@@ -41,7 +41,7 @@ public class FuelCustomerController {
     }
 
     @PostMapping("/customer-accounts")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_CUSTOMERS_MANAGE')")
     public ResponseEntity<ApiResponse<CustomerAccountResponse>> create(@Valid @RequestBody CustomerAccountRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Customer account created",
@@ -49,7 +49,7 @@ public class FuelCustomerController {
     }
 
     @PutMapping("/customer-accounts/{id}")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_CUSTOMERS_MANAGE')")
     public ResponseEntity<ApiResponse<CustomerAccountResponse>> update(@PathVariable UUID id, @Valid @RequestBody CustomerAccountRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Customer account updated",
@@ -57,7 +57,7 @@ public class FuelCustomerController {
     }
 
     @PostMapping("/customer-accounts/{id}/credit-hold")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_CUSTOMERS_MANAGE')")
     public ResponseEntity<ApiResponse<CustomerAccountResponse>> creditHold(@PathVariable UUID id, @Valid @RequestBody CreditHoldRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(req.hold() ? "Account placed on credit hold" : "Credit hold released",
@@ -65,7 +65,7 @@ public class FuelCustomerController {
     }
 
     @PostMapping("/customer-accounts/{id}/sites")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_CUSTOMERS_MANAGE')")
     public ResponseEntity<ApiResponse<CustomerSiteResponse>> addSite(@PathVariable UUID id, @Valid @RequestBody CustomerSiteRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Site added",
@@ -73,7 +73,7 @@ public class FuelCustomerController {
     }
 
     @PutMapping("/customer-sites/{siteId}")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_CUSTOMERS_MANAGE')")
     public ResponseEntity<ApiResponse<CustomerSiteResponse>> updateSite(@PathVariable UUID siteId, @Valid @RequestBody CustomerSiteRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Site updated",
@@ -81,7 +81,7 @@ public class FuelCustomerController {
     }
 
     @DeleteMapping("/customer-sites/{siteId}")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_CUSTOMERS_MANAGE')")
     public ResponseEntity<ApiResponse<Void>> removeSite(@PathVariable UUID siteId) {
         featureGuard.requireModule("fuel");
         customers.removeSite(TenantContext.getTenantIdAsObject(), siteId);

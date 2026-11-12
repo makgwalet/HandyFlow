@@ -270,7 +270,7 @@ export const FUEL_SECTIONS: ModuleSections = {
     {
       label: 'Retail',
       sections: [
-        { id: 'forecourt', label: 'Forecourt', icon: Fuel, anyPermission: ['FUEL_READ', 'FUEL_FORECOURT', 'FUEL_MANAGE'], divisions: ['RETAIL_FORECOURT'] },
+        { id: 'forecourt', label: 'Forecourt', icon: Fuel, anyPermission: ['FUEL_READ', 'FUEL_FORECOURT', 'FUEL_MANAGE', 'FUEL_FORECOURT_MANAGE'], divisions: ['RETAIL_FORECOURT'] },
       ],
     },
     {

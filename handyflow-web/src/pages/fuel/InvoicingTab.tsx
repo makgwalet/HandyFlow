@@ -12,7 +12,7 @@ const th: React.CSSProperties = { textAlign: "left", padding: "8px 12px", fontSi
 const td: React.CSSProperties = { padding: "8px 12px", fontSize: 13, color: "var(--hf-text)" }
 
 export default function InvoicingTab() {
-  const canManage = usePermissions(["FUEL_MANAGE"])
+  const canManage = usePermissions(["FUEL_MANAGE", "FUEL_ORDERS_MANAGE"])
   const qc = useQueryClient()
   const [picked, setPicked] = useState<Record<string, boolean>>({})
   const [err, setErr] = useState(""); const [done, setDone] = useState("")

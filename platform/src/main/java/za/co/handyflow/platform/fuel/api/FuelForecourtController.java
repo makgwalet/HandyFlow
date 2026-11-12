@@ -30,8 +30,8 @@ import java.util.UUID;
 @Tag(name = "Fuel Forecourt", description = "Pumps, attendant shifts and takings")
 public class FuelForecourtController {
 
-    private static final String RUN = "hasAnyAuthority('FUEL_FORECOURT','FUEL_MANAGE')";
-    private static final String SEE = "hasAnyAuthority('FUEL_READ','FUEL_FORECOURT','FUEL_MANAGE')";
+    private static final String RUN = "hasAnyAuthority('FUEL_FORECOURT','FUEL_MANAGE','FUEL_FORECOURT_MANAGE')";
+    private static final String SEE = "hasAnyAuthority('FUEL_READ','FUEL_FORECOURT','FUEL_MANAGE','FUEL_FORECOURT_MANAGE')";
 
     private static final String SUPERVISE = "hasAuthority('FUEL_SHIFT_SUPERVISE')";
 
@@ -59,21 +59,21 @@ public class FuelForecourtController {
     }
 
     @PostMapping("/pumps")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_FORECOURT_MANAGE')")
     public ResponseEntity<ApiResponse<PumpResponse>> createPump(@Valid @RequestBody PumpRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Pump added", forecourt.createPump(TenantContext.getTenantIdAsObject(), req)));
     }
 
     @PutMapping("/pumps/{id}")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_FORECOURT_MANAGE')")
     public ResponseEntity<ApiResponse<PumpResponse>> updatePump(@PathVariable UUID id, @Valid @RequestBody PumpRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Pump updated", forecourt.updatePump(TenantContext.getTenantIdAsObject(), id, req)));
     }
 
     @DeleteMapping("/pumps/{id}")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_FORECOURT_MANAGE')")
     public ResponseEntity<ApiResponse<Void>> deletePump(@PathVariable UUID id) {
         featureGuard.requireModule("fuel");
         forecourt.deletePump(TenantContext.getTenantIdAsObject(), id);
@@ -110,7 +110,7 @@ public class FuelForecourtController {
     }
 
     @PostMapping("/shifts/{id}/reverse")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_FORECOURT_MANAGE')")
     public ResponseEntity<ApiResponse<ShiftResponse>> reverse(@PathVariable UUID id, @Valid @RequestBody ReverseShiftRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Shift reversed", forecourt.reverseShift(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));

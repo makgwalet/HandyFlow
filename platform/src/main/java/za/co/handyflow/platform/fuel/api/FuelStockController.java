@@ -42,7 +42,7 @@ public class FuelStockController {
     }
 
     @PostMapping("/depots")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_STOCK_MANAGE')")
     public ResponseEntity<ApiResponse<DepotResponse>> createDepot(@Valid @RequestBody DepotRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Depot created",
@@ -50,7 +50,7 @@ public class FuelStockController {
     }
 
     @PutMapping("/depots/{id}")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_STOCK_MANAGE')")
     public ResponseEntity<ApiResponse<DepotResponse>> updateDepot(@PathVariable UUID id, @Valid @RequestBody DepotRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Depot updated",
@@ -58,7 +58,7 @@ public class FuelStockController {
     }
 
     @PostMapping("/depots/{id}/deactivate")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_STOCK_MANAGE')")
     public ResponseEntity<ApiResponse<Void>> deactivateDepot(@PathVariable UUID id) {
         featureGuard.requireModule("fuel");
         stock.deactivateDepot(TenantContext.getTenantIdAsObject(), id);
@@ -66,7 +66,7 @@ public class FuelStockController {
     }
 
     @PutMapping("/tanks/{id}/placement")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_STOCK_MANAGE')")
     @Operation(summary = "Assign a tank to a depot and set its safety stock")
     public ResponseEntity<ApiResponse<TankResponse>> placeTank(@PathVariable UUID id, @Valid @RequestBody TankPlacementRequest req) {
         featureGuard.requireModule("fuel");
@@ -117,7 +117,7 @@ public class FuelStockController {
     }
 
     @PostMapping("/transfers")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_STOCK_MANAGE')")
     public ResponseEntity<ApiResponse<TransferResponse>> transfer(@Valid @RequestBody TransferRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Transfer recorded",
@@ -143,7 +143,7 @@ public class FuelStockController {
     // ── Reservations and availability ────────────────────────────────────────
 
     @PostMapping("/reservations")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_STOCK_MANAGE')")
     public ResponseEntity<ApiResponse<ReservationResponse>> reserve(@Valid @RequestBody ReservationRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Stock reserved",
@@ -151,7 +151,7 @@ public class FuelStockController {
     }
 
     @PostMapping("/reservations/{id}/release")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_STOCK_MANAGE')")
     public ResponseEntity<ApiResponse<ReservationResponse>> release(@PathVariable UUID id) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Reservation released",

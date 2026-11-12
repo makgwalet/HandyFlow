@@ -14,7 +14,7 @@ const tone = (s: string) => s === "EXPIRED" ? { bg: "var(--hf-danger-soft)", fg:
 type Dialog = { kind: "edit"; item?: ComplianceItem } | { kind: "evidence"; item: ComplianceItem } | { kind: "renew"; item: ComplianceItem } | null
 
 export default function ComplianceTab() {
-  const canManage = usePermissions(["FUEL_MANAGE"])
+  const canManage = usePermissions(["FUEL_MANAGE", "FUEL_COMPLIANCE_MANAGE"])
   const qc = useQueryClient()
   const [dialog, setDialog] = useState<Dialog>(null)
   const [err, setErr] = useState("")

@@ -16,7 +16,7 @@ const tone = (s: string) => s === "RECEIVED" ? { bg: "var(--hf-success-soft-stro
 type Dialog = { kind: "edit"; po?: PurchaseOrder } | { kind: "cancel"; po: PurchaseOrder } | { kind: "closeShort"; po: PurchaseOrder } | null
 
 export default function PurchaseOrdersTab() {
-  const canManage = usePermissions(["FUEL_MANAGE"])
+  const canManage = usePermissions(["FUEL_MANAGE", "FUEL_PURCHASING_MANAGE"])
   const qc = useQueryClient()
   const [dialog, setDialog] = useState<Dialog>(null)
   const [open, setOpen] = useState<string | null>(null)

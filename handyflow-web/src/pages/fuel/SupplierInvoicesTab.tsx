@@ -20,7 +20,7 @@ const statusTone = (s: string) => s === "APPROVED" ? ["var(--hf-success-soft-str
 function Err({ text }: { text: string }) { return <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12.5, margin: "10px 0 0" }}>{text}</p> }
 
 export default function SupplierInvoicesTab() {
-  const canManage = usePermissions(["FUEL_MANAGE"])
+  const canManage = usePermissions(["FUEL_MANAGE", "FUEL_SUPPLIER_INVOICE_MANAGE"])
   const qc = useQueryClient()
   const [dialog, setDialog] = useState<Dialog>(null)
   const [open, setOpen] = useState<string | null>(null)

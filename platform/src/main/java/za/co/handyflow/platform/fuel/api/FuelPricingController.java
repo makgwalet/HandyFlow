@@ -40,7 +40,7 @@ public class FuelPricingController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_PRICING_MANAGE')")
     public ResponseEntity<ApiResponse<PriceResponse>> create(@Valid @RequestBody PriceRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Price added",
@@ -48,7 +48,7 @@ public class FuelPricingController {
     }
 
     @PostMapping("/{id}/end")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_PRICING_MANAGE')")
     public ResponseEntity<ApiResponse<Void>> end(@PathVariable UUID id,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate lastDay) {
         featureGuard.requireModule("fuel");

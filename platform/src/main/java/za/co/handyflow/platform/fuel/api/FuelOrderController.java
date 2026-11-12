@@ -60,7 +60,7 @@ public class FuelOrderController {
     }
 
     @PostMapping("/orders")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_ORDERS_MANAGE')")
     public ResponseEntity<ApiResponse<OrderResponse>> create(@Valid @RequestBody OrderRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Quotation created",
@@ -68,14 +68,14 @@ public class FuelOrderController {
     }
 
     @PutMapping("/orders/{id}")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_ORDERS_MANAGE')")
     public ResponseEntity<ApiResponse<OrderResponse>> revise(@PathVariable UUID id, @Valid @RequestBody OrderRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Quotation updated", orders.revise(TenantContext.getTenantIdAsObject(), id, req)));
     }
 
     @PostMapping("/orders/{id}/confirm")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_ORDERS_MANAGE')")
     public ResponseEntity<ApiResponse<OrderResponse>> confirm(@PathVariable UUID id, @Valid @RequestBody ConfirmOrderRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Order confirmed and fuel allocated",
@@ -83,14 +83,14 @@ public class FuelOrderController {
     }
 
     @PostMapping("/orders/{id}/cancel")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_ORDERS_MANAGE')")
     public ResponseEntity<ApiResponse<OrderResponse>> cancel(@PathVariable UUID id, @Valid @RequestBody OrderCancelRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Order cancelled", orders.cancel(TenantContext.getTenantIdAsObject(), id, req)));
     }
 
     @PostMapping("/orders/{id}/deliveries")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_ORDERS_MANAGE')")
     public ResponseEntity<ApiResponse<DeliveryResponse>> scheduleLoad(@PathVariable UUID id, @Valid @RequestBody OrderDeliveryRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Load scheduled",
@@ -98,7 +98,7 @@ public class FuelOrderController {
     }
 
     @PostMapping("/deliveries/{id}/loading")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_ORDERS_MANAGE')")
     public ResponseEntity<ApiResponse<DeliveryResponse>> loading(@PathVariable UUID id, @Valid @RequestBody LoadingRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Loading recorded", fuel.recordLoading(TenantContext.getTenantIdAsObject(), id, req)));
@@ -112,7 +112,7 @@ public class FuelOrderController {
     }
 
     @PostMapping("/invoicing/invoice")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_ORDERS_MANAGE')")
     public ResponseEntity<ApiResponse<InvoiceCreatedResponse>> invoice(@Valid @RequestBody CreateInvoiceFromDeliveriesRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Draft invoice created",
@@ -128,7 +128,7 @@ public class FuelOrderController {
     }
 
     @PostMapping("/invoicing/attempts/{id}/relink")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_ORDERS_MANAGE')")
     public ResponseEntity<ApiResponse<FuelInvoiceAttemptDtos.AttemptView>> relink(@PathVariable UUID id, @RequestBody(required = false) FuelInvoiceAttemptDtos.ResolveRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Deliveries linked to the invoice",
@@ -136,7 +136,7 @@ public class FuelOrderController {
     }
 
     @PostMapping("/invoicing/attempts/{id}/release")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_ORDERS_MANAGE')")
     public ResponseEntity<ApiResponse<FuelInvoiceAttemptDtos.AttemptView>> release(@PathVariable UUID id, @Valid @RequestBody FuelInvoiceAttemptDtos.ResolveRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Deliveries released to the queue",

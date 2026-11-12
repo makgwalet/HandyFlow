@@ -36,21 +36,21 @@ public class FuelTransportController {
     }
 
     @PostMapping("/tankers")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
     public ResponseEntity<ApiResponse<TankerResponse>> createTanker(@Valid @RequestBody TankerRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Tanker added", transport.createTanker(TenantContext.getTenantIdAsObject(), req)));
     }
 
     @PutMapping("/tankers/{id}")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
     public ResponseEntity<ApiResponse<TankerResponse>> updateTanker(@PathVariable UUID id, @Valid @RequestBody TankerRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Tanker updated", transport.updateTanker(TenantContext.getTenantIdAsObject(), id, req.registration(), req.name())));
     }
 
     @DeleteMapping("/tankers/{id}")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
     public ResponseEntity<ApiResponse<Void>> deactivateTanker(@PathVariable UUID id) {
         featureGuard.requireModule("fuel");
         transport.deactivateTanker(TenantContext.getTenantIdAsObject(), id);
@@ -65,7 +65,7 @@ public class FuelTransportController {
     }
 
     @PostMapping("/deliveries/{id}/allocate")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
     public ResponseEntity<ApiResponse<DeliveryResponse>> allocate(@PathVariable UUID id, @Valid @RequestBody AllocationRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Load allocated", transport.allocate(TenantContext.getTenantIdAsObject(), id, req)));
@@ -82,21 +82,21 @@ public class FuelTransportController {
     // ── Driver app: only the signed-in driver's own loads ────────────────────
 
     @GetMapping("/driver/loads")
-    @PreAuthorize("hasAnyAuthority('FUEL_DRIVER','FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_DRIVER','FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
     public ResponseEntity<ApiResponse<List<DeliveryResponse>>> myLoads() {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(transport.myLoads(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/driver/loads/{id}/dispatch")
-    @PreAuthorize("hasAnyAuthority('FUEL_DRIVER','FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_DRIVER','FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
     public ResponseEntity<ApiResponse<DeliveryResponse>> myDispatch(@PathVariable UUID id) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("On the road", transport.myDispatch(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id)));
     }
 
     @PostMapping("/driver/loads/{id}/complete")
-    @PreAuthorize("hasAnyAuthority('FUEL_DRIVER','FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_DRIVER','FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
     public ResponseEntity<ApiResponse<DeliveryResponse>> myComplete(@PathVariable UUID id, @Valid @RequestBody CompleteDeliveryRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Delivery recorded", transport.myComplete(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id, req)));

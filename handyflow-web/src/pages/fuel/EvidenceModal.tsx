@@ -12,7 +12,7 @@ const when = (iso: string) => new Date(iso).toLocaleString("en-ZA", { day: "nume
 /** Proof of delivery for one delivery: add, replace (before verification) and verify (by someone else, which locks it). */
 export default function EvidenceModal({ deliveryId, label, canAdd, onClose }: { deliveryId: string; label: string; canAdd: boolean; onClose: () => void }) {
   const qc = useQueryClient()
-  const canManage = usePermissions(["FUEL_MANAGE"])
+  const canManage = usePermissions(["FUEL_MANAGE", "FUEL_DISTRIBUTION_MANAGE"])
   const canVerifyPerm = usePermissions(["FUEL_EVIDENCE_VERIFY"])
   const me = useAuthStore(s => s.user?.userId) as string | undefined
   const key = ["fuel-evidence", deliveryId]

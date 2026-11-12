@@ -48,7 +48,7 @@ public class FuelSupplierInvoiceController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_SUPPLIER_INVOICE_MANAGE')")
     public ResponseEntity<ApiResponse<InvoiceResponse>> capture(@Valid @RequestBody CaptureRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Invoice captured",
@@ -56,14 +56,14 @@ public class FuelSupplierInvoiceController {
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_SUPPLIER_INVOICE_MANAGE')")
     public ResponseEntity<ApiResponse<InvoiceResponse>> approve(@PathVariable UUID id, @Valid @RequestBody(required = false) DecisionRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Invoice approved", service.approve(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_SUPPLIER_INVOICE_MANAGE')")
     public ResponseEntity<ApiResponse<InvoiceResponse>> reject(@PathVariable UUID id, @Valid @RequestBody DecisionRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Invoice rejected", service.reject(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));

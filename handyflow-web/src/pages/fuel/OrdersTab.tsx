@@ -26,7 +26,7 @@ function tone(s: string) {
 const Err = ({ text }: { text: string }) => text ? <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12, margin: "8px 0 0" }}>{text}</p> : null
 
 export default function OrdersTab() {
-  const canManage = usePermissions(["FUEL_MANAGE"])
+  const canManage = usePermissions(["FUEL_MANAGE", "FUEL_ORDERS_MANAGE"])
   const qc = useQueryClient()
   const [dialog, setDialog] = useState<Dialog>(null)
   const [open, setOpen] = useState<string | null>(null)

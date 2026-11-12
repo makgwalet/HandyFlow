@@ -35,7 +35,7 @@ public class FuelPortalAdminController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_PORTAL_MANAGE')")
     public ResponseEntity<ApiResponse<GrantResponse>> invite(@PathVariable UUID accountId, @Valid @RequestBody InviteRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Invite sent",
@@ -43,7 +43,7 @@ public class FuelPortalAdminController {
     }
 
     @PostMapping("/{grantId}/revoke")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_PORTAL_MANAGE')")
     public ResponseEntity<ApiResponse<GrantResponse>> revoke(@PathVariable UUID accountId, @PathVariable UUID grantId) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Access revoked",

@@ -14,7 +14,7 @@ const th: React.CSSProperties = { textAlign: "left", padding: "10px 12px", fontS
 const td: React.CSSProperties = { padding: "10px 12px", fontSize: 13, color: "var(--hf-text)" }
 
 export default function CustomersTab() {
-  const canManage = usePermissions(["FUEL_MANAGE"])
+  const canManage = usePermissions(["FUEL_MANAGE", "FUEL_CUSTOMERS_MANAGE"])
   const qc = useQueryClient()
   const [dialog, setDialog] = useState<Dialog>(null)
   const [open, setOpen] = useState<string | null>(null)

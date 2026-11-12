@@ -64,6 +64,17 @@ describe("PricingTab", () => {
     expect((await screen.findByRole("alert")).textContent).toMatch(/already covers/)
   })
 
+  it("G01: the narrower pricing permission alone is enough to add prices; other area permissions are not", async () => {
+    perms = ["FUEL_PRICING_MANAGE"]
+    mount()
+    await waitFor(() => screen.getByText("Add price"))
+    cleanup()
+    perms = ["FUEL_ORDERS_MANAGE"]
+    mount()
+    await waitFor(() => screen.getByText(/Standard|Prices|No prices|Loading/))
+    expect(screen.queryByText("Add price")).toBeNull()
+  })
+
   it("hides Add price without the manage permission", async () => {
     perms = ["FUEL_READ"]
     mount()

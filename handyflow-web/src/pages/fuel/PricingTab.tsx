@@ -16,7 +16,7 @@ const FUELS = ["DIESEL", "DIESEL_50PPM", "DIESEL_500PPM", "PETROL_95", "PETROL_9
 const today = () => new Date().toISOString().slice(0, 10)
 
 export default function PricingTab() {
-  const canManage = usePermissions(["FUEL_MANAGE"])
+  const canManage = usePermissions(["FUEL_MANAGE", "FUEL_PRICING_MANAGE"])
   const qc = useQueryClient()
   const [adding, setAdding] = useState(false)
   const [err, setErr] = useState("")

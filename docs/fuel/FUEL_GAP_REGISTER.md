@@ -75,3 +75,6 @@ Built (patch 0780): attempt trail, needs-attention panel, relink/release, block 
 
 ## D01 - Nozzles and tank-to-pump reconciliation (2026-11-12)
 Built (patch 0781): reconciliation report + panel; nozzle grouping as a label layer on pump records (shift flow untouched by design). See FUEL-D01-NOZZLES-RECONCILIATION-NOTES-2026-11-12.md.
+
+## G01 - Granular permissions (2026-11-12)
+Built (patch 0782): 12 area MANAGE permissions beside FUEL_MANAGE (umbrella kept). Division/site scope not built (needs IAM scope model, a decision). See FUEL-G01-GRANULAR-PERMISSIONS-NOTES-2026-11-12.md.

@@ -9,7 +9,7 @@ import { attemptAdvice, attemptHeadline, validateReleaseNote, type InvoiceAttemp
 const unwrap = (r: any) => r.data?.data ?? r.data
 
 export default function InvoiceAttentionPanel() {
-  const canManage = usePermissions(["FUEL_MANAGE"])
+  const canManage = usePermissions(["FUEL_MANAGE", "FUEL_ORDERS_MANAGE"])
   const qc = useQueryClient()
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [err, setErr] = useState("")

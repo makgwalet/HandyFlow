@@ -52,42 +52,42 @@ public class FuelComplianceController {
     }
 
     @PostMapping("/{id}/evidence")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_COMPLIANCE_MANAGE')")
     public ResponseEntity<ApiResponse<EvidenceView>> addEvidence(@PathVariable UUID id, @Valid @RequestBody EvidenceRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Added", compliance.addEvidence(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/evidence/{evidenceId}/supersede")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_COMPLIANCE_MANAGE')")
     public ResponseEntity<ApiResponse<EvidenceView>> supersedeEvidence(@PathVariable UUID evidenceId, @Valid @RequestBody ReasonRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Replaced", compliance.supersedeEvidence(TenantContext.getTenantIdAsObject(), evidenceId, req.reason(), TenantContext.getCurrentUserId())));
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_COMPLIANCE_MANAGE')")
     public ResponseEntity<ApiResponse<ComplianceResponse>> create(@Valid @RequestBody ComplianceRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Added", compliance.create(TenantContext.getTenantIdAsObject(), req)));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_COMPLIANCE_MANAGE')")
     public ResponseEntity<ApiResponse<ComplianceResponse>> update(@PathVariable UUID id, @Valid @RequestBody ComplianceRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Updated", compliance.update(TenantContext.getTenantIdAsObject(), id, req)));
     }
 
     @PostMapping("/{id}/renew")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_COMPLIANCE_MANAGE')")
     public ResponseEntity<ApiResponse<ComplianceResponse>> renew(@PathVariable UUID id, @Valid @RequestBody RenewRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Renewed", compliance.renew(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_COMPLIANCE_MANAGE')")
     public ResponseEntity<ApiResponse<Void>> remove(@PathVariable UUID id) {
         featureGuard.requireModule("fuel");
         compliance.remove(TenantContext.getTenantIdAsObject(), id);

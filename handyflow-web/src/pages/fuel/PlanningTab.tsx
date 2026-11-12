@@ -16,7 +16,7 @@ const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "Africa/J
 const time = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })
 
 export default function PlanningTab() {
-  const canManage = usePermissions(["FUEL_MANAGE"])
+  const canManage = usePermissions(["FUEL_MANAGE", "FUEL_TRANSPORT_MANAGE"])
   const qc = useQueryClient()
   const [date, setDate] = useState(today())
   const [allocating, setAllocating] = useState<PlanLoad | null>(null)
