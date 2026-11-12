@@ -97,7 +97,8 @@ class FuelRouteCostServiceTest {
     @Test @DisplayName("the estimate is a round trip to the farthest stop at the tenant's per-km rate plus typical hours at the hourly rate")
     void estimate() {
         UUID near = UUID.randomUUID(), far = UUID.randomUUID();
-        when(sites.findAllById(any())).thenReturn(List.of(site(near, "40"), site(far, "120")));
+        List<FuelCustomerSite> found = List.of(site(near, "40"), site(far, "120"));
+        when(sites.findAllById(any())).thenReturn(found);
         withStops(delivered(tankA, near, "3000"), delivered(tankA, far, "5000"));
         RouteCostRow r = service.report(T, DAY, DAY).routes().get(0);
         assertEquals(0, bd("1200.00").compareTo(r.estimateVehicle())); // 2 x 120 x 5
@@ -110,7 +111,8 @@ class FuelRouteCostServiceTest {
     @Test @DisplayName("variance compares vehicle and driver only where both an estimate and an actual exist; tolls and other are not compared")
     void varianceOnComparableCategories() {
         UUID s1 = UUID.randomUUID();
-        when(sites.findAllById(any())).thenReturn(List.of(site(s1, "100")));
+        List<FuelCustomerSite> found = List.of(site(s1, "100"));
+        when(sites.findAllById(any())).thenReturn(found);
         withStops(delivered(tankA, s1, "4000")); // estimate vehicle 1000, driver 600
         entry("VEHICLE", "1300"); entry("TOLLS", "250"); entry("OTHER", "50");
         RouteCostRow r = service.report(T, DAY, DAY).routes().get(0);
@@ -156,7 +158,8 @@ class FuelRouteCostServiceTest {
     @Test @DisplayName("rollups by tanker count unreconciled routes and add up the comparable figures")
     void tankerRollup() {
         UUID s1 = UUID.randomUUID();
-        when(sites.findAllById(any())).thenReturn(List.of(site(s1, "100")));
+        List<FuelCustomerSite> found = List.of(site(s1, "100"));
+        when(sites.findAllById(any())).thenReturn(found);
         withStops(delivered(tankA, s1, "4000"));
         RouteCostReport none = service.report(T, DAY, DAY);
         assertEquals(1, none.unreconciledRoutes());
@@ -171,7 +174,8 @@ class FuelRouteCostServiceTest {
     @Test @DisplayName("by depot, a route's figures are shared by litres delivered from each depot's tanks")
     void depotRollupSharesByLitres() {
         UUID s1 = UUID.randomUUID();
-        when(sites.findAllById(any())).thenReturn(List.of(site(s1, "100")));
+        List<FuelCustomerSite> found = List.of(site(s1, "100"));
+        when(sites.findAllById(any())).thenReturn(found);
         withStops(delivered(tankA, s1, "3000"), delivered(tankB, s1, "1000")); // 75% / 25%
         entry("VEHICLE", "1000"); entry("DRIVER", "600"); entry("TOLLS", "400");
         List<Rollup> d = service.report(T, DAY, DAY).byDepot();

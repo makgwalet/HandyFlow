@@ -53,8 +53,9 @@ class FuelGroupReportServiceTest {
     }
 
     private FuelDelivery load(FuelTank t, String litres, String total, String cost, boolean reversed) {
+        UUID tankId = t.getId();   // read the other mock first: calling it inside a thenReturn breaks the stubbing
         FuelDelivery d = mock(FuelDelivery.class);
-        when(d.getId()).thenReturn(UUID.randomUUID()); when(d.getTenantId()).thenReturn(T); when(d.getTankId()).thenReturn(t.getId());
+        when(d.getId()).thenReturn(UUID.randomUUID()); when(d.getTenantId()).thenReturn(T); when(d.getTankId()).thenReturn(tankId);
         when(d.getLitresDelivered()).thenReturn(bd(litres)); when(d.getTotalAmount()).thenReturn(bd(total));
         when(d.getCostPerLitreAtSale()).thenReturn(cost == null ? null : bd(cost));
         when(d.getReversedAt()).thenReturn(reversed ? Instant.now() : null);
@@ -95,7 +96,8 @@ class FuelGroupReportServiceTest {
 
     @Test @DisplayName("without margin permission no money is returned, but litres and counts still are")
     void moneyHidden() {
-        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(List.of(load(acmeTank, "1000", "20000", "18", false)), List.of());
+        List<FuelDelivery> now = List.of(load(acmeTank, "1000", "20000", "18", false));   // built first: a mock must not be created while another is being stubbed
+        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(now, List.of());
         Report r = service.report(T, 30, false);
         assertFalse(r.moneyShown());
         Row a = row(r, "Acme Fuels");
@@ -105,7 +107,8 @@ class FuelGroupReportServiceTest {
 
     @Test @DisplayName("the previous period of equal length is counted separately, and the dates abut")
     void previousPeriod() {
-        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(List.of(load(acmeTank, "1000", "20000", "18", false)), List.of(load(acmeTank, "400", "8000", "18", false)));
+        List<FuelDelivery> thisPeriod = List.of(load(acmeTank, "1000", "20000", "18", false)), lastPeriod = List.of(load(acmeTank, "400", "8000", "18", false));
+        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(thisPeriod, lastPeriod);
         Report r = service.report(T, 7, true);
         Row a = row(r, "Acme Fuels");
         assertEquals(0, bd("1000.00").compareTo(a.litres())); assertEquals(0, bd("400.00").compareTo(a.previousLitres())); assertEquals(1, a.previousDeliveries());
@@ -116,8 +119,9 @@ class FuelGroupReportServiceTest {
 
     @Test @DisplayName("a load with no cost at sale counts in revenue and litres but not margin, and is counted; a reversed load is left out and counted")
     void costAndReversals() {
-        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(List.of(
-                load(acmeTank, "1000", "20000", null, false), load(acmeTank, "100", "2000", "18", false), load(acmeTank, "50", "1000", "18", true)), List.of());
+        List<FuelDelivery> mixed = List.of(
+                load(acmeTank, "1000", "20000", null, false), load(acmeTank, "100", "2000", "18", false), load(acmeTank, "50", "1000", "18", true));
+        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(mixed, List.of());
         Report r = service.report(T, 30, true);
         Row a = row(r, "Acme Fuels");
         assertEquals(2, a.deliveries()); assertEquals(1, a.deliveriesWithoutCost()); assertEquals(0, bd("22000.00").compareTo(a.revenue()));

@@ -110,7 +110,8 @@ class FuelEvidenceFileServiceTest {
         FuelDelivery d = delivery("IN_TRANSIT", DRIVER_EMP);
         UUID req = UUID.randomUUID();
         FuelDeliveryEvidence first = FuelDeliveryEvidence.createFile(T, d.getId(), "PHOTO", "key-0", "image/jpeg", 10, "a.jpg", null, ALICE);
-        when(evidence.findByClientRequest(any(TenantId.class), eq(d.getId()), eq(req))).thenReturn(Optional.of(first));
+        UUID deliveryId = d.getId();   // read the mock first: calling it inside the matchers breaks them
+        when(evidence.findByClientRequest(any(TenantId.class), eq(deliveryId), eq(req))).thenReturn(Optional.of(first));
         EvidenceView v = service.addAsOffice(T, d.getId(), new Upload("PHOTO", "a.jpg", JPEG, null, req), ALICE);
         assertEquals(first.getId(), v.id());
         verify(storage, never()).store(any(), any(), any(), any());
@@ -142,7 +143,8 @@ class FuelEvidenceFileServiceTest {
         assertEquals("image/png", f.contentType()); assertArrayEquals(PNG, f.bytes()); assertEquals("sig.png", f.filename());
 
         FuelDeliveryEvidence typed = FuelDeliveryEvidence.create(T, UUID.randomUUID(), "PHOTO", "scans/a.jpg", null, null, null, null, ALICE);
-        when(evidence.findOne(any(TenantId.class), eq(typed.getId()))).thenReturn(Optional.of(typed));
+        UUID typedId = typed.getId();
+        when(evidence.findOne(any(TenantId.class), eq(typedId))).thenReturn(Optional.of(typed));
         assertThrows(ResourceNotFoundException.class, () -> service.download(T, typed.getId()));
         UUID missing = UUID.randomUUID();
         when(evidence.findOne(any(TenantId.class), eq(missing))).thenReturn(Optional.empty());

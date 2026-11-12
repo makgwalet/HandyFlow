@@ -106,7 +106,8 @@ class FuelAutomationSchedulerTest {
         when(rules.findTenantsWithEnabledRules()).thenReturn(List.of());
         when(settings.findTenantsAlertingOverduePurchaseOrders()).thenReturn(List.of(A, B));
         when(automation.runRules(any())).thenReturn(new RunResult(0, 0, 0, 0, List.of()));
-        when(automation.overdueOrders(any())).thenReturn(List.of(po("PO-1")));
+        List<FuelPurchaseOrder> overdue = List.of(po("PO-1"));
+        when(automation.overdueOrders(any())).thenReturn(overdue);
         doThrow(new IllegalStateException("mail down")).doNothing().when(notifications).send(any());
         assertEquals(1, scheduler.sweep());
         verify(automation, times(1)).markOverdueAlerted(any(), any());
