@@ -3,7 +3,7 @@
 // A repeat is harmless: completion and evidence carry a clientRequestId the server de-duplicates on.
 // A network failure keeps everything and stops the run. A server refusal marks only that item FAILED, keeps it
 // visible for Retry or Discard, and holds back later items for the same load so they never run out of order.
-export type QueueKind = "START" | "COMPLETE" | "EVIDENCE"
+export type QueueKind = "START" | "COMPLETE" | "EVIDENCE" | "FAILED"
 export interface QueueItem {
   id: string; kind: QueueKind; deliveryId: string; path: string; body: Record<string, unknown> | null
   queuedAt: string; status: "PENDING" | "FAILED"; message: string | null; attempts: number; label: string
@@ -32,10 +32,10 @@ export function readQueue(s: Store = localStorage): QueueItem[] {
   return Array.isArray(q) ? q : []
 }
 
-/** Adds an item. A completion replaces any earlier completion for the same load (the driver corrected it). */
+/** Adds an item. A completion replaces any earlier completion for the same load (the driver corrected it). Everything else is kept: a load can be started and fail more than once. */
 export function enqueue(item: Omit<QueueItem, "queuedAt" | "status" | "message" | "attempts">, s: Store = localStorage): QueueItem {
   const full: QueueItem = { ...item, queuedAt: new Date().toISOString(), status: "PENDING", message: null, attempts: 0 }
-  const q = readQueue(s).filter(x => !(item.kind !== "EVIDENCE" && x.kind === item.kind && x.deliveryId === item.deliveryId))
+  const q = readQueue(s).filter(x => !(item.kind === "COMPLETE" && x.kind === "COMPLETE" && x.deliveryId === item.deliveryId))
   write([...q, full], s)
   return full
 }

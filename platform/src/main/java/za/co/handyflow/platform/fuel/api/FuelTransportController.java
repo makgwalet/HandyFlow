@@ -9,7 +9,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.fuel.application.internal.FuelDeliveryExceptionService;
 import za.co.handyflow.platform.fuel.application.internal.FuelTransportService;
+import za.co.handyflow.platform.fuel.dto.DeliveryExceptionDtos.ExceptionView;
+import za.co.handyflow.platform.fuel.dto.DeliveryExceptionDtos.FailedAttemptRequest;
+import za.co.handyflow.platform.fuel.dto.DeliveryExceptionDtos.WindowRequest;
 import za.co.handyflow.platform.fuel.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -26,6 +30,7 @@ import java.util.UUID;
 public class FuelTransportController {
 
     private final FuelTransportService transport;
+    private final FuelDeliveryExceptionService exceptionService;
     private final FeatureGuard featureGuard;
 
     @GetMapping("/tankers")
@@ -108,5 +113,38 @@ public class FuelTransportController {
     public ResponseEntity<ApiResponse<DeliveryResponse>> myComplete(@PathVariable UUID id, @Valid @RequestBody CompleteDeliveryRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Delivery recorded", transport.myComplete(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id, req)));
+    }
+
+    // ── C04: delivery windows and failed attempts ────────────────────────────
+
+    @GetMapping("/deliveries/{id}/exceptions")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<List<ExceptionView>>> exceptions(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(exceptionService.list(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PutMapping("/deliveries/{id}/window")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
+    public ResponseEntity<ApiResponse<Void>> setWindow(@PathVariable UUID id, @RequestBody WindowRequest req) {
+        featureGuard.requireModule("fuel");
+        exceptionService.setWindow(TenantContext.getTenantIdAsObject(), id, req);
+        return ResponseEntity.ok(ApiResponse.success("Window saved", null));
+    }
+
+    @PostMapping("/deliveries/{id}/failed-attempt")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
+    public ResponseEntity<ApiResponse<ExceptionView>> failedAttempt(@PathVariable UUID id, @Valid @RequestBody FailedAttemptRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Failed attempt recorded",
+                exceptionService.recordAsOffice(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/driver/loads/{id}/failed-attempt")
+    @PreAuthorize("hasAnyAuthority('FUEL_DRIVER','FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
+    public ResponseEntity<ApiResponse<ExceptionView>> myFailedAttempt(@PathVariable UUID id, @Valid @RequestBody FailedAttemptRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Failed attempt recorded",
+                exceptionService.recordAsDriver(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id, req)));
     }
 }

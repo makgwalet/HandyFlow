@@ -63,6 +63,15 @@ public class FuelDelivery {
     @Column(name = "delivered_at")
     private Instant deliveredAt;
 
+    @Column(name = "window_start")
+    private Instant windowStart;
+
+    @Column(name = "window_end")
+    private Instant windowEnd;
+
+    @Column(name = "failed_attempts", nullable = false)
+    private int failedAttempts = 0;
+
     @Column(name = "driver_name")
     private String driverName;
 
@@ -242,6 +251,29 @@ public class FuelDelivery {
         this.receiptNumber        = receiptNumber;
         this.receiptGeneratedAt   = Instant.now();
         this.updatedAt            = Instant.now();
+    }
+
+    /** The time the customer can receive the fuel. Either end may be left open; when both are given the end must be after the start. */
+    public void setWindow(Instant start, Instant end) {
+        requireStatus("set a window for", "SCHEDULED", "IN_TRANSIT");
+        if (start != null && end != null && !end.isAfter(start)) throw new IllegalArgumentException("The delivery window must end after it starts.");
+        this.windowStart = start; this.windowEnd = end; this.updatedAt = Instant.now();
+    }
+
+    /** True when it is delivered, or would be delivered at {@code at}, outside the window. No window means never outside. */
+    public boolean isOutsideWindow(Instant at) {
+        if (at == null) return false;
+        return (windowStart != null && at.isBefore(windowStart)) || (windowEnd != null && at.isAfter(windowEnd));
+    }
+
+    /** The truck got there (or tried) and could not deliver. The load goes back to Scheduled to be tried again; nothing is invoiced or deducted. */
+    public int recordFailedAttempt(Instant rescheduledTo) {
+        requireStatus("record a failed attempt for", "IN_TRANSIT");
+        this.status = "SCHEDULED";
+        this.failedAttempts++;
+        if (rescheduledTo != null) this.scheduledAt = rescheduledTo;
+        this.updatedAt = Instant.now();
+        return this.failedAttempts;
     }
 
     public void cancel() {

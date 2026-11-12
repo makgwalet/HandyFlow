@@ -5,7 +5,8 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import { fmtL } from "./orderOps"
-import { parseCapacities, validateTanker, autoSplit, validateAllocation, type Plan, type PlanLoad, type Tanker, type Driver, type FleetVehicleOption, fleetOptionText } from "./transportOps"
+import { WindowDialog, FailedAttemptDialog } from "./DeliveryExceptionDialogs"
+import { parseCapacities, validateTanker, autoSplit, validateAllocation, type Plan, type PlanLoad, type Tanker, type Driver, type FleetVehicleOption, fleetOptionText, windowText } from "./transportOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const msg = (e: any, fb: string) => e?.response?.data?.message ?? fb
@@ -21,6 +22,8 @@ export default function PlanningTab() {
   const [date, setDate] = useState(today())
   const [allocating, setAllocating] = useState<PlanLoad | null>(null)
   const [addTanker, setAddTanker] = useState(false)
+  const [windowFor, setWindowFor] = useState<PlanLoad | null>(null)
+  const [failing, setFailing] = useState<PlanLoad | null>(null)
   const plan = useQuery<Plan>({ queryKey: ["fuel-plan", date], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/planning", { params: { date } })) })
   const tankers = useQuery<Tanker[]>({ queryKey: ["fuel-tankers"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/tankers")) })
   const refresh = () => { qc.invalidateQueries({ queryKey: ["fuel-plan"] }); qc.invalidateQueries({ queryKey: ["fuel-tankers"] }); qc.invalidateQueries({ queryKey: ["deliveries"] }) }
@@ -40,14 +43,16 @@ export default function PlanningTab() {
       {plan.isLoading ? <p style={{ color: "var(--hf-text-muted)" }}>Loading…</p> : loads.length === 0 ? <p style={{ color: "var(--hf-text-muted)" }}>No loads scheduled for this day.</p> : (
         <div style={{ ...card, overflowX: "auto", marginBottom: 20 }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr><th style={th}>Time</th><th style={th}>Customer</th><th style={th}>Fuel</th><th style={th}>Litres</th><th style={th}>Tanker</th><th style={th}>Driver</th><th style={th}>Status</th><th style={th}></th></tr></thead>
+            <thead><tr><th style={th}>Time</th><th style={th}>Window</th><th style={th}>Customer</th><th style={th}>Fuel</th><th style={th}>Litres</th><th style={th}>Tanker</th><th style={th}>Driver</th><th style={th}>Status</th><th style={th}></th></tr></thead>
             <tbody>
               {loads.map(l => (
                 <tr key={l.deliveryId} style={{ borderTop: "1px solid var(--hf-border)" }}>
-                  <td style={td}>{time(l.scheduledAt)}</td><td style={td}>{l.customerName ?? "Walk-in"}</td><td style={td}>{l.fuelType}</td><td style={td}>{fmtL(l.litres)}</td>
+                  <td style={td}>{time(l.scheduledAt)}</td><td style={td}>{windowText(l.windowStart, l.windowEnd) ?? "–"}</td><td style={td}>{l.customerName ?? "Walk-in"}</td><td style={td}>{l.fuelType}</td><td style={td}>{fmtL(l.litres)}</td>
                   <td style={td}>{l.tankerRegistration ?? "–"}</td><td style={td}>{l.driverName ?? "–"}</td>
-                  <td style={td}>{l.status === "SCHEDULED" && !l.allocated ? <Chip bg="var(--hf-danger-soft)" fg="var(--hf-danger-text)">Unallocated</Chip> : l.status.toLowerCase().replace("_", " ")}</td>
-                  <td style={td}>{canManage && l.status === "SCHEDULED" && <button style={btnGhost} onClick={() => setAllocating(l)}>{l.allocated ? "Reallocate" : "Allocate"}</button>}</td>
+                  <td style={td}>{l.status === "SCHEDULED" && !l.allocated ? <Chip bg="var(--hf-danger-soft)" fg="var(--hf-danger-text)">Unallocated</Chip> : l.status.toLowerCase().replace("_", " ")}{(l.failedAttempts ?? 0) > 0 && <> <Chip bg="var(--hf-warning-soft)" fg="var(--hf-warning-text)">{l.failedAttempts} failed attempt{l.failedAttempts === 1 ? "" : "s"}</Chip></>}</td>
+                  <td style={td}>{canManage && l.status === "SCHEDULED" && <button style={btnGhost} onClick={() => setAllocating(l)}>{l.allocated ? "Reallocate" : "Allocate"}</button>}
+                    {canManage && (l.status === "SCHEDULED" || l.status === "IN_TRANSIT") && <button style={{ ...btnGhost, marginLeft: 6 }} onClick={() => setWindowFor(l)}>Window</button>}
+                    {canManage && l.status === "IN_TRANSIT" && <button style={{ ...btnGhost, marginLeft: 6 }} onClick={() => setFailing(l)}>Could not deliver</button>}</td>
                 </tr>
               ))}
             </tbody>
@@ -89,6 +94,8 @@ export default function PlanningTab() {
           </table>
         </div>
       )}
+      {windowFor && <WindowDialog deliveryId={windowFor.deliveryId} start={windowFor.windowStart} end={windowFor.windowEnd} onDone={refresh} onClose={() => setWindowFor(null)} />}
+      {failing && <FailedAttemptDialog deliveryId={failing.deliveryId} onDone={refresh} onClose={() => setFailing(null)} />}
       {allocating && <AllocateDialog load={allocating} tankers={tankers.data ?? []} onDone={refresh} onClose={() => setAllocating(null)} />}
       {addTanker && <TankerDialog onDone={refresh} onClose={() => setAddTanker(false)} />}
     </div>

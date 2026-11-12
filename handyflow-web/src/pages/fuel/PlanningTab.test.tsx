@@ -3,9 +3,9 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import PlanningTab from "./PlanningTab"
 
-const get = vi.fn(); const post = vi.fn(); const del = vi.fn()
+const get = vi.fn(); const post = vi.fn(); const del = vi.fn(); const put = vi.fn()
 let perms: string[] = []
-vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a), delete: (...a: unknown[]) => del(...a) } }))
+vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a), delete: (...a: unknown[]) => del(...a), put: (...a: unknown[]) => put(...a) } }))
 vi.mock("../../hooks/usePermission", () => ({ usePermissions: (ps: string[]) => ps.some(p => perms.includes(p)) }))
 
 const tanker = { id: "t1", registration: "GP 12 AB", name: null, active: true, totalCapacity: 16000, openLoads: 0, compartments: [{ id: "c1", number: 1, capacityLitres: 10000 }, { id: "c2", number: 2, capacityLitres: 6000 }] }
@@ -18,7 +18,7 @@ function mount() {
 
 describe("PlanningTab", () => {
   beforeEach(() => {
-    get.mockReset(); post.mockReset(); del.mockReset(); perms = ["FUEL_MANAGE"]
+    get.mockReset(); post.mockReset(); del.mockReset(); put.mockReset(); put.mockResolvedValue({ data: { data: null } }); perms = ["FUEL_MANAGE"]
     plan = { date: "2026-11-12", loads: [load(), load({ deliveryId: "d2", customerName: "Held Farm", allocated: true, tankerRegistration: "GP 12 AB", driverName: "Moses Sithole" })], tankers: [{ tankerId: "t1", registration: "GP 12 AB", capacity: 16000, loads: 1, litres: 12000 }] }
     post.mockResolvedValue({ data: { data: {} } })
     get.mockImplementation(async (u: string) => {
@@ -110,5 +110,37 @@ describe("PlanningTab", () => {
     await waitFor(() => screen.getByText("Gold Mine Ltd"))
     expect(screen.queryByText("Allocate")).toBeNull()
     expect(screen.queryByText("Add tanker")).toBeNull()
+  })
+
+  it("shows the window and failed attempts, and sets a window", async () => {
+    plan = { ...plan, loads: [load({ windowStart: "2026-11-12T06:00:00Z", windowEnd: "2026-11-12T10:00:00Z", failedAttempts: 2 })] }
+    mount()
+    await waitFor(() => screen.getByText("Gold Mine Ltd"))
+    expect(screen.getByText("2 failed attempts")).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Window" }))
+    fireEvent.change(screen.getByLabelText("Window from"), { target: { value: "2026-11-12T10:00" } })
+    fireEvent.change(screen.getByLabelText("Window to"), { target: { value: "2026-11-12T09:00" } })
+    fireEvent.click(screen.getByText("Save window"))
+    expect(screen.getByRole("alert").textContent).toMatch(/end after/)
+    fireEvent.change(screen.getByLabelText("Window to"), { target: { value: "2026-11-12T12:00" } })
+    fireEvent.click(screen.getByText("Save window"))
+    await waitFor(() => expect(put).toHaveBeenCalledTimes(1))
+    expect(put.mock.calls[0][0]).toBe("/api/v1/fuel/deliveries/d1/window")
+    expect(typeof put.mock.calls[0][1].windowStart).toBe("string")
+  })
+
+  it("records a failed delivery for a load on the road and not for a scheduled one", async () => {
+    plan = { ...plan, loads: [load({ status: "IN_TRANSIT", allocated: true }), load({ deliveryId: "d9", customerName: "Quiet Farm" })] }
+    mount()
+    await waitFor(() => screen.getByText("Gold Mine Ltd"))
+    expect(screen.getAllByText("Could not deliver")).toHaveLength(1)
+    fireEvent.click(screen.getByText("Could not deliver"))
+    fireEvent.click(screen.getByText("Record failed delivery"))
+    expect(screen.getByRole("alert").textContent).toMatch(/reason/i)
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "REFUSED" } })
+    fireEvent.click(screen.getByText("Record failed delivery"))
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1))
+    expect(post.mock.calls[0][0]).toBe("/api/v1/fuel/deliveries/d1/failed-attempt")
+    expect(post.mock.calls[0][1]).toMatchObject({ reasonCode: "REFUSED", litresReturned: null })
   })
 })

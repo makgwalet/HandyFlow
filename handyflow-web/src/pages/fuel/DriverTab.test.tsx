@@ -113,6 +113,39 @@ describe("DriverTab", () => {
     expect(readQueue()).toHaveLength(0)
   })
 
+  it("records a failed delivery with a reason and the litres brought back", async () => {
+    loads = [load({ loadedLitres: 12000, windowStart: "2026-11-12T08:00:00Z", windowEnd: "2026-11-12T10:00:00Z", failedAttempts: 1 })]
+    mount()
+    await waitFor(() => screen.getByText("Could not deliver"))
+    expect(screen.getByText(/window/)).toBeTruthy(); expect(screen.getByText(/1 failed attempt$/, { exact: false })).toBeTruthy()
+    fireEvent.click(screen.getByText("Could not deliver"))
+    fireEvent.click(screen.getByText("Confirm not delivered"))
+    expect(screen.getByRole("alert").textContent).toMatch(/reason/i)
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "SITE_CLOSED" } })
+    fireEvent.change(screen.getByLabelText("Litres returned"), { target: { value: "13000" } })
+    fireEvent.click(screen.getByText("Confirm not delivered"))
+    expect(screen.getByRole("alert").textContent).toMatch(/more than/)
+    fireEvent.change(screen.getByLabelText("Litres returned"), { target: { value: "12000" } })
+    fireEvent.click(screen.getByText("Confirm not delivered"))
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1))
+    const [url, body] = post.mock.calls[0]
+    expect(url).toBe("/api/v1/fuel/driver/loads/d1/failed-attempt")
+    expect(body).toMatchObject({ reasonCode: "SITE_CLOSED", litresReturned: 12000 }); expect(typeof body.clientRequestId).toBe("string")
+  })
+
+  it("a failed delivery with no signal is kept and the delivery buttons are hidden meanwhile", async () => {
+    post.mockRejectedValueOnce(new Error("Network Error"))
+    mount()
+    await waitFor(() => screen.getByText("Could not deliver"))
+    fireEvent.click(screen.getByText("Could not deliver"))
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "NO_ACCESS" } })
+    fireEvent.click(screen.getByText("Confirm not delivered"))
+    await waitFor(() => expect(readQueue()).toHaveLength(1))
+    expect(readQueue()[0].kind).toBe("FAILED")
+    expect(screen.queryByText("Record delivery")).toBeNull()
+    expect(screen.getByText(/failed delivery saved/)).toBeTruthy()
+  })
+
   it("says when nothing is allocated", async () => {
     loads = []; mount()
     await waitFor(() => screen.getByText(/No loads allocated to you/))

@@ -10,6 +10,7 @@ import java.util.UUID;
 public record PlanningResponse(LocalDate date, List<PlanLoad> loads, List<TankerDay> tankers) {
     public record PlanLoad(UUID deliveryId, String status, Instant scheduledAt, UUID customerId, String customerName,
                            String fuelType, BigDecimal litres, UUID tankerId, String tankerRegistration,
-                           UUID driverEmployeeId, String driverName, boolean allocated) {}
+                           UUID driverEmployeeId, String driverName, boolean allocated,
+                           Instant windowStart, Instant windowEnd, int failedAttempts) {}
     public record TankerDay(UUID tankerId, String registration, BigDecimal capacity, int loads, BigDecimal litres) {}
 }

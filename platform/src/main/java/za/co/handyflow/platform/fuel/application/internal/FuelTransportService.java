@@ -187,7 +187,8 @@ public class FuelTransportService {
             FuelTanker t = d.getTankerId() == null ? null : tankerById.get(d.getTankerId());
             loads.add(new PlanningResponse.PlanLoad(d.getId(), d.getStatus(), d.getScheduledAt(), d.getCustomerId(), customer, d.getFuelType(),
                     d.getLitresOrdered(), d.getTankerId(), t != null ? t.getRegistration() : d.getVehicleReg(),
-                    d.getDriverEmployeeId(), d.getDriverName(), d.isAllocated()));
+                    d.getDriverEmployeeId(), d.getDriverName(), d.isAllocated(),
+                    d.getWindowStart(), d.getWindowEnd(), d.getFailedAttempts()));
             if (d.getTankerId() != null) {
                 count.computeIfAbsent(d.getTankerId(), k -> new int[1])[0]++;
                 litres.merge(d.getTankerId(), d.getLitresOrdered(), BigDecimal::add);

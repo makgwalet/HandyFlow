@@ -835,7 +835,8 @@ public class FuelService {
                 d.getSiteId(),
                 d.getOrderId(), d.getLoadedLitres(), d.getSealNumbers(),
                 d.getInvoiceState(), d.getInvoiceId(), d.getInvoiceNumber(), d.getInvoiceError(),
-                d.getTankerId(), d.getDriverEmployeeId()
+                d.getTankerId(), d.getDriverEmployeeId(),
+                d.getWindowStart(), d.getWindowEnd(), d.getFailedAttempts()
         );
     }
 

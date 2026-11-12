@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { parseCapacities, validateTanker, autoSplit, validateAllocation, fleetOptionText, type Compartment } from "./transportOps"
+import { parseCapacities, validateTanker, autoSplit, validateAllocation, fleetOptionText, windowText, validateFailure, reasonLabel, FAILURE_REASONS, type Compartment } from "./transportOps"
 
 const comps: Compartment[] = [{ id: "c1", number: 1, capacityLitres: 10000 }, { id: "c2", number: 2, capacityLitres: 6000 }]
 
@@ -33,5 +33,28 @@ describe("fleetOptionText (C03)", () => {
   })
   it("says when a vehicle already backs a tanker", () => {
     expect(fleetOptionText({ id: "1", registration: "CY 1", label: "CY 1 · Volvo FM", linkedTankerRegistration: "CY 1" })).toContain("already a tanker")
+  })
+})
+
+describe("delivery windows and failed attempts (C04)", () => {
+  it("describes a window, open at either end", () => {
+    expect(windowText(null, null)).toBeNull()
+    expect(windowText("2026-11-13T08:00:00Z", "2026-11-13T10:00:00Z")).toMatch(/ to /)
+    expect(windowText("2026-11-13T08:00:00Z", null)).toMatch(/^from /)
+    expect(windowText(null, "2026-11-13T08:00:00Z")).toMatch(/^by /)
+  })
+  it("needs a reason, a note for Other, and sensible litres", () => {
+    expect(validateFailure("", "", "")).toMatch(/reason/i)
+    expect(validateFailure("OTHER", " ", "")).toMatch(/Describe/)
+    expect(validateFailure("OTHER", "gate welded shut", "")).toBeNull()
+    expect(validateFailure("SITE_CLOSED", "", "-1", 100)).toMatch(/zero or more/)
+    expect(validateFailure("SITE_CLOSED", "", "101", 100)).toMatch(/more than/)
+    expect(validateFailure("SITE_CLOSED", "", "5", null)).toMatch(/No loading/)
+    expect(validateFailure("SITE_CLOSED", "", "0", null)).toBeNull()
+    expect(validateFailure("SITE_CLOSED", "", "100", 100)).toBeNull()
+  })
+  it("labels every reason", () => {
+    expect(FAILURE_REASONS.every(r => reasonLabel(r.code) === r.label)).toBe(true)
+    expect(reasonLabel("UNKNOWN")).toBe("UNKNOWN")
   })
 })

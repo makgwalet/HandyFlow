@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { btnPrimary, btnGhost, card, inputStyle, labelStyle } from "../warehousing/whseUi"
 import { fmtL } from "./orderOps"
+import { FAILURE_REASONS, validateFailure, windowText } from "./transportOps"
 import { enqueue, readQueue, flushQueue, remove, retry, isNetworkError, type QueueItem } from "./offlineQueue"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -15,6 +16,8 @@ const when = (iso: string) => new Date(iso).toLocaleString("en-ZA", { day: "nume
 export default function DriverTab() {
   const qc = useQueryClient()
   const [completing, setCompleting] = useState<string | null>(null)
+  const [failing, setFailing] = useState<any | null>(null)
+  const [fReason, setFReason] = useState(""); const [fNote, setFNote] = useState(""); const [fLitres, setFLitres] = useState("")
   const [litres, setLitres] = useState(""); const [receiver, setReceiver] = useState(""); const [meterEnd, setMeterEnd] = useState("")
   const [err, setErr] = useState(""); const [note, setNote] = useState("")
   const [pending, setPending] = useState<QueueItem[]>(() => readQueue())
@@ -70,10 +73,20 @@ export default function DriverTab() {
       { enableHighAccuracy: true, timeout: 15000 })
   }
 
+  /** The truck got there and could not deliver. Saved on the phone like everything else when there is no signal. */
+  const fail = async (l: any) => {
+    const v = validateFailure(fReason, fNote, fLitres, l.loadedLitres)
+    if (v) return setErr(v)
+    const body = { reasonCode: fReason, note: fNote.trim() || null, litresReturned: fLitres.trim() ? Number(fLitres) : null, clientRequestId: newId() }
+    const ok = await act("FAILED", l.id, `/api/v1/fuel/driver/loads/${l.id}/failed-attempt`, body, "Failed delivery", "Recorded. The office will reschedule this load.")
+    if (ok) { setFailing(null); setFReason(""); setFNote(""); setFLitres("") }
+  }
+
   const discard = (id: string) => { remove(id); setPending(readQueue()) }
   const again = (id: string) => { retry(id); setPending(readQueue()); void flush() }
   const reset = () => { setCompleting(null); setLitres(""); setReceiver(""); setMeterEnd("") }
   const queuedKinds = (id: string) => new Set(pending.filter(p => p.deliveryId === id).map(p => p.kind))
+  const closedOut = (id: string) => queuedKinds(id).has("COMPLETE") || queuedKinds(id).has("FAILED")
 
   return (
     <div style={{ maxWidth: 520 }}>
@@ -96,10 +109,25 @@ export default function DriverTab() {
           <div key={l.id} style={{ ...card, padding: 14, marginBottom: 12 }}>
             <div style={{ fontWeight: 700 }}>{fmtL(l.litresOrdered)} {l.fuelType}</div>
             <div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>{when(l.scheduledAt)} · {l.vehicleReg ?? ""}{l.deliveryAddress?.street ? ` · ${l.deliveryAddress.street}` : ""}</div>
-            <div style={{ fontSize: 13, margin: "4px 0 8px" }}>{l.status === "IN_TRANSIT" ? "On the road" : "Ready to go"}{queuedKinds(l.id).has("COMPLETE") ? " · delivery saved, waiting to send" : ""}</div>
+            <div style={{ fontSize: 13, margin: "4px 0 8px" }}>{l.status === "IN_TRANSIT" ? "On the road" : "Ready to go"}{windowText(l.windowStart, l.windowEnd) ? ` · window ${windowText(l.windowStart, l.windowEnd)}` : ""}{l.failedAttempts > 0 ? ` · ${l.failedAttempts} failed attempt${l.failedAttempts === 1 ? "" : "s"}` : ""}{queuedKinds(l.id).has("COMPLETE") ? " · delivery saved, waiting to send" : queuedKinds(l.id).has("FAILED") ? " · failed delivery saved, waiting to send" : ""}</div>
             {l.status === "SCHEDULED" && !queuedKinds(l.id).has("START") && <button style={{ ...btnPrimary, width: "100%", padding: 12 }} onClick={() => start(l.id)}>Start trip</button>}
-            {l.status === "IN_TRANSIT" && !queuedKinds(l.id).has("COMPLETE") && completing !== l.id && <button style={{ ...btnPrimary, width: "100%", padding: 12 }} onClick={() => { setCompleting(l.id); setLitres(String(l.litresOrdered)) }}>Record delivery</button>}
+            {l.status === "IN_TRANSIT" && !closedOut(l.id) && completing !== l.id && <button style={{ ...btnPrimary, width: "100%", padding: 12 }} onClick={() => { setCompleting(l.id); setLitres(String(l.litresOrdered)) }}>Record delivery</button>}
             {l.status === "IN_TRANSIT" && completing !== l.id && <button style={{ ...btnGhost, width: "100%", padding: 12, marginTop: 8 }} onClick={() => recordLocation(l.id)}>Record location</button>}
+            {l.status === "IN_TRANSIT" && completing !== l.id && failing?.id !== l.id && !closedOut(l.id) && <button style={{ ...btnGhost, width: "100%", padding: 12, marginTop: 8 }} onClick={() => setFailing(l)}>Could not deliver</button>}
+            {failing?.id === l.id && (
+              <div>
+                <label style={labelStyle}>Why *</label>
+                <select aria-label="Reason" value={fReason} onChange={e => setFReason(e.target.value)} style={{ ...inputStyle, fontSize: 16 }}>
+                  <option value="">Choose…</option>{FAILURE_REASONS.map(r => <option key={r.code} value={r.code}>{r.label}</option>)}
+                </select>
+                <label style={{ ...labelStyle, marginTop: 8 }}>Note</label><input aria-label="Failure note" value={fNote} onChange={e => setFNote(e.target.value)} style={{ ...inputStyle, fontSize: 16 }} />
+                <label style={{ ...labelStyle, marginTop: 8 }}>Litres you are bringing back</label><input aria-label="Litres returned" type="number" inputMode="decimal" value={fLitres} onChange={e => setFLitres(e.target.value)} style={{ ...inputStyle, fontSize: 16 }} />
+                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  <button style={{ ...btnGhost, flex: 1, padding: 12 }} onClick={() => setFailing(null)}>Back</button>
+                  <button style={{ ...btnPrimary, flex: 2, padding: 12 }} onClick={() => fail(l)}>Confirm not delivered</button>
+                </div>
+              </div>
+            )}
             {completing === l.id && (
               <div>
                 <label style={labelStyle}>Litres delivered *</label><input aria-label="Litres delivered" type="number" inputMode="decimal" value={litres} onChange={e => setLitres(e.target.value)} style={{ ...inputStyle, fontSize: 16 }} />

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest"
 import { enqueue, readQueue, remove, retry, flushQueue, isNetworkError } from "./offlineQueue"
 
 const mem = () => { const m: Record<string, string> = {}; return { getItem: (k: string) => m[k] ?? null, setItem: (k: string, v: string) => { m[k] = v }, removeItem: (k: string) => { delete m[k] } } }
-const item = (id: string, kind: "START" | "COMPLETE" | "EVIDENCE", deliveryId: string) => ({ id, kind, deliveryId, path: `/p/${deliveryId}/${kind}`, body: { clientRequestId: id }, label: kind })
+const item = (id: string, kind: "START" | "COMPLETE" | "EVIDENCE" | "FAILED", deliveryId: string) => ({ id, kind, deliveryId, path: `/p/${deliveryId}/${kind}`, body: { clientRequestId: id }, label: kind })
 
 describe("offlineQueue (C05)", () => {
   let s: ReturnType<typeof mem>
@@ -12,6 +12,10 @@ describe("offlineQueue (C05)", () => {
     enqueue(item("a", "COMPLETE", "d1"), s); enqueue(item("b", "COMPLETE", "d1"), s)
     enqueue(item("e1", "EVIDENCE", "d1"), s); enqueue(item("e2", "EVIDENCE", "d1"), s)
     expect(readQueue(s).map(x => x.id)).toEqual(["b", "e1", "e2"])
+  })
+  it("keeps a start, a failure and a second start for the same load, in order", () => {
+    enqueue(item("s1", "START", "d1"), s); enqueue(item("f1", "FAILED", "d1"), s); enqueue(item("s2", "START", "d1"), s); enqueue(item("f2", "FAILED", "d1"), s)
+    expect(readQueue(s).map(x => x.id)).toEqual(["s1", "f1", "s2", "f2"])
   })
   it("brings over completions saved by the earlier app version, once", () => {
     s.setItem("fuel-driver-queue-v1", JSON.stringify([{ deliveryId: "d9", clientRequestId: "old", body: { litresDelivered: 5, clientRequestId: "old" }, queuedAt: "2026-11-01T00:00:00Z" }]))
