@@ -8,6 +8,7 @@ import za.co.handyflow.platform.fuel.domain.model.FuelComplianceItem;
 import za.co.handyflow.platform.fuel.domain.model.FuelLegalEntity;
 import za.co.handyflow.platform.fuel.dto.ComplianceLinkageDtos.*;
 import za.co.handyflow.platform.fuel.domain.model.FuelComplianceRenewal;
+import za.co.handyflow.platform.fuel.domain.model.FuelDepot;
 import za.co.handyflow.platform.fuel.domain.repository.*;
 import za.co.handyflow.platform.fuel.dto.ComplianceRequest;
 import za.co.handyflow.platform.fuel.dto.ComplianceResponse;
