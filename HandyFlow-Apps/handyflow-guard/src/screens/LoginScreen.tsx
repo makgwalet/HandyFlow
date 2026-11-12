@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from "react-native";
 import { useAuth } from "@/auth/AuthContext";
+import { getDeviceId } from "@/auth/deviceStore";
 import { PIN_PATTERN } from "@/api/guardAuth";
 import { Button } from "@/ui/Button";
 import { colors, spacing } from "@/ui/theme";
@@ -11,6 +12,8 @@ export function LoginScreen() {
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+  useEffect(() => { void getDeviceId().then(setDeviceId).catch(() => undefined); }, []);
 
   const ready = identifier.trim().length >= 3 && PIN_PATTERN.test(pin);
 
@@ -53,6 +56,9 @@ export function LoginScreen() {
         />
         {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
         <Button label="Sign in" onPress={submit} loading={busy} disabled={!ready} />
+        {deviceId ? (
+          <Text selectable style={styles.device}>Phone ID (your supervisor needs this to enrol the phone): {deviceId}</Text>
+        ) : null}
       </View>
     </KeyboardAvoidingView>
   );
@@ -64,5 +70,6 @@ const styles = StyleSheet.create({
   form: { gap: spacing.sm },
   label: { color: colors.muted, fontSize: 14 },
   input: { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border, borderWidth: 1, borderRadius: 12, minHeight: 52, paddingHorizontal: 14, fontSize: 18, marginBottom: spacing.sm },
+  device: { color: colors.muted, fontSize: 12, marginTop: spacing.md },
   error: { color: colors.danger, marginBottom: spacing.sm },
 });

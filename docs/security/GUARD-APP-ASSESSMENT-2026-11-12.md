@@ -156,3 +156,9 @@ Open: (1) a scan that arrives after its round was already marked missed does not
 
 - App: each person on site has ID photo / Vehicle disc / Other photo buttons that take a picture and upload it to the hardened endpoint from 0825 (own-site entries only, attributed to the signed-in guard). `tsc` clean, 19 jest tests, `expo export` ok; not run on a device.
 - Open: online only; a photo whose upload fails stays in the app's private storage (not retried or cleaned up); no photo count limit on the gate side.
+
+## 17. Status: first-run readiness (patches 0828 backend, 0829 app and test script, 2026-11-12)
+
+- Found while writing the test script: enrolment creates the guard's device with no site (`site_id` null) and clock-in only linked a shift when the device's site matched the shift's site. A guard's own phone would therefore open a session with no shift, no patrol rounds, no geofence check, and every site screen (patrol, post orders, gate) would answer 409 NO_SHIFT. 0828 (written, not compiled) links the guard's own scheduled shift when the device has no site, geofences against that shift's site, and generates rounds for it. A site-owned device keeps the old rule. Test added to `DeviceSessionServiceGuardTest`. Clock-in must still happen within 30 minutes of the shift start; later than that no shift is linked (rule unchanged, worth a decision).
+- App (0829): the sign-in screen shows the phone's id so a supervisor can enrol the phone (there was no way to get it before).
+- New doc `docs/security/GUARD-APP-PILOT-TEST-SCRIPT-2026-11-12.md`: test data to key in, expected results for each feature, and the refusal checks.
