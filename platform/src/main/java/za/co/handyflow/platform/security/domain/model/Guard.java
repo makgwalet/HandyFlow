@@ -75,6 +75,9 @@ public class Guard {
     @Column(name = "status", length = 30)
     private String status = "ACTIVE";
 
+    @Column(name = "site_supervisor", nullable = false)
+    private boolean siteSupervisor = false;
+
     @Column(name = "status_note")
     private String statusNote;
 
@@ -348,6 +351,12 @@ public class Guard {
     public void setFaceEmbedding(String embedding) {
         this.faceEmbedding = embedding;
         this.updatedAt     = Instant.now();
+    }
+
+    /** Lets the guard see their current site's overview in the Guard app. Set by a manager. */
+    public void setSiteSupervisor(boolean siteSupervisor) {
+        this.siteSupervisor = siteSupervisor;
+        this.updatedAt      = Instant.now();
     }
 
     public void setRegisteredDeviceId(String deviceId) {
