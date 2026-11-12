@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { validatePrice, scopeLabel, breakLabel } from "./priceOps"
+import { validatePrice, scopeLabel, priceStatusLabel, breakLabel } from "./priceOps"
 
 describe("priceOps", () => {
   it("validates a price", () => {
@@ -16,5 +16,11 @@ describe("priceOps", () => {
     expect(scopeLabel({ accountId: "a", customerName: "Gold Mine" })).toBe("Gold Mine")
     expect(breakLabel(0)).toBe("any volume")
     expect(breakLabel(10000)).toMatch(/from .*10.*000 L/)
+  })
+  it("status label shows approval state before live state", () => {
+    expect(priceStatusLabel({ live: false, approvalStatus: "PENDING_APPROVAL" })).toBe("Waiting for approval")
+    expect(priceStatusLabel({ live: false, approvalStatus: "REJECTED" })).toBe("Rejected")
+    expect(priceStatusLabel({ live: true, approvalStatus: "APPROVED" })).toBe("Live")
+    expect(priceStatusLabel({ live: false })).toBe("Not live")
   })
 })

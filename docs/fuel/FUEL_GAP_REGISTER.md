@@ -66,3 +66,6 @@ Each row is a gap statement; the backend/frontend/database/permission/test lists
 - New tests: `FuelEndpointSecurityTest` (157 endpoints: @PreAuthorize, seeded authorities, no read-only guard on writes, requireModule per endpoint, no client-supplied tenantId) and `FuelRepositoryTenantScopingTest` (every @Query tenant-filtered or on a reviewed allow-list).
 - Known debt: `FuelPortalDataController` has no `requireModule("fuel")` (listed in controllers-without-module-guard.txt).
 - Not covered: MockMvc/runtime security behaviour and DB-level cross-tenant integration tests.
+
+## B07 - Pricing approval (2026-11-12)
+Built (patch 0779): threshold and margin guard, approval via ApprovalFacade, change history. Margin uses latest receipt cost only. See FUEL-B07-PRICING-APPROVAL-NOTES-2026-11-12.md.

@@ -13,12 +13,16 @@ import za.co.handyflow.platform.approvals.ApprovalCompletedEvent;
 class FuelApprovalEventHandler {
 
     private final FuelPurchasingService purchasing;
+    private final FuelPricingService pricing;
 
     @ApplicationModuleListener
     void onApprovalCompleted(ApprovalCompletedEvent event) {
-        if (!"fuel".equals(event.module()) || !"PURCHASE_ORDER".equals(event.entityType())) return;
+        if (!"fuel".equals(event.module())) return;
+        boolean price = "PRICE".equals(event.entityType());
+        if (!price && !"PURCHASE_ORDER".equals(event.entityType())) return;
         try {
-            purchasing.applyApprovalOutcome(event.tenantId(), event.entityId(), event.outcome());
+            if (price) pricing.applyApprovalOutcome(event.tenantId(), event.entityId(), event.outcome());
+            else purchasing.applyApprovalOutcome(event.tenantId(), event.entityId(), event.outcome());
         } catch (Exception e) {
             log.error("[Fuel] Failed to apply approval outcome={} purchaseOrder={} tenant={}: {}",
                     event.outcome(), event.entityId(), event.tenantId(), e.getMessage(), e);

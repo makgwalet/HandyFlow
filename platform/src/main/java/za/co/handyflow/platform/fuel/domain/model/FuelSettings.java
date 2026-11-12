@@ -64,6 +64,14 @@ public class FuelSettings {
     @Column(name = "require_separate_closer", nullable = false)
     private boolean requireSeparateCloser = false;
 
+    /** A new price that moves more than this percentage from the price it replaces waits for approval. Null: off. */
+    @Column(name = "price_change_approval_pct", precision = 6, scale = 2)
+    private BigDecimal priceChangeApprovalPct;
+
+    /** A new price whose margin over the latest purchase cost is below this percentage waits for approval. Null: off. */
+    @Column(name = "min_margin_pct", precision = 6, scale = 2)
+    private BigDecimal minMarginPct;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -112,6 +120,19 @@ public class FuelSettings {
             this.cashVarianceTolerance = tolerance;
         }
         if (separateCloser != null) this.requireSeparateCloser = separateCloser;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Null leaves the current value alone; zero switches that check off. */
+    public void updatePriceControls(BigDecimal changePct, BigDecimal minMargin) {
+        if (changePct != null) {
+            if (changePct.signum() < 0) throw new IllegalArgumentException("The price-change limit cannot be negative.");
+            this.priceChangeApprovalPct = changePct.signum() == 0 ? null : changePct;
+        }
+        if (minMargin != null) {
+            if (minMargin.signum() < 0 || minMargin.compareTo(new BigDecimal("100")) >= 0) throw new IllegalArgumentException("The minimum margin must be between 0% and under 100%.");
+            this.minMarginPct = minMargin.signum() == 0 ? null : minMargin;
+        }
         this.updatedAt = Instant.now();
     }
 

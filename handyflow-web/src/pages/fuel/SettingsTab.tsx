@@ -52,6 +52,12 @@ function ControlsCard() {
         <input type="checkbox" checked={f.separateCloser} disabled={!canConfigure} onChange={e => { setSaved(false); setF(s => s && ({ ...s, separateCloser: e.target.checked })) }} />
         The person who opens a shift cannot be the person who closes it
       </label>
+      <label style={labelStyle} htmlFor="fs-priceChange">Price change needing approval (%)</label>
+      <input id="fs-priceChange" inputMode="decimal" style={{ ...inputStyle, maxWidth: 240 }} value={f.priceChange} disabled={!canConfigure} placeholder="Off" onChange={e => { setSaved(false); setF(s => s && ({ ...s, priceChange: e.target.value })) }} />
+      <div style={{ fontSize: 11, color: "var(--hf-text-muted)", margin: "3px 0 10px" }}>A new price that moves by more than this percentage from the price it replaces is held until it is approved, and does not apply until then. Leave empty to switch the check off.</div>
+      <label style={labelStyle} htmlFor="fs-minMargin">Minimum margin (%)</label>
+      <input id="fs-minMargin" inputMode="decimal" style={{ ...inputStyle, maxWidth: 240 }} value={f.minMargin} disabled={!canConfigure} placeholder="Off" onChange={e => { setSaved(false); setF(s => s && ({ ...s, minMargin: e.target.value })) }} />
+      <div style={{ fontSize: 11, color: "var(--hf-text-muted)", margin: "3px 0 10px" }}>A new price whose margin over the latest purchase cost of that fuel is below this percentage is held until it is approved. If no purchase has been received for that fuel the check cannot run. Leave empty to switch it off.</div>
       {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12 }}>{err}</p>}
       {saved && <p role="status" style={{ color: "var(--hf-success-text-strong)", fontSize: 12 }}>Saved.</p>}
       {canConfigure

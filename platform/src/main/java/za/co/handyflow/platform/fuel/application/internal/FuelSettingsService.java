@@ -53,12 +53,13 @@ public class FuelSettingsService {
         s.updateControls(req.requireSupplierApproval(), req.adjustmentThresholdLitres());
         s.updateVarianceTolerance(req.varianceTolerancePct());
         s.updateCashControls(req.cashVarianceTolerance(), req.requireSeparateCloser());
+        s.updatePriceControls(req.priceChangeApprovalPct(), req.minMarginPct());
         return toControls(settings.save(s));
     }
 
     private static ControlsResponse toControls(FuelSettings s) {
         return new ControlsResponse(s.isRequireSupplierApproval(), s.getAdjustmentThresholdLitres(), s.getVarianceTolerancePct(),
-                s.getCashVarianceTolerance(), s.isRequireSeparateCloser());
+                s.getCashVarianceTolerance(), s.isRequireSeparateCloser(), s.getPriceChangeApprovalPct(), s.getMinMarginPct());
     }
 
     private static SettingsResponse toResponse(FuelSettings s) {

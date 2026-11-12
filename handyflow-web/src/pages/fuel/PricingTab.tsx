@@ -5,7 +5,7 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import type { CustomerAccount } from "./customerOps"
-import { validatePrice, scopeLabel, breakLabel, type PriceRow } from "./priceOps"
+import { validatePrice, scopeLabel, breakLabel, priceStatusLabel, type PriceRow } from "./priceOps"
 import { fmtR } from "./orderOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -44,8 +44,8 @@ export default function PricingTab() {
                 <tr key={r.id} style={{ borderTop: "1px solid var(--hf-border)" }}>
                   <td style={td}>{r.fuelType}</td><td style={td}>{scopeLabel(r)}</td><td style={td}>{breakLabel(r.minLitres)}</td>
                   <td style={td}>{fmtR(r.pricePerLitre)}</td><td style={td}>{r.validFrom}</td><td style={td}>{r.validTo ?? "open"}</td>
-                  <td style={td}><Chip bg={r.live ? "var(--hf-success-soft-strong)" : "var(--hf-surface-alt)"} fg={r.live ? "var(--hf-success-text-strong)" : "var(--hf-text)"}>{r.live ? "Live" : "Not live"}</Chip></td>
-                  <td style={td}>{canManage && (r.validTo == null || r.validTo >= today()) && <button style={btnGhost} onClick={() => end.mutate(r.id)}>End today</button>}</td>
+                  <td style={td} title={r.approvalReason ?? undefined}><Chip bg={r.live ? "var(--hf-success-soft-strong)" : "var(--hf-surface-alt)"} fg={r.live ? "var(--hf-success-text-strong)" : "var(--hf-text)"}>{priceStatusLabel(r)}</Chip>{r.changePct != null && <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{r.changePct > 0 ? "+" : ""}{r.changePct}% vs {fmtR(r.previousPricePerLitre ?? 0)}</div>}</td>
+                  <td style={td}>{canManage && r.approvalStatus !== "PENDING_APPROVAL" && r.approvalStatus !== "REJECTED" && (r.validTo == null || r.validTo >= today()) && <button style={btnGhost} onClick={() => end.mutate(r.id)}>End today</button>}</td>
                 </tr>
               ))}
             </tbody>

@@ -2,7 +2,12 @@
 export interface PriceRow {
   id: string; fuelType: string; accountId: string | null; customerName: string | null; pricePerLitre: number
   minLitres: number; validFrom: string; validTo: string | null; note: string | null; live: boolean
+  approvalStatus?: "APPROVED" | "PENDING_APPROVAL" | "REJECTED"; approvalReason?: string | null; previousPricePerLitre?: number | null
+  changePct?: number | null; costPerLitreAtEntry?: number | null; marginPct?: number | null
 }
+
+export const priceStatusLabel = (r: Pick<PriceRow, "live" | "approvalStatus">) =>
+  r.approvalStatus === "PENDING_APPROVAL" ? "Waiting for approval" : r.approvalStatus === "REJECTED" ? "Rejected" : r.live ? "Live" : "Not live"
 
 const num = (s: string) => (s.trim() === "" ? NaN : Number(s))
 

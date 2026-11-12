@@ -13,13 +13,19 @@ public final class FuelWholesaleDtos {
 
     /** cashVarianceTolerance and requireSeparateCloser: null means "leave as it is". */
     public record ControlsRequest(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres, BigDecimal varianceTolerancePct,
-                                  BigDecimal cashVarianceTolerance, Boolean requireSeparateCloser) {
+                                  BigDecimal cashVarianceTolerance, Boolean requireSeparateCloser,
+                                  BigDecimal priceChangeApprovalPct, BigDecimal minMarginPct) {
+        public ControlsRequest(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres, BigDecimal varianceTolerancePct,
+                               BigDecimal cashVarianceTolerance, Boolean requireSeparateCloser) {
+            this(requireSupplierApproval, adjustmentThresholdLitres, varianceTolerancePct, cashVarianceTolerance, requireSeparateCloser, null, null);
+        }
         public ControlsRequest(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres, BigDecimal varianceTolerancePct) {
-            this(requireSupplierApproval, adjustmentThresholdLitres, varianceTolerancePct, null, null);
+            this(requireSupplierApproval, adjustmentThresholdLitres, varianceTolerancePct, null, null, null, null);
         }
     }
     public record ControlsResponse(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres, BigDecimal varianceTolerancePct,
-                                   BigDecimal cashVarianceTolerance, boolean requireSeparateCloser) {}
+                                   BigDecimal cashVarianceTolerance, boolean requireSeparateCloser,
+                                   BigDecimal priceChangeApprovalPct, BigDecimal minMarginPct) {}
 
     public record ReasonRequest(@NotBlank @Size(min = 5, max = 300, message = "Reason must be 5 to 300 characters") String reason) {}
 
