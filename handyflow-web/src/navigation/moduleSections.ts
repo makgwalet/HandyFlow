@@ -265,6 +265,7 @@ export const FUEL_SECTIONS: ModuleSections = {
         { id: 'suppliers', label: 'Suppliers', icon: Users },
         { id: 'purchase-orders', label: 'Purchase orders', icon: ShoppingCart, divisions: ['WHOLESALE_SUPPLY', 'RETAIL_FORECOURT'] },
         { id: 'supplier-invoices', label: 'Supplier invoices', icon: FileText, divisions: ['WHOLESALE_SUPPLY', 'RETAIL_FORECOURT'] },
+        { id: 'automation', label: 'Reorder rules', icon: Settings, divisions: ['WHOLESALE_SUPPLY', 'RETAIL_FORECOURT'] },
         { id: 'compliance', label: 'Compliance', icon: ShieldCheck },
       ],
     },

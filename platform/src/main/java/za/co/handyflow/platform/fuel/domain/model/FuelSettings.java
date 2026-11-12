@@ -76,6 +76,10 @@ public class FuelSettings {
     @Column(name = "licence_blocking_activities", nullable = false, length = 120)
     private String licenceBlockingActivities = "";
 
+    /** Opt-in: tell the administrators once when an order passes its expected date without being fully received. */
+    @Column(name = "alert_overdue_purchase_orders", nullable = false)
+    private boolean alertOverduePurchaseOrders = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -152,6 +156,10 @@ public class FuelSettings {
         }
         this.licenceBlockingActivities = String.join(",", chosen);
         this.updatedAt = Instant.now();
+    }
+
+    public void updateAutomation(boolean alertOverduePurchaseOrders) {
+        this.alertOverduePurchaseOrders = alertOverduePurchaseOrders; this.updatedAt = Instant.now();
     }
 
     public java.util.Set<String> blockingActivities() {

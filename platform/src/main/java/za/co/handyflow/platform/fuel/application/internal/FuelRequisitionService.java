@@ -60,6 +60,16 @@ public class FuelRequisitionService {
         return one(tenantId, requisitions.save(r));
     }
 
+    /** Drafted by an automation rule: the same as create, with no person behind it and a link back to the rule. Never submitted here. */
+    @Transactional
+    public RequisitionView createFromRule(TenantId tenantId, RequisitionRequest req, UUID ruleId) {
+        if (req.supplierId() != null) requireSupplier(tenantId, req.supplierId());
+        FuelPurchaseRequisition r = FuelPurchaseRequisition.create(tenantId, numbers.generate(tenantId), req.fuelType(), req.litres(), req.tankId(), req.supplierId(),
+                req.estimatedPrice(), req.neededBy(), req.reason(), null);
+        r.madeByRule(ruleId);
+        return one(tenantId, requisitions.save(r));
+    }
+
     @Transactional
     public RequisitionView update(TenantId tenantId, UUID id, RequisitionRequest req) {
         FuelPurchaseRequisition r = lock(tenantId, id);

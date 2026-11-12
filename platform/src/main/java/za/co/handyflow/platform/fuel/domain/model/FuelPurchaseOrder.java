@@ -48,6 +48,9 @@ public class FuelPurchaseOrder {
     @Column(name = "expected_date")
     private LocalDate expectedDate;
 
+    @Column(name = "overdue_alerted_at")
+    private Instant overdueAlertedAt;
+
     @Column(name = "cancel_reason", length = 300)
     private String cancelReason;
 
@@ -131,6 +134,8 @@ public class FuelPurchaseOrder {
         if (reason == null || reason.isBlank()) throw new IllegalArgumentException("Give a reason for cancelling.");
         this.status = "CANCELLED"; this.cancelReason = reason.trim(); this.updatedAt = Instant.now();
     }
+
+    public void markOverdueAlerted() { this.overdueAlertedAt = Instant.now(); }
 
     public boolean canReceive() { return "ORDERED".equals(status) || "PART_RECEIVED".equals(status); }
 

@@ -26,4 +26,9 @@ public interface FuelPurchaseOrderRepository extends JpaRepository<FuelPurchaseO
 
     @Query("SELECT COUNT(p) FROM FuelPurchaseOrder p WHERE p.tenantId = :tenantId AND p.deletedAt IS NULL AND p.status IN ('ORDERED','PART_RECEIVED')")
     long countAwaitingDelivery(TenantId tenantId);
+
+    /** Orders placed but not fully received, past their expected date, not yet alerted. */
+    @Query("SELECT p FROM FuelPurchaseOrder p WHERE p.tenantId = :tenantId AND p.deletedAt IS NULL AND p.status IN ('ORDERED','PART_RECEIVED') "
+            + "AND p.expectedDate IS NOT NULL AND p.expectedDate < :today AND p.overdueAlertedAt IS NULL ORDER BY p.expectedDate")
+    List<FuelPurchaseOrder> findOverdueNotAlerted(TenantId tenantId, java.time.LocalDate today);
 }

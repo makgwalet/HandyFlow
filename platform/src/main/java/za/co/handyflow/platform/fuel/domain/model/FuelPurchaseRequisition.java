@@ -66,6 +66,9 @@ public class FuelPurchaseRequisition {
     @Column(name = "purchase_order_id")
     private UUID purchaseOrderId;
 
+    @Column(name = "automation_rule_id", updatable = false)
+    private UUID automationRuleId;
+
     @Column(name = "cancel_reason", length = 300)
     private String cancelReason;
 
@@ -85,6 +88,9 @@ public class FuelPurchaseRequisition {
         r.fill(fuelType, litres, tankId, supplierId, estimatedPrice, neededBy, reason);
         return r;
     }
+
+    /** Marks a draft as made by an automation rule, so it can be traced back. */
+    public void madeByRule(UUID ruleId) { this.automationRuleId = ruleId; }
 
     public void edit(String fuelType, BigDecimal litres, UUID tankId, UUID supplierId, BigDecimal estimatedPrice, LocalDate neededBy, String reason) {
         if (!"DRAFT".equals(status)) throw new IllegalStateException(reqNumber + " is " + label() + " and can no longer be changed.");

@@ -17,4 +17,8 @@ public interface FuelSettingsRepository extends JpaRepository<FuelSettings, UUID
     /** Every tenant that has set a delivery variance tolerance: the daily variance sweep. */
     @Query("SELECT s.tenantId FROM FuelSettings s WHERE s.varianceTolerancePct IS NOT NULL")
     List<TenantId> findTenantsWithVarianceTolerance();
+
+    /** Every tenant that asked for overdue purchase order alerts: the daily automation sweep. */
+    @Query("SELECT s.tenantId FROM FuelSettings s WHERE s.alertOverduePurchaseOrders = true")
+    List<TenantId> findTenantsAlertingOverduePurchaseOrders();
 }

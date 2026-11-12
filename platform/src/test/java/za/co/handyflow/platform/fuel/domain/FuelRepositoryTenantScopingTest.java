@@ -30,7 +30,9 @@ class FuelRepositoryTenantScopingTest {
             "FuelDispatchRepository.sumLitresDispensedByTankIdsRaw", "tank ids come from a tenant-scoped tank list",
             "FuelPortalAccessGrantRepository.findActiveGrantsForUser", "portal identity is global; tenant derived from grant",
             "FuelPortalAccessGrantRepository.findActiveGrant", "portal identity is global; tenant derived from grant",
-            "FuelSettingsRepository.findTenantsWithVarianceTolerance", "scheduler sweeps all tenants");
+            "FuelSettingsRepository.findTenantsWithVarianceTolerance", "scheduler sweeps all tenants",
+            "FuelSettingsRepository.findTenantsAlertingOverduePurchaseOrders", "scheduler sweeps all tenants",
+            "FuelAutomationRuleRepository.findTenantsWithEnabledRules", "scheduler sweeps all tenants");
 
     private static final Pattern QUERY = Pattern.compile("@Query\\((.*?)\\)\\s*\\n\\s*[^\\n]*?\\s(\\w+)\\(", Pattern.DOTALL);
 

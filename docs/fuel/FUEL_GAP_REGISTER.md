@@ -100,3 +100,6 @@ Built (patch 0794, V677): licence-to-depot link and per-site coverage; opt-in se
 
 ## Phase 6a - Group report (2026-11-12)
 Built (patch 0795, no migration): read-only report per legal entity of deliveries, litres, revenue, margin, stock, stock value and open variances, with previous-period comparison; money only for FUEL_MARGIN_READ. Not built: forecourt sales (a shift is not tied to a depot), division split, export. See FUEL-PHASE6A-GROUP-REPORT-NOTES-2026-11-12.md.
+
+## Phase 6b - Automation (2026-11-12)
+Built (patch 0796, V678): per-tank reorder rules that draft (never submit or order) a requisition when the tank is below the company's level, daily at 06:30 with a notice, a "Check now" button and a log; opt-in overdue purchase order alert. Licence expiry reminders already existed. Not built: rules by fuel type or forecast, orders raised without a requisition are invisible to the rule, per-user notice choice. See FUEL-PHASE6B-AUTOMATION-NOTES-2026-11-12.md.
