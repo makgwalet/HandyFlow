@@ -31,5 +31,6 @@ public final class FuelDistributionDtos {
 
     public record EvidenceView(UUID id, UUID deliveryId, String kind, String fileRef, BigDecimal latitude, BigDecimal longitude, BigDecimal accuracyM,
                                String note, Instant capturedAt, UUID capturedBy, String status, String supersededReason, UUID verifiedBy,
-                               Instant verifiedAt, boolean locked) {}
+                               Instant verifiedAt, boolean locked,
+                               boolean fileStored, String contentType, Integer fileSizeBytes) {}
 }

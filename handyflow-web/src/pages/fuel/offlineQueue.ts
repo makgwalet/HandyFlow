@@ -3,10 +3,13 @@
 // A repeat is harmless: completion and evidence carry a clientRequestId the server de-duplicates on.
 // A network failure keeps everything and stops the run. A server refusal marks only that item FAILED, keeps it
 // visible for Retry or Discard, and holds back later items for the same load so they never run out of order.
+import type { QueueFile } from "./evidenceCapture"
 export type QueueKind = "START" | "COMPLETE" | "EVIDENCE" | "FAILED"
 export interface QueueItem {
   id: string; kind: QueueKind; deliveryId: string; path: string; body: Record<string, unknown> | null
   queuedAt: string; status: "PENDING" | "FAILED"; message: string | null; attempts: number; label: string
+  /** A photo or signature kept with the item (a small data URL) and sent as an upload. */
+  file?: QueueFile | null
 }
 type Store = Pick<Storage, "getItem" | "setItem">
 const KEY = "fuel-driver-queue-v2"
@@ -14,7 +17,8 @@ const LEGACY_KEY = "fuel-driver-queue-v1"
 
 export const isNetworkError = (e: any) => !e?.response
 
-function write(q: QueueItem[], s: Store) { try { s.setItem(KEY, JSON.stringify(q)) } catch { /* storage full or blocked */ } }
+/** False when the phone would not keep it (storage full or blocked): the caller must tell the driver, never pretend it was saved. */
+function write(q: QueueItem[], s: Store): boolean { try { s.setItem(KEY, JSON.stringify(q)); return true } catch { return false } }
 
 /** Reads the queue, bringing over completions saved by the earlier version of the app. */
 export function readQueue(s: Store = localStorage): QueueItem[] {
@@ -33,11 +37,10 @@ export function readQueue(s: Store = localStorage): QueueItem[] {
 }
 
 /** Adds an item. A completion replaces any earlier completion for the same load (the driver corrected it). Everything else is kept: a load can be started and fail more than once. */
-export function enqueue(item: Omit<QueueItem, "queuedAt" | "status" | "message" | "attempts">, s: Store = localStorage): QueueItem {
+export function enqueue(item: Omit<QueueItem, "queuedAt" | "status" | "message" | "attempts">, s: Store = localStorage): QueueItem | null {
   const full: QueueItem = { ...item, queuedAt: new Date().toISOString(), status: "PENDING", message: null, attempts: 0 }
   const q = readQueue(s).filter(x => !(item.kind === "COMPLETE" && x.kind === "COMPLETE" && x.deliveryId === item.deliveryId))
-  write([...q, full], s)
-  return full
+  return write([...q, full], s) ? full : null
 }
 
 export const remove = (id: string, s: Store = localStorage) => write(readQueue(s).filter(x => x.id !== id), s)

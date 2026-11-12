@@ -4,6 +4,7 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { useAuthStore } from "../../store/auth.store"
 import { btnGhost, btnPrimary, Chip, ErrorLine, inputStyle, labelStyle, Modal } from "../warehousing/whseUi"
+import { UPLOAD_KINDS, sizeText, validateUpload } from "./evidenceCapture"
 import { canReplace, canVerify, emptyEvidence, hasVerifiedProof, KIND_LABEL, toEvidenceRequest, validateEvidence, type Evidence, type EvidenceForm } from "./distributionOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -27,6 +28,23 @@ export default function EvidenceModal({ deliveryId, label, canAdd, onClose }: { 
     mutationFn: (a: { id: string; reason: string }) => apiClient.post(`/api/v1/fuel/evidence/${a.id}/supersede`, { reason: a.reason, replacement: form ? toEvidenceRequest(form) : null }),
     onSuccess: refresh,
   })
+  const upload = useMutation({
+    mutationFn: (a: { kind: string; file: File; note: string }) => {
+      const f = new FormData(); f.append("kind", a.kind); f.append("file", a.file, a.file.name); if (a.note.trim()) f.append("note", a.note.trim())
+      return apiClient.post(`/api/v1/fuel/deliveries/${deliveryId}/evidence/file`, f)
+    },
+    onSuccess: () => { refresh(); setUploading(false) },
+  })
+  const [uploading, setUploading] = useState(false)
+  const [viewProblem, setViewProblem] = useState("")
+  /** Files are private, so they are fetched with the user's sign-in and opened from memory, never by a public link. */
+  const view = async (e: Evidence) => {
+    setViewProblem("")
+    try {
+      const r = await apiClient.get(`/api/v1/fuel/evidence/${e.id}/file`, { responseType: "blob" })
+      const url = URL.createObjectURL(r.data as Blob); window.open(url, "_blank", "noopener"); setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch { setViewProblem("Could not open the file.") }
+  }
   const list = Array.isArray(q.data) ? q.data : []
   const set = (k: keyof EvidenceForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { setProblem(""); setForm(f => f && ({ ...f, [k]: e.target.value } as EvidenceForm)) }
   return (
@@ -43,16 +61,20 @@ export default function EvidenceModal({ deliveryId, label, canAdd, onClose }: { 
                 {e.status === "SUPERSEDED" && <Chip bg="var(--hf-surface-alt)" fg="var(--hf-text-muted)">Replaced</Chip>}
                 <span style={{ fontSize: 11.5, color: "var(--hf-text-muted)" }}>{when(e.capturedAt)}</span>
                 <span style={{ flex: 1 }} />
+                {e.fileStored && <button style={btnGhost} onClick={() => view(e)} aria-label={`View ${KIND_LABEL[e.kind]}`}>View</button>}
                 {canVerifyPerm && canVerify(e, me) && <button style={btnPrimary} disabled={verify.isPending} onClick={() => verify.mutate(e.id)} aria-label={`Verify ${KIND_LABEL[e.kind]}`}>Verify</button>}
                 {canManage && canReplace(e) && <button style={btnGhost} onClick={() => { setForm(emptyEvidence()); setReplacing(e) }} aria-label={`Replace ${KIND_LABEL[e.kind]}`}>Replace</button>}
               </div>
               <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>
-                {e.kind === "GPS" ? `${e.latitude}, ${e.longitude}${e.accuracyM != null ? ` (±${e.accuracyM} m)` : ""}` : e.fileRef}
+                {e.kind === "GPS" ? `${e.latitude}, ${e.longitude}${e.accuracyM != null ? ` (±${e.accuracyM} m)` : ""}` : e.fileRef}{e.fileStored && e.fileSizeBytes ? ` · ${sizeText(e.fileSizeBytes)}` : ""}
                 {e.note ? ` · ${e.note}` : ""}{e.supersededReason ? ` · Replaced: ${e.supersededReason}` : ""}
               </div>
             </div>
           ))}
           <ErrorLine error={verify.error} />
+          {viewProblem && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12 }}>{viewProblem}</p>}
+          {canAdd && !form && !uploading && <button style={{ ...btnGhost, marginTop: 12, marginRight: 8 }} onClick={() => setUploading(true)}>Upload photo or file</button>}
+          {uploading && <UploadBlock pending={upload.isPending} error={upload.error} onCancel={() => setUploading(false)} onSend={(kind, file, note) => upload.mutate({ kind, file, note })} />}
           {canAdd && !form && <button style={{ ...btnPrimary, marginTop: 12 }} onClick={() => setForm(emptyEvidence())}>Add evidence</button>}
           {form && !replacing && (
             <div style={{ marginTop: 12, borderTop: "1px solid var(--hf-border)", paddingTop: 12 }}>
@@ -115,6 +137,25 @@ function ReplaceBlock({ form, set, problem, pending, error, onCancel, onConfirm 
       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
         <button style={btnGhost} onClick={onCancel}>Cancel</button>
         <button style={btnPrimary} disabled={pending || reason.trim().length < 5} onClick={() => onConfirm(reason.trim())}>Replace evidence</button>
+      </div>
+    </div>
+  )
+}
+
+function UploadBlock({ pending, error, onCancel, onSend }: { pending: boolean; error: unknown; onCancel: () => void; onSend: (kind: string, file: File, note: string) => void }) {
+  const [kind, setKind] = useState("PHOTO"); const [file, setFile] = useState<File | null>(null); const [note, setNote] = useState(""); const [problem, setProblem] = useState("")
+  return (
+    <div style={{ marginTop: 12, borderTop: "1px solid var(--hf-border)", paddingTop: 12, display: "grid", gap: 8 }}>
+      <div><label style={labelStyle} htmlFor="up-kind">Type</label>
+        <select id="up-kind" style={{ ...inputStyle, width: "100%" }} value={kind} onChange={e => { setKind(e.target.value); setProblem("") }}>{UPLOAD_KINDS.map(k => <option key={k.code} value={k.code}>{k.label}</option>)}</select></div>
+      <div><label style={labelStyle} htmlFor="up-file">File (image{kind === "DOCUMENT" ? " or PDF" : ""}, up to 5 MB)</label>
+        <input id="up-file" type="file" accept={kind === "DOCUMENT" ? "image/jpeg,image/png,image/webp,application/pdf" : "image/jpeg,image/png,image/webp"} onChange={e => { setFile(e.target.files?.[0] ?? null); setProblem("") }} /></div>
+      <div><label style={labelStyle} htmlFor="up-note">Note (optional)</label><input id="up-note" style={{ ...inputStyle, width: "100%" }} maxLength={300} value={note} onChange={e => setNote(e.target.value)} /></div>
+      {problem && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12, margin: 0 }}>{problem}</p>}
+      <ErrorLine error={error} />
+      <div style={{ display: "flex", gap: 8 }}>
+        <button style={btnGhost} onClick={onCancel}>Cancel</button>
+        <button style={btnPrimary} disabled={pending} onClick={() => { const p = validateUpload(kind, file); if (p) return setProblem(p); onSend(kind, file as File, note) }}>Upload</button>
       </div>
     </div>
   )

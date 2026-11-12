@@ -77,6 +77,18 @@ public class FuelDeliveryEvidence {
     @Column(name = "verified_at")
     private Instant verifiedAt;
 
+    @Column(name = "file_stored", nullable = false)
+    private boolean fileStored;
+
+    @Column(name = "content_type", length = 100)
+    private String contentType;
+
+    @Column(name = "file_size_bytes")
+    private Integer fileSizeBytes;
+
+    @Column(name = "file_name", length = 120)
+    private String fileName;
+
     @Version
     private Long version;
 
@@ -99,6 +111,18 @@ public class FuelDeliveryEvidence {
             e.fileRef = fileRef.trim().length() > 500 ? fileRef.trim().substring(0, 500) : fileRef.trim();
         }
         e.note = note == null || note.isBlank() ? null : (note.trim().length() > 300 ? note.trim().substring(0, 300) : note.trim());
+        return e;
+    }
+
+    /** Evidence whose file sits in the shared file store under {@code storageKey}. GPS has no file. */
+    public static FuelDeliveryEvidence createFile(TenantId tenantId, UUID deliveryId, String kind, String storageKey, String contentType,
+                                                  int sizeBytes, String fileName, String note, UUID by) {
+        if ("GPS".equals(kind)) throw new IllegalArgumentException("A location record has no file.");
+        if (contentType == null || contentType.isBlank()) throw new IllegalArgumentException("The file type is unknown.");
+        if (sizeBytes <= 0) throw new IllegalArgumentException("The file is empty.");
+        FuelDeliveryEvidence e = create(tenantId, deliveryId, kind, storageKey, null, null, null, note, by);
+        e.fileStored = true; e.contentType = contentType; e.fileSizeBytes = sizeBytes;
+        e.fileName = fileName == null || fileName.isBlank() ? null : (fileName.length() > 120 ? fileName.substring(0, 120) : fileName);
         return e;
     }
 

@@ -8,7 +8,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.fuel.application.internal.FuelEvidenceFileService;
 import za.co.handyflow.platform.fuel.application.internal.FuelEvidenceService;
+import za.co.handyflow.platform.fuel.dto.EvidenceFileDtos.StoredFile;
+import za.co.handyflow.platform.fuel.dto.EvidenceFileDtos.Upload;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
 import za.co.handyflow.platform.fuel.application.internal.FuelVarianceService;
 import za.co.handyflow.platform.fuel.dto.FuelDistributionDtos.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -26,6 +35,7 @@ public class FuelDistributionController {
 
     private final FuelVarianceService variances;
     private final FuelEvidenceService evidence;
+    private final FuelEvidenceFileService evidenceFiles;
     private final FeatureGuard featureGuard;
 
     @GetMapping("/variances")
@@ -79,6 +89,53 @@ public class FuelDistributionController {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Evidence added",
                 evidence.addAsDriver(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id, req)));
+    }
+
+    @PostMapping(value = "/deliveries/{id}/evidence/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_DISTRIBUTION_MANAGE')")
+    public ResponseEntity<ApiResponse<EvidenceView>> addEvidenceFile(@PathVariable UUID id, @RequestParam("file") MultipartFile file, @RequestParam("kind") String kind,
+                                                                    @RequestParam(value = "note", required = false) String note, @RequestParam(value = "clientRequestId", required = false) UUID clientRequestId) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Evidence added",
+                evidenceFiles.addAsOffice(TenantContext.getTenantIdAsObject(), id, upload(file, kind, note, clientRequestId), TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping(value = "/driver/loads/{id}/evidence/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyAuthority('FUEL_DRIVER','FUEL_MANAGE','FUEL_DISTRIBUTION_MANAGE')")
+    public ResponseEntity<ApiResponse<EvidenceView>> addMyEvidenceFile(@PathVariable UUID id, @RequestParam("file") MultipartFile file, @RequestParam("kind") String kind,
+                                                                      @RequestParam(value = "note", required = false) String note, @RequestParam(value = "clientRequestId", required = false) UUID clientRequestId) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Evidence added",
+                evidenceFiles.addAsDriver(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id, upload(file, kind, note, clientRequestId))));
+    }
+
+    @GetMapping("/evidence/{id}/file")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<byte[]> evidenceFile(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return served(evidenceFiles.download(TenantContext.getTenantIdAsObject(), id));
+    }
+
+    @GetMapping("/driver/evidence/{id}/file")
+    @PreAuthorize("hasAnyAuthority('FUEL_DRIVER','FUEL_MANAGE','FUEL_DISTRIBUTION_MANAGE')")
+    public ResponseEntity<byte[]> myEvidenceFile(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return served(evidenceFiles.downloadAsDriver(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id));
+    }
+
+    private static Upload upload(MultipartFile file, String kind, String note, UUID clientRequestId) {
+        try { return new Upload(kind, file.getOriginalFilename(), file.getBytes(), note, clientRequestId); }
+        catch (IOException e) { throw new IllegalArgumentException("The file could not be read."); }
+    }
+
+    /** Served as an attachment-safe, never-sniffed, never-cached response: proof of delivery is private to the company. */
+    private static ResponseEntity<byte[]> served(StoredFile f) {
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(f.contentType()))
+                .header("X-Content-Type-Options", "nosniff")
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().filename(f.filename()).build().toString())
+                .cacheControl(CacheControl.noStore().cachePrivate())
+                .body(f.bytes());
     }
 
     @PostMapping("/evidence/{id}/supersede")

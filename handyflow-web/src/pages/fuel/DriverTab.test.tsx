@@ -3,8 +3,11 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import DriverTab from "./DriverTab"
 import { readQueue } from "./offlineQueue"
+import * as capture from "./evidenceCapture"
 
 const get = vi.fn(); const post = vi.fn()
+const photo = { dataUrl: "data:image/jpeg;base64,aGk=", name: "IMG_1.jpg" }
+const pick = (name = "Photo file", f = new File(["x"], "IMG_1.jpg", { type: "image/jpeg" })) => fireEvent.change(screen.getByLabelText(name), { target: { files: [f] } })
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a) } }))
 
 const load = (o: any = {}) => ({ id: "d1", status: "IN_TRANSIT", litresOrdered: 12000, fuelType: "DIESEL", scheduledAt: "2026-11-12T08:00:00Z", vehicleReg: "GP 12 AB", deliveryAddress: { street: "Gate 3" }, ...o })
@@ -155,5 +158,72 @@ describe("DriverTab", () => {
   it("says when nothing is allocated", async () => {
     loads = []; mount()
     await waitFor(() => screen.getByText(/No loads allocated to you/))
+  })
+
+  describe("photos and signatures", () => {
+    beforeEach(() => { vi.spyOn(capture, "shrinkImage").mockResolvedValue(photo) })
+    afterEach(() => vi.restoreAllMocks())
+
+    it("sends a photo as an upload to the driver's file endpoint", async () => {
+      mount(); await waitFor(() => screen.getByText("Take photo"))
+      pick()
+      await waitFor(() => expect(post).toHaveBeenCalled())
+      const [path, body] = post.mock.calls[0]
+      expect(path).toBe("/api/v1/fuel/driver/loads/d1/evidence/file")
+      expect(body).toBeInstanceOf(FormData); expect((body as FormData).get("kind")).toBe("PHOTO"); expect((body as FormData).get("clientRequestId")).toBeTruthy()
+      expect(((body as FormData).get("file") as File).name).toBe("IMG_1.jpg")
+      await waitFor(() => screen.getByText("Photo saved."))
+    })
+
+    it("a photo taken with no signal is kept with its file, and sent as an upload when back online", async () => {
+      post.mockRejectedValueOnce(new Error("Network Error"))
+      mount(); await waitFor(() => screen.getByText("Take photo"))
+      pick()
+      await waitFor(() => expect(readQueue()).toHaveLength(1))
+      expect(readQueue()[0].file).toEqual(photo); expect(readQueue()[0].label).toBe("Photo")
+      window.dispatchEvent(new Event("online"))
+      await waitFor(() => expect(readQueue()).toHaveLength(0))
+      const last = post.mock.calls[post.mock.calls.length - 1]
+      expect(last[1]).toBeInstanceOf(FormData)
+    })
+
+    it("says so when the phone has no room to keep a photo, and does not pretend it was saved", async () => {
+      post.mockRejectedValueOnce(new Error("Network Error"))
+      const set = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("QuotaExceededError") })
+      mount(); await waitFor(() => screen.getByText("Take photo"))
+      pick()
+      await waitFor(() => screen.getByRole("alert"))
+      expect(screen.getByRole("alert").textContent).toMatch(/no room to save the photo/)
+      expect(screen.queryByText(/saved on this phone/i)).toBeNull()
+      set.mockRestore()
+    })
+
+    it("a photo the browser cannot read is reported and nothing is sent", async () => {
+      vi.spyOn(capture, "shrinkImage").mockRejectedValue(new Error("bad"))
+      mount(); await waitFor(() => screen.getByText("Take photo"))
+      pick()
+      await waitFor(() => screen.getByRole("alert"))
+      expect(screen.getByRole("alert").textContent).toMatch(/Could not read that photo/); expect(post).not.toHaveBeenCalled()
+    })
+
+    it("a signature is drawn, then sent as a SIGNATURE upload", async () => {
+      vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, clearRect() {} } as any)
+      vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue("data:image/png;base64,aGk=")
+      mount(); await waitFor(() => screen.getByText("Get signature"))
+      fireEvent.click(screen.getByText("Get signature"))
+      const c = screen.getByLabelText("Signature pad")
+      fireEvent.pointerDown(c, { clientX: 5, clientY: 5, pointerId: 1 }); fireEvent.pointerMove(c, { clientX: 30, clientY: 20, pointerId: 1 })
+      fireEvent.click(screen.getByText("Save signature"))
+      await waitFor(() => expect(post).toHaveBeenCalled())
+      const [path, body] = post.mock.calls[0]
+      expect(path).toBe("/api/v1/fuel/driver/loads/d1/evidence/file"); expect((body as FormData).get("kind")).toBe("SIGNATURE")
+      await waitFor(() => expect(screen.queryByLabelText("Signature pad")).toBeNull())
+    })
+
+    it("photo and signature are not offered before the trip starts", async () => {
+      loads = [load({ status: "SCHEDULED" })]
+      mount(); await waitFor(() => screen.getByText("Start trip"))
+      expect(screen.queryByText("Take photo")).toBeNull(); expect(screen.queryByText("Get signature")).toBeNull()
+    })
   })
 })

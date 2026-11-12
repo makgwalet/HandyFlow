@@ -24,6 +24,7 @@ export interface Evidence {
   latitude?: number | null; longitude?: number | null; accuracyM?: number | null; note?: string | null
   capturedAt: string; capturedBy?: string | null; status: "ACTIVE" | "SUPERSEDED"; supersededReason?: string | null
   verifiedBy?: string | null; verifiedAt?: string | null; locked: boolean
+  fileStored?: boolean; contentType?: string | null; fileSizeBytes?: number | null
 }
 export interface EvidenceForm { kind: Evidence["kind"]; fileRef: string; latitude: string; longitude: string; accuracyM: string; note: string }
 export const emptyEvidence = (): EvidenceForm => ({ kind: "PHOTO", fileRef: "", latitude: "", longitude: "", accuracyM: "", note: "" })

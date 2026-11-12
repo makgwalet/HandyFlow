@@ -114,8 +114,10 @@ public class FuelEvidenceService {
         return evidence.findByIdForUpdate(tenantId, id).orElseThrow(() -> new ResourceNotFoundException("Evidence", id.toString()));
     }
 
-    private static EvidenceView view(FuelDeliveryEvidence e) {
-        return new EvidenceView(e.getId(), e.getDeliveryId(), e.getKind(), e.getFileRef(), e.getLatitude(), e.getLongitude(), e.getAccuracyM(), e.getNote(),
-                e.getCapturedAt(), e.getCapturedBy(), e.getStatus(), e.getSupersededReason(), e.getVerifiedBy(), e.getVerifiedAt(), e.isVerified());
+    /** A stored file shows its name, never the file store's internal key. */
+    static EvidenceView view(FuelDeliveryEvidence e) {
+        return new EvidenceView(e.getId(), e.getDeliveryId(), e.getKind(), e.isFileStored() ? e.getFileName() : e.getFileRef(), e.getLatitude(), e.getLongitude(), e.getAccuracyM(), e.getNote(),
+                e.getCapturedAt(), e.getCapturedBy(), e.getStatus(), e.getSupersededReason(), e.getVerifiedBy(), e.getVerifiedAt(), e.isVerified(),
+                e.isFileStored(), e.getContentType(), e.getFileSizeBytes());
     }
 }

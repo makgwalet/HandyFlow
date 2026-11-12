@@ -7,6 +7,8 @@ import { apiClient } from "../../api/client"
 import { btnPrimary, btnGhost, card, inputStyle, labelStyle } from "../warehousing/whseUi"
 import { fmtL } from "./orderOps"
 import { FAILURE_REASONS, validateFailure, windowText } from "./transportOps"
+import SignaturePad from "./SignaturePad"
+import { shrinkImage, uploadForm, type QueueFile } from "./evidenceCapture"
 import { enqueue, readQueue, flushQueue, remove, retry, isNetworkError, type QueueItem } from "./offlineQueue"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -17,13 +19,14 @@ export default function DriverTab() {
   const qc = useQueryClient()
   const [completing, setCompleting] = useState<string | null>(null)
   const [failing, setFailing] = useState<any | null>(null)
+  const [signing, setSigning] = useState<string | null>(null)
   const [fReason, setFReason] = useState(""); const [fNote, setFNote] = useState(""); const [fLitres, setFLitres] = useState("")
   const [litres, setLitres] = useState(""); const [receiver, setReceiver] = useState(""); const [meterEnd, setMeterEnd] = useState("")
   const [err, setErr] = useState(""); const [note, setNote] = useState("")
   const [pending, setPending] = useState<QueueItem[]>(() => readQueue())
   const loads = useQuery<any[]>({ queryKey: ["fuel-my-loads"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/driver/loads")) })
 
-  const send = useCallback((i: QueueItem) => apiClient.post(i.path, i.body ?? undefined), [])
+  const send = useCallback((i: QueueItem) => apiClient.post(i.path, i.file ? uploadForm(i.body, i.file) : (i.body ?? undefined)), [])
   // A start that was refused is fine if the load is already on the road (a repeat, or the office dispatched it).
   const alreadyDone = useCallback(async (i: QueueItem) => {
     if (i.kind !== "START") return false
@@ -41,12 +44,15 @@ export default function DriverTab() {
   useEffect(() => { flush(); window.addEventListener("online", flush); return () => window.removeEventListener("online", flush) }, [flush])
 
   /** Tries now. With no signal the action is saved on the phone; a refusal from the server is shown and not saved. */
-  const act = async (kind: QueueItem["kind"], deliveryId: string, path: string, body: Record<string, unknown> | null, label: string, done: string) => {
+  const act = async (kind: QueueItem["kind"], deliveryId: string, path: string, body: Record<string, unknown> | null, label: string, done: string, file: QueueFile | null = null) => {
     setErr(""); setNote("")
     const id = (body?.clientRequestId as string | undefined) ?? newId()
-    try { await apiClient.post(path, body ?? undefined); setNote(done); qc.invalidateQueries({ queryKey: ["fuel-my-loads"] }); return true }
+    try { await apiClient.post(path, file ? uploadForm(body, file) : (body ?? undefined)); setNote(done); qc.invalidateQueries({ queryKey: ["fuel-my-loads"] }); return true }
     catch (e: any) {
-      if (isNetworkError(e)) { enqueue({ id, kind, deliveryId, path, body, label }); setPending(readQueue()); setNote(`No signal. ${label} saved on this phone: it will be sent automatically when you are back online.`); return true }
+      if (isNetworkError(e)) {
+        const kept = enqueue({ id, kind, deliveryId, path, body, label, file })
+        if (!kept) { setErr(`This phone has no room to save the ${label.toLowerCase()}. Get a signal so the saved items can be sent, then try again.`); return false }
+        setPending(readQueue()); setNote(`No signal. ${label} saved on this phone: it will be sent automatically when you are back online.`); return true }
       setErr(e.response?.data?.message ?? `Could not record: ${label.toLowerCase()}`); return false
     }
   }
@@ -62,7 +68,21 @@ export default function DriverTab() {
     if (ok) reset()
   }
 
-  /** Records where the phone is now. A photo or signature needs file upload, which is not built yet. */
+  /** A photo from the camera (or gallery), shrunk, then sent now or kept on the phone. */
+  const takePhoto = async (id: string, f: File | undefined) => {
+    if (!f) return
+    setErr(""); setNote("Preparing photo…")
+    let file: QueueFile
+    try { file = await shrinkImage(f, f.name || "photo.jpg") } catch { setNote(""); return setErr("Could not read that photo. Try taking it again.") }
+    await act("EVIDENCE", id, `/api/v1/fuel/driver/loads/${id}/evidence/file`, { kind: "PHOTO", clientRequestId: newId() }, "Photo", "Photo saved.", file)
+  }
+
+  const saveSignature = async (id: string, dataUrl: string) => {
+    const ok = await act("EVIDENCE", id, `/api/v1/fuel/driver/loads/${id}/evidence/file`, { kind: "SIGNATURE", clientRequestId: newId() }, "Signature", "Signature saved.", { dataUrl, name: "signature.png" })
+    if (ok) setSigning(null)
+  }
+
+  /** Records where the phone is now. */
   const recordLocation = (id: string) => {
     setErr(""); setNote("")
     if (!("geolocation" in navigator)) return setErr("This phone cannot give its location.")
@@ -113,6 +133,15 @@ export default function DriverTab() {
             {l.status === "SCHEDULED" && !queuedKinds(l.id).has("START") && <button style={{ ...btnPrimary, width: "100%", padding: 12 }} onClick={() => start(l.id)}>Start trip</button>}
             {l.status === "IN_TRANSIT" && !closedOut(l.id) && completing !== l.id && <button style={{ ...btnPrimary, width: "100%", padding: 12 }} onClick={() => { setCompleting(l.id); setLitres(String(l.litresOrdered)) }}>Record delivery</button>}
             {l.status === "IN_TRANSIT" && completing !== l.id && <button style={{ ...btnGhost, width: "100%", padding: 12, marginTop: 8 }} onClick={() => recordLocation(l.id)}>Record location</button>}
+            {l.status === "IN_TRANSIT" && completing !== l.id && signing !== l.id && (
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <label style={{ ...btnGhost, flex: 1, padding: 12, textAlign: "center", cursor: "pointer" }}>Take photo
+                  <input type="file" accept="image/*" capture="environment" aria-label="Photo file" style={{ display: "none" }}
+                    onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; void takePhoto(l.id, f) }} />
+                </label>
+                <button style={{ ...btnGhost, flex: 1, padding: 12 }} onClick={() => { setErr(""); setNote(""); setSigning(l.id) }}>Get signature</button>
+              </div>)}
+            {signing === l.id && <div style={{ marginTop: 8 }}><SignaturePad onSave={d => saveSignature(l.id, d)} onCancel={() => setSigning(null)} /></div>}
             {l.status === "IN_TRANSIT" && completing !== l.id && failing?.id !== l.id && !closedOut(l.id) && <button style={{ ...btnGhost, width: "100%", padding: 12, marginTop: 8 }} onClick={() => setFailing(l)}>Could not deliver</button>}
             {failing?.id === l.id && (
               <div>

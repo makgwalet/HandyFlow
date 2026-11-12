@@ -22,4 +22,7 @@ public interface FuelDeliveryEvidenceRepository extends JpaRepository<FuelDelive
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT e FROM FuelDeliveryEvidence e WHERE e.tenantId = :tenantId AND e.id = :id")
     Optional<FuelDeliveryEvidence> findByIdForUpdate(TenantId tenantId, UUID id);
+
+    @Query("SELECT e FROM FuelDeliveryEvidence e WHERE e.tenantId = :tenantId AND e.id = :id")
+    Optional<FuelDeliveryEvidence> findOne(TenantId tenantId, UUID id);
 }

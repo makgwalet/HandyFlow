@@ -67,4 +67,14 @@ describe("offlineQueue (C05)", () => {
     expect(r.sent.map(x => x.id)).toEqual(["a"]); expect(r.failed).toEqual([]); expect(readQueue(s)).toEqual([])
   })
   it("tells network errors from server answers", () => { expect(isNetworkError(new Error("x"))).toBe(true); expect(isNetworkError({ response: { status: 409 } })).toBe(false) })
+
+  it("keeps a photo with its item, and reports when the phone has no room to keep it", () => {
+    const file = { dataUrl: "data:image/jpeg;base64,aGk=", name: "a.jpg" }
+    const kept = enqueue({ ...item("p1", "EVIDENCE", "d1"), file }, s)
+    expect(kept?.file).toEqual(file); expect(readQueue(s)[0].file).toEqual(file)
+    const full = { ...s, setItem: () => { throw new Error("QuotaExceededError") } }
+    expect(enqueue({ ...item("p2", "EVIDENCE", "d1"), file }, full)).toBeNull()
+    expect(readQueue(s).map(x => x.id)).toEqual(["p1"])
+  })
 })
+
