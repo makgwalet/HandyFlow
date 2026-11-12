@@ -318,6 +318,10 @@ public class ControlRoomService {
 
         log.warn("[Security] DURESS TRIGGERED eventId={} guard={} detail={}",
                 event.getId(), req.triggeredByGuardId(), req.protectionDetailId());
+        if (push != null) {
+            push.notifySiteSupervisorsOf(tenantId, req.triggeredByGuardId(), "PANIC ALERT",
+                    "A guard at your site pressed panic. Check the site overview and call the control room.", java.util.Map.of("screen", "Supervisor"));
+        }
 
         return event;
     }

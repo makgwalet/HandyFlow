@@ -92,4 +92,33 @@ class GuardPushServiceTest {
         verify(jdbc).update(contains("SET revoked_at = NOW()"), any(), eq("dev-1"), eq(TOKEN_A));
         verify(jdbc).update(contains("INSERT INTO security_guard_push_tokens"), any(), eq(guard), eq("dev-1"), eq(TOKEN_A));
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void everySupervisorOnDutyAtThePressersSiteIsAlerted() {
+        UUID sup1 = UUID.randomUUID();
+        UUID sup2 = UUID.randomUUID();
+        when(jdbc.query(contains("site_supervisor"), any(org.springframework.jdbc.core.RowMapper.class), any(), any(), any()))
+                .thenReturn(List.of(sup1, sup2));
+        when(jdbc.queryForList(anyString(), eq(String.class), any(), any())).thenReturn(List.of(TOKEN_A));
+        when(client.send(any())).thenReturn(List.of(new ExpoPushClient.Result(true, false, null)));
+
+        service(true).notifySiteSupervisorsOf(TENANT, guard, "PANIC ALERT", "x", Map.of("screen", "Supervisor"));
+
+        verify(client, times(2)).send(any());
+    }
+
+    @Test
+    void noSupervisorsOnDutyMeansNobodyIsAlertedAndNothingFails() {
+        when(jdbc.query(contains("site_supervisor"), any(org.springframework.jdbc.core.RowMapper.class), any(), any(), any()))
+                .thenReturn(List.of());
+        service(true).notifySiteSupervisorsOf(TENANT, guard, "PANIC ALERT", "x", Map.of());
+        verify(client, never()).send(any());
+    }
+
+    @Test
+    void supervisorAlertsAreOffWhenPushIsOff() {
+        service(false).notifySiteSupervisorsOf(TENANT, guard, "PANIC ALERT", "x", Map.of());
+        verify(jdbc, never()).query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), any(), any(), any());
+    }
 }

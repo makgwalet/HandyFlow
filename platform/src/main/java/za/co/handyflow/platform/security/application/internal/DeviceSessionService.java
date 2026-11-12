@@ -46,6 +46,10 @@ public class DeviceSessionService {
     private final PatrolRoundService        patrolRoundService;
     private final SiteRepository            siteRepository;
 
+    /** Optional so the service still builds without push (tests, installs with push off). Never throws. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private GuardPushService push;
+
     // ── Session Open ───────────────────────────────────────────────────────────
 
     /**
@@ -353,7 +357,12 @@ public class DeviceSessionService {
             throw new HandyFlowException("This item has already been returned.", HttpStatus.CONFLICT, "ALREADY_RETURNED");
         }
         custody.returnResource(condition, req.notes());
-        return custodyRepository.save(custody);
+        ResourceCustody saved = custodyRepository.save(custody);
+        if (condition == ResourceCustody.ConditionOnReturn.MISSING && push != null) {
+            push.notifySiteSupervisorsOf(tenantId, saved.getGuardId(), "Equipment reported missing",
+                    saved.getResourceRef() + " was returned as missing.", java.util.Map.of("screen", "Supervisor"));
+        }
+        return saved;
     }
 
     // ── Queries ────────────────────────────────────────────────────────────────

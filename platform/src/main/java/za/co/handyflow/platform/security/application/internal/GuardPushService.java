@@ -81,7 +81,35 @@ public class GuardPushService {
     /** Alert a guard on every phone they are signed in on. Never throws. Sent after the surrounding transaction commits. */
     public void notifyGuard(TenantId tenantId, UUID guardId, String title, String body, Map<String, String> data) {
         if (!enabled || guardId == null) return;
-        Runnable send = () -> executor.execute(() -> deliver(tenantId, guardId, title, body, data));
+        afterCommit(() -> deliver(tenantId, guardId, title, body, data), guardId);
+    }
+
+    /**
+     * Alert every site supervisor who is on duty at the site this guard is on shift at (not the guard themselves).
+     * Looked up after commit, so the request is not slowed down. A guard with no open shift alerts nobody.
+     */
+    public void notifySiteSupervisorsOf(TenantId tenantId, UUID subjectGuardId, String title, String body, Map<String, String> data) {
+        if (!enabled || subjectGuardId == null) return;
+        afterCommit(() -> {
+            try {
+                List<UUID> supervisors = jdbc.query("""
+                        SELECT DISTINCT g.id FROM security_guards g
+                          JOIN security_device_sessions ds ON ds.guard_id = g.id AND ds.ended_at IS NULL
+                          JOIN security_shifts s ON s.id = ds.shift_id
+                         WHERE g.tenant_id = ? AND g.site_supervisor = TRUE AND g.deleted_at IS NULL AND g.id <> ?
+                           AND s.site_id = (SELECT s2.site_id FROM security_device_sessions d2
+                                              JOIN security_shifts s2 ON s2.id = d2.shift_id
+                                             WHERE d2.guard_id = ? AND d2.ended_at IS NULL LIMIT 1)
+                        """, (rs, i) -> rs.getObject(1, UUID.class), tenantId.getValue(), subjectGuardId, subjectGuardId);
+                supervisors.forEach(id -> deliver(tenantId, id, title, body, data));
+            } catch (Exception e) {
+                log.warn("[Security] Could not alert site supervisors for guard={}: {}", subjectGuardId, e.toString());
+            }
+        }, subjectGuardId);
+    }
+
+    private void afterCommit(Runnable work, UUID guardId) {
+        Runnable send = () -> executor.execute(work);
         try {
             if (TransactionSynchronizationManager.isSynchronizationActive()) {
                 TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
