@@ -93,7 +93,16 @@ public class FuelEvidenceService {
         if (!CAPTURABLE.contains(d.getStatus())) {
             throw new IllegalStateException("Evidence can be added once a delivery is on the road or delivered. This one is " + d.getStatus().toLowerCase().replace('_', ' ') + ".");
         }
-        FuelDeliveryEvidence e = FuelDeliveryEvidence.create(tenantId, d.getId(), req.kind(), req.fileRef(), req.latitude(), req.longitude(), req.accuracyM(), req.note(), by);
+        // A replay of a request the server already saved (the phone never saw the reply) returns that record, not a second one.
+        if (req.clientRequestId() != null) {
+            var existing = evidence.findByClientRequest(tenantId, d.getId(), req.clientRequestId());
+            if (existing.isPresent()) {
+                log.info("Evidence request {} for delivery {} already saved; returning the first record", req.clientRequestId(), d.getId());
+                return view(existing.get());
+            }
+        }
+        FuelDeliveryEvidence e = FuelDeliveryEvidence.create(tenantId, d.getId(), req.kind(), req.fileRef(), req.latitude(), req.longitude(), req.accuracyM(), req.note(), by)
+                .withClientRequestId(req.clientRequestId());
         return view(evidence.save(e));
     }
 

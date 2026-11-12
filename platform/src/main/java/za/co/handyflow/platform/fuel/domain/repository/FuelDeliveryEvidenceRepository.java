@@ -16,6 +16,9 @@ public interface FuelDeliveryEvidenceRepository extends JpaRepository<FuelDelive
     @Query("SELECT e FROM FuelDeliveryEvidence e WHERE e.tenantId = :tenantId AND e.deliveryId = :deliveryId ORDER BY e.capturedAt ASC")
     List<FuelDeliveryEvidence> findByDelivery(TenantId tenantId, UUID deliveryId);
 
+    @Query("SELECT e FROM FuelDeliveryEvidence e WHERE e.tenantId = :tenantId AND e.deliveryId = :deliveryId AND e.clientRequestId = :clientRequestId")
+    Optional<FuelDeliveryEvidence> findByClientRequest(TenantId tenantId, UUID deliveryId, UUID clientRequestId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT e FROM FuelDeliveryEvidence e WHERE e.tenantId = :tenantId AND e.id = :id")
     Optional<FuelDeliveryEvidence> findByIdForUpdate(TenantId tenantId, UUID id);

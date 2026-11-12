@@ -20,8 +20,13 @@ public final class FuelDistributionDtos {
     public record NoteRequest(@NotBlank @Size(min = 5, max = 300, message = "Note must be 5 to 300 characters") String note) {}
     public record CloseVarianceRequest(@NotBlank String decision, @NotBlank @Size(min = 5, max = 300, message = "Note must be 5 to 300 characters") String note) {}
 
+    /** clientRequestId is made once by the phone and kept with a queued item, so a retry after a lost reply returns the first record instead of adding a second. */
     public record EvidenceRequest(@NotBlank String kind, @Size(max = 500) String fileRef, BigDecimal latitude, BigDecimal longitude,
-                                  BigDecimal accuracyM, @Size(max = 300) String note) {}
+                                  BigDecimal accuracyM, @Size(max = 300) String note, UUID clientRequestId) {
+        public EvidenceRequest(String kind, String fileRef, BigDecimal latitude, BigDecimal longitude, BigDecimal accuracyM, String note) {
+            this(kind, fileRef, latitude, longitude, accuracyM, note, null);
+        }
+    }
     public record SupersedeRequest(@NotBlank @Size(min = 5, max = 300, message = "Reason must be 5 to 300 characters") String reason, EvidenceRequest replacement) {}
 
     public record EvidenceView(UUID id, UUID deliveryId, String kind, String fileRef, BigDecimal latitude, BigDecimal longitude, BigDecimal accuracyM,

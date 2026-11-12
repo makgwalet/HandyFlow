@@ -1,7 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest"
-import { parseCapacities, validateTanker, autoSplit, validateAllocation, enqueue, fleetOptionText, readQueue, dequeue, flushQueue, isNetworkError, type Compartment } from "./transportOps"
+import { describe, it, expect } from "vitest"
+import { parseCapacities, validateTanker, autoSplit, validateAllocation, fleetOptionText, type Compartment } from "./transportOps"
 
-const mem = () => { const m: Record<string, string> = {}; return { getItem: (k: string) => m[k] ?? null, setItem: (k: string, v: string) => { m[k] = v } } }
 const comps: Compartment[] = [{ id: "c1", number: 1, capacityLitres: 10000 }, { id: "c2", number: 2, capacityLitres: 6000 }]
 
 describe("transportOps", () => {
@@ -25,35 +24,6 @@ describe("transportOps", () => {
     expect(validateAllocation("t", "d", 12000, { c1: "10000", c2: "1000" }, comps)).toMatch(/add up/)
     expect(validateAllocation("t", "d", 12000, { c1: "5000", c2: "7000" }, comps)).toMatch(/holds 6000/)
     expect(validateAllocation("t", "d", 12000, { c1: "10000", c2: "2000" }, comps)).toBeNull()
-  })
-  describe("offline queue", () => {
-    let s: ReturnType<typeof mem>
-    beforeEach(() => { s = mem() })
-    it("keeps the same request id on the queued item and replaces an older entry for the same delivery", () => {
-      enqueue("d1", { litresDelivered: 100 }, "id-1", s)
-      enqueue("d1", { litresDelivered: 120 }, "id-2", s)
-      const q = readQueue(s)
-      expect(q).toHaveLength(1)
-      expect(q[0].body.clientRequestId).toBe("id-2")
-      dequeue("d1", s); expect(readQueue(s)).toHaveLength(0)
-    })
-    it("survives corrupt storage", () => { s.setItem("fuel-driver-queue-v1", "{{"); expect(readQueue(s)).toEqual([]) })
-    it("sends in order, stops at a network failure and keeps the rest", async () => {
-      enqueue("d1", {}, "a", s); enqueue("d2", {}, "b", s); enqueue("d3", {}, "c", s)
-      const calls: string[] = []
-      const r = await flushQueue(async i => { calls.push(i.deliveryId); if (i.deliveryId === "d2") throw new Error("offline") }, s)
-      expect(calls).toEqual(["d1", "d2"])
-      expect(r.sent).toEqual(["d1"])
-      expect(readQueue(s).map(x => x.deliveryId)).toEqual(["d2", "d3"])
-    })
-    it("drops an item the server refused, reports it, and carries on", async () => {
-      enqueue("d1", {}, "a", s); enqueue("d2", {}, "b", s)
-      const r = await flushQueue(async i => { if (i.deliveryId === "d1") throw { response: { data: { message: "Already delivered" } } } }, s)
-      expect(r.refused).toEqual([{ deliveryId: "d1", message: "Already delivered" }])
-      expect(r.sent).toEqual(["d2"])
-      expect(readQueue(s)).toHaveLength(0)
-    })
-    it("tells network errors from server answers", () => { expect(isNetworkError(new Error("x"))).toBe(true); expect(isNetworkError({ response: { status: 409 } })).toBe(false) })
   })
 })
 

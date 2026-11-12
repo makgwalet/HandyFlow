@@ -59,6 +59,9 @@ public class FuelDeliveryEvidence {
     @Column(nullable = false, length = 12)
     private String status = "ACTIVE";
 
+    @Column(name = "client_request_id", updatable = false)
+    private UUID clientRequestId;
+
     @Column(name = "superseded_reason", length = 300)
     private String supersededReason;
 
@@ -76,6 +79,9 @@ public class FuelDeliveryEvidence {
 
     @Version
     private Long version;
+
+    /** Marks the record with the phone's request id so a replay of the same request can be recognised. Call before saving. */
+    public FuelDeliveryEvidence withClientRequestId(UUID id) { this.clientRequestId = id; return this; }
 
     public static FuelDeliveryEvidence create(TenantId tenantId, UUID deliveryId, String kind, String fileRef,
                                               BigDecimal latitude, BigDecimal longitude, BigDecimal accuracyM, String note, UUID by) {

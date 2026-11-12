@@ -1,4 +1,4 @@
-// Stage 3 helpers: tanker/compartment validation, load splitting, and the driver's offline queue.
+// Stage 3 helpers: tanker/compartment validation, load splitting. The driver's offline queue lives in offlineQueue.ts.
 export interface Compartment { id: string; number: number; capacityLitres: number }
 export interface Tanker { id: string; registration: string; name: string | null; active: boolean; totalCapacity: number; compartments: Compartment[]; openLoads: number
   fleetVehicleId?: string | null; fleetVehicleLabel?: string | null; fleetSuggestionId?: string | null; fleetSuggestionLabel?: string | null }
@@ -56,41 +56,4 @@ export function validateAllocation(tankerId: string, driverId: string, litres: n
   }
   if (Math.abs(total - litres) > 0.0001) return `The compartments add up to ${total} L but the load is ${litres} L.`
   return null
-}
-
-// ── Driver offline queue ────────────────────────────────────────────────────
-export interface QueuedCompletion { deliveryId: string; clientRequestId: string; body: Record<string, unknown>; queuedAt: string }
-const KEY = "fuel-driver-queue-v1"
-
-export function readQueue(storage: Pick<Storage, "getItem"> = localStorage): QueuedCompletion[] {
-  try { const v = JSON.parse(storage.getItem(KEY) ?? "[]"); return Array.isArray(v) ? v : [] } catch { return [] }
-}
-function write(q: QueuedCompletion[], storage: Pick<Storage, "setItem">) { try { storage.setItem(KEY, JSON.stringify(q)) } catch { /* storage full or blocked: nothing more we can do */ } }
-
-/** The id is made once per completion and kept with the queued item, so every retry carries the same one. */
-export function enqueue(deliveryId: string, body: Record<string, unknown>, id: string, storage: Pick<Storage, "getItem" | "setItem"> = localStorage): QueuedCompletion {
-  const q = readQueue(storage).filter(x => x.deliveryId !== deliveryId)
-  const item = { deliveryId, clientRequestId: id, body: { ...body, clientRequestId: id }, queuedAt: new Date().toISOString() }
-  write([...q, item], storage); return item
-}
-export const dequeue = (deliveryId: string, storage: Pick<Storage, "getItem" | "setItem"> = localStorage) =>
-  write(readQueue(storage).filter(x => x.deliveryId !== deliveryId), storage)
-
-/** A failed request with no response from the server (offline, timeout) is worth retrying; one the server answered is not. */
-export const isNetworkError = (e: any) => !e?.response
-
-/**
- * Sends what is queued. Network failures stop the run and keep the rest; a server refusal drops that item and
- * is reported, so a bad item can never block the ones behind it.
- */
-export async function flushQueue(send: (item: QueuedCompletion) => Promise<unknown>, storage: Pick<Storage, "getItem" | "setItem"> = localStorage) {
-  const sent: string[] = []; const refused: { deliveryId: string; message: string }[] = []
-  for (const item of readQueue(storage)) {
-    try { await send(item); dequeue(item.deliveryId, storage); sent.push(item.deliveryId) }
-    catch (e: any) {
-      if (isNetworkError(e)) break
-      dequeue(item.deliveryId, storage); refused.push({ deliveryId: item.deliveryId, message: e?.response?.data?.message ?? "The server refused this delivery." })
-    }
-  }
-  return { sent, refused }
 }

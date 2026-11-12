@@ -116,6 +116,28 @@ class FuelDistributionControlsServiceTest {
         assertThrows(IllegalStateException.class, () -> evidenceService.addAsOffice(T, cancelled.getId(), photoReq(), ALICE));
     }
 
+    @Test @DisplayName("C05: a replayed request returns the first record and saves nothing new; a new request id saves a new one")
+    void evidenceReplayIsIdempotent() {
+        FuelDelivery ok = delivery("DELIVERED", "1000", "1000");
+        UUID rid = UUID.randomUUID();
+        EvidenceRequest gps = new EvidenceRequest("GPS", null, new java.math.BigDecimal("-26.2"), new java.math.BigDecimal("28.0"), new java.math.BigDecimal("12"), null, rid);
+        FuelDeliveryEvidence first = FuelDeliveryEvidence.create(T, ok.getId(), "GPS", null, new java.math.BigDecimal("-26.2"), new java.math.BigDecimal("28.0"), new java.math.BigDecimal("12"), null, ALICE).withClientRequestId(rid);
+        when(evidence.findByClientRequest(T, ok.getId(), rid)).thenReturn(Optional.of(first));
+        EvidenceView again = evidenceService.addAsOffice(T, ok.getId(), gps, ALICE);
+        assertEquals(first.getId(), again.id());
+        verify(evidence, never()).save(any());
+        when(evidence.findByClientRequest(T, ok.getId(), rid)).thenReturn(Optional.empty());
+        evidenceService.addAsOffice(T, ok.getId(), gps, ALICE);
+        verify(evidence, times(1)).save(argThat((FuelDeliveryEvidence e) -> rid.equals(e.getClientRequestId())));
+    }
+
+    @Test @DisplayName("C05: a request with no id is never treated as a replay")
+    void noIdNoLookup() {
+        FuelDelivery ok = delivery("DELIVERED", "1000", "1000");
+        evidenceService.addAsOffice(T, ok.getId(), photoReq(), ALICE);
+        verify(evidence, never()).findByClientRequest(any(), any(), any());
+    }
+
     @Test @DisplayName("a driver can add evidence to their own load only; another driver's load looks missing")
     void driverOwnership() {
         EmployeeSummary me = new EmployeeSummary(DRIVER_EMP, "E1", "Dan", "Driver", "Dan Driver", null, null, "Driver", null, "ACTIVE");
