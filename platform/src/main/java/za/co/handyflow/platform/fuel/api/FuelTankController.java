@@ -62,6 +62,7 @@ public class FuelTankController {
     private final FuelSupplierApprovalService supplierApproval;
     private final FeatureGuard             featureGuard;
     private final DeliveryReceiptPdfService receiptPdfService;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelScopeService scopeService;
 
     // ── Tanks ─────────────────────────────────────────────────────────────────
 
@@ -69,8 +70,16 @@ public class FuelTankController {
     @PreAuthorize("hasAuthority('FUEL_READ')")
     public ResponseEntity<ApiResponse<List<TankResponse>>> getTanks() {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success(
-                fuelService.getTanks(TenantContext.getTenantIdAsObject())));
+        var tenant = TenantContext.getTenantIdAsObject();
+        var all = fuelService.getTanks(tenant);
+        var allowed = scopeService.allowedTankIds(tenant, userOrNull());
+        return ResponseEntity.ok(ApiResponse.success(allowed == null ? all : all.stream().filter(t -> allowed.contains(t.id())).toList()));
+    }
+
+    private static java.util.UUID userOrNull() {
+        String id = TenantContext.getUserId();
+        if (id == null || TenantContext.isImpersonation()) return null;
+        try { return java.util.UUID.fromString(id); } catch (IllegalArgumentException e) { return null; }
     }
 
     @GetMapping("/tanks/utilization-forecast")

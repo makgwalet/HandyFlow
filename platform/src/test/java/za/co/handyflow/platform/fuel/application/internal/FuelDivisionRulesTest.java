@@ -60,4 +60,10 @@ class FuelDivisionRulesTest {
 
     @Test @DisplayName("every division has a readable label")
     void labels() { for (FuelDivision d : FuelDivision.values()) assertFalse(FuelDivisionRules.label(d).isBlank()); }
+
+    @Test @DisplayName("8c: the load-returns API (the real path behind the Returned fuel screen) needs Distribution")
+    void loadReturnsGated() {
+        assertEquals(Set.of(DISTRIBUTION), req("/load-returns/outstanding"));
+        assertEquals(Set.of(DISTRIBUTION), req("/returned-fuel"));
+    }
 }

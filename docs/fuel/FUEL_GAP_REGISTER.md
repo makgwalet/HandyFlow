@@ -124,3 +124,6 @@ Built (patch 0806, no migration): a report that shares each route's recorded act
 
 ## Phase 8b - Route optimisation suggestion (2026-11-12)
 Built (patch 0807, V683): optional map position on customer sites; a suggested stop order for a route (straight-line cheapest insertion plus 2-opt, window order kept, only scheduled stops move; falls back to windows and stored distance when positions are missing). Suggestion only; applied with the existing stop-order call. Not built: road distances or traffic, arrival-time feasibility, capacity checks, stored depot position, map picker.
+
+## G01 scope - Division and depot access limits (2026-11-12, patch 0808)
+Built: per-user division and depot limits (V684), enforced in the Fuel interceptor; tank and depot lists filtered; Setup > Access limits screen. Also fixed the ungated `load-returns` API. Open: depot filtering of non-tank lists and reports; forecourt site depot (8d). See FUEL-PHASE8C-SCOPED-PERMISSIONS-NOTES-2026-11-12.md.

@@ -2,11 +2,13 @@ package za.co.handyflow.platform.fuel.api;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 import za.co.handyflow.platform.fuel.application.internal.FuelDivisionGuard;
 import za.co.handyflow.platform.fuel.application.internal.FuelDivisionRules;
+import za.co.handyflow.platform.fuel.application.internal.FuelScopeService;
 import za.co.handyflow.platform.shared.TenantContext;
 
 /**
@@ -20,16 +22,37 @@ public class FuelDivisionInterceptor implements HandlerInterceptor {
 
     private final FuelDivisionGuard guard;
 
+    private final FuelScopeService scopes;
+
     /** Lazy so controller slice tests, which do not contain the guard, still load. */
-    public FuelDivisionInterceptor(@Lazy FuelDivisionGuard guard) { this.guard = guard; }
+    @Autowired
+    public FuelDivisionInterceptor(@Lazy FuelDivisionGuard guard, @Lazy FuelScopeService scopes) { this.guard = guard; this.scopes = scopes; }
+
+    /** Division checks only, with no per-user limits. */
+    public FuelDivisionInterceptor(FuelDivisionGuard guard) { this.guard = guard; this.scopes = null; }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) return true;
         if (TenantContext.getTenantId() == null) return true;
-        var required = FuelDivisionRules.requirementFor(request.getRequestURI());
-        if (required.isEmpty()) return true;
-        guard.require(TenantContext.getTenantIdAsObject(), required);
+        var tenant = TenantContext.getTenantIdAsObject();
+        var path = request.getRequestURI();
+        var required = FuelDivisionRules.requirementFor(path);
+        if (!required.isEmpty()) guard.require(tenant, required);
+        if (scopes != null) {
+            // Per-user limits (Phase 8c). Only users the security chain has identified can have limits.
+            java.util.UUID user = currentUser();
+            if (user != null) {
+                scopes.requireDivision(tenant, user, required);
+                FuelScopeService.targetOf(path).ifPresent(t -> scopes.requireTarget(tenant, user, t));
+            }
+        }
         return true;
+    }
+
+    private static java.util.UUID currentUser() {
+        String id = TenantContext.getUserId();
+        if (id == null || TenantContext.isImpersonation()) return null;
+        try { return java.util.UUID.fromString(id); } catch (IllegalArgumentException e) { return null; }
     }
 }

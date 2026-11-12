@@ -298,6 +298,7 @@ export const FUEL_SECTIONS: ModuleSections = {
       label: 'Setup',
       sections: [
         { id: 'setup', label: 'Setup & divisions', icon: Layers, anyPermission: ['FUEL_CONFIGURATION_READ', 'FUEL_CONFIGURATION_MANAGE'] },
+        { id: 'access-limits', label: 'Access limits', icon: ShieldCheck, anyPermission: ['FUEL_CONFIGURATION_READ', 'FUEL_CONFIGURATION_MANAGE'] },
         { id: 'legal-entities', label: 'Legal entities', icon: Building2, anyPermission: ['FUEL_CONFIGURATION_READ', 'FUEL_CONFIGURATION_MANAGE'] },
         { id: 'settings', label: 'Settings', icon: Settings, permission: 'FUEL_MANAGE' },
       ],

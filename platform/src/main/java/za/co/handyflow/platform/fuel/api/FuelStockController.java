@@ -31,6 +31,7 @@ public class FuelStockController {
     private final FuelStockService stock;
     private final FuelStockAdjustmentApprovalService adjustments;
     private final FeatureGuard featureGuard;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelScopeService scopeService;
 
     // ── Depots ───────────────────────────────────────────────────────────────
 
@@ -38,7 +39,13 @@ public class FuelStockController {
     @PreAuthorize("hasAuthority('FUEL_READ')")
     public ResponseEntity<ApiResponse<List<DepotResponse>>> depots() {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success(stock.getDepots(TenantContext.getTenantIdAsObject())));
+        var tenant = TenantContext.getTenantIdAsObject();
+        var all = stock.getDepots(tenant);
+        String uid = TenantContext.getUserId();
+        java.util.UUID user = null;
+        if (uid != null && !TenantContext.isImpersonation()) { try { user = java.util.UUID.fromString(uid); } catch (IllegalArgumentException ignored) { } }
+        var allowed = scopeService.allowedDepotIds(tenant, user);
+        return ResponseEntity.ok(ApiResponse.success(allowed == null ? all : all.stream().filter(d -> allowed.contains(d.id())).toList()));
     }
 
     @PostMapping("/depots")
