@@ -184,7 +184,7 @@ public class FuelService {
         String lastSupplierName = null;
         BigDecimal lastPricePerLitre = null;
 
-        var lastReceipt = receiptRepository.findMostRecentForTank(tankId);
+        var lastReceipt = receiptRepository.findMostRecentForTank(tenantId, tankId);
         if (lastReceipt.isPresent()) {
             FuelReceipt receipt = lastReceipt.get();
             lastPricePerLitre = receipt.getPricePerLitre();

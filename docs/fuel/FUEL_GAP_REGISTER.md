@@ -59,3 +59,10 @@ Each row is a gap statement; the backend/frontend/database/permission/test lists
 - Not Fuel, not touched: `EventsSchemaAndSecurityGuardTest` (1), `ControllerAccessCoverageTest` also lists Admin pricing and Events controllers (7 files), `WhseFefoTest` (5).
 - **`ArchitectureVerificationTest` does not appear in the log, so A01 is still unverified.** Run `mvn -Dtest=ArchitectureVerificationTest test`.
 - H01 (controller, security, cross-tenant tests) still open.
+
+## H01 - Fuel security and cross-tenant tests (2026-11-12)
+- Status: tests written, NOT yet run by Maven (parse-checked only).
+- Production fix: `FuelReceiptRepository.findMostRecentForTank`, `findByTank` and `FuelDispatchRepository.findByTank` now filter by tenant; `FuelService` passes tenantId.
+- New tests: `FuelEndpointSecurityTest` (157 endpoints: @PreAuthorize, seeded authorities, no read-only guard on writes, requireModule per endpoint, no client-supplied tenantId) and `FuelRepositoryTenantScopingTest` (every @Query tenant-filtered or on a reviewed allow-list).
+- Known debt: `FuelPortalDataController` has no `requireModule("fuel")` (listed in controllers-without-module-guard.txt).
+- Not covered: MockMvc/runtime security behaviour and DB-level cross-tenant integration tests.

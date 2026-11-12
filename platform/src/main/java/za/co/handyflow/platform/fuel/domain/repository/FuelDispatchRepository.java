@@ -16,8 +16,8 @@ import java.util.UUID;
 
 public interface FuelDispatchRepository extends JpaRepository<FuelDispatch, UUID> {
 
-    @Query("SELECT d FROM FuelDispatch d WHERE d.tankId = :tankId AND d.deletedAt IS NULL ORDER BY d.dispatchedAt DESC")
-    Page<FuelDispatch> findByTank(UUID tankId, Pageable pageable);
+    @Query("SELECT d FROM FuelDispatch d WHERE d.tenantId = :tenantId AND d.tankId = :tankId AND d.deletedAt IS NULL ORDER BY d.dispatchedAt DESC")
+    Page<FuelDispatch> findByTank(TenantId tenantId, UUID tankId, Pageable pageable);
 
     @Query("SELECT d FROM FuelDispatch d WHERE d.tenantId = :tenantId AND d.deletedAt IS NULL ORDER BY d.dispatchedAt DESC")
     Page<FuelDispatch> findAllActive(TenantId tenantId, Pageable pageable);
