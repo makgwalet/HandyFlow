@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.fuel.application.internal.FuelRouteOptimiserService;
 import za.co.handyflow.platform.fuel.application.internal.FuelRouteService;
 import za.co.handyflow.platform.fuel.dto.RouteDtos.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -26,6 +27,7 @@ import java.util.UUID;
 public class FuelRouteController {
 
     private final FuelRouteService routes;
+    private final FuelRouteOptimiserService optimiser;
     private final FeatureGuard featureGuard;
 
     @GetMapping
@@ -40,6 +42,15 @@ public class FuelRouteController {
     public ResponseEntity<ApiResponse<RouteView>> get(@PathVariable UUID id) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(routes.get(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    /** Phase 8b: a suggested stop order. Nothing is saved; apply it with PUT /{id}/stop-order. Optional start point (the depot) as startLat and startLng. */
+    @GetMapping("/{id}/suggested-order")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<SuggestedOrder>> suggestedOrder(@PathVariable UUID id,
+            @RequestParam(required = false) java.math.BigDecimal startLat, @RequestParam(required = false) java.math.BigDecimal startLng) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(optimiser.suggest(TenantContext.getTenantIdAsObject(), id, startLat, startLng)));
     }
 
     @PostMapping

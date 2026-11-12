@@ -77,6 +77,7 @@ public class FuelCustomerService {
         FuelCustomerSite s = sites.save(FuelCustomerSite.create(tenantId, accountId, req.name(), req.address(),
                 req.contactName(), req.contactPhone(), req.deliveryInstructions(), req.operatingHours()));
         s.setDistanceKm(req.distanceKm());
+        s.setCoordinates(req.latitude(), req.longitude());
         return toResponse(sites.save(s));
     }
 
@@ -85,6 +86,7 @@ public class FuelCustomerService {
         FuelCustomerSite s = findSite(tenantId, siteId);
         s.update(req.name(), req.address(), req.contactName(), req.contactPhone(), req.deliveryInstructions(), req.operatingHours());
         s.setDistanceKm(req.distanceKm());
+        s.setCoordinates(req.latitude(), req.longitude());
         return toResponse(sites.save(s));
     }
 
@@ -112,6 +114,6 @@ public class FuelCustomerService {
 
     private CustomerSiteResponse toResponse(FuelCustomerSite s) {
         return new CustomerSiteResponse(s.getId(), s.getAccountId(), s.getName(), s.getAddress(), s.getContactName(),
-                s.getContactPhone(), s.getDeliveryInstructions(), s.getOperatingHours(), s.getDistanceKm());
+                s.getContactPhone(), s.getDeliveryInstructions(), s.getOperatingHours(), s.getDistanceKm(), s.getLatitude(), s.getLongitude());
     }
 }

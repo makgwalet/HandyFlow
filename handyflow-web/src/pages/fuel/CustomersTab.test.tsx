@@ -108,6 +108,22 @@ describe("CustomersTab", () => {
     fireEvent.click(screen.getByText("Save site"))
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/customer-accounts/a1/sites", expect.objectContaining({ name: "Pit 2" })))
   })
+
+  it("saves a site's optional map position, and refuses half of one", async () => {
+    mount()
+    await waitFor(() => screen.getByText("Gold Mine Ltd"))
+    fireEvent.click(screen.getByText("Gold Mine Ltd"))
+    await waitFor(() => screen.getByText("Pit 1"))
+    fireEvent.click(screen.getByText("Add site"))
+    fireEvent.change(screen.getByLabelText("Site name"), { target: { value: "Pit 3" } })
+    fireEvent.change(screen.getByLabelText("Latitude"), { target: { value: "-26.2" } })
+    fireEvent.click(screen.getByText("Save site"))
+    expect(screen.getByRole("alert").textContent).toMatch(/both latitude and longitude/)
+    expect(post).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText("Longitude"), { target: { value: "28.05" } })
+    fireEvent.click(screen.getByText("Save site"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/customer-accounts/a1/sites", expect.objectContaining({ name: "Pit 3", latitude: -26.2, longitude: 28.05 })))
+  })
   it("invites a contact to the portal and can revoke access", async () => {
     const grants = [{ id: "g1", inviteEmail: "old@gold.co.za", status: "ACTIVE", invitedAt: null, acceptedAt: null, revokedAt: null }]
     const base = get.getMockImplementation()!

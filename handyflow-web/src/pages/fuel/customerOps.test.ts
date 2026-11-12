@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { validateDistance, validateAccount, validateHold, validateSite, deliverable, typeLabel, fmtR, type CustomerAccount } from "./customerOps"
+import { validateCoordinates, validateDistance, validateAccount, validateHold, validateSite, deliverable, typeLabel, fmtR, type CustomerAccount } from "./customerOps"
 
 describe("customerOps", () => {
   it("validates account fields", () => {
@@ -26,5 +26,13 @@ describe("customerOps", () => {
   it("a site distance may be blank, otherwise 0 to 5000 km", () => {
     expect(validateDistance("")).toBeNull(); expect(validateDistance("42.5")).toBeNull(); expect(validateDistance("0")).toBeNull()
     expect(validateDistance("-1")).toMatch(/5000/); expect(validateDistance("5001")).toMatch(/5000/); expect(validateDistance("far")).toMatch(/5000/)
+  })
+  it("accepts a map position that is blank or complete and in range", () => {
+    expect(validateCoordinates("", "")).toBeNull()
+    expect(validateCoordinates("-26.2041", "28.0473")).toBeNull()
+    expect(validateCoordinates("-26.2", "")).toMatch(/both latitude and longitude/)
+    expect(validateCoordinates("95", "28")).toMatch(/Latitude/)
+    expect(validateCoordinates("-26", "200")).toMatch(/Longitude/)
+    expect(validateCoordinates("abc", "28")).toMatch(/Latitude/)
   })
 })

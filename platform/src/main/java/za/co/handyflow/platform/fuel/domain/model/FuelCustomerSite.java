@@ -48,6 +48,11 @@ public class FuelCustomerSite {
     @Column(name = "distance_km", precision = 8, scale = 1)
     private java.math.BigDecimal distanceKm;
 
+    /** Optional map position, used only to suggest a stop order. Both or neither. */
+    @Column(precision = 9, scale = 6)
+    private java.math.BigDecimal latitude;
+    @Column(precision = 9, scale = 6)
+    private java.math.BigDecimal longitude;
     @Column(nullable = false)
     private boolean active = true;
 
@@ -85,6 +90,12 @@ public class FuelCustomerSite {
         this.distanceKm = km; this.updatedAt = Instant.now();
     }
 
+    public void setCoordinates(java.math.BigDecimal lat, java.math.BigDecimal lng) {
+        if ((lat == null) != (lng == null)) throw new IllegalArgumentException("Give both latitude and longitude, or neither.");
+        if (lat != null && lat.abs().compareTo(new java.math.BigDecimal("90")) > 0) throw new IllegalArgumentException("Latitude must be between -90 and 90.");
+        if (lng != null && lng.abs().compareTo(new java.math.BigDecimal("180")) > 0) throw new IllegalArgumentException("Longitude must be between -180 and 180.");
+        this.latitude = lat; this.longitude = lng; this.updatedAt = Instant.now();
+    }
     public void softDelete() { this.deletedAt = Instant.now(); this.active = false; this.updatedAt = Instant.now(); }
 
     @PreUpdate

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import { fmtL } from "./orderOps"
+import { canSuggest, movedCount, suggestedIds, suggestionHeadline, type SuggestedOrder } from "./routeSuggestOps"
 import { autoSplit, moveStop, routable, routeStateLabel, windowText, type Driver, type PlanLoad, type RouteView, type Tanker } from "./transportOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -16,6 +17,7 @@ export default function RoutesPanel({ date, loads, tankers, canManage, onChanged
   const [creating, setCreating] = useState(false)
   const [adding, setAdding] = useState<RouteView | null>(null)
   const [cancelling, setCancelling] = useState<RouteView | null>(null)
+  const [suggesting, setSuggesting] = useState<RouteView | null>(null)
   const [err, setErr] = useState("")
   const routes = useQuery<RouteView[]>({ queryKey: ["fuel-routes", date], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/routes", { params: { date } })) })
   const refresh = () => { qc.invalidateQueries({ queryKey: ["fuel-routes"] }); onChanged() }
@@ -67,12 +69,14 @@ export default function RoutesPanel({ date, loads, tankers, canManage, onChanged
             {canManage && r.state !== "CANCELLED" && (
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                 <button style={btnGhost} onClick={() => setAdding(r)}>Add stop</button>
+                {canSuggest(r.stops) && <button style={btnGhost} onClick={() => setSuggesting(r)}>Suggest order</button>}
                 {r.stops.every(s => s.status === "SCHEDULED") && <button style={btnGhost} onClick={() => setCancelling(r)}>Cancel route</button>}
               </div>
             )}
           </div>
         ))}
       {creating && <NewRouteDialog date={date} tankers={tankers} onDone={refresh} onClose={() => setCreating(false)} />}
+      {suggesting && <SuggestDialog route={suggesting} busy={order.isPending} onApply={ids => order.mutate({ id: suggesting.id, ids }, { onSuccess: () => setSuggesting(null) })} onClose={() => setSuggesting(null)} />}
       {adding && <AddStopDialog route={adding} loads={routable(loads)} tanker={tankers.find(t => t.id === adding.tankerId)} onDone={refresh} onClose={() => setAdding(null)} />}
       {cancelling && <CancelRouteDialog route={cancelling} onDone={refresh} onClose={() => setCancelling(null)} />}
     </div>
@@ -160,6 +164,34 @@ function CancelRouteDialog({ route, onDone, onClose }: { route: RouteView; onDon
         <button style={btnGhost} onClick={onClose}>Back</button>
         <button style={btnPrimary} disabled={save.isPending} onClick={() => { if (!reason.trim()) return setErr("Give a reason."); setErr(""); save.mutate() }}>Cancel route</button>
       </div>
+    </Modal>
+  )
+}
+
+
+function SuggestDialog({ route, busy, onApply, onClose }: { route: RouteView; busy: boolean; onApply: (ids: string[]) => void; onClose: () => void }) {
+  const q = useQuery<SuggestedOrder>({ queryKey: ["fuel-route-suggestion", route.id], gcTime: 0, queryFn: async () => unwrap(await apiClient.get(`/api/v1/fuel/routes/${route.id}/suggested-order`)) })
+  const o = q.data
+  return (
+    <Modal title="Suggested stop order" onClose={onClose}>
+      {q.isLoading ? <p style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>Working out an order…</p> : q.isError || !o ? <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 13 }}>Could not work out an order.</p> : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>{suggestionHeadline(o)}</p>
+          <ol style={{ margin: 0, paddingLeft: 20, fontSize: 13 }}>
+            {o.stops.map(s => (
+              <li key={s.deliveryId} style={{ padding: "3px 0" }}>
+                {s.customerName ?? "Walk-in"}{s.moved ? <span style={{ color: "var(--hf-text-muted)" }}> (was stop {s.previousSequence})</span> : null}{!s.movable ? <span style={{ color: "var(--hf-text-muted)" }}> (stays: {s.status.toLowerCase().replace("_", " ")})</span> : null}
+              </li>
+            ))}
+          </ol>
+          {o.sitesWithoutPoint.length > 0 && <p role="status" style={{ margin: 0, fontSize: 12.5, color: "var(--hf-warning-text-strong)" }}>No map position for: {o.sitesWithoutPoint.join(", ")}.</p>}
+          <p style={{ margin: 0, fontSize: 12, color: "var(--hf-text-muted)" }}>{o.note}</p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <button style={btnGhost} onClick={onClose}>Keep my order</button>
+            <button style={btnPrimary} disabled={!o.changed || busy} onClick={() => onApply(suggestedIds(o))}>Use this order{o.changed ? ` (${movedCount(o)} moved)` : ""}</button>
+          </div>
+        </div>
+      )}
     </Modal>
   )
 }

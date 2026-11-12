@@ -10,5 +10,11 @@ public record CustomerSiteRequest(
         @Size(max = 30) String contactPhone,
         @Size(max = 500) String deliveryInstructions,
         @Size(max = 100) String operatingHours,
-        @jakarta.validation.constraints.DecimalMin("0") @jakarta.validation.constraints.DecimalMax("5000") java.math.BigDecimal distanceKm
-) {}
+        @jakarta.validation.constraints.DecimalMin("0") @jakarta.validation.constraints.DecimalMax("5000") java.math.BigDecimal distanceKm,
+        java.math.BigDecimal latitude,
+        java.math.BigDecimal longitude
+) {
+    public CustomerSiteRequest(String name, String address, String contactName, String contactPhone, String deliveryInstructions, String operatingHours, java.math.BigDecimal distanceKm) {
+        this(name, address, contactName, contactPhone, deliveryInstructions, operatingHours, distanceKm, null, null);
+    }
+}

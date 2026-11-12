@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
-import { CUSTOMER_TYPES, typeLabel, fmtR, validateAccount, validateHold, validateSite, validateDistance, type CustomerAccount, type CustomerSite } from "./customerOps"
+import { CUSTOMER_TYPES, typeLabel, fmtR, validateAccount, validateHold, validateSite, validateDistance, validateCoordinates, type CustomerAccount, type CustomerSite } from "./customerOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const msg = (e: any, fallback: string) => e?.response?.data?.message ?? fallback
@@ -209,12 +209,12 @@ function HoldDialog({ account, onDone, onClose }: { account: CustomerAccount; on
 }
 
 function SiteDialog({ account, site, onDone, onClose }: { account: CustomerAccount; site?: CustomerSite; onDone: () => void; onClose: () => void }) {
-  const [f, setF] = useState({ name: site?.name ?? "", address: site?.address ?? "", contactName: site?.contactName ?? "", contactPhone: site?.contactPhone ?? "", deliveryInstructions: site?.deliveryInstructions ?? "", operatingHours: site?.operatingHours ?? "", distanceKm: site?.distanceKm == null ? "" : String(site.distanceKm) })
+  const [f, setF] = useState({ name: site?.name ?? "", address: site?.address ?? "", contactName: site?.contactName ?? "", contactPhone: site?.contactPhone ?? "", deliveryInstructions: site?.deliveryInstructions ?? "", operatingHours: site?.operatingHours ?? "", distanceKm: site?.distanceKm == null ? "" : String(site.distanceKm), latitude: site?.latitude == null ? "" : String(site.latitude), longitude: site?.longitude == null ? "" : String(site.longitude) })
   const [err, setErr] = useState("")
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF(s => ({ ...s, [k]: e.target.value }))
   const save = useMutation({
     mutationFn: () => {
-      const body = { ...f, distanceKm: f.distanceKm.trim() === "" ? null : Number(f.distanceKm) }
+      const body = { ...f, distanceKm: f.distanceKm.trim() === "" ? null : Number(f.distanceKm), latitude: f.latitude.trim() === "" ? null : Number(f.latitude), longitude: f.longitude.trim() === "" ? null : Number(f.longitude) }
       return site ? apiClient.put(`/api/v1/fuel/customer-sites/${site.id}`, body) : apiClient.post(`/api/v1/fuel/customer-accounts/${account.id}/sites`, body)
     },
     onSuccess: () => { onDone(); onClose() }, onError: (e: any) => setErr(msg(e, "Could not save the site")),
@@ -235,10 +235,18 @@ function SiteDialog({ account, site, onDone, onClose }: { account: CustomerAccou
           <input aria-label="Distance km" inputMode="decimal" value={f.distanceKm} onChange={set("distanceKm")} style={inputStyle} />
           <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 3 }}>Used for cost-to-serve. Leave blank if you do not know; those deliveries are then shown without a vehicle cost.</div>
         </div>
+        <div>
+          <label style={labelStyle}>Map position (optional)</label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <input aria-label="Latitude" inputMode="decimal" placeholder="Latitude, e.g. -26.2041" value={f.latitude} onChange={set("latitude")} style={inputStyle} />
+            <input aria-label="Longitude" inputMode="decimal" placeholder="Longitude, e.g. 28.0473" value={f.longitude} onChange={set("longitude")} style={inputStyle} />
+          </div>
+          <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 3 }}>Used only to suggest a stop order on a route. Give both or leave both blank.</div>
+        </div>
         {err && <Err text={err} />}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button style={btnGhost} onClick={onClose}>Cancel</button>
-          <button style={btnPrimary} disabled={save.isPending} onClick={() => { const v = validateSite(f.name) ?? validateDistance(f.distanceKm); if (v) return setErr(v); setErr(""); save.mutate() }}>Save site</button>
+          <button style={btnPrimary} disabled={save.isPending} onClick={() => { const v = validateSite(f.name) ?? validateDistance(f.distanceKm) ?? validateCoordinates(f.latitude, f.longitude); if (v) return setErr(v); setErr(""); save.mutate() }}>Save site</button>
         </div>
       </div>
     </Modal>

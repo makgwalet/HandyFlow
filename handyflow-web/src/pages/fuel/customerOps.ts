@@ -1,5 +1,5 @@
 // Stage 1B helpers: customer account types and validation mirroring the server rules.
-export interface CustomerSite { id: string; accountId: string; name: string; address: string | null; contactName: string | null; contactPhone: string | null; deliveryInstructions: string | null; operatingHours: string | null; distanceKm?: number | null }
+export interface CustomerSite { id: string; accountId: string; name: string; address: string | null; contactName: string | null; contactPhone: string | null; deliveryInstructions: string | null; operatingHours: string | null; distanceKm?: number | null; latitude?: number | null; longitude?: number | null }
 export interface CustomerAccount {
   id: string; crmCustomerId: string; customerName: string; customerType: string; creditLimit: number
   paymentTermsDays: number; creditHold: boolean; creditHoldReason: string | null; licenceNumber: string | null
@@ -42,3 +42,14 @@ export function validateDistance(km: string): string | null {
 
 /** Accounts a delivery can be scheduled for: those not on credit hold. */
 export const deliverable = (accounts: CustomerAccount[]) => accounts.filter(a => !a.creditHold)
+
+/** Both blank, or both a valid position. Used only to suggest a stop order. */
+export function validateCoordinates(lat: string, lng: string): string | null {
+  const a = lat.trim(), b = lng.trim()
+  if (a === "" && b === "") return null
+  if (a === "" || b === "") return "Give both latitude and longitude, or leave both blank."
+  const la = Number(a), lo = Number(b)
+  if (Number.isNaN(la) || la < -90 || la > 90) return "Latitude must be between -90 and 90."
+  if (Number.isNaN(lo) || lo < -180 || lo > 180) return "Longitude must be between -180 and 180."
+  return null
+}

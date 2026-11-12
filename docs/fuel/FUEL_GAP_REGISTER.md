@@ -121,3 +121,6 @@ Built (patch 0803, V682): Fuel-owned multi-night parking for the Truck Stop divi
 
 ## Phase 8a - Route cost by customer (2026-11-12)
 Built (patch 0806, no migration): a report that shares each route's recorded actual cost across the customers delivered to, by litres, equal per stop, or site distance, chosen per report. Cent-exact, skips routes with no recorded actuals, never estimates. Not built: posting to invoices or statements, a saved default method, export.
+
+## Phase 8b - Route optimisation suggestion (2026-11-12)
+Built (patch 0807, V683): optional map position on customer sites; a suggested stop order for a route (straight-line cheapest insertion plus 2-opt, window order kept, only scheduled stops move; falls back to windows and stored distance when positions are missing). Suggestion only; applied with the existing stop-order call. Not built: road distances or traffic, arrival-time feasibility, capacity checks, stored depot position, map picker.

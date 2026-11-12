@@ -118,4 +118,44 @@ describe("RoutesPanel", () => {
     expect(screen.queryByText("New route")).toBeNull(); expect(screen.queryByText("Add stop")).toBeNull(); expect(screen.queryByLabelText("Move stop 1 down")).toBeNull()
     expect(screen.getByText(/Cancelled: Fuel shortage/)).toBeTruthy()
   })
+  const suggestion = (o: any = {}) => ({ routeId: "r1", method: "STRAIGHT_LINE", changed: true, currentKm: 60, suggestedKm: 48.5, savingKm: 11.5, sitesWithoutPoint: [], note: "Straight-line distances, so shorter than by road and blind to traffic.",
+    stops: [{ deliveryId: "b", sequence: 1, previousSequence: 2, customerName: "Cust b", status: "SCHEDULED", movable: true, moved: true, windowStart: null, windowEnd: null, hasPoint: true },
+            { deliveryId: "a", sequence: 2, previousSequence: 1, customerName: "Cust a", status: "SCHEDULED", movable: true, moved: true, windowStart: null, windowEnd: null, hasPoint: true }], ...o })
+  const withSuggestion = (o: any = {}) => get.mockImplementation(async (u: string) => u.endsWith("/drivers") ? { data: { data: [] } } : u.endsWith("/suggested-order") ? { data: { data: suggestion(o) } } : { data: { data: routes } })
+
+  it("shows a suggested order and applies it with the normal stop-order call", async () => {
+    withSuggestion(); mount()
+    await waitFor(() => screen.getByText("Suggest order"))
+    fireEvent.click(screen.getByText("Suggest order"))
+    await waitFor(() => screen.getByText(/11\.5 km shorter/))
+    expect(get.mock.calls.some(c => c[0] === "/api/v1/fuel/routes/r1/suggested-order")).toBe(true)
+    fireEvent.click(screen.getByText(/Use this order \(2 moved\)/))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/routes/r1/stop-order", { deliveryIds: ["b", "a"] }))
+  })
+
+  it("keeping my order saves nothing", async () => {
+    withSuggestion(); mount()
+    await waitFor(() => screen.getByText("Suggest order"))
+    fireEvent.click(screen.getByText("Suggest order"))
+    await waitFor(() => screen.getByText(/km shorter/))
+    fireEvent.click(screen.getByText("Keep my order"))
+    expect(put).not.toHaveBeenCalled()
+  })
+
+  it("names the sites with no map position and cannot apply an unchanged order", async () => {
+    withSuggestion({ method: "WINDOWS_AND_DISTANCE", changed: false, savingKm: null, currentKm: null, suggestedKm: null, sitesWithoutPoint: ["Cust a"], note: "Some sites have no map position." }); mount()
+    await waitFor(() => screen.getByText("Suggest order"))
+    fireEvent.click(screen.getByText("Suggest order"))
+    await waitFor(() => screen.getByText(/No map position for: Cust a/))
+    expect((screen.getByText(/Use this order/) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it("offers no suggestion when fewer than two stops can still move, or without the manage permission", async () => {
+    routes = [route({ stops: [stop("a", 1, "DELIVERED"), stop("b", 2)] })]; withSuggestion(); mount()
+    await waitFor(() => screen.getByText(/Morning run/))
+    expect(screen.queryByText("Suggest order")).toBeNull()
+    cleanup(); routes = [route()]; canManage = false; withSuggestion(); mount()
+    await waitFor(() => screen.getByText(/Morning run/))
+    expect(screen.queryByText("Suggest order")).toBeNull()
+  })
 })
