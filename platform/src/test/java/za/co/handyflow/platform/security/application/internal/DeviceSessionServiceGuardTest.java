@@ -225,4 +225,49 @@ class DeviceSessionServiceGuardTest {
         assertThat(s.getShiftId()).isEqualTo(mine.getId());
         assertThat(s.getStartGeofenceOk()).isTrue();
     }
+
+    private za.co.handyflow.platform.security.domain.model.Shift myShiftStartingInMinutes(long minutes) {
+        SecurityDevice personal = mock(SecurityDevice.class);
+        when(personal.getId()).thenReturn(UUID.randomUUID());
+        when(personal.isActive()).thenReturn(true);
+        when(personal.getSiteId()).thenReturn(null);
+        when(devices.findByTenantIdAndDeviceHardwareId(TENANT, "hw-1")).thenReturn(Optional.of(personal));
+        za.co.handyflow.platform.security.domain.model.Shift s = mock(za.co.handyflow.platform.security.domain.model.Shift.class);
+        when(s.getId()).thenReturn(UUID.randomUUID());
+        when(s.getGuardId()).thenReturn(me);
+        when(s.getSiteId()).thenReturn(siteId);
+        when(s.getStartAt()).thenReturn(java.time.Instant.now().plusSeconds(minutes * 60));
+        when(shifts.findScheduledStartingBefore(any(), any())).thenReturn(List.of(s));
+        return s;
+    }
+
+    private void siteWindow(Integer minutes) {
+        deviceAtSiteWithPosition("-26.2041", "28.0473");
+        Site site = mock(Site.class);
+        when(site.getLatitude()).thenReturn(new BigDecimal("-26.2041"));
+        when(site.getLongitude()).thenReturn(new BigDecimal("28.0473"));
+        when(site.getClockInWindowMinutes()).thenReturn(minutes);
+        when(sites.findActiveById(TENANT, siteId)).thenReturn(Optional.of(site));
+    }
+
+    @Test
+    void aShiftTwoHoursAwayIsNotLinkedUnderTheDefaultWindow() {
+        siteWindow(null);
+        myShiftStartingInMinutes(-120);
+        assertThat(openAndCapture(new GuardOpenSessionRequest("hw-1", null, null, null)).getShiftId()).isNull();
+    }
+
+    @Test
+    void aSiteWithALongerWindowLinksALateGuardsShift() {
+        siteWindow(240);
+        var shift = myShiftStartingInMinutes(-120);
+        assertThat(openAndCapture(new GuardOpenSessionRequest("hw-1", null, null, null)).getShiftId()).isEqualTo(shift.getId());
+    }
+
+    @Test
+    void aShortWindowRefusesAnEarlyGuardsShift() {
+        siteWindow(10);
+        myShiftStartingInMinutes(25);
+        assertThat(openAndCapture(new GuardOpenSessionRequest("hw-1", null, null, null)).getShiftId()).isNull();
+    }
 }

@@ -114,6 +114,16 @@ public class SiteService {
     }
 
     @Transactional
+    public void setClockInWindow(TenantId tenantId, UUID siteId, Integer minutes) {
+        Site site = siteRepository.findActiveById(tenantId, siteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Site", siteId.toString()));
+        site.setClockInWindowMinutes(minutes);
+        siteRepository.save(site);
+        log.info("[Security] Clock-in window for site={} set to {} minutes tenant={}", siteId,
+                minutes == null ? "default" : minutes, tenantId.getValue());
+    }
+
+    @Transactional
     public void setQrEnforcement(TenantId tenantId, UUID siteId, boolean requireSignedQr) {
         Site site = siteRepository.findActiveById(tenantId, siteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Site", siteId.toString()));

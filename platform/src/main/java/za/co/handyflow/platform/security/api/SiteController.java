@@ -178,6 +178,21 @@ public class SiteController {
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
+    @PatchMapping("/{id}/clock-in-window")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @Operation(
+            summary = "Set how early or late a guard may start a shift at this site (5 to 480 minutes)",
+            description = """
+            A guard who taps Start shift within this many minutes of the shift's start is linked to that shift. Outside it
+            the session opens with no shift. Send minutes = null to go back to the platform default (30).
+            """)
+    public ResponseEntity<ApiResponse<Void>> setClockInWindow(
+            @PathVariable UUID id, @Valid @RequestBody SetClockInWindowRequest req) {
+        featureGuard.requireModule("security");
+        siteService.setClockInWindow(TenantContext.getTenantIdAsObject(), id, req.minutes());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
     // ── QR regeneration + printing (V217) ─────────────────────────────────────
 
     @PostMapping("/{siteId}/checkpoints/{checkpointId}/qr-secret/regenerate")

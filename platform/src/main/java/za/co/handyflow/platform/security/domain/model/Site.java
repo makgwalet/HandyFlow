@@ -115,6 +115,9 @@ public class Site {
     @Column(name = "require_signed_qr", nullable = false)
     private boolean requireSignedQr = false;
 
+    @Column(name = "clock_in_window_minutes")
+    private Integer clockInWindowMinutes;
+
     // ── V218: branch assignment ────────────────────────────────────────────────
 
     @Column(name = "branch_id")
@@ -173,6 +176,12 @@ public class Site {
     }
 
     public boolean isDeleted() { return deletedAt != null; }
+
+    /** Minutes either side of its start that a guard may start this site's shifts. null = platform default. */
+    public void setClockInWindowMinutes(Integer minutes) {
+        this.clockInWindowMinutes = minutes;
+        this.updatedAt            = Instant.now();
+    }
 
     public void setRequireSignedQr(boolean requireSignedQr) {
         this.requireSignedQr = requireSignedQr;

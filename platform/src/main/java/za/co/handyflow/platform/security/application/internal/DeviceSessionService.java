@@ -75,6 +75,15 @@ public class DeviceSessionService {
     }
 
     /** The site to check against is the shift's site, else the device's. A guard's own phone has no site of its own. */
+    static final int DEFAULT_CLOCK_IN_WINDOW_MINUTES = 30;
+    static final int MAX_CLOCK_IN_WINDOW_MINUTES = 480;
+
+    /** The site's own setting, else the platform default. */
+    private int clockInWindowMinutes(TenantId tenantId, UUID siteId) {
+        Integer set = siteRepository.findActiveById(tenantId, siteId).map(Site::getClockInWindowMinutes).orElse(null);
+        return set == null || set <= 0 ? DEFAULT_CLOCK_IN_WINDOW_MINUTES : Math.min(set, MAX_CLOCK_IN_WINDOW_MINUTES);
+    }
+
     private Boolean evaluateGeofence(TenantId tenantId, SecurityDevice device,
                                      za.co.handyflow.platform.security.domain.model.Shift shift,
                                      GuardOpenSessionRequest req) {
@@ -127,17 +136,22 @@ public class DeviceSessionService {
         }
 
         Instant now        = Instant.now();
-        Instant windowStart = now.minus(30, ChronoUnit.MINUTES);
-        Instant windowEnd   = now.plus(30, ChronoUnit.MINUTES);
+        // Fetch with the widest window a site may set, then apply each shift's own site window below.
+        Instant widest = now.plus(MAX_CLOCK_IN_WINDOW_MINUTES, ChronoUnit.MINUTES);
+        java.util.Map<UUID, Integer> windowBySite = new java.util.HashMap<>();
 
         List<za.co.handyflow.platform.security.domain.model.Shift> candidateShifts =
-                shiftRepository.findScheduledStartingBefore(tenantId, windowEnd)
+                shiftRepository.findScheduledStartingBefore(tenantId, widest)
                         .stream()
                         .filter(s -> s.getGuardId().equals(guardId))
                         // A site-owned device only starts shifts at its own site. A guard's personal phone has no site
                         // (site_id is null from enrolment), so it starts the guard's own shift wherever it is.
                         .filter(s -> device.getSiteId() == null || s.getSiteId().equals(device.getSiteId()))
-                        .filter(s -> s.getStartAt().isAfter(windowStart))
+                        .filter(s -> {
+                            int minutes = windowBySite.computeIfAbsent(s.getSiteId(), id -> clockInWindowMinutes(tenantId, id));
+                            return s.getStartAt().isAfter(now.minus(minutes, ChronoUnit.MINUTES))
+                                    && !s.getStartAt().isAfter(now.plus(minutes, ChronoUnit.MINUTES));
+                        })
                         .sorted(java.util.Comparator.comparing(za.co.handyflow.platform.security.domain.model.Shift::getStartAt))
                         .toList();
 
