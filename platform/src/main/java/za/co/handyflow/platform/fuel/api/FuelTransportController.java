@@ -35,6 +35,14 @@ public class FuelTransportController {
         return ResponseEntity.ok(ApiResponse.success(transport.listTankers(TenantContext.getTenantIdAsObject())));
     }
 
+    /** C03: Fleet vehicles a tanker can be linked to. Needs the same permission as editing a tanker, since it lists Fleet data. */
+    @GetMapping("/tankers/fleet-vehicles")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
+    public ResponseEntity<ApiResponse<List<FleetVehicleOption>>> fleetVehicles() {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(transport.fleetVehicles(TenantContext.getTenantIdAsObject())));
+    }
+
     @PostMapping("/tankers")
     @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
     public ResponseEntity<ApiResponse<TankerResponse>> createTanker(@Valid @RequestBody TankerRequest req) {
@@ -46,7 +54,7 @@ public class FuelTransportController {
     @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
     public ResponseEntity<ApiResponse<TankerResponse>> updateTanker(@PathVariable UUID id, @Valid @RequestBody TankerRequest req) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success("Tanker updated", transport.updateTanker(TenantContext.getTenantIdAsObject(), id, req.registration(), req.name())));
+        return ResponseEntity.ok(ApiResponse.success("Tanker updated", transport.updateTanker(TenantContext.getTenantIdAsObject(), id, req.registration(), req.name(), req.fleetVehicleId(), Boolean.TRUE.equals(req.unlinkFleetVehicle()))));
     }
 
     @DeleteMapping("/tankers/{id}")

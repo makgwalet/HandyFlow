@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest"
-import { parseCapacities, validateTanker, autoSplit, validateAllocation, enqueue, readQueue, dequeue, flushQueue, isNetworkError, type Compartment } from "./transportOps"
+import { parseCapacities, validateTanker, autoSplit, validateAllocation, enqueue, fleetOptionText, readQueue, dequeue, flushQueue, isNetworkError, type Compartment } from "./transportOps"
 
 const mem = () => { const m: Record<string, string> = {}; return { getItem: (k: string) => m[k] ?? null, setItem: (k: string, v: string) => { m[k] = v } } }
 const comps: Compartment[] = [{ id: "c1", number: 1, capacityLitres: 10000 }, { id: "c2", number: 2, capacityLitres: 6000 }]
@@ -54,5 +54,14 @@ describe("transportOps", () => {
       expect(readQueue(s)).toHaveLength(0)
     })
     it("tells network errors from server answers", () => { expect(isNetworkError(new Error("x"))).toBe(true); expect(isNetworkError({ response: { status: 409 } })).toBe(false) })
+  })
+})
+
+describe("fleetOptionText (C03)", () => {
+  it("shows a free vehicle by its label", () => {
+    expect(fleetOptionText({ id: "1", registration: "CY 1", label: "CY 1 · Volvo FM", linkedTankerRegistration: null })).toBe("CY 1 · Volvo FM")
+  })
+  it("says when a vehicle already backs a tanker", () => {
+    expect(fleetOptionText({ id: "1", registration: "CY 1", label: "CY 1 · Volvo FM", linkedTankerRegistration: "CY 1" })).toContain("already a tanker")
   })
 })

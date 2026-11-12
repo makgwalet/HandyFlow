@@ -17,6 +17,10 @@ public interface FuelTankerRepository extends JpaRepository<FuelTanker, UUID> {
     @Query("SELECT t FROM FuelTanker t WHERE t.tenantId = :tenantId AND t.id = :id AND t.deletedAt IS NULL")
     Optional<FuelTanker> findActiveById(TenantId tenantId, UUID id);
 
+    /** True when another live tanker is already linked to this Fleet vehicle. */
+    @Query("SELECT COUNT(t) > 0 FROM FuelTanker t WHERE t.tenantId = :tenantId AND t.fleetVehicleId = :vehicleId AND t.deletedAt IS NULL AND t.id <> :excludeId")
+    boolean fleetVehicleTaken(TenantId tenantId, UUID vehicleId, UUID excludeId);
+
     @Query("SELECT COUNT(t) > 0 FROM FuelTanker t WHERE t.tenantId = :tenantId AND UPPER(t.registration) = UPPER(:registration) AND t.deletedAt IS NULL AND t.id <> :excludeId")
     boolean registrationTaken(TenantId tenantId, String registration, UUID excludeId);
 }

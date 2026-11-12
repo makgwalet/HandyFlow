@@ -82,7 +82,27 @@ describe("PlanningTab", () => {
     fireEvent.change(screen.getByLabelText("Registration"), { target: { value: "GP 99 ZZ" } })
     fireEvent.change(screen.getByLabelText("Compartment capacities"), { target: { value: "8000, 8000" } })
     fireEvent.click(screen.getByText("Save tanker"))
-    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/tankers", { registration: "GP 99 ZZ", name: null, compartmentCapacities: [8000, 8000] }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/tankers", { registration: "GP 99 ZZ", name: null, compartmentCapacities: [8000, 8000], fleetVehicleId: null }))
+  })
+
+  it("C03: choosing a Fleet vehicle sends its id and uses Fleet's registration", async () => {
+    get.mockImplementation(async (u: string) => {
+      if (u.endsWith("/planning")) return { data: { data: plan } }
+      if (u.endsWith("/tankers/fleet-vehicles")) return { data: { data: [
+        { id: "v1", registration: "CY 1", label: "CY 1 · Volvo FM", linkedTankerRegistration: null },
+        { id: "v2", registration: "CY 2", label: "CY 2 · Scania", linkedTankerRegistration: "CY 2" }] } }
+      if (u.endsWith("/tankers")) return { data: { data: [tanker] } }
+      return { data: { data: [] } }
+    })
+    mount()
+    await waitFor(() => screen.getByText("Add tanker"))
+    fireEvent.click(screen.getByText("Add tanker"))
+    const pick = await screen.findByLabelText("Fleet vehicle")
+    expect((screen.getByText(/CY 2 · Scania/) as HTMLOptionElement).disabled).toBe(true)
+    fireEvent.change(pick, { target: { value: "v1" } })
+    fireEvent.change(screen.getByLabelText("Compartment capacities"), { target: { value: "8000" } })
+    fireEvent.click(screen.getByText("Save tanker"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/tankers", { registration: "CY 1", name: null, compartmentCapacities: [8000], fleetVehicleId: "v1" }))
   })
 
   it("a read-only user cannot allocate or add tankers", async () => {

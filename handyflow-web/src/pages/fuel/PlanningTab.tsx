@@ -5,7 +5,7 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import { fmtL } from "./orderOps"
-import { parseCapacities, validateTanker, autoSplit, validateAllocation, type Plan, type PlanLoad, type Tanker, type Driver } from "./transportOps"
+import { parseCapacities, validateTanker, autoSplit, validateAllocation, type Plan, type PlanLoad, type Tanker, type Driver, type FleetVehicleOption, fleetOptionText } from "./transportOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const msg = (e: any, fb: string) => e?.response?.data?.message ?? fb
@@ -76,7 +76,10 @@ export default function PlanningTab() {
             <tbody>
               {tankers.data!.map(t => (
                 <Fragment key={t.id}><tr style={{ borderTop: "1px solid var(--hf-border)" }}>
-                  <td style={td}>{t.registration}</td><td style={td}>{t.name ?? "–"}</td>
+                  <td style={td}>{t.registration}
+                    {t.fleetVehicleLabel && <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>Fleet: {t.fleetVehicleLabel}</div>}
+                    {!t.fleetVehicleId && t.fleetSuggestionLabel && <div style={{ fontSize: 11, color: "var(--hf-warning-text)" }}>Also in Fleet as {t.fleetSuggestionLabel}</div>}
+                  </td><td style={td}>{t.name ?? "–"}</td>
                   <td style={td}>{t.compartments.map(c => c.capacityLitres.toLocaleString("en-ZA")).join(" + ")}</td>
                   <td style={td}>{fmtL(t.totalCapacity)}</td><td style={td}>{t.openLoads}</td>
                   <td style={td}>{canManage && <button style={btnGhost} disabled={t.openLoads > 0 || remove.isPending} onClick={() => remove.mutate(t.id)}>Remove</button>}</td>
@@ -94,13 +97,24 @@ export default function PlanningTab() {
 
 function TankerDialog({ onDone, onClose }: { onDone: () => void; onClose: () => void }) {
   const [reg, setReg] = useState(""); const [name, setName] = useState(""); const [caps, setCaps] = useState(""); const [err, setErr] = useState("")
+  const [fleetId, setFleetId] = useState("")
+  const fleet = useQuery<FleetVehicleOption[]>({ queryKey: ["fuel-tanker-fleet-vehicles"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/tankers/fleet-vehicles")), retry: false })
+  const chosen = (fleet.data ?? []).find(v => v.id === fleetId)
   const save = useMutation({
-    mutationFn: () => apiClient.post("/api/v1/fuel/tankers", { registration: reg, name: name || null, compartmentCapacities: parseCapacities(caps).values }),
+    mutationFn: () => apiClient.post("/api/v1/fuel/tankers", { registration: chosen ? chosen.registration : reg, name: name || null, compartmentCapacities: parseCapacities(caps).values, fleetVehicleId: fleetId || null }),
     onSuccess: () => { onDone(); onClose() }, onError: (e: any) => setErr(msg(e, "Could not add the tanker")),
   })
   return (
     <Modal title="Add tanker" onClose={onClose}>
-      <label style={labelStyle}>Registration *</label><input aria-label="Registration" value={reg} onChange={e => setReg(e.target.value)} style={inputStyle} />
+      {(fleet.data ?? []).length > 0 && <>
+        <label style={labelStyle}>Fleet vehicle</label>
+        <select aria-label="Fleet vehicle" value={fleetId} onChange={e => setFleetId(e.target.value)} style={inputStyle}>
+          <option value="">Not in Fleet / enter the registration</option>
+          {fleet.data!.map(v => <option key={v.id} value={v.id} disabled={!!v.linkedTankerRegistration}>{fleetOptionText(v)}</option>)}
+        </select>
+        <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "4px 0 10px" }}>Linking keeps the registration in step with Fleet.</p>
+      </>}
+      <label style={labelStyle}>Registration *</label><input aria-label="Registration" value={chosen ? chosen.registration : reg} disabled={!!chosen} onChange={e => setReg(e.target.value)} style={inputStyle} />
       <label style={{ ...labelStyle, marginTop: 10 }}>Name</label><input value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
       <label style={{ ...labelStyle, marginTop: 10 }}>Compartment capacities (litres) *</label>
       <input aria-label="Compartment capacities" value={caps} onChange={e => setCaps(e.target.value)} placeholder="10000, 6000" style={inputStyle} />
@@ -108,7 +122,7 @@ function TankerDialog({ onDone, onClose }: { onDone: () => void; onClose: () => 
       <Err text={err} />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
         <button style={btnGhost} onClick={onClose}>Cancel</button>
-        <button style={btnPrimary} disabled={save.isPending} onClick={() => { const v = validateTanker(reg, caps); if (v) return setErr(v); setErr(""); save.mutate() }}>Save tanker</button>
+        <button style={btnPrimary} disabled={save.isPending} onClick={() => { const v = validateTanker(chosen ? chosen.registration : reg, caps); if (v) return setErr(v); setErr(""); save.mutate() }}>Save tanker</button>
       </div>
     </Modal>
   )

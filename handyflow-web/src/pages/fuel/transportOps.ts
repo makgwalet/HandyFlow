@@ -1,6 +1,13 @@
 // Stage 3 helpers: tanker/compartment validation, load splitting, and the driver's offline queue.
 export interface Compartment { id: string; number: number; capacityLitres: number }
-export interface Tanker { id: string; registration: string; name: string | null; active: boolean; totalCapacity: number; compartments: Compartment[]; openLoads: number }
+export interface Tanker { id: string; registration: string; name: string | null; active: boolean; totalCapacity: number; compartments: Compartment[]; openLoads: number
+  fleetVehicleId?: string | null; fleetVehicleLabel?: string | null; fleetSuggestionId?: string | null; fleetSuggestionLabel?: string | null }
+export interface FleetVehicleOption { id: string; registration: string; label: string; linkedTankerRegistration: string | null }
+
+/** What a Fleet vehicle reads as in the picker; one already used by a tanker is shown but cannot be chosen. */
+export function fleetOptionText(v: FleetVehicleOption): string {
+  return v.linkedTankerRegistration ? `${v.label} (already a tanker: ${v.linkedTankerRegistration})` : v.label
+}
 export interface Driver { id: string; name: string; jobTitle: string | null; phone: string | null }
 export interface PlanLoad {
   deliveryId: string; status: string; scheduledAt: string; customerId: string | null; customerName: string | null; fuelType: string

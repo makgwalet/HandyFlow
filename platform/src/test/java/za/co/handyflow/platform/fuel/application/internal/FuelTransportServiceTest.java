@@ -5,6 +5,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.springframework.beans.factory.ObjectProvider;
+import za.co.handyflow.platform.fuel.FleetVehicleLookup;
+import za.co.handyflow.platform.fuel.FleetVehicleLookup.VehicleRef;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -44,6 +47,8 @@ class FuelTransportServiceTest {
     @Mock HrFacade hr;
     @Mock CrmFacade crm;
     @Mock FuelComplianceService compliance;
+    @Mock ObjectProvider<FleetVehicleLookup> fleetProvider;
+    @Mock FleetVehicleLookup fleetLookup;
     @InjectMocks FuelTransportService service;
 
     static final TenantId T = TenantId.of(UUID.randomUUID());
@@ -85,6 +90,73 @@ class FuelTransportServiceTest {
         when(tankers.registrationTaken(eq(T), any(), any())).thenReturn(true);
         assertThrows(ConflictException.class, () -> service.createTanker(T, new TankerRequest("GP 12 AB", null, List.of(bd("5000")))));
         verify(tankers, never()).save(any());
+    }
+
+    // ---- C03: tankers linked to a Fleet vehicle ----
+
+    private VehicleRef vehicle(String reg) { return new VehicleRef(UUID.randomUUID(), reg, "Volvo", "FM"); }
+
+    @Test @DisplayName("C03: linking takes the registration from Fleet, not from what was typed")
+    void linkTakesFleetRegistration() {
+        VehicleRef v = vehicle("cy 99 zz");
+        when(fleetProvider.getIfAvailable()).thenReturn(fleetLookup);
+        when(fleetLookup.find(T, v.id())).thenReturn(Optional.of(v));
+        when(fleetLookup.list(T)).thenReturn(List.of(v));
+        TankerResponse r = service.createTanker(T, new TankerRequest("typed wrongly", "Blue", List.of(bd("5000")), v.id(), null));
+        assertEquals("CY 99 ZZ", r.registration());
+        assertEquals(v.id(), r.fleetVehicleId());
+        assertEquals(v.label(), r.fleetVehicleLabel());
+    }
+
+    @Test @DisplayName("C03: a vehicle that is not in this tenant's Fleet is refused and nothing is saved")
+    void unknownVehicleRefused() {
+        UUID missing = UUID.randomUUID();
+        when(fleetProvider.getIfAvailable()).thenReturn(fleetLookup);
+        when(fleetLookup.find(T, missing)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> service.createTanker(T, new TankerRequest("GP 1", null, List.of(bd("5000")), missing, null)));
+        verify(tankers, never()).save(any());
+    }
+
+    @Test @DisplayName("C03: one Fleet vehicle can back only one tanker")
+    void vehicleAlreadyLinked() {
+        VehicleRef v = vehicle("CY 99 ZZ");
+        when(fleetProvider.getIfAvailable()).thenReturn(fleetLookup);
+        when(fleetLookup.find(T, v.id())).thenReturn(Optional.of(v));
+        when(tankers.fleetVehicleTaken(eq(T), eq(v.id()), any())).thenReturn(true);
+        assertThrows(ConflictException.class, () -> service.createTanker(T, new TankerRequest("GP 1", null, List.of(bd("5000")), v.id(), null)));
+        verify(tankers, never()).save(any());
+    }
+
+    @Test @DisplayName("C03: when Fleet is not available, linking is refused clearly rather than silently ignored")
+    void fleetMissing() {
+        when(fleetProvider.getIfAvailable()).thenReturn(null);
+        assertThrows(IllegalStateException.class, () -> service.createTanker(T, new TankerRequest("GP 1", null, List.of(bd("5000")), UUID.randomUUID(), null)));
+    }
+
+    @Test @DisplayName("C03: a tanker with no link is unaffected, and an unlinked one with a matching plate gets a suggestion")
+    void suggestionForMatchingPlate() {
+        VehicleRef v = vehicle("gp 12 ab");
+        when(fleetProvider.getIfAvailable()).thenReturn(fleetLookup);
+        when(fleetLookup.list(T)).thenReturn(List.of(v));
+        when(tankers.findAllActive(T)).thenReturn(List.of(tanker));
+        when(compartments.findByTankers(eq(T), any())).thenReturn(List.of(c1, c2));
+        List<TankerResponse> out = service.listTankers(T);
+        assertNull(out.get(0).fleetVehicleId());
+        assertEquals(v.id(), out.get(0).fleetSuggestionId());
+    }
+
+    @Test @DisplayName("C03: Fleet failing does not stop the tanker list loading")
+    void fleetFailureDoesNotBreakList() {
+        when(fleetProvider.getIfAvailable()).thenReturn(fleetLookup);
+        when(fleetLookup.list(T)).thenThrow(new RuntimeException("fleet down"));
+        when(tankers.findAllActive(T)).thenReturn(List.of(tanker));
+        when(compartments.findByTankers(eq(T), any())).thenReturn(List.of(c1, c2));
+        assertEquals(1, service.listTankers(T).size());
+    }
+
+    @Test @DisplayName("C03: choosing a vehicle and unlinking in the same request is refused")
+    void linkAndUnlinkTogether() {
+        assertThrows(IllegalArgumentException.class, () -> service.updateTanker(T, tanker.getId(), "X", null, UUID.randomUUID(), true));
     }
 
     @Test @DisplayName("allocating sets tanker, driver and plate and stores the compartment split")

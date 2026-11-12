@@ -1,10 +1,13 @@
 package za.co.handyflow.platform.fuel.application.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.crm.CrmFacade;
 import za.co.handyflow.platform.crm.CustomerSummary;
+import za.co.handyflow.platform.fuel.FleetVehicleLookup;
+import za.co.handyflow.platform.fuel.FleetVehicleLookup.VehicleRef;
 import za.co.handyflow.platform.fuel.domain.model.*;
 import za.co.handyflow.platform.fuel.domain.repository.*;
 import za.co.handyflow.platform.fuel.dto.*;
@@ -39,6 +42,7 @@ public class FuelTransportService {
     private final HrFacade hr;
     private final CrmFacade crm;
     private final FuelComplianceService compliance;
+    private final ObjectProvider<FleetVehicleLookup> fleet;
 
     // ── Tankers ──────────────────────────────────────────────────────────────
 
@@ -48,12 +52,14 @@ public class FuelTransportService {
         Map<UUID, List<FuelTankerCompartment>> byTanker = list.isEmpty() ? Map.of()
                 : compartments.findByTankers(tenantId, list.stream().map(FuelTanker::getId).toList())
                         .stream().collect(Collectors.groupingBy(FuelTankerCompartment::getTankerId));
-        return list.stream().map(t -> toResponse(tenantId, t, byTanker.getOrDefault(t.getId(), List.of()))).toList();
+        Map<UUID, VehicleRef> fleetById = fleetIndex(tenantId, list);
+        return list.stream().map(t -> toResponse(tenantId, t, byTanker.getOrDefault(t.getId(), List.of()), fleetById)).toList();
     }
 
     @Transactional
     public TankerResponse createTanker(TenantId tenantId, TankerRequest req) {
         FuelTanker t = FuelTanker.create(tenantId, req.registration(), req.name());
+        if (req.fleetVehicleId() != null) linkToFleet(tenantId, t, req.fleetVehicleId());
         if (tankers.registrationTaken(tenantId, t.getRegistration(), t.getId())) {
             throw new ConflictException("A tanker with registration " + t.getRegistration() + " already exists.");
         }
@@ -68,8 +74,18 @@ public class FuelTransportService {
     /** Registration and name only; compartments are fixed (deactivate and recreate if the tanker is rebuilt). */
     @Transactional
     public TankerResponse updateTanker(TenantId tenantId, UUID id, String registration, String name) {
+        return updateTanker(tenantId, id, registration, name, null, false);
+    }
+
+    /** As above, and optionally links to a Fleet vehicle, or (unlink true) removes the link. Null/false leaves the link alone. */
+    @Transactional
+    public TankerResponse updateTanker(TenantId tenantId, UUID id, String registration, String name, UUID fleetVehicleId, boolean unlink) {
         FuelTanker t = findTanker(tenantId, id);
-        t.update(registration, name);
+        if (fleetVehicleId != null && unlink) throw new IllegalArgumentException("Choose a vehicle to link, or unlink, not both.");
+        // While linked, Fleet owns the registration: the typed one is ignored so the two can never disagree.
+        t.update(t.getFleetVehicleId() != null && fleetVehicleId == null && !unlink ? t.getRegistration() : registration, name);
+        if (fleetVehicleId != null) linkToFleet(tenantId, t, fleetVehicleId);
+        else if (unlink) t.linkFleetVehicle(null, null);
         if (tankers.registrationTaken(tenantId, t.getRegistration(), t.getId())) {
             throw new ConflictException("A tanker with registration " + t.getRegistration() + " already exists.");
         }
@@ -85,6 +101,16 @@ public class FuelTransportService {
         }
         t.deactivate();
         tankers.save(t);
+    }
+
+    /** Fleet vehicles the tenant could link a tanker to; each says which tanker already uses it. Empty when Fleet is not available. */
+    @Transactional(readOnly = true)
+    public List<FleetVehicleOption> fleetVehicles(TenantId tenantId) {
+        FleetVehicleLookup lookup = fleet == null ? null : fleet.getIfAvailable();
+        if (lookup == null) return List.of();
+        Map<UUID, String> used = new HashMap<>();
+        for (FuelTanker t : tankers.findAllActive(tenantId)) if (t.getFleetVehicleId() != null) used.put(t.getFleetVehicleId(), t.getRegistration());
+        return lookup.list(tenantId).stream().map(v -> new FleetVehicleOption(v.id(), v.registration(), v.label(), used.get(v.id()))).toList();
     }
 
     @Transactional(readOnly = true)
@@ -214,14 +240,47 @@ public class FuelTransportService {
                 .orElseThrow(() -> new IllegalStateException("Your login is not linked to an employee record, so no loads can be allocated to you. Ask HR to link it."));
     }
 
+    /** Checks the vehicle is one of this tenant's in Fleet and not already another tanker, then links and takes its registration. */
+    private void linkToFleet(TenantId tenantId, FuelTanker t, UUID vehicleId) {
+        FleetVehicleLookup lookup = fleet == null ? null : fleet.getIfAvailable();
+        if (lookup == null) throw new IllegalStateException("Fleet is not available, so a vehicle cannot be linked.");
+        VehicleRef v = lookup.find(tenantId, vehicleId).orElseThrow(() -> new IllegalArgumentException("That vehicle is not in your Fleet."));
+        if (tankers.fleetVehicleTaken(tenantId, vehicleId, t.getId())) {
+            throw new ConflictException(v.registration() + " is already linked to another tanker.");
+        }
+        t.linkFleetVehicle(vehicleId, v.registration());
+    }
+
+    /** One Fleet lookup for a whole list (not one per tanker); empty when Fleet is not there or nothing needs it. */
+    private Map<UUID, VehicleRef> fleetIndex(TenantId tenantId, List<FuelTanker> list) {
+        FleetVehicleLookup lookup = fleet == null ? null : fleet.getIfAvailable();
+        if (lookup == null || list.isEmpty()) return Map.of();
+        try {
+            return lookup.list(tenantId).stream().collect(Collectors.toMap(VehicleRef::id, v -> v, (a, b) -> a));
+        } catch (RuntimeException e) {
+            return Map.of();   // Fleet being slow or down must not stop the tanker list loading
+        }
+    }
+
     private FuelTanker findTanker(TenantId tenantId, UUID id) {
         return tankers.findActiveById(tenantId, id).orElseThrow(() -> new ResourceNotFoundException("Tanker", id.toString()));
     }
 
     private TankerResponse toResponse(TenantId tenantId, FuelTanker t, List<FuelTankerCompartment> comps) {
+        return toResponse(tenantId, t, comps, t.getFleetVehicleId() == null ? Map.of() : fleetIndex(tenantId, List.of(t)));
+    }
+
+    private TankerResponse toResponse(TenantId tenantId, FuelTanker t, List<FuelTankerCompartment> comps, Map<UUID, VehicleRef> fleetById) {
+        VehicleRef linked = t.getFleetVehicleId() == null ? null : fleetById.get(t.getFleetVehicleId());
+        // Unlinked and the same registration exists in Fleet: say so, it is probably the same vehicle entered twice.
+        VehicleRef suggestion = t.getFleetVehicleId() != null ? null : fleetById.values().stream()
+                .filter(v -> v.registration() != null && v.registration().trim().equalsIgnoreCase(t.getRegistration())).findFirst().orElse(null);
         BigDecimal total = comps.stream().map(FuelTankerCompartment::getCapacityLitres).reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new TankerResponse(t.getId(), t.getRegistration(), t.getName(), t.isActive(), total,
+        String registration = linked != null ? linked.registration().trim().toUpperCase() : t.getRegistration();
+        String linkLabel = t.getFleetVehicleId() == null ? null : linked != null ? linked.label() : "(vehicle removed from Fleet)";
+        return new TankerResponse(t.getId(), registration, t.getName(), t.isActive(), total,
                 comps.stream().map(c -> new TankerResponse.CompartmentResponse(c.getId(), c.getNumber(), c.getCapacityLitres())).toList(),
-                deliveries.countOpenForTanker(tenantId, t.getId()));
+                deliveries.countOpenForTanker(tenantId, t.getId()), t.getFleetVehicleId(), linkLabel,
+                suggestion == null ? null : suggestion.id(), suggestion == null ? null : suggestion.label());
     }
 }
