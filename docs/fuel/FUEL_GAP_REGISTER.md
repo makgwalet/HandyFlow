@@ -118,3 +118,6 @@ Built (patch 0802, V681): contracts that group and report only: number, customer
 
 ## Phase 7d - Overnight stays (2026-11-12)
 Built (patch 0803, V682): Fuel-owned multi-night parking for the Truck Stop division: company-set nightly rate and bay count, stays that keep the rate they were booked at, check in and out, cancel, no-show, change departure, bay capacity per night, overstay flag, yard today. Bookings untouched. Not built: invoicing or charge to account, named bays, capacity lock under concurrent booking, Fleet link. See FUEL-PHASE7D-OVERNIGHT-STAYS-NOTES-2026-11-12.md.
+
+## Phase 8a - Route cost by customer (2026-11-12)
+Built (patch 0806, no migration): a report that shares each route's recorded actual cost across the customers delivered to, by litres, equal per stop, or site distance, chosen per report. Cent-exact, skips routes with no recorded actuals, never estimates. Not built: posting to invoices or statements, a saved default method, export.

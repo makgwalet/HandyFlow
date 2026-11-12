@@ -6,7 +6,7 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import { fmtL, fmtR } from "./orderOps"
-import { CATEGORIES, categoryLabel, flagText, periodDates, validateCost, varianceText, type CostEntry, type Rollup, type RouteCostReport, type RouteCostRow } from "./routeCostOps"
+import { ALLOCATION_METHODS, allocationNote, CATEGORIES, categoryLabel, flagText, methodHint, periodDates, validateCost, varianceText, type AllocationReport, type CostEntry, type Rollup, type RouteCostReport, type RouteCostRow } from "./routeCostOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const msg = (e: any, fb: string) => e?.response?.data?.message ?? fb
@@ -60,9 +60,58 @@ export default function RouteCostsPanel({ days }: { days: number }) {
           </div>
           <Rollups title="By tanker" rows={rep.byTanker} />
           <Rollups title="By depot" rows={rep.byDepot} note="A route's figures are shared across depots by litres delivered from each depot's tanks." />
+          <CustomerAllocation from={from} to={to} />
         </>
       )}
       {recording && <CostsDialog route={recording} canRecord={canRecord} onChanged={refresh} onClose={() => setRecording(null)} />}
+    </div>
+  )
+}
+
+function CustomerAllocation({ from, to }: { from: string; to: string }) {
+  const [method, setMethod] = useState("LITRES")
+  const q = useQuery<AllocationReport>({ queryKey: ["fuel-route-cost-customers", from, to, method], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/cost-actuals/by-customer", { params: { from, to, method } })) })
+  const rep = q.data
+  const customers = Array.isArray(rep?.customers) ? rep!.customers : []
+  const note = rep ? allocationNote(rep) : null
+  return (
+    <div style={{ marginTop: 18 }}>
+      <h3 style={{ margin: "0 0 4px", fontSize: 14 }}>Route cost by customer</h3>
+      <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: "0 0 8px" }}>
+        Each route's recorded actual cost (vehicle, driver, tolls and other) is shared across the customers it delivered to. Only costs you recorded are shared; nothing is estimated.
+      </p>
+      <label style={{ ...labelStyle, display: "inline-block", marginBottom: 8 }}>How to share
+        <select aria-label="How to share" style={{ ...inputStyle, marginLeft: 8, width: "auto" }} value={method} onChange={e => setMethod(e.target.value)}>
+          {ALLOCATION_METHODS.map(m => <option key={m.code} value={m.code}>{m.label}</option>)}
+        </select>
+      </label>
+      <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "0 0 8px" }}>{methodHint(method)}</p>
+      {q.isLoading ? <p style={{ color: "var(--hf-text-muted)", fontSize: 13 }}>Loading…</p> : q.isError || !rep ? <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 13 }}>Could not load the customer split.</p> : (
+        <>
+          {note && <p role="status" style={{ fontSize: 12.5, color: "var(--hf-warning-text-strong)", margin: "0 0 8px" }}>{note}</p>}
+          {customers.length === 0 ? <p style={{ color: "var(--hf-text-muted)", fontSize: 13 }}>No recorded route costs to share in this period.</p> : (
+            <div style={{ ...card, overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr><th style={{ ...th, textAlign: "left" }}>Customer</th><th style={th}>Routes</th><th style={th}>Stops</th><th style={th}>Litres</th><th style={th}>Cost shared</th><th style={th}>Per litre</th></tr></thead>
+                <tbody>
+                  {customers.map(c => (
+                    <tr key={c.customerId ?? c.customerName} style={{ borderTop: "1px solid var(--hf-border)" }}>
+                      <td style={{ ...td, textAlign: "left", whiteSpace: "normal" }}>{c.customerName}</td>
+                      <td style={td}>{c.routes}</td><td style={td}>{c.stops}</td><td style={td}>{fmtL(c.litres)}</td>
+                      <td style={{ ...td, fontWeight: 700 }}>{fmtR(c.allocated)}</td>
+                      <td style={td}>{c.costPerLitre == null ? "–" : fmtR(c.costPerLitre)}</td>
+                    </tr>
+                  ))}
+                  <tr style={{ borderTop: "2px solid var(--hf-border)" }}>
+                    <td style={{ ...td, textAlign: "left", fontWeight: 700 }}>Total shared</td><td style={td} colSpan={3}></td>
+                    <td style={{ ...td, fontWeight: 700 }}>{fmtR(rep.allocatedTotal)}</td><td style={td}></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }

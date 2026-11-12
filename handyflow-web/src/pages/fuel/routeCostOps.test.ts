@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { flagText, varianceText, validateCost, periodDates, categoryLabel } from "./routeCostOps"
+import { flagText, varianceText, validateCost, periodDates, categoryLabel, allocationNote, methodHint, ALLOCATION_METHODS } from "./routeCostOps"
 
 const r = (n: number) => `R${n}`
 
@@ -28,4 +28,14 @@ describe("routeCostOps (F02)", () => {
     expect(periodDates(1, new Date("2026-11-12T10:00:00Z"))).toEqual({ from: "2026-11-12", to: "2026-11-12" })
   })
   it("labels categories", () => { expect(categoryLabel("TOLLS")).toBe("Tolls"); expect(categoryLabel("Z")).toBe("Z") })
+  it("offers three ways to share, each with a hint", () => {
+    expect(ALLOCATION_METHODS.map(m => m.code)).toEqual(["LITRES", "STOPS", "DISTANCE"])
+    expect(methodHint("STOPS")).toMatch(/same share/)
+    expect(methodHint("NOPE")).toBe("")
+  })
+  it("notes skipped and equally split routes, and says nothing when all is straightforward", () => {
+    expect(allocationNote({ routesAllocated: 3, routesSkipped: 0, fallbackRoutes: 0 })).toBeNull()
+    expect(allocationNote({ routesAllocated: 3, routesSkipped: 1, fallbackRoutes: 0 })).toMatch(/1 delivered route has no actual cost/)
+    expect(allocationNote({ routesAllocated: 3, routesSkipped: 0, fallbackRoutes: 2 })).toMatch(/2 routes had nothing to weigh by.*were split equally/)
+  })
 })

@@ -9,7 +9,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.fuel.application.internal.FuelRouteCostAllocationService;
 import za.co.handyflow.platform.fuel.application.internal.FuelRouteCostService;
+import za.co.handyflow.platform.fuel.dto.RouteCostAllocationDtos;
 import za.co.handyflow.platform.fuel.dto.RouteCostDtos.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -26,6 +28,7 @@ import java.util.UUID;
 public class FuelRouteCostController {
 
     private final FuelRouteCostService costs;
+    private final FuelRouteCostAllocationService allocation;
     private final FeatureGuard featureGuard;
 
     @GetMapping
@@ -34,6 +37,17 @@ public class FuelRouteCostController {
                                                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(costs.report(TenantContext.getTenantIdAsObject(), from, to)));
+    }
+
+    /** Phase 8a: each route's actual cost spread across the customers delivered to. method = LITRES (default), STOPS or DISTANCE. */
+    @GetMapping("/by-customer")
+    @PreAuthorize("hasAuthority('FUEL_MARGIN_READ')")
+    public ResponseEntity<ApiResponse<RouteCostAllocationDtos.AllocationReport>> byCustomer(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) RouteCostAllocationDtos.Method method) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(allocation.report(TenantContext.getTenantIdAsObject(), from, to, method)));
     }
 
     @GetMapping("/routes/{routeId}/entries")

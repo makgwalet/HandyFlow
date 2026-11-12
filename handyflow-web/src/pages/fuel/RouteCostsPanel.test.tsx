@@ -12,6 +12,7 @@ const row = (o: any = {}) => ({ routeId: "r1", routeDate: "2026-11-10", label: "
   estimateVehicle: 1000, estimateDriver: 600, estimateTotal: 1600, actualVehicle: 1300, actualDriver: null, actualTolls: 250, actualOther: null, actualTotal: 1550, variance: 300, variancePct: 30, actualCostPerLitre: 0.19375, reconciled: true, flags: [], ...o })
 const rollup = (o: any = {}) => ({ key: "k", label: "GP 12 AB", routes: 1, reconciledRoutes: 1, litres: 8000, estimate: 1000, comparableActual: 1300, variance: 300, actualTotal: 1550, actualCostPerLitre: 0.19, ...o })
 let report: any
+const allocation = (method = "LITRES") => ({ from: "2026-10-14", to: "2026-11-12", method, routesAllocated: 1, routesSkipped: 0, fallbackRoutes: 0, allocatedTotal: 1000, customers: [{ customerId: "c1", customerName: "Acme Mining", routes: 1, stops: 1, litres: 3000, allocated: 750, costPerLitre: 0.25 }, { customerId: "c2", customerName: "Bolt Haulage", routes: 1, stops: 1, litres: 1000, allocated: 250, costPerLitre: 0.25 }] })
 let entries: any[]
 
 function mount(days = 30) {
@@ -24,7 +25,7 @@ describe("RouteCostsPanel", () => {
     get.mockReset(); post.mockReset(); canRecord = true
     report = { from: "2026-10-14", to: "2026-11-12", ratesSet: true, unreconciledRoutes: 0, routes: [row()], byTanker: [rollup()], byDepot: [rollup({ key: "d", label: "North depot", reconciledRoutes: 0 })] }
     entries = [{ id: "e1", routeId: "r1", category: "VEHICLE", amount: 1300, quantity: 250, unit: "km", note: "odometer", status: "ACTIVE", voidReason: null, recordedAt: "2026-11-10T10:00:00Z" }]
-    get.mockImplementation(async (u: string) => ({ data: { data: u.endsWith("/entries") ? entries : report } }))
+    get.mockImplementation(async (u: string, cfg?: any) => ({ data: { data: u.endsWith("/entries") ? entries : u.endsWith("/by-customer") ? allocation(cfg?.params?.method) : report } }))
     post.mockResolvedValue({ data: { data: {} } })
   })
   afterEach(() => cleanup())
@@ -87,5 +88,36 @@ describe("RouteCostsPanel", () => {
     canRecord = false; mount()
     await waitFor(() => screen.getByText(/Morning run/))
     expect(screen.queryByText("Costs")).toBeNull()
+  })
+  it("shows each customer's share of the recorded route cost, asking for litres by default", async () => {
+    mount()
+    await waitFor(() => screen.getByText("Acme Mining"))
+    const call = get.mock.calls.find(c => c[0] === "/api/v1/fuel/cost-actuals/by-customer")!
+    expect(call[1].params.method).toBe("LITRES")
+    expect(call[1].params.from).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(screen.getByText("Bolt Haulage")).toBeTruthy()
+    expect(screen.getByText("Total shared")).toBeTruthy()
+  })
+
+  it("asks again with the chosen way of sharing and shows what it means", async () => {
+    mount()
+    await waitFor(() => screen.getByText("Acme Mining"))
+    fireEvent.change(screen.getByLabelText("How to share"), { target: { value: "DISTANCE" } })
+    await waitFor(() => expect(get.mock.calls.some(c => c[0] === "/api/v1/fuel/cost-actuals/by-customer" && c[1].params.method === "DISTANCE")).toBe(true))
+    expect(screen.getByText(/farther site carries more/i)).toBeTruthy()
+  })
+
+  it("says plainly when routes were skipped or split equally", async () => {
+    const base = allocation
+    get.mockImplementation(async (u: string, cfg?: any) => ({ data: { data: u.endsWith("/entries") ? entries : u.endsWith("/by-customer") ? { ...base(cfg?.params?.method), routesSkipped: 2, fallbackRoutes: 1 } : report } }))
+    mount()
+    await waitFor(() => screen.getByText(/2 delivered routes have no actual cost recorded/))
+    expect(screen.getByText(/1 route had nothing to weigh by/)).toBeTruthy()
+  })
+
+  it("explains an empty customer split instead of showing an empty table", async () => {
+    get.mockImplementation(async (u: string) => ({ data: { data: u.endsWith("/by-customer") ? { from: "a", to: "b", method: "LITRES", routesAllocated: 0, routesSkipped: 1, fallbackRoutes: 0, allocatedTotal: 0, customers: [] } : report } }))
+    mount()
+    await waitFor(() => screen.getByText(/No recorded route costs to share/))
   })
 })

@@ -48,3 +48,22 @@ export function periodDates(days: number, today = new Date()): { from: string; t
   const start = new Date(today.getTime() - (days - 1) * 86400000)
   return { from: iso(start), to: iso(today) }
 }
+
+// Phase 8a: a route's recorded actual cost spread across the customers delivered to.
+export interface CustomerShare { customerId: string | null; customerName: string; routes: number; stops: number; litres: number; allocated: number; costPerLitre: number | null }
+export interface AllocationReport { from: string; to: string; method: string; routesAllocated: number; routesSkipped: number; fallbackRoutes: number; allocatedTotal: number; customers: CustomerShare[] }
+
+export const ALLOCATION_METHODS: { code: string; label: string; hint: string }[] = [
+  { code: "LITRES", label: "By litres delivered", hint: "A customer who took more fuel carries more of the route cost." },
+  { code: "STOPS", label: "Equal per stop", hint: "Every delivered stop carries the same share." },
+  { code: "DISTANCE", label: "By site distance", hint: "A farther site carries more. Needs a distance on the customer site." },
+]
+export const methodHint = (code: string) => ALLOCATION_METHODS.find(m => m.code === code)?.hint ?? ""
+
+/** One line explaining what was and was not shared, or null when everything was straightforward. */
+export function allocationNote(r: Pick<AllocationReport, "routesAllocated" | "routesSkipped" | "fallbackRoutes">): string | null {
+  const parts: string[] = []
+  if (r.routesSkipped > 0) parts.push(`${r.routesSkipped} delivered route${r.routesSkipped === 1 ? " has" : "s have"} no actual cost recorded, so nothing was shared for ${r.routesSkipped === 1 ? "it" : "them"}.`)
+  if (r.fallbackRoutes > 0) parts.push(`${r.fallbackRoutes} route${r.fallbackRoutes === 1 ? "" : "s"} had nothing to weigh by for this method and ${r.fallbackRoutes === 1 ? "was" : "were"} split equally per stop.`)
+  return parts.length ? parts.join(" ") : null
+}
