@@ -106,3 +106,82 @@ async function sendPhoto(item: OutboxItem): Promise<void> {
   await api<unknown>(`/api/v1/guard/incidents/by-ref/${p.incidentRef}/evidence`, { method: "POST", form });
   await removePhoto(p.localUri);
 }
+
+// ── My post (site orders) ─────────────────────────────────────────────────────
+
+const orderSchema = z.object({
+  id: z.string(),
+  version: z.number(),
+  postName: z.string().nullish(),
+  instructions: z.string().nullish(),
+  duties: z.string().nullish(),
+  emergencyProcedures: z.string().nullish(),
+  restrictedAreas: z.string().nullish(),
+  accessRules: z.string().nullish(),
+  contacts: z.array(z.object({ id: z.string(), name: z.string(), role: z.string().nullish(), phone: z.string().nullish() })).default([]),
+});
+export type PostOrder = z.infer<typeof orderSchema>;
+
+const myPostSchema = z.object({
+  siteId: z.string(),
+  siteLevelOrder: orderSchema.nullish(),
+  siteLevelNeedsAcknowledgment: z.boolean(),
+  posts: z.array(z.object({ postId: z.string(), postName: z.string(), hasActiveOrder: z.boolean() })),
+});
+export type MyPost = z.infer<typeof myPostSchema>;
+
+/** Needs an open session: the server picks the site from it. */
+export async function getMyPost(): Promise<MyPost> {
+  return myPostSchema.parse(await api<unknown>("/api/v1/guard/my-post"));
+}
+
+export async function getPostOrder(postId: string): Promise<PostOrder> {
+  return orderSchema.parse(await api<unknown>(`/api/v1/guard/my-post/posts/${postId}`));
+}
+
+/** Says which version was read, so a newer one published meanwhile is refused rather than wrongly acknowledged. */
+export function acknowledgeOrder(order: { id: string; version: number }, deviceHardwareId: string): Promise<unknown> {
+  return api<unknown>(`/api/v1/guard/my-post/orders/${order.id}/acknowledge`, {
+    method: "POST",
+    body: { deviceHardwareId, acknowledgedOffline: false, version: order.version },
+  });
+}
+
+// ── Shift swaps ───────────────────────────────────────────────────────────────
+
+const swapSchema = z.object({
+  id: z.string(),
+  originalShiftId: z.string(),
+  shiftSummary: z.string().nullish(),
+  requestingGuardId: z.string(),
+  requestingGuardName: z.string().nullish(),
+  proposedGuardId: z.string().nullish(),
+  proposedGuardName: z.string().nullish(),
+  status: z.string(),
+  reason: z.string().nullish(),
+  rejectionReason: z.string().nullish(),
+});
+export type Swap = z.infer<typeof swapSchema>;
+
+export async function getMySwaps(): Promise<Swap[]> {
+  const page = z.object({ content: z.array(swapSchema) }).parse(await api<unknown>("/api/v1/guard/shifts/swaps/my-swaps?size=30"));
+  return page.content;
+}
+
+/** An open request: any available guard, the supervisor decides. Naming a colleague needs a colleague list the server does not offer guards yet. */
+export async function requestSwap(originalShiftId: string, reason: string): Promise<Swap> {
+  return swapSchema.parse(
+    await api<unknown>("/api/v1/guard/shifts/swaps", {
+      method: "POST",
+      body: { originalShiftId, proposedGuardId: null, reason: reason.trim() || null },
+    }),
+  );
+}
+
+export async function acceptSwap(id: string): Promise<Swap> {
+  return swapSchema.parse(await api<unknown>(`/api/v1/guard/shifts/swaps/${id}/accept`, { method: "POST" }));
+}
+
+export async function cancelSwap(id: string): Promise<Swap> {
+  return swapSchema.parse(await api<unknown>(`/api/v1/guard/shifts/swaps/${id}`, { method: "DELETE" }));
+}

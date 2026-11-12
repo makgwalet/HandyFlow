@@ -78,6 +78,7 @@ export function HomeScreen({ navigation }: Props) {
       {open ? (
         <View style={s.stack}>
           <Button label="Patrol rounds" onPress={() => navigation.navigate("Patrol")} />
+          <Button label="My post orders" tone="plain" onPress={() => navigation.navigate("MyPost")} />
           <Button label="Scan checkpoint" onPress={() => navigation.navigate("Scan", { shiftId: open.shiftId ?? null })} />
           <Button
             label="Report an incident"
@@ -91,6 +92,7 @@ export function HomeScreen({ navigation }: Props) {
         <Button label="Start shift" onPress={() => clockInM.mutate()} loading={clockInM.isPending} disabled={!deviceQ.data} />
       )}
 
+      <Button label="Shift swaps" tone="plain" onPress={() => navigation.navigate("Swaps")} />
       <PanicButton />
       {pendingCount > 0 ? (
         <Text style={s.muted}>Sign out is available once your {pendingCount} waiting item(s) are sent, so nothing is lost.</Text>

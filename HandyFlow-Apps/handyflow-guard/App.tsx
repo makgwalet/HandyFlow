@@ -14,6 +14,8 @@ import { PatrolScreen } from "@/screens/PatrolScreen";
 import { ScanScreen } from "@/screens/ScanScreen";
 import { IncidentScreen } from "@/screens/IncidentScreen";
 import { ClockOutScreen } from "@/screens/ClockOutScreen";
+import { MyPostScreen } from "@/screens/MyPostScreen";
+import { SwapsScreen } from "@/screens/SwapsScreen";
 import type { RootStackParamList } from "@/screens/types";
 import { colors } from "@/ui/theme";
 
@@ -28,6 +30,8 @@ function SignedIn() {
         <Stack.Navigator>
           <Stack.Screen name="Home" component={HomeScreen} options={{ title: "HandyFlow Guard", headerBackVisible: false }} />
           <Stack.Screen name="Patrol" component={PatrolScreen} options={{ title: "Patrol" }} />
+          <Stack.Screen name="MyPost" component={MyPostScreen} options={{ title: "My post" }} />
+          <Stack.Screen name="Swaps" component={SwapsScreen} options={{ title: "Swaps" }} />
           <Stack.Screen name="Scan" component={ScanScreen} options={{ title: "Scan" }} />
           <Stack.Screen name="Incident" component={IncidentScreen} options={{ title: "Incident" }} />
           <Stack.Screen name="ClockOut" component={ClockOutScreen} options={{ title: "End shift" }} />

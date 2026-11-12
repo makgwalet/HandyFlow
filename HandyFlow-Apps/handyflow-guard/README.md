@@ -22,7 +22,9 @@ Done (screens, patch 0818): shift and clock in/out, patrol rounds with checkpoin
 Offline: every scan, incident and panic is saved in SQLite first, then sent. Each carries a `clientRef` and `recordedAt`. Panic sends first, then incidents, then scans. No signal or an expired sign-in stops sending and keeps everything; a request the server refuses for good is parked as failed and shown. Each item is only ever sent under its own guard's sign-in (shared tablets), and Sign out is blocked while items are waiting.
 Incident photos: up to 5 per report, taken in the report screen, kept in the app's private storage, queued behind the report and uploaded by the report's id (a retry never attaches twice); the phone's copy is deleted after a successful upload. A photo whose report was refused for good stays parked as failed.
 
-Not done: push alerts, supervisor mode, shift swaps, post orders, equipment checkout, gate log, EAS builds, real icon and splash, translations.
+My post orders (read the site and post orders, acknowledge the version read; needs signal, not queued offline) and shift swaps (ask for an open swap of an upcoming shift, accept one proposed to you, cancel yours; the supervisor decides).
+
+Not done: push alerts, supervisor mode, naming a colleague for a swap (the server has no guard-facing colleague list), offline acknowledgement, equipment checkout, gate log, EAS builds, real icon and splash, translations.
 Never run on a phone or emulator: checked only by type check, unit tests and an Android bundle build.
 
 ## Rules for this app
