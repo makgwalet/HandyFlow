@@ -116,7 +116,7 @@ export default function ReceiptsTab() {
                   <td style={{ padding: "12px 14px", color: "var(--hf-text-tertiary)" }}>{tankMap[r.tankId] ?? "—"}</td>
                   <td style={{ padding: "12px 14px", fontWeight: 700, color: "var(--hf-accent-text)" }}>{Number(r.litresReceived).toLocaleString()} L</td>
                   <td style={{ padding: "12px 14px", color: "var(--hf-text-tertiary)" }}>{r.pricePerLitre ? `R ${Number(r.pricePerLitre).toFixed(3)}` : "—"}</td>
-                  <td style={{ padding: "12px 14px", fontWeight: 700, color: "var(--hf-text)" }}>{fmtR(r.totalCost)}</td>
+                  <td style={{ padding: "12px 14px", fontWeight: 700, color: "var(--hf-text)" }}>{fmtR(r.totalCost)}{r.freightAmount ? <div style={{ fontWeight: 500, fontSize: 11, color: "var(--hf-text-muted)" }}>+ {fmtR(r.freightAmount)} freight</div> : null}</td>
                   <td style={{ padding: "12px 14px", color: "var(--hf-text-tertiary)", fontSize: 12 }}>{r.deliveryNote || "—"}</td>
                   <td style={{ padding: "12px 14px", color: "var(--hf-text-faint)", fontSize: 12 }}>{r.invoiceRef || "—"}</td>
                   <td style={{ padding: "12px 14px", fontSize: 12, color: "var(--hf-text-muted)", whiteSpace: "nowrap" }}>

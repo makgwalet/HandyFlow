@@ -21,7 +21,7 @@ FUEL_MARGIN_READ on the endpoint, requireModule("fuel"), tenant from context, di
 - Web: LandedCostTab (4), landedCostOps (3). tsc clean.
 
 ## Gaps and risks
-- Inbound freight from supplier to depot is not recorded anywhere, so "landed" here means landed at the customer's tank, not at the depot.
+- Inbound freight is included from patch 0801 onward, when it is entered at receipt. Receipts made before that, or without freight, carry the supplier price only.
 - Cost at sale is the tank's weighted-average cost when sold, so it moves with purchase timing.
 - Transport is not split by customer; use Cost to serve for customers.
 - No forecourt, no export.

@@ -39,7 +39,7 @@ export default function LandedCostTab() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
         <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: 0, flex: 1, minWidth: 260 }}>
-          What a litre really cost by the time it reached the customer: the cost of the fuel when it was sold, plus the vehicle, driver, toll and other costs recorded on the route. Only routes with every cost recorded are counted, so a missing cost is never read as zero. Depot figures share a route by litres delivered from each depot.
+          What a litre really cost by the time it reached the customer: the cost of the fuel when it was sold (including inbound freight when it was entered at receipt), plus the vehicle, driver, toll and other costs recorded on the route. Only routes with every cost recorded are counted, so a missing cost is never read as zero. Depot figures share a route by litres delivered from each depot.
         </p>
         <select aria-label="Period" value={days} onChange={e => setDays(Number(e.target.value))} style={{ ...inputStyle, width: "auto" }}>
           {PERIODS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}

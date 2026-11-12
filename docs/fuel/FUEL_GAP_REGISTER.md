@@ -109,3 +109,6 @@ Built (patch 0797, no migration): per route, tanker and depot, the cost at sale 
 
 ## Phase 7a - Returned fuel (2026-11-12)
 Built (patch 0800, V679): confirm which tank fuel brought back on a failed attempt was put into; limit is what was declared returned plus loaded-not-delivered litres; append-only; books NO stock movement because tanks are only deducted at delivery completion. Not built: fuel-type check against the tank, link to tank reconciliation. See FUEL-PHASE7A-RETURNED-FUEL-NOTES-2026-11-12.md.
+
+## Phase 7b - Inbound freight (2026-11-12)
+Built (patch 0801, V680): optional freight on a stock receipt, spread over the litres and added to the tank's weighted-average cost; supplier price and receipt total unchanged so PO and invoice matching are unaffected. Not built: freight added after the receipt, carrier invoices through AP, freight on the PO match screen, VAT handling. See FUEL-PHASE7B-INBOUND-FREIGHT-NOTES-2026-11-12.md.

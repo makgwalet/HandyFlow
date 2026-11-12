@@ -70,6 +70,12 @@ public class FuelReceipt {
     @Column(name = "purchase_order_id")
     private UUID purchaseOrderId;
 
+    @Column(name = "freight_amount", precision = 14, scale = 2)
+    private BigDecimal freightAmount;
+
+    @Column(name = "freight_note", length = 200)
+    private String freightNote;
+
     @Column(name = "reversed_at")
     private Instant reversedAt;
 
@@ -103,6 +109,25 @@ public class FuelReceipt {
     }
 
     public void assignPurchaseOrder(UUID purchaseOrderId) { this.purchaseOrderId = purchaseOrderId; }
+
+    /**
+     * What the tank's cost should be built from: the supplier's price plus the freight spread over the litres received. With no freight it
+     * is exactly the supplier's price. Pure function so the receipt service and the tests use the same arithmetic.
+     */
+    public static BigDecimal landedPrice(BigDecimal pricePerLitre, BigDecimal litres, BigDecimal freightAmount) {
+        if (freightAmount == null || freightAmount.signum() == 0) return pricePerLitre;
+        if (freightAmount.signum() < 0) throw new IllegalArgumentException("Freight cannot be negative.");
+        return pricePerLitre.add(freightAmount.divide(litres, 4, java.math.RoundingMode.HALF_UP));
+    }
+
+    public void recordFreight(BigDecimal freightAmount, String note) {
+        if (freightAmount != null && freightAmount.signum() < 0) throw new IllegalArgumentException("Freight cannot be negative.");
+        this.freightAmount = freightAmount == null || freightAmount.signum() == 0 ? null : freightAmount.setScale(2, java.math.RoundingMode.HALF_UP);
+        this.freightNote = this.freightAmount == null || note == null || note.isBlank() ? null : (note.trim().length() > 200 ? note.trim().substring(0, 200) : note.trim());
+    }
+
+    /** Supplier price plus freight per litre; the supplier price when there is no freight. */
+    public BigDecimal landedPricePerLitre() { return landedPrice(pricePerLitre, litresReceived, freightAmount); }
 
     public boolean isDeleted() { return deletedAt != null; }
 

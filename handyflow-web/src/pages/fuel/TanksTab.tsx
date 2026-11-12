@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { validateFreight, landedText } from "./receiveOps"
 import { Plus, Droplets, AlertTriangle, X, ChevronDown, ChevronUp, AlertCircle, Download } from "lucide-react"
 
 interface Tank {
@@ -42,7 +43,7 @@ export default function TanksTab() {
   const [error, setError]           = useState("")
 
   const [tankForm, setTankForm]     = useState({ name: "", fuelType: "DIESEL", capacityLitres: "", location: "", lowThresholdPct: "20" })
-  const [receiveForm, setReceiveForm] = useState({ litresReceived: "", pricePerLitre: "", supplierId: "", deliveryNote: "", invoiceRef: "", purchaseOrderId: "" })
+  const [receiveForm, setReceiveForm] = useState({ litresReceived: "", pricePerLitre: "", supplierId: "", deliveryNote: "", invoiceRef: "", purchaseOrderId: "", freightAmount: "", freightNote: "" })
   const [dipForm, setDipForm]       = useState({ actualLitres: "", readBy: "", notes: "" })
 
   const { data: tanks = [], isLoading } = useQuery<Tank[]>({
@@ -106,7 +107,7 @@ export default function TanksTab() {
   const receiveFuel = useMutation({
     mutationFn: ({ tankId, body }: { tankId: string; body: any }) =>
       apiClient.post(`/api/v1/fuel/tanks/${tankId}/receive`, body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tanks"] }); qc.invalidateQueries({ queryKey: ["receipts"] }); setShowReceive(null); setReceiveForm({ litresReceived: "", pricePerLitre: "", supplierId: "", deliveryNote: "", invoiceRef: "", purchaseOrderId: "" }); setError("") },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tanks"] }); qc.invalidateQueries({ queryKey: ["receipts"] }); setShowReceive(null); setReceiveForm({ litresReceived: "", pricePerLitre: "", supplierId: "", deliveryNote: "", invoiceRef: "", purchaseOrderId: "", freightAmount: "", freightNote: "" }); setError("") },
     onError: (e: any) => setError(e.response?.data?.message ?? "Failed to receive fuel"),
   })
 
@@ -146,12 +147,14 @@ export default function TanksTab() {
         deliveryNote: "",
         invoiceRef: "",
         purchaseOrderId: "",
+        freightAmount: "",
+        freightNote: "",
       })
       setPrefilled(!!(s?.suggestedLitres || s?.lastSupplierId))
     } catch {
       // Suggestion is a convenience, not a requirement — fall back to a blank form
       // rather than blocking the receive flow if the endpoint has a hiccup.
-      setReceiveForm({ litresReceived: "", pricePerLitre: "", supplierId: "", deliveryNote: "", invoiceRef: "", purchaseOrderId: "" })
+      setReceiveForm({ litresReceived: "", pricePerLitre: "", supplierId: "", deliveryNote: "", invoiceRef: "", purchaseOrderId: "", freightAmount: "", freightNote: "" })
     }
     setShowReceive(tank)
   }
@@ -462,6 +465,14 @@ export default function TanksTab() {
                 </select>
               </div>
             )}
+            <div>
+              <label style={lbl}>Inbound freight (R, total)</label>
+              <input aria-label="Inbound freight" type="number" step="0.01" min="0" value={receiveForm.freightAmount} onChange={e => setReceiveForm(f => ({ ...f, freightAmount: e.target.value }))} placeholder="Optional" style={inp} />
+            </div>
+            <div>
+              <label style={lbl}>Freight note</label>
+              <input aria-label="Freight note" maxLength={200} value={receiveForm.freightNote} onChange={e => setReceiveForm(f => ({ ...f, freightNote: e.target.value }))} placeholder="Carrier invoice no." style={inp} />
+            </div>
             <div style={{ gridColumn: "1 / -1" }}>
               <label style={lbl}>Invoice Reference</label>
               <input value={receiveForm.invoiceRef} onChange={e => setReceiveForm(f => ({ ...f, invoiceRef: e.target.value }))} placeholder="SASOL-INV-8834" style={inp} />
@@ -470,13 +481,17 @@ export default function TanksTab() {
           {receiveForm.litresReceived && receiveForm.pricePerLitre && (
             <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border-subtle)", borderRadius: 8, fontSize: 13, color: "var(--hf-success-text-strong)", fontWeight: 600 }}>
               Total cost: {fmtR(Number(receiveForm.litresReceived) * Number(receiveForm.pricePerLitre))}
+              {landedText(receiveForm.litresReceived, receiveForm.pricePerLitre, receiveForm.freightAmount) && (
+                <div style={{ fontWeight: 500, fontSize: 12, marginTop: 4 }}>The tank's cost will be built from {landedText(receiveForm.litresReceived, receiveForm.pricePerLitre, receiveForm.freightAmount)}. The supplier's price and total above stay as charged.</div>
+              )}
             </div>
           )}
+          {validateFreight(receiveForm.freightAmount) && <ErrBanner msg={validateFreight(receiveForm.freightAmount) as string} />}
           {error && <ErrBanner msg={error} />}
           <MFoot onCancel={() => { setShowReceive(null); setError("") }}
-            onSubmit={() => receiveFuel.mutate({ tankId: showReceive.id, body: { litresReceived: Number(receiveForm.litresReceived), pricePerLitre: Number(receiveForm.pricePerLitre), receivedAt: new Date().toISOString(), supplierId: receiveForm.supplierId || null, purchaseOrderId: receiveForm.purchaseOrderId || null, deliveryNote: receiveForm.deliveryNote || null, invoiceRef: receiveForm.invoiceRef || null } })}
+            onSubmit={() => receiveFuel.mutate({ tankId: showReceive.id, body: { litresReceived: Number(receiveForm.litresReceived), pricePerLitre: Number(receiveForm.pricePerLitre), receivedAt: new Date().toISOString(), supplierId: receiveForm.supplierId || null, purchaseOrderId: receiveForm.purchaseOrderId || null, deliveryNote: receiveForm.deliveryNote || null, invoiceRef: receiveForm.invoiceRef || null, freightAmount: receiveForm.freightAmount.trim() === "" ? null : Number(receiveForm.freightAmount), freightNote: receiveForm.freightNote.trim() || null } })}
             loading={receiveFuel.isPending} label="Receive Fuel"
-            disabled={!receiveForm.litresReceived || !receiveForm.pricePerLitre} />
+            disabled={!receiveForm.litresReceived || !receiveForm.pricePerLitre || !!validateFreight(receiveForm.freightAmount)} />
         </Overlay>
       )}
 

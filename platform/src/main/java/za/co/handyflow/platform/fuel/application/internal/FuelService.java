@@ -387,7 +387,8 @@ public class FuelService {
         // addStock validates capacity — throws if would overflow.
         // Now also recalculates the tank's weighted-average cost —
         // see FuelTank.addStock()'s own comment for the formula.
-        var levelAfter = tank.addStock(req.litresReceived(), req.pricePerLitre());
+        // Phase 7b: the tank's cost is built from the supplier price plus any freight entered for this delivery.
+        var levelAfter = tank.addStock(req.litresReceived(), FuelReceipt.landedPrice(req.pricePerLitre(), req.litresReceived(), req.freightAmount()));
         tankRepository.save(tank);
 
         FuelReceipt receipt = FuelReceipt.create(tenantId, tankId,
@@ -395,6 +396,7 @@ public class FuelService {
                 req.receivedAt(), req.deliveryNote(), req.invoiceRef(),
                 levelBefore, levelAfter);
         receipt.assignPurchaseOrder(req.purchaseOrderId());
+        receipt.recordFreight(req.freightAmount(), req.freightNote());
         receiptRepository.save(receipt);
         if (req.purchaseOrderId() != null) purchasing.resync(tenantId, req.purchaseOrderId());
         ledger.post(tank, FuelStockMovement.Type.RECEIPT, req.litresReceived(), "RECEIPT", receipt.getId(),
@@ -800,7 +802,8 @@ public class FuelService {
                 r.getLitresReceived(), r.getPricePerLitre(), r.getTotalCost(),
                 r.getReceivedAt(), r.getDeliveryNote(), r.getInvoiceRef(),
                 r.getLevelBefore(), r.getLevelAfter(), r.getCreatedAt(),
-                r.getReversedAt(), r.getReversalReason());
+                r.getReversedAt(), r.getReversalReason(),
+                r.getFreightAmount(), r.getFreightNote(), r.landedPricePerLitre());
     }
 
     private DispatchResponse toDispatchResponse(FuelDispatch d) {
