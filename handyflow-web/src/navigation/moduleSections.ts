@@ -275,6 +275,7 @@ export const FUEL_SECTIONS: ModuleSections = {
       label: 'Truck stop',
       sections: [
         { id: 'truck-stop', label: 'Truck stop', icon: Car, anyPermission: ['FUEL_READ', 'FUEL_TRUCKSTOP_MANAGE', 'FUEL_MANAGE'], divisions: ['TRUCK_STOP'] },
+        { id: 'overnight-stays', label: 'Overnight stays', icon: Car, anyPermission: ['FUEL_READ', 'FUEL_TRUCKSTOP_MANAGE', 'FUEL_MANAGE'], divisions: ['TRUCK_STOP'] },
       ],
     },
     {

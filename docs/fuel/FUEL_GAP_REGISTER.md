@@ -23,7 +23,7 @@ Priority: P0 security/integrity/financial/tenant/critical · P1 essential · P2 
 | D01 | Retail | Nozzles, tank-to-pump reconciliation | pumps + readings | no nozzles | Pump accuracy | none | P1 | A02 | Nozzle entity |
 | D02 | Retail | Refunds, voids, discounts, fleet-card tender, supervisor approval | `FuelShift.close` records cash, card, account and other, closed_by, variance vs a R5 constant (V655) | No separate fleet-card tender, refunds, voids, discounts or supervisor approval; tolerance is a code constant; no check that the closer differs from the opener (not found) | Cash control | Self-close possible (no rule found) | P1 | none | Configurable tolerance, supervisor approval over tolerance, tender types |
 | D03 | Retail | POS/pump integration | none | Needs real integration | n/a | n/a | P2 | External | Define integration boundary only |
-| E01 | Truck stop | Entire division | **v1 built (V669)**: timed services reserved through Bookings. Not built: multi-night parking, fleet accounts, invoicing/payment, POS items | everything else | New revenue line | n/a | P2 | A02, Bookings/POS/Fleet facades | Phase 5 |
+| E01 | Truck stop | Entire division | **v1 built (V669)**: timed services reserved through Bookings. Multi-night parking built in 0803 (V682). Not built: fleet accounts, invoicing/payment, POS items | everything else | New revenue line | n/a | P2 | A02, Bookings/POS/Fleet facades | Phase 5 |
 | F01 | Compliance | Entity/licence/site linkage | `FuelComplianceItem` generic with expiry | no legal entity, licensed activity, site, vehicle or person link; no evidence | Regulatory traceability | none | P0 (spec) | A03 | Licence model on legal entity |
 | F02 | Cost | Actual vs estimate | cost-to-serve flags estimates | no per vehicle/route/depot, no reconciled costs | Profit accuracy | none | P2 | C04 | Extend | **Done (route level, 0791, V674)**: estimate vs user-entered actuals per route, rollups by tanker and depot. Rates come from tenant settings. Tolls/other shown, not compared. Fuel purchase cost excluded. |
 | G01 | Platform | Permissions granularity | 10 FUEL_* permissions; 72 uses of FUEL_MANAGE; inline `FUEL_CREDIT_OVERRIDE` check | Coarse write permission; no division/site scope | Least privilege | Over-broad write access | P1 | A02 | Granular permissions per brief, mapped from FUEL_MANAGE for existing roles |
@@ -81,7 +81,7 @@ Built (patch 0782): 12 area MANAGE permissions beside FUEL_MANAGE (umbrella kept
 
 ## E01 - Truck Stop v1 (2026-11-12)
 - Built: truck stop services (a Bookings service marked as parking, shower, wash, weighbridge, workshop, food or other), reservations through a new `BookingsFacade` with truck and driver details kept in Fuel, cancel/complete/no-show, a Truck stop screen gated by the Truck Stop division. See FUEL-E01-TRUCK-STOP-NOTES-2026-11-12.
-- Not built: multi-night parking (Bookings is single-day slots), fleet accounts and charge-to-account, invoicing or payment, POS items, driver self-service, capacity view.
+- Multi-night parking built separately in 0803 (Bookings is single-day slots). Not built here, fleet accounts and charge-to-account, invoicing or payment, POS items, driver self-service, capacity view.
 
 ## B06a - Enquiries, quote history, acceptance (2026-11-12)
 - Built: enquiries (EQ-numbers, quote / lost / cancelled with reasons), append-only quotation version history with price change, optional acceptance record on confirmation (who, how, reference, which version). See FUEL-B06A-NOTES-2026-11-12.
@@ -115,3 +115,6 @@ Built (patch 0801, V680): optional freight on a stock receipt, spread over the l
 
 ## Phase 7c - Supply contracts, B06b (2026-11-12)
 Built (patch 0802, V681): contracts that group and report only: number, customer account, dates, optional fuel and committed litres, terms; link to the account's existing prices (no price held); litres delivered against commitment, days left, status; cancel with reason. Not built: terms document upload, expiry reminder, any enforcement in orders or invoices, volume-tier pricing (decided against). See FUEL-PHASE7C-CONTRACTS-NOTES-2026-11-12.md.
+
+## Phase 7d - Overnight stays (2026-11-12)
+Built (patch 0803, V682): Fuel-owned multi-night parking for the Truck Stop division: company-set nightly rate and bay count, stays that keep the rate they were booked at, check in and out, cancel, no-show, change departure, bay capacity per night, overstay flag, yard today. Bookings untouched. Not built: invoicing or charge to account, named bays, capacity lock under concurrent booking, Fleet link. See FUEL-PHASE7D-OVERNIGHT-STAYS-NOTES-2026-11-12.md.
