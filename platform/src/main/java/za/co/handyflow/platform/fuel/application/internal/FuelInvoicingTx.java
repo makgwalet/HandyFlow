@@ -5,6 +5,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.fuel.domain.model.FuelDelivery;
+import za.co.handyflow.platform.fuel.domain.model.FuelInvoiceAttempt;
+import za.co.handyflow.platform.fuel.domain.repository.FuelInvoiceAttemptRepository;
 import za.co.handyflow.platform.fuel.domain.repository.FuelDeliveryRepository;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -25,6 +27,42 @@ public class FuelInvoicingTx {
     static final Duration STALE_CLAIM = Duration.ofMinutes(15);
 
     private final FuelDeliveryRepository deliveries;
+    private final FuelInvoiceAttemptRepository attempts;
+
+    /** Records that an attempt has begun. Its own transaction, so the record survives whatever happens next. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public UUID startAttempt(TenantId tenantId, UUID customerId, Collection<UUID> ids, UUID by) {
+        return attempts.save(FuelInvoiceAttempt.start(tenantId, customerId, ids, by)).getId();
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void attemptCreated(TenantId tenantId, UUID attemptId, UUID invoiceId, String invoiceNumber) {
+        attempts.findOwned(tenantId, attemptId).ifPresent(a -> { a.created(invoiceId, invoiceNumber); attempts.save(a); });
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void attemptFailed(TenantId tenantId, UUID attemptId, String message) {
+        attempts.findOwned(tenantId, attemptId).ifPresent(a -> { a.failed(message); attempts.save(a); });
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void attemptLinkFailed(TenantId tenantId, UUID attemptId, UUID invoiceId, String invoiceNumber, String message) {
+        attempts.findOwned(tenantId, attemptId).ifPresent(a -> { a.linkFailed(invoiceId, invoiceNumber, message); attempts.save(a); });
+    }
+
+    /**
+     * An earlier attempt created an invoice for one of these deliveries but could not link it. Invoicing them again would bill the
+     * customer twice, so refuse until a person has finished that attempt on the Needs attention list.
+     */
+    @Transactional(readOnly = true)
+    public void requireNoUnlinkedInvoice(TenantId tenantId, Collection<UUID> ids) {
+        var open = attempts.findUnlinkedCovering(tenantId, ids);
+        if (!open.isEmpty()) {
+            String no = open.get(0).getInvoiceNumber();
+            throw new IllegalStateException("An earlier attempt already created invoice " + (no == null ? "(number unknown)" : no)
+                    + " for some of these deliveries but could not link it. Finish that on the Needs attention list before invoicing them again.");
+        }
+    }
 
     /** All-or-nothing: either every delivery is claimed or none is. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)

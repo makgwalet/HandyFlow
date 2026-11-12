@@ -133,4 +133,61 @@ class FuelInvoicingServiceTest {
         a.markInvoiceFailed("x");
         assertFalse(a.isInvoiceLocked());
     }
+
+    // ---- G02: the attempt trail ----
+
+    @Test @DisplayName("G02: a successful invoice records an attempt that starts, then finishes as created")
+    void attemptTrailOnSuccess() {
+        FuelDelivery a = delivered(customer, "1000");
+        UUID attempt = UUID.randomUUID(), inv = UUID.randomUUID(), by = UUID.randomUUID();
+        when(deliveries.findAllByIds(eq(T), any())).thenReturn(new ArrayList<>(List.of(a)));
+        when(tx.startAttempt(eq(T), eq(customer), any(), eq(by))).thenReturn(attempt);
+        when(invoicing.createDraftInvoice(any(), any())).thenReturn(new InvoicingFacade.DraftInvoiceResult(inv, "INV-7", bd("1"), bd("0"), bd("1")));
+        service.invoice(T, new CreateInvoiceFromDeliveriesRequest(List.of(a.getId())), by);
+        verify(tx).attemptCreated(T, attempt, inv, "INV-7");
+        verify(tx, never()).attemptFailed(any(), any(), any());
+    }
+
+    @Test @DisplayName("G02: a failure in Invoicing is recorded on the attempt as FAILED")
+    void attemptTrailOnFailure() {
+        FuelDelivery a = delivered(customer, "1000");
+        UUID attempt = UUID.randomUUID();
+        when(deliveries.findAllByIds(eq(T), any())).thenReturn(new ArrayList<>(List.of(a)));
+        when(tx.startAttempt(any(), any(), any(), any())).thenReturn(attempt);
+        when(invoicing.createDraftInvoice(any(), any())).thenThrow(new IllegalArgumentException("nope"));
+        assertThrows(IllegalStateException.class, () -> service.invoice(T, new CreateInvoiceFromDeliveriesRequest(List.of(a.getId())), null));
+        verify(tx).attemptFailed(T, attempt, "nope");
+    }
+
+    @Test @DisplayName("G02: an invoice created but not linkable is recorded as LINK_FAILED with the invoice id kept")
+    void attemptTrailOnLinkFailure() {
+        FuelDelivery a = delivered(customer, "1000");
+        UUID attempt = UUID.randomUUID(), inv = UUID.randomUUID();
+        when(deliveries.findAllByIds(eq(T), any())).thenReturn(new ArrayList<>(List.of(a)));
+        when(tx.startAttempt(any(), any(), any(), any())).thenReturn(attempt);
+        when(invoicing.createDraftInvoice(any(), any())).thenReturn(new InvoicingFacade.DraftInvoiceResult(inv, "INV-9", bd("1"), bd("0"), bd("1")));
+        doThrow(new IllegalStateException("db down")).when(tx).link(any(), any(), any(), any());
+        assertThrows(IllegalStateException.class, () -> service.invoice(T, new CreateInvoiceFromDeliveriesRequest(List.of(a.getId())), null));
+        verify(tx).attemptLinkFailed(T, attempt, inv, "INV-9", "db down");
+        verify(tx, never()).attemptCreated(any(), any(), any(), any());
+    }
+
+    @Test @DisplayName("G02: if the trail cannot be written the invoice still goes ahead")
+    void trailFailureDoesNotBlockInvoicing() {
+        FuelDelivery a = delivered(customer, "1000");
+        when(deliveries.findAllByIds(eq(T), any())).thenReturn(new ArrayList<>(List.of(a)));
+        when(tx.startAttempt(any(), any(), any(), any())).thenThrow(new RuntimeException("trail table unavailable"));
+        when(invoicing.createDraftInvoice(any(), any())).thenReturn(new InvoicingFacade.DraftInvoiceResult(UUID.randomUUID(), "INV-1", bd("1"), bd("0"), bd("1")));
+        assertEquals("INV-1", service.invoice(T, new CreateInvoiceFromDeliveriesRequest(List.of(a.getId())), null).invoiceNumber());
+    }
+
+    @Test @DisplayName("G02: deliveries with an unlinked earlier invoice are refused before any claim or call to Invoicing")
+    void unlinkedInvoiceBlocksReinvoicing() {
+        FuelDelivery a = delivered(customer, "1000");
+        when(deliveries.findAllByIds(eq(T), any())).thenReturn(new ArrayList<>(List.of(a)));
+        doThrow(new IllegalStateException("An earlier attempt already created invoice INV-3")).when(tx).requireNoUnlinkedInvoice(any(), any());
+        assertThrows(IllegalStateException.class, () -> service.invoice(T, new CreateInvoiceFromDeliveriesRequest(List.of(a.getId())), null));
+        verify(tx, never()).claim(any(), any());
+        verify(invoicing, never()).createDraftInvoice(any(), any());
+    }
 }

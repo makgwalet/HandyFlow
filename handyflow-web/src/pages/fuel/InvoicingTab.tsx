@@ -5,6 +5,7 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { btnPrimary, card, Chip } from "../warehousing/whseUi"
 import { fmtL, fmtR, groupByCustomer, type QueueLine } from "./orderOps"
+import InvoiceAttentionPanel from "./InvoiceAttentionPanel"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const th: React.CSSProperties = { textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)" }
@@ -19,7 +20,7 @@ export default function InvoicingTab() {
   const create = useMutation({
     mutationFn: (ids: string[]) => apiClient.post("/api/v1/fuel/invoicing/invoice", { deliveryIds: ids }),
     onSuccess: (r: any) => { const d = unwrap(r); setErr(""); setPicked({}); setDone(`Draft invoice ${d.invoiceNumber} created for ${d.deliveries} deliver${d.deliveries === 1 ? "y" : "ies"}. Issue it in Invoicing.`); qc.invalidateQueries({ queryKey: ["fuel-invoice-queue"] }) },
-    onError: (e: any) => { setDone(""); setErr(e?.response?.data?.message ?? "Could not create the invoice"); qc.invalidateQueries({ queryKey: ["fuel-invoice-queue"] }) },
+    onError: (e: any) => { setDone(""); setErr(e?.response?.data?.message ?? "Could not create the invoice"); qc.invalidateQueries({ queryKey: ["fuel-invoice-queue"] }); qc.invalidateQueries({ queryKey: ["fuel-invoice-attempts"] }) },
   })
   const groups = groupByCustomer(queue.data ?? [])
   const total = (queue.data ?? []).reduce((s, l) => s + Number(l.totalAmount ?? 0), 0)
@@ -29,6 +30,7 @@ export default function InvoicingTab() {
       <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: "0 0 12px" }}>
         Fuel that has been delivered but not yet invoiced{queue.data?.length ? `: ${queue.data.length} load${queue.data.length === 1 ? "" : "s"}, ${fmtR(total)}` : ""}. Choose loads for one customer to create a draft invoice. A failed attempt stays here with the reason.
       </p>
+      <InvoiceAttentionPanel />
       {done && <p role="status" style={{ color: "var(--hf-success-text-strong)", fontSize: 13 }}>{done}</p>}
       {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 13 }}>{err}</p>}
       {queue.isLoading ? <p style={{ color: "var(--hf-text-muted)" }}>Loading…</p> : groups.length === 0 ? <p style={{ color: "var(--hf-text-muted)" }}>Nothing waiting: every delivered load has been invoiced.</p> : groups.map(g => {

@@ -69,3 +69,6 @@ Each row is a gap statement; the backend/frontend/database/permission/test lists
 
 ## B07 - Pricing approval (2026-11-12)
 Built (patch 0779): threshold and margin guard, approval via ApprovalFacade, change history. Margin uses latest receipt cost only. See FUEL-B07-PRICING-APPROVAL-NOTES-2026-11-12.md.
+
+## G02 - Invoice attempt trail (2026-11-12)
+Built (patch 0780): attempt trail, needs-attention panel, relink/release, block on re-invoicing unlinked deliveries. No automatic retry by design (no idempotency key in Invoicing). See FUEL-G02-INVOICE-ATTEMPTS-NOTES-2026-11-12.md.

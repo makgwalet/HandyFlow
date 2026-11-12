@@ -1,0 +1,12 @@
+# Fuel G02 - Invoice hand-off trail, relink and release (2026-11-12)
+**Implemented:** every hand-off from Fuel to Invoicing now leaves a durable record (STARTED, then CREATED / FAILED / LINK_FAILED, or RESOLVED by a person). Attempts that need a person appear in a "Needs attention" panel on the Invoicing tab: an invoice that was created but never linked to its deliveries (LINK_FAILED), or an attempt that never finished (STARTED for over 15 minutes). A person can relink (one click) or release the deliveries back to the queue (note required).
+**Closed a duplicate-billing path:** before this, a created-but-unlinked invoice left the deliveries claimed; after 15 minutes the claim went stale and the same deliveries could be invoiced again. Deliveries covered by an open LINK_FAILED attempt are now refused until a person finishes it.
+**Deliberately NOT built: automatic retry.** InvoicingFacade.createDraftInvoice has no idempotency key, so a blind retry after an unclear failure could create a second invoice. A plain FAILED attempt is safe for a person to retry (no invoice was created); that is the existing "Create draft invoice" action.
+**Preserved:** the invoicing flow, claim/stale rules and error messages are unchanged. The trail is best effort: if it cannot be written the invoice still goes ahead.
+**Files:** V664; FuelInvoiceAttempt, FuelInvoiceAttemptRepository, FuelInvoiceAttemptService, FuelInvoiceAttemptDtos, FuelInvoicingService/Tx, FuelDelivery.releaseInvoiceClaim, FuelOrderController; web InvoiceAttentionPanel, invoiceAttemptOps, InvoicingTab.
+**DB (V664, additive):** fuel_invoice_attempts, fuel_invoice_attempt_deliveries (cascade). Checked on scratch PostgreSQL 16.
+**API:** GET /api/v1/fuel/invoicing/attempts?attentionOnly, POST .../attempts/{id}/relink (FUEL_MANAGE), POST .../attempts/{id}/release (FUEL_MANAGE, note 5-300 chars). Same module guard as the rest.
+**Security:** tenant-scoped queries with row lock on the two actions; relink checks Invoicing still has the invoice and refuses if a delivery was since invoiced elsewhere.
+**Tests:** FuelInvoiceAttemptServiceTest (8), 5 more in FuelInvoicingServiceTest, web tests (InvoicingTab 7, invoiceAttemptOps 2; vitest run here, tsc see below). Java tests parse-checked only.
+**Gaps:** release trusts the person's check of Invoicing (no facade lookup by customer); no email/notification when an attempt needs attention; the attention count is not yet on the Fuel overview.
+**Next:** D01 nozzles.

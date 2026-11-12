@@ -13,7 +13,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.fuel.application.internal.FuelInvoiceAttemptService;
 import za.co.handyflow.platform.fuel.application.internal.FuelInvoicingService;
+import za.co.handyflow.platform.fuel.dto.FuelInvoiceAttemptDtos;
 import za.co.handyflow.platform.fuel.application.internal.FuelOrderService;
 import za.co.handyflow.platform.fuel.application.internal.FuelService;
 import za.co.handyflow.platform.fuel.dto.*;
@@ -32,6 +34,7 @@ public class FuelOrderController {
 
     private final FuelOrderService orders;
     private final FuelInvoicingService invoicing;
+    private final FuelInvoiceAttemptService attempts;
     private final FuelService fuel;
     private final FeatureGuard featureGuard;
 
@@ -113,7 +116,31 @@ public class FuelOrderController {
     public ResponseEntity<ApiResponse<InvoiceCreatedResponse>> invoice(@Valid @RequestBody CreateInvoiceFromDeliveriesRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Draft invoice created",
-                invoicing.invoice(TenantContext.getTenantIdAsObject(), req)));
+                invoicing.invoice(TenantContext.getTenantIdAsObject(), req, TenantContext.getCurrentUserId())));
+    }
+
+    /** G02: the trail of hand-offs to Invoicing. attentionOnly lists just the ones a person must finish. */
+    @GetMapping("/invoicing/attempts")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<List<FuelInvoiceAttemptDtos.AttemptView>>> attempts(@RequestParam(defaultValue = "false") boolean attentionOnly) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(attempts.list(TenantContext.getTenantIdAsObject(), attentionOnly)));
+    }
+
+    @PostMapping("/invoicing/attempts/{id}/relink")
+    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    public ResponseEntity<ApiResponse<FuelInvoiceAttemptDtos.AttemptView>> relink(@PathVariable UUID id, @RequestBody(required = false) FuelInvoiceAttemptDtos.ResolveRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Deliveries linked to the invoice",
+                attempts.relink(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId(), req == null ? null : req.note())));
+    }
+
+    @PostMapping("/invoicing/attempts/{id}/release")
+    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    public ResponseEntity<ApiResponse<FuelInvoiceAttemptDtos.AttemptView>> release(@PathVariable UUID id, @Valid @RequestBody FuelInvoiceAttemptDtos.ResolveRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Deliveries released to the queue",
+                attempts.release(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId(), req.note())));
     }
 
     private static boolean canOverrideCredit() {

@@ -10,6 +10,7 @@ vi.mock("../../hooks/usePermission", () => ({ usePermissions: (ps: string[]) => 
 
 const line = (o: any = {}) => ({ deliveryId: "d1", receiptNumber: "FDR-2026-00001", customerId: "c1", customerName: "Gold Mine Ltd", fuelType: "DIESEL", litresDelivered: 1000, pricePerLitre: 22.5, totalAmount: 22500, deliveredAt: "2026-11-11T10:00:00Z", invoiceState: "NONE", invoiceError: null, ...o })
 let queue: any[]
+let attempts: any[] = []
 function mount() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   render(<QueryClientProvider client={qc}><InvoicingTab /></QueryClientProvider>)
@@ -17,10 +18,10 @@ function mount() {
 
 describe("InvoicingTab", () => {
   beforeEach(() => {
-    get.mockReset(); post.mockReset(); perms = ["FUEL_MANAGE"]
+    get.mockReset(); post.mockReset(); perms = ["FUEL_MANAGE"]; attempts = []
     queue = [line(), line({ deliveryId: "d2", receiptNumber: "FDR-2026-00002", invoiceState: "FAILED", invoiceError: "That customer was not found." }),
       line({ deliveryId: "d3", receiptNumber: "FDR-2026-00003", customerId: null, customerName: null })]
-    get.mockImplementation(async () => ({ data: { data: queue } }))
+    get.mockImplementation(async (u: string) => ({ data: { data: String(u).includes("/attempts") ? attempts : queue } }))
     post.mockResolvedValue({ data: { data: { invoiceId: "i1", invoiceNumber: "INV-00042", deliveries: 2 } } })
   })
   afterEach(() => cleanup())
@@ -60,5 +61,34 @@ describe("InvoicingTab", () => {
     expect(screen.queryByText(/Create draft invoice/)).toBeNull()
     cleanup(); queue = []; mount()
     await waitFor(() => screen.getByText(/Nothing waiting/))
+  })
+
+  it("shows an invoice that was created but not linked, and links it in one click", async () => {
+    attempts = [{ id: "a1", customerName: "Gold Mine Ltd", status: "LINK_FAILED", needsAttention: true, receiptNumbers: ["FDR-2026-00001"], deliveryCount: 1, invoiceNumber: "INV-00099", error: "db down", startedAt: "2026-11-12T08:00:00Z" }]
+    post.mockResolvedValue({ data: { data: {} } })
+    mount()
+    await waitFor(() => screen.getByText(/Needs attention \(1\)/))
+    expect(screen.getByText(/Invoice INV-00099 was created for 1 delivery but they were not linked/)).toBeTruthy()
+    fireEvent.click(screen.getByText(/Link to INV-00099/))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/invoicing/attempts/a1/relink", {}))
+  })
+
+  it("will not release a never-finished attempt without a note, then sends the note", async () => {
+    attempts = [{ id: "a2", customerName: "Gold Mine Ltd", status: "STARTED", needsAttention: true, receiptNumbers: ["FDR-2026-00001"], deliveryCount: 1, invoiceNumber: null, error: null, startedAt: "2026-11-12T07:00:00Z" }]
+    post.mockResolvedValue({ data: { data: {} } })
+    mount()
+    await waitFor(() => screen.getByText(/never finished/))
+    fireEvent.click(screen.getByText("Release to queue"))
+    await waitFor(() => screen.getByText(/Say what you checked/))
+    expect(post).not.toHaveBeenCalledWith(expect.stringContaining("/release"), expect.anything())
+    fireEvent.change(screen.getByLabelText(/What you checked for a2/), { target: { value: "Checked Invoicing, none exists" } })
+    fireEvent.click(screen.getByText("Release to queue"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/invoicing/attempts/a2/release", { note: "Checked Invoicing, none exists" }))
+  })
+
+  it("shows no panel when nothing needs attention", async () => {
+    mount()
+    await waitFor(() => screen.getByText("FDR-2026-00001"))
+    expect(screen.queryByText(/Needs attention/)).toBeNull()
   })
 })

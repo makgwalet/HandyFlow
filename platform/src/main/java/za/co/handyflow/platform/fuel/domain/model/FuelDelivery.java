@@ -283,6 +283,12 @@ public class FuelDelivery {
         this.invoicedAt = Instant.now(); this.invoiceError = null; this.updatedAt = Instant.now();
     }
 
+    /** A person has checked that no invoice exists, so the delivery goes back to the queue. Only valid while claimed. */
+    public void releaseInvoiceClaim() {
+        if (!"INVOICING".equals(invoiceState)) throw new IllegalStateException("Delivery " + receiptNumber + " is not waiting on an invoice attempt.");
+        this.invoiceState = "NONE"; this.invoiceClaimedAt = null; this.invoiceError = null; this.updatedAt = Instant.now();
+    }
+
     public void markInvoiceFailed(String message) {
         this.invoiceState = "FAILED";
         this.invoiceError = message == null ? "Invoice could not be created." : (message.length() > 490 ? message.substring(0, 490) : message);

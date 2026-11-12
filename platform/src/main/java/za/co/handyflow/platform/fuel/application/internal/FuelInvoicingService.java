@@ -62,6 +62,12 @@ public class FuelInvoicingService {
     /** Not transactional on purpose: each step commits on its own so a failure leaves a visible trail. */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public InvoiceCreatedResponse invoice(TenantId tenantId, CreateInvoiceFromDeliveriesRequest req) {
+        return invoice(tenantId, req, null);
+    }
+
+    /** Not transactional on purpose: each step commits on its own so a failure leaves a visible trail. */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public InvoiceCreatedResponse invoice(TenantId tenantId, CreateInvoiceFromDeliveriesRequest req, UUID by) {
         Set<UUID> ids = new LinkedHashSet<>(req.deliveryIds());
         List<FuelDelivery> list = deliveries.findAllByIds(tenantId, ids);
         if (list.size() != ids.size()) throw new ResourceNotFoundException("Delivery", "one or more of the chosen deliveries");
@@ -71,7 +77,10 @@ public class FuelInvoicingService {
             if (d.getCustomerId() == null) throw new IllegalArgumentException("Delivery " + d.getReceiptNumber() + " has no customer, so it cannot be invoiced. Walk-in sales are billed at the point of sale.");
             if (!d.getCustomerId().equals(customerId)) throw new IllegalArgumentException("Choose deliveries for one customer at a time.");
         }
+        tx.requireNoUnlinkedInvoice(tenantId, ids);
         tx.claim(tenantId, ids);
+        // The trail is best effort: if it cannot be written the invoice still goes ahead, because the delivery state already tells the story.
+        UUID attemptId = startAttemptQuietly(tenantId, customerId, ids, by);
 
         DraftInvoiceResult result;
         try {
@@ -95,15 +104,37 @@ public class FuelInvoicingService {
             String why = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
             log.warn("Fuel invoicing failed for customer={} deliveries={}: {}", customerId, ids, why);
             tx.fail(tenantId, ids, why);
+            recordQuietly(attemptId, () -> tx.attemptFailed(tenantId, attemptId, why));
             throw new IllegalStateException("The invoice could not be created: " + why + " The deliveries stay in the queue.");
         }
+        final DraftInvoiceResult created = result;
         try {
             tx.link(tenantId, ids, result.id(), result.invoiceNumber());
+            recordQuietly(attemptId, () -> tx.attemptCreated(tenantId, attemptId, created.id(), created.invoiceNumber()));
         } catch (RuntimeException e) {
+            recordQuietly(attemptId, () -> tx.attemptLinkFailed(tenantId, attemptId, created.id(), created.invoiceNumber(), e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
             // The invoice exists; the claim will go stale and show up again. Say so rather than hide it.
             log.error("Invoice {} was created but could not be linked to deliveries {}", result.invoiceNumber(), ids, e);
-            throw new IllegalStateException("Invoice " + result.invoiceNumber() + " was created in Invoicing but could not be linked here. Do not invoice these deliveries again; contact support.");
+            throw new IllegalStateException("Invoice " + result.invoiceNumber() + " was created in Invoicing but could not be linked here. Do not invoice these deliveries again; it is on the Needs attention list to finish.");
         }
         return new InvoiceCreatedResponse(result.id(), result.invoiceNumber(), result.subtotal(), result.vatTotal(), result.total(), ids.size());
+    }
+
+    private UUID startAttemptQuietly(TenantId tenantId, UUID customerId, Set<UUID> ids, UUID by) {
+        try {
+            return tx.startAttempt(tenantId, customerId, ids, by);
+        } catch (RuntimeException e) {
+            log.error("Could not record the invoice attempt for deliveries {}: {}", ids, e.getMessage());
+            return null;
+        }
+    }
+
+    private void recordQuietly(UUID attemptId, Runnable step) {
+        if (attemptId == null) return;
+        try {
+            step.run();
+        } catch (RuntimeException e) {
+            log.error("Could not update the invoice attempt record: {}", e.getMessage());
+        }
     }
 }
