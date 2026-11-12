@@ -5,6 +5,9 @@ import CostToServeTab from "./CostToServeTab"
 
 const get = vi.fn()
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a) } }))
+vi.mock("../../hooks/usePermission", () => ({ usePermissions: () => false }))
+let bodyNow: any
+const routeReport = { from: "2026-10-13", to: "2026-11-11", ratesSet: true, unreconciledRoutes: 0, routes: [], byTanker: [], byDepot: [] }
 
 const row = (o: any = {}) => ({ customerId: "c1", customerName: "Acme Mining", deliveries: 4, litres: 20000, revenue: 440000, margin: 40000, driverCost: 1200, vehicleCost: 3000,
   fixedCost: 200, overheadCost: 13200, netMargin: 22400, netPerLitre: 1.12, deliveriesWithoutDistance: 0, deliveriesWithEstimatedHours: 0, ...o })
@@ -18,13 +21,16 @@ function mount(onNavigate = vi.fn()) {
 }
 
 describe("CostToServeTab", () => {
-  beforeEach(() => { get.mockReset(); get.mockResolvedValue({ data: { data: body() } }) })
+  beforeEach(() => {
+    get.mockReset(); bodyNow = body()
+    get.mockImplementation(async (u: string) => ({ data: { data: u.includes("cost-actuals") ? routeReport : bodyNow } }))
+  })
   afterEach(cleanup)
 
   it("shows the customer's margin, each cost and the net margin", async () => {
     mount()
     expect(await screen.findByText("Acme Mining")).toBeTruthy()
-    expect(get.mock.calls[0][0]).toMatch(/cost-to-serve\?days=30/)
+    expect(get.mock.calls.some(c => /cost-to-serve\?days=30/.test(c[0]))).toBe(true)
     expect(screen.getByText("Net margin", { selector: "div" })).toBeTruthy()
   })
 
@@ -65,6 +71,6 @@ describe("CostToServeTab", () => {
     cleanup()
     get.mockRejectedValue(new Error("boom"))
     mount()
-    expect((await screen.findByRole("alert")).textContent).toMatch(/Could not load/)
+    await waitFor(() => expect(screen.getAllByRole("alert").some(a => /Could not load cost-to-serve/.test(a.textContent ?? ""))).toBe(true))
   })
 })

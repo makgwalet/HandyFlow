@@ -17,6 +17,9 @@ public interface FuelRouteRepository extends JpaRepository<FuelRoute, UUID> {
     @Query("SELECT r FROM FuelRoute r WHERE r.tenantId = :tenantId AND r.routeDate = :date ORDER BY r.createdAt")
     List<FuelRoute> findByDate(TenantId tenantId, LocalDate date);
 
+    @Query("SELECT r FROM FuelRoute r WHERE r.tenantId = :tenantId AND r.routeDate BETWEEN :from AND :to ORDER BY r.routeDate, r.createdAt")
+    List<FuelRoute> findBetween(TenantId tenantId, LocalDate from, LocalDate to);
+
     @Query("SELECT r FROM FuelRoute r WHERE r.tenantId = :tenantId AND r.id = :id")
     Optional<FuelRoute> findOne(TenantId tenantId, UUID id);
 

@@ -4,6 +4,7 @@ import { apiClient } from "../../api/client"
 import { card, inputStyle, Chip } from "../warehousing/whseUi"
 import { fmtL, fmtR } from "./orderOps"
 import { rowCaveats, losesMoneyToServe, type CostToServe } from "./costToServeOps"
+import RouteCostsPanel from "./RouteCostsPanel"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const th: React.CSSProperties = { textAlign: "right", padding: "10px 12px", fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", whiteSpace: "nowrap" }
@@ -79,6 +80,7 @@ export default function CostToServeTab({ onNavigate }: { onNavigate?: (section: 
           )}
         </>
       )}
+      <RouteCostsPanel days={days} />
     </div>
   )
 }
