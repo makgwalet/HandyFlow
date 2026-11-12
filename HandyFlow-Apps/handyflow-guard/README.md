@@ -35,3 +35,11 @@ Never run on a phone or emulator: checked only by type check, unit tests and an 
 - The phone never states who the guard is, whether a PIN passed, or whether they are inside the geofence. The server decides all three (assessment R1, R2). Clock-in sends only `{deviceHardwareId, latitude, longitude, accuracyMetres}` to `POST /api/v1/guard/sessions/open` (backend patch 0815); it never sends a guard id or check results.
 - Writes that can be repeated (scan, incident, panic) get a client-generated `clientRef` (UUID, made once per action and reused on every retry) and a `recordedAt` before they go on the wire. Backend support is in patch 0817. Clock-in is online-only.
 - Token only in secure storage. No guard data in logs.
+
+
+## Building for a real phone (EAS)
+
+1. `npm install -g eas-cli`, `eas login`, then `eas init` in this folder (adds the project id to the Expo config).
+2. Edit `eas.json`: replace the two `REPLACE-WITH-...-API-URL` placeholders with the real https address of your staging and production backends. The build stops with a clear error if a placeholder or a plain `http://` address is left in (phones block plain http, so a local backend cannot be used from an installed build; use the emulator for that).
+3. `eas build --profile preview --platform android` produces an APK you can install on pilot phones from the link EAS prints. `--profile production` produces an app bundle for Play.
+4. Still missing before a wider release: a real icon and splash (the ones here are the Expo template), a privacy policy URL for the store listing (the app collects location, photos and, at the gate, ID numbers), and the translations.

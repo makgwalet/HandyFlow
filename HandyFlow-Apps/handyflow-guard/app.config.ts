@@ -2,6 +2,14 @@ import type { ExpoConfig } from "expo/config";
 
 // One source for build identity. API address comes from the environment so the
 // same code runs against local, staging and production without edits.
+const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://10.0.2.2:8080";
+
+// A cloud build (EAS sets EAS_BUILD_PROFILE) must point at a real https server. Refuse to build an app that would
+// ship with the placeholder address from eas.json, or with a plain http address a phone's network layer will block.
+if (process.env.EAS_BUILD_PROFILE && (!apiBaseUrl.startsWith("https://") || apiBaseUrl.includes("REPLACE"))) {
+  throw new Error(`EXPO_PUBLIC_API_BASE_URL must be a real https address for EAS builds (got "${apiBaseUrl}"). Edit eas.json.`);
+}
+
 const config: ExpoConfig = {
   name: "HandyFlow Guard",
   slug: "handyflow-guard",
@@ -51,7 +59,7 @@ const config: ExpoConfig = {
     ],
   ],
   extra: {
-    apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://10.0.2.2:8080",
+    apiBaseUrl,
   },
 };
 
