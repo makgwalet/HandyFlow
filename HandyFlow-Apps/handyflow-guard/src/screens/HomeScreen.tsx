@@ -79,6 +79,7 @@ export function HomeScreen({ navigation }: Props) {
         <View style={s.stack}>
           <Button label="Patrol rounds" onPress={() => navigation.navigate("Patrol")} />
           <Button label="My post orders" tone="plain" onPress={() => navigation.navigate("MyPost")} />
+          <Button label="Gate log" tone="plain" onPress={() => navigation.navigate("Gate")} />
           <Button label="Equipment" tone="plain" onPress={() => navigation.navigate("Equipment", { sessionId: open.id })} />
           <Button label="Scan checkpoint" onPress={() => navigation.navigate("Scan", { shiftId: open.shiftId ?? null })} />
           <Button

@@ -15,6 +15,7 @@ import { ScanScreen } from "@/screens/ScanScreen";
 import { IncidentScreen } from "@/screens/IncidentScreen";
 import { ClockOutScreen } from "@/screens/ClockOutScreen";
 import { EquipmentScreen } from "@/screens/EquipmentScreen";
+import { GateScreen } from "@/screens/GateScreen";
 import { MyPostScreen } from "@/screens/MyPostScreen";
 import { SwapsScreen } from "@/screens/SwapsScreen";
 import type { RootStackParamList } from "@/screens/types";
@@ -34,6 +35,7 @@ function SignedIn() {
           <Stack.Screen name="MyPost" component={MyPostScreen} options={{ title: "My post" }} />
           <Stack.Screen name="Swaps" component={SwapsScreen} options={{ title: "Swaps" }} />
           <Stack.Screen name="Equipment" component={EquipmentScreen} options={{ title: "Equipment" }} />
+          <Stack.Screen name="Gate" component={GateScreen} options={{ title: "Gate log" }} />
           <Stack.Screen name="Scan" component={ScanScreen} options={{ title: "Scan" }} />
           <Stack.Screen name="Incident" component={IncidentScreen} options={{ title: "Incident" }} />
           <Stack.Screen name="ClockOut" component={ClockOutScreen} options={{ title: "End shift" }} />

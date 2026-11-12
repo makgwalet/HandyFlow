@@ -26,7 +26,9 @@ My post orders (read the site and post orders, acknowledge the version read; nee
 
 Equipment: sign out a radio, key, vehicle or other item, return it as good, damaged or missing, and ending the shift is blocked until the server shows nothing signed out to the guard (no more "I returned everything" switch). Firearms are not offered; they go through the armoury process. Needs signal, not queued offline.
 
-Not done: push alerts, supervisor mode, naming a colleague for a swap (the server has no guard-facing colleague list), offline acknowledgement, equipment checkout, gate log, EAS builds, real icon and splash, translations.
+Gate log: who is on site, log an arrival (visitor, contractor, delivery, staff vehicle, other; ID number optional and masked once saved) and a departure. Needs signal; a double tap or timed-out retry logs the visitor once. Gate photos (ID, vehicle disc) are not in the app yet.
+
+Not done: push alerts, supervisor mode, gate photos, naming a colleague for a swap (the server has no guard-facing colleague list), offline acknowledgement, equipment checkout, gate log, EAS builds, real icon and splash, translations.
 Never run on a phone or emulator: checked only by type check, unit tests and an Android bundle build.
 
 ## Rules for this app

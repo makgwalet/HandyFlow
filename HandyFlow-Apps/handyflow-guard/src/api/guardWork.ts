@@ -221,3 +221,71 @@ export function returnEquipment(custodyId: string, condition: ReturnCondition, n
     body: { condition, notes: notes.trim() || null },
   });
 }
+
+// ── Gate log ──────────────────────────────────────────────────────────────────
+
+const accessPointSchema = z.object({ id: z.string(), name: z.string() });
+export type AccessPoint = z.infer<typeof accessPointSchema>;
+
+const gateEntrySchema = z.object({
+  id: z.string(),
+  accessPointName: z.string().nullish(),
+  entryType: z.string(),
+  personName: z.string(),
+  company: z.string().nullish(),
+  vehicleRegistration: z.string().nullish(),
+  hostName: z.string().nullish(),
+  loggedInAt: z.string(),
+  status: z.string(),
+});
+export type GateEntry = z.infer<typeof gateEntrySchema>;
+
+export const ENTRY_TYPES = ["VISITOR", "CONTRACTOR", "DELIVERY", "STAFF_VEHICLE", "OTHER"] as const;
+export type EntryType = (typeof ENTRY_TYPES)[number];
+
+export async function getAccessPoints(): Promise<AccessPoint[]> {
+  return z.array(accessPointSchema).parse(await api<unknown>("/api/v1/guard/gate/access-points"));
+}
+
+export async function getOnSite(): Promise<GateEntry[]> {
+  return z.array(gateEntrySchema).parse(await api<unknown>("/api/v1/guard/gate/on-site"));
+}
+
+const clean = (v: string) => v.trim() || null;
+
+/** `clientRef` is made once per arrival form, so a double tap or a timed-out retry logs the visitor once. */
+export async function logArrival(input: {
+  clientRef: string;
+  deviceHardwareId: string;
+  accessPointId: string;
+  entryType: EntryType;
+  personName: string;
+  idNumber: string;
+  company: string;
+  hostName: string;
+  purpose: string;
+  vehicleRegistration: string;
+}): Promise<GateEntry> {
+  return gateEntrySchema.parse(
+    await api<unknown>("/api/v1/guard/gate/entries", {
+      method: "POST",
+      body: {
+        clientRef: input.clientRef,
+        deviceHardwareId: input.deviceHardwareId,
+        accessPointId: input.accessPointId,
+        entryType: input.entryType,
+        personName: input.personName.trim(),
+        idNumber: clean(input.idNumber),
+        company: clean(input.company),
+        hostName: clean(input.hostName),
+        purpose: clean(input.purpose),
+        vehicleRegistration: clean(input.vehicleRegistration)?.toUpperCase() ?? null,
+        idScanConfidence: clean(input.idNumber) ? "MANUAL_ENTRY" : null,
+      },
+    }),
+  );
+}
+
+export function logDeparture(entryId: string, deviceHardwareId: string): Promise<unknown> {
+  return api<unknown>(`/api/v1/guard/gate/entries/${entryId}/exit`, { method: "POST", body: { deviceHardwareId } });
+}
