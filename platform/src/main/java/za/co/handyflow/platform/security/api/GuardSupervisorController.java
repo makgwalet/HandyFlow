@@ -8,7 +8,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.security.application.internal.GuardSupervisorService;
+import za.co.handyflow.platform.security.dto.GuardSupervisorDtos.DecideSwapRequest;
+import za.co.handyflow.platform.security.dto.GuardSupervisorDtos.ResolveIncidentRequest;
 import za.co.handyflow.platform.security.dto.GuardSupervisorDtos.SetSiteSupervisorRequest;
+import za.co.handyflow.platform.security.dto.IncidentResponse;
+import za.co.handyflow.platform.security.dto.ShiftSwapResponse;
 import za.co.handyflow.platform.security.dto.GuardSupervisorDtos.SiteOverview;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.billing.FeatureGuard;
@@ -33,6 +37,53 @@ public class GuardSupervisorController {
         featureGuard.requireModule("security");
         return ResponseEntity.ok(ApiResponse.success(
                 service.siteOverview(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId())));
+    }
+
+    @GetMapping("/api/v1/guard/supervisor/swaps")
+    @PreAuthorize("hasAuthority('SECURITY_GUARD')")
+    @Operation(summary = "Swaps at my site waiting for a supervisor — site supervisors only",
+            description = "Only swaps a colleague has already agreed to, and never one the caller is part of.")
+    public ResponseEntity<ApiResponse<java.util.List<ShiftSwapResponse>>> swaps() {
+        featureGuard.requireModule("security");
+        return ResponseEntity.ok(ApiResponse.success(
+                service.swapsToDecide(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/api/v1/guard/supervisor/swaps/{id}/approve")
+    @PreAuthorize("hasAuthority('SECURITY_GUARD')")
+    @Operation(summary = "Approve a swap at my site — site supervisors only",
+            description = "Re-runs the scheduling checks and reassigns the shift. 403 for a swap the caller is part of; 409 if it is not waiting for a decision.")
+    public ResponseEntity<ApiResponse<ShiftSwapResponse>> approveSwap(@PathVariable UUID id, @Valid @RequestBody DecideSwapRequest req) {
+        featureGuard.requireModule("security");
+        return ResponseEntity.ok(ApiResponse.success(service.decideSwap(
+                TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id, true, req.reason())));
+    }
+
+    @PostMapping("/api/v1/guard/supervisor/swaps/{id}/reject")
+    @PreAuthorize("hasAuthority('SECURITY_GUARD')")
+    @Operation(summary = "Refuse a swap at my site — site supervisors only")
+    public ResponseEntity<ApiResponse<ShiftSwapResponse>> rejectSwap(@PathVariable UUID id, @Valid @RequestBody DecideSwapRequest req) {
+        featureGuard.requireModule("security");
+        return ResponseEntity.ok(ApiResponse.success(service.decideSwap(
+                TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id, false, req.reason())));
+    }
+
+    @PostMapping("/api/v1/guard/supervisor/incidents/{id}/acknowledge")
+    @PreAuthorize("hasAuthority('SECURITY_GUARD')")
+    @Operation(summary = "Acknowledge an incident at my site — site supervisors only")
+    public ResponseEntity<ApiResponse<IncidentResponse>> acknowledgeIncident(@PathVariable UUID id) {
+        featureGuard.requireModule("security");
+        return ResponseEntity.ok(ApiResponse.success(service.acknowledgeIncident(
+                TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id)));
+    }
+
+    @PostMapping("/api/v1/guard/supervisor/incidents/{id}/resolve")
+    @PreAuthorize("hasAuthority('SECURITY_GUARD')")
+    @Operation(summary = "Resolve an incident at my site with a note on how it was dealt with — site supervisors only")
+    public ResponseEntity<ApiResponse<IncidentResponse>> resolveIncident(@PathVariable UUID id, @Valid @RequestBody ResolveIncidentRequest req) {
+        featureGuard.requireModule("security");
+        return ResponseEntity.ok(ApiResponse.success(service.resolveIncident(
+                TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id, req.note())));
     }
 
     @PatchMapping("/api/v1/security/guards/{id}/site-supervisor")

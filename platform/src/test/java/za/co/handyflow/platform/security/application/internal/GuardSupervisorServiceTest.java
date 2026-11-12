@@ -8,7 +8,12 @@ import za.co.handyflow.platform.security.domain.model.Site;
 import za.co.handyflow.platform.security.domain.repository.GuardRepository;
 import za.co.handyflow.platform.security.domain.repository.IncidentRepository;
 import za.co.handyflow.platform.security.domain.repository.PatrolRoundRepository;
+import za.co.handyflow.platform.security.domain.model.Shift;
+import za.co.handyflow.platform.security.domain.model.ShiftSwapRequest;
+import za.co.handyflow.platform.security.domain.repository.ShiftRepository;
+import za.co.handyflow.platform.security.domain.repository.ShiftSwapRepository;
 import za.co.handyflow.platform.security.domain.repository.SiteRepository;
+import za.co.handyflow.platform.security.dto.SwapActionRequest;
 import za.co.handyflow.platform.security.dto.GuardSupervisorDtos.SiteOverview;
 import za.co.handyflow.platform.security.dto.LiveGuardResponse;
 import za.co.handyflow.platform.shared.HandyFlowException;
@@ -38,7 +43,12 @@ class GuardSupervisorServiceTest {
     private final PatrolRoundRepository rounds = mock(PatrolRoundRepository.class);
     private final IncidentRepository incidents = mock(IncidentRepository.class);
     private final SiteRepository sites = mock(SiteRepository.class);
-    private final GuardSupervisorService service = new GuardSupervisorService(guards, sessions, live, rounds, incidents, sites);
+    private final ShiftSwapService swapService = mock(ShiftSwapService.class);
+    private final ShiftSwapRepository swapRepository = mock(ShiftSwapRepository.class);
+    private final ShiftRepository shiftRepository = mock(ShiftRepository.class);
+    private final IncidentService incidentService = mock(IncidentService.class);
+    private final GuardSupervisorService service = new GuardSupervisorService(guards, sessions, live, rounds, incidents, sites,
+            swapService, swapRepository, shiftRepository, incidentService);
 
     private final UUID me = UUID.randomUUID();
     private final UUID siteId = UUID.randomUUID();
@@ -112,5 +122,96 @@ class GuardSupervisorServiceTest {
         when(guards.findActiveById(TENANT, other)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.setSiteSupervisor(TENANT, other, true))
                 .isInstanceOf(za.co.handyflow.platform.shared.ResourceNotFoundException.class);
+    }
+
+    // ── Actions ──────────────────────────────────────────────────────────────
+
+    private ShiftSwapRequest swapAt(UUID swapSite, String status, UUID requester, UUID proposed) {
+        UUID swapId = UUID.randomUUID();
+        UUID shiftId = UUID.randomUUID();
+        ShiftSwapRequest w = mock(ShiftSwapRequest.class);
+        when(w.getOriginalShiftId()).thenReturn(shiftId);
+        when(w.getRequestingGuardId()).thenReturn(requester);
+        when(w.getProposedGuardId()).thenReturn(proposed);
+        when(w.getStatus()).thenReturn(ShiftSwapRequest.SwapStatus.valueOf(status));
+        Shift shift = mock(Shift.class);
+        when(shift.getSiteId()).thenReturn(swapSite);
+        when(shiftRepository.findByTenantAndId(TENANT, shiftId)).thenReturn(Optional.of(shift));
+        when(swapRepository.findByTenantAndId(any(), any())).thenReturn(Optional.of(w));
+        return w;
+    }
+
+    @Test
+    void aGuardWhoIsNotASupervisorCannotDecideASwap() {
+        guard(false);
+        assertThatThrownBy(() -> service.decideSwap(TENANT, me, UUID.randomUUID(), true, null))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("not set up as a site supervisor");
+        verify(swapService, never()).approveSwap(any(), any(), any(), any());
+    }
+
+    @Test
+    void aSupervisorCannotDecideASwapTheyArePartOf() {
+        guard(true);
+        when(sessions.resolveCurrentSiteForGuard(me)).thenReturn(siteId);
+        swapAt(siteId, "PROPOSED_ACCEPTED", me, UUID.randomUUID());
+        assertThatThrownBy(() -> service.decideSwap(TENANT, me, UUID.randomUUID(), true, null))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("part of");
+        verify(swapService, never()).approveSwap(any(), any(), any(), any());
+    }
+
+    @Test
+    void aSwapAtAnotherSiteIsNotFound() {
+        guard(true);
+        when(sessions.resolveCurrentSiteForGuard(me)).thenReturn(siteId);
+        swapAt(UUID.randomUUID(), "PROPOSED_ACCEPTED", UUID.randomUUID(), UUID.randomUUID());
+        assertThatThrownBy(() -> service.decideSwap(TENANT, me, UUID.randomUUID(), true, null))
+                .isInstanceOf(za.co.handyflow.platform.shared.ResourceNotFoundException.class);
+    }
+
+    @Test
+    void aSwapNobodyHasAgreedToYetCannotBeApproved() {
+        guard(true);
+        when(sessions.resolveCurrentSiteForGuard(me)).thenReturn(siteId);
+        swapAt(siteId, "PENDING", UUID.randomUUID(), UUID.randomUUID());
+        assertThatThrownBy(() -> service.decideSwap(TENANT, me, UUID.randomUUID(), true, null))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("cannot be decided now");
+        verify(swapService, never()).approveSwap(any(), any(), any(), any());
+    }
+
+    @Test
+    void aSupervisorApprovesAnAgreedSwapAtTheirSiteUnderTheirOwnId() {
+        guard(true);
+        when(sessions.resolveCurrentSiteForGuard(me)).thenReturn(siteId);
+        swapAt(siteId, "PROPOSED_ACCEPTED", UUID.randomUUID(), UUID.randomUUID());
+        UUID swapId = UUID.randomUUID();
+        service.decideSwap(TENANT, me, swapId, true, "fine");
+        verify(swapService).approveSwap(org.mockito.ArgumentMatchers.eq(TENANT), org.mockito.ArgumentMatchers.eq(swapId),
+                org.mockito.ArgumentMatchers.eq(me), org.mockito.ArgumentMatchers.any(SwapActionRequest.class));
+    }
+
+    @Test
+    void anIncidentAtAnotherSiteCannotBeAcknowledged() {
+        guard(true);
+        when(sessions.resolveCurrentSiteForGuard(me)).thenReturn(siteId);
+        UUID incidentId = UUID.randomUUID();
+        Incident elsewhere = mock(Incident.class);
+        when(elsewhere.getSiteId()).thenReturn(UUID.randomUUID());
+        when(incidents.findByIdAndTenantId(incidentId, TENANT)).thenReturn(Optional.of(elsewhere));
+        assertThatThrownBy(() -> service.acknowledgeIncident(TENANT, me, incidentId))
+                .isInstanceOf(za.co.handyflow.platform.shared.ResourceNotFoundException.class);
+        verify(incidentService, never()).acknowledge(any(), any(), any(), any());
+    }
+
+    @Test
+    void anIncidentAtMySiteIsResolvedWithMyNameAndTheNote() {
+        Guard g = guard(true);
+        when(g.getFullName()).thenReturn("Lerato Mokoena");
+        when(sessions.resolveCurrentSiteForGuard(me)).thenReturn(siteId);
+        UUID incidentId = UUID.randomUUID();
+        Incident mine = mock(Incident.class);
+        when(mine.getSiteId()).thenReturn(siteId);
+        when(incidents.findByIdAndTenantId(incidentId, TENANT)).thenReturn(Optional.of(mine));
+        service.resolveIncident(TENANT, me, incidentId, "Gate secured");
+        verify(incidentService).resolve(TENANT, incidentId, me, "Lerato Mokoena", "Gate secured");
     }
 }

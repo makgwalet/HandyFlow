@@ -10,7 +10,13 @@ import za.co.handyflow.platform.security.domain.model.PatrolRound;
 import za.co.handyflow.platform.security.domain.repository.GuardRepository;
 import za.co.handyflow.platform.security.domain.repository.IncidentRepository;
 import za.co.handyflow.platform.security.domain.repository.PatrolRoundRepository;
+import za.co.handyflow.platform.security.domain.model.ShiftSwapRequest;
+import za.co.handyflow.platform.security.domain.repository.ShiftRepository;
+import za.co.handyflow.platform.security.domain.repository.ShiftSwapRepository;
 import za.co.handyflow.platform.security.domain.repository.SiteRepository;
+import za.co.handyflow.platform.security.dto.IncidentResponse;
+import za.co.handyflow.platform.security.dto.ShiftSwapResponse;
+import za.co.handyflow.platform.security.dto.SwapActionRequest;
 import za.co.handyflow.platform.security.dto.GuardSupervisorDtos.OnDutyGuard;
 import za.co.handyflow.platform.security.dto.GuardSupervisorDtos.OpenIncident;
 import za.co.handyflow.platform.security.dto.GuardSupervisorDtos.SiteOverview;
@@ -44,6 +50,10 @@ public class GuardSupervisorService {
     private final PatrolRoundRepository roundRepository;
     private final IncidentRepository incidentRepository;
     private final SiteRepository siteRepository;
+    private final ShiftSwapService swapService;
+    private final ShiftSwapRepository swapRepository;
+    private final ShiftRepository shiftRepository;
+    private final IncidentService incidentService;
 
     /** Manager action: make a guard a site supervisor, or take it away. */
     @Transactional
@@ -55,14 +65,78 @@ public class GuardSupervisorService {
         log.info("[Security] Site supervisor {} for guard={} tenant={}", enabled ? "ENABLED" : "disabled", guardId, tenantId.getValue());
     }
 
-    @Transactional(readOnly = true)
-    public SiteOverview siteOverview(TenantId tenantId, UUID guardId) {
+    /** The caller must be an active site supervisor with an open shift session. Returns the site they are on shift at. */
+    private Guard requireSupervisor(TenantId tenantId, UUID guardId) {
         Guard me = guardRepository.findActiveById(tenantId, guardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Guard", guardId.toString()));
         if (!me.isSiteSupervisor()) {
             throw new HandyFlowException("You are not set up as a site supervisor. Ask your manager.",
                     HttpStatus.FORBIDDEN, "NOT_SITE_SUPERVISOR");
         }
+        return me;
+    }
+
+    /** Swaps at my site that a colleague has agreed to and that now wait for a supervisor, oldest first. */
+    @Transactional(readOnly = true)
+    public List<ShiftSwapResponse> swapsToDecide(TenantId tenantId, UUID guardId) {
+        requireSupervisor(tenantId, guardId);
+        UUID siteId = deviceSessionService.resolveCurrentSiteForGuard(guardId);
+        return swapService.getPendingSwaps(tenantId, org.springframework.data.domain.PageRequest.of(0, 100)).getContent().stream()
+                .filter(w -> "PROPOSED_ACCEPTED".equals(w.status()))
+                .filter(w -> shiftSiteOf(tenantId, w.originalShiftId()).map(siteId::equals).orElse(false))
+                .filter(w -> !guardId.equals(w.requestingGuardId()) && !guardId.equals(w.proposedGuardId()))
+                .toList();
+    }
+
+    /** Approve or refuse a swap at my site. Not my own swap, and only one a colleague has already agreed to. */
+    @Transactional
+    public ShiftSwapResponse decideSwap(TenantId tenantId, UUID guardId, UUID swapId, boolean approve, String reason) {
+        requireSupervisor(tenantId, guardId);
+        UUID siteId = deviceSessionService.resolveCurrentSiteForGuard(guardId);
+        ShiftSwapRequest swap = swapRepository.findByTenantAndId(tenantId, swapId)
+                .filter(w -> shiftSiteOf(tenantId, w.getOriginalShiftId()).map(siteId::equals).orElse(false))
+                .orElseThrow(() -> new ResourceNotFoundException("ShiftSwapRequest", swapId.toString()));
+        if (guardId.equals(swap.getRequestingGuardId()) || guardId.equals(swap.getProposedGuardId())) {
+            throw new HandyFlowException("You cannot decide a swap you are part of.", HttpStatus.FORBIDDEN, "CANNOT_DECIDE_OWN_SWAP");
+        }
+        String status = String.valueOf(swap.getStatus());
+        boolean decidable = approve ? "PROPOSED_ACCEPTED".equals(status) : ("PENDING".equals(status) || "PROPOSED_ACCEPTED".equals(status));
+        if (!decidable) {
+            throw new HandyFlowException("This swap is " + status.toLowerCase().replace('_', ' ') + " and cannot be decided now.",
+                    HttpStatus.CONFLICT, "SWAP_NOT_AWAITING_DECISION");
+        }
+        SwapActionRequest body = new SwapActionRequest(reason);
+        return approve ? swapService.approveSwap(tenantId, swapId, guardId, body) : swapService.rejectSwap(tenantId, swapId, guardId, body);
+    }
+
+    @Transactional
+    public IncidentResponse acknowledgeIncident(TenantId tenantId, UUID guardId, UUID incidentId) {
+        Guard me = requireSupervisor(tenantId, guardId);
+        requireIncidentAtMySite(tenantId, guardId, incidentId);
+        return incidentService.acknowledge(tenantId, incidentId, guardId, me.getFullName());
+    }
+
+    @Transactional
+    public IncidentResponse resolveIncident(TenantId tenantId, UUID guardId, UUID incidentId, String note) {
+        Guard me = requireSupervisor(tenantId, guardId);
+        requireIncidentAtMySite(tenantId, guardId, incidentId);
+        return incidentService.resolve(tenantId, incidentId, guardId, me.getFullName(), note);
+    }
+
+    private void requireIncidentAtMySite(TenantId tenantId, UUID guardId, UUID incidentId) {
+        UUID siteId = deviceSessionService.resolveCurrentSiteForGuard(guardId);
+        incidentRepository.findByIdAndTenantId(incidentId, tenantId)
+                .filter(i -> siteId.equals(i.getSiteId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Incident", incidentId.toString()));
+    }
+
+    private java.util.Optional<UUID> shiftSiteOf(TenantId tenantId, UUID shiftId) {
+        return shiftRepository.findByTenantAndId(tenantId, shiftId).map(s -> s.getSiteId());
+    }
+
+    @Transactional(readOnly = true)
+    public SiteOverview siteOverview(TenantId tenantId, UUID guardId) {
+        requireSupervisor(tenantId, guardId);
         UUID siteId = deviceSessionService.resolveCurrentSiteForGuard(guardId);
         Instant now = Instant.now();
 

@@ -17,6 +17,10 @@ public final class GuardSupervisorDtos {
 
     public record OpenIncident(UUID id, String title, String severity, String status, Instant createdAt) {}
 
+    public record DecideSwapRequest(@jakarta.validation.constraints.Size(max = 500) String reason) {}
+
+    public record ResolveIncidentRequest(@jakarta.validation.constraints.Size(max = 1000) String note) {}
+
     public record SiteOverview(UUID siteId, String siteName, Instant generatedAt,
                                List<OnDutyGuard> onDuty, List<OpenIncident> openIncidents) {}
 }
