@@ -48,6 +48,7 @@ public class GuardGateAccessController {
 
     private final GateAccessService gateAccessService;
     private final DeviceSessionService deviceSessionService;
+    private final za.co.handyflow.platform.security.application.internal.GuardOfflineWriteService offlineWrites;
 
     // ── GAP-07 fix: guard-facing reads ──────────────────────────────────────────
     // A guard needs an accessPointId to log an arrival and needs to know
@@ -96,8 +97,10 @@ public class GuardGateAccessController {
                     "Fails with 403/NO_OPEN_SESSION if the device has no open session (guard not clocked in).")
     public ResponseEntity<ApiResponse<GateRegisterEntryResponse>> logArrival(
             @Valid @RequestBody LogArrivalRequest request) {
+        UUID guardId = TenantContext.getCurrentUserId();
+        UUID siteId = deviceSessionService.resolveCurrentSiteForGuard(guardId);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Entry logged",
-                gateAccessService.logArrival(TenantContext.getTenantIdAsObject(), request)));
+                offlineWrites.gateArrival(TenantContext.getTenantIdAsObject(), guardId, siteId, request)));
     }
 
     @PostMapping("/entries/{entryId}/exit")
@@ -110,8 +113,10 @@ public class GuardGateAccessController {
     public ResponseEntity<ApiResponse<GateRegisterEntryResponse>> logExit(
             @PathVariable UUID entryId,
             @Valid @RequestBody LogExitRequest request) {
+        UUID guardId = TenantContext.getCurrentUserId();
+        UUID siteId = deviceSessionService.resolveCurrentSiteForGuard(guardId);
         return ResponseEntity.ok(ApiResponse.success("Exit logged",
-                gateAccessService.logExit(TenantContext.getTenantIdAsObject(), entryId, request)));
+                gateAccessService.logExitByGuard(TenantContext.getTenantIdAsObject(), guardId, siteId, entryId)));
     }
 
     // ── Evidence attachment ───────────────────────────────────────────────────
@@ -128,9 +133,11 @@ public class GuardGateAccessController {
             @PathVariable UUID entryId,
             @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
             @RequestParam("docType") String docType,
-            @RequestParam("deviceHardwareId") String deviceHardwareId) {
+            @RequestParam(value = "deviceHardwareId", required = false) String deviceHardwareId) {
+        UUID guardId = TenantContext.getCurrentUserId();
+        UUID siteId = deviceSessionService.resolveCurrentSiteForGuard(guardId);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Attachment uploaded",
-                gateAccessService.attachEvidence(TenantContext.getTenantIdAsObject(), entryId,
-                        file, docType, deviceHardwareId)));
+                gateAccessService.attachEvidenceByGuard(TenantContext.getTenantIdAsObject(), guardId, siteId, entryId,
+                        file, docType)));
     }
 }

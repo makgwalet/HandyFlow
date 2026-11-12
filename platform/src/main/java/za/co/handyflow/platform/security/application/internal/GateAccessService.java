@@ -74,8 +74,10 @@ public class GateAccessService {
                     HttpStatus.BAD_REQUEST, "ACCESS_POINT_INACTIVE");
         }
 
-        UUID guardId = resolveActingGuard(tenantId, req.deviceHardwareId());
+        return record(tenantId, resolveActingGuard(tenantId, req.deviceHardwareId()), accessPoint, req);
+    }
 
+    private GateRegisterEntryResponse record(TenantId tenantId, UUID guardId, AccessPoint accessPoint, LogArrivalRequest req) {
         GateRegisterEntry entry = GateRegisterEntry.logArrival(
                 tenantId, accessPoint.getSiteId(), accessPoint.getId(),
                 req.entryType(), req.personName(), req.idNumber(), req.phone(), req.company(),
@@ -88,6 +90,61 @@ public class GateAccessService {
                 entry.getId(), accessPoint.getId(), req.entryType(), guardId);
 
         return toResponse(entry, accessPoint);
+    }
+
+    /**
+     * Guard route. Who logged it is the signed-in guard (never a device id from the body) and the gate must be at the
+     * site the guard is on shift at; any other gate looks like it does not exist.
+     */
+    @Transactional
+    public GateRegisterEntryResponse logArrivalByGuard(TenantId tenantId, UUID guardId, UUID siteId, LogArrivalRequest req) {
+        AccessPoint accessPoint = accessPointRepository.findByIdAndTenant(req.accessPointId(), tenantId)
+                .filter(a -> siteId.equals(a.getSiteId()))
+                .orElseThrow(() -> new ResourceNotFoundException("AccessPoint", req.accessPointId().toString()));
+        if (!accessPoint.isActive()) {
+            throw new HandyFlowException("This access point is not active", HttpStatus.BAD_REQUEST, "ACCESS_POINT_INACTIVE");
+        }
+        return record(tenantId, guardId, accessPoint, req);
+    }
+
+    /** Guard route departure: the entry must be at the guard's own site and still on site. */
+    @Transactional
+    public GateRegisterEntryResponse logExitByGuard(TenantId tenantId, UUID guardId, UUID siteId, UUID entryId) {
+        GateRegisterEntry entry = entryAtSite(tenantId, siteId, entryId);
+        if (!"ON_SITE".equals(entry.getStatus()) && !"OVERSTAYED".equals(entry.getStatus())) {
+            throw new HandyFlowException("This visitor is already logged as departed.", HttpStatus.CONFLICT, "ALREADY_DEPARTED");
+        }
+        entry.logExit(guardId);
+        entryRepository.save(entry);
+        log.info("[Security] Gate entry departed id={} guard={}", entryId, guardId);
+        return toResponse(entry, accessPointRepository.findById(entry.getAccessPointId()).orElse(null));
+    }
+
+    /** Guard route photo: own site's entry only, attributed to the signed-in guard. */
+    @Transactional
+    public EvidenceResponse attachEvidenceByGuard(TenantId tenantId, UUID guardId, UUID siteId, UUID entryId,
+                                                  MultipartFile file, String docType) {
+        GateRegisterEntry entry = entryAtSite(tenantId, siteId, entryId);
+        if (!VALID_ATTACHMENT_DOC_TYPES.contains(docType)) {
+            throw new HandyFlowException("docType must be one of: " + VALID_ATTACHMENT_DOC_TYPES,
+                    HttpStatus.BAD_REQUEST, "INVALID_DOC_TYPE");
+        }
+        String guardName = guardRepository.findById(guardId).map(Guard::getFullName).orElse("Unknown guard");
+        return evidenceFacade.attach(tenantId, file, docType, "security", "GateRegisterEntry", entry.getId(), null, guardId, guardName);
+    }
+
+    /** One entry as first logged, for answering a repeated arrival. */
+    @Transactional(readOnly = true)
+    public GateRegisterEntryResponse getEntry(TenantId tenantId, UUID entryId) {
+        GateRegisterEntry entry = entryRepository.findByIdAndTenant(entryId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("GateRegisterEntry", entryId.toString()));
+        return toResponse(entry, accessPointRepository.findById(entry.getAccessPointId()).orElse(null));
+    }
+
+    private GateRegisterEntry entryAtSite(TenantId tenantId, UUID siteId, UUID entryId) {
+        return entryRepository.findByIdAndTenant(entryId, tenantId)
+                .filter(e -> siteId.equals(e.getSiteId()))
+                .orElseThrow(() -> new ResourceNotFoundException("GateRegisterEntry", entryId.toString()));
     }
 
     // ── Guard-facing: exit ───────────────────────────────────────────────────

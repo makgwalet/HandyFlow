@@ -19,7 +19,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class GuardClientLedger {
 
-    public enum Kind { SCAN, INCIDENT, DURESS, EVIDENCE }
+    public enum Kind { SCAN, INCIDENT, DURESS, EVIDENCE, GATE_ENTRY }
 
     private final JdbcTemplate jdbc;
 

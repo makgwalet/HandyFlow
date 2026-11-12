@@ -9,7 +9,9 @@ import za.co.handyflow.platform.security.application.internal.GuardClientLedger.
 import za.co.handyflow.platform.security.domain.model.AlarmEvent;
 import za.co.handyflow.platform.security.domain.repository.AlarmEventRepository;
 import za.co.handyflow.platform.security.dto.CreateIncidentRequest;
+import za.co.handyflow.platform.security.dto.GateRegisterEntryResponse;
 import za.co.handyflow.platform.security.dto.IncidentResponse;
+import za.co.handyflow.platform.security.dto.LogArrivalRequest;
 import za.co.handyflow.platform.security.dto.ScanRequest;
 import za.co.handyflow.platform.security.dto.ScanResponse;
 import za.co.handyflow.platform.security.dto.TriggerDuressRequest;
@@ -41,7 +43,8 @@ class GuardOfflineWriteServiceTest {
     private final AlarmEventRepository alarms = mock(AlarmEventRepository.class);
     private final IncidentCaseService cases = mock(IncidentCaseService.class);
     private final EvidenceFacade evidenceFacade = mock(EvidenceFacade.class);
-    private final GuardOfflineWriteService service = new GuardOfflineWriteService(ledger, scans, incidents, controlRoom, alarms, cases, evidenceFacade);
+    private final GateAccessService gates = mock(GateAccessService.class);
+    private final GuardOfflineWriteService service = new GuardOfflineWriteService(ledger, scans, incidents, controlRoom, alarms, cases, evidenceFacade, gates);
 
     private final UUID guard = UUID.randomUUID();
     private final UUID ref = UUID.randomUUID();
@@ -158,5 +161,36 @@ class GuardOfflineWriteServiceTest {
 
         assertThat(service.evidence(TENANT, guard, "Lerato", ref, photoRef, photo, null)).isSameAs(first);
         verify(cases, never()).attachByGuard(any(), any(), any(), any(), any(), any());
+    }
+
+    private LogArrivalRequest arrival(UUID clientRef) {
+        return new LogArrivalRequest(UUID.randomUUID(), "dev", "VISITOR", "Thabo", null, null, null, null, null, null,
+                null, null, null, null, clientRef);
+    }
+
+    @Test
+    void aRetriedGateArrivalDoesNotLogTheVisitorTwice() {
+        UUID siteId = UUID.randomUUID();
+        UUID firstId = UUID.randomUUID();
+        GateRegisterEntryResponse first = mock(GateRegisterEntryResponse.class);
+        when(ledger.find(TENANT, Kind.GATE_ENTRY, ref, guard)).thenReturn(Optional.of(firstId));
+        when(gates.getEntry(TENANT, firstId)).thenReturn(first);
+
+        assertThat(service.gateArrival(TENANT, guard, siteId, arrival(ref))).isSameAs(first);
+        verify(gates, never()).logArrivalByGuard(any(), any(), any(), any());
+    }
+
+    @Test
+    void theFirstGateArrivalIsLoggedAndRemembered() {
+        UUID siteId = UUID.randomUUID();
+        UUID entryId = UUID.randomUUID();
+        GateRegisterEntryResponse made = mock(GateRegisterEntryResponse.class);
+        when(made.id()).thenReturn(entryId);
+        LogArrivalRequest req = arrival(ref);
+        when(ledger.find(TENANT, Kind.GATE_ENTRY, ref, guard)).thenReturn(Optional.empty());
+        when(gates.logArrivalByGuard(TENANT, guard, siteId, req)).thenReturn(made);
+
+        assertThat(service.gateArrival(TENANT, guard, siteId, req)).isSameAs(made);
+        verify(ledger).record(TENANT, guard, Kind.GATE_ENTRY, ref, entryId);
     }
 }

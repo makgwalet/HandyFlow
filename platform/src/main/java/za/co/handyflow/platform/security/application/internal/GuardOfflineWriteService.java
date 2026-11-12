@@ -13,7 +13,9 @@ import za.co.handyflow.platform.security.application.internal.GuardClientLedger.
 import za.co.handyflow.platform.security.domain.model.AlarmEvent;
 import za.co.handyflow.platform.security.domain.repository.AlarmEventRepository;
 import za.co.handyflow.platform.security.dto.CreateIncidentRequest;
+import za.co.handyflow.platform.security.dto.GateRegisterEntryResponse;
 import za.co.handyflow.platform.security.dto.IncidentResponse;
+import za.co.handyflow.platform.security.dto.LogArrivalRequest;
 import za.co.handyflow.platform.security.dto.ScanRequest;
 import za.co.handyflow.platform.security.dto.ScanResponse;
 import za.co.handyflow.platform.security.dto.TriggerDuressRequest;
@@ -43,6 +45,7 @@ public class GuardOfflineWriteService {
     private final AlarmEventRepository alarmEvents;
     private final IncidentCaseService caseService;
     private final EvidenceFacade evidenceFacade;
+    private final GateAccessService gateAccessService;
 
     @Transactional
     public ScanResponse scan(TenantId tenantId, UUID guardId, ScanRequest req) {
@@ -63,6 +66,14 @@ public class GuardOfflineWriteService {
         return once(tenantId, guardId, Kind.DURESS, req.clientRef(),
                 () -> controlRoomService.triggerDuress(tenantId, req), AlarmEvent::getId,
                 id -> alarmEvents.findById(id).orElseThrow(() -> new ResourceNotFoundException("AlarmEvent", id.toString())));
+    }
+
+    /** A gate arrival. A repeat with the same clientRef returns the first entry instead of logging the visitor again. */
+    @Transactional
+    public GateRegisterEntryResponse gateArrival(TenantId tenantId, UUID guardId, UUID siteId, LogArrivalRequest req) {
+        return once(tenantId, guardId, Kind.GATE_ENTRY, req.clientRef(),
+                () -> gateAccessService.logArrivalByGuard(tenantId, guardId, siteId, req), GateRegisterEntryResponse::id,
+                id -> gateAccessService.getEntry(tenantId, id));
     }
 
     /**

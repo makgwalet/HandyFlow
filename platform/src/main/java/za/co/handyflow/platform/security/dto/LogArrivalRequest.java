@@ -33,5 +33,8 @@ public record LogArrivalRequest(
         String vehicleMakeModel,
         String driverName,
 
-        String idScanConfidence   // BARCODE_DECODED | OCR_EXTRACTED | MANUAL_ENTRY | null
+        String idScanConfidence,  // BARCODE_DECODED | OCR_EXTRACTED | MANUAL_ENTRY | null
+
+        // Made once on the phone per arrival. A repeat with the same id returns the first entry (guard route only).
+        UUID clientRef
 ) {}
