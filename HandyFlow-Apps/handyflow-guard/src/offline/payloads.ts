@@ -103,3 +103,11 @@ export function duressItem(input: { position: Position | null }, ctx: Context): 
     ctx,
   );
 }
+
+/**
+ * "I have read this version", made while there was no signal. It names the version the guard actually saw, so the
+ * server refuses it (409) if a newer one was published meanwhile instead of recording a version they never read.
+ */
+export function acknowledgeItem(input: { orderId: string; version: number; deviceHardwareId: string }, ctx: Context): OutboxItem {
+  return make("ACK", { orderId: input.orderId, version: input.version, deviceHardwareId: input.deviceHardwareId }, ctx);
+}

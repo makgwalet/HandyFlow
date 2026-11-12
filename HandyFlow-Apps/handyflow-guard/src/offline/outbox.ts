@@ -1,6 +1,6 @@
 import { ApiError } from "@/api/client";
 
-export type OutboxKind = "SCAN" | "INCIDENT" | "DURESS" | "EVIDENCE";
+export type OutboxKind = "SCAN" | "INCIDENT" | "DURESS" | "ACK" | "EVIDENCE";
 export type OutboxStatus = "PENDING" | "FAILED";
 
 /** One write waiting to reach the server. `id` is also the clientRef, so a retry can never double-create. */
@@ -39,7 +39,7 @@ export interface FlushResult {
 }
 
 /** Panic goes out before anything else, photos go last (they need their incident on the server first); the rest keep the order they were made in. */
-const PRIORITY: Record<OutboxKind, number> = { DURESS: 0, INCIDENT: 1, SCAN: 2, EVIDENCE: 3 };
+const PRIORITY: Record<OutboxKind, number> = { DURESS: 0, INCIDENT: 1, SCAN: 2, ACK: 3, EVIDENCE: 4 };
 
 export function sortForSending(items: OutboxItem[]): OutboxItem[] {
   return [...items].sort(
@@ -47,8 +47,12 @@ export function sortForSending(items: OutboxItem[]): OutboxItem[] {
   );
 }
 
-/** Retryable: the server may accept the same request later. 409 covers "already being processed". */
-function isRetryable(e: ApiError): boolean {
+/**
+ * Retryable: the server may accept the same request later. 409 covers "already being processed" for the kinds that
+ * have a ledger. For an acknowledgement a 409 means the order was replaced by a newer version, which no retry can fix.
+ */
+function isRetryable(e: ApiError, kind: OutboxKind): boolean {
+  if (kind === "ACK" && e.status === 409) return false;
   return e.status === 409 || e.status === 429 || e.status === 408 || e.status >= 500;
 }
 
@@ -81,7 +85,7 @@ async function run(store: OutboxStore, send: Sender, guardId: string): Promise<F
         return result;
       }
       const attempts = item.attempts + 1;
-      if (isRetryable(e) && attempts < MAX_ATTEMPTS) {
+      if (isRetryable(e, item.kind) && attempts < MAX_ATTEMPTS) {
         await store.update(item.id, { attempts, lastError: e.message });
       } else {
         await store.update(item.id, { status: "FAILED", attempts, lastError: e.message });

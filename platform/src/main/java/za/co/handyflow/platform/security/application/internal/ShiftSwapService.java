@@ -61,6 +61,34 @@ public class ShiftSwapService {
 
     // ── Queries ────────────────────────────────────────────────────────────────
 
+    /** How far either side of today a shared roster counts as "works with". */
+    static final long COLLEAGUE_WINDOW_DAYS = 30;
+
+    /**
+     * Guards the caller can ask to take a shift: other active, schedulable guards rostered at a site the caller is
+     * rostered at within 30 days either side of today. Names only, so a guard cannot browse the wider company.
+     */
+    @Transactional(readOnly = true)
+    public List<za.co.handyflow.platform.security.dto.SwapColleagueView> colleaguesFor(TenantId tenantId, UUID guardId) {
+        java.time.Instant now = java.time.Instant.now();
+        java.time.Instant from = now.minus(COLLEAGUE_WINDOW_DAYS, java.time.temporal.ChronoUnit.DAYS);
+        java.time.Instant to = now.plus(COLLEAGUE_WINDOW_DAYS, java.time.temporal.ChronoUnit.DAYS);
+        java.util.Set<UUID> sites = new java.util.LinkedHashSet<>();
+        shiftRepository.findByGuardInRange(tenantId, guardId, from, to).forEach(s -> sites.add(s.getSiteId()));
+        java.util.Set<UUID> others = new java.util.LinkedHashSet<>();
+        for (UUID site : sites) {
+            shiftRepository.findBySiteInRange(tenantId, site, from, to).forEach(s -> {
+                if (s.getGuardId() != null && !s.getGuardId().equals(guardId)) others.add(s.getGuardId());
+            });
+        }
+        return others.stream()
+                .map(id -> guardRepository.findActiveById(tenantId, id).orElse(null))
+                .filter(g -> g != null && g.isSchedulable())
+                .map(g -> new za.co.handyflow.platform.security.dto.SwapColleagueView(g.getId(), g.getFullName()))
+                .sorted(java.util.Comparator.comparing(za.co.handyflow.platform.security.dto.SwapColleagueView::name, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public Page<ShiftSwapResponse> getPendingSwaps(TenantId tenantId, Pageable pageable) {
         return swapRepository.findPending(tenantId, pageable)
@@ -102,8 +130,14 @@ public class ShiftSwapService {
 
         // Validate proposed guard belongs to this tenant (if supplied)
         if (req.proposedGuardId() != null) {
-            guardRepository.findActiveById(tenantId, req.proposedGuardId())
+            if (req.proposedGuardId().equals(requestingGuardId)) {
+                throw new HandyFlowException("You cannot ask yourself to take your own shift.", HttpStatus.BAD_REQUEST, "VALIDATION_ERROR");
+            }
+            Guard proposed = guardRepository.findActiveById(tenantId, req.proposedGuardId())
                     .orElseThrow(() -> new ResourceNotFoundException("Proposed guard not found", "lookup"));
+            if (!proposed.isSchedulable()) {
+                throw new HandyFlowException("That colleague cannot take shifts right now.", HttpStatus.BAD_REQUEST, "VALIDATION_ERROR");
+            }
         }
 
         ShiftSwapRequest swapRequest = ShiftSwapRequest.create(

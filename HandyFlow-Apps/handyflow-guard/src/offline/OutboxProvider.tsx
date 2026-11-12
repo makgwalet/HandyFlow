@@ -10,6 +10,8 @@ import { openSqliteOutbox } from "./sqliteStore";
 interface OutboxValue {
   ready: boolean;
   pendingCount: number;
+  /** What is waiting to be sent, so a screen can show "saved, will send" instead of offering the same action again. */
+  pending: OutboxItem[];
   failed: OutboxItem[];
   /** Saves the write on the phone first, then tries to send it. Resolves once it is safely stored. */
   /** Who is signed in plus id and clock sources, for building queue items. */
@@ -27,13 +29,14 @@ export function OutboxProvider({ children }: { children: React.ReactNode }) {
   const guardId = session?.guardId ?? "";
   const storeRef = useRef<OutboxStore | null>(null);
   const [ready, setReady] = useState(false);
-  const [pendingCount, setPendingCount] = useState(0);
+  const [pending, setPending] = useState<OutboxItem[]>([]);
+  const pendingCount = pending.length;
   const [failed, setFailed] = useState<OutboxItem[]>([]);
 
   const refresh = useCallback(async () => {
     const store = storeRef.current;
     if (!store || !guardId) return;
-    setPendingCount((await store.pending(guardId)).length);
+    setPending(await store.pending(guardId));
     setFailed(await store.failed(guardId));
   }, [guardId]);
 
@@ -100,8 +103,8 @@ export function OutboxProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ ready, pendingCount, failed, context, enqueue, syncNow, dismissFailed }),
-    [ready, pendingCount, failed, context, enqueue, syncNow, dismissFailed],
+    () => ({ ready, pendingCount, pending, failed, context, enqueue, syncNow, dismissFailed }),
+    [ready, pendingCount, pending, failed, context, enqueue, syncNow, dismissFailed],
   );
   return <OutboxContext.Provider value={value}>{children}</OutboxContext.Provider>;
 }

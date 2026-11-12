@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { StyleSheet, Text, TextInput } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
-import { acceptSwap, cancelSwap, getMyShifts, getMySwaps, requestSwap, type Swap } from "@/api/guardWork";
+import { acceptSwap, cancelSwap, getMyShifts, getMySwaps, getSwapColleagues, requestSwap, type Swap } from "@/api/guardWork";
 import { Button } from "@/ui/Button";
 import { Card, Screen } from "@/ui/Screen";
 import { colors } from "@/ui/theme";
@@ -25,9 +25,12 @@ export function SwapsScreen() {
   const me = session?.guardId ?? "";
   const qc = useQueryClient();
   const [reason, setReason] = useState("");
+  const [shiftId, setShiftId] = useState<string | null>(null);
+  const [colleagueId, setColleagueId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const swapsQ = useQuery({ queryKey: ["mySwaps"], queryFn: getMySwaps });
   const shiftsQ = useQuery({ queryKey: ["myShifts"], queryFn: getMyShifts });
+  const colleaguesQ = useQuery({ queryKey: ["swapColleagues"], queryFn: getSwapColleagues });
 
   const swaps = swapsQ.data ?? [];
   const taken = new Set(swaps.filter((w) => OPEN.includes(w.status)).map((w) => w.originalShiftId));
@@ -40,7 +43,16 @@ export function SwapsScreen() {
     },
     onError: (e: unknown) => setError(e instanceof Error ? e.message : "That did not work"),
   };
-  const request = useMutation({ mutationFn: (shiftId: string) => requestSwap(shiftId, reason), ...done, onSuccess: () => { setReason(""); done.onSuccess(); } });
+  const request = useMutation({
+    mutationFn: () => requestSwap(shiftId ?? "", colleagueId ?? "", reason),
+    ...done,
+    onSuccess: () => {
+      setReason("");
+      setShiftId(null);
+      setColleagueId(null);
+      done.onSuccess();
+    },
+  });
   const accept = useMutation({ mutationFn: (id: string) => acceptSwap(id), ...done });
   const cancel = useMutation({ mutationFn: (id: string) => cancelSwap(id), ...done });
 
@@ -50,13 +62,22 @@ export function SwapsScreen() {
   return (
     <Screen title="Shift swaps">
       {error ? <Text accessibilityRole="alert" style={s.err}>{error}</Text> : null}
-      <Text style={s.head}>Ask to swap a shift</Text>
-      <TextInput style={s.input} value={reason} onChangeText={setReason} maxLength={500} placeholder="Reason (optional)" placeholderTextColor={colors.muted} accessibilityLabel="Reason" />
+      <Text style={s.head}>1. Pick the shift</Text>
       {swappable.length === 0 ? <Text style={s.muted}>{shiftsQ.isLoading ? "Loading..." : "No upcoming shifts that can be swapped."}</Text> : null}
       {swappable.map((x) => (
-        <Button key={x.id} tone="plain" label={`${x.siteName}, ${fmt(x.startAt)}`} loading={request.isPending && request.variables === x.id} onPress={() => request.mutate(x.id)} />
+        <Button key={x.id} tone={shiftId === x.id ? "primary" : "plain"} label={`${shiftId === x.id ? "✓ " : ""}${x.siteName}, ${fmt(x.startAt)}`} onPress={() => setShiftId(x.id)} />
       ))}
-      <Text style={s.muted}>Your supervisor decides. The shift stays yours until it is approved.</Text>
+
+      <Text style={s.head}>2. Pick who to ask</Text>
+      {colleaguesQ.isError ? <Text style={s.err}>Could not load your colleagues.</Text> : null}
+      {!colleaguesQ.isLoading && (colleaguesQ.data ?? []).length === 0 ? <Text style={s.muted}>No colleagues are rostered with you right now.</Text> : null}
+      {(colleaguesQ.data ?? []).map((c) => (
+        <Button key={c.id} tone={colleagueId === c.id ? "primary" : "plain"} label={`${colleagueId === c.id ? "✓ " : ""}${c.name}`} onPress={() => setColleagueId(c.id)} />
+      ))}
+
+      <TextInput style={s.input} value={reason} onChangeText={setReason} maxLength={500} placeholder="Reason (optional)" placeholderTextColor={colors.muted} accessibilityLabel="Reason" />
+      <Button label="Send request" disabled={!shiftId || !colleagueId} loading={request.isPending} onPress={() => request.mutate()} />
+      <Text style={s.muted}>Your colleague must agree, then your supervisor decides. The shift stays yours until it is approved.</Text>
 
       <Text style={s.head}>Your requests</Text>
       {swapsQ.isError ? <Text style={s.err}>Could not load your swaps.</Text> : null}
@@ -65,7 +86,7 @@ export function SwapsScreen() {
         <Card key={w.id}>
           <Text style={s.strong}>{w.shiftSummary ?? "Shift"}</Text>
           <Text style={s.muted}>
-            {w.requestingGuardId === me ? "You asked" : `${w.requestingGuardName ?? "A colleague"} asked you`}: {STATUS_WORDS[w.status] ?? w.status}
+            {w.requestingGuardId === me ? "You asked" : `${w.requestingGuardName ?? "A colleague"} asked you`}${w.requestingGuardId === me && w.proposedGuardName ? ` (${w.proposedGuardName})` : ""}: {STATUS_WORDS[w.status] ?? w.status}
           </Text>
           {w.rejectionReason ? <Text style={s.muted}>Reason given: {w.rejectionReason}</Text> : null}
           {mineToAccept(w) ? <Button label="Accept" onPress={() => accept.mutate(w.id)} loading={accept.isPending && accept.variables === w.id} /> : null}

@@ -1,6 +1,6 @@
 import { ApiError } from "@/api/client";
 import { flush, MAX_ATTEMPTS, sortForSending, type OutboxItem, type OutboxStore } from "@/offline/outbox";
-import { duressItem, evidenceItem, incidentItem, scanItem, type Context } from "@/offline/payloads";
+import { acknowledgeItem, duressItem, evidenceItem, incidentItem, scanItem, type Context } from "@/offline/payloads";
 
 function memoryStore(): OutboxStore & { all: Map<string, OutboxItem> } {
   const all = new Map<string, OutboxItem>();
@@ -160,5 +160,42 @@ describe("incident photos", () => {
       ctx("g1", "2026-11-12T11:30:00.000Z"),
     );
     expect(sortForSending([photo, scan, incident]).map((i) => i.kind)).toEqual(["INCIDENT", "SCAN", "EVIDENCE"]);
+  });
+});
+
+describe("offline post-order acknowledgement", () => {
+  const ack = () => acknowledgeItem({ orderId: "o1", version: 3, deviceHardwareId: "dev" }, ctx());
+
+  it("names the exact version read and carries when the guard read it", () => {
+    const item = ack();
+    expect(item.kind).toBe("ACK");
+    expect(item.payload).toMatchObject({ orderId: "o1", version: 3, deviceHardwareId: "dev", recordedAt: "2026-11-12T10:00:00.000Z" });
+    expect(item.payload).not.toHaveProperty("guardId");
+  });
+
+  it("goes after panic, incidents and scans but before photos", () => {
+    const scan = scanItem({ qrCode: "a", shiftId: null, position: null, deviceId: "d" }, ctx());
+    const photo = evidenceItem({ incidentRef: "i", localUri: "file:///p.jpg", label: null }, ctx());
+    expect(sortForSending([photo, ack(), scan]).map((i) => i.kind)).toEqual(["SCAN", "ACK", "EVIDENCE"]);
+  });
+
+  it("is parked as failed at once when the server says a newer version exists (409), never retried", async () => {
+    const store = memoryStore();
+    const item = ack();
+    await store.add(item);
+    const send = jest.fn().mockRejectedValue(new ApiError("A newer version of this order has been published. Read it again before acknowledging.", 409));
+    const result = await flush(store, send, "g1");
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(result.failed).toBe(1);
+    expect(store.all.get(item.id)).toMatchObject({ status: "FAILED", attempts: 1 });
+  });
+
+  it("is kept and retried on no signal", async () => {
+    const store = memoryStore();
+    const item = ack();
+    await store.add(item);
+    const result = await flush(store, jest.fn().mockRejectedValue(new ApiError("offline", 0)), "g1");
+    expect(result.stopped).toBe(true);
+    expect(store.all.get(item.id)?.status).toBe("PENDING");
   });
 });

@@ -32,7 +32,10 @@ Site overview (guards a manager made site supervisors only): who is on duty at t
 
 Push alerts: the app registers the phone's token after sign-in, removes it on sign-out, and opens the right screen when an alert is tapped. Needs a real phone with an EAS build (not an emulator, not Expo Go) and `eas init` so the project id exists. The backend sends only when `handyflow.guard.push.enabled=true`.
 
-Not done: supervisor actions (approving swaps, acknowledging incidents), naming a colleague for a swap (the server has no guard-facing colleague list), offline acknowledgement, equipment checkout, gate log, EAS builds, real icon and splash, translations.
+Swap colleague picker: a swap is now always sent to a named colleague (the server cannot approve a request that names nobody). The list is guards rostered at a site you are rostered at within 30 days, names only.
+Offline post orders: the last orders you loaded are kept on the phone (one file per guard, removed at sign-out). With no signal you can read that copy (it says when it was saved) and acknowledge it; the acknowledgement names the version you read and the time, is saved in the queue, and is refused by the server (shown as failed, not retried) if a newer version was published meanwhile.
+
+Not done: offline gate log, real icon and splash, translations, privacy policy.
 Never run on a phone or emulator: checked only by type check, unit tests and an Android bundle build.
 
 ## Rules for this app

@@ -89,6 +89,14 @@ export async function sendOutboxItem(item: OutboxItem): Promise<void> {
     await sendPhoto(item);
     return;
   }
+  if (item.kind === "ACK") {
+    const p = item.payload as { orderId: string; version: number; deviceHardwareId: string };
+    await api<unknown>(`/api/v1/guard/my-post/orders/${p.orderId}/acknowledge`, {
+      method: "POST",
+      body: { deviceHardwareId: p.deviceHardwareId, acknowledgedOffline: true, acknowledgedAt: item.recordedAt, version: p.version },
+    });
+    return;
+  }
   const path =
     item.kind === "SCAN" ? "/api/v1/guard/checkpoints/scan"
     : item.kind === "INCIDENT" ? "/api/v1/guard/incidents"
@@ -109,7 +117,7 @@ async function sendPhoto(item: OutboxItem): Promise<void> {
 
 // ── My post (site orders) ─────────────────────────────────────────────────────
 
-const orderSchema = z.object({
+export const orderSchema = z.object({
   id: z.string(),
   version: z.number(),
   postName: z.string().nullish(),
@@ -122,7 +130,7 @@ const orderSchema = z.object({
 });
 export type PostOrder = z.infer<typeof orderSchema>;
 
-const myPostSchema = z.object({
+export const myPostSchema = z.object({
   siteId: z.string(),
   siteLevelOrder: orderSchema.nullish(),
   siteLevelNeedsAcknowledgment: z.boolean(),
@@ -168,12 +176,20 @@ export async function getMySwaps(): Promise<Swap[]> {
   return page.content;
 }
 
-/** An open request: any available guard, the supervisor decides. Naming a colleague needs a colleague list the server does not offer guards yet. */
-export async function requestSwap(originalShiftId: string, reason: string): Promise<Swap> {
+const colleagueSchema = z.object({ id: z.string(), name: z.string() });
+export type Colleague = z.infer<typeof colleagueSchema>;
+
+/** Guards on the same rosters as me, names only. */
+export async function getSwapColleagues(): Promise<Colleague[]> {
+  return z.array(colleagueSchema).parse(await api<unknown>("/api/v1/guard/shifts/swaps/colleagues"));
+}
+
+/** Ask a named colleague to take a shift. The server will not approve a request that names nobody, so the app always names one. */
+export async function requestSwap(originalShiftId: string, proposedGuardId: string, reason: string): Promise<Swap> {
   return swapSchema.parse(
     await api<unknown>("/api/v1/guard/shifts/swaps", {
       method: "POST",
-      body: { originalShiftId, proposedGuardId: null, reason: reason.trim() || null },
+      body: { originalShiftId, proposedGuardId, reason: reason.trim() || null },
     }),
   );
 }

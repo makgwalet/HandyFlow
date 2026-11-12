@@ -69,6 +69,16 @@ public class GuardShiftSwapController {
                 swapService.getSwapsByGuard(tenantId, guardId, pageable)));
     }
 
+    @GetMapping("/colleagues")
+    @PreAuthorize("hasAuthority('SECURITY_GUARD')")
+    @Operation(summary = "Colleagues this guard can ask to take a shift",
+            description = "Active guards rostered at a site the caller is rostered at within 30 days either side of " +
+                    "today. Names and ids only.")
+    public ResponseEntity<ApiResponse<java.util.List<za.co.handyflow.platform.security.dto.SwapColleagueView>>> colleagues() {
+        return ResponseEntity.ok(ApiResponse.success(
+                swapService.colleaguesFor(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId())));
+    }
+
     @PostMapping
     @PreAuthorize("hasAuthority('SECURITY_GUARD')")
     @Operation(summary = "Request a shift swap — guard-facing",
