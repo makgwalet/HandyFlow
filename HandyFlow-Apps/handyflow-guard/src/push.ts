@@ -15,16 +15,20 @@ export function screenFromData(data: unknown): OpenableScreen | null {
   return typeof screen === "string" && (OPENABLE as readonly string[]).includes(screen) ? (screen as OpenableScreen) : null;
 }
 
-/** Call once at start: show alerts while the app is open, and create the Android channel the server names. */
+/** Call once at start: show alerts while the app is open, and create the Android channel the server names. Never throws. */
 export async function configurePush(): Promise<void> {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
-  });
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "Alerts",
-      importance: Notifications.AndroidImportance.HIGH,
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
     });
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "Alerts",
+        importance: Notifications.AndroidImportance.HIGH,
+      });
+    }
+  } catch {
+    /* Expo Go and some emulators cannot create the channel; alerts are simply unavailable there */
   }
 }
 
