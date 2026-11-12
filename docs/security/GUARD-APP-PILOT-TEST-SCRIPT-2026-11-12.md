@@ -86,6 +86,12 @@ Use a second guard, enrolled the same way, with a shift at a second site (create
 | G5 | `PATCH /api/v1/security/guards/<Lerato>/site-supervisor` `{"enabled":true}`, reopen Home | "Site overview" appears. It lists Sipho on duty with rounds done/missed and last scan, and any unresolved incident from the last day |
 | G6 | `{"enabled":false}`, tap Refresh in the overview | Refused at once (no token change needed) |
 
+| G7 | Lerato is a site supervisor on shift. Sipho asks to swap a shift at the site for Lerato's colleague (a third guard) in Swagger (`POST /api/v1/guard/shifts/swaps` with `proposedGuardId`), the colleague accepts (`POST .../{id}/accept`) | In Lerato's Site overview, "Swaps waiting for you (1)" shows it |
+| G8 | Approve it | It disappears; the shift now belongs to the colleague (check the shift in Swagger). A second approve from a stale screen: "cannot be decided now" |
+| G9 | A swap Lerato herself asked for or was asked to take: call `POST /api/v1/guard/supervisor/swaps/<id>/approve` with her token | 403 "cannot decide a swap you are part of" |
+| G10 | Open incident at the site: Acknowledge, then Resolve with a note | Status changes; the incident timeline in Swagger shows Lerato's name and the note |
+| G11 | An incident at another site, with Lerato's token on `.../supervisor/incidents/<id>/acknowledge` | 404 |
+
 ## F. What to send back
 
 For every row that did not behave as expected: the row number, what you saw, a screenshot, and the backend log lines around the time. Also tell me: how long Start shift took, whether the camera scan worked from the monitor, and anything a guard would find confusing.

@@ -335,3 +335,22 @@ export type SiteOverview = z.infer<typeof siteOverviewSchema>;
 export async function getSiteOverview(): Promise<SiteOverview> {
   return siteOverviewSchema.parse(await api<unknown>("/api/v1/guard/supervisor/site"));
 }
+
+export async function getSwapsToDecide(): Promise<Swap[]> {
+  return z.array(swapSchema).parse(await api<unknown>("/api/v1/guard/supervisor/swaps"));
+}
+
+export function decideSwap(id: string, approve: boolean, reason: string): Promise<unknown> {
+  return api<unknown>(`/api/v1/guard/supervisor/swaps/${id}/${approve ? "approve" : "reject"}`, {
+    method: "POST",
+    body: { reason: reason.trim() || null },
+  });
+}
+
+export function acknowledgeIncident(id: string): Promise<unknown> {
+  return api<unknown>(`/api/v1/guard/supervisor/incidents/${id}/acknowledge`, { method: "POST" });
+}
+
+export function resolveIncident(id: string, note: string): Promise<unknown> {
+  return api<unknown>(`/api/v1/guard/supervisor/incidents/${id}/resolve`, { method: "POST", body: { note: note.trim() || null } });
+}
