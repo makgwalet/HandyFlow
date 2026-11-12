@@ -48,6 +48,13 @@ public class FuelVarianceService {
         return new VarianceList(tolerance != null, out);
     }
 
+    /** How many new variances were raised just now. Zero when no tolerance is set. Used by the daily sweep. */
+    @Transactional
+    public int raiseNew(TenantId tenantId) {
+        BigDecimal tolerance = settings.current(tenantId).getVarianceTolerancePct();
+        return tolerance == null ? 0 : detect(tenantId, tolerance);
+    }
+
     int detect(TenantId tenantId, BigDecimal tolerance) {
         Instant since = Instant.now().minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
         int created = 0;

@@ -52,7 +52,22 @@ class FuelPortalDataServiceTest {
     @Mock PortalUserRepository portalUsers;
     @Mock NotificationService notifications;
     @Mock TenantAdminRecipients adminRecipients;
+    @Mock za.co.handyflow.platform.billing.FeatureGuard featureGuard;
     @InjectMocks FuelPortalDataService service;
+
+    @org.junit.jupiter.api.BeforeEach
+    void entitled() { when(featureGuard.hasModuleFor(any(TenantId.class), eq("fuel"))).thenReturn(true); }
+
+    @Test @DisplayName("when the supplier's plan no longer includes Fuel the customer gets 'not found' and no accounts")
+    void moduleLapsed() {
+        when(featureGuard.hasModuleFor(any(TenantId.class), eq("fuel"))).thenReturn(false);
+        when(grants.findActiveGrant(USER, ACCOUNT)).thenReturn(Optional.of(activeGrant()));
+        when(grants.findActiveGrantsForUser(USER)).thenReturn(List.of(activeGrant()));
+        assertThrows(HandyFlowException.class, () -> service.myOrders(USER, ACCOUNT));
+        assertThrows(HandyFlowException.class, () -> service.requestOrder(USER, ACCOUNT, body()));
+        assertTrue(service.myAccounts(USER).isEmpty());
+        verifyNoInteractions(orderService);
+    }
 
     private FuelPortalAccessGrant activeGrant() {
         FuelPortalAccessGrant g = FuelPortalAccessGrant.createInvite(TENANT, ACCOUNT, "A@Customer.com", null);

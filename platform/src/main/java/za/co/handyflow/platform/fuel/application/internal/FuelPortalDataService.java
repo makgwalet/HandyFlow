@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.crm.CrmFacade;
 import za.co.handyflow.platform.crm.CustomerSummary;
 import za.co.handyflow.platform.fuel.domain.model.FuelCustomerAccount;
@@ -51,12 +52,14 @@ public class FuelPortalDataService {
     private final PortalUserRepository portalUsers;
     private final NotificationService notifications;
     private final TenantAdminRecipients adminRecipients;
+    private final FeatureGuard featureGuard;
 
     @Transactional(readOnly = true)
     public List<AccountSummary> myAccounts(UUID portalUserId) {
         List<AccountSummary> out = new ArrayList<>();
         for (FuelPortalAccessGrant g : grants.findActiveGrantsForUser(portalUserId)) {
             TenantId tenant = TenantId.of(g.getTenantId());
+            if (!featureGuard.hasModuleFor(tenant, "fuel")) continue; // the supplier's plan no longer includes Fuel
             accounts.findActiveById(tenant, g.getAccountId()).ifPresent(a -> out.add(
                     new AccountSummary(a.getId(), crm.findCustomerById(tenant, a.getCrmCustomerId()).map(CustomerSummary::name).orElse("Customer"), a.getPaymentTermsDays())));
         }
@@ -124,7 +127,10 @@ public class FuelPortalDataService {
     }
 
     private FuelPortalAccessGrant requireGrant(UUID portalUserId, UUID accountId) {
-        return grants.findActiveGrant(portalUserId, accountId).orElseThrow(FuelPortalDataService::notFound);
+        FuelPortalAccessGrant g = grants.findActiveGrant(portalUserId, accountId).orElseThrow(FuelPortalDataService::notFound);
+        // The portal request has no tenant context, so the module check uses the grant's tenant. Same answer as "not yours".
+        if (!featureGuard.hasModuleFor(TenantId.of(g.getTenantId()), "fuel")) throw notFound();
+        return g;
     }
 
     /** Same answer for "no such account" and "not yours", so ids cannot be probed. */

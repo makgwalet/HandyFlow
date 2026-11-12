@@ -78,7 +78,15 @@ public class FeatureGuard {
 
     public boolean hasModule(String moduleKey) {
         if (!TenantContext.hasTenant()) return false;
-        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        return hasModuleFor(TenantContext.getTenantIdAsObject(), moduleKey);
+    }
+
+    /**
+     * Same test as {@link #hasModule} for a tenant named by the caller, for requests that have no tenant context
+     * (customer portal tokens carry the tenant on the access grant instead).
+     */
+    public boolean hasModuleFor(TenantId tenantId, String moduleKey) {
+        if (tenantId == null) return false;
 
         // Suspended tenants have no module access
         boolean suspended = subscriptionRepository.findByTenantId(tenantId)

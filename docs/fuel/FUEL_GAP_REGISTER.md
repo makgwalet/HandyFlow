@@ -86,3 +86,8 @@ Built (patch 0782): 12 area MANAGE permissions beside FUEL_MANAGE (umbrella kept
 ## B06a - Enquiries, quote history, acceptance (2026-11-12)
 - Built: enquiries (EQ-numbers, quote / lost / cancelled with reasons), append-only quotation version history with price change, optional acceptance record on confirmation (who, how, reference, which version). See FUEL-B06A-NOTES-2026-11-12.
 - Not built (B06b): contracts and volume pricing. Existing contract prices are account-specific price-list entries (B07 controls); a contract entity must not become a second price master, so it needs a decision first.
+
+## H02 - Portal module check and variance alert (2026-11-12)
+- Built: the customer portal now checks the supplier's Fuel entitlement using the access grant's tenant (`FeatureGuard.hasModuleFor`); a customer of a tenant whose plan no longer includes Fuel (or that is suspended or cancelled) gets "not found" and no accounts. This closes the `FuelPortalDataController` debt noted above (the controller itself has no tenant context, so the check is in `FuelPortalDataService.requireGrant`).
+- Built: daily variance alert (07:15 SAST, `fuel.variance.alerts.enabled`, default on). For each tenant that has set a tolerance and still has Fuel, new variances are raised and the administrators get one in-app and email notice with the count and a pointer to the list. Nothing is written off and no cause is implied.
+- Not built: alert for variances that stay open too long; per-tenant choice of who is told (administrators only for now).
