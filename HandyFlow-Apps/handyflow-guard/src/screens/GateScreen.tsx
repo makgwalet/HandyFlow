@@ -3,7 +3,8 @@ import { StyleSheet, Text, TextInput } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import { getDeviceId } from "@/auth/deviceStore";
-import { ENTRY_TYPES, getAccessPoints, getOnSite, logArrival, logDeparture, type EntryType } from "@/api/guardWork";
+import { attachGatePhoto, ENTRY_TYPES, GATE_PHOTO_TYPES, getAccessPoints, getOnSite, logArrival, logDeparture, type EntryType, type GatePhotoType } from "@/api/guardWork";
+import { takePhoto } from "@/photos";
 import { Button } from "@/ui/Button";
 import { Card, Screen } from "@/ui/Screen";
 import { colors } from "@/ui/theme";
@@ -31,6 +32,7 @@ export function GateScreen() {
   const [purpose, setPurpose] = useState("");
   const [reg, setReg] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const clientRef = useRef(Crypto.randomUUID()); // one per arrival form
 
   const gates = useQuery({ queryKey: ["accessPoints"], queryFn: getAccessPoints });
@@ -50,6 +52,15 @@ export function GateScreen() {
       void qc.invalidateQueries({ queryKey: ["onSite"] });
     },
     onError: (e) => setError(e instanceof Error ? e.message : "Could not log the arrival"),
+  });
+  const photo = useMutation({
+    mutationFn: async (v: { id: string; docType: GatePhotoType }) => {
+      const uri = await takePhoto();
+      if (!uri) throw new Error("No photo taken. Allow the camera in Settings if you want to add one.");
+      await attachGatePhoto(v.id, v.docType, uri);
+    },
+    onSuccess: () => { setError(null); setNote("Photo saved."); },
+    onError: (e) => { setNote(null); setError(e instanceof Error ? e.message : "Could not save the photo"); },
   });
   const depart = useMutation({
     mutationFn: async (id: string) => logDeparture(id, await getDeviceId()),
@@ -73,12 +84,17 @@ export function GateScreen() {
   return (
     <Screen title="Gate log">
       {error ? <Text accessibilityRole="alert" style={s.err}>{error}</Text> : null}
+      {note ? <Text style={s.muted}>{note}</Text> : null}
       <Text style={s.head}>On site now ({list.length})</Text>
       {list.length === 0 && !onSite.isLoading ? <Text style={s.muted}>Nobody logged in.</Text> : null}
       {list.map((e) => (
         <Card key={e.id}>
           <Text style={s.strong}>{e.personName}{e.company ? `, ${e.company}` : ""}</Text>
           <Text style={s.muted}>{word(e.entryType)} in at {time(e.loggedInAt)}{e.vehicleRegistration ? `, ${e.vehicleRegistration}` : ""}{e.status === "OVERSTAYED" ? ". Overstayed" : ""}</Text>
+          {GATE_PHOTO_TYPES.map((t) => (
+            <Button key={t.docType} label={t.label} tone="plain" onPress={() => photo.mutate({ id: e.id, docType: t.docType })}
+              loading={photo.isPending && photo.variables?.id === e.id && photo.variables.docType === t.docType} />
+          ))}
           <Button label="Log departure" tone="plain" onPress={() => depart.mutate(e.id)} loading={depart.isPending && depart.variables === e.id} />
         </Card>
       ))}
@@ -93,7 +109,7 @@ export function GateScreen() {
       <Field label="Reason (optional)" value={purpose} onChange={setPurpose} autoCapitalize="none" />
       <Field label="Vehicle registration (optional)" value={reg} onChange={setReg} autoCapitalize="characters" />
       <Button label="Log arrival" onPress={() => arrive.mutate()} loading={arrive.isPending} disabled={!gate || name.trim().length < 2} />
-      <Text style={s.muted}>Needs signal. ID numbers are masked once saved.</Text>
+      <Text style={s.muted}>Needs signal. ID numbers are masked once saved. Add photos from the visitor card above.</Text>
     </Screen>
   );
 }

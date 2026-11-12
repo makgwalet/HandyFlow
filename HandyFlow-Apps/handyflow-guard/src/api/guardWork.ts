@@ -289,3 +289,19 @@ export async function logArrival(input: {
 export function logDeparture(entryId: string, deviceHardwareId: string): Promise<unknown> {
   return api<unknown>(`/api/v1/guard/gate/entries/${entryId}/exit`, { method: "POST", body: { deviceHardwareId } });
 }
+
+export const GATE_PHOTO_TYPES = [
+  { docType: "ID_DOCUMENT", label: "ID photo" },
+  { docType: "VEHICLE_DISC", label: "Vehicle disc" },
+  { docType: "GENERAL_PHOTO", label: "Other photo" },
+] as const;
+export type GatePhotoType = (typeof GATE_PHOTO_TYPES)[number]["docType"];
+
+/** Uploads a photo for an entry at the guard's own site, then deletes the phone's copy. The file stays if the upload fails. */
+export async function attachGatePhoto(entryId: string, docType: GatePhotoType, localUri: string): Promise<void> {
+  const form = new FormData();
+  form.append("file", { uri: localUri, name: `${entryId}-${docType}.jpg`, type: "image/jpeg" } as unknown as Blob);
+  form.append("docType", docType);
+  await api<unknown>(`/api/v1/guard/gate/entries/${entryId}/attachments`, { method: "POST", form });
+  await removePhoto(localUri);
+}

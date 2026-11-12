@@ -151,3 +151,8 @@ Open: (1) a scan that arrives after its round was already marked missed does not
 - Backend (0825, written not compiled): the guard gate endpoints took "who is logging" from a `deviceHardwareId` in the body, so a guard could name another device and have the entry attributed to someone else, and any gate, entry or photo target in the tenant could be used from any site. Now the logger is the signed-in guard, the gate/entry must be at the site of the guard's open shift (anything else is 404), a repeat departure is a 409 (was a 500), and the photo is attributed to the signed-in guard. Arrivals take an optional `clientRef` (migration V689 adds kind GATE_ENTRY), so a repeat returns the first entry. The old `deviceHardwareId` fields are still accepted and ignored. Staff routes untouched. Tests: `GateAccessServiceGuardTest` (4), two more in `GuardOfflineWriteServiceTest`.
 - App (0826): Gate log screen (on-site list with Log departure, arrival form). `tsc` clean, 19 jest tests, `expo export` ok; not run on a device.
 - Open: gate photos (ID, disc) not in the app; no offline queue for gate entries; ID numbers are collected, so how long they are kept and who may see them is a POPIA decision for the tenant; no overstay alert in the app.
+
+## 16. Status: gate photos (patch 0827, app only, 2026-11-12)
+
+- App: each person on site has ID photo / Vehicle disc / Other photo buttons that take a picture and upload it to the hardened endpoint from 0825 (own-site entries only, attributed to the signed-in guard). `tsc` clean, 19 jest tests, `expo export` ok; not run on a device.
+- Open: online only; a photo whose upload fails stays in the app's private storage (not retried or cleaned up); no photo count limit on the gate side.
