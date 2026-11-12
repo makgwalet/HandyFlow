@@ -49,7 +49,7 @@ Each row is a gap statement; the backend/frontend/database/permission/test lists
 - **D01 (nozzles)** not started: changes the meter model. **D03 (POS/pump integration, P2)** not started: boundary only.
 
 ## Status after F01 (code written; Java not compiled or run by the author)
-- **F01** done in code: licences link to a legal entity, a licensed activity and an issuing authority; evidence references (append-only); per-entity coverage (information only, no required-licence rules). Not done: site entity link, blocking by entity, evidence verification.
+- **F01** done in code: licences link to a legal entity, a licensed activity and an issuing authority; evidence references (append-only); per-entity coverage (information only, no required-licence rules). Site link, opt-in blocking by entity and evidence files with verification were added later (0794, see below).
 - Owner decisions recorded 2026-11-11: Truck Stop reservations on Bookings (E01); tankers to reference Fleet vehicles (C03); Fuel may depend on Accounts Payable via a facade (B08). Each adds a module dependency, so A01 should be settled first.
 
 ## Maven run of 2026-11-12 (full suite, user's machine, PostgreSQL 16)
@@ -94,3 +94,6 @@ Built (patch 0782): 12 area MANAGE permissions beside FUEL_MANAGE (umbrella kept
 
 ## B04 / B05 - Supplier banking and requisitions (2026-11-12)
 Built (patch 0793, V676): supplier bank details proposed by one person and verified by another (enforced in the database too), masked lists, full number only to FUEL_SUPPLIER_BANK_READ with a log line, old details kept as history. Purchase requisitions through the Approvals engine (entity type REQUISITION; no rule means approved straight away), converted to a draft purchase order. Not built: supplier documents and scorecard, Accounts Payable reading the verified account, a hold period after a change, tank selection in the requisition screen. See FUEL-B04-B05-SUPPLIER-BANKING-REQUISITIONS-NOTES-2026-11-12.md.
+
+## F01 leftovers (2026-11-12)
+Built (patch 0794, V677): licence-to-depot link and per-site coverage; opt-in setting for which licensed activities block loading when expired on the loading depot's legal entity (off by default); licence evidence file upload and second-person verification (FUEL_COMPLIANCE_VERIFY, ADMIN only). Not built: required-licence rules (deliberately none), locking verified evidence, virus scan. See FUEL-F01-LEFTOVERS-NOTES-2026-11-12.md.

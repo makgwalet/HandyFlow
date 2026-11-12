@@ -4,7 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip, ReasonModal } from "../warehousing/whseUi"
-import { TYPES, SUBJECTS, ACTIVITIES, activityLabel, coverageText, validateEvidenceRef, subjectNeedsPick, validateItem, validateRenew, whenLabel, byUrgency, type ComplianceItem, type ComplianceEvidence, type Coverage } from "./complianceOps"
+import { sizeText } from "./evidenceCapture"
+import { TYPES, SUBJECTS, ACTIVITIES, activityLabel, coverageText, evidenceLabel, validateComplianceFile, validateEvidenceRef, subjectNeedsPick, validateItem, validateRenew, whenLabel, byUrgency, type ComplianceItem, type ComplianceEvidence, type Coverage } from "./complianceOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const msg = (e: any, fb: string) => e?.response?.data?.message ?? fb
@@ -33,7 +34,7 @@ export default function ComplianceTab() {
         </p>
         {canManage && <button style={btnPrimary} onClick={() => setDialog({ kind: "edit" })}>Add item</button>}
       </div>
-      {cov.length > 0 && (
+      {(cov.length > 0 || (coverage.data?.sites ?? []).length > 0) && (
         <div style={{ ...card, padding: 12, marginBottom: 14 }}>
           <p style={{ margin: "0 0 6px", fontSize: 12.5, fontWeight: 700 }}>Licences by legal entity</p>
           {cov.map(c => (
@@ -41,6 +42,14 @@ export default function ComplianceTab() {
               <strong>{c.name}</strong>: {coverageText(c)}{c.activities.length > 0 && <span style={{ color: "var(--hf-text-muted)" }}> · {c.activities.map(activityLabel).join(", ")}</span>}
             </div>
           ))}
+          {(coverage.data?.sites ?? []).length > 0 && <>
+            <p style={{ margin: "10px 0 6px", fontSize: 12.5, fontWeight: 700 }}>Licences by site</p>
+            {coverage.data!.sites!.map(c => (
+              <div key={c.depotId} style={{ fontSize: 12.5, padding: "3px 0" }}>
+                <strong>{c.name}</strong>{c.legalEntityName ? ` (${c.legalEntityName})` : ""}: {coverageText(c)}{c.activities.length > 0 && <span style={{ color: "var(--hf-text-muted)" }}> · {c.activities.map(activityLabel).join(", ")}</span>}
+              </div>
+            ))}
+          </>}
           {(coverage.data?.unlinkedLicences ?? 0) > 0 && <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 4 }}>{coverage.data!.unlinkedLicences} licence{coverage.data!.unlinkedLicences === 1 ? " is" : "s are"} not linked to a legal entity.</div>}
           <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 4 }}>For information only. The system does not know which licences your business is required to hold.</div>
         </div>
@@ -56,7 +65,7 @@ export default function ComplianceTab() {
                 <tr key={i.id} style={{ borderTop: "1px solid var(--hf-border)" }}>
                   <td style={td}>{i.title}<div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{i.itemType.toLowerCase()}</div></td>
                   <td style={td}>{i.subjectType === "COMPANY" ? "Company" : `${i.subjectType.toLowerCase()}: ${i.subjectLabel ?? ""}`}
-                    {(i.legalEntityName || i.licensedActivity) && <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{[i.legalEntityName, i.licensedActivity ? activityLabel(i.licensedActivity) : null, i.issuingAuthority].filter(Boolean).join(" · ")}</div>}</td>
+                    {(i.legalEntityName || i.depotName || i.licensedActivity) && <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{[i.legalEntityName, i.depotName ? `Site: ${i.depotName}` : null, i.licensedActivity ? activityLabel(i.licensedActivity) : null, i.issuingAuthority].filter(Boolean).join(" · ")}</div>}</td>
                   <td style={td}>{i.referenceNo ?? "–"}</td>
                   <td style={td}>{i.expiresOn}<div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{whenLabel(i)}</div></td>
                   <td style={td}><Chip bg={tone(i.status).bg} fg={tone(i.status).fg}>{i.status === "VALID" ? "Valid" : i.status === "EXPIRING" ? "Expiring" : "Expired"}</Chip></td>
@@ -81,8 +90,9 @@ export default function ComplianceTab() {
 }
 
 function EditDialog({ item, onDone, onClose }: { item?: ComplianceItem; onDone: () => void; onClose: () => void }) {
-  const [f, setF] = useState({ itemType: item?.itemType ?? "CERTIFICATE", title: item?.title ?? "", referenceNo: item?.referenceNo ?? "", subjectType: item?.subjectType ?? "TANKER", subjectId: item?.subjectId ?? "", subjectLabel: item?.subjectLabel ?? "", issuedOn: item?.issuedOn ?? "", expiresOn: item?.expiresOn ?? "", notes: item?.notes ?? "", legalEntityId: item?.legalEntityId ?? "", licensedActivity: item?.licensedActivity ?? "", issuingAuthority: item?.issuingAuthority ?? "" })
+  const [f, setF] = useState({ itemType: item?.itemType ?? "CERTIFICATE", title: item?.title ?? "", referenceNo: item?.referenceNo ?? "", subjectType: item?.subjectType ?? "TANKER", subjectId: item?.subjectId ?? "", subjectLabel: item?.subjectLabel ?? "", issuedOn: item?.issuedOn ?? "", expiresOn: item?.expiresOn ?? "", notes: item?.notes ?? "", legalEntityId: item?.legalEntityId ?? "", licensedActivity: item?.licensedActivity ?? "", issuingAuthority: item?.issuingAuthority ?? "", depotId: item?.depotId ?? "" })
   const entities = useQuery<{ id: string; name: string }[]>({ queryKey: ["fuel-legal-entities"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/legal-entities")) })
+  const sites = useQuery<{ id: string; name: string }[]>({ queryKey: ["fuel-compliance-sites"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/depots")) })
   const [err, setErr] = useState("")
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF(s => ({ ...s, [k]: e.target.value }))
   const pick = f.subjectType
@@ -97,7 +107,7 @@ function EditDialog({ item, onDone, onClose }: { item?: ComplianceItem; onDone: 
   })
   const save = useMutation({
     mutationFn: () => {
-      const body = { itemType: f.itemType, title: f.title, referenceNo: f.referenceNo || null, subjectType: f.subjectType, subjectId: f.subjectId || null, subjectLabel: f.subjectLabel || null, issuedOn: f.issuedOn || null, expiresOn: f.expiresOn, notes: f.notes || null, legalEntityId: f.legalEntityId || null, licensedActivity: f.licensedActivity || null, issuingAuthority: f.issuingAuthority.trim() || null }
+      const body = { itemType: f.itemType, title: f.title, referenceNo: f.referenceNo || null, subjectType: f.subjectType, subjectId: f.subjectId || null, subjectLabel: f.subjectLabel || null, issuedOn: f.issuedOn || null, expiresOn: f.expiresOn, notes: f.notes || null, legalEntityId: f.legalEntityId || null, licensedActivity: f.licensedActivity || null, issuingAuthority: f.issuingAuthority.trim() || null, depotId: f.depotId || null }
       return item ? apiClient.put(`/api/v1/fuel/compliance/${item.id}`, body) : apiClient.post("/api/v1/fuel/compliance", body)
     },
     onSuccess: () => { onDone(); onClose() }, onError: (e: any) => setErr(msg(e, "Could not save")),
@@ -125,6 +135,8 @@ function EditDialog({ item, onDone, onClose }: { item?: ComplianceItem; onDone: 
           <div><label style={labelStyle} htmlFor="ci-activity">Licensed activity</label>
             <select id="ci-activity" value={f.licensedActivity} onChange={set("licensedActivity")} style={inputStyle}><option value="">Not stated</option>{ACTIVITIES.map(a => <option key={a} value={a}>{activityLabel(a)}</option>)}</select></div>
         </div>
+        <div><label style={labelStyle} htmlFor="ci-depot">Depot (site)</label>
+          <select id="ci-depot" value={f.depotId} onChange={set("depotId")} style={inputStyle}><option value="">Not tied to a depot</option>{(Array.isArray(sites.data) ? sites.data : []).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
         <div><label style={labelStyle} htmlFor="ci-authority">Issuing authority</label><input id="ci-authority" value={f.issuingAuthority} onChange={set("issuingAuthority")} style={inputStyle} /></div>
         {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12, margin: 0 }}>{err}</p>}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
@@ -138,24 +150,46 @@ function EditDialog({ item, onDone, onClose }: { item?: ComplianceItem; onDone: 
 
 function EvidenceDialog({ item, canManage, onDone, onClose }: { item: ComplianceItem; canManage: boolean; onDone: () => void; onClose: () => void }) {
   const qc = useQueryClient()
+  const canVerify = usePermissions(["FUEL_COMPLIANCE_VERIFY"])
+  const [picked, setPicked] = useState<File | null>(null); const [fileNote, setFileNote] = useState("")
   const q = useQuery<ComplianceEvidence[]>({ queryKey: ["fuel-compliance-evidence", item.id], queryFn: async () => unwrap(await apiClient.get(`/api/v1/fuel/compliance/${item.id}/evidence`)) })
   const [ref, setRef] = useState(""); const [note, setNote] = useState(""); const [err, setErr] = useState(""); const [replacing, setReplacing] = useState<string | null>(null)
   const done = () => { setErr(""); setReplacing(null); qc.invalidateQueries({ queryKey: ["fuel-compliance-evidence", item.id] }); onDone() }
   const add = useMutation({ mutationFn: () => apiClient.post(`/api/v1/fuel/compliance/${item.id}/evidence`, { fileRef: ref.trim(), note: note.trim() || null }), onSuccess: () => { setRef(""); setNote(""); done() }, onError: (e: any) => setErr(msg(e, "Could not add the evidence")) })
+  const upload = useMutation({
+    mutationFn: () => { const f = new FormData(); f.append("file", picked!); if (fileNote.trim()) f.append("note", fileNote.trim()); return apiClient.post(`/api/v1/fuel/compliance/${item.id}/evidence/file`, f) },
+    onSuccess: () => { setPicked(null); setFileNote(""); done() }, onError: (e: any) => setErr(msg(e, "Could not upload the file")),
+  })
+  const verify = useMutation({ mutationFn: (id: string) => apiClient.post(`/api/v1/fuel/compliance/evidence/${id}/verify`), onSuccess: done, onError: (e: any) => setErr(msg(e, "Could not verify it")) })
+  const view = async (id: string) => {
+    try {
+      const r = await apiClient.get(`/api/v1/fuel/compliance/evidence/${id}/file`, { responseType: "blob" })
+      const url = URL.createObjectURL(r.data as Blob); window.open(url, "_blank", "noopener"); setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (e: any) { setErr(msg(e, "Could not open the file")) }
+  }
   const replace = useMutation({ mutationFn: (a: { id: string; reason: string }) => apiClient.post(`/api/v1/fuel/compliance/evidence/${a.id}/supersede`, { reason: a.reason }), onSuccess: done })
   const list = Array.isArray(q.data) ? q.data : []
   return (
     <Modal title={`Evidence: ${item.title}`} onClose={onClose}>
-      <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", marginTop: 0 }}>Links to the scanned licence or certificate. The file is not uploaded here. Evidence is never edited or deleted: a wrong one is replaced with a reason and kept on record.</p>
+      <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", marginTop: 0 }}>Upload a scan or photo of the licence or certificate (JPEG, PNG, WebP or PDF, up to 5 MB), or record a link to it. Evidence is never edited or deleted: a wrong one is replaced with a reason and kept on record. A second person can verify it; you cannot verify your own.</p>
       {list.length === 0 && <p style={{ fontSize: 13 }}>{q.isLoading ? "Loading…" : "No evidence recorded."}</p>}
       {list.map(e => (
         <div key={e.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 0", borderTop: "1px solid var(--hf-border)", fontSize: 12.5 }}>
-          <span style={{ flex: 1, wordBreak: "break-all", textDecoration: e.status === "SUPERSEDED" ? "line-through" : undefined }}>{e.fileRef}{e.note ? ` · ${e.note}` : ""}{e.status === "SUPERSEDED" ? ` · Replaced: ${e.supersededReason}` : ""}</span>
+          <span style={{ flex: 1, wordBreak: "break-all", textDecoration: e.status === "SUPERSEDED" ? "line-through" : undefined }}>{evidenceLabel(e)}{e.fileStored && e.fileSizeBytes ? ` (${sizeText(e.fileSizeBytes)})` : ""}{e.note ? ` · ${e.note}` : ""}{e.status === "SUPERSEDED" ? ` · Replaced: ${e.supersededReason}` : ""}</span>
+          {e.status === "ACTIVE" && (e.verifiedAt ? <Chip bg="var(--hf-success-soft-strong)" fg="var(--hf-success-text-strong)">Verified</Chip> : <Chip bg="var(--hf-warning-soft)" fg="var(--hf-warning-text)">Not verified</Chip>)}
+          {e.fileStored && <button style={btnGhost} onClick={() => view(e.id)}>View</button>}
+          {canVerify && e.status === "ACTIVE" && !e.verifiedAt && <button style={btnGhost} disabled={verify.isPending} onClick={() => verify.mutate(e.id)}>Verify</button>}
           {canManage && e.status === "ACTIVE" && <button style={btnGhost} onClick={() => setReplacing(e.id)}>Replace</button>}
         </div>
       ))}
       {canManage && (
         <div style={{ marginTop: 10 }}>
+          <label style={labelStyle} htmlFor="ev-file">Scan or photo</label>
+          <input id="ev-file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={e => { setPicked(e.target.files?.[0] ?? null); setErr("") }} />
+          <input aria-label="File note" placeholder="Note (optional)" value={fileNote} onChange={e => setFileNote(e.target.value)} style={{ ...inputStyle, marginTop: 6 }} />
+          <div style={{ display: "flex", justifyContent: "flex-end", margin: "8px 0 12px" }}>
+            <button style={btnPrimary} disabled={upload.isPending} onClick={() => { const v = validateComplianceFile(picked); if (v) return setErr(v); setErr(""); upload.mutate() }}>Upload file</button>
+          </div>
           <label style={labelStyle} htmlFor="ev-ref">File link or reference *</label>
           <input id="ev-ref" value={ref} onChange={e => setRef(e.target.value)} style={inputStyle} />
           <label style={{ ...labelStyle, marginTop: 8 }} htmlFor="ev-note">Note</label>

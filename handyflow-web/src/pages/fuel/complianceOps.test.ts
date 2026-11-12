@@ -33,3 +33,19 @@ describe("complianceOps", () => {
     expect(validateEvidenceRef("scans/a.pdf")).toBeNull()
   })
 })
+
+import { evidenceLabel, validateComplianceFile } from "./complianceOps"
+describe("licence evidence files (F01)", () => {
+  it("accepts images and PDFs up to 5 MB and refuses anything else", () => {
+    expect(validateComplianceFile(null)).toMatch(/Choose a file/)
+    expect(validateComplianceFile({ type: "application/pdf", size: 1000 })).toBeNull()
+    expect(validateComplianceFile({ type: "image/png", size: 1000 })).toBeNull()
+    expect(validateComplianceFile({ type: "application/zip", size: 1000 })).toMatch(/JPEG, PNG or WebP image or a PDF/)
+    expect(validateComplianceFile({ type: "image/png", size: 0 })).toMatch(/empty/)
+    expect(validateComplianceFile({ type: "image/png", size: 6 * 1024 * 1024 })).toMatch(/5 MB/)
+  })
+  it("shows a stored file by name and a typed reference as typed", () => {
+    expect(evidenceLabel({ fileStored: true, fileName: "Licence.pdf", fileRef: null })).toBe("Licence.pdf")
+    expect(evidenceLabel({ fileStored: false, fileName: null, fileRef: "scans/a.pdf" })).toBe("scans/a.pdf")
+  })
+})

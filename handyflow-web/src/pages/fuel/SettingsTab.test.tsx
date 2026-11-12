@@ -59,6 +59,18 @@ describe("SettingsTab", () => {
     expect(screen.queryByText("Save settings")).toBeNull()
   })
 
+  it("lets the licensed activities that stop loading be chosen, and sends them", async () => {
+    perms = ["FUEL_MANAGE", "FUEL_CONFIGURATION_MANAGE"]
+    get.mockImplementation(async (u: string) => u.includes("/controls") ? { data: { data: { requireSupplierApproval: false, adjustmentThresholdLitres: null, licenceBlockingActivities: ["STORAGE"] } } } : { data: { data: saved } })
+    mount()
+    const storage = (await screen.findByLabelText("Storage")) as HTMLInputElement
+    expect(storage.checked).toBe(true)
+    expect((screen.getByLabelText("Wholesale") as HTMLInputElement).checked).toBe(false)
+    fireEvent.click(screen.getByLabelText("Wholesale"))
+    fireEvent.click(screen.getByText("Save controls"))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/settings/controls", expect.objectContaining({ licenceBlockingActivities: ["STORAGE", "WHOLESALE"] })))
+  })
+
   it("saves the approval controls with a blank threshold as no limit", async () => {
     perms = ["FUEL_MANAGE", "FUEL_CONFIGURATION_MANAGE"]
     get.mockImplementation(async (u: string) => u.includes("/controls") ? { data: { data: { requireSupplierApproval: false, adjustmentThresholdLitres: 500 } } } : { data: { data: saved } })
@@ -68,7 +80,7 @@ describe("SettingsTab", () => {
     fireEvent.change(box, { target: { value: "" } })
     fireEvent.click(screen.getByLabelText(/New suppliers must be approved/))
     fireEvent.click(screen.getByText("Save controls"))
-    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/settings/controls", { requireSupplierApproval: true, adjustmentThresholdLitres: null, varianceTolerancePct: null, cashVarianceTolerance: 5, requireSeparateCloser: false, priceChangeApprovalPct: 0, minMarginPct: 0 }))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/settings/controls", { requireSupplierApproval: true, adjustmentThresholdLitres: null, varianceTolerancePct: null, cashVarianceTolerance: 5, requireSeparateCloser: false, priceChangeApprovalPct: 0, minMarginPct: 0, licenceBlockingActivities: [] }))
   })
 
   it("rejects a zero threshold before calling the server", async () => {

@@ -69,6 +69,10 @@ public class FuelComplianceItem {
     @Column(name = "issuing_authority", length = 120)
     private String issuingAuthority;
 
+    /** The depot (site) this item belongs to, when it is tied to one. Null for items that are not (all existing rows). */
+    @Column(name = "depot_id")
+    private UUID depotId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -109,6 +113,8 @@ public class FuelComplianceItem {
         this.legalEntityId = legalEntityId; this.licensedActivity = a; this.issuingAuthority = blank(authority);
         this.updatedAt = Instant.now();
     }
+
+    public void linkDepot(UUID depotId) { this.depotId = depotId; this.updatedAt = Instant.now(); }
 
     /** Extends validity. The new expiry must be later than the current one: renewing cannot shorten a certificate. */
     public LocalDate renew(LocalDate newExpiry, LocalDate issued) {

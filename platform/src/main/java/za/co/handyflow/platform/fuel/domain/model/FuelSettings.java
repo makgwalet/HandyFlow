@@ -72,6 +72,10 @@ public class FuelSettings {
     @Column(name = "min_margin_pct", precision = 6, scale = 2)
     private BigDecimal minMarginPct;
 
+    /** Comma-separated licensed activities (e.g. "WHOLESALE,STORAGE") whose expiry on the loading depot's legal entity blocks allocation. Empty = off. */
+    @Column(name = "licence_blocking_activities", nullable = false, length = 120)
+    private String licenceBlockingActivities = "";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -134,6 +138,25 @@ public class FuelSettings {
             this.minMarginPct = minMargin.signum() == 0 ? null : minMargin;
         }
         this.updatedAt = Instant.now();
+    }
+
+    /** Null leaves the current choice alone; an empty list switches the check off. */
+    public void updateLicenceBlocking(java.util.List<String> activities) {
+        if (activities == null) return;
+        java.util.TreeSet<String> chosen = new java.util.TreeSet<>();
+        for (String a : activities) {
+            if (a == null || a.isBlank()) continue;
+            String up = a.trim().toUpperCase();
+            if (!FuelComplianceItem.ACTIVITIES.contains(up)) throw new IllegalArgumentException("Unknown licensed activity: " + a);
+            chosen.add(up);
+        }
+        this.licenceBlockingActivities = String.join(",", chosen);
+        this.updatedAt = Instant.now();
+    }
+
+    public java.util.Set<String> blockingActivities() {
+        if (licenceBlockingActivities == null || licenceBlockingActivities.isBlank()) return java.util.Set.of();
+        return new java.util.TreeSet<>(java.util.Arrays.asList(licenceBlockingActivities.split(",")));
     }
 
     public void updateVarianceTolerance(BigDecimal pct) {

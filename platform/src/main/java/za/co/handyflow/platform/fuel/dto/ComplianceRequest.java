@@ -19,11 +19,17 @@ public record ComplianceRequest(
         @Size(max = 500) String notes,
         UUID legalEntityId,
         @Size(max = 16) String licensedActivity,
-        @Size(max = 120) String issuingAuthority
+        @Size(max = 120) String issuingAuthority,
+        UUID depotId
 ) {
+    /** Without the site link. */
+    public ComplianceRequest(String itemType, String title, String referenceNo, String subjectType, UUID subjectId, String subjectLabel,
+                             LocalDate issuedOn, LocalDate expiresOn, String notes, UUID legalEntityId, String licensedActivity, String issuingAuthority) {
+        this(itemType, title, referenceNo, subjectType, subjectId, subjectLabel, issuedOn, expiresOn, notes, legalEntityId, licensedActivity, issuingAuthority, null);
+    }
     /** Without the licence-linkage fields (older clients). */
     public ComplianceRequest(String itemType, String title, String referenceNo, String subjectType, UUID subjectId, String subjectLabel,
                              LocalDate issuedOn, LocalDate expiresOn, String notes) {
-        this(itemType, title, referenceNo, subjectType, subjectId, subjectLabel, issuedOn, expiresOn, notes, null, null, null);
+        this(itemType, title, referenceNo, subjectType, subjectId, subjectLabel, issuedOn, expiresOn, notes, null, null, null, null);
     }
 }

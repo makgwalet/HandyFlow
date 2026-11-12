@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /** Phase 2 wholesale controls: supplier approval, purchase-order approval, large stock adjustments. */
@@ -14,18 +15,22 @@ public final class FuelWholesaleDtos {
     /** cashVarianceTolerance and requireSeparateCloser: null means "leave as it is". */
     public record ControlsRequest(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres, BigDecimal varianceTolerancePct,
                                   BigDecimal cashVarianceTolerance, Boolean requireSeparateCloser,
-                                  BigDecimal priceChangeApprovalPct, BigDecimal minMarginPct) {
+                                  BigDecimal priceChangeApprovalPct, BigDecimal minMarginPct, List<String> licenceBlockingActivities) {
+        public ControlsRequest(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres, BigDecimal varianceTolerancePct,
+                               BigDecimal cashVarianceTolerance, Boolean requireSeparateCloser, BigDecimal priceChangeApprovalPct, BigDecimal minMarginPct) {
+            this(requireSupplierApproval, adjustmentThresholdLitres, varianceTolerancePct, cashVarianceTolerance, requireSeparateCloser, priceChangeApprovalPct, minMarginPct, null);
+        }
         public ControlsRequest(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres, BigDecimal varianceTolerancePct,
                                BigDecimal cashVarianceTolerance, Boolean requireSeparateCloser) {
-            this(requireSupplierApproval, adjustmentThresholdLitres, varianceTolerancePct, cashVarianceTolerance, requireSeparateCloser, null, null);
+            this(requireSupplierApproval, adjustmentThresholdLitres, varianceTolerancePct, cashVarianceTolerance, requireSeparateCloser, null, null, null);
         }
         public ControlsRequest(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres, BigDecimal varianceTolerancePct) {
-            this(requireSupplierApproval, adjustmentThresholdLitres, varianceTolerancePct, null, null, null, null);
+            this(requireSupplierApproval, adjustmentThresholdLitres, varianceTolerancePct, null, null, null, null, null);
         }
     }
     public record ControlsResponse(boolean requireSupplierApproval, BigDecimal adjustmentThresholdLitres, BigDecimal varianceTolerancePct,
                                    BigDecimal cashVarianceTolerance, boolean requireSeparateCloser,
-                                   BigDecimal priceChangeApprovalPct, BigDecimal minMarginPct) {}
+                                   BigDecimal priceChangeApprovalPct, BigDecimal minMarginPct, List<String> licenceBlockingActivities) {}
 
     public record ReasonRequest(@NotBlank @Size(min = 5, max = 300, message = "Reason must be 5 to 300 characters") String reason) {}
 

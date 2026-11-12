@@ -20,6 +20,9 @@ public interface FuelComplianceEvidenceRepository extends JpaRepository<FuelComp
     @Query("SELECT e FROM FuelComplianceEvidence e WHERE e.tenantId = :tenantId AND e.id = :id")
     Optional<FuelComplianceEvidence> findByIdForUpdate(TenantId tenantId, UUID id);
 
+    @Query("SELECT e FROM FuelComplianceEvidence e WHERE e.tenantId = :tenantId AND e.id = :id")
+    Optional<FuelComplianceEvidence> findOne(TenantId tenantId, UUID id);
+
     /** Rows of [itemId, active evidence count] for every item that has any. */
     @Query("SELECT e.itemId, COUNT(e) FROM FuelComplianceEvidence e WHERE e.tenantId = :tenantId AND e.status = 'ACTIVE' GROUP BY e.itemId")
     List<Object[]> countActiveByItem(TenantId tenantId);

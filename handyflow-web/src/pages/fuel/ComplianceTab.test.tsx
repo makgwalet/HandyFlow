@@ -87,6 +87,59 @@ describe("ComplianceTab", () => {
     expect(screen.getByText(/does not know which licences/)).toBeTruthy()
   })
 
+  it("shows licences by site, and shows the site beside an item", async () => {
+    coverage = { entities: [], unlinkedLicences: 0, sites: [{ depotId: "d1", name: "Germiston", legalEntityName: "Acme Fuels (Pty) Ltd", valid: 1, expiring: 0, expired: 1, activities: ["STORAGE"] }] }
+    mount()
+    expect(await screen.findByText("Licences by site")).toBeTruthy()
+    expect(screen.getByText(/1 valid, 0 expiring, 1 expired/)).toBeTruthy()
+  })
+
+  it("ties a licence to a depot when adding", async () => {
+    get.mockImplementation(async (u: string) => {
+      if (u.endsWith("/depots")) return { data: { data: [{ id: "d1", name: "Germiston" }] } }
+      if (u.endsWith("/compliance")) return { data: { data: [item()] } }
+      if (u.endsWith("/coverage")) return { data: { data: coverage } }
+      return { data: { data: [] } }
+    })
+    mount()
+    await screen.findByText("Roadworthy")
+    fireEvent.click(screen.getByText("Add item"))
+    fireEvent.change(screen.getByLabelText("For"), { target: { value: "COMPANY" } })
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Storage licence" } })
+    fireEvent.change(screen.getByLabelText("Expires"), { target: { value: "2027-01-01" } })
+    await screen.findByText("Germiston")
+    fireEvent.change(screen.getByLabelText("Depot (site)"), { target: { value: "d1" } })
+    fireEvent.click(screen.getByText("Save"))
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post.mock.calls[0][1]).toMatchObject({ depotId: "d1" })
+  })
+
+  it("uploads a licence scan, refuses a wrong type, shows verified state, and lets only a verifier verify", async () => {
+    perms = ["FUEL_MANAGE", "FUEL_COMPLIANCE_VERIFY"]
+    evidence = [{ id: "v1", itemId: "c1", fileRef: null, fileStored: true, fileName: "Licence.pdf", fileSizeBytes: 2048, note: null, capturedAt: "2026-11-01T08:00:00Z", status: "ACTIVE", supersededReason: null, verifiedAt: null },
+      { id: "v2", itemId: "c1", fileRef: "link", note: null, capturedAt: "2026-11-01T08:00:00Z", status: "ACTIVE", supersededReason: null, verifiedAt: "2026-11-02T08:00:00Z" }]
+    mount()
+    await screen.findByText("Roadworthy")
+    fireEvent.click(screen.getAllByText(/^Evidence \(/)[0])
+    expect(await screen.findByText(/Licence\.pdf \(2 KB\)/)).toBeTruthy()
+    expect(screen.getByText("Not verified")).toBeTruthy(); expect(screen.getByText("Verified")).toBeTruthy()
+    fireEvent.click(screen.getByText("Verify"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/compliance/evidence/v1/verify"))
+    fireEvent.change(screen.getByLabelText("Scan or photo"), { target: { files: [new File(["x"], "a.zip", { type: "application/zip" })] } })
+    fireEvent.click(screen.getByText("Upload file"))
+    expect((await screen.findAllByRole("alert")).some(a => /JPEG, PNG or WebP image or a PDF/.test(a.textContent ?? ""))).toBe(true)
+    expect(post.mock.calls.some(c => String(c[0]).endsWith("/evidence/file"))).toBe(false)
+    fireEvent.change(screen.getByLabelText("Scan or photo"), { target: { files: [new File(["%PDF-1.7"], "licence.pdf", { type: "application/pdf" })] } })
+    fireEvent.click(screen.getByText("Upload file"))
+    await waitFor(() => expect(post.mock.calls.some(c => c[0] === "/api/v1/fuel/compliance/c1/evidence/file" && c[1] instanceof FormData)).toBe(true))
+    cleanup(); perms = ["FUEL_MANAGE"]
+    mount()
+    await screen.findByText("Roadworthy")
+    fireEvent.click(screen.getAllByText(/^Evidence \(/)[0])
+    await screen.findByText(/Licence\.pdf/)
+    expect(screen.queryByText("Verify")).toBeNull()
+  })
+
   it("links a licence to a legal entity, activity and authority when adding", async () => {
     mount()
     await screen.findByText("Roadworthy")

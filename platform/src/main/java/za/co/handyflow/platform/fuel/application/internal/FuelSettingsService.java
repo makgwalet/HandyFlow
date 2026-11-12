@@ -12,6 +12,7 @@ import za.co.handyflow.platform.fuel.dto.FuelSettingsDtos.SettingsResponse;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /** Per-tenant fuel settings. A tenant that has never saved any gets defaults without a row being written. */
 @Service
@@ -54,12 +55,13 @@ public class FuelSettingsService {
         s.updateVarianceTolerance(req.varianceTolerancePct());
         s.updateCashControls(req.cashVarianceTolerance(), req.requireSeparateCloser());
         s.updatePriceControls(req.priceChangeApprovalPct(), req.minMarginPct());
+        s.updateLicenceBlocking(req.licenceBlockingActivities());
         return toControls(settings.save(s));
     }
 
     private static ControlsResponse toControls(FuelSettings s) {
         return new ControlsResponse(s.isRequireSupplierApproval(), s.getAdjustmentThresholdLitres(), s.getVarianceTolerancePct(),
-                s.getCashVarianceTolerance(), s.isRequireSeparateCloser(), s.getPriceChangeApprovalPct(), s.getMinMarginPct());
+                s.getCashVarianceTolerance(), s.isRequireSeparateCloser(), s.getPriceChangeApprovalPct(), s.getMinMarginPct(), List.copyOf(s.blockingActivities()));
     }
 
     private static SettingsResponse toResponse(FuelSettings s) {

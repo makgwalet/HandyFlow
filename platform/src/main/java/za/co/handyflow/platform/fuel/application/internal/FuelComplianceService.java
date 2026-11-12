@@ -36,14 +36,16 @@ public class FuelComplianceService {
     private final HrFacade hr;
     private final FuelLegalEntityRepository legalEntities;
     private final FuelComplianceEvidenceRepository evidence;
+    private final FuelSettingsService settings;
 
     @Transactional(readOnly = true)
     public List<ComplianceResponse> list(TenantId tenantId) {
         LocalDate today = LocalDate.now(SAST);
         Map<UUID, String> names = entityNames(tenantId);
+        Map<UUID, String> depotNames = depotNames(tenantId);
         Map<UUID, Long> counts = new HashMap<>();
         for (Object[] row : evidence.countActiveByItem(tenantId)) counts.put((UUID) row[0], ((Number) row[1]).longValue());
-        return items.findAllActive(tenantId).stream().map(i -> toResponse(i, today, names.get(i.getLegalEntityId()), counts.getOrDefault(i.getId(), 0L))).toList();
+        return items.findAllActive(tenantId).stream().map(i -> toResponse(i, today, names.get(i.getLegalEntityId()), counts.getOrDefault(i.getId(), 0L), depotNames.get(i.getDepotId()))).toList();
     }
 
     /** Licences by legal entity and status today. Information only: the system does not know which licences a business must hold. */
@@ -62,7 +64,21 @@ public class FuelComplianceService {
             }
             rows.add(new CoverageRow(e.getId(), e.getName(), valid, expiring, expired, List.copyOf(activities)));
         }
-        return new Coverage(rows, licences.stream().filter(i -> i.getLegalEntityId() == null).count());
+        List<SiteCoverageRow> sites = new ArrayList<>();
+        Map<UUID, String> entityNames = entityNames(tenantId);
+        for (FuelDepot d : depots.findAllActive(tenantId)) {
+            long valid = 0, expiring = 0, expired = 0;
+            TreeSet<String> activities = new TreeSet<>();
+            for (FuelComplianceItem i : licences) {
+                if (!d.getId().equals(i.getDepotId())) continue;
+                switch (i.statusOn(today)) { case "EXPIRED" -> expired++; case "EXPIRING" -> expiring++; default -> valid++; }
+                if (i.getLicensedActivity() != null) activities.add(i.getLicensedActivity());
+            }
+            if (valid + expiring + expired > 0) {
+                sites.add(new SiteCoverageRow(d.getId(), d.getName(), d.getLegalEntityId(), entityNames.get(d.getLegalEntityId()), valid, expiring, expired, List.copyOf(activities)));
+            }
+        }
+        return new Coverage(rows, licences.stream().filter(i -> i.getLegalEntityId() == null).count(), sites);
     }
 
     @Transactional(readOnly = true)
@@ -84,14 +100,36 @@ public class FuelComplianceService {
         return view(evidence.save(e));
     }
 
-    private static EvidenceView view(FuelComplianceEvidence e) {
-        return new EvidenceView(e.getId(), e.getItemId(), e.getFileRef(), e.getNote(), e.getCapturedBy(), e.getCapturedAt(), e.getStatus(), e.getSupersededReason());
+    /** A second person confirms the evidence. The person who added it cannot (the entity and the database both refuse). */
+    @Transactional
+    public EvidenceView verifyEvidence(TenantId tenantId, UUID evidenceId, UUID by) {
+        FuelComplianceEvidence e = evidence.findByIdForUpdate(tenantId, evidenceId).orElseThrow(() -> new ResourceNotFoundException("Evidence", evidenceId.toString()));
+        e.verify(by);
+        return view(evidence.save(e));
+    }
+
+    static EvidenceView view(FuelComplianceEvidence e) {
+        return new EvidenceView(e.getId(), e.getItemId(), e.isFileStored() ? null : e.getFileRef(), e.getNote(), e.getCapturedBy(), e.getCapturedAt(), e.getStatus(), e.getSupersededReason(),
+                e.isFileStored(), e.getContentType(), e.getFileSizeBytes(), e.getFileName(), e.getVerifiedBy(), e.getVerifiedAt());
     }
 
     private Map<UUID, String> entityNames(TenantId tenantId) {
         Map<UUID, String> m = new HashMap<>();
         for (FuelLegalEntity e : legalEntities.findAllActive(tenantId)) m.put(e.getId(), e.getName());
         return m;
+    }
+
+    private Map<UUID, String> depotNames(TenantId tenantId) {
+        Map<UUID, String> m = new HashMap<>();
+        for (FuelDepot d : depots.findAllActive(tenantId)) m.put(d.getId(), d.getName());
+        return m;
+    }
+
+    /** The depot must belong to this tenant. Null means "not linked". */
+    private String requireDepot(TenantId tenantId, UUID depotId) {
+        if (depotId == null) return null;
+        return depots.findActiveById(tenantId, depotId).map(FuelDepot::getName)
+                .orElseThrow(() -> new ResourceNotFoundException("Depot", depotId.toString()));
     }
 
     /** The legal entity must belong to this tenant. Null means "not linked". */
@@ -108,7 +146,9 @@ public class FuelComplianceService {
                 req.subjectId(), label, req.issuedOn(), req.expiresOn(), req.notes());
         String entityName = requireEntity(tenantId, req.legalEntityId());
         i.applyScope(req.legalEntityId(), req.licensedActivity(), req.issuingAuthority());
-        return toResponse(items.save(i), LocalDate.now(SAST), entityName, 0L);
+        String depotName = requireDepot(tenantId, req.depotId());
+        i.linkDepot(req.depotId());
+        return toResponse(items.save(i), LocalDate.now(SAST), entityName, 0L, depotName);
     }
 
     /** What the item is (type, title, dates, notes); who it is for cannot change: add a new item instead. */
@@ -118,7 +158,9 @@ public class FuelComplianceService {
         i.update(req.itemType(), req.title(), req.referenceNo(), req.issuedOn(), req.expiresOn(), req.notes());
         String entityName = requireEntity(tenantId, req.legalEntityId());
         i.applyScope(req.legalEntityId(), req.licensedActivity(), req.issuingAuthority());
-        return toResponse(items.save(i), LocalDate.now(SAST), entityName, evidence.countActive(tenantId, id));
+        String depotName = requireDepot(tenantId, req.depotId());
+        i.linkDepot(req.depotId());
+        return toResponse(items.save(i), LocalDate.now(SAST), entityName, evidence.countActive(tenantId, id), depotName);
     }
 
     @Transactional
@@ -127,7 +169,7 @@ public class FuelComplianceService {
         LocalDate previous = i.renew(req.newExpiresOn(), req.issuedOn());
         items.save(i);
         renewals.save(FuelComplianceRenewal.of(tenantId, id, previous, req.newExpiresOn(), by, req.note()));
-        return toResponse(i, LocalDate.now(SAST), i.getLegalEntityId() == null ? null : entityNames(tenantId).get(i.getLegalEntityId()), evidence.countActive(tenantId, id));
+        return toResponse(i, LocalDate.now(SAST), i.getLegalEntityId() == null ? null : entityNames(tenantId).get(i.getLegalEntityId()), evidence.countActive(tenantId, id), depotNames(tenantId).get(i.getDepotId()));
     }
 
     @Transactional
@@ -149,6 +191,34 @@ public class FuelComplianceService {
         for (FuelComplianceItem i : items.findExpiredFor(tenantId, "DRIVER", driverEmployeeId, today)) {
             if ("COMPANY".equals(i.getSubjectType())) continue; // already reported once above
             describe(problems, i, driverLabel);
+        }
+        if (problems.length() > 0) throw new IllegalStateException("Cannot allocate: " + problems.toString().trim() + " Renew it in Compliance first.");
+    }
+
+    /**
+     * Opt-in. When the company has chosen licensed activities in Settings, a load cannot be allocated while a licence for one of
+     * those activities has expired on the legal entity that owns the loading depot (or is linked to that depot). The loading depot
+     * is the one holding the delivery's tank. Off by default; the system never decides which licences a business must hold.
+     */
+    @Transactional(readOnly = true)
+    public void requireLoadingSiteLicensed(TenantId tenantId, UUID tankId) {
+        Set<String> blocking = settings.current(tenantId).blockingActivities();
+        if (blocking.isEmpty() || tankId == null) return;
+        UUID depotId = tanks.findActiveById(tenantId, tankId).map(t -> t.getDepotId()).orElse(null);
+        if (depotId == null) return;
+        FuelDepot depot = depots.findActiveById(tenantId, depotId).orElse(null);
+        if (depot == null) return;
+        LocalDate today = LocalDate.now(SAST);
+        StringBuilder problems = new StringBuilder();
+        for (FuelComplianceItem i : items.findAllActive(tenantId)) {
+            if (!"LICENCE".equals(i.getItemType()) || i.getLicensedActivity() == null || !blocking.contains(i.getLicensedActivity())) continue;
+            if (!i.getExpiresOn().isBefore(today)) continue;
+            boolean onEntity = depot.getLegalEntityId() != null && depot.getLegalEntityId().equals(i.getLegalEntityId());
+            boolean onDepot = depot.getId().equals(i.getDepotId());
+            if (!onEntity && !onDepot) continue;
+            String holder = onEntity ? legalEntities.findActiveById(tenantId, i.getLegalEntityId()).map(FuelLegalEntity::getName).orElse("The company") : depot.getName();
+            problems.append(holder).append(" has an expired ").append(i.getLicensedActivity().toLowerCase()).append(" licence, ").append(i.getTitle())
+                    .append(" (expired ").append(i.getExpiresOn()).append(") for the loading depot ").append(depot.getName()).append(". ");
         }
         if (problems.length() > 0) throw new IllegalStateException("Cannot allocate: " + problems.toString().trim() + " Renew it in Compliance first.");
     }
@@ -180,9 +250,9 @@ public class FuelComplianceService {
         return items.findActiveById(tenantId, id).orElseThrow(() -> new ResourceNotFoundException("Compliance item", id.toString()));
     }
 
-    private ComplianceResponse toResponse(FuelComplianceItem i, LocalDate today, String entityName, long evidenceCount) {
+    private ComplianceResponse toResponse(FuelComplianceItem i, LocalDate today, String entityName, long evidenceCount, String depotName) {
         return new ComplianceResponse(i.getId(), i.getItemType(), i.getTitle(), i.getReferenceNo(), i.getSubjectType(), i.getSubjectId(),
                 i.getSubjectLabel(), i.getIssuedOn(), i.getExpiresOn(), i.getNotes(), i.statusOn(today), ChronoUnit.DAYS.between(today, i.getExpiresOn()),
-                i.getLegalEntityId(), entityName, i.getLicensedActivity(), i.getIssuingAuthority(), evidenceCount);
+                i.getLegalEntityId(), entityName, i.getLicensedActivity(), i.getIssuingAuthority(), evidenceCount, i.getDepotId(), depotName);
     }
 }

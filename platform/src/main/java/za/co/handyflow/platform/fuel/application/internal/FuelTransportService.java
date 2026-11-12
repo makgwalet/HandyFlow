@@ -149,6 +149,7 @@ public class FuelTransportService {
         }
 
         compliance.requireCompliantForAllocation(tenantId, tanker.getId(), tanker.getRegistration(), driver.id(), driver.fullName());
+        compliance.requireLoadingSiteLicensed(tenantId, d.getTankId());
 
         Map<UUID, FuelTankerCompartment> comps = compartments.findByTanker(tenantId, tanker.getId()).stream()
                 .collect(Collectors.toMap(FuelTankerCompartment::getId, c -> c));

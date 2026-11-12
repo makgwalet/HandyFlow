@@ -2,11 +2,15 @@
 export interface ComplianceItem {
   id: string; itemType: string; title: string; referenceNo: string | null; subjectType: string; subjectId: string | null; subjectLabel: string | null
   issuedOn: string | null; expiresOn: string; notes: string | null; status: "VALID" | "EXPIRING" | "EXPIRED"; daysToExpiry: number
-  legalEntityId?: string | null; legalEntityName?: string | null; licensedActivity?: string | null; issuingAuthority?: string | null; evidenceCount?: number
+  legalEntityId?: string | null; legalEntityName?: string | null; licensedActivity?: string | null; issuingAuthority?: string | null; evidenceCount?: number; depotId?: string | null; depotName?: string | null
 }
-export interface ComplianceEvidence { id: string; itemId: string; fileRef: string; note: string | null; capturedAt: string; status: "ACTIVE" | "SUPERSEDED"; supersededReason: string | null }
+export interface ComplianceEvidence {
+  id: string; itemId: string; fileRef: string | null; note: string | null; capturedAt: string; status: "ACTIVE" | "SUPERSEDED"; supersededReason: string | null
+  fileStored?: boolean; contentType?: string | null; fileSizeBytes?: number | null; fileName?: string | null; verifiedBy?: string | null; verifiedAt?: string | null
+}
+export interface SiteCoverageRow { depotId: string; name: string; legalEntityName: string | null; valid: number; expiring: number; expired: number; activities: string[] }
 export interface CoverageRow { legalEntityId: string; name: string; valid: number; expiring: number; expired: number; activities: string[] }
-export interface Coverage { entities: CoverageRow[]; unlinkedLicences: number }
+export interface Coverage { entities: CoverageRow[]; unlinkedLicences: number; sites?: SiteCoverageRow[] }
 export const ACTIVITIES = ["WHOLESALE", "RETAIL", "DISTRIBUTION", "STORAGE", "TRANSPORT", "OTHER"]
 export const activityLabel = (a: string) => a.charAt(0) + a.slice(1).toLowerCase()
 
@@ -40,3 +44,15 @@ export function whenLabel(i: Pick<ComplianceItem, "status" | "daysToExpiry">): s
 
 /** Expired first, then expiring soonest. */
 export const byUrgency = (a: ComplianceItem, b: ComplianceItem) => a.daysToExpiry - b.daysToExpiry
+
+/** What to show for a piece of evidence: the stored file's name, or the link that was typed in. */
+export const evidenceLabel = (e: Pick<ComplianceEvidence, "fileStored" | "fileName" | "fileRef">) => (e.fileStored ? e.fileName ?? "File" : e.fileRef ?? "")
+
+/** A check before sending; the server decides again from the file's real contents. */
+export function validateComplianceFile(file: { type: string; size: number } | null): string | null {
+  if (!file) return "Choose a file."
+  if (file.size <= 0) return "That file is empty."
+  if (file.size > 5 * 1024 * 1024) return "That file is too large. The limit is 5 MB."
+  if (!["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(file.type)) return "Attach a JPEG, PNG or WebP image or a PDF."
+  return null
+}

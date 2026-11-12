@@ -3,12 +3,15 @@ package za.co.handyflow.platform.fuel.api;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.fuel.application.internal.FuelComplianceEvidenceFileService;
 import za.co.handyflow.platform.fuel.application.internal.FuelComplianceService;
+import za.co.handyflow.platform.fuel.dto.EvidenceFileDtos.StoredFile;
+import org.springframework.http.*;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
 import za.co.handyflow.platform.fuel.dto.ComplianceLinkageDtos.*;
 import za.co.handyflow.platform.fuel.dto.FuelWholesaleDtos.ReasonRequest;
 import za.co.handyflow.platform.fuel.dto.ComplianceRequest;
@@ -28,6 +31,7 @@ import java.util.UUID;
 public class FuelComplianceController {
 
     private final FuelComplianceService compliance;
+    private final FuelComplianceEvidenceFileService evidenceFiles;
     private final FeatureGuard featureGuard;
 
     @GetMapping
@@ -56,6 +60,37 @@ public class FuelComplianceController {
     public ResponseEntity<ApiResponse<EvidenceView>> addEvidence(@PathVariable UUID id, @Valid @RequestBody EvidenceRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Added", compliance.addEvidence(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping(value = "/{id}/evidence/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_COMPLIANCE_MANAGE')")
+    public ResponseEntity<ApiResponse<EvidenceView>> addEvidenceFile(@PathVariable UUID id, @RequestParam("file") MultipartFile file,
+                                                                    @RequestParam(value = "note", required = false) String note) {
+        featureGuard.requireModule("fuel");
+        byte[] bytes;
+        try { bytes = file.getBytes(); } catch (IOException e) { throw new IllegalArgumentException("The file could not be read."); }
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Added",
+                evidenceFiles.add(TenantContext.getTenantIdAsObject(), id, file.getOriginalFilename(), bytes, note, TenantContext.getCurrentUserId())));
+    }
+
+    @GetMapping("/evidence/{evidenceId}/file")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<byte[]> evidenceFile(@PathVariable UUID evidenceId) {
+        featureGuard.requireModule("fuel");
+        StoredFile f = evidenceFiles.download(TenantContext.getTenantIdAsObject(), evidenceId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(f.contentType()))
+                .header("X-Content-Type-Options", "nosniff")
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().filename(f.filename()).build().toString())
+                .cacheControl(CacheControl.noStore().cachePrivate())
+                .body(f.bytes());
+    }
+
+    @PostMapping("/evidence/{evidenceId}/verify")
+    @PreAuthorize("hasAuthority('FUEL_COMPLIANCE_VERIFY')")
+    public ResponseEntity<ApiResponse<EvidenceView>> verifyEvidence(@PathVariable UUID evidenceId) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Verified", compliance.verifyEvidence(TenantContext.getTenantIdAsObject(), evidenceId, TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/evidence/{evidenceId}/supersede")

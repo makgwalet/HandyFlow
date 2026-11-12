@@ -189,4 +189,15 @@ class FuelEndpointSecurityTest {
         }
         assertThat(sql).contains("r.name = 'ADMIN'");
     }
+
+    /** F01: verifying licence evidence has its own permission, which is not the umbrella, and ADMIN is the only role given it. */
+    @Test
+    void complianceEvidenceVerificationHasItsOwnPermission() throws IOException {
+        String src = Files.readString(API.resolve("FuelComplianceController.java"));
+        assertThat(src).containsPattern("FUEL_COMPLIANCE_VERIFY[^\\n]*\\n\\s+public ResponseEntity<ApiResponse<EvidenceView>> verifyEvidence");
+        String sql = Files.readString(MIGRATIONS.resolve("V677__fuel_licence_site_link_blocking_and_evidence_files.sql"));
+        assertThat(sql).containsPattern("module_key = 'fuel'[^;]*WHERE name = 'FUEL_COMPLIANCE_VERIFY'");
+        assertThat(sql).contains("r.name = 'ADMIN'");
+        assertThat(sql).contains("verified_by <> captured_by");
+    }
 }
