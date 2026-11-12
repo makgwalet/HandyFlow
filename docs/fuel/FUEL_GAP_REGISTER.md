@@ -51,3 +51,11 @@ Each row is a gap statement; the backend/frontend/database/permission/test lists
 ## Status after F01 (code written; Java not compiled or run by the author)
 - **F01** done in code: licences link to a legal entity, a licensed activity and an issuing authority; evidence references (append-only); per-entity coverage (information only, no required-licence rules). Not done: site entity link, blocking by entity, evidence verification.
 - Owner decisions recorded 2026-11-11: Truck Stop reservations on Bookings (E01); tankers to reference Fleet vehicles (C03); Fuel may depend on Accounts Payable via a facade (B08). Each adds a module dependency, so A01 should be settled first.
+
+## Maven run of 2026-11-12 (full suite, user's machine, PostgreSQL 16)
+- 8132 tests: 3 failures, 12 errors. **No failure in any Phase 1-4 or F01 test.**
+- Flyway applied V658-V662 to a real database and `HandyFlowApplicationTests` (full Spring context) and `PermissionConsistencyTest` passed. This is the first real-database check of the Fuel migrations and bean wiring.
+- Fuel failures, now fixed in tests only: `FuelCostToServeServiceTest` (5) and `FuelDashboardServiceTest` (2) built mocks inside `when(...).thenReturn(...)`; hoisted to locals. `ControllerAccessCoverageTest`: `FuelPortalAuthController` added to the reviewed public list (customer login, as every other portal) and `FuelPortalAuthController` and `FuelPortalDataController` added to the module-guard debt list, matching the other portals. **That adds two entries to a list meant to shrink.** Adding `requireModule("fuel")` to the portal data controller would remove one but needs a check that portal tokens carry the tenant.
+- Not Fuel, not touched: `EventsSchemaAndSecurityGuardTest` (1), `ControllerAccessCoverageTest` also lists Admin pricing and Events controllers (7 files), `WhseFefoTest` (5).
+- **`ArchitectureVerificationTest` does not appear in the log, so A01 is still unverified.** Run `mvn -Dtest=ArchitectureVerificationTest test`.
+- H01 (controller, security, cross-tenant tests) still open.

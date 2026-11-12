@@ -55,9 +55,10 @@ class FuelDashboardServiceTest {
     @Test @DisplayName("margin = revenue less cost at sale, per customer; deliveries with no cost are counted, not guessed")
     void marginByCustomer() {
         UUID a = UUID.randomUUID();
-        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(List.of(
+        var built1 = List.of(
                 delivered(a, "1000", "22.00", "20.00"),
-                delivered(a, "500", "22.00", null)));
+                delivered(a, "500", "22.00", null));
+        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(built1);
         when(crm.findCustomerById(any(), any())).thenReturn(Optional.empty());
         MarginResponse m = service.margin(T, 30);
         assertEquals(1, m.customers().size());
@@ -79,8 +80,9 @@ class FuelDashboardServiceTest {
     @Test @DisplayName("customers are ranked by margin, highest first")
     void ranked() {
         UUID a = UUID.randomUUID(), b = UUID.randomUUID();
-        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(List.of(
-                delivered(a, "100", "22.00", "21.00"), delivered(b, "100", "25.00", "20.00")));
+        var built2 = List.of(
+                delivered(a, "100", "22.00", "21.00"), delivered(b, "100", "25.00", "20.00"));
+        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(built2);
         when(crm.findCustomerById(any(), any())).thenReturn(Optional.empty());
         assertEquals(b, service.margin(T, 30).customers().get(0).customerId());
     }

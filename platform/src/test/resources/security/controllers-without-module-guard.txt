@@ -120,6 +120,8 @@ za/co/handyflow/platform/expenses/api/ExpensePolicyController.java
 za/co/handyflow/platform/expenses/api/ExpensesController.java
 za/co/handyflow/platform/facilitiesmanagement/api/FmPortalDataController.java
 za/co/handyflow/platform/fleet/api/TelematicsIngestController.java
+za/co/handyflow/platform/fuel/api/FuelPortalAuthController.java
+za/co/handyflow/platform/fuel/api/FuelPortalDataController.java
 za/co/handyflow/platform/hr/api/AttendanceController.java
 za/co/handyflow/platform/hr/api/BenefitController.java
 za/co/handyflow/platform/hr/api/Emp201Controller.java

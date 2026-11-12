@@ -79,8 +79,10 @@ class FuelCostToServeServiceTest {
         UUID siteId = UUID.randomUUID();
         Instant t0 = Instant.parse("2026-11-01T06:00:00Z");
         when(settingsService.current(any())).thenReturn(settings("100", "5", "50", "1", "2"));
-        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(List.of(delivery(siteId, t0, t0.plusSeconds(3 * 3600), "20")));
-        when(sites.findAllById(any())).thenReturn(List.of(site(siteId, "40")));
+        var built1 = List.of(delivery(siteId, t0, t0.plusSeconds(3 * 3600), "20"));
+        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(built1);
+        var built2 = List.of(site(siteId, "40"));
+        when(sites.findAllById(any())).thenReturn(built2);
 
         CostToServeResponse r = service.costToServe(T, 30);
         assertEquals(0, bd("2000.00").compareTo(r.margin()));
@@ -99,8 +101,10 @@ class FuelCostToServeServiceTest {
     void estimatesAreFlagged() {
         UUID noKm = UUID.randomUUID();
         when(settingsService.current(any())).thenReturn(settings("100", "5", "0", "0", "2"));
-        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(List.of(delivery(noKm, null, Instant.now(), "20"), delivery(null, null, null, "20")));
-        when(sites.findAllById(any())).thenReturn(List.of(site(noKm, null)));
+        var built3 = List.of(delivery(noKm, null, Instant.now(), "20"), delivery(null, null, null, "20"));
+        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(built3);
+        var built4 = List.of(site(noKm, null));
+        when(sites.findAllById(any())).thenReturn(built4);
 
         CostToServeResponse r = service.costToServe(T, 30);
         assertEquals(2, r.deliveriesWithEstimatedHours());
@@ -122,7 +126,8 @@ class FuelCostToServeServiceTest {
         when(settingsService.current(any())).thenReturn(settings("100", "0", "0", "0", "2"));
         FuelDelivery reversed = delivery(null, null, null, "20");
         when(reversed.getReversedAt()).thenReturn(Instant.now());
-        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(List.of(delivery(null, null, null, null), reversed));
+        var built5 = List.of(delivery(null, null, null, null), reversed);
+        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(built5);
         when(sites.findAllById(any())).thenReturn(List.of());
         CostToServeResponse r = service.costToServe(T, 30);
         assertEquals(1, r.deliveriesWithoutCost());
@@ -134,7 +139,8 @@ class FuelCostToServeServiceTest {
     @Test @DisplayName("with no rates set, net margin equals plain margin and the response says rates are not configured")
     void noRates() {
         when(settingsService.current(any())).thenReturn(FuelSettings.forTenant(T));
-        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(List.of(delivery(null, null, null, "20")));
+        var built6 = List.of(delivery(null, null, null, "20"));
+        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(built6);
         when(sites.findAllById(any())).thenReturn(List.of());
         CostToServeResponse r = service.costToServe(T, 30);
         assertFalse(r.ratesConfigured());
@@ -149,7 +155,8 @@ class FuelCostToServeServiceTest {
         when(foreign.getTenantId()).thenReturn(TenantId.of(UUID.randomUUID()));
         when(foreign.getDistanceKm()).thenReturn(bd("100"));
         when(settingsService.current(any())).thenReturn(settings("0", "5", "0", "0", "2"));
-        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(List.of(delivery(siteId, null, null, "20")));
+        var built7 = List.of(delivery(siteId, null, null, "20"));
+        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(built7);
         when(sites.findAllById(any())).thenReturn(List.of(foreign));
         CostToServeResponse r = service.costToServe(T, 30);
         assertEquals(1, r.deliveriesWithoutDistance());
