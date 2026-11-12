@@ -106,3 +106,6 @@ Built (patch 0796, V678): per-tank reorder rules that draft (never submit or ord
 
 ## Phase 6c - Landed cost per litre (2026-11-12)
 Built (patch 0797, no migration): per route, tanker and depot, the cost at sale plus every recorded route cost (F02 actuals) gives landed cost per litre and margin per litre. Only routes with every cost recorded feed the per-litre figures and rollups; the rest are listed with the reason and counted as left out. FUEL_MARGIN_READ only. Not built: inbound freight from supplier to depot (not recorded anywhere), allocation by customer, forecourt, export. See FUEL-PHASE6C-LANDED-COST-NOTES-2026-11-12.md.
+
+## Phase 7a - Returned fuel (2026-11-12)
+Built (patch 0800, V679): confirm which tank fuel brought back on a failed attempt was put into; limit is what was declared returned plus loaded-not-delivered litres; append-only; books NO stock movement because tanks are only deducted at delivery completion. Not built: fuel-type check against the tank, link to tank reconciliation. See FUEL-PHASE7A-RETURNED-FUEL-NOTES-2026-11-12.md.

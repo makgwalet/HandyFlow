@@ -16,4 +16,7 @@ public interface FuelDeliveryExceptionRepository extends JpaRepository<FuelDeliv
 
     @Query("SELECT e FROM FuelDeliveryException e WHERE e.tenantId = :tenantId AND e.deliveryId = :deliveryId AND e.clientRequestId = :clientRequestId")
     Optional<FuelDeliveryException> findByClientRequest(TenantId tenantId, UUID deliveryId, UUID clientRequestId);
+
+    @Query("SELECT e FROM FuelDeliveryException e WHERE e.tenantId = :tenantId AND e.litresReturned > 0 ORDER BY e.recordedAt ASC")
+    List<FuelDeliveryException> findAllWithReturnedLitres(TenantId tenantId);
 }
