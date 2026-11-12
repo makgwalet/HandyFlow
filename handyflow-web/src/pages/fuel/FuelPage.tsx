@@ -26,6 +26,7 @@ import TruckStopTab from "./TruckStopTab"
 import EnquiriesTab from "./EnquiriesTab"
 import SupplierInvoicesTab from "./SupplierInvoicesTab"
 import CostToServeTab from "./CostToServeTab"
+import LandedCostTab from "./LandedCostTab"
 import GroupReportTab from "./GroupReportTab"
 import AutomationTab from "./AutomationTab"
 import SettingsTab from "./SettingsTab"
@@ -86,6 +87,7 @@ export function FuelPage() {
         case "overview":   return <OverviewTab onNavigate={goTo} />
         case "margin":     return <MarginTab />
         case "cost-to-serve": return <CostToServeTab onNavigate={goTo} />
+        case "landed-cost": return <LandedCostTab />
         case "group-report": return <GroupReportTab />
         case "automation": return <AutomationTab />
         case "settings":   return <SettingsTab />

@@ -103,3 +103,6 @@ Built (patch 0795, no migration): read-only report per legal entity of deliverie
 
 ## Phase 6b - Automation (2026-11-12)
 Built (patch 0796, V678): per-tank reorder rules that draft (never submit or order) a requisition when the tank is below the company's level, daily at 06:30 with a notice, a "Check now" button and a log; opt-in overdue purchase order alert. Licence expiry reminders already existed. Not built: rules by fuel type or forecast, orders raised without a requisition are invisible to the rule, per-user notice choice. See FUEL-PHASE6B-AUTOMATION-NOTES-2026-11-12.md.
+
+## Phase 6c - Landed cost per litre (2026-11-12)
+Built (patch 0797, no migration): per route, tanker and depot, the cost at sale plus every recorded route cost (F02 actuals) gives landed cost per litre and margin per litre. Only routes with every cost recorded feed the per-litre figures and rollups; the rest are listed with the reason and counted as left out. FUEL_MARGIN_READ only. Not built: inbound freight from supplier to depot (not recorded anywhere), allocation by customer, forecourt, export. See FUEL-PHASE6C-LANDED-COST-NOTES-2026-11-12.md.
