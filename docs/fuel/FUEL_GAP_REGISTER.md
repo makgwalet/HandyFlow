@@ -133,3 +133,6 @@ Built: depots can record a supplying depot (V685, loop-safe); forecourt sales by
 
 ## D03 - Pump/POS import (2026-11-12, patch 0810)
 Built the inbound boundary only: key-authenticated idempotent shift import (V686), review queue, accept through the normal shift code. Not built: device or vendor adapters, live transactions, tank-gauge feeds, auto-accept, pump alias mapping. See FUEL-PHASE8E-POS-IMPORT-NOTES-2026-11-12.md.
+
+## Backlog
+The open work after Phase 8 is listed in FUEL-MODULE-BACKLOG-2026-11-12.md.
