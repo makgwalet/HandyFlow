@@ -56,6 +56,14 @@ public class IncidentService {
     private final SiteRepository     siteRepo;
     private final JdbcTemplate       jdbc;
 
+    /** Optional so the service still builds without push (tests, installs with push off). Never throws. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private GuardPushService push;
+
+    private void pushTo(TenantId tenantId, UUID guardId, String title, String body, String screen) {
+        if (push != null) push.notifyGuard(tenantId, guardId, title, body, java.util.Map.of("screen", screen));
+    }
+
     // ── Queries ───────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
@@ -215,6 +223,7 @@ public class IncidentService {
 
         record(tenantId, incidentId, "ACKNOWLEDGED", "ACKNOWLEDGED", null, acknowledgedBy, byName);
         log.info("[Security] Incident acknowledged id={} by={}", incidentId, acknowledgedBy);
+        pushTo(tenantId, incident.getGuardId(), "Report received", "Your incident report was acknowledged: " + incident.getTitle(), "Home");
         return getIncidentById(tenantId, incidentId);
     }
 

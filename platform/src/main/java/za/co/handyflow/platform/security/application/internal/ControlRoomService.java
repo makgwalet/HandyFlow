@@ -57,6 +57,14 @@ public class ControlRoomService {
     private final GuardRepository      guardRepository;
     private final IncidentRepository   incidentRepository;
 
+    /** Optional so the service still builds without push (tests, installs with push off). Never throws. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private GuardPushService push;
+
+    private void pushTo(TenantId tenantId, UUID guardId, String title, String body, String screen) {
+        if (push != null) push.notifyGuard(tenantId, guardId, title, body, java.util.Map.of("screen", screen));
+    }
+
     // ── Ingestion ──────────────────────────────────────────────────────────────
 
     /**
@@ -133,6 +141,8 @@ public class ControlRoomService {
 
         log.info("[Security] Alarm event triaged id={} by={} severity={}",
                 eventId, operatorId, event.getSeverity());
+        pushTo(tenantId, event.getTriggeredByGuardId(), "Control room has your alert",
+                "The control room has seen your alert.", "Home");
         return event;
     }
 

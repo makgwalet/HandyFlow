@@ -54,6 +54,14 @@ public class ShiftService {
     private final DeviceSessionRepository  deviceSessionRepository;
     private final ResourceCustodyRepository resourceCustodyRepository;
 
+    /** Optional so the service still builds without push (tests, installs with push off). Never throws. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private GuardPushService push;
+
+    private void pushTo(TenantId tenantId, UUID guardId, String title, String body, String screen) {
+        if (push != null) push.notifyGuard(tenantId, guardId, title, body, java.util.Map.of("screen", screen));
+    }
+
     // ── Queries ───────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
@@ -130,7 +138,11 @@ public class ShiftService {
 
         log.info("[Security] Shift created guard={} site={} start={} end={}",
                 req.guardId(), req.siteId(), req.startAt(), req.endAt());
-        return toResponse(shift);
+        ShiftResponse created = toResponse(shift);
+        pushTo(tenantId, req.guardId(), "New shift",
+                "You have a new shift starting " + java.time.format.DateTimeFormatter.ofPattern("EEE d MMM HH:mm")
+                        .withZone(java.time.ZoneId.of("Africa/Johannesburg")).format(req.startAt()), "Home");
+        return created;
     }
 
     /**

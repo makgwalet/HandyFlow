@@ -51,6 +51,14 @@ public class ShiftSwapService {
     private final ShiftRepository       shiftRepository;
     private final GuardRepository       guardRepository;
 
+    /** Optional so the service still builds without push (tests, installs with push off). Never throws. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private GuardPushService push;
+
+    private void pushTo(TenantId tenantId, UUID guardId, String title, String body, String screen) {
+        if (push != null) push.notifyGuard(tenantId, guardId, title, body, java.util.Map.of("screen", screen));
+    }
+
     // ── Queries ────────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
@@ -105,7 +113,13 @@ public class ShiftSwapService {
 
         log.info("[Security] Swap request created id={} shift={} requestingGuard={}",
                 swapRequest.getId(), req.originalShiftId(), requestingGuardId);
-        return toResponse(swapRequest);
+        ShiftSwapResponse created = toResponse(swapRequest);
+        if (req.proposedGuardId() != null) {
+            pushTo(tenantId, req.proposedGuardId(), "Shift swap request",
+                    (created.requestingGuardName() == null ? "A colleague" : created.requestingGuardName())
+                            + " asked you to take a shift: " + created.shiftSummary(), "Swaps");
+        }
+        return created;
     }
 
     // ── Stage 2a: Proposed guard accepts ──────────────────────────────────────
@@ -211,7 +225,10 @@ public class ShiftSwapService {
 
         log.info("[Security] Swap approved swapId={} newGuard={} validationPassed={}",
                 swapId, proposedGuardId, allPassed);
-        return toResponse(swap);
+        ShiftSwapResponse approved = toResponse(swap);
+        pushTo(tenantId, swap.getRequestingGuardId(), "Swap approved", "Your swap was approved: " + approved.shiftSummary(), "Swaps");
+        pushTo(tenantId, proposedGuardId, "New shift", "A shift was added to your roster: " + approved.shiftSummary(), "Home");
+        return approved;
     }
 
     // ── Stage 2b: Supervisor rejects ──────────────────────────────────────────
@@ -225,7 +242,9 @@ public class ShiftSwapService {
         swapRepository.save(swap);
 
         log.info("[Security] Swap rejected swapId={} by supervisor={}", swapId, supervisorId);
-        return toResponse(swap);
+        ShiftSwapResponse refused = toResponse(swap);
+        pushTo(tenantId, swap.getRequestingGuardId(), "Swap refused", "Your swap was refused: " + refused.shiftSummary(), "Swaps");
+        return refused;
     }
 
     // ── Cancel (requesting guard) ──────────────────────────────────────────────
