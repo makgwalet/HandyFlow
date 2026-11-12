@@ -143,6 +143,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
             // generous; it is there to slow key guessing and runaway senders, not to meter normal traffic.
             new Limit("fleet:telematics-ingest", "/api/v1/fleet/telematics/ingest", 300, 60 * 1_000L),
 
+            // Fuel pump/POS shift import (public, key authenticated). A site sends a few shifts a day; this slows key guessing and runaway senders.
+            new Limit("fuel:pos-import", "/api/v1/fuel/import/pos-shifts", 120, 60 * 1_000L),
+
             // CRM lead capture (public, key authenticated). A busy website form is a few per minute; this slows key guessing and form-spam floods.
             new Limit("crm:lead-capture", "/api/v1/public/crm/leads", 60, 60 * 1_000L),
     };

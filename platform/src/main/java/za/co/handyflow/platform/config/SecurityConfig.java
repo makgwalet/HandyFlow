@@ -197,6 +197,10 @@ public class SecurityConfig {
                                 // Fleet telematics ingest: called by a provider's system with no login. Authenticated by the per-company
                                 // X-Telematics-Key header inside the service (unknown, missing or revoked key gets 401); rate limited in RateLimitFilter.
                                 "/api/v1/fleet/telematics/ingest",
+                                // Fuel pump/POS shift import: called by a sender's system with no login. Authenticated by the per-company
+                                // X-Fuel-Import-Key header inside the service (unknown, missing or revoked key gets 401); it only stages a
+                                // shift for review; rate limited in RateLimitFilter.
+                                "/api/v1/fuel/import/pos-shifts",
                                 // CRM lead capture: called by a website form or another system with no login. Authenticated by the X-Crm-Key header
                                 // inside the service (unknown, missing or revoked key gets 401); rate limited in RateLimitFilter.
                                 "/api/v1/public/crm/leads",

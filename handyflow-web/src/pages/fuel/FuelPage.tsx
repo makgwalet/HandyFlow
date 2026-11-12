@@ -36,6 +36,7 @@ import SettingsTab from "./SettingsTab"
 import VariancesTab from "./VariancesTab"
 import SetupTab from "./SetupTab"
 import AccessLimitsTab from "./AccessLimitsTab"
+import ImportsTab from "./ImportsTab"
 import LegalEntitiesTab from "./LegalEntitiesTab"
 import { useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
@@ -101,6 +102,7 @@ export function FuelPage() {
         case "variances": return <VariancesTab />
         case "setup":      return <SetupTab />
         case "access-limits": return <AccessLimitsTab />
+        case "imports": return <ImportsTab />
         case "legal-entities": return <LegalEntitiesTab />
         default:           return null
       }
