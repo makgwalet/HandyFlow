@@ -75,6 +75,17 @@ Use a second guard, enrolled the same way, with a shift at a second site (create
 | E7 | Guard 1's token: close guard 2's session id | 404 |
 | E8 | Revoke guard 1's tokens in Swagger (`/guards/<id>/revoke-tokens`) while the app is open | App returns to sign-in on its next call; nothing is lost from the queue |
 
+## G. Clock-in window and site supervisor (patches 0831, 0832, 0833)
+
+| # | Do | Expect |
+|---|----|--------|
+| G1 | Create a shift that started 2 hours ago (Swagger A7), sign in, Start shift | Session opens with no shift linked; Patrol, My post and Gate answer that there is no shift |
+| G2 | `PATCH /api/v1/security/sites/<site>/clock-in-window` `{"minutes":240}`, close the session in Swagger, Start shift again | The shift is now linked and the site screens work |
+| G3 | `PATCH` with `{"minutes":null}` | Back to the 30-minute default. Values under 5 or over 480 are refused |
+| G4 | Sign in as a second guard (Sipho) with an active shift at the site. As Lerato, no site supervisor yet: open Home | No "Site overview" button. `GET /api/v1/guard/supervisor/site` with Lerato's token answers 403 |
+| G5 | `PATCH /api/v1/security/guards/<Lerato>/site-supervisor` `{"enabled":true}`, reopen Home | "Site overview" appears. It lists Sipho on duty with rounds done/missed and last scan, and any unresolved incident from the last day |
+| G6 | `{"enabled":false}`, tap Refresh in the overview | Refused at once (no token change needed) |
+
 ## F. What to send back
 
 For every row that did not behave as expected: the row number, what you saw, a screenshot, and the backend log lines around the time. Also tell me: how long Start shift took, whether the camera scan worked from the monitor, and anything a guard would find confusing.

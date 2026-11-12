@@ -4,7 +4,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
 import { getDeviceId } from "@/auth/deviceStore";
-import { clockIn, getCurrentSession, getMyShifts, type Shift } from "@/api/guardWork";
+import { clockIn, getCurrentSession, getMyShifts, getSiteOverview, type Shift } from "@/api/guardWork";
 import { getPosition } from "@/location";
 import { Button } from "@/ui/Button";
 import { useOutbox } from "@/offline/OutboxProvider";
@@ -33,6 +33,8 @@ export function HomeScreen({ navigation }: Props) {
   });
 
   const open = sessionQ.data ?? null;
+  // Only site supervisors get an answer (everyone else gets 403 once, no retry), so the button is shown only to them.
+  const overviewQ = useQuery({ queryKey: ["siteOverview"], queryFn: getSiteOverview, enabled: !!sessionQ.data, retry: false });
   const shifts = shiftsQ.data ?? [];
   const current: Shift | undefined = open?.shiftId ? shifts.find((s) => s.id === open.shiftId) : undefined;
   const next: Shift | undefined = shifts.find((s) => s.status === "SCHEDULED") ?? shifts[0];
@@ -77,6 +79,7 @@ export function HomeScreen({ navigation }: Props) {
 
       {open ? (
         <View style={s.stack}>
+          {overviewQ.data ? <Button label="Site overview" onPress={() => navigation.navigate("Supervisor")} /> : null}
           <Button label="Patrol rounds" onPress={() => navigation.navigate("Patrol")} />
           <Button label="My post orders" tone="plain" onPress={() => navigation.navigate("MyPost")} />
           <Button label="Gate log" tone="plain" onPress={() => navigation.navigate("Gate")} />

@@ -4,6 +4,7 @@ export type RootStackParamList = {
   MyPost: undefined;
   Swaps: undefined;
   Gate: undefined;
+  Supervisor: undefined;
   Equipment: { sessionId: string };
   Scan: { shiftId: string | null };
   Incident: { siteId: string; shiftId: string | null };

@@ -167,3 +167,12 @@ Open: (1) a scan that arrives after its round was already marked missed does not
 
 - `eas.json` with `preview` (APK for pilot phones) and `production` (app bundle) profiles. `app.config.ts` refuses an EAS build whose API address is still the placeholder or is plain http. README has the steps. Checked: the config loads normally locally and throws on the placeholder; an actual EAS build was not run (needs your Expo account).
 - Still needed for a wider release: real icon and splash, privacy policy URL, translations. A local http backend cannot be used from an installed phone build; the emulator is the way to test against local.
+
+## 19. Status: clock-in window and site supervisor (patches 0831 and 0832 backend, 0833 app, 2026-11-12)
+
+Decisions taken from you: allow and flag outside/unknown geofence (unchanged), per-site clock-in window, no face check for now, supervisor view next.
+
+- 0831 (written, not compiled): migration V690 adds `security_sites.clock_in_window_minutes` (5 to 480, null = default 30); `PATCH /api/v1/security/sites/{id}/clock-in-window`; clock-in applies each shift's own site window. Three tests in `DeviceSessionServiceGuardTest`.
+- 0832 (written, not compiled): migration V691 adds `security_guards.site_supervisor`; `PATCH /api/v1/security/guards/{id}/site-supervisor` (SECURITY_MANAGE); `GET /api/v1/guard/supervisor/site` returns on-duty guards (reusing Live Operations) with round counts, and unresolved incidents from the last 24 hours, for the site the caller is on shift at. The flag is read from the database on every call, so switching it off is immediate and the guard token has no extra authority. `GuardSupervisorServiceTest` (3 tests).
+- 0833 (app): Site overview screen; the Home button appears only when the server answers. `tsc` clean, 19 jest tests, `expo export` ok; not run on a device. Test script section G added.
+- Open: read only. Approving swaps needs a check on whether `decided_by` on swap requests can hold a guard id; acknowledging or assigning incidents and a supervisor push alert are the next supervisor steps. Supervisor access is per site and per shift (own open session), not tenant-wide.

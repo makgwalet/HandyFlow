@@ -305,3 +305,33 @@ export async function attachGatePhoto(entryId: string, docType: GatePhotoType, l
   await api<unknown>(`/api/v1/guard/gate/entries/${entryId}/attachments`, { method: "POST", form });
   await removePhoto(localUri);
 }
+
+// ── Site supervisor ───────────────────────────────────────────────────────────
+
+const siteOverviewSchema = z.object({
+  siteId: z.string(),
+  siteName: z.string(),
+  generatedAt: z.string(),
+  onDuty: z.array(
+    z.object({
+      guardId: z.string(),
+      name: z.string(),
+      shiftStart: z.string(),
+      shiftEnd: z.string(),
+      overrunning: z.boolean(),
+      gpsState: z.string().nullish(),
+      lastScanAt: z.string().nullish(),
+      lastScanCheckpoint: z.string().nullish(),
+      roundsTotal: z.number(),
+      roundsComplete: z.number(),
+      roundsMissed: z.number(),
+    }),
+  ),
+  openIncidents: z.array(z.object({ id: z.string(), title: z.string(), severity: z.string(), status: z.string(), createdAt: z.string() })),
+});
+export type SiteOverview = z.infer<typeof siteOverviewSchema>;
+
+/** Only a guard a manager made a site supervisor gets this; anyone else gets 403 and the button never shows. */
+export async function getSiteOverview(): Promise<SiteOverview> {
+  return siteOverviewSchema.parse(await api<unknown>("/api/v1/guard/supervisor/site"));
+}

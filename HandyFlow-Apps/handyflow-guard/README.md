@@ -28,7 +28,9 @@ Equipment: sign out a radio, key, vehicle or other item, return it as good, dama
 
 Gate log: who is on site, log an arrival (visitor, contractor, delivery, staff vehicle, other; ID number optional and masked once saved) and a departure. Needs signal; a double tap or timed-out retry logs the visitor once. Photos (ID, vehicle disc, other) are taken from the visitor's card and uploaded straight away.
 
-Not done: push alerts, supervisor mode, naming a colleague for a swap (the server has no guard-facing colleague list), offline acknowledgement, equipment checkout, gate log, EAS builds, real icon and splash, translations.
+Site overview (guards a manager made site supervisors only): who is on duty at the site they are on shift at, round counts, last scan, and unresolved incidents from the last 24 hours. Read only. The button appears on Home only when the server allows it.
+
+Not done: push alerts, supervisor actions (approving swaps, acknowledging incidents), naming a colleague for a swap (the server has no guard-facing colleague list), offline acknowledgement, equipment checkout, gate log, EAS builds, real icon and splash, translations.
 Never run on a phone or emulator: checked only by type check, unit tests and an Android bundle build.
 
 ## Rules for this app
