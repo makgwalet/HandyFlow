@@ -5,7 +5,7 @@ export const DIVISIONS: { id: Division; label: string; blurb: string }[] = [
   { id: "WHOLESALE_SUPPLY", label: "Wholesale supply", blurb: "Buy fuel from suppliers and sell to account customers: purchase orders, orders, pricing, invoicing." },
   { id: "DISTRIBUTION", label: "Distribution", blurb: "Deliver fuel to customers' sites with your own tankers and drivers: planning, deliveries, driver app." },
   { id: "RETAIL_FORECOURT", label: "Retail forecourt", blurb: "Run service stations: pumps, shifts, cash-up and forecourt sales." },
-  { id: "TRUCK_STOP", label: "Truck stop", blurb: "Heavy-vehicle stops with fleet accounts and services. Set-up only for now; operations come in a later release." },
+  { id: "TRUCK_STOP", label: "Truck stop", blurb: "Heavy-vehicle stops with fleet accounts and services. Timed services such as showers, washes and weighbridge slots are reserved through Bookings." },
 ]
 
 export const SIZES = [{ id: "SMALL", label: "Small" }, { id: "MEDIUM", label: "Medium" }, { id: "LARGE", label: "Large" }, { id: "ENTERPRISE", label: "Enterprise" }]

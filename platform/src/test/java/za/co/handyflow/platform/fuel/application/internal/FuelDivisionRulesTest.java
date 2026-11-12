@@ -31,6 +31,13 @@ class FuelDivisionRulesTest {
         assertEquals(Set.of(WHOLESALE_SUPPLY, RETAIL_FORECOURT), req("/supplier-invoices"));
     }
 
+    @Test @DisplayName("E01: truck stop routes need the Truck Stop division and nothing else opens them")
+    void truckStopRoutes() {
+        assertEquals(Set.of(FuelDivision.TRUCK_STOP), req("/truck-stop/reservations"));
+        assertEquals(Set.of(FuelDivision.TRUCK_STOP), req("/truck-stop"));
+        assertTrue(req("/truck-stopper").isEmpty());
+    }
+
     @Test @DisplayName("shared foundation, setup and the customer portal are open to every Fuel tenant")
     void shared() {
         for (String p : new String[]{"/tanks", "/depots", "/tanks/1/receive", "/ledger", "/transfers", "/reservations", "/compliance", "/dashboard", "/dashboard/margin",

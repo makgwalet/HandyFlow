@@ -160,7 +160,8 @@ class FuelEndpointSecurityTest {
 
     @Test
     void areaPermissionsAreSeededForFuelAndGivenToAdmin() throws IOException {
-        String sql = Files.readString(MIGRATIONS.resolve("V666__fuel_granular_manage_permissions.sql"));
+        String sql = Files.readString(MIGRATIONS.resolve("V666__fuel_granular_manage_permissions.sql"))
+                + Files.readString(MIGRATIONS.resolve("V669__fuel_truck_stop.sql"));  // later phases seed their own area permission
         Set<String> used = new java.util.TreeSet<>();
         for (Path p : controllers()) {
             for (Endpoint e : endpoints(p)) {

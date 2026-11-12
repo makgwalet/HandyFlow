@@ -13,7 +13,7 @@ import static za.co.handyflow.platform.fuel.domain.model.FuelDivision.*;
  *
  * Customers, orders, prices, invoicing and deliveries are shared by Wholesale and Distribution: a delivery company
  * has customers and orders as much as a wholesaler does. Procurement is shared by Wholesale and Retail.
- * Truck Stop has no routes yet, so it gates nothing today.
+ * Truck Stop reservations (/truck-stop) need the Truck Stop division.
  */
 public final class FuelDivisionRules {
     private FuelDivisionRules() {}
@@ -33,6 +33,7 @@ public final class FuelDivisionRules {
             case "tankers", "drivers", "planning", "driver" -> Set.of(DISTRIBUTION);
             case "customer-accounts", "customer-sites", "orders", "invoicing", "prices", "deliveries", "variances", "evidence" -> Set.of(WHOLESALE_SUPPLY, DISTRIBUTION);
             case "purchase-orders", "supplier-invoices" -> Set.of(WHOLESALE_SUPPLY, RETAIL_FORECOURT);
+            case "truck-stop" -> Set.of(TRUCK_STOP);
             default -> NONE;
         };
     }

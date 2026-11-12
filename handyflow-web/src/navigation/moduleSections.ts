@@ -268,6 +268,12 @@ export const FUEL_SECTIONS: ModuleSections = {
       ],
     },
     {
+      label: 'Truck stop',
+      sections: [
+        { id: 'truck-stop', label: 'Truck stop', icon: Car, anyPermission: ['FUEL_READ', 'FUEL_TRUCKSTOP_MANAGE', 'FUEL_MANAGE'], divisions: ['TRUCK_STOP'] },
+      ],
+    },
+    {
       label: 'Retail',
       sections: [
         { id: 'forecourt', label: 'Forecourt', icon: Fuel, anyPermission: ['FUEL_READ', 'FUEL_FORECOURT', 'FUEL_MANAGE', 'FUEL_FORECOURT_MANAGE'], divisions: ['RETAIL_FORECOURT'] },

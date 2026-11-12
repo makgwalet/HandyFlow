@@ -22,6 +22,7 @@ import ComplianceTab from "./ComplianceTab"
 import PurchaseOrdersTab from "./PurchaseOrdersTab"
 import OverviewTab from "./OverviewTab"
 import ForecourtTab from "./ForecourtTab"
+import TruckStopTab from "./TruckStopTab"
 import SupplierInvoicesTab from "./SupplierInvoicesTab"
 import CostToServeTab from "./CostToServeTab"
 import SettingsTab from "./SettingsTab"
@@ -77,6 +78,7 @@ export function FuelPage() {
         case "purchase-orders": return <PurchaseOrdersTab />
         case "supplier-invoices": return <SupplierInvoicesTab />
         case "forecourt":  return <ForecourtTab />
+        case "truck-stop": return <TruckStopTab />
         case "overview":   return <OverviewTab onNavigate={goTo} />
         case "margin":     return <MarginTab />
         case "cost-to-serve": return <CostToServeTab onNavigate={goTo} />
