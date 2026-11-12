@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import za.co.handyflow.platform.evidence.dto.EvidenceResponse;
 import za.co.handyflow.platform.security.application.internal.IncidentCaseService;
-import za.co.handyflow.platform.security.application.internal.IncidentService;
+import za.co.handyflow.platform.security.application.internal.GuardOfflineWriteService;
 import za.co.handyflow.platform.security.dto.CreateIncidentRequest;
 import za.co.handyflow.platform.security.dto.IncidentResponse;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -51,7 +51,7 @@ import java.util.UUID;
 @Tag(name = "Guard - Incidents", description = "Guard-facing incident reporting (mobile)")
 public class GuardIncidentController {
 
-    private final IncidentService incidentService;
+    private final GuardOfflineWriteService offlineWrites;
     private final IncidentCaseService caseService;
 
     @PostMapping
@@ -67,9 +67,10 @@ public class GuardIncidentController {
         // The reporting guard is the token's guard. A body naming another guard, or none, is overridden.
         UUID me = TenantContext.getCurrentUserId();
         CreateIncidentRequest own = new CreateIncidentRequest(req.siteId(), req.shiftId(), me, req.title(),
-                req.description(), req.severity(), req.type(), req.latitude(), req.longitude());
+                req.description(), req.severity(), req.type(), req.latitude(), req.longitude(),
+                req.clientRef(), req.recordedAt());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
-                incidentService.createIncident(TenantContext.getTenantIdAsObject(), own, me, TenantContext.getCurrentUserName())));
+                offlineWrites.incident(TenantContext.getTenantIdAsObject(), me, TenantContext.getCurrentUserName(), own)));
     }
 
     @PostMapping(value = "/{id}/evidence", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

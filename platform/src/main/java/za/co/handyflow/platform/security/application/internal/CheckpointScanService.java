@@ -15,6 +15,7 @@ import za.co.handyflow.platform.security.domain.repository.ShiftRepository;
 import za.co.handyflow.platform.security.dto.ScanRequest;
 import za.co.handyflow.platform.security.dto.ScanResponse;
 import za.co.handyflow.platform.shared.HandyFlowException;
+import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import javax.crypto.Mac;
@@ -81,7 +82,8 @@ public class CheckpointScanService {
                 req.shiftId(),
                 req.latitude(),
                 req.longitude(),
-                scanType                // persisted for audit trail
+                scanType,               // persisted for audit trail
+                OfflineTimestamp.accept(req.recordedAt(), Instant.now())
         );
         // Count the scan towards the shift's current patrol round (this was never wired in before, so rounds could not
         // progress and were all marked MISSED). Must run before the save so a repeat scan is recognised as a repeat.
@@ -99,6 +101,17 @@ public class CheckpointScanService {
                 checkpoint.getSite().getName(),
                 entry.getScannedAt()
         );
+    }
+
+    /** The response for a scan already saved, used when a retried request is replayed. */
+    @Transactional(readOnly = true)
+    public ScanResponse describe(TenantId tenantId, UUID logId) {
+        CheckpointLog log = logRepository.findById(logId)
+                .filter(l -> l.getTenantId().equals(tenantId))
+                .orElseThrow(() -> new ResourceNotFoundException("CheckpointLog", logId.toString()));
+        Checkpoint checkpoint = checkpointRepository.findById(log.getCheckpointId())
+                .orElseThrow(() -> new ResourceNotFoundException("Checkpoint", log.getCheckpointId().toString()));
+        return new ScanResponse(log.getId(), checkpoint.getName(), checkpoint.getSite().getName(), log.getScannedAt());
     }
 
     // ── HMAC QR verification (bug #7) ─────────────────────────────────────────

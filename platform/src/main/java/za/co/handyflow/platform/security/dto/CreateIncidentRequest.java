@@ -45,5 +45,9 @@ public record CreateIncidentRequest(
         String type,
 
         BigDecimal latitude,
-        BigDecimal longitude
+        BigDecimal longitude,
+        /** Guard app only: phone-generated id so a retry returns the first report. Ignored on the staff route. */
+        UUID    clientRef,
+        /** Guard app only: when the phone recorded it. Noted on the incident when it arrives late. */
+        java.time.Instant recordedAt
 ) {}

@@ -297,7 +297,7 @@ public class ControlRoomService {
     public AlarmEvent triggerDuress(TenantId tenantId, TriggerDuressRequest req) {
         IngestAlarmEventRequest alarmReq = new IngestAlarmEventRequest(
                 null, "DURESS", null, "CRITICAL", req.triggeredByGuardId(),
-                req.latitude(), req.longitude(), "DURESS TRIGGER — immediate response required");
+                req.latitude(), req.longitude(), "DURESS TRIGGER — immediate response required" + duressLateNote(req));
 
         AlarmEvent event = ingest(tenantId, alarmReq);
 
@@ -310,6 +310,13 @@ public class ControlRoomService {
                 event.getId(), req.triggeredByGuardId(), req.protectionDetailId());
 
         return event;
+    }
+
+    /** A panic press sent late from the phone says when it was pressed. */
+    private static String duressLateNote(TriggerDuressRequest req) {
+        if (req.recordedAt() == null) return "";
+        java.time.Instant now = java.time.Instant.now();
+        return OfflineTimestamp.lateNote(OfflineTimestamp.accept(req.recordedAt(), now), now);
     }
 
     // ── Queries ────────────────────────────────────────────────────────────────

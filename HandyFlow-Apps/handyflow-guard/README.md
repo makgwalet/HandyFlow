@@ -22,5 +22,5 @@ Not done: shift (clock in/out), patrol rounds, checkpoint scan, panic, incident 
 
 ## Rules for this app
 - The phone never states who the guard is, whether a PIN passed, or whether they are inside the geofence. The server decides all three (assessment R1, R2). Clock-in sends only `{deviceHardwareId, latitude, longitude, accuracyMetres}` to `POST /api/v1/guard/sessions/open` (backend patch 0815); it never sends a guard id or check results.
-- Writes that can be repeated (scan, incident, panic) get a client-generated id and a recorded-at time before they go on the wire (assessment G3).
+- Writes that can be repeated (scan, incident, panic) get a client-generated `clientRef` (UUID, made once per action and reused on every retry) and a `recordedAt` before they go on the wire. Backend support is in patch 0817. Clock-in is online-only.
 - Token only in secure storage. No guard data in logs.

@@ -13,5 +13,7 @@ public record TriggerDuressRequest(
         UUID       protectionDetailId,   // nullable — duress may be triggered with no active detail context
         UUID       triggeredByGuardId,
         BigDecimal latitude,
-        BigDecimal longitude
+        BigDecimal longitude,
+        UUID       clientRef,    // guard app: phone-generated id so a retried press is not a second alarm
+        java.time.Instant recordedAt // guard app: when the phone recorded the press
 ) {}

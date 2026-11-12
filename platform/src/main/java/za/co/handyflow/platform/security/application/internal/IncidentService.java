@@ -150,7 +150,7 @@ public class IncidentService {
                 req.shiftId(),
                 req.guardId(),
                 req.title(),
-                req.description(),
+                withLateNote(req.description(), req.recordedAt()),
                 req.severity(),
                 req.latitude(),
                 req.longitude()
@@ -182,6 +182,15 @@ public class IncidentService {
         log.info("[Security] Incident created id={} type={} severity={} site={}",
                 incident.getId(), incidentType, req.severity(), req.siteId());
         return getIncidentById(tenantId, incident.getId());
+    }
+
+    /** A report sent late from the guard app says when the phone recorded it. Staff-route requests carry no time. */
+    private static String withLateNote(String description, java.time.Instant recordedAt) {
+        if (recordedAt == null) return description;
+        java.time.Instant now = java.time.Instant.now();
+        String note = OfflineTimestamp.lateNote(OfflineTimestamp.accept(recordedAt, now), now);
+        if (note.isEmpty()) return description;
+        return (description == null ? "" : description) + note;
     }
 
     public IncidentResponse acknowledge(TenantId tenantId, UUID incidentId, UUID acknowledgedBy) {

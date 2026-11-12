@@ -114,3 +114,15 @@ Written, not compiled or run here (same limit as step A). Run `mvn -q test "-Dte
 | New hole closed | The guard incident route took the reporting guard from the request body, so a guard could file as someone else or as nobody. It now uses the token's guard. |
 
 Still open from section 4: G3 (client ids and recorded-at for scan, incident, panic, clock-in, needs a migration), G4 (push token), G5, G6. The other guard controllers are still on the "no entitlement check" debt list; only the new controller checks it.
+
+## 11. Status: step B2 (patch 0817, 2026-11-12)
+
+Written, not compiled or run here. Adds migration **V687** (`security_client_requests`). Run `mvn -q test "-Dtest=OfflineTimestampTest,GuardOfflineWriteServiceTest,ControllerAccessCoverageTest"` with the app stopped, then start the app once so V687 runs.
+
+| Gap | Change |
+|---|---|
+| G3 duplicates | The scan, incident and panic endpoints on the guard routes accept an optional `clientRef` (a UUID the phone makes once per action). The first call does the work and remembers the id; a retry with the same id returns the first result and creates nothing. Two retries racing each other cannot both win (unique key; the loser gets 409 `REQUEST_IN_PROGRESS` and retries). An id first used by another guard is refused (409 `CLIENT_REF_IN_USE`). With no `clientRef` everything behaves as before. |
+| G3 late time | The same three accept an optional `recordedAt`. A scan is stamped with it (kept if it is from the last 48 hours, up to 5 minutes ahead; further ahead it is replaced by server time; older than 48 hours is refused 400 `RECORDED_AT_TOO_OLD`). An incident or panic alarm that arrives more than 2 minutes late gets a line added to its description saying when the phone recorded it and when it was received. |
+| Clock-in | Stays online-only on purpose: it has server checks and conflicts that cannot be replayed safely. |
+
+Open: (1) a scan that arrives after its round was already marked missed does not count towards a round, because round routing only looks at open rounds; a grace window for late syncs is a rule decision. (2) Incident photo uploads have no client id, so a retried upload can attach twice (cap 20). (3) The ledger is never pruned; a cleanup after 90 days is easy to add. (4) The staff routes accept the new fields and ignore them.

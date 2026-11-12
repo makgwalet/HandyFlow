@@ -9,7 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import za.co.handyflow.platform.security.application.internal.CheckpointScanService;
+import za.co.handyflow.platform.security.application.internal.GuardOfflineWriteService;
 import za.co.handyflow.platform.security.dto.ScanRequest;
 import za.co.handyflow.platform.security.dto.ScanResponse;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -44,7 +44,7 @@ import java.util.UUID;
 @Tag(name = "Guard - Checkpoints", description = "Guard-facing QR/NFC/BLE checkpoint scanning (mobile)")
 public class GuardCheckpointController {
 
-    private final CheckpointScanService scanService;
+    private final GuardOfflineWriteService offlineWrites;
 
     @PostMapping("/scan")
     @PreAuthorize("hasAuthority('SECURITY_GUARD')")
@@ -56,7 +56,7 @@ public class GuardCheckpointController {
     public ResponseEntity<ApiResponse<ScanResponse>> scan(@Valid @RequestBody ScanRequest request) {
         var tenantId = TenantContext.getTenantIdAsObject();
         UUID authenticatedGuardId = TenantContext.getCurrentUserId();
-        var result = scanService.scan(tenantId, request, authenticatedGuardId);
+        var result = offlineWrites.scan(tenantId, authenticatedGuardId, request);
         return ResponseEntity.ok(ApiResponse.success("Checkpoint scanned", result));
     }
 }

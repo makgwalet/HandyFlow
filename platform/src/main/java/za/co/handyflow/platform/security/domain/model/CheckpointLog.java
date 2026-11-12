@@ -58,12 +58,20 @@ public class CheckpointLog {
                                        UUID guardId, UUID shiftId,
                                        BigDecimal latitude, BigDecimal longitude,
                                        String scanType) {
+        return create(tenantId, checkpointId, guardId, shiftId, latitude, longitude, scanType, Instant.now());
+    }
+
+    /** As above, with the time the scan happened (a late-synced scan from the guard app). */
+    public static CheckpointLog create(TenantId tenantId, UUID checkpointId,
+                                       UUID guardId, UUID shiftId,
+                                       BigDecimal latitude, BigDecimal longitude,
+                                       String scanType, Instant scannedAt) {
         CheckpointLog log = new CheckpointLog();
         log.tenantId      = tenantId;
         log.checkpointId  = checkpointId;
         log.guardId       = guardId;
         log.shiftId       = shiftId;
-        log.scannedAt     = Instant.now();
+        log.scannedAt     = scannedAt;
         log.latitude      = latitude;
         log.longitude     = longitude;
         log.scanType      = scanType;

@@ -10,7 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import za.co.handyflow.platform.security.application.internal.ControlRoomService;
+import za.co.handyflow.platform.security.application.internal.GuardOfflineWriteService;
 import za.co.handyflow.platform.security.domain.model.AlarmEvent;
 import za.co.handyflow.platform.security.dto.TriggerDuressRequest;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -53,7 +53,7 @@ import za.co.handyflow.platform.shared.TenantContext;
 @Tag(name = "Guard - Duress", description = "Guard-facing panic/duress trigger (mobile)")
 public class GuardDuressController {
 
-    private final ControlRoomService controlRoomService;
+    private final GuardOfflineWriteService offlineWrites;
 
     @PostMapping("/duress")
     @PreAuthorize("hasAuthority('SECURITY_GUARD')")
@@ -73,9 +73,10 @@ public class GuardDuressController {
             @Valid @RequestBody TriggerDuressRequest req) {
         // Who raised it comes from the token. A body naming another guard is ignored.
         TriggerDuressRequest own = new TriggerDuressRequest(
-                req.protectionDetailId(), TenantContext.getCurrentUserId(), req.latitude(), req.longitude());
+                req.protectionDetailId(), TenantContext.getCurrentUserId(), req.latitude(), req.longitude(),
+                req.clientRef(), req.recordedAt());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(
-                        controlRoomService.triggerDuress(TenantContext.getTenantIdAsObject(), own)));
+                        offlineWrites.duress(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), own)));
     }
 }
