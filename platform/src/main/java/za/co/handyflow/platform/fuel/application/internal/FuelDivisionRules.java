@@ -31,7 +31,7 @@ public final class FuelDivisionRules {
         return switch (first) {
             case "forecourt" -> Set.of(RETAIL_FORECOURT);
             case "tankers", "drivers", "planning", "driver", "routes", "cost-actuals", "landed-cost", "returned-fuel" -> Set.of(DISTRIBUTION);
-            case "customer-accounts", "customer-sites", "orders", "invoicing", "prices", "deliveries", "variances", "evidence", "enquiries" -> Set.of(WHOLESALE_SUPPLY, DISTRIBUTION);
+            case "customer-accounts", "customer-sites", "orders", "invoicing", "prices", "deliveries", "variances", "evidence", "enquiries", "contracts" -> Set.of(WHOLESALE_SUPPLY, DISTRIBUTION);
             case "purchase-orders", "supplier-invoices", "requisitions", "automation" -> Set.of(WHOLESALE_SUPPLY, RETAIL_FORECOURT);
             case "truck-stop" -> Set.of(TRUCK_STOP);
             default -> NONE;
