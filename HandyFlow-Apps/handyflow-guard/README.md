@@ -24,6 +24,8 @@ Incident photos: up to 5 per report, taken in the report screen, kept in the app
 
 My post orders (read the site and post orders, acknowledge the version read; needs signal, not queued offline) and shift swaps (ask for an open swap of an upcoming shift, accept one proposed to you, cancel yours; the supervisor decides).
 
+Equipment: sign out a radio, key, vehicle or other item, return it as good, damaged or missing, and ending the shift is blocked until the server shows nothing signed out to the guard (no more "I returned everything" switch). Firearms are not offered; they go through the armoury process. Needs signal, not queued offline.
+
 Not done: push alerts, supervisor mode, naming a colleague for a swap (the server has no guard-facing colleague list), offline acknowledgement, equipment checkout, gate log, EAS builds, real icon and splash, translations.
 Never run on a phone or emulator: checked only by type check, unit tests and an Android bundle build.
 

@@ -185,3 +185,39 @@ export async function acceptSwap(id: string): Promise<Swap> {
 export async function cancelSwap(id: string): Promise<Swap> {
   return swapSchema.parse(await api<unknown>(`/api/v1/guard/shifts/swaps/${id}`, { method: "DELETE" }));
 }
+
+// ── Equipment in my custody ───────────────────────────────────────────────────
+
+const custodySchema = z.object({
+  id: z.string(),
+  resourceType: z.string(),
+  resourceRef: z.string(),
+  checkedOutAt: z.string(),
+});
+export type Custody = z.infer<typeof custodySchema>;
+
+/** Firearms are issued through the armoury process, so the app does not offer them. */
+export const RESOURCE_TYPES = ["RADIO", "KEY", "VEHICLE", "OTHER"] as const;
+export type ResourceType = (typeof RESOURCE_TYPES)[number];
+export const RETURN_CONDITIONS = ["GOOD", "DAMAGED", "MISSING"] as const;
+export type ReturnCondition = (typeof RETURN_CONDITIONS)[number];
+
+export async function getMyEquipment(): Promise<Custody[]> {
+  return z.array(custodySchema).parse(await api<unknown>("/api/v1/guard/sessions/resources/mine"));
+}
+
+export async function checkoutEquipment(sessionId: string, type: ResourceType, ref: string): Promise<Custody> {
+  return custodySchema.parse(
+    await api<unknown>(`/api/v1/guard/sessions/${sessionId}/resources/checkout`, {
+      method: "POST",
+      body: { resourceType: type, resourceRef: ref.trim(), notes: null },
+    }),
+  );
+}
+
+export function returnEquipment(custodyId: string, condition: ReturnCondition, notes: string): Promise<unknown> {
+  return api<unknown>(`/api/v1/guard/sessions/resources/${custodyId}/return`, {
+    method: "POST",
+    body: { condition, notes: notes.trim() || null },
+  });
+}
