@@ -176,4 +176,17 @@ class FuelEndpointSecurityTest {
             assertThat(sql).as(perm + " given to ADMIN").contains("'" + perm + "'");
         }
     }
+
+    /** B04: where a supplier is paid is not opened by the umbrella permission; each step has its own, and ADMIN is the only role given them. */
+    @Test
+    void supplierBankingHasItsOwnPermissionsAndIsNotOpenedByFuelManage() throws IOException {
+        String src = Files.readString(API.resolve("FuelSupplierBankController.java"));
+        assertThat(src).doesNotContain("FUEL_MANAGE").doesNotContain("_OPERATIONS_MANAGE");
+        assertThat(src).contains("FUEL_SUPPLIER_BANK_EDIT", "FUEL_SUPPLIER_BANK_VERIFY", "FUEL_SUPPLIER_BANK_READ");
+        String sql = Files.readString(MIGRATIONS.resolve("V676__fuel_supplier_banking_and_requisitions.sql"));
+        for (String perm : List.of("FUEL_SUPPLIER_BANK_EDIT", "FUEL_SUPPLIER_BANK_VERIFY", "FUEL_SUPPLIER_BANK_READ")) {
+            assertThat(sql).as(perm + " has module_key fuel").containsPattern("module_key = 'fuel'[^;]*WHERE name = '" + perm + "'");
+        }
+        assertThat(sql).contains("r.name = 'ADMIN'");
+    }
 }

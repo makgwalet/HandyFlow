@@ -4,6 +4,7 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { ReasonModal } from "../warehousing/whseUi"
 import { SUPPLIER_STATUS_LABEL } from "./wholesaleOps"
+import SupplierBankDialog from "./SupplierBankDialog"
 import { Plus, Users, Phone, Mail, X, Pencil, Download } from "lucide-react"
 
 interface Supplier {
@@ -29,6 +30,7 @@ export default function SuppliersTab() {
   const [editForm, setEditForm] = useState(EMPTY)
   const canApprove = usePermissions(["FUEL_SUPPLIER_APPROVE"])
   const [suspending, setSuspending] = useState<Supplier | null>(null)
+  const [banking, setBanking] = useState<Supplier | null>(null)
   const statusDone = () => { qc.invalidateQueries({ queryKey: ["fuel-suppliers"] }); setSuspending(null); setError("") }
   const approve = useMutation({ mutationFn: (id: string) => apiClient.post(`/api/v1/fuel/suppliers/${id}/approve`), onSuccess: statusDone, onError: (e: any) => setError(e.response?.data?.message || "Could not approve the supplier") })
   const suspend = useMutation({ mutationFn: (a: { id: string; reason: string }) => apiClient.post(`/api/v1/fuel/suppliers/${a.id}/suspend`, { reason: a.reason }), onSuccess: statusDone })
@@ -100,6 +102,7 @@ export default function SuppliersTab() {
   return (
     <div>
       {error && !showAdd && !editing && <ErrMsg msg={error} />}
+      {banking && <SupplierBankDialog supplierId={banking.id} supplierName={banking.name} onClose={() => setBanking(null)} />}
       {suspending && <ReasonModal title={`Suspend ${suspending.name}`} intro="No new orders can be raised or placed with a suspended supplier. Orders already placed are not affected." confirmLabel="Suspend" pending={suspend.isPending} error={suspend.error} onConfirm={reason => suspend.mutate({ id: suspending.id, reason })} onClose={() => setSuspending(null)} />}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div style={{ fontSize: 14, color: "var(--hf-text-muted)" }}>
@@ -138,6 +141,10 @@ export default function SuppliersTab() {
                   <button onClick={() => downloadStatement(s)}
                     style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "var(--hf-accent-soft)", border: "1px solid var(--hf-accent-border)", borderRadius: 7, fontSize: 12, color: "var(--hf-accent-text)", cursor: "pointer" }}>
                     <Download size={12} /> Statement
+                  </button>
+                  <button onClick={() => setBanking(s)} aria-label={`Bank details for ${s.name}`}
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12, color: "var(--hf-text-secondary)", cursor: "pointer" }}>
+                    Bank details
                   </button>
                   <button onClick={() => openEdit(s)}
                     style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)", borderRadius: 7, fontSize: 12, color: "var(--hf-info-text)", cursor: "pointer" }}>

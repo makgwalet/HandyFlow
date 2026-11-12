@@ -35,8 +35,8 @@ Each row is a gap statement; the backend/frontend/database/permission/test lists
 ## Status after Phase 2 (code written; Java not compiled or run by the author)
 - **B01** done in code: adjustments at or above a per-tenant litre threshold are held until a different person with FUEL_STOCK_ADJUST_APPROVE approves. No threshold means no change from before.
 - **B03** done in code for dip readings (tenant parameter added). `FuelReceiptRepository.findByTank` and `FuelDispatchRepository.findByTank` have the same shape but no callers; left alone.
-- **B04** done in code (supplier status, off by default). Banking details and supplier documents are **not** built.
-- **B05** done in code through the Approvals engine (module fuel, type PURCHASE_ORDER). Requisitions are not built.
+- **B04** done in code (supplier status, off by default). Banking details built in 0793 (V676): see below. Supplier documents and a scorecard are **not** built.
+- **B05** done in code through the Approvals engine (module fuel, type PURCHASE_ORDER). Requisitions built in 0793 (V676): see below.
 - **B06 (quotes, contracts), B07 (price approval/margin guard)**: not started. **B08**: built (V668), see FUEL-B08-SUPPLIER-INVOICE-TO-AP-NOTES-2026-11-12.
 
 ## Status after Phase 3 (code written; Java not compiled or run by the author)
@@ -91,3 +91,6 @@ Built (patch 0782): 12 area MANAGE permissions beside FUEL_MANAGE (umbrella kept
 - Built: the customer portal now checks the supplier's Fuel entitlement using the access grant's tenant (`FeatureGuard.hasModuleFor`); a customer of a tenant whose plan no longer includes Fuel (or that is suspended or cancelled) gets "not found" and no accounts. This closes the `FuelPortalDataController` debt noted above (the controller itself has no tenant context, so the check is in `FuelPortalDataService.requireGrant`).
 - Built: daily variance alert (07:15 SAST, `fuel.variance.alerts.enabled`, default on). For each tenant that has set a tolerance and still has Fuel, new variances are raised and the administrators get one in-app and email notice with the count and a pointer to the list. Nothing is written off and no cause is implied.
 - Not built: alert for variances that stay open too long; per-tenant choice of who is told (administrators only for now).
+
+## B04 / B05 - Supplier banking and requisitions (2026-11-12)
+Built (patch 0793, V676): supplier bank details proposed by one person and verified by another (enforced in the database too), masked lists, full number only to FUEL_SUPPLIER_BANK_READ with a log line, old details kept as history. Purchase requisitions through the Approvals engine (entity type REQUISITION; no rule means approved straight away), converted to a draft purchase order. Not built: supplier documents and scorecard, Accounts Payable reading the verified account, a hold period after a change, tank selection in the requisition screen. See FUEL-B04-B05-SUPPLIER-BANKING-REQUISITIONS-NOTES-2026-11-12.md.

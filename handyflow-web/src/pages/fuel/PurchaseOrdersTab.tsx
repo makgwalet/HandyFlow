@@ -5,6 +5,7 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import { fmtL, fmtR } from "./orderOps"
+import RequisitionsPanel from "./RequisitionsPanel"
 import { STATUS_LABEL, validatePo, validateCloseReason, litresVarianceLabel, type PurchaseOrder, type Match } from "./purchasingOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -28,6 +29,7 @@ export default function PurchaseOrdersTab() {
   const rows = list.data ?? []
   return (
     <div>
+      <RequisitionsPanel />
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
         <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: 0, flex: 1 }}>
           Raise an order, place it with the supplier, then choose it when you receive the fuel (Tanks &rarr; Receive). The order follows the litres that arrive, and a delivery over the tolerance in Settings (2% unless you changed it) is refused. If the supplier will not deliver the rest, close the order short. The supplier's invoice is matched to the order and receipts under Supplier invoices.

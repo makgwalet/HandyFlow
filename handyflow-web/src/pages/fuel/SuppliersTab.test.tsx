@@ -55,4 +55,14 @@ describe("SuppliersTab approval", () => {
     expect(screen.queryByLabelText("Approve Acme Fuels")).toBeNull()
     expect(screen.queryByLabelText("Suspend Beta Oil")).toBeNull()
   })
+
+  it("opens a supplier's bank details, loading them for that supplier only", async () => {
+    get.mockImplementation(async (u: string) => u.endsWith("/bank-accounts") ? { data: { data: [] } } : { data: suppliers })
+    mount()
+    await screen.findByText("Beta Oil")
+    fireEvent.click(screen.getByLabelText("Bank details for Beta Oil"))
+    await screen.findByText("No verified bank details yet.")
+    expect(get).toHaveBeenCalledWith("/api/v1/fuel/suppliers/s2/bank-accounts")
+  })
 })
+
