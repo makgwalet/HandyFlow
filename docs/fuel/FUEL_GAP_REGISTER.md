@@ -97,3 +97,6 @@ Built (patch 0793, V676): supplier bank details proposed by one person and verif
 
 ## F01 leftovers (2026-11-12)
 Built (patch 0794, V677): licence-to-depot link and per-site coverage; opt-in setting for which licensed activities block loading when expired on the loading depot's legal entity (off by default); licence evidence file upload and second-person verification (FUEL_COMPLIANCE_VERIFY, ADMIN only). Not built: required-licence rules (deliberately none), locking verified evidence, virus scan. See FUEL-F01-LEFTOVERS-NOTES-2026-11-12.md.
+
+## Phase 6a - Group report (2026-11-12)
+Built (patch 0795, no migration): read-only report per legal entity of deliveries, litres, revenue, margin, stock, stock value and open variances, with previous-period comparison; money only for FUEL_MARGIN_READ. Not built: forecourt sales (a shift is not tied to a depot), division split, export. See FUEL-PHASE6A-GROUP-REPORT-NOTES-2026-11-12.md.

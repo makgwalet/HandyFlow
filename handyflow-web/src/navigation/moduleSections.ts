@@ -286,6 +286,7 @@ export const FUEL_SECTIONS: ModuleSections = {
         { id: 'overview', label: 'Manager overview', icon: BarChart2 },
         { id: 'margin', label: 'Cost & Margin', icon: TrendingUp, permission: 'FUEL_MARGIN_READ' },
         { id: 'cost-to-serve', label: 'Cost to serve', icon: TrendingUp, permission: 'FUEL_MARGIN_READ' },
+        { id: 'group-report', label: 'Group report', icon: Building2 },
       ],
     },
     {
