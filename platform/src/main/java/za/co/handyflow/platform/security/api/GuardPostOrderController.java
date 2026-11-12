@@ -57,8 +57,9 @@ public class GuardPostOrderController {
     @Operation(summary = "A specific post's own current order",
             description = "The guard picks their own post from MyPostResponse's own posts list — no formal post-assignment concept exists yet.")
     public ResponseEntity<ApiResponse<PostOrderResponse>> getPostOrder(@PathVariable UUID postId) {
-        return ResponseEntity.ok(ApiResponse.success(
-                postOrderService.getMyPostOrderForPost(TenantContext.getTenantIdAsObject(), postId)));
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        UUID siteId = deviceSessionService.resolveCurrentSiteForGuard(TenantContext.getCurrentUserId());
+        return ResponseEntity.ok(ApiResponse.success(postOrderService.getMyPostOrderForPost(tenantId, siteId, postId)));
     }
 
     @PostMapping("/orders/{postOrderId}/acknowledge")

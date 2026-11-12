@@ -11,5 +11,8 @@ import jakarta.validation.constraints.NotNull;
 public record AcknowledgePostOrderRequest(
         String deviceHardwareId,
         @NotNull Boolean acknowledgedOffline,
-        java.time.Instant acknowledgedAt // when acknowledgedOffline=true, the device's own recorded time; ignored (server "now" used instead) when false
+        java.time.Instant acknowledgedAt, // when acknowledgedOffline=true, the device's own recorded time; ignored (server "now" used instead) when false
+        // The version the guard actually read. Optional so older callers keep working; when given and no longer current the
+        // acknowledgement is refused (409), so an ack can never claim a version the guard did not see.
+        Integer version
 ) {}

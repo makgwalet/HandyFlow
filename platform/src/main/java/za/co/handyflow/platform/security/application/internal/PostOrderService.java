@@ -205,6 +205,15 @@ public class PostOrderService {
         return toOrderResponse(o);
     }
 
+    /** A post's current order, for a guard at {@code siteId}. A post at any other site is reported as not found. */
+    @Transactional(readOnly = true)
+    public PostOrderResponse getMyPostOrderForPost(TenantId tenantId, UUID siteId, UUID postId) {
+        Post post = postRepo.findByTenantAndId(tenantId, postId)
+                .filter(p -> siteId.equals(p.getSiteId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Post", postId.toString()));
+        return getMyPostOrderForPost(tenantId, post.getId());
+    }
+
     private boolean needsAcknowledgment(TenantId tenantId, UUID postOrderId, int version, UUID guardId) {
         return ackRepo.findByOrderVersionAndGuard(tenantId, postOrderId, version, guardId).isEmpty();
     }
@@ -214,8 +223,20 @@ public class PostOrderService {
                                                         AcknowledgePostOrderRequest req) {
         PostOrder o = orderRepo.findByTenantAndId(tenantId, postOrderId)
                 .orElseThrow(() -> new ResourceNotFoundException("PostOrder", postOrderId.toString()));
-        Instant when = Boolean.TRUE.equals(req.acknowledgedOffline()) && req.acknowledgedAt() != null
-                ? req.acknowledgedAt() : Instant.now();
+        if (!"ACTIVE".equals(o.getStatus())) {
+            throw new HandyFlowException("This order is no longer current. Open it again to read the latest version.",
+                    HttpStatus.CONFLICT, "ORDER_NOT_CURRENT");
+        }
+        if (req.version() != null && req.version() != o.getVersion()) {
+            throw new HandyFlowException("A newer version of this order has been published. Read it again before acknowledging.",
+                    HttpStatus.CONFLICT, "ORDER_VERSION_CHANGED");
+        }
+        // Acknowledging the same version twice (a retry from the phone) returns the first record.
+        var already = ackRepo.findByOrderVersionAndGuard(tenantId, postOrderId, o.getVersion(), guardId);
+        if (already.isPresent()) return toAckResponse(already.get());
+        Instant now = Instant.now();
+        Instant when = Boolean.TRUE.equals(req.acknowledgedOffline())
+                ? OfflineTimestamp.accept(req.acknowledgedAt(), now) : now;
         PostOrderAcknowledgement ack = PostOrderAcknowledgement.create(tenantId, postOrderId, o.getVersion(),
                 guardId, when, req.deviceHardwareId(), Boolean.TRUE.equals(req.acknowledgedOffline()));
         ackRepo.save(ack);
