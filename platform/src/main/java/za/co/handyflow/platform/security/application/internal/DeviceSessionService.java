@@ -176,6 +176,13 @@ public class DeviceSessionService {
                 .orElseThrow(() -> new ResourceNotFoundException("ResourceCustody", custodyId.toString()));
     }
 
+    /** Items this guard has signed out and not yet returned, oldest first. Always the caller's own. */
+    @Transactional(readOnly = true)
+    public List<ResourceCustody> openCustodyOf(UUID guardId) {
+        return custodyRepository.findCheckedOutByGuard(guardId).stream()
+                .sorted(java.util.Comparator.comparing(ResourceCustody::getCheckedOutAt)).toList();
+    }
+
     /** Guard route close: ownership checked, PIN claim taken from the token, face score dropped. */
     @Transactional
     public DeviceSessionResponse closeGuardSession(TenantId tenantId, UUID authenticatedGuardId,
@@ -293,10 +300,18 @@ public class DeviceSessionService {
                 .orElseThrow(() -> new ResourceNotFoundException("DeviceSession",
                         sessionId.toString()));
 
+        ResourceCustody.ResourceType type;
+        try {
+            type = ResourceCustody.ResourceType.valueOf(req.resourceType());
+        } catch (IllegalArgumentException e) {
+            throw new HandyFlowException("Unknown resource type: " + req.resourceType(), HttpStatus.BAD_REQUEST, "INVALID_RESOURCE_TYPE");
+        }
+        if (req.resourceRef().length() > 100) {
+            throw new HandyFlowException("The item name is too long (100 characters at most).", HttpStatus.BAD_REQUEST, "VALIDATION_ERROR");
+        }
         ResourceCustody custody = ResourceCustody.checkout(
-                tenantId, sessionId, session.getGuardId(), session.getShiftId(),
-                ResourceCustody.ResourceType.valueOf(req.resourceType()),
-                req.resourceRef(), req.witnessedBy(), req.notes());
+                tenantId, sessionId, session.getGuardId(), session.getShiftId(), type,
+                req.resourceRef().trim(), req.witnessedBy(), req.notes());
         return custodyRepository.save(custody);
     }
 
@@ -308,9 +323,16 @@ public class DeviceSessionService {
                 .orElseThrow(() -> new ResourceNotFoundException("ResourceCustody",
                         custodyId.toString()));
 
-        custody.returnResource(
-                ResourceCustody.ConditionOnReturn.valueOf(req.condition()),
-                req.notes());
+        ResourceCustody.ConditionOnReturn condition;
+        try {
+            condition = ResourceCustody.ConditionOnReturn.valueOf(req.condition());
+        } catch (IllegalArgumentException e) {
+            throw new HandyFlowException("Condition must be GOOD, DAMAGED or MISSING.", HttpStatus.BAD_REQUEST, "INVALID_CONDITION");
+        }
+        if (!custody.isCheckedOut()) {
+            throw new HandyFlowException("This item has already been returned.", HttpStatus.CONFLICT, "ALREADY_RETURNED");
+        }
+        custody.returnResource(condition, req.notes());
         return custodyRepository.save(custody);
     }
 

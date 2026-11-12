@@ -14,6 +14,9 @@ import za.co.handyflow.platform.security.domain.repository.SecurityDeviceReposit
 import za.co.handyflow.platform.security.domain.repository.ShiftRepository;
 import za.co.handyflow.platform.security.domain.repository.SiteRepository;
 import za.co.handyflow.platform.security.dto.GuardOpenSessionRequest;
+import za.co.handyflow.platform.security.dto.CheckoutResourceRequest;
+import za.co.handyflow.platform.security.dto.ReturnResourceRequest;
+import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -152,5 +155,53 @@ class DeviceSessionServiceGuardTest {
         when(custody.findById(custodyId)).thenReturn(Optional.of(theirs));
         assertThatThrownBy(() -> service.assertCustodyOwnedBy(TENANT, custodyId, me))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void anUnknownResourceTypeIsABadRequestNotAServerError() {
+        UUID sessionId = UUID.randomUUID();
+        DeviceSession open = mock(DeviceSession.class);
+        when(open.getTenantId()).thenReturn(TENANT);
+        when(open.isOpen()).thenReturn(true);
+        when(sessions.findById(sessionId)).thenReturn(Optional.of(open));
+
+        assertThatThrownBy(() -> service.checkoutResource(TENANT, sessionId, new CheckoutResourceRequest("JETPACK", "J-1", null, null)))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("Unknown resource type");
+    }
+
+    @Test
+    void anItemAlreadyReturnedCannotBeReturnedAgain() {
+        UUID custodyId = UUID.randomUUID();
+        ResourceCustody item = mock(ResourceCustody.class);
+        when(item.getTenantId()).thenReturn(TENANT);
+        when(item.isCheckedOut()).thenReturn(false);
+        when(custody.findById(custodyId)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.returnResource(TENANT, custodyId, new ReturnResourceRequest("GOOD", null)))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("already been returned");
+        verify(custody, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void anUnknownConditionIsABadRequest() {
+        UUID custodyId = UUID.randomUUID();
+        ResourceCustody item = mock(ResourceCustody.class);
+        when(item.getTenantId()).thenReturn(TENANT);
+        when(custody.findById(custodyId)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.returnResource(TENANT, custodyId, new ReturnResourceRequest("SHINY", null)))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("GOOD, DAMAGED or MISSING");
+    }
+
+    @Test
+    void myOpenItemsAreOnlyMyOwnOldestFirst() {
+        ResourceCustody older = mock(ResourceCustody.class);
+        ResourceCustody newer = mock(ResourceCustody.class);
+        when(older.getCheckedOutAt()).thenReturn(java.time.Instant.parse("2026-11-12T06:00:00Z"));
+        when(newer.getCheckedOutAt()).thenReturn(java.time.Instant.parse("2026-11-12T07:00:00Z"));
+        when(custody.findCheckedOutByGuard(me)).thenReturn(List.of(newer, older));
+
+        assertThat(service.openCustodyOf(me)).containsExactly(older, newer);
+        verify(custody, org.mockito.Mockito.never()).findCheckedOutByGuard(someoneElse);
     }
 }

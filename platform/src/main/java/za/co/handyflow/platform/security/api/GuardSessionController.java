@@ -128,14 +128,14 @@ public class GuardSessionController {
             description = "Optionally requires witnessedBy (a second guard's ID) for " +
                     "high-risk items like firearms, per site configuration. Same posture as " +
                     "the endpoint this mirrors.")
-    public ResponseEntity<ApiResponse<ResourceCustody>> checkoutResource(
+    public ResponseEntity<ApiResponse<GuardCustodyView>> checkoutResource(
             @PathVariable UUID sessionId,
             @Valid @RequestBody CheckoutResourceRequest req) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         sessionService.assertSessionOwnedBy(tenantId, sessionId, TenantContext.getCurrentUserId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(
-                        sessionService.checkoutResource(tenantId, sessionId, req)));
+                        GuardCustodyView.of(sessionService.checkoutResource(tenantId, sessionId, req))));
     }
 
     @PostMapping("/resources/{custodyId}/return")
@@ -144,12 +144,20 @@ public class GuardSessionController {
             description = "Records condition on return (GOOD/DAMAGED/MISSING). A session " +
                     "cannot close while resources remain checked out unless resourcesReturned " +
                     "is explicitly set on the close request.")
-    public ResponseEntity<ApiResponse<ResourceCustody>> returnResource(
+    public ResponseEntity<ApiResponse<GuardCustodyView>> returnResource(
             @PathVariable UUID custodyId,
             @Valid @RequestBody ReturnResourceRequest req) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         sessionService.assertCustodyOwnedBy(tenantId, custodyId, TenantContext.getCurrentUserId());
         return ResponseEntity.ok(ApiResponse.success(
-                sessionService.returnResource(tenantId, custodyId, req)));
+                GuardCustodyView.of(sessionService.returnResource(tenantId, custodyId, req))));
+    }
+
+    @GetMapping("/resources/mine")
+    @Operation(summary = "Items I have signed out and not returned — guard-facing",
+            description = "Always the calling guard's own, resolved from the token. No guard id parameter.")
+    public ResponseEntity<ApiResponse<java.util.List<GuardCustodyView>>> myOpenResources() {
+        return ResponseEntity.ok(ApiResponse.success(
+                sessionService.openCustodyOf(TenantContext.getCurrentUserId()).stream().map(GuardCustodyView::of).toList()));
     }
 }
