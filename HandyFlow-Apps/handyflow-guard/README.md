@@ -17,8 +17,11 @@ Android emulator reaches the host at `10.0.2.2` (the default). A real phone need
 Always add packages with `npx expo install <pkg>` on a machine that can reach api.expo.dev (it picks the SDK-matched version). The cloud workspace this was scaffolded in could not, so versions came from `node_modules/expo/bundledNativeModules.json`; run `npx expo install --check` once on your PC.
 
 ## State
-Done: scaffold, strict config, API client (envelope, timeout, 401 sign-out, network = status 0), guard sign-in (phone or employee code + 6-digit PIN), device id in secure storage, forced PIN change, sign-out that always clears the device.
-Not done: shift (clock in/out), patrol rounds, checkpoint scan, panic, incident with photos, post orders, swaps, offline queue, push, Android/iOS builds (EAS), real icon and splash.
+Done: scaffold, strict config, API client, sign-in (phone or employee code + 6-digit PIN), forced PIN change, device id in secure storage.
+Done (screens, patch 0818): shift and clock in/out, patrol rounds with checkpoint ticks, QR scan with camera and GPS, incident report, panic (hold 1.5 s), sync banner.
+Offline: every scan, incident and panic is saved in SQLite first, then sent. Each carries a `clientRef` and `recordedAt`. Panic sends first, then incidents, then scans. No signal or an expired sign-in stops sending and keeps everything; a request the server refuses for good is parked as failed and shown. Each item is only ever sent under its own guard's sign-in (shared tablets), and Sign out is blocked while items are waiting.
+Not done: incident photos (needs the camera and file upload in the queue), push alerts, supervisor mode, shift swaps, post orders, equipment checkout, gate log, EAS builds, real icon and splash, translations.
+Never run on a phone or emulator: checked only by type check, unit tests and an Android bundle build.
 
 ## Rules for this app
 - The phone never states who the guard is, whether a PIN passed, or whether they are inside the geofence. The server decides all three (assessment R1, R2). Clock-in sends only `{deviceHardwareId, latitude, longitude, accuracyMetres}` to `POST /api/v1/guard/sessions/open` (backend patch 0815); it never sends a guard id or check results.
