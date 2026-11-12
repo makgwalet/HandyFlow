@@ -127,3 +127,6 @@ Built (patch 0807, V683): optional map position on customer sites; a suggested s
 
 ## G01 scope - Division and depot access limits (2026-11-12, patch 0808)
 Built: per-user division and depot limits (V684), enforced in the Fuel interceptor; tank and depot lists filtered; Setup > Access limits screen. Also fixed the ungated `load-returns` API. Open: depot filtering of non-tank lists and reports; forecourt site depot (8d). See FUEL-PHASE8C-SCOPED-PERMISSIONS-NOTES-2026-11-12.md.
+
+## Forecourt-to-depot attribution (2026-11-12, patch 0809)
+Built: depots can record a supplying depot (V685, loop-safe); forecourt sales by supplying depot report. Open: attribution to legal entities in the main group table; depot-limit filtering of the report; supplier volume split. See FUEL-PHASE8D-FORECOURT-DEPOT-ATTRIBUTION-NOTES-2026-11-12.md.

@@ -154,16 +154,16 @@ function Depots({ canManage, onDialog }: { canManage: boolean; onDialog: (d: Dia
       <ErrorLine error={off.error} fallback="Could not remove the depot" />
       <div style={{ ...card, overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead><tr style={{ background: "var(--hf-surface-muted)" }}>{["Code", "Name", "Address", "Tanks", ""].map(h => <th key={h} style={th}>{h}</th>)}</tr></thead>
+          <thead><tr style={{ background: "var(--hf-surface-muted)" }}>{["Code", "Name", "Address", "Supplied by", "Tanks", ""].map(h => <th key={h} style={th}>{h}</th>)}</tr></thead>
           <tbody>
             {(q.data ?? []).map(d => (
               <tr key={d.id} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
-                <td style={{ ...td, fontWeight: 700 }}>{d.code}</td><td style={td}>{d.name}</td><td style={{ ...td, color: "var(--hf-text-muted)" }}>{d.address ?? ""}</td><td style={td}>{d.tankCount}</td>
+                <td style={{ ...td, fontWeight: 700 }}>{d.code}</td><td style={td}>{d.name}</td><td style={{ ...td, color: "var(--hf-text-muted)" }}>{d.address ?? ""}</td><td style={td}>{(q.data ?? []).find(x => x.id === d.supplyingDepotId)?.name ?? ""}</td><td style={td}>{d.tankCount}</td>
                 <td style={td}>{canManage && <>
                   <button style={{ ...btnGhost, padding: "4px 10px" }} onClick={() => onDialog({ kind: "depot", depot: d })}>Edit</button>{" "}
                   <button style={{ ...btnGhost, padding: "4px 10px" }} onClick={() => { if (confirm(`Remove depot ${d.name}?`)) off.mutate(d.id) }}>Remove</button></>}</td>
               </tr>))}
-            {q.data && q.data.length === 0 && <tr><td colSpan={5} style={{ ...td, color: "var(--hf-text-muted)" }}>No depots yet. A single-site business can skip this.</td></tr>}
+            {q.data && q.data.length === 0 && <tr><td colSpan={6} style={{ ...td, color: "var(--hf-text-muted)" }}>No depots yet. A single-site business can skip this.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -317,8 +317,11 @@ function TransferDialog({ tanks, onClose }: { tanks: TankLine[]; onClose: () => 
 
 function DepotDialog({ depot, onClose }: { depot?: any; onClose: () => void }) {
   const [name, setName] = useState(depot?.name ?? ""); const [code, setCode] = useState(depot?.code ?? ""); const [address, setAddress] = useState(depot?.address ?? "")
-  const done = useDone([["fuel-depots"], ["fuel-availability"]], onClose)
-  const body = { name: name.trim(), code: code.trim(), address: address.trim() || null }
+  const [supplier, setSupplier] = useState<string>(depot?.supplyingDepotId ?? "")
+  const others = useQuery<any[]>({ queryKey: ["fuel-depots"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/depots")) })
+  const done = useDone([["fuel-depots"], ["fuel-availability"], ["fuel-forecourt-supply"]], onClose)
+  // An edit always sends the supplier (so clearing works); a new depot sends it only when one is chosen.
+  const body = { name: name.trim(), code: code.trim(), address: address.trim() || null, ...(depot || supplier ? { supplyingDepotId: supplier || null } : {}) }
   const m = useMutation({ mutationFn: () => depot ? apiClient.put(`/api/v1/fuel/depots/${depot.id}`, body) : apiClient.post("/api/v1/fuel/depots", body), onSuccess: done })
   const problem = !name.trim() ? "Enter a name." : !/^[A-Za-z0-9._-]+$/.test(code.trim()) ? "Code: letters, digits, dot, dash or underscore (up to 20)." : null
   return (
@@ -326,6 +329,12 @@ function DepotDialog({ depot, onClose }: { depot?: any; onClose: () => void }) {
       <label style={labelStyle} htmlFor="dp-n">Name</label><input id="dp-n" style={{ ...inputStyle, width: "100%" }} value={name} maxLength={120} onChange={e => setName(e.target.value)} />
       <label style={{ ...labelStyle, marginTop: 10 }} htmlFor="dp-c">Code</label><input id="dp-c" style={{ ...inputStyle, width: "100%" }} value={code} maxLength={20} onChange={e => setCode(e.target.value)} />
       <label style={{ ...labelStyle, marginTop: 10 }} htmlFor="dp-a">Address</label><input id="dp-a" style={{ ...inputStyle, width: "100%" }} value={address} maxLength={300} onChange={e => setAddress(e.target.value)} />
+      <label style={{ ...labelStyle, marginTop: 10 }} htmlFor="dp-s">Supplied by</label>
+      <select id="dp-s" style={{ ...inputStyle, width: "100%" }} value={supplier} onChange={e => setSupplier(e.target.value)}>
+        <option value="">No supplying depot</option>
+        {(others.data ?? []).filter(x => x.id !== depot?.id).map(x => <option key={x.id} value={x.id}>{x.code} - {x.name}</option>)}
+      </select>
+      <p style={{ fontSize: 11.5, color: "var(--hf-text-muted)", margin: "4px 0 0" }}>For a forecourt: the depot its fuel comes from. Used to report forecourt sales by supplying depot.</p>
       <Footer problem={problem} error={m.error} pending={m.isPending} label="Save" onSubmit={() => m.mutate()} onClose={onClose} />
     </Modal>
   )

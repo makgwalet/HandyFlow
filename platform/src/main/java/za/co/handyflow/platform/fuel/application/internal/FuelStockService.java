@@ -49,7 +49,9 @@ public class FuelStockService {
         if (depotRepository.codeInUse(tenantId, req.code().trim(), null)) {
             throw new ConflictException("Depot code " + req.code().trim().toUpperCase() + " is already in use.");
         }
-        FuelDepot d = depotRepository.save(FuelDepot.create(tenantId, req.name(), req.code(), req.address()));
+        FuelDepot created = FuelDepot.create(tenantId, req.name(), req.code(), req.address());
+        if (req.supplyingDepotId() != null) created.setSupplier(checkSupplier(tenantId, created.getId(), req.supplyingDepotId()));
+        FuelDepot d = depotRepository.save(created);
         return toResponse(d, 0);
     }
 
@@ -60,6 +62,7 @@ public class FuelStockService {
             throw new ConflictException("Depot code " + req.code().trim().toUpperCase() + " is already in use.");
         }
         d.update(req.name(), req.code(), req.address());
+        d.setSupplier(req.supplyingDepotId() == null ? null : checkSupplier(tenantId, id, req.supplyingDepotId()));
         return toResponse(depotRepository.save(d), tanksIn(tenantId, id));
     }
 
@@ -231,6 +234,20 @@ public class FuelStockService {
                 .orElseThrow(() -> new ResourceNotFoundException("Tank", id.toString()));
     }
 
+    /** The supplier must be an active depot of this company, and the chain of suppliers must not loop back to this depot. */
+    private UUID checkSupplier(TenantId tenantId, UUID depotId, UUID supplierId) {
+        if (supplierId.equals(depotId)) throw new IllegalArgumentException("A depot cannot supply itself.");
+        FuelDepot next = findDepot(tenantId, supplierId);
+        Set<UUID> seen = new HashSet<>();
+        seen.add(depotId);
+        while (next != null) {
+            if (!seen.add(next.getId())) throw new IllegalArgumentException("That would make the supply chain loop back on itself.");
+            UUID up = next.getSupplyingDepotId();
+            next = up == null ? null : depotRepository.findActiveById(tenantId, up).orElse(null);
+        }
+        return supplierId;
+    }
+
     private FuelDepot findDepot(TenantId tenantId, UUID id) {
         return depotRepository.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Depot", id.toString()));
@@ -241,7 +258,7 @@ public class FuelStockService {
     }
 
     private DepotResponse toResponse(FuelDepot d, int tanks) {
-        return new DepotResponse(d.getId(), d.getName(), d.getCode(), d.getAddress(), d.isActive(), tanks, d.getCreatedAt());
+        return new DepotResponse(d.getId(), d.getName(), d.getCode(), d.getAddress(), d.isActive(), tanks, d.getCreatedAt(), d.getSupplyingDepotId());
     }
 
     private MovementResponse toResponse(FuelStockMovement m) {

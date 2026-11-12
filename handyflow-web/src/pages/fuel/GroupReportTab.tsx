@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { card, inputStyle, Chip } from "../warehousing/whseUi"
 import { fmtL, fmtR } from "./orderOps"
+import ForecourtSupplySection from "./ForecourtSupplySection"
 import { changeText, caveats, type GroupReport, type GroupRow } from "./groupReportOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -37,7 +38,7 @@ export default function GroupReportTab() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
         <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: 0, flex: 1, minWidth: 260 }}>
-          Every legal entity side by side: fuel delivered, stock on hand and variances still open. Each figure sits with the entity that owns the depot the tank is in. Forecourt sales are not included, because a forecourt shift is not tied to a depot. This page only reports; it changes nothing.
+          Every legal entity side by side: fuel delivered, stock on hand and variances still open. Each figure sits with the entity that owns the depot the tank is in. Forecourt sales are shown separately below, grouped by the depot that supplies each forecourt. This page only reports; it changes nothing.
         </p>
         <select aria-label="Period" value={days} onChange={e => setDays(Number(e.target.value))} style={{ ...inputStyle, width: "auto" }}>
           {PERIODS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -58,6 +59,7 @@ export default function GroupReportTab() {
               <tbody>{d.entities.map(r => line(r))}{line(d.total, true)}</tbody>
             </table>
           </div>
+          <ForecourtSupplySection days={days} />
         </>
       )}
     </div>

@@ -35,6 +35,10 @@ public class FuelDepot {
     @Column(name = "legal_entity_id")
     private UUID legalEntityId;
 
+    /** Phase 8d: the depot that supplies this one (for a forecourt: the depot its fuel comes from). Null when not set. */
+    @Column(name = "supplying_depot_id")
+    private UUID supplyingDepotId;
+
     @Column(nullable = false)
     private boolean active = true;
 
@@ -67,6 +71,12 @@ public class FuelDepot {
         this.name    = name.trim();
         this.code    = code.trim().toUpperCase();
         this.address = address == null || address.isBlank() ? null : address.trim();
+        this.updatedAt = Instant.now();
+    }
+
+    public void setSupplier(UUID supplyingDepotId) {
+        if (supplyingDepotId != null && supplyingDepotId.equals(id)) throw new IllegalArgumentException("A depot cannot supply itself.");
+        this.supplyingDepotId = supplyingDepotId;
         this.updatedAt = Instant.now();
     }
 

@@ -120,4 +120,21 @@ describe("StockTab", () => {
     fireEvent.click(screen.getByText("Post adjustment"))
     expect((await screen.findByRole("status")).textContent).toMatch(/sent for approval/)
   })
+  it("depots: shows the supplying depot and sends the supplier when editing (including clearing it)", async () => {
+    perms = ["FUEL_MANAGE"]
+    const base = get.getMockImplementation()!
+    get.mockImplementation(async (u: string, ...r: unknown[]) => u.includes("/depots")
+      ? { data: { data: [{ id: "d1", code: "WIT", name: "Witbank Depot", tankCount: 2 }, { id: "d2", code: "FC1", name: "Forecourt One", tankCount: 1, supplyingDepotId: "d1" }] } }
+      : base(u, ...r))
+    mount(); await waitFor(() => screen.getByText("Diesel 1"))
+    fireEvent.click(screen.getByRole("button", { name: "Depots" }))
+    expect(await screen.findByText("Forecourt One")).toBeTruthy()
+    expect(screen.getByText("Supplied by")).toBeTruthy()
+    fireEvent.click(screen.getAllByText("Edit")[1])
+    const dlg = screen.getByRole("dialog")
+    expect((within(dlg).getByLabelText("Supplied by") as HTMLSelectElement).value).toBe("d1")
+    fireEvent.change(within(dlg).getByLabelText("Supplied by"), { target: { value: "" } })
+    fireEvent.click(within(dlg).getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/depots/d2", { name: "Forecourt One", code: "FC1", address: null, supplyingDepotId: null }))
+  })
 })
