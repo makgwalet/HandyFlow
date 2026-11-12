@@ -57,7 +57,7 @@ public class DeviceSessionService {
         return doOpen(tenantId, req.deviceHardwareId(), req.guardId(), req.pinVerified(),
                 req.faceMatchConfidence() != null
                         ? new BigDecimal(req.faceMatchConfidence().toString()) : null,
-                device -> req.geofenceOk());
+                (device, shift) -> req.geofenceOk());
     }
 
     /**
@@ -71,13 +71,16 @@ public class DeviceSessionService {
     public DeviceSessionResponse openGuardSession(TenantId tenantId, UUID authenticatedGuardId,
                                                   GuardOpenSessionRequest req) {
         return doOpen(tenantId, req.deviceHardwareId(), authenticatedGuardId, true, null,
-                device -> evaluateGeofence(tenantId, device, req));
+                (device, shift) -> evaluateGeofence(tenantId, device, shift, req));
     }
 
+    /** The site to check against is the shift's site, else the device's. A guard's own phone has no site of its own. */
     private Boolean evaluateGeofence(TenantId tenantId, SecurityDevice device,
+                                     za.co.handyflow.platform.security.domain.model.Shift shift,
                                      GuardOpenSessionRequest req) {
-        if (device.getSiteId() == null) return null;
-        return siteRepository.findActiveById(tenantId, device.getSiteId())
+        UUID siteId = shift != null ? shift.getSiteId() : device.getSiteId();
+        if (siteId == null) return null;
+        return siteRepository.findActiveById(tenantId, siteId)
                 .map(site -> SessionGeofence.evaluate(site.getLatitude(), site.getLongitude(),
                         req.latitude(), req.longitude(), req.accuracyMetres()))
                 .orElse(null);
@@ -85,7 +88,7 @@ public class DeviceSessionService {
 
     private DeviceSessionResponse doOpen(TenantId tenantId, String deviceHardwareId, UUID guardId,
                                          boolean pinVerified, BigDecimal faceConfidence,
-                                         java.util.function.Function<SecurityDevice, Boolean> geofence) {
+                                         java.util.function.BiFunction<SecurityDevice, za.co.handyflow.platform.security.domain.model.Shift, Boolean> geofence) {
 
         SecurityDevice device = deviceRepository
                 .findByTenantIdAndDeviceHardwareId(tenantId, deviceHardwareId)
@@ -131,8 +134,11 @@ public class DeviceSessionService {
                 shiftRepository.findScheduledStartingBefore(tenantId, windowEnd)
                         .stream()
                         .filter(s -> s.getGuardId().equals(guardId))
-                        .filter(s -> s.getSiteId().equals(device.getSiteId()))
+                        // A site-owned device only starts shifts at its own site. A guard's personal phone has no site
+                        // (site_id is null from enrolment), so it starts the guard's own shift wherever it is.
+                        .filter(s -> device.getSiteId() == null || s.getSiteId().equals(device.getSiteId()))
                         .filter(s -> s.getStartAt().isAfter(windowStart))
+                        .sorted(java.util.Comparator.comparing(za.co.handyflow.platform.security.domain.model.Shift::getStartAt))
                         .toList();
 
         za.co.handyflow.platform.security.domain.model.Shift shift = null;
@@ -145,10 +151,10 @@ public class DeviceSessionService {
         DeviceSession session = DeviceSession.open(
                 tenantId, device.getId(), guardId,
                 shift != null ? shift.getId() : null,
-                pinVerified, faceConfidence, geofence.apply(device));
+                pinVerified, faceConfidence, geofence.apply(device, shift));
         sessionRepository.save(session);
 
-        if (shift != null && device.getSiteId() != null) {
+        if (shift != null) {
             patrolRoundService.generateRoundsForShift(tenantId, shift);
         }
 

@@ -204,4 +204,25 @@ class DeviceSessionServiceGuardTest {
         assertThat(service.openCustodyOf(me)).containsExactly(older, newer);
         verify(custody, org.mockito.Mockito.never()).findCheckedOutByGuard(someoneElse);
     }
+
+    @Test
+    void aGuardsOwnPhoneWithNoSiteStillStartsTheirShiftAndIsCheckedAgainstTheShiftsSite() {
+        deviceAtSiteWithPosition("-26.2041", "28.0473");
+        SecurityDevice personal = mock(SecurityDevice.class);
+        when(personal.getId()).thenReturn(UUID.randomUUID());
+        when(personal.isActive()).thenReturn(true);
+        when(personal.getSiteId()).thenReturn(null);
+        when(devices.findByTenantIdAndDeviceHardwareId(TENANT, "hw-1")).thenReturn(Optional.of(personal));
+        za.co.handyflow.platform.security.domain.model.Shift mine = mock(za.co.handyflow.platform.security.domain.model.Shift.class);
+        when(mine.getId()).thenReturn(UUID.randomUUID());
+        when(mine.getGuardId()).thenReturn(me);
+        when(mine.getSiteId()).thenReturn(siteId);
+        when(mine.getStartAt()).thenReturn(java.time.Instant.now().minusSeconds(300));
+        when(shifts.findScheduledStartingBefore(any(), any())).thenReturn(List.of(mine));
+
+        DeviceSession s = openAndCapture(new GuardOpenSessionRequest(
+                "hw-1", new BigDecimal("-26.2041"), new BigDecimal("28.0473"), 10.0));
+        assertThat(s.getShiftId()).isEqualTo(mine.getId());
+        assertThat(s.getStartGeofenceOk()).isTrue();
+    }
 }
