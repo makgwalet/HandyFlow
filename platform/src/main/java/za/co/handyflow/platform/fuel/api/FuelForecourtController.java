@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.fuel.application.internal.FuelCashControlService;
 import za.co.handyflow.platform.fuel.application.internal.FuelForecourtService;
+import za.co.handyflow.platform.fuel.application.internal.FuelScopeService;
 import za.co.handyflow.platform.fuel.application.internal.FuelTankReconciliationService;
 import za.co.handyflow.platform.fuel.dto.FuelRetailDtos;
 import za.co.handyflow.platform.fuel.dto.FuelWholesaleDtos.ReasonRequest;
@@ -36,6 +37,7 @@ public class FuelForecourtController {
     private static final String SUPERVISE = "hasAuthority('FUEL_SHIFT_SUPERVISE')";
 
     private final FuelForecourtService forecourt;
+    private final FuelScopeService scopes;
     private final FuelCashControlService cash;
     private final FuelTankReconciliationService reconciliation;
     private final FeatureGuard featureGuard;
@@ -84,14 +86,16 @@ public class FuelForecourtController {
     @PreAuthorize(SEE)
     public ResponseEntity<ApiResponse<List<ShiftResponse>>> shifts(@RequestParam(defaultValue = "50") int limit) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success(forecourt.listShifts(TenantContext.getTenantIdAsObject(), limit)));
+        var tenant = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(forecourt.listShifts(tenant, limit, scopes.allowedTankIds(tenant, FuelScopeService.currentUserOrNull()))));
     }
 
     @GetMapping("/shifts/{id}")
     @PreAuthorize(SEE)
     public ResponseEntity<ApiResponse<ShiftResponse>> shift(@PathVariable UUID id) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success(forecourt.getShift(TenantContext.getTenantIdAsObject(), id)));
+        var tenant = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(forecourt.getShift(tenant, id, scopes.allowedTankIds(tenant, FuelScopeService.currentUserOrNull()))));
     }
 
     @PostMapping("/shifts")
@@ -164,6 +168,7 @@ public class FuelForecourtController {
     @PreAuthorize(SEE)
     public ResponseEntity<ApiResponse<ForecourtSummary>> summary(@RequestParam(defaultValue = "7") int days) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success(forecourt.summary(TenantContext.getTenantIdAsObject(), days)));
+        var tenant = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(forecourt.summary(tenant, days, scopes.allowedTankIds(tenant, FuelScopeService.currentUserOrNull()))));
     }
 }

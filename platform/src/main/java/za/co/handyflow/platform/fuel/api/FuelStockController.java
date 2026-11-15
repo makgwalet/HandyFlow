@@ -16,6 +16,7 @@ import za.co.handyflow.platform.fuel.application.internal.FuelStockAdjustmentApp
 import za.co.handyflow.platform.fuel.application.internal.FuelStockService;
 import za.co.handyflow.platform.fuel.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
+import za.co.handyflow.platform.fuel.application.internal.FuelScopeService;
 import za.co.handyflow.platform.shared.TenantContext;
 
 import java.util.List;
@@ -135,7 +136,8 @@ public class FuelStockController {
     @PreAuthorize("hasAuthority('FUEL_READ')")
     public ResponseEntity<ApiResponse<Page<TransferResponse>>> transfers(@PageableDefault(size = 50) Pageable pageable) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success(stock.getTransfers(TenantContext.getTenantIdAsObject(), pageable)));
+        var tenant = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(stock.getTransfers(tenant, scopeService.allowedTankIds(tenant, FuelScopeService.currentUserOrNull()), pageable)));
     }
 
     @GetMapping("/ledger")
@@ -144,7 +146,11 @@ public class FuelStockController {
     public ResponseEntity<ApiResponse<Page<MovementResponse>>> ledger(@RequestParam(required = false) UUID tankId,
                                                                       @PageableDefault(size = 50) Pageable pageable) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success(stock.getLedger(TenantContext.getTenantIdAsObject(), tankId, pageable)));
+        var tenant = TenantContext.getTenantIdAsObject();
+        var user = FuelScopeService.currentUserOrNull();
+        // Asking for one tank is checked like any path that names a tank.
+        if (tankId != null) scopeService.requireTarget(tenant, user, new FuelScopeService.Target(FuelScopeService.Target.Kind.TANK, tankId));
+        return ResponseEntity.ok(ApiResponse.success(stock.getLedger(tenant, tankId, scopeService.allowedTankIds(tenant, user), pageable)));
     }
 
     // ── Reservations and availability ────────────────────────────────────────
@@ -169,7 +175,8 @@ public class FuelStockController {
     @PreAuthorize("hasAuthority('FUEL_READ')")
     public ResponseEntity<ApiResponse<Page<ReservationResponse>>> reservations(@PageableDefault(size = 50) Pageable pageable) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success(stock.getReservations(TenantContext.getTenantIdAsObject(), pageable)));
+        var tenant = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(stock.getReservations(tenant, scopeService.allowedTankIds(tenant, FuelScopeService.currentUserOrNull()), pageable)));
     }
 
     @GetMapping("/availability")
@@ -177,6 +184,7 @@ public class FuelStockController {
     @Operation(summary = "Physical, reserved, safety and available-to-promise litres per tank and per depot")
     public ResponseEntity<ApiResponse<AvailabilityResponse>> availability() {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success(stock.getAvailability(TenantContext.getTenantIdAsObject())));
+        var tenant = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(stock.getAvailability(tenant, scopeService.allowedDepotIds(tenant, FuelScopeService.currentUserOrNull()))));
     }
 }

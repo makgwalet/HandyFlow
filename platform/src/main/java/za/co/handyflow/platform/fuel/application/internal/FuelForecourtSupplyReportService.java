@@ -37,8 +37,14 @@ public class FuelForecourtSupplyReportService {
     private final FuelTankRepository tanks;
     private final FuelDepotRepository depots;
 
+    public Report report(TenantId tenantId, int days, boolean includeMoney) { return report(tenantId, days, includeMoney, null); }
+
+    /**
+     * {@code allowedDepotIds} null means no depot limit. Otherwise only forecourts (depots) in that set are counted, so totals cover what the user may see;
+     * a supplier is still named above the forecourts it supplies, because the forecourt's own report needs it. A tank in no depot is left out for a limited user.
+     */
     @Transactional(readOnly = true)
-    public Report report(TenantId tenantId, int days, boolean includeMoney) {
+    public Report report(TenantId tenantId, int days, boolean includeMoney, Set<UUID> allowedDepotIds) {
         int span = Math.max(1, Math.min(days, 366));
         LocalDate to = LocalDate.now(SAST), from = to.minusDays(span - 1L);
         var fromInstant = from.atStartOfDay(SAST).toInstant();
@@ -61,6 +67,7 @@ public class FuelForecourtSupplyReportService {
             for (FuelShiftReading r : readings.findByShifts(tenantId, ids)) {
                 if (r.getLitresSold() == null) { left++; continue; }
                 UUID forecourt = tankDepot.get(r.getTankId());
+                if (allowedDepotIds != null && (forecourt == null || !allowedDepotIds.contains(forecourt))) continue;
                 FuelDepot fd = forecourt == null ? null : depotById.get(forecourt);
                 UUID supplier = fd == null ? null : fd.getSupplyingDepotId();
                 if (supplier != null && !depotById.containsKey(supplier)) supplier = null; // supplier since deactivated

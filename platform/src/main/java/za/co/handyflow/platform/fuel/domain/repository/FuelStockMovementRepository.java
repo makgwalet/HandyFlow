@@ -21,6 +21,9 @@ public interface FuelStockMovementRepository extends JpaRepository<FuelStockMove
     @Query("SELECT m FROM FuelStockMovement m WHERE m.tenantId = :tenantId ORDER BY m.createdAt DESC")
     Page<FuelStockMovement> findAllForTenant(TenantId tenantId, Pageable pageable);
 
+    @Query("SELECT m FROM FuelStockMovement m WHERE m.tenantId = :tenantId AND m.tankId IN :tankIds ORDER BY m.createdAt DESC")
+    Page<FuelStockMovement> findByTanks(TenantId tenantId, java.util.Collection<UUID> tankIds, Pageable pageable);
+
     /** Movements after {@code after} up to and including {@code upTo}, oldest first. */
     @Query("SELECT m FROM FuelStockMovement m WHERE m.tenantId = :tenantId AND m.tankId = :tankId AND m.createdAt > :after AND m.createdAt <= :upTo ORDER BY m.createdAt")
     List<FuelStockMovement> findByTankBetween(TenantId tenantId, UUID tankId, java.time.Instant after, java.time.Instant upTo);

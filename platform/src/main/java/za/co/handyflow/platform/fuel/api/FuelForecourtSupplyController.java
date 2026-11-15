@@ -22,12 +22,15 @@ public class FuelForecourtSupplyController {
 
     private final FuelForecourtSupplyReportService report;
     private final FeatureGuard featureGuard;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelScopeService scopes;
 
     @GetMapping
     @PreAuthorize("hasAuthority('FUEL_READ')")
     public ResponseEntity<ApiResponse<Report>> get(@RequestParam(defaultValue = "30") int days) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success(report.report(TenantContext.getTenantIdAsObject(), days, canSeeMoney())));
+        var tenant = TenantContext.getTenantIdAsObject();
+        var allowed = scopes.allowedDepotIds(tenant, za.co.handyflow.platform.fuel.application.internal.FuelScopeService.currentUserOrNull());
+        return ResponseEntity.ok(ApiResponse.success(report.report(tenant, days, canSeeMoney(), allowed)));
     }
 
     private static boolean canSeeMoney() {

@@ -134,8 +134,13 @@ public class FuelStockService {
     }
 
     @Transactional(readOnly = true)
-    public Page<TransferResponse> getTransfers(TenantId tenantId, Pageable pageable) {
-        return transferRepository.findAllForTenant(tenantId, pageable)
+    public Page<TransferResponse> getTransfers(TenantId tenantId, Pageable pageable) { return getTransfers(tenantId, null, pageable); }
+
+    /** {@code allowedTankIds} null means no depot limit; otherwise only transfers with an end on one of those tanks. */
+    @Transactional(readOnly = true)
+    public Page<TransferResponse> getTransfers(TenantId tenantId, Set<UUID> allowedTankIds, Pageable pageable) {
+        if (allowedTankIds != null && allowedTankIds.isEmpty()) return Page.empty(pageable);
+        return (allowedTankIds == null ? transferRepository.findAllForTenant(tenantId, pageable) : transferRepository.findInvolving(tenantId, allowedTankIds, pageable))
                 .map(t -> new TransferResponse(t.getId(), t.getFromTankId(), t.getToTankId(), t.getLitres(), t.getReason(), t.getCreatedAt()));
     }
 
@@ -169,14 +174,22 @@ public class FuelStockService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ReservationResponse> getReservations(TenantId tenantId, Pageable pageable) {
-        return reservationRepository.findAllForTenant(tenantId, pageable).map(this::toResponse);
+    public Page<ReservationResponse> getReservations(TenantId tenantId, Pageable pageable) { return getReservations(tenantId, null, pageable); }
+
+    @Transactional(readOnly = true)
+    public Page<ReservationResponse> getReservations(TenantId tenantId, Set<UUID> allowedTankIds, Pageable pageable) {
+        if (allowedTankIds != null && allowedTankIds.isEmpty()) return Page.empty(pageable);
+        return (allowedTankIds == null ? reservationRepository.findAllForTenant(tenantId, pageable) : reservationRepository.findForTanks(tenantId, allowedTankIds, pageable)).map(this::toResponse);
     }
 
     // ── Availability and ledger ──────────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public AvailabilityResponse getAvailability(TenantId tenantId) {
+    public AvailabilityResponse getAvailability(TenantId tenantId) { return getAvailability(tenantId, null); }
+
+    /** {@code allowedDepotIds} null means no depot limit; otherwise only tanks in those depots, and depot totals for them. */
+    @Transactional(readOnly = true)
+    public AvailabilityResponse getAvailability(TenantId tenantId, Set<UUID> allowedDepotIds) {
         Instant now = Instant.now();
         Map<UUID, BigDecimal> reserved = new HashMap<>();
         for (Object[] row : reservationRepository.sumLiveByTank(tenantId, now)) {
@@ -186,6 +199,7 @@ public class FuelStockService {
                 .collect(Collectors.toMap(FuelDepot::getId, FuelDepot::getName));
         List<AvailabilityResponse.TankLine> lines = new ArrayList<>();
         for (FuelTank t : tankRepository.findAllActive(tenantId)) {
+            if (allowedDepotIds != null && (t.getDepotId() == null || !allowedDepotIds.contains(t.getDepotId()))) continue;
             BigDecimal res = reserved.getOrDefault(t.getId(), BigDecimal.ZERO);
             BigDecimal ledgerBalance = movementRepository.sumForTank(tenantId, t.getId());
             lines.add(new AvailabilityResponse.TankLine(t.getId(), t.getName(), t.getFuelType(), t.getDepotId(),
@@ -208,10 +222,15 @@ public class FuelStockService {
     }
 
     @Transactional(readOnly = true)
-    public Page<MovementResponse> getLedger(TenantId tenantId, UUID tankId, Pageable pageable) {
-        Page<FuelStockMovement> page = tankId == null
-                ? movementRepository.findAllForTenant(tenantId, pageable)
-                : movementRepository.findByTank(tenantId, tankId, pageable);
+    public Page<MovementResponse> getLedger(TenantId tenantId, UUID tankId, Pageable pageable) { return getLedger(tenantId, tankId, null, pageable); }
+
+    /** {@code allowedTankIds} null means no depot limit. With a tank given the caller has already checked that tank against the limit. */
+    @Transactional(readOnly = true)
+    public Page<MovementResponse> getLedger(TenantId tenantId, UUID tankId, Set<UUID> allowedTankIds, Pageable pageable) {
+        if (tankId == null && allowedTankIds != null && allowedTankIds.isEmpty()) return Page.empty(pageable);
+        Page<FuelStockMovement> page = tankId != null ? movementRepository.findByTank(tenantId, tankId, pageable)
+                : allowedTankIds == null ? movementRepository.findAllForTenant(tenantId, pageable)
+                : movementRepository.findByTanks(tenantId, allowedTankIds, pageable);
         return page.map(this::toResponse);
     }
 

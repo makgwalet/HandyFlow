@@ -192,25 +192,54 @@ public class FuelForecourtService {
     }
 
     @Transactional(readOnly = true)
-    public List<ShiftResponse> listShifts(TenantId tenantId, int limit) {
+    public List<ShiftResponse> listShifts(TenantId tenantId, int limit) { return listShifts(tenantId, limit, null); }
+
+    /**
+     * {@code allowedTankIds} null means no depot limit. Otherwise a shift is listed only when every pump read in it is on one of those tanks, because
+     * a shift's takings cover all of its pumps. The limit applies before that filter, so a limited user can get fewer rows than asked for.
+     */
+    @Transactional(readOnly = true)
+    public List<ShiftResponse> listShifts(TenantId tenantId, int limit, Set<UUID> allowedTankIds) {
         List<FuelShift> list = shifts.findRecent(tenantId, PageRequest.of(0, Math.max(1, Math.min(limit, 200))));
         if (list.isEmpty()) return List.of();
         Map<UUID, List<FuelShiftReading>> byShift = readings.findByShifts(tenantId, list.stream().map(FuelShift::getId).toList())
                 .stream().collect(Collectors.groupingBy(FuelShiftReading::getShiftId));
         Map<UUID, String> names = pumpNames(tenantId);
-        return list.stream().map(s -> toShift(s, byShift.getOrDefault(s.getId(), List.of()), names)).toList();
+        return list.stream().filter(s -> visible(allowedTankIds, byShift.getOrDefault(s.getId(), List.of())))
+                .map(s -> toShift(s, byShift.getOrDefault(s.getId(), List.of()), names)).toList();
+    }
+
+    private static boolean visible(Set<UUID> allowedTankIds, List<FuelShiftReading> rs) {
+        return FuelScopeService.shiftVisible(allowedTankIds, rs.stream().map(FuelShiftReading::getTankId).toList());
     }
 
     @Transactional(readOnly = true)
-    public ShiftResponse getShift(TenantId tenantId, UUID id) {
+    public ShiftResponse getShift(TenantId tenantId, UUID id) { return getShift(tenantId, id, null); }
+
+    /** A depot-limited user is refused a shift that touches a tank outside their depots. */
+    @Transactional(readOnly = true)
+    public ShiftResponse getShift(TenantId tenantId, UUID id, Set<UUID> allowedTankIds) {
         FuelShift s = shift(tenantId, id);
-        return toShift(s, readings.findByShift(tenantId, id), pumpNames(tenantId));
+        List<FuelShiftReading> rs = readings.findByShift(tenantId, id);
+        if (!visible(allowedTankIds, rs)) {
+            throw new za.co.handyflow.platform.shared.HandyFlowException("Your access is limited to other depots, so you cannot see this shift. An administrator can change this under Fuel > Setup > Access limits.",
+                    org.springframework.http.HttpStatus.FORBIDDEN, "FUEL_SCOPE_DEPOT");
+        }
+        return toShift(s, rs, pumpNames(tenantId));
     }
 
     @Transactional(readOnly = true)
-    public ForecourtSummary summary(TenantId tenantId, int days) {
+    public ForecourtSummary summary(TenantId tenantId, int days) { return summary(tenantId, days, null); }
+
+    /** {@code allowedTankIds} null means no depot limit; otherwise only shifts that sit wholly on those tanks are counted. */
+    @Transactional(readOnly = true)
+    public ForecourtSummary summary(TenantId tenantId, int days, Set<UUID> allowedTankIds) {
         int d = Math.max(1, Math.min(days, 366));
         List<FuelShift> closed = shifts.findClosedSince(tenantId, Instant.now().minus(d, ChronoUnit.DAYS));
+        if (allowedTankIds != null && !closed.isEmpty()) {
+            Map<UUID, List<FuelShiftReading>> by = readings.findByShifts(tenantId, closed.stream().map(FuelShift::getId).toList()).stream().collect(Collectors.groupingBy(FuelShiftReading::getShiftId));
+            closed = closed.stream().filter(s -> visible(allowedTankIds, by.getOrDefault(s.getId(), List.of()))).toList();
+        }
         if (closed.isEmpty()) return new ForecourtSummary(d, 0, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0, List.of());
         BigDecimal litres = BigDecimal.ZERO, sales = BigDecimal.ZERO, variance = BigDecimal.ZERO;
         int flagged = 0;

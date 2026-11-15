@@ -38,6 +38,22 @@ public class FuelScopeService {
     private final FuelTankRepository tanks;
     private final FuelDepotRepository depots;
 
+    /**
+     * A user's scope is read on every Fuel request, so it is kept for a few seconds. Saving a user's limits evicts that user at once on this node;
+     * on another node a change can take up to {@link #CACHE_NANOS} to be seen. Kept short because a limit that is added should bite quickly.
+     */
+    static final long CACHE_NANOS = 15_000_000_000L;
+    private record Cached(Scope scope, long at) {}
+    private final java.util.concurrent.ConcurrentHashMap<String, Cached> cache = new java.util.concurrent.ConcurrentHashMap<>();
+    java.util.function.LongSupplier nanos = System::nanoTime;
+
+    /** The signed-in user, or null for impersonation sessions and calls with no identified user (which are not limited here). */
+    public static UUID currentUserOrNull() {
+        String id = za.co.handyflow.platform.shared.TenantContext.getUserId();
+        if (id == null || za.co.handyflow.platform.shared.TenantContext.isImpersonation()) return null;
+        try { return UUID.fromString(id); } catch (IllegalArgumentException e) { return null; }
+    }
+
     /** What a user may reach. Empty sets mean no limit of that kind. */
     public record Scope(Set<FuelDivision> divisions, Set<UUID> depotIds) {
         public static final Scope UNRESTRICTED = new Scope(Set.of(), Set.of());
@@ -78,6 +94,16 @@ public class FuelScopeService {
     @Transactional(readOnly = true)
     public Scope scopeOf(TenantId tenantId, UUID userId) {
         if (userId == null) return Scope.UNRESTRICTED;
+        String key = tenantId.getValue() + "/" + userId;
+        long now = nanos.getAsLong();
+        Cached hit = cache.get(key);
+        if (hit != null && now - hit.at() < CACHE_NANOS) return hit.scope();
+        Scope fresh = load(tenantId, userId);
+        cache.put(key, new Cached(fresh, now));
+        return fresh;
+    }
+
+    private Scope load(TenantId tenantId, UUID userId) {
         Set<FuelDivision> divisions = EnumSet.noneOf(FuelDivision.class);
         Set<UUID> depotIds = new HashSet<>();
         for (FuelUserScope s : scopes.findByUser(tenantId, userId)) {
@@ -128,6 +154,15 @@ public class FuelScopeService {
         return out;
     }
 
+    /**
+     * Whether a depot-limited user may see a shift. A shift's takings are for the whole shift, so it is shown only when every pump read in it
+     * is on a tank in the user's depots, and it has at least one reading. Pure, so it can be tested without a database.
+     */
+    public static boolean shiftVisible(Set<UUID> allowedTankIds, Collection<UUID> readingTankIds) {
+        if (allowedTankIds == null) return true;
+        return !readingTankIds.isEmpty() && allowedTankIds.containsAll(readingTankIds);
+    }
+
     /** The depot ids the user may see, or null when the user has no depot limit. */
     @Transactional(readOnly = true)
     public Set<UUID> allowedDepotIds(TenantId tenantId, UUID userId) {
@@ -166,12 +201,14 @@ public class FuelScopeService {
         for (UUID depotId : depotSet) {
             if (depotId == null || depots.findActiveById(tenantId, depotId).isEmpty()) throw new IllegalArgumentException("A depot in the list was not found.");
         }
+        cache.remove(tenantId.getValue() + "/" + userId);
         scopes.deleteByUser(tenantId, userId);
         scopes.flush();
         List<FuelUserScope> rows = new ArrayList<>();
         for (FuelDivision d : divisions) rows.add(FuelUserScope.division(tenantId, userId, d, by));
         for (UUID depotId : depotSet) rows.add(FuelUserScope.depot(tenantId, userId, depotId, by));
         if (!rows.isEmpty()) scopes.saveAll(rows);
+        cache.remove(tenantId.getValue() + "/" + userId);
         return new UserScope(userId, divisions.stream().map(Enum::name).sorted().toList(), List.copyOf(depotSet));
     }
 

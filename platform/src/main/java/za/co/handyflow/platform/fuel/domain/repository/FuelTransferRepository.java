@@ -17,4 +17,8 @@ public interface FuelTransferRepository extends JpaRepository<FuelTransfer, UUID
 
     @Query("SELECT t FROM FuelTransfer t WHERE t.tenantId = :tenantId ORDER BY t.createdAt DESC")
     Page<FuelTransfer> findAllForTenant(TenantId tenantId, Pageable pageable);
+
+    /** Transfers with either end on one of the tanks. */
+    @Query("SELECT t FROM FuelTransfer t WHERE t.tenantId = :tenantId AND (t.fromTankId IN :tankIds OR t.toTankId IN :tankIds) ORDER BY t.createdAt DESC")
+    Page<FuelTransfer> findInvolving(TenantId tenantId, java.util.Collection<UUID> tankIds, Pageable pageable);
 }

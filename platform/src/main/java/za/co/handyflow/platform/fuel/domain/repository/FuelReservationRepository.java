@@ -21,6 +21,9 @@ public interface FuelReservationRepository extends JpaRepository<FuelReservation
     @Query("SELECT r FROM FuelReservation r WHERE r.tenantId = :tenantId ORDER BY r.createdAt DESC")
     Page<FuelReservation> findAllForTenant(TenantId tenantId, Pageable pageable);
 
+    @Query("SELECT r FROM FuelReservation r WHERE r.tenantId = :tenantId AND r.tankId IN :tankIds ORDER BY r.createdAt DESC")
+    Page<FuelReservation> findForTanks(TenantId tenantId, java.util.Collection<UUID> tankIds, Pageable pageable);
+
     @Query("SELECT r FROM FuelReservation r WHERE r.tenantId = :tenantId AND r.status = 'ACTIVE' AND (r.expiresAt IS NULL OR r.expiresAt > :now) ORDER BY r.createdAt DESC")
     List<FuelReservation> findLive(TenantId tenantId, Instant now);
 

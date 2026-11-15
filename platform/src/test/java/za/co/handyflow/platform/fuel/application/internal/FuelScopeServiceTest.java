@@ -154,4 +154,51 @@ class FuelScopeServiceTest {
         assertThrows(IllegalArgumentException.class, () -> svc.replace(T, USER, new SaveScopeRequest(List.of(), List.of(UUID.randomUUID())), null));
         verify(scopes, never()).deleteByUser(any(), any());
     }
+
+    @Test @DisplayName("the scope is read once inside the cache window and again after it")
+    void cache() {
+        rows(FuelUserScope.depot(T, USER, DEPOT_A, null));
+        long[] clock = {0};
+        svc.nanos = () -> clock[0];
+        svc.scopeOf(T, USER); svc.scopeOf(T, USER); svc.scopeOf(T, USER);
+        verify(scopes, times(1)).findByUser(T, USER);
+        clock[0] = FuelScopeService.CACHE_NANOS + 1;
+        svc.scopeOf(T, USER);
+        verify(scopes, times(2)).findByUser(T, USER);
+    }
+
+    @Test @DisplayName("saving a user's limits takes effect at once on this node, not after the cache window")
+    void cacheEvictedOnSave() {
+        long[] clock = {0};
+        svc.nanos = () -> clock[0];
+        rows();
+        assertFalse(svc.scopeOf(T, USER).restricted());           // cached as unrestricted
+        when(depots.findActiveById(T, DEPOT_A)).thenReturn(Optional.of(mock(FuelDepot.class)));
+        when(scopes.saveAll(any())).thenAnswer(i -> i.getArgument(0));
+        svc.replace(T, USER, new SaveScopeRequest(List.of(), List.of(DEPOT_A)), null);
+        rows(FuelUserScope.depot(T, USER, DEPOT_A, null));
+        assertTrue(svc.scopeOf(T, USER).restricted());            // same instant, no waiting
+    }
+
+    @Test @DisplayName("one user's cached scope is never served to another user or tenant")
+    void cacheKeyed() {
+        UUID other = UUID.randomUUID();
+        rows(FuelUserScope.depot(T, USER, DEPOT_A, null));
+        when(scopes.findByUser(T, other)).thenReturn(List.of());
+        assertTrue(svc.scopeOf(T, USER).restricted());
+        assertFalse(svc.scopeOf(T, other).restricted());
+        TenantId t2 = TenantId.of(UUID.randomUUID());
+        when(scopes.findByUser(t2, USER)).thenReturn(List.of());
+        assertFalse(svc.scopeOf(t2, USER).restricted());
+    }
+
+    @Test @DisplayName("a shift is visible to a depot-limited user only when every pump read in it is on their tanks")
+    void shiftVisibility() {
+        UUID mine = UUID.randomUUID(), theirs = UUID.randomUUID();
+        assertTrue(FuelScopeService.shiftVisible(null, List.of(theirs)));          // no limit
+        assertTrue(FuelScopeService.shiftVisible(Set.of(mine), List.of(mine)));
+        assertFalse(FuelScopeService.shiftVisible(Set.of(mine), List.of(mine, theirs)));
+        assertFalse(FuelScopeService.shiftVisible(Set.of(mine), List.of()));      // nothing to place it by
+        assertFalse(FuelScopeService.shiftVisible(Set.of(), List.of(mine)));
+    }
 }
