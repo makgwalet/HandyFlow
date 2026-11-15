@@ -7,6 +7,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.fuel.domain.model.FuelTruckStopParking;
 import za.co.handyflow.platform.fuel.domain.model.FuelTruckStopStay;
+import za.co.handyflow.platform.fuel.domain.model.FuelCustomerAccount;
+import za.co.handyflow.platform.fuel.domain.repository.FuelCustomerAccountRepository;
 import za.co.handyflow.platform.fuel.domain.repository.FuelTruckStopParkingRepository;
 import za.co.handyflow.platform.fuel.domain.repository.FuelTruckStopStayRepository;
 import za.co.handyflow.platform.fuel.dto.StayDtos.*;
@@ -19,8 +21,8 @@ import java.util.UUID;
 
 /**
  * Phase 7d: overnight parking, owned by Fuel because Bookings only holds a slot within one day. The nightly rate and the number of bays
- * are the company's own settings; with no bay count nothing is capacity-limited. A stay keeps the rate it was booked at. Nothing is
- * invoiced here; the amount is what the stay comes to.
+ * are the company's own settings; with no bay count nothing is capacity-limited. A stay keeps the rate it was booked at. A stay on a customer account is
+ * invoiced at check-out by FuelStayInvoicingService; one with no account is paid at the gate.
  */
 @Slf4j
 @Service
@@ -29,6 +31,7 @@ public class FuelTruckStopStayService {
 
     private final FuelTruckStopStayRepository stays;
     private final FuelTruckStopParkingRepository parking;
+    private final FuelCustomerAccountRepository accounts;
 
     @Transactional(readOnly = true)
     public SettingsView settings(TenantId tenantId) {
@@ -42,6 +45,9 @@ public class FuelTruckStopStayService {
         parking.save(p);
         return new SettingsView(p.getNightlyRate(), p.getBays());
     }
+
+    @Transactional(readOnly = true)
+    public StayView get(TenantId tenantId, UUID id, LocalDate today) { return view(find(tenantId, id), today); }
 
     @Transactional(readOnly = true)
     public List<StayView> list(TenantId tenantId, int limit, LocalDate today) {
@@ -58,6 +64,7 @@ public class FuelTruckStopStayService {
         FuelTruckStopStay s = FuelTruckStopStay.book(tenantId, req.vehicleRegistration(), req.driverName(), req.driverPhone(), req.arrivalDate(), req.departureDate(),
                 p.getNightlyRate(), req.note(), by);
         requireRoom(tenantId, p.getBays(), s.getArrivalDate(), s.getDepartureDate(), null, today);
+        if (req.accountId() != null) s.chargeTo(requireChargeable(tenantId, req.accountId()).getId());
         stays.save(s);
         log.info("Overnight stay booked for {} from {} to {}", s.getVehicleRegistration(), s.getArrivalDate(), s.getDepartureDate());
         return view(s, today);
@@ -67,7 +74,16 @@ public class FuelTruckStopStayService {
     public StayView checkIn(TenantId tenantId, UUID id, LocalDate today) {
         FuelTruckStopStay s = find(tenantId, id);
         if (today.isBefore(s.getArrivalDate())) throw new IllegalStateException("This truck is not due until " + s.getArrivalDate() + ".");
+        if (s.getAccountId() != null) requireChargeable(tenantId, s.getAccountId());
         s.checkIn();
+        return view(stays.save(s), today);
+    }
+
+    /** Charges a stay that has not ended to an account, or with a null account back to paying at the gate. */
+    @Transactional
+    public StayView setAccount(TenantId tenantId, UUID id, AccountRequest req, LocalDate today) {
+        FuelTruckStopStay s = find(tenantId, id);
+        s.chargeTo(req == null || req.accountId() == null ? null : requireChargeable(tenantId, req.accountId()).getId());
         return view(stays.save(s), today);
     }
 
@@ -75,7 +91,9 @@ public class FuelTruckStopStayService {
     public StayView checkOut(TenantId tenantId, UUID id, CheckOutRequest req, LocalDate today) {
         FuelTruckStopStay s = find(tenantId, id);
         s.checkOut(req == null || req.date() == null ? today : req.date());
-        return view(stays.save(s), today);
+        stays.saveAndFlush(s);
+        stays.markPending(tenantId, id); // queued for the draft invoice when the stay is on an account
+        return view(find(tenantId, id), today);
     }
 
     /** Moves the planned departure. Extra nights need a free bay on each of them. */
@@ -157,12 +175,21 @@ public class FuelTruckStopStayService {
         return night.isBefore(s.getDepartureDate()) || (FuelTruckStopStay.CHECKED_IN.equals(s.getStatus()) && !night.isAfter(today));
     }
 
+    /** A stay can only be charged to an active account that is not on credit hold. */
+    private FuelCustomerAccount requireChargeable(TenantId tenantId, UUID accountId) {
+        FuelCustomerAccount a = accounts.findActiveById(tenantId, accountId).orElseThrow(() -> new ResourceNotFoundException("Customer account", accountId.toString()));
+        if (a.isCreditHold()) throw new IllegalStateException("This customer is on credit hold" + (a.getCreditHoldReason() != null ? " (" + a.getCreditHoldReason() + ")" : "")
+                + ". Release the hold, or take payment at the gate.");
+        return a;
+    }
+
     private FuelTruckStopStay find(TenantId tenantId, UUID id) {
         return stays.findOwned(tenantId, id).orElseThrow(() -> new ResourceNotFoundException("Stay", id.toString()));
     }
 
     static StayView view(FuelTruckStopStay s, LocalDate today) {
         return new StayView(s.getId(), s.getVehicleRegistration(), s.getDriverName(), s.getDriverPhone(), s.getArrivalDate(), s.getDepartureDate(), s.getActualDepartureDate(),
-                s.getStatus(), s.getRatePerNight(), s.nights(), s.amount(), s.getNote(), s.getCancelledReason(), s.isOverstaying(today), s.getCheckedInAt(), s.getCheckedOutAt());
+                s.getStatus(), s.getRatePerNight(), s.nights(), s.amount(), s.getNote(), s.getCancelledReason(), s.isOverstaying(today), s.getCheckedInAt(), s.getCheckedOutAt(),
+                s.getAccountId(), s.getInvoiceState(), s.getInvoiceNumber(), s.getInvoiceError());
     }
 }

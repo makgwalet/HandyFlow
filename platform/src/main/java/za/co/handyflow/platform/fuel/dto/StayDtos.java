@@ -19,7 +19,10 @@ public final class StayDtos {
     public record SettingsView(BigDecimal nightlyRate, Integer bays) {}
 
     public record BookRequest(@NotBlank @Size(max = 20) String vehicleRegistration, @Size(max = 120) String driverName, @Size(max = 40) String driverPhone,
-                              @NotNull LocalDate arrivalDate, @NotNull LocalDate departureDate, @Size(max = 300) String note) {}
+                              @NotNull LocalDate arrivalDate, @NotNull LocalDate departureDate, @Size(max = 300) String note, UUID accountId) {}
+
+    /** Charge the stay to this Fuel customer account; null means paid at the gate. */
+    public record AccountRequest(UUID accountId) {}
 
     public record DepartureRequest(@NotNull LocalDate departureDate) {}
 
@@ -31,7 +34,8 @@ public final class StayDtos {
     /** nights and amount are for the planned dates until the truck has left, then for the actual departure. overstaying is true when still in the yard past the planned date. */
     public record StayView(UUID id, String vehicleRegistration, String driverName, String driverPhone, LocalDate arrivalDate, LocalDate departureDate,
                            LocalDate actualDepartureDate, String status, BigDecimal ratePerNight, int nights, BigDecimal amount, String note,
-                           String cancelledReason, boolean overstaying, Instant checkedInAt, Instant checkedOutAt) {}
+                           String cancelledReason, boolean overstaying, Instant checkedInAt, Instant checkedOutAt,
+                           UUID accountId, String invoiceState, String invoiceNumber, String invoiceError) {}
 
     /** One night in the capacity view. free is null when no bay count is set. */
     public record NightView(LocalDate date, int used, int arrivals, int departures, Integer free) {}

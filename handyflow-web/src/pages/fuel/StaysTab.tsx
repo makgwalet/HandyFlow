@@ -1,11 +1,11 @@
-// Phase 7d: overnight stays at the truck stop, kept by Fuel because Bookings only holds a slot within one day. Nothing is invoiced here.
+// Phase 7d: overnight stays at the truck stop, kept by Fuel because Bookings only holds a slot within one day. A stay on a customer account gets a DRAFT invoice at check-out.
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import { fmtR } from "./orderOps"
-import { emptyStay, validateStay, validateSettings, nightsText, stayActions, nightState, firstFullNight, STATUS_LABEL, type Stay, type StayForm, type ParkingSettings, type Occupancy, type Capacity } from "./stayOps"
+import { emptyStay, validateStay, validateSettings, nightsText, stayActions, nightState, firstFullNight, chargeText, invoiceText, canRaiseInvoice, chargeableAccounts, STATUS_LABEL, type StayAccount, type Stay, type StayForm, type ParkingSettings, type Occupancy, type Capacity } from "./stayOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const msg = (e: any, fb: string) => e?.response?.data?.message ?? fb
@@ -21,18 +21,21 @@ export default function StaysTab() {
   const [dated, setDated] = useState<{ stay: Stay; kind: "extend" | "checkOut" } | null>(null)
   const [cancelling, setCancelling] = useState<Stay | null>(null)
   const [err, setErr] = useState("")
+  const [notice, setNotice] = useState("")
+  const accounts = useQuery<StayAccount[]>({ queryKey: ["fuel-stay-accounts"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/customer-accounts")) })
+  const accountList: StayAccount[] = Array.isArray(accounts.data) ? accounts.data.filter((a: any) => a?.customerName) : []
   const settings = useQuery<ParkingSettings>({ queryKey: ["fuel-stay-settings"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/truck-stop/parking-settings")) })
   const occ = useQuery<Occupancy>({ queryKey: ["fuel-stay-occupancy"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/truck-stop/stays/occupancy")) })
   const capacity = useQuery<Capacity>({ queryKey: ["fuel-stay-capacity"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/truck-stop/stays/capacity?days=14")) })
   const stays = useQuery<Stay[]>({ queryKey: ["fuel-stays"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/truck-stop/stays")) })
   const refresh = () => { for (const k of ["fuel-stays", "fuel-stay-occupancy", "fuel-stay-settings", "fuel-stay-capacity"]) qc.invalidateQueries({ queryKey: [k] }) }
-  const act = useMutation({ mutationFn: (v: { id: string; path: string }) => apiClient.post(`/api/v1/fuel/truck-stop/stays/${v.id}/${v.path}`), onSuccess: () => { setErr(""); refresh() }, onError: (e: any) => setErr(msg(e, "That did not work")) })
+  const act = useMutation({ mutationFn: (v: { id: string; path: string }) => apiClient.post(`/api/v1/fuel/truck-stop/stays/${v.id}/${v.path}`), onSuccess: (r: any) => { setErr(""); setNotice(r?.data?.message ?? ""); refresh() }, onError: (e: any) => setErr(msg(e, "That did not work")) })
   const rows = stays.data ?? []
   const rateSet = settings.data?.nightlyRate != null
   return (
     <div>
       <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: "0 0 12px" }}>
-        Overnight parking. Each night from arrival up to the departure date is charged at the nightly rate in force when the stay was booked, with a minimum of one night. Nothing is invoiced from here; the amount is what the stay comes to.
+        Overnight parking. Each night from arrival up to the departure date is charged at the nightly rate in force when the stay was booked, with a minimum of one night. A stay charged to a customer account gets a draft invoice when it checks out (it is never issued from here); a driver with no account pays at the gate.
       </p>
       <SettingsBox settings={settings.data} canManage={canManage} onSaved={refresh} />
       {occ.data && (
@@ -46,12 +49,13 @@ export default function StaysTab() {
       {capacity.data?.nights && <CapacityBox c={capacity.data} />}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>{canManage && <button style={btnPrimary} onClick={() => setDialog("book")}>Book a stay</button>}</div>
       {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12.5 }}>{err}</p>}
+      {notice && <p role="status" style={{ fontSize: 12.5, color: "var(--hf-text-muted)" }}>{notice}</p>}
       {stays.isLoading ? <p style={{ color: "var(--hf-text-muted)" }}>Loading…</p> : stays.isError ? <p role="alert" style={{ color: "var(--hf-danger-text)" }}>Could not load stays.</p> : rows.length === 0 ? (
         <p style={{ color: "var(--hf-text-muted)" }}>No overnight stays yet.</p>
       ) : (
         <div style={{ ...card, overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr><th style={th}>Truck</th><th style={th}>Arrives</th><th style={th}>Leaves</th><th style={th}>Nights</th><th style={th}>Amount</th><th style={th}>Status</th><th style={th} /></tr></thead>
+            <thead><tr><th style={th}>Truck</th><th style={th}>Arrives</th><th style={th}>Leaves</th><th style={th}>Nights</th><th style={th}>Amount</th><th style={th}>Charged to</th><th style={th}>Status</th><th style={th} /></tr></thead>
             <tbody>{rows.map(s => (
               <tr key={s.id} style={{ borderTop: "1px solid var(--hf-border)" }}>
                 <td style={td}><strong>{s.vehicleRegistration}</strong><div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{[s.driverName, s.driverPhone].filter(Boolean).join(" · ")}</div></td>
@@ -59,6 +63,7 @@ export default function StaysTab() {
                 <td style={td}>{s.actualDepartureDate ?? s.departureDate}{s.actualDepartureDate && s.actualDepartureDate !== s.departureDate && <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>planned {s.departureDate}</div>}</td>
                 <td style={td}>{nightsText(s)}</td>
                 <td style={td}>{fmtR(s.amount)}<div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{fmtR(s.ratePerNight)} a night</div></td>
+                <td style={td}>{chargeText(s, accountList)}{invoiceText(s) && <div style={{ fontSize: 11, color: s.invoiceState === "FAILED" || s.invoiceState === "LINK_FAILED" ? "var(--hf-danger-text)" : "var(--hf-text-muted)" }}>{invoiceText(s)}</div>}</td>
                 <td style={td}><Chip bg={s.status === "CHECKED_IN" ? "var(--hf-success-soft-strong)" : s.status === "BOOKED" ? "var(--hf-warning-soft)" : "var(--hf-surface-muted)"} fg={s.status === "CHECKED_IN" ? "var(--hf-success-text-strong)" : s.status === "BOOKED" ? "var(--hf-warning-text)" : "var(--hf-text-muted)"}>{STATUS_LABEL[s.status]}</Chip>
                   {s.overstaying && <> <Chip bg="var(--hf-danger-soft)" fg="var(--hf-danger-text)">Past its departure date</Chip></>}
                   {s.cancelledReason && <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{s.cancelledReason}</div>}</td>
@@ -67,13 +72,14 @@ export default function StaysTab() {
                   : a === "checkOut" ? <button key={a} style={btnGhost} onClick={() => setDated({ stay: s, kind: "checkOut" })}>Check out</button>
                   : a === "extend" ? <button key={a} style={btnGhost} onClick={() => setDated({ stay: s, kind: "extend" })}>Change departure</button>
                   : a === "cancel" ? <button key={a} style={btnGhost} onClick={() => setCancelling(s)}>Cancel</button>
-                  : <button key={a} style={btnGhost} onClick={() => act.mutate({ id: s.id, path: "no-show" })}>No-show</button>)}</td>
+                  : <button key={a} style={btnGhost} onClick={() => act.mutate({ id: s.id, path: "no-show" })}>No-show</button>)}
+                  {canManage && canRaiseInvoice(s) && <button style={btnGhost} onClick={() => act.mutate({ id: s.id, path: "invoice" })}>Raise invoice</button>}</td>
               </tr>))}</tbody>
           </table>
         </div>
       )}
-      {dialog === "book" && <BookDialog today={today} rateSet={rateSet} onDone={refresh} onClose={() => setDialog(null)} />}
-      {dated && <DateDialog stay={dated.stay} kind={dated.kind} today={today} onDone={refresh} onClose={() => setDated(null)} />}
+      {dialog === "book" && <BookDialog today={today} rateSet={rateSet} accounts={chargeableAccounts(accountList)} onDone={refresh} onClose={() => setDialog(null)} />}
+      {dated && <DateDialog stay={dated.stay} kind={dated.kind} today={today} onDone={(m?: string) => { setNotice(m ?? ""); refresh() }} onClose={() => setDated(null)} />}
       {cancelling && <CancelDialog stay={cancelling} onDone={refresh} onClose={() => setCancelling(null)} />}
     </div>
   )
@@ -134,11 +140,11 @@ function SettingsBox({ settings, canManage, onSaved }: { settings?: ParkingSetti
   )
 }
 
-function BookDialog({ today, rateSet, onDone, onClose }: { today: string; rateSet: boolean; onDone: () => void; onClose: () => void }) {
+function BookDialog({ today, rateSet, accounts, onDone, onClose }: { today: string; rateSet: boolean; accounts: StayAccount[]; onDone: () => void; onClose: () => void }) {
   const [f, setF] = useState<StayForm>(emptyStay(today)); const [err, setErr] = useState("")
-  const set = (k: keyof StayForm) => (e: React.ChangeEvent<HTMLInputElement>) => setF(s => ({ ...s, [k]: e.target.value }))
+  const set = (k: keyof StayForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF(s => ({ ...s, [k]: e.target.value }))
   const save = useMutation({
-    mutationFn: () => apiClient.post("/api/v1/fuel/truck-stop/stays", { vehicleRegistration: f.vehicleRegistration.trim(), driverName: f.driverName.trim() || null, driverPhone: f.driverPhone.trim() || null, arrivalDate: f.arrivalDate, departureDate: f.departureDate, note: f.note.trim() || null }),
+    mutationFn: () => apiClient.post("/api/v1/fuel/truck-stop/stays", { vehicleRegistration: f.vehicleRegistration.trim(), driverName: f.driverName.trim() || null, driverPhone: f.driverPhone.trim() || null, arrivalDate: f.arrivalDate, departureDate: f.departureDate, note: f.note.trim() || null, accountId: f.accountId || null }),
     onSuccess: () => { onDone(); onClose() }, onError: (e: any) => setErr(msg(e, "Could not book the stay")),
   })
   return (
@@ -153,6 +159,12 @@ function BookDialog({ today, rateSet, onDone, onClose }: { today: string; rateSe
           <div style={{ flex: 1 }}><label style={labelStyle} htmlFor="bs-in">Arrives *</label><input id="bs-in" type="date" value={f.arrivalDate} onChange={set("arrivalDate")} style={inputStyle} /></div>
           <div style={{ flex: 1 }}><label style={labelStyle} htmlFor="bs-out">Leaves *</label><input id="bs-out" type="date" value={f.departureDate} onChange={set("departureDate")} style={inputStyle} /></div>
         </div>
+        <div><label style={labelStyle} htmlFor="bs-acct">Charge to</label>
+          <select id="bs-acct" value={f.accountId} onChange={set("accountId")} style={inputStyle}>
+            <option value="">Pays at the gate (no invoice)</option>
+            {accounts.map(a => <option key={a.id} value={a.id}>{a.customerName}</option>)}
+          </select>
+          <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 3 }}>A customer account gets a draft invoice at check-out. Accounts on credit hold are not listed.</div></div>
         <div><label style={labelStyle} htmlFor="bs-note">Note</label><input id="bs-note" value={f.note} maxLength={300} onChange={set("note")} style={inputStyle} /></div>
       </div>
       {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12, margin: "8px 0 0" }}>{err}</p>}
@@ -164,11 +176,11 @@ function BookDialog({ today, rateSet, onDone, onClose }: { today: string; rateSe
   )
 }
 
-function DateDialog({ stay, kind, today, onDone, onClose }: { stay: Stay; kind: "extend" | "checkOut"; today: string; onDone: () => void; onClose: () => void }) {
+function DateDialog({ stay, kind, today, onDone, onClose }: { stay: Stay; kind: "extend" | "checkOut"; today: string; onDone: (message?: string) => void; onClose: () => void }) {
   const [date, setDate] = useState(kind === "checkOut" ? today : stay.departureDate); const [err, setErr] = useState("")
   const save = useMutation({
     mutationFn: () => kind === "checkOut" ? apiClient.post(`/api/v1/fuel/truck-stop/stays/${stay.id}/check-out`, { date }) : apiClient.put(`/api/v1/fuel/truck-stop/stays/${stay.id}/departure`, { departureDate: date }),
-    onSuccess: () => { onDone(); onClose() }, onError: (e: any) => setErr(msg(e, "That did not work")),
+    onSuccess: (r: any) => { onDone(r?.data?.message); onClose() }, onError: (e: any) => setErr(msg(e, "That did not work")),
   })
   const title = kind === "checkOut" ? `Check out ${stay.vehicleRegistration}` : `Change departure of ${stay.vehicleRegistration}`
   return (

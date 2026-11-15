@@ -23,6 +23,7 @@ import java.util.UUID;
 public class FuelTruckStopStayController {
 
     private final FuelTruckStopStayService service;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelStayInvoicingService invoicing;
     private final FeatureGuard featureGuard;
 
     private static LocalDate today() { return LocalDate.now(ZoneId.of("Africa/Johannesburg")); }
@@ -76,11 +77,33 @@ public class FuelTruckStopStayController {
         return ResponseEntity.ok(ApiResponse.success("Checked in", service.checkIn(TenantContext.getTenantIdAsObject(), id, today())));
     }
 
+    /** Checks the truck out, then raises the draft invoice if the stay is on an account. A failed invoice never undoes the check-out; it can be retried. */
     @PostMapping("/stays/{id}/check-out")
     @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRUCKSTOP_MANAGE')")
     public ResponseEntity<ApiResponse<StayView>> checkOut(@PathVariable UUID id, @RequestBody(required = false) CheckOutRequest req) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success("Checked out", service.checkOut(TenantContext.getTenantIdAsObject(), id, req, today())));
+        var tenant = TenantContext.getTenantIdAsObject();
+        StayView out = service.checkOut(tenant, id, req, today());
+        if (out.accountId() == null) return ResponseEntity.ok(ApiResponse.success("Checked out", out));
+        try {
+            return ResponseEntity.ok(ApiResponse.success("Checked out. Draft invoice raised", invoicing.invoice(tenant, id)));
+        } catch (RuntimeException e) {
+            return ResponseEntity.ok(ApiResponse.success("Checked out, but the invoice was not raised: " + e.getMessage(), service.get(tenant, id, today())));
+        }
+    }
+
+    @PostMapping("/stays/{id}/invoice")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRUCKSTOP_MANAGE')")
+    public ResponseEntity<ApiResponse<StayView>> invoice(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Draft invoice raised", invoicing.invoice(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PutMapping("/stays/{id}/account")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRUCKSTOP_MANAGE')")
+    public ResponseEntity<ApiResponse<StayView>> account(@PathVariable UUID id, @RequestBody AccountRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Account saved", service.setAccount(TenantContext.getTenantIdAsObject(), id, req, today())));
     }
 
     @PutMapping("/stays/{id}/departure")

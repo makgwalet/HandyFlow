@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { emptyStay, validateStay, validateSettings, nightsText, stayActions, nightState, firstFullNight, type Stay, type Night, type Capacity } from "./stayOps"
+import { emptyStay, validateStay, validateSettings, nightsText, stayActions, nightState, firstFullNight, chargeText, invoiceText, canRaiseInvoice, chargeableAccounts, type Stay, type Night, type Capacity } from "./stayOps"
 
 const TODAY = "2026-11-12"
 const form = (o: any = {}) => ({ ...emptyStay(TODAY), vehicleRegistration: "GP 12 AB", departureDate: "2026-11-14", ...o })
@@ -43,4 +43,29 @@ describe("yard capacity helpers", () => {
     expect(firstFullNight(c)).toBe("2026-11-13")
     expect(firstFullNight({ ...c, nights: [night()] })).toBeNull()
   })
+})
+
+describe("charging a stay to an account", () => {
+  const accts = [{ id: "a1", customerName: "Acme", creditHold: false }, { id: "a2", customerName: "Held", creditHold: true }]
+  it("names the account, or says paid at the gate", () => {
+    expect(chargeText(stay({ accountId: "a1" }), accts)).toBe("Acme")
+    expect(chargeText(stay(), accts)).toBe("Paid at the gate")
+    expect(chargeText(stay({ accountId: "zz" }), accts)).toBe("Customer account")
+  })
+  it("says nothing about an invoice for a stay with no account", () => { expect(invoiceText(stay())).toBeNull() })
+  it("describes each invoice state", () => {
+    expect(invoiceText(stay({ accountId: "a1" }))).toBe("Invoiced at check-out")
+    expect(invoiceText(stay({ accountId: "a1", status: "CHECKED_OUT", invoiceState: "INVOICED", invoiceNumber: "INV-7" }))).toBe("Draft invoice INV-7")
+    expect(invoiceText(stay({ accountId: "a1", status: "CHECKED_OUT", invoiceState: "FAILED", invoiceError: "boom" }))).toBe("Invoice failed: boom")
+    expect(invoiceText(stay({ accountId: "a1", status: "CHECKED_OUT", invoiceState: "LINK_FAILED", invoiceNumber: "INV-8" }))).toMatch(/INV-8 was created but not linked/)
+  })
+  it("lets only a left stay with a pending or failed invoice be raised again", () => {
+    expect(canRaiseInvoice(stay({ accountId: "a1", status: "CHECKED_OUT", invoiceState: "FAILED" }))).toBe(true)
+    expect(canRaiseInvoice(stay({ accountId: "a1", status: "CHECKED_OUT", invoiceState: "PENDING" }))).toBe(true)
+    expect(canRaiseInvoice(stay({ accountId: "a1", status: "CHECKED_OUT", invoiceState: "INVOICED" }))).toBe(false)
+    expect(canRaiseInvoice(stay({ accountId: "a1", status: "CHECKED_OUT", invoiceState: "LINK_FAILED" }))).toBe(false)
+    expect(canRaiseInvoice(stay({ accountId: "a1", status: "CHECKED_IN" }))).toBe(false)
+    expect(canRaiseInvoice(stay({ status: "CHECKED_OUT" }))).toBe(false)
+  })
+  it("leaves accounts on credit hold out of the choices", () => { expect(chargeableAccounts(accts).map(a => a.id)).toEqual(["a1"]) })
 })

@@ -38,6 +38,7 @@ class FuelTruckStopStayServiceTest {
 
     @Mock FuelTruckStopStayRepository stays;
     @Mock FuelTruckStopParkingRepository parking;
+    @Mock za.co.handyflow.platform.fuel.domain.repository.FuelCustomerAccountRepository accounts;
     @InjectMocks FuelTruckStopStayService service;
 
     final List<FuelTruckStopStay> saved = new ArrayList<>();
@@ -50,6 +51,7 @@ class FuelTruckStopStayServiceTest {
         when(parking.save(any())).thenAnswer(i -> { settings = i.getArgument(0); return settings; });
         when(stays.findRecent(eq(T), any())).thenAnswer(i -> new ArrayList<>(saved));
         when(stays.save(any())).thenAnswer(i -> { FuelTruckStopStay s = i.getArgument(0); if (!saved.contains(s)) saved.add(s); return s; });
+        when(stays.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
         when(stays.findOwned(eq(T), any())).thenAnswer(i -> saved.stream().filter(s -> s.getId().equals(i.getArgument(1))).findFirst());
         // Same rule as the repository query: holding a bay, starting before 'to', and either ending after 'from' or still in the yard.
         when(stays.findHoldingBays(eq(T), any(), any())).thenAnswer(i -> {
@@ -59,7 +61,7 @@ class FuelTruckStopStayServiceTest {
     }
 
     private void rate(String r, Integer bays) { service.saveSettings(T, new SettingsRequest(r == null ? null : bd(r), bays), BY); }
-    private BookRequest req(String reg, int fromOffset, int toOffset) { return new BookRequest(reg, "Sipho", "0821234567", TODAY.plusDays(fromOffset), TODAY.plusDays(toOffset), null); }
+    private BookRequest req(String reg, int fromOffset, int toOffset) { return new BookRequest(reg, "Sipho", "0821234567", TODAY.plusDays(fromOffset), TODAY.plusDays(toOffset), null, null); }
     private StayView book(String reg, int fromOffset, int toOffset) { return service.book(T, req(reg, fromOffset, toOffset), BY, TODAY); }
 
     @Test @DisplayName("nothing can be booked until the company sets a nightly rate")
@@ -100,7 +102,7 @@ class FuelTruckStopStayServiceTest {
         rate("100", null);
         assertThrows(IllegalArgumentException.class, () -> book("GP 1", -1, 1));
         assertThrows(IllegalArgumentException.class, () -> book("GP 1", 2, 2));
-        assertThrows(IllegalArgumentException.class, () -> service.book(T, new BookRequest(" ", null, null, TODAY, TODAY.plusDays(1), null), BY, TODAY));
+        assertThrows(IllegalArgumentException.class, () -> service.book(T, new BookRequest(" ", null, null, TODAY, TODAY.plusDays(1), null, null), BY, TODAY));
         assertTrue(saved.isEmpty());
     }
 
@@ -131,9 +133,9 @@ class FuelTruckStopStayServiceTest {
         StayView seen = service.list(T, 10, later).get(0);
         assertTrue(seen.overstaying());
         assertEquals(1, service.occupancy(T, later).inYard());
-        assertThrows(IllegalStateException.class, () -> service.book(T, new BookRequest("GP 2", null, null, later, later.plusDays(1), null), BY, later));
+        assertThrows(IllegalStateException.class, () -> service.book(T, new BookRequest("GP 2", null, null, later, later.plusDays(1), null, null), BY, later));
         service.checkOut(T, v.id(), new CheckOutRequest(later), later);
-        assertEquals("BOOKED", service.book(T, new BookRequest("GP 2", null, null, later, later.plusDays(1), null), BY, later).status());
+        assertEquals("BOOKED", service.book(T, new BookRequest("GP 2", null, null, later, later.plusDays(1), null, null), BY, later).status());
     }
 
     @Test @DisplayName("extending needs a free bay on each added night; shortening does not, and the departure must stay after the arrival")
@@ -235,5 +237,61 @@ class FuelTruckStopStayServiceTest {
         rate("150", 2);
         assertEquals(1, service.capacity(T, TODAY, 0, TODAY).nights().size());
         assertEquals(31, service.capacity(T, TODAY, 400, TODAY).nights().size());
+    }
+
+    private za.co.handyflow.platform.fuel.domain.model.FuelCustomerAccount account(boolean hold) {
+        var a = za.co.handyflow.platform.fuel.domain.model.FuelCustomerAccount.create(T, UUID.randomUUID(), "OTHER", bd("1000"), 30, null, null);
+        if (hold) a.placeOnHold("Overdue");
+        when(accounts.findActiveById(T, a.getId())).thenReturn(Optional.of(a));
+        return a;
+    }
+
+    @Test @DisplayName("a stay can be booked onto an active account; the account is kept on the stay")
+    void bookOnAccount() {
+        rate("500", 5);
+        var a = account(false);
+        var v = service.book(T, new BookRequest("GP 7", null, null, TODAY, TODAY.plusDays(1), null, a.getId()), BY, TODAY);
+        assertEquals(a.getId(), v.accountId());
+    }
+
+    @Test @DisplayName("an account on credit hold cannot be charged: booking and check-in are refused")
+    void creditHoldBlocks() {
+        rate("500", 5);
+        var held = account(true);
+        assertThrows(IllegalStateException.class, () -> service.book(T, new BookRequest("GP 8", null, null, TODAY, TODAY.plusDays(1), null, held.getId()), BY, TODAY));
+        var ok = account(false);
+        var v = service.book(T, new BookRequest("GP 9", null, null, TODAY, TODAY.plusDays(1), null, ok.getId()), BY, TODAY);
+        ok.placeOnHold("Overdue");
+        assertThrows(IllegalStateException.class, () -> service.checkIn(T, v.id(), TODAY));
+    }
+
+    @Test @DisplayName("an unknown account is refused")
+    void unknownAccount() {
+        rate("500", 5);
+        when(accounts.findActiveById(eq(T), any())).thenReturn(Optional.empty());
+        assertThrows(za.co.handyflow.platform.shared.ResourceNotFoundException.class,
+                () -> service.book(T, new BookRequest("GP 10", null, null, TODAY, TODAY.plusDays(1), null, UUID.randomUUID()), BY, TODAY));
+    }
+
+    @Test @DisplayName("checking out queues the stay for invoicing")
+    void checkOutQueues() {
+        rate("500", 5);
+        var a = account(false);
+        var v = service.book(T, new BookRequest("GP 11", null, null, TODAY, TODAY.plusDays(1), null, a.getId()), BY, TODAY);
+        service.checkIn(T, v.id(), TODAY);
+        service.checkOut(T, v.id(), null, TODAY.plusDays(1));
+        verify(stays).markPending(T, v.id());
+    }
+
+    @Test @DisplayName("the account can be changed to none while the stay has not ended, not after check-out")
+    void setAccount() {
+        rate("500", 5);
+        var a = account(false);
+        var v = service.book(T, req("GP 12", 0, 1), BY, TODAY);
+        assertEquals(a.getId(), service.setAccount(T, v.id(), new AccountRequest(a.getId()), TODAY).accountId());
+        assertNull(service.setAccount(T, v.id(), new AccountRequest(null), TODAY).accountId());
+        service.checkIn(T, v.id(), TODAY);
+        service.checkOut(T, v.id(), null, TODAY);
+        assertThrows(IllegalStateException.class, () -> service.setAccount(T, v.id(), new AccountRequest(a.getId()), TODAY));
     }
 }

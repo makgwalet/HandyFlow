@@ -11,16 +11,17 @@ vi.mock("../../hooks/usePermission", () => ({ usePermissions: () => can }))
 const todayStr = () => new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" })
 const plus = (n: number) => { const d = new Date(todayStr() + "T12:00:00"); d.setDate(d.getDate() + n); return d.toLocaleDateString("en-CA") }
 const stay = (o: any = {}) => ({ id: "s1", vehicleRegistration: "GP 12 AB", driverName: "Sipho", driverPhone: "0821234567", arrivalDate: todayStr(), departureDate: plus(2), actualDepartureDate: null, status: "BOOKED",
-  ratePerNight: 150, nights: 2, amount: 300, note: null, cancelledReason: null, overstaying: false, checkedInAt: null, checkedOutAt: null, ...o })
+  ratePerNight: 150, nights: 2, amount: 300, note: null, cancelledReason: null, overstaying: false, checkedInAt: null, checkedOutAt: null, accountId: null, invoiceState: null, invoiceNumber: null, invoiceError: null, ...o })
 let settingsNow: any
 let capacityNow: any
+let accountsNow: any[] = []
 function mount() { render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><StaysTab /></QueryClientProvider>) }
 
 describe("StaysTab", () => {
   beforeEach(() => {
-    get.mockReset(); post.mockReset(); put.mockReset(); can = true; settingsNow = { nightlyRate: 150, bays: 5 }
+    get.mockReset(); post.mockReset(); put.mockReset(); can = true; accountsNow = [{ id: "a1", customerName: "Acme Haulage", creditHold: false }, { id: "a2", customerName: "Slow Payer", creditHold: true }]; settingsNow = { nightlyRate: 150, bays: 5 }
     capacityNow = { from: todayStr(), bays: 5, overstays: [], nights: [{ date: todayStr(), used: 2, arrivals: 1, departures: 0, free: 3 }, { date: plus(1), used: 5, arrivals: 0, departures: 0, free: 0 }] }
-    get.mockImplementation(async (u: string) => ({ data: { data: u.includes("parking-settings") ? settingsNow : u.includes("occupancy") ? { date: todayStr(), inYard: 2, arrivals: 1, departures: 0, bays: 5, free: 3 } : u.includes("capacity") ? capacityNow : [stay()] } }))
+    get.mockImplementation(async (u: string) => ({ data: { data: u.includes("parking-settings") ? settingsNow : u.includes("customer-accounts") ? accountsNow : u.includes("occupancy") ? { date: todayStr(), inYard: 2, arrivals: 1, departures: 0, bays: 5, free: 3 } : u.includes("capacity") ? capacityNow : [stay()] } }))
     post.mockResolvedValue({ data: { data: {} } }); put.mockResolvedValue({ data: { data: {} } })
   })
   afterEach(cleanup)
@@ -29,7 +30,7 @@ describe("StaysTab", () => {
     mount()
     expect(await screen.findByText("GP 12 AB")).toBeTruthy()
     expect(screen.getByText(/in the yard today/)).toBeTruthy(); expect(screen.getByText(/of 5 bays free/)).toBeTruthy()
-    expect(screen.getByText("2 nights")).toBeTruthy(); expect(screen.getByText(/Nothing is invoiced from here/)).toBeTruthy()
+    expect(screen.getByText("2 nights")).toBeTruthy(); expect(screen.getByText(/draft invoice when it checks out/)).toBeTruthy()
   })
   it("checks in a booked truck that is due", async () => {
     mount()
@@ -91,5 +92,30 @@ describe("StaysTab", () => {
     capacityNow = { ...capacityNow, bays: null, nights: [{ date: todayStr(), used: 1, arrivals: 0, departures: 0, free: null }] }
     mount()
     expect(await screen.findByText(/No bay limit is set, so nothing is capacity-limited/)).toBeTruthy()
+  })
+  it("offers only accounts not on credit hold when booking, and sends the chosen account", async () => {
+    post.mockResolvedValue({ data: { data: stay() } })
+    mount()
+    fireEvent.click(await screen.findByText("Book a stay"))
+    const sel = (await screen.findByLabelText("Charge to")) as HTMLSelectElement
+    expect([...sel.options].map(o => o.text)).toEqual(["Pays at the gate (no invoice)", "Acme Haulage"])
+    fireEvent.change(await screen.findByLabelText(/Truck registration/), { target: { value: "GP 5" } })
+    fireEvent.change(screen.getByLabelText(/Leaves/), { target: { value: plus(2) } })
+    fireEvent.change(sel, { target: { value: "a1" } })
+    fireEvent.click(screen.getByText("Book stay"))
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post.mock.calls[0][1].accountId).toBe("a1")
+  })
+  it("shows who a stay is charged to and its invoice, and lets a failed one be raised again", async () => {
+    get.mockImplementation(async (u: string) => ({ data: { data: u.includes("parking-settings") ? settingsNow : u.includes("customer-accounts") ? accountsNow : u.includes("occupancy") ? { date: todayStr(), inYard: 0, arrivals: 0, departures: 0, bays: null, free: null } : u.includes("capacity") ? capacityNow
+      : [stay({ id: "s2", status: "CHECKED_OUT", actualDepartureDate: plus(1), accountId: "a1", invoiceState: "FAILED", invoiceError: "No series" }), stay({ id: "s3", status: "CHECKED_OUT", vehicleRegistration: "GP 3" })] } }))
+    post.mockResolvedValue({ data: { message: "Draft invoice raised", data: stay() } })
+    mount()
+    expect(await screen.findByText("Acme Haulage")).toBeTruthy()
+    expect(screen.getByText(/Invoice failed: No series/)).toBeTruthy()
+    expect(screen.getByText("Paid at the gate")).toBeTruthy()
+    expect(screen.getAllByText("Raise invoice").length).toBe(1)
+    fireEvent.click(screen.getByText("Raise invoice"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/truck-stop/stays/s2/invoice"))
   })
 })

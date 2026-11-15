@@ -66,6 +66,24 @@ public class FuelTruckStopStay {
     @Column(name = "checked_out_at")
     private Instant checkedOutAt;
 
+    @Column(name = "account_id")
+    private UUID accountId;
+
+    public static final String PENDING = "PENDING", CLAIMED = "CLAIMED", INVOICED = "INVOICED", FAILED = "FAILED", LINK_FAILED = "LINK_FAILED";
+
+    /** Null for a stay paid at the gate. Otherwise PENDING, CLAIMED, INVOICED, FAILED or LINK_FAILED. The invoice columns are changed by guarded updates, not by this entity. */
+    @Column(name = "invoice_state", length = 12, insertable = false, updatable = false)
+    private String invoiceState;
+
+    @Column(name = "invoice_id", insertable = false, updatable = false)
+    private UUID invoiceId;
+
+    @Column(name = "invoice_number", length = 40, insertable = false, updatable = false)
+    private String invoiceNumber;
+
+    @Column(name = "invoice_error", length = 500, insertable = false, updatable = false)
+    private String invoiceError;
+
     @Column(name = "created_by", updatable = false)
     private UUID createdBy;
 
@@ -90,6 +108,12 @@ public class FuelTruckStopStay {
         s.driverName = clean(driverName, 120); s.driverPhone = clean(driverPhone, 40); s.note = clean(note, 300);
         s.arrivalDate = arrival; s.departureDate = departure; s.ratePerNight = ratePerNight; s.createdBy = by;
         return s;
+    }
+
+    /** Charges the stay to a customer account; only while it has not ended. */
+    public void chargeTo(UUID accountId) {
+        requireStatus("change the account of", BOOKED, CHECKED_IN);
+        this.accountId = accountId; this.updatedAt = Instant.now();
     }
 
     private static String clean(String v, int max) { return v == null || v.isBlank() ? null : (v.trim().length() > max ? v.trim().substring(0, max) : v.trim()); }

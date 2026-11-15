@@ -3,14 +3,17 @@ export type StayStatus = "BOOKED" | "CHECKED_IN" | "CHECKED_OUT" | "CANCELLED" |
 export interface Stay {
   id: string; vehicleRegistration: string; driverName: string | null; driverPhone: string | null; arrivalDate: string; departureDate: string; actualDepartureDate: string | null
   status: StayStatus; ratePerNight: number; nights: number; amount: number; note: string | null; cancelledReason: string | null; overstaying: boolean; checkedInAt: string | null; checkedOutAt: string | null
+  accountId?: string | null; invoiceState?: InvoiceState | null; invoiceNumber?: string | null; invoiceError?: string | null
 }
+export type InvoiceState = "PENDING" | "CLAIMED" | "INVOICED" | "FAILED" | "LINK_FAILED"
+export interface StayAccount { id: string; customerName: string; creditHold: boolean }
 export interface ParkingSettings { nightlyRate: number | null; bays: number | null }
 export interface Occupancy { date: string; inYard: number; arrivals: number; departures: number; bays: number | null; free: number | null }
 export interface Night { date: string; used: number; arrivals: number; departures: number; free: number | null }
 export interface Overstay { id: string; vehicleRegistration: string; plannedDeparture: string; daysOver: number }
 export interface Capacity { from: string; bays: number | null; nights: Night[]; overstays: Overstay[] }
-export interface StayForm { vehicleRegistration: string; driverName: string; driverPhone: string; arrivalDate: string; departureDate: string; note: string }
-export const emptyStay = (today: string): StayForm => ({ vehicleRegistration: "", driverName: "", driverPhone: "", arrivalDate: today, departureDate: "", note: "" })
+export interface StayForm { vehicleRegistration: string; driverName: string; driverPhone: string; arrivalDate: string; departureDate: string; note: string; accountId: string }
+export const emptyStay = (today: string): StayForm => ({ vehicleRegistration: "", driverName: "", driverPhone: "", arrivalDate: today, departureDate: "", note: "", accountId: "" })
 
 export const STATUS_LABEL: Record<StayStatus, string> = { BOOKED: "Booked", CHECKED_IN: "In the yard", CHECKED_OUT: "Left", CANCELLED: "Cancelled", NO_SHOW: "No-show" }
 
@@ -52,3 +55,26 @@ export function firstFullNight(c: Capacity): string | null {
   const n = c.nights.find(x => nightState(x, c.bays) === "full")
   return n ? n.date : null
 }
+
+/** Where the money goes: the account the stay is charged to, or paid at the gate. */
+export const chargeText = (s: Stay, accounts: StayAccount[]): string =>
+  s.accountId ? (accounts.find(a => a.id === s.accountId)?.customerName ?? "Customer account") : "Paid at the gate"
+
+/** The invoice line shown under the charge, or null when there is nothing to say (no account, or the stay has not left). */
+export function invoiceText(s: Stay): string | null {
+  if (!s.accountId) return null
+  switch (s.invoiceState) {
+    case "INVOICED": return `Draft invoice ${s.invoiceNumber ?? ""}`.trim()
+    case "CLAIMED": return "Invoice being created"
+    case "PENDING": return "Invoice not raised yet"
+    case "FAILED": return `Invoice failed: ${s.invoiceError ?? "unknown error"}`
+    case "LINK_FAILED": return `Invoice ${s.invoiceNumber ?? ""} was created but not linked here. Do not raise it again.`.replace("  ", " ")
+    default: return s.status === "CHECKED_OUT" ? "Invoice not raised yet" : "Invoiced at check-out"
+  }
+}
+
+/** A left stay whose invoice has not been raised, or failed, can be tried again. A half-finished invoice (LINK_FAILED) never can. */
+export const canRaiseInvoice = (s: Stay): boolean => s.status === "CHECKED_OUT" && !!s.accountId && (s.invoiceState === "PENDING" || s.invoiceState === "FAILED" || !s.invoiceState)
+
+/** Accounts a stay can be charged to: not on credit hold. */
+export const chargeableAccounts = (a: StayAccount[]): StayAccount[] => a.filter(x => !x.creditHold)
